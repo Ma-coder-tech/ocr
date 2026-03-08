@@ -10,8 +10,18 @@ const app = express();
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? "127.0.0.1";
 
-const uploadDir = path.resolve("data/uploads");
-const reportDir = path.resolve("data/reports");
+const isVercel = Boolean(process.env.VERCEL) || Boolean(process.env.VERCEL_ENV);
+const dataRoot = isVercel ? path.join("/tmp", "ocr-data") : path.resolve("data");
+const uploadDir = path.join(dataRoot, "uploads");
+const reportDir = path.join(dataRoot, "reports");
+
+function asyncHandler(
+  fn: (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<void>,
+): express.RequestHandler {
+  return (req, res, next) => {
+    void fn(req, res, next).catch(next);
+  };
+}
 
 const upload = multer({
   dest: uploadDir,
@@ -31,7 +41,7 @@ const upload = multer({
 app.use(express.json());
 app.use(express.static(path.resolve("public")));
 
-app.post("/api/jobs", upload.single("file"), async (req, res) => {
+app.post("/api/jobs", upload.single("file"), asyncHandler(async (req, res) => {
   const file = req.file;
   if (!file) {
     res.status(400).json({ error: "Missing file upload" });
@@ -58,7 +68,7 @@ app.post("/api/jobs", upload.single("file"), async (req, res) => {
   enqueueJob(job.id);
 
   res.status(201).json({ jobId: job.id });
-});
+}));
 
 app.get("/api/jobs/:id", (req, res) => {
   const job = getJob(req.params.id);

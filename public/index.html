@@ -160,10 +160,24 @@
         }
       }
 
+      async function readJsonSafe(res) {
+        const text = await res.text();
+        if (!text) return null;
+        try {
+          return JSON.parse(text);
+        } catch {
+          return null;
+        }
+      }
+
       async function pollJob(jobId) {
         const res = await fetch(`/api/jobs/${jobId}`);
-        if (!res.ok) throw new Error("Could not fetch job status");
-        const job = await res.json();
+        const payload = await readJsonSafe(res);
+        if (!res.ok) {
+          throw new Error(payload?.error || `Could not fetch job status (${res.status})`);
+        }
+        const job = payload;
+        if (!job) throw new Error("Server returned an empty response while checking job status.");
 
         statusLabel.textContent = `${job.status.replaceAll("_", " ")} (${job.progress}%)`;
         if (stageOrder.includes(job.status)) {
@@ -209,8 +223,9 @@
 
         try {
           const res = await fetch("/api/jobs", { method: "POST", body });
-          const payload = await res.json();
-          if (!res.ok) throw new Error(payload.error || "Upload failed");
+          const payload = await readJsonSafe(res);
+          if (!res.ok) throw new Error(payload?.error || `Upload failed (${res.status})`);
+          if (!payload?.jobId) throw new Error("Server returned an invalid response for job creation.");
 
           let done = false;
           while (!done) {
@@ -220,7 +235,7 @@
             }
           }
         } catch (err) {
-          error.textContent = err.message || "Something went wrong.";
+          error.textContent = err?.message || "Something went wrong.";
           analyzeBtn.disabled = false;
         }
       });
