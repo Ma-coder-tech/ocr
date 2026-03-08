@@ -62,7 +62,8 @@ async function processJob(jobId: string): Promise<void> {
     summary = await maybeRunAiRefinement(summary);
 
     stageUpdate(jobId, "generating_report", 90, "Generating your report");
-    const reportPath = await buildReportPdf(path.resolve("data/reports"), jobId, summary);
+    const reportDir = process.env.VERCEL ? path.join("/tmp", "ocr-data", "reports") : path.resolve("data/reports");
+    const reportPath = await buildReportPdf(reportDir, jobId, summary);
 
     updateJob(
       jobId,
