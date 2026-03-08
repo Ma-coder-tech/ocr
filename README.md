@@ -67,4 +67,5 @@ cp .env.example .env
 - Anthropic refinement is enabled only when `ANTHROPIC_API_KEY` is set.
 - Default model is `claude-opus-4-6` (override with `ANTHROPIC_MODEL`).
 - Current storage and job state are local/in-memory; restarting the server resets job state.
+- On Vercel, runtime temp files are written under `/tmp/ocr-data`.
 - This MVP is designed as a low-cost base that can be extended with OCR workers, persistent queue/db, auth, and billing.
