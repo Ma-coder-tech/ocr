@@ -6,7 +6,7 @@ import fs from "node:fs/promises";
 import { createJob, getJob, listEvents } from "./store.js";
 import { enqueueJob } from "./worker.js";
 
-const app = express();
+export const app = express();
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? "127.0.0.1";
 
@@ -133,10 +133,12 @@ async function start(): Promise<void> {
   });
 }
 
-start().catch((error) => {
-  console.error("[startup-error]", error);
-  process.exit(1);
-});
+if (!process.env.VERCEL) {
+  start().catch((error) => {
+    console.error("[startup-error]", error);
+    process.exit(1);
+  });
+}
 
 process.on("uncaughtException", (error) => {
   console.error("[uncaughtException]", error);
@@ -145,3 +147,5 @@ process.on("uncaughtException", (error) => {
 process.on("unhandledRejection", (reason) => {
   console.error("[unhandledRejection]", reason);
 });
+
+export default app;
