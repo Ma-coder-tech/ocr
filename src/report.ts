@@ -194,6 +194,7 @@ export async function buildReportPdf(outputDir: string, jobId: string, summary: 
   }
 
   const bytes = await pdf.save();
+  await fs.mkdir(outputDir, { recursive: true });
   const reportPath = path.join(outputDir, `${jobId}.pdf`);
   await fs.writeFile(reportPath, bytes);
   return reportPath;
