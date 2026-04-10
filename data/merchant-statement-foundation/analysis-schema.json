@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "merchant-statement-foundation/analysis-schema.json",
+  "title": "Merchant Statement Analysis Extraction Schema",
+  "type": "object",
+  "required": [
+    "meta",
+    "elements",
+    "coverage_report",
+    "dedup_notes"
+  ],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "source_document",
+        "output_style",
+        "scope",
+        "granularity",
+        "coverage"
+      ],
+      "properties": {
+        "schema_version": { "type": "string" },
+        "source_document": { "type": "string" },
+        "output_style": { "type": "string" },
+        "scope": { "type": "string" },
+        "granularity": { "type": "string" },
+        "coverage": { "type": "string" },
+        "extraction_method": {
+          "type": "object",
+          "required": ["pass_1", "pass_2"],
+          "properties": {
+            "pass_1": { "type": "string" },
+            "pass_2": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "elements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/analysisElement"
+      }
+    },
+    "coverage_report": {
+      "type": "object",
+      "required": ["source_sections", "coverage_checks", "unmapped_items"],
+      "properties": {
+        "source_sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["section_id", "section_title", "summary", "mapped_element_ids"],
+            "properties": {
+              "section_id": { "type": "string" },
+              "section_title": { "type": "string" },
+              "summary": { "type": "string" },
+              "mapped_element_ids": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "coverage_checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["check_name", "status", "notes"],
+            "properties": {
+              "check_name": { "type": "string" },
+              "status": { "type": "string", "enum": ["pass", "warning", "fail"] },
+              "notes": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "unmapped_items": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "dedup_notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["normalized_into", "merged_from", "rationale"],
+        "properties": {
+          "normalized_into": { "type": "string" },
+          "merged_from": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "rationale": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "analysisElement": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "category",
+        "description",
+        "required_inputs",
+        "rule_or_threshold",
+        "calculation",
+        "trigger_condition",
+        "recommended_action",
+        "source_type",
+        "source_trace"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": {
+          "type": "string",
+          "enum": [
+            "core_economics_and_formulas",
+            "statement_structure_and_reading_sequence",
+            "fee_classes",
+            "red_flags_and_unnecessary_fees",
+            "data_quality_and_downgrade_signals",
+            "compliance_and_legal_constraints",
+            "cost_optimization_levers",
+            "ongoing_monitoring_and_review_cadence",
+            "surcharging_and_cash_discount_policy_checks",
+            "decisioning_guidance"
+          ]
+        },
+        "description": { "type": "string" },
+        "required_inputs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rule_or_threshold": {
+          "type": ["string", "null"]
+        },
+        "calculation": {
+          "type": ["string", "null"]
+        },
+        "trigger_condition": {
+          "type": ["string", "null"]
+        },
+        "recommended_action": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "source_type": {
+          "type": "string",
+          "enum": ["explicit", "inferred"]
+        },
+        "source_trace": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

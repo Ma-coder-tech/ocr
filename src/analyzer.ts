@@ -51,12 +51,19 @@ function includesAny(input: string, terms: string[]): boolean {
 
 function inferProcessor(text: string): string {
   const v = text.toLowerCase();
+  if (v.includes("paysafe")) return "Paysafe";
+  if (v.includes("worldpay")) return "Worldpay";
+  if (v.includes("payarc")) return "Payarc";
+  if (v.includes("heartland") || v.includes("hps processing fee")) return "Heartland";
+  if (v.includes("tsys")) return "TSYS";
+  if (v.includes("clearent")) return "Clearent";
   if (v.includes("stripe")) return "Stripe";
   if (v.includes("square")) return "Square";
   if (v.includes("paypal")) return "PayPal";
   if (v.includes("adyen")) return "Adyen";
   if (v.includes("fiserv") || v.includes("first data") || v.includes("clover")) return "Fiserv/Clover";
   if (v.includes("elavon")) return "Elavon";
+  if (v.includes("global payments")) return "Global Payments";
   return "Unknown";
 }
 
@@ -159,8 +166,93 @@ function inferPeriod(row: Record<string, string | number>, periodKeys: string[])
   return null;
 }
 
+function createTextOnlyPdfSummary(doc: ParsedDocument, processorName: string): AnalysisSummary {
+  const benchmarkBase = benchmarkForProcessor(processorName);
+  const benchmark: BenchmarkResult = {
+    ...benchmarkBase,
+    status: "within",
+    deltaFromUpperRate: 0,
+  };
+
+  const textWarnings = doc.extraction.reasons.map((message): DataQualitySignal => ({ level: "warning", message }));
+  const dataQuality: DataQualitySignal[] = [
+    {
+      level: "critical",
+      message:
+        "PDF preflight quality gate blocked numeric extraction. The tool is running text-only analysis to avoid misleading fee/volume outputs.",
+    },
+    ...textWarnings,
+  ];
+
+  const insights: FeeInsight[] = [
+    {
+      title: "Text-only PDF analysis",
+      detail: "This file did not pass structured numeric extraction. Use this output for qualitative review only.",
+      impactUsd: 0,
+    },
+  ];
+
+  if (processorName !== "Unknown") {
+    insights.push({
+      title: "Processor hint detected",
+      detail: `The extracted text suggests processor family '${processorName}'. Processor-specific rules can still be partially evaluated.`,
+      impactUsd: 0,
+    });
+  } else {
+    insights.push({
+      title: "Processor not confidently detected",
+      detail: "No strong processor signature was found in extracted text. Universal checklist rules should be prioritized.",
+      impactUsd: 0,
+    });
+  }
+
+  return {
+    processorName,
+    sourceType: doc.sourceType,
+    statementPeriod: "Not reliably extractable from current PDF text layer",
+    executiveSummary:
+      "The uploaded PDF could not be parsed into structured numeric tables. To avoid inaccurate conclusions, numeric fee metrics are withheld and only qualitative checks are returned.",
+    totalVolume: 0,
+    totalFees: 0,
+    effectiveRate: 0,
+    estimatedMonthlyVolume: 0,
+    estimatedMonthlyFees: 0,
+    estimatedAnnualFees: 0,
+    estimatedAnnualSavings: 0,
+    benchmark,
+    kpis: [
+      { label: "Effective Rate", value: "N/A", note: "Structured numeric extraction unavailable for this PDF." },
+      { label: "Estimated Monthly Fees", value: "N/A", note: "Fee totals withheld to avoid misleading math." },
+      { label: "Top Fee Concentration", value: "N/A", note: "Line-item fee breakdown could not be normalized." },
+      { label: "Potential Annual Savings", value: "N/A", note: "Requires structured fee and volume fields." },
+    ],
+    feeBreakdown: [],
+    suspiciousFees: [],
+    savingsOpportunities: [],
+    negotiationChecklist: [
+      "Request CSV export (or machine-readable statement export) for accurate fee decomposition.",
+      "If only PDF is available, provide a searchable/native PDF instead of image-only scans.",
+      "Ask processor for a detailed fee schedule with interchange, markup, and per-item components separated.",
+    ],
+    actionPlan: [
+      "Step 1: Obtain structured statement data (CSV preferred).",
+      "Step 2: Re-run analysis with universal + processor-specific rule packs.",
+      "Step 3: Validate high-impact fee findings against statement line-item evidence.",
+    ],
+    trend: [],
+    dataQuality,
+    dynamicFields: [],
+    insights,
+    confidence: processorName === "Unknown" ? "low" : "medium",
+  };
+}
+
 export function analyzeDocument(doc: ParsedDocument): AnalysisSummary {
   const processorName = inferProcessor(`${doc.headers.join(" ")} ${doc.textPreview}`);
+  if (doc.sourceType === "pdf" && doc.extraction.mode !== "structured") {
+    return createTextOnlyPdfSummary(doc, processorName);
+  }
+
   const feeBuckets = new Map<string, number>();
   const numericColumns = new Set<string>();
   const columnStats = new Map<string, ColumnStats>();
@@ -231,7 +323,7 @@ export function analyzeDocument(doc: ParsedDocument): AnalysisSummary {
     }
   }
 
-  if (doc.sourceType === "pdf" && totalFeesRaw <= 0) {
+  if (doc.sourceType === "pdf" && doc.extraction.mode === "structured" && totalFeesRaw <= 0) {
     const txt = doc.textPreview.toLowerCase();
     const roughFees = (txt.match(/fee|charge|commission|markup|assessment/g) ?? []).length;
     totalFeesRaw += roughFees * 0.4;

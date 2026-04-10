@@ -1,0 +1,134 @@
+{
+  "meta": {
+    "schema_version": "1.0.0",
+    "artifact": "processor_grouped_checklist",
+    "source_document": "/Users/martialmahougnonamoussou/Downloads/How to analyze a merchant statement.docx",
+    "generated_from": "/Users/martialmahougnonamoussou/Documents/OCR/data/merchant-statement-foundation/processor-grouped-checklist.md",
+    "purpose": "Machine-readable processor-specific analysis checks for statement parsing, rule evaluation, and recommendation generation"
+  },
+  "processors": [
+    {
+      "processor_id": "heartland",
+      "name": "Heartland Payment Systems",
+      "family": "Global Payments",
+      "statement_model": "interchange_plus",
+      "checks": [
+        "Verify analyzed month is representative using monthly sales graph before quoting savings",
+        "Capture interchange detail by card brand: txn count, volume, rate, per-item fee, total paid",
+        "Extract processor markup from HPS processing fee lines by brand and normalize to basis points",
+        "Flag unjustified AmEx markup premium versus other brands",
+        "Flag over-market markup (source guidance: above ~70 bps)",
+        "Detect monthly-vs-daily discount handling add-on and quantify bps impact (example: +5 bps)",
+        "Detect non-EMV trigger threshold (example: >10% non-EMV share)",
+        "Detect non-EMV fixed monthly fee (example: $25)",
+        "Detect non-EMV additional percentage markup on non-EMV/card-not-present volume (example: +1%)",
+        "Detect recurring Customer Intelligence Suite fee, verify usage, and flag auto-trial conversion risk",
+        "Run month-over-month new-fee appearance detection"
+      ]
+    },
+    {
+      "processor_id": "tsys",
+      "name": "TSYS",
+      "family": "Global Payments",
+      "statement_model": "interchange_plus_blended_presentation",
+      "checks": [
+        "Capture card-type sales summary, credits, and total sales",
+        "Parse daily batch totals",
+        "Split blended rows where top number is processor markup and bottom number is interchange",
+        "Normalize blended rows into distinct interchange and processor components",
+        "Confirm pricing remains true interchange-plus/cost-plus after unbundling",
+        "Compare normalized markup and per-item economics against benchmark outputs"
+      ]
+    },
+    {
+      "processor_id": "fiserv_first_data_interchange_plus",
+      "name": "Fiserv / First Data (Interchange-Plus)",
+      "family": "Fiserv",
+      "statement_model": "interchange_plus",
+      "checks": [
+        "Scan fine print for explicit repricing notices and effective dates",
+        "Capture acceptance-by-use language in terms notices",
+        "Parse daily batch summary and fee sections",
+        "Identify processor markup lines (for example service charge labels) and normalize notation (0.008 => 0.80% => 80 bps)",
+        "Flag unjustified debit-vs-credit markup differences",
+        "Detect downgrade indicators (for example non-qualified, EIRF descriptors)",
+        "Estimate downgrade penalty impact (source guidance: ~0.3% to 0.4% extra)",
+        "Detect commercial card interchange savings adjustment fee",
+        "Quantify processor-retained savings share (example: 75%)",
+        "Flag hidden/opaque repricing risk"
+      ]
+    },
+    {
+      "processor_id": "fiserv_first_data_bundled",
+      "name": "Fiserv / First Data (Bundled)",
+      "family": "Fiserv",
+      "statement_model": "bundled_qualified_tiered",
+      "checks": [
+        "Detect bundled model using qualified/mid-qualified/non-qualified bucket presentation",
+        "Capture bucket rates and bucket-level volume/fee distribution",
+        "Flag processor-controlled bucket assignment risk",
+        "Flag over-market bundle rates (examples discussed: 4.09% mid-qualified and ~5% non-qualified)",
+        "Classify bundled pricing as high overpayment risk versus interchange-plus in most cases",
+        "Recommend interchange-plus conversion analysis"
+      ]
+    },
+    {
+      "processor_id": "clearent",
+      "name": "Clearent",
+      "family": "Clearent",
+      "statement_model": "interchange_plus",
+      "checks": [
+        "Extract assessment markup (example: 64 bps) and per-item charge",
+        "Detect Express Merchant Funding premium (example: +5 bps)",
+        "Detect monthly minimum required markup amount (example: $25)",
+        "Detect actual markup paid in period",
+        "Detect top-up difference charged when markup is below monthly minimum",
+        "Flag monthly minimum risk for lower-volume merchants (source note: common under roughly $55k/month)",
+        "Detect PCI non-compliance fee and trigger remediation workflow",
+        "Track PCI completion requirements (SAQ, vulnerability scans, recert cycle reminders)"
+      ]
+    },
+    {
+      "processor_id": "worldpay",
+      "name": "Worldpay",
+      "family": "Worldpay",
+      "statement_model": "interchange_plus_with_split_item_fees",
+      "checks": [
+        "Extract basis-point markup by brand (source example shown: 86 bps)",
+        "Extract per-item transaction fee",
+        "Extract separate authorization fee",
+        "Combine transaction and authorization fees into true all-in per-item cost",
+        "Flag high all-in per-item burden (source context discusses >$0.40 as problematic in many cases)",
+        "Prioritize per-item optimization for low average-ticket merchants (source note: under ~$50 ticket size)",
+        "Detect monthly minimum language and assess effective-rate distortion"
+      ]
+    },
+    {
+      "processor_id": "elavon",
+      "name": "Elavon",
+      "family": "Elavon",
+      "statement_model": "interchange_plus_with_notice_dependent_changes",
+      "checks": [
+        "Parse sales/deposits summary and daily batch totals",
+        "Scan notices for billing changes including online-only disclosures",
+        "Extract basis-point markup and per-item transaction fee",
+        "Detect additional authorization fee section",
+        "Combine per-item transaction and authorization fees to true all-in per-item total (source warning: displayed 10 cents can effectively become ~20 cents)",
+        "Flag transparency risk when fee changes are not clearly disclosed on-statement"
+      ]
+    }
+  ],
+  "cross_processor_checks": [
+    "Compute net effective rate as total fees divided by total sales",
+    "Split all fees into card-brand costs versus processor-owned costs",
+    "Benchmark card-brand share and processor share against expected ranges from source context",
+    "Detect and classify unnecessary fees: non-EMV overlays, risk fees, unused intelligence suites, daily/monthly discount handling add-ons, avoidable PCI non-compliance charges",
+    "Detect hidden markup embedded inside interchange presentation",
+    "Detect month-over-month fee drift and newly introduced recurring fees",
+    "Enforce surcharge cap from source guidance (max 3%)",
+    "Enforce debit exclusion from surcharging",
+    "Enforce uniform surcharge rule across eligible credit transactions",
+    "Require robust debit identification controls (prefer BIN automation over manual-only handling)",
+    "Trigger full review cadence at least every 6 to 12 months"
+  ]
+}

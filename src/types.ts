@@ -76,6 +76,45 @@ export type DataQualitySignal = {
   message: string;
 };
 
+export type RuleStatus = "pass" | "fail" | "warning" | "unknown" | "not_applicable";
+
+export type ChecklistRuleResult = {
+  id: string;
+  title: string;
+  status: RuleStatus;
+  reason: string;
+  evidence: string[];
+};
+
+export type ChecklistBucket = {
+  total: number;
+  pass: number;
+  fail: number;
+  warning: number;
+  unknown: number;
+  notApplicable: number;
+  results: ChecklistRuleResult[];
+};
+
+export type ChecklistReport = {
+  extractionMode: "structured" | "text_only" | "unusable";
+  extractionQualityScore: number;
+  extractionReasons: string[];
+  processorDetection: {
+    detectedProcessorId: string | null;
+    detectedProcessorName: string | null;
+    confidence: number;
+    matchedKeywords: string[];
+  };
+  universal: ChecklistBucket;
+  processorSpecific: ChecklistBucket & {
+    processorId: string | null;
+    processorName: string | null;
+    skippedReason?: string;
+  };
+  crossProcessor: ChecklistBucket;
+};
+
 export type AnalysisSummary = {
   processorName: string;
   sourceType: "csv" | "pdf";
@@ -100,6 +139,7 @@ export type AnalysisSummary = {
   dynamicFields: DynamicField[];
   insights: FeeInsight[];
   confidence: "high" | "medium" | "low";
+  checklistReport?: ChecklistReport;
 };
 
 export type Job = {
@@ -113,6 +153,5 @@ export type Job = {
   progress: number;
   events: JobEvent[];
   error?: string;
-  reportPath?: string;
   summary?: AnalysisSummary;
 };

@@ -1,6 +1,6 @@
 # Merchant Fee Analyzer (V1 MVP)
 
-Simple upload-and-analyze tool for merchant statements (`CSV` or `PDF`) with progress tracking and downloadable PDF report.
+Simple upload-and-analyze tool for merchant statements (`CSV` or `PDF`) with progress tracking and a live browser report.
 
 ## What is implemented
 
@@ -13,8 +13,8 @@ Simple upload-and-analyze tool for merchant statements (`CSV` or `PDF`) with pro
   - `generating_report`
 - Deterministic parser + fee estimation pipeline
 - Dynamic field capture for unknown numeric columns
-- PDF report generation
-- Frontend with progress animation + download button
+- Live report page for merchant-friendly results
+- Frontend that routes uploads directly into the report view
 
 ## Project structure
 
@@ -22,9 +22,9 @@ Simple upload-and-analyze tool for merchant statements (`CSV` or `PDF`) with pro
 - `src/worker.ts`: queue + processing pipeline
 - `src/parser.ts`: CSV/PDF parsing
 - `src/analyzer.ts`: classification + fee calculation + insights
-- `src/report.ts`: PDF report generation
 - `src/store.ts`: in-memory job/event store
-- `public/index.html`: upload/progress/download UI
+- `public/index.html`: upload entry page
+- `public/report.html`: live report page
 
 ## Run locally
 
@@ -59,7 +59,7 @@ cp .env.example .env
 - `POST /api/jobs` (multipart with field `file`)
 - `GET /api/jobs/:id`
 - `GET /api/jobs/:id/events`
-- `GET /api/jobs/:id/download`
+- `GET /report/:id`
 - `GET /health`
 
 ## Notes

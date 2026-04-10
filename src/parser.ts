@@ -6,6 +6,18 @@ export type ParsedDocument = {
   headers: string[];
   rows: Array<Record<string, string | number>>;
   textPreview: string;
+  extraction: ExtractionDiagnostics;
+};
+
+export type ExtractionMode = "structured" | "text_only" | "unusable";
+
+export type ExtractionDiagnostics = {
+  mode: ExtractionMode;
+  qualityScore: number;
+  reasons: string[];
+  lineCount: number;
+  amountTokenCount: number;
+  hasExtractableText: boolean;
 };
 
 function isLikelyHeaderCell(value: string): boolean {
@@ -45,7 +57,8 @@ function detectCsvLayout(raw: string): { delimiter: string; headerRowIndex: numb
       const nonEmpty = row.filter((cell) => String(cell).trim().length > 0);
       const headerLike = nonEmpty.filter((cell) => isLikelyHeaderCell(String(cell))).length;
       const score = nonEmpty.length * 2 + headerLike * 6;
-      if (score > best.score && nonEmpty.length >= 4) {
+      // Allow narrow statements (2-3 columns) while still preferring header-like rows.
+      if (score > best.score && nonEmpty.length >= 2 && (headerLike > 0 || i === 0)) {
         best = { delimiter, headerRowIndex: i, score };
       }
     }
@@ -70,6 +83,14 @@ function safeNum(input: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function isRateLikeField(key: string, rawValue: string): boolean {
+  const k = key.toLowerCase();
+  if (k.includes("rate") || k.includes("pct") || k.includes("percent") || k.includes("bps") || k.includes("basis")) {
+    return true;
+  }
+  return rawValue.includes("%");
+}
+
 export async function parseCsv(filePath: string): Promise<ParsedDocument> {
   const raw = await fs.readFile(filePath, "utf8");
   const { delimiter, headerRowIndex } = detectCsvLayout(raw);
@@ -88,6 +109,11 @@ export async function parseCsv(filePath: string): Promise<ParsedDocument> {
     const normalized: Record<string, string | number> = {};
     for (const [key, value] of Object.entries(row)) {
       if (!key.trim()) continue;
+      if (typeof value === "string" && isRateLikeField(key, value)) {
+        // Preserve rate semantics as text so analyzers do not confuse percentages with amount fields.
+        normalized[key] = value.trim();
+        continue;
+      }
       const n = safeNum(value);
       normalized[key] = n ?? value;
     }
@@ -99,6 +125,14 @@ export async function parseCsv(filePath: string): Promise<ParsedDocument> {
     headers,
     rows,
     textPreview: JSON.stringify(rows.slice(0, 3)).slice(0, 1200),
+    extraction: {
+      mode: "structured",
+      qualityScore: rows.length > 0 ? 1 : 0.6,
+      reasons: rows.length > 0 ? [] : ["CSV parsed but no data rows were found after header detection."],
+      lineCount: rows.length,
+      amountTokenCount: JSON.stringify(rows).match(/\$?\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g)?.length ?? 0,
+      hasExtractableText: rows.length > 0,
+    },
   };
 }
 
@@ -113,15 +147,45 @@ export async function parsePdf(filePath: string): Promise<ParsedDocument> {
     .filter(Boolean)
     .slice(0, 1200);
 
-  const rows = lines.map((line: string, index: number) => ({
-    line_number: index + 1,
+  const rows = lines.map((line: string) => ({
     content: line,
   }));
 
+  const hasExtractableText = lines.length > 0;
+  const text = lines.join(" ");
+  const amountTokenCount = text.match(/\$?\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g)?.length ?? 0;
+  const feeSignals = (text.match(/fee|charge|discount|assessment|markup|interchange|statement/gi) ?? []).length;
+
+  const mode: ExtractionMode = hasExtractableText ? "text_only" : "unusable";
+  const reasons: string[] = [];
+  if (!hasExtractableText) {
+    reasons.push("No extractable text was found in this PDF (likely image-only/scanned).");
+  } else {
+    reasons.push("PDF was parsed as text lines only; structured table extraction is not available yet.");
+    if (amountTokenCount < 10) {
+      reasons.push("Very few numeric amount tokens were found in extracted text.");
+    }
+    if (feeSignals < 2) {
+      reasons.push("Very few fee-related terms were found in extracted text.");
+    }
+  }
+
+  const qualityScore = !hasExtractableText
+    ? 0
+    : Math.min(0.45, 0.15 + Math.min(0.2, amountTokenCount / 200) + Math.min(0.1, feeSignals / 40));
+
   return {
     sourceType: "pdf",
-    headers: ["line_number", "content"],
+    headers: ["content"],
     rows,
-    textPreview: lines.join(" ").slice(0, 1500),
+    textPreview: text.slice(0, 1500),
+    extraction: {
+      mode,
+      qualityScore,
+      reasons,
+      lineCount: lines.length,
+      amountTokenCount,
+      hasExtractableText,
+    },
   };
 }

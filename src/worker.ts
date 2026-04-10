@@ -1,9 +1,8 @@
 import { setTimeout as delay } from "node:timers/promises";
-import path from "node:path";
 import { analyzeDocument } from "./analyzer.js";
-import { maybeRunAiRefinement } from "./aiFallback.js";
+import { evaluateChecklistReport } from "./checklistEngine.js";
 import { parseCsv, parsePdf } from "./parser.js";
-import { buildReportPdf } from "./report.js";
+import { refineTextOnlyPdfSummary } from "./pdfHeuristic.js";
 import { failJob, getJob, stageUpdate, updateJob } from "./store.js";
 
 const queue: string[] = [];
@@ -42,12 +41,33 @@ async function processJob(jobId: string): Promise<void> {
       fileType: job.fileType,
       headers: parsed.headers.slice(0, 8),
       rowCount: parsed.rows.length,
+      extractionMode: parsed.extraction.mode,
+      extractionQualityScore: parsed.extraction.qualityScore,
     });
+
+    if (job.fileType === "pdf" && parsed.extraction.mode === "unusable") {
+      failJob(
+        jobId,
+        "PDF preflight failed: no extractable text was found (likely scanned/image-only). Upload a searchable PDF or CSV export.",
+      );
+      return;
+    }
 
     stageUpdate(jobId, "classifying", 38, "Classifying your data");
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
     let summary = analyzeDocument(parsed);
+    if (job.fileType === "pdf" && parsed.extraction.mode === "text_only") {
+      const recoveredSummary = refineTextOnlyPdfSummary(parsed, summary);
+      if (recoveredSummary) {
+        summary = recoveredSummary;
+        console.log(`[job:${jobId}] pdf-text-recovery`, {
+          totalVolume: summary.totalVolume,
+          totalFees: summary.totalFees,
+          effectiveRate: summary.effectiveRate,
+        });
+      }
+    }
     console.log(`[job:${jobId}] deterministic-summary`, {
       processor: summary.processorName,
       totalVolume: summary.totalVolume,
@@ -59,24 +79,80 @@ async function processJob(jobId: string): Promise<void> {
     stageUpdate(jobId, "calculating", 68, "Calculating fees and hidden costs");
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
-    summary = await maybeRunAiRefinement(summary);
+    summary = await runAiRefinement(summary);
+    try {
+      const checklistReport = await evaluateChecklistReport(parsed, summary);
+      summary = { ...summary, checklistReport };
+      console.log(`[job:${jobId}] checklist-report`, {
+        universal: {
+          total: checklistReport.universal.total,
+          fail: checklistReport.universal.fail,
+          warning: checklistReport.universal.warning,
+        },
+        processorSpecific: {
+          processor: checklistReport.processorSpecific.processorName,
+          total: checklistReport.processorSpecific.total,
+          fail: checklistReport.processorSpecific.fail,
+          warning: checklistReport.processorSpecific.warning,
+        },
+        crossProcessor: {
+          total: checklistReport.crossProcessor.total,
+          fail: checklistReport.crossProcessor.fail,
+          warning: checklistReport.crossProcessor.warning,
+        },
+      });
+    } catch (error) {
+      console.error(`[job:${jobId}] checklist-report-skip`, error instanceof Error ? error.message : error);
+      summary = {
+        ...summary,
+        dataQuality: [
+          ...summary.dataQuality,
+          {
+            level: "warning",
+            message:
+              "Universal/processor checklist evaluation could not be completed due to a rule-pack loading issue.",
+          },
+        ],
+      };
+    }
 
-    stageUpdate(jobId, "generating_report", 90, "Generating your report");
-    const reportDir = process.env.VERCEL ? path.join("/tmp", "ocr-data", "reports") : path.resolve("data/reports");
-    const reportPath = await buildReportPdf(reportDir, jobId, summary);
+    stageUpdate(jobId, "generating_report", 90, "Preparing your report");
+    if (stageDelayMs > 0) await delay(stageDelayMs);
 
     updateJob(
       jobId,
       {
         status: "completed",
         progress: 100,
-        reportPath,
         summary,
       },
-      "Report ready for download",
+      "Report ready",
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown processing error";
     failJob(jobId, message);
+  }
+}
+
+async function runAiRefinement(summary: Awaited<ReturnType<typeof analyzeDocument>>) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return summary;
+  }
+
+  const importTimeoutMs = Number(process.env.AI_IMPORT_TIMEOUT_MS ?? 4000);
+
+  try {
+    const modulePromise = import("./aiFallback.js");
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`AI refinement module import timed out after ${importTimeoutMs}ms`));
+      }, importTimeoutMs);
+    });
+
+    const module = (await Promise.race([modulePromise, timeoutPromise])) as typeof import("./aiFallback.js");
+    return await module.maybeRunAiRefinement(summary);
+  } catch (error) {
+    console.error("[ai-refinement-skip]", error instanceof Error ? error.message : error);
+    return summary;
   }
 }

@@ -107,7 +107,7 @@
   <body>
     <main class="card">
       <h1>Merchant Fee Analyzer</h1>
-      <p>Upload a processor statement (CSV or PDF). We analyze fees and generate your summary report.</p>
+      <p>Upload a processor statement (CSV or PDF). We analyze the file and open a live merchant report in your browser.</p>
 
       <form id="uploadForm" class="upload-row">
         <input id="fileInput" type="file" accept=".csv,.pdf" required />
@@ -115,24 +115,14 @@
       </form>
 
       <section class="status" id="statusBlock" style="display:none;">
-        <strong id="statusLabel">Queued...</strong>
+        <strong id="statusLabel">Uploading your statement...</strong>
         <div class="bar"><span id="progressBar"></span></div>
         <div class="steps">
-          <div id="step-analyzing" class="step">1. Analyzing your data</div>
-          <div id="step-classifying" class="step">2. Classifying your data</div>
-          <div id="step-calculating" class="step">3. Calculating fees and hidden costs</div>
-          <div id="step-generating_report" class="step">4. Generating your report</div>
+          <div class="step active">1. Uploading your file</div>
+          <div class="step">2. Opening report workspace</div>
+          <div class="step">3. Analysis continues on the report page</div>
         </div>
       </section>
-
-      <div id="result" class="result">
-        <strong>Your report is ready.</strong>
-        <div style="margin-top:10px;">
-          <a id="downloadLink" href="#" target="_blank" rel="noopener">
-            <button type="button">Download PDF</button>
-          </a>
-        </div>
-      </div>
 
       <div id="error" class="error"></div>
     </main>
@@ -144,21 +134,7 @@
       const statusBlock = document.getElementById("statusBlock");
       const statusLabel = document.getElementById("statusLabel");
       const progressBar = document.getElementById("progressBar");
-      const result = document.getElementById("result");
-      const downloadLink = document.getElementById("downloadLink");
       const error = document.getElementById("error");
-
-      const stageOrder = ["analyzing", "classifying", "calculating", "generating_report"];
-
-      function setStage(stage, progress) {
-        progressBar.style.width = `${progress}%`;
-        for (const name of stageOrder) {
-          const node = document.getElementById(`step-${name}`);
-          node.classList.remove("active", "done");
-          if (name === stage) node.classList.add("active");
-          if (stageOrder.indexOf(name) < stageOrder.indexOf(stage)) node.classList.add("done");
-        }
-      }
 
       async function readJsonSafe(res) {
         const text = await res.text();
@@ -170,45 +146,12 @@
         }
       }
 
-      async function pollJob(jobId) {
-        const res = await fetch(`/api/jobs/${jobId}`);
-        const payload = await readJsonSafe(res);
-        if (!res.ok) {
-          throw new Error(payload?.error || `Could not fetch job status (${res.status})`);
-        }
-        const job = payload;
-        if (!job) throw new Error("Server returned an empty response while checking job status.");
-
-        statusLabel.textContent = `${job.status.replaceAll("_", " ")} (${job.progress}%)`;
-        if (stageOrder.includes(job.status)) {
-          setStage(job.status, job.progress);
-        }
-        if (job.status === "completed") {
-          progressBar.style.width = "100%";
-          for (const name of stageOrder) {
-            const node = document.getElementById(`step-${name}`);
-            node.classList.remove("active");
-            node.classList.add("done");
-          }
-          downloadLink.href = `/api/jobs/${jobId}/download`;
-          result.style.display = "block";
-          analyzeBtn.disabled = false;
-          return true;
-        }
-        if (job.status === "failed") {
-          error.textContent = job.error || "Job failed.";
-          analyzeBtn.disabled = false;
-          return true;
-        }
-        return false;
-      }
-
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
         error.textContent = "";
-        result.style.display = "none";
         statusBlock.style.display = "block";
-        progressBar.style.width = "0%";
+        progressBar.style.width = "35%";
+        statusLabel.textContent = "Uploading your statement...";
         analyzeBtn.disabled = true;
 
         const file = fileInput.files?.[0];
@@ -226,14 +169,9 @@
           const payload = await readJsonSafe(res);
           if (!res.ok) throw new Error(payload?.error || `Upload failed (${res.status})`);
           if (!payload?.jobId) throw new Error("Server returned an invalid response for job creation.");
-
-          let done = false;
-          while (!done) {
-            done = await pollJob(payload.jobId);
-            if (!done) {
-              await new Promise((r) => setTimeout(r, 1000));
-            }
-          }
+          progressBar.style.width = "100%";
+          statusLabel.textContent = "Opening your live report...";
+          window.location.href = `/report/${payload.jobId}`;
         } catch (err) {
           error.textContent = err?.message || "Something went wrong.";
           analyzeBtn.disabled = false;

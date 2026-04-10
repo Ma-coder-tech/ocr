@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "validate:foundation": "node scripts/validate-merchant-foundation.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
