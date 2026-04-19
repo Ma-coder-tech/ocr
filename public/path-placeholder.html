@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Next step</title>
+    <link rel="stylesheet" href="/dashboard.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header id="topbar" class="topbar"></header>
+      <section id="page" class="panel placeholder-panel">Loading your next step…</section>
+    </main>
+
+    <script type="module">
+      import { attachDevResetHandler, clearPendingStatementJobId, escapeHtml, fetchJson, merchantBadgeMarkup } from "/dashboard.js";
+
+      const topbar = document.getElementById("topbar");
+      const page = document.getElementById("page");
+      const path = new URLSearchParams(window.location.search).get("path") || "";
+
+      function topbarMarkup(merchant) {
+        return `
+          <a class="logo" href="/dashboard/report" aria-label="FeeClear">
+            <span class="logo-mark">F</span>
+            <span class="logo-copy">
+              <span class="logo-kicker">Merchant statement analysis</span>
+              <span class="logo-name">FeeClear</span>
+            </span>
+          </a>
+          ${merchantBadgeMarkup(merchant)}
+        `;
+      }
+
+      async function boot() {
+        try {
+          clearPendingStatementJobId();
+          const merchant = await fetchJson("/api/auth/me");
+          topbar.innerHTML = topbarMarkup(merchant);
+          attachDevResetHandler(topbar);
+          const title = path === "audit" ? "Full audit coming next" : path === "monitor" ? "Monitoring coming next" : "Next step saved";
+          const copy =
+            path === "audit"
+              ? "You chose the one-time audit path. The payment and account-upgrade flow will connect here in the next sprint."
+              : path === "monitor"
+                ? "You chose monthly monitoring. The payment and recurring-monitoring setup flow will connect here in the next sprint."
+                : "Your next-step choice has been saved. The payment and upgrade flow will connect here in the next sprint.";
+          page.innerHTML = `
+            <div class="eyebrow">Placeholder route</div>
+            <h1>${escapeHtml(title)}</h1>
+            <p class="placeholder-copy">${escapeHtml(copy)}</p>
+            <div class="button-row" style="margin-top: 24px;">
+              <a class="primary-btn" href="/dashboard/comparison">Back to comparison →</a>
+            </div>
+          `;
+        } catch (error) {
+          page.innerHTML = `<div class="form-error">${escapeHtml(error instanceof Error ? error.message : "Unable to load this page.")}</div>`;
+        }
+      }
+
+      boot();
+    </script>
+  </body>
+</html>

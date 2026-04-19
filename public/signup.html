@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Create your FeeClear account</title>
+    <link rel="stylesheet" href="/dashboard.css" />
+  </head>
+  <body class="auth-page">
+    <main class="auth-shell">
+      <header class="topbar">
+        <a class="logo" href="/" aria-label="FeeClear">
+          <span class="logo-mark">F</span>
+          <span class="logo-copy">
+            <span class="logo-kicker">Merchant statement analysis</span>
+            <span class="logo-name">FeeClear</span>
+          </span>
+        </a>
+        <a id="signinLinkTop" class="link-btn" href="/signin">Sign in</a>
+      </header>
+
+      <section class="auth-layout">
+        <div class="panel hero-panel">
+          <div class="eyebrow">Free account</div>
+          <h1>Unlock your full fee breakdown.</h1>
+          <p class="subheading">
+            We’ll save your first statement to your account, open the full merchant report, and keep one more free
+            statement ready for month-to-month comparison.
+          </p>
+          <ul class="auth-benefits">
+            <li><span class="check-mark">✓</span><span>Your first analyzed statement is saved to your account.</span></li>
+            <li><span class="check-mark">✓</span><span>You’ll see the full breakdown instead of the teaser-only view.</span></li>
+            <li><span class="check-mark">✓</span><span>You get one more free statement so we can compare two real months.</span></li>
+          </ul>
+        </div>
+
+        <section class="panel auth-card">
+          <div class="eyebrow">Create account</div>
+          <h2>Start free</h2>
+          <p class="helper-copy">Use the same email you want tied to your saved statements.</p>
+          <form id="signupForm" class="form-grid">
+            <div class="form-row two-up">
+              <label>
+                First name
+                <input id="firstNameInput" type="text" name="firstName" autocomplete="given-name" required />
+              </label>
+              <label>
+                Last name
+                <input id="lastNameInput" type="text" name="lastName" autocomplete="family-name" required />
+              </label>
+            </div>
+            <label>
+              Email
+              <input id="emailInput" type="email" name="email" autocomplete="email" required />
+            </label>
+            <label>
+              Password
+              <input id="passwordInput" type="password" name="password" autocomplete="new-password" minlength="8" required />
+            </label>
+            <div id="formError" class="form-error hidden"></div>
+            <button id="submitBtn" class="primary-btn full-width" type="submit">Create free account →</button>
+          </form>
+          <p class="inline-note">
+            Already have an account?
+            <a id="signinLinkBottom" class="text-link" href="/signin">Sign in</a>
+          </p>
+        </section>
+      </section>
+    </main>
+
+    <script type="module">
+      import { clearPendingStatementJobId, fetchJson, getPendingStatementJobId } from "/dashboard.js";
+
+      const params = new URLSearchParams(window.location.search);
+      const statementJobId = params.get("job") || getPendingStatementJobId() || "";
+      const signupForm = document.getElementById("signupForm");
+      const formError = document.getElementById("formError");
+      const submitBtn = document.getElementById("submitBtn");
+      const signinLinkTop = document.getElementById("signinLinkTop");
+      const signinLinkBottom = document.getElementById("signinLinkBottom");
+
+      const signinHref = statementJobId ? `/signin?job=${encodeURIComponent(statementJobId)}` : "/signin";
+      signinLinkTop.href = signinHref;
+      signinLinkBottom.href = signinHref;
+
+      signupForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        formError.classList.add("hidden");
+        formError.textContent = "";
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Creating your account...";
+
+        const payload = {
+          firstName: document.getElementById("firstNameInput").value.trim(),
+          lastName: document.getElementById("lastNameInput").value.trim(),
+          email: document.getElementById("emailInput").value.trim(),
+          password: document.getElementById("passwordInput").value,
+          statementJobId,
+        };
+
+        try {
+          const response = await fetchJson("/api/auth/signup", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          clearPendingStatementJobId();
+          window.location.href = response.redirectTo || "/dashboard/report";
+        } catch (error) {
+          formError.textContent = error instanceof Error ? error.message : "We could not create your account.";
+          formError.classList.remove("hidden");
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Create free account →";
+        }
+      });
+    </script>
+  </body>
+</html>

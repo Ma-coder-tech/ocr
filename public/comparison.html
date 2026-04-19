@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Two-month comparison</title>
+    <link rel="stylesheet" href="/dashboard.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header id="topbar" class="topbar"></header>
+      <div id="stepper" class="stepper"></div>
+      <section id="page" class="panel hero-panel">Loading your two-month comparison...</section>
+    </main>
+
+    <script type="module">
+      import {
+        attachDevResetHandler,
+        clearPendingStatementJobId,
+        escapeHtml,
+        fetchJson,
+        formatMoney,
+        formatPeriodLabel,
+        formatPct,
+        merchantBadgeMarkup,
+        monthRangeLabel,
+        postJson,
+        progressMarkup,
+        verdictLabel,
+        verdictTone,
+        chartBarHeight,
+        benchmarkReferenceOffset,
+      } from "/dashboard.js";
+
+      const topbar = document.getElementById("topbar");
+      const stepper = document.getElementById("stepper");
+      const page = document.getElementById("page");
+      let selectedPath = null;
+      let comparisonData = null;
+
+      function topbarMarkup(merchant) {
+        return `
+          <a class="logo" href="/dashboard/report" aria-label="FeeClear">
+            <span class="logo-mark">F</span>
+            <span class="logo-copy">
+              <span class="logo-kicker">Merchant statement analysis</span>
+              <span class="logo-name">FeeClear</span>
+            </span>
+          </a>
+          ${merchantBadgeMarkup(merchant)}
+        `;
+      }
+
+      function alertCopy(data) {
+        const { comparison, businessType } = data;
+        const earlierMonth = formatPeriodLabel(data.earlierMonth) || data.earlierMonth;
+        const laterMonth = formatPeriodLabel(data.laterMonth) || data.laterMonth;
+        const rateDelta = Math.abs(Number(comparison.effectiveRateDelta || 0)).toFixed(2);
+        const earlierRate = formatPct(comparison.earlierRate);
+        const laterRate = formatPct(comparison.laterRate);
+
+        switch (comparison.alertType) {
+          case "rate_up_above_benchmark":
+            return {
+              tone: "amber",
+              message: `Your rate went up ${rateDelta}% in one month. ${laterMonth} is above the benchmark for ${businessType}. That kind of move in a single month is worth investigating.`,
+            };
+          case "rate_up_within_benchmark":
+            return {
+              tone: "amber",
+              message: `Your rate went up slightly between ${earlierMonth} and ${laterMonth}, but both months are still within the normal range for ${businessType}. Something to keep an eye on.`,
+            };
+          case "both_above_benchmark":
+            return {
+              tone: "amber",
+              message: `Both months show a rate above the benchmark for ${businessType}. This is not a one-time event — there is a pattern worth looking at.`,
+            };
+          case "rate_down":
+            return {
+              tone: "green",
+              message: `Good news — your rate dropped from ${earlierRate} to ${laterRate} between ${earlierMonth} and ${laterMonth}.`,
+            };
+          default:
+            return {
+              tone: "green",
+              message: `Your rate held steady across both months and is within the normal range for ${businessType}. That is a positive sign.`,
+            };
+        }
+      }
+
+      function forkCardMarkup(type, isSelected) {
+        const isAudit = type === "audit";
+        const selectedClass = isSelected ? (isAudit ? "selected-audit" : "selected-monitor") : "";
+        const checkClass = isAudit ? "audit" : "monitor";
+        const icon = isAudit
+          ? `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`
+          : `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 13H7L9 7L12 17L14 11L16 13H20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+        return `
+          <article class="fork-card ${selectedClass}" data-path="${type}">
+            ${isSelected ? `<div class="selection-check ${checkClass}">✓</div>` : ""}
+            <div class="fork-icon ${checkClass}">${icon}</div>
+            <h2>${isAudit ? "Investigate the past" : "Watch going forward"}</h2>
+            <p class="body-copy">
+              ${
+                isAudit
+                  ? "Upload up to 12 months at once. See exactly when this started and how much it has cost you."
+                  : "Upload one statement per month. Get alerted the moment your rate moves again."
+              }
+            </p>
+            <div class="price-row">
+              <div class="price-value">${isAudit ? "$49" : "$19"}</div>
+              <div class="secondary-text">${isAudit ? "one-time · up to 12 statements" : "per month · cancel anytime"}</div>
+            </div>
+          </article>
+        `;
+      }
+
+      function renderForkSelection() {
+        const cards = document.getElementById("forkCards");
+        cards.innerHTML = `
+          ${forkCardMarkup("audit", selectedPath === "audit")}
+          ${forkCardMarkup("monitor", selectedPath === "monitor")}
+        `;
+        cards.querySelectorAll(".fork-card").forEach((card) => {
+          card.addEventListener("click", () => {
+            selectedPath = card.getAttribute("data-path");
+            renderForkSelection();
+            renderPathCta();
+          });
+        });
+      }
+
+      function renderPathCta() {
+        const wrap = document.getElementById("pathCtaWrap");
+        if (!selectedPath) {
+          wrap.innerHTML = "";
+          return;
+        }
+        const label = selectedPath === "audit" ? "Start my full audit — $49 →" : "Start monitoring — $19/month →";
+        wrap.innerHTML = `<button id="pathCtaBtn" class="primary-btn" type="button">${label}</button>`;
+        document.getElementById("pathCtaBtn").addEventListener("click", async () => {
+          const btn = document.getElementById("pathCtaBtn");
+          btn.disabled = true;
+          try {
+            const response = await postJson("/api/dashboard/chosen-path", { chosenPath: selectedPath });
+            window.location.href = response.redirectTo;
+          } catch (error) {
+            btn.disabled = false;
+            const existing = document.getElementById("pathError");
+            existing.textContent = error instanceof Error ? error.message : "We could not save that choice.";
+            existing.classList.remove("hidden");
+          }
+        });
+      }
+
+      function comparisonTable(data) {
+        const { comparison, statement1, statement2 } = data;
+        const earlierMonth = formatPeriodLabel(data.earlierMonth) || data.earlierMonth;
+        const laterMonth = formatPeriodLabel(data.laterMonth) || data.laterMonth;
+        const effectiveRateUp = Number(comparison.laterRate) > Number(comparison.earlierRate) && statement2.benchmarkVerdict === "above";
+        const feesUp = Number(comparison.laterTotalFees) > Number(comparison.earlierTotalFees);
+        const markupUp = Number(comparison.laterProcessorMarkup ?? 0) > Number(comparison.earlierProcessorMarkup ?? 0);
+
+        return `
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>${escapeHtml(earlierMonth)}</th>
+                <th>→</th>
+                <th>${escapeHtml(laterMonth)}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Volume processed</td>
+                <td>${formatMoney(comparison.earlierVolume)}</td>
+                <td>→</td>
+                <td>${formatMoney(comparison.laterVolume)}</td>
+              </tr>
+              <tr>
+                <td>Total fees paid</td>
+                <td>${formatMoney(comparison.earlierTotalFees)}</td>
+                <td>→</td>
+                <td class="${feesUp ? "value-up" : ""}">${formatMoney(comparison.laterTotalFees)}</td>
+              </tr>
+              <tr>
+                <td>Effective rate</td>
+                <td>${formatPct(comparison.earlierRate)}</td>
+                <td>→</td>
+                <td class="${effectiveRateUp ? "value-up" : ""}">${formatPct(comparison.laterRate)}</td>
+              </tr>
+              <tr>
+                <td>Processor markup</td>
+                <td>${comparison.earlierProcessorMarkup == null ? "—" : formatMoney(comparison.earlierProcessorMarkup)}</td>
+                <td>→</td>
+                <td class="${markupUp ? "value-up" : ""}">${comparison.laterProcessorMarkup == null ? "—" : formatMoney(comparison.laterProcessorMarkup)}</td>
+              </tr>
+              <tr>
+                <td>Card network fees</td>
+                <td>${comparison.earlierCardNetworkFees == null ? "—" : formatMoney(comparison.earlierCardNetworkFees)}</td>
+                <td>→</td>
+                <td>${comparison.laterCardNetworkFees == null ? "—" : formatMoney(comparison.laterCardNetworkFees)}</td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+      }
+
+      function comparisonChart(data) {
+        const maxValue = Math.max(Number(data.comparison.earlierRate || 0), Number(data.comparison.laterRate || 0), Number(data.benchmark.ceiling || 0)) * 1.2;
+        const referenceOffset = benchmarkReferenceOffset(data.benchmark.ceiling, maxValue);
+        const earlierAbove = data.statement1.benchmarkVerdict === "above";
+        const laterAbove = data.statement2.benchmarkVerdict === "above";
+        const earlierMonth = formatPeriodLabel(data.earlierMonth) || data.earlierMonth;
+        const laterMonth = formatPeriodLabel(data.laterMonth) || data.laterMonth;
+        return `
+          <div class="chart-wrap">
+            <div class="chart-reference" style="top: ${referenceOffset};">
+              <span class="chart-reference-label">Benchmark ceiling: ${formatPct(data.benchmark.ceiling)}</span>
+            </div>
+            <div class="chart-bars">
+              <div class="chart-column">
+                <div class="big-value">${formatPct(data.comparison.earlierRate)}</div>
+                <div class="bar ${earlierAbove ? "above" : ""}" style="height: ${chartBarHeight(data.comparison.earlierRate, maxValue)};"></div>
+                <div>${escapeHtml(earlierMonth)}</div>
+              </div>
+              <div class="chart-column">
+                <div class="big-value">${formatPct(data.comparison.laterRate)}</div>
+                <div class="bar ${laterAbove ? "above" : ""}" style="height: ${chartBarHeight(data.comparison.laterRate, maxValue)};"></div>
+                <div>${escapeHtml(laterMonth)}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function rateChangeSummary(data) {
+        const rateDelta = Number(data.comparison.effectiveRateDelta || 0);
+        const feeDiff = Number(data.comparison.feesDelta || 0);
+        const volumeDiff = Number(data.comparison.volumeDelta || 0);
+        const earlierMonth = formatPeriodLabel(data.earlierMonth) || data.earlierMonth;
+        const laterMonth = formatPeriodLabel(data.laterMonth) || data.laterMonth;
+
+        if (rateDelta < -0.001) {
+          return feeDiff > 0 && volumeDiff > 0
+            ? "Your rate improved. Total fees increased because your volume grew."
+            : "Your rate and total fees both improved.";
+        }
+
+        if (rateDelta > 0.001) {
+          if (feeDiff > 0) {
+            return `Your total fees and rate both increased from ${earlierMonth} to ${laterMonth}.`;
+          }
+          return `Your rate increased from ${earlierMonth} to ${laterMonth}, even though total fees did not increase.`;
+        }
+
+        return "Your rate held steady between these two months.";
+      }
+
+      function rateChangeCard(data) {
+        const rateDelta = Number(data.comparison.effectiveRateDelta || 0);
+        const feeDiff = Number(data.comparison.feesDelta || 0);
+        const tone = rateDelta < -0.001 ? "trend-good" : rateDelta > 0.001 ? "trend-danger" : "trend-neutral";
+        const deltaLabel =
+          Math.abs(rateDelta) <= 0.001 ? "0.00%" : `${rateDelta > 0 ? "↑" : "↓"} ${Math.abs(rateDelta).toFixed(2)}%`;
+        const feeDeltaLabel =
+          feeDiff === 0
+            ? "Total fees were unchanged."
+            : `Total fees: ${feeDiff > 0 ? "↑" : "↓"} ${formatMoney(Math.abs(feeDiff))}`;
+
+        return `
+          <article class="stat-card rate-change-card ${tone}">
+            <span class="stat-label">Rate change</span>
+            <div class="stat-value rate-change-value">${deltaLabel}</div>
+            <div class="inline-note">${escapeHtml(feeDeltaLabel)}</div>
+            <p class="body-copy">${escapeHtml(rateChangeSummary(data))}</p>
+          </article>
+        `;
+      }
+
+      function render(data) {
+        comparisonData = data;
+        selectedPath = data.merchant.chosenPath || null;
+        const alert = alertCopy(data);
+        const earlierMonth = formatPeriodLabel(data.earlierMonth) || data.earlierMonth;
+        const laterMonth = formatPeriodLabel(data.laterMonth) || data.laterMonth;
+
+        topbar.innerHTML = topbarMarkup(data.merchant);
+        attachDevResetHandler(topbar);
+        stepper.innerHTML = progressMarkup([
+          { label: "Statement 1", state: "completed" },
+          { label: "Statement 2", state: "completed" },
+          { label: "Your picture", state: "active" },
+        ]);
+
+        page.innerHTML = `
+          <div class="eyebrow">${escapeHtml(data.processorName)} · ${escapeHtml(data.businessType)} · ${escapeHtml(monthRangeLabel(earlierMonth, laterMonth))}</div>
+          <h1>Two months in — here&apos;s what we see.</h1>
+
+          <div class="alert-box ${alert.tone}" style="margin-top: 20px;">${escapeHtml(alert.message)}</div>
+
+          <div class="three-grid" style="margin-top: 20px;">
+            <article class="stat-card">
+              <span class="stat-label">Effective rate — ${escapeHtml(earlierMonth)}</span>
+              <div class="stat-value">${formatPct(data.comparison.earlierRate)}</div>
+              <div class="inline-note"><span class="verdict-pill info">${escapeHtml(verdictLabel(data.statement1.benchmarkVerdict))}</span></div>
+            </article>
+            <article class="stat-card">
+              <span class="stat-label">Effective rate — ${escapeHtml(laterMonth)}</span>
+              <div class="stat-value">${formatPct(data.comparison.laterRate)}</div>
+              <div class="inline-note"><span class="verdict-pill ${verdictTone(data.statement2.benchmarkVerdict)}">${escapeHtml(verdictLabel(data.statement2.benchmarkVerdict))}</span></div>
+            </article>
+            ${rateChangeCard(data)}
+          </div>
+
+          <div class="report-grid" style="margin-top: 20px;">
+            <section class="table-card">
+              <span class="kicker">Comparison table</span>
+              ${comparisonTable(data)}
+            </section>
+            <section class="table-card">
+              <span class="kicker">Effective rate by month</span>
+              ${comparisonChart(data)}
+            </section>
+          </div>
+
+          <section class="context-box" style="margin-top: 20px;">
+            Two months is a signal. It is not yet the full story. You can see something changed between ${escapeHtml(earlierMonth)} and ${escapeHtml(laterMonth)}. But two months is not enough to know whether this is a one-time jump or the start of a pattern. To get the full picture — and the evidence you need to act — you need more months. Choose how you want to go deeper.
+          </section>
+
+          <div id="forkCards" class="cards-two" style="margin-top: 20px;"></div>
+          <div id="pathCtaWrap" class="button-row" style="margin-top: 18px;"></div>
+          <div id="pathError" class="inline-error hidden" style="margin-top: 10px;"></div>
+          <p class="inline-note" style="margin-top: 18px;">
+            Not sure which one?
+            <a class="text-link" href="/dashboard/next-step">Answer two quick questions and we&apos;ll tell you →</a>
+          </p>
+        `;
+
+        renderForkSelection();
+        renderPathCta();
+      }
+
+      async function boot() {
+        try {
+          clearPendingStatementJobId();
+          const data = await fetchJson("/api/dashboard/comparison");
+          render(data);
+        } catch (error) {
+          page.innerHTML = `<div class="form-error">${escapeHtml(error instanceof Error ? error.message : "Unable to load the comparison.")}</div>`;
+        }
+      }
+
+      boot();
+    </script>
+  </body>
+</html>

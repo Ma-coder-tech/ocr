@@ -96,23 +96,6 @@ function titleCase(label: string): string {
     .join(" ");
 }
 
-function benchmarkForProcessor(processorName: string) {
-  const key = processorName.toLowerCase();
-  if (key.includes("square")) {
-    return { segment: "SMB blended card mix (Square)", lowerRate: 2.6, upperRate: 4.1 };
-  }
-  if (key.includes("stripe")) {
-    return { segment: "SMB blended card mix (Stripe)", lowerRate: 2.4, upperRate: 3.9 };
-  }
-  if (key.includes("paypal")) {
-    return { segment: "SMB blended card mix (PayPal)", lowerRate: 2.9, upperRate: 4.6 };
-  }
-  if (key.includes("adyen")) {
-    return { segment: "Mid-market card mix (Adyen)", lowerRate: 1.8, upperRate: 3.2 };
-  }
-  return { segment: "General SMB card processing", lowerRate: 2.2, upperRate: 3.8 };
-}
-
 function severityFromShare(sharePct: number): "low" | "medium" | "high" {
   if (sharePct >= 15) return "high";
   if (sharePct >= 7) return "medium";
@@ -350,7 +333,11 @@ export function refineTextOnlyPdfSummary(doc: ParsedDocument, baseSummary: Analy
     return null;
   }
 
-  const benchmarkBase = benchmarkForProcessor(baseSummary.processorName || "Unknown");
+  const benchmarkBase = {
+    segment: baseSummary.benchmark.segment,
+    lowerRate: baseSummary.benchmark.lowerRate,
+    upperRate: baseSummary.benchmark.upperRate,
+  };
   const benchmarkStatus =
     effectiveRate > benchmarkBase.upperRate ? "above" : effectiveRate < benchmarkBase.lowerRate ? "below" : "within";
   const deltaFromUpperRate = Math.round(Math.max(0, effectiveRate - benchmarkBase.upperRate) * 100) / 100;

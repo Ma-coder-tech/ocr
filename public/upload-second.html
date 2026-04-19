@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Upload your second statement</title>
+    <link rel="stylesheet" href="/dashboard.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header id="topbar" class="topbar"></header>
+      <div id="stepper" class="stepper"></div>
+      <section id="page" class="panel hero-panel">Loading your statement context...</section>
+    </main>
+
+    <script type="module">
+      import {
+        attachDevResetHandler,
+        clearPendingStatementJobId,
+        escapeHtml,
+        fetchJson,
+        formatMoney,
+        formatPeriodLabel,
+        formatPct,
+        merchantBadgeMarkup,
+        progressMarkup,
+        verdictLabel,
+        verdictTone,
+      } from "/dashboard.js";
+
+      const topbar = document.getElementById("topbar");
+      const stepper = document.getElementById("stepper");
+      const page = document.getElementById("page");
+
+      let selectedFile = null;
+      let validatedUpload = null;
+
+      function topbarMarkup(merchant) {
+        return `
+          <a class="logo" href="/dashboard/report" aria-label="FeeClear">
+            <span class="logo-mark">F</span>
+            <span class="logo-copy">
+              <span class="logo-kicker">Merchant statement analysis</span>
+              <span class="logo-name">FeeClear</span>
+            </span>
+          </a>
+          ${merchantBadgeMarkup(merchant)}
+        `;
+      }
+
+      function fileSizeLabel(bytes) {
+        return `${(Number(bytes || 0) / (1024 * 1024)).toFixed(2)} MB`;
+      }
+
+      function renderStatusRow(payload, tone, detail) {
+        const statusRow = document.getElementById("statusRow");
+        statusRow.classList.remove("hidden");
+        statusRow.innerHTML = `
+          <div>
+            <div class="file-name">${escapeHtml(payload.fileName || selectedFile?.name || "Selected file")}</div>
+            <div class="file-meta">${escapeHtml(detail)}</div>
+          </div>
+          <div class="file-meta">${escapeHtml(formatPeriodLabel(payload.detectedStatementPeriod) || payload.detectedStatementPeriod || "Still detecting period")}</div>
+          <div class="file-meta">${escapeHtml(payload.fileSize ? fileSizeLabel(payload.fileSize) : fileSizeLabel(selectedFile?.size || 0))}</div>
+          <div><span class="status-pill ${tone}">${escapeHtml(payload.status || (tone === "error" ? "error" : "ready"))}</span></div>
+        `;
+      }
+
+      async function validateSelectedFile(file) {
+        if (!file) return;
+        selectedFile = file;
+        validatedUpload = null;
+        document.getElementById("analyzeBtnWrap").classList.add("hidden");
+        document.getElementById("uploadError").classList.add("hidden");
+        document.getElementById("uploadError").textContent = "";
+
+        renderStatusRow(
+          { fileName: file.name, fileSize: file.size, detectedStatementPeriod: "Checking statement period…", status: "validating" },
+          "validating",
+          "Validating your second statement against your saved first month.",
+        );
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          const payload = await fetchJson("/api/dashboard/statement2/validate", {
+            method: "POST",
+            body: formData,
+          });
+          validatedUpload = payload;
+          renderStatusRow(payload, "ready", "This statement is ready to analyze.");
+          document.getElementById("analyzeBtnWrap").classList.remove("hidden");
+        } catch (error) {
+          renderStatusRow(
+            { fileName: file.name, fileSize: file.size, detectedStatementPeriod: "Not accepted", status: "error" },
+            "error",
+            error instanceof Error ? error.message : "We could not validate this statement.",
+          );
+          const uploadError = document.getElementById("uploadError");
+          uploadError.textContent = error instanceof Error ? error.message : "We could not validate this statement.";
+          uploadError.classList.remove("hidden");
+        }
+      }
+
+      async function startAnalysis() {
+        if (!validatedUpload?.uploadId) return;
+        const analyzeBtn = document.getElementById("analyzeBtn");
+        analyzeBtn.disabled = true;
+        analyzeBtn.textContent = "Starting analysis...";
+        try {
+          const payload = await fetchJson("/api/dashboard/statement2/start", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ uploadId: validatedUpload.uploadId }),
+          });
+          window.location.href = payload.redirectTo;
+        } catch (error) {
+          const uploadError = document.getElementById("uploadError");
+          uploadError.textContent = error instanceof Error ? error.message : "We could not start the analysis.";
+          uploadError.classList.remove("hidden");
+          analyzeBtn.disabled = false;
+          analyzeBtn.textContent = "Analyze second statement →";
+        }
+      }
+
+      async function boot() {
+        try {
+          clearPendingStatementJobId();
+          const data = await fetchJson("/api/dashboard/upload-second/context");
+          const { merchant, statement1 } = data;
+          const verdictClass = verdictTone(statement1.benchmarkVerdict);
+
+          topbar.innerHTML = topbarMarkup(merchant);
+          attachDevResetHandler(topbar);
+          stepper.innerHTML = progressMarkup([
+            { label: "Statement 1", state: "completed" },
+            { label: "Statement 2", state: "active" },
+            { label: "Your picture", state: "" },
+          ]);
+
+          page.innerHTML = `
+            <div class="eyebrow">Free account · ${merchant.freeStatementsRemaining} statement remaining</div>
+            <h1>Let&apos;s add another month</h1>
+            <p class="subheading">
+              You uploaded ${escapeHtml(formatPeriodLabel(statement1.period) || statement1.period)} already. Add a different month so we can start seeing whether your fees are consistent — or changing.
+            </p>
+
+            <section class="reference-card" style="margin-top: 24px;">
+              <div class="reference-head">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 10px; font-weight: 800;">
+                    <span class="check-mark">✓</span>
+                    <span>${escapeHtml(formatPeriodLabel(statement1.period) || statement1.period)} — already analyzed</span>
+                  </div>
+                  <div class="reference-meta">${escapeHtml(statement1.processorName)} · ${escapeHtml(statement1.businessType)} · ${formatMoney(statement1.totalVolume)} volume</div>
+                </div>
+                <div class="card-head">
+                  <div style="font-weight: 800;">${formatPct(statement1.effectiveRate)}</div>
+                  <span class="verdict-pill ${verdictClass}">${escapeHtml(verdictLabel(statement1.benchmarkVerdict))}</span>
+                </div>
+              </div>
+            </section>
+
+            <p class="inline-note" style="margin-top: 20px;">
+              Pick a different month — ideally the one right before or after your first statement. The more the months differ, the clearer the story becomes.
+            </p>
+
+            <div class="upload-zone" id="dropzone" style="margin-top: 22px;" tabindex="0" role="button" aria-label="Upload second statement">
+              <div class="upload-zone-title">Drop your second statement here</div>
+              <p class="upload-zone-hint">or click to browse · PDF only · Choose a different month than ${escapeHtml(formatPeriodLabel(statement1.period) || statement1.period)}</p>
+            </div>
+            <input id="fileInput" type="file" accept="application/pdf,.pdf" class="hidden" />
+
+            <div id="statusRow" class="file-status-row hidden" style="margin-top: 18px;"></div>
+            <div id="uploadError" class="inline-error hidden" style="margin-top: 12px;"></div>
+
+            <div id="analyzeBtnWrap" class="button-row hidden" style="margin-top: 20px;">
+              <button id="analyzeBtn" class="primary-btn" type="button">Analyze second statement →</button>
+            </div>
+          `;
+
+          const dropzone = document.getElementById("dropzone");
+          const fileInput = document.getElementById("fileInput");
+          const analyzeBtn = document.getElementById("analyzeBtn");
+
+          dropzone.addEventListener("click", () => fileInput.click());
+          dropzone.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              fileInput.click();
+            }
+          });
+          dropzone.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            dropzone.classList.add("dragover");
+          });
+          dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+          dropzone.addEventListener("drop", (event) => {
+            event.preventDefault();
+            dropzone.classList.remove("dragover");
+            validateSelectedFile(event.dataTransfer?.files?.[0]);
+          });
+          fileInput.addEventListener("change", () => validateSelectedFile(fileInput.files?.[0]));
+          analyzeBtn.addEventListener("click", startAnalysis);
+        } catch (error) {
+          page.innerHTML = `<div class="form-error">${escapeHtml(error instanceof Error ? error.message : "Unable to load this page.")}</div>`;
+        }
+      }
+
+      boot();
+    </script>
+  </body>
+</html>

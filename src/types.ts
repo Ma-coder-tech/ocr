@@ -1,11 +1,25 @@
+import type { BusinessTypeId } from "./businessTypes.js";
+
 export type JobStatus =
   | "queued"
-  | "analyzing"
-  | "classifying"
-  | "calculating"
-  | "generating_report"
+  | "verifying_statement"
+  | "identifying_processor"
+  | "extracting_fee_line_items"
+  | "calculating_effective_rate"
+  | "comparing_to_benchmark"
   | "completed"
   | "failed";
+
+export const JOB_STATUS_VALUES = [
+  "queued",
+  "verifying_statement",
+  "identifying_processor",
+  "extracting_fee_line_items",
+  "calculating_effective_rate",
+  "comparing_to_benchmark",
+  "completed",
+  "failed",
+] as const satisfies readonly JobStatus[];
 
 export type Stage = Exclude<JobStatus, "queued" | "completed" | "failed">;
 
@@ -34,6 +48,7 @@ export type FeeBreakdownRow = {
 };
 
 export type BenchmarkStatus = "below" | "within" | "above";
+export const BENCHMARK_STATUS_VALUES = ["below", "within", "above"] as const satisfies readonly BenchmarkStatus[];
 
 export type BenchmarkResult = {
   segment: string;
@@ -116,6 +131,7 @@ export type ChecklistReport = {
 };
 
 export type AnalysisSummary = {
+  businessType: BusinessTypeId;
   processorName: string;
   sourceType: "csv" | "pdf";
   statementPeriod: string;
@@ -142,11 +158,32 @@ export type AnalysisSummary = {
   checklistReport?: ChecklistReport;
 };
 
+export type PublicReportSummary = Pick<
+  AnalysisSummary,
+  | "businessType"
+  | "processorName"
+  | "sourceType"
+  | "statementPeriod"
+  | "executiveSummary"
+  | "totalVolume"
+  | "totalFees"
+  | "estimatedMonthlyVolume"
+  | "estimatedMonthlyFees"
+  | "effectiveRate"
+  | "benchmark"
+  | "confidence"
+  | "dataQuality"
+>;
+
 export type Job = {
   id: string;
   fileName: string;
   filePath: string;
   fileType: "csv" | "pdf";
+  businessType: BusinessTypeId;
+  merchantId?: number | null;
+  statementSlot?: 1 | 2 | null;
+  detectedStatementPeriod?: string | null;
   createdAt: string;
   updatedAt: string;
   status: JobStatus;

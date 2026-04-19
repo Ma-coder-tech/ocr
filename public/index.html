@@ -3,180 +3,891 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Merchant Fee Analyzer</title>
+    <title>FeeClear</title>
     <style>
       :root {
-        --bg: #f4f7fb;
-        --card: #ffffff;
-        --primary: #1f4f9d;
-        --accent: #16a085;
-        --text: #14233b;
-        --muted: #6a7486;
+        --bg: #eef3fb;
+        --surface: rgba(255, 255, 255, 0.9);
+        --surface-strong: #ffffff;
+        --surface-muted: #f6f8fc;
+        --text: #162033;
+        --muted: #647089;
+        --line: #d6deef;
+        --line-strong: #b7c6e3;
+        --brand: #2f66ff;
+        --brand-strong: #1948cf;
+        --brand-soft: rgba(47, 102, 255, 0.1);
+        --success: #0c8f68;
+        --success-soft: rgba(12, 143, 104, 0.12);
+        --warning: #b86d0b;
+        --warning-soft: rgba(184, 109, 11, 0.12);
+        --danger: #c43838;
+        --danger-soft: rgba(196, 56, 56, 0.12);
+        --shadow: 0 28px 70px rgba(27, 46, 94, 0.12);
       }
+
       * { box-sizing: border-box; }
+
       body {
         margin: 0;
-        font-family: "Avenir Next", "Segoe UI", sans-serif;
-        color: var(--text);
-        background: radial-gradient(circle at top left, #ebf2ff, var(--bg));
         min-height: 100vh;
+        color: var(--text);
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(47, 102, 255, 0.18), transparent 28%),
+          radial-gradient(circle at top right, rgba(16, 128, 255, 0.12), transparent 24%),
+          linear-gradient(180deg, #f7faff 0%, #eef3fb 100%);
+      }
+
+      button, input, select, textarea {
+        font: inherit;
+      }
+
+      .shell {
+        width: min(1180px, 100%);
+        margin: 0 auto;
+        padding: 28px 18px 64px;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 26px;
+      }
+
+      .logo {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+        color: var(--text);
+      }
+
+      .logo-mark {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #2f66ff, #67a1ff);
+        color: white;
         display: grid;
         place-items: center;
-        padding: 24px;
+        font-weight: 800;
+        box-shadow: 0 10px 24px rgba(47, 102, 255, 0.24);
       }
-      .card {
-        width: min(760px, 100%);
-        background: var(--card);
-        border-radius: 16px;
-        box-shadow: 0 20px 50px rgba(31, 79, 157, 0.12);
-        padding: 28px;
-      }
-      h1 { margin: 0 0 8px; }
-      p { margin: 0 0 18px; color: var(--muted); }
-      .upload-row {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        align-items: center;
-      }
-      input[type="file"] {
-        border: 1px dashed #a6b6d5;
-        border-radius: 10px;
-        padding: 10px;
-        flex: 1;
-      }
-      button {
-        border: 0;
-        background: var(--primary);
-        color: #fff;
-        border-radius: 10px;
-        padding: 10px 18px;
-        cursor: pointer;
-        font-weight: 600;
-      }
-      button:disabled { opacity: 0.55; cursor: not-allowed; }
-      .status { margin-top: 20px; }
-      .bar {
-        margin: 10px 0 16px;
-        height: 10px;
-        background: #e8edf6;
-        border-radius: 999px;
-        overflow: hidden;
-      }
-      .bar > span {
-        display: block;
-        height: 100%;
-        background: linear-gradient(90deg, var(--primary), var(--accent));
-        width: 0%;
-        transition: width 0.5s ease;
-      }
-      .steps {
+
+      .logo-copy {
         display: grid;
-        gap: 8px;
+        gap: 2px;
       }
-      .step {
-        padding: 10px 12px;
-        border-radius: 8px;
-        background: #f7f9fc;
+
+      .logo-kicker {
+        font-size: 0.72rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
         color: var(--muted);
       }
-      .step.active {
+
+      .logo-name {
+        font-size: 1.45rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+      }
+
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .link-btn, .primary-btn, .secondary-btn, .ghost-btn {
+        border-radius: 999px;
+        padding: 12px 18px;
+        text-decoration: none;
+        font-weight: 700;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: 0.2s ease;
+      }
+
+      .link-btn {
         color: var(--text);
-        background: #e9f0ff;
-        border-left: 4px solid var(--primary);
+        background: transparent;
       }
-      .step.done {
-        color: #0a7a63;
-        background: #e8fbf6;
-        border-left: 4px solid #10a37f;
+
+      .primary-btn {
+        color: white;
+        background: linear-gradient(135deg, var(--brand), var(--brand-strong));
+        box-shadow: 0 16px 30px rgba(47, 102, 255, 0.22);
       }
-      .result {
-        margin-top: 18px;
-        padding: 14px;
-        border-radius: 10px;
-        background: #f2f8ff;
+
+      .primary-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+      }
+
+      .secondary-btn, .ghost-btn {
+        color: var(--text);
+        background: white;
+        border-color: var(--line);
+      }
+
+      .primary-btn:disabled, .secondary-btn:disabled, .ghost-btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+
+      .panel {
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(214, 222, 239, 0.9);
+        border-radius: 28px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .hero {
+        padding: 28px;
+      }
+
+      .stepper {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 28px;
+      }
+
+      .step-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 15px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.75);
+        color: var(--muted);
+        font-size: 0.93rem;
+        font-weight: 700;
+      }
+
+      .step-pill.active {
+        color: var(--brand-strong);
+        border-color: rgba(47, 102, 255, 0.22);
+        background: var(--brand-soft);
+      }
+
+      .step-pill .step-dot {
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        display: inline-grid;
+        place-items: center;
+        border: 1px solid currentColor;
+        font-size: 0.78rem;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 14px;
+        padding: 9px 14px;
+        border-radius: 999px;
+        background: rgba(47, 102, 255, 0.08);
+        color: var(--brand-strong);
+        font-size: 0.82rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: clamp(2.2rem, 6vw, 4.2rem);
+        line-height: 0.95;
+        letter-spacing: -0.05em;
+      }
+
+      .subheading {
+        max-width: 720px;
+        margin: 0 0 30px;
+        font-size: 1.12rem;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+
+      .section-label {
+        margin: 0 0 14px;
+        font-size: 0.86rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 800;
+      }
+
+      .business-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .business-card {
+        border: 1px solid var(--line);
+        background: var(--surface-strong);
+        border-radius: 18px;
+        padding: 16px;
+        text-align: left;
+        cursor: pointer;
+        min-height: 108px;
+        transition: 0.2s ease;
+      }
+
+      .business-card:hover {
+        border-color: var(--line-strong);
+        transform: translateY(-1px);
+      }
+
+      .business-card.active {
+        border-color: rgba(47, 102, 255, 0.4);
+        background: linear-gradient(180deg, rgba(47, 102, 255, 0.12), rgba(255, 255, 255, 0.95));
+        box-shadow: 0 12px 24px rgba(47, 102, 255, 0.12);
+      }
+
+      .business-card-icon {
+        width: 20px;
+        height: 20px;
+        margin-bottom: 12px;
+        color: var(--brand-strong);
+      }
+
+      .business-card-title {
+        display: block;
+        font-weight: 800;
+        font-size: 1rem;
+        margin-bottom: 8px;
+      }
+
+      .business-card-note {
+        display: block;
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.4;
+      }
+
+      .soft-warning {
         display: none;
+        margin: 0 0 16px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid rgba(184, 109, 11, 0.2);
+        background: var(--warning-soft);
+        color: #8c5508;
+        font-weight: 700;
       }
-      .error {
+
+      .uploader {
+        margin-top: 12px;
+      }
+
+      .dropzone {
+        position: relative;
+        min-height: 240px;
+        border-radius: 24px;
+        border: 2px dashed rgba(47, 102, 255, 0.24);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(245, 248, 255, 0.9));
+        display: grid;
+        place-items: center;
+        padding: 28px;
+        text-align: center;
+        transition: 0.2s ease;
+      }
+
+      .dropzone-input {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+      }
+
+      .dropzone.inactive {
+        opacity: 0.48;
+        cursor: not-allowed;
+      }
+
+      .dropzone.inactive .dropzone-input {
+        pointer-events: none;
+        cursor: not-allowed;
+      }
+
+      .dropzone.active {
+        cursor: pointer;
+      }
+
+      .dropzone.active:hover {
+        border-color: rgba(47, 102, 255, 0.46);
+      }
+
+      .dropzone.dragover {
+        border-style: solid;
+        border-color: var(--brand);
+        background: linear-gradient(180deg, rgba(47, 102, 255, 0.12), rgba(255, 255, 255, 0.95));
+      }
+
+      .dropzone-icon {
+        width: 72px;
+        height: 72px;
+        border-radius: 24px;
+        margin: 0 auto 18px;
+        display: grid;
+        place-items: center;
+        background: rgba(47, 102, 255, 0.1);
+        color: var(--brand);
+        font-size: 1.8rem;
+        font-weight: 900;
+      }
+
+      .dropzone-title {
+        margin: 0 0 10px;
+        font-size: 1.45rem;
+        font-weight: 800;
+      }
+
+      .dropzone-copy {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .dropzone-copy strong {
+        color: var(--text);
+      }
+
+      .status-row {
+        display: none;
+        align-items: center;
+        gap: 16px;
+        padding: 18px 18px;
+        border-radius: 20px;
+        border: 1px solid var(--line);
+        background: var(--surface-strong);
+      }
+
+      .status-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 16px;
+        background: #eff4ff;
+        color: var(--brand);
+        display: grid;
+        place-items: center;
+        font-size: 1.35rem;
+        font-weight: 900;
+        flex: 0 0 auto;
+      }
+
+      .status-copy {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .status-name {
+        margin: 0 0 6px;
+        font-size: 1rem;
+        font-weight: 800;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .status-meta {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 14px;
+        border-radius: 999px;
+        font-weight: 800;
+        font-size: 0.88rem;
+      }
+
+      .status-pill.validating {
+        color: #5f6573;
+        background: #eef1f6;
+      }
+
+      .status-pill.ready {
+        color: #0d7d5d;
+        background: var(--success-soft);
+      }
+
+      .status-pill.error {
+        color: #a62f2f;
+        background: var(--danger-soft);
+      }
+
+      .spinner {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        border: 2px solid rgba(95, 101, 115, 0.18);
+        border-top-color: currentColor;
+        animation: spin 0.8s linear infinite;
+      }
+
+      .remove-btn {
+        width: 40px;
+        height: 40px;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--muted);
+        border-radius: 999px;
+        cursor: pointer;
+        flex: 0 0 auto;
+      }
+
+      .file-error {
+        display: none;
         margin-top: 10px;
-        color: #b22020;
-        font-weight: 600;
+        color: var(--danger);
+        font-weight: 700;
+        line-height: 1.5;
+      }
+
+      .submit-row {
+        display: none;
+        justify-content: flex-end;
+        margin-top: 18px;
+      }
+
+      .footer-note {
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 0.94rem;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      @media (max-width: 960px) {
+        .business-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 720px) {
+        .shell {
+          padding-left: 14px;
+          padding-right: 14px;
+        }
+
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .top-actions {
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .business-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .status-row {
+          align-items: flex-start;
+          flex-wrap: wrap;
+        }
+
+        .submit-row {
+          justify-content: stretch;
+        }
+
+        .submit-row .primary-btn {
+          width: 100%;
+        }
       }
     </style>
   </head>
   <body>
-    <main class="card">
-      <h1>Merchant Fee Analyzer</h1>
-      <p>Upload a processor statement (CSV or PDF). We analyze the file and open a live merchant report in your browser.</p>
-
-      <form id="uploadForm" class="upload-row">
-        <input id="fileInput" type="file" accept=".csv,.pdf" required />
-        <button id="analyzeBtn" type="submit">Analyze</button>
-      </form>
-
-      <section class="status" id="statusBlock" style="display:none;">
-        <strong id="statusLabel">Uploading your statement...</strong>
-        <div class="bar"><span id="progressBar"></span></div>
-        <div class="steps">
-          <div class="step active">1. Uploading your file</div>
-          <div class="step">2. Opening report workspace</div>
-          <div class="step">3. Analysis continues on the report page</div>
+    <div class="shell">
+      <header class="topbar">
+        <a class="logo" href="#" aria-label="FeeClear home">
+          <span class="logo-mark">F</span>
+          <span class="logo-copy">
+            <span class="logo-kicker">Merchant statement analysis</span>
+            <span class="logo-name">FeeClear</span>
+          </span>
+        </a>
+        <div class="top-actions">
+          <a class="link-btn" href="/signin">Sign In</a>
+          <a class="secondary-btn" href="/signup">Create Account</a>
         </div>
-      </section>
+      </header>
 
-      <div id="error" class="error"></div>
-    </main>
+      <main class="panel hero">
+        <div class="stepper" aria-label="Progress">
+          <div class="step-pill active"><span class="step-dot">1</span> Upload statement</div>
+          <div class="step-pill"><span class="step-dot">2</span> Analysis</div>
+          <div class="step-pill"><span class="step-dot">3</span> Your results</div>
+        </div>
+
+        <div class="eyebrow">Free analysis — no account needed</div>
+        <h1>Let's check your processor fees.</h1>
+        <p class="subheading">
+          Upload one monthly statement. We'll tell you exactly what you paid and whether it's fair for your type of business.
+        </p>
+
+        <section>
+          <p class="section-label">Select your business type</p>
+          <div class="business-grid" id="businessGrid"></div>
+        </section>
+
+        <div class="soft-warning" id="businessWarning">
+          Please select your business type above before uploading.
+        </div>
+
+        <section class="uploader">
+          <div id="dropzone" class="dropzone inactive" role="button" tabindex="0" aria-disabled="true">
+            <input id="fileInput" class="dropzone-input" type="file" accept=".pdf,application/pdf" aria-label="Upload monthly statement" />
+            <div>
+              <div class="dropzone-icon">PDF</div>
+              <h2 class="dropzone-title">Drop your monthly statement here</h2>
+              <p class="dropzone-copy">
+                <strong>PDF only.</strong> Drag and drop a processor statement or click to browse.<br />
+                We'll extract the financial data directly from the statement. You never need to type the numbers in manually.
+              </p>
+            </div>
+          </div>
+
+          <div class="status-row" id="statusRow">
+            <div class="status-icon">PDF</div>
+            <div class="status-copy">
+              <p class="status-name" id="statusName"></p>
+              <div class="status-meta" id="statusMeta"></div>
+            </div>
+            <div class="status-pill validating" id="statusPill"><span class="spinner"></span><span id="statusPillLabel">Validating...</span></div>
+            <button type="button" class="remove-btn" id="removeBtn" aria-label="Remove file">×</button>
+          </div>
+          <div class="file-error" id="fileError"></div>
+
+          <div class="submit-row" id="submitRow">
+            <button class="primary-btn" id="analyzeBtn" type="button">Analyze my statement</button>
+          </div>
+          <div class="footer-note">PDF only · Maximum file size 20 MB · One monthly statement at a time</div>
+        </section>
+      </main>
+    </div>
 
     <script>
-      const form = document.getElementById("uploadForm");
-      const fileInput = document.getElementById("fileInput");
-      const analyzeBtn = document.getElementById("analyzeBtn");
-      const statusBlock = document.getElementById("statusBlock");
-      const statusLabel = document.getElementById("statusLabel");
-      const progressBar = document.getElementById("progressBar");
-      const error = document.getElementById("error");
+      const BUSINESS_TYPES = [
+        { id: "restaurant_food_beverage", label: "Restaurant / Food & Beverage", note: "" },
+        { id: "retail", label: "Retail", note: "" },
+        { id: "ecommerce", label: "E-commerce", note: "" },
+        { id: "healthcare", label: "Healthcare", note: "" },
+        { id: "hospitality", label: "Hospitality", note: "" },
+        { id: "high_risk", label: "High-risk", note: "covers CBD, dispensaries, adult, firearms" },
+        { id: "professional_services", label: "Professional services", note: "" },
+        { id: "other", label: "Other", note: "" },
+      ];
 
-      async function readJsonSafe(res) {
-        const text = await res.text();
-        if (!text) return null;
-        try {
-          return JSON.parse(text);
-        } catch {
-          return null;
+      const businessGrid = document.getElementById("businessGrid");
+      const businessWarning = document.getElementById("businessWarning");
+      const dropzone = document.getElementById("dropzone");
+      const fileInput = document.getElementById("fileInput");
+      const statusRow = document.getElementById("statusRow");
+      const statusName = document.getElementById("statusName");
+      const statusMeta = document.getElementById("statusMeta");
+      const statusPill = document.getElementById("statusPill");
+      const statusPillLabel = document.getElementById("statusPillLabel");
+      const removeBtn = document.getElementById("removeBtn");
+      const fileError = document.getElementById("fileError");
+      const submitRow = document.getElementById("submitRow");
+      const analyzeBtn = document.getElementById("analyzeBtn");
+
+      let selectedBusinessType = sessionStorage.getItem("feeclearBusinessType") || "";
+      let selectedFile = null;
+      let readyForUpload = false;
+
+      function getBusinessTypeIcon(id) {
+        const icons = {
+          restaurant_food_beverage: `
+            <svg class="business-card-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M4.5 2.5V8.5C4.5 9.6 5.4 10.5 6.5 10.5V17.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2.5 2.5V6.2M4.5 2.5V6.2M6.5 2.5V6.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+              <path d="M12.5 2.8C14.2 4.5 14.2 7.2 12.5 8.9L11.5 9.9V17.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>`,
+          retail: `
+            <svg class="business-card-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M4 6.5H16L15 16H5L4 6.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="M7 8V5.8C7 4.25 8.35 3 10 3C11.65 3 13 4.25 13 5.8V8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>`,
+          ecommerce: `
+            <svg class="business-card-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M3 4.5H5L6.2 11H14.7L16.3 6.5H6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="7.6" cy="15.2" r="1.1" fill="currentColor"/>
+              <circle cx="13.7" cy="15.2" r="1.1" fill="currentColor"/>
+            </svg>`,
+          healthcare: `
+            <svg class="business-card-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M2.5 10H5.3L7.1 6.4L9.6 13.4L11.6 9.6H17.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>`,
+          hospitality: `
+            <svg class="business-card-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M4 16.5V8L10 3.5L16 8V16.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M7.5 16.5V12.2H12.5V16.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>`,
+          high_risk: `
+            <svg class="business-card-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M10 3L17 16H3L10 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="M10 7.2V11.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+              <circle cx="10" cy="14.2" r="1" fill="currentColor"/>
+            </svg>`,
+          professional_services: `
+            <svg class="business-card-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M3.5 6.5H16.5V16H3.5V6.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="M7.2 6.5V4.8C7.2 3.8 8 3 9 3H11C12 3 12.8 3.8 12.8 4.8V6.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+              <path d="M3.5 9.4H16.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>`,
+          other: `
+            <svg class="business-card-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.7"/>
+              <path d="M10 8.2V12.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+              <circle cx="10" cy="6" r="1" fill="currentColor"/>
+            </svg>`,
+        };
+
+        return icons[id] || icons.other;
+      }
+
+      function renderBusinessCards() {
+        businessGrid.innerHTML = BUSINESS_TYPES.map((item) => `
+          <button type="button" class="business-card ${item.id === selectedBusinessType ? "active" : ""}" data-business-type="${item.id}">
+            ${getBusinessTypeIcon(item.id)}
+            <span class="business-card-title">${item.label}</span>
+            ${item.note ? `<span class="business-card-note">${item.note}</span>` : `<span class="business-card-note">&nbsp;</span>`}
+          </button>
+        `).join("");
+      }
+
+      function setBusinessType(id) {
+        selectedBusinessType = id;
+        sessionStorage.setItem("feeclearBusinessType", id);
+        businessWarning.style.display = "none";
+        renderBusinessCards();
+        updateDropzoneState();
+      }
+
+      function updateDropzoneState() {
+        const active = Boolean(selectedBusinessType);
+        dropzone.classList.toggle("inactive", !active);
+        dropzone.classList.toggle("active", active);
+        dropzone.setAttribute("aria-disabled", active ? "false" : "true");
+        fileInput.disabled = !active;
+      }
+
+      function showBusinessWarning() {
+        businessWarning.style.display = "block";
+      }
+
+      function resetFileSelection() {
+        selectedFile = null;
+        readyForUpload = false;
+        fileInput.value = "";
+        statusRow.style.display = "none";
+        submitRow.style.display = "none";
+        fileError.style.display = "none";
+        fileError.textContent = "";
+        dropzone.style.display = "grid";
+      }
+
+      function formatBytes(bytes) {
+        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      }
+
+      function detectPeriod(fileName) {
+        const value = fileName.toLowerCase();
+        const monthMap = {
+          jan: "January", feb: "February", mar: "March", apr: "April", may: "May", jun: "June",
+          jul: "July", aug: "August", sep: "September", sept: "September", oct: "October", nov: "November", dec: "December",
+        };
+
+        const monthYear = value.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s._-]*(20\d{2}|\d{2})/i);
+        if (monthYear) {
+          const year = monthYear[2].length === 2 ? `20${monthYear[2]}` : monthYear[2];
+          return `${monthMap[monthYear[1].toLowerCase()]} ${year}`;
+        }
+
+        const numeric = value.match(/(20\d{2}|\d{2})[\s._-]?(0[1-9]|1[0-2])|(0[1-9]|1[0-2])[\s._-]?(20\d{2}|\d{2})/);
+        if (!numeric) return "Period not detected yet";
+
+        const first = numeric[1];
+        const second = numeric[2];
+        const third = numeric[3];
+        const fourth = numeric[4];
+        if (first && second) {
+          const year = first.length === 2 ? `20${first}` : first;
+          const month = Number(second);
+          return `${new Date(Number(year), month - 1, 1).toLocaleString("en-US", { month: "long" })} ${year}`;
+        }
+        if (third && fourth) {
+          const year = fourth.length === 2 ? `20${fourth}` : fourth;
+          const month = Number(third);
+          return `${new Date(Number(year), month - 1, 1).toLocaleString("en-US", { month: "long" })} ${year}`;
+        }
+        return "Period not detected yet";
+      }
+
+      function setStatus(type, label, errorMessage = "") {
+        statusPill.className = `status-pill ${type}`;
+        statusPill.innerHTML = type === "validating"
+          ? `<span class="spinner"></span><span id="statusPillLabel">${label}</span>`
+          : `<span>${label}</span>`;
+        if (type === "error") {
+          fileError.style.display = "block";
+          fileError.textContent = errorMessage;
+        } else {
+          fileError.style.display = "none";
+          fileError.textContent = "";
         }
       }
 
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        error.textContent = "";
-        statusBlock.style.display = "block";
-        progressBar.style.width = "35%";
-        statusLabel.textContent = "Uploading your statement...";
-        analyzeBtn.disabled = true;
-
-        const file = fileInput.files?.[0];
-        if (!file) {
-          error.textContent = "Please select a CSV or PDF file.";
-          analyzeBtn.disabled = false;
+      function validateFile(file) {
+        if (!selectedBusinessType) {
+          showBusinessWarning();
           return;
         }
+        if (!file) return;
+        selectedFile = file;
+        readyForUpload = false;
+        statusName.textContent = file.name;
+        statusMeta.textContent = `${detectPeriod(file.name)} · ${formatBytes(file.size)}`;
+        statusRow.style.display = "flex";
+        dropzone.style.display = "none";
+        submitRow.style.display = "none";
+        setStatus("validating", "Validating...");
 
-        const body = new FormData();
-        body.append("file", file);
+        window.setTimeout(() => {
+          const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+          if (!isPdf) {
+            setStatus(
+              "error",
+              "Error",
+              "This file isn't a PDF. Please download your statement as a PDF from your processor's portal and try again.",
+            );
+            return;
+          }
+
+          if (file.size > 20 * 1024 * 1024) {
+            setStatus(
+              "error",
+              "Error",
+              "This file is too large (over 20 MB). Try downloading a single monthly statement rather than a combined document.",
+            );
+            return;
+          }
+
+          readyForUpload = true;
+          setStatus("ready", "Ready");
+          submitRow.style.display = "flex";
+        }, 420);
+      }
+
+      async function createJob() {
+        if (!selectedBusinessType) {
+          showBusinessWarning();
+          return;
+        }
+        if (!selectedFile || !readyForUpload) return;
+
+        analyzeBtn.disabled = true;
+        analyzeBtn.textContent = "Starting analysis...";
+
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        formData.append("businessType", selectedBusinessType);
 
         try {
-          const res = await fetch("/api/jobs", { method: "POST", body });
-          const payload = await readJsonSafe(res);
-          if (!res.ok) throw new Error(payload?.error || `Upload failed (${res.status})`);
-          if (!payload?.jobId) throw new Error("Server returned an invalid response for job creation.");
-          progressBar.style.width = "100%";
-          statusLabel.textContent = "Opening your live report...";
+          const response = await fetch("/api/jobs", {
+            method: "POST",
+            body: formData,
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(payload.error || "We couldn't start the analysis.");
+          if (payload.jobId) {
+            try {
+              sessionStorage.setItem("feeclearPendingJobId", payload.jobId);
+            } catch {}
+          }
           window.location.href = `/report/${payload.jobId}`;
-        } catch (err) {
-          error.textContent = err?.message || "Something went wrong.";
+        } catch (error) {
           analyzeBtn.disabled = false;
+          analyzeBtn.textContent = "Analyze my statement";
+          setStatus("error", "Error", error?.message || "We couldn't start the analysis.");
+        }
+      }
+
+      businessGrid.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-business-type]");
+        if (!button) return;
+        setBusinessType(button.getAttribute("data-business-type"));
+      });
+
+      dropzone.addEventListener("click", () => {
+        if (!selectedBusinessType) {
+          showBusinessWarning();
         }
       });
+
+      dropzone.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        dropzone.click();
+      });
+
+      ["dragenter", "dragover"].forEach((name) => {
+        dropzone.addEventListener(name, (event) => {
+          event.preventDefault();
+          if (!selectedBusinessType) {
+            showBusinessWarning();
+            dropzone.classList.remove("dragover");
+            return;
+          }
+          dropzone.classList.add("dragover");
+        });
+      });
+
+      ["dragleave", "dragend", "drop"].forEach((name) => {
+        dropzone.addEventListener(name, (event) => {
+          event.preventDefault();
+          dropzone.classList.remove("dragover");
+        });
+      });
+
+      dropzone.addEventListener("drop", (event) => {
+        if (!selectedBusinessType) {
+          showBusinessWarning();
+          return;
+        }
+        const file = event.dataTransfer?.files?.[0];
+        validateFile(file);
+      });
+
+      fileInput.addEventListener("change", () => validateFile(fileInput.files?.[0]));
+      removeBtn.addEventListener("click", resetFileSelection);
+      analyzeBtn.addEventListener("click", createJob);
+
+      renderBusinessCards();
+      updateDropzoneState();
     </script>
   </body>
 </html>

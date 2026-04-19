@@ -16,7 +16,7 @@ export async function maybeRunAiRefinement(summary: AnalysisSummary): Promise<An
     return summary;
   }
 
-  const modelName = process.env.ANTHROPIC_MODEL ?? "claude-opus-4-6";
+  const modelName = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
   const maxInputTokens = Number(process.env.AI_MAX_INPUT_TOKENS ?? 4000);
   const maxOutputTokens = Number(process.env.AI_MAX_OUTPUT_TOKENS ?? 600);
 

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign in to FeeClear</title>
+    <link rel="stylesheet" href="/dashboard.css" />
+  </head>
+  <body class="auth-page">
+    <main class="auth-shell">
+      <header class="topbar">
+        <a class="logo" href="/" aria-label="FeeClear">
+          <span class="logo-mark">F</span>
+          <span class="logo-copy">
+            <span class="logo-kicker">Merchant statement analysis</span>
+            <span class="logo-name">FeeClear</span>
+          </span>
+        </a>
+        <a id="signupLinkTop" class="link-btn" href="/signup">Create account</a>
+      </header>
+
+      <section class="auth-layout">
+        <div class="panel hero-panel">
+          <div class="eyebrow">Welcome back</div>
+          <h1>Pick up where you left off.</h1>
+          <p class="subheading">
+            Sign in to see your saved merchant statement, unlock the full report, and keep moving into the two-month
+            comparison flow.
+          </p>
+          <ul class="auth-benefits">
+            <li><span class="dot-mark">1</span><span>Your full statement breakdown stays attached to your account.</span></li>
+            <li><span class="dot-mark">2</span><span>Your free second statement stays available until you use it.</span></li>
+            <li><span class="dot-mark">3</span><span>If this page came from a fresh teaser result, we’ll attach that statement when you sign in.</span></li>
+          </ul>
+        </div>
+
+        <section class="panel auth-card">
+          <div class="eyebrow">Sign in</div>
+          <h2>Access your report</h2>
+          <form id="signinForm" class="form-grid">
+            <label>
+              Email
+              <input id="emailInput" type="email" name="email" autocomplete="email" required />
+            </label>
+            <label>
+              Password
+              <input id="passwordInput" type="password" name="password" autocomplete="current-password" required />
+            </label>
+            <div id="formError" class="form-error hidden"></div>
+            <button id="submitBtn" class="primary-btn full-width" type="submit">Sign in →</button>
+          </form>
+          <p class="inline-note">
+            Need an account?
+            <a id="signupLinkBottom" class="text-link" href="/signup">Create one free</a>
+          </p>
+        </section>
+      </section>
+    </main>
+
+    <script type="module">
+      import { clearPendingStatementJobId, fetchJson, getPendingStatementJobId } from "/dashboard.js";
+
+      const params = new URLSearchParams(window.location.search);
+      const statementJobId = params.get("job") || getPendingStatementJobId() || "";
+      const signinForm = document.getElementById("signinForm");
+      const formError = document.getElementById("formError");
+      const submitBtn = document.getElementById("submitBtn");
+      const signupHref = statementJobId ? `/signup?job=${encodeURIComponent(statementJobId)}` : "/signup";
+      document.getElementById("signupLinkTop").href = signupHref;
+      document.getElementById("signupLinkBottom").href = signupHref;
+
+      signinForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        formError.classList.add("hidden");
+        formError.textContent = "";
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Signing you in...";
+
+        const payload = {
+          email: document.getElementById("emailInput").value.trim(),
+          password: document.getElementById("passwordInput").value,
+          statementJobId,
+        };
+
+        try {
+          const response = await fetchJson("/api/auth/signin", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          clearPendingStatementJobId();
+          window.location.href = response.redirectTo || "/dashboard/report";
+        } catch (error) {
+          formError.textContent = error instanceof Error ? error.message : "We could not sign you in.";
+          formError.classList.remove("hidden");
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Sign in →";
+        }
+      });
+    </script>
+  </body>
+</html>

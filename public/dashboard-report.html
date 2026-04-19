@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Your FeeClear report</title>
+    <link rel="stylesheet" href="/dashboard.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header id="topbar" class="topbar"></header>
+      <div id="stepper" class="stepper"></div>
+      <section id="page" class="panel hero-panel">Loading your saved report...</section>
+    </main>
+
+    <script type="module">
+      import {
+        attachDevResetHandler,
+        clearPendingStatementJobId,
+        escapeHtml,
+        fetchJson,
+        formatMoney,
+        formatPeriodLabel,
+        formatPct,
+        merchantBadgeMarkup,
+        progressMarkup,
+        verdictLabel,
+        verdictTone,
+      } from "/dashboard.js";
+
+      const topbar = document.getElementById("topbar");
+      const stepper = document.getElementById("stepper");
+      const page = document.getElementById("page");
+
+      function topbarMarkup(merchant) {
+        return `
+          <a class="logo" href="/dashboard/report" aria-label="FeeClear">
+            <span class="logo-mark">F</span>
+            <span class="logo-copy">
+              <span class="logo-kicker">Merchant statement analysis</span>
+              <span class="logo-name">FeeClear</span>
+            </span>
+          </a>
+          ${merchantBadgeMarkup(merchant)}
+        `;
+      }
+
+      function normalizeFeeLabel(value) {
+        return String(value ?? "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, " ")
+          .trim();
+      }
+
+      function displayFeeLabel(value) {
+        const specialWords = {
+          amex: "Amex",
+          api: "API",
+          ach: "ACH",
+          avs: "AVS",
+          pci: "PCI",
+          pos: "POS",
+          ebt: "EBT",
+        };
+        return String(value ?? "")
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((part) => {
+            const lower = part.toLowerCase();
+            return specialWords[lower] || `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`;
+          })
+          .join(" ");
+      }
+
+      function feeTypeFor(label) {
+        const lower = normalizeFeeLabel(label);
+        if (/interchange|assessment|dues|network|card brand|visa|mastercard|discover|amex|american express/.test(lower)) {
+          return "Pass-through";
+        }
+        if (/pci|statement|gateway|batch|monthly|minimum|admin|compliance|noncompliance|service|platform/.test(lower)) {
+          return "Compliance / service fee";
+        }
+        return "Processor fee";
+      }
+
+      function buildFeeRows(summary) {
+        const suspiciousLabels = new Set(
+          (Array.isArray(summary?.suspiciousFees) ? summary.suspiciousFees : []).map((item) => normalizeFeeLabel(item.label)),
+        );
+
+        return (Array.isArray(summary?.feeBreakdown) ? summary.feeBreakdown : []).map((row) => {
+          const feeType = feeTypeFor(row.label);
+          const lower = normalizeFeeLabel(row.label);
+          const isNegotiable = /pci|statement|gateway|batch|monthly|minimum|admin|compliance|noncompliance|service|platform/.test(lower);
+          const isAboveTypical = !isNegotiable && suspiciousLabels.has(lower);
+          const status = isNegotiable
+            ? "Negotiable — ask your processor"
+            : isAboveTypical
+              ? "Above typical for your industry"
+              : "Normal";
+          const statusTone = isNegotiable ? "info" : isAboveTypical ? "warn" : "good";
+
+          return {
+            feeName: displayFeeLabel(row.label),
+            amount: Number(row.amount || 0),
+            feeType,
+            status,
+            statusTone,
+          };
+        });
+      }
+
+      function feeBreakdownTable(rows) {
+        if (!rows.length) {
+          return `<p class="helper-copy">No fee line items were extracted from this statement yet.</p>`;
+        }
+
+        return `
+          <table class="comparison-table fee-breakdown-table">
+            <thead>
+              <tr>
+                <th>Fee name</th>
+                <th>Amount</th>
+                <th>Fee type</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows
+                .map(
+                  (row) => `
+                    <tr>
+                      <td>${escapeHtml(row.feeName)}</td>
+                      <td>${formatMoney(row.amount)}</td>
+                      <td>${escapeHtml(row.feeType)}</td>
+                      <td><span class="verdict-pill ${row.statusTone}">${escapeHtml(row.status)}</span></td>
+                    </tr>
+                  `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        `;
+      }
+
+      function watchCopy(row, businessType) {
+        if (row.status === "Negotiable — ask your processor") {
+          return `${row.feeName} (${formatMoney(row.amount)}) — this is often negotiable. Ask your processor to remove it or explain what it covers.`;
+        }
+
+        if (row.feeType === "Pass-through") {
+          return `${row.feeName} (${formatMoney(row.amount)}) — this looks high for a ${businessType.toLowerCase()} business. Ask your processor to show how it was calculated and whether your card mix is pushing it up.`;
+        }
+
+        return `${row.feeName} (${formatMoney(row.amount)}) — this looks high for a ${businessType.toLowerCase()} business. Ask your processor whether the markup can be reduced or moved to a simpler pricing plan.`;
+      }
+
+      function watchList(rows, businessType) {
+        const flagged = rows.filter((row) => row.status !== "Normal");
+        if (!flagged.length) {
+          return `<p class="body-copy">Everything on this statement looks normal for a ${escapeHtml(String(businessType).toLowerCase())} business.</p>`;
+        }
+
+        return `
+          <ul class="simple-list">
+            ${flagged
+              .map(
+                (row) => `
+                  <li>
+                    <span class="dot-mark">•</span>
+                    <span>${escapeHtml(watchCopy(row, businessType))}</span>
+                  </li>
+                `,
+              )
+              .join("")}
+          </ul>
+        `;
+      }
+
+      async function boot() {
+        try {
+          clearPendingStatementJobId();
+          const data = await fetchJson("/api/dashboard/report");
+          const merchant = data.merchant;
+          const statement = data.statement;
+          const summary = statement.summary || {};
+          const verdictClass = verdictTone(statement.benchmarkVerdict);
+          const feeRows = buildFeeRows(summary);
+          const nextHref = merchant.freeStatementsRemaining > 0 ? "/dashboard/upload-second" : "/dashboard/comparison";
+          const nextLabel =
+            merchant.freeStatementsRemaining > 0 ? "Add another month →" : "See your two-month comparison →";
+
+          topbar.innerHTML = topbarMarkup(merchant);
+          attachDevResetHandler(topbar);
+          stepper.innerHTML = progressMarkup([
+            { label: "Statement 1", state: "completed" },
+            { label: "Statement 2", state: merchant.freeStatementsRemaining > 0 ? "active" : "completed" },
+            { label: "Your picture", state: merchant.freeStatementsRemaining > 0 ? "" : "active" },
+          ]);
+
+          page.innerHTML = `
+            <div class="eyebrow">Free account · ${merchant.freeStatementsRemaining} statement remaining</div>
+            <h1>Your first statement is saved.</h1>
+            <p class="subheading">
+              ${escapeHtml(formatPeriodLabel(statement.period) || statement.period)} · ${escapeHtml(statement.processorName)} · ${escapeHtml(statement.businessType)}
+            </p>
+
+            <div class="stats-grid" style="margin-top: 24px;">
+              <article class="stat-card">
+                <span class="stat-label">Monthly volume</span>
+                <div class="stat-value">${formatMoney(statement.totalVolume)}</div>
+              </article>
+              <article class="stat-card">
+                <span class="stat-label">Total fees paid</span>
+                <div class="stat-value">${formatMoney(statement.totalFees)}</div>
+              </article>
+              <article class="stat-card">
+                <span class="stat-label">Effective rate</span>
+                <div class="stat-value">${formatPct(statement.effectiveRate)}</div>
+                <div class="inline-note"><span class="verdict-pill ${verdictClass}">${escapeHtml(verdictLabel(statement.benchmarkVerdict))}</span></div>
+              </article>
+            </div>
+
+            <div class="info-grid" style="margin-top: 20px;">
+              <section class="table-card">
+                <span class="kicker">Fee breakdown</span>
+                <p class="body-copy">
+                  Benchmark range for ${escapeHtml(statement.businessType)}: ${formatPct(statement.benchmarkLow)} to ${formatPct(statement.benchmarkHigh)}.
+                </p>
+                ${feeBreakdownTable(feeRows)}
+              </section>
+              <section class="summary-card">
+                <span class="kicker">Suggested next step</span>
+                <h2>Compare one more month.</h2>
+                <p class="body-copy">
+                  One statement gives us a snapshot. A second month shows whether your fees are steady or starting to move.
+                </p>
+                <a class="primary-btn full-width" href="${nextHref}">${nextLabel}</a>
+              </section>
+            </div>
+
+            <section class="summary-card" style="margin-top: 20px;">
+              <span class="kicker">What to watch</span>
+              ${watchList(feeRows, statement.businessType)}
+            </section>
+          `;
+        } catch (error) {
+          page.innerHTML = `<div class="form-error">${escapeHtml(error instanceof Error ? error.message : "Unable to load your report.")}</div>`;
+        }
+      }
+
+      boot();
+    </script>
+  </body>
+</html>

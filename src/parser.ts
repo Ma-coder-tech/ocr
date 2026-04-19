@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 import { parse } from "csv-parse/sync";
 
+const PDF_PARSE_TIMEOUT_MS = Number(process.env.PDF_PARSE_TIMEOUT_MS ?? 30_000);
+
 export type ParsedDocument = {
   sourceType: "csv" | "pdf";
   headers: string[];
@@ -136,10 +138,27 @@ export async function parseCsv(filePath: string): Promise<ParsedDocument> {
   };
 }
 
-export async function parsePdf(filePath: string): Promise<ParsedDocument> {
+export async function parsePdf(filePath: string, jobId?: string): Promise<ParsedDocument> {
   const { default: pdfParse } = await import("pdf-parse");
   const buffer = await fs.readFile(filePath);
-  const data = await pdfParse(buffer);
+  if (jobId) {
+    console.log(`[job:${jobId}] pdf-parse-start timeout=${PDF_PARSE_TIMEOUT_MS}ms`);
+  } else {
+    console.log(`[pdf-parse] start timeout=${PDF_PARSE_TIMEOUT_MS}ms`);
+  }
+
+  let timer: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error("PDF parsing timed out. The file may be corrupted or too complex to process."));
+    }, PDF_PARSE_TIMEOUT_MS);
+  });
+
+  const data = await Promise.race([pdfParse(buffer), timeoutPromise]).finally(() => {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  });
 
   const lines = data.text
     .split(/\r?\n/)

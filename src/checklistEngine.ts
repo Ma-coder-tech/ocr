@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { ParsedDocument } from "./parser.js";
 import { AnalysisSummary, ChecklistBucket, ChecklistReport, ChecklistRuleResult, RuleStatus } from "./types.js";
 
@@ -30,7 +31,8 @@ type LoadedChecklists = {
 
 let checklistCachePromise: Promise<LoadedChecklists> | null = null;
 
-const FOUNDATION_DIR = path.resolve("data", "merchant-statement-foundation");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const FOUNDATION_DIR = path.resolve(__dirname, "..", "data", "merchant-statement-foundation");
 const UNIVERSAL_PATH = path.join(FOUNDATION_DIR, "master-checklist.json");
 const PROCESSOR_PATH = path.join(FOUNDATION_DIR, "processor-grouped-checklist.json");
 

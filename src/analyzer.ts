@@ -1,3 +1,4 @@
+import { BusinessTypeId, getBusinessTypeBenchmark, getBusinessTypeReportLabel } from "./businessTypes.js";
 import {
   AnalysisSummary,
   BenchmarkResult,
@@ -118,21 +119,13 @@ function parseDateish(value: string): string | null {
   return null;
 }
 
-function benchmarkForProcessor(processorName: string): Omit<BenchmarkResult, "status" | "deltaFromUpperRate"> {
-  const key = processorName.toLowerCase();
-  if (key.includes("square")) {
-    return { segment: "SMB blended card mix (Square)", lowerRate: 2.6, upperRate: 4.1 };
-  }
-  if (key.includes("stripe")) {
-    return { segment: "SMB blended card mix (Stripe)", lowerRate: 2.4, upperRate: 3.9 };
-  }
-  if (key.includes("paypal")) {
-    return { segment: "SMB blended card mix (PayPal)", lowerRate: 2.9, upperRate: 4.6 };
-  }
-  if (key.includes("adyen")) {
-    return { segment: "Mid-market card mix (Adyen)", lowerRate: 1.8, upperRate: 3.2 };
-  }
-  return { segment: "General SMB card processing", lowerRate: 2.2, upperRate: 3.8 };
+function benchmarkForBusinessType(businessType: BusinessTypeId): Omit<BenchmarkResult, "status" | "deltaFromUpperRate"> {
+  const benchmark = getBusinessTypeBenchmark(businessType);
+  return {
+    segment: `${getBusinessTypeReportLabel(businessType)} benchmark`,
+    lowerRate: benchmark.lowerRate,
+    upperRate: benchmark.upperRate,
+  };
 }
 
 function severityFromShare(sharePct: number): SuspiciousFee["severity"] {
@@ -166,8 +159,12 @@ function inferPeriod(row: Record<string, string | number>, periodKeys: string[])
   return null;
 }
 
-function createTextOnlyPdfSummary(doc: ParsedDocument, processorName: string): AnalysisSummary {
-  const benchmarkBase = benchmarkForProcessor(processorName);
+function createTextOnlyPdfSummary(
+  doc: ParsedDocument,
+  processorName: string,
+  businessType: BusinessTypeId,
+): AnalysisSummary {
+  const benchmarkBase = benchmarkForBusinessType(businessType);
   const benchmark: BenchmarkResult = {
     ...benchmarkBase,
     status: "within",
@@ -207,6 +204,7 @@ function createTextOnlyPdfSummary(doc: ParsedDocument, processorName: string): A
   }
 
   return {
+    businessType,
     processorName,
     sourceType: doc.sourceType,
     statementPeriod: "Not reliably extractable from current PDF text layer",
@@ -247,10 +245,10 @@ function createTextOnlyPdfSummary(doc: ParsedDocument, processorName: string): A
   };
 }
 
-export function analyzeDocument(doc: ParsedDocument): AnalysisSummary {
+export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeId): AnalysisSummary {
   const processorName = inferProcessor(`${doc.headers.join(" ")} ${doc.textPreview}`);
   if (doc.sourceType === "pdf" && doc.extraction.mode !== "structured") {
-    return createTextOnlyPdfSummary(doc, processorName);
+    return createTextOnlyPdfSummary(doc, processorName, businessType);
   }
 
   const feeBuckets = new Map<string, number>();
@@ -342,7 +340,7 @@ export function analyzeDocument(doc: ParsedDocument): AnalysisSummary {
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 15);
 
-  const benchmarkBase = benchmarkForProcessor(processorName);
+  const benchmarkBase = benchmarkForBusinessType(businessType);
   const benchmark: BenchmarkResult = {
     ...benchmarkBase,
     status:
@@ -596,6 +594,7 @@ export function analyzeDocument(doc: ParsedDocument): AnalysisSummary {
         : "low";
 
   return {
+    businessType,
     processorName,
     sourceType: doc.sourceType,
     statementPeriod,
