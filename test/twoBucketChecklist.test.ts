@@ -35,17 +35,44 @@ const FIXTURE_FILES = [
   "bloom_january_2024_warning.json",
   "clover_june_processing_unknown.json",
 ] as const;
+const MISSING_PDF_FIXTURE_MESSAGE = "PDF fixture not present — copy files into test/fixtures/pdfs/ to run this test";
 
 async function loadFixture(fileName: string): Promise<GoldenFixture> {
   const raw = await fs.readFile(path.join(FIXTURE_DIR, fileName), "utf8");
   return JSON.parse(raw) as GoldenFixture;
 }
 
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const FIXTURE_CASES = await Promise.all(
+  FIXTURE_FILES.map(async (fileName) => {
+    const fixture = await loadFixture(fileName);
+    const sourceFile = path.resolve(process.cwd(), fixture.sourceFile);
+    return {
+      fileName,
+      fixture,
+      sourceFile,
+      exists: await fileExists(sourceFile),
+    };
+  }),
+);
+
 describe("two-bucket golden fixtures", () => {
-  for (const fileName of FIXTURE_FILES) {
-    it(`matches phase-1 checklist statuses for ${fileName}`, async () => {
-      const fixture = await loadFixture(fileName);
-      const parsed = await parsePdf(fixture.sourceFile);
+  for (const { fileName, fixture, sourceFile, exists } of FIXTURE_CASES) {
+    const run = exists ? it : it.skip;
+    const testName = exists
+      ? `matches phase-1 checklist statuses for ${fileName}`
+      : `matches phase-1 checklist statuses for ${fileName} (${MISSING_PDF_FIXTURE_MESSAGE})`;
+
+    run(testName, async () => {
+      const parsed = await parsePdf(sourceFile);
       const baseSummary = analyzeDocument(parsed, "other");
       const summary = parsed.extraction.mode === "text_only" ? refineTextOnlyPdfSummary(parsed, baseSummary) ?? baseSummary : baseSummary;
       const checklist = await evaluateChecklistReport(parsed, summary);

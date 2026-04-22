@@ -1,6 +1,6 @@
 {
   "id": "clover_november_2024_pass",
-  "sourceFile": "/Users/martialmahougnonamoussou/Downloads/Nov_2024_Statement.pdf",
+  "sourceFile": "test/fixtures/pdfs/Nov_2024_Statement.pdf",
   "processorFamily": "Fiserv/Clover",
   "fixturePurpose": "Second pass case for the phase-1 two-bucket evaluator, confirming the same statement family stays inside the guide baseline across months.",
   "method": "Use the explicit section totals printed on the statement summary page.",

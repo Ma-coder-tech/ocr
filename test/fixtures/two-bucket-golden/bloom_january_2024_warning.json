@@ -1,6 +1,6 @@
 {
   "id": "bloom_january_2024_warning",
-  "sourceFile": "/Users/martialmahougnonamoussou/Downloads/SAMPLE MERCHANT 2Statement Bloom-To-Beauty-By-Maria-Jan-24.pdf",
+  "sourceFile": "test/fixtures/pdfs/SAMPLE_MERCHANT_2Statement_Bloom-To-Beauty-By-Maria-Jan-24.pdf",
   "processorFamily": "Unspecified processor statement with clear fee sections",
   "fixturePurpose": "Warning case for the phase-1 two-bucket evaluator using explicit section subtotals.",
   "method": "Card-brand total is the sum of explicit interchange/program and card-brand sections. Processor-owned total is the sum of authorization, transaction, and other-fee sections.",
