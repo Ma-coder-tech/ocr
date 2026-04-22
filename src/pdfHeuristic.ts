@@ -269,6 +269,7 @@ function pickTotalFees(candidates: Candidate[], totalVolume: number): Candidate 
         const lower = label.toLowerCase();
         let score = 0;
         if (/total \(service charges.*interchange charges.*fees/.test(lower)) score += 15;
+        if (/total fees due/.test(lower)) score += 14;
         if (/fees charged/.test(lower)) score += 12;
         if (/month end charge|less discount paid/.test(lower)) score += 11;
         if (/^total fees$|total charges/.test(lower)) score += 6;

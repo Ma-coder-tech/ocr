@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "NODE_ENV=production node dist/server.js",
     "test": "vitest run",
+    "bakeoff:pdf": "npm run build && node scripts/pdf-bakeoff.mjs",
     "validate:foundation": "node scripts/validate-merchant-foundation.mjs"
   },
   "dependencies": {
@@ -16,7 +17,7 @@
     "better-sqlite3": "^12.9.0",
     "csv-parse": "^5.5.6",
     "dotenv": "^17.3.1",
-    "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^5.6.205",
     "zod": "^4.3.6"
   },
   "devDependencies": {

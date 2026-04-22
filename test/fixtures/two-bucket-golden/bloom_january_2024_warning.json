@@ -1,0 +1,52 @@
+{
+  "id": "bloom_january_2024_warning",
+  "sourceFile": "/Users/martialmahougnonamoussou/Downloads/SAMPLE MERCHANT 2Statement Bloom-To-Beauty-By-Maria-Jan-24.pdf",
+  "processorFamily": "Unspecified processor statement with clear fee sections",
+  "fixturePurpose": "Warning case for the phase-1 two-bucket evaluator using explicit section subtotals.",
+  "method": "Card-brand total is the sum of explicit interchange/program and card-brand sections. Processor-owned total is the sum of authorization, transaction, and other-fee sections.",
+  "evidence": [
+    {
+      "line": 78,
+      "text": "Total Authorization Fees:$1.28"
+    },
+    {
+      "line": 89,
+      "text": "Total Interchange Fees/American Express Program Fees:$35.07"
+    },
+    {
+      "line": 93,
+      "text": "Total Transaction Fees:$1.01"
+    },
+    {
+      "line": 119,
+      "text": "Total Card Brand Fees:$5.31"
+    },
+    {
+      "line": 124,
+      "text": "Total Other Fees:$39.95"
+    },
+    {
+      "line": 125,
+      "text": "Total Fees Due:Total Fees Due:$82.62$82.62"
+    }
+  ],
+  "expected": {
+    "phase": "phase1_e001_e003_e004",
+    "e001Status": "pass",
+    "e003Status": "warning",
+    "e004Status": "warning",
+    "totalFees": 82.62,
+    "cardBrandTotal": 40.38,
+    "processorOwnedTotal": 42.24,
+    "unknownTotal": 0,
+    "cardBrandSharePct": 48.87,
+    "processorOwnedSharePct": 51.13,
+    "coveragePct": 100,
+    "reconciliationDeltaUsd": 0
+  },
+  "notes": [
+    "This fixture is intentionally outside the guide baseline: card-brand share is below 60% and processor-owned share is above 40%.",
+    "The statement sections are clean enough that phase 1 can assert the two-bucket split directly from section subtotals.",
+    "This fixture could support later sub-bucket assertions because the processor-owned sections are explicit."
+  ]
+}

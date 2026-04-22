@@ -1,0 +1,44 @@
+{
+  "id": "clover_november_2024_pass",
+  "sourceFile": "/Users/martialmahougnonamoussou/Downloads/Nov_2024_Statement.pdf",
+  "processorFamily": "Fiserv/Clover",
+  "fixturePurpose": "Second pass case for the phase-1 two-bucket evaluator, confirming the same statement family stays inside the guide baseline across months.",
+  "method": "Use the explicit section totals printed on the statement summary page.",
+  "evidence": [
+    {
+      "line": 367,
+      "text": "Total Interchange Charges/Program Fees-$970.13"
+    },
+    {
+      "line": 368,
+      "text": "Total Service Charges-$90.09"
+    },
+    {
+      "line": 369,
+      "text": "Total Fees-$270.74"
+    },
+    {
+      "line": 370,
+      "text": "Total (Service Charges, Interchange Charges/Program Fees, and Fees)-$1,330.96"
+    }
+  ],
+  "expected": {
+    "phase": "phase1_e001_e003_e004",
+    "e001Status": "pass",
+    "e003Status": "pass",
+    "e004Status": "pass",
+    "totalFees": 1330.96,
+    "cardBrandTotal": 970.13,
+    "processorOwnedTotal": 360.83,
+    "unknownTotal": 0,
+    "cardBrandSharePct": 72.89,
+    "processorOwnedSharePct": 27.11,
+    "coveragePct": 100,
+    "reconciliationDeltaUsd": 0
+  },
+  "notes": [
+    "This is intentionally paired with the October Clover fixture to confirm the same section-total method is stable across months.",
+    "Phase 1 treats 'Total Interchange Charges/Program Fees' as the card-brand bucket.",
+    "Phase 1 treats 'Total Service Charges' plus 'Total Fees' as the processor-owned bucket for this statement-level baseline."
+  ]
+}

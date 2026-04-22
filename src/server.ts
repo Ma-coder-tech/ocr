@@ -47,7 +47,6 @@ import { analyzeDocument } from "./analyzer.js";
 import { detectPeriodKeyFromFileName, formatPeriodKey, inferPeriodKeyFromText, parsePeriodKey, toPeriodLabel } from "./periods.js";
 import { parsePdf } from "./parser.js";
 import { detectPreflightFailure } from "./preflight.js";
-import { refineTextOnlyPdfSummary } from "./pdfHeuristic.js";
 import { createJob, getJob, listEvents, pruneJobs } from "./store.js";
 import { enqueueJob, hydrateQueuedJobs } from "./worker.js";
 
@@ -457,9 +456,7 @@ async function validateProcessorStatementPdf(input: {
     throw new Error(preflightFailure);
   }
 
-  const summaryBase = analyzeDocument(parsed, input.businessType as AnalysisSummary["businessType"]);
-  const summary =
-    parsed.extraction.mode === "text_only" ? refineTextOnlyPdfSummary(parsed, summaryBase) ?? summaryBase : summaryBase;
+  const summary = analyzeDocument(parsed, input.businessType as AnalysisSummary["businessType"]);
 
   const detectedPeriodKey = detectStatementPeriodKey(summary, parsed.textPreview, input.fileName, null);
   if (input.existingPeriodKey && detectedPeriodKey && input.existingPeriodKey === detectedPeriodKey) {

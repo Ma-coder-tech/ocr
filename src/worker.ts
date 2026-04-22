@@ -56,11 +56,10 @@ async function processJob(jobId: string): Promise<void> {
     stageUpdate(jobId, "verifying_statement", 10, "Verifying statement format");
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
-    const [{ parseCsv, parsePdf }, { analyzeDocument }, { refineTextOnlyPdfSummary }, { evaluateChecklistReport }] =
+    const [{ parseCsv, parsePdf }, { analyzeDocument }, { evaluateChecklistReport }] =
       await Promise.all([
         import("./parser.js"),
         import("./analyzer.js"),
-        import("./pdfHeuristic.js"),
         import("./checklistEngine.js"),
       ]);
 
@@ -94,17 +93,6 @@ async function processJob(jobId: string): Promise<void> {
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
     let summary = analyzeDocument(parsed, job.businessType);
-    if (job.fileType === "pdf" && parsed.extraction.mode === "text_only") {
-      const recoveredSummary = refineTextOnlyPdfSummary(parsed, summary);
-      if (recoveredSummary) {
-        summary = recoveredSummary;
-        console.log(`[job:${jobId}] pdf-text-recovery`, {
-          totalVolume: summary.totalVolume,
-          totalFees: summary.totalFees,
-          effectiveRate: summary.effectiveRate,
-        });
-      }
-    }
     console.log(`[job:${jobId}] deterministic-summary`, {
       businessType: job.businessType,
       processor: summary.processorName,

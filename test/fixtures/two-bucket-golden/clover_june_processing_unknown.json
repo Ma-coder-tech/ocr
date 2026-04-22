@@ -1,0 +1,56 @@
+{
+  "id": "clover_june_processing_unknown",
+  "sourceFile": "/Users/martialmahougnonamoussou/Downloads/SAMPLE MERCHANT 3-Clover-June-Processing-Report.pdf",
+  "processorFamily": "Fiserv/Clover",
+  "fixturePurpose": "Unknown case for the phase-1 two-bucket evaluator when the statement does not expose a trustworthy card-brand subtotal.",
+  "method": "Do not fabricate a two-bucket split when the statement only exposes service-charge and fee totals without a usable interchange/card-brand subtotal.",
+  "evidence": [
+    {
+      "line": 101,
+      "text": "NON SWIPED DISCOUNT $1,450.00 AT .028900 , 4 TRANS AT .100000Service charges-$42.31"
+    },
+    {
+      "line": 102,
+      "text": "TOTAL TRANSACTION FEES-$42.31"
+    },
+    {
+      "line": 106,
+      "text": "APPLICATION FEEFees-$99.00"
+    },
+    {
+      "line": 107,
+      "text": "TOTAL ACCOUNT FEES-$99.00"
+    },
+    {
+      "line": 109,
+      "text": "Total Service Charges-$42.31"
+    },
+    {
+      "line": 110,
+      "text": "Total Fees-$99.00"
+    },
+    {
+      "line": 111,
+      "text": "Total (Service Charges, Interchange Charges/Program Fees, and Fees)-$141.31"
+    }
+  ],
+  "expected": {
+    "phase": "phase1_e001_e003_e004",
+    "e001Status": "unknown",
+    "e003Status": "unknown",
+    "e004Status": "unknown",
+    "totalFees": 141.31,
+    "cardBrandTotal": null,
+    "processorOwnedTotal": null,
+    "unknownTotal": null,
+    "cardBrandSharePct": null,
+    "processorOwnedSharePct": null,
+    "coveragePct": null,
+    "reconciliationDeltaUsd": null
+  },
+  "notes": [
+    "This fixture is a guardrail against invented certainty.",
+    "The statement exposes total fees, service charges, and account fees, but it does not expose a trustworthy card-brand/interchange subtotal for a phase-1 statement-level split.",
+    "The correct phase-1 outcome is unknown, not a guessed bucket share."
+  ]
+}

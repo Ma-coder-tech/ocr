@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ParsedDocument } from "./parser.js";
 import { AnalysisSummary, ChecklistBucket, ChecklistReport, ChecklistRuleResult, RuleStatus } from "./types.js";
+import { analyzeTwoBucketStatement } from "./twoBucketAnalysis.js";
 
 type UniversalElement = {
   id: string;
@@ -173,6 +174,75 @@ function evaluateUniversalRule(
   let status: RuleStatus = "unknown";
   let reason = "Automated evaluator for this rule is not fully implemented yet.";
   const evidence: string[] = [];
+
+  if (element.id === "E001" || element.id === "E003" || element.id === "E004") {
+    const analysis = analyzeTwoBucketStatement(doc, summary);
+    const numericEvidence = [
+      analysis.totalFees !== null ? `Total fees: ${analysis.totalFees.toFixed(2)}` : null,
+      analysis.cardBrandTotal !== null ? `Card-brand total: ${analysis.cardBrandTotal.toFixed(2)}` : null,
+      analysis.processorOwnedTotal !== null ? `Processor-owned total: ${analysis.processorOwnedTotal.toFixed(2)}` : null,
+      analysis.cardBrandSharePct !== null ? `Card-brand share: ${analysis.cardBrandSharePct.toFixed(2)}%` : null,
+      analysis.processorOwnedSharePct !== null ? `Processor-owned share: ${analysis.processorOwnedSharePct.toFixed(2)}%` : null,
+      analysis.reconciliationDeltaUsd !== null ? `Reconciliation delta: ${analysis.reconciliationDeltaUsd.toFixed(2)}` : null,
+    ].filter((item): item is string => Boolean(item));
+
+    const lineEvidence = [
+      ...analysis.evidence.cardBrand,
+      ...analysis.evidence.processorOwned,
+      ...analysis.evidence.totalFees,
+    ]
+      .slice(0, 6)
+      .map((item) => `${item.label}: ${item.line}`);
+
+    evidence.push(...numericEvidence, ...lineEvidence);
+
+    if (!analysis.available) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "unknown",
+        reason: analysis.reason,
+        evidence,
+      };
+    }
+
+    if (element.id === "E001") {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "pass",
+        reason: analysis.reason,
+        evidence,
+      };
+    }
+
+    if (element.id === "E003") {
+      const within = analysis.cardBrandSharePct !== null && analysis.cardBrandSharePct >= 60 && analysis.cardBrandSharePct <= 80;
+      return {
+        id: element.id,
+        title: element.name,
+        status: within ? "pass" : "warning",
+        reason: within
+          ? `Card-brand share (${analysis.cardBrandSharePct?.toFixed(2)}%) is inside the expected 60%-80% range.`
+          : `Card-brand share (${analysis.cardBrandSharePct?.toFixed(2)}%) is outside the expected 60%-80% range.`,
+        evidence,
+      };
+    }
+
+    const within =
+      analysis.processorOwnedSharePct !== null &&
+      analysis.processorOwnedSharePct >= 20 &&
+      analysis.processorOwnedSharePct <= 40;
+    return {
+      id: element.id,
+      title: element.name,
+      status: within ? "pass" : "warning",
+      reason: within
+        ? `Processor-owned share (${analysis.processorOwnedSharePct?.toFixed(2)}%) is inside the expected 20%-40% range.`
+        : `Processor-owned share (${analysis.processorOwnedSharePct?.toFixed(2)}%) is outside the expected 20%-40% range.`,
+      evidence,
+    };
+  }
 
   if (element.id === "E006") {
     if (summary.totalVolume > 0) {

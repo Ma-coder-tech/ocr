@@ -1,0 +1,44 @@
+{
+  "id": "clover_october_2024_pass",
+  "sourceFile": "/Users/martialmahougnonamoussou/Downloads/SAMPLE MERCHANT4 CLOVER.pdf",
+  "processorFamily": "Fiserv/Clover",
+  "fixturePurpose": "Pass case for the phase-1 two-bucket evaluator using statement-supported section totals.",
+  "method": "Use the explicit section totals printed on the statement summary page.",
+  "evidence": [
+    {
+      "line": 377,
+      "text": "Total Interchange Charges/Program Fees-$955.20"
+    },
+    {
+      "line": 378,
+      "text": "Total Service Charges-$89.12"
+    },
+    {
+      "line": 379,
+      "text": "Total Fees-$268.23"
+    },
+    {
+      "line": 380,
+      "text": "Total (Service Charges, Interchange Charges/Program Fees, and Fees)-$1,312.55"
+    }
+  ],
+  "expected": {
+    "phase": "phase1_e001_e003_e004",
+    "e001Status": "pass",
+    "e003Status": "pass",
+    "e004Status": "pass",
+    "totalFees": 1312.55,
+    "cardBrandTotal": 955.2,
+    "processorOwnedTotal": 357.35,
+    "unknownTotal": 0,
+    "cardBrandSharePct": 72.77,
+    "processorOwnedSharePct": 27.23,
+    "coveragePct": 100,
+    "reconciliationDeltaUsd": 0
+  },
+  "notes": [
+    "Phase 1 treats 'Total Interchange Charges/Program Fees' as the card-brand bucket.",
+    "Phase 1 treats 'Total Service Charges' plus 'Total Fees' as the processor-owned bucket for this statement-level baseline.",
+    "Do not use this fixture yet to assert processorMarkupTotal versus processorAncillaryTotal."
+  ]
+}

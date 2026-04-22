@@ -12,6 +12,7 @@ import {
   TrendPoint,
 } from "./types.js";
 import { ParsedDocument } from "./parser.js";
+import { refineTextOnlyPdfSummary } from "./pdfHeuristic.js";
 
 type ColumnStats = {
   sum: number;
@@ -247,8 +248,15 @@ function createTextOnlyPdfSummary(
 
 export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeId): AnalysisSummary {
   const processorName = inferProcessor(`${doc.headers.join(" ")} ${doc.textPreview}`);
-  if (doc.sourceType === "pdf" && doc.extraction.mode !== "structured") {
-    return createTextOnlyPdfSummary(doc, processorName, businessType);
+  if (doc.sourceType === "pdf") {
+    const qualitativeSummary = createTextOnlyPdfSummary(doc, processorName, businessType);
+    const recoveredSummary = refineTextOnlyPdfSummary(doc, qualitativeSummary);
+    if (recoveredSummary) {
+      return recoveredSummary;
+    }
+    if (doc.extraction.mode !== "structured") {
+      return qualitativeSummary;
+    }
   }
 
   const feeBuckets = new Map<string, number>();
