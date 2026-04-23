@@ -25,7 +25,28 @@ function makeSummary(period = "2024-10") {
       deltaFromUpperRate: 0,
     },
     kpis: [],
-    feeBreakdown: [{ label: "Processor Fees", amount: 25, sharePct: 100 }],
+    feeBreakdown: [
+      {
+        label: "Processor Fees",
+        amount: 15,
+        sharePct: 60,
+        feeClass: "processor_markup" as const,
+        broadType: "Processor" as const,
+        classificationConfidence: "high" as const,
+        classificationRule: "E018",
+        classificationReason: "Test classified processor fee.",
+      },
+      {
+        label: "Card Brand / Network Fees",
+        amount: 10,
+        sharePct: 40,
+        feeClass: "card_brand_pass_through" as const,
+        broadType: "Pass-through" as const,
+        classificationConfidence: "high" as const,
+        classificationRule: "E017",
+        classificationReason: "Test classified pass-through fee.",
+      },
+    ],
     suspiciousFees: [],
     savingsOpportunities: [],
     negotiationChecklist: [],
@@ -95,6 +116,8 @@ describe("accountStore", () => {
 
     expect(inserted.statementPeriod).toBe("October 2024");
     expect(inserted.totalFees).toBe(25);
+    expect(inserted.processorMarkup).toBe(15);
+    expect(inserted.cardNetworkFees).toBe(10);
 
     const updated = accountStore.persistStatementFromSummary({
       merchantId: merchant.id,

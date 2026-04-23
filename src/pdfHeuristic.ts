@@ -1,5 +1,6 @@
 import type { ParsedDocument } from "./parser.js";
-import type { AnalysisSummary } from "./types.js";
+import type { AnalysisSummary, FeeBreakdownRow } from "./types.js";
+import { classifyFeeRow, type FeeClassification } from "./feeClassification.js";
 
 type CandidateKind = "volume" | "fee" | "other";
 
@@ -173,15 +174,17 @@ function suspiciousReason(label: string): string | null {
   return null;
 }
 
-function feeBucket(label: string): string {
-  const lower = label.toLowerCase();
-  if (/interchange|assessment|dues|visa|mastercard|discover|amex|network/.test(lower)) {
+function feeBucket(label: string, classification: FeeClassification): string {
+  if (classification.broadType === "Pass-through") {
     return "Card Brand / Network Fees";
   }
-  if (/pci|non[\s-]?emv|risk|statement|gateway|monthly minimum|monthly fee|service fee/.test(lower)) {
-    return "Service / Add-On Fees";
+  if (classification.broadType === "Service / compliance") {
+    return "Service / Compliance Fees";
   }
-  if (/processing|discount|authorization|auth|batch|transaction|markup/.test(lower)) {
+  if (classification.broadType === "Processor") {
+    if (classification.feeClass === "processor_transaction_or_auth") {
+      return "Processor Transaction / Authorization Fees";
+    }
     return "Processor Fees";
   }
   return titleCase(label);
@@ -420,18 +423,46 @@ function deriveFeeRecovery(candidates: Candidate[], totalVolume: number) {
   };
 }
 
-function buildFeeBreakdown(sourceRows: Candidate[], totalFees: number) {
-  const buckets = new Map<string, number>();
+function buildFeeBreakdown(sourceRows: Candidate[], totalFees: number, processorName: string): FeeBreakdownRow[] {
+  const buckets = new Map<
+    string,
+    {
+      amount: number;
+      classification: FeeClassification;
+      evidenceLine: string;
+      sections: Set<string>;
+    }
+  >();
+
   for (const candidate of sourceRows) {
-    const bucket = feeBucket(candidate.label);
-    buckets.set(bucket, (buckets.get(bucket) ?? 0) + candidate.amount);
+    const classification = classifyFeeRow({
+      label: candidate.label,
+      amount: candidate.amount,
+      processorName,
+      sourceSection: candidate.section,
+      evidenceLine: candidate.rawLine,
+    });
+    const bucket = feeBucket(candidate.label, classification);
+    const current = buckets.get(bucket) ?? {
+      amount: 0,
+      classification,
+      evidenceLine: candidate.rawLine,
+      sections: new Set<string>(),
+    };
+    current.amount += candidate.amount;
+    if (candidate.section) current.sections.add(candidate.section);
+    buckets.set(bucket, current);
   }
 
   return [...buckets.entries()]
-    .map(([label, amount]) => ({
+    .map(([label, value]) => ({
       label,
-      amount: Math.round(amount * 100) / 100,
-      sharePct: totalFees > 0 ? Math.round((amount / totalFees) * 10000) / 100 : 0,
+      amount: Math.round(value.amount * 100) / 100,
+      sharePct: totalFees > 0 ? Math.round((value.amount / totalFees) * 10000) / 100 : 0,
+      ...value.classification,
+      sourceSection:
+        value.sections.size === 0 ? undefined : value.sections.size === 1 ? [...value.sections][0] : "Multiple statement sections",
+      evidenceLine: value.evidenceLine,
     }))
     .sort((left, right) => right.amount - left.amount)
     .slice(0, 6);
@@ -464,7 +495,7 @@ export function refineTextOnlyPdfSummary(doc: ParsedDocument, baseSummary: Analy
   const deltaFromUpperRate = Math.round(Math.max(0, effectiveRate - benchmarkBase.upperRate) * 100) / 100;
 
   const feeSourceRows = feeRecovery.sourceRows.length > 0 ? feeRecovery.sourceRows : candidates.filter((candidate) => candidate.kind === "fee");
-  const feeBreakdown = buildFeeBreakdown(feeSourceRows, totalFees);
+  const feeBreakdown = buildFeeBreakdown(feeSourceRows, totalFees, baseSummary.processorName);
   const suspiciousRows = feeSourceRows
     .filter((candidate) => candidate.amount >= Math.max(1, totalFees * 0.005))
     .map((candidate) => ({ candidate, reason: suspiciousReason(candidate.label) }))

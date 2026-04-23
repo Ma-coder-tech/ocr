@@ -14,6 +14,7 @@ import {
 import { ParsedDocument } from "./parser.js";
 import { refineTextOnlyPdfSummary } from "./pdfHeuristic.js";
 import { detectProcessorIdentity } from "./processorDetection.js";
+import { withFeeClassification } from "./feeClassification.js";
 
 type ColumnStats = {
   sum: number;
@@ -329,6 +330,16 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
       amount: toMoney(amount),
       sharePct: totalFees > 0 ? toPct((amount / totalFees) * 100) : 0,
     }))
+    .map((row) =>
+      withFeeClassification(
+        {
+          ...row,
+          sourceSection: "Structured fee column",
+          evidenceLine: row.label,
+        },
+        { processorName },
+      ),
+    )
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 15);
 

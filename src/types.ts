@@ -42,10 +42,27 @@ export type FeeInsight = {
   impactUsd: number;
 };
 
+export type FeeBroadType = "Pass-through" | "Processor" | "Service / compliance" | "Unknown";
+export type FeeClass =
+  | "card_brand_pass_through"
+  | "processor_markup"
+  | "processor_transaction_or_auth"
+  | "processor_service_add_on"
+  | "compliance_remediation"
+  | "unknown";
+export type FeeClassificationConfidence = "high" | "medium" | "low";
+
 export type FeeBreakdownRow = {
   label: string;
   amount: number;
   sharePct: number;
+  feeClass?: FeeClass;
+  broadType?: FeeBroadType;
+  sourceSection?: string;
+  evidenceLine?: string;
+  classificationConfidence?: FeeClassificationConfidence;
+  classificationRule?: string;
+  classificationReason?: string;
 };
 
 export type BenchmarkStatus = "below" | "within" | "above";

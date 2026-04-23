@@ -73,33 +73,24 @@
           .join(" ");
       }
 
-      function feeTypeFor(label) {
-        const lower = normalizeFeeLabel(label);
-        if (/interchange|assessment|dues|network|card brand|visa|mastercard|discover|amex|american express/.test(lower)) {
-          return "Pass-through";
-        }
-        if (/pci|statement|gateway|batch|monthly|minimum|admin|compliance|noncompliance|service|platform/.test(lower)) {
-          return "Compliance / service fee";
-        }
-        return "Processor fee";
-      }
-
       function buildFeeRows(summary) {
         const suspiciousLabels = new Set(
           (Array.isArray(summary?.suspiciousFees) ? summary.suspiciousFees : []).map((item) => normalizeFeeLabel(item.label)),
         );
 
         return (Array.isArray(summary?.feeBreakdown) ? summary.feeBreakdown : []).map((row) => {
-          const feeType = feeTypeFor(row.label);
-          const lower = normalizeFeeLabel(row.label);
-          const isNegotiable = /pci|statement|gateway|batch|monthly|minimum|admin|compliance|noncompliance|service|platform/.test(lower);
-          const isAboveTypical = !isNegotiable && suspiciousLabels.has(lower);
-          const status = isNegotiable
-            ? "Negotiable — ask your processor"
-            : isAboveTypical
-              ? "Above typical for your industry"
-              : "Normal";
-          const statusTone = isNegotiable ? "info" : isAboveTypical ? "warn" : "good";
+          const feeType = row.broadType || "Unknown";
+          const isServiceOrCompliance = feeType === "Service / compliance";
+          const isUnknown = feeType === "Unknown";
+          const isAboveTypical = !isServiceOrCompliance && !isUnknown && suspiciousLabels.has(normalizeFeeLabel(row.label));
+          const status = isUnknown
+            ? "Needs statement review"
+            : isServiceOrCompliance
+              ? "Review — ask your processor"
+              : isAboveTypical
+                ? "Above typical for your industry"
+                : "Normal";
+          const statusTone = isUnknown || isServiceOrCompliance ? "info" : isAboveTypical ? "warn" : "good";
 
           return {
             feeName: displayFeeLabel(row.label),
@@ -145,8 +136,12 @@
       }
 
       function watchCopy(row, businessType) {
-        if (row.status === "Negotiable — ask your processor") {
-          return `${row.feeName} (${formatMoney(row.amount)}) — this is often negotiable. Ask your processor to remove it or explain what it covers.`;
+        if (row.feeType === "Unknown") {
+          return `${row.feeName} (${formatMoney(row.amount)}) — this row needs statement review before we label it. Ask your processor for the section it belongs to and a line-item fee schedule.`;
+        }
+
+        if (row.feeType === "Service / compliance") {
+          return `${row.feeName} (${formatMoney(row.amount)}) — this should be explained and tied to a service or compliance requirement. Ask whether it can be removed or remediated.`;
         }
 
         if (row.feeType === "Pass-through") {

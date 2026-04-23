@@ -5,6 +5,7 @@ import { BUSINESS_TYPE_IDS, type BusinessTypeId } from "./businessTypes.js";
 import { db, nowIso } from "./db.js";
 import { formatPeriodKey, parsePeriodKey } from "./periods.js";
 import { sessionExpiryIso } from "./auth.js";
+import { isCardBrandPassThrough, isProcessorCoreFee } from "./feeClassification.js";
 
 export type MerchantAccount = {
   id: number;
@@ -244,16 +245,15 @@ function deriveFeeComponentAmounts(summary: AnalysisSummary): { processorMarkup:
   let cardNetworkFees = 0;
 
   for (const row of buckets) {
-    const label = row.label.toLowerCase();
     const amount = Number(row.amount || 0);
     if (!Number.isFinite(amount) || amount <= 0) continue;
 
-    if (/card brand|network|interchange|assessment|dues|visa|mastercard|discover|amex/.test(label)) {
+    if (isCardBrandPassThrough(row)) {
       cardNetworkFees += amount;
       continue;
     }
 
-    if (/processor|markup|processing|service/.test(label) && !/statement|gateway|pci|monthly|batch/.test(label)) {
+    if (isProcessorCoreFee(row)) {
       processorMarkup += amount;
     }
   }
