@@ -6,7 +6,10 @@ type CandidateKind = "volume" | "fee" | "other";
 type Candidate = {
   rawLine: string;
   label: string;
+  contextLabel: string;
+  section: string;
   amount: number;
+  amounts: number[];
   kind: CandidateKind;
   totalLike: boolean;
 };
@@ -53,9 +56,14 @@ function collapseWhitespace(input: string): string {
   return input.replace(/\s+/g, " ").trim();
 }
 
+function normalizeForMatch(input: string): string {
+  return input.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
 function includesAny(input: string, terms: string[]): boolean {
   const lower = input.toLowerCase();
-  return terms.some((term) => lower.includes(term));
+  const normalized = normalizeForMatch(input);
+  return terms.some((term) => lower.includes(term) || normalized.includes(normalizeForMatch(term)));
 }
 
 function parseMoney(token: string): number | null {
@@ -71,6 +79,10 @@ function cleanLabel(line: string, moneyTokens: string[], percentTokens: string[]
     label = label.replace(token, " ");
   }
   return collapseWhitespace(label.replace(/[|:]+/g, " ").replace(/\s{2,}/g, " ").replace(/^[^\p{L}\d]+|[^\p{L}\d]+$/gu, ""));
+}
+
+function cleanContextLine(line: string): string {
+  return collapseWhitespace(line.replace(/[|:]+/g, " ").replace(/\s{2,}/g, " "));
 }
 
 function classifyLabel(label: string): CandidateKind {
@@ -175,6 +187,89 @@ function feeBucket(label: string): string {
   return titleCase(label);
 }
 
+function amountOnlyValue(line: string): number | null {
+  if (!/^(?:\(?-?\$?\d[\d,]*\.\d{2}\)?\s*)+$/.test(line)) return null;
+  const tokens = line.match(MONEY_RE) ?? [];
+  return parseMoney(tokens[tokens.length - 1] ?? "");
+}
+
+function shouldMergeTrailingAmount(line: string, next: string): boolean {
+  const nextAmount = amountOnlyValue(next);
+  if (nextAmount === null || !/[a-z]/i.test(line)) return false;
+
+  const moneyTokens = line.match(MONEY_RE) ?? [];
+  if (moneyTokens.length === 0) return true;
+
+  const currentLabel = cleanLabel(line, moneyTokens, []);
+  if (!includesAny(currentLabel, ["total", "volume", "sales", "submitted", "processed", "funded", "deposit"])) {
+    return false;
+  }
+
+  const currentAmounts = moneyTokens
+    .map((token) => parseMoney(token))
+    .filter((amount): amount is number => amount !== null && amount > 0);
+  const currentMax = currentAmounts.length > 0 ? Math.max(...currentAmounts) : 0;
+
+  return nextAmount >= Math.max(1, currentMax * 0.95);
+}
+
+function isLikelySectionHeader(line: string): boolean {
+  const normalized = cleanContextLine(line);
+  if (!normalized || normalized.length > 90 || !/[a-z]/i.test(normalized)) return false;
+  if (/page \d|merchant statement|customer service|attention/i.test(normalized)) return false;
+  return /\b(summary|fees|surcharge|deposit|activity|chargeback|service)\b/i.test(normalized) || normalized === normalized.toUpperCase();
+}
+
+function resolveCandidateLabel(label: string, contextLabel: string, section: string): string {
+  const normalizedLabel = normalizeForMatch(label);
+  const normalizedContext = normalizeForMatch(contextLabel);
+  const normalizedSection = normalizeForMatch(section);
+
+  if (/^total(?:\s+\d+)*$/i.test(label) || normalizedLabel === "total") {
+    if (normalizedContext.includes("processing") && normalizedContext.includes("fee")) return "Processing Fees Total";
+    if (normalizedContext.includes("surcharge")) return "Surcharge Fees Total";
+    if (normalizedContext.includes("interchange")) return "Interchange Charges Total";
+    if (normalizedContext.includes("servicecharge")) return "Service Charges Total";
+    if (normalizedContext.includes("deposit") || normalizedContext.includes("netsales") || normalizedContext.includes("salesvolume")) {
+      return "Sales Volume Total";
+    }
+    if (section && normalizedSection !== "uncategorized") return `${section} Total`;
+  }
+
+  return label;
+}
+
+function isGrandTotalFeeLabel(label: string): boolean {
+  const lower = label.toLowerCase();
+  return (
+    /total \(service charges.*interchange charges.*fees/.test(lower) ||
+    /total fees due/.test(lower) ||
+    /fees charged/.test(lower) ||
+    /month end charge|less discount paid/.test(lower) ||
+    /^total fees$|^total charges$/.test(lower) ||
+    /grand total.*fees|fees due|statement total fees|all-in fees/i.test(lower)
+  );
+}
+
+function isSectionFeeTotalCandidate(candidate: Candidate): boolean {
+  if (candidate.kind !== "fee") return false;
+  if (candidate.totalLike) return true;
+  return /^(processing fees|surcharge fees|service charges|interchange charges|transaction fees|account fees)$/i.test(candidate.label);
+}
+
+function scoreTotalFeeLabel(label: string): number {
+  const lower = label.toLowerCase();
+  let score = 0;
+  if (/total \(service charges.*interchange charges.*fees/.test(lower)) score += 15;
+  if (/total fees due/.test(lower)) score += 14;
+  if (/fees charged/.test(lower)) score += 12;
+  if (/month end charge|less discount paid/.test(lower)) score += 11;
+  if (/^total fees$|^total charges$/.test(lower)) score += 8;
+  if (/grand total.*fees|fees due|statement total fees|all-in fees/.test(lower)) score += 7;
+  if (/fee|charge|discount/.test(lower)) score += 4;
+  return score;
+}
+
 function mergeAmountOnlyLines(lines: string[]): string[] {
   const merged: string[] = [];
   for (let index = 0; index < lines.length; index += 1) {
@@ -182,12 +277,7 @@ function mergeAmountOnlyLines(lines: string[]): string[] {
     if (!line) continue;
 
     const next = collapseWhitespace(lines[index + 1] ?? "");
-    const nextIsAmountOnly = next.length > 0 && /^(?:\(?-?\$?\d[\d,]*\.\d{2}\)?\s*)+$/.test(next);
-    const currentHasLetters = /[a-z]/i.test(line);
-    const currentHasMoney = MONEY_RE.test(line);
-    MONEY_RE.lastIndex = 0;
-
-    if (currentHasLetters && !currentHasMoney && nextIsAmountOnly) {
+    if (next.length > 0 && shouldMergeTrailingAmount(line, next)) {
       merged.push(`${line} ${next}`);
       index += 1;
       continue;
@@ -205,6 +295,8 @@ function collectCandidates(doc: ParsedDocument): Candidate[] {
   const lines = mergeAmountOnlyLines(rawLines);
   const seen = new Set<string>();
   const candidates: Candidate[] = [];
+  const recentHints: string[] = [];
+  let currentSection = "Uncategorized";
 
   for (const line of lines) {
     if (seen.has(line)) continue;
@@ -212,23 +304,46 @@ function collectCandidates(doc: ParsedDocument): Candidate[] {
 
     const moneyTokens = line.match(MONEY_RE) ?? [];
     const percentTokens = line.match(PERCENT_RE) ?? [];
-    if (moneyTokens.length === 0) continue;
+    if (moneyTokens.length === 0) {
+      if (/[a-z]/i.test(line)) {
+        const hint = cleanContextLine(line);
+        if (hint.length >= 3 && hint.length <= 160 && !/page \d|merchant statement|customer service|attention/i.test(hint)) {
+          recentHints.push(hint);
+          if (recentHints.length > 4) recentHints.shift();
+        }
+        if (isLikelySectionHeader(line)) {
+          currentSection = titleCase(hint);
+        }
+      }
+      continue;
+    }
 
     const label = cleanLabel(line, moneyTokens, percentTokens);
     if (label.length < 3 || !/[a-z]/i.test(label)) continue;
 
-    const amount = parseMoney(moneyTokens[moneyTokens.length - 1]);
-    if (amount === null || amount <= 0) continue;
+    const amounts = moneyTokens
+      .map((token) => parseMoney(token))
+      .filter((amount): amount is number => amount !== null && amount > 0);
+    if (amounts.length === 0) continue;
 
-    const kind = classifyLabel(label);
-    if (kind === "other" && !isTotalLike(label)) continue;
+    const hintedLabel = cleanContextLine(`${recentHints.slice(-3).join(" ")} ${label}`);
+    const resolvedLabel = resolveCandidateLabel(label, hintedLabel, currentSection);
+    const contextLabel = cleanContextLine(`${recentHints.slice(-3).join(" ")} ${resolvedLabel}`);
+    const totalLike = isTotalLike(resolvedLabel);
+    const labelKind = classifyLabel(label);
+    const sectionLooksFeeOnly = /\bfees?\b/i.test(currentSection);
+    const kind = labelKind === "other" && (totalLike || sectionLooksFeeOnly) ? classifyLabel(contextLabel) : labelKind;
+    if (kind === "other" && !totalLike) continue;
 
     candidates.push({
       rawLine: line,
-      label,
-      amount,
+      label: resolvedLabel,
+      contextLabel,
+      section: currentSection,
+      amount: amounts[amounts.length - 1] ?? 0,
+      amounts,
       kind,
-      totalLike: isTotalLike(label),
+      totalLike,
     });
   }
 
@@ -262,38 +377,51 @@ function pickVolume(candidates: Candidate[]): Candidate | null {
 function pickTotalFees(candidates: Candidate[], totalVolume: number): Candidate | null {
   return [...candidates]
     .filter((candidate) => candidate.kind === "fee")
-    .filter((candidate) => candidate.totalLike || /total|fees charged|discount fees|total fees|processing fees|month end charge|less discount paid/i.test(candidate.label))
+    .filter((candidate) => isGrandTotalFeeLabel(candidate.contextLabel))
     .filter((candidate) => totalVolume <= 0 || candidate.amount < totalVolume * 0.3)
     .sort((left, right) => {
-      const scoreFeeLabel = (label: string): number => {
-        const lower = label.toLowerCase();
-        let score = 0;
-        if (/total \(service charges.*interchange charges.*fees/.test(lower)) score += 15;
-        if (/total fees due/.test(lower)) score += 14;
-        if (/fees charged/.test(lower)) score += 12;
-        if (/month end charge|less discount paid/.test(lower)) score += 11;
-        if (/^total fees$|total charges/.test(lower)) score += 6;
-        if (/total account fees|total transaction fees|total debit network fees|total service charges|total interchange charges/.test(lower)) score += 4;
-        if (/processing fees/.test(lower)) score += 7;
-        if (/fee|charge|discount/.test(lower)) score += 4;
-        return score;
-      };
-      const leftScore = scoreFeeLabel(left.label) * 1_000_000 + left.amount;
-      const rightScore = scoreFeeLabel(right.label) * 1_000_000 + right.amount;
+      const leftScore = scoreTotalFeeLabel(left.contextLabel) * 1_000_000 + left.amount;
+      const rightScore = scoreTotalFeeLabel(right.contextLabel) * 1_000_000 + right.amount;
       return rightScore - leftScore;
     })[0] ?? null;
 }
 
-function buildFeeBreakdown(candidates: Candidate[], totalFees: number, totalFeeRow: Candidate | null) {
-  const buckets = new Map<string, number>();
-  const components = candidates
+function deriveFeeRecovery(candidates: Candidate[], totalVolume: number) {
+  const feeCandidates = candidates
     .filter((candidate) => candidate.kind === "fee")
-    .filter((candidate) => !candidate.totalLike)
     .filter((candidate) => candidate.amount > 0)
-    .filter((candidate) => !totalFeeRow || candidate.amount < totalFeeRow.amount * 0.95)
-    .filter((candidate) => !totalFeeRow || candidate.amount >= Math.max(1, totalFeeRow.amount * 0.005));
+    .filter((candidate) => totalVolume <= 0 || candidate.amount < totalVolume * 0.3);
 
-  const sourceRows = components.length > 0 ? components : totalFeeRow ? [totalFeeRow] : [];
+  const totalFeeRow = pickTotalFees(feeCandidates, totalVolume);
+  if (totalFeeRow) {
+    const itemizedRows = feeCandidates
+      .filter((candidate) => !isSectionFeeTotalCandidate(candidate))
+      .filter((candidate) => candidate.amount < totalFeeRow.amount * 0.95)
+      .filter((candidate) => candidate.amount >= Math.max(1, totalFeeRow.amount * 0.005));
+
+    return {
+      totalFees: Math.round(totalFeeRow.amount * 100) / 100,
+      totalFeeRow,
+      sourceRows: itemizedRows.length > 0 ? itemizedRows : [totalFeeRow],
+      usedSectionFallback: false,
+    };
+  }
+
+  const sectionTotalRows = feeCandidates.filter((candidate) => isSectionFeeTotalCandidate(candidate));
+  const sectionsWithTotals = new Set(sectionTotalRows.map((candidate) => candidate.section));
+  const itemizedRows = feeCandidates.filter((candidate) => !isSectionFeeTotalCandidate(candidate)).filter((candidate) => !sectionsWithTotals.has(candidate.section));
+  const sourceRows = [...sectionTotalRows, ...itemizedRows];
+
+  return {
+    totalFees: Math.round(sourceRows.reduce((sum, candidate) => sum + candidate.amount, 0) * 100) / 100,
+    totalFeeRow: null,
+    sourceRows,
+    usedSectionFallback: sectionTotalRows.length > 0,
+  };
+}
+
+function buildFeeBreakdown(sourceRows: Candidate[], totalFees: number) {
+  const buckets = new Map<string, number>();
   for (const candidate of sourceRows) {
     const bucket = feeBucket(candidate.label);
     buckets.set(bucket, (buckets.get(bucket) ?? 0) + candidate.amount);
@@ -315,17 +443,9 @@ export function refineTextOnlyPdfSummary(doc: ParsedDocument, baseSummary: Analy
 
   const bestVolume = pickVolume(candidates);
   const totalVolume = Math.round((bestVolume?.amount ?? 0) * 100) / 100;
-  const totalFeeRow = pickTotalFees(candidates, totalVolume);
-
-  let totalFees = Math.round((totalFeeRow?.amount ?? 0) * 100) / 100;
-  if (totalFees <= 0) {
-    totalFees =
-      Math.round(
-        candidates
-          .filter((candidate) => candidate.kind === "fee" && !candidate.totalLike)
-          .reduce((sum, candidate) => sum + candidate.amount, 0) * 100,
-      ) / 100;
-  }
+  const feeRecovery = deriveFeeRecovery(candidates, totalVolume);
+  const totalFees = feeRecovery.totalFees;
+  const totalFeeRow = feeRecovery.totalFeeRow;
 
   if (totalVolume <= 0 || totalFees <= 0) return null;
 
@@ -343,9 +463,9 @@ export function refineTextOnlyPdfSummary(doc: ParsedDocument, baseSummary: Analy
     effectiveRate > benchmarkBase.upperRate ? "above" : effectiveRate < benchmarkBase.lowerRate ? "below" : "within";
   const deltaFromUpperRate = Math.round(Math.max(0, effectiveRate - benchmarkBase.upperRate) * 100) / 100;
 
-  const feeBreakdown = buildFeeBreakdown(candidates, totalFees, totalFeeRow);
-  const suspiciousRows = candidates
-    .filter((candidate) => candidate.kind === "fee")
+  const feeSourceRows = feeRecovery.sourceRows.length > 0 ? feeRecovery.sourceRows : candidates.filter((candidate) => candidate.kind === "fee");
+  const feeBreakdown = buildFeeBreakdown(feeSourceRows, totalFees);
+  const suspiciousRows = feeSourceRows
     .filter((candidate) => candidate.amount >= Math.max(1, totalFees * 0.005))
     .map((candidate) => ({ candidate, reason: suspiciousReason(candidate.label) }))
     .filter((item) => Boolean(item.reason))
@@ -414,10 +534,22 @@ export function refineTextOnlyPdfSummary(doc: ParsedDocument, baseSummary: Analy
     },
   ];
 
+  if (doc.extraction.mode !== "structured") {
+    dataQuality.push({
+      level: "warning",
+      message: "Structured table extraction was unavailable, so the report estimated numeric totals from the searchable PDF text layer.",
+    });
+    for (const reason of doc.extraction.reasons) {
+      dataQuality.push({ level: "warning", message: reason });
+    }
+  }
+
   if (!totalFeeRow) {
     dataQuality.push({
       level: "warning",
-      message: "A direct total-fees row was not found, so the report used the sum of detected fee lines.",
+      message: feeRecovery.usedSectionFallback
+        ? "A single grand-total fees row was not found, so the report combined section totals and itemized fee lines."
+        : "A direct total-fees row was not found, so the report used the sum of detected fee lines.",
     });
   }
 
@@ -459,7 +591,7 @@ export function refineTextOnlyPdfSummary(doc: ParsedDocument, baseSummary: Analy
     ],
     dataQuality,
     insights,
-    confidence: totalFeeRow && bestVolume ? "medium" : "low",
+    confidence: doc.extraction.mode === "structured" && totalFeeRow && bestVolume ? "medium" : "low",
   } as AnalysisSummary;
 
   return summary;
