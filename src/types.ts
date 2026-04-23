@@ -1,4 +1,5 @@
 import type { BusinessTypeId } from "./businessTypes.js";
+import type { ProcessorDetection } from "./processorDetection.js";
 
 export type JobStatus =
   | "queued"
@@ -115,12 +116,7 @@ export type ChecklistReport = {
   extractionMode: "structured" | "text_only" | "unusable";
   extractionQualityScore: number;
   extractionReasons: string[];
-  processorDetection: {
-    detectedProcessorId: string | null;
-    detectedProcessorName: string | null;
-    confidence: number;
-    matchedKeywords: string[];
-  };
+  processorDetection: ProcessorDetection;
   universal: ChecklistBucket;
   processorSpecific: ChecklistBucket & {
     processorId: string | null;

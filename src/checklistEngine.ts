@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { ParsedDocument } from "./parser.js";
 import { AnalysisSummary, ChecklistBucket, ChecklistReport, ChecklistRuleResult, RuleStatus } from "./types.js";
 import { analyzeTwoBucketStatement } from "./twoBucketAnalysis.js";
+import { buildProcessorCorpus, detectProcessorIdentity } from "./processorDetection.js";
 
 type UniversalElement = {
   id: string;
@@ -64,80 +65,6 @@ const UNIVERSAL_KEYWORD_RULES: Record<string, RegExp[]> = {
 };
 
 const UNIVERSAL_FAIL_ON_MATCH = new Set(["E023", "E024", "E033", "E064"]);
-
-const PROCESSOR_SIGNATURES: Array<{ id: string; name: string; keywords: string[] }> = [
-  { id: "heartland", name: "Heartland Payment Systems", keywords: ["heartland", "hps processing"] },
-  { id: "tsys", name: "TSYS", keywords: ["tsys"] },
-  {
-    id: "fiserv_first_data_interchange_plus",
-    name: "Fiserv / First Data (Interchange-Plus)",
-    keywords: ["fiserv", "first data", "clover", "omaha, ne 68103-2394"],
-  },
-  {
-    id: "fiserv_first_data_bundled",
-    name: "Fiserv / First Data (Bundled)",
-    keywords: ["qualified", "mid-qualified", "non-qualified", "fiserv", "first data"],
-  },
-  { id: "clearent", name: "Clearent", keywords: ["clearent"] },
-  { id: "worldpay", name: "Worldpay", keywords: ["worldpay"] },
-  { id: "elavon", name: "Elavon", keywords: ["elavon"] },
-];
-
-function getTextCorpus(doc: ParsedDocument): string {
-  const rowText = doc.rows
-    .slice(0, 1500)
-    .map((row) => {
-      if (typeof row.content === "string" && row.content.trim().length > 0) {
-        return row.content;
-      }
-      // CSV rows do not have a `content` field, so fold key/value pairs into the corpus.
-      return Object.entries(row)
-        .map(([key, value]) => `${key} ${String(value)}`)
-        .join(" ");
-    })
-    .join("\n");
-  return `${doc.textPreview}\n${rowText}`.toLowerCase();
-}
-
-function countMatches(text: string, keyword: string): number {
-  const safe = keyword.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const matches = text.match(new RegExp(safe, "g"));
-  return matches?.length ?? 0;
-}
-
-function detectProcessor(text: string): {
-  detectedProcessorId: string | null;
-  detectedProcessorName: string | null;
-  confidence: number;
-  matchedKeywords: string[];
-} {
-  let best: { id: string; name: string; score: number; matchedKeywords: string[] } | null = null;
-
-  for (const signature of PROCESSOR_SIGNATURES) {
-    const matchedKeywords = signature.keywords.filter((k) => text.includes(k));
-    const score = matchedKeywords.reduce((acc, keyword) => acc + Math.max(1, countMatches(text, keyword)), 0);
-    if (!best || score > best.score) {
-      best = { id: signature.id, name: signature.name, score, matchedKeywords };
-    }
-  }
-
-  if (!best || best.score === 0) {
-    return {
-      detectedProcessorId: null,
-      detectedProcessorName: null,
-      confidence: 0,
-      matchedKeywords: [],
-    };
-  }
-
-  const confidence = Math.min(1, 0.3 + best.score * 0.18);
-  return {
-    detectedProcessorId: best.id,
-    detectedProcessorName: best.name,
-    confidence,
-    matchedKeywords: best.matchedKeywords,
-  };
-}
 
 function countStatuses(results: ChecklistRuleResult[]): Omit<ChecklistBucket, "results"> {
   const bucket = {
@@ -508,9 +435,9 @@ async function loadChecklists(): Promise<LoadedChecklists> {
 
 export async function evaluateChecklistReport(doc: ParsedDocument, summary: AnalysisSummary): Promise<ChecklistReport> {
   const packs = await loadChecklists();
-  const text = getTextCorpus(doc);
+  const text = buildProcessorCorpus(doc);
 
-  const processorDetection = detectProcessor(text);
+  const processorDetection = detectProcessorIdentity(doc);
 
   const universalResults = packs.universal.elements.map((element) => evaluateUniversalRule(element, doc, summary, text));
   const universal: ChecklistBucket = {
@@ -518,8 +445,8 @@ export async function evaluateChecklistReport(doc: ParsedDocument, summary: Anal
     results: universalResults,
   };
 
-  const detectedPack = processorDetection.detectedProcessorId
-    ? packs.processors.processors.find((p) => p.processor_id === processorDetection.detectedProcessorId)
+  const detectedPack = processorDetection.rulePackId
+    ? packs.processors.processors.find((p) => p.processor_id === processorDetection.rulePackId)
     : null;
 
   let processorResults: ChecklistRuleResult[] = [];

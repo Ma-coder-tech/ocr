@@ -13,6 +13,7 @@ import {
 } from "./types.js";
 import { ParsedDocument } from "./parser.js";
 import { refineTextOnlyPdfSummary } from "./pdfHeuristic.js";
+import { detectProcessorIdentity } from "./processorDetection.js";
 
 type ColumnStats = {
   sum: number;
@@ -49,24 +50,6 @@ const PERIOD_TERMS = ["date", "month", "period", "statement", "year"];
 function includesAny(input: string, terms: string[]): boolean {
   const v = input.toLowerCase();
   return terms.some((t) => v.includes(t));
-}
-
-function inferProcessor(text: string): string {
-  const v = text.toLowerCase();
-  if (v.includes("paysafe")) return "Paysafe";
-  if (v.includes("worldpay")) return "Worldpay";
-  if (v.includes("payarc")) return "Payarc";
-  if (v.includes("heartland") || v.includes("hps processing fee")) return "Heartland";
-  if (v.includes("tsys")) return "TSYS";
-  if (v.includes("clearent")) return "Clearent";
-  if (v.includes("stripe")) return "Stripe";
-  if (v.includes("square")) return "Square";
-  if (v.includes("paypal")) return "PayPal";
-  if (v.includes("adyen")) return "Adyen";
-  if (v.includes("fiserv") || v.includes("first data") || v.includes("clover")) return "Fiserv/Clover";
-  if (v.includes("elavon")) return "Elavon";
-  if (v.includes("global payments")) return "Global Payments";
-  return "Unknown";
 }
 
 function toMoney(value: number): number {
@@ -247,7 +230,8 @@ function createTextOnlyPdfSummary(
 }
 
 export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeId): AnalysisSummary {
-  const processorName = inferProcessor(`${doc.headers.join(" ")} ${doc.textPreview}`);
+  const processorDetection = detectProcessorIdentity(doc);
+  const processorName = processorDetection.detectedProcessorName ?? "Unknown";
   if (doc.sourceType === "pdf") {
     const qualitativeSummary = createTextOnlyPdfSummary(doc, processorName, businessType);
     const recoveredSummary = refineTextOnlyPdfSummary(doc, qualitativeSummary);
