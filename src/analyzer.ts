@@ -15,6 +15,7 @@ import { ParsedDocument } from "./parser.js";
 import { refineTextOnlyPdfSummary } from "./pdfHeuristic.js";
 import { detectProcessorIdentity } from "./processorDetection.js";
 import { withFeeClassification } from "./feeClassification.js";
+import { extractStructuredStatementFacts, type StructuredStatementFacts } from "./statementSections.js";
 
 type ColumnStats = {
   sum: number;
@@ -148,6 +149,7 @@ function createTextOnlyPdfSummary(
   doc: ParsedDocument,
   processorName: string,
   businessType: BusinessTypeId,
+  structuredFacts: StructuredStatementFacts,
 ): AnalysisSummary {
   const benchmarkBase = benchmarkForBusinessType(businessType);
   const benchmark: BenchmarkResult = {
@@ -203,6 +205,10 @@ function createTextOnlyPdfSummary(
     estimatedAnnualFees: 0,
     estimatedAnnualSavings: 0,
     benchmark,
+    statementSections: structuredFacts.statementSections,
+    interchangeAudit: structuredFacts.interchangeAudit,
+    interchangeAuditRows: structuredFacts.interchangeAuditRows,
+    blendedFeeSplits: structuredFacts.blendedFeeSplits,
     kpis: [
       { label: "Effective Rate", value: "N/A", note: "Structured numeric extraction unavailable for this PDF." },
       { label: "Estimated Monthly Fees", value: "N/A", note: "Fee totals withheld to avoid misleading math." },
@@ -233,8 +239,12 @@ function createTextOnlyPdfSummary(
 export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeId): AnalysisSummary {
   const processorDetection = detectProcessorIdentity(doc);
   const processorName = processorDetection.detectedProcessorName ?? "Unknown";
+  const structuredFacts = extractStructuredStatementFacts(doc, {
+    processorId: processorDetection.detectedProcessorId,
+    rulePackId: processorDetection.rulePackId,
+  });
   if (doc.sourceType === "pdf") {
-    const qualitativeSummary = createTextOnlyPdfSummary(doc, processorName, businessType);
+    const qualitativeSummary = createTextOnlyPdfSummary(doc, processorName, businessType, structuredFacts);
     const recoveredSummary = refineTextOnlyPdfSummary(doc, qualitativeSummary);
     if (recoveredSummary) {
       return recoveredSummary;
@@ -314,6 +324,31 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     }
   }
 
+  const structuredInterchangePaid = structuredFacts.interchangeAudit.totalPaid ?? 0;
+  const blendedProcessorMarkupTotal = toMoney(
+    structuredFacts.blendedFeeSplits.reduce(
+      (sum, split) => sum + (split.processorMarkup.totalPaid ?? split.processorMarkup.expectedTotalPaid ?? 0),
+      0,
+    ),
+  );
+  const canUseBlendedRollup =
+    blendedProcessorMarkupTotal > 0 &&
+    (totalFeesRaw <= 0 ||
+      (structuredInterchangePaid > 0 && Math.abs(totalFeesRaw - structuredInterchangePaid) <= Math.max(1, structuredInterchangePaid * 0.01)));
+
+  if (totalFeesRaw <= 0 && (structuredInterchangePaid > 0 || blendedProcessorMarkupTotal > 0)) {
+    totalFeesRaw = structuredInterchangePaid + blendedProcessorMarkupTotal;
+    if (structuredInterchangePaid > 0) {
+      feeBuckets.set("card brand interchange detail", structuredInterchangePaid);
+    }
+    if (blendedProcessorMarkupTotal > 0) {
+      feeBuckets.set("processor markup from blended rows", blendedProcessorMarkupTotal);
+    }
+  } else if (canUseBlendedRollup) {
+    totalFeesRaw += blendedProcessorMarkupTotal;
+    feeBuckets.set("processor markup from blended rows", blendedProcessorMarkupTotal);
+  }
+
   if (doc.sourceType === "pdf" && doc.extraction.mode === "structured" && totalFeesRaw <= 0) {
     const txt = doc.textPreview.toLowerCase();
     const roughFees = (txt.match(/fee|charge|commission|markup|assessment/g) ?? []).length;
@@ -323,19 +358,28 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
 
   const totalFees = toMoney(totalFeesRaw);
   const effectiveRate = totalVolume > 0 ? toPct((totalFees / totalVolume) * 100) : 0;
+  const interchangeTotalPaid = structuredFacts.interchangeAudit.totalPaid ?? 0;
 
   const feeBreakdown: FeeBreakdownRow[] = [...feeBuckets.entries()]
-    .map(([label, amount]) => ({
-      label,
-      amount: toMoney(amount),
-      sharePct: totalFees > 0 ? toPct((amount / totalFees) * 100) : 0,
-    }))
+    .map(([label, amount]) => {
+      const roundedAmount = toMoney(amount);
+      const matchesInterchangeAudit =
+        interchangeTotalPaid > 0 &&
+        Math.abs(roundedAmount - interchangeTotalPaid) <= Math.max(1, interchangeTotalPaid * 0.01) &&
+        includesAny(label, ["interchange", "card brand", "program", "fee amount", "fees paid", "total paid"]);
+
+      return {
+        label: matchesInterchangeAudit ? "card brand interchange detail" : label,
+        amount: roundedAmount,
+        sharePct: totalFees > 0 ? toPct((amount / totalFees) * 100) : 0,
+        sourceSection: matchesInterchangeAudit ? "Interchange detail" : "Structured fee column",
+        evidenceLine: matchesInterchangeAudit ? "Rollup from captured interchange audit rows" : label,
+      };
+    })
     .map((row) =>
       withFeeClassification(
         {
           ...row,
-          sourceSection: "Structured fee column",
-          evidenceLine: row.label,
         },
         { processorName },
       ),
@@ -499,6 +543,22 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     });
   }
 
+  if (structuredFacts.interchangeAudit.rowCount > 0) {
+    insights.push({
+      title: "Interchange audit detail captured",
+      detail: `${structuredFacts.interchangeAudit.rowCount} row(s) were preserved as structured interchange detail before the summary fee buckets were calculated.`,
+      impactUsd: structuredFacts.interchangeAudit.totalPaid ?? 0,
+    });
+  }
+
+  if (structuredFacts.blendedFeeSplits.length > 0) {
+    insights.push({
+      title: "Blended pricing rows normalized",
+      detail: `${structuredFacts.blendedFeeSplits.length} blended row pair(s) were split into card-brand interchange and processor markup before fee analysis.`,
+      impactUsd: blendedProcessorMarkupTotal,
+    });
+  }
+
   for (const s of suspiciousFees.slice(0, 4)) {
     insights.push({
       title: `Audit candidate: ${s.label}`,
@@ -560,6 +620,26 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     });
   }
 
+  if (structuredFacts.interchangeAudit.rowCount > 0) {
+    dataQuality.push({
+      level: "info",
+      message: `Captured ${structuredFacts.interchangeAudit.rowCount} interchange audit row(s) before fee rollup, preserving transaction count, volume, rate, per-item fee, and total paid where present.`,
+    });
+  } else if (doc.extraction.mode === "structured") {
+    dataQuality.push({
+      level: "warning",
+      message:
+        "No interchange detail rows were captured. If the statement contains an interchange table, provide a clearer export or processor-specific layout mapping.",
+    });
+  }
+
+  if (structuredFacts.blendedFeeSplits.length > 0) {
+    dataQuality.push({
+      level: "info",
+      message: `Normalized ${structuredFacts.blendedFeeSplits.length} blended pricing row pair(s) into separate interchange and processor-markup components.`,
+    });
+  }
+
   if (dataQuality.length === 0) {
     dataQuality.push({ level: "info", message: "Detected both volume and fee structures with no critical parsing issues." });
   }
@@ -610,6 +690,10 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     estimatedAnnualFees,
     estimatedAnnualSavings,
     benchmark,
+    statementSections: structuredFacts.statementSections,
+    interchangeAudit: structuredFacts.interchangeAudit,
+    interchangeAuditRows: structuredFacts.interchangeAuditRows,
+    blendedFeeSplits: structuredFacts.blendedFeeSplits,
     kpis,
     feeBreakdown,
     suspiciousFees,

@@ -171,6 +171,139 @@ function evaluateUniversalRule(
     };
   }
 
+  if (element.id === "E002") {
+    const rowCount = summary.interchangeAudit?.rowCount ?? 0;
+    const auditRows = summary.interchangeAuditRows ?? summary.interchangeAudit?.rows ?? [];
+    if (rowCount > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "pass",
+        reason: `Interchange is modeled as row-level detail (${rowCount} row${rowCount === 1 ? "" : "s"} captured), not a single flat wholesale rate.`,
+        evidence: auditRows.slice(0, 4).map((row) => row.evidenceLine),
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: /interchange|card brand|program fees/i.test(text) ? "warning" : "unknown",
+      reason: /interchange|card brand|program fees/i.test(text)
+        ? "Interchange text was detected, but row-level interchange detail was not captured."
+        : "No interchange detail table was detected in the extracted statement text.",
+      evidence,
+    };
+  }
+
+  if (element.id === "E010") {
+    const sections = summary.statementSections ?? [];
+    if (sections.length > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "pass",
+        reason: `Statement was parsed into ${sections.length} structured section${sections.length === 1 ? "" : "s"} before fee rollup.`,
+        evidence: sections.slice(0, 5).map((section) => `${section.type}: ${section.title}`),
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: "warning",
+      reason: "No structured statement sections were identified; analysis may be relying on generic numeric columns.",
+      evidence,
+    };
+  }
+
+  if (element.id === "E011") {
+    const rows = summary.interchangeAuditRows ?? summary.interchangeAudit?.rows ?? [];
+    if (rows.length > 0) {
+      const fullyCapturedRows = rows.filter(
+        (row) =>
+          row.transactionCount !== null &&
+          row.volume !== null &&
+          row.ratePercent !== null &&
+          row.perItemFee !== null &&
+          row.totalPaid !== null,
+      );
+      const inferredPaidRows = rows.filter((row) => row.totalPaid === null && row.expectedTotalPaid !== null);
+      return {
+        id: element.id,
+        title: element.name,
+        status: fullyCapturedRows.length === rows.length ? "pass" : "warning",
+        reason:
+          fullyCapturedRows.length === rows.length
+            ? `All ${rows.length} captured interchange row${rows.length === 1 ? "" : "s"} include count, volume, rate, per-item fee, and an extracted total paid value.`
+            : inferredPaidRows.length > 0
+              ? `${fullyCapturedRows.length} of ${rows.length} captured interchange row${rows.length === 1 ? "" : "s"} include an extracted total paid value; ${inferredPaidRows.length} rely on calculated expected paid only.`
+              : `${fullyCapturedRows.length} of ${rows.length} captured interchange row${rows.length === 1 ? "" : "s"} include the full audit field set.`,
+        evidence: rows
+          .slice(0, 5)
+          .map(
+            (row) =>
+              `${row.label}: count=${row.transactionCount ?? "n/a"}, volume=${row.volume ?? "n/a"}, rate=${row.ratePercent ?? "n/a"}%, perItem=${row.perItemFee ?? "n/a"}, paid=${row.totalPaid ?? "n/a"}, expected=${row.expectedTotalPaid ?? "n/a"}`,
+          ),
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: /interchange|program fees|card brand/i.test(text) ? "warning" : "not_applicable",
+      reason: /interchange|program fees|card brand/i.test(text)
+        ? "Interchange language was detected, but no row-level audit detail was captured."
+        : "No interchange detail signal was detected in this statement.",
+      evidence,
+    };
+  }
+
+  if (element.id === "E012") {
+    const rowsWithRates = (summary.interchangeAuditRows ?? summary.interchangeAudit?.rows ?? []).filter(
+      (row) => row.ratePercent !== null && row.rateBps !== null,
+    );
+    if (rowsWithRates.length > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "pass",
+        reason: `${rowsWithRates.length} interchange rate${rowsWithRates.length === 1 ? "" : "s"} normalized to both percent and basis points.`,
+        evidence: rowsWithRates.slice(0, 5).map((row) => `${row.label}: ${row.ratePercent}% / ${row.rateBps} bps`),
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: /%|\bbps\b|basis|0\.00\d/i.test(text) ? "warning" : "unknown",
+      reason: "No normalized interchange rate rows were available for basis-point validation.",
+      evidence,
+    };
+  }
+
+  if (element.id === "E013") {
+    const splits = summary.blendedFeeSplits ?? [];
+    if (splits.length > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "pass",
+        reason: `${splits.length} blended pricing row pair${splits.length === 1 ? "" : "s"} split into interchange and processor-markup components.`,
+        evidence: splits
+          .slice(0, 5)
+          .map(
+            (split) =>
+              `${split.label}: processor=${split.processorMarkup.totalPaid ?? split.processorMarkup.expectedTotalPaid ?? "n/a"}, interchange=${split.interchange.totalPaid ?? split.interchange.expectedTotalPaid ?? "n/a"}`,
+          ),
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: /tsys|top number|bottom number|blended|bundl/i.test(text) ? "warning" : "not_applicable",
+      reason: /tsys|top number|bottom number|blended|bundl/i.test(text)
+        ? "Blended-pricing language was detected, but no top/bottom row pair was normalized."
+        : "No blended-pricing presentation signal was detected in this statement.",
+      evidence,
+    };
+  }
+
   if (element.id === "E006") {
     if (summary.totalVolume > 0) {
       status = "pass";
@@ -229,6 +362,7 @@ function evaluateProcessorRule(
   id: string,
   title: string,
   doc: ParsedDocument,
+  summary: AnalysisSummary,
   text: string,
 ): ChecklistRuleResult {
   if (doc.extraction.mode === "unusable") {
@@ -237,6 +371,28 @@ function evaluateProcessorRule(
       title,
       status: "unknown",
       reason: "No extractable text; processor-specific rule cannot be evaluated.",
+      evidence: [],
+    };
+  }
+
+  if (/blended|top number|bottom number|unbundl|normalize blended|processor component|interchange component/i.test(title)) {
+    const splits = summary.blendedFeeSplits ?? [];
+    if (splits.length > 0) {
+      return {
+        id,
+        title,
+        status: "pass",
+        reason: `${splits.length} blended pricing row pair${splits.length === 1 ? "" : "s"} normalized into separate interchange and processor components.`,
+        evidence: splits.slice(0, 4).map((split) => split.evidenceLine),
+      };
+    }
+    return {
+      id,
+      title,
+      status: /tsys|blended|bundl/i.test(text) ? "warning" : "unknown",
+      reason: /tsys|blended|bundl/i.test(text)
+        ? "TSYS/blended-pricing context detected, but no blended row pair was split."
+        : "Rule loaded, but no blended-pricing signal was found in the current statement text.",
       evidence: [],
     };
   }
@@ -456,7 +612,7 @@ export async function evaluateChecklistReport(doc: ParsedDocument, summary: Anal
     skippedReason = "Processor detection confidence is low or processor is outside current rule-pack coverage.";
   } else {
     processorResults = detectedPack.checks.map((check, index) =>
-      evaluateProcessorRule(`P${String(index + 1).padStart(3, "0")}`, check, doc, text),
+      evaluateProcessorRule(`P${String(index + 1).padStart(3, "0")}`, check, doc, summary, text),
     );
   }
 

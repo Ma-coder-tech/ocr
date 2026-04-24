@@ -65,6 +65,77 @@ export type FeeBreakdownRow = {
   classificationReason?: string;
 };
 
+export type StatementSectionType =
+  | "summary"
+  | "interchange_detail"
+  | "processor_markup"
+  | "add_on_fees"
+  | "notices"
+  | "unknown";
+
+export type StatementSection = {
+  type: StatementSectionType;
+  title: string;
+  rowCount: number;
+  confidence: number;
+  evidenceLines: string[];
+};
+
+export type CardBrand = "Visa" | "Mastercard" | "Discover" | "AmEx" | "Unknown";
+
+export type InterchangeAuditRow = {
+  label: string;
+  cardBrand: CardBrand;
+  cardType?: string;
+  entryMode?: string;
+  transactionCount: number | null;
+  volume: number | null;
+  ratePercent: number | null;
+  rateBps: number | null;
+  perItemFee: number | null;
+  totalPaid: number | null;
+  expectedTotalPaid: number | null;
+  variance: number | null;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+  downgradeIndicators: string[];
+};
+
+export type InterchangeAuditSummary = {
+  rows: InterchangeAuditRow[];
+  rowCount: number;
+  transactionCount: number | null;
+  volume: number | null;
+  totalPaid: number | null;
+  weightedAverageRateBps: number | null;
+  totalVariance: number | null;
+  confidence: number;
+};
+
+export type BlendedFeeSplitComponent = {
+  ratePercent: number | null;
+  rateBps: number | null;
+  perItemFee: number | null;
+  totalPaid: number | null;
+  expectedTotalPaid: number | null;
+};
+
+export type BlendedFeeSplit = {
+  label: string;
+  cardBrand: CardBrand;
+  cardType?: string;
+  transactionCount: number | null;
+  volume: number | null;
+  processorMarkup: BlendedFeeSplitComponent;
+  interchange: BlendedFeeSplitComponent;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+};
+
 export type BenchmarkStatus = "below" | "within" | "above";
 export const BENCHMARK_STATUS_VALUES = ["below", "within", "above"] as const satisfies readonly BenchmarkStatus[];
 
@@ -157,6 +228,10 @@ export type AnalysisSummary = {
   estimatedAnnualFees: number;
   estimatedAnnualSavings: number;
   benchmark: BenchmarkResult;
+  statementSections: StatementSection[];
+  interchangeAudit: InterchangeAuditSummary;
+  interchangeAuditRows: InterchangeAuditRow[];
+  blendedFeeSplits: BlendedFeeSplit[];
   kpis: KpiMetric[];
   feeBreakdown: FeeBreakdownRow[];
   suspiciousFees: SuspiciousFee[];

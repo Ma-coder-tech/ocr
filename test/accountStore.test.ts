@@ -24,6 +24,19 @@ function makeSummary(period = "2024-10") {
       status: "within" as const,
       deltaFromUpperRate: 0,
     },
+    statementSections: [],
+    interchangeAudit: {
+      rows: [],
+      rowCount: 0,
+      transactionCount: null,
+      volume: null,
+      totalPaid: null,
+      weightedAverageRateBps: null,
+      totalVariance: null,
+      confidence: 0,
+    },
+    interchangeAuditRows: [],
+    blendedFeeSplits: [],
     kpis: [],
     feeBreakdown: [
       {
