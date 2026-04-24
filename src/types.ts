@@ -136,6 +136,35 @@ export type BlendedFeeSplit = {
   confidence: number;
 };
 
+export type ProcessorMarkupAuditRow = {
+  label: string;
+  cardBrand: CardBrand;
+  cardType?: string;
+  transactionCount: number | null;
+  volume: number | null;
+  ratePercent: number | null;
+  rateBps: number | null;
+  effectiveRateBps: number | null;
+  perItemFee: number | null;
+  totalPaid: number | null;
+  expectedTotalPaid: number | null;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+};
+
+export type ProcessorMarkupAuditSummary = {
+  rows: ProcessorMarkupAuditRow[];
+  rowCount: number;
+  transactionCount: number | null;
+  volume: number | null;
+  totalPaid: number | null;
+  weightedAverageRateBps: number | null;
+  effectiveRateBps: number | null;
+  confidence: number;
+};
+
 export type BenchmarkStatus = "below" | "within" | "above";
 export const BENCHMARK_STATUS_VALUES = ["below", "within", "above"] as const satisfies readonly BenchmarkStatus[];
 
@@ -232,6 +261,7 @@ export type AnalysisSummary = {
   interchangeAudit: InterchangeAuditSummary;
   interchangeAuditRows: InterchangeAuditRow[];
   blendedFeeSplits: BlendedFeeSplit[];
+  processorMarkupAudit: ProcessorMarkupAuditSummary;
   kpis: KpiMetric[];
   feeBreakdown: FeeBreakdownRow[];
   suspiciousFees: SuspiciousFee[];

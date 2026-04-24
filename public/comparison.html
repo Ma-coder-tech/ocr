@@ -154,13 +154,28 @@
         });
       }
 
+      function formatBps(value) {
+        const amount = Number(value);
+        if (!Number.isFinite(amount)) return "—";
+        return `${amount.toFixed(2)} bps`;
+      }
+
+      function formatMarkup(value, bpsValue, showBps) {
+        if (!showBps) return value == null ? "—" : formatMoney(value);
+        const dollars = value == null ? "" : ` (${formatMoney(value)})`;
+        return `${formatBps(bpsValue)}${dollars}`;
+      }
+
       function comparisonTable(data) {
         const { comparison, statement1, statement2 } = data;
         const earlierMonth = formatPeriodLabel(data.earlierMonth) || data.earlierMonth;
         const laterMonth = formatPeriodLabel(data.laterMonth) || data.laterMonth;
         const effectiveRateUp = Number(comparison.laterRate) > Number(comparison.earlierRate) && statement2.benchmarkVerdict === "above";
         const feesUp = Number(comparison.laterTotalFees) > Number(comparison.earlierTotalFees);
-        const markupUp = Number(comparison.laterProcessorMarkup ?? 0) > Number(comparison.earlierProcessorMarkup ?? 0);
+        const hasMarkupBps = comparison.earlierProcessorMarkupBps != null && comparison.laterProcessorMarkupBps != null;
+        const markupUp = hasMarkupBps
+          ? Number(comparison.laterProcessorMarkupBps) > Number(comparison.earlierProcessorMarkupBps)
+          : Number(comparison.laterProcessorMarkup ?? 0) > Number(comparison.earlierProcessorMarkup ?? 0);
 
         return `
           <table class="comparison-table">
@@ -193,9 +208,9 @@
               </tr>
               <tr>
                 <td>Processor markup</td>
-                <td>${comparison.earlierProcessorMarkup == null ? "—" : formatMoney(comparison.earlierProcessorMarkup)}</td>
+                <td>${formatMarkup(comparison.earlierProcessorMarkup, comparison.earlierProcessorMarkupBps, hasMarkupBps)}</td>
                 <td>→</td>
-                <td class="${markupUp ? "value-up" : ""}">${comparison.laterProcessorMarkup == null ? "—" : formatMoney(comparison.laterProcessorMarkup)}</td>
+                <td class="${markupUp ? "value-up" : ""}">${formatMarkup(comparison.laterProcessorMarkup, comparison.laterProcessorMarkupBps, hasMarkupBps)}</td>
               </tr>
               <tr>
                 <td>Card network fees</td>

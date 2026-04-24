@@ -7,6 +7,8 @@ import {
   FeeBreakdownRow,
   FeeInsight,
   KpiMetric,
+  ProcessorMarkupAuditRow,
+  ProcessorMarkupAuditSummary,
   SavingsOpportunity,
   SuspiciousFee,
   TrendPoint,
@@ -124,6 +126,71 @@ function formatMoney(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
+function amountToBps(amount: number | null, volume: number | null): number | null {
+  if (amount === null || volume === null) return null;
+  if (!Number.isFinite(amount) || !Number.isFinite(volume) || amount <= 0 || volume <= 0) return null;
+  return toPct((amount / volume) * 10_000);
+}
+
+function createProcessorMarkupAudit(structuredFacts: StructuredStatementFacts): ProcessorMarkupAuditSummary {
+  const blendedRows: ProcessorMarkupAuditRow[] = structuredFacts.blendedFeeSplits
+    .map((split) => {
+      const totalPaid = split.processorMarkup.totalPaid ?? split.processorMarkup.expectedTotalPaid;
+      const volume = split.volume;
+      return {
+        label: split.label,
+        cardBrand: split.cardBrand,
+        cardType: split.cardType,
+        transactionCount: split.transactionCount,
+        volume,
+        ratePercent: split.processorMarkup.ratePercent,
+        rateBps: split.processorMarkup.rateBps,
+        effectiveRateBps: amountToBps(totalPaid, volume),
+        perItemFee: split.processorMarkup.perItemFee,
+        totalPaid: split.processorMarkup.totalPaid,
+        expectedTotalPaid: split.processorMarkup.expectedTotalPaid,
+        sourceSection: split.sourceSection,
+        evidenceLine: split.evidenceLine,
+        rowIndex: split.rowIndex,
+        confidence: split.confidence,
+      };
+    });
+  const rows = [...structuredFacts.processorMarkupRows, ...blendedRows].filter(
+    (row) =>
+      row.rateBps !== null ||
+      row.effectiveRateBps !== null ||
+      row.totalPaid !== null ||
+      row.expectedTotalPaid !== null ||
+      row.perItemFee !== null,
+  );
+
+  const transactionCountRaw = rows.reduce((sum, row) => sum + (row.transactionCount ?? 0), 0);
+  const volumeRaw = rows.reduce((sum, row) => sum + (row.volume ?? 0), 0);
+  const totalPaidRaw = rows.reduce((sum, row) => sum + (row.totalPaid ?? row.expectedTotalPaid ?? 0), 0);
+  const weightedRate = rows.reduce(
+    (acc, row) => {
+      if (row.rateBps === null || row.volume === null || row.volume <= 0) return acc;
+      return {
+        weightedSum: acc.weightedSum + row.rateBps * row.volume,
+        volume: acc.volume + row.volume,
+      };
+    },
+    { weightedSum: 0, volume: 0 },
+  );
+  const confidenceRaw = rows.reduce((sum, row) => sum + row.confidence, 0);
+
+  return {
+    rows,
+    rowCount: rows.length,
+    transactionCount: transactionCountRaw > 0 ? Math.round(transactionCountRaw) : null,
+    volume: volumeRaw > 0 ? toMoney(volumeRaw) : null,
+    totalPaid: totalPaidRaw > 0 ? toMoney(totalPaidRaw) : null,
+    weightedAverageRateBps: weightedRate.volume > 0 ? toPct(weightedRate.weightedSum / weightedRate.volume) : null,
+    effectiveRateBps: amountToBps(totalPaidRaw, volumeRaw),
+    confidence: rows.length > 0 ? toPct(confidenceRaw / rows.length) : 0,
+  };
+}
+
 function inferPeriod(row: Record<string, string | number>, periodKeys: string[]): string | null {
   for (const key of periodKeys) {
     const value = row[key];
@@ -152,6 +219,7 @@ function createTextOnlyPdfSummary(
   structuredFacts: StructuredStatementFacts,
 ): AnalysisSummary {
   const benchmarkBase = benchmarkForBusinessType(businessType);
+  const processorMarkupAudit = createProcessorMarkupAudit(structuredFacts);
   const benchmark: BenchmarkResult = {
     ...benchmarkBase,
     status: "within",
@@ -209,6 +277,7 @@ function createTextOnlyPdfSummary(
     interchangeAudit: structuredFacts.interchangeAudit,
     interchangeAuditRows: structuredFacts.interchangeAuditRows,
     blendedFeeSplits: structuredFacts.blendedFeeSplits,
+    processorMarkupAudit,
     kpis: [
       { label: "Effective Rate", value: "N/A", note: "Structured numeric extraction unavailable for this PDF." },
       { label: "Estimated Monthly Fees", value: "N/A", note: "Fee totals withheld to avoid misleading math." },
@@ -325,28 +394,30 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
   }
 
   const structuredInterchangePaid = structuredFacts.interchangeAudit.totalPaid ?? 0;
-  const blendedProcessorMarkupTotal = toMoney(
-    structuredFacts.blendedFeeSplits.reduce(
-      (sum, split) => sum + (split.processorMarkup.totalPaid ?? split.processorMarkup.expectedTotalPaid ?? 0),
-      0,
-    ),
+  const processorMarkupAudit = createProcessorMarkupAudit(structuredFacts);
+  const structuredProcessorMarkupTotal = toMoney(
+    processorMarkupAudit.totalPaid ??
+      structuredFacts.blendedFeeSplits.reduce(
+        (sum, split) => sum + (split.processorMarkup.totalPaid ?? split.processorMarkup.expectedTotalPaid ?? 0),
+        0,
+      ),
   );
-  const canUseBlendedRollup =
-    blendedProcessorMarkupTotal > 0 &&
+  const canUseProcessorMarkupRollup =
+    structuredProcessorMarkupTotal > 0 &&
     (totalFeesRaw <= 0 ||
       (structuredInterchangePaid > 0 && Math.abs(totalFeesRaw - structuredInterchangePaid) <= Math.max(1, structuredInterchangePaid * 0.01)));
 
-  if (totalFeesRaw <= 0 && (structuredInterchangePaid > 0 || blendedProcessorMarkupTotal > 0)) {
-    totalFeesRaw = structuredInterchangePaid + blendedProcessorMarkupTotal;
+  if (totalFeesRaw <= 0 && (structuredInterchangePaid > 0 || structuredProcessorMarkupTotal > 0)) {
+    totalFeesRaw = structuredInterchangePaid + structuredProcessorMarkupTotal;
     if (structuredInterchangePaid > 0) {
       feeBuckets.set("card brand interchange detail", structuredInterchangePaid);
     }
-    if (blendedProcessorMarkupTotal > 0) {
-      feeBuckets.set("processor markup from blended rows", blendedProcessorMarkupTotal);
+    if (structuredProcessorMarkupTotal > 0) {
+      feeBuckets.set("processor markup detail", structuredProcessorMarkupTotal);
     }
-  } else if (canUseBlendedRollup) {
-    totalFeesRaw += blendedProcessorMarkupTotal;
-    feeBuckets.set("processor markup from blended rows", blendedProcessorMarkupTotal);
+  } else if (canUseProcessorMarkupRollup) {
+    totalFeesRaw += structuredProcessorMarkupTotal;
+    feeBuckets.set("processor markup detail", structuredProcessorMarkupTotal);
   }
 
   if (doc.sourceType === "pdf" && doc.extraction.mode === "structured" && totalFeesRaw <= 0) {
@@ -555,7 +626,7 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     insights.push({
       title: "Blended pricing rows normalized",
       detail: `${structuredFacts.blendedFeeSplits.length} blended row pair(s) were split into card-brand interchange and processor markup before fee analysis.`,
-      impactUsd: blendedProcessorMarkupTotal,
+      impactUsd: structuredProcessorMarkupTotal,
     });
   }
 
@@ -636,7 +707,10 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
   if (structuredFacts.blendedFeeSplits.length > 0) {
     dataQuality.push({
       level: "info",
-      message: `Normalized ${structuredFacts.blendedFeeSplits.length} blended pricing row pair(s) into separate interchange and processor-markup components.`,
+      message:
+        processorMarkupAudit.effectiveRateBps !== null
+          ? `Normalized ${structuredFacts.blendedFeeSplits.length} blended pricing row pair(s) into separate interchange and processor-markup components (${processorMarkupAudit.effectiveRateBps.toFixed(2)} bps effective markup).`
+          : `Normalized ${structuredFacts.blendedFeeSplits.length} blended pricing row pair(s) into separate interchange and processor-markup components.`,
     });
   }
 
@@ -694,6 +768,7 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     interchangeAudit: structuredFacts.interchangeAudit,
     interchangeAuditRows: structuredFacts.interchangeAuditRows,
     blendedFeeSplits: structuredFacts.blendedFeeSplits,
+    processorMarkupAudit,
     kpis,
     feeBreakdown,
     suspiciousFees,

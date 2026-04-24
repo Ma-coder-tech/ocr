@@ -4,6 +4,7 @@ import type {
   CardBrand,
   InterchangeAuditRow,
   InterchangeAuditSummary,
+  ProcessorMarkupAuditRow,
   StatementSection,
   StatementSectionType,
 } from "./types.js";
@@ -13,6 +14,7 @@ export type StructuredStatementFacts = {
   interchangeAudit: InterchangeAuditSummary;
   interchangeAuditRows: InterchangeAuditRow[];
   blendedFeeSplits: BlendedFeeSplit[];
+  processorMarkupRows: ProcessorMarkupAuditRow[];
 };
 
 type StructuredStatementOptions = {
@@ -55,6 +57,12 @@ function round2(value: number): number {
 
 function round4(value: number): number {
   return Math.round(value * 10_000) / 10_000;
+}
+
+function amountToBps(amount: number | null, volume: number | null): number | null {
+  if (amount === null || volume === null) return null;
+  if (!Number.isFinite(amount) || !Number.isFinite(volume) || amount <= 0 || volume <= 0) return null;
+  return round2((amount / volume) * 10_000);
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -510,6 +518,41 @@ function splitBlendedCandidates(top: PricingCandidate, bottom: PricingCandidate)
   };
 }
 
+function hasProcessorMarkupContext(section: SectionContext, row: Record<string, string | number>, evidenceLine: string): boolean {
+  if (section.type === "interchange_detail") return false;
+  const context = collapseWhitespace(
+    [
+      section.title,
+      evidenceLine,
+      ...entriesFor(row).map((entry) => `${entry.key} ${String(entry.value)}`),
+    ].join(" "),
+  ).toLowerCase();
+
+  if (/\binterchange\b|\bprogram fees?\b|\bcard brand\b|\bcard network\b/.test(context)) return false;
+  return /\b(processor markup|service charges?|discount fees?|processing fees?|assessment markup|hps processing|markup)\b/.test(context);
+}
+
+function processorMarkupRowFromCandidate(candidate: PricingCandidate): ProcessorMarkupAuditRow {
+  const totalPaid = candidate.totalPaid ?? candidate.expectedTotalPaid;
+  return {
+    label: candidate.label,
+    cardBrand: candidate.cardBrand,
+    cardType: candidate.cardType,
+    transactionCount: candidate.transactionCount,
+    volume: candidate.volume,
+    ratePercent: candidate.ratePercent,
+    rateBps: candidate.rateBps,
+    effectiveRateBps: amountToBps(totalPaid, candidate.volume),
+    perItemFee: candidate.perItemFee,
+    totalPaid: candidate.totalPaid,
+    expectedTotalPaid: candidate.expectedTotalPaid,
+    sourceSection: candidate.sourceSection,
+    evidenceLine: candidate.evidenceLine,
+    rowIndex: candidate.rowIndex,
+    confidence: 0.78,
+  };
+}
+
 function interchangeRowFromBlendedSplit(split: BlendedFeeSplit): InterchangeAuditRow | null {
   const totalPaid = split.interchange.totalPaid;
   const expectedTotalPaid = split.interchange.expectedTotalPaid;
@@ -669,6 +712,7 @@ export function extractStructuredStatementFacts(
   const sections: StatementSection[] = [];
   const interchangeRows: InterchangeAuditRow[] = [];
   const blendedFeeSplits: BlendedFeeSplit[] = [];
+  const processorMarkupRows: ProcessorMarkupAuditRow[] = [];
   const blendedCandidates: PricingCandidate[] = [];
   const parseBlendedRows = shouldParseBlendedRows(doc, options);
   let currentSection: SectionContext = { type: "unknown", title: "Uncategorized" };
@@ -705,6 +749,13 @@ export function extractStructuredStatementFacts(
       }
     }
 
+    if (hasProcessorMarkupContext(currentSection, mappedRow, evidence)) {
+      const processorCandidate = buildPricingCandidate(mappedRow, rowIndex, currentSection, evidence);
+      if (processorCandidate) {
+        processorMarkupRows.push(processorMarkupRowFromCandidate(processorCandidate));
+      }
+    }
+
     const columnRow = buildInterchangeRow(mappedRow, rowIndex, currentSection, evidence);
     if (columnRow) {
       interchangeRows.push(columnRow);
@@ -728,5 +779,6 @@ export function extractStructuredStatementFacts(
     interchangeAudit,
     interchangeAuditRows: dedupedRows,
     blendedFeeSplits,
+    processorMarkupRows,
   };
 }

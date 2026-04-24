@@ -279,17 +279,21 @@ function evaluateUniversalRule(
 
   if (element.id === "E013") {
     const splits = summary.blendedFeeSplits ?? [];
+    const markupBps = summary.processorMarkupAudit?.effectiveRateBps ?? null;
     if (splits.length > 0) {
       return {
         id: element.id,
         title: element.name,
         status: "pass",
-        reason: `${splits.length} blended pricing row pair${splits.length === 1 ? "" : "s"} split into interchange and processor-markup components.`,
+        reason:
+          markupBps === null
+            ? `${splits.length} blended pricing row pair${splits.length === 1 ? "" : "s"} split into interchange and processor-markup components.`
+            : `${splits.length} blended pricing row pair${splits.length === 1 ? "" : "s"} split into interchange and processor-markup components with ${markupBps.toFixed(2)} bps effective processor markup.`,
         evidence: splits
           .slice(0, 5)
           .map(
             (split) =>
-              `${split.label}: processor=${split.processorMarkup.totalPaid ?? split.processorMarkup.expectedTotalPaid ?? "n/a"}, interchange=${split.interchange.totalPaid ?? split.interchange.expectedTotalPaid ?? "n/a"}`,
+              `${split.label}: processor=${split.processorMarkup.totalPaid ?? split.processorMarkup.expectedTotalPaid ?? "n/a"} (${split.processorMarkup.rateBps ?? "n/a"} bps), interchange=${split.interchange.totalPaid ?? split.interchange.expectedTotalPaid ?? "n/a"}`,
           ),
       };
     }
@@ -377,13 +381,19 @@ function evaluateProcessorRule(
 
   if (/blended|top number|bottom number|unbundl|normalize blended|processor component|interchange component/i.test(title)) {
     const splits = summary.blendedFeeSplits ?? [];
+    const markupBps = summary.processorMarkupAudit?.effectiveRateBps ?? null;
     if (splits.length > 0) {
       return {
         id,
         title,
         status: "pass",
-        reason: `${splits.length} blended pricing row pair${splits.length === 1 ? "" : "s"} normalized into separate interchange and processor components.`,
-        evidence: splits.slice(0, 4).map((split) => split.evidenceLine),
+        reason:
+          markupBps === null
+            ? `${splits.length} blended pricing row pair${splits.length === 1 ? "" : "s"} normalized into separate interchange and processor components.`
+            : `${splits.length} blended pricing row pair${splits.length === 1 ? "" : "s"} normalized into separate interchange and processor components (${markupBps.toFixed(2)} bps effective processor markup).`,
+        evidence: splits
+          .slice(0, 4)
+          .map((split) => `${split.evidenceLine}; processor markup ${split.processorMarkup.rateBps ?? "n/a"} bps`),
       };
     }
     return {

@@ -24,10 +24,12 @@ export type MerchantAccount = {
   statement2EffectiveRate: number | null;
   statement2BenchmarkVerdict: BenchmarkStatus | null;
   statement2ProcessorMarkup: number | null;
+  statement2ProcessorMarkupBps: number | null;
   statement2CardNetworkFees: number | null;
   comparisonAlertType: ComparisonAlertType | null;
   comparisonEffectiveRateDelta: number | null;
   comparisonFeesDelta: number | null;
+  comparisonProcessorMarkupBpsDelta: number | null;
 };
 
 export type SessionRecord = {
@@ -54,6 +56,7 @@ export type StatementRecord = {
   benchmarkLow: number;
   benchmarkHigh: number;
   processorMarkup: number | null;
+  processorMarkupBps: number | null;
   cardNetworkFees: number | null;
   analysisSummary: AnalysisSummary;
   sourceJobId: string | null;
@@ -89,6 +92,7 @@ export type ComparisonRecord = {
   feesDelta: number;
   volumeDelta: number;
   processorMarkupDelta: number | null;
+  processorMarkupBpsDelta: number | null;
   cardNetworkFeesDelta: number | null;
   createdAt: string;
   updatedAt: string;
@@ -132,6 +136,10 @@ function mapMerchant(row: Record<string, unknown> | undefined): MerchantAccount 
       row.statement_2_processor_markup === null || row.statement_2_processor_markup === undefined
         ? null
         : Number(row.statement_2_processor_markup),
+    statement2ProcessorMarkupBps:
+      row.statement_2_processor_markup_bps === null || row.statement_2_processor_markup_bps === undefined
+        ? null
+        : Number(row.statement_2_processor_markup_bps),
     statement2CardNetworkFees:
       row.statement_2_card_network_fees === null || row.statement_2_card_network_fees === undefined
         ? null
@@ -145,6 +153,10 @@ function mapMerchant(row: Record<string, unknown> | undefined): MerchantAccount 
         : Number(row.comparison_effective_rate_delta),
     comparisonFeesDelta:
       row.comparison_fees_delta === null || row.comparison_fees_delta === undefined ? null : Number(row.comparison_fees_delta),
+    comparisonProcessorMarkupBpsDelta:
+      row.comparison_processor_markup_bps_delta === null || row.comparison_processor_markup_bps_delta === undefined
+        ? null
+        : Number(row.comparison_processor_markup_bps_delta),
   };
 }
 
@@ -174,6 +186,7 @@ function mapStatement(row: Record<string, unknown> | undefined): StatementRecord
     benchmarkLow: Number(row.benchmark_low),
     benchmarkHigh: Number(row.benchmark_high),
     processorMarkup: row.processor_markup === null || row.processor_markup === undefined ? null : Number(row.processor_markup),
+    processorMarkupBps: row.processor_markup_bps === null || row.processor_markup_bps === undefined ? null : Number(row.processor_markup_bps),
     cardNetworkFees:
       row.card_network_fees === null || row.card_network_fees === undefined ? null : Number(row.card_network_fees),
     analysisSummary,
@@ -196,6 +209,10 @@ function mapComparison(row: Record<string, unknown> | undefined): ComparisonReco
     volumeDelta: Number(row.volume_delta),
     processorMarkupDelta:
       row.processor_markup_delta === null || row.processor_markup_delta === undefined ? null : Number(row.processor_markup_delta),
+    processorMarkupBpsDelta:
+      row.processor_markup_bps_delta === null || row.processor_markup_bps_delta === undefined
+        ? null
+        : Number(row.processor_markup_bps_delta),
     cardNetworkFeesDelta:
       row.card_network_fees_delta === null || row.card_network_fees_delta === undefined ? null : Number(row.card_network_fees_delta),
     createdAt: String(row.created_at),
@@ -235,10 +252,28 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function deriveFeeComponentAmounts(summary: AnalysisSummary): { processorMarkup: number | null; cardNetworkFees: number | null } {
+function positiveFiniteOrNull(value: unknown): number | null {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+function deriveFeeComponentAmounts(summary: AnalysisSummary): {
+  processorMarkup: number | null;
+  processorMarkupBps: number | null;
+  cardNetworkFees: number | null;
+} {
   const buckets = Array.isArray(summary.feeBreakdown) ? summary.feeBreakdown : [];
+  const interchangeTotal =
+    summary.interchangeAudit?.totalPaid !== null && summary.interchangeAudit?.totalPaid !== undefined
+      ? Number(summary.interchangeAudit.totalPaid)
+      : null;
+  const processorMarkupBps = positiveFiniteOrNull(summary.processorMarkupAudit?.effectiveRateBps);
   if (!buckets.length) {
-    return { processorMarkup: null, cardNetworkFees: null };
+    return {
+      processorMarkup: null,
+      processorMarkupBps: processorMarkupBps === null ? null : round2(processorMarkupBps),
+      cardNetworkFees: interchangeTotal !== null && Number.isFinite(interchangeTotal) && interchangeTotal > 0 ? round2(interchangeTotal) : null,
+    };
   }
 
   let processorMarkup = 0;
@@ -260,7 +295,13 @@ function deriveFeeComponentAmounts(summary: AnalysisSummary): { processorMarkup:
 
   return {
     processorMarkup: processorMarkup > 0 ? round2(processorMarkup) : null,
-    cardNetworkFees: cardNetworkFees > 0 ? round2(cardNetworkFees) : null,
+    processorMarkupBps: processorMarkupBps === null ? null : round2(processorMarkupBps),
+    cardNetworkFees:
+      cardNetworkFees > 0
+        ? round2(cardNetworkFees)
+        : interchangeTotal !== null && Number.isFinite(interchangeTotal) && interchangeTotal > 0
+          ? round2(interchangeTotal)
+          : null,
   };
 }
 
@@ -416,7 +457,7 @@ export function persistStatementFromSummary(input: {
     const statementPeriod = formatPeriodKey(periodKey);
     const processorName = input.summary.processorName === "Unknown" ? null : input.summary.processorName;
     const benchmarkVerdict = input.summary.benchmark.status;
-    const { processorMarkup, cardNetworkFees } = deriveFeeComponentAmounts(input.summary);
+    const { processorMarkup, processorMarkupBps, cardNetworkFees } = deriveFeeComponentAmounts(input.summary);
     const now = nowIso();
     const existing = getStatementByMerchantSlot(input.merchantId, input.slot);
 
@@ -434,6 +475,7 @@ export function persistStatementFromSummary(input: {
           benchmark_low = ?,
           benchmark_high = ?,
           processor_markup = ?,
+          processor_markup_bps = ?,
           card_network_fees = ?,
           analysis_summary_json = ?,
           source_job_id = ?,
@@ -451,6 +493,7 @@ export function persistStatementFromSummary(input: {
         round2(input.summary.benchmark.lowerRate),
         round2(input.summary.benchmark.upperRate),
         processorMarkup,
+        processorMarkupBps,
         cardNetworkFees,
         JSON.stringify(input.summary),
         input.sourceJobId ?? null,
@@ -462,9 +505,9 @@ export function persistStatementFromSummary(input: {
       db.prepare(`
         INSERT INTO statements (
           merchant_id, slot, period_key, statement_period, processor_name, business_type, total_volume, total_fees,
-          effective_rate, benchmark_verdict, benchmark_low, benchmark_high, processor_markup, card_network_fees,
+          effective_rate, benchmark_verdict, benchmark_low, benchmark_high, processor_markup, processor_markup_bps, card_network_fees,
           analysis_summary_json, source_job_id, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         input.merchantId,
         input.slot,
@@ -479,6 +522,7 @@ export function persistStatementFromSummary(input: {
         round2(input.summary.benchmark.lowerRate),
         round2(input.summary.benchmark.upperRate),
         processorMarkup,
+        processorMarkupBps,
         cardNetworkFees,
         JSON.stringify(input.summary),
         input.sourceJobId ?? null,
@@ -510,6 +554,7 @@ export function persistStatementFromSummary(input: {
           statement_2_effective_rate = ?,
           statement_2_benchmark_verdict = ?,
           statement_2_processor_markup = ?,
+          statement_2_processor_markup_bps = ?,
           statement_2_card_network_fees = ?,
           free_statements_remaining = 0,
           updated_at = ?
@@ -522,6 +567,7 @@ export function persistStatementFromSummary(input: {
         statement.effectiveRate,
         statement.benchmarkVerdict,
         statement.processorMarkup,
+        statement.processorMarkupBps,
         statement.cardNetworkFees,
         nowIso(),
         input.merchantId,
@@ -549,6 +595,10 @@ export function createOrReplaceComparison(merchantId: number): ComparisonRecord 
       statement1.processorMarkup === null || statement2.processorMarkup === null
         ? null
         : round2(statement2.processorMarkup - statement1.processorMarkup);
+    const processorMarkupBpsDelta =
+      statement1.processorMarkupBps === null || statement2.processorMarkupBps === null
+        ? null
+        : round2(statement2.processorMarkupBps - statement1.processorMarkupBps);
     const cardNetworkFeesDelta =
       statement1.cardNetworkFees === null || statement2.cardNetworkFees === null
         ? null
@@ -561,7 +611,7 @@ export function createOrReplaceComparison(merchantId: number): ComparisonRecord 
       db.prepare(`
         UPDATE comparisons
         SET statement_1_id = ?, statement_2_id = ?, alert_type = ?, effective_rate_delta = ?, fees_delta = ?, volume_delta = ?,
-            processor_markup_delta = ?, card_network_fees_delta = ?, updated_at = ?
+            processor_markup_delta = ?, processor_markup_bps_delta = ?, card_network_fees_delta = ?, updated_at = ?
         WHERE merchant_id = ?
       `).run(
         statement1.id,
@@ -571,6 +621,7 @@ export function createOrReplaceComparison(merchantId: number): ComparisonRecord 
         feesDelta,
         volumeDelta,
         processorMarkupDelta,
+        processorMarkupBpsDelta,
         cardNetworkFeesDelta,
         now,
         merchantId,
@@ -579,8 +630,8 @@ export function createOrReplaceComparison(merchantId: number): ComparisonRecord 
       db.prepare(`
         INSERT INTO comparisons (
           merchant_id, statement_1_id, statement_2_id, alert_type, effective_rate_delta, fees_delta, volume_delta,
-          processor_markup_delta, card_network_fees_delta, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          processor_markup_delta, processor_markup_bps_delta, card_network_fees_delta, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         merchantId,
         statement1.id,
@@ -590,6 +641,7 @@ export function createOrReplaceComparison(merchantId: number): ComparisonRecord 
         feesDelta,
         volumeDelta,
         processorMarkupDelta,
+        processorMarkupBpsDelta,
         cardNetworkFeesDelta,
         now,
         now,
@@ -598,9 +650,9 @@ export function createOrReplaceComparison(merchantId: number): ComparisonRecord 
 
     db.prepare(`
       UPDATE merchants
-      SET comparison_alert_type = ?, comparison_effective_rate_delta = ?, comparison_fees_delta = ?, updated_at = ?
+      SET comparison_alert_type = ?, comparison_effective_rate_delta = ?, comparison_fees_delta = ?, comparison_processor_markup_bps_delta = ?, updated_at = ?
       WHERE id = ?
-    `).run(alertType, effectiveRateDelta, feesDelta, nowIso(), merchantId);
+    `).run(alertType, effectiveRateDelta, feesDelta, processorMarkupBpsDelta, nowIso(), merchantId);
 
     return getComparisonForMerchant(merchantId)!;
   });
@@ -636,10 +688,12 @@ export function resetMerchantDevState(merchantId: number): void {
         statement_2_effective_rate = NULL,
         statement_2_benchmark_verdict = NULL,
         statement_2_processor_markup = NULL,
+        statement_2_processor_markup_bps = NULL,
         statement_2_card_network_fees = NULL,
         comparison_alert_type = NULL,
         comparison_effective_rate_delta = NULL,
         comparison_fees_delta = NULL,
+        comparison_processor_markup_bps_delta = NULL,
         updated_at = ?
       WHERE id = ?
     `).run(now, merchantId);

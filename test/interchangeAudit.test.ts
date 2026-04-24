@@ -194,6 +194,12 @@ describe("interchange audit extraction", () => {
     expect(summary.statementSections.some((section) => section.type === "summary")).toBe(true);
     expect(summary.interchangeAuditRows).toHaveLength(0);
     expect(summary.interchangeAudit.rowCount).toBe(0);
+    expect(summary.processorMarkupAudit).toMatchObject({
+      rowCount: 2,
+      volume: 5626.5,
+      totalPaid: 17.67,
+      effectiveRateBps: 31.4,
+    });
   });
 
   it("keeps extracted paid separate from expected paid and warns checklist E011 when paid is missing", async () => {
@@ -244,6 +250,21 @@ describe("interchange audit extraction", () => {
         expectedTotalPaid: 80,
       },
     });
+    expect(summary.processorMarkupAudit).toMatchObject({
+      rowCount: 1,
+      transactionCount: 100,
+      volume: 10000,
+      totalPaid: 80,
+      weightedAverageRateBps: 65,
+      effectiveRateBps: 80,
+    });
+    expect(summary.processorMarkupAudit.rows[0]).toMatchObject({
+      label: "Visa Credit",
+      rateBps: 65,
+      effectiveRateBps: 80,
+      perItemFee: 0.15,
+      totalPaid: 80,
+    });
     expect(summary.interchangeAuditRows).toHaveLength(1);
     expect(summary.interchangeAuditRows[0]).toMatchObject({
       label: "Visa Credit",
@@ -259,7 +280,7 @@ describe("interchange audit extraction", () => {
           feeClass: "card_brand_pass_through",
         }),
         expect.objectContaining({
-          label: "processor markup from blended rows",
+          label: "processor markup detail",
           amount: 80,
           feeClass: "processor_markup",
         }),

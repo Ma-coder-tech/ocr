@@ -46,10 +46,12 @@ function migrate(): void {
       statement_2_effective_rate REAL,
       statement_2_benchmark_verdict TEXT,
       statement_2_processor_markup REAL,
+      statement_2_processor_markup_bps REAL,
       statement_2_card_network_fees REAL,
       comparison_alert_type TEXT,
       comparison_effective_rate_delta REAL,
       comparison_fees_delta REAL,
+      comparison_processor_markup_bps_delta REAL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -116,6 +118,7 @@ function migrate(): void {
       benchmark_low REAL NOT NULL,
       benchmark_high REAL NOT NULL,
       processor_markup REAL,
+      processor_markup_bps REAL,
       card_network_fees REAL,
       analysis_summary_json TEXT NOT NULL,
       source_job_id TEXT,
@@ -134,6 +137,7 @@ function migrate(): void {
       fees_delta REAL NOT NULL,
       volume_delta REAL NOT NULL,
       processor_markup_delta REAL,
+      processor_markup_bps_delta REAL,
       card_network_fees_delta REAL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -153,15 +157,19 @@ function migrate(): void {
   ensureColumn("merchants", "statement_2_effective_rate", "REAL");
   ensureColumn("merchants", "statement_2_benchmark_verdict", "TEXT");
   ensureColumn("merchants", "statement_2_processor_markup", "REAL");
+  ensureColumn("merchants", "statement_2_processor_markup_bps", "REAL");
   ensureColumn("merchants", "statement_2_card_network_fees", "REAL");
   ensureColumn("merchants", "comparison_alert_type", "TEXT");
   ensureColumn("merchants", "comparison_effective_rate_delta", "REAL");
   ensureColumn("merchants", "comparison_fees_delta", "REAL");
+  ensureColumn("merchants", "comparison_processor_markup_bps_delta", "REAL");
   ensureColumn("merchants", "free_statements_remaining", "INTEGER NOT NULL DEFAULT 2");
   ensureColumn("merchants", "chosen_path", "TEXT");
   ensureColumn("analysis_jobs", "merchant_id", "INTEGER");
   ensureColumn("analysis_jobs", "statement_slot", "INTEGER");
   ensureColumn("analysis_jobs", "detected_statement_period", "TEXT");
+  ensureColumn("statements", "processor_markup_bps", "REAL");
+  ensureColumn("comparisons", "processor_markup_bps_delta", "REAL");
 }
 
 migrate();
