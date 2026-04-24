@@ -92,6 +92,26 @@ function firstEvidence(text: string, pattern: RegExp): string | null {
   return match ? `Matched pattern: ${match[0]}` : null;
 }
 
+function perItemModelEvidence(summary: AnalysisSummary): string[] {
+  const model = summary.perItemFeeModel;
+  if (!model) return [];
+
+  const componentEvidence = model.components
+    .slice(0, 5)
+    .map((component) => `${component.kind}=${component.amount.toFixed(4)} from ${component.sourceSection}: ${component.evidenceLine}`);
+
+  return [
+    model.transactionFee !== null ? `Transaction fee: ${model.transactionFee.toFixed(4)}` : null,
+    model.authorizationFee !== null ? `Authorization fee: ${model.authorizationFee.toFixed(4)}` : null,
+    model.allInPerItemFee !== null ? `All-in per-item fee: ${model.allInPerItemFee.toFixed(4)}` : null,
+    ...componentEvidence,
+  ].filter((item): item is string => Boolean(item));
+}
+
+function hasPerItemTextSignal(text: string): boolean {
+  return /\bauthori[sz]ation fees?\b|\bauth fees?\b|\btransaction fees?\b|\bper item\b|\bper trans\b|\bper txn\b|\bitem fees?\b/i.test(text);
+}
+
 function evaluateUniversalRule(
   element: UniversalElement,
   doc: ParsedDocument,
@@ -308,6 +328,41 @@ function evaluateUniversalRule(
     };
   }
 
+  if (element.id === "E019") {
+    const model = summary.perItemFeeModel;
+    const evidence = perItemModelEvidence(summary);
+    if (model?.allInPerItemFee !== null && model?.allInPerItemFee !== undefined) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "pass",
+        reason: `Transaction and authorization components were combined into a true all-in per-item cost (${model.allInPerItemFee.toFixed(4)}).`,
+        evidence,
+      };
+    }
+
+    if (model && (model.transactionFee !== null || model.authorizationFee !== null)) {
+      const missing = model.transactionFee === null ? "transaction fee" : "authorization fee";
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason: `A per-item component was extracted from statement sections, but the ${missing} was not captured, so the all-in per-item cost was not computed.`,
+        evidence,
+      };
+    }
+
+    return {
+      id: element.id,
+      title: element.name,
+      status: hasPerItemTextSignal(text) ? "warning" : "not_applicable",
+      reason: hasPerItemTextSignal(text)
+        ? "Per-item or authorization language was detected, but no section-supported transaction/auth fee component was extracted."
+        : "No transaction or authorization per-item component was detected in statement sections.",
+      evidence,
+    };
+  }
+
   if (element.id === "E006") {
     if (summary.totalVolume > 0) {
       status = "pass";
@@ -354,11 +409,113 @@ function processorPatternForCheck(check: string): RegExp | null {
   if (lower.includes("non-emv")) return /non[\s-]?emv/i;
   if (lower.includes("pci")) return /\bpci\b/i;
   if (lower.includes("monthly minimum")) return /monthly minimum/i;
-  if (lower.includes("authorization fee")) return /authorization/i;
   if (lower.includes("customer intelligence suite")) return /customer intelligence suite/i;
   if (lower.includes("repricing") || lower.includes("fine print") || lower.includes("effective")) return /effective|billing change|terms/i;
   if (lower.includes("eirf") || lower.includes("non-qualified") || lower.includes("downgrade")) return /eirf|non-?qualified|downgrade/i;
   if (lower.includes("surcharge")) return /surcharge/i;
+  return null;
+}
+
+function evaluatePerItemProcessorRule(id: string, title: string, summary: AnalysisSummary, text: string): ChecklistRuleResult | null {
+  const lower = title.toLowerCase();
+  const model = summary.perItemFeeModel;
+  const evidence = perItemModelEvidence(summary);
+
+  if (lower.includes("extract per-item transaction fee") || lower.includes("per-item transaction fee")) {
+    if (model?.transactionFee !== null && model?.transactionFee !== undefined) {
+      return {
+        id,
+        title,
+        status: "pass",
+        reason: `A transaction per-item fee was extracted from statement sections (${model.transactionFee.toFixed(4)}).`,
+        evidence,
+      };
+    }
+    return {
+      id,
+      title,
+      status: hasPerItemTextSignal(text) ? "warning" : "not_applicable",
+      reason: hasPerItemTextSignal(text)
+        ? "Per-item language was detected, but no section-supported transaction fee amount was extracted."
+        : "No transaction per-item fee signal was detected in statement sections.",
+      evidence,
+    };
+  }
+
+  if (lower.includes("combine") && (lower.includes("authorization") || lower.includes("all-in per-item"))) {
+    if (model?.allInPerItemFee !== null && model?.allInPerItemFee !== undefined) {
+      return {
+        id,
+        title,
+        status: "pass",
+        reason: `Transaction and authorization components were combined into a true all-in per-item cost (${model.allInPerItemFee.toFixed(4)}).`,
+        evidence,
+      };
+    }
+    if (model && (model.transactionFee !== null || model.authorizationFee !== null)) {
+      const missing = model.transactionFee === null ? "transaction fee" : "authorization fee";
+      return {
+        id,
+        title,
+        status: "warning",
+        reason: `Only one per-item component was extracted; missing ${missing}, so the all-in per-item cost was not computed.`,
+        evidence,
+      };
+    }
+    return {
+      id,
+      title,
+      status: hasPerItemTextSignal(text) ? "warning" : "not_applicable",
+      reason: hasPerItemTextSignal(text)
+        ? "Per-item or authorization language was detected, but the section-supported components needed for all-in cost were not extracted."
+        : "No transaction/auth per-item components were detected in statement sections.",
+      evidence,
+    };
+  }
+
+  if (lower.includes("authorization fee") || lower.includes("authorization fee section")) {
+    if (model?.authorizationFee !== null && model?.authorizationFee !== undefined) {
+      return {
+        id,
+        title,
+        status: "pass",
+        reason: `An authorization per-item fee was extracted from statement sections (${model.authorizationFee.toFixed(4)}).`,
+        evidence,
+      };
+    }
+    return {
+      id,
+      title,
+      status: /\bauthori[sz]ation\b|\bauth fee\b/i.test(text) ? "warning" : "not_applicable",
+      reason: /\bauthori[sz]ation\b|\bauth fee\b/i.test(text)
+        ? "Authorization language was detected, but no section-supported authorization fee amount was extracted."
+        : "No authorization fee section or line was detected in statement sections.",
+      evidence,
+    };
+  }
+
+  if (lower.includes("high all-in per-item")) {
+    if (model?.allInPerItemFee !== null && model?.allInPerItemFee !== undefined) {
+      return {
+        id,
+        title,
+        status: model.allInPerItemFee > 0.4 ? "warning" : "pass",
+        reason:
+          model.allInPerItemFee > 0.4
+            ? `All-in per-item fee is above the source concern threshold (${model.allInPerItemFee.toFixed(4)} > 0.4000).`
+            : `All-in per-item fee is available and not above the source concern threshold (${model.allInPerItemFee.toFixed(4)}).`,
+        evidence,
+      };
+    }
+    return {
+      id,
+      title,
+      status: model && (model.transactionFee !== null || model.authorizationFee !== null) ? "warning" : "unknown",
+      reason: "High all-in per-item burden cannot be evaluated until both transaction and authorization components are captured.",
+      evidence,
+    };
+  }
+
   return null;
 }
 
@@ -406,6 +563,9 @@ function evaluateProcessorRule(
       evidence: [],
     };
   }
+
+  const perItemResult = evaluatePerItemProcessorRule(id, title, summary, text);
+  if (perItemResult) return perItemResult;
 
   const pattern = processorPatternForCheck(title);
   if (!pattern) {

@@ -134,6 +134,55 @@ function tsysBlendedRowsDoc(): ParsedDocument {
   };
 }
 
+function worldpaySplitPerItemDoc(): ParsedDocument {
+  return {
+    sourceType: "pdf",
+    headers: ["content"],
+    rows: [
+      { content: "Worldpay Merchant Statement" },
+      { content: "PROCESSING FEES" },
+      { content: "Transaction Fee | $0.10" },
+      { content: "AUTHORIZATION FEES" },
+      { content: "Authorization Fee | $0.10" },
+      { content: "Total Volume | $1,000.00" },
+      { content: "Total Fees | $20.00" },
+    ],
+    textPreview:
+      "Worldpay Merchant Statement Worldpay PROCESSING FEES Transaction Fee $0.10 AUTHORIZATION FEES Authorization Fee $0.10",
+    extraction: {
+      mode: "structured",
+      qualityScore: 0.9,
+      reasons: [],
+      lineCount: 7,
+      amountTokenCount: 4,
+      hasExtractableText: true,
+    },
+  };
+}
+
+function worldpayMissingAuthorizationDoc(): ParsedDocument {
+  return {
+    sourceType: "pdf",
+    headers: ["content"],
+    rows: [
+      { content: "Worldpay Merchant Statement" },
+      { content: "PROCESSING FEES" },
+      { content: "Transaction Fee | $0.10" },
+      { content: "Total Volume | $1,000.00" },
+      { content: "Total Fees | $10.00" },
+    ],
+    textPreview: "Worldpay Merchant Statement Worldpay PROCESSING FEES Transaction Fee $0.10",
+    extraction: {
+      mode: "structured",
+      qualityScore: 0.9,
+      reasons: [],
+      lineCount: 5,
+      amountTokenCount: 3,
+      hasExtractableText: true,
+    },
+  };
+}
+
 describe("interchange audit extraction", () => {
   it("preserves CSV interchange rows before summary fee rollup", async () => {
     const summary = analyzeDocument(csvInterchangeDoc(), "other");
@@ -292,5 +341,44 @@ describe("interchange audit extraction", () => {
     expect(blendedUniversal?.status).toBe("pass");
     const processorSplit = checklist.processorSpecific.results.find((result) => result.title.includes("Split blended rows"));
     expect(processorSplit?.status).toBe("pass");
+  });
+
+  it("combines section-supported transaction and authorization fees into true all-in per-item cost", async () => {
+    const doc = worldpaySplitPerItemDoc();
+    const summary = analyzeDocument(doc, "other");
+
+    expect(summary.perItemFeeModel).toMatchObject({
+      transactionFee: 0.1,
+      authorizationFee: 0.1,
+      allInPerItemFee: 0.2,
+    });
+    expect(summary.perItemFeeModel.components.map((component) => component.kind)).toEqual(["transaction", "authorization"]);
+
+    const checklist = await evaluateChecklistReport(doc, summary);
+    const perItemUniversal = checklist.universal.results.find((result) => result.id === "E019");
+    expect(perItemUniversal?.status).toBe("pass");
+
+    const combineCheck = checklist.processorSpecific.results.find((result) => result.title.includes("Combine transaction and authorization"));
+    expect(combineCheck?.status).toBe("pass");
+    expect(combineCheck?.reason).toContain("0.2000");
+  });
+
+  it("does not compute all-in per-item cost when authorization fee is not statement-supported", async () => {
+    const doc = worldpayMissingAuthorizationDoc();
+    const summary = analyzeDocument(doc, "other");
+
+    expect(summary.perItemFeeModel).toMatchObject({
+      transactionFee: 0.1,
+      authorizationFee: null,
+      allInPerItemFee: null,
+    });
+
+    const checklist = await evaluateChecklistReport(doc, summary);
+    const perItemUniversal = checklist.universal.results.find((result) => result.id === "E019");
+    expect(perItemUniversal?.status).toBe("warning");
+    expect(perItemUniversal?.reason).toContain("authorization fee was not captured");
+
+    const combineCheck = checklist.processorSpecific.results.find((result) => result.title.includes("Combine transaction and authorization"));
+    expect(combineCheck?.status).toBe("warning");
   });
 });

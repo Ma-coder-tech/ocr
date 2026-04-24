@@ -4,6 +4,8 @@ import type {
   CardBrand,
   InterchangeAuditRow,
   InterchangeAuditSummary,
+  PerItemFeeComponent,
+  PerItemFeeModel,
   ProcessorMarkupAuditRow,
   StatementSection,
   StatementSectionType,
@@ -15,6 +17,7 @@ export type StructuredStatementFacts = {
   interchangeAuditRows: InterchangeAuditRow[];
   blendedFeeSplits: BlendedFeeSplit[];
   processorMarkupRows: ProcessorMarkupAuditRow[];
+  perItemFeeModel: PerItemFeeModel;
 };
 
 type StructuredStatementOptions = {
@@ -294,6 +297,126 @@ function expectedPaid(
   const itemComponent = transactionCount !== null && perItemFee !== null ? transactionCount * perItemFee : 0;
   if (rateComponent <= 0 && itemComponent <= 0) return null;
   return round2(rateComponent + itemComponent);
+}
+
+function isPerItemAmount(value: number | null): value is number {
+  return value !== null && Number.isFinite(value) && value > 0 && value <= 2;
+}
+
+function perItemKindFromContext(section: SectionContext, entries: FieldHit[], evidenceLine: string): PerItemFeeComponent["kind"] | null {
+  if (section.type === "interchange_detail") return null;
+
+  const context = normalize(
+    [
+      section.title,
+      evidenceLine,
+      ...entries.map((entry) => `${entry.key} ${String(entry.value)}`),
+    ].join(" "),
+  );
+  const dense = compact(context);
+
+  if (/\bauthori[sz]ation fees?\b|\bauth fees?\b|\bper auth\b|\bauth\b/.test(context) || /authorizationfee|authfee|perauth/.test(dense)) {
+    return "authorization";
+  }
+
+  if (
+    /\btransaction fees?\b|\bper transaction\b|\bper trans\b|\bper txn\b|\bper item\b|\bitem fees?\b/.test(context) ||
+    /transactionfee|pertransaction|pertrans|pertxn|peritem|itemfee/.test(dense)
+  ) {
+    return "transaction";
+  }
+
+  return null;
+}
+
+function keyLooksLikePerItemAmount(key: string, dense: string, kind: PerItemFeeComponent["kind"]): boolean {
+  if (/\b(count|qty|quantity|volume|sales|total paid|total fee|amount due|rate|percent|pct|bps|basis)\b/.test(key)) return false;
+  if (/count|quantity|volume|sales|totalpaid|totalfee|amountdue|rate|percent|pct|bps|basis/.test(dense)) return false;
+
+  if (kind === "authorization") {
+    return /\bauthori[sz]ation fees?\b|\bauth fees?\b|\bper auth\b|\bfee\b|\bamount\b/.test(key) || /authorizationfee|authfee|perauth|fee|amount/.test(dense);
+  }
+
+  return /\btransaction fees?\b|\bper transaction\b|\bper trans\b|\bper txn\b|\bper item\b|\bitem fees?\b|\bfee\b|\bamount\b/.test(key) ||
+    /transactionfee|pertransaction|pertrans|pertxn|peritem|itemfee|fee|amount/.test(dense);
+}
+
+function perItemAmountFromEntries(entries: FieldHit[], kind: PerItemFeeComponent["kind"]): number | null {
+  const keyedCandidates = entries
+    .map((entry) => {
+      const amount = parseAmount(entry.value);
+      const key = normalize(entry.key);
+      return { amount, key, dense: compact(entry.key) };
+    })
+    .filter((candidate) => isPerItemAmount(candidate.amount))
+    .filter((candidate) => keyLooksLikePerItemAmount(candidate.key, candidate.dense, kind));
+
+  if (keyedCandidates.length > 0) {
+    const amount = keyedCandidates[0].amount;
+    return amount === null ? null : round4(amount);
+  }
+
+  return null;
+}
+
+function perItemAmountFromEvidence(evidenceLine: string): number | null {
+  const tokens = evidenceLine.match(/\(?-?\$?\d[\d,]*(?:\.\d+)?%?\)?/g) ?? [];
+  const amounts = tokens
+    .filter((token) => !token.includes("%"))
+    .filter((token) => token.includes("$") || token.includes("."))
+    .map((token) => parseAmount(token))
+    .filter((amount): amount is number => isPerItemAmount(amount));
+  return amounts.length > 0 ? round4(amounts[0]) : null;
+}
+
+function buildPerItemFeeComponent(
+  row: Record<string, string | number>,
+  rowIndex: number,
+  section: SectionContext,
+  evidenceLine: string,
+): PerItemFeeComponent | null {
+  const entries = entriesFor(row);
+  const kind = perItemKindFromContext(section, entries, evidenceLine);
+  if (!kind) return null;
+
+  const amount = perItemAmountFromEntries(entries, kind) ?? perItemAmountFromEvidence(evidenceLine);
+  if (amount === null) return null;
+
+  return {
+    kind,
+    amount,
+    sourceSection: section.title || (kind === "authorization" ? "Authorization fee detail" : "Transaction fee detail"),
+    evidenceLine,
+    rowIndex,
+    confidence: section.type === "processor_markup" || section.type === "add_on_fees" ? 0.84 : 0.68,
+  };
+}
+
+function buildPerItemFeeModel(components: PerItemFeeComponent[]): PerItemFeeModel {
+  const seen = new Set<string>();
+  const deduped: PerItemFeeComponent[] = [];
+
+  for (const component of components) {
+    const key = [component.kind, component.amount, component.sourceSection, normalize(component.evidenceLine)].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(component);
+  }
+
+  const transactionComponent = deduped.find((component) => component.kind === "transaction");
+  const authorizationComponent = deduped.find((component) => component.kind === "authorization");
+  const transactionFee = transactionComponent?.amount ?? null;
+  const authorizationFee = authorizationComponent?.amount ?? null;
+  const allInPerItemFee = transactionFee !== null && authorizationFee !== null ? round4(transactionFee + authorizationFee) : null;
+  const confidence = deduped.length > 0 ? round2(deduped.reduce((sum, component) => sum + component.confidence, 0) / deduped.length) : 0;
+
+  return {
+    transactionFee,
+    authorizationFee,
+    allInPerItemFee,
+    components: deduped,
+    confidence,
+  };
 }
 
 function hasExplicitInterchangeContext(section: SectionContext, entries: FieldHit[], evidenceLine: string): boolean {
@@ -713,6 +836,7 @@ export function extractStructuredStatementFacts(
   const interchangeRows: InterchangeAuditRow[] = [];
   const blendedFeeSplits: BlendedFeeSplit[] = [];
   const processorMarkupRows: ProcessorMarkupAuditRow[] = [];
+  const perItemFeeComponents: PerItemFeeComponent[] = [];
   const blendedCandidates: PricingCandidate[] = [];
   const parseBlendedRows = shouldParseBlendedRows(doc, options);
   let currentSection: SectionContext = { type: "unknown", title: "Uncategorized" };
@@ -736,6 +860,11 @@ export function extractStructuredStatementFacts(
       isContentLine && currentAuditHeaders.length > 0 && cells.length >= Math.max(3, currentAuditHeaders.length - 1)
         ? recordFromCells(cells, currentAuditHeaders, row)
         : row;
+
+    const perItemComponent = buildPerItemFeeComponent(mappedRow, rowIndex, currentSection, evidence);
+    if (perItemComponent) {
+      perItemFeeComponents.push(perItemComponent);
+    }
 
     if (parseBlendedRows) {
       const candidate = buildPricingCandidate(mappedRow, rowIndex, currentSection, evidence);
@@ -773,6 +902,7 @@ export function extractStructuredStatementFacts(
     .filter((row): row is InterchangeAuditRow => row !== null);
   const dedupedRows = dedupeInterchangeRows([...interchangeRows, ...blendedInterchangeRows]);
   const interchangeAudit = buildInterchangeAudit(dedupedRows);
+  const perItemFeeModel = buildPerItemFeeModel(perItemFeeComponents);
 
   return {
     statementSections: sections,
@@ -780,5 +910,6 @@ export function extractStructuredStatementFacts(
     interchangeAuditRows: dedupedRows,
     blendedFeeSplits,
     processorMarkupRows,
+    perItemFeeModel,
   };
 }

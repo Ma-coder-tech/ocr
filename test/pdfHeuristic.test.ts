@@ -47,6 +47,13 @@ function createBaseSummary(): AnalysisSummary {
       effectiveRateBps: null,
       confidence: 0,
     },
+    perItemFeeModel: {
+      transactionFee: null,
+      authorizationFee: null,
+      allInPerItemFee: null,
+      components: [],
+      confidence: 0,
+    },
     kpis: [],
     feeBreakdown: [],
     suspiciousFees: [],

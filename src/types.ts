@@ -165,6 +165,23 @@ export type ProcessorMarkupAuditSummary = {
   confidence: number;
 };
 
+export type PerItemFeeComponent = {
+  kind: "transaction" | "authorization";
+  amount: number;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+};
+
+export type PerItemFeeModel = {
+  transactionFee: number | null;
+  authorizationFee: number | null;
+  allInPerItemFee: number | null;
+  components: PerItemFeeComponent[];
+  confidence: number;
+};
+
 export type BenchmarkStatus = "below" | "within" | "above";
 export const BENCHMARK_STATUS_VALUES = ["below", "within", "above"] as const satisfies readonly BenchmarkStatus[];
 
@@ -262,6 +279,7 @@ export type AnalysisSummary = {
   interchangeAuditRows: InterchangeAuditRow[];
   blendedFeeSplits: BlendedFeeSplit[];
   processorMarkupAudit: ProcessorMarkupAuditSummary;
+  perItemFeeModel: PerItemFeeModel;
   kpis: KpiMetric[];
   feeBreakdown: FeeBreakdownRow[];
   suspiciousFees: SuspiciousFee[];

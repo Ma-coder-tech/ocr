@@ -278,6 +278,7 @@ function createTextOnlyPdfSummary(
     interchangeAuditRows: structuredFacts.interchangeAuditRows,
     blendedFeeSplits: structuredFacts.blendedFeeSplits,
     processorMarkupAudit,
+    perItemFeeModel: structuredFacts.perItemFeeModel,
     kpis: [
       { label: "Effective Rate", value: "N/A", note: "Structured numeric extraction unavailable for this PDF." },
       { label: "Estimated Monthly Fees", value: "N/A", note: "Fee totals withheld to avoid misleading math." },
@@ -769,6 +770,7 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     interchangeAuditRows: structuredFacts.interchangeAuditRows,
     blendedFeeSplits: structuredFacts.blendedFeeSplits,
     processorMarkupAudit,
+    perItemFeeModel: structuredFacts.perItemFeeModel,
     kpis,
     feeBreakdown,
     suspiciousFees,

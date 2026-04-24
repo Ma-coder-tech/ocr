@@ -80,6 +80,13 @@ function makeSummary(
       effectiveRateBps: processorMarkupBps,
       confidence: processorMarkupBps === null ? 0 : 0.82,
     },
+    perItemFeeModel: {
+      transactionFee: null,
+      authorizationFee: null,
+      allInPerItemFee: null,
+      components: [],
+      confidence: 0,
+    },
     kpis: [],
     feeBreakdown: [
       {
