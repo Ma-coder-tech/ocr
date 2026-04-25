@@ -81,6 +81,28 @@ export type StatementSection = {
   evidenceLines: string[];
 };
 
+export type StatementEconomicBucket = "card_brand_pass_through" | "processor_markup" | "add_on_fees";
+
+export type StatementEconomicFeeRow = {
+  label: string;
+  amount: number;
+  bucket: StatementEconomicBucket;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+};
+
+export type StatementEconomicRollup = {
+  totalVolume: number | null;
+  totalFees: number | null;
+  cardBrandPassThrough: number | null;
+  processorMarkup: number | null;
+  addOnFees: number | null;
+  feeRows: StatementEconomicFeeRow[];
+  confidence: number;
+};
+
 export type CardBrand = "Visa" | "Mastercard" | "Discover" | "AmEx" | "Unknown";
 
 export type InterchangeAuditRow = {
@@ -182,6 +204,45 @@ export type PerItemFeeModel = {
   confidence: number;
 };
 
+export type MonthlyMinimumModel = {
+  minimumUsd: number | null;
+  actualMarkupUsd: number | null;
+  monthlyVolumeUsd: number | null;
+  topUpUsd: number | null;
+  effectiveMarkupUsd: number | null;
+  effectiveRateImpactPct: number | null;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+};
+
+export type ExpressFundingPremiumModel = {
+  fundingVolumeUsd: number | null;
+  premiumBps: number | null;
+  premiumUsd: number | null;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+};
+
+export type SavingsShareAdjustmentModel = {
+  savingsSharePct: number | null;
+  grossSavingsUsd: number | null;
+  retainedSavingsUsd: number | null;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+};
+
+export type GuideMeasureModel = {
+  monthlyMinimum: MonthlyMinimumModel | null;
+  expressFundingPremium: ExpressFundingPremiumModel | null;
+  savingsShareAdjustment: SavingsShareAdjustmentModel | null;
+};
+
 export type BenchmarkStatus = "below" | "within" | "above";
 export const BENCHMARK_STATUS_VALUES = ["below", "within", "above"] as const satisfies readonly BenchmarkStatus[];
 
@@ -280,6 +341,7 @@ export type AnalysisSummary = {
   blendedFeeSplits: BlendedFeeSplit[];
   processorMarkupAudit: ProcessorMarkupAuditSummary;
   perItemFeeModel: PerItemFeeModel;
+  guideMeasures: GuideMeasureModel;
   kpis: KpiMetric[];
   feeBreakdown: FeeBreakdownRow[];
   suspiciousFees: SuspiciousFee[];

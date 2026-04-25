@@ -135,6 +135,76 @@
         `;
       }
 
+      function formatOptionalNumber(value) {
+        const amount = Number(value);
+        if (!Number.isFinite(amount)) return "N/A";
+        return amount.toLocaleString(undefined, { maximumFractionDigits: 0 });
+      }
+
+      function formatOptionalMoney(value) {
+        const amount = Number(value);
+        if (!Number.isFinite(amount)) return "N/A";
+        return formatMoney(amount);
+      }
+
+      function buildInterchangeRows(summary) {
+        const rows = Array.isArray(summary?.interchangeAuditRows)
+          ? summary.interchangeAuditRows
+          : Array.isArray(summary?.interchangeAudit?.rows)
+            ? summary.interchangeAudit.rows
+            : [];
+
+        return rows.map((row) => ({
+          label: displayFeeLabel(row.label),
+          brand: row.cardBrand || "Unknown",
+          count: row.transactionCount,
+          volume: row.volume,
+          rate: row.ratePercent,
+          perItem: row.perItemFee,
+          paid: row.totalPaid,
+          confidence: row.confidence,
+        }));
+      }
+
+      function interchangeAuditTable(rows) {
+        if (!rows.length) {
+          return `<p class="helper-copy">No interchange audit rows were captured from this statement. If the statement has an interchange table, upload a clearer export so we can preserve count, volume, rate, per-item fee, and total paid.</p>`;
+        }
+
+        return `
+          <table class="comparison-table fee-breakdown-table">
+            <thead>
+              <tr>
+                <th>Interchange row</th>
+                <th>Brand</th>
+                <th>Txns</th>
+                <th>Volume</th>
+                <th>Rate</th>
+                <th>Per item</th>
+                <th>Total paid</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows
+                .map(
+                  (row) => `
+                    <tr>
+                      <td>${escapeHtml(row.label)}</td>
+                      <td>${escapeHtml(row.brand)}</td>
+                      <td>${escapeHtml(formatOptionalNumber(row.count))}</td>
+                      <td>${formatOptionalMoney(row.volume)}</td>
+                      <td>${row.rate === null || row.rate === undefined ? "N/A" : formatPct(row.rate)}</td>
+                      <td>${row.perItem === null || row.perItem === undefined ? "N/A" : formatMoney(row.perItem)}</td>
+                      <td>${row.paid === null || row.paid === undefined ? "N/A" : formatMoney(row.paid)}</td>
+                    </tr>
+                  `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        `;
+      }
+
       function watchCopy(row, businessType) {
         if (row.feeType === "Unknown") {
           return `${row.feeName} (${formatMoney(row.amount)}) — this row needs statement review before we label it. Ask your processor for the section it belongs to and a line-item fee schedule.`;
@@ -182,6 +252,7 @@
           const summary = statement.summary || {};
           const verdictClass = verdictTone(statement.benchmarkVerdict);
           const feeRows = buildFeeRows(summary);
+          const interchangeRows = buildInterchangeRows(summary);
           const nextHref = merchant.freeStatementsRemaining > 0 ? "/dashboard/upload-second" : "/dashboard/comparison";
           const nextLabel =
             merchant.freeStatementsRemaining > 0 ? "Add another month →" : "See your two-month comparison →";
@@ -234,6 +305,14 @@
                 <a class="primary-btn full-width" href="${nextHref}">${nextLabel}</a>
               </section>
             </div>
+
+            <section class="table-card" style="margin-top: 20px;">
+              <span class="kicker">Interchange audit detail</span>
+              <p class="body-copy">
+                These rows are captured before the fee rollup, so the audit keeps transaction count, volume, rate, per-item fee, and total paid separate from summary buckets.
+              </p>
+              ${interchangeAuditTable(interchangeRows)}
+            </section>
 
             <section class="summary-card" style="margin-top: 20px;">
               <span class="kicker">What to watch</span>

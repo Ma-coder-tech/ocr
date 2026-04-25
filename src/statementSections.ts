@@ -2,11 +2,18 @@ import type { ParsedDocument } from "./parser.js";
 import type {
   BlendedFeeSplit,
   CardBrand,
+  ExpressFundingPremiumModel,
+  GuideMeasureModel,
   InterchangeAuditRow,
   InterchangeAuditSummary,
+  MonthlyMinimumModel,
   PerItemFeeComponent,
   PerItemFeeModel,
   ProcessorMarkupAuditRow,
+  SavingsShareAdjustmentModel,
+  StatementEconomicBucket,
+  StatementEconomicFeeRow,
+  StatementEconomicRollup,
   StatementSection,
   StatementSectionType,
 } from "./types.js";
@@ -18,6 +25,8 @@ export type StructuredStatementFacts = {
   blendedFeeSplits: BlendedFeeSplit[];
   processorMarkupRows: ProcessorMarkupAuditRow[];
   perItemFeeModel: PerItemFeeModel;
+  guideMeasures: GuideMeasureModel;
+  economicRollup: StatementEconomicRollup;
 };
 
 type StructuredStatementOptions = {
@@ -51,7 +60,22 @@ type PricingCandidate = {
   rowIndex: number;
 };
 
+type StatementAmountFact = {
+  amount: number;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+};
+
+type EconomicAccumulator = {
+  totalVolumeFacts: StatementAmountFact[];
+  totalFeeFacts: StatementAmountFact[];
+  feeRows: StatementEconomicFeeRow[];
+};
+
 const MONEY_TOKEN_RE = /\(?-?\$?\d[\d,]*(?:\.\d+)?%?\)?/g;
+const MONEY_VALUE_PATTERN = String.raw`\(?\$?\d[\d,]*(?:\.\d+)?\)?`;
 const SECTION_NOISE_RE = /\b(page|merchant statement|customer service|attention)\b/i;
 
 function round2(value: number): number {
@@ -117,6 +141,10 @@ function parseAmount(value: string | number | undefined | null): number | null {
   return parsed === null ? null : Math.abs(parsed);
 }
 
+function isPositiveAmount(value: number | null | undefined): value is number {
+  return value !== null && value !== undefined && value > 0;
+}
+
 function parseRate(value: string | number | undefined | null, key = ""): { percent: number; bps: number } | null {
   const parsed = parseNumber(value);
   if (parsed === null) return null;
@@ -149,6 +177,7 @@ function classifySectionTitle(line: string): StatementSectionType {
   if (/\bnotice|notices|terms|billing change|effective date|acceptance\b/.test(lower)) return "notices";
   if (/interchange|programfees|cardbrand|cardnetwork/.test(dense)) return "interchange_detail";
   if (/\bsummary\b|deposit|batch totals?|sales activity|processing activity|card type sales/.test(lower)) return "summary";
+  if (/chargebacks?\s*reversals?|no chargebacks|date submitted chargebacks/.test(lower)) return "summary";
   if (/processing fees?|service charges?|discount fees?|processor markup|assessment markup|hps processing/.test(lower)) {
     return "processor_markup";
   }
@@ -416,6 +445,406 @@ function buildPerItemFeeModel(components: PerItemFeeComponent[]): PerItemFeeMode
     allInPerItemFee,
     components: deduped,
     confidence,
+  };
+}
+
+function rowContext(section: SectionContext, entries: FieldHit[], evidenceLine: string): string {
+  return collapseWhitespace(
+    [
+      section.title,
+      evidenceLine,
+      ...entries.map((entry) => `${entry.key} ${String(entry.value)}`),
+    ].join(" "),
+  );
+}
+
+function amountFromEntries(entries: FieldHit[], predicate: (key: string, dense: string) => boolean): number | null {
+  const hit = findNumericField(entries, predicate);
+  return hit ? parseAmount(hit.value) : null;
+}
+
+function rateBpsFromEntries(entries: FieldHit[], predicate: (key: string, dense: string) => boolean): number | null {
+  const hit = findField(entries, predicate);
+  const rate = hit ? parseRate(hit.value, hit.key) : null;
+  return rate?.bps ?? null;
+}
+
+function hasRecognizedSection(section: SectionContext): boolean {
+  return section.type !== "unknown";
+}
+
+function amountNearPhrase(evidenceLine: string, phrases: RegExp[]): number | null {
+  for (const phrase of phrases) {
+    const regex = new RegExp(`${phrase.source}[^\\d$()%-]{0,45}(${MONEY_VALUE_PATTERN})`, "i");
+    const match = evidenceLine.match(regex);
+    if (!match) continue;
+    const amount = parseAmount(match[1]);
+    if (amount !== null) return amount;
+  }
+  return null;
+}
+
+function amountFromLabeledCells(evidenceLine: string, predicate: (label: string) => boolean): number | null {
+  const cells = splitCells(evidenceLine);
+  for (let index = 0; index < cells.length - 1; index += 1) {
+    const label = normalize(cells[index]);
+    if (!predicate(label)) continue;
+    const amount = parseAmount(cells[index + 1]);
+    if (amount !== null) return amount;
+  }
+  return null;
+}
+
+function numericAmountEntries(entries: FieldHit[]): Array<{ key: string; dense: string; amount: number }> {
+  return entries
+    .map((entry) => {
+      const key = normalize(entry.key);
+      const dense = compact(entry.key);
+      const amount = parseAmount(entry.value);
+      return { key, dense, amount };
+    })
+    .filter((candidate): candidate is { key: string; dense: string; amount: number } => candidate.amount !== null)
+    .filter((candidate) => !/\b(count|qty|quantity|rate|percent|pct|bps|basis|page)\b/.test(candidate.key))
+    .filter((candidate) => !/count|quantity|rate|percent|pct|bps|basis|page/.test(candidate.dense));
+}
+
+function firstRowAmount(entries: FieldHit[], evidenceLine: string): number | null {
+  const entry = numericAmountEntries(entries)[0];
+  if (entry) return round2(entry.amount);
+
+  const cells = splitCells(evidenceLine);
+  const cellAmount = cells.map((cell) => parseAmount(cell)).find((amount): amount is number => amount !== null);
+  if (cellAmount !== undefined) return round2(cellAmount);
+
+  const tokens = evidenceLine.match(MONEY_TOKEN_RE) ?? [];
+  MONEY_TOKEN_RE.lastIndex = 0;
+  const tokenAmount = tokens.map((token) => parseAmount(token)).find((amount): amount is number => amount !== null);
+  return tokenAmount === undefined ? null : round2(tokenAmount);
+}
+
+function lastRowAmount(entries: FieldHit[], evidenceLine: string): number | null {
+  const entryAmounts = numericAmountEntries(entries);
+  if (entryAmounts.length > 0) return round2(entryAmounts[entryAmounts.length - 1].amount);
+
+  const cells = splitCells(evidenceLine);
+  const cellAmounts = cells.map((cell) => parseAmount(cell)).filter((amount): amount is number => amount !== null);
+  if (cellAmounts.length > 0) return round2(cellAmounts[cellAmounts.length - 1]);
+
+  const tokens = evidenceLine.match(MONEY_TOKEN_RE) ?? [];
+  MONEY_TOKEN_RE.lastIndex = 0;
+  const tokenAmounts = tokens.map((token) => parseAmount(token)).filter((amount): amount is number => amount !== null);
+  return tokenAmounts.length === 0 ? null : round2(tokenAmounts[tokenAmounts.length - 1]);
+}
+
+function contextualAmount(
+  entries: FieldHit[],
+  evidenceLine: string,
+  keyPredicate: (key: string, dense: string) => boolean,
+  labelPredicate: (label: string) => boolean,
+): number | null {
+  const keyed = numericAmountEntries(entries).find((entry) => keyPredicate(entry.key, entry.dense));
+  if (keyed) return round2(keyed.amount);
+  return amountFromLabeledCells(evidenceLine, labelPredicate) ?? firstRowAmount(entries, evidenceLine);
+}
+
+function sourceSectionName(section: SectionContext, fallback: string): string {
+  return section.title && section.title !== "Uncategorized" ? section.title : fallback;
+}
+
+function shouldSkipGenericFeeRow(context: string): boolean {
+  return (
+    /\b(total volume|total sales|sales volume|gross sales|net sales|processed volume|amount processed)\b/.test(context) ||
+    /\b(total fees?|fees charged|statement fee total|grand total)\b/.test(context) ||
+    /\bmonthly minimum|minimum discount|minimum markup\b/.test(context) ||
+    /\bexpress merchant funding|express funding|accelerated funding|faster funding\b/.test(context) ||
+    /\bcommercial card interchange savings adjustment|interchange savings adjustment|savings adjustment\b/.test(context)
+  );
+}
+
+function feeBucketForSection(section: SectionContext, context: string): StatementEconomicBucket | null {
+  if (section.type === "notices" || section.type === "summary") return null;
+  if (section.type === "interchange_detail") return /\b(total|subtotal|interchange|program|card brand|card network)\b/.test(context)
+    ? "card_brand_pass_through"
+    : null;
+  if (section.type === "processor_markup") return "processor_markup";
+  if (section.type === "add_on_fees") return "add_on_fees";
+  if (/\b(total interchange|interchange charges?|program fees?|card brand fees?|card network fees?)\b/.test(context)) {
+    return "card_brand_pass_through";
+  }
+  if (/\b(processor markup|service charges?|discount fees?|processing fees?|assessment markup)\b/.test(context)) {
+    return "processor_markup";
+  }
+  if (/\b(pci|gateway|statement fee|monthly fee|account fee|authorization fee|transaction fee|batch fee|chargeback|risk fee)\b/.test(context)) {
+    return "add_on_fees";
+  }
+  return null;
+}
+
+function addEconomicFacts(
+  acc: EconomicAccumulator,
+  row: Record<string, string | number>,
+  rowIndex: number,
+  section: SectionContext,
+  evidenceLine: string,
+): void {
+  const entries = entriesFor(row);
+  const context = normalize(rowContext(section, entries, evidenceLine));
+  const sourceSection = sourceSectionName(section, "Statement detail");
+
+  if (/\b(total volume|total sales|sales volume|gross sales|net sales|processed volume|amount processed)\b/.test(context)) {
+    const amount = contextualAmount(
+      entries,
+      evidenceLine,
+      (key, dense) =>
+        /\b(total volume|sales volume|gross sales|net sales|processed volume|amount processed|volume|sales)\b/.test(key) ||
+        /totalvolume|salesvolume|grosssales|netsales|processedvolume|amountprocessed/.test(dense),
+      (label) => /\b(total volume|total sales|sales volume|gross sales|net sales|processed volume|amount processed)\b/.test(label),
+    );
+    if (amount !== null && amount > 0) {
+      acc.totalVolumeFacts.push({
+        amount,
+        sourceSection,
+        evidenceLine,
+        rowIndex,
+        confidence: section.type === "summary" ? 0.9 : 0.78,
+      });
+    }
+  }
+
+  if (/\b(total fees?|fees charged|statement fee total|grand total fees?|month end charge|amount due)\b/.test(context)) {
+    const amount = contextualAmount(
+      entries,
+      evidenceLine,
+      (key, dense) =>
+        /\b(total fees?|fees?|charges?|amount due|month end charge|fee amount)\b/.test(key) ||
+        /totalfees|feescharged|amountdue|monthendcharge|feeamount/.test(dense),
+      (label) => /\b(total fees?|fees charged|statement fee total|grand total fees?|month end charge|amount due)\b/.test(label),
+    );
+    if (amount !== null && amount > 0) {
+      acc.totalFeeFacts.push({
+        amount,
+        sourceSection,
+        evidenceLine,
+        rowIndex,
+        confidence: section.type === "summary" ? 0.9 : 0.78,
+      });
+    }
+  }
+
+  if (shouldSkipGenericFeeRow(context)) return;
+
+  const bucket = feeBucketForSection(section, context);
+  if (!bucket) return;
+
+  const amount = lastRowAmount(entries, evidenceLine);
+  if (amount === null || amount <= 0) return;
+
+  acc.feeRows.push({
+    label: labelFromRecord(row, entries, evidenceLine),
+    amount,
+    bucket,
+    sourceSection,
+    evidenceLine,
+    rowIndex,
+    confidence: section.type === "unknown" ? 0.55 : 0.74,
+  });
+}
+
+function bpsFromEvidence(evidenceLine: string): number | null {
+  const match = evidenceLine.match(/([+-]?\d+(?:\.\d+)?)\s*(?:bps|basis points?)/i);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? round2(Math.abs(parsed)) : null;
+}
+
+function percentFromEvidence(evidenceLine: string): number | null {
+  const match = evidenceLine.match(/([+-]?\d+(?:\.\d+)?)\s*%/);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? round2(Math.abs(parsed)) : null;
+}
+
+function percentFromEntries(entries: FieldHit[], predicate: (key: string, dense: string) => boolean): number | null {
+  const hit = findField(entries, predicate);
+  if (!hit) return null;
+  const parsed = parseNumber(hit.value);
+  if (parsed === null) return null;
+  const raw = String(hit.value);
+  if (raw.includes("%")) return round2(Math.abs(parsed));
+  if (Math.abs(parsed) > 0 && Math.abs(parsed) <= 1) return round2(Math.abs(parsed) * 100);
+  if (Math.abs(parsed) <= 100) return round2(Math.abs(parsed));
+  return null;
+}
+
+function buildMonthlyMinimumModel(
+  row: Record<string, string | number>,
+  rowIndex: number,
+  section: SectionContext,
+  evidenceLine: string,
+): MonthlyMinimumModel | null {
+  const entries = entriesFor(row);
+  const context = normalize(rowContext(section, entries, evidenceLine));
+  if (!hasRecognizedSection(section)) return null;
+  if (!/monthly minimum|minimum discount|minimum markup/.test(context)) return null;
+
+  const minimumUsd =
+    amountFromEntries(entries, (key, dense) =>
+      /monthly minimum|minimum amount|minimum discount|minimum markup|required minimum/.test(key) ||
+      /monthlyminimum|minimumamount|minimumdiscount|minimummarkup|requiredminimum/.test(dense),
+    ) ??
+    amountFromLabeledCells(evidenceLine, (label) => /monthly minimum|minimum amount|minimum discount|minimum markup|required minimum/.test(label)) ??
+    amountNearPhrase(evidenceLine, [/monthly minimum/i, /minimum discount/i, /minimum markup/i, /required minimum/i]);
+
+  const actualMarkupUsd =
+    amountFromEntries(entries, (key, dense) =>
+      /(actual|earned).*(markup|discount)|(markup|discount).*(actual|earned)/.test(key) ||
+      /actualmarkup|earnedmarkup|actualdiscount|discountearned/.test(dense),
+    ) ??
+    amountFromLabeledCells(evidenceLine, (label) =>
+      /(actual|earned).*(markup|discount)|(markup|discount).*(actual|earned)/.test(label),
+    ) ??
+    amountNearPhrase(evidenceLine, [/actual markup/i, /earned markup/i, /actual discount/i, /discount earned/i]);
+
+  const explicitTopUpUsd =
+    amountFromEntries(entries, (key, dense) =>
+      /top.?up|difference|shortfall|minimum fee|minimum charge|amount charged/.test(key) ||
+      /topup|difference|shortfall|minimumfee|minimumcharge|amountcharged/.test(dense),
+    ) ??
+    amountFromLabeledCells(evidenceLine, (label) => /top.?up|difference|shortfall|minimum fee|minimum charge|amount charged/.test(label)) ??
+    amountNearPhrase(evidenceLine, [/top.?up/i, /difference/i, /shortfall/i, /amount charged/i, /minimum fee/i]);
+
+  const monthlyVolumeUsd =
+    amountFromEntries(entries, (key, dense) =>
+      /monthly volume|processing volume|sales volume|total sales|volume/.test(key) ||
+      /monthlyvolume|processingvolume|salesvolume|totalsales/.test(dense),
+    ) ??
+    amountFromLabeledCells(evidenceLine, (label) => /monthly volume|processing volume|sales volume|total sales/.test(label)) ??
+    amountNearPhrase(evidenceLine, [/monthly volume/i, /processing volume/i, /sales volume/i, /total sales/i]);
+
+  const topUpUsd =
+    explicitTopUpUsd ??
+    (minimumUsd !== null && actualMarkupUsd !== null ? round2(Math.max(0, minimumUsd - actualMarkupUsd)) : null);
+  const inferredActualMarkupUsd =
+    actualMarkupUsd ??
+    (minimumUsd !== null && topUpUsd !== null ? round2(Math.max(0, minimumUsd - topUpUsd)) : null);
+  const effectiveMarkupUsd =
+    minimumUsd !== null && inferredActualMarkupUsd !== null ? round2(Math.max(minimumUsd, inferredActualMarkupUsd)) : null;
+  const effectiveRateImpactPct =
+    topUpUsd !== null && monthlyVolumeUsd !== null && monthlyVolumeUsd > 0 ? round4((topUpUsd / monthlyVolumeUsd) * 100) : null;
+  const capturedFields = [minimumUsd, inferredActualMarkupUsd, monthlyVolumeUsd, topUpUsd, effectiveMarkupUsd].filter(
+    (value) => value !== null,
+  ).length;
+
+  return {
+    minimumUsd,
+    actualMarkupUsd: inferredActualMarkupUsd,
+    monthlyVolumeUsd,
+    topUpUsd,
+    effectiveMarkupUsd,
+    effectiveRateImpactPct,
+    sourceSection: section.title || "Monthly minimum detail",
+    evidenceLine,
+    rowIndex,
+    confidence: clamp(0.42 + capturedFields * 0.08 + (section.type === "add_on_fees" ? 0.1 : 0), 0.45, 0.9),
+  };
+}
+
+function buildExpressFundingPremiumModel(
+  row: Record<string, string | number>,
+  rowIndex: number,
+  section: SectionContext,
+  evidenceLine: string,
+): ExpressFundingPremiumModel | null {
+  const entries = entriesFor(row);
+  const context = normalize(rowContext(section, entries, evidenceLine));
+  if (!hasRecognizedSection(section)) return null;
+  if (!/express merchant funding|express funding|accelerated funding|faster funding/.test(context)) return null;
+
+  const premiumBps =
+    rateBpsFromEntries(entries, (key, dense) =>
+      /premium|bps|basis|rate|funding fee/.test(key) || /premium|bps|basis|rate|fundingfee/.test(dense),
+    ) ?? bpsFromEvidence(evidenceLine);
+  const fundingVolumeUsd =
+    amountFromEntries(entries, (key, dense) =>
+      /funding volume|funded amount|amount funded|processing volume|sales volume|volume/.test(key) ||
+      /fundingvolume|fundedamount|amountfunded|processingvolume|salesvolume/.test(dense),
+    ) ??
+    amountFromLabeledCells(evidenceLine, (label) => /funding volume|funded amount|amount funded|processing volume|sales volume/.test(label)) ??
+    amountNearPhrase(evidenceLine, [/funding volume/i, /funded amount/i, /amount funded/i, /processing volume/i, /sales volume/i]);
+  const explicitPremiumUsd =
+    amountFromEntries(entries, (key, dense) =>
+      /premium amount|funding fee|express funding fee|fee amount|amount charged/.test(key) ||
+      /premiumamount|fundingfee|expressfundingfee|feeamount|amountcharged/.test(dense),
+    ) ?? amountFromLabeledCells(evidenceLine, (label) => /premium amount|funding fee|express funding fee|fee amount|amount charged/.test(label));
+  const premiumUsd =
+    premiumBps !== null && fundingVolumeUsd !== null ? round2((fundingVolumeUsd * premiumBps) / 10_000) : explicitPremiumUsd;
+  const capturedFields = [premiumBps, fundingVolumeUsd, premiumUsd].filter((value) => value !== null).length;
+
+  return {
+    fundingVolumeUsd,
+    premiumBps,
+    premiumUsd,
+    sourceSection: section.title || "Express funding detail",
+    evidenceLine,
+    rowIndex,
+    confidence: clamp(0.45 + capturedFields * 0.12 + (section.type === "add_on_fees" ? 0.08 : 0), 0.45, 0.9),
+  };
+}
+
+function buildSavingsShareAdjustmentModel(
+  row: Record<string, string | number>,
+  rowIndex: number,
+  section: SectionContext,
+  evidenceLine: string,
+): SavingsShareAdjustmentModel | null {
+  const entries = entriesFor(row);
+  const context = normalize(rowContext(section, entries, evidenceLine));
+  if (!hasRecognizedSection(section)) return null;
+  if (!/commercial card interchange savings adjustment|interchange savings adjustment|savings adjustment/.test(context)) return null;
+
+  const savingsSharePct =
+    percentFromEntries(entries, (key, dense) =>
+      /share|retained|percent|pct|savings adjustment/.test(key) || /share|retained|percent|pct|savingsadjustment/.test(dense),
+    ) ?? percentFromEvidence(evidenceLine);
+  const grossSavingsUsd =
+    amountFromEntries(entries, (key, dense) =>
+      /gross savings|savings amount|interchange savings|eligible savings/.test(key) ||
+      /grosssavings|savingsamount|interchangesavings|eligiblesavings/.test(dense),
+    ) ??
+    amountFromLabeledCells(evidenceLine, (label) => /gross savings|savings amount|interchange savings|eligible savings/.test(label)) ??
+    amountNearPhrase(evidenceLine, [/gross savings/i, /savings amount/i, /interchange savings/i, /eligible savings/i]);
+  const explicitRetainedUsd =
+    amountFromEntries(entries, (key, dense) =>
+      /retained|adjustment fee|savings adjustment fee|fee amount|amount charged/.test(key) ||
+      /retained|adjustmentfee|savingsadjustmentfee|feeamount|amountcharged/.test(dense),
+    ) ?? amountFromLabeledCells(evidenceLine, (label) => /retained|adjustment fee|savings adjustment fee|fee amount|amount charged/.test(label));
+  const retainedSavingsUsd =
+    savingsSharePct !== null && grossSavingsUsd !== null ? round2((savingsSharePct / 100) * grossSavingsUsd) : explicitRetainedUsd;
+  const capturedFields = [savingsSharePct, grossSavingsUsd, retainedSavingsUsd].filter((value) => value !== null).length;
+
+  return {
+    savingsSharePct,
+    grossSavingsUsd,
+    retainedSavingsUsd,
+    sourceSection: section.title || "Savings-share adjustment detail",
+    evidenceLine,
+    rowIndex,
+    confidence: clamp(0.45 + capturedFields * 0.12 + (section.type === "add_on_fees" ? 0.08 : 0), 0.45, 0.9),
+  };
+}
+
+function buildGuideMeasureModel(
+  monthlyMinimums: MonthlyMinimumModel[],
+  expressFundingPremiums: ExpressFundingPremiumModel[],
+  savingsShareAdjustments: SavingsShareAdjustmentModel[],
+): GuideMeasureModel {
+  const bestByConfidence = <T extends { confidence: number }>(items: T[]): T | null =>
+    items.length > 0 ? [...items].sort((a, b) => b.confidence - a.confidence)[0] : null;
+
+  return {
+    monthlyMinimum: bestByConfidence(monthlyMinimums),
+    expressFundingPremium: bestByConfidence(expressFundingPremiums),
+    savingsShareAdjustment: bestByConfidence(savingsShareAdjustments),
   };
 }
 
@@ -810,6 +1239,145 @@ function buildInterchangeAudit(rows: InterchangeAuditRow[]): InterchangeAuditSum
   };
 }
 
+function explicitAmountTotal(rows: StatementEconomicFeeRow[], bucket: StatementEconomicBucket): number | null {
+  const total = rows.filter((row) => row.bucket === bucket).reduce((sum, row) => sum + row.amount, 0);
+  return total > 0 ? round2(total) : null;
+}
+
+function processorMarkupTotal(rows: ProcessorMarkupAuditRow[], blendedFeeSplits: BlendedFeeSplit[]): number | null {
+  const rowTotal = rows.reduce((sum, row) => sum + (row.totalPaid ?? row.expectedTotalPaid ?? 0), 0);
+  const blendedTotal = blendedFeeSplits.reduce(
+    (sum, split) => sum + (split.processorMarkup.totalPaid ?? split.processorMarkup.expectedTotalPaid ?? 0),
+    0,
+  );
+  const total = rowTotal + blendedTotal;
+  return total > 0 ? round2(total) : null;
+}
+
+function guideMeasureFeeRows(guideMeasures: GuideMeasureModel): StatementEconomicFeeRow[] {
+  const rows: StatementEconomicFeeRow[] = [];
+  const monthlyMinimum = guideMeasures.monthlyMinimum;
+  const expressFunding = guideMeasures.expressFundingPremium;
+  const savingsShare = guideMeasures.savingsShareAdjustment;
+
+  if (isPositiveAmount(monthlyMinimum?.topUpUsd)) {
+    rows.push({
+      label: "monthly minimum top-up",
+      amount: round2(monthlyMinimum.topUpUsd),
+      bucket: "add_on_fees",
+      sourceSection: monthlyMinimum.sourceSection,
+      evidenceLine: monthlyMinimum.evidenceLine,
+      rowIndex: monthlyMinimum.rowIndex,
+      confidence: monthlyMinimum.confidence,
+    });
+  }
+
+  if (isPositiveAmount(expressFunding?.premiumUsd)) {
+    rows.push({
+      label: "express funding premium",
+      amount: round2(expressFunding.premiumUsd),
+      bucket: "add_on_fees",
+      sourceSection: expressFunding.sourceSection,
+      evidenceLine: expressFunding.evidenceLine,
+      rowIndex: expressFunding.rowIndex,
+      confidence: expressFunding.confidence,
+    });
+  }
+
+  if (isPositiveAmount(savingsShare?.retainedSavingsUsd)) {
+    rows.push({
+      label: "savings-share adjustment",
+      amount: round2(savingsShare.retainedSavingsUsd),
+      bucket: "add_on_fees",
+      sourceSection: savingsShare.sourceSection,
+      evidenceLine: savingsShare.evidenceLine,
+      rowIndex: savingsShare.rowIndex,
+      confidence: savingsShare.confidence,
+    });
+  }
+
+  return rows;
+}
+
+function dedupeEconomicRows(rows: StatementEconomicFeeRow[]): StatementEconomicFeeRow[] {
+  const seen = new Set<string>();
+  const deduped: StatementEconomicFeeRow[] = [];
+
+  for (const row of rows) {
+    const key = [row.bucket, normalize(row.label), row.amount, row.rowIndex, normalize(row.evidenceLine)].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(row);
+  }
+
+  return deduped;
+}
+
+function bestAmountFact(facts: StatementAmountFact[]): StatementAmountFact | null {
+  if (facts.length === 0) return null;
+  return [...facts].sort((a, b) => b.confidence - a.confidence || b.amount - a.amount || b.rowIndex - a.rowIndex)[0];
+}
+
+function buildEconomicRollup(
+  acc: EconomicAccumulator,
+  interchangeAudit: InterchangeAuditSummary,
+  processorRows: ProcessorMarkupAuditRow[],
+  blendedFeeSplits: BlendedFeeSplit[],
+  guideMeasures: GuideMeasureModel,
+): StatementEconomicRollup {
+  const feeRows = dedupeEconomicRows([...acc.feeRows, ...guideMeasureFeeRows(guideMeasures)]);
+  const cardBrandPassThrough = interchangeAudit.totalPaid ?? explicitAmountTotal(feeRows, "card_brand_pass_through");
+  const markupTotal = processorMarkupTotal(processorRows, blendedFeeSplits) ?? explicitAmountTotal(feeRows, "processor_markup");
+  const addOnTotal = explicitAmountTotal(feeRows, "add_on_fees");
+
+  const synthesizedRows: StatementEconomicFeeRow[] = [];
+  if (interchangeAudit.totalPaid !== null && interchangeAudit.totalPaid > 0) {
+    synthesizedRows.push({
+      label: "card brand interchange detail",
+      amount: round2(interchangeAudit.totalPaid),
+      bucket: "card_brand_pass_through",
+      sourceSection: "Interchange detail",
+      evidenceLine: "Rollup from captured interchange audit rows",
+      rowIndex: -1,
+      confidence: interchangeAudit.confidence,
+    });
+  }
+  if (markupTotal !== null && markupTotal > 0 && processorRows.length + blendedFeeSplits.length > 0) {
+    synthesizedRows.push({
+      label: "processor markup detail",
+      amount: markupTotal,
+      bucket: "processor_markup",
+      sourceSection: "Processor markup detail",
+      evidenceLine: "Rollup from captured processor markup rows",
+      rowIndex: -1,
+      confidence: 0.82,
+    });
+  }
+
+  const detailRows = feeRows.filter((row) => {
+    if (row.bucket === "card_brand_pass_through" && interchangeAudit.totalPaid !== null) return false;
+    if (row.bucket === "processor_markup" && processorRows.length + blendedFeeSplits.length > 0) return false;
+    return true;
+  });
+  const allRows = dedupeEconomicRows([...synthesizedRows, ...detailRows]);
+  const componentTotal = [cardBrandPassThrough, markupTotal, addOnTotal].reduce<number>((sum, value) => sum + (value ?? 0), 0);
+  const totalFeeFact = bestAmountFact(acc.totalFeeFacts);
+  const totalVolumeFact = bestAmountFact(acc.totalVolumeFacts);
+  const totalFees = totalFeeFact?.amount ?? (componentTotal > 0 ? round2(componentTotal) : null);
+  const capturedCoreFacts = [totalVolumeFact, totalFees, cardBrandPassThrough, markupTotal, addOnTotal].filter((value) => value !== null).length;
+  const confidence = clamp(0.25 + capturedCoreFacts * 0.12 + (allRows.length > 0 ? 0.12 : 0), 0, 0.92);
+
+  return {
+    totalVolume: totalVolumeFact?.amount ?? interchangeAudit.volume ?? null,
+    totalFees,
+    cardBrandPassThrough,
+    processorMarkup: markupTotal,
+    addOnFees: addOnTotal,
+    feeRows: allRows,
+    confidence: round2(confidence),
+  };
+}
+
 export function emptyInterchangeAudit(): InterchangeAuditSummary {
   return buildInterchangeAudit([]);
 }
@@ -837,7 +1405,15 @@ export function extractStructuredStatementFacts(
   const blendedFeeSplits: BlendedFeeSplit[] = [];
   const processorMarkupRows: ProcessorMarkupAuditRow[] = [];
   const perItemFeeComponents: PerItemFeeComponent[] = [];
+  const monthlyMinimums: MonthlyMinimumModel[] = [];
+  const expressFundingPremiums: ExpressFundingPremiumModel[] = [];
+  const savingsShareAdjustments: SavingsShareAdjustmentModel[] = [];
   const blendedCandidates: PricingCandidate[] = [];
+  const economicAccumulator: EconomicAccumulator = {
+    totalVolumeFacts: [],
+    totalFeeFacts: [],
+    feeRows: [],
+  };
   const parseBlendedRows = shouldParseBlendedRows(doc, options);
   let currentSection: SectionContext = { type: "unknown", title: "Uncategorized" };
   let currentAuditHeaders: string[] = [];
@@ -846,7 +1422,11 @@ export function extractStructuredStatementFacts(
     const evidence = rowEvidence(row);
     if (!evidence) return;
 
+    const previousSection = currentSection;
     currentSection = updateSection(sections, currentSection, evidence);
+    if (currentSection.type !== previousSection.type || currentSection.title !== previousSection.title) {
+      currentAuditHeaders = [];
+    }
     noteSectionRow(sections, currentSection, evidence);
 
     const isContentLine = typeof row.content === "string";
@@ -861,9 +1441,26 @@ export function extractStructuredStatementFacts(
         ? recordFromCells(cells, currentAuditHeaders, row)
         : row;
 
+    addEconomicFacts(economicAccumulator, mappedRow, rowIndex, currentSection, evidence);
+
     const perItemComponent = buildPerItemFeeComponent(mappedRow, rowIndex, currentSection, evidence);
     if (perItemComponent) {
       perItemFeeComponents.push(perItemComponent);
+    }
+
+    const monthlyMinimum = buildMonthlyMinimumModel(mappedRow, rowIndex, currentSection, evidence);
+    if (monthlyMinimum) {
+      monthlyMinimums.push(monthlyMinimum);
+    }
+
+    const expressFundingPremium = buildExpressFundingPremiumModel(mappedRow, rowIndex, currentSection, evidence);
+    if (expressFundingPremium) {
+      expressFundingPremiums.push(expressFundingPremium);
+    }
+
+    const savingsShareAdjustment = buildSavingsShareAdjustmentModel(mappedRow, rowIndex, currentSection, evidence);
+    if (savingsShareAdjustment) {
+      savingsShareAdjustments.push(savingsShareAdjustment);
     }
 
     if (parseBlendedRows) {
@@ -903,6 +1500,14 @@ export function extractStructuredStatementFacts(
   const dedupedRows = dedupeInterchangeRows([...interchangeRows, ...blendedInterchangeRows]);
   const interchangeAudit = buildInterchangeAudit(dedupedRows);
   const perItemFeeModel = buildPerItemFeeModel(perItemFeeComponents);
+  const guideMeasures = buildGuideMeasureModel(monthlyMinimums, expressFundingPremiums, savingsShareAdjustments);
+  const economicRollup = buildEconomicRollup(
+    economicAccumulator,
+    interchangeAudit,
+    processorMarkupRows,
+    blendedFeeSplits,
+    guideMeasures,
+  );
 
   return {
     statementSections: sections,
@@ -911,5 +1516,7 @@ export function extractStructuredStatementFacts(
     blendedFeeSplits,
     processorMarkupRows,
     perItemFeeModel,
+    guideMeasures,
+    economicRollup,
   };
 }

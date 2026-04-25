@@ -10,6 +10,7 @@ import {
   ProcessorMarkupAuditRow,
   ProcessorMarkupAuditSummary,
   SavingsOpportunity,
+  StatementEconomicFeeRow,
   SuspiciousFee,
   TrendPoint,
 } from "./types.js";
@@ -126,6 +127,10 @@ function formatMoney(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
+function isPositiveAmount(value: number | null | undefined): value is number {
+  return value !== null && value !== undefined && value > 0;
+}
+
 function amountToBps(amount: number | null, volume: number | null): number | null {
   if (amount === null || volume === null) return null;
   if (!Number.isFinite(amount) || !Number.isFinite(volume) || amount <= 0 || volume <= 0) return null;
@@ -189,6 +194,46 @@ function createProcessorMarkupAudit(structuredFacts: StructuredStatementFacts): 
     effectiveRateBps: amountToBps(totalPaidRaw, volumeRaw),
     confidence: rows.length > 0 ? toPct(confidenceRaw / rows.length) : 0,
   };
+}
+
+function structuredFeeRowsToBreakdown(
+  rows: StatementEconomicFeeRow[],
+  totalFees: number,
+  processorName: string,
+): FeeBreakdownRow[] {
+  return rows
+    .filter((row) => row.amount > 0)
+    .map((row) =>
+      withFeeClassification(
+        {
+          label: row.label,
+          amount: toMoney(row.amount),
+          sharePct: totalFees > 0 ? toPct((row.amount / totalFees) * 100) : 0,
+          sourceSection: row.sourceSection,
+          evidenceLine: row.evidenceLine,
+        },
+        { processorName },
+      ),
+    )
+    .sort((a, b) => b.amount - a.amount);
+}
+
+function hasCoherentSectionRollup(structuredFacts: StructuredStatementFacts): boolean {
+  const rollup = structuredFacts.economicRollup;
+  if (rollup.totalVolume === null || rollup.totalFees === null) return false;
+  if (rollup.totalVolume <= 0 || rollup.totalFees <= 0 || rollup.totalFees > rollup.totalVolume) return false;
+  if (rollup.totalVolume > 100_000_000) return false;
+
+  const effectiveRate = (rollup.totalFees / rollup.totalVolume) * 100;
+  if (!Number.isFinite(effectiveRate) || effectiveRate < 0.05 || effectiveRate > 15) return false;
+
+  const categorizedTotal = rollup.feeRows.reduce((sum, row) => sum + row.amount, 0);
+  return (
+    rollup.confidence >= 0.55 &&
+    rollup.feeRows.length > 0 &&
+    categorizedTotal >= rollup.totalFees * 0.95 &&
+    categorizedTotal <= rollup.totalFees * 1.15
+  );
 }
 
 function inferPeriod(row: Record<string, string | number>, periodKeys: string[]): string | null {
@@ -279,6 +324,7 @@ function createTextOnlyPdfSummary(
     blendedFeeSplits: structuredFacts.blendedFeeSplits,
     processorMarkupAudit,
     perItemFeeModel: structuredFacts.perItemFeeModel,
+    guideMeasures: structuredFacts.guideMeasures,
     kpis: [
       { label: "Effective Rate", value: "N/A", note: "Structured numeric extraction unavailable for this PDF." },
       { label: "Estimated Monthly Fees", value: "N/A", note: "Fee totals withheld to avoid misleading math." },
@@ -313,15 +359,14 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     processorId: processorDetection.detectedProcessorId,
     rulePackId: processorDetection.rulePackId,
   });
-  if (doc.sourceType === "pdf") {
+  const hasStructuredRollup = hasCoherentSectionRollup(structuredFacts);
+  if (doc.sourceType === "pdf" && (doc.extraction.mode !== "structured" || !hasStructuredRollup)) {
     const qualitativeSummary = createTextOnlyPdfSummary(doc, processorName, businessType, structuredFacts);
     const recoveredSummary = refineTextOnlyPdfSummary(doc, qualitativeSummary);
     if (recoveredSummary) {
       return recoveredSummary;
     }
-    if (doc.extraction.mode !== "structured") {
-      return qualitativeSummary;
-    }
+    return qualitativeSummary;
   }
 
   const feeBuckets = new Map<string, number>();
@@ -375,7 +420,7 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     .filter((c) => includesAny(c.key.toLowerCase(), FEE_TERMS) || c.stats.negAbsSum > 0)
     .slice(0, 6);
 
-  const totalVolume = toMoney(selectedVolume?.stats.posSum ?? 0);
+  let totalVolume = toMoney(selectedVolume?.stats.posSum ?? 0);
 
   let totalFeesRaw = 0;
   for (const c of selectedFeeColumns) {
@@ -394,8 +439,10 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     }
   }
 
-  const structuredInterchangePaid = structuredFacts.interchangeAudit.totalPaid ?? 0;
   const processorMarkupAudit = createProcessorMarkupAudit(structuredFacts);
+  const structuredRollup = structuredFacts.economicRollup;
+  let usedStructuredRollup = false;
+  const structuredInterchangePaid = structuredFacts.interchangeAudit.totalPaid ?? 0;
   const structuredProcessorMarkupTotal = toMoney(
     processorMarkupAudit.totalPaid ??
       structuredFacts.blendedFeeSplits.reduce(
@@ -408,7 +455,12 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     (totalFeesRaw <= 0 ||
       (structuredInterchangePaid > 0 && Math.abs(totalFeesRaw - structuredInterchangePaid) <= Math.max(1, structuredInterchangePaid * 0.01)));
 
-  if (totalFeesRaw <= 0 && (structuredInterchangePaid > 0 || structuredProcessorMarkupTotal > 0)) {
+  if (hasStructuredRollup) {
+    usedStructuredRollup = true;
+    totalVolume = toMoney(structuredRollup.totalVolume ?? 0);
+    totalFeesRaw = structuredRollup.totalFees ?? 0;
+    feeBuckets.clear();
+  } else if (totalFeesRaw <= 0 && (structuredInterchangePaid > 0 || structuredProcessorMarkupTotal > 0)) {
     totalFeesRaw = structuredInterchangePaid + structuredProcessorMarkupTotal;
     if (structuredInterchangePaid > 0) {
       feeBuckets.set("card brand interchange detail", structuredInterchangePaid);
@@ -430,32 +482,56 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
 
   const totalFees = toMoney(totalFeesRaw);
   const effectiveRate = totalVolume > 0 ? toPct((totalFees / totalVolume) * 100) : 0;
+  const guideMeasures = structuredFacts.guideMeasures;
   const interchangeTotalPaid = structuredFacts.interchangeAudit.totalPaid ?? 0;
 
-  const feeBreakdown: FeeBreakdownRow[] = [...feeBuckets.entries()]
-    .map(([label, amount]) => {
-      const roundedAmount = toMoney(amount);
-      const matchesInterchangeAudit =
-        interchangeTotalPaid > 0 &&
-        Math.abs(roundedAmount - interchangeTotalPaid) <= Math.max(1, interchangeTotalPaid * 0.01) &&
-        includesAny(label, ["interchange", "card brand", "program", "fee amount", "fees paid", "total paid"]);
-
-      return {
-        label: matchesInterchangeAudit ? "card brand interchange detail" : label,
-        amount: roundedAmount,
-        sharePct: totalFees > 0 ? toPct((amount / totalFees) * 100) : 0,
-        sourceSection: matchesInterchangeAudit ? "Interchange detail" : "Structured fee column",
-        evidenceLine: matchesInterchangeAudit ? "Rollup from captured interchange audit rows" : label,
-      };
-    })
-    .map((row) =>
+  const structuredFeeBreakdown = usedStructuredRollup
+    ? structuredFeeRowsToBreakdown(structuredRollup.feeRows, totalFees, processorName)
+    : [];
+  const structuredBreakdownTotal = structuredFeeBreakdown.reduce((sum, row) => sum + row.amount, 0);
+  if (usedStructuredRollup && totalFees > structuredBreakdownTotal + 0.01) {
+    structuredFeeBreakdown.push(
       withFeeClassification(
         {
-          ...row,
+          label: "uncategorized statement fees",
+          amount: toMoney(totalFees - structuredBreakdownTotal),
+          sharePct: toPct(((totalFees - structuredBreakdownTotal) / totalFees) * 100),
+          sourceSection: "Statement summary",
+          evidenceLine: "Remainder between statement total fees and section-classified fee rows",
         },
         { processorName },
       ),
-    )
+    );
+  }
+
+  const feeBreakdown: FeeBreakdownRow[] = (
+    usedStructuredRollup
+      ? structuredFeeBreakdown
+      : [...feeBuckets.entries()]
+          .map(([label, amount]) => {
+            const roundedAmount = toMoney(amount);
+            const matchesInterchangeAudit =
+              interchangeTotalPaid > 0 &&
+              Math.abs(roundedAmount - interchangeTotalPaid) <= Math.max(1, interchangeTotalPaid * 0.01) &&
+              includesAny(label, ["interchange", "card brand", "program", "fee amount", "fees paid", "total paid"]);
+
+            return {
+              label: matchesInterchangeAudit ? "card brand interchange detail" : label,
+              amount: roundedAmount,
+              sharePct: totalFees > 0 ? toPct((amount / totalFees) * 100) : 0,
+              sourceSection: matchesInterchangeAudit ? "Interchange detail" : "Structured fee column",
+              evidenceLine: matchesInterchangeAudit ? "Rollup from captured interchange audit rows" : label,
+            };
+          })
+          .map((row) =>
+            withFeeClassification(
+              {
+                ...row,
+              },
+              { processorName },
+            ),
+          )
+  )
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 15);
 
@@ -552,6 +628,48 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
       monthlySavingsUsd: toMoney(annualSavings / 12),
       annualSavingsUsd: annualSavings,
       effort: "low",
+    });
+  }
+
+  const monthlyMinimumTopUp = guideMeasures.monthlyMinimum?.topUpUsd;
+  if (isPositiveAmount(monthlyMinimumTopUp)) {
+    const monthlySavings = toMoney(monthlyMinimumTopUp / observedMonths);
+    savingsOpportunities.push({
+      title: "Remove monthly minimum top-up",
+      detail: `Structured statement sections modeled a monthly minimum top-up of ${formatMoney(monthlyMinimumTopUp)}.`,
+      monthlySavingsUsd: monthlySavings,
+      annualSavingsUsd: toMoney(monthlySavings * 12),
+      effort: "low",
+    });
+  }
+
+  const expressFundingPremium = guideMeasures.expressFundingPremium;
+  if (isPositiveAmount(expressFundingPremium?.premiumUsd)) {
+    const monthlySavings = toMoney(expressFundingPremium.premiumUsd / observedMonths);
+    savingsOpportunities.push({
+      title: "Validate express funding premium",
+      detail:
+        expressFundingPremium.premiumBps !== null
+          ? `Structured statement sections modeled express funding at ${expressFundingPremium.premiumBps.toFixed(2)} bps.`
+          : "Structured statement sections captured an express funding premium amount.",
+      monthlySavingsUsd: monthlySavings,
+      annualSavingsUsd: toMoney(monthlySavings * 12),
+      effort: "low",
+    });
+  }
+
+  const savingsShareAdjustment = guideMeasures.savingsShareAdjustment;
+  if (isPositiveAmount(savingsShareAdjustment?.retainedSavingsUsd)) {
+    const monthlySavings = toMoney(savingsShareAdjustment.retainedSavingsUsd / observedMonths);
+    savingsOpportunities.push({
+      title: "Challenge savings-share adjustment",
+      detail:
+        savingsShareAdjustment.savingsSharePct !== null
+          ? `Structured statement sections modeled processor-retained savings at ${savingsShareAdjustment.savingsSharePct.toFixed(2)}%.`
+          : "Structured statement sections captured a savings-share adjustment amount.",
+      monthlySavingsUsd: monthlySavings,
+      annualSavingsUsd: toMoney(monthlySavings * 12),
+      effort: "medium",
     });
   }
 
@@ -670,11 +788,18 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
 
   const dataQuality: DataQualitySignal[] = [];
 
-  if (!selectedVolume) {
+  if (usedStructuredRollup) {
+    dataQuality.push({
+      level: "info",
+      message: "Used section-first statement rollup for total volume, total fees, and fee buckets; generic numeric-column inference was not needed.",
+    });
+  }
+
+  if (!selectedVolume && !usedStructuredRollup) {
     dataQuality.push({ level: "critical", message: "No clear volume column was detected. Volume-based metrics may be inaccurate." });
   }
 
-  if (selectedFeeColumns.length === 0) {
+  if (selectedFeeColumns.length === 0 && !usedStructuredRollup) {
     dataQuality.push({ level: "critical", message: "No explicit fee columns were detected. Fee totals may be underreported." });
   }
 
@@ -745,7 +870,9 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
       : `Your blended fees are within expected benchmark range. Main value will come from tightening ancillary fees and ongoing monitoring to prevent rate drift.`;
 
   const confidence: AnalysisSummary["confidence"] =
-    selectedVolume && selectedFeeColumns.length > 0 && dataQuality.every((d) => d.level !== "critical")
+    usedStructuredRollup && dataQuality.every((d) => d.level !== "critical")
+      ? "high"
+      : selectedVolume && selectedFeeColumns.length > 0 && dataQuality.every((d) => d.level !== "critical")
       ? "high"
       : selectedVolume || selectedFeeColumns.length > 0
         ? "medium"
@@ -771,6 +898,7 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     blendedFeeSplits: structuredFacts.blendedFeeSplits,
     processorMarkupAudit,
     perItemFeeModel: structuredFacts.perItemFeeModel,
+    guideMeasures,
     kpis,
     feeBreakdown,
     suspiciousFees,

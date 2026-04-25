@@ -65,6 +65,9 @@ const UNIVERSAL_KEYWORD_RULES: Record<string, RegExp[]> = {
 };
 
 const UNIVERSAL_FAIL_ON_MATCH = new Set(["E023", "E024", "E033", "E064"]);
+const EXPRESS_FUNDING_SIGNAL = /express merchant funding|express funding|accelerated funding|faster funding/i;
+const MONTHLY_MINIMUM_SIGNAL = /monthly minimum|minimum discount|minimum markup/i;
+const SAVINGS_SHARE_SIGNAL = /commercial card interchange savings adjustment|interchange savings adjustment|savings adjustment/i;
 
 function countStatuses(results: ChecklistRuleResult[]): Omit<ChecklistBucket, "results"> {
   const bucket = {
@@ -92,6 +95,10 @@ function firstEvidence(text: string, pattern: RegExp): string | null {
   return match ? `Matched pattern: ${match[0]}` : null;
 }
 
+function hasPositiveAmount(value: number | null | undefined): value is number {
+  return value !== null && value !== undefined && value > 0;
+}
+
 function perItemModelEvidence(summary: AnalysisSummary): string[] {
   const model = summary.perItemFeeModel;
   if (!model) return [];
@@ -105,6 +112,41 @@ function perItemModelEvidence(summary: AnalysisSummary): string[] {
     model.authorizationFee !== null ? `Authorization fee: ${model.authorizationFee.toFixed(4)}` : null,
     model.allInPerItemFee !== null ? `All-in per-item fee: ${model.allInPerItemFee.toFixed(4)}` : null,
     ...componentEvidence,
+  ].filter((item): item is string => Boolean(item));
+}
+
+function guideMeasureEvidence(summary: AnalysisSummary, key: keyof AnalysisSummary["guideMeasures"]): string[] {
+  if (key === "monthlyMinimum") {
+    const monthly = summary.guideMeasures?.monthlyMinimum;
+    if (!monthly) return [];
+    return [
+      monthly.minimumUsd !== null ? `Monthly minimum: $${monthly.minimumUsd.toFixed(2)}` : null,
+      monthly.actualMarkupUsd !== null ? `Actual markup: $${monthly.actualMarkupUsd.toFixed(2)}` : null,
+      monthly.topUpUsd !== null ? `Top-up: $${monthly.topUpUsd.toFixed(2)}` : null,
+      monthly.monthlyVolumeUsd !== null ? `Monthly volume: $${monthly.monthlyVolumeUsd.toFixed(2)}` : null,
+      monthly.effectiveRateImpactPct !== null ? `Effective-rate impact: ${monthly.effectiveRateImpactPct.toFixed(4)}%` : null,
+      `${monthly.sourceSection}: ${monthly.evidenceLine}`,
+    ].filter((item): item is string => Boolean(item));
+  }
+
+  if (key === "expressFundingPremium") {
+    const funding = summary.guideMeasures?.expressFundingPremium;
+    if (!funding) return [];
+    return [
+      funding.premiumBps !== null ? `Express funding premium: ${funding.premiumBps.toFixed(2)} bps` : null,
+      funding.fundingVolumeUsd !== null ? `Funding volume: $${funding.fundingVolumeUsd.toFixed(2)}` : null,
+      funding.premiumUsd !== null ? `Modeled premium: $${funding.premiumUsd.toFixed(2)}` : null,
+      `${funding.sourceSection}: ${funding.evidenceLine}`,
+    ].filter((item): item is string => Boolean(item));
+  }
+
+  const savings = summary.guideMeasures?.savingsShareAdjustment;
+  if (!savings) return [];
+  return [
+    savings.savingsSharePct !== null ? `Savings share retained: ${savings.savingsSharePct.toFixed(2)}%` : null,
+    savings.grossSavingsUsd !== null ? `Gross savings: $${savings.grossSavingsUsd.toFixed(2)}` : null,
+    savings.retainedSavingsUsd !== null ? `Retained savings fee: $${savings.retainedSavingsUsd.toFixed(2)}` : null,
+    `${savings.sourceSection}: ${savings.evidenceLine}`,
   ].filter((item): item is string => Boolean(item));
 }
 
@@ -363,6 +405,144 @@ function evaluateUniversalRule(
     };
   }
 
+  if (element.id === "E021") {
+    const funding = summary.guideMeasures?.expressFundingPremium;
+    const evidence = guideMeasureEvidence(summary, "expressFundingPremium");
+    if (funding) {
+      const modeledPremium =
+        funding.premiumUsd !== null ? `$${funding.premiumUsd.toFixed(2)}` : funding.premiumBps !== null ? `${funding.premiumBps.toFixed(2)} bps` : "partial inputs";
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason: `Express/accelerated funding premium was modeled from structured statement sections (${modeledPremium}).`,
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: EXPRESS_FUNDING_SIGNAL.test(text) ? "warning" : "not_applicable",
+      reason: EXPRESS_FUNDING_SIGNAL.test(text)
+        ? "Express funding language was detected, but premium bps/amount was not modeled from a structured statement section."
+        : "No express or accelerated funding signal was detected in statement sections.",
+      evidence,
+    };
+  }
+
+  if (element.id === "E022") {
+    const monthly = summary.guideMeasures?.monthlyMinimum;
+    const evidence = guideMeasureEvidence(summary, "monthlyMinimum");
+    if (monthly) {
+      const topUp = monthly.topUpUsd;
+      const hasTopUp = hasPositiveAmount(topUp);
+      return {
+        id: element.id,
+        title: element.name,
+        status: hasTopUp ? "fail" : monthly.minimumUsd !== null && monthly.actualMarkupUsd !== null ? "pass" : "warning",
+        reason: hasTopUp
+          ? `Monthly minimum top-up was modeled at $${topUp.toFixed(2)}.`
+          : monthly.minimumUsd !== null && monthly.actualMarkupUsd !== null
+            ? "Monthly minimum inputs were modeled and no top-up difference was found."
+            : "Monthly minimum was detected from a structured section, but minimum and actual markup inputs are incomplete.",
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: MONTHLY_MINIMUM_SIGNAL.test(text) ? "warning" : "not_applicable",
+      reason: MONTHLY_MINIMUM_SIGNAL.test(text)
+        ? "Monthly minimum language was detected, but the minimum/top-up math was not modeled from structured statement sections."
+        : "No monthly minimum signal was detected in statement sections.",
+      evidence,
+    };
+  }
+
+  if (element.id === "E027") {
+    const savings = summary.guideMeasures?.savingsShareAdjustment;
+    const evidence = guideMeasureEvidence(summary, "savingsShareAdjustment");
+    if (savings) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason:
+          savings.retainedSavingsUsd !== null
+            ? `Savings-share adjustment was modeled at $${savings.retainedSavingsUsd.toFixed(2)} retained by the processor.`
+            : "Savings-share adjustment was detected from a structured section, but gross savings/retained amount inputs are incomplete.",
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: SAVINGS_SHARE_SIGNAL.test(text) ? "warning" : "not_applicable",
+      reason: SAVINGS_SHARE_SIGNAL.test(text)
+        ? "Savings-share adjustment language was detected, but retained savings were not modeled from structured statement sections."
+        : "No savings-share adjustment signal was detected in statement sections.",
+      evidence,
+    };
+  }
+
+  if (element.id === "E035") {
+    const monthly = summary.guideMeasures?.monthlyMinimum;
+    const evidence = guideMeasureEvidence(summary, "monthlyMinimum");
+    if (monthly) {
+      const topUp = monthly.topUpUsd;
+      const hasTopUp = hasPositiveAmount(topUp);
+      const lowerVolumeRisk = monthly.monthlyVolumeUsd !== null && monthly.monthlyVolumeUsd < 55_000;
+      return {
+        id: element.id,
+        title: element.name,
+        status: hasTopUp ? "fail" : lowerVolumeRisk ? "warning" : "pass",
+        reason: hasTopUp
+          ? `Monthly minimum floor is distorting processor economics by $${topUp.toFixed(2)} this period.`
+          : lowerVolumeRisk
+            ? `Monthly minimum was modeled and volume ($${monthly.monthlyVolumeUsd?.toFixed(2)}) is below the guide's lower-volume risk band.`
+            : "Monthly minimum inputs were modeled without an active top-up trap.",
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: MONTHLY_MINIMUM_SIGNAL.test(text) ? "warning" : "not_applicable",
+      reason: MONTHLY_MINIMUM_SIGNAL.test(text)
+        ? "Monthly minimum language was detected, but profitability-trap math was not modeled."
+        : "No monthly minimum signal was detected in statement sections.",
+      evidence,
+    };
+  }
+
+  if (element.id === "E060") {
+    const monthly = summary.guideMeasures?.monthlyMinimum;
+    const evidence = guideMeasureEvidence(summary, "monthlyMinimum");
+    if (monthly) {
+      const topUp = monthly.topUpUsd;
+      const hasTopUp = hasPositiveAmount(topUp);
+      return {
+        id: element.id,
+        title: element.name,
+        status: hasTopUp ? "warning" : "pass",
+        reason:
+          hasTopUp
+            ? `Monthly minimum elimination lever has a modeled monthly value of $${topUp.toFixed(2)}.`
+            : "Monthly minimum was modeled; no current top-up amount was found.",
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: MONTHLY_MINIMUM_SIGNAL.test(text) ? "warning" : "not_applicable",
+      reason: MONTHLY_MINIMUM_SIGNAL.test(text)
+        ? "Monthly minimum language was detected, but elimination-lever value was not modeled."
+        : "No monthly minimum signal was detected in statement sections.",
+      evidence,
+    };
+  }
+
   if (element.id === "E006") {
     if (summary.totalVolume > 0) {
       status = "pass";
@@ -413,6 +593,97 @@ function processorPatternForCheck(check: string): RegExp | null {
   if (lower.includes("repricing") || lower.includes("fine print") || lower.includes("effective")) return /effective|billing change|terms/i;
   if (lower.includes("eirf") || lower.includes("non-qualified") || lower.includes("downgrade")) return /eirf|non-?qualified|downgrade/i;
   if (lower.includes("surcharge")) return /surcharge/i;
+  return null;
+}
+
+function evaluateGuideMeasureProcessorRule(
+  id: string,
+  title: string,
+  summary: AnalysisSummary,
+  text: string,
+): ChecklistRuleResult | null {
+  const lower = title.toLowerCase();
+
+  if ((lower.includes("express") || lower.includes("accelerated")) && lower.includes("funding")) {
+    const funding = summary.guideMeasures?.expressFundingPremium;
+    const evidence = guideMeasureEvidence(summary, "expressFundingPremium");
+    if (funding) {
+      return {
+        id,
+        title,
+        status: "pass",
+        reason:
+          funding.premiumUsd !== null
+            ? `Express funding premium was modeled from statement sections ($${funding.premiumUsd.toFixed(2)}).`
+            : `Express funding premium inputs were captured from statement sections (${funding.premiumBps?.toFixed(2) ?? "unknown"} bps).`,
+        evidence,
+      };
+    }
+    return {
+      id,
+      title,
+      status: EXPRESS_FUNDING_SIGNAL.test(text) ? "warning" : "not_applicable",
+      reason: EXPRESS_FUNDING_SIGNAL.test(text)
+        ? "Express funding text was found, but premium math was not modeled from a structured section."
+        : "No express funding signal found in structured statement sections.",
+      evidence: [],
+    };
+  }
+
+  if (lower.includes("monthly minimum")) {
+    const monthly = summary.guideMeasures?.monthlyMinimum;
+    const evidence = guideMeasureEvidence(summary, "monthlyMinimum");
+    if (monthly) {
+      const topUp = monthly.topUpUsd ?? 0;
+      const needsPositiveTopUp = lower.includes("top-up") || lower.includes("top up") || lower.includes("risk");
+      return {
+        id,
+        title,
+        status: needsPositiveTopUp ? (topUp > 0 ? "pass" : "warning") : "pass",
+        reason:
+          topUp > 0
+            ? `Monthly minimum mechanics were modeled from statement sections with a $${topUp.toFixed(2)} top-up.`
+            : "Monthly minimum was detected in structured statement sections, but no positive top-up was modeled.",
+        evidence,
+      };
+    }
+    return {
+      id,
+      title,
+      status: MONTHLY_MINIMUM_SIGNAL.test(text) ? "warning" : "not_applicable",
+      reason: MONTHLY_MINIMUM_SIGNAL.test(text)
+        ? "Monthly minimum text was found, but minimum/top-up math was not modeled from a structured section."
+        : "No monthly minimum signal found in structured statement sections.",
+      evidence: [],
+    };
+  }
+
+  if (lower.includes("savings adjustment") || lower.includes("savings share")) {
+    const savings = summary.guideMeasures?.savingsShareAdjustment;
+    const evidence = guideMeasureEvidence(summary, "savingsShareAdjustment");
+    if (savings) {
+      return {
+        id,
+        title,
+        status: "pass",
+        reason:
+          savings.retainedSavingsUsd !== null
+            ? `Savings-share adjustment was modeled from statement sections ($${savings.retainedSavingsUsd.toFixed(2)} retained).`
+            : "Savings-share adjustment was captured from statement sections with incomplete amount inputs.",
+        evidence,
+      };
+    }
+    return {
+      id,
+      title,
+      status: SAVINGS_SHARE_SIGNAL.test(text) ? "warning" : "not_applicable",
+      reason: SAVINGS_SHARE_SIGNAL.test(text)
+        ? "Savings adjustment text was found, but retained-savings math was not modeled from a structured section."
+        : "No savings-share adjustment signal found in structured statement sections.",
+      evidence: [],
+    };
+  }
+
   return null;
 }
 
@@ -563,6 +834,9 @@ function evaluateProcessorRule(
       evidence: [],
     };
   }
+
+  const guideMeasureResult = evaluateGuideMeasureProcessorRule(id, title, summary, text);
+  if (guideMeasureResult) return guideMeasureResult;
 
   const perItemResult = evaluatePerItemProcessorRule(id, title, summary, text);
   if (perItemResult) return perItemResult;
