@@ -79,6 +79,7 @@ const SAVINGS_SHARE_SIGNAL = /commercial card interchange savings adjustment|int
 const INTERCHANGE_PRESENTATION_SIGNAL = /\b(interchange|program fees?|card[-\s]?brand|card[-\s]?network|pass[-\s]?through|wholesale)\b/i;
 const PROCESSOR_MARKUP_PRESENTATION_SIGNAL =
   /\b(processor markup|service charges?|discount fees?|assessment markup|savings adjustment|markup)\b/i;
+const DOWNGRADE_PRESENTATION_SIGNAL = /\beirf\b|non[\s-]?qualified|downgrad(?:e|ed|ing)\b/i;
 
 function countStatuses(results: ChecklistRuleResult[]): Omit<ChecklistBucket, "results"> {
   const bucket = {
@@ -170,6 +171,47 @@ function downgradeEvidence(summary: AnalysisSummary): string[] {
           row.estimatedPenaltyLowUsd,
         )}-${moneyEvidence(row.estimatedPenaltyHighUsd)}; ${row.sourceSection}: ${row.evidenceLine}`,
     );
+}
+
+function hasModeledDowngradeImpact(analysis: AnalysisSummary["downgradeAnalysis"] | null | undefined): analysis is AnalysisSummary["downgradeAnalysis"] {
+  return (
+    analysis?.affectedVolumeUsd !== null &&
+    analysis?.affectedVolumeUsd !== undefined &&
+    analysis.estimatedPenaltyLowUsd !== null &&
+    analysis.estimatedPenaltyLowUsd !== undefined &&
+    analysis.estimatedPenaltyHighUsd !== null &&
+    analysis.estimatedPenaltyHighUsd !== undefined
+  );
+}
+
+function downgradeImpactSummary(analysis: AnalysisSummary["downgradeAnalysis"]): string {
+  return `affected volume ${moneyEvidence(analysis.affectedVolumeUsd)}, estimated penalty range ${moneyEvidence(
+    analysis.estimatedPenaltyLowUsd,
+  )}-${moneyEvidence(analysis.estimatedPenaltyHighUsd)}`;
+}
+
+function downgradeSectionSignalEvidence(summary: AnalysisSummary): string[] {
+  return (summary.statementSections ?? [])
+    .filter((section) => DOWNGRADE_PRESENTATION_SIGNAL.test(`${section.title} ${section.evidenceLines.join(" ")}`))
+    .slice(0, 5)
+    .map((section) => {
+      const firstSignal = section.evidenceLines.find((line) => DOWNGRADE_PRESENTATION_SIGNAL.test(line)) ?? section.evidenceLines[0] ?? section.title;
+      return `${section.type}: ${section.title}: ${firstSignal}`;
+    });
+}
+
+function downgradeImpactEvidence(summary: AnalysisSummary): string[] {
+  const analysis = summary.downgradeAnalysis;
+  if (!hasModeledDowngradeImpact(analysis)) {
+    return downgradeEvidence(summary);
+  }
+
+  return [
+    `Downgrade cost model: affectedVolume=${moneyEvidence(analysis.affectedVolumeUsd)}, rateDelta=0.30%-0.40%, estimatedPenalty=${moneyEvidence(
+      analysis.estimatedPenaltyLowUsd,
+    )}-${moneyEvidence(analysis.estimatedPenaltyHighUsd)}`,
+    ...downgradeEvidence(summary),
+  ].slice(0, 7);
 }
 
 function hiddenMarkupAuditEvidence(summary: AnalysisSummary): string[] {
@@ -877,28 +919,66 @@ function evaluateUniversalRule(
   if (element.id === "E043") {
     const evidence = downgradeEvidence(summary);
     if (evidence.length > 0) {
-      const penalty =
-        summary.downgradeAnalysis.estimatedPenaltyLowUsd !== null && summary.downgradeAnalysis.estimatedPenaltyHighUsd !== null
-          ? ` Estimated penalty range: ${moneyEvidence(summary.downgradeAnalysis.estimatedPenaltyLowUsd)}-${moneyEvidence(
-              summary.downgradeAnalysis.estimatedPenaltyHighUsd,
-            )}.`
-          : "";
       return {
         id: element.id,
         title: element.name,
         status: "warning",
-        reason: `Downgrade indicators were found on structured interchange rows.${penalty}`,
+        reason: "Downgrade indicators were found on structured interchange rows; cost impact is evaluated separately by E044.",
         evidence,
+      };
+    }
+    const sectionEvidence = downgradeSectionSignalEvidence(summary);
+    if (sectionEvidence.length > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "unknown",
+        reason: "Downgrade descriptors were found in structured statement sections, but not on parsed interchange rows with volume/count evidence.",
+        evidence: sectionEvidence,
       };
     }
     return {
       id: element.id,
       title: element.name,
-      status: /eirf|non-?qualified|downgrade/i.test(text) ? "unknown" : "not_applicable",
-      reason: /eirf|non-?qualified|downgrade/i.test(text)
-        ? "Downgrade language was found, but not on a structured interchange row with volume/count evidence."
-        : "No section-backed downgrade rows were found.",
+      status: "not_applicable",
+      reason: "No section-backed downgrade descriptors were found.",
       evidence: [],
+    };
+  }
+
+  if (element.id === "E044") {
+    const evidence = downgradeImpactEvidence(summary);
+    const analysis = summary.downgradeAnalysis;
+    if (hasModeledDowngradeImpact(analysis)) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason: `Downgrade cost delta was quantified from section-backed interchange rows: ${downgradeImpactSummary(
+          analysis,
+        )} using the documented 0.30%-0.40% guidance.`,
+        evidence,
+      };
+    }
+    if (evidence.length > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "unknown",
+        reason: "Downgrade rows were found, but affected volume was not captured, so the documented cost delta could not be computed.",
+        evidence,
+      };
+    }
+    const sectionEvidence = downgradeSectionSignalEvidence(summary);
+    return {
+      id: element.id,
+      title: element.name,
+      status: sectionEvidence.length > 0 ? "unknown" : "not_applicable",
+      reason:
+        sectionEvidence.length > 0
+          ? "Section-backed downgrade descriptors were found, but no structured downgraded volume was captured for cost modeling."
+          : "No section-backed downgrade descriptors were found, so downgrade cost delta is not applicable.",
+      evidence: sectionEvidence,
     };
   }
 
@@ -1218,24 +1298,58 @@ function evaluateStructuredSignalProcessorRule(id: string, title: string, summar
     };
   }
 
-  if (lower.includes("eirf") || lower.includes("non-qualified") || lower.includes("downgrade")) {
-    const evidence = downgradeEvidence(summary);
+  if (DOWNGRADE_PRESENTATION_SIGNAL.test(title)) {
+    const expectsImpact = lower.includes("estimate") || lower.includes("impact") || lower.includes("penalty");
+    const evidence = expectsImpact ? downgradeImpactEvidence(summary) : downgradeEvidence(summary);
+    const analysis = summary.downgradeAnalysis;
+
+    if (expectsImpact) {
+      if (hasModeledDowngradeImpact(analysis)) {
+        return {
+          id,
+          title,
+          status: "pass",
+          reason: `Downgrade penalty impact was quantified from section-backed interchange rows: ${downgradeImpactSummary(analysis)}.`,
+          evidence,
+        };
+      }
+      const sectionEvidence = downgradeSectionSignalEvidence(summary);
+      return {
+        id,
+        title,
+        status: evidence.length > 0 || sectionEvidence.length > 0 ? "warning" : "not_applicable",
+        reason:
+          evidence.length > 0 || sectionEvidence.length > 0
+            ? "Downgrade descriptors were section-backed, but structured downgraded volume was not captured for penalty modeling."
+            : "No section-backed downgrade descriptors were found.",
+        evidence: evidence.length > 0 ? evidence : sectionEvidence,
+      };
+    }
+
     if (evidence.length > 0) {
       return {
         id,
         title,
         status: "pass",
-        reason: "Downgrade indicators were detected on structured interchange rows with available impact modeling.",
+        reason: "Downgrade indicators were detected on structured interchange rows.",
         evidence,
+      };
+    }
+    const sectionEvidence = downgradeSectionSignalEvidence(summary);
+    if (sectionEvidence.length > 0) {
+      return {
+        id,
+        title,
+        status: "warning",
+        reason: "Downgrade descriptors were found in structured statement sections, but not on parsed interchange rows.",
+        evidence: sectionEvidence,
       };
     }
     return {
       id,
       title,
-      status: /eirf|non-?qualified|downgrade/i.test(text) ? "warning" : "not_applicable",
-      reason: /eirf|non-?qualified|downgrade/i.test(text)
-        ? "Downgrade text was found, but not on a structured interchange row."
-        : "No section-backed downgrade indicators were found.",
+      status: "not_applicable",
+      reason: "No section-backed downgrade indicators were found.",
       evidence: [],
     };
   }

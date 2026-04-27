@@ -274,6 +274,23 @@ function downgradeInterchangeDoc(): ParsedDocument {
   };
 }
 
+function downgradeTextOnlyDoc(): ParsedDocument {
+  return {
+    sourceType: "pdf",
+    headers: ["content"],
+    rows: [],
+    textPreview: "Merchant note mentions EIRF, but no statement section or interchange row was extracted.",
+    extraction: {
+      mode: "structured",
+      qualityScore: 0.35,
+      reasons: ["text preview only"],
+      lineCount: 0,
+      amountTokenCount: 0,
+      hasExtractableText: true,
+    },
+  };
+}
+
 function noticeSectionDoc(): ParsedDocument {
   return {
     sourceType: "pdf",
@@ -377,7 +394,25 @@ describe("interchange audit extraction", () => {
     const checklist = await evaluateChecklistReport(doc, summary);
     const downgradeRule = checklist.universal.results.find((result) => result.id === "E043");
     expect(downgradeRule?.status).toBe("warning");
-    expect(downgradeRule?.reason).toContain("$26.76-$35.68");
+    expect(downgradeRule?.reason).toContain("cost impact is evaluated separately by E044");
+
+    const downgradeCostRule = checklist.universal.results.find((result) => result.id === "E044");
+    expect(downgradeCostRule?.status).toBe("warning");
+    expect(downgradeCostRule?.reason).toContain("affected volume $8920.00");
+    expect(downgradeCostRule?.reason).toContain("$26.76-$35.68");
+    expect(downgradeCostRule?.evidence.join(" ")).toContain("rateDelta=0.30%-0.40%");
+  });
+
+  it("does not treat downgrade words in generic text as section-backed cost evidence", async () => {
+    const doc = downgradeTextOnlyDoc();
+    const summary = analyzeDocument(doc, "other");
+
+    expect(summary.statementSections).toHaveLength(0);
+    expect(summary.downgradeAnalysis.rows).toHaveLength(0);
+
+    const checklist = await evaluateChecklistReport(doc, summary);
+    expect(checklist.universal.results.find((result) => result.id === "E043")?.status).toBe("not_applicable");
+    expect(checklist.universal.results.find((result) => result.id === "E044")?.status).toBe("not_applicable");
   });
 
   it("evaluates notice risks from parsed notice sections instead of generic website text", async () => {
