@@ -352,6 +352,21 @@ function guideMeasureEvidence(summary: AnalysisSummary, key: keyof AnalysisSumma
   ].filter((item): item is string => Boolean(item));
 }
 
+function level3Evidence(summary: AnalysisSummary): string[] {
+  const level3 = summary.level3Optimization;
+  if (!level3) return [];
+  return [
+    level3.eligibleVolumeUsd !== null ? `Eligible commercial-card volume: $${level3.eligibleVolumeUsd.toFixed(2)}` : null,
+    level3.rateDeltaBps !== null ? `Estimated Level 3 rate delta: ${level3.rateDeltaBps.toFixed(2)} bps` : null,
+    level3.estimatedAnnualSavingsUsd !== null ? `Estimated annual Level 3 savings: $${level3.estimatedAnnualSavingsUsd.toFixed(2)}` : null,
+    level3.capturedFields.length > 0 ? `Captured field signals: ${level3.capturedFields.join(", ")}` : null,
+    level3.missingFields.length > 0 ? `Missing field signals: ${level3.missingFields.join(", ")}` : null,
+    ...level3.evidence,
+  ]
+    .filter((item): item is string => Boolean(item))
+    .slice(0, 8);
+}
+
 function hasPerItemTextSignal(text: string): boolean {
   return /\bauthori[sz]ation fees?\b|\bauth fees?\b|\btransaction fees?\b|\bper item\b|\bper trans\b|\bper txn\b|\bitem fees?\b/i.test(text);
 }
@@ -979,6 +994,90 @@ function evaluateUniversalRule(
           ? "Section-backed downgrade descriptors were found, but no structured downgraded volume was captured for cost modeling."
           : "No section-backed downgrade descriptors were found, so downgrade cost delta is not applicable.",
       evidence: sectionEvidence,
+    };
+  }
+
+  if (element.id === "E049") {
+    const level3 = summary.level3Optimization;
+    const evidence = level3Evidence(summary);
+    if (level3?.eligible) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason:
+          level3.eligibleVolumeUsd !== null
+            ? `Commercial-card/B2B-B2G Level 3 eligibility signals were detected with $${level3.eligibleVolumeUsd.toFixed(2)} candidate volume.`
+            : "Commercial-card/B2B-B2G Level 3 eligibility signals were detected, but candidate volume was not captured.",
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: "not_applicable",
+      reason: "No commercial-card, B2B/B2G, or Level 3 eligibility signal was detected in parsed statement data.",
+      evidence,
+    };
+  }
+
+  if (element.id === "E050") {
+    const level3 = summary.level3Optimization;
+    const evidence = level3Evidence(summary);
+    if (!level3?.eligible) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "not_applicable",
+        reason: "Level 3 data-field review is only applicable after commercial-card/B2B-B2G eligibility is detected.",
+        evidence,
+      };
+    }
+    if (level3.missingFields.length > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason: `Level 3 eligible flow detected, but required field signals are missing or not visible on the statement: ${level3.missingFields.join(", ")}.`,
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: "pass",
+      reason: "Level 3 eligible flow detected and all required field signals were found in parsed statement data.",
+      evidence,
+    };
+  }
+
+  if (element.id === "E051") {
+    const level3 = summary.level3Optimization;
+    const evidence = level3Evidence(summary);
+    if (!level3?.eligible) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "not_applicable",
+        reason: "No eligible commercial-card/B2B-B2G volume was detected, so Level 3 savings potential is not applicable.",
+        evidence,
+      };
+    }
+    if (level3.estimatedAnnualSavingsUsd !== null) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason: `Level 3 enablement savings were estimated at $${level3.estimatedAnnualSavingsUsd.toFixed(2)} annually using a ${level3.rateDeltaBps?.toFixed(2) ?? "default"} bps opportunity assumption.`,
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: "unknown",
+      reason: "Level 3 eligibility was detected, but eligible volume or rate-delta inputs were missing, so savings could not be estimated.",
+      evidence,
     };
   }
 

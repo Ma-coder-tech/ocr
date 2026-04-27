@@ -35,6 +35,45 @@ function guideMeasureDoc(): ParsedDocument {
   };
 }
 
+function level3Doc(): ParsedDocument {
+  return {
+    sourceType: "csv",
+    headers: ["content", "card_type", "transactions", "volume", "rate", "per_item", "fee", "metric", "fees"],
+    rows: [
+      { content: "Worldpay Merchant Statement" },
+      { content: "INTERCHANGE DETAIL" },
+      {
+        card_type: "Visa Commercial Credit",
+        transactions: 20,
+        volume: 10000,
+        rate: "2.20%",
+        per_item: 0.1,
+        fee: 222,
+      },
+      {
+        card_type: "Mastercard Purchasing Card",
+        transactions: 10,
+        volume: 5000,
+        rate: "2.10%",
+        per_item: 0.1,
+        fee: 106,
+      },
+      { metric: "Total Volume", volume: 15000 },
+      { metric: "Total Fees", fees: 328 },
+    ],
+    textPreview:
+      "Worldpay Merchant Statement INTERCHANGE DETAIL Visa Commercial Credit Mastercard Purchasing Card Total Volume $15,000.00 Total Fees $328.00",
+    extraction: {
+      mode: "structured",
+      qualityScore: 0.95,
+      reasons: [],
+      lineCount: 6,
+      amountTokenCount: 10,
+      hasExtractableText: true,
+    },
+  };
+}
+
 describe("structured guide-measure modeling", () => {
   it("models monthly minimum top-ups, funding premiums, and savings-share adjustments from statement sections", async () => {
     const doc = guideMeasureDoc();
@@ -72,5 +111,31 @@ describe("structured guide-measure modeling", () => {
     expect(checklist.universal.results.find((result) => result.id === "E022")?.status).toBe("fail");
     expect(checklist.universal.results.find((result) => result.id === "E027")?.reason).toContain("$75.00");
     expect(checklist.universal.results.find((result) => result.id === "E035")?.status).toBe("fail");
+  });
+
+  it("detects Level 3 eligibility, missing data fields, and savings opportunity for commercial-card volume", async () => {
+    const doc = level3Doc();
+    const summary = analyzeDocument(doc, "professional_services");
+
+    expect(summary.level3Optimization).toMatchObject({
+      eligible: true,
+      eligibleVolumeUsd: 15000,
+      rateDeltaBps: 75,
+      estimatedMonthlySavingsUsd: 112.5,
+      estimatedAnnualSavingsUsd: 1350,
+    });
+    expect(summary.level3Optimization.missingFields).toEqual([
+      "invoice_number",
+      "product_code",
+      "quantity",
+      "item_description",
+      "commodity_code",
+    ]);
+    expect(summary.savingsOpportunities.map((item) => item.title)).toContain("Enable Level 3 data pass-through");
+
+    const checklist = await evaluateChecklistReport(doc, summary);
+    expect(checklist.universal.results.find((result) => result.id === "E049")?.status).toBe("warning");
+    expect(checklist.universal.results.find((result) => result.id === "E050")?.reason).toContain("invoice_number");
+    expect(checklist.universal.results.find((result) => result.id === "E051")?.reason).toContain("$1350.00");
   });
 });

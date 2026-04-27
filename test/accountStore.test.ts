@@ -50,6 +50,7 @@ function makeSummary(
     },
     interchangeAuditRows: [],
     blendedFeeSplits: [],
+    structuredFeeFindings: [],
     processorMarkupAudit: {
       rows:
         processorMarkupBps === null
@@ -90,12 +91,46 @@ function makeSummary(
       status: "not_applicable" as const,
       confidence: 0,
     },
+    bundledPricing: {
+      active: false,
+      buckets: [],
+      highestRatePercent: null,
+      totalVolumeUsd: null,
+      totalFeesUsd: null,
+      confidence: 0,
+    },
+    noticeFindings: [],
+    downgradeAnalysis: {
+      rows: [],
+      affectedVolumeUsd: null,
+      estimatedPenaltyLowUsd: null,
+      estimatedPenaltyHighUsd: null,
+      confidence: 0,
+    },
     perItemFeeModel: {
       transactionFee: null,
       authorizationFee: null,
       allInPerItemFee: null,
       components: [],
       confidence: 0,
+    },
+    guideMeasures: {
+      monthlyMinimum: null,
+      expressFundingPremium: null,
+      savingsShareAdjustment: null,
+    },
+    level3Optimization: {
+      eligible: false,
+      confidence: 0,
+      eligibleVolumeUsd: null,
+      rateDeltaBps: null,
+      requiredFields: ["invoice_number", "product_code", "quantity", "item_description", "commodity_code"],
+      capturedFields: [],
+      missingFields: [],
+      detectedSignals: [],
+      estimatedMonthlySavingsUsd: null,
+      estimatedAnnualSavingsUsd: null,
+      evidence: [],
     },
     kpis: [],
     feeBreakdown: [

@@ -6,6 +6,8 @@ import {
   DynamicField,
   FeeBreakdownRow,
   FeeInsight,
+  InterchangeAuditRow,
+  Level3OptimizationModel,
   KpiMetric,
   ProcessorMarkupAuditRow,
   ProcessorMarkupAuditSummary,
@@ -52,6 +54,19 @@ const FEE_TERMS = [
 const VOLUME_TERMS = ["volume", "gross", "sale", "sales", "revenue", "deposit", "processed", "amount"];
 const EXCLUDE_VOLUME_TERMS = ["fee", "charge", "cost", "rate", "%", "count", "qty", "ticket", "avg"];
 const PERIOD_TERMS = ["date", "month", "period", "statement", "year"];
+const LEVEL3_REQUIRED_FIELDS = ["invoice_number", "product_code", "quantity", "item_description", "commodity_code"] as const;
+const LEVEL3_DEFAULT_RATE_DELTA_BPS = 75;
+const LEVEL3_ELIGIBILITY_SIGNAL =
+  /\blevel\s*(?:3|iii)\b|\bb2b\b|\bb2g\b|\bcommercial card\b|\bbusiness card\b|\bcorporate card\b|\bpurchasing card\b|\bp-?card\b|\bprocurement card\b|\bgovernment card\b/i;
+const LEVEL3_COMMERCIAL_ROW_SIGNAL =
+  /\bcommercial\b|\bbusiness card\b|\bcorporate\b|\bpurchasing\b|\bp-?card\b|\bprocurement\b|\bgovernment\b/i;
+const LEVEL3_FIELD_PATTERNS: Record<(typeof LEVEL3_REQUIRED_FIELDS)[number], RegExp> = {
+  invoice_number: /\binvoice\s*(?:(?:number|no\.?)\b|#)|\binvoice_number\b/i,
+  product_code: /\b(product|item|sku)\s*code\b|\bsku\b/i,
+  quantity: /\bquantity\b|\bqty\b/i,
+  item_description: /\bitem\s*description\b|\bline\s*item\s*description\b/i,
+  commodity_code: /\bcommodity\s*code\b/i,
+};
 
 function includesAny(input: string, terms: string[]): boolean {
   const v = input.toLowerCase();
@@ -136,6 +151,92 @@ function amountToBps(amount: number | null, volume: number | null): number | nul
   if (amount === null || volume === null) return null;
   if (!Number.isFinite(amount) || !Number.isFinite(volume) || amount <= 0 || volume <= 0) return null;
   return toPct((amount / volume) * 10_000);
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.filter((value) => value.trim().length > 0))];
+}
+
+function compactEvidence(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, 220);
+}
+
+function rowLevel3Context(row: InterchangeAuditRow): string {
+  return [row.label, row.cardType, row.sourceSection, row.evidenceLine].filter(Boolean).join(" ");
+}
+
+function isLevel3EligibleInterchangeRow(row: InterchangeAuditRow): boolean {
+  if (row.cardType === "Commercial") return true;
+  return LEVEL3_COMMERCIAL_ROW_SIGNAL.test(rowLevel3Context(row));
+}
+
+function collectLevel3Text(doc: ParsedDocument, structuredFacts: StructuredStatementFacts): string {
+  const rowText = doc.rows
+    .slice(0, 500)
+    .map((row) => Object.values(row).join(" "))
+    .join(" ");
+  const sectionText = structuredFacts.statementSections
+    .map((section) => `${section.title} ${section.evidenceLines.join(" ")}`)
+    .join(" ");
+  const interchangeText = structuredFacts.interchangeAuditRows.map(rowLevel3Context).join(" ");
+  return `${doc.headers.join(" ")} ${doc.textPreview} ${rowText} ${sectionText} ${interchangeText}`;
+}
+
+function buildLevel3OptimizationModel(
+  doc: ParsedDocument,
+  structuredFacts: StructuredStatementFacts,
+  observedMonths: number,
+): Level3OptimizationModel {
+  const allText = collectLevel3Text(doc, structuredFacts);
+  const eligibleRows = structuredFacts.interchangeAuditRows.filter(isLevel3EligibleInterchangeRow);
+  const rowEligibleVolume = eligibleRows.reduce((sum, row) => sum + (row.volume ?? 0), 0);
+
+  const evidence = uniqueStrings([
+    ...eligibleRows
+      .slice(0, 5)
+      .map((row) => `Commercial interchange row: ${row.label}: volume=${row.volume ?? "n/a"}; ${row.evidenceLine}`),
+    ...structuredFacts.statementSections
+      .flatMap((section) =>
+        section.evidenceLines
+          .filter((line) => LEVEL3_ELIGIBILITY_SIGNAL.test(`${section.title} ${line}`))
+          .slice(0, 2)
+          .map((line) => `${section.type}: ${section.title}: ${compactEvidence(line)}`),
+      )
+      .slice(0, 5),
+    LEVEL3_ELIGIBILITY_SIGNAL.test(doc.textPreview) ? `Statement text signal: ${doc.textPreview.match(LEVEL3_ELIGIBILITY_SIGNAL)?.[0] ?? "Level 3"}` : "",
+  ]).slice(0, 8);
+
+  const capturedFields = LEVEL3_REQUIRED_FIELDS.filter((field) => LEVEL3_FIELD_PATTERNS[field].test(allText));
+  const hasEligibilitySignal = eligibleRows.length > 0 || LEVEL3_ELIGIBILITY_SIGNAL.test(allText);
+  const eligibleVolumeUsd = rowEligibleVolume > 0 ? toMoney(rowEligibleVolume) : null;
+  const rateDeltaBps = eligibleVolumeUsd !== null ? LEVEL3_DEFAULT_RATE_DELTA_BPS : null;
+  const monthlyEligibleVolume = eligibleVolumeUsd !== null ? eligibleVolumeUsd / observedMonths : null;
+  const estimatedMonthlySavingsUsd =
+    monthlyEligibleVolume !== null && rateDeltaBps !== null ? toMoney((monthlyEligibleVolume * rateDeltaBps) / 10_000) : null;
+
+  return {
+    eligible: hasEligibilitySignal,
+    confidence: hasEligibilitySignal
+      ? toPct(Math.min(0.95, 0.35 + eligibleRows.length * 0.12 + (eligibleVolumeUsd !== null ? 0.18 : 0) + evidence.length * 0.04))
+      : 0,
+    eligibleVolumeUsd,
+    rateDeltaBps,
+    requiredFields: [...LEVEL3_REQUIRED_FIELDS],
+    capturedFields,
+    missingFields: hasEligibilitySignal ? LEVEL3_REQUIRED_FIELDS.filter((field) => !capturedFields.includes(field)) : [],
+    detectedSignals: uniqueStrings([
+      eligibleRows.length > 0 ? "commercial_card_interchange_rows" : "",
+      /\blevel\s*(?:3|iii)\b/i.test(allText) ? "level_3_language" : "",
+      /\bb2b\b/i.test(allText) ? "b2b_language" : "",
+      /\bb2g\b|\bgovernment card\b/i.test(allText) ? "b2g_or_government_card_language" : "",
+    ]),
+    estimatedMonthlySavingsUsd,
+    estimatedAnnualSavingsUsd: estimatedMonthlySavingsUsd !== null ? toMoney(estimatedMonthlySavingsUsd * 12) : null,
+    evidence:
+      rateDeltaBps !== null
+        ? [...evidence, `Savings estimate uses conservative default Level 3 rate delta: ${rateDeltaBps.toFixed(2)} bps`].slice(0, 8)
+        : evidence,
+  };
 }
 
 function createProcessorMarkupAudit(structuredFacts: StructuredStatementFacts): ProcessorMarkupAuditSummary {
@@ -272,6 +373,7 @@ function createTextOnlyPdfSummary(
     deltaFromUpperRate: 0,
   };
   const hiddenMarkupAudit = buildHiddenMarkupAudit(structuredFacts.interchangeAuditRows);
+  const level3Optimization = buildLevel3OptimizationModel(doc, structuredFacts, 1);
 
   const textWarnings = doc.extraction.reasons.map((message): DataQualitySignal => ({ level: "warning", message }));
   const dataQuality: DataQualitySignal[] = [
@@ -332,6 +434,7 @@ function createTextOnlyPdfSummary(
     downgradeAnalysis: structuredFacts.downgradeAnalysis,
     perItemFeeModel: structuredFacts.perItemFeeModel,
     guideMeasures: structuredFacts.guideMeasures,
+    level3Optimization,
     kpis: [
       { label: "Effective Rate", value: "N/A", note: "Structured numeric extraction unavailable for this PDF." },
       { label: "Estimated Monthly Fees", value: "N/A", note: "Fee totals withheld to avoid misleading math." },
@@ -591,6 +694,7 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
   const estimatedMonthlyVolume = toMoney(totalVolume / observedMonths);
   const estimatedMonthlyFees = toMoney(totalFees / observedMonths);
   const estimatedAnnualFees = toMoney(estimatedMonthlyFees * 12);
+  const level3Optimization = buildLevel3OptimizationModel(doc, structuredFacts, observedMonths);
 
   const suspiciousFees: SuspiciousFee[] = feeBreakdown
     .filter((f) => f.amount > 0)
@@ -677,6 +781,19 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
           : "Structured statement sections captured a savings-share adjustment amount.",
       monthlySavingsUsd: monthlySavings,
       annualSavingsUsd: toMoney(monthlySavings * 12),
+      effort: "medium",
+    });
+  }
+
+  if (isPositiveAmount(level3Optimization.estimatedMonthlySavingsUsd)) {
+    savingsOpportunities.push({
+      title: "Enable Level 3 data pass-through",
+      detail:
+        level3Optimization.missingFields.length > 0
+          ? `Commercial-card volume was detected; missing Level 3 field signals: ${level3Optimization.missingFields.join(", ")}.`
+          : "Commercial-card volume was detected with required Level 3 field signals present.",
+      monthlySavingsUsd: level3Optimization.estimatedMonthlySavingsUsd,
+      annualSavingsUsd: level3Optimization.estimatedAnnualSavingsUsd ?? toMoney(level3Optimization.estimatedMonthlySavingsUsd * 12),
       effort: "medium",
     });
   }
@@ -912,6 +1029,7 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     downgradeAnalysis: structuredFacts.downgradeAnalysis,
     perItemFeeModel: structuredFacts.perItemFeeModel,
     guideMeasures,
+    level3Optimization,
     kpis,
     feeBreakdown,
     suspiciousFees,

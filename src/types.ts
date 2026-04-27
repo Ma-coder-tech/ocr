@@ -357,6 +357,20 @@ export type SavingsShareAdjustmentModel = {
   confidence: number;
 };
 
+export type Level3OptimizationModel = {
+  eligible: boolean;
+  confidence: number;
+  eligibleVolumeUsd: number | null;
+  rateDeltaBps: number | null;
+  requiredFields: string[];
+  capturedFields: string[];
+  missingFields: string[];
+  detectedSignals: string[];
+  estimatedMonthlySavingsUsd: number | null;
+  estimatedAnnualSavingsUsd: number | null;
+  evidence: string[];
+};
+
 export type GuideMeasureModel = {
   monthlyMinimum: MonthlyMinimumModel | null;
   expressFundingPremium: ExpressFundingPremiumModel | null;
@@ -467,6 +481,7 @@ export type AnalysisSummary = {
   downgradeAnalysis: DowngradeAnalysis;
   perItemFeeModel: PerItemFeeModel;
   guideMeasures: GuideMeasureModel;
+  level3Optimization: Level3OptimizationModel;
   kpis: KpiMetric[];
   feeBreakdown: FeeBreakdownRow[];
   suspiciousFees: SuspiciousFee[];
