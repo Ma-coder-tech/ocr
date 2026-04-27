@@ -19,6 +19,7 @@ import { refineTextOnlyPdfSummary } from "./pdfHeuristic.js";
 import { detectProcessorIdentity } from "./processorDetection.js";
 import { withFeeClassification } from "./feeClassification.js";
 import { extractStructuredStatementFacts, type StructuredStatementFacts } from "./statementSections.js";
+import { buildHiddenMarkupAudit } from "./hiddenMarkupAudit.js";
 
 type ColumnStats = {
   sum: number;
@@ -270,6 +271,7 @@ function createTextOnlyPdfSummary(
     status: "within",
     deltaFromUpperRate: 0,
   };
+  const hiddenMarkupAudit = buildHiddenMarkupAudit(structuredFacts.interchangeAuditRows);
 
   const textWarnings = doc.extraction.reasons.map((message): DataQualitySignal => ({ level: "warning", message }));
   const dataQuality: DataQualitySignal[] = [
@@ -323,6 +325,11 @@ function createTextOnlyPdfSummary(
     interchangeAuditRows: structuredFacts.interchangeAuditRows,
     blendedFeeSplits: structuredFacts.blendedFeeSplits,
     processorMarkupAudit,
+    hiddenMarkupAudit,
+    structuredFeeFindings: structuredFacts.structuredFeeFindings,
+    bundledPricing: structuredFacts.bundledPricing,
+    noticeFindings: structuredFacts.noticeFindings,
+    downgradeAnalysis: structuredFacts.downgradeAnalysis,
     perItemFeeModel: structuredFacts.perItemFeeModel,
     guideMeasures: structuredFacts.guideMeasures,
     kpis: [
@@ -440,6 +447,7 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
   }
 
   const processorMarkupAudit = createProcessorMarkupAudit(structuredFacts);
+  const hiddenMarkupAudit = buildHiddenMarkupAudit(structuredFacts.interchangeAuditRows);
   const structuredRollup = structuredFacts.economicRollup;
   let usedStructuredRollup = false;
   const structuredInterchangePaid = structuredFacts.interchangeAudit.totalPaid ?? 0;
@@ -897,6 +905,11 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     interchangeAuditRows: structuredFacts.interchangeAuditRows,
     blendedFeeSplits: structuredFacts.blendedFeeSplits,
     processorMarkupAudit,
+    hiddenMarkupAudit,
+    structuredFeeFindings: structuredFacts.structuredFeeFindings,
+    bundledPricing: structuredFacts.bundledPricing,
+    noticeFindings: structuredFacts.noticeFindings,
+    downgradeAnalysis: structuredFacts.downgradeAnalysis,
     perItemFeeModel: structuredFacts.perItemFeeModel,
     guideMeasures,
     kpis,

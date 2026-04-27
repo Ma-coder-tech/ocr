@@ -80,6 +80,16 @@ function makeSummary(
       effectiveRateBps: processorMarkupBps,
       confidence: processorMarkupBps === null ? 0 : 0.82,
     },
+    hiddenMarkupAudit: {
+      rows: [],
+      rowCount: 0,
+      matchedRowCount: 0,
+      flaggedRowCount: 0,
+      hiddenMarkupUsd: null,
+      hiddenMarkupBps: null,
+      status: "not_applicable" as const,
+      confidence: 0,
+    },
     perItemFeeModel: {
       transactionFee: null,
       authorizationFee: null,

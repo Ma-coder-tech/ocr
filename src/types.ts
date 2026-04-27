@@ -103,6 +103,82 @@ export type StatementEconomicRollup = {
   confidence: number;
 };
 
+export type StructuredFeeFindingKind =
+  | "pci_non_compliance"
+  | "non_emv"
+  | "risk_fee"
+  | "customer_intelligence_suite";
+
+export type StructuredFeeFinding = {
+  kind: StructuredFeeFindingKind;
+  label: string;
+  amountUsd: number | null;
+  ratePercent: number | null;
+  affectedVolumeUsd: number | null;
+  estimatedImpactUsd: number | null;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+};
+
+export type BundledPricingQualification = "qualified" | "mid_qualified" | "non_qualified" | "unknown";
+
+export type BundledPricingBucket = {
+  qualification: BundledPricingQualification;
+  label: string;
+  ratePercent: number | null;
+  volumeUsd: number | null;
+  transactionCount: number | null;
+  feeAmountUsd: number | null;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+};
+
+export type BundledPricingModel = {
+  active: boolean;
+  buckets: BundledPricingBucket[];
+  highestRatePercent: number | null;
+  totalVolumeUsd: number | null;
+  totalFeesUsd: number | null;
+  confidence: number;
+};
+
+export type NoticeFindingKind = "fee_change" | "online_only" | "acceptance_by_use" | "effective_date";
+
+export type NoticeFinding = {
+  kind: NoticeFindingKind;
+  effectiveDate: string | null;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+};
+
+export type DowngradeFindingRow = {
+  label: string;
+  indicators: string[];
+  transactionCount: number | null;
+  volumeUsd: number | null;
+  totalPaidUsd: number | null;
+  estimatedPenaltyLowUsd: number | null;
+  estimatedPenaltyHighUsd: number | null;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+};
+
+export type DowngradeAnalysis = {
+  rows: DowngradeFindingRow[];
+  affectedVolumeUsd: number | null;
+  estimatedPenaltyLowUsd: number | null;
+  estimatedPenaltyHighUsd: number | null;
+  confidence: number;
+};
+
 export type CardBrand = "Visa" | "Mastercard" | "Discover" | "AmEx" | "Unknown";
 
 export type InterchangeAuditRow = {
@@ -184,6 +260,50 @@ export type ProcessorMarkupAuditSummary = {
   totalPaid: number | null;
   weightedAverageRateBps: number | null;
   effectiveRateBps: number | null;
+  confidence: number;
+};
+
+export type HiddenMarkupAuditRowStatus = "pass" | "warning" | "unknown";
+
+export type InterchangeScheduleMatch = {
+  referenceId: string;
+  version: string;
+  brand: CardBrand;
+  descriptor: string;
+  rateBps: number;
+  perItemFee: number;
+  source: string;
+  confidence: number;
+};
+
+export type HiddenMarkupAuditRow = {
+  label: string;
+  cardBrand: CardBrand;
+  transactionCount: number | null;
+  volume: number | null;
+  actualTotalPaid: number | null;
+  expectedCardBrandCost: number | null;
+  expectedRateBps: number | null;
+  expectedPerItemFee: number | null;
+  embeddedMarkupUsd: number | null;
+  embeddedMarkupBps: number | null;
+  status: HiddenMarkupAuditRowStatus;
+  reason: string;
+  scheduleMatch: InterchangeScheduleMatch | null;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+};
+
+export type HiddenMarkupAuditSummary = {
+  rows: HiddenMarkupAuditRow[];
+  rowCount: number;
+  matchedRowCount: number;
+  flaggedRowCount: number;
+  hiddenMarkupUsd: number | null;
+  hiddenMarkupBps: number | null;
+  status: "pass" | "warning" | "unknown" | "not_applicable";
   confidence: number;
 };
 
@@ -340,6 +460,11 @@ export type AnalysisSummary = {
   interchangeAuditRows: InterchangeAuditRow[];
   blendedFeeSplits: BlendedFeeSplit[];
   processorMarkupAudit: ProcessorMarkupAuditSummary;
+  hiddenMarkupAudit: HiddenMarkupAuditSummary;
+  structuredFeeFindings: StructuredFeeFinding[];
+  bundledPricing: BundledPricingModel;
+  noticeFindings: NoticeFinding[];
+  downgradeAnalysis: DowngradeAnalysis;
   perItemFeeModel: PerItemFeeModel;
   guideMeasures: GuideMeasureModel;
   kpis: KpiMetric[];

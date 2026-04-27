@@ -2,7 +2,15 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ParsedDocument } from "./parser.js";
-import { AnalysisSummary, ChecklistBucket, ChecklistReport, ChecklistRuleResult, RuleStatus } from "./types.js";
+import {
+  AnalysisSummary,
+  ChecklistBucket,
+  ChecklistReport,
+  ChecklistRuleResult,
+  NoticeFindingKind,
+  RuleStatus,
+  StructuredFeeFindingKind,
+} from "./types.js";
 import { analyzeTwoBucketStatement } from "./twoBucketAnalysis.js";
 import { buildProcessorCorpus, detectProcessorIdentity } from "./processorDetection.js";
 
@@ -68,6 +76,9 @@ const UNIVERSAL_FAIL_ON_MATCH = new Set(["E023", "E024", "E033", "E064"]);
 const EXPRESS_FUNDING_SIGNAL = /express merchant funding|express funding|accelerated funding|faster funding/i;
 const MONTHLY_MINIMUM_SIGNAL = /monthly minimum|minimum discount|minimum markup/i;
 const SAVINGS_SHARE_SIGNAL = /commercial card interchange savings adjustment|interchange savings adjustment|savings adjustment/i;
+const INTERCHANGE_PRESENTATION_SIGNAL = /\b(interchange|program fees?|card[-\s]?brand|card[-\s]?network|pass[-\s]?through|wholesale)\b/i;
+const PROCESSOR_MARKUP_PRESENTATION_SIGNAL =
+  /\b(processor markup|service charges?|discount fees?|assessment markup|savings adjustment|markup)\b/i;
 
 function countStatuses(results: ChecklistRuleResult[]): Omit<ChecklistBucket, "results"> {
   const bucket = {
@@ -97,6 +108,155 @@ function firstEvidence(text: string, pattern: RegExp): string | null {
 
 function hasPositiveAmount(value: number | null | undefined): value is number {
   return value !== null && value !== undefined && value > 0;
+}
+
+function moneyEvidence(value: number | null | undefined): string {
+  return value === null || value === undefined ? "n/a" : `$${value.toFixed(2)}`;
+}
+
+function bpsEvidence(value: number | null | undefined): string {
+  return value === null || value === undefined ? "n/a" : `${value.toFixed(2)} bps`;
+}
+
+function percentEvidence(value: number | null | undefined): string {
+  return value === null || value === undefined ? "n/a" : `${value.toFixed(2)}%`;
+}
+
+function structuredFeeEvidence(summary: AnalysisSummary, kind: StructuredFeeFindingKind): string[] {
+  return (summary.structuredFeeFindings ?? [])
+    .filter((finding) => finding.kind === kind)
+    .slice(0, 5)
+    .map((finding) => {
+      const impact = finding.estimatedImpactUsd ?? finding.amountUsd;
+      return `${finding.label}: amount=${moneyEvidence(finding.amountUsd)}, rate=${percentEvidence(
+        finding.ratePercent,
+      )}, affectedVolume=${moneyEvidence(finding.affectedVolumeUsd)}, modeledImpact=${moneyEvidence(impact)}; ${finding.sourceSection}: ${
+        finding.evidenceLine
+      }`;
+    });
+}
+
+function hasNoticeSection(summary: AnalysisSummary): boolean {
+  return (summary.statementSections ?? []).some((section) => section.type === "notices");
+}
+
+function noticeEvidence(summary: AnalysisSummary, kinds: NoticeFindingKind[]): string[] {
+  const kindSet = new Set(kinds);
+  return (summary.noticeFindings ?? [])
+    .filter((finding) => kindSet.has(finding.kind))
+    .slice(0, 5)
+    .map((finding) =>
+      `${finding.kind}${finding.effectiveDate ? ` effective ${finding.effectiveDate}` : ""}; ${finding.sourceSection}: ${finding.evidenceLine}`,
+    );
+}
+
+function bundledPricingEvidence(summary: AnalysisSummary): string[] {
+  return (summary.bundledPricing?.buckets ?? [])
+    .slice(0, 6)
+    .map(
+      (bucket) =>
+        `${bucket.qualification}: rate=${percentEvidence(bucket.ratePercent)}, volume=${moneyEvidence(bucket.volumeUsd)}, fees=${moneyEvidence(
+          bucket.feeAmountUsd,
+        )}; ${bucket.sourceSection}: ${bucket.evidenceLine}`,
+    );
+}
+
+function downgradeEvidence(summary: AnalysisSummary): string[] {
+  return (summary.downgradeAnalysis?.rows ?? [])
+    .slice(0, 6)
+    .map(
+      (row) =>
+        `${row.label}: indicators=${row.indicators.join(", ")}, volume=${moneyEvidence(row.volumeUsd)}, penaltyRange=${moneyEvidence(
+          row.estimatedPenaltyLowUsd,
+        )}-${moneyEvidence(row.estimatedPenaltyHighUsd)}; ${row.sourceSection}: ${row.evidenceLine}`,
+    );
+}
+
+function hiddenMarkupAuditEvidence(summary: AnalysisSummary): string[] {
+  const evidence: string[] = [];
+
+  for (const row of (summary.hiddenMarkupAudit?.rows ?? []).filter((item) => item.status === "warning").slice(0, 5)) {
+    evidence.push(
+      `Schedule delta: ${row.label}: actual=${moneyEvidence(row.actualTotalPaid)}, expected=${moneyEvidence(
+        row.expectedCardBrandCost,
+      )}, embedded=${moneyEvidence(row.embeddedMarkupUsd)} (${bpsEvidence(row.embeddedMarkupBps)}); matched ${
+        row.scheduleMatch?.descriptor ?? "schedule"
+      } ${row.scheduleMatch?.version ?? ""}`,
+    );
+  }
+
+  const suspectInterchangeRows = (summary.interchangeAuditRows ?? summary.interchangeAudit?.rows ?? []).filter((row) =>
+    PROCESSOR_MARKUP_PRESENTATION_SIGNAL.test(`${row.label} ${row.sourceSection} ${row.evidenceLine}`),
+  );
+
+  for (const row of suspectInterchangeRows.slice(0, 5)) {
+    evidence.push(
+      `Interchange row carries processor-markup wording: ${row.label}: paid=${moneyEvidence(row.totalPaid ?? row.expectedTotalPaid)}, rate=${bpsEvidence(
+        row.rateBps,
+      )}; ${row.sourceSection}: ${row.evidenceLine}`,
+    );
+  }
+
+  for (const split of (summary.blendedFeeSplits ?? []).slice(0, 5)) {
+    const processorPaid = split.processorMarkup.totalPaid ?? split.processorMarkup.expectedTotalPaid;
+    const interchangePaid = split.interchange.totalPaid ?? split.interchange.expectedTotalPaid;
+    evidence.push(
+      `Blended presentation: ${split.label}: processor=${moneyEvidence(processorPaid)} (${bpsEvidence(
+        split.processorMarkup.rateBps,
+      )}), interchange=${moneyEvidence(interchangePaid)}; ${split.evidenceLine}`,
+    );
+  }
+
+  const savings = summary.guideMeasures?.savingsShareAdjustment;
+  if (savings) {
+    evidence.push(
+      `Interchange savings adjustment: retained=${moneyEvidence(savings.retainedSavingsUsd)}, share=${
+        savings.savingsSharePct === null ? "n/a" : `${savings.savingsSharePct.toFixed(2)}%`
+      }; ${savings.sourceSection}: ${savings.evidenceLine}`,
+    );
+  }
+
+  const embeddedProcessorRows = (summary.processorMarkupAudit?.rows ?? []).filter((row) => {
+    const sourceContext = `${row.sourceSection} ${row.evidenceLine}`;
+    if (!INTERCHANGE_PRESENTATION_SIGNAL.test(sourceContext)) return false;
+    return (
+      row.rateBps !== null ||
+      row.effectiveRateBps !== null ||
+      row.totalPaid !== null ||
+      row.expectedTotalPaid !== null ||
+      row.perItemFee !== null
+    );
+  });
+
+  for (const row of embeddedProcessorRows.slice(0, 5)) {
+    evidence.push(
+      `Processor markup inside interchange context: ${row.label}: paid=${moneyEvidence(row.totalPaid ?? row.expectedTotalPaid)}, rate=${bpsEvidence(
+        row.rateBps ?? row.effectiveRateBps,
+      )}; ${row.sourceSection}: ${row.evidenceLine}`,
+    );
+  }
+
+  return [...new Set(evidence)].slice(0, 8);
+}
+
+function hiddenMarkupSectionSignalEvidence(summary: AnalysisSummary): string[] {
+  return (summary.statementSections ?? [])
+    .filter((section) => {
+      const context = `${section.title} ${section.evidenceLines.join(" ")}`;
+      return INTERCHANGE_PRESENTATION_SIGNAL.test(context) && PROCESSOR_MARKUP_PRESENTATION_SIGNAL.test(context);
+    })
+    .slice(0, 5)
+    .map((section) => {
+      const firstSignal = section.evidenceLines.find((line) => PROCESSOR_MARKUP_PRESENTATION_SIGNAL.test(line)) ?? section.evidenceLines[0] ?? section.title;
+      return `${section.type}: ${section.title}: ${firstSignal}`;
+    });
+}
+
+function interchangeSectionEvidence(summary: AnalysisSummary): string[] {
+  return (summary.statementSections ?? [])
+    .filter((section) => section.type === "interchange_detail" || INTERCHANGE_PRESENTATION_SIGNAL.test(section.title))
+    .slice(0, 4)
+    .map((section) => `${section.type}: ${section.title}`);
 }
 
 function perItemModelEvidence(summary: AnalysisSummary): string[] {
@@ -543,6 +703,205 @@ function evaluateUniversalRule(
     };
   }
 
+  if (element.id === "E014") {
+    const evidence = noticeEvidence(summary, ["fee_change", "acceptance_by_use", "effective_date"]);
+    if (evidence.length > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason: "Fee-change, effective-date, or acceptance-by-use language was found inside a parsed statement notice section.",
+        evidence,
+      };
+    }
+    if (hasNoticeSection(summary)) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "pass",
+        reason: "Statement notice sections were parsed and no fee-change or acceptance-by-use notice was detected.",
+        evidence: (summary.statementSections ?? [])
+          .filter((section) => section.type === "notices")
+          .slice(0, 3)
+          .map((section) => `${section.type}: ${section.title}`),
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: "unknown",
+      reason: /effective|billing change|terms/i.test(text)
+        ? "Notice-related text was found, but it was not isolated into a statement notice section."
+        : "No parsed notice section was available for the fine-print scan.",
+      evidence: [],
+    };
+  }
+
+  if (element.id === "E015") {
+    const evidence = noticeEvidence(summary, ["online_only"]);
+    if (evidence.length > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason: "A parsed statement notice directs the merchant online for details, so fee-change details may be absent from the statement.",
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: hasNoticeSection(summary) ? "not_applicable" : /go online|website|online/i.test(text) ? "unknown" : "not_applicable",
+      reason: hasNoticeSection(summary)
+        ? "Parsed notice sections did not contain online-only fee-change disclosure language."
+        : /go online|website|online/i.test(text)
+          ? "Online/website language was found, but not inside a parsed statement notice section."
+          : "No online-only notice risk was detected in parsed statement sections.",
+      evidence: [],
+    };
+  }
+
+  if (element.id === "E023") {
+    const evidence = structuredFeeEvidence(summary, "pci_non_compliance");
+    if (evidence.length > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "fail",
+        reason: "A PCI non-compliance fee was found as a structured add-on/service fee, not just as generic text.",
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: /pci\s*non-?compliance|non-?compliance/i.test(text) ? "unknown" : "not_applicable",
+      reason: /pci\s*non-?compliance|non-?compliance/i.test(text)
+        ? "PCI/non-compliance text was found, but no section-backed fee row or amount was extracted."
+        : "No section-backed PCI non-compliance fee was found.",
+      evidence: [],
+    };
+  }
+
+  if (element.id === "E024" || element.id === "E033") {
+    const evidence = structuredFeeEvidence(summary, "non_emv");
+    if (evidence.length > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "fail",
+        reason: "A non-EMV penalty was found as a structured fee finding and any available rate/volume inputs were modeled.",
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: /non[\s-]?emv/i.test(text) ? "unknown" : "not_applicable",
+      reason: /non[\s-]?emv/i.test(text)
+        ? "Non-EMV text was found, but no section-backed fixed fee, markup rate, or affected-volume row was extracted."
+        : "No section-backed non-EMV penalty was found.",
+      evidence: [],
+    };
+  }
+
+  if (element.id === "E025") {
+    const evidence = structuredFeeEvidence(summary, "risk_fee");
+    if (evidence.length > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason: "A risk fee was found as a structured fee row; merchant risk fit still requires profile/chargeback context.",
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: /\brisk fee\b|portfolio risk|risk assessment|risk monitoring/i.test(text) ? "unknown" : "not_applicable",
+      reason: /\brisk fee\b|portfolio risk|risk assessment|risk monitoring/i.test(text)
+        ? "Risk-fee language was found, but no section-backed fee row or amount was extracted."
+        : "No section-backed risk fee was found.",
+      evidence: [],
+    };
+  }
+
+  if (element.id === "E031") {
+    const evidence = structuredFeeEvidence(summary, "customer_intelligence_suite");
+    if (evidence.length > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason: "Customer Intelligence Suite was found as a structured recurring/add-on fee candidate.",
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: /customer intelligence suite/i.test(text) ? "unknown" : "not_applicable",
+      reason: /customer intelligence suite/i.test(text)
+        ? "Customer Intelligence Suite text was found, but no section-backed add-on fee row was extracted."
+        : "No section-backed Customer Intelligence Suite fee was found.",
+      evidence: [],
+    };
+  }
+
+  if (element.id === "E038") {
+    const evidence = bundledPricingEvidence(summary);
+    if (summary.bundledPricing?.active) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason:
+          summary.bundledPricing.highestRatePercent !== null
+            ? `Bundled qualified/mid/non-qualified bucket structure was modeled from statement sections; highest captured rate is ${summary.bundledPricing.highestRatePercent.toFixed(2)}%.`
+            : "Bundled qualified/mid/non-qualified bucket structure was modeled from statement sections.",
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: /qualified|mid-?qualified|non-?qualified|bundl/i.test(text) ? "unknown" : "not_applicable",
+      reason: /qualified|mid-?qualified|non-?qualified|bundl/i.test(text)
+        ? "Tier-pricing language was found, but the statement was not parsed into bundled pricing buckets."
+        : "No bundled qualified/mid/non-qualified bucket structure was detected.",
+      evidence,
+    };
+  }
+
+  if (element.id === "E043") {
+    const evidence = downgradeEvidence(summary);
+    if (evidence.length > 0) {
+      const penalty =
+        summary.downgradeAnalysis.estimatedPenaltyLowUsd !== null && summary.downgradeAnalysis.estimatedPenaltyHighUsd !== null
+          ? ` Estimated penalty range: ${moneyEvidence(summary.downgradeAnalysis.estimatedPenaltyLowUsd)}-${moneyEvidence(
+              summary.downgradeAnalysis.estimatedPenaltyHighUsd,
+            )}.`
+          : "";
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason: `Downgrade indicators were found on structured interchange rows.${penalty}`,
+        evidence,
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: /eirf|non-?qualified|downgrade/i.test(text) ? "unknown" : "not_applicable",
+      reason: /eirf|non-?qualified|downgrade/i.test(text)
+        ? "Downgrade language was found, but not on a structured interchange row with volume/count evidence."
+        : "No section-backed downgrade rows were found.",
+      evidence: [],
+    };
+  }
+
   if (element.id === "E006") {
     if (summary.totalVolume > 0) {
       status = "pass";
@@ -790,6 +1149,128 @@ function evaluatePerItemProcessorRule(id: string, title: string, summary: Analys
   return null;
 }
 
+function evaluateStructuredSignalProcessorRule(id: string, title: string, summary: AnalysisSummary, text: string): ChecklistRuleResult | null {
+  const lower = title.toLowerCase();
+
+  if (lower.includes("pci")) {
+    const evidence = structuredFeeEvidence(summary, "pci_non_compliance");
+    if (evidence.length > 0) {
+      return {
+        id,
+        title,
+        status: "pass",
+        reason: "PCI non-compliance was detected from a structured fee row and can trigger the remediation workflow.",
+        evidence,
+      };
+    }
+    return {
+      id,
+      title,
+      status: /\bpci\b/i.test(text) ? "warning" : "not_applicable",
+      reason: /\bpci\b/i.test(text)
+        ? "PCI text was found, but no section-backed PCI non-compliance fee row was extracted."
+        : "No section-backed PCI non-compliance fee was found.",
+      evidence: [],
+    };
+  }
+
+  if (lower.includes("non-emv") || lower.includes("non emv")) {
+    const evidence = structuredFeeEvidence(summary, "non_emv");
+    if (evidence.length > 0) {
+      return {
+        id,
+        title,
+        status: "pass",
+        reason: "Non-EMV penalty mechanics were detected from structured fee sections.",
+        evidence,
+      };
+    }
+    return {
+      id,
+      title,
+      status: /non[\s-]?emv/i.test(text) ? "warning" : "not_applicable",
+      reason: /non[\s-]?emv/i.test(text)
+        ? "Non-EMV text was found, but no section-backed fee/rate/volume finding was extracted."
+        : "No section-backed non-EMV fee was found.",
+      evidence: [],
+    };
+  }
+
+  if (lower.includes("customer intelligence suite")) {
+    const evidence = structuredFeeEvidence(summary, "customer_intelligence_suite");
+    if (evidence.length > 0) {
+      return {
+        id,
+        title,
+        status: "pass",
+        reason: "Customer Intelligence Suite was detected from a structured add-on fee section.",
+        evidence,
+      };
+    }
+    return {
+      id,
+      title,
+      status: /customer intelligence suite/i.test(text) ? "warning" : "not_applicable",
+      reason: /customer intelligence suite/i.test(text)
+        ? "Customer Intelligence Suite text was found, but no section-backed add-on fee row was extracted."
+        : "No section-backed Customer Intelligence Suite fee was found.",
+      evidence: [],
+    };
+  }
+
+  if (lower.includes("eirf") || lower.includes("non-qualified") || lower.includes("downgrade")) {
+    const evidence = downgradeEvidence(summary);
+    if (evidence.length > 0) {
+      return {
+        id,
+        title,
+        status: "pass",
+        reason: "Downgrade indicators were detected on structured interchange rows with available impact modeling.",
+        evidence,
+      };
+    }
+    return {
+      id,
+      title,
+      status: /eirf|non-?qualified|downgrade/i.test(text) ? "warning" : "not_applicable",
+      reason: /eirf|non-?qualified|downgrade/i.test(text)
+        ? "Downgrade text was found, but not on a structured interchange row."
+        : "No section-backed downgrade indicators were found.",
+      evidence: [],
+    };
+  }
+
+  if (lower.includes("qualified") || lower.includes("bundled") || lower.includes("bundle")) {
+    const evidence = bundledPricingEvidence(summary);
+    if (summary.bundledPricing?.active) {
+      return {
+        id,
+        title,
+        status: "pass",
+        reason: "Bundled qualified/mid/non-qualified bucket presentation was modeled from statement sections.",
+        evidence,
+      };
+    }
+    return null;
+  }
+
+  if (lower.includes("repricing") || lower.includes("fine print") || lower.includes("effective") || lower.includes("notice")) {
+    const evidence = noticeEvidence(summary, ["fee_change", "online_only", "acceptance_by_use", "effective_date"]);
+    if (evidence.length > 0) {
+      return {
+        id,
+        title,
+        status: "pass",
+        reason: "Notice/fine-print language was detected inside parsed statement notice sections.",
+        evidence,
+      };
+    }
+    return null;
+  }
+
+  return null;
+}
+
 function evaluateProcessorRule(
   id: string,
   title: string,
@@ -840,6 +1321,9 @@ function evaluateProcessorRule(
 
   const perItemResult = evaluatePerItemProcessorRule(id, title, summary, text);
   if (perItemResult) return perItemResult;
+
+  const structuredSignalResult = evaluateStructuredSignalProcessorRule(id, title, summary, text);
+  if (structuredSignalResult) return structuredSignalResult;
 
   const pattern = processorPatternForCheck(title);
   if (!pattern) {
@@ -983,6 +1467,107 @@ function evaluateCrossChecks(doc: ParsedDocument, summary: AnalysisSummary, text
         title: check,
         status: "unknown",
         reason: "Requires structured numeric extraction and table-level parsing.",
+        evidence: [],
+      };
+    }
+
+    if (tag === "unnecessary_fees") {
+      const evidence = [
+        ...structuredFeeEvidence(summary, "pci_non_compliance"),
+        ...structuredFeeEvidence(summary, "non_emv"),
+        ...structuredFeeEvidence(summary, "risk_fee"),
+        ...structuredFeeEvidence(summary, "customer_intelligence_suite"),
+      ].slice(0, 8);
+      if (evidence.length > 0) {
+        return {
+          id,
+          title: check,
+          status: "warning",
+          reason: "Avoidable/add-on fee candidates were detected from structured fee sections.",
+          evidence,
+        };
+      }
+      return {
+        id,
+        title: check,
+        status: "pass",
+        reason: "No section-backed PCI, non-EMV, risk-fee, or unused-suite add-on candidates were found.",
+        evidence: [],
+      };
+    }
+
+    if (tag === "hidden_markup") {
+      const auditEvidence = hiddenMarkupAuditEvidence(summary);
+      if (auditEvidence.length > 0) {
+        return {
+          id,
+          title: check,
+          status: "warning",
+          reason:
+            "Processor-owned markup was detected inside an interchange/card-brand-style presentation and separated for review.",
+          evidence: auditEvidence,
+        };
+      }
+
+      if (summary.hiddenMarkupAudit?.status === "pass") {
+        return {
+          id,
+          title: check,
+          status: "pass",
+          reason: `All ${summary.hiddenMarkupAudit.matchedRowCount} structured interchange row${
+            summary.hiddenMarkupAudit.matchedRowCount === 1 ? "" : "s"
+          } matched trusted schedule references within tolerance.`,
+          evidence: summary.hiddenMarkupAudit.rows
+            .slice(0, 4)
+            .map((row) => `${row.label}: actual=${moneyEvidence(row.actualTotalPaid)}, expected=${moneyEvidence(row.expectedCardBrandCost)}`),
+        };
+      }
+
+      if (summary.hiddenMarkupAudit?.status === "unknown") {
+        return {
+          id,
+          title: check,
+          status: "unknown",
+          reason:
+            "Structured interchange rows were captured, but trusted card-brand schedule references were missing for one or more rows.",
+          evidence: summary.hiddenMarkupAudit.rows
+            .slice(0, 4)
+            .map((row) => `${row.label}: ${row.reason}`),
+        };
+      }
+
+      const sectionEvidence = hiddenMarkupSectionSignalEvidence(summary);
+      if (sectionEvidence.length > 0) {
+        return {
+          id,
+          title: check,
+          status: "unknown",
+          reason:
+            "Structured interchange sections contain processor-markup wording, but no row-level hidden-markup amount was captured.",
+          evidence: sectionEvidence,
+        };
+      }
+
+      const structuredInterchangeEvidence = interchangeSectionEvidence(summary);
+      if (structuredInterchangeEvidence.length > 0 || INTERCHANGE_PRESENTATION_SIGNAL.test(text)) {
+        return {
+          id,
+          title: check,
+          status: "unknown",
+          reason:
+            "Interchange/card-brand presentation was detected, but no row-level interchange rows were available for hidden-markup audit.",
+          evidence:
+            structuredInterchangeEvidence.length > 0
+              ? structuredInterchangeEvidence
+              : [`Matched unstructured interchange context: ${text.match(INTERCHANGE_PRESENTATION_SIGNAL)?.[0] ?? "interchange"}`],
+        };
+      }
+
+      return {
+        id,
+        title: check,
+        status: "not_applicable",
+        reason: "No interchange/card-brand presentation was detected in this statement.",
         evidence: [],
       };
     }

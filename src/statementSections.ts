@@ -1,12 +1,17 @@
 import type { ParsedDocument } from "./parser.js";
 import type {
   BlendedFeeSplit,
+  BundledPricingBucket,
+  BundledPricingModel,
   CardBrand,
+  DowngradeAnalysis,
+  DowngradeFindingRow,
   ExpressFundingPremiumModel,
   GuideMeasureModel,
   InterchangeAuditRow,
   InterchangeAuditSummary,
   MonthlyMinimumModel,
+  NoticeFinding,
   PerItemFeeComponent,
   PerItemFeeModel,
   ProcessorMarkupAuditRow,
@@ -16,6 +21,8 @@ import type {
   StatementEconomicRollup,
   StatementSection,
   StatementSectionType,
+  StructuredFeeFinding,
+  StructuredFeeFindingKind,
 } from "./types.js";
 
 export type StructuredStatementFacts = {
@@ -24,6 +31,10 @@ export type StructuredStatementFacts = {
   interchangeAuditRows: InterchangeAuditRow[];
   blendedFeeSplits: BlendedFeeSplit[];
   processorMarkupRows: ProcessorMarkupAuditRow[];
+  structuredFeeFindings: StructuredFeeFinding[];
+  bundledPricing: BundledPricingModel;
+  noticeFindings: NoticeFinding[];
+  downgradeAnalysis: DowngradeAnalysis;
   perItemFeeModel: PerItemFeeModel;
   guideMeasures: GuideMeasureModel;
   economicRollup: StatementEconomicRollup;
@@ -848,6 +859,272 @@ function buildGuideMeasureModel(
   };
 }
 
+function structuredFeeKindFromContext(context: string): StructuredFeeFindingKind | null {
+  if (/\bpci\b.*\b(non compliance|noncompliance)\b|\b(non compliance|noncompliance)\b.*\bpci\b/.test(context)) {
+    return "pci_non_compliance";
+  }
+  if (/\bnon emv\b|\bnonemv\b|\bnon chip\b|\bemv non compliance\b/.test(context)) return "non_emv";
+  if (/\brisk fee\b|\bportfolio risk\b|\brisk assessment\b|\brisk monitoring\b|\brisk adjustment\b/.test(context)) {
+    return "risk_fee";
+  }
+  if (/\bcustomer intelligence suite\b/.test(context)) return "customer_intelligence_suite";
+  return null;
+}
+
+function buildStructuredFeeFinding(
+  row: Record<string, string | number>,
+  rowIndex: number,
+  section: SectionContext,
+  evidenceLine: string,
+): StructuredFeeFinding | null {
+  if (!hasRecognizedSection(section)) return null;
+  if (section.type !== "add_on_fees" && section.type !== "processor_markup" && section.type !== "summary") return null;
+
+  const entries = entriesFor(row);
+  const context = normalize(rowContext(section, entries, evidenceLine));
+  const kind = structuredFeeKindFromContext(context);
+  if (!kind) return null;
+
+  const label = labelFromRecord(row, entries, evidenceLine);
+  const explicitAmountUsd =
+    numericAmountEntries(entries).find((entry) => {
+      const isRate = /rate|percent|pct|basis|bps/.test(entry.key) || /rate|percent|pct|basis|bps/.test(entry.dense);
+      const isVolume = /volume|sales|processed|affected/.test(entry.key) || /volume|sales|processed|affected/.test(entry.dense);
+      if (isRate || isVolume) return false;
+      return /amount|fee|charge|paid|total/.test(entry.key) || /amount|fee|charge|paid|total/.test(entry.dense);
+    })?.amount ??
+    amountFromLabeledCells(evidenceLine, (labelText) => {
+      if (/volume|sales|processed|affected|rate|percent|pct|basis|bps/.test(labelText)) return false;
+      return /amount|fee|charge|paid|total/.test(labelText);
+    });
+  const ratePercent =
+    percentFromEntries(entries, (key, dense) =>
+      /rate|percent|pct|extra markup|surcharge|non emv/.test(key) || /rate|percent|pct|extramarkup|surcharge|nonemv/.test(dense),
+    ) ?? percentFromEvidence(evidenceLine);
+  const affectedVolumeUsd =
+    amountFromEntries(entries, (key, dense) =>
+      /affected volume|non emv volume|qualifying volume|card not present volume|cnp volume|volume|sales/.test(key) ||
+      /affectedvolume|nonemvvolume|qualifyingvolume|cardnotpresentvolume|cnpvolume|volume|sales/.test(dense),
+    ) ??
+    amountFromLabeledCells(evidenceLine, (labelText) =>
+      /affected volume|non emv volume|qualifying volume|card not present volume|cnp volume|volume|sales/.test(labelText),
+    ) ??
+    amountNearPhrase(evidenceLine, [/affected volume/i, /non[-\s]?emv volume/i, /qualifying volume/i, /card[-\s]?not[-\s]?present volume/i]);
+  const fallbackAmountUsd = lastRowAmount(entries, evidenceLine);
+  const fallbackLooksLikeAffectedVolume =
+    kind === "non_emv" &&
+    fallbackAmountUsd !== null &&
+    affectedVolumeUsd !== null &&
+    Math.abs(fallbackAmountUsd - affectedVolumeUsd) <= 0.01;
+  const amountUsd = explicitAmountUsd ?? (fallbackLooksLikeAffectedVolume ? null : fallbackAmountUsd);
+
+  const estimatedImpactUsd =
+    kind === "non_emv" && ratePercent !== null && affectedVolumeUsd !== null
+      ? round2((affectedVolumeUsd * ratePercent) / 100 + (amountUsd ?? 0))
+      : amountUsd;
+  const capturedFields = [amountUsd, ratePercent, affectedVolumeUsd, estimatedImpactUsd].filter((value) => value !== null).length;
+
+  return {
+    kind,
+    label,
+    amountUsd,
+    ratePercent,
+    affectedVolumeUsd,
+    estimatedImpactUsd,
+    sourceSection: sourceSectionName(section, "Statement fee detail"),
+    evidenceLine,
+    rowIndex,
+    confidence: clamp(0.48 + capturedFields * 0.1 + (section.type === "add_on_fees" ? 0.12 : 0), 0.5, 0.94),
+  };
+}
+
+function qualificationFromContext(context: string): BundledPricingBucket["qualification"] {
+  if (/\bmid qualified\b|\bmidqualified\b|\bmid qual\b|\bmidqual\b/.test(context)) return "mid_qualified";
+  if (/\bnon qualified\b|\bnonqualified\b|\bnon qual\b|\bnonqual\b/.test(context)) return "non_qualified";
+  if (/\bqualified\b|\bqual\b/.test(context)) return "qualified";
+  return "unknown";
+}
+
+function countFromEntries(entries: FieldHit[]): number | null {
+  const hit = findNumericField(entries, (key, dense) =>
+    /\b(transaction|transactions|trans|txn|items|item count|count|qty|quantity|number)\b/.test(key) ||
+    /transactioncount|txncount|itemcount|quantity|number/.test(dense),
+  );
+  const amount = hit ? parseAmount(hit.value) : null;
+  return amount === null ? null : Math.round(amount);
+}
+
+function buildBundledPricingBucket(
+  row: Record<string, string | number>,
+  rowIndex: number,
+  section: SectionContext,
+  evidenceLine: string,
+): BundledPricingBucket | null {
+  if (!hasRecognizedSection(section) || section.type === "interchange_detail" || section.type === "notices") return null;
+
+  const entries = entriesFor(row);
+  const context = normalize(rowContext(section, entries, evidenceLine));
+  const qualification = qualificationFromContext(context);
+  if (qualification === "unknown") return null;
+
+  const rate =
+    percentFromEntries(entries, (key, dense) =>
+      /\b(rate|percent|pct|discount rate|qualified rate)\b/.test(key) || /discountrate|qualifiedrate|rate|percent|pct/.test(dense),
+    ) ?? percentFromEvidence(evidenceLine);
+  const volumeUsd =
+    amountFromEntries(entries, (key, dense) =>
+      /\b(volume|sales amount|sales volume|amount processed|processed amount|total sales)\b/.test(key) ||
+      /salesamount|salesvolume|amountprocessed|processedamount|totalsales/.test(dense),
+    ) ?? amountFromLabeledCells(evidenceLine, (labelText) => /\b(volume|sales amount|sales volume|amount processed|total sales)\b/.test(labelText));
+  const transactionCount = countFromEntries(entries);
+  const feeAmountUsd =
+    amountFromEntries(entries, (key, dense) => {
+      const isVolume = /volume|sales|processed/.test(key) || /volume|sales|processed/.test(dense);
+      const isRate = /rate|percent|pct|basis|bps/.test(key) || /rate|percent|pct|basis|bps/.test(dense);
+      const isCount = /count|qty|quantity|transaction|trans|txn|items|number/.test(key) || /count|qty|quantity|transaction|txn|items|number/.test(dense);
+      if (isVolume || isRate || isCount) return false;
+      return /\b(fee|fees|charge|amount due|paid|total)\b/.test(key) || /fee|charge|amountdue|paid|total/.test(dense);
+    }) ?? null;
+
+  if (rate === null && volumeUsd === null && feeAmountUsd === null) return null;
+
+  return {
+    qualification,
+    label: labelFromRecord(row, entries, evidenceLine),
+    ratePercent: rate,
+    volumeUsd,
+    transactionCount,
+    feeAmountUsd,
+    sourceSection: sourceSectionName(section, "Bundled pricing detail"),
+    evidenceLine,
+    rowIndex,
+    confidence: clamp(
+      0.42 +
+        (rate !== null ? 0.14 : 0) +
+        (volumeUsd !== null ? 0.12 : 0) +
+        (feeAmountUsd !== null ? 0.12 : 0) +
+        (section.type === "processor_markup" || section.type === "summary" ? 0.08 : 0),
+      0.45,
+      0.92,
+    ),
+  };
+}
+
+function buildBundledPricingModel(buckets: BundledPricingBucket[]): BundledPricingModel {
+  const seen = new Set<string>();
+  const deduped: BundledPricingBucket[] = [];
+  for (const bucket of buckets) {
+    const key = [bucket.qualification, bucket.ratePercent ?? "", bucket.volumeUsd ?? "", normalize(bucket.evidenceLine)].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(bucket);
+  }
+
+  const qualifications = new Set(deduped.map((bucket) => bucket.qualification));
+  const hasTierSpread = qualifications.has("qualified") && (qualifications.has("mid_qualified") || qualifications.has("non_qualified"));
+  const hasPenaltyTierWithRate = deduped.some(
+    (bucket) => (bucket.qualification === "mid_qualified" || bucket.qualification === "non_qualified") && bucket.ratePercent !== null,
+  );
+  const rates = deduped.map((bucket) => bucket.ratePercent).filter((value): value is number => value !== null);
+  const volumes = deduped.map((bucket) => bucket.volumeUsd).filter((value): value is number => value !== null);
+  const fees = deduped.map((bucket) => bucket.feeAmountUsd).filter((value): value is number => value !== null);
+  const active = deduped.length >= 2 && (hasTierSpread || hasPenaltyTierWithRate);
+
+  return {
+    active,
+    buckets: deduped,
+    highestRatePercent: rates.length > 0 ? round4(Math.max(...rates)) : null,
+    totalVolumeUsd: volumes.length > 0 ? round2(volumes.reduce((sum, value) => sum + value, 0)) : null,
+    totalFeesUsd: fees.length > 0 ? round2(fees.reduce((sum, value) => sum + value, 0)) : null,
+    confidence: deduped.length > 0 ? round2(deduped.reduce((sum, bucket) => sum + bucket.confidence, 0) / deduped.length) : 0,
+  };
+}
+
+function effectiveDateFromEvidence(evidenceLine: string): string | null {
+  const match =
+    evidenceLine.match(/\b(?:effective|beginning|starts?|as of)\s+([A-Z][a-z]+\.?\s+\d{1,2},?\s+\d{4}|[A-Z][a-z]+\.?\s+\d{1,2}|[A-Z][a-z]+\.?\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{2,4})/i) ??
+    evidenceLine.match(/\b(\d{1,2}\/\d{1,2}\/\d{2,4})\b/);
+  return match ? collapseWhitespace(match[1]) : null;
+}
+
+function buildNoticeFindings(rowIndex: number, section: SectionContext, evidenceLine: string): NoticeFinding[] {
+  if (section.type !== "notices") return [];
+  const normalized = normalize(`${section.title} ${evidenceLine}`);
+  const findings: NoticeFinding[] = [];
+  const effectiveDate = effectiveDateFromEvidence(evidenceLine);
+
+  const push = (kind: NoticeFinding["kind"], confidence: number) => {
+    findings.push({
+      kind,
+      effectiveDate,
+      sourceSection: sourceSectionName(section, "Statement notices"),
+      evidenceLine,
+      rowIndex,
+      confidence,
+    });
+  };
+
+  if (/billing change|fee change|pricing change|rate change|new fee|increase|adjustment|terms? change/.test(normalized)) {
+    push("fee_change", 0.82);
+  }
+  if (/go online|visit.*website|website.*details|online.*details|log in.*details/.test(normalized)) {
+    push("online_only", 0.84);
+  }
+  if (/continued use|use your account|accept these terms|acceptance|deemed accepted/.test(normalized)) {
+    push("acceptance_by_use", 0.82);
+  }
+  if (effectiveDate) {
+    push("effective_date", 0.78);
+  }
+
+  return findings;
+}
+
+function dedupeNoticeFindings(findings: NoticeFinding[]): NoticeFinding[] {
+  const seen = new Set<string>();
+  return findings.filter((finding) => {
+    const key = [finding.kind, finding.effectiveDate ?? "", normalize(finding.evidenceLine)].join("|");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function buildDowngradeAnalysis(rows: InterchangeAuditRow[]): DowngradeAnalysis {
+  const downgradeRows: DowngradeFindingRow[] = rows
+    .filter((row) => row.downgradeIndicators.length > 0)
+    .map((row) => {
+      const low = row.volume !== null ? round2(row.volume * 0.003) : null;
+      const high = row.volume !== null ? round2(row.volume * 0.004) : null;
+      return {
+        label: row.label,
+        indicators: row.downgradeIndicators,
+        transactionCount: row.transactionCount,
+        volumeUsd: row.volume,
+        totalPaidUsd: row.totalPaid ?? row.expectedTotalPaid,
+        estimatedPenaltyLowUsd: low,
+        estimatedPenaltyHighUsd: high,
+        sourceSection: row.sourceSection,
+        evidenceLine: row.evidenceLine,
+        rowIndex: row.rowIndex,
+        confidence: row.confidence,
+      };
+    });
+
+  const volumes = downgradeRows.map((row) => row.volumeUsd).filter((value): value is number => value !== null);
+  const lows = downgradeRows.map((row) => row.estimatedPenaltyLowUsd).filter((value): value is number => value !== null);
+  const highs = downgradeRows.map((row) => row.estimatedPenaltyHighUsd).filter((value): value is number => value !== null);
+
+  return {
+    rows: downgradeRows,
+    affectedVolumeUsd: volumes.length > 0 ? round2(volumes.reduce((sum, value) => sum + value, 0)) : null,
+    estimatedPenaltyLowUsd: lows.length > 0 ? round2(lows.reduce((sum, value) => sum + value, 0)) : null,
+    estimatedPenaltyHighUsd: highs.length > 0 ? round2(highs.reduce((sum, value) => sum + value, 0)) : null,
+    confidence:
+      downgradeRows.length > 0 ? round2(downgradeRows.reduce((sum, row) => sum + row.confidence, 0) / downgradeRows.length) : 0,
+  };
+}
+
 function hasExplicitInterchangeContext(section: SectionContext, entries: FieldHit[], evidenceLine: string): boolean {
   const keyContext = entries.map((entry) => normalize(entry.key)).join(" ");
   const explicitContext = normalize(`${section.title} ${evidenceLine} ${keyContext}`);
@@ -1404,6 +1681,9 @@ export function extractStructuredStatementFacts(
   const interchangeRows: InterchangeAuditRow[] = [];
   const blendedFeeSplits: BlendedFeeSplit[] = [];
   const processorMarkupRows: ProcessorMarkupAuditRow[] = [];
+  const structuredFeeFindings: StructuredFeeFinding[] = [];
+  const bundledPricingBuckets: BundledPricingBucket[] = [];
+  const noticeFindings: NoticeFinding[] = [];
   const perItemFeeComponents: PerItemFeeComponent[] = [];
   const monthlyMinimums: MonthlyMinimumModel[] = [];
   const expressFundingPremiums: ExpressFundingPremiumModel[] = [];
@@ -1442,6 +1722,18 @@ export function extractStructuredStatementFacts(
         : row;
 
     addEconomicFacts(economicAccumulator, mappedRow, rowIndex, currentSection, evidence);
+
+    const structuredFeeFinding = buildStructuredFeeFinding(mappedRow, rowIndex, currentSection, evidence);
+    if (structuredFeeFinding) {
+      structuredFeeFindings.push(structuredFeeFinding);
+    }
+
+    const bundledPricingBucket = buildBundledPricingBucket(mappedRow, rowIndex, currentSection, evidence);
+    if (bundledPricingBucket) {
+      bundledPricingBuckets.push(bundledPricingBucket);
+    }
+
+    noticeFindings.push(...buildNoticeFindings(rowIndex, currentSection, evidence));
 
     const perItemComponent = buildPerItemFeeComponent(mappedRow, rowIndex, currentSection, evidence);
     if (perItemComponent) {
@@ -1499,6 +1791,8 @@ export function extractStructuredStatementFacts(
     .filter((row): row is InterchangeAuditRow => row !== null);
   const dedupedRows = dedupeInterchangeRows([...interchangeRows, ...blendedInterchangeRows]);
   const interchangeAudit = buildInterchangeAudit(dedupedRows);
+  const bundledPricing = buildBundledPricingModel(bundledPricingBuckets);
+  const downgradeAnalysis = buildDowngradeAnalysis(dedupedRows);
   const perItemFeeModel = buildPerItemFeeModel(perItemFeeComponents);
   const guideMeasures = buildGuideMeasureModel(monthlyMinimums, expressFundingPremiums, savingsShareAdjustments);
   const economicRollup = buildEconomicRollup(
@@ -1515,6 +1809,10 @@ export function extractStructuredStatementFacts(
     interchangeAuditRows: dedupedRows,
     blendedFeeSplits,
     processorMarkupRows,
+    structuredFeeFindings,
+    bundledPricing,
+    noticeFindings: dedupeNoticeFindings(noticeFindings),
+    downgradeAnalysis,
     perItemFeeModel,
     guideMeasures,
     economicRollup,

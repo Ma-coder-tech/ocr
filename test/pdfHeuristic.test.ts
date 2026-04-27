@@ -47,6 +47,16 @@ function createBaseSummary(): AnalysisSummary {
       effectiveRateBps: null,
       confidence: 0,
     },
+    hiddenMarkupAudit: {
+      rows: [],
+      rowCount: 0,
+      matchedRowCount: 0,
+      flaggedRowCount: 0,
+      hiddenMarkupUsd: null,
+      hiddenMarkupBps: null,
+      status: "not_applicable",
+      confidence: 0,
+    },
     perItemFeeModel: {
       transactionFee: null,
       authorizationFee: null,
