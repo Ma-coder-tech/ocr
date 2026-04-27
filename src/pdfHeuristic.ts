@@ -67,6 +67,16 @@ function includesAny(input: string, terms: string[]): boolean {
   return terms.some((term) => lower.includes(term) || normalized.includes(normalizeForMatch(term)));
 }
 
+function isNoticeContext(input: string): boolean {
+  return /\b(notice|notices|terms|billing change|pricing change|fee change|rate change|acceptance)\b/i.test(input);
+}
+
+function isNoticeContinuationLine(input: string): boolean {
+  return /\b(effective|beginning|starts?|as of|increase|increased|increasing|billing change|pricing change|fee change|rate change|continued use|accept these terms|from\s+\$|to\s+\$)\b/i.test(
+    input,
+  );
+}
+
 function parseMoney(token: string): number | null {
   const normalized = token.replace(/^\((.*)\)$/, "-$1").replace(/[$,\s]/g, "").trim();
   if (!normalized) return null;
@@ -308,6 +318,7 @@ function collectCandidates(doc: ParsedDocument): Candidate[] {
     const moneyTokens = line.match(MONEY_RE) ?? [];
     const percentTokens = line.match(PERCENT_RE) ?? [];
     if (moneyTokens.length === 0) {
+      if (isNoticeContext(currentSection) && isNoticeContinuationLine(line)) continue;
       if (/[a-z]/i.test(line)) {
         const hint = cleanContextLine(line);
         if (hint.length >= 3 && hint.length <= 160 && !/page \d|merchant statement|customer service|attention/i.test(hint)) {
@@ -320,6 +331,7 @@ function collectCandidates(doc: ParsedDocument): Candidate[] {
       }
       continue;
     }
+    if (isNoticeContext(currentSection)) continue;
 
     const label = cleanLabel(line, moneyTokens, percentTokens);
     if (label.length < 3 || !/[a-z]/i.test(label)) continue;

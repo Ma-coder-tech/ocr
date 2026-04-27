@@ -157,6 +157,35 @@ export type NoticeFinding = {
   confidence: number;
 };
 
+export type RepricingEventKind = "fee_increase" | "new_fee" | "rate_increase";
+export type RepricingValueType = "money" | "percentage" | "basis_points";
+export type RepricingCadence = "monthly" | "annual" | "per_item" | "one_time" | "unknown";
+export type RepricingValueSource = "explicit" | "inferred";
+export type RepricingDisclosureStyle = "explicit_on_statement" | "online_only" | "acceptance_by_use" | "ambiguous";
+
+export type RepricingValue = {
+  value: number;
+  valueType: RepricingValueType;
+  cadence: RepricingCadence;
+  source: RepricingValueSource;
+};
+
+export type RepricingEvent = {
+  kind: RepricingEventKind;
+  feeLabel: string | null;
+  oldValue: RepricingValue | null;
+  newValue: RepricingValue | null;
+  deltaValue: RepricingValue | null;
+  effectiveDate: string | null;
+  disclosureStyle: RepricingDisclosureStyle;
+  sourceSection: string;
+  evidenceLine: string;
+  evidenceLines: string[];
+  rowStartIndex: number;
+  rowEndIndex: number;
+  confidence: number;
+};
+
 export type DowngradeFindingRow = {
   label: string;
   indicators: string[];
@@ -478,6 +507,7 @@ export type AnalysisSummary = {
   structuredFeeFindings: StructuredFeeFinding[];
   bundledPricing: BundledPricingModel;
   noticeFindings: NoticeFinding[];
+  repricingEvents?: RepricingEvent[];
   downgradeAnalysis: DowngradeAnalysis;
   perItemFeeModel: PerItemFeeModel;
   guideMeasures: GuideMeasureModel;

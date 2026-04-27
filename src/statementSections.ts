@@ -1,4 +1,8 @@
 import type { ParsedDocument } from "./parser.js";
+import {
+  extractRepricingEventsFromNoticeLines,
+  type RepricingNoticeLine,
+} from "./repricingNotices.js";
 import type {
   BlendedFeeSplit,
   BundledPricingBucket,
@@ -15,6 +19,7 @@ import type {
   PerItemFeeComponent,
   PerItemFeeModel,
   ProcessorMarkupAuditRow,
+  RepricingEvent,
   SavingsShareAdjustmentModel,
   StatementEconomicBucket,
   StatementEconomicFeeRow,
@@ -34,6 +39,7 @@ export type StructuredStatementFacts = {
   structuredFeeFindings: StructuredFeeFinding[];
   bundledPricing: BundledPricingModel;
   noticeFindings: NoticeFinding[];
+  repricingEvents: RepricingEvent[];
   downgradeAnalysis: DowngradeAnalysis;
   perItemFeeModel: PerItemFeeModel;
   guideMeasures: GuideMeasureModel;
@@ -224,6 +230,12 @@ function isAuditHeaderCells(cells: string[]): boolean {
   return score >= 3;
 }
 
+function isNoticeContinuationLine(line: string): boolean {
+  return /\b(effective|beginning|starts?|as of|increase|increased|increasing|billing change|pricing change|fee change|rate change|continued use|accept these terms|from\s+\$|to\s+\$)\b/i.test(
+    line,
+  );
+}
+
 function updateSection(
   sections: StatementSection[],
   current: SectionContext,
@@ -233,6 +245,9 @@ function updateSection(
 
   const sectionType = classifySectionTitle(line);
   if (sectionType === "unknown") return current;
+  if (current.type === "notices" && sectionType !== "notices" && isNoticeContinuationLine(line)) {
+    return current;
+  }
 
   const title = collapseWhitespace(line.replace(/[|:]+/g, " "));
   const existing = sections.find((section) => section.type === sectionType && section.title === title);
@@ -1684,6 +1699,7 @@ export function extractStructuredStatementFacts(
   const structuredFeeFindings: StructuredFeeFinding[] = [];
   const bundledPricingBuckets: BundledPricingBucket[] = [];
   const noticeFindings: NoticeFinding[] = [];
+  const repricingNoticeLines: RepricingNoticeLine[] = [];
   const perItemFeeComponents: PerItemFeeComponent[] = [];
   const monthlyMinimums: MonthlyMinimumModel[] = [];
   const expressFundingPremiums: ExpressFundingPremiumModel[] = [];
@@ -1734,6 +1750,13 @@ export function extractStructuredStatementFacts(
     }
 
     noticeFindings.push(...buildNoticeFindings(rowIndex, currentSection, evidence));
+    if (currentSection.type === "notices") {
+      repricingNoticeLines.push({
+        rowIndex,
+        sourceSection: sourceSectionName(currentSection, "Statement notices"),
+        evidenceLine: evidence,
+      });
+    }
 
     const perItemComponent = buildPerItemFeeComponent(mappedRow, rowIndex, currentSection, evidence);
     if (perItemComponent) {
@@ -1795,6 +1818,7 @@ export function extractStructuredStatementFacts(
   const downgradeAnalysis = buildDowngradeAnalysis(dedupedRows);
   const perItemFeeModel = buildPerItemFeeModel(perItemFeeComponents);
   const guideMeasures = buildGuideMeasureModel(monthlyMinimums, expressFundingPremiums, savingsShareAdjustments);
+  const repricingEvents = extractRepricingEventsFromNoticeLines(repricingNoticeLines);
   const economicRollup = buildEconomicRollup(
     economicAccumulator,
     interchangeAudit,
@@ -1812,6 +1836,7 @@ export function extractStructuredStatementFacts(
     structuredFeeFindings,
     bundledPricing,
     noticeFindings: dedupeNoticeFindings(noticeFindings),
+    repricingEvents,
     downgradeAnalysis,
     perItemFeeModel,
     guideMeasures,

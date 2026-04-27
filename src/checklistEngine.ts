@@ -8,6 +8,7 @@ import {
   ChecklistReport,
   ChecklistRuleResult,
   NoticeFindingKind,
+  RepricingValue,
   RuleStatus,
   StructuredFeeFindingKind,
 } from "./types.js";
@@ -123,6 +124,15 @@ function percentEvidence(value: number | null | undefined): string {
   return value === null || value === undefined ? "n/a" : `${value.toFixed(2)}%`;
 }
 
+function repricingValueEvidence(value: RepricingValue | null): string {
+  if (!value) return "n/a";
+  const prefix = value.source === "inferred" ? "inferred " : "";
+  const cadence = value.cadence === "unknown" ? "" : ` ${value.cadence}`;
+  if (value.valueType === "money") return `${prefix}${moneyEvidence(value.value)}${cadence}`;
+  if (value.valueType === "basis_points") return `${prefix}${value.value.toFixed(2)} bps${cadence}`;
+  return `${prefix}${value.value.toFixed(2)}%${cadence}`;
+}
+
 function structuredFeeEvidence(summary: AnalysisSummary, kind: StructuredFeeFindingKind): string[] {
   return (summary.structuredFeeFindings ?? [])
     .filter((finding) => finding.kind === kind)
@@ -149,6 +159,17 @@ function noticeEvidence(summary: AnalysisSummary, kinds: NoticeFindingKind[]): s
     .map((finding) =>
       `${finding.kind}${finding.effectiveDate ? ` effective ${finding.effectiveDate}` : ""}; ${finding.sourceSection}: ${finding.evidenceLine}`,
     );
+}
+
+function repricingEventEvidence(summary: AnalysisSummary): string[] {
+  return (summary.repricingEvents ?? []).slice(0, 5).map((event) => {
+    const label = event.feeLabel ?? event.kind.replace(/_/g, " ");
+    return `${label}: old=${repricingValueEvidence(event.oldValue)}, new=${repricingValueEvidence(
+      event.newValue,
+    )}, delta=${repricingValueEvidence(event.deltaValue)}${
+      event.effectiveDate ? `, effective ${event.effectiveDate}` : ""
+    }; ${event.sourceSection}: ${event.evidenceLine}`;
+  });
 }
 
 function bundledPricingEvidence(summary: AnalysisSummary): string[] {
@@ -761,6 +782,17 @@ function evaluateUniversalRule(
   }
 
   if (element.id === "E014") {
+    const repricingEvidence = repricingEventEvidence(summary);
+    if (repricingEvidence.length > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason: "Structured fee/rate repricing language was extracted from a parsed statement notice section.",
+        evidence: repricingEvidence,
+      };
+    }
+
     const evidence = noticeEvidence(summary, ["fee_change", "acceptance_by_use", "effective_date"]);
     if (evidence.length > 0) {
       return {
@@ -814,6 +846,38 @@ function evaluateUniversalRule(
         : /go online|website|online/i.test(text)
           ? "Online/website language was found, but not inside a parsed statement notice section."
           : "No online-only notice risk was detected in parsed statement sections.",
+      evidence: [],
+    };
+  }
+
+  if (element.id === "E041") {
+    const eventCount = summary.repricingEvents?.length ?? 0;
+    const evidence = repricingEventEvidence(summary);
+    if (evidence.length > 0) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "warning",
+        reason: `${eventCount} quantified fee/rate repricing event${eventCount === 1 ? "" : "s"} extracted from statement notice text.`,
+        evidence,
+      };
+    }
+    if (hasNoticeSection(summary)) {
+      return {
+        id: element.id,
+        title: element.name,
+        status: "not_applicable",
+        reason: "Parsed notice sections did not contain a quantified old/new fee, new-fee, or rate-increase event.",
+        evidence: [],
+      };
+    }
+    return {
+      id: element.id,
+      title: element.name,
+      status: /increase|new fee|pricing change|rate change|billing change/i.test(text) ? "unknown" : "not_applicable",
+      reason: /increase|new fee|pricing change|rate change|billing change/i.test(text)
+        ? "Repricing language was detected, but no parsed notice section was available for structured extraction."
+        : "No quantified fee-jump notice signal was detected.",
       evidence: [],
     };
   }
