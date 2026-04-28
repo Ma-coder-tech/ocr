@@ -66,14 +66,9 @@ const UNIVERSAL_KEYWORD_RULES: Record<string, RegExp[]> = {
   E033: [/non[\s-]?emv/i],
   E038: [/qualified/i, /mid-?qualified/i, /non-?qualified/i],
   E043: [/eirf/i, /non-?qualified/i],
-  E061: [/surcharge/i],
-  E062: [/cash discount/i],
-  E063: [/surcharge/i, /3%/i],
-  E064: [/surcharge/i, /debit/i],
-  E065: [/surcharge/i],
 };
 
-const UNIVERSAL_FAIL_ON_MATCH = new Set(["E023", "E024", "E033", "E064"]);
+const UNIVERSAL_FAIL_ON_MATCH = new Set(["E023", "E024", "E033"]);
 const EXPRESS_FUNDING_SIGNAL = /express merchant funding|express funding|accelerated funding|faster funding/i;
 const MONTHLY_MINIMUM_SIGNAL = /monthly minimum|minimum discount|minimum markup/i;
 const SAVINGS_SHARE_SIGNAL = /commercial card interchange savings adjustment|interchange savings adjustment|savings adjustment/i;
@@ -81,6 +76,30 @@ const INTERCHANGE_PRESENTATION_SIGNAL = /\b(interchange|program fees?|card[-\s]?
 const PROCESSOR_MARKUP_PRESENTATION_SIGNAL =
   /\b(processor markup|service charges?|discount fees?|assessment markup|savings adjustment|markup)\b/i;
 const DOWNGRADE_PRESENTATION_SIGNAL = /\beirf\b|non[\s-]?qualified|downgrad(?:e|ed|ing)\b/i;
+const SURCHARGE_TERM_SIGNAL = /\b(?:surcharge|surcharges|surcharged|surcharging|non[\s-]?cash adjustment)\b/i;
+const CASH_DISCOUNT_SIGNAL = /\bcash discount\b|\bdiscount for cash\b|\bcash price\b/i;
+const SURCHARGE_PROGRAM_CONTEXT_SIGNAL =
+  /\b(?:program|fee|rate|percent|appl(?:y|ies|ied)|charg(?:e|ed|es|ing)|assess(?:ed|es|ing)?|customer|receipt|configured|enabled|exclude[sd]?|excluding|include[sd]?|including|subject|eligible|credit card|non[\s-]?cash adjustment)\b|%/i;
+const SURCHARGE_PERCENT_SIGNAL = /(\d+(?:\.\d+)?)\s*%/g;
+const DEBIT_SURCHARGED_SIGNALS = [
+  /\b(?:debit|pin debit|signature debit)\b.{0,90}\b(?:subject to|charged|assessed|appl(?:y|ies|ied)|include[sd]?|including|eligible for)\b.{0,90}\b(?:surcharge|surcharges|surcharged|non[\s-]?cash adjustment)\b/i,
+  /\b(?:surcharge|surcharges|surcharged|non[\s-]?cash adjustment)\b.{0,90}\b(?:subject to|charged|assessed|appl(?:y|ies|ied)|include[sd]?|including|eligible for)\b.{0,90}\b(?:debit|pin debit|signature debit)\b/i,
+  /\b(?:debit|pin debit|signature debit)\s+surcharge(?:s|\s+fee)?\b/i,
+];
+const DEBIT_EXCLUDED_SIGNALS = [
+  /\b(?:debit|pin debit|signature debit)\b.{0,90}\b(?:excluded|excluding|not included|not eligible|not subject|not charged|no surcharge|cannot be surcharged|can't be surcharged|do(?:es)? not apply|not appl(?:y|ied)|never surcharge)\b/i,
+  /\b(?:surcharge|surcharges|surcharged|non[\s-]?cash adjustment)\b.{0,90}\b(?:excluded|excluding|not included|not eligible|not subject|not charged|does not apply|not appl(?:y|ied)|never)\b.{0,90}\b(?:debit|pin debit|signature debit)\b/i,
+  /\b(?:no|without)\s+(?:surcharge|surcharges|non[\s-]?cash adjustment)\b.{0,90}\b(?:debit|pin debit|signature debit)\b/i,
+  /\b(?:surcharge|surcharges|surcharged|non[\s-]?cash adjustment)\b.{0,90}\b(?:eligible\s+)?credit(?:\s+(?:card|transaction))?s?\s+only\b/i,
+];
+const DEBIT_CONTROL_SIGNAL =
+  /\b(?:bin|bank identification number|automated|automatic|terminal logic|card type detection|detect(?:ion)?|identify|identification|manual|manually|card label|staff)\b.{0,90}\b(?:debit|pin debit|signature debit)\b|\b(?:debit|pin debit|signature debit)\b.{0,90}\b(?:bin|bank identification number|automated|automatic|terminal logic|card type detection|detect(?:ion)?|identify|identification|manual|manually|card label|staff)\b/i;
+const AUTOMATED_DEBIT_CONTROL_SIGNAL =
+  /\b(?:bin|bank identification number|automated|automatic|terminal logic|card type detection)\b.{0,90}\b(?:debit|pin debit|signature debit)\b|\b(?:debit|pin debit|signature debit)\b.{0,90}\b(?:bin|bank identification number|automated|automatic|terminal logic|card type detection)\b/i;
+const MANUAL_DEBIT_CONTROL_SIGNAL =
+  /\b(?:manual|manually|card label|staff)\b.{0,90}\b(?:debit|pin debit|signature debit)\b|\b(?:debit|pin debit|signature debit)\b.{0,90}\b(?:manual|manually|card label|staff)\b/i;
+const SELECTIVE_SURCHARGE_SIGNAL =
+  /\b(?:surcharge|surcharges|surcharged|non[\s-]?cash adjustment)\b.{0,110}\b(?:only above|above \$|over \$|minimum purchase|threshold|selected customers|certain customers|selected transactions|certain transactions)\b|\b(?:only above|above \$|over \$|minimum purchase|threshold|selected customers|certain customers|selected transactions|certain transactions)\b.{0,110}\b(?:surcharge|surcharges|surcharged|non[\s-]?cash adjustment)\b/i;
 
 function countStatuses(results: ChecklistRuleResult[]): Omit<ChecklistBucket, "results"> {
   const bucket = {
@@ -106,6 +125,295 @@ function countStatuses(results: ChecklistRuleResult[]): Omit<ChecklistBucket, "r
 function firstEvidence(text: string, pattern: RegExp): string | null {
   const match = text.match(pattern);
   return match ? `Matched pattern: ${match[0]}` : null;
+}
+
+type SurchargePolicyEvidence = {
+  hasSurchargeProgram: boolean;
+  hasCashDiscountProgram: boolean;
+  surchargePercent: number | null;
+  surchargeEvidence: string[];
+  cashDiscountEvidence: string[];
+  surchargePercentEvidence: string[];
+  debitSurchargedEvidence: string[];
+  debitExcludedEvidence: string[];
+  debitControlEvidence: string[];
+  automatedDebitControlEvidence: string[];
+  manualDebitControlEvidence: string[];
+  selectiveSurchargeEvidence: string[];
+};
+
+function rowToPolicyText(row: Record<string, string | number>): string {
+  if (typeof row.content === "string" && row.content.trim().length > 0) {
+    return row.content;
+  }
+
+  return Object.entries(row)
+    .filter(([, value]) => value !== null && value !== undefined && String(value).trim().length > 0)
+    .map(([key, value]) => `${key} ${String(value)}`)
+    .join(" ");
+}
+
+function compactEvidence(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function addEvidence(target: string[], value: string, limit = 5): void {
+  const evidence = compactEvidence(value);
+  if (evidence.length === 0 || target.includes(evidence) || target.length >= limit) return;
+  target.push(evidence);
+}
+
+function surchargePolicyUnits(doc: ParsedDocument, fallbackText: string): string[] {
+  const rowUnits = doc.rows
+    .slice(0, 1500)
+    .map(rowToPolicyText)
+    .map(compactEvidence)
+    .filter((unit) => unit.length > 0);
+
+  if (rowUnits.length > 0) return rowUnits;
+
+  return fallbackText
+    .split(/\n+/)
+    .map(compactEvidence)
+    .filter((unit) => unit.length > 0 && unit.length <= 500);
+}
+
+function detectSurchargePolicyEvidence(doc: ParsedDocument, text: string): SurchargePolicyEvidence {
+  const result: SurchargePolicyEvidence = {
+    hasSurchargeProgram: false,
+    hasCashDiscountProgram: false,
+    surchargePercent: null,
+    surchargeEvidence: [],
+    cashDiscountEvidence: [],
+    surchargePercentEvidence: [],
+    debitSurchargedEvidence: [],
+    debitExcludedEvidence: [],
+    debitControlEvidence: [],
+    automatedDebitControlEvidence: [],
+    manualDebitControlEvidence: [],
+    selectiveSurchargeEvidence: [],
+  };
+
+  for (const unit of surchargePolicyUnits(doc, text)) {
+    const hasSurchargeTerm = SURCHARGE_TERM_SIGNAL.test(unit);
+    const hasSurchargeProgramSignal = hasSurchargeTerm && SURCHARGE_PROGRAM_CONTEXT_SIGNAL.test(unit);
+    const hasCashDiscountSignal = CASH_DISCOUNT_SIGNAL.test(unit);
+
+    if (hasSurchargeProgramSignal) {
+      result.hasSurchargeProgram = true;
+      addEvidence(result.surchargeEvidence, unit);
+      for (const match of unit.matchAll(SURCHARGE_PERCENT_SIGNAL)) {
+        const percent = Number.parseFloat(match[1]);
+        if (Number.isFinite(percent)) {
+          result.surchargePercent = result.surchargePercent === null ? percent : Math.max(result.surchargePercent, percent);
+          addEvidence(result.surchargePercentEvidence, unit);
+        }
+      }
+    }
+
+    if (hasCashDiscountSignal) {
+      result.hasCashDiscountProgram = true;
+      addEvidence(result.cashDiscountEvidence, unit);
+    }
+
+    if (!hasSurchargeTerm) {
+      continue;
+    }
+
+    if (SELECTIVE_SURCHARGE_SIGNAL.test(unit)) {
+      result.hasSurchargeProgram = true;
+      addEvidence(result.selectiveSurchargeEvidence, unit);
+      addEvidence(result.surchargeEvidence, unit);
+    }
+
+    const hasDebitExclusion = DEBIT_EXCLUDED_SIGNALS.some((pattern) => pattern.test(unit));
+    if (hasDebitExclusion) {
+      result.hasSurchargeProgram = true;
+      addEvidence(result.debitExcludedEvidence, unit);
+      addEvidence(result.surchargeEvidence, unit);
+    }
+
+    if (!hasDebitExclusion && DEBIT_SURCHARGED_SIGNALS.some((pattern) => pattern.test(unit))) {
+      result.hasSurchargeProgram = true;
+      addEvidence(result.debitSurchargedEvidence, unit);
+      addEvidence(result.surchargeEvidence, unit);
+    }
+
+    if (DEBIT_CONTROL_SIGNAL.test(unit)) {
+      result.hasSurchargeProgram = true;
+      addEvidence(result.debitControlEvidence, unit);
+      addEvidence(result.surchargeEvidence, unit);
+    }
+
+    if (AUTOMATED_DEBIT_CONTROL_SIGNAL.test(unit)) {
+      result.hasSurchargeProgram = true;
+      addEvidence(result.automatedDebitControlEvidence, unit);
+    }
+
+    if (MANUAL_DEBIT_CONTROL_SIGNAL.test(unit)) {
+      result.hasSurchargeProgram = true;
+      addEvidence(result.manualDebitControlEvidence, unit);
+    }
+  }
+
+  return result;
+}
+
+function evaluateUniversalSurchargeRule(
+  id: string,
+  title: string,
+  policy: SurchargePolicyEvidence,
+): ChecklistRuleResult | null {
+  if (id === "E061") {
+    if (!policy.hasSurchargeProgram) {
+      return {
+        id,
+        title,
+        status: "not_applicable",
+        reason: "No surcharge-program signal was detected in parsed statement rows.",
+        evidence: [],
+      };
+    }
+    return {
+      id,
+      title,
+      status: "warning",
+      reason: "Surcharge-program signal detected; verify that customer-facing fee handling matches the surcharge rulebook.",
+      evidence: policy.surchargeEvidence,
+    };
+  }
+
+  if (id === "E062") {
+    if (!policy.hasCashDiscountProgram) {
+      return {
+        id,
+        title,
+        status: "not_applicable",
+        reason: "No cash-discount program signal was detected in parsed statement rows.",
+        evidence: [],
+      };
+    }
+    return {
+      id,
+      title,
+      status: "warning",
+      reason: "Cash-discount program signal detected; verify signage, posted-price, and receipt treatment.",
+      evidence: policy.cashDiscountEvidence,
+    };
+  }
+
+  if (id === "E063") {
+    if (!policy.hasSurchargeProgram) {
+      return {
+        id,
+        title,
+        status: "not_applicable",
+        reason: "No surcharge-program signal was detected, so the surcharge-cap check is not applicable.",
+        evidence: [],
+      };
+    }
+    if (policy.surchargePercent === null) {
+      return {
+        id,
+        title,
+        status: "unknown",
+        reason: "Surcharge program detected, but no configured surcharge percentage was found in parsed statement rows.",
+        evidence: policy.surchargeEvidence,
+      };
+    }
+    if (policy.surchargePercent > 3) {
+      return {
+        id,
+        title,
+        status: "fail",
+        reason: `Detected surcharge percentage (${policy.surchargePercent.toFixed(2)}%) exceeds the max-3% source guidance.`,
+        evidence: policy.surchargePercentEvidence,
+      };
+    }
+    return {
+      id,
+      title,
+      status: "pass",
+      reason: `Detected surcharge percentage (${policy.surchargePercent.toFixed(2)}%) is at or below the max-3% source guidance.`,
+      evidence: policy.surchargePercentEvidence,
+    };
+  }
+
+  if (id === "E064") {
+    if (!policy.hasSurchargeProgram) {
+      return {
+        id,
+        title,
+        status: "not_applicable",
+        reason: "No surcharge-program signal was detected, so ordinary debit statement text is not a debit-surcharge violation.",
+        evidence: [],
+      };
+    }
+    if (policy.debitSurchargedEvidence.length > 0) {
+      return {
+        id,
+        title,
+        status: "fail",
+        reason: "Detected language indicating debit transactions are included in or charged by a surcharge program.",
+        evidence: policy.debitSurchargedEvidence,
+      };
+    }
+    if (policy.debitExcludedEvidence.length > 0) {
+      return {
+        id,
+        title,
+        status: "pass",
+        reason: "Surcharge program detected with language excluding debit transactions.",
+        evidence: policy.debitExcludedEvidence,
+      };
+    }
+    if (policy.debitControlEvidence.length > 0) {
+      return {
+        id,
+        title,
+        status: "warning",
+        reason: "Surcharge program detected with debit-handling controls, but debit exclusion was not explicit.",
+        evidence: policy.debitControlEvidence,
+      };
+    }
+    return {
+      id,
+      title,
+      status: "unknown",
+      reason: "Surcharge program detected, but parsed statement rows do not show whether debit transactions are excluded.",
+      evidence: policy.surchargeEvidence,
+    };
+  }
+
+  if (id === "E065") {
+    if (!policy.hasSurchargeProgram) {
+      return {
+        id,
+        title,
+        status: "not_applicable",
+        reason: "No surcharge-program signal was detected, so the uniform surcharge rule is not applicable.",
+        evidence: [],
+      };
+    }
+    if (policy.selectiveSurchargeEvidence.length > 0) {
+      return {
+        id,
+        title,
+        status: "warning",
+        reason: "Detected language suggesting surcharge may apply selectively rather than uniformly to eligible credit transactions.",
+        evidence: policy.selectiveSurchargeEvidence,
+      };
+    }
+    return {
+      id,
+      title,
+      status: "unknown",
+      reason: "Surcharge program detected, but parsed statement rows do not show enough policy detail to verify uniform application.",
+      evidence: policy.surchargeEvidence,
+    };
+  }
+
+  return null;
 }
 
 function hasPositiveAmount(value: number | null | undefined): value is number {
@@ -397,6 +705,7 @@ function evaluateUniversalRule(
   doc: ParsedDocument,
   summary: AnalysisSummary,
   text: string,
+  surchargePolicy: SurchargePolicyEvidence,
 ): ChecklistRuleResult {
   let status: RuleStatus = "unknown";
   let reason = "Automated evaluator for this rule is not fully implemented yet.";
@@ -1156,6 +1465,11 @@ function evaluateUniversalRule(
     return { id: element.id, title: element.name, status, reason, evidence };
   }
 
+  const surchargeResult = evaluateUniversalSurchargeRule(element.id, element.name, surchargePolicy);
+  if (surchargeResult) {
+    return surchargeResult;
+  }
+
   const patterns = UNIVERSAL_KEYWORD_RULES[element.id] ?? [];
   const anyMatched = patterns.some((p) => p.test(text));
 
@@ -1632,7 +1946,13 @@ function evaluateProcessorRule(
   };
 }
 
-function evaluateCrossChecks(doc: ParsedDocument, summary: AnalysisSummary, text: string, checks: string[]): ChecklistBucket {
+function evaluateCrossChecks(
+  doc: ParsedDocument,
+  summary: AnalysisSummary,
+  text: string,
+  checks: string[],
+  surchargePolicy: SurchargePolicyEvidence = detectSurchargePolicyEvidence(doc, text),
+): ChecklistBucket {
   const resolveCrossCheckTag = (check: string):
     | "net_effective_rate"
     | "fee_split"
@@ -1683,7 +2003,6 @@ function evaluateCrossChecks(doc: ParsedDocument, summary: AnalysisSummary, text
     return "unknown";
   };
 
-  const hasSurchargeContext = /surcharge|cash discount|debit/i.test(text);
   const results: ChecklistRuleResult[] = checks.map((check, index) => {
     const id = `X${String(index + 1).padStart(3, "0")}`;
     const tag = resolveCrossCheckTag(check);
@@ -1707,27 +2026,136 @@ function evaluateCrossChecks(doc: ParsedDocument, summary: AnalysisSummary, text
       };
     }
 
-    if (
-      tag === "surcharge_cap" ||
-      tag === "surcharge_debit_exclusion" ||
-      tag === "surcharge_uniformity" ||
-      tag === "debit_identification_controls"
-    ) {
-      if (hasSurchargeContext) {
+    if (tag === "surcharge_cap") {
+      if (!surchargePolicy.hasSurchargeProgram) {
         return {
           id,
           title: check,
-          status: "warning",
-          reason: "Policy-related keywords detected; compliance checks should be reviewed.",
-          evidence: ["Matched surcharge/cash/debit terminology"],
+          status: "not_applicable",
+          reason: "No surcharge-program signal detected in parsed statement rows.",
+          evidence: [],
+        };
+      }
+      if (surchargePolicy.surchargePercent === null) {
+        return {
+          id,
+          title: check,
+          status: "unknown",
+          reason: "Surcharge program detected, but no configured surcharge percentage was found in parsed statement rows.",
+          evidence: surchargePolicy.surchargeEvidence,
         };
       }
       return {
         id,
         title: check,
-        status: "not_applicable",
-        reason: "No surcharge/cash-discount context detected in this statement.",
-        evidence: [],
+        status: surchargePolicy.surchargePercent > 3 ? "fail" : "pass",
+        reason:
+          surchargePolicy.surchargePercent > 3
+            ? `Detected surcharge percentage (${surchargePolicy.surchargePercent.toFixed(2)}%) exceeds the max-3% source guidance.`
+            : `Detected surcharge percentage (${surchargePolicy.surchargePercent.toFixed(2)}%) is at or below the max-3% source guidance.`,
+        evidence: surchargePolicy.surchargePercentEvidence,
+      };
+    }
+
+    if (tag === "surcharge_debit_exclusion") {
+      if (!surchargePolicy.hasSurchargeProgram) {
+        return {
+          id,
+          title: check,
+          status: "not_applicable",
+          reason: "No surcharge-program signal detected in parsed statement rows.",
+          evidence: [],
+        };
+      }
+      if (surchargePolicy.debitSurchargedEvidence.length > 0) {
+        return {
+          id,
+          title: check,
+          status: "fail",
+          reason: "Detected language indicating debit transactions are included in or charged by a surcharge program.",
+          evidence: surchargePolicy.debitSurchargedEvidence,
+        };
+      }
+      if (surchargePolicy.debitExcludedEvidence.length > 0) {
+        return {
+          id,
+          title: check,
+          status: "pass",
+          reason: "Surcharge program detected with language excluding debit transactions.",
+          evidence: surchargePolicy.debitExcludedEvidence,
+        };
+      }
+      return {
+        id,
+        title: check,
+        status: "unknown",
+        reason: "Surcharge program detected, but parsed statement rows do not show whether debit transactions are excluded.",
+        evidence: surchargePolicy.surchargeEvidence,
+      };
+    }
+
+    if (tag === "surcharge_uniformity") {
+      if (!surchargePolicy.hasSurchargeProgram) {
+        return {
+          id,
+          title: check,
+          status: "not_applicable",
+          reason: "No surcharge-program signal detected in parsed statement rows.",
+          evidence: [],
+        };
+      }
+      if (surchargePolicy.selectiveSurchargeEvidence.length > 0) {
+        return {
+          id,
+          title: check,
+          status: "warning",
+          reason: "Detected language suggesting surcharge may apply selectively rather than uniformly to eligible credit transactions.",
+          evidence: surchargePolicy.selectiveSurchargeEvidence,
+        };
+      }
+      return {
+        id,
+        title: check,
+        status: "unknown",
+        reason: "Surcharge program detected, but parsed statement rows do not show enough policy detail to verify uniform application.",
+        evidence: surchargePolicy.surchargeEvidence,
+      };
+    }
+
+    if (tag === "debit_identification_controls") {
+      if (!surchargePolicy.hasSurchargeProgram) {
+        return {
+          id,
+          title: check,
+          status: "not_applicable",
+          reason: "No surcharge-program signal detected in parsed statement rows.",
+          evidence: [],
+        };
+      }
+      if (surchargePolicy.automatedDebitControlEvidence.length > 0) {
+        return {
+          id,
+          title: check,
+          status: "pass",
+          reason: "Surcharge program detected with automated debit-identification control language.",
+          evidence: surchargePolicy.automatedDebitControlEvidence,
+        };
+      }
+      if (surchargePolicy.manualDebitControlEvidence.length > 0) {
+        return {
+          id,
+          title: check,
+          status: "warning",
+          reason: "Surcharge program detected with manual debit-identification controls; BIN or terminal automation should be preferred.",
+          evidence: surchargePolicy.manualDebitControlEvidence,
+        };
+      }
+      return {
+        id,
+        title: check,
+        status: "warning",
+        reason: "Surcharge program detected, but robust debit-identification controls were not visible in parsed statement rows.",
+        evidence: surchargePolicy.surchargeEvidence,
       };
     }
 
@@ -1898,10 +2326,13 @@ async function loadChecklists(): Promise<LoadedChecklists> {
 export async function evaluateChecklistReport(doc: ParsedDocument, summary: AnalysisSummary): Promise<ChecklistReport> {
   const packs = await loadChecklists();
   const text = buildProcessorCorpus(doc);
+  const surchargePolicy = detectSurchargePolicyEvidence(doc, text);
 
   const processorDetection = detectProcessorIdentity(doc);
 
-  const universalResults = packs.universal.elements.map((element) => evaluateUniversalRule(element, doc, summary, text));
+  const universalResults = packs.universal.elements.map((element) =>
+    evaluateUniversalRule(element, doc, summary, text, surchargePolicy),
+  );
   const universal: ChecklistBucket = {
     ...countStatuses(universalResults),
     results: universalResults,
@@ -1930,7 +2361,7 @@ export async function evaluateChecklistReport(doc: ParsedDocument, summary: Anal
     skippedReason,
   };
 
-  const crossProcessor = evaluateCrossChecks(doc, summary, text, packs.processors.cross_processor_checks);
+  const crossProcessor = evaluateCrossChecks(doc, summary, text, packs.processors.cross_processor_checks, surchargePolicy);
 
   return {
     extractionMode: doc.extraction.mode,
