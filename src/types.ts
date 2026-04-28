@@ -484,6 +484,27 @@ export type ChecklistReport = {
   crossProcessor: ChecklistBucket;
 };
 
+export type PublicChecklistFindingStatus = Extract<RuleStatus, "fail" | "warning" | "unknown">;
+
+export type PublicChecklistFinding = Omit<Pick<ChecklistRuleResult, "title" | "status" | "reason" | "evidence">, "status"> & {
+  bucket: "universal" | "processorSpecific" | "crossProcessor";
+  status: PublicChecklistFindingStatus;
+};
+
+export type PublicChecklistReport = {
+  extractionMode: ChecklistReport["extractionMode"];
+  extractionQualityScore: number;
+  extractionReasons: string[];
+  processorName: string | null;
+  counts: {
+    total: number;
+    fail: number;
+    warning: number;
+    unknown: number;
+  };
+  findings: PublicChecklistFinding[];
+};
+
 export type AnalysisSummary = {
   businessType: BusinessTypeId;
   processorName: string;
@@ -541,7 +562,9 @@ export type PublicReportSummary = Pick<
   | "benchmark"
   | "confidence"
   | "dataQuality"
->;
+> & {
+  checklistReport?: PublicChecklistReport;
+};
 
 export type Job = {
   id: string;

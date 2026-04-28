@@ -42,11 +42,12 @@ import {
   setSessionCookie,
   verifyPassword,
 } from "./auth.js";
-import type { AnalysisSummary, BenchmarkStatus, Job, PublicReportSummary } from "./types.js";
+import type { AnalysisSummary, BenchmarkStatus, Job } from "./types.js";
 import { analyzeDocument } from "./analyzer.js";
 import { detectPeriodKeyFromFileName, formatPeriodKey, inferPeriodKeyFromText, parsePeriodKey, toPeriodLabel } from "./periods.js";
 import { parsePdf } from "./parser.js";
 import { detectPreflightFailure } from "./preflight.js";
+import { toPublicReportSummary } from "./publicReport.js";
 import { createJob, getJob, listEvents, pruneJobs } from "./store.js";
 import { enqueueJob, hydrateQueuedJobs } from "./worker.js";
 
@@ -84,25 +85,6 @@ type AuthenticatedContext = {
   businessType: string | null;
   devMode: boolean;
 };
-
-function toPublicReportSummary(summary?: AnalysisSummary): PublicReportSummary | undefined {
-  if (!summary) return undefined;
-  return {
-    businessType: summary.businessType,
-    processorName: summary.processorName,
-    sourceType: summary.sourceType,
-    statementPeriod: merchantPeriodLabel(summary.statementPeriod) ?? summary.statementPeriod,
-    executiveSummary: summary.executiveSummary,
-    totalVolume: summary.totalVolume,
-    totalFees: summary.totalFees,
-    estimatedMonthlyVolume: summary.estimatedMonthlyVolume,
-    estimatedMonthlyFees: summary.estimatedMonthlyFees,
-    effectiveRate: summary.effectiveRate,
-    benchmark: summary.benchmark,
-    confidence: summary.confidence,
-    dataQuality: summary.dataQuality,
-  };
-}
 
 function setSecurityHeaders(res: ServerResponse): void {
   res.setHeader("X-Content-Type-Options", "nosniff");

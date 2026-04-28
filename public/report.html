@@ -641,6 +641,85 @@
         gap: 10px;
       }
 
+      .audit-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .audit-count {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--muted);
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+
+      .audit-count strong {
+        color: var(--ink);
+      }
+
+      .audit-list {
+        display: grid;
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .audit-item {
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .audit-item-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .audit-title {
+        margin: 0;
+        font-size: 1rem;
+      }
+
+      .audit-bucket {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 0.84rem;
+        font-weight: 700;
+      }
+
+      .audit-reason {
+        margin: 12px 0 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .audit-evidence {
+        display: grid;
+        gap: 8px;
+        margin: 12px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .audit-evidence li {
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(23, 34, 49, 0.04);
+        color: var(--ink);
+        line-height: 1.45;
+      }
+
       .quality-note {
         border-radius: 18px;
         justify-content: flex-start;
@@ -726,8 +805,8 @@
         <div class="state-head">
           <div>
             <div class="eyebrow">We hit a problem</div>
-            <h1 class="state-title">We couldn’t finish this statement read.</h1>
-            <p class="state-copy">Your upload worked, but we couldn’t produce a trustworthy result from this file.</p>
+            <h1 id="errorTitle" class="state-title">We couldn’t finish this statement read.</h1>
+            <p id="errorCopy" class="state-copy">Your upload worked, but we couldn’t produce a trustworthy result from this file.</p>
           </div>
           <a class="ghost-btn" href="/">Try another statement</a>
         </div>
@@ -805,10 +884,23 @@
       const progressFill = document.getElementById("progressFill");
       const stageList = document.getElementById("stageList");
       const errorText = document.getElementById("errorText");
+      const errorTitle = document.getElementById("errorTitle");
+      const errorCopy = document.getElementById("errorCopy");
       const stepper = document.getElementById("stepper");
       const topSignInLink = document.getElementById("topSignInLink");
       const topSignUpLink = document.getElementById("topSignUpLink");
-      const jobId = window.location.pathname.split("/").filter(Boolean).pop();
+
+      function readReportJobId() {
+        const params = new URLSearchParams(window.location.search);
+        const queryJob = String(params.get("job") || "").trim();
+        if (queryJob) return queryJob;
+
+        const parts = window.location.pathname.split("/").filter(Boolean);
+        const reportIndex = parts.lastIndexOf("report");
+        return reportIndex >= 0 && parts[reportIndex + 1] ? decodeURIComponent(parts[reportIndex + 1]) : "";
+      }
+
+      const jobId = readReportJobId();
       const signInHref = jobId ? `/signin?job=${encodeURIComponent(jobId)}` : "/signin";
       const signUpHref = jobId ? `/signup?job=${encodeURIComponent(jobId)}` : "/signup";
 
@@ -1025,12 +1117,18 @@
         stageList.innerHTML = stageMarkup(job);
       }
 
-      function renderError(message) {
+      function renderError(
+        message,
+        title = "We couldn’t finish this statement read.",
+        copy = "Your upload worked, but we couldn’t produce a trustworthy result from this file.",
+      ) {
         renderStepper("loading");
         loadingState.classList.add("hidden");
         reportState.classList.remove("visible");
         reportState.innerHTML = "";
         errorState.classList.remove("hidden");
+        errorTitle.textContent = title;
+        errorCopy.textContent = copy;
         errorText.textContent = message || "Unknown processing error.";
       }
 
@@ -1064,6 +1162,79 @@
               )
               .join("")}
           </div>
+        `;
+      }
+
+      function checklistBucketLabel(bucket) {
+        if (bucket === "processorSpecific") return "Processor-specific check";
+        if (bucket === "crossProcessor") return "Cross-processor check";
+        return "Universal check";
+      }
+
+      function checklistStatusLabel(status) {
+        if (status === "fail") return "Needs attention";
+        if (status === "warning") return "Warning";
+        if (status === "unknown") return "Needs review";
+        return "Info";
+      }
+
+      function checklistStatusTone(status) {
+        if (status === "fail") return "danger";
+        if (status === "warning") return "warn";
+        return "info";
+      }
+
+      function renderChecklistReport(summary) {
+        const report = summary?.checklistReport;
+        if (!report) return "";
+        const findings = Array.isArray(report.findings) ? report.findings : [];
+        const counts = report.counts || {};
+        const processorCopy = report.processorName
+          ? `Processor rules matched ${escapeHtml(report.processorName)}.`
+          : "Processor-specific rules were limited because the processor was not confidently identified.";
+
+        return `
+          <section class="panel card">
+            <div class="section-kicker eyebrow">Audit findings</div>
+            <h2 class="card-title">Checklist items that need review</h2>
+            <p class="card-copy">${processorCopy}</p>
+            <div class="audit-summary">
+              <div class="audit-count"><strong>${Number(counts.fail || 0)}</strong> failed</div>
+              <div class="audit-count"><strong>${Number(counts.warning || 0)}</strong> warnings</div>
+              <div class="audit-count"><strong>${Number(counts.unknown || 0)}</strong> need review</div>
+              <div class="audit-count"><strong>${Number(counts.total || 0)}</strong> checks run</div>
+            </div>
+            ${
+              findings.length
+                ? `<div class="audit-list">
+                    ${findings
+                      .map((finding) => {
+                        const evidence = Array.isArray(finding.evidence) ? finding.evidence.slice(0, 3) : [];
+                        return `
+                          <article class="audit-item">
+                            <div class="audit-item-head">
+                              <div>
+                                <h3 class="audit-title">${escapeHtml(finding.title)}</h3>
+                                <div class="audit-bucket">${escapeHtml(checklistBucketLabel(finding.bucket))}</div>
+                              </div>
+                              <span class="status-chip ${checklistStatusTone(finding.status)}">${escapeHtml(checklistStatusLabel(finding.status))}</span>
+                            </div>
+                            <p class="audit-reason">${escapeHtml(finding.reason)}</p>
+                            ${
+                              evidence.length
+                                ? `<ul class="audit-evidence">
+                                    ${evidence.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+                                  </ul>`
+                                : ""
+                            }
+                          </article>
+                        `;
+                      })
+                      .join("")}
+                  </div>`
+                : `<div class="quality-note info" style="margin-top: 18px;">No failed or warning checklist items were found in this public scan.</div>`
+            }
+          </section>
         `;
       }
 
@@ -1121,6 +1292,8 @@
             <p class="card-copy">We compare your effective rate to the normal range for ${escapeHtml(businessType.label)} businesses.</p>
             ${benchmarkBar(summary, businessType, tone)}
           </section>
+
+          ${renderChecklistReport(summary)}
 
           <section class="panel locked-panel">
             <div class="locked-shell">
@@ -1182,7 +1355,11 @@
       }
 
       if (!jobId) {
-        renderError("Missing report ID.");
+        renderError(
+          "Missing report ID.",
+          "Open this report from the app.",
+          "This page needs a report ID from a completed upload. Start from the upload page, or open the report through the local server URL after analysis finishes.",
+        );
       } else {
         updateAuthLinks();
         pollJob();
