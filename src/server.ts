@@ -885,6 +885,7 @@ async function handleDashboardReportData(res: ServerResponse, merchant: Authenti
     json(res, 404, { error: "No saved statement was found for this account yet." });
     return;
   }
+  const publicSummary = toPublicReportSummary(statement1.analysisSummary);
 
   json(res, 200, {
     merchant: {
@@ -905,6 +906,7 @@ async function handleDashboardReportData(res: ServerResponse, merchant: Authenti
       benchmarkLow: statement1.benchmarkLow,
       benchmarkHigh: statement1.benchmarkHigh,
       summary: statement1.analysisSummary,
+      checklistReport: publicSummary?.checklistReport,
     },
   });
 }

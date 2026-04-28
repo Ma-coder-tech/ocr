@@ -45,13 +45,6 @@
         `;
       }
 
-      function normalizeFeeLabel(value) {
-        return String(value ?? "")
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, " ")
-          .trim();
-      }
-
       function displayFeeLabel(value) {
         const specialWords = {
           amex: "Amex",
@@ -74,32 +67,11 @@
       }
 
       function buildFeeRows(summary) {
-        const suspiciousLabels = new Set(
-          (Array.isArray(summary?.suspiciousFees) ? summary.suspiciousFees : []).map((item) => normalizeFeeLabel(item.label)),
-        );
-
-        return (Array.isArray(summary?.feeBreakdown) ? summary.feeBreakdown : []).map((row) => {
-          const feeType = row.broadType || "Unknown";
-          const isServiceOrCompliance = feeType === "Service / compliance";
-          const isUnknown = feeType === "Unknown";
-          const isAboveTypical = !isServiceOrCompliance && !isUnknown && suspiciousLabels.has(normalizeFeeLabel(row.label));
-          const status = isUnknown
-            ? "Needs statement review"
-            : isServiceOrCompliance
-              ? "Review — ask your processor"
-              : isAboveTypical
-                ? "Above typical for your industry"
-                : "Normal";
-          const statusTone = isUnknown || isServiceOrCompliance ? "info" : isAboveTypical ? "warn" : "good";
-
-          return {
-            feeName: displayFeeLabel(row.label),
-            amount: Number(row.amount || 0),
-            feeType,
-            status,
-            statusTone,
-          };
-        });
+        return (Array.isArray(summary?.feeBreakdown) ? summary.feeBreakdown : []).map((row) => ({
+          feeName: displayFeeLabel(row.label),
+          amount: Number(row.amount || 0),
+          feeType: row.broadType || "Unknown",
+        }));
       }
 
       function feeBreakdownTable(rows) {
@@ -114,7 +86,6 @@
                 <th>Fee name</th>
                 <th>Amount</th>
                 <th>Fee type</th>
-                <th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -125,7 +96,6 @@
                       <td>${escapeHtml(row.feeName)}</td>
                       <td>${formatMoney(row.amount)}</td>
                       <td>${escapeHtml(row.feeType)}</td>
-                      <td><span class="verdict-pill ${row.statusTone}">${escapeHtml(row.status)}</span></td>
                     </tr>
                   `,
                 )
@@ -205,41 +175,88 @@
         `;
       }
 
-      function watchCopy(row, businessType) {
-        if (row.feeType === "Unknown") {
-          return `${row.feeName} (${formatMoney(row.amount)}) — this row needs statement review before we label it. Ask your processor for the section it belongs to and a line-item fee schedule.`;
-        }
-
-        if (row.feeType === "Service / compliance") {
-          return `${row.feeName} (${formatMoney(row.amount)}) — this should be explained and tied to a service or compliance requirement. Ask whether it can be removed or remediated.`;
-        }
-
-        if (row.feeType === "Pass-through") {
-          return `${row.feeName} (${formatMoney(row.amount)}) — this looks high for a ${businessType.toLowerCase()} business. Ask your processor to show how it was calculated and whether your card mix is pushing it up.`;
-        }
-
-        return `${row.feeName} (${formatMoney(row.amount)}) — this looks high for a ${businessType.toLowerCase()} business. Ask your processor whether the markup can be reduced or moved to a simpler pricing plan.`;
+      function checklistBucketLabel(bucket) {
+        if (bucket === "processorSpecific") return "Processor-specific check";
+        if (bucket === "crossProcessor") return "Cross-processor check";
+        return "Universal check";
       }
 
-      function watchList(rows, businessType) {
-        const flagged = rows.filter((row) => row.status !== "Normal");
-        if (!flagged.length) {
-          return `<p class="body-copy">Everything on this statement looks normal for a ${escapeHtml(String(businessType).toLowerCase())} business.</p>`;
+      function checklistStatusLabel(status) {
+        if (status === "fail") return "Needs attention";
+        if (status === "warning") return "Warning";
+        if (status === "unknown") return "Needs review";
+        return "Info";
+      }
+
+      function checklistStatusTone(status) {
+        if (status === "fail") return "danger";
+        if (status === "warning") return "warn";
+        return "info";
+      }
+
+      function checklistCount(counts, key) {
+        const value = Number(counts?.[key]);
+        return Number.isFinite(value) ? value : 0;
+      }
+
+      function renderChecklistReport(report) {
+        if (!report) {
+          return `
+            <section class="summary-card" style="margin-top: 20px;">
+              <span class="kicker">Audit findings</span>
+              <p class="body-copy">Checklist findings are not available for this saved statement yet.</p>
+            </section>
+          `;
         }
 
+        const counts = report.counts || {};
+        const findings = Array.isArray(report.findings) ? report.findings : [];
+        const processorCopy = report.processorName
+          ? `Processor rules matched ${escapeHtml(report.processorName)}.`
+          : "Processor-specific checks were limited because the processor was not confidently identified.";
+
         return `
-          <ul class="simple-list">
-            ${flagged
-              .map(
-                (row) => `
-                  <li>
-                    <span class="dot-mark">•</span>
-                    <span>${escapeHtml(watchCopy(row, businessType))}</span>
-                  </li>
-                `,
-              )
-              .join("")}
-          </ul>
+          <section class="summary-card" style="margin-top: 20px;">
+            <span class="kicker">Audit findings</span>
+            <h2>Checklist items that need review</h2>
+            <p class="body-copy">${processorCopy}</p>
+            <div class="audit-summary">
+              <div class="audit-count"><strong>${checklistCount(counts, "fail")}</strong> failed</div>
+              <div class="audit-count"><strong>${checklistCount(counts, "warning")}</strong> warnings</div>
+              <div class="audit-count"><strong>${checklistCount(counts, "unknown")}</strong> need review</div>
+              <div class="audit-count"><strong>${checklistCount(counts, "total")}</strong> checks run</div>
+            </div>
+            ${
+              findings.length
+                ? `<div class="audit-list">
+                    ${findings
+                      .map((finding) => {
+                        const evidence = Array.isArray(finding.evidence) ? finding.evidence.slice(0, 3) : [];
+                        return `
+                          <article class="audit-item">
+                            <div class="audit-item-head">
+                              <div>
+                                <h3 class="audit-title">${escapeHtml(finding.title)}</h3>
+                                <div class="audit-bucket">${escapeHtml(checklistBucketLabel(finding.bucket))}</div>
+                              </div>
+                              <span class="verdict-pill ${checklistStatusTone(finding.status)}">${escapeHtml(checklistStatusLabel(finding.status))}</span>
+                            </div>
+                            <p class="audit-reason">${escapeHtml(finding.reason)}</p>
+                            ${
+                              evidence.length
+                                ? `<ul class="audit-evidence">
+                                    ${evidence.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+                                  </ul>`
+                                : ""
+                            }
+                          </article>
+                        `;
+                      })
+                      .join("")}
+                  </div>`
+                : `<p class="body-copy">No checklist findings need attention on this statement.</p>`
+            }
+          </section>
         `;
       }
 
@@ -250,6 +267,7 @@
           const merchant = data.merchant;
           const statement = data.statement;
           const summary = statement.summary || {};
+          const checklistReport = statement.checklistReport;
           const verdictClass = verdictTone(statement.benchmarkVerdict);
           const feeRows = buildFeeRows(summary);
           const interchangeRows = buildInterchangeRows(summary);
@@ -314,10 +332,7 @@
               ${interchangeAuditTable(interchangeRows)}
             </section>
 
-            <section class="summary-card" style="margin-top: 20px;">
-              <span class="kicker">What to watch</span>
-              ${watchList(feeRows, statement.businessType)}
-            </section>
+            ${renderChecklistReport(checklistReport)}
           `;
         } catch (error) {
           page.innerHTML = `<div class="form-error">${escapeHtml(error instanceof Error ? error.message : "Unable to load your report.")}</div>`;
