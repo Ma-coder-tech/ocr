@@ -323,7 +323,8 @@ label {
 
 input[type="text"],
 input[type="email"],
-input[type="password"] {
+input[type="password"],
+select {
   width: 100%;
   padding: 14px 15px;
   border-radius: 16px;
@@ -332,7 +333,8 @@ input[type="password"] {
   color: var(--text);
 }
 
-input:focus {
+input:focus,
+select:focus {
   outline: 2px solid rgba(46, 102, 255, 0.16);
   border-color: rgba(46, 102, 255, 0.3);
 }
@@ -539,12 +541,35 @@ input:focus {
 .button-row,
 .reference-head,
 .meta-row,
-.card-head {
+.card-head,
+.library-head,
+.library-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.library-head {
+  align-items: flex-start;
+}
+
+.library-head > div:first-child {
+  max-width: 720px;
+}
+
+.library-actions {
+  justify-content: flex-end;
+}
+
+.library-stats,
+.statement-library-section {
+  margin-top: 20px;
+}
+
+.library-stats {
+  margin-top: 24px;
 }
 
 .tone-pill,
@@ -599,6 +624,16 @@ input:focus {
 .link-btn {
   padding: 13px 18px;
   font-weight: 800;
+}
+
+.compact-btn {
+  padding: 9px 13px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.stacked-action {
+  margin-top: 10px;
 }
 
 .primary-btn {
@@ -663,6 +698,16 @@ input:focus {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.82);
   padding: 16px 18px;
+}
+
+.decision-panel {
+  margin-top: 18px;
+}
+
+.period-confirm-grid,
+.duplicate-reference,
+.duplicate-actions {
+  margin-top: 16px;
 }
 
 .file-name {
@@ -758,6 +803,37 @@ input:focus {
 
 .fee-breakdown-table td {
   vertical-align: top;
+}
+
+.statement-library-section {
+  overflow-x: auto;
+}
+
+.statement-library-table {
+  min-width: 880px;
+}
+
+.statement-library-table td {
+  vertical-align: middle;
+}
+
+.statement-period-link {
+  color: var(--text);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.statement-period-link:hover,
+.statement-period-link:focus-visible {
+  color: var(--brand-strong);
+  text-decoration: underline;
+}
+
+.empty-state {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  padding: 24px 0 6px;
 }
 
 .value-up {
@@ -926,7 +1002,9 @@ input:focus {
   .reference-head,
   .meta-row,
   .card-head,
-  .button-row {
+  .button-row,
+  .library-head,
+  .library-actions {
     flex-direction: column;
     align-items: flex-start;
   }

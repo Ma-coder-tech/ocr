@@ -40,7 +40,7 @@
 
       function topbarMarkup(merchant) {
         return `
-          <a class="logo" href="/dashboard/report" aria-label="FeeClear">
+          <a class="logo" href="/dashboard/statements" aria-label="FeeClear">
             <span class="logo-mark">F</span>
             <span class="logo-copy">
               <span class="logo-kicker">Merchant statement analysis</span>
@@ -251,6 +251,78 @@
         `;
       }
 
+      function driftValue(finding) {
+        if (finding.kind === "per_item_increase") {
+          return `${formatMoney(finding.earlierPerItemUsd)} to ${formatMoney(finding.laterPerItemUsd)}`;
+        }
+        if (finding.rateDeltaBps != null) {
+          return `${formatBps(finding.rateDeltaBps)} increase`;
+        }
+        if (finding.amountDeltaUsd != null) {
+          return `${finding.amountDeltaUsd > 0 ? "+" : ""}${formatMoney(finding.amountDeltaUsd)}`;
+        }
+        if (finding.laterAmountUsd != null) {
+          return formatMoney(finding.laterAmountUsd);
+        }
+        return "Review";
+      }
+
+      function driftSeverityClass(severity) {
+        if (severity === "critical") return "value-up";
+        if (severity === "info") return "";
+        return "value-up";
+      }
+
+      function feeDriftSection(data) {
+        const drift = data.feeDrift;
+        if (!drift || drift.status === "unknown") {
+          return `
+            <section class="table-card" style="margin-top: 20px;">
+              <span class="kicker">Fee drift</span>
+              <p class="body-copy">${escapeHtml(drift?.summary || "No comparable fee line items were available for month-to-month drift detection.")}</p>
+            </section>
+          `;
+        }
+
+        const visibleFindings = (drift.findings || []).filter((finding) => finding.severity !== "info").slice(0, 6);
+        if (visibleFindings.length === 0) {
+          return `
+            <section class="table-card" style="margin-top: 20px;">
+              <span class="kicker">Fee drift</span>
+              <p class="body-copy">${escapeHtml(drift.summary)}</p>
+            </section>
+          `;
+        }
+
+        return `
+          <section class="table-card" style="margin-top: 20px;">
+            <span class="kicker">Fee changes found</span>
+            <table class="comparison-table">
+              <thead>
+                <tr>
+                  <th>Fee</th>
+                  <th>Change</th>
+                  <th>Why it matters</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${visibleFindings
+                  .map(
+                    (finding) => `
+                      <tr>
+                        <td>${escapeHtml(finding.label)}</td>
+                        <td class="${driftSeverityClass(finding.severity)}">${escapeHtml(driftValue(finding))}</td>
+                        <td>${escapeHtml(finding.reason)}</td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </section>
+        `;
+      }
+
       function rateChangeSummary(data) {
         const rateDelta = Number(data.comparison.effectiveRateDelta || 0);
         const feeDiff = Number(data.comparison.feesDelta || 0);
@@ -340,6 +412,8 @@
               ${comparisonChart(data)}
             </section>
           </div>
+
+          ${feeDriftSection(data)}
 
           <section class="context-box" style="margin-top: 20px;">
             Two months is a signal. It is not yet the full story. You can see something changed between ${escapeHtml(earlierMonth)} and ${escapeHtml(laterMonth)}. But two months is not enough to know whether this is a one-time jump or the start of a pattern. To get the full picture — and the evidence you need to act — you need more months. Choose how you want to go deeper.

@@ -31,10 +31,14 @@
       const topbar = document.getElementById("topbar");
       const stepper = document.getElementById("stepper");
       const page = document.getElementById("page");
+      const statementReportMatch = window.location.pathname.match(/^\/dashboard\/statements\/(\d+)\/report$/);
+      const reportApiPath = statementReportMatch
+        ? `/api/dashboard/statements/${encodeURIComponent(statementReportMatch[1])}/report`
+        : "/api/dashboard/report";
 
       function topbarMarkup(merchant) {
         return `
-          <a class="logo" href="/dashboard/report" aria-label="FeeClear">
+          <a class="logo" href="/dashboard/statements" aria-label="FeeClear">
             <span class="logo-mark">F</span>
             <span class="logo-copy">
               <span class="logo-kicker">Merchant statement analysis</span>
@@ -263,7 +267,7 @@
       async function boot() {
         try {
           clearPendingStatementJobId();
-          const data = await fetchJson("/api/dashboard/report");
+          const data = await fetchJson(reportApiPath);
           const merchant = data.merchant;
           const statement = data.statement;
           const summary = statement.summary || {};
@@ -271,21 +275,29 @@
           const verdictClass = verdictTone(statement.benchmarkVerdict);
           const feeRows = buildFeeRows(summary);
           const interchangeRows = buildInterchangeRows(summary);
-          const nextHref = merchant.freeStatementsRemaining > 0 ? "/dashboard/upload-second" : "/dashboard/comparison";
-          const nextLabel =
-            merchant.freeStatementsRemaining > 0 ? "Add another month →" : "See your two-month comparison →";
+          const statementCount = Number(merchant.statementCount || 1);
+          const remainingStatements = Number(merchant.freeStatementsRemaining || 0);
+          const canAddStatement = remainingStatements > 0;
+          const hasComparison = statementCount >= 2;
+          const nextHref = canAddStatement ? "/dashboard/statements/upload" : hasComparison ? "/dashboard/comparison" : "/dashboard/report";
+          const nextLabel = canAddStatement
+            ? "Add another month →"
+            : hasComparison
+              ? "See your two-month comparison →"
+              : "Back to report →";
+          const headline = statement.slot === 1 ? "Your first statement is saved." : "Statement report is ready.";
+          const stepLabels = Array.from({ length: Math.min(merchant.statementLimit || 12, Math.max(statementCount + 1, 2)) }, (_, index) => ({
+            label: `Statement ${index + 1}`,
+            state: index + 1 <= statementCount ? "completed" : canAddStatement && index + 1 === statementCount + 1 ? "active" : "",
+          }));
 
           topbar.innerHTML = topbarMarkup(merchant);
           attachDevResetHandler(topbar);
-          stepper.innerHTML = progressMarkup([
-            { label: "Statement 1", state: "completed" },
-            { label: "Statement 2", state: merchant.freeStatementsRemaining > 0 ? "active" : "completed" },
-            { label: "Your picture", state: merchant.freeStatementsRemaining > 0 ? "" : "active" },
-          ]);
+          stepper.innerHTML = progressMarkup(stepLabels);
 
           page.innerHTML = `
-            <div class="eyebrow">Free account · ${merchant.freeStatementsRemaining} statement remaining</div>
-            <h1>Your first statement is saved.</h1>
+            <div class="eyebrow">${statementCount} of ${merchant.statementLimit || 12} statements saved · ${remainingStatements} remaining</div>
+            <h1>${headline}</h1>
             <p class="subheading">
               ${escapeHtml(formatPeriodLabel(statement.period) || statement.period)} · ${escapeHtml(statement.processorName)} · ${escapeHtml(statement.businessType)}
             </p>
@@ -316,11 +328,12 @@
               </section>
               <section class="summary-card">
                 <span class="kicker">Suggested next step</span>
-                <h2>Compare one more month.</h2>
+                <h2>${canAddStatement ? "Add another month." : "Review the library."}</h2>
                 <p class="body-copy">
-                  One statement gives us a snapshot. A second month shows whether your fees are steady or starting to move.
+                  Each saved month gets its own report. Add more statements to build the full fee picture.
                 </p>
                 <a class="primary-btn full-width" href="${nextHref}">${nextLabel}</a>
+                <a class="secondary-btn full-width stacked-action" href="/dashboard/statements">All statements</a>
               </section>
             </div>
 

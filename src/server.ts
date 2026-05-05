@@ -22,8 +22,13 @@ import {
   getMerchantDashboardContext,
   getMerchantPasswordHash,
   getSessionRecord,
+  getNextAvailableStatementSlot,
+  getStatementBySourceJobIdForMerchant,
+  getStatementByIdForMerchant,
   getStatementByMerchantSlot,
+  getStatementsForMerchant,
   getStatementUploadForMerchant,
+  MAX_COMPLETED_STATEMENTS_PER_MERCHANT,
   resetMerchantDevState,
   setMerchantFreeStatementsRemaining,
   setMerchantChosenPath,
@@ -43,12 +48,14 @@ import {
   verifyPassword,
 } from "./auth.js";
 import type { AnalysisSummary, BenchmarkStatus, Job } from "./types.js";
+import { buildAggregateAudit } from "./aggregateAudit.js";
+import { detectFeeDrift } from "./feeDrift.js";
 import { analyzeDocument } from "./analyzer.js";
 import { detectPeriodKeyFromFileName, formatPeriodKey, inferPeriodKeyFromText, parsePeriodKey, toPeriodLabel } from "./periods.js";
 import { parsePdf } from "./parser.js";
 import { detectPreflightFailure } from "./preflight.js";
 import { toPublicReportSummary } from "./publicReport.js";
-import { createJob, getJob, listEvents, pruneJobs } from "./store.js";
+import { createJob, getJob, getJobByUploadId, listEvents, listStatementJobsForMerchant, pruneJobs, updateJob } from "./store.js";
 import { enqueueJob, hydrateQueuedJobs } from "./worker.js";
 
 const port = Number(process.env.PORT ?? 3000);
@@ -213,7 +220,7 @@ function getRateLimitConfig(pathname: string, method: string): RateLimitConfig |
 
   if (
     method === "POST" &&
-    (pathname === "/api/jobs" || pathname === "/api/dashboard/statement2/validate")
+    (pathname === "/api/jobs" || pathname === "/api/dashboard/statements/validate")
   ) {
     return { limit: 5, windowMs: 60 * 1000, key: `upload:${pathname}` };
   }
@@ -272,7 +279,16 @@ function maybeClaimPendingStatementOne(merchantId: number, pendingJobId: string 
     return false;
   }
 
-  claimStatementOneJob({ merchantId, job });
+  if (!parsePeriodKey(job.summary.statementPeriod) && !parsePeriodKey(job.detectedStatementPeriod ?? "")) {
+    return false;
+  }
+
+  try {
+    claimStatementOneJob({ merchantId, job });
+  } catch (error) {
+    console.warn("[statement-claim] unable to claim pending statement", error instanceof Error ? error.message : error);
+    return false;
+  }
   return true;
 }
 
@@ -423,7 +439,6 @@ async function validateProcessorStatementPdf(input: {
   filePath: string;
   fileName: string;
   businessType: string;
-  existingPeriodKey?: string | null;
 }): Promise<{ detectedPeriodKey: string | null; detectedPeriodLabel: string | null }> {
   const parsed = await parsePdf(input.filePath);
 
@@ -441,9 +456,6 @@ async function validateProcessorStatementPdf(input: {
   const summary = analyzeDocument(parsed, input.businessType as AnalysisSummary["businessType"]);
 
   const detectedPeriodKey = detectStatementPeriodKey(summary, parsed.textPreview, input.fileName, null);
-  if (input.existingPeriodKey && detectedPeriodKey && input.existingPeriodKey === detectedPeriodKey) {
-    throw new Error("This looks like the same statement you already uploaded. Please choose a different month.");
-  }
 
   return {
     detectedPeriodKey,
@@ -548,6 +560,10 @@ async function handleSignUp(req: IncomingMessage, res: ServerResponse): Promise<
     json(res, 400, { error: "Your first statement is no longer available. Please upload it again before creating the account." });
     return;
   }
+  if (job?.summary && !parsePeriodKey(job.summary.statementPeriod) && !parsePeriodKey(job.detectedStatementPeriod ?? "")) {
+    json(res, 400, { error: "We could not confirm the statement month. Please upload a statement with a visible monthly period." });
+    return;
+  }
 
   const merchant = createMerchantAccount({
     email,
@@ -601,7 +617,7 @@ async function handleSignIn(req: IncomingMessage, res: ServerResponse): Promise<
   const statementJobId = body.statementJobId ? String(body.statementJobId) : readPendingStatementJobId(req) ?? "";
   if (statementJobId && !getStatementByMerchantSlot(merchant.id, 1)) {
     const job = getJob(statementJobId);
-    if (job?.summary) {
+    if (job?.summary && (parsePeriodKey(job.summary.statementPeriod) || parsePeriodKey(job.detectedStatementPeriod ?? ""))) {
       claimStatementOneJob({ merchantId: merchant.id, job });
     }
   }
@@ -628,12 +644,152 @@ async function handleSignOut(req: IncomingMessage, res: ServerResponse): Promise
   json(res, 200, { ok: true, redirectTo: "/" });
 }
 
-async function handleValidateSecondStatement(req: IncomingMessage, res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
-  if (merchant.freeStatementsRemaining <= 0) {
-    json(res, 403, { error: "Your free second statement has already been used." });
+function statementSummaryPayload(statement: NonNullable<ReturnType<typeof getStatementByMerchantSlot>>): Record<string, unknown> {
+  return {
+    kind: "statement",
+    id: statement.id,
+    jobId: statement.sourceJobId,
+    slot: statement.slot,
+    period: merchantPeriodLabel(statement.statementPeriod) ?? statement.statementPeriod,
+    periodKey: statement.periodKey,
+    processorName: statement.processorName ?? "Processor not identified",
+    businessType: getBusinessTypeReportLabel(statement.businessType),
+    totalVolume: statement.totalVolume,
+    totalFees: statement.totalFees,
+    effectiveRate: statement.effectiveRate,
+    analysisStatus: statement.analysisStatus,
+    benchmarkVerdict: statement.benchmarkVerdict,
+    processorMarkup: statement.processorMarkup,
+    processorMarkupBps: statement.processorMarkupBps,
+    cardNetworkFees: statement.cardNetworkFees,
+    sourceJobId: statement.sourceJobId,
+    createdAt: statement.createdAt,
+    updatedAt: statement.updatedAt,
+  };
+}
+
+function isProcessingJobStatus(status: Job["status"]): boolean {
+  return status !== "completed" && status !== "failed";
+}
+
+function statementJobPayload(job: Job): Record<string, unknown> {
+  const status = job.status === "failed" ? "failed" : isProcessingJobStatus(job.status) ? "processing" : "completed";
+  return {
+    kind: "job",
+    id: `job:${job.id}`,
+    jobId: job.id,
+    uploadId: job.uploadId,
+    slot: job.statementSlot,
+    period: merchantPeriodLabel(job.detectedStatementPeriod) ?? job.detectedStatementPeriod ?? "Statement period pending",
+    periodKey: job.detectedStatementPeriod,
+    processorName: "Analysis pending",
+    businessType: getBusinessTypeReportLabel(job.businessType),
+    totalVolume: null,
+    totalFees: null,
+    effectiveRate: null,
+    analysisStatus: status,
+    jobStatus: job.status,
+    progress: job.progress,
+    attemptCount: job.attemptCount,
+    maxAttempts: job.maxAttempts,
+    nextRunAt: job.nextRunAt,
+    error: job.error,
+    sourceJobId: job.id,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+  };
+}
+
+function statementLibraryItems(merchantId: number): Array<Record<string, unknown>> {
+  const completedStatements = getStatementsForMerchant(merchantId);
+  const completedByJobId = new Set(completedStatements.map((statement) => statement.sourceJobId).filter(Boolean));
+  const completedBySlotAndPeriod = new Set(
+    completedStatements.map((statement) => `${statement.slot}:${statement.periodKey}`),
+  );
+  const inFlightOrFailedJobs = listStatementJobsForMerchant(merchantId).filter((job) => {
+    if (job.status === "completed") return false;
+    if (job.id && completedByJobId.has(job.id)) return false;
+    const completedSlotPeriodKey = job.statementSlot && job.detectedStatementPeriod ? `${job.statementSlot}:${job.detectedStatementPeriod}` : "";
+    if (!job.replaceStatementId && completedSlotPeriodKey && completedBySlotAndPeriod.has(completedSlotPeriodKey)) {
+      return false;
+    }
+    return true;
+  });
+
+  return [
+    ...completedStatements.map(statementSummaryPayload),
+    ...inFlightOrFailedJobs.map(statementJobPayload),
+  ].sort((left, right) => {
+    const leftSlot = Number(left.slot ?? 99);
+    const rightSlot = Number(right.slot ?? 99);
+    if (leftSlot !== rightSlot) return leftSlot - rightSlot;
+    return String(left.createdAt ?? "").localeCompare(String(right.createdAt ?? ""));
+  });
+}
+
+function parseReplaceStatementId(value: FormDataEntryValue | null): number | null | undefined {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const statementId = Number(value);
+  return Number.isInteger(statementId) && statementId > 0 ? statementId : undefined;
+}
+
+function parseOptionalStatementId(value: unknown): number | null | undefined {
+  if (value === null || value === undefined || value === "") return null;
+  const statementId = Number(value);
+  return Number.isInteger(statementId) && statementId > 0 ? statementId : undefined;
+}
+
+function parseConfirmedPeriodKey(value: unknown): string | null | undefined {
+  if (value === null || value === undefined || value === "") return null;
+  const raw = String(value).trim();
+  if (!/^\d{4}-\d{2}$/.test(raw)) return undefined;
+  const periodKey = parsePeriodKey(raw);
+  return periodKey === raw ? periodKey : undefined;
+}
+
+async function handleStatementLibraryData(res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
+  const statements = getStatementsForMerchant(merchant.merchantId);
+  const items = statementLibraryItems(merchant.merchantId);
+  const remaining = Math.max(0, MAX_COMPLETED_STATEMENTS_PER_MERCHANT - statements.length);
+  json(res, 200, {
+    merchant: {
+      firstName: merchant.firstName,
+      lastName: merchant.lastName,
+      initials: merchant.initials,
+      statementCount: statements.length,
+      statementItemCount: items.length,
+      statementLimit: MAX_COMPLETED_STATEMENTS_PER_MERCHANT,
+      freeStatementsRemaining: remaining,
+      devMode: merchant.devMode,
+    },
+    statements: statements.map(statementSummaryPayload),
+    items,
+  });
+}
+
+async function handleAggregateAuditData(res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
+  const statements = getStatementsForMerchant(merchant.merchantId);
+  if (!statements.length) {
+    json(res, 404, { error: "At least one completed statement is required before the aggregate audit is available." });
     return;
   }
 
+  json(res, 200, {
+    merchant: {
+      firstName: merchant.firstName,
+      lastName: merchant.lastName,
+      initials: merchant.initials,
+      statementCount: statements.length,
+      statementLimit: MAX_COMPLETED_STATEMENTS_PER_MERCHANT,
+      devMode: merchant.devMode,
+    },
+    statements: statements.map(statementSummaryPayload),
+    audit: buildAggregateAudit(statements),
+  });
+}
+
+async function handleValidateStatementUpload(req: IncomingMessage, res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
+  const statements = getStatementsForMerchant(merchant.merchantId);
   const statement1 = getStatementByMerchantSlot(merchant.merchantId, 1);
   if (!statement1) {
     json(res, 400, { error: "You need to finish your first statement before adding another month." });
@@ -649,6 +805,16 @@ async function handleValidateSecondStatement(req: IncomingMessage, res: ServerRe
   }
 
   const file = form.get("file");
+  const replaceStatementId = parseReplaceStatementId(form.get("replaceStatementId"));
+  if (replaceStatementId === undefined) {
+    json(res, 400, { error: "Replacement statement id must be a positive integer." });
+    return;
+  }
+  const replacementTarget = replaceStatementId ? getStatementByIdForMerchant(replaceStatementId, merchant.merchantId) : null;
+  if (replaceStatementId && !replacementTarget) {
+    json(res, 404, { error: "Replacement statement not found." });
+    return;
+  }
   if (!file || typeof file !== "object" || typeof (file as File).name !== "string") {
     json(res, 400, { error: "Missing file upload" });
     return;
@@ -672,9 +838,18 @@ async function handleValidateSecondStatement(req: IncomingMessage, res: ServerRe
     const validation = await validateProcessorStatementPdf({
       filePath: finalPath,
       fileName: upload.name,
-      businessType: statement1.businessType,
-      existingPeriodKey: statement1.periodKey,
+      businessType: replacementTarget?.businessType ?? statement1.businessType,
     });
+    const duplicate = validation.detectedPeriodKey
+      ? statements.find((statement) => statement.periodKey === validation.detectedPeriodKey && statement.id !== replacementTarget?.id)
+      : null;
+    if (!replacementTarget && !duplicate && validation.detectedPeriodKey && statements.length >= MAX_COMPLETED_STATEMENTS_PER_MERCHANT) {
+      await fs
+        .unlink(finalPath)
+        .catch((e) => console.warn("[cleanup] failed to unlink over-limit upload", finalPath, e instanceof Error ? e.message : e));
+      json(res, 403, { error: `You can store up to ${MAX_COMPLETED_STATEMENTS_PER_MERCHANT} completed statements. Replace an existing month to continue.` });
+      return;
+    }
 
     const uploadRecord = createStatementUpload({
       merchantId: merchant.merchantId,
@@ -690,8 +865,13 @@ async function handleValidateSecondStatement(req: IncomingMessage, res: ServerRe
       uploadId: uploadRecord.id,
       fileName: uploadRecord.fileName,
       fileSize: uploadRecord.fileSize,
+      detectedPeriodKey: validation.detectedPeriodKey,
       detectedStatementPeriod: validation.detectedPeriodLabel,
-      status: "ready",
+      requiresPeriodConfirmation: !validation.detectedPeriodKey,
+      duplicate: Boolean(duplicate),
+      existingStatement: duplicate ? statementSummaryPayload(duplicate) : null,
+      status: duplicate ? "duplicate" : validation.detectedPeriodKey ? "ready" : "needs_period",
+      replaceStatementId: replacementTarget?.id ?? null,
     });
   } catch (error) {
     await fs
@@ -703,13 +883,8 @@ async function handleValidateSecondStatement(req: IncomingMessage, res: ServerRe
   }
 }
 
-async function handleStartSecondAnalysis(req: IncomingMessage, res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
-  if (merchant.freeStatementsRemaining <= 0) {
-    json(res, 403, { error: "Your free second statement has already been used." });
-    return;
-  }
-
-  const body = await readJsonBody<{ uploadId?: string }>(req, res);
+async function handleStartStatementAnalysis(req: IncomingMessage, res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
+  const body = await readJsonBody<{ uploadId?: string; replaceStatementId?: number | string | null; confirmedPeriodKey?: string | null }>(req, res);
   if (!body) return;
   const uploadId = String(body.uploadId ?? "").trim();
   if (!uploadId) {
@@ -723,24 +898,89 @@ async function handleStartSecondAnalysis(req: IncomingMessage, res: ServerRespon
     return;
   }
 
+  const existingUploadJob = getJobByUploadId(upload.id);
+  if (existingUploadJob) {
+    if (existingUploadJob.merchantId !== merchant.merchantId) {
+      json(res, 404, { error: "Validated upload not found." });
+      return;
+    }
+    const statement =
+      existingUploadJob.status === "completed" ? getStatementBySourceJobIdForMerchant(existingUploadJob.id, merchant.merchantId) : null;
+    const redirectTo =
+      statement && statement.slot === 2 && getComparisonForMerchant(merchant.merchantId)
+        ? "/dashboard/comparison"
+        : statement
+          ? `/dashboard/statements/${statement.id}/report`
+          : `/dashboard/statements/analyze?job=${encodeURIComponent(existingUploadJob.id)}`;
+    json(res, 200, { jobId: existingUploadJob.id, redirectTo, idempotent: true });
+    return;
+  }
+
   const statement1 = getStatementByMerchantSlot(merchant.merchantId, 1);
   if (!statement1) {
     json(res, 400, { error: "Your first statement must be saved before a second analysis can start." });
     return;
   }
 
+  const replaceStatementId = parseOptionalStatementId(body.replaceStatementId);
+  if (replaceStatementId === undefined) {
+    json(res, 400, { error: "Replacement statement id must be a positive integer." });
+    return;
+  }
+  const replacementTarget = replaceStatementId ? getStatementByIdForMerchant(replaceStatementId, merchant.merchantId) : null;
+  if (replaceStatementId && !replacementTarget) {
+    json(res, 404, { error: "Replacement statement not found." });
+    return;
+  }
+
+  const confirmedPeriodKey = parseConfirmedPeriodKey(body.confirmedPeriodKey);
+  if (confirmedPeriodKey === undefined) {
+    json(res, 400, { error: "Confirmed statement period must use YYYY-MM format." });
+    return;
+  }
+  const finalPeriodKey = upload.detectedStatementPeriod ?? confirmedPeriodKey;
+  if (!finalPeriodKey) {
+    json(res, 400, { error: "Choose the statement month before starting analysis." });
+    return;
+  }
+  if (replacementTarget && replacementTarget.periodKey !== finalPeriodKey) {
+    json(res, 409, {
+      error: `The replacement file is for ${merchantPeriodLabel(finalPeriodKey) ?? finalPeriodKey}, but the selected saved statement is ${merchantPeriodLabel(replacementTarget.statementPeriod) ?? replacementTarget.statementPeriod}. Choose the matching saved month or upload a different file.`,
+      existingStatement: statementSummaryPayload(replacementTarget),
+    });
+    return;
+  }
+
+  const statements = getStatementsForMerchant(merchant.merchantId);
+  const duplicate = statements.find((statement) => statement.periodKey === finalPeriodKey && statement.id !== replacementTarget?.id) ?? null;
+  if (duplicate) {
+    json(res, 409, {
+      error: `A statement for ${merchantPeriodLabel(duplicate.statementPeriod) ?? duplicate.statementPeriod} is already saved. Replace it intentionally or upload a different month.`,
+      existingStatement: statementSummaryPayload(duplicate),
+    });
+    return;
+  }
+
+  const nextSlot = replacementTarget?.slot ?? getNextAvailableStatementSlot(merchant.merchantId);
+  if (!nextSlot) {
+    json(res, 403, { error: `You can store up to ${MAX_COMPLETED_STATEMENTS_PER_MERCHANT} completed statements. Replace an existing month to continue.` });
+    return;
+  }
+
   const job = createJob({
+    uploadId: upload.id,
     fileName: upload.fileName,
     filePath: upload.filePath,
     fileType: "pdf",
-    businessType: statement1.businessType,
+    businessType: replacementTarget?.businessType ?? statement1.businessType,
     merchantId: merchant.merchantId,
-    statementSlot: 2,
-    detectedStatementPeriod: upload.detectedStatementPeriod,
+    statementSlot: nextSlot,
+    replaceStatementId: replacementTarget?.id ?? null,
+    detectedStatementPeriod: finalPeriodKey,
   });
 
   enqueueJob(job.id);
-  json(res, 201, { jobId: job.id, redirectTo: `/dashboard/analyze-second?job=${encodeURIComponent(job.id)}` });
+  json(res, 201, { jobId: job.id, redirectTo: `/dashboard/statements/analyze?job=${encodeURIComponent(job.id)}` });
 }
 
 async function handleAuthenticatedJob(req: IncomingMessage, res: ServerResponse, merchant: AuthenticatedContext, jobId: string): Promise<void> {
@@ -749,6 +989,13 @@ async function handleAuthenticatedJob(req: IncomingMessage, res: ServerResponse,
     json(res, 404, { error: "Job not found" });
     return;
   }
+  const statement = job.status === "completed" ? getStatementBySourceJobIdForMerchant(job.id, merchant.merchantId) : null;
+  const redirectTo =
+    statement && statement.slot === 2 && getComparisonForMerchant(merchant.merchantId)
+      ? "/dashboard/comparison"
+      : statement
+        ? `/dashboard/statements/${statement.id}/report`
+        : undefined;
 
   json(res, 200, {
     id: job.id,
@@ -757,9 +1004,40 @@ async function handleAuthenticatedJob(req: IncomingMessage, res: ServerResponse,
     detectedStatementPeriod: merchantPeriodLabel(job.detectedStatementPeriod),
     status: job.status,
     progress: job.progress,
+    attemptCount: job.attemptCount,
+    maxAttempts: job.maxAttempts,
+    nextRunAt: job.nextRunAt,
     error: job.error,
     summary: toPublicReportSummary(job.summary),
+    statement: statement ? statementSummaryPayload(statement) : null,
+    redirectTo,
   });
+}
+
+async function handleRetryAuthenticatedJob(res: ServerResponse, merchant: AuthenticatedContext, jobId: string): Promise<void> {
+  const job = getJob(jobId);
+  if (!job || job.merchantId !== merchant.merchantId || !job.statementSlot) {
+    json(res, 404, { error: "Job not found" });
+    return;
+  }
+  if (job.status !== "failed") {
+    json(res, 409, { error: "Only failed statement analyses can be retried." });
+    return;
+  }
+
+  const requeued = updateJob(
+    job.id,
+    {
+      status: "queued",
+      progress: 0,
+      error: undefined,
+      nextRunAt: null,
+      maxAttempts: Math.max(job.maxAttempts, job.attemptCount + 1),
+    },
+    "Retry requested",
+  );
+  enqueueJob(requeued.id);
+  json(res, 200, { jobId: requeued.id, redirectTo: `/dashboard/statements/analyze?job=${encodeURIComponent(requeued.id)}` });
 }
 
 async function handleChosenPath(req: IncomingMessage, res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
@@ -807,6 +1085,7 @@ async function handleComparisonData(res: ServerResponse, merchant: Authenticated
   const earlier = ordered[0];
   const later = ordered[1];
   const comparison = context.comparison;
+  const feeDrift = detectFeeDrift(earlier.analysisSummary, later.analysisSummary);
   const benchmarkCeiling = Math.max(earlier.benchmarkHigh, later.benchmarkHigh);
   const processorName = later.processorName ?? earlier.processorName ?? "Processor not identified";
 
@@ -872,6 +1151,7 @@ async function handleComparisonData(res: ServerResponse, merchant: Authenticated
       earlierCardNetworkFees: earlier.cardNetworkFees,
       laterCardNetworkFees: later.cardNetworkFees,
     },
+    feeDrift,
     formatted: {
       feesDelta: formatDeltaMoney(comparison.feesDelta),
       effectiveRateDelta: formatDeltaPct(comparison.effectiveRateDelta),
@@ -886,13 +1166,16 @@ async function handleDashboardReportData(res: ServerResponse, merchant: Authenti
     return;
   }
   const publicSummary = toPublicReportSummary(statement1.analysisSummary);
+  const statementCount = getStatementsForMerchant(merchant.merchantId).length;
 
   json(res, 200, {
     merchant: {
       firstName: merchant.firstName,
       lastName: merchant.lastName,
       initials: merchant.initials,
-      freeStatementsRemaining: merchant.freeStatementsRemaining,
+      freeStatementsRemaining: Math.max(0, MAX_COMPLETED_STATEMENTS_PER_MERCHANT - statementCount),
+      statementCount,
+      statementLimit: MAX_COMPLETED_STATEMENTS_PER_MERCHANT,
       devMode: merchant.devMode,
     },
     statement: {
@@ -911,30 +1194,67 @@ async function handleDashboardReportData(res: ServerResponse, merchant: Authenti
   });
 }
 
-async function handleUploadSecondContext(res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
-  const statement1 = getStatementByMerchantSlot(merchant.merchantId, 1);
-  if (!statement1) {
-    json(res, 404, { error: "Your first statement has not been saved yet." });
+async function handleStatementReportData(res: ServerResponse, merchant: AuthenticatedContext, statementId: number): Promise<void> {
+  const statement = getStatementByIdForMerchant(statementId, merchant.merchantId);
+  if (!statement) {
+    json(res, 404, { error: "Statement not found." });
     return;
   }
+  const publicSummary = toPublicReportSummary(statement.analysisSummary);
+  const statementCount = getStatementsForMerchant(merchant.merchantId).length;
 
   json(res, 200, {
     merchant: {
       firstName: merchant.firstName,
       lastName: merchant.lastName,
       initials: merchant.initials,
-      freeStatementsRemaining: merchant.freeStatementsRemaining,
+      freeStatementsRemaining: Math.max(0, MAX_COMPLETED_STATEMENTS_PER_MERCHANT - statementCount),
+      statementCount,
+      statementLimit: MAX_COMPLETED_STATEMENTS_PER_MERCHANT,
       devMode: merchant.devMode,
     },
-    statement1: {
-      period: merchantPeriodLabel(statement1.statementPeriod) ?? statement1.statementPeriod,
-      processorName: statement1.processorName ?? "Processor not identified",
-      businessType: getBusinessTypeReportLabel(statement1.businessType),
-      totalVolume: statement1.totalVolume,
-      effectiveRate: statement1.effectiveRate,
-      benchmarkVerdict: statement1.benchmarkVerdict,
-      periodKey: statement1.periodKey,
+    statement: {
+      ...statementSummaryPayload(statement),
+      benchmarkLow: statement.benchmarkLow,
+      benchmarkHigh: statement.benchmarkHigh,
+      summary: statement.analysisSummary,
+      findings: statement.analysisSummary.insights,
+      checklistReport: publicSummary?.checklistReport,
     },
+  });
+}
+
+async function handleStatementUploadContext(res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
+  const statement1 = getStatementByMerchantSlot(merchant.merchantId, 1);
+  if (!statement1) {
+    json(res, 404, { error: "Your first statement has not been saved yet." });
+    return;
+  }
+  const statementCount = getStatementsForMerchant(merchant.merchantId).length;
+
+  const firstStatement = {
+    period: merchantPeriodLabel(statement1.statementPeriod) ?? statement1.statementPeriod,
+    processorName: statement1.processorName ?? "Processor not identified",
+    businessType: getBusinessTypeReportLabel(statement1.businessType),
+    totalVolume: statement1.totalVolume,
+    effectiveRate: statement1.effectiveRate,
+    benchmarkVerdict: statement1.benchmarkVerdict,
+    periodKey: statement1.periodKey,
+  };
+
+  json(res, 200, {
+    merchant: {
+      firstName: merchant.firstName,
+      lastName: merchant.lastName,
+      initials: merchant.initials,
+      freeStatementsRemaining: Math.max(0, MAX_COMPLETED_STATEMENTS_PER_MERCHANT - statementCount),
+      statementCount,
+      statementLimit: MAX_COMPLETED_STATEMENTS_PER_MERCHANT,
+      devMode: merchant.devMode,
+    },
+    firstStatement,
+    statement1: firstStatement,
+    statements: getStatementsForMerchant(merchant.merchantId).map(statementSummaryPayload),
   });
 }
 
@@ -1062,24 +1382,49 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return;
   }
 
-  if (method === "GET" && pathname === "/api/dashboard/upload-second/context") {
+  if (
+    method === "GET" &&
+    (pathname === "/api/dashboard/statements/upload-context" || pathname === "/api/dashboard/upload-second/context")
+  ) {
     const merchant = await requireMerchantApi(req, res);
     if (!merchant) return;
-    await handleUploadSecondContext(res, merchant);
+    await handleStatementUploadContext(res, merchant);
     return;
   }
 
-  if (method === "POST" && pathname === "/api/dashboard/statement2/validate") {
+  if (method === "GET" && pathname === "/api/dashboard/statements") {
     const merchant = await requireMerchantApi(req, res);
     if (!merchant) return;
-    await handleValidateSecondStatement(req, res, merchant);
+    await handleStatementLibraryData(res, merchant);
     return;
   }
 
-  if (method === "POST" && pathname === "/api/dashboard/statement2/start") {
+  if (method === "GET" && pathname === "/api/dashboard/audit") {
     const merchant = await requireMerchantApi(req, res);
     if (!merchant) return;
-    await handleStartSecondAnalysis(req, res, merchant);
+    await handleAggregateAuditData(res, merchant);
+    return;
+  }
+
+  if (method === "POST" && pathname === "/api/dashboard/statements/validate") {
+    const merchant = await requireMerchantApi(req, res);
+    if (!merchant) return;
+    await handleValidateStatementUpload(req, res, merchant);
+    return;
+  }
+
+  if (method === "POST" && pathname === "/api/dashboard/statements/start") {
+    const merchant = await requireMerchantApi(req, res);
+    if (!merchant) return;
+    await handleStartStatementAnalysis(req, res, merchant);
+    return;
+  }
+
+  const statementReportMatch = pathname.match(/^\/api\/dashboard\/statements\/(\d+)\/report$/);
+  if (method === "GET" && statementReportMatch) {
+    const merchant = await requireMerchantApi(req, res);
+    if (!merchant) return;
+    await handleStatementReportData(res, merchant, Number(statementReportMatch[1]));
     return;
   }
 
@@ -1088,6 +1433,14 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const merchant = await requireMerchantApi(req, res);
     if (!merchant) return;
     await handleAuthenticatedJob(req, res, merchant, decodeURIComponent(dashboardJobMatch[1]));
+    return;
+  }
+
+  const dashboardJobRetryMatch = pathname.match(/^\/api\/dashboard\/jobs\/([^/]+)\/retry$/);
+  if (method === "POST" && dashboardJobRetryMatch) {
+    const merchant = await requireMerchantApi(req, res);
+    if (!merchant) return;
+    await handleRetryAuthenticatedJob(res, merchant, decodeURIComponent(dashboardJobRetryMatch[1]));
     return;
   }
 
@@ -1153,7 +1506,32 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return;
   }
 
-  if (method === "GET" && pathname === "/dashboard/upload-second") {
+  if (method === "GET" && pathname === "/dashboard/statements") {
+    const merchant = await requireMerchantPage(req, res);
+    if (!merchant) return;
+    const statements = getStatementsForMerchant(merchant.merchantId);
+    if (!statements.length) {
+      redirect(res, "/");
+      return;
+    }
+    await sendFile(res, path.join(publicDir, "statements.html"));
+    return;
+  }
+
+  const statementReportPageMatch = pathname.match(/^\/dashboard\/statements\/(\d+)\/report$/);
+  if (method === "GET" && statementReportPageMatch) {
+    const merchant = await requireMerchantPage(req, res);
+    if (!merchant) return;
+    const statement = getStatementByIdForMerchant(Number(statementReportPageMatch[1]), merchant.merchantId);
+    if (!statement) {
+      redirect(res, "/dashboard/report");
+      return;
+    }
+    await sendFile(res, path.join(publicDir, "dashboard-report.html"));
+    return;
+  }
+
+  if (method === "GET" && pathname === "/dashboard/statements/upload") {
     const merchant = await requireMerchantPage(req, res);
     if (!merchant) return;
     const statement1 = getStatementByMerchantSlot(merchant.merchantId, 1);
@@ -1161,24 +1539,30 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       redirect(res, "/dashboard/report");
       return;
     }
-    if (merchant.freeStatementsRemaining <= 0) {
-      redirect(res, "/dashboard/comparison");
-      return;
-    }
     await sendFile(res, path.join(publicDir, "upload-second.html"));
     return;
   }
 
-  if (method === "GET" && pathname === "/dashboard/analyze-second") {
+  if (method === "GET" && pathname === "/dashboard/upload-second") {
+    redirect(res, "/dashboard/statements/upload");
+    return;
+  }
+
+  if (method === "GET" && pathname === "/dashboard/statements/analyze") {
     const merchant = await requireMerchantPage(req, res);
     if (!merchant) return;
     const jobId = url.searchParams.get("job") ?? "";
     const job = jobId ? getJob(jobId) : undefined;
     if (!job || job.merchantId !== merchant.merchantId) {
-      redirect(res, "/dashboard/upload-second");
+      redirect(res, "/dashboard/statements/upload");
       return;
     }
     await sendFile(res, path.join(publicDir, "analyze-second.html"));
+    return;
+  }
+
+  if (method === "GET" && pathname === "/dashboard/analyze-second") {
+    redirect(res, `/dashboard/statements/analyze${url.search}`);
     return;
   }
 
@@ -1187,7 +1571,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (!merchant) return;
     const context = getMerchantDashboardContext(merchant.merchantId);
     if (!context?.statement1 || !context.statement2 || !context.comparison) {
-      redirect(res, merchant.freeStatementsRemaining > 0 ? "/dashboard/upload-second" : "/dashboard/report");
+      const canAddStatement = getStatementsForMerchant(merchant.merchantId).length < MAX_COMPLETED_STATEMENTS_PER_MERCHANT;
+      redirect(res, canAddStatement ? "/dashboard/statements/upload" : "/dashboard/report");
       return;
     }
     await sendFile(res, path.join(publicDir, "comparison.html"));

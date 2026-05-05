@@ -221,8 +221,11 @@ describe("accountStore", () => {
       summary: makeSummary("2024-10"),
       sourceJobId: "job-1",
     });
+    accountStore.setMerchantFreeStatementsRemaining(merchant.id, 99);
 
     expect(inserted.statementPeriod).toBe("October 2024");
+    expect(inserted.slot).toBe(1);
+    expect(inserted.analysisStatus).toBe("completed");
     expect(inserted.totalFees).toBe(25);
     expect(inserted.processorMarkup).toBe(15);
     expect(inserted.processorMarkupBps).toBeNull();
@@ -232,7 +235,7 @@ describe("accountStore", () => {
       merchantId: merchant.id,
       slot: 1,
       summary: {
-        ...makeSummary("2024-11"),
+        ...makeSummary("2024-10"),
         totalFees: 30,
         estimatedMonthlyFees: 30,
         estimatedAnnualFees: 360,
@@ -241,9 +244,156 @@ describe("accountStore", () => {
     });
 
     expect(updated.id).toBe(inserted.id);
-    expect(updated.statementPeriod).toBe("November 2024");
+    expect(updated.statementPeriod).toBe("October 2024");
     expect(updated.totalFees).toBe(30);
     expect(updated.sourceJobId).toBe("job-2");
+    expect(accountStore.getMerchantById(merchant.id)?.freeStatementsRemaining).toBe(99);
+
+    expect(() =>
+      accountStore.persistStatementFromSummary({
+        merchantId: merchant.id,
+        slot: 1,
+        summary: makeSummary("2024-11"),
+        sourceJobId: "job-period-change",
+      }),
+    ).toThrow(accountStore.ReplacementStatementPeriodMismatchError);
+  });
+
+  it("stores a library of completed statements without hard-coded second-statement slots", () => {
+    const merchant = accountStore.createMerchantAccount({
+      email: "library@example.com",
+      firstName: "Library",
+      lastName: "Owner",
+      passwordHash: "hash",
+      businessType: "retail",
+    });
+
+    const statements = ["2024-01", "2024-02", "2024-03", "2024-04"].map((period, index) =>
+      accountStore.persistStatementFromSummary({
+        merchantId: merchant.id,
+        summary: makeSummary(period),
+        sourceJobId: `job-${index + 1}`,
+      }),
+    );
+
+    expect(statements.map((statement) => statement.slot)).toEqual([1, 2, 3, 4]);
+    expect(accountStore.getStatementsForMerchant(merchant.id)).toHaveLength(4);
+    expect(accountStore.getStatementByMerchantSlot(merchant.id, 4)?.periodKey).toBe("2024-04");
+    expect(accountStore.getStatementBySourceJobIdForMerchant("job-4", merchant.id)?.id).toBe(statements[3].id);
+  });
+
+  it("allows up to twelve completed statements and blocks the thirteenth", () => {
+    const merchant = accountStore.createMerchantAccount({
+      email: "limit@example.com",
+      firstName: "Limit",
+      lastName: "Owner",
+      passwordHash: "hash",
+      businessType: "retail",
+    });
+
+    for (let month = 1; month <= 12; month += 1) {
+      accountStore.persistStatementFromSummary({
+        merchantId: merchant.id,
+        summary: makeSummary(`2024-${String(month).padStart(2, "0")}`),
+        sourceJobId: `job-${month}`,
+      });
+    }
+
+    expect(accountStore.getStatementsForMerchant(merchant.id)).toHaveLength(12);
+    expect(() =>
+      accountStore.persistStatementFromSummary({
+        merchantId: merchant.id,
+        summary: makeSummary("2025-01"),
+        sourceJobId: "job-13",
+      }),
+    ).toThrow(accountStore.StatementLimitError);
+
+    const replacement = accountStore.persistStatementFromSummary({
+      merchantId: merchant.id,
+      replaceStatementId: accountStore.getStatementByMerchantSlot(merchant.id, 12)!.id,
+      summary: {
+        ...makeSummary("2024-12"),
+        totalVolume: 24000,
+      },
+      sourceJobId: "job-12-replacement",
+    });
+
+    expect(replacement.slot).toBe(12);
+    expect(replacement.totalVolume).toBe(24000);
+    expect(accountStore.getStatementsForMerchant(merchant.id)).toHaveLength(12);
+  });
+
+  it("blocks duplicate statement periods unless replacing intentionally", () => {
+    const merchant = accountStore.createMerchantAccount({
+      email: "duplicates@example.com",
+      firstName: "Duplicate",
+      lastName: "Owner",
+      passwordHash: "hash",
+      businessType: "retail",
+    });
+
+    const october = accountStore.persistStatementFromSummary({
+      merchantId: merchant.id,
+      summary: makeSummary("2024-10"),
+      sourceJobId: "job-1",
+    });
+    accountStore.persistStatementFromSummary({
+      merchantId: merchant.id,
+      summary: makeSummary("2024-11"),
+      sourceJobId: "job-2",
+    });
+
+    expect(() =>
+      accountStore.persistStatementFromSummary({
+        merchantId: merchant.id,
+        summary: makeSummary("2024-10"),
+        sourceJobId: "job-duplicate",
+      }),
+    ).toThrow(accountStore.DuplicateStatementPeriodError);
+
+    const replacement = accountStore.persistStatementFromSummary({
+      merchantId: merchant.id,
+      replaceStatementId: october.id,
+      summary: {
+        ...makeSummary("2024-10"),
+        totalVolume: 2000,
+        totalFees: 50,
+        effectiveRate: 2.5,
+      },
+      sourceJobId: "job-replacement",
+    });
+
+    expect(replacement.id).toBe(october.id);
+    expect(replacement.slot).toBe(october.slot);
+    expect(replacement.totalVolume).toBe(2000);
+    expect(accountStore.getStatementsForMerchant(merchant.id)).toHaveLength(2);
+
+    expect(() =>
+      accountStore.persistStatementFromSummary({
+        merchantId: merchant.id,
+        replaceStatementId: october.id,
+        summary: makeSummary("2024-12"),
+        sourceJobId: "job-mismatched-replacement",
+      }),
+    ).toThrow(accountStore.ReplacementStatementPeriodMismatchError);
+  });
+
+  it("requires a statement period before storing a completed statement", () => {
+    const merchant = accountStore.createMerchantAccount({
+      email: "period-required@example.com",
+      firstName: "Period",
+      lastName: "Required",
+      passwordHash: "hash",
+      businessType: "retail",
+    });
+
+    expect(() =>
+      accountStore.persistStatementFromSummary({
+        merchantId: merchant.id,
+        summary: makeSummary("Statement period not reliably extractable"),
+        sourceJobId: "job-no-period",
+      }),
+    ).toThrow(accountStore.StatementPeriodRequiredError);
   });
 
   it("persists normalized processor markup bps and compares markup pricing separately from dollars", () => {

@@ -1,21 +1,59 @@
 import { setTimeout as delay } from "node:timers/promises";
-import { createOrReplaceComparison, persistStatementFromSummary } from "./accountStore.js";
+import { createOrReplaceComparison, getStatementsForMerchant, persistStatementFromSummary } from "./accountStore.js";
 import type { AnalysisSummary } from "./types.js";
 import type { ParsedDocument } from "./parser.js";
 import { detectPreflightFailure } from "./preflight.js";
-import { failJob, getJob, getNextQueuedJob, listQueuedJobs, requeueInterruptedJobs, stageUpdate, updateJob } from "./store.js";
+import {
+  failJob,
+  getJob,
+  getNextQueuedJob,
+  getNextQueuedJobDelayMs,
+  listQueuedJobs,
+  retryJobOrFail,
+  requeueInterruptedJobs,
+  stageUpdate,
+  startJobAttempt,
+  updateJob,
+} from "./store.js";
 
 const queue = new Set<string>();
 let busy = false;
 let tickScheduled = false;
+let delayedTick: ReturnType<typeof setTimeout> | null = null;
+let delayedTickAt = 0;
 
 function scheduleTick(): void {
+  if (delayedTick) {
+    clearTimeout(delayedTick);
+    delayedTick = null;
+    delayedTickAt = 0;
+  }
   if (tickScheduled) return;
   tickScheduled = true;
   setTimeout(() => {
     tickScheduled = false;
     void tick();
   }, 0);
+}
+
+function scheduleTickAfter(delayMs: number): void {
+  const boundedDelayMs = Math.max(0, delayMs);
+  if (boundedDelayMs === 0) {
+    scheduleTick();
+    return;
+  }
+  const targetAt = Date.now() + boundedDelayMs;
+  if (delayedTick && delayedTickAt <= targetAt) return;
+  if (delayedTick) {
+    clearTimeout(delayedTick);
+  }
+  delayedTickAt = targetAt;
+  delayedTick = setTimeout(() => {
+    delayedTick = null;
+    delayedTickAt = 0;
+    scheduleTick();
+  }, boundedDelayMs);
+  delayedTick.unref?.();
 }
 
 export function enqueueJob(jobId: string): void {
@@ -33,9 +71,29 @@ export function hydrateQueuedJobs(): void {
 
 async function tick(): Promise<void> {
   if (busy) return;
-  const nextQueued = queue.values().next().value as string | undefined;
+  let nextQueued: string | undefined;
+  const now = Date.now();
+  for (const candidate of queue) {
+    const job = getJob(candidate);
+    if (!job || job.status === "completed" || job.status === "failed") {
+      queue.delete(candidate);
+      continue;
+    }
+    if (job.status === "queued" && job.nextRunAt && new Date(job.nextRunAt).getTime() > now) {
+      queue.delete(candidate);
+      continue;
+    }
+    nextQueued = candidate;
+    break;
+  }
   const fallback = nextQueued ?? getNextQueuedJob()?.id;
-  if (!fallback) return;
+  if (!fallback) {
+    const nextDelayMs = getNextQueuedJobDelayMs();
+    if (nextDelayMs !== null) {
+      scheduleTickAfter(nextDelayMs);
+    }
+    return;
+  }
   queue.delete(fallback);
 
   busy = true;
@@ -48,12 +106,12 @@ async function tick(): Promise<void> {
 }
 
 async function processJob(jobId: string): Promise<void> {
-  const job = getJob(jobId);
-  if (!job) return;
+  const queuedJob = getJob(jobId);
+  if (!queuedJob || queuedJob.status === "completed" || queuedJob.status === "failed") return;
   const stageDelayMs = Number(process.env.STAGE_DELAY_MS ?? 0);
 
   try {
-    stageUpdate(jobId, "verifying_statement", 10, "Verifying statement format");
+    const job = startJobAttempt(jobId);
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
     const [{ parseCsv, parsePdf }, { analyzeDocument }, { evaluateChecklistReport }] =
@@ -117,7 +175,15 @@ async function processJob(jobId: string): Promise<void> {
 
     summary = await runAiRefinement(summary);
     try {
-      const checklistReport = await evaluateChecklistReport(parsed, summary);
+      const previousStatement =
+        job.merchantId && job.statementSlot
+          ? getStatementsForMerchant(job.merchantId)
+              .filter((statement) => statement.slot < job.statementSlot!)
+              .sort((left, right) => right.slot - left.slot)[0] ?? null
+          : null;
+      const checklistReport = await evaluateChecklistReport(parsed, summary, {
+        previousSummary: previousStatement?.analysisSummary ?? null,
+      });
       summary = { ...summary, checklistReport };
       console.log(`[job:${jobId}] checklist-report`, {
         universal: {
@@ -159,6 +225,7 @@ async function processJob(jobId: string): Promise<void> {
       persistStatementFromSummary({
         merchantId: job.merchantId,
         slot: job.statementSlot,
+        replaceStatementId: job.replaceStatementId ?? null,
         summary,
         sourceJobId: job.id,
         preferredPeriodKey: job.detectedStatementPeriod ?? undefined,
@@ -180,7 +247,10 @@ async function processJob(jobId: string): Promise<void> {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown processing error";
-    failJob(jobId, message);
+    const retry = retryJobOrFail(jobId, message);
+    if (retry.retrying) {
+      scheduleTickAfter(retry.delayMs);
+    }
   }
 }
 

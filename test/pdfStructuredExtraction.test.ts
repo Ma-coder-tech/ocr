@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { analyzeDocument } from "../src/analyzer.js";
 import { evaluateChecklistReport } from "../src/checklistEngine.js";
 import { parsePdf } from "../src/parser.js";
+import type { ParsedDocument } from "../src/parser.js";
 
 const PDF_FIXTURE_DIR = path.resolve(process.cwd(), "test", "fixtures", "pdfs");
 const MISSING_PDF_FIXTURE_MESSAGE = "PDF fixture not present — copy files into test/fixtures/pdfs/ to run this test";
@@ -27,6 +28,64 @@ const hasBloomPdf = await fileExists(BLOOM_PDF);
 const hasScannedPdf = await fileExists(SCANNED_PDF);
 
 describe("pdf structured extraction", () => {
+  it("prefers usable structured PDF columns before text heuristic recovery", () => {
+    const parsed: ParsedDocument = {
+      sourceType: "pdf",
+      headers: ["content", "Net Sales", "Processing Fees"],
+      rows: [
+        {
+          content: "Statement text says Total Volume 9999.99 and Total Fees 999.99",
+          "Net Sales": 1000,
+          "Processing Fees": -20,
+        },
+      ],
+      textPreview: "Statement text says Total Volume 9999.99 and Total Fees 999.99",
+      extraction: {
+        mode: "structured",
+        qualityScore: 0.9,
+        reasons: [],
+        lineCount: 1,
+        amountTokenCount: 4,
+        hasExtractableText: true,
+      },
+    };
+
+    const summary = analyzeDocument(parsed, "other");
+
+    expect(summary.totalVolume).toBe(1000);
+    expect(summary.totalFees).toBe(20);
+    expect(summary.effectiveRate).toBe(2);
+    expect(summary.feeBreakdown[0]?.label).toBe("processing fees");
+  });
+
+  it("uses text recovery when structured PDFs have volume but no real fee source", () => {
+    const parsed: ParsedDocument = {
+      sourceType: "pdf",
+      headers: ["content", "Net Sales"],
+      rows: [
+        { content: "Processing Summary", "Net Sales": 100 },
+        { content: "Total Volume | 100.00", "Net Sales": 0 },
+        { content: "Total Fees | 12.00", "Net Sales": 0 },
+      ],
+      textPreview: "Processing Summary Total Volume | 100.00 Total Fees | 12.00",
+      extraction: {
+        mode: "structured",
+        qualityScore: 0.9,
+        reasons: [],
+        lineCount: 3,
+        amountTokenCount: 2,
+        hasExtractableText: true,
+      },
+    };
+
+    const summary = analyzeDocument(parsed, "other");
+
+    expect(summary.totalVolume).toBe(100);
+    expect(summary.totalFees).toBe(12);
+    expect(summary.effectiveRate).toBe(12);
+    expect(summary.insights[0]?.title).toBe("Statement totals recovered from PDF text");
+  });
+
   const cloverTest = hasCloverPdf ? it : it.skip;
   cloverTest(
     hasCloverPdf

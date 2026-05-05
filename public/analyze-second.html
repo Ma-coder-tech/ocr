@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Analyzing your second statement</title>
+    <title>Analyzing statement</title>
     <link rel="stylesheet" href="/dashboard.css" />
   </head>
   <body>
@@ -21,18 +21,17 @@
         { id: "identifying_processor", label: "Identifying your processor" },
         { id: "extracting_fee_line_items", label: "Extracting fee line items" },
         { id: "calculating_effective_rate", label: "Calculating effective rate" },
-        { id: "comparing_to_benchmark", labelPrefix: "Comparing " },
+        { id: "comparing_to_benchmark", label: "Running benchmark checks" },
       ];
 
       const jobId = new URLSearchParams(window.location.search).get("job") || "";
       const topbar = document.getElementById("topbar");
       const stepper = document.getElementById("stepper");
       const page = document.getElementById("page");
-      let statement1Period = "your first statement";
 
       function topbarMarkup(merchant) {
         return `
-          <a class="logo" href="/dashboard/report" aria-label="FeeClear">
+          <a class="logo" href="/dashboard/statements" aria-label="FeeClear">
             <span class="logo-mark">F</span>
             <span class="logo-copy">
               <span class="logo-kicker">Merchant statement analysis</span>
@@ -50,10 +49,7 @@
         return STAGES.map((stage, index) => {
           const completed = completedIndex > index;
           const active = !completed && currentIndex === index;
-          const label =
-            stage.id === "comparing_to_benchmark"
-              ? `${stage.labelPrefix}${escapeHtml(detectedPeriod)} vs ${escapeHtml(statement1Period)}`
-              : escapeHtml(stage.label);
+          const label = escapeHtml(stage.label);
           const stateLabel = completed ? "Done" : active ? "In progress" : "Waiting";
           return `
             <div class="step-list-item ${completed ? "completed" : active ? "active" : ""}">
@@ -73,21 +69,21 @@
       }
 
       function render(job, merchant) {
-        const detectedPeriod = formatPeriodLabel(job.detectedStatementPeriod) || "your second statement";
+        const detectedPeriod = formatPeriodLabel(job.detectedStatementPeriod) || "this statement";
         const progress = stageProgress(job);
 
         topbar.innerHTML = topbarMarkup(merchant);
         attachDevResetHandler(topbar);
         stepper.innerHTML = progressMarkup([
-          { label: "Statement 1", state: "completed" },
-          { label: "Statement 2", state: "active" },
-          { label: "Your picture", state: "" },
+          { label: "Saved statements", state: "completed" },
+          { label: "Current statement", state: "active" },
+          { label: "Report", state: "" },
         ]);
 
         page.innerHTML = `
-          <div class="eyebrow">Processing second statement</div>
+          <div class="eyebrow">Processing statement</div>
           <h1>Analyzing ${escapeHtml(detectedPeriod)}...</h1>
-          <p class="subheading">This screen reflects the real backend processing state. We’ll move forward only when the comparison is fully ready.</p>
+          <p class="subheading">This screen reflects the real backend processing state. We’ll move forward when the statement report is ready.</p>
           <div class="progress-bar" style="margin-top: 18px;"><span class="progress-fill" style="width: ${progress}%;"></span></div>
           <div class="file-meta" style="margin-top: 10px;">${progress}% complete</div>
           <div class="step-list">${stageListMarkup(job, detectedPeriod)}</div>
@@ -97,23 +93,23 @@
       function renderFailure(message) {
         page.innerHTML = `
           <div class="eyebrow">We hit a problem</div>
-          <h1>We couldn&apos;t finish the second statement.</h1>
+          <h1>We couldn&apos;t finish this statement.</h1>
           <p class="form-error">${escapeHtml(message)}</p>
           <div class="button-row" style="margin-top: 18px;">
-            <a class="primary-btn" href="/dashboard/upload-second">Back to second upload →</a>
+            <a class="primary-btn" href="/dashboard/statements/upload">Back to upload →</a>
           </div>
         `;
       }
 
       async function loadContext() {
-        const data = await fetchJson("/api/dashboard/upload-second/context");
-        statement1Period = formatPeriodLabel(data.statement1.period) || "your first statement";
+        const data = await fetchJson("/api/dashboard/statements/upload-context");
+        const statementCount = Number(data.merchant.statementCount || data.statements?.length || 1);
         topbar.innerHTML = topbarMarkup(data.merchant);
         attachDevResetHandler(topbar);
         stepper.innerHTML = progressMarkup([
-          { label: "Statement 1", state: "completed" },
-          { label: "Statement 2", state: "active" },
-          { label: "Your picture", state: "" },
+          { label: `${statementCount} saved`, state: "completed" },
+          { label: "Current statement", state: "active" },
+          { label: "Report", state: "" },
         ]);
         return data.merchant;
       }
@@ -122,7 +118,7 @@
         try {
           const job = await fetchJson(`/api/dashboard/jobs/${encodeURIComponent(jobId)}`);
           if (job.status === "completed") {
-            window.location.replace("/dashboard/comparison");
+            window.location.replace(job.redirectTo || "/dashboard/statements");
             return;
           }
           if (job.status === "failed") {

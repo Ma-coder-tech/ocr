@@ -67,15 +67,20 @@ function migrate(): void {
 
     CREATE TABLE IF NOT EXISTS analysis_jobs (
       id TEXT PRIMARY KEY,
+      upload_id TEXT,
       merchant_id INTEGER REFERENCES merchants(id) ON DELETE SET NULL,
       file_name TEXT NOT NULL,
       file_path TEXT NOT NULL,
       file_type TEXT NOT NULL,
       business_type TEXT NOT NULL,
       statement_slot INTEGER,
+      replace_statement_id INTEGER,
       detected_statement_period TEXT,
       status TEXT NOT NULL,
       progress INTEGER NOT NULL,
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      max_attempts INTEGER NOT NULL DEFAULT 3,
+      next_run_at TEXT,
       error TEXT,
       summary_json TEXT,
       created_at TEXT NOT NULL,
@@ -114,6 +119,7 @@ function migrate(): void {
       total_volume REAL NOT NULL,
       total_fees REAL NOT NULL,
       effective_rate REAL NOT NULL,
+      analysis_status TEXT NOT NULL DEFAULT 'completed',
       benchmark_verdict TEXT NOT NULL,
       benchmark_low REAL NOT NULL,
       benchmark_high REAL NOT NULL,
@@ -148,6 +154,7 @@ function migrate(): void {
     CREATE INDEX IF NOT EXISTS idx_jobs_status_updated ON analysis_jobs(status, updated_at);
     CREATE INDEX IF NOT EXISTS idx_uploads_merchant ON statement_uploads(merchant_id);
     CREATE INDEX IF NOT EXISTS idx_job_events_job ON analysis_job_events(job_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_statements_merchant_period ON statements(merchant_id, period_key);
   `);
 
   ensureColumn("merchants", "statement_2_period", "TEXT");
@@ -165,11 +172,22 @@ function migrate(): void {
   ensureColumn("merchants", "comparison_processor_markup_bps_delta", "REAL");
   ensureColumn("merchants", "free_statements_remaining", "INTEGER NOT NULL DEFAULT 2");
   ensureColumn("merchants", "chosen_path", "TEXT");
+  ensureColumn("analysis_jobs", "upload_id", "TEXT");
   ensureColumn("analysis_jobs", "merchant_id", "INTEGER");
   ensureColumn("analysis_jobs", "statement_slot", "INTEGER");
+  ensureColumn("analysis_jobs", "replace_statement_id", "INTEGER");
   ensureColumn("analysis_jobs", "detected_statement_period", "TEXT");
+  ensureColumn("analysis_jobs", "attempt_count", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("analysis_jobs", "max_attempts", "INTEGER NOT NULL DEFAULT 3");
+  ensureColumn("analysis_jobs", "next_run_at", "TEXT");
+  ensureColumn("statements", "analysis_status", "TEXT NOT NULL DEFAULT 'completed'");
   ensureColumn("statements", "processor_markup_bps", "REAL");
   ensureColumn("comparisons", "processor_markup_bps_delta", "REAL");
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_jobs_due ON analysis_jobs(status, next_run_at, created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_upload_id ON analysis_jobs(upload_id) WHERE upload_id IS NOT NULL;
+  `);
 }
 
 migrate();

@@ -1,6 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { assertOneOf } from "./assertOneOf.js";
-import { BENCHMARK_STATUS_VALUES, type AnalysisSummary, type BenchmarkStatus, type Job } from "./types.js";
+import {
+  BENCHMARK_STATUS_VALUES,
+  STATEMENT_ANALYSIS_STATUS_VALUES,
+  isStatementSlot,
+  type AnalysisSummary,
+  type BenchmarkStatus,
+  type Job,
+  type StatementAnalysisStatus,
+  type StatementSlot,
+} from "./types.js";
 import { BUSINESS_TYPE_IDS, type BusinessTypeId } from "./businessTypes.js";
 import { db, nowIso } from "./db.js";
 import { formatPeriodKey, parsePeriodKey } from "./periods.js";
@@ -44,7 +53,7 @@ export type SessionRecord = {
 export type StatementRecord = {
   id: number;
   merchantId: number;
-  slot: 1 | 2;
+  slot: StatementSlot;
   periodKey: string;
   statementPeriod: string;
   processorName: string | null;
@@ -52,6 +61,7 @@ export type StatementRecord = {
   totalVolume: number;
   totalFees: number;
   effectiveRate: number;
+  analysisStatus: StatementAnalysisStatus;
   benchmarkVerdict: BenchmarkStatus;
   benchmarkLow: number;
   benchmarkHigh: number;
@@ -81,6 +91,37 @@ export const COMPARISON_ALERT_TYPE_VALUES = [
 
 export const CHOSEN_PATH_VALUES = ["audit", "monitor"] as const satisfies readonly NonNullable<MerchantAccount["chosenPath"]>[];
 export const STATEMENT_UPLOAD_STATUS_VALUES = ["ready", "error"] as const satisfies readonly StatementUploadRecord["validationStatus"][];
+export const MAX_COMPLETED_STATEMENTS_PER_MERCHANT = 12;
+
+export class DuplicateStatementPeriodError extends Error {
+  constructor(
+    public readonly periodKey: string,
+    public readonly existingStatement: StatementRecord,
+  ) {
+    super(`A statement for ${formatPeriodKey(periodKey)} already exists.`);
+  }
+}
+
+export class StatementLimitError extends Error {
+  constructor(public readonly limit = MAX_COMPLETED_STATEMENTS_PER_MERCHANT) {
+    super(`A merchant can store up to ${limit} completed statements.`);
+  }
+}
+
+export class StatementPeriodRequiredError extends Error {
+  constructor() {
+    super("A statement period is required before a statement can be stored.");
+  }
+}
+
+export class ReplacementStatementPeriodMismatchError extends Error {
+  constructor(
+    public readonly expectedPeriodKey: string,
+    public readonly actualPeriodKey: string,
+  ) {
+    super(`Replacement statement period must remain ${formatPeriodKey(expectedPeriodKey)}; received ${formatPeriodKey(actualPeriodKey)}.`);
+  }
+}
 
 export type ComparisonRecord = {
   id: number;
@@ -174,7 +215,7 @@ function mapStatement(row: Record<string, unknown> | undefined): StatementRecord
   return {
     id: Number(row.id),
     merchantId: Number(row.merchant_id),
-    slot: Number(row.slot) as 1 | 2,
+    slot: toStatementSlot(Number(row.slot)),
     periodKey: String(row.period_key),
     statementPeriod: String(row.statement_period),
     processorName: row.processor_name ? String(row.processor_name) : null,
@@ -182,6 +223,7 @@ function mapStatement(row: Record<string, unknown> | undefined): StatementRecord
     totalVolume: Number(row.total_volume),
     totalFees: Number(row.total_fees),
     effectiveRate: Number(row.effective_rate),
+    analysisStatus: assertOneOf(String(row.analysis_status ?? "completed"), STATEMENT_ANALYSIS_STATUS_VALUES, "statements.analysis_status"),
     benchmarkVerdict: assertOneOf(String(row.benchmark_verdict), BENCHMARK_STATUS_VALUES, "statements.benchmark_verdict"),
     benchmarkLow: Number(row.benchmark_low),
     benchmarkHigh: Number(row.benchmark_high),
@@ -255,6 +297,13 @@ function round2(value: number): number {
 function positiveFiniteOrNull(value: unknown): number | null {
   const amount = Number(value);
   return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+function toStatementSlot(value: unknown): StatementSlot {
+  if (!isStatementSlot(value)) {
+    throw new Error(`Statement slot must be an integer from 1 to ${MAX_COMPLETED_STATEMENTS_PER_MERCHANT}.`);
+  }
+  return Number(value) as StatementSlot;
 }
 
 function deriveFeeComponentAmounts(summary: AnalysisSummary): {
@@ -431,10 +480,31 @@ export function deleteStatementUpload(id: string, merchantId: number): void {
   db.prepare(`DELETE FROM statement_uploads WHERE id = ? AND merchant_id = ?`).run(id, merchantId);
 }
 
-export function getStatementByMerchantSlot(merchantId: number, slot: 1 | 2): StatementRecord | null {
+export function getStatementByMerchantSlot(merchantId: number, slot: StatementSlot): StatementRecord | null {
   const row = db
     .prepare(`SELECT * FROM statements WHERE merchant_id = ? AND slot = ?`)
     .get(merchantId, slot) as Record<string, unknown> | undefined;
+  return mapStatement(row);
+}
+
+export function getStatementByIdForMerchant(statementId: number, merchantId: number): StatementRecord | null {
+  const row = db
+    .prepare(`SELECT * FROM statements WHERE id = ? AND merchant_id = ?`)
+    .get(statementId, merchantId) as Record<string, unknown> | undefined;
+  return mapStatement(row);
+}
+
+export function getStatementByMerchantPeriodKey(merchantId: number, periodKey: string): StatementRecord | null {
+  const row = db
+    .prepare(`SELECT * FROM statements WHERE merchant_id = ? AND period_key = ?`)
+    .get(merchantId, periodKey) as Record<string, unknown> | undefined;
+  return mapStatement(row);
+}
+
+export function getStatementBySourceJobIdForMerchant(sourceJobId: string, merchantId: number): StatementRecord | null {
+  const row = db
+    .prepare(`SELECT * FROM statements WHERE source_job_id = ? AND merchant_id = ?`)
+    .get(sourceJobId, merchantId) as Record<string, unknown> | undefined;
   return mapStatement(row);
 }
 
@@ -445,21 +515,66 @@ export function getStatementsForMerchant(merchantId: number): StatementRecord[] 
   return rows.map((row) => mapStatement(row)!).filter(Boolean);
 }
 
+export function getCompletedStatementCountForMerchant(merchantId: number): number {
+  const row = db.prepare(`SELECT COUNT(*) AS count FROM statements WHERE merchant_id = ?`).get(merchantId) as { count: number };
+  return Number(row.count);
+}
+
+export function getNextAvailableStatementSlot(merchantId: number): StatementSlot | null {
+  const used = new Set(getStatementsForMerchant(merchantId).map((statement) => statement.slot));
+  for (let slot = 1; slot <= MAX_COMPLETED_STATEMENTS_PER_MERCHANT; slot += 1) {
+    if (!used.has(slot as StatementSlot)) {
+      return slot as StatementSlot;
+    }
+  }
+  return null;
+}
+
 export function persistStatementFromSummary(input: {
   merchantId: number;
-  slot: 1 | 2;
+  slot?: StatementSlot | null;
+  replaceStatementId?: number | null;
   summary: AnalysisSummary;
   sourceJobId?: string | null;
   preferredPeriodKey?: string | null;
 }): StatementRecord {
   const tx = db.transaction(() => {
-    const periodKey = input.preferredPeriodKey ?? parsePeriodKey(input.summary.statementPeriod) ?? nowIso().slice(0, 7);
+    const periodKey = input.preferredPeriodKey ?? parsePeriodKey(input.summary.statementPeriod);
+    if (!periodKey) {
+      throw new StatementPeriodRequiredError();
+    }
     const statementPeriod = formatPeriodKey(periodKey);
     const processorName = input.summary.processorName === "Unknown" ? null : input.summary.processorName;
     const benchmarkVerdict = input.summary.benchmark.status;
     const { processorMarkup, processorMarkupBps, cardNetworkFees } = deriveFeeComponentAmounts(input.summary);
     const now = nowIso();
-    const existing = getStatementByMerchantSlot(input.merchantId, input.slot);
+    const existing = input.replaceStatementId
+      ? getStatementByIdForMerchant(input.replaceStatementId, input.merchantId)
+      : input.slot
+        ? getStatementByMerchantSlot(input.merchantId, input.slot)
+        : null;
+    const duplicatePeriod = getStatementByMerchantPeriodKey(input.merchantId, periodKey);
+
+    if (input.replaceStatementId && !existing) {
+      throw new Error("Replacement statement was not found for this merchant.");
+    }
+
+    if (duplicatePeriod && duplicatePeriod.id !== existing?.id) {
+      throw new DuplicateStatementPeriodError(periodKey, duplicatePeriod);
+    }
+
+    if (existing && existing.periodKey !== periodKey) {
+      throw new ReplacementStatementPeriodMismatchError(existing.periodKey, periodKey);
+    }
+
+    const slot = existing?.slot ?? (input.slot ? toStatementSlot(input.slot) : getNextAvailableStatementSlot(input.merchantId));
+    if (!slot) {
+      throw new StatementLimitError();
+    }
+
+    if (!existing && getCompletedStatementCountForMerchant(input.merchantId) >= MAX_COMPLETED_STATEMENTS_PER_MERCHANT) {
+      throw new StatementLimitError();
+    }
 
     if (existing) {
       db.prepare(`
@@ -471,6 +586,7 @@ export function persistStatementFromSummary(input: {
           total_volume = ?,
           total_fees = ?,
           effective_rate = ?,
+          analysis_status = 'completed',
           benchmark_verdict = ?,
           benchmark_low = ?,
           benchmark_high = ?,
@@ -480,7 +596,7 @@ export function persistStatementFromSummary(input: {
           analysis_summary_json = ?,
           source_job_id = ?,
           updated_at = ?
-        WHERE merchant_id = ? AND slot = ?
+        WHERE id = ? AND merchant_id = ?
       `).run(
         periodKey,
         statementPeriod,
@@ -498,19 +614,19 @@ export function persistStatementFromSummary(input: {
         JSON.stringify(input.summary),
         input.sourceJobId ?? null,
         now,
+        existing.id,
         input.merchantId,
-        input.slot,
       );
     } else {
       db.prepare(`
         INSERT INTO statements (
           merchant_id, slot, period_key, statement_period, processor_name, business_type, total_volume, total_fees,
-          effective_rate, benchmark_verdict, benchmark_low, benchmark_high, processor_markup, processor_markup_bps, card_network_fees,
+          effective_rate, analysis_status, benchmark_verdict, benchmark_low, benchmark_high, processor_markup, processor_markup_bps, card_network_fees,
           analysis_summary_json, source_job_id, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         input.merchantId,
-        input.slot,
+        slot,
         periodKey,
         statementPeriod,
         processorName,
@@ -532,7 +648,7 @@ export function persistStatementFromSummary(input: {
     }
 
     updateMerchantBusinessType(input.merchantId, input.summary.businessType);
-    if (input.slot === 1) {
+    if (!existing && slot === 1) {
       db.prepare(`
         UPDATE merchants
         SET free_statements_remaining = CASE WHEN free_statements_remaining > 1 THEN free_statements_remaining - 1 ELSE free_statements_remaining END,
@@ -541,9 +657,9 @@ export function persistStatementFromSummary(input: {
       `).run(nowIso(), input.merchantId);
     }
 
-    const statement = getStatementByMerchantSlot(input.merchantId, input.slot)!;
+    const statement = getStatementByMerchantSlot(input.merchantId, slot)!;
 
-    if (input.slot === 2) {
+    if (slot === 2) {
       db.prepare(`
         UPDATE merchants
         SET

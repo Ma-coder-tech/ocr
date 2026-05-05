@@ -338,6 +338,11 @@ function hasCoherentSectionRollup(structuredFacts: StructuredStatementFacts): bo
   );
 }
 
+function hasUsableEconomicTotals(summary: Pick<AnalysisSummary, "totalVolume" | "totalFees" | "effectiveRate">): boolean {
+  if (summary.totalVolume <= 0 || summary.totalFees <= 0 || summary.totalFees > summary.totalVolume) return false;
+  return Number.isFinite(summary.effectiveRate) && summary.effectiveRate >= 0.05 && summary.effectiveRate <= 15;
+}
+
 function inferPeriod(row: Record<string, string | number>, periodKeys: string[]): string | null {
   for (const key of periodKeys) {
     const value = row[key];
@@ -471,7 +476,7 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     rulePackId: processorDetection.rulePackId,
   });
   const hasStructuredRollup = hasCoherentSectionRollup(structuredFacts);
-  if (doc.sourceType === "pdf" && (doc.extraction.mode !== "structured" || !hasStructuredRollup)) {
+  if (doc.sourceType === "pdf" && doc.extraction.mode !== "structured") {
     const qualitativeSummary = createTextOnlyPdfSummary(doc, processorName, businessType, structuredFacts);
     const recoveredSummary = refineTextOnlyPdfSummary(doc, qualitativeSummary);
     if (recoveredSummary) {
@@ -566,6 +571,8 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     structuredProcessorMarkupTotal > 0 &&
     (totalFeesRaw <= 0 ||
       (structuredInterchangePaid > 0 && Math.abs(totalFeesRaw - structuredInterchangePaid) <= Math.max(1, structuredInterchangePaid * 0.01)));
+  const hasStructuredFeeSource =
+    hasStructuredRollup || selectedFeeColumns.length > 0 || structuredInterchangePaid > 0 || structuredProcessorMarkupTotal > 0;
 
   if (hasStructuredRollup) {
     usedStructuredRollup = true;
@@ -1004,7 +1011,7 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
         ? "medium"
         : "low";
 
-  return {
+  const summary: AnalysisSummary = {
     businessType,
     processorName,
     sourceType: doc.sourceType,
@@ -1044,4 +1051,17 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     insights,
     confidence,
   };
+
+  if (
+    doc.sourceType === "pdf" &&
+    doc.extraction.mode === "structured" &&
+    (!hasUsableEconomicTotals(summary) || !hasStructuredFeeSource)
+  ) {
+    const recoveredSummary = refineTextOnlyPdfSummary(doc, summary);
+    if (recoveredSummary) {
+      return recoveredSummary;
+    }
+  }
+
+  return summary;
 }

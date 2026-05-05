@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Statement library</title>
+    <link rel="stylesheet" href="/dashboard.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header id="topbar" class="topbar"></header>
+      <section id="page" class="panel hero-panel">Loading statement library...</section>
+    </main>
+
+    <script type="module">
+      import {
+        attachDevResetHandler,
+        clearPendingStatementJobId,
+        escapeHtml,
+        fetchJson,
+        formatMoney,
+        formatPeriodLabel,
+        formatPct,
+        merchantBadgeMarkup,
+        verdictLabel,
+        verdictTone,
+      } from "/dashboard.js";
+
+      const topbar = document.getElementById("topbar");
+      const page = document.getElementById("page");
+
+      function topbarMarkup(merchant) {
+        return `
+          <a class="logo" href="/dashboard/statements" aria-label="FeeClear">
+            <span class="logo-mark">F</span>
+            <span class="logo-copy">
+              <span class="logo-kicker">Merchant statement analysis</span>
+              <span class="logo-name">FeeClear</span>
+            </span>
+          </a>
+          ${merchantBadgeMarkup(merchant)}
+        `;
+      }
+
+      function statementReportHref(statement) {
+        return `/dashboard/statements/${encodeURIComponent(statement.id)}/report`;
+      }
+
+      function analysisStatusLabel(status) {
+        if (status === "completed") return "Completed";
+        if (status === "processing") return "Processing";
+        if (status === "failed") return "Failed";
+        return String(status || "Processing");
+      }
+
+      function analysisStatusTone(status) {
+        if (status === "failed") return "error";
+        if (status === "processing") return "validating";
+        return "ready";
+      }
+
+      function metricCell(value, formatter) {
+        if (value === null || value === undefined || value === "") return '<span class="file-meta">Pending</span>';
+        return formatter(value);
+      }
+
+      async function retryJob(jobId, button) {
+        button.disabled = true;
+        button.textContent = "Retrying...";
+        try {
+          const payload = await fetchJson(`/api/dashboard/jobs/${encodeURIComponent(jobId)}/retry`, { method: "POST" });
+          window.location.href = payload.redirectTo || `/dashboard/statements/analyze?job=${encodeURIComponent(jobId)}`;
+        } catch (error) {
+          button.disabled = false;
+          button.textContent = "Retry";
+          window.alert(error instanceof Error ? error.message : "Unable to retry this statement.");
+        }
+      }
+
+      function statementRows(items) {
+        if (!items.length) {
+          return `
+            <div class="empty-state">
+              <h2>No statements saved yet.</h2>
+              <p class="body-copy">Upload a monthly processor statement to create the first report.</p>
+              <a class="primary-btn" href="/">Upload first statement →</a>
+            </div>
+          `;
+        }
+
+        return `
+          <table class="comparison-table statement-library-table">
+            <thead>
+              <tr>
+                <th>Period</th>
+                <th>Processor</th>
+                <th>Volume</th>
+                <th>Fees</th>
+                <th>Rate</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items
+                .map((statement) => {
+                  const verdictClass = verdictTone(statement.benchmarkVerdict);
+                  const statusTone = analysisStatusTone(statement.analysisStatus);
+                  const isCompleted = statement.analysisStatus === "completed";
+                  const action =
+                    isCompleted
+                      ? `<a class="secondary-btn compact-btn" href="${statementReportHref(statement)}">Report →</a>`
+                      : statement.analysisStatus === "failed"
+                        ? `<button class="secondary-btn compact-btn" type="button" data-retry-job="${escapeHtml(statement.jobId || statement.sourceJobId || "")}">Retry</button>`
+                        : `<a class="secondary-btn compact-btn" href="/dashboard/statements/analyze?job=${encodeURIComponent(statement.jobId || statement.sourceJobId || "")}">View progress</a>`;
+                  const periodLabel = escapeHtml(formatPeriodLabel(statement.period) || statement.period);
+                  return `
+                    <tr>
+                      <td>
+                        ${
+                          isCompleted
+                            ? `<a class="statement-period-link" href="${statementReportHref(statement)}">${periodLabel}</a>`
+                            : `<span class="statement-period-link">${periodLabel}</span>`
+                        }
+                        <div class="file-meta">Statement ${escapeHtml(statement.slot || "")}${statement.attemptCount ? ` · Attempt ${escapeHtml(statement.attemptCount)} of ${escapeHtml(statement.maxAttempts)}` : ""}</div>
+                        ${statement.error ? `<div class="inline-error">${escapeHtml(statement.error)}</div>` : ""}
+                      </td>
+                      <td>${escapeHtml(statement.processorName || "Processor not identified")}</td>
+                      <td>${metricCell(statement.totalVolume, formatMoney)}</td>
+                      <td>${metricCell(statement.totalFees, formatMoney)}</td>
+                      <td>
+                        ${isCompleted ? `<strong>${formatPct(statement.effectiveRate)}</strong><div class="inline-note"><span class="verdict-pill ${verdictClass}">${escapeHtml(verdictLabel(statement.benchmarkVerdict))}</span></div>` : '<span class="file-meta">Pending</span>'}
+                      </td>
+                      <td><span class="status-pill ${statusTone}">${escapeHtml(analysisStatusLabel(statement.analysisStatus))}</span></td>
+                      <td>${action}</td>
+                    </tr>
+                  `;
+                })
+                .join("")}
+            </tbody>
+          </table>
+        `;
+      }
+
+      function render(data) {
+        const merchant = data.merchant;
+        const statements = Array.isArray(data.statements) ? data.statements : [];
+        const items = Array.isArray(data.items) ? data.items : statements;
+        const statementCount = Number(merchant.statementCount ?? statements.length);
+        const statementLimit = Number(merchant.statementLimit ?? 12);
+        const remaining = Math.max(0, statementLimit - statementCount);
+        const canAdd = remaining > 0;
+        const totalVolume = statements.reduce((sum, statement) => sum + Number(statement.totalVolume || 0), 0);
+        const latest =
+          [...statements].sort((left, right) => String(right.periodKey || "").localeCompare(String(left.periodKey || "")))[0] || null;
+
+        topbar.innerHTML = topbarMarkup(merchant);
+        attachDevResetHandler(topbar);
+
+        page.innerHTML = `
+          <div class="library-head">
+            <div>
+              <div class="eyebrow">${statementCount} of ${statementLimit} statements saved</div>
+              <h1>Statement library</h1>
+              <p class="subheading">
+                Review each completed monthly analysis, open individual reports, and add more months until the library is full.
+              </p>
+            </div>
+            <div class="library-actions">
+              ${canAdd ? `<a class="primary-btn" href="/dashboard/statements/upload">Add statement →</a>` : ""}
+              ${statementCount >= 2 ? `<a class="secondary-btn" href="/dashboard/comparison">Two-month comparison</a>` : ""}
+            </div>
+          </div>
+
+          <div class="stats-grid library-stats">
+            <article class="stat-card">
+              <span class="stat-label">Saved statements</span>
+              <div class="stat-value">${statementCount}/${statementLimit}</div>
+              <p class="inline-note">${remaining} remaining</p>
+            </article>
+            <article class="stat-card">
+              <span class="stat-label">Library volume</span>
+              <div class="stat-value">${formatMoney(totalVolume)}</div>
+              <p class="inline-note">Across saved statements</p>
+            </article>
+            <article class="stat-card">
+              <span class="stat-label">Latest rate</span>
+              <div class="stat-value">${latest ? formatPct(latest.effectiveRate) : "—"}</div>
+              <p class="inline-note">${latest ? escapeHtml(formatPeriodLabel(latest.period) || latest.period) : "No report yet"}</p>
+            </article>
+          </div>
+
+          <section class="table-card statement-library-section">
+            <div class="card-head">
+              <div>
+                <span class="kicker">Statement status</span>
+                <h2>Monthly reports</h2>
+              </div>
+              ${canAdd ? `<a class="secondary-btn" href="/dashboard/statements/upload">Upload another</a>` : `<span class="status-pill info">Library limit reached</span>`}
+            </div>
+            ${statementRows(items)}
+          </section>
+        `;
+
+        page.querySelectorAll("[data-retry-job]").forEach((button) => {
+          button.addEventListener("click", () => retryJob(button.getAttribute("data-retry-job"), button));
+        });
+      }
+
+      async function boot() {
+        try {
+          clearPendingStatementJobId();
+          const data = await fetchJson("/api/dashboard/statements");
+          render(data);
+        } catch (error) {
+          page.innerHTML = `
+            <div class="eyebrow">We hit a problem</div>
+            <h1>Unable to load statement library.</h1>
+            <p class="form-error">${escapeHtml(error instanceof Error ? error.message : "Please refresh and try again.")}</p>
+          `;
+        }
+      }
+
+      boot();
+    </script>
+  </body>
+</html>

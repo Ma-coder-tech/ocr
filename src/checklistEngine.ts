@@ -14,6 +14,7 @@ import {
 } from "./types.js";
 import { analyzeTwoBucketStatement } from "./twoBucketAnalysis.js";
 import { buildProcessorCorpus, detectProcessorIdentity } from "./processorDetection.js";
+import { detectFeeDrift } from "./feeDrift.js";
 
 type UniversalElement = {
   id: string;
@@ -38,6 +39,10 @@ type ProcessorChecklist = {
 type LoadedChecklists = {
   universal: MasterChecklist;
   processors: ProcessorChecklist;
+};
+
+type ChecklistEvaluationOptions = {
+  previousSummary?: AnalysisSummary | null;
 };
 
 let checklistCachePromise: Promise<LoadedChecklists> | null = null;
@@ -1951,6 +1956,7 @@ function evaluateCrossChecks(
   summary: AnalysisSummary,
   text: string,
   checks: string[],
+  options: ChecklistEvaluationOptions = {},
   surchargePolicy: SurchargePolicyEvidence = detectSurchargePolicyEvidence(doc, text),
 ): ChecklistBucket {
   const resolveCrossCheckTag = (check: string):
@@ -2201,6 +2207,50 @@ function evaluateCrossChecks(
       };
     }
 
+    if (tag === "fee_drift") {
+      if (!options.previousSummary) {
+        return {
+          id,
+          title: check,
+          status: "unknown",
+          reason: "Requires a prior statement month before month-over-month fee drift can be evaluated.",
+          evidence: [],
+        };
+      }
+
+      const drift = detectFeeDrift(options.previousSummary, summary);
+      if (drift.status === "unknown") {
+        return {
+          id,
+          title: check,
+          status: "unknown",
+          reason: drift.summary,
+          evidence: [],
+        };
+      }
+
+      if (drift.findings.some((finding) => finding.severity !== "info")) {
+        return {
+          id,
+          title: check,
+          status: "warning",
+          reason: drift.summary,
+          evidence: drift.findings
+            .filter((finding) => finding.severity !== "info")
+            .slice(0, 6)
+            .map((finding) => `${finding.label}: ${finding.reason}`),
+        };
+      }
+
+      return {
+        id,
+        title: check,
+        status: "pass",
+        reason: drift.summary,
+        evidence: drift.findings.slice(0, 4).map((finding) => `${finding.label}: ${finding.reason}`),
+      };
+    }
+
     if (tag === "hidden_markup") {
       const auditEvidence = hiddenMarkupAuditEvidence(summary);
       if (auditEvidence.length > 0) {
@@ -2323,7 +2373,11 @@ async function loadChecklists(): Promise<LoadedChecklists> {
   return checklistCachePromise;
 }
 
-export async function evaluateChecklistReport(doc: ParsedDocument, summary: AnalysisSummary): Promise<ChecklistReport> {
+export async function evaluateChecklistReport(
+  doc: ParsedDocument,
+  summary: AnalysisSummary,
+  options: ChecklistEvaluationOptions = {},
+): Promise<ChecklistReport> {
   const packs = await loadChecklists();
   const text = buildProcessorCorpus(doc);
   const surchargePolicy = detectSurchargePolicyEvidence(doc, text);
@@ -2361,7 +2415,7 @@ export async function evaluateChecklistReport(doc: ParsedDocument, summary: Anal
     skippedReason,
   };
 
-  const crossProcessor = evaluateCrossChecks(doc, summary, text, packs.processors.cross_processor_checks, surchargePolicy);
+  const crossProcessor = evaluateCrossChecks(doc, summary, text, packs.processors.cross_processor_checks, options, surchargePolicy);
 
   return {
     extractionMode: doc.extraction.mode,

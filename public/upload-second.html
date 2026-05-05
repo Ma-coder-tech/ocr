@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Upload your second statement</title>
+    <title>Upload statement</title>
     <link rel="stylesheet" href="/dashboard.css" />
   </head>
   <body>
@@ -34,10 +34,12 @@
 
       let selectedFile = null;
       let validatedUpload = null;
+      let savedStatements = [];
+      let libraryRemaining = 0;
 
       function topbarMarkup(merchant) {
         return `
-          <a class="logo" href="/dashboard/report" aria-label="FeeClear">
+          <a class="logo" href="/dashboard/statements" aria-label="FeeClear">
             <span class="logo-mark">F</span>
             <span class="logo-copy">
               <span class="logo-kicker">Merchant statement analysis</span>
@@ -55,15 +57,145 @@
       function renderStatusRow(payload, tone, detail) {
         const statusRow = document.getElementById("statusRow");
         statusRow.classList.remove("hidden");
+        const label = payload.status === "needs_period" ? "needs period" : payload.status || (tone === "error" ? "error" : "ready");
         statusRow.innerHTML = `
           <div>
             <div class="file-name">${escapeHtml(payload.fileName || selectedFile?.name || "Selected file")}</div>
             <div class="file-meta">${escapeHtml(detail)}</div>
           </div>
-          <div class="file-meta">${escapeHtml(formatPeriodLabel(payload.detectedStatementPeriod) || payload.detectedStatementPeriod || "Still detecting period")}</div>
+          <div class="file-meta">${escapeHtml(formatPeriodLabel(payload.detectedStatementPeriod) || payload.detectedStatementPeriod || "Period not detected")}</div>
           <div class="file-meta">${escapeHtml(payload.fileSize ? fileSizeLabel(payload.fileSize) : fileSizeLabel(selectedFile?.size || 0))}</div>
-          <div><span class="status-pill ${tone}">${escapeHtml(payload.status || (tone === "error" ? "error" : "ready"))}</span></div>
+          <div><span class="status-pill ${tone}">${escapeHtml(label)}</span></div>
         `;
+      }
+
+      function resetDecisionPanels() {
+        document.getElementById("periodPrompt")?.classList.add("hidden");
+        document.getElementById("duplicatePrompt")?.classList.add("hidden");
+      }
+
+      function monthOptions() {
+        return Array.from({ length: 12 }, (_, index) => {
+          const value = String(index + 1).padStart(2, "0");
+          const label = new Date(2024, index, 1).toLocaleString("en-US", { month: "long" });
+          return `<option value="${value}">${label}</option>`;
+        }).join("");
+      }
+
+      function findSavedStatementByPeriodKey(periodKey) {
+        return savedStatements.find((statement) => statement.periodKey === periodKey) || null;
+      }
+
+      function renderDuplicatePrompt(existingStatement, payload) {
+        const prompt = document.getElementById("duplicatePrompt");
+        prompt.classList.remove("hidden");
+        prompt.innerHTML = `
+          <section class="summary-card">
+            <span class="kicker">Duplicate month</span>
+            <h2>${escapeHtml(formatPeriodLabel(existingStatement.period) || existingStatement.period)} is already saved.</h2>
+            <p class="body-copy">
+              Replace the saved statement only if this file is the corrected statement for that same month.
+            </p>
+            <div class="reference-card duplicate-reference">
+              <div class="reference-head">
+                <div>
+                  <div class="file-name">${escapeHtml(existingStatement.processorName || "Processor not identified")}</div>
+                  <div class="reference-meta">${formatMoney(existingStatement.totalVolume)} volume · ${formatMoney(existingStatement.totalFees)} fees · ${formatPct(existingStatement.effectiveRate)}</div>
+                </div>
+                <a class="secondary-btn compact-btn" href="/dashboard/statements/${encodeURIComponent(existingStatement.id)}/report">Existing report</a>
+              </div>
+            </div>
+            <div class="button-row duplicate-actions">
+              <button id="replaceStatementBtn" class="primary-btn" type="button">Replace saved statement →</button>
+              <button id="chooseDifferentBtn" class="secondary-btn" type="button">Choose another file</button>
+            </div>
+          </section>
+        `;
+
+        document.getElementById("replaceStatementBtn").addEventListener("click", () => {
+          validatedUpload = { ...payload, replaceStatementId: existingStatement.id, confirmedPeriodKey: existingStatement.periodKey };
+          document.getElementById("duplicatePrompt").classList.add("hidden");
+          renderStatusRow(validatedUpload, "ready", "Ready to replace the saved statement for this month.");
+          const analyzeBtn = document.getElementById("analyzeBtn");
+          analyzeBtn.textContent = "Replace saved statement →";
+          document.getElementById("analyzeBtnWrap").classList.remove("hidden");
+        });
+
+        document.getElementById("chooseDifferentBtn").addEventListener("click", () => {
+          document.getElementById("fileInput").click();
+        });
+      }
+
+      function renderPeriodPrompt(payload) {
+        const prompt = document.getElementById("periodPrompt");
+        const now = new Date();
+        prompt.classList.remove("hidden");
+        prompt.innerHTML = `
+          <section class="summary-card">
+            <span class="kicker">Confirm statement month</span>
+            <h2>Choose the month shown on the PDF.</h2>
+            <p class="body-copy">We could not confidently read the statement period. Pick the month before analysis starts so the library stays clean.</p>
+            <div class="form-row two-up period-confirm-grid">
+              <label>
+                Month
+                <select id="periodMonth">${monthOptions()}</select>
+              </label>
+              <label>
+                Year
+                <input id="periodYear" type="text" inputmode="numeric" maxlength="4" value="${escapeHtml(now.getFullYear())}" />
+              </label>
+            </div>
+            <div id="periodDuplicateNote" class="inline-error hidden"></div>
+          </section>
+        `;
+
+        const monthInput = document.getElementById("periodMonth");
+        const yearInput = document.getElementById("periodYear");
+        monthInput.value = String(now.getMonth() + 1).padStart(2, "0");
+
+        const syncPeriod = () => {
+          const year = String(yearInput.value || "").trim();
+          const month = String(monthInput.value || "").trim();
+          const analyzeBtnWrap = document.getElementById("analyzeBtnWrap");
+          const duplicateNote = document.getElementById("periodDuplicateNote");
+          if (!/^20\d{2}$/.test(year) || !/^(0[1-9]|1[0-2])$/.test(month)) {
+            document.getElementById("duplicatePrompt").classList.add("hidden");
+            analyzeBtnWrap.classList.add("hidden");
+            duplicateNote.textContent = "Enter a valid four-digit year.";
+            duplicateNote.classList.remove("hidden");
+            return;
+          }
+
+          const periodKey = `${year}-${month}`;
+          const duplicate = findSavedStatementByPeriodKey(periodKey);
+          validatedUpload = { ...payload, confirmedPeriodKey: periodKey, replaceStatementId: null };
+          if (duplicate) {
+            analyzeBtnWrap.classList.add("hidden");
+            duplicateNote.textContent = "";
+            duplicateNote.classList.add("hidden");
+            renderDuplicatePrompt(duplicate, validatedUpload);
+            return;
+          }
+
+          if (libraryRemaining <= 0) {
+            document.getElementById("duplicatePrompt").classList.add("hidden");
+            analyzeBtnWrap.classList.add("hidden");
+            duplicateNote.textContent = "Your library is full. Choose a saved month if this file should replace an existing statement.";
+            duplicateNote.classList.remove("hidden");
+            return;
+          }
+
+          document.getElementById("duplicatePrompt").classList.add("hidden");
+          duplicateNote.textContent = "";
+          duplicateNote.classList.add("hidden");
+          renderStatusRow({ ...payload, detectedStatementPeriod: formatPeriodLabel(periodKey), status: "ready" }, "ready", "Statement month confirmed.");
+          document.getElementById("analyzeBtn").textContent = "Analyze statement →";
+          analyzeBtnWrap.classList.remove("hidden");
+        };
+
+        monthInput.addEventListener("change", syncPeriod);
+        yearInput.addEventListener("input", syncPeriod);
+        syncPeriod();
       }
 
       async function validateSelectedFile(file) {
@@ -73,23 +205,35 @@
         document.getElementById("analyzeBtnWrap").classList.add("hidden");
         document.getElementById("uploadError").classList.add("hidden");
         document.getElementById("uploadError").textContent = "";
+        resetDecisionPanels();
 
         renderStatusRow(
           { fileName: file.name, fileSize: file.size, detectedStatementPeriod: "Checking statement period…", status: "validating" },
           "validating",
-          "Validating your second statement against your saved first month.",
+          "Validating this statement against your saved library.",
         );
 
         const formData = new FormData();
         formData.append("file", file);
 
         try {
-          const payload = await fetchJson("/api/dashboard/statement2/validate", {
+          const payload = await fetchJson("/api/dashboard/statements/validate", {
             method: "POST",
             body: formData,
           });
           validatedUpload = payload;
+          if (payload.duplicate && payload.existingStatement) {
+            renderStatusRow(payload, "validating", "This month is already in your library.");
+            renderDuplicatePrompt(payload.existingStatement, payload);
+            return;
+          }
+          if (payload.requiresPeriodConfirmation) {
+            renderStatusRow(payload, "validating", "Confirm the statement month before analysis starts.");
+            renderPeriodPrompt(payload);
+            return;
+          }
           renderStatusRow(payload, "ready", "This statement is ready to analyze.");
+          document.getElementById("analyzeBtn").textContent = "Analyze statement →";
           document.getElementById("analyzeBtnWrap").classList.remove("hidden");
         } catch (error) {
           renderStatusRow(
@@ -109,10 +253,14 @@
         analyzeBtn.disabled = true;
         analyzeBtn.textContent = "Starting analysis...";
         try {
-          const payload = await fetchJson("/api/dashboard/statement2/start", {
+          const payload = await fetchJson("/api/dashboard/statements/start", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ uploadId: validatedUpload.uploadId }),
+            body: JSON.stringify({
+              uploadId: validatedUpload.uploadId,
+              replaceStatementId: validatedUpload.replaceStatementId || null,
+              confirmedPeriodKey: validatedUpload.confirmedPeriodKey || null,
+            }),
           });
           window.location.href = payload.redirectTo;
         } catch (error) {
@@ -120,31 +268,43 @@
           uploadError.textContent = error instanceof Error ? error.message : "We could not start the analysis.";
           uploadError.classList.remove("hidden");
           analyzeBtn.disabled = false;
-          analyzeBtn.textContent = "Analyze second statement →";
+          analyzeBtn.textContent = "Analyze statement →";
         }
       }
 
       async function boot() {
         try {
           clearPendingStatementJobId();
-          const data = await fetchJson("/api/dashboard/upload-second/context");
-          const { merchant, statement1 } = data;
+          const data = await fetchJson("/api/dashboard/statements/upload-context");
+          const { merchant } = data;
+          const statement1 = data.firstStatement || data.statement1;
+          savedStatements = Array.isArray(data.statements) ? data.statements : [];
+          libraryRemaining = Number(merchant.freeStatementsRemaining || 0);
           const verdictClass = verdictTone(statement1.benchmarkVerdict);
+          const statementLimit = Number(merchant.statementLimit || 12);
+          const canAddStatement = libraryRemaining > 0;
+          const nextStatementNumber = Math.min(savedStatements.length + 1, statementLimit);
+          const activeStepLabel = canAddStatement ? `Statement ${nextStatementNumber}` : "Replacement";
+          const heading = canAddStatement ? "Let&apos;s add another month" : "Replace a saved month";
+          const intro = canAddStatement
+            ? `You uploaded ${escapeHtml(formatPeriodLabel(statement1.period) || statement1.period)} already. Add another monthly statement so we can start seeing whether your fees are consistent — or changing.`
+            : `Your statement library is full. Upload a corrected statement for a month that is already saved, then choose replace when prompted.`;
+          const guidance = canAddStatement
+            ? "Pick a different month — ideally the one right before or after your first statement. The more the months differ, the clearer the story becomes."
+            : "The system will block a new month at the limit, but it can still replace an existing month when the statement period matches.";
 
           topbar.innerHTML = topbarMarkup(merchant);
           attachDevResetHandler(topbar);
           stepper.innerHTML = progressMarkup([
-            { label: "Statement 1", state: "completed" },
-            { label: "Statement 2", state: "active" },
-            { label: "Your picture", state: "" },
+            { label: "Saved statements", state: "completed" },
+            { label: activeStepLabel, state: "active" },
+            { label: "Report", state: "" },
           ]);
 
           page.innerHTML = `
-            <div class="eyebrow">Free account · ${merchant.freeStatementsRemaining} statement remaining</div>
-            <h1>Let&apos;s add another month</h1>
-            <p class="subheading">
-              You uploaded ${escapeHtml(formatPeriodLabel(statement1.period) || statement1.period)} already. Add a different month so we can start seeing whether your fees are consistent — or changing.
-            </p>
+            <div class="eyebrow">${savedStatements.length} of ${statementLimit} statements saved · ${libraryRemaining} remaining</div>
+            <h1>${heading}</h1>
+            <p class="subheading">${intro}</p>
 
             <section class="reference-card" style="margin-top: 24px;">
               <div class="reference-head">
@@ -163,20 +323,22 @@
             </section>
 
             <p class="inline-note" style="margin-top: 20px;">
-              Pick a different month — ideally the one right before or after your first statement. The more the months differ, the clearer the story becomes.
+              ${guidance}
             </p>
 
-            <div class="upload-zone" id="dropzone" style="margin-top: 22px;" tabindex="0" role="button" aria-label="Upload second statement">
-              <div class="upload-zone-title">Drop your second statement here</div>
+            <div class="upload-zone" id="dropzone" style="margin-top: 22px;" tabindex="0" role="button" aria-label="Upload statement">
+              <div class="upload-zone-title">Drop your statement here</div>
               <p class="upload-zone-hint">or click to browse · PDF only · Choose a different month than ${escapeHtml(formatPeriodLabel(statement1.period) || statement1.period)}</p>
             </div>
             <input id="fileInput" type="file" accept="application/pdf,.pdf" class="hidden" />
 
             <div id="statusRow" class="file-status-row hidden" style="margin-top: 18px;"></div>
+            <div id="periodPrompt" class="hidden decision-panel"></div>
+            <div id="duplicatePrompt" class="hidden decision-panel"></div>
             <div id="uploadError" class="inline-error hidden" style="margin-top: 12px;"></div>
 
             <div id="analyzeBtnWrap" class="button-row hidden" style="margin-top: 20px;">
-              <button id="analyzeBtn" class="primary-btn" type="button">Analyze second statement →</button>
+              <button id="analyzeBtn" class="primary-btn" type="button">Analyze statement →</button>
             </div>
           `;
 

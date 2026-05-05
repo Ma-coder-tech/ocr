@@ -1,6 +1,17 @@
 import type { BusinessTypeId } from "./businessTypes.js";
 import type { ProcessorDetection } from "./processorDetection.js";
 
+export type StatementSlot = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+export const STATEMENT_SLOT_VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const satisfies readonly StatementSlot[];
+
+export function isStatementSlot(value: unknown): value is StatementSlot {
+  const slot = Number(value);
+  return Number.isInteger(slot) && STATEMENT_SLOT_VALUES.includes(slot as StatementSlot);
+}
+
+export type StatementAnalysisStatus = "completed";
+export const STATEMENT_ANALYSIS_STATUS_VALUES = ["completed"] as const satisfies readonly StatementAnalysisStatus[];
+
 export type JobStatus =
   | "queued"
   | "verifying_statement"
@@ -505,6 +516,164 @@ export type PublicChecklistReport = {
   findings: PublicChecklistFinding[];
 };
 
+export type FeeDriftFindingKind =
+  | "new_fee"
+  | "removed_fee"
+  | "recurring_fee_added"
+  | "amount_increase"
+  | "rate_increase"
+  | "per_item_increase"
+  | "repricing_notice"
+  | "opaque_change";
+
+export type FeeDriftSeverity = "info" | "warning" | "critical";
+
+export type FeeDriftFinding = {
+  kind: FeeDriftFindingKind;
+  severity: FeeDriftSeverity;
+  label: string;
+  normalizedKey: string;
+  bucket: StatementEconomicBucket | "per_item" | "repricing" | "unknown";
+  earlierAmountUsd: number | null;
+  laterAmountUsd: number | null;
+  amountDeltaUsd: number | null;
+  earlierRateBps: number | null;
+  laterRateBps: number | null;
+  rateDeltaBps: number | null;
+  earlierPerItemUsd: number | null;
+  laterPerItemUsd: number | null;
+  perItemDeltaUsd: number | null;
+  reason: string;
+  evidence: string[];
+  confidence: FeeClassificationConfidence;
+};
+
+export type FeeDriftReport = {
+  status: "pass" | "warning" | "unknown";
+  summary: string;
+  comparedFeeCount: number;
+  findings: FeeDriftFinding[];
+};
+
+export type AggregateAuditMetric =
+  | "effective_rate"
+  | "total_fees"
+  | "volume"
+  | "processor_markup"
+  | "card_brand_pass_through";
+
+export type AggregateAuditTrendDirection = "up" | "down" | "flat" | "baseline" | "unknown";
+
+export type AggregateAuditTrendPoint = {
+  statementId: number;
+  period: string;
+  periodKey: string;
+  value: number | null;
+};
+
+export type AggregateAuditTrend = {
+  metric: AggregateAuditMetric;
+  label: string;
+  unit: "percent" | "money" | "bps";
+  points: AggregateAuditTrendPoint[];
+  observedPointCount: number;
+  firstValue: number | null;
+  latestValue: number | null;
+  absoluteDelta: number | null;
+  percentDelta: number | null;
+  averageMonthlyChange: number | null;
+  direction: AggregateAuditTrendDirection;
+  confidence: "high" | "medium" | "low";
+  note: string;
+};
+
+export type AggregateAuditFeeTimelineEntry = {
+  normalizedKey: string;
+  label: string;
+  bucket: StatementEconomicBucket | "per_item" | "repricing" | "unknown";
+  origin: "line_item" | "modeled" | "rollup";
+  monthsPresent: number;
+  firstSeenPeriod: string;
+  lastSeenPeriod: string;
+  totalObservedUsd: number | null;
+  latestAmountUsd: number | null;
+  latestRateBps: number | null;
+  latestPerItemUsd: number | null;
+  recurring: boolean;
+  knownUnwanted: boolean;
+  evidence: string[];
+  confidence: FeeClassificationConfidence;
+};
+
+export type AggregateAuditFeeChanges = {
+  newFees: AggregateAuditFeeTimelineEntry[];
+  removedFees: AggregateAuditFeeTimelineEntry[];
+  recurringNuisanceFees: AggregateAuditFeeTimelineEntry[];
+  feeIncreases: FeeDriftFinding[];
+  driftFindings: FeeDriftFinding[];
+};
+
+export type AggregateAuditBenchmark = {
+  monthsAboveBenchmark: number;
+  monthsWithinBenchmark: number;
+  monthsBelowBenchmark: number;
+  aboveBenchmarkPeriods: string[];
+  averageEffectiveRate: number | null;
+  averageBenchmarkHigh: number | null;
+  worstBenchmarkGap: number | null;
+};
+
+export type AggregateAuditOverpayment = {
+  observedOverpaymentUsd: number;
+  averageMonthlyOverpaymentUsd: number;
+  annualizedOverpaymentUsd: number;
+  calculation: "benchmark_ceiling_delta";
+  confidence: "high" | "medium" | "low";
+};
+
+export type AggregateAuditMonthScore = {
+  statementId: number;
+  period: string;
+  periodKey: string;
+  effectiveRate: number;
+  totalFees: number;
+  totalVolume: number;
+  processorMarkupBps: number | null;
+  benchmarkOverpaymentUsd: number;
+  nuisanceFeeUsd: number;
+  score: number;
+  reasons: string[];
+};
+
+export type AggregateAuditVerdictStatus = "healthy" | "watch" | "overpaying" | "urgent" | "unknown";
+
+export type AggregateAuditVerdict = {
+  status: AggregateAuditVerdictStatus;
+  title: string;
+  summary: string;
+  reasons: string[];
+  recommendedActions: string[];
+  confidence: "high" | "medium" | "low";
+};
+
+export type AggregateAuditReport = {
+  statementCount: number;
+  observedPeriods: string[];
+  coverage: {
+    requestedStatementLimit: number;
+    hasFullTwelveMonthHistory: boolean;
+    missingMetricNotes: string[];
+  };
+  trends: Record<AggregateAuditMetric, AggregateAuditTrend>;
+  feeChanges: AggregateAuditFeeChanges;
+  benchmark: AggregateAuditBenchmark;
+  annualizedOverpayment: AggregateAuditOverpayment;
+  bestMonth: AggregateAuditMonthScore | null;
+  worstMonth: AggregateAuditMonthScore | null;
+  verdict: AggregateAuditVerdict;
+  dataQuality: DataQualitySignal[];
+};
+
 export type AnalysisSummary = {
   businessType: BusinessTypeId;
   processorName: string;
@@ -568,17 +737,22 @@ export type PublicReportSummary = Pick<
 
 export type Job = {
   id: string;
+  uploadId?: string | null;
   fileName: string;
   filePath: string;
   fileType: "csv" | "pdf";
   businessType: BusinessTypeId;
   merchantId?: number | null;
-  statementSlot?: 1 | 2 | null;
+  statementSlot?: StatementSlot | null;
+  replaceStatementId?: number | null;
   detectedStatementPeriod?: string | null;
   createdAt: string;
   updatedAt: string;
   status: JobStatus;
   progress: number;
+  attemptCount: number;
+  maxAttempts: number;
+  nextRunAt?: string | null;
   events: JobEvent[];
   error?: string;
   summary?: AnalysisSummary;
