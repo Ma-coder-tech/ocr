@@ -730,7 +730,17 @@ describe("Fiserv First Data full statement parser", () => {
       printedTotal: 378.55,
       delta: 0.01,
     });
-    expect(actual.feeLedger.rows).toHaveLength(49);
+    expect(actual.feeLedger.rows).toHaveLength(50);
+    expect(actual.feeLedger.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          network: "VISA",
+          description: "DISC 6",
+          amount: 0,
+          evidenceLine: "0044464510/31/25 | CF | DISC 6 | 0.01990 | 0.00",
+        }),
+      ]),
+    );
     expect(actual.feeLedger.controls).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -743,7 +753,7 @@ describe("Fiserv First Data full statement parser", () => {
     );
     expect(actual.feeLedger.feeClassificationSummary).toMatchObject({
       status: "validated_with_unresolved_rows",
-      rowCount: 49,
+      rowCount: 50,
       unresolvedRowCount: 9,
       needsUnbundlingRowCount: 4,
       totalClassifiedAmount: 378.54,
@@ -1207,18 +1217,90 @@ describe("Fiserv First Data full statement parser", () => {
       fundedTotal: 2620.92,
     });
     expect(actual.feeLedger).toMatchObject({
-      status: "unreconciled",
-      totalRowSum: 87.2,
+      status: "reconciled_with_rounding_delta",
+      totalRowSum: 91.2,
       printedTotal: 91.19,
-      delta: 3.99,
+      delta: -0.01,
     });
+    expect(actual.feeLedger.feeClassificationSummary).toMatchObject({
+      status: "validated_with_rounding_delta",
+      rowCount: 51,
+      classifiedRowCount: 51,
+      unresolvedRowCount: 0,
+      needsUnbundlingRowCount: 0,
+      totalClassifiedAmount: 91.2,
+      printedTotal: 91.19,
+      delta: -0.01,
+    });
+    expect(actual.feeLedger.feeClassificationSummary.bucketTotals).toEqual([
+      { economicBucket: "card_brand_pass_through", amount: 43.74, rowCount: 29 },
+      { economicBucket: "processor_transaction_or_auth", amount: 27.9, rowCount: 12 },
+      { economicBucket: "miscellaneous_or_statement_fee", amount: 13.95, rowCount: 2 },
+      { economicBucket: "processor_controlled_flat_discount_fee", amount: 5.61, rowCount: 7 },
+      { economicBucket: "zero_amount_no_charge", amount: 0, rowCount: 1 },
+    ]);
+    expect(actual.feeLedger.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          network: "MASTERCARD",
+          description: "CPU GTWY",
+          amount: 4,
+          evidenceLine: "0045247508/31/25 | CF | CPU GTWY | 40.00 | 0.1000 | -$4.00",
+        }),
+        expect.objectContaining({
+          network: "VISA",
+          description: "FIXED NETWORK CP FEE",
+          amount: 1.45,
+          classification: expect.objectContaining({
+            economicBucket: "card_brand_pass_through",
+            confidence: "high",
+            rule: "FISERV_CARD_BRAND_ASSESSMENT_LABEL",
+            passedThroughAtCostKnown: false,
+          }),
+        }),
+        expect.objectContaining({
+          network: null,
+          description: "SALES ITEMS",
+          amount: 6.4,
+          classification: expect.objectContaining({
+            economicBucket: "processor_transaction_or_auth",
+            confidence: "medium",
+            rule: "FISERV_GENERIC_SALES_ITEM_FEE",
+          }),
+        }),
+        expect.objectContaining({
+          network: null,
+          description: "REGULATORY PRODUCT",
+          amount: 3.95,
+          classification: expect.objectContaining({
+            economicBucket: "miscellaneous_or_statement_fee",
+            confidence: "high",
+            rule: "FISERV_MISCELLANEOUS_ACCOUNT_FEE",
+          }),
+        }),
+        expect.objectContaining({
+          network: "VISA",
+          description: "DISC 1",
+          amount: 0.79,
+          classification: expect.objectContaining({
+            economicBucket: "processor_controlled_flat_discount_fee",
+            confidence: "medium",
+            rule: "FISERV_PROCESSOR_DISCOUNT_LABEL_EVIDENCE",
+          }),
+        }),
+      ]),
+    );
     expect(actual.decision).toMatchObject({
-      status: "needs_review",
-      reportable: false,
+      status: "accepted_with_warnings",
+      reportable: true,
       validationState: {
         topLevelTotals: "validated",
-        feeLedger: "failed",
+        feeLedger: "validated_with_rounding",
         batchLedger: "validated",
+        feeClassification: "validated_with_rounding",
+        customerFacingTotalsAllowed: true,
+        feeLedgerAllowed: true,
+        feeClassificationAllowed: true,
       },
     });
   });

@@ -111,7 +111,9 @@ const CARD_BRAND_FEE_LABELS = new Set([
   "KILOBYTE AUTH FEE US",
   "ACQR PROCESSOR FEES",
   "ACOR PROCESSOR FEES",
+  "FIXED NETWORK CP FEE",
   "FIXED NETWORK CNP FEE",
+  "FILE TRANSMISSION FEE",
   "CR DUES AND ASSESS",
   "DB DUES AND ASSESS",
   "BIN ICA FEE",
@@ -121,11 +123,13 @@ const CARD_BRAND_FEE_LABELS = new Set([
   "AMEX ACQR TRANSACTION FEE",
   "NETWORK FEE",
   "ACQ ISA FEE",
+  "INTRNTL ACQ PROC FEE DB",
   "ZERO FLOOR FEES",
   "INTERNTL ACQUIRER FEE",
   "TRAN INTEGRITY FEE",
   "VISA DISPUTE NO ACCEPT",
   "ADDRESS VERIFICATION US",
+  "DSCV AUTH FEE",
   "DSCV DATA USAGE FEE",
   "ADDR VERIFICATION SRV FEE",
   "DISC NETWORK AUTH FEE",
@@ -145,6 +149,7 @@ const PROCESSOR_ACCOUNT_OR_MISC_LABELS = new Set([
   "ACH REJECT FEE",
   "PCI MONTHLY FEE",
   "COMM CARD I/C SAVINGS ADJ",
+  "REGULATORY PRODUCT",
   "STATEMENT FEE",
   "DEBIT MONTHLY FEE",
   "CHARGEBACKS",
@@ -439,6 +444,22 @@ export function classifyFiservProcessorFeeRow(
     });
   }
 
+  if (description === "DISC 1" || description === "OTHER VOLUME FEES") {
+    return classification({
+      economicBucket: "processor_controlled_flat_discount_fee",
+      confidence: "medium",
+      rule: "FISERV_PROCESSOR_DISCOUNT_LABEL_EVIDENCE",
+      reason:
+        "The fee label and rate/volume math behave like processor-controlled discount markup, but the processor-specific abbreviation does not expose a card-brand pass-through reference.",
+      row,
+      needsUnbundling: false,
+      atCostStatus: "not_applicable",
+      atCostReasonCode: "NOT_PASS_THROUGH_CATEGORY",
+      costExposure: "not_applicable",
+      marginAmountKnown: true,
+    });
+  }
+
   if (CARD_BRAND_FEE_LABELS.has(description)) {
     const isLumpInterchangeLine = description === "INTERCHANGE" || description === "TOTAL INTERCHANGE";
     const atCost = isLumpInterchangeLine ? null : atCostFromReferenceMatch(referenceMatchFor(row, context));
@@ -481,6 +502,21 @@ export function classifyFiservProcessorFeeRow(
       rule: "FISERV_GENERIC_ITEM_FEE",
       reason:
         "The row is a per-item charge with count and rate evidence, but the label is generic, so it is treated as processor-controlled with medium confidence.",
+      row,
+      atCostStatus: "not_applicable",
+      atCostReasonCode: "NOT_PASS_THROUGH_CATEGORY",
+      costExposure: "not_applicable",
+      marginAmountKnown: true,
+    });
+  }
+
+  if (description === "SALES ITEMS") {
+    return classification({
+      economicBucket: "processor_transaction_or_auth",
+      confidence: "medium",
+      rule: "FISERV_GENERIC_SALES_ITEM_FEE",
+      reason:
+        "The row is a per-item sales charge with count and rate evidence, so it is treated as processor-controlled transaction economics with medium confidence.",
       row,
       atCostStatus: "not_applicable",
       atCostReasonCode: "NOT_PASS_THROUGH_CATEGORY",

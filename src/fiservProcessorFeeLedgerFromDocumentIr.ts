@@ -204,9 +204,10 @@ function parseFeeRows(lines: DocumentLine[]): ParsedFeeRow[] {
       network = normalizedHeading;
       continue;
     }
-    if (!/^\d{2}\/\d{2}(?:\/\d{2})?\s*\|\s*(CF|MISC)\s*\|/.test(content)) continue;
+    const feeRowContent = normalizeFeeRowContent(content);
+    if (!/^\d{2}\/\d{2}(?:\/\d{2})?\s*\|\s*(CF|MISC)\s*\|/.test(feeRowContent)) continue;
 
-    const parts = cellParts(content);
+    const parts = cellParts(feeRowContent);
     const date = parts[0] ?? null;
     const type = parts[1] ?? null;
     const description = parts[2]?.replace(/\s+/g, " ").trim() ?? "";
@@ -238,6 +239,11 @@ function parseFeeRows(lines: DocumentLine[]): ParsedFeeRow[] {
   }
 
   return rows;
+}
+
+function normalizeFeeRowContent(content: string): string {
+  const match = content.match(/\d{2}\/\d{2}(?:\/\d{2})?\s*\|\s*(?:CF|MISC)\s*\|/);
+  return match?.index === undefined ? content : content.slice(match.index).trim();
 }
 
 function findTotalLine(lines: DocumentLine[], predicate: (normalizedText: string) => boolean): TotalLine | null {
