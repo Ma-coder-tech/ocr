@@ -3,7 +3,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { parse } from "csv-parse/sync";
 
-const PDF_PARSE_TIMEOUT_MS = Number(process.env.PDF_PARSE_TIMEOUT_MS ?? 30_000);
+const PDF_PARSE_TIMEOUT_MS = Number(process.env.PDF_PARSE_TIMEOUT_MS ?? 60_000);
 const require = createRequire(import.meta.url);
 const PDFJS_STANDARD_FONT_DATA_URL = `${path.join(path.dirname(require.resolve("pdfjs-dist/package.json")), "standard_fonts")}/`;
 
@@ -45,6 +45,24 @@ type PdfLine = {
   y: number;
   cells: PdfCell[];
   text: string;
+};
+
+type PdfJsPageProxy = {
+  getTextContent: () => Promise<{
+    items: Array<{ str?: string; transform?: number[]; width?: number; height?: number }>;
+  }>;
+  cleanup: () => void;
+};
+
+type PdfJsDocumentProxy = {
+  numPages: number;
+  getPage: (pageNumber: number) => Promise<PdfJsPageProxy>;
+  destroy: () => Promise<void>;
+};
+
+type PdfJsLoadingTask = {
+  promise: Promise<PdfJsDocumentProxy>;
+  destroy: () => Promise<void>;
 };
 
 function isLikelyHeaderCell(value: string): boolean {
@@ -265,30 +283,65 @@ function extractPdfLabelValue(line: PdfLine): { label: string; value: string | n
 }
 
 async function extractPdfLines(buffer: Buffer): Promise<PdfLine[]> {
+  // pdfjs-dist expects browser geometry classes even when we only extract text.
+  // Some local Node installs do not load the optional canvas package, so provide
+  // the minimal constructor surface needed for text extraction.
+  const globalScope = globalThis as Record<string, unknown>;
+  if (!globalScope.DOMMatrix) {
+    globalScope.DOMMatrix = class DOMMatrix {
+      a = 1;
+      b = 0;
+      c = 0;
+      d = 1;
+      e = 0;
+      f = 0;
+    };
+  }
+  if (!globalScope.ImageData) {
+    globalScope.ImageData = class ImageData {};
+  }
+  if (!globalScope.Path2D) {
+    globalScope.Path2D = class Path2D {};
+  }
+
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const document = await pdfjs.getDocument({
+  const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(buffer),
     isEvalSupported: false,
     useWorkerFetch: false,
     standardFontDataUrl: PDFJS_STANDARD_FONT_DATA_URL,
-  }).promise;
+  }) as PdfJsLoadingTask;
 
   const lines: PdfLine[] = [];
-  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
-    const page = await document.getPage(pageNumber);
-    const textContent = await page.getTextContent();
-    const items = textContent.items
-      .filter((item): item is typeof item & { str: string; transform: number[]; width: number; height: number } => "str" in item)
-      .map((item) => ({
-        str: item.str,
-        x: item.transform[4] ?? 0,
-        y: item.transform[5] ?? 0,
-        width: item.width ?? 0,
-        height: item.height ?? 0,
-      }))
-      .filter((item) => item.str.length > 0);
+  let document: PdfJsDocumentProxy | null = null;
+  try {
+    document = await loadingTask.promise;
+    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+      const page = await document.getPage(pageNumber);
+      try {
+        const textContent = await page.getTextContent();
+        const items = textContent.items
+          .filter((item): item is typeof item & { str: string; transform: number[]; width: number; height: number } => "str" in item)
+          .map((item) => ({
+            str: item.str,
+            x: item.transform[4] ?? 0,
+            y: item.transform[5] ?? 0,
+            width: item.width ?? 0,
+            height: item.height ?? 0,
+          }))
+          .filter((item) => item.str.length > 0);
 
-    lines.push(...groupPdfItemsIntoLines(items, pageNumber));
+        lines.push(...groupPdfItemsIntoLines(items, pageNumber));
+      } finally {
+        page.cleanup();
+      }
+    }
+  } finally {
+    if (document) {
+      await document.destroy();
+    } else {
+      await loadingTask.destroy();
+    }
   }
 
   return lines;

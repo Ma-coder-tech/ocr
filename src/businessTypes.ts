@@ -58,9 +58,13 @@ export const BUSINESS_TYPES = [
 ] as const;
 
 export type BusinessTypeId = (typeof BUSINESS_TYPES)[number]["id"];
-export const BUSINESS_TYPE_IDS = BUSINESS_TYPES.map((entry) => entry.id) as readonly BusinessTypeId[];
+export type BusinessTypeConfig = (typeof BUSINESS_TYPES)[number];
+export const BUSINESS_TYPE_IDS: readonly BusinessTypeId[] = BUSINESS_TYPES.map((entry) => entry.id);
 
-const BUSINESS_TYPE_MAP = new Map(BUSINESS_TYPES.map((entry) => [entry.id, entry]));
+const BUSINESS_TYPE_MAP = new Map<BusinessTypeId, BusinessTypeConfig>();
+for (const entry of BUSINESS_TYPES) {
+  BUSINESS_TYPE_MAP.set(entry.id, entry);
+}
 
 export function isBusinessTypeId(value: string): value is BusinessTypeId {
   return BUSINESS_TYPE_MAP.has(value as BusinessTypeId);

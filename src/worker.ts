@@ -114,10 +114,10 @@ async function processJob(jobId: string): Promise<void> {
     const job = startJobAttempt(jobId);
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
-    const [{ parseCsv, parsePdf }, { analyzeDocument }, { evaluateChecklistReport }] =
+    const [{ parseCsv, parsePdf }, { analyzeStatementDocument }, { evaluateChecklistReport }] =
       await Promise.all([
         import("./parser.js"),
-        import("./analyzer.js"),
+        import("./statementParserOrchestrator.js"),
         import("./checklistEngine.js"),
       ]);
 
@@ -150,7 +150,7 @@ async function processJob(jobId: string): Promise<void> {
     stageUpdate(jobId, "extracting_fee_line_items", 48, "Extracting fee line items");
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
-    let summary = analyzeDocument(parsed, job.businessType);
+    let summary = analyzeStatementDocument(parsed, job.businessType, { sourceFileName: job.fileName });
     console.log(`[job:${jobId}] deterministic-summary`, {
       businessType: job.businessType,
       processor: summary.processorName,

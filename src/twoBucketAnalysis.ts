@@ -1,37 +1,12 @@
 import type { ParsedDocument } from "./parser.js";
-import type { AnalysisSummary } from "./types.js";
-
-export type TwoBucketEvidence = {
-  label: string;
-  amount: number;
-  line: string;
-  lineIndex: number;
-};
-
-export type TwoBucketAnalysis = {
-  totalFees: number | null;
-  cardBrandTotal: number | null;
-  processorOwnedTotal: number | null;
-  unknownTotal: number | null;
-  cardBrandSharePct: number | null;
-  processorOwnedSharePct: number | null;
-  coveragePct: number | null;
-  reconciliationDeltaUsd: number | null;
-  available: boolean;
-  reason: string;
-  evidence: {
-    totalFees: TwoBucketEvidence[];
-    cardBrand: TwoBucketEvidence[];
-    processorOwned: TwoBucketEvidence[];
-  };
-};
+import type { AnalysisSummary, StatementEconomicRollup, TwoBucketAnalysis, TwoBucketEvidence } from "./types.js";
 
 type PatternSpec = {
   label: string;
   pattern: RegExp;
 };
 
-const MONEY_RE = /\(?-?\$?\d[\d,]*\.\d{2}\)?/g;
+const MONEY_RE = /\(?-?\$?\d[\d,\s]*\.\d{2}\)?/g;
 
 const TOTAL_FEE_PATTERNS: PatternSpec[] = [
   {
@@ -43,6 +18,10 @@ const TOTAL_FEE_PATTERNS: PatternSpec[] = [
     pattern: /total fees due/i,
   },
   {
+    label: "Total Miscellaneous Fees and Card Fees",
+    pattern: /total\s*\(miscellaneous fees and card fees\)/i,
+  },
+  {
     label: "Summary fees total",
     pattern: /^fees-\$?\d/i,
   },
@@ -52,6 +31,10 @@ const CARD_BRAND_OVERALL_PATTERNS: PatternSpec[] = [
   {
     label: "Total Interchange Charges/Program Fees",
     pattern: /total interchange charges\/program fees/i,
+  },
+  {
+    label: "Total Card Fees",
+    pattern: /^total card fees(?:\s*[:\-|]|\s{2,})/i,
   },
 ];
 
@@ -91,10 +74,20 @@ const PROCESSOR_COMPONENT_PATTERNS: PatternSpec[] = [
     pattern: /^total other fees(?:\s*[:\-|]|\s{2,})/i,
   },
   {
+    label: "Total Miscellaneous Fees",
+    pattern: /^total miscellaneous fees(?:\s*[:\-|]|\s{2,})/i,
+  },
+  {
     label: "Total Account Fees",
     pattern: /^total account fees(?:\s*[:\-|]|\s{2,})/i,
   },
 ];
+
+const RECONCILIATION_DOLLAR_TOLERANCE = 5;
+const RECONCILIATION_PCT_TOLERANCE = 0.02;
+const STRUCTURED_ROLLUP_CONFIDENCE_THRESHOLD = 0.55;
+const STRUCTURED_COMPONENT_COVERAGE_FLOOR = 0.85;
+const STRUCTURED_COMPONENT_COVERAGE_CEILING = 1.15;
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
@@ -182,6 +175,275 @@ function sumEvidence(items: TwoBucketEvidence[]): number | null {
   return round2(items.reduce((sum, item) => sum + item.amount, 0));
 }
 
+function evidenceCount(analysis: TwoBucketAnalysis): number {
+  return analysis.evidence.totalFees.length + analysis.evidence.cardBrand.length + analysis.evidence.processorOwned.length;
+}
+
+function finitePositive(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? round2(number) : null;
+}
+
+function evidenceFromStructuredRows(
+  rollup: StatementEconomicRollup,
+  bucket: "card_brand_pass_through" | "processor_markup" | "add_on_fees",
+): TwoBucketEvidence[] {
+  return rollup.feeRows
+    .filter((row) => row.bucket === bucket && row.amount > 0)
+    .map((row) => ({
+      label: row.label,
+      amount: round2(row.amount),
+      line: row.evidenceLine,
+      lineIndex: row.rowIndex,
+    }));
+}
+
+function totalFeesEvidenceFromRollup(rollup: StatementEconomicRollup): TwoBucketEvidence[] {
+  if (rollup.totalFees === null || rollup.totalFees <= 0) return [];
+  return [
+    {
+      label: "Structured statement total fees",
+      amount: round2(rollup.totalFees),
+      line: "Structured economic rollup total fees",
+      lineIndex: -1,
+    },
+  ];
+}
+
+function finalizeAnalysis(input: {
+  source: TwoBucketAnalysis["source"];
+  totalFees: number | null;
+  cardBrandTotal: number | null;
+  processorControlledTotal: number | null;
+  evidence: TwoBucketAnalysis["evidence"];
+  missingTotalReason: string;
+  missingCardBrandReason: string;
+  missingProcessorReason: string;
+}): TwoBucketAnalysis {
+  const { source, totalFees, cardBrandTotal, processorControlledTotal, evidence } = input;
+
+  if (totalFees === null) {
+    return {
+      source,
+      totalFees: null,
+      cardBrandTotal: null,
+      processorOwnedTotal: null,
+      processorControlledTotal: null,
+      unknownTotal: null,
+      cardBrandSharePct: null,
+      processorOwnedSharePct: null,
+      processorControlledSharePct: null,
+      coveragePct: null,
+      reconciliationDeltaUsd: null,
+      available: false,
+      reason: input.missingTotalReason,
+      evidence,
+    };
+  }
+
+  if (cardBrandTotal === null) {
+    return {
+      source,
+      totalFees,
+      cardBrandTotal: null,
+      processorOwnedTotal: null,
+      processorControlledTotal: null,
+      unknownTotal: null,
+      cardBrandSharePct: null,
+      processorOwnedSharePct: null,
+      processorControlledSharePct: null,
+      coveragePct: null,
+      reconciliationDeltaUsd: null,
+      available: false,
+      reason: input.missingCardBrandReason,
+      evidence,
+    };
+  }
+
+  if (processorControlledTotal === null) {
+    return {
+      source,
+      totalFees,
+      cardBrandTotal,
+      processorOwnedTotal: null,
+      processorControlledTotal: null,
+      unknownTotal: null,
+      cardBrandSharePct: null,
+      processorOwnedSharePct: null,
+      processorControlledSharePct: null,
+      coveragePct: null,
+      reconciliationDeltaUsd: null,
+      available: false,
+      reason: input.missingProcessorReason,
+      evidence,
+    };
+  }
+
+  const knownTotal = round2(cardBrandTotal + processorControlledTotal);
+  const reconciliationDeltaUsd = round2(Math.abs(totalFees - knownTotal));
+  const tolerance = Math.max(RECONCILIATION_DOLLAR_TOLERANCE, totalFees * RECONCILIATION_PCT_TOLERANCE);
+  const coveragePct = totalFees > 0 ? round2((knownTotal / totalFees) * 100) : null;
+
+  if (reconciliationDeltaUsd > tolerance) {
+    return {
+      source,
+      totalFees,
+      cardBrandTotal,
+      processorOwnedTotal: processorControlledTotal,
+      processorControlledTotal,
+      unknownTotal: null,
+      cardBrandSharePct: null,
+      processorOwnedSharePct: null,
+      processorControlledSharePct: null,
+      coveragePct,
+      reconciliationDeltaUsd,
+      available: false,
+      reason: `Two-bucket totals do not reconcile tightly enough to total fees (delta ${reconciliationDeltaUsd.toFixed(2)}).`,
+      evidence,
+    };
+  }
+
+  const unknownTotal = round2(Math.max(0, totalFees - knownTotal));
+  return {
+    source,
+    totalFees,
+    cardBrandTotal,
+    processorOwnedTotal: processorControlledTotal,
+    processorControlledTotal,
+    unknownTotal,
+    cardBrandSharePct: round2((cardBrandTotal / totalFees) * 100),
+    processorOwnedSharePct: round2((processorControlledTotal / totalFees) * 100),
+    processorControlledSharePct: round2((processorControlledTotal / totalFees) * 100),
+    coveragePct,
+    reconciliationDeltaUsd,
+    available: true,
+    reason: `Card-brand and processor-controlled totals reconcile to total fees with delta ${reconciliationDeltaUsd.toFixed(2)}.`,
+    evidence,
+  };
+}
+
+function analyzeStructuredRollup(rollup: StatementEconomicRollup | null | undefined, summary?: AnalysisSummary): TwoBucketAnalysis | null {
+  if (!rollup) return null;
+
+  const totalFees = finitePositive(rollup.totalFees) ?? finitePositive(summary?.totalFees);
+  if (rollup.confidence < STRUCTURED_ROLLUP_CONFIDENCE_THRESHOLD || rollup.feeRows.length === 0 || totalFees === null) {
+    return null;
+  }
+
+  const cardBrandTotal = finitePositive(rollup.cardBrandPassThrough);
+  const processorControlledTotal = finitePositive((rollup.processorMarkup ?? 0) + (rollup.addOnFees ?? 0));
+  const categorizedTotal = round2(rollup.feeRows.reduce((sum, row) => sum + (row.amount > 0 ? row.amount : 0), 0));
+  const categorizedCoverage = categorizedTotal / totalFees;
+  if (
+    categorizedCoverage < STRUCTURED_COMPONENT_COVERAGE_FLOOR ||
+    categorizedCoverage > STRUCTURED_COMPONENT_COVERAGE_CEILING
+  ) {
+    return null;
+  }
+
+  const evidence = {
+    totalFees: totalFeesEvidenceFromRollup(rollup),
+    cardBrand: evidenceFromStructuredRows(rollup, "card_brand_pass_through"),
+    processorOwned: [
+      ...evidenceFromStructuredRows(rollup, "processor_markup"),
+      ...evidenceFromStructuredRows(rollup, "add_on_fees"),
+    ],
+  };
+
+  return finalizeAnalysis({
+    source: "structured_rollup",
+    totalFees,
+    cardBrandTotal,
+    processorControlledTotal,
+    evidence,
+    missingTotalReason: "No reliable total-fees value was found in the structured economic rollup.",
+    missingCardBrandReason: "No card-brand/interchange total was found in the structured economic rollup.",
+    missingProcessorReason: "No processor-controlled total was found in the structured economic rollup.",
+  });
+}
+
+function evidenceFromFeeRows(
+  summary: AnalysisSummary,
+  kind: "cardBrand" | "processorControlled",
+): TwoBucketEvidence[] {
+  return (summary.feeBreakdown ?? [])
+    .filter((row) => row.amount > 0)
+    .filter((row) => {
+      if (row.classificationConfidence === "low") return false;
+      if (kind === "cardBrand") return row.feeClass === "card_brand_pass_through" || row.broadType === "Pass-through";
+      return (
+        row.feeClass === "processor_markup" ||
+        row.feeClass === "processor_transaction_or_auth" ||
+        row.feeClass === "processor_service_add_on" ||
+        row.feeClass === "compliance_remediation" ||
+        row.broadType === "Processor" ||
+        row.broadType === "Service / compliance"
+      );
+    })
+    .map((row) => ({
+      label: row.label,
+      amount: round2(row.amount),
+      line: row.evidenceLine ?? row.label,
+      lineIndex: -1,
+    }));
+}
+
+function analyzeSummaryFeeRows(summary: AnalysisSummary): TwoBucketAnalysis | null {
+  const totalFees = finitePositive(summary.totalFees);
+  if (totalFees === null) return null;
+
+  const cardBrandEvidence = evidenceFromFeeRows(summary, "cardBrand");
+  const processorControlledEvidence = evidenceFromFeeRows(summary, "processorControlled");
+  const auditCardBrandTotal = finitePositive(summary.interchangeAudit?.totalPaid);
+  const feeRowCardBrandTotal = sumEvidence(cardBrandEvidence);
+  const cardBrandTotal = auditCardBrandTotal ?? feeRowCardBrandTotal;
+  const processorControlledTotal = sumEvidence(processorControlledEvidence);
+
+  const cardBrandRowsMatchAudit =
+    auditCardBrandTotal !== null &&
+    feeRowCardBrandTotal !== null &&
+    Math.abs(auditCardBrandTotal - feeRowCardBrandTotal) <= Math.max(1, auditCardBrandTotal * 0.01);
+  const cardBrand =
+    auditCardBrandTotal === null || cardBrandRowsMatchAudit || cardBrandTotal === null
+      ? cardBrandEvidence
+      : [
+          {
+            label: "card brand interchange detail",
+            amount: cardBrandTotal,
+            line: "Rollup from captured interchange audit rows",
+            lineIndex: -1,
+          },
+        ];
+
+  return finalizeAnalysis({
+    source: "summary_fee_rows",
+    totalFees,
+    cardBrandTotal,
+    processorControlledTotal,
+    evidence: {
+      totalFees: [
+        {
+          label: "Summary total fees",
+          amount: totalFees,
+          line: "Analysis summary total fees",
+          lineIndex: -1,
+        },
+      ],
+      cardBrand,
+      processorOwned: processorControlledEvidence,
+    },
+    missingTotalReason: "No reliable total-fees value was found in the analysis summary.",
+    missingCardBrandReason: "No card-brand/interchange total was found in summary fee rows.",
+    missingProcessorReason: "No processor-controlled total was found in summary fee rows.",
+  });
+}
+
+function selectBestAnalysis(candidates: TwoBucketAnalysis[]): TwoBucketAnalysis {
+  const available = candidates.find((analysis) => analysis.available);
+  if (available) return available;
+  return [...candidates].sort((left, right) => evidenceCount(right) - evidenceCount(left))[0];
+}
+
 export function analyzeTwoBucketStatement(doc: ParsedDocument, summary?: AnalysisSummary): TwoBucketAnalysis {
   const lines = getLines(doc);
 
@@ -205,12 +467,15 @@ export function analyzeTwoBucketStatement(doc: ParsedDocument, summary?: Analysi
 
   if (totalFees === null) {
     return {
+      source: "statement_text",
       totalFees: null,
       cardBrandTotal: null,
       processorOwnedTotal: null,
+      processorControlledTotal: null,
       unknownTotal: null,
       cardBrandSharePct: null,
       processorOwnedSharePct: null,
+      processorControlledSharePct: null,
       coveragePct: null,
       reconciliationDeltaUsd: null,
       available: false,
@@ -225,12 +490,15 @@ export function analyzeTwoBucketStatement(doc: ParsedDocument, summary?: Analysi
 
   if (cardBrandTotal === null) {
     return {
+      source: "statement_text",
       totalFees,
       cardBrandTotal: null,
       processorOwnedTotal: null,
+      processorControlledTotal: null,
       unknownTotal: null,
       cardBrandSharePct: null,
       processorOwnedSharePct: null,
+      processorControlledSharePct: null,
       coveragePct: null,
       reconciliationDeltaUsd: null,
       available: false,
@@ -245,12 +513,15 @@ export function analyzeTwoBucketStatement(doc: ParsedDocument, summary?: Analysi
 
   if (processorOwnedTotal === null) {
     return {
+      source: "statement_text",
       totalFees,
       cardBrandTotal,
       processorOwnedTotal: null,
+      processorControlledTotal: null,
       unknownTotal: null,
       cardBrandSharePct: null,
       processorOwnedSharePct: null,
+      processorControlledSharePct: null,
       coveragePct: null,
       reconciliationDeltaUsd: null,
       available: false,
@@ -265,17 +536,20 @@ export function analyzeTwoBucketStatement(doc: ParsedDocument, summary?: Analysi
 
   const knownTotal = round2(cardBrandTotal + processorOwnedTotal);
   const reconciliationDeltaUsd = round2(Math.abs(totalFees - knownTotal));
-  const tolerance = Math.max(5, totalFees * 0.02);
+  const tolerance = Math.max(RECONCILIATION_DOLLAR_TOLERANCE, totalFees * RECONCILIATION_PCT_TOLERANCE);
   const coveragePct = totalFees > 0 ? round2((knownTotal / totalFees) * 100) : null;
 
   if (reconciliationDeltaUsd > tolerance) {
     return {
+      source: "statement_text",
       totalFees,
       cardBrandTotal,
       processorOwnedTotal,
+      processorControlledTotal: processorOwnedTotal,
       unknownTotal: null,
       cardBrandSharePct: null,
       processorOwnedSharePct: null,
+      processorControlledSharePct: null,
       coveragePct,
       reconciliationDeltaUsd,
       available: false,
@@ -289,12 +563,15 @@ export function analyzeTwoBucketStatement(doc: ParsedDocument, summary?: Analysi
   }
 
   return {
+    source: "statement_text",
     totalFees,
     cardBrandTotal,
     processorOwnedTotal,
+    processorControlledTotal: processorOwnedTotal,
     unknownTotal: 0,
     cardBrandSharePct: round2((cardBrandTotal / totalFees) * 100),
     processorOwnedSharePct: round2((processorOwnedTotal / totalFees) * 100),
+    processorControlledSharePct: round2((processorOwnedTotal / totalFees) * 100),
     coveragePct,
     reconciliationDeltaUsd,
     available: true,
@@ -305,4 +582,15 @@ export function analyzeTwoBucketStatement(doc: ParsedDocument, summary?: Analysi
       processorOwned: processorOwnedEvidence,
     },
   };
+}
+
+export function buildTwoBucketAnalysis(
+  doc: ParsedDocument,
+  summary: AnalysisSummary,
+  options: { economicRollup?: StatementEconomicRollup | null } = {},
+): TwoBucketAnalysis {
+  const textAnalysis = analyzeTwoBucketStatement(doc, summary);
+  const structuredAnalysis = analyzeStructuredRollup(options.economicRollup, summary);
+  const summaryAnalysis = analyzeSummaryFeeRows(summary);
+  return selectBestAnalysis([structuredAnalysis, textAnalysis, summaryAnalysis].filter((analysis): analysis is TwoBucketAnalysis => analysis !== null));
 }

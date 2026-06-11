@@ -1,0 +1,46 @@
+# Fiserv / First Data Parser Coverage Audit
+
+Generated: 2026-06-09T03:49:09.982Z
+
+## Scope
+
+This audit checks the current Fiserv / First Data parser drivers against the Fiserv-related PDFs currently available in repo fixtures and the known local Downloads samples. It is a parser coverage audit, not a merchant-facing accuracy report.
+
+## Summary
+
+- Samples checked: 12
+- Parsed by a Fiserv driver: 11
+- Unsupported by current Fiserv drivers: 1
+- Failed or missing: 0
+
+## Coverage Matrix
+
+Sample | Source | File | Parser status | Driver | Visible brand | Family | Period | Volume | Fees | Eff. rate | Decision | Fee ledger | Fee rows | Batch ledger | Batch rows | Classification | Pricing model | At-cost statuses | Gap / next action
+--- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | ---: | --- | ---: | --- | --- | --- | ---
+Full Clover October fixture | repo_fixture | SAMPLE_MERCHANT4_CLOVER.pdf | parsed | fiserv_first_data_full_statement | First Data / Fiserv-style card processing statement | fiserv_first_data_full_statement | 2024-10 | $52,460.55 | $1,312.55 | 2.50% | WARN accepted_with_warnings | PASS reconciled | 134 | PASS reconciled | 52 | PASS validated | interchange_plus | indeterminate:87, not_applicable:47 | at-cost proof waits on reference-rate catalog; 3 parser warning(s)
+Short Clover June fixture | repo_fixture | SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf | parsed | fiserv_first_data_short_statement | First Data / Fiserv-style card processing statement | fiserv_first_data_short_statement | 2024-06 | $2,400.00 | $141.31 | 5.89% | WARN accepted_with_warnings | PASS reconciled | 2 | PASS reconciled | 10 | PASS validated | flat_rate | not_applicable:1, unprovable_by_model:1 | 2 parser warning(s)
+Paysafe February fixture | repo_fixture | fiserv_PAYSAFE_Febr_2024.pdf | parsed | fiserv_first_data_processor_statement | Paysafe Payment Processing | fiserv_first_data_processor_statement | 2024-02 | $36,912.94 | $1,565.73 | 4.24% | WARN accepted_with_warnings | WARN reconciled_with_rounding_delta | 28 | WARN reconciled_with_warnings | 18 | WARN validated_with_unresolved_rows | tiered_pricing | indeterminate:11, not_applicable:13, unprovable_by_model:4 | fee classification has unresolved/unbundled rows; batch funding anomaly present; at-cost proof waits on reference-rate catalog; 3 parser warning(s)
+Priority December fixture | repo_fixture | fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf | parsed | fiserv_first_data_processor_statement | Priority Payment Systems | fiserv_first_data_processor_statement | 2024-12 | $80,591.44 | $3,082.82 | 3.83% | PASS accepted | PASS reconciled | 14 | PASS reconciled | 34 | PASS validated | flat_discount_pricing | not_applicable:8, unprovable_by_model:6 | No current parser gap detected for this sample.
+November statement fixture | repo_fixture | Nov_2024_Statement.pdf | parsed | fiserv_first_data_full_statement | First Data / Fiserv-style card processing statement | fiserv_first_data_full_statement | 2024-11 | $53,291.02 | $1,330.96 | 2.50% | needs_review | PASS reconciled | 134 | WARN reconciled_with_warnings | 38 | PASS validated | interchange_plus | indeterminate:87, not_applicable:47 | parser decision blocks customer-facing totals; batch funding anomaly present; at-cost proof waits on reference-rate catalog; 3 parser warning(s)
+Basys Processing March 2020 | downloads_sample | Fiserv_BasysProcessing_March_2020.pdf | unsupported | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | No Fiserv / First Data parser driver currently supports this layout.
+Clover January 2024 | downloads_sample | fiserv_Clover_Jan_2024.pdf | parsed | fiserv_first_data_full_statement | First Data / Fiserv-style card processing statement | fiserv_first_data_full_statement | 2024-10 | $52,460.55 | $1,312.55 | 2.50% | WARN accepted_with_warnings | PASS reconciled | 134 | PASS reconciled | 52 | PASS validated | interchange_plus | indeterminate:87, not_applicable:47 | at-cost proof waits on reference-rate catalog; 3 parser warning(s)
+Clover June 2024 original | downloads_sample | fiserv_Clover_June_2024.pdf | parsed | fiserv_first_data_short_statement | First Data / Fiserv-style card processing statement | fiserv_first_data_short_statement | 2024-06 | $2,400.00 | $141.31 | 5.89% | WARN accepted_with_warnings | PASS reconciled | 2 | PASS reconciled | 10 | PASS validated | flat_rate | not_applicable:1, unprovable_by_model:1 | 2 parser warning(s)
+NXGEN January 2022 | repo_fixture | fiserv_NXGEN_PAYMENT_SERVICES_jan_2022.pdf | parsed | fiserv_first_data_processor_statement | Nxgen Payment Services | fiserv_first_data_processor_statement | 2022-09 | $42,638.08 | $2,007.73 | 4.71% | WARN accepted_with_warnings | WARN reconciled_with_rounding_delta | 67 | WARN reconciled_with_warnings | 42 | WARN validated_with_rounding_delta | flat_discount_pricing | indeterminate:33, not_applicable:29, unprovable_by_line:5 | batch funding anomaly present; at-cost proof waits on reference-rate catalog; 2 parser warning(s)
+Paysafe February original | downloads_sample | fiserv_PAYSAFE_Febr_2024.pdf | parsed | fiserv_first_data_processor_statement | Paysafe Payment Processing | fiserv_first_data_processor_statement | 2024-02 | $36,912.94 | $1,565.73 | 4.24% | WARN accepted_with_warnings | WARN reconciled_with_rounding_delta | 28 | WARN reconciled_with_warnings | 18 | WARN validated_with_unresolved_rows | tiered_pricing | indeterminate:11, not_applicable:13, unprovable_by_model:4 | fee classification has unresolved/unbundled rows; batch funding anomaly present; at-cost proof waits on reference-rate catalog; 3 parser warning(s)
+Priority December original | downloads_sample | Fiser_PRIORITY PAYMENT SYSTEMS_2024pdf.pdf | parsed | fiserv_first_data_processor_statement | Priority Payment Systems | fiserv_first_data_processor_statement | 2024-12 | $80,591.44 | $3,082.82 | 3.83% | PASS accepted | PASS reconciled | 14 | PASS reconciled | 34 | PASS validated | flat_discount_pricing | not_applicable:8, unprovable_by_model:6 | No current parser gap detected for this sample.
+December 2024 statement | downloads_sample | Dec_2024_Statement.pdf | parsed | fiserv_first_data_full_statement | First Data / Fiserv-style card processing statement | fiserv_first_data_full_statement | 2024-12 | $56,343.39 | $1,395.09 | 2.48% | needs_review | PASS reconciled | 134 | WARN reconciled_with_warnings | 46 | PASS validated | interchange_plus | indeterminate:87, not_applicable:47 | parser decision blocks customer-facing totals; batch funding anomaly present; at-cost proof waits on reference-rate catalog; 3 parser warning(s)
+
+## Engineering Recommendations
+
+- Add or intentionally reject layout support for unsupported samples: Basys Processing March 2020.
+- Move parsed Downloads-only samples into repo fixtures once we trust them: Clover January 2024, Clover June 2024 original, Paysafe February original, Priority December original, December 2024 statement.
+- Reference-rate catalog remains the next blocker for proving at-cost assessment/network rows.
+- Do not add new processor families until this matrix has no unexpected unsupported/failing Fiserv samples.
+
+## Review Notes
+
+- PASS means the parser produced internally reconciled output for that specific layer; it does not mean every economic claim is fully proven.
+- WARN means the parser intentionally preserved a known issue, such as row-level batch anomaly, fee-ledger rounding, or unresolved classification.
+- `indeterminate` at-cost statuses are expected until approved, period-backed reference rates are available.
+- Downloads-only samples are useful for exploration but are not regression-safe until copied into repo fixtures and covered by tests.
+

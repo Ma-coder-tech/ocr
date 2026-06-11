@@ -178,4 +178,56 @@ describe("pdf heuristic recovery", () => {
       "A single grand-total fees row was not found, so the report combined section totals and itemized fee lines.",
     );
   });
+
+  it("prefers an explicit Total Fees row over summing Heartland detail sections", () => {
+    const doc: ParsedDocument = {
+      sourceType: "pdf",
+      headers: ["content"],
+      rows: [
+        { content: "Your Deposits & Fees at a Glance This Is Not A Bill" },
+        { content: "Total Deposits..................................................$32,488.54" },
+        { content: "Total Fees ......................................................................................................$723.25" },
+        { content: "HPS Processing Fees" },
+        { content: "American Express Flat Rate Fee | 8 | $3,134.28 | 1.9900 | - | - | $62.37" },
+        { content: "Discover Flat Rate Fee | 1 | $300.00 | 1.9900 | - | - | $5.97" },
+        { content: "Flat Rate Fee | 79 | $31,218.06 | 1.9900 | - | - | $621.25" },
+        { content: "Gateway Fee | 8 | $3,134.28 | - | $0.0150 | $0.11" },
+        { content: "Gateway Transaction Fee | 80 | $0.00 | - | $0.0150 | $1.21" },
+        { content: "Visa Flat Rate Fee | 40 | $15,762.31 | 1.9900 | - | - | $313.68" },
+        { content: "Monthly vs Daily Discount Cost | 88 | $34,652.34 | 0.0500 | - | - | $17.34" },
+        { content: "Gateway Monthly Fee | 1 | $0.00 | - | - | $15.00" },
+        { content: "Batch # Total Deposit Daily Discount Paid By HPS" },
+        { content: "Fees | T | 05/31/2025 | - | - | - | ($723.25)" },
+      ],
+      textPreview:
+        "Heartland Payment Systems May 2025 Your Deposits & Fees at a Glance Total Deposits $32,488.54 Total Fees $723.25 HPS Processing Fees",
+      extraction: {
+        mode: "text_only",
+        qualityScore: 0.46,
+        reasons: ["PDF was parsed as text lines only; structured field recovery was not confident enough yet."],
+        lineCount: 13,
+        amountTokenCount: 20,
+        hasExtractableText: true,
+      },
+    };
+
+    const summary = refineTextOnlyPdfSummary(doc, { ...createBaseSummary(), processorName: "Heartland Payment Systems" });
+
+    expect(summary).not.toBeNull();
+    expect(summary?.statementPeriod).toBe("2025-05");
+    expect(summary?.totalVolume).toBe(32488.54);
+    expect(summary?.totalFees).toBe(723.25);
+    expect(summary?.effectiveRate).toBe(2.23);
+    expect(summary?.feeBreakdown).toEqual([
+      expect.objectContaining({
+        label: "Processing Fees",
+        amount: 723.25,
+        sharePct: 100,
+        broadType: "Processor",
+      }),
+    ]);
+    expect(summary?.dataQuality.map((signal) => signal.message)).not.toContain(
+      "A single grand-total fees row was not found, so the report combined section totals and itemized fee lines.",
+    );
+  });
 });

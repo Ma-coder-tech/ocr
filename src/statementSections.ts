@@ -16,12 +16,16 @@ import type {
   InterchangeAuditSummary,
   MonthlyMinimumModel,
   NoticeFinding,
+  ParserTrace,
+  ParserTraceEvent,
   PerItemFeeComponent,
   PerItemFeeModel,
   ProcessorMarkupAuditRow,
   RepricingEvent,
   SavingsShareAdjustmentModel,
   StatementEconomicBucket,
+  StatementEconomicFact,
+  StatementEconomicFactKind,
   StatementEconomicFeeRow,
   StatementEconomicRollup,
   StatementSection,
@@ -44,11 +48,13 @@ export type StructuredStatementFacts = {
   perItemFeeModel: PerItemFeeModel;
   guideMeasures: GuideMeasureModel;
   economicRollup: StatementEconomicRollup;
+  parserTrace?: ParserTrace;
 };
 
 type StructuredStatementOptions = {
   processorId?: string | null;
   rulePackId?: string | null;
+  trace?: boolean;
 };
 
 type SectionContext = {
@@ -89,10 +95,13 @@ type EconomicAccumulator = {
   totalVolumeFacts: StatementAmountFact[];
   totalFeeFacts: StatementAmountFact[];
   feeRows: StatementEconomicFeeRow[];
+  facts: StatementEconomicFact[];
 };
 
-const MONEY_TOKEN_RE = /\(?-?\$?\d[\d,]*(?:\.\d+)?%?\)?/g;
-const MONEY_VALUE_PATTERN = String.raw`\(?\$?\d[\d,]*(?:\.\d+)?\)?`;
+type StatementTableContext = "fee_detail" | "single_total";
+
+const MONEY_TOKEN_RE = /\(?-?\$?\d[\d,\s]*(?:\.\d+)?%?\)?/g;
+const MONEY_VALUE_PATTERN = String.raw`\(?\$?\d[\d,\s]*(?:\.\d+)?\)?`;
 const SECTION_NOISE_RE = /\b(page|merchant statement|customer service|attention)\b/i;
 
 function round2(value: number): number {
@@ -123,6 +132,46 @@ function normalize(input: string): string {
 
 function compact(input: string): string {
   return normalize(input).replace(/\s+/g, "");
+}
+
+function traceEvent(trace: ParserTrace | undefined, event: ParserTraceEvent): void {
+  trace?.events.push(event);
+}
+
+function acceptedFact(
+  acc: EconomicAccumulator,
+  trace: ParserTrace | undefined,
+  fact: StatementEconomicFact,
+): void {
+  acc.facts.push(fact);
+  traceEvent(trace, {
+    type: "accepted_fact",
+    rowIndex: fact.rowIndex,
+    factKind: fact.kind,
+    amount: fact.amount,
+    label: fact.label,
+    evidenceLine: fact.evidenceLine,
+  });
+}
+
+function economicNoiseReason(evidenceLine: string): string | null {
+  const normalized = normalize(evidenceLine);
+  const dense = compact(evidenceLine);
+  if (!normalized) return "empty row";
+  if (/^page\s+\d+\s+of\s+\d+$/.test(normalized)) return "page number";
+  if (/\bmerchant number\b/.test(normalized)) return "merchant identifier";
+  if (/\bcustomer service\b|\bstatement period\b/.test(normalized)) return "statement metadata";
+  if (/\bpo box\b|\bthousand oaks\b|\bca\s+\d{5}\b/.test(normalized)) return "mailing address";
+  if (/^n+\s+\d{2}\s+\d{2}\s+\d{6,}/.test(normalized) || /^n+\d{6,}/.test(dense)) return "statement tracking code";
+  if (/\btin\b|\bytd\b|\breportable sales\b|\bgross reportable sales\b/.test(normalized)) return "tax/reportable sales metadata";
+  if (/\bemail\b|@/.test(normalized)) return "contact information";
+  return null;
+}
+
+function hasFeeLineSignal(context: string): boolean {
+  return /\b(fee|fees|disc|discount|dues|assess|assessment|interchange|program|card brand|card network|network|gateway|gtwy|batch|authorization|auth|transaction|processor|markup|misc|statement|pci|risk|chargeback|nabu|acquirer|kilobyte|digital enablement)\b/.test(
+    context,
+  );
 }
 
 function rowEvidence(row: Record<string, string | number>): string {
@@ -195,6 +244,7 @@ function classifySectionTitle(line: string): StatementSectionType {
   if (/interchange|programfees|cardbrand|cardnetwork/.test(dense)) return "interchange_detail";
   if (/\bsummary\b|deposit|batch totals?|sales activity|processing activity|card type sales/.test(lower)) return "summary";
   if (/chargebacks?\s*reversals?|no chargebacks|date submitted chargebacks/.test(lower)) return "summary";
+  if (/^fees charged$/.test(lower)) return "add_on_fees";
   if (/processing fees?|service charges?|discount fees?|processor markup|assessment markup|hps processing/.test(lower)) {
     return "processor_markup";
   }
@@ -228,6 +278,17 @@ function isAuditHeaderCells(cells: string[]): boolean {
   if (/\b(per item|item fee|per trans|transaction fee|auth fee|authorization)\b/.test(joined)) score += 1;
   if (/\b(total|paid|fee amount|fees|charge)\b/.test(joined)) score += 1;
   return score >= 3;
+}
+
+function detectTableContext(cells: string[]): StatementTableContext | null {
+  const joined = normalize(cells.join(" "));
+  if (/\bdate\b/.test(joined) && /\btype\b/.test(joined) && /\bdescription\b/.test(joined) && /\btotal\b/.test(joined)) {
+    return "fee_detail";
+  }
+  if (cells.length === 2 && normalize(cells[0]) === "date" && normalize(cells[1]) === "total") {
+    return "single_total";
+  }
+  return null;
 }
 
 function isNoticeContinuationLine(line: string): boolean {
@@ -579,12 +640,96 @@ function sourceSectionName(section: SectionContext, fallback: string): string {
 
 function shouldSkipGenericFeeRow(context: string): boolean {
   return (
+    /\bsubmitted\b.*\btransactions\b.*\bchargebacks\b.*\bcharged\b.*\bamount\b/.test(context) ||
     /\b(total volume|total sales|sales volume|gross sales|net sales|processed volume|amount processed)\b/.test(context) ||
     /\b(total fees?|fees charged|statement fee total|grand total)\b/.test(context) ||
     /\bmonthly minimum|minimum discount|minimum markup\b/.test(context) ||
     /\bexpress merchant funding|express funding|accelerated funding|faster funding\b/.test(context) ||
     /\bcommercial card interchange savings adjustment|interchange savings adjustment|savings adjustment\b/.test(context)
   );
+}
+
+function addFiservProcessorFeeDetailFact(
+  acc: EconomicAccumulator,
+  trace: ParserTrace | undefined,
+  rowIndex: number,
+  section: SectionContext,
+  evidenceLine: string,
+): boolean {
+  const context = normalize(evidenceLine);
+  const sourceSection = sourceSectionName(section, "Fees charged");
+  const amount = lastRowAmount([], evidenceLine);
+  if (amount === null || amount <= 0) return false;
+
+  if (/\btotal\s+miscellaneous fees and card fees\b/.test(context)) {
+    acc.totalFeeFacts.push({
+      amount,
+      sourceSection,
+      evidenceLine,
+      rowIndex,
+      confidence: 0.94,
+    });
+    acceptedFact(acc, trace, {
+      kind: "total_fees",
+      amount,
+      label: "Total Miscellaneous Fees and Card Fees",
+      sourceSection,
+      evidenceLine,
+      rowIndex,
+      confidence: 0.94,
+    });
+    return true;
+  }
+
+  if (/\btotal card fees\b/.test(context)) {
+    const row: StatementEconomicFeeRow = {
+      label: "Total Card Fees",
+      amount,
+      bucket: "card_brand_pass_through",
+      sourceSection,
+      evidenceLine,
+      rowIndex,
+      confidence: 0.92,
+    };
+    acc.feeRows.push(row);
+    acceptedFact(acc, trace, {
+      kind: "card_brand_total",
+      amount,
+      label: row.label,
+      sourceSection,
+      evidenceLine,
+      rowIndex,
+      confidence: row.confidence,
+    });
+    traceEvent(trace, { type: "accepted_fee_row", rowIndex, bucket: row.bucket, amount, label: row.label, evidenceLine });
+    return true;
+  }
+
+  if (/\btotal miscellaneous fees\b/.test(context)) {
+    const row: StatementEconomicFeeRow = {
+      label: "Total Miscellaneous Fees",
+      amount,
+      bucket: "add_on_fees",
+      sourceSection,
+      evidenceLine,
+      rowIndex,
+      confidence: 0.9,
+    };
+    acc.feeRows.push(row);
+    acceptedFact(acc, trace, {
+      kind: "processor_controlled_total",
+      amount,
+      label: row.label,
+      sourceSection,
+      evidenceLine,
+      rowIndex,
+      confidence: row.confidence,
+    });
+    traceEvent(trace, { type: "accepted_fee_row", rowIndex, bucket: row.bucket, amount, label: row.label, evidenceLine });
+    return true;
+  }
+
+  return false;
 }
 
 function feeBucketForSection(section: SectionContext, context: string): StatementEconomicBucket | null {
@@ -612,12 +757,52 @@ function addEconomicFacts(
   rowIndex: number,
   section: SectionContext,
   evidenceLine: string,
+  tableContext: StatementTableContext | null,
+  trace: ParserTrace | undefined,
 ): void {
+  const noiseReason = economicNoiseReason(evidenceLine);
+  if (noiseReason) {
+    traceEvent(trace, { type: "rejected_row", rowIndex, reason: noiseReason, evidenceLine });
+    return;
+  }
+
   const entries = entriesFor(row);
   const context = normalize(rowContext(section, entries, evidenceLine));
+  const rowOnlyContext = normalize([evidenceLine, ...entries.map((entry) => `${entry.key} ${String(entry.value)}`)].join(" "));
   const sourceSection = sourceSectionName(section, "Statement detail");
 
-  if (/\b(total volume|total sales|sales volume|gross sales|net sales|processed volume|amount processed)\b/.test(context)) {
+  if (tableContext === "fee_detail" && addFiservProcessorFeeDetailFact(acc, trace, rowIndex, section, evidenceLine)) {
+    return;
+  }
+  if (tableContext === "fee_detail") {
+    traceEvent(trace, { type: "rejected_row", rowIndex, reason: "fee detail item deferred to table totals", evidenceLine });
+    return;
+  }
+
+  if (tableContext === "single_total" && /^total\s*\|/i.test(evidenceLine)) {
+    const amount = lastRowAmount(entries, evidenceLine);
+    if (amount !== null && amount > 0) {
+      acc.totalVolumeFacts.push({
+        amount,
+        sourceSection,
+        evidenceLine,
+        rowIndex,
+        confidence: 0.86,
+      });
+      acceptedFact(acc, trace, {
+        kind: "total_volume",
+        amount,
+        label: "Table total",
+        sourceSection,
+        evidenceLine,
+        rowIndex,
+        confidence: 0.86,
+      });
+      return;
+    }
+  }
+
+  if (/\b(total volume|total sales|sales volume|gross sales|net sales|processed volume|amount processed)\b/.test(rowOnlyContext)) {
     const amount = contextualAmount(
       entries,
       evidenceLine,
@@ -634,21 +819,44 @@ function addEconomicFacts(
         rowIndex,
         confidence: section.type === "summary" ? 0.9 : 0.78,
       });
+      acceptedFact(acc, trace, {
+        kind: "total_volume",
+        amount,
+        label: "Total volume",
+        sourceSection,
+        evidenceLine,
+        rowIndex,
+        confidence: section.type === "summary" ? 0.9 : 0.78,
+      });
     }
   }
 
-  if (/\b(total fees?|fees charged|statement fee total|grand total fees?|month end charge|amount due)\b/.test(context)) {
+  if (
+    /\b(total fees?|fees charged|statement fee total|grand total fees?|month end charge|amount due)\b/.test(rowOnlyContext) ||
+    /\btotal\s+service charges\b.*\binterchange charges\b.*\bprogram fees\b.*\bfees\b/.test(rowOnlyContext)
+  ) {
     const amount = contextualAmount(
       entries,
       evidenceLine,
       (key, dense) =>
         /\b(total fees?|fees?|charges?|amount due|month end charge|fee amount)\b/.test(key) ||
         /totalfees|feescharged|amountdue|monthendcharge|feeamount/.test(dense),
-      (label) => /\b(total fees?|fees charged|statement fee total|grand total fees?|month end charge|amount due)\b/.test(label),
+      (label) =>
+        /\b(total fees?|fees charged|statement fee total|grand total fees?|month end charge|amount due)\b/.test(label) ||
+        /\btotal\s+service charges\b.*\binterchange charges\b.*\bprogram fees\b.*\bfees\b/.test(label),
     );
     if (amount !== null && amount > 0) {
       acc.totalFeeFacts.push({
         amount,
+        sourceSection,
+        evidenceLine,
+        rowIndex,
+        confidence: section.type === "summary" ? 0.9 : 0.78,
+      });
+      acceptedFact(acc, trace, {
+        kind: "total_fees",
+        amount,
+        label: "Total fees",
         sourceSection,
         evidenceLine,
         rowIndex,
@@ -661,6 +869,10 @@ function addEconomicFacts(
 
   const bucket = feeBucketForSection(section, context);
   if (!bucket) return;
+  if (!hasFeeLineSignal(rowOnlyContext)) {
+    traceEvent(trace, { type: "rejected_row", rowIndex, reason: "numeric row lacks fee context", evidenceLine });
+    return;
+  }
 
   const amount = lastRowAmount(entries, evidenceLine);
   if (amount === null || amount <= 0) return;
@@ -673,6 +885,23 @@ function addEconomicFacts(
     evidenceLine,
     rowIndex,
     confidence: section.type === "unknown" ? 0.55 : 0.74,
+  });
+  acceptedFact(acc, trace, {
+    kind: "fee_line",
+    amount,
+    label: labelFromRecord(row, entries, evidenceLine),
+    sourceSection,
+    evidenceLine,
+    rowIndex,
+    confidence: section.type === "unknown" ? 0.55 : 0.74,
+  });
+  traceEvent(trace, {
+    type: "accepted_fee_row",
+    rowIndex,
+    bucket,
+    amount,
+    label: labelFromRecord(row, entries, evidenceLine),
+    evidenceLine,
   });
 }
 
@@ -1666,6 +1895,7 @@ function buildEconomicRollup(
     processorMarkup: markupTotal,
     addOnFees: addOnTotal,
     feeRows: allRows,
+    facts: acc.facts,
     confidence: round2(confidence),
   };
 }
@@ -1709,24 +1939,49 @@ export function extractStructuredStatementFacts(
     totalVolumeFacts: [],
     totalFeeFacts: [],
     feeRows: [],
+    facts: [],
   };
+  const parserTrace: ParserTrace | undefined = options.trace ? { events: [] } : undefined;
   const parseBlendedRows = shouldParseBlendedRows(doc, options);
   let currentSection: SectionContext = { type: "unknown", title: "Uncategorized" };
   let currentAuditHeaders: string[] = [];
+  let currentTableContext: StatementTableContext | null = null;
 
   doc.rows.forEach((row, rowIndex) => {
     const evidence = rowEvidence(row);
     if (!evidence) return;
 
+    const rowNoiseReason = economicNoiseReason(evidence);
+    if (rowNoiseReason) {
+      traceEvent(parserTrace, { type: "rejected_row", rowIndex, reason: rowNoiseReason, evidenceLine: evidence });
+      currentSection = { type: "unknown", title: "Uncategorized" };
+      currentAuditHeaders = [];
+      currentTableContext = null;
+      return;
+    }
+
     const previousSection = currentSection;
     currentSection = updateSection(sections, currentSection, evidence);
     if (currentSection.type !== previousSection.type || currentSection.title !== previousSection.title) {
       currentAuditHeaders = [];
+      currentTableContext = null;
+      traceEvent(parserTrace, {
+        type: "section",
+        rowIndex,
+        sectionType: currentSection.type,
+        title: currentSection.title,
+        evidenceLine: evidence,
+      });
     }
     noteSectionRow(sections, currentSection, evidence);
 
     const isContentLine = typeof row.content === "string";
     const cells = splitCells(evidence);
+    const detectedTable = cells.length > 0 ? detectTableContext(cells) : null;
+    if (detectedTable) {
+      currentTableContext = detectedTable;
+      traceEvent(parserTrace, { type: "table", rowIndex, tableKind: detectedTable, evidenceLine: evidence });
+    }
     if (isContentLine && cells.length >= 3 && isAuditHeaderCells(cells)) {
       currentAuditHeaders = cells;
       return;
@@ -1737,7 +1992,7 @@ export function extractStructuredStatementFacts(
         ? recordFromCells(cells, currentAuditHeaders, row)
         : row;
 
-    addEconomicFacts(economicAccumulator, mappedRow, rowIndex, currentSection, evidence);
+    addEconomicFacts(economicAccumulator, mappedRow, rowIndex, currentSection, evidence, currentTableContext, parserTrace);
 
     const structuredFeeFinding = buildStructuredFeeFinding(mappedRow, rowIndex, currentSection, evidence);
     if (structuredFeeFinding) {
@@ -1826,6 +2081,26 @@ export function extractStructuredStatementFacts(
     blendedFeeSplits,
     guideMeasures,
   );
+  traceEvent(parserTrace, {
+    type: "rollup",
+    accepted:
+      economicRollup.totalVolume !== null &&
+      economicRollup.totalFees !== null &&
+      economicRollup.totalVolume > 0 &&
+      economicRollup.totalFees > 0 &&
+      economicRollup.totalFees < economicRollup.totalVolume,
+    reason:
+      economicRollup.totalVolume === null
+        ? "missing total volume"
+        : economicRollup.totalFees === null
+          ? "missing total fees"
+          : economicRollup.totalFees >= economicRollup.totalVolume
+            ? "total fees are not below total volume"
+            : "rollup has positive volume and fee totals",
+    totalVolume: economicRollup.totalVolume,
+    totalFees: economicRollup.totalFees,
+    feeRowCount: economicRollup.feeRows.length,
+  });
 
   return {
     statementSections: sections,
@@ -1841,5 +2116,6 @@ export function extractStructuredStatementFacts(
     perItemFeeModel,
     guideMeasures,
     economicRollup,
+    parserTrace,
   };
 }

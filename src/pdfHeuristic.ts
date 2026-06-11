@@ -15,7 +15,7 @@ type Candidate = {
   totalLike: boolean;
 };
 
-const MONEY_RE = /\(?-?\$?\d[\d,]*\.\d{2}\)?/g;
+const MONEY_RE = /\(?-?\$?\d[\d,\s]*\.\d{2}\)?/g;
 const PERCENT_RE = /-?\d+(?:\.\d+)?%/g;
 
 const FEE_TERMS = [
@@ -257,6 +257,7 @@ function isGrandTotalFeeLabel(label: string): boolean {
   return (
     /total \(service charges.*interchange charges.*fees/.test(lower) ||
     /total fees due/.test(lower) ||
+    /\btotal fees\b/.test(lower) ||
     /fees charged/.test(lower) ||
     /month end charge|less discount paid/.test(lower) ||
     /^total fees$|^total charges$/.test(lower) ||
@@ -277,6 +278,7 @@ function scoreTotalFeeLabel(label: string): number {
   if (/total fees due/.test(lower)) score += 14;
   if (/fees charged/.test(lower)) score += 12;
   if (/month end charge|less discount paid/.test(lower)) score += 11;
+  if (/\btotal fees\b/.test(lower)) score += 10;
   if (/^total fees$|^total charges$/.test(lower)) score += 8;
   if (/grand total.*fees|fees due|statement total fees|all-in fees/.test(lower)) score += 7;
   if (/fee|charge|discount/.test(lower)) score += 4;
@@ -466,7 +468,7 @@ function buildFeeBreakdown(sourceRows: Candidate[], totalFees: number, processor
     buckets.set(bucket, current);
   }
 
-  return [...buckets.entries()]
+  const rows = [...buckets.entries()]
     .map(([label, value]) => ({
       label,
       amount: Math.round(value.amount * 100) / 100,
@@ -476,8 +478,30 @@ function buildFeeBreakdown(sourceRows: Candidate[], totalFees: number, processor
         value.sections.size === 0 ? undefined : value.sections.size === 1 ? [...value.sections][0] : "Multiple statement sections",
       evidenceLine: value.evidenceLine,
     }))
-    .sort((left, right) => right.amount - left.amount)
-    .slice(0, 6);
+    .sort((left, right) => right.amount - left.amount);
+
+  const rowTotal = rows.reduce((sum, row) => sum + row.amount, 0);
+  if (totalFees > 0 && rowTotal > totalFees * 1.05) {
+    const classification = classifyFeeRow({
+      label: "Processing Fees",
+      amount: totalFees,
+      processorName,
+      sourceSection: "Statement summary",
+      evidenceLine: "Reconciled to the statement Total Fees row because itemized PDF text repeated fee details.",
+    });
+    return [
+      {
+        label: "Processing Fees",
+        amount: Math.round(totalFees * 100) / 100,
+        sharePct: 100,
+        ...classification,
+        sourceSection: "Statement summary",
+        evidenceLine: "Reconciled to the statement Total Fees row because itemized PDF text repeated fee details.",
+      },
+    ];
+  }
+
+  return rows.slice(0, 6);
 }
 
 export function refineTextOnlyPdfSummary(doc: ParsedDocument, baseSummary: AnalysisSummary): AnalysisSummary | null {

@@ -1,7 +1,50 @@
-import { generateObject, generateText } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
-import { z } from "zod";
-import { AnalysisSummary } from "./types.js";
+import { createRequire } from "node:module";
+import type { AnalysisSummary } from "./types.js";
+
+const require = createRequire(import.meta.url);
+
+type GenerateObject = (options: Record<string, unknown>) => Promise<{ object: unknown }>;
+type GenerateText = (options: Record<string, unknown>) => Promise<{ text: string }>;
+type AnthropicModelFactory = (modelName: string) => unknown;
+type RefinementObject = {
+  confidence: "high" | "medium" | "low";
+  insights: Array<{
+    title: string;
+    detail: string;
+    impactUsd: number;
+  }>;
+  dynamicFields: Array<{
+    label: string;
+    value: number;
+    confidence: number;
+  }>;
+};
+
+function loadAiSdk(): {
+  generateObject: GenerateObject;
+  generateText: GenerateText;
+  anthropic: AnthropicModelFactory;
+} {
+  const ai = require("ai") as { generateObject: GenerateObject; generateText: GenerateText };
+  const anthropicSdk = require("@ai-sdk/anthropic") as { anthropic: AnthropicModelFactory };
+  return {
+    generateObject: ai.generateObject,
+    generateText: ai.generateText,
+    anthropic: anthropicSdk.anthropic,
+  };
+}
+
+function loadZod() {
+  return require("zod/v3") as {
+    z: {
+      object: (shape: Record<string, unknown>) => unknown;
+      enum: (values: readonly [string, ...string[]]) => unknown;
+      array: (schema: unknown) => unknown;
+      string: () => unknown;
+      number: () => unknown;
+    };
+  };
+}
 
 function extractJsonObject(text: string): string | null {
   const start = text.indexOf("{");
@@ -29,6 +72,7 @@ export async function maybeRunAiRefinement(summary: AnalysisSummary): Promise<An
     JSON.stringify(summary),
   ].join("\n\n");
 
+  const { z } = loadZod();
   const schema = z.object({
     confidence: z.enum(["high", "medium", "low"]),
     insights: z.array(
@@ -47,7 +91,11 @@ export async function maybeRunAiRefinement(summary: AnalysisSummary): Promise<An
     ),
   });
 
-  const normalize = (object: z.infer<typeof schema>): AnalysisSummary => {
+  const parseRefinement = (value: unknown): RefinementObject => {
+    return (schema as { parse: (value: unknown) => RefinementObject }).parse(value);
+  };
+
+  const normalize = (object: RefinementObject): AnalysisSummary => {
     return {
       ...summary,
       confidence: object.confidence,
@@ -70,9 +118,13 @@ export async function maybeRunAiRefinement(summary: AnalysisSummary): Promise<An
     };
   };
 
+  let sdk: ReturnType<typeof loadAiSdk> | null = null;
+
   try {
-    const result = await generateObject({
-      model: anthropic(modelName),
+    sdk = loadAiSdk();
+
+    const result = await sdk.generateObject({
+      model: sdk.anthropic(modelName),
       schema,
       prompt,
       maxOutputTokens,
@@ -84,14 +136,18 @@ export async function maybeRunAiRefinement(summary: AnalysisSummary): Promise<An
         },
       },
     });
-    const refined = normalize(result.object);
+    const refined = normalize(parseRefinement(result.object));
     console.log("[ai-refinement] success");
     return refined;
   } catch (error) {
     console.error("[ai-refinement-error]", error instanceof Error ? error.message : error);
+    if (!sdk) {
+      return summary;
+    }
+
     try {
-      const retry = await generateText({
-        model: anthropic(modelName),
+      const retry = await sdk.generateText({
+        model: sdk.anthropic(modelName),
         prompt,
         maxOutputTokens,
         temperature: 0,
@@ -106,7 +162,7 @@ export async function maybeRunAiRefinement(summary: AnalysisSummary): Promise<An
       if (!jsonCandidate) {
         throw new Error("No JSON object found in text response");
       }
-      const parsed = schema.parse(JSON.parse(jsonCandidate));
+      const parsed = parseRefinement(JSON.parse(jsonCandidate));
       const refined = normalize(parsed);
       console.log("[ai-refinement] success-retry");
       return refined;

@@ -3,12 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "npm@10.9.3",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "dev": "NODE_ENV=development tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs ./node_modules/typescript/bin/tsc -p tsconfig.json",
     "start": "NODE_ENV=production node dist/server.js",
-    "test": "vitest run",
+    "test": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs ./node_modules/vitest/vitest.mjs run",
+    "parser:audit": "tsx scripts/parser-audit.ts",
+    "fiserv:coverage": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/fiserv-coverage-audit.ts",
     "bakeoff:pdf": "npm run build && node scripts/pdf-bakeoff.mjs",
+    "bakeoff:azure": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/azure-layout-bakeoff.ts",
+    "bakeoff:document-ir": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/document-ir-bakeoff.ts",
+    "bakeoff:fiserv-document-ir": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/document-ir-bakeoff.ts",
     "validate:foundation": "node scripts/validate-merchant-foundation.mjs"
   },
   "dependencies": {
@@ -21,9 +30,9 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/node": "^22.13.10",
-    "tsx": "^4.19.3",
-    "typescript": "^5.8.2",
-    "vitest": "^2.1.9"
+    "@types/node": "22.13.10",
+    "tsx": "4.19.3",
+    "typescript": "5.8.2",
+    "vitest": "2.1.9"
   }
 }

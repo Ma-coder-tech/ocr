@@ -1238,16 +1238,132 @@
         `;
       }
 
+      function metricById(report, id) {
+        return Array.isArray(report?.metrics) ? report.metrics.find((item) => item.id === id) : null;
+      }
+
+      function sectionById(report, id) {
+        return Array.isArray(report?.sections) ? report.sections.find((item) => item.id === id) : null;
+      }
+
+      function metricDisplay(metric) {
+        if (!metric || metric.displayMode !== "exact") {
+          return escapeHtml(metric?.fallbackCopy || "Unavailable");
+        }
+        return escapeHtml(metric.value);
+      }
+
+      function metricNote(metric, exactCopy, fallbackCopy) {
+        if (!metric || metric.displayMode !== "exact") return fallbackCopy;
+        return exactCopy;
+      }
+
+      function renderCustomerBenchmark(report, tone) {
+        const section = sectionById(report, "benchmark");
+        const rateMetric = metricById(report, "effective_rate");
+        const benchmarkRange = Array.isArray(section?.metrics) ? section.metrics.find((item) => item.id === "benchmark_range") : null;
+        const verdict = Array.isArray(section?.metrics) ? section.metrics.find((item) => item.id === "benchmark_verdict") : null;
+        if (!section || section.displayMode !== "exact" || !rateMetric || rateMetric.displayMode !== "exact") {
+          return `
+            <div class="range-card">
+              <div class="quality-note warning">${escapeHtml(section?.fallbackCopy || "We could not compare this statement to a benchmark reliably.")}</div>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="range-card">
+            <div class="range-head">
+              <div>
+                <div class="range-label">Current effective rate</div>
+                <div class="range-value">${escapeHtml(rateMetric.value)}</div>
+              </div>
+              <div class="range-window-meta">Typical range: ${escapeHtml(benchmarkRange?.value || "Unavailable")}</div>
+            </div>
+            <p class="plain-note">${escapeHtml(verdict?.value || "Benchmark verdict unavailable.")}</p>
+          </div>
+        `;
+      }
+
+      function renderCustomerBucket(report) {
+        const section = sectionById(report, "two_bucket_split");
+        if (!section || section.displayMode !== "exact") {
+          return `
+            <section class="panel card">
+              <div class="section-kicker eyebrow">Where your fees go</div>
+              <h2 class="card-title">Fee split unavailable</h2>
+              <p class="card-copy">${escapeHtml(section?.fallbackCopy || "This statement does not separate fees clearly enough to show a reliable split.")}</p>
+            </section>
+          `;
+        }
+        const metrics = Array.isArray(section.metrics) ? section.metrics : [];
+        return `
+          <section class="panel card">
+            <div class="section-kicker eyebrow">Where your fees go</div>
+            <h2 class="card-title">${escapeHtml(section.title)}</h2>
+            <p class="card-copy">${escapeHtml(section.body || "")}</p>
+            <div class="mini-grid">
+              ${metrics
+                .map(
+                  (item) => `
+                    <article class="mini-card">
+                      <div class="mini-label">${escapeHtml(item.label)}</div>
+                      <div class="mini-value">${metricDisplay(item)}</div>
+                    </article>
+                  `,
+                )
+                .join("")}
+            </div>
+          </section>
+        `;
+      }
+
+      function renderCustomerFindings(report) {
+        const section = sectionById(report, "findings");
+        const findings = Array.isArray(section?.findings) ? section.findings : Array.isArray(report?.findings) ? report.findings : [];
+        return `
+          <section class="panel card">
+            <div class="section-kicker eyebrow">${report.kind === "free_teaser" ? "Top items" : "Findings"}</div>
+            <h2 class="card-title">${escapeHtml(section?.title || "What we found")}</h2>
+            <div class="bullet-list">
+              ${findings
+                .map(
+                  (finding) => `
+                    <article class="bullet">
+                      <strong>${escapeHtml(finding.title)}${finding.monthlyImpact ? ` - ${escapeHtml(finding.monthlyImpact)}` : ""}</strong>
+                      ${escapeHtml(finding.description)}
+                    </article>
+                  `,
+                )
+                .join("")}
+            </div>
+          </section>
+        `;
+      }
+
+      function renderCustomerQuality(report) {
+        const note = report?.dataQuality;
+        return `
+          <div class="quality-list">
+            <div class="quality-note ${escapeHtml(note?.level || "info")}">${escapeHtml(note?.message || "This statement was read cleanly enough to produce a customer-safe report.")}</div>
+          </div>
+        `;
+      }
+
       function renderReport(job) {
         renderStepper("report");
-        const summary = job.summary || {};
-        const businessType = getBusinessTypeConfig(summary.businessType || job.businessType);
-        const verdict = verdictCopy(summary, businessType);
-        const tone = benchmarkTone(summary?.benchmark?.status);
-        const processorUnknown = !summary?.processorName || summary.processorName === "Unknown";
-        const confidenceTone = summary.confidence === "high" ? "good" : summary.confidence === "medium" ? "info" : "warn";
-        const monthlyVolume = Number(summary.estimatedMonthlyVolume || summary.totalVolume || 0);
-        const monthlyFees = Number(summary.estimatedMonthlyFees || summary.totalFees || 0);
+        const report = job.customerReport;
+        if (!report) {
+          renderError("The report finished, but no customer-safe report DTO was available.");
+          return;
+        }
+        const tone = report.headline?.tone === "danger" ? "danger" : report.headline?.tone === "good" ? "good" : "info";
+        const volume = metricById(report, "monthly_volume");
+        const fees = metricById(report, "total_fees");
+        const rate = metricById(report, "effective_rate");
+        const processor = report.identity?.processorName;
+        const period = report.identity?.statementPeriod;
+        const businessType = report.identity?.businessType;
 
         loadingState.classList.add("hidden");
         errorState.classList.add("hidden");
@@ -1256,44 +1372,40 @@
           <section class="panel report-hero">
             <div class="hero-head">
               <div>
-                <div class="eyebrow">${escapeHtml(prettyProcessor(summary.processorName))} · ${escapeHtml(prettyPeriod(summary.statementPeriod))} · ${escapeHtml(businessType.label)}</div>
-                <h1 class="hero-title">${escapeHtml(verdict.title)}</h1>
-                <p class="hero-copy">${escapeHtml(verdict.body)}</p>
+                <div class="eyebrow">${metricDisplay(processor)} · ${metricDisplay(period)} · ${metricDisplay(businessType)}</div>
+                <h1 class="hero-title">${escapeHtml(report.headline?.title || "Your report is ready.")}</h1>
+                <p class="hero-copy">${escapeHtml(report.headline?.body || "")}</p>
               </div>
             </div>
 
             <div class="stats">
               <article class="stat-card">
                 <div class="stat-label">Monthly volume</div>
-                <div class="stat-value">${formatMoney(monthlyVolume)}</div>
-                <div class="stat-note">Processed volume found in this statement.</div>
+                <div class="stat-value">${metricDisplay(volume)}</div>
+                <div class="stat-note">${escapeHtml(metricNote(volume, "Processed volume found in this statement.", "Monthly volume could not be verified."))}</div>
               </article>
               <article class="stat-card">
                 <div class="stat-label">Total fees paid</div>
-                <div class="stat-value">${formatMoney(monthlyFees)}</div>
-                <div class="stat-note">All fees currently detected in this statement.</div>
+                <div class="stat-value">${metricDisplay(fees)}</div>
+                <div class="stat-note">${escapeHtml(metricNote(fees, "Approved fee total from this statement.", "Total fees could not be verified."))}</div>
               </article>
               <article class="stat-card">
                 <div class="stat-label">Effective rate</div>
-                <div class="stat-value">${formatPct(summary.effectiveRate || 0)}</div>
-                <div class="stat-note">Your total fees divided by processed volume.</div>
+                <div class="stat-value">${metricDisplay(rate)}</div>
+                <div class="stat-note">${escapeHtml(metricNote(rate, "Your total fees divided by processed volume.", "Effective rate could not be calculated."))}</div>
               </article>
             </div>
-            ${
-              processorUnknown
-                ? `<p class="plain-note">Note: your processor could not be identified. This comparison is based on your selected business type only.</p>`
-                : ""
-            }
           </section>
 
           <section class="panel card">
             <div class="section-kicker eyebrow">Rate vs benchmark</div>
             <h2 class="card-title">Where your current rate sits</h2>
-            <p class="card-copy">We compare your effective rate to the normal range for ${escapeHtml(businessType.label)} businesses.</p>
-            ${benchmarkBar(summary, businessType, tone)}
+            <p class="card-copy">We compare your effective rate to the normal range for your selected business type.</p>
+            ${renderCustomerBenchmark(report, tone)}
           </section>
 
-          ${renderChecklistReport(summary)}
+          ${renderCustomerBucket(report)}
+          ${renderCustomerFindings(report)}
 
           <section class="panel locked-panel">
             <div class="locked-shell">
@@ -1302,14 +1414,16 @@
                 <rect x="5" y="10" width="14" height="10" rx="2.5" stroke="currentColor" stroke-width="1.8"/>
                 <path d="M12 14.5V16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
               </svg>
-              <h2 class="locked-title">Full fee breakdown is locked</h2>
-              <p class="locked-copy">Sign up free to see every fee line item, understand which ones are negotiable, and get one more statement analyzed at no cost.</p>
+              <h2 class="locked-title">${escapeHtml(report.cta?.title || "Full fee breakdown is locked")}</h2>
+              <p class="locked-copy">${escapeHtml(report.cta?.body || "Sign up free to see every approved fee line item and get one more statement analyzed at no cost.")}</p>
               <div class="locked-actions">
-                <a class="primary-btn" href="${escapeHtml(signUpHref)}">Sign up free to unlock →</a>
+                <a class="primary-btn" href="${escapeHtml(signUpHref)}">${escapeHtml(report.cta?.label || "Sign up free to unlock →")}</a>
                 <a class="signin-link" href="${escapeHtml(signInHref)}">Already have an account? Sign in</a>
               </div>
             </div>
           </section>
+
+          ${renderCustomerQuality(report)}
         `;
         updateAuthLinks();
       }

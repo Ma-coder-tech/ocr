@@ -50,11 +50,12 @@ import {
 import type { AnalysisSummary, BenchmarkStatus, Job } from "./types.js";
 import { buildAggregateAudit } from "./aggregateAudit.js";
 import { detectFeeDrift } from "./feeDrift.js";
-import { analyzeDocument } from "./analyzer.js";
+import { analyzeStatementDocument } from "./statementParserOrchestrator.js";
 import { detectPeriodKeyFromFileName, formatPeriodKey, inferPeriodKeyFromText, parsePeriodKey, toPeriodLabel } from "./periods.js";
 import { parsePdf } from "./parser.js";
 import { detectPreflightFailure } from "./preflight.js";
 import { toPublicReportSummary } from "./publicReport.js";
+import { buildSingleStatementCustomerReport } from "./reporting/index.js";
 import { createJob, getJob, getJobByUploadId, listEvents, listStatementJobsForMerchant, pruneJobs, updateJob } from "./store.js";
 import { enqueueJob, hydrateQueuedJobs } from "./worker.js";
 
@@ -336,8 +337,8 @@ async function readJsonBody<T>(req: IncomingMessage, res: ServerResponse): Promi
 async function readMultipartForm(req: IncomingMessage): Promise<FormData> {
   const request = new Request(`${APP_ORIGIN}${req.url ?? "/"}`, {
     method: req.method,
-    headers: req.headers as HeadersInit,
-    body: req as unknown as BodyInit,
+    headers: req.headers as RequestInit["headers"],
+    body: req as unknown as RequestInit["body"],
     duplex: "half",
   } as RequestInit & { duplex: "half" });
   return await request.formData();
@@ -453,7 +454,9 @@ async function validateProcessorStatementPdf(input: {
     throw new Error(preflightFailure);
   }
 
-  const summary = analyzeDocument(parsed, input.businessType as AnalysisSummary["businessType"]);
+  const summary = analyzeStatementDocument(parsed, input.businessType as AnalysisSummary["businessType"], {
+    sourceFileName: input.fileName,
+  });
 
   const detectedPeriodKey = detectStatementPeriodKey(summary, parsed.textPreview, input.fileName, null);
 
@@ -727,7 +730,7 @@ function statementLibraryItems(merchantId: number): Array<Record<string, unknown
   });
 }
 
-function parseReplaceStatementId(value: FormDataEntryValue | null): number | null | undefined {
+function parseReplaceStatementId(value: unknown): number | null | undefined {
   if (typeof value !== "string" || !value.trim()) return null;
   const statementId = Number(value);
   return Number.isInteger(statementId) && statementId > 0 ? statementId : undefined;
@@ -1009,6 +1012,13 @@ async function handleAuthenticatedJob(req: IncomingMessage, res: ServerResponse,
     nextRunAt: job.nextRunAt,
     error: job.error,
     summary: toPublicReportSummary(job.summary),
+    customerReport: job.summary
+      ? buildSingleStatementCustomerReport({
+          kind: "single_statement_full",
+          analysis: job.summary,
+          context: { unlocked: true },
+        })
+      : null,
     statement: statement ? statementSummaryPayload(statement) : null,
     redirectTo,
   });
@@ -1167,6 +1177,11 @@ async function handleDashboardReportData(res: ServerResponse, merchant: Authenti
   }
   const publicSummary = toPublicReportSummary(statement1.analysisSummary);
   const statementCount = getStatementsForMerchant(merchant.merchantId).length;
+  const customerReport = buildSingleStatementCustomerReport({
+    kind: "single_statement_full",
+    analysis: statement1.analysisSummary,
+    context: { unlocked: true },
+  });
 
   json(res, 200, {
     merchant: {
@@ -1190,6 +1205,7 @@ async function handleDashboardReportData(res: ServerResponse, merchant: Authenti
       benchmarkHigh: statement1.benchmarkHigh,
       summary: statement1.analysisSummary,
       checklistReport: publicSummary?.checklistReport,
+      customerReport,
     },
   });
 }
@@ -1202,6 +1218,11 @@ async function handleStatementReportData(res: ServerResponse, merchant: Authenti
   }
   const publicSummary = toPublicReportSummary(statement.analysisSummary);
   const statementCount = getStatementsForMerchant(merchant.merchantId).length;
+  const customerReport = buildSingleStatementCustomerReport({
+    kind: "single_statement_full",
+    analysis: statement.analysisSummary,
+    context: { unlocked: true },
+  });
 
   json(res, 200, {
     merchant: {
@@ -1220,6 +1241,7 @@ async function handleStatementReportData(res: ServerResponse, merchant: Authenti
       summary: statement.analysisSummary,
       findings: statement.analysisSummary.insights,
       checklistReport: publicSummary?.checklistReport,
+      customerReport,
     },
   });
 }
@@ -1281,6 +1303,13 @@ async function handleAnonymousJobLookup(req: IncomingMessage, res: ServerRespons
     progress: job.progress,
     error: job.error,
     summary: toPublicReportSummary(job.summary),
+    customerReport: job.summary
+      ? buildSingleStatementCustomerReport({
+          kind: "free_teaser",
+          analysis: job.summary,
+          context: { unlocked: false },
+        })
+      : null,
   });
 }
 

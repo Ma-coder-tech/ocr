@@ -1,0 +1,1062 @@
+{
+  "statementIdentity": {
+    "processorFamily": "Fiserv / First Data",
+    "visibleBrand": "First Data / Fiserv-style card processing statement",
+    "statementFamily": "fiserv_first_data_short_statement",
+    "merchantName": "EMERGING SOLUTIONS PLA",
+    "merchantNumber": "526497540884",
+    "statementPeriodStart": "2024-06-01",
+    "statementPeriodEnd": "2024-06-30",
+    "sourceFileName": "fiserv_Clover_June_2024.pdf",
+    "pageCount": 2
+  },
+  "selectedFinancials": {
+    "totalVolume": 2400,
+    "totalFees": 141.31,
+    "effectiveRate": 0.05887917,
+    "amountFunded": 1058.69,
+    "grossSales": 2900,
+    "refunds": 500,
+    "adjustmentsChargebacks": -1200,
+    "thirdPartyTransactions": 0,
+    "transactionCount": {
+      "primaryTransactionCount": 10,
+      "supportingTransactionCounts": [
+        {
+          "role": "gross_sale_items",
+          "value": 8,
+          "reason": "Summary by card type shows 8 gross sale items before 2 refund items."
+        }
+      ]
+    }
+  },
+  "feeBreakdown": {
+    "layout": "service_fees_only_short_statement",
+    "buckets": [
+      {
+        "key": "serviceCharges",
+        "label": "Total Service Charges",
+        "amount": 42.31,
+        "sourceSection": "FEES",
+        "evidenceLine": "Total Service Charges | -$42.31",
+        "confidence": "high"
+      },
+      {
+        "key": "processorOrAccountFees",
+        "label": "Total Fees",
+        "amount": 99,
+        "sourceSection": "FEES",
+        "evidenceLine": "Total Fees | -$99.00",
+        "confidence": "high"
+      }
+    ],
+    "total": 141.31,
+    "evidenceLine": "Total (Service Charges, Interchange Charges/Program Fees, and Fees) | -$141.31"
+  },
+  "pricingModel": {
+    "pricingModel": "unknown",
+    "confidence": "low",
+    "cashDiscountStatus": "unknown",
+    "flatDiscountRate": null,
+    "evidenceType": "not_detected",
+    "evidence": [],
+    "notes": [
+      "Pricing model detection is not implemented for the First Data short-statement fixture."
+    ]
+  },
+  "feeLedger": {
+    "status": "reconciled",
+    "rows": [
+      {
+        "date": null,
+        "type": "Service charges",
+        "network": "Other",
+        "description": "NON SWIPED DISCOUNT $1,450.00 AT .028900 , 4 TRANS AT .100000",
+        "volumeBasis": 1450,
+        "count": 4,
+        "rate": 0.0289,
+        "amount": 42.31,
+        "bucket": "cardFees",
+        "sourceSection": "TRANSACTION FEES",
+        "evidenceLine": "NON SWIPED DISCOUNT $1,450.00 AT .028900 , 4 TRANS AT .100000 | Service charges | -$42.31",
+        "pageNumber": 2,
+        "confidence": "high",
+        "classification": {
+          "economicBucket": "processor_controlled_flat_discount_fee",
+          "confidence": "high",
+          "rule": "FISERV_DISCOUNT_SERVICE_CHARGE",
+          "reason": "Fiserv / First Data discount service-charge rows are processor-controlled discount pricing. The statement exposes the charged fee, not an interchange-versus-margin cost split.",
+          "needsUnbundling": false,
+          "atCostStatus": "unprovable_by_model",
+          "atCostReasonCode": "FLAT_RATE_PROGRAM",
+          "passedThroughAtCostKnown": false,
+          "costExposure": "flat",
+          "comparedValue": 0.0289,
+          "comparedBasis": "stated_rate",
+          "catalogFeeCode": null,
+          "catalogRate": null,
+          "marginAmountKnown": true,
+          "effectiveRatePct": 2.92
+        }
+      },
+      {
+        "date": null,
+        "type": "Fees",
+        "network": null,
+        "description": "APPLICATION FEE",
+        "volumeBasis": null,
+        "count": null,
+        "rate": null,
+        "amount": 99,
+        "bucket": "miscellaneousFees",
+        "sourceSection": "ACCOUNT FEES",
+        "evidenceLine": "APPLICATION FEE | Fees | -$99.00",
+        "pageNumber": 2,
+        "confidence": "high",
+        "classification": {
+          "economicBucket": "miscellaneous_or_statement_fee",
+          "confidence": "medium",
+          "rule": "FISERV_FULL_STATEMENT_ACCOUNT_OR_OTHER_FEE_TYPE",
+          "reason": "The row is printed as a Fees line but does not expose enough detail to classify it more narrowly than account/other fee.",
+          "needsUnbundling": false,
+          "atCostStatus": "not_applicable",
+          "atCostReasonCode": "NOT_PASS_THROUGH_CATEGORY",
+          "passedThroughAtCostKnown": false,
+          "costExposure": "not_applicable",
+          "comparedValue": null,
+          "comparedBasis": "not_compared",
+          "catalogFeeCode": null,
+          "catalogRate": null,
+          "marginAmountKnown": true,
+          "effectiveRatePct": null
+        }
+      }
+    ],
+    "controls": [
+      {
+        "label": "TOTAL TRANSACTION FEES",
+        "bucket": "cardFees",
+        "rowSum": 42.31,
+        "printedTotal": 42.31,
+        "delta": 0,
+        "tolerance": 0.01,
+        "status": "reconciled",
+        "evidenceLine": "TOTAL TRANSACTION FEES | -$42.31"
+      },
+      {
+        "label": "TOTAL ACCOUNT FEES",
+        "bucket": "miscellaneousFees",
+        "rowSum": 99,
+        "printedTotal": 99,
+        "delta": 0,
+        "tolerance": 0.01,
+        "status": "reconciled",
+        "evidenceLine": "TOTAL ACCOUNT FEES | -$99.00"
+      },
+      {
+        "label": "TOTAL",
+        "bucket": "unknown",
+        "rowSum": 141.31,
+        "printedTotal": 141.31,
+        "delta": 0,
+        "tolerance": 0.01,
+        "status": "reconciled",
+        "evidenceLine": "TOTAL | -$141.31"
+      }
+    ],
+    "totalRowSum": 141.31,
+    "printedTotal": 141.31,
+    "delta": 0,
+    "tolerance": 0.01,
+    "evidenceLine": "TOTAL | -$141.31",
+    "feeClassificationSummary": {
+      "status": "validated",
+      "rowCount": 2,
+      "classifiedRowCount": 2,
+      "unresolvedRowCount": 0,
+      "needsUnbundlingRowCount": 0,
+      "totalClassifiedAmount": 141.31,
+      "printedTotal": 141.31,
+      "delta": 0,
+      "tolerance": 0.02,
+      "bucketTotals": [
+        {
+          "economicBucket": "miscellaneous_or_statement_fee",
+          "amount": 99,
+          "rowCount": 1
+        },
+        {
+          "economicBucket": "processor_controlled_flat_discount_fee",
+          "amount": 42.31,
+          "rowCount": 1
+        }
+      ],
+      "notes": [
+        "Classification preserves the full fee ledger and does not split blended tier rows into interchange and markup without external evidence."
+      ]
+    },
+    "notes": [
+      "Short First Data/Clover fee ledger exposes service-charge and account-fee rows, but no interchange/program detail rows."
+    ]
+  },
+  "fundingBatchLedger": {
+    "status": "reconciled",
+    "formula": "Submitted batch amounts + adjustments - month-end fees = Total Amount Processed",
+    "rows": [
+      {
+        "dateSubmitted": "06/11/24",
+        "batchNumber": "061176110001",
+        "amountSubmitted": 0,
+        "thirdPartyTransactions": 0,
+        "adjustments": 0,
+        "chargebacks": 0,
+        "feesCharged": 0,
+        "amountFunded": 0,
+        "formulaResult": 0,
+        "delta": 0,
+        "tolerance": 0.01,
+        "status": "pass",
+        "evidenceLine": "061176110001 | 06/11/24 | 0.00 | 1 | $250.00 | 1 | -$250.00 | 2 | 0.00",
+        "pageNumber": 1,
+        "notes": [
+          "Short First Data/Clover batch row shows submitted net batch amount; adjustments and month-end fees are modeled as separate funding rows."
+        ]
+      },
+      {
+        "dateSubmitted": "06/12/24",
+        "batchNumber": "061176120002",
+        "amountSubmitted": 700,
+        "thirdPartyTransactions": 0,
+        "adjustments": 0,
+        "chargebacks": 0,
+        "feesCharged": 0,
+        "amountFunded": 700,
+        "formulaResult": 700,
+        "delta": 0,
+        "tolerance": 0.01,
+        "status": "pass",
+        "evidenceLine": "061176120002 | 06/12/24 | $350.00 | 2 | $700.00 | 0 | 0.00 | 2 | $700.00",
+        "pageNumber": 1,
+        "notes": [
+          "Short First Data/Clover batch row shows submitted net batch amount; adjustments and month-end fees are modeled as separate funding rows."
+        ]
+      },
+      {
+        "dateSubmitted": "06/14/24",
+        "batchNumber": "061176140003",
+        "amountSubmitted": 500,
+        "thirdPartyTransactions": 0,
+        "adjustments": 0,
+        "chargebacks": 0,
+        "feesCharged": 0,
+        "amountFunded": 500,
+        "formulaResult": 500,
+        "delta": 0,
+        "tolerance": 0.01,
+        "status": "pass",
+        "evidenceLine": "061176140003 | 06/14/24 | $500.00 | 1 | $500.00 | 0 | 0.00 | 1 | $500.00",
+        "pageNumber": 1,
+        "notes": [
+          "Short First Data/Clover batch row shows submitted net batch amount; adjustments and month-end fees are modeled as separate funding rows."
+        ]
+      },
+      {
+        "dateSubmitted": "06/24/24",
+        "batchNumber": "000000117890",
+        "amountSubmitted": 0,
+        "thirdPartyTransactions": 0,
+        "adjustments": 0,
+        "chargebacks": 0,
+        "feesCharged": 0,
+        "amountFunded": 0,
+        "formulaResult": 0,
+        "delta": 0,
+        "tolerance": 0.01,
+        "status": "pass",
+        "evidenceLine": "000000117890 | 06/24/24 | 0.00 | 1 | $250.00 | 1 | -$250.00 | 2 | 0.00",
+        "pageNumber": 2,
+        "notes": [
+          "Short First Data/Clover batch row shows submitted net batch amount; adjustments and month-end fees are modeled as separate funding rows."
+        ]
+      },
+      {
+        "dateSubmitted": "06/24/24",
+        "batchNumber": "000000157890",
+        "amountSubmitted": 700,
+        "thirdPartyTransactions": 0,
+        "adjustments": 0,
+        "chargebacks": 0,
+        "feesCharged": 0,
+        "amountFunded": 700,
+        "formulaResult": 700,
+        "delta": 0,
+        "tolerance": 0.01,
+        "status": "pass",
+        "evidenceLine": "000000157890 | 06/24/24 | $350.00 | 2 | $700.00 | 0 | 0.00 | 2 | $700.00",
+        "pageNumber": 2,
+        "notes": [
+          "Short First Data/Clover batch row shows submitted net batch amount; adjustments and month-end fees are modeled as separate funding rows."
+        ]
+      },
+      {
+        "dateSubmitted": "06/24/24",
+        "batchNumber": "000000217890",
+        "amountSubmitted": 500,
+        "thirdPartyTransactions": 0,
+        "adjustments": 0,
+        "chargebacks": 0,
+        "feesCharged": 0,
+        "amountFunded": 500,
+        "formulaResult": 500,
+        "delta": 0,
+        "tolerance": 0.01,
+        "status": "pass",
+        "evidenceLine": "000000217890 | 06/24/24 | $500.00 | 1 | $500.00 | 0 | 0.00 | 1 | $500.00",
+        "pageNumber": 2,
+        "notes": [
+          "Short First Data/Clover batch row shows submitted net batch amount; adjustments and month-end fees are modeled as separate funding rows."
+        ]
+      },
+      {
+        "dateSubmitted": "06/11/24",
+        "batchNumber": null,
+        "amountSubmitted": 0,
+        "thirdPartyTransactions": 0,
+        "adjustments": 0,
+        "chargebacks": 0,
+        "feesCharged": 0,
+        "amountFunded": 0,
+        "formulaResult": 0,
+        "delta": 0,
+        "tolerance": 0.01,
+        "status": "pass",
+        "evidenceLine": "06/11/24 | ELECTRONIC DEPOSIT REJECTS | 0.00",
+        "pageNumber": 2,
+        "notes": [
+          "Adjustment detail row (ELECTRONIC DEPOSIT REJECTS) is modeled separately from submitted-sales batches."
+        ]
+      },
+      {
+        "dateSubmitted": "06/12/24",
+        "batchNumber": null,
+        "amountSubmitted": 0,
+        "thirdPartyTransactions": 0,
+        "adjustments": -700,
+        "chargebacks": 0,
+        "feesCharged": 0,
+        "amountFunded": -700,
+        "formulaResult": -700,
+        "delta": 0,
+        "tolerance": 0.01,
+        "status": "pass",
+        "evidenceLine": "06/12/24 | ELECTRONIC DEPOSIT REJECTS | -$700.00",
+        "pageNumber": 2,
+        "notes": [
+          "Adjustment detail row (ELECTRONIC DEPOSIT REJECTS) is modeled separately from submitted-sales batches."
+        ]
+      },
+      {
+        "dateSubmitted": "06/14/24",
+        "batchNumber": null,
+        "amountSubmitted": 0,
+        "thirdPartyTransactions": 0,
+        "adjustments": -500,
+        "chargebacks": 0,
+        "feesCharged": 0,
+        "amountFunded": -500,
+        "formulaResult": -500,
+        "delta": 0,
+        "tolerance": 0.01,
+        "status": "pass",
+        "evidenceLine": "06/14/24 | ELECTRONIC DEPOSIT REJECTS | -$500.00",
+        "pageNumber": 2,
+        "notes": [
+          "Adjustment detail row (ELECTRONIC DEPOSIT REJECTS) is modeled separately from submitted-sales batches."
+        ]
+      },
+      {
+        "dateSubmitted": "Month End Charge",
+        "batchNumber": null,
+        "amountSubmitted": 0,
+        "thirdPartyTransactions": 0,
+        "adjustments": 0,
+        "chargebacks": 0,
+        "feesCharged": 141.31,
+        "amountFunded": -141.31,
+        "formulaResult": -141.31,
+        "delta": 0,
+        "tolerance": 0.01,
+        "status": "pass",
+        "evidenceLine": "Month End Charge | 0.00 | 0.00 | 0.00 | -$141.31 | -$141.31",
+        "pageNumber": 1,
+        "notes": [
+          "Month-end fee row reconciles submitted batches and adjustments to the printed amount processed."
+        ]
+      }
+    ],
+    "rowCount": 10,
+    "anomalyCount": 0,
+    "submittedTotal": 2400,
+    "fundedTotal": 1058.69,
+    "feesChargedTotal": 141.31,
+    "controlSubmittedTotal": 2400,
+    "controlFundedTotal": 1058.69,
+    "controlFeesChargedTotal": 141.31,
+    "submittedDelta": 0,
+    "fundedDelta": 0,
+    "feesChargedDelta": 0,
+    "evidenceLine": "Total | 8 | $2,900.00 | 2 | -$500.00 | 10 | $2,400.00",
+    "notes": [
+      "Short First Data/Clover funding ledger uses submitted batch rows, separate adjustment detail rows, and the month-end fee row because the statement does not print per-batch funded deposits."
+    ]
+  },
+  "interchangeDetail": {
+    "available": false,
+    "detailTotal": null,
+    "detailTransactionCount": null,
+    "detailVolume": null,
+    "rows": [],
+    "rowsStatus": "not_present_on_short_statement",
+    "evidenceLine": null
+  },
+  "candidateTotals": [
+    {
+      "roleCandidate": "total_volume",
+      "label": "Total Amount Submitted",
+      "amount": 2400,
+      "sourceSection": "SUMMARY",
+      "pageNumber": 1,
+      "evidenceLine": "Page | 1 | Total Amount Submitted | $2,400.00",
+      "selected": true,
+      "selectionReason": "Statement-level submitted total reconciles with funding after the adjustment deduction.",
+      "rejectionReason": null,
+      "confidence": "high"
+    },
+    {
+      "roleCandidate": "amount_funded",
+      "label": "Total Amount Processed",
+      "amount": 1058.69,
+      "sourceSection": "SUMMARY",
+      "pageNumber": 1,
+      "evidenceLine": "Total Amount Processed | $1,058.69",
+      "selected": true,
+      "selectionReason": "Statement uses processed amount as post-adjustment, post-fee funded/processed result.",
+      "rejectionReason": null,
+      "confidence": "high"
+    },
+    {
+      "roleCandidate": "total_fees",
+      "label": "Fees",
+      "amount": 141.31,
+      "sourceSection": "SUMMARY",
+      "pageNumber": 1,
+      "evidenceLine": "Page | 2 | Fees | -$141.31",
+      "selected": true,
+      "selectionReason": "Statement-level summary fee total reconciles with fee section grand total.",
+      "rejectionReason": null,
+      "confidence": "high"
+    },
+    {
+      "roleCandidate": "gross_sales",
+      "label": "Total Gross Sales You Submitted",
+      "amount": 2900,
+      "sourceSection": "SUMMARY BY CARD TYPE",
+      "pageNumber": 1,
+      "evidenceLine": "Total | 8 | $2,900.00 | 2 | -$500.00 | 10 | $1,200.00",
+      "selected": false,
+      "selectionReason": null,
+      "rejectionReason": "Gross sales before refunds are not the effective-rate denominator when submitted volume is available.",
+      "confidence": "high"
+    },
+    {
+      "roleCandidate": "conflicting_total",
+      "label": "Summary By Card Type Total Amount You Submitted",
+      "amount": 1200,
+      "sourceSection": "SUMMARY BY CARD TYPE",
+      "pageNumber": 1,
+      "evidenceLine": "Total | 8 | $2,900.00 | 2 | -$500.00 | 10 | $1,200.00",
+      "selected": false,
+      "selectionReason": null,
+      "rejectionReason": "Card-type total is distorted by the adjustment line; statement-level summary and batch total are the reconciled submitted volume.",
+      "confidence": "high"
+    },
+    {
+      "roleCandidate": "total_volume",
+      "label": "Summary By Batch Total Amount You Submitted",
+      "amount": 2400,
+      "sourceSection": "SUMMARY BY BATCH",
+      "pageNumber": 2,
+      "evidenceLine": "Total | 8 | $2,900.00 | 2 | -$500.00 | 10 | $2,400.00",
+      "selected": false,
+      "selectionReason": null,
+      "rejectionReason": "Supporting evidence only; statement-level summary total has higher priority.",
+      "confidence": "high"
+    },
+    {
+      "roleCandidate": "fee_bucket_total",
+      "label": "Total Service Charges",
+      "amount": 42.31,
+      "sourceSection": "FEES",
+      "pageNumber": 2,
+      "evidenceLine": "Total Service Charges | -$42.31",
+      "selected": false,
+      "selectionReason": null,
+      "rejectionReason": "Fee bucket only; not all-in total fees.",
+      "confidence": "high"
+    },
+    {
+      "roleCandidate": "fee_bucket_total",
+      "label": "Total Fees",
+      "amount": 99,
+      "sourceSection": "FEES",
+      "pageNumber": 2,
+      "evidenceLine": "Total Fees | -$99.00",
+      "selected": false,
+      "selectionReason": null,
+      "rejectionReason": "Fee bucket only; not all-in total fees.",
+      "confidence": "high"
+    },
+    {
+      "roleCandidate": "conflicting_total",
+      "label": "Adjustment Detail Total",
+      "amount": 1200,
+      "sourceSection": "ADJUSTMENTS",
+      "pageNumber": 2,
+      "evidenceLine": "TOTAL | -$1,200.00",
+      "selected": false,
+      "selectionReason": null,
+      "rejectionReason": "Adjustment total is a deduction used in funding reconciliation, not processing volume or fees.",
+      "confidence": "high"
+    }
+  ],
+  "excludedTotals": [
+    {
+      "amount": 2900,
+      "label": "Total Gross Sales You Submitted",
+      "sourceSection": "SUMMARY BY CARD TYPE",
+      "evidenceLine": "Total | 8 | $2,900.00 | 2 | -$500.00 | 10 | $1,200.00",
+      "excludedFrom": "totalVolume",
+      "reason": "Gross sales before refunds are not the effective-rate denominator when submitted volume is available."
+    },
+    {
+      "amount": 1200,
+      "label": "Summary By Card Type Total Amount You Submitted",
+      "sourceSection": "SUMMARY BY CARD TYPE",
+      "evidenceLine": "Total | 8 | $2,900.00 | 2 | -$500.00 | 10 | $1,200.00",
+      "excludedFrom": "totalVolume",
+      "reason": "Card-type total is distorted by the adjustment line and does not reconcile to amount funded."
+    },
+    {
+      "amount": 1200,
+      "label": "Adjustment Detail Total",
+      "sourceSection": "ADJUSTMENTS",
+      "evidenceLine": "TOTAL | -$1,200.00",
+      "excludedFrom": "totalVolume",
+      "reason": "Adjustment total is a deduction in the funding formula, not statement-period submitted volume."
+    }
+  ],
+  "reconciliation": {
+    "fundingFormula": {
+      "status": "pass",
+      "expected": 1058.69,
+      "actual": 1058.69,
+      "delta": 0,
+      "tolerance": 0.01,
+      "explanation": "2400.00 - 0.00 + -1200.00 - 141.31 = 1058.69"
+    },
+    "feeBucketFormula": {
+      "status": "pass",
+      "expected": 141.31,
+      "actual": 141.31,
+      "delta": 0,
+      "tolerance": 0.02,
+      "explanation": "42.31 + 99.00 = 141.31"
+    },
+    "effectiveRateFormula": {
+      "status": "pass",
+      "expected": 0.05887917,
+      "actual": 0.05887917,
+      "delta": 0,
+      "tolerance": 0.000001,
+      "explanation": "141.31 / 2400.00 = 0.05887917"
+    },
+    "supportingVolumeAgreement": {
+      "status": "pass",
+      "expected": 2400,
+      "actual": 2400,
+      "delta": 0,
+      "tolerance": 0.01,
+      "explanation": "Statement summary total and batch total agree; card-type total is separately excluded because it is adjustment-distorted."
+    },
+    "supportingFeeAgreement": {
+      "status": "pass",
+      "expected": 141.31,
+      "actual": 141.31,
+      "delta": 0,
+      "tolerance": 0.01,
+      "explanation": "Statement-level fees agree with the short-statement fee ledger grand total."
+    }
+  },
+  "reconciliationResults": [
+    {
+      "identity": "headline:submitted_plus_adjustments_minus_fees_eq_processed",
+      "status": "RECON_OK",
+      "stated": 1058.69,
+      "computed": 1058.69,
+      "delta": 0,
+      "toleranceBand": 0.01,
+      "note": "Short-statement headline funding formula using selected top-line totals.",
+      "evidence": {
+        "section": "SUMMARY",
+        "rowLabel": "Total Amount Processed"
+      }
+    },
+    {
+      "identity": "batch_columns:sum_submitted_eq_submitted_total",
+      "status": "RECON_OK",
+      "stated": 2400,
+      "computed": 2400,
+      "delta": 0,
+      "toleranceBand": 0.05,
+      "note": "Submitted batch amounts are checked against the Summary By Batch total.",
+      "evidence": {
+        "section": "SUMMARY BY BATCH",
+        "rowLabel": "Total",
+        "sourceText": "Total | 8 | $2,900.00 | 2 | -$500.00 | 10 | $2,400.00"
+      }
+    },
+    {
+      "identity": "batch_columns:sum_funded_eq_processed_total",
+      "status": "RECON_OK",
+      "stated": 1058.69,
+      "computed": 1058.69,
+      "delta": 0,
+      "toleranceBand": 0.05,
+      "note": "Submitted batches, adjustment detail rows, and month-end fees are summed to the printed Total Amount Processed.",
+      "evidence": {
+        "section": "SUMMARY BY BATCH",
+        "rowLabel": "Total Amount Processed"
+      }
+    },
+    {
+      "identity": "batch_columns:sum_fees_eq_total_fees",
+      "status": "RECON_OK",
+      "stated": 141.31,
+      "computed": 141.31,
+      "delta": 0,
+      "toleranceBand": 0.05,
+      "note": "Month-end fee row is checked against selected total fees.",
+      "evidence": {
+        "section": "SUMMARY BY DAY",
+        "rowLabel": "Month End Charge"
+      }
+    },
+    {
+      "identity": "batch_row:06/11/24:061176110001:funding_formula",
+      "status": "RECON_OK",
+      "stated": 0,
+      "computed": 0,
+      "delta": 0,
+      "toleranceBand": 0.01,
+      "note": "Short-statement funding row checked using the row's exposed submitted, adjustment, and fee values.",
+      "evidence": {
+        "section": "SUMMARY BY BATCH / ADJUSTMENTS",
+        "pageNumber": 1,
+        "rowLabel": "06/11/24",
+        "rowIndex": 0,
+        "sourceText": "061176110001 | 06/11/24 | 0.00 | 1 | $250.00 | 1 | -$250.00 | 2 | 0.00"
+      }
+    },
+    {
+      "identity": "batch_row:06/12/24:061176120002:funding_formula",
+      "status": "RECON_OK",
+      "stated": 700,
+      "computed": 700,
+      "delta": 0,
+      "toleranceBand": 0.01,
+      "note": "Short-statement funding row checked using the row's exposed submitted, adjustment, and fee values.",
+      "evidence": {
+        "section": "SUMMARY BY BATCH / ADJUSTMENTS",
+        "pageNumber": 1,
+        "rowLabel": "06/12/24",
+        "rowIndex": 1,
+        "sourceText": "061176120002 | 06/12/24 | $350.00 | 2 | $700.00 | 0 | 0.00 | 2 | $700.00"
+      }
+    },
+    {
+      "identity": "batch_row:06/14/24:061176140003:funding_formula",
+      "status": "RECON_OK",
+      "stated": 500,
+      "computed": 500,
+      "delta": 0,
+      "toleranceBand": 0.01,
+      "note": "Short-statement funding row checked using the row's exposed submitted, adjustment, and fee values.",
+      "evidence": {
+        "section": "SUMMARY BY BATCH / ADJUSTMENTS",
+        "pageNumber": 1,
+        "rowLabel": "06/14/24",
+        "rowIndex": 2,
+        "sourceText": "061176140003 | 06/14/24 | $500.00 | 1 | $500.00 | 0 | 0.00 | 1 | $500.00"
+      }
+    },
+    {
+      "identity": "batch_row:06/24/24:000000117890:funding_formula",
+      "status": "RECON_OK",
+      "stated": 0,
+      "computed": 0,
+      "delta": 0,
+      "toleranceBand": 0.01,
+      "note": "Short-statement funding row checked using the row's exposed submitted, adjustment, and fee values.",
+      "evidence": {
+        "section": "SUMMARY BY BATCH / ADJUSTMENTS",
+        "pageNumber": 2,
+        "rowLabel": "06/24/24",
+        "rowIndex": 3,
+        "sourceText": "000000117890 | 06/24/24 | 0.00 | 1 | $250.00 | 1 | -$250.00 | 2 | 0.00"
+      }
+    },
+    {
+      "identity": "batch_row:06/24/24:000000157890:funding_formula",
+      "status": "RECON_OK",
+      "stated": 700,
+      "computed": 700,
+      "delta": 0,
+      "toleranceBand": 0.01,
+      "note": "Short-statement funding row checked using the row's exposed submitted, adjustment, and fee values.",
+      "evidence": {
+        "section": "SUMMARY BY BATCH / ADJUSTMENTS",
+        "pageNumber": 2,
+        "rowLabel": "06/24/24",
+        "rowIndex": 4,
+        "sourceText": "000000157890 | 06/24/24 | $350.00 | 2 | $700.00 | 0 | 0.00 | 2 | $700.00"
+      }
+    },
+    {
+      "identity": "batch_row:06/24/24:000000217890:funding_formula",
+      "status": "RECON_OK",
+      "stated": 500,
+      "computed": 500,
+      "delta": 0,
+      "toleranceBand": 0.01,
+      "note": "Short-statement funding row checked using the row's exposed submitted, adjustment, and fee values.",
+      "evidence": {
+        "section": "SUMMARY BY BATCH / ADJUSTMENTS",
+        "pageNumber": 2,
+        "rowLabel": "06/24/24",
+        "rowIndex": 5,
+        "sourceText": "000000217890 | 06/24/24 | $500.00 | 1 | $500.00 | 0 | 0.00 | 1 | $500.00"
+      }
+    },
+    {
+      "identity": "batch_row:06/11/24:adjustment_or_month_end:funding_formula",
+      "status": "RECON_OK",
+      "stated": 0,
+      "computed": 0,
+      "delta": 0,
+      "toleranceBand": 0.01,
+      "note": "Short-statement funding row checked using the row's exposed submitted, adjustment, and fee values.",
+      "evidence": {
+        "section": "SUMMARY BY BATCH / ADJUSTMENTS",
+        "pageNumber": 2,
+        "rowLabel": "06/11/24",
+        "rowIndex": 6,
+        "sourceText": "06/11/24 | ELECTRONIC DEPOSIT REJECTS | 0.00"
+      }
+    },
+    {
+      "identity": "batch_row:06/12/24:adjustment_or_month_end:funding_formula",
+      "status": "RECON_OK",
+      "stated": -700,
+      "computed": -700,
+      "delta": 0,
+      "toleranceBand": 0.01,
+      "note": "Short-statement funding row checked using the row's exposed submitted, adjustment, and fee values.",
+      "evidence": {
+        "section": "SUMMARY BY BATCH / ADJUSTMENTS",
+        "pageNumber": 2,
+        "rowLabel": "06/12/24",
+        "rowIndex": 7,
+        "sourceText": "06/12/24 | ELECTRONIC DEPOSIT REJECTS | -$700.00"
+      }
+    },
+    {
+      "identity": "batch_row:06/14/24:adjustment_or_month_end:funding_formula",
+      "status": "RECON_OK",
+      "stated": -500,
+      "computed": -500,
+      "delta": 0,
+      "toleranceBand": 0.01,
+      "note": "Short-statement funding row checked using the row's exposed submitted, adjustment, and fee values.",
+      "evidence": {
+        "section": "SUMMARY BY BATCH / ADJUSTMENTS",
+        "pageNumber": 2,
+        "rowLabel": "06/14/24",
+        "rowIndex": 8,
+        "sourceText": "06/14/24 | ELECTRONIC DEPOSIT REJECTS | -$500.00"
+      }
+    },
+    {
+      "identity": "batch_row:Month End Charge:adjustment_or_month_end:funding_formula",
+      "status": "RECON_OK",
+      "stated": -141.31,
+      "computed": -141.31,
+      "delta": 0,
+      "toleranceBand": 0.01,
+      "note": "Short-statement funding row checked using the row's exposed submitted, adjustment, and fee values.",
+      "evidence": {
+        "section": "SUMMARY BY BATCH / ADJUSTMENTS",
+        "pageNumber": 1,
+        "rowLabel": "Month End Charge",
+        "rowIndex": 9,
+        "sourceText": "Month End Charge | 0.00 | 0.00 | 0.00 | -$141.31 | -$141.31"
+      }
+    },
+    {
+      "identity": "fee_detail:total_transaction_fees:line_sum_eq_printed_total",
+      "status": "RECON_OK",
+      "stated": 42.31,
+      "computed": 42.31,
+      "delta": 0,
+      "toleranceBand": 0.02,
+      "note": "Short-statement fee rows are checked against printed fee controls.",
+      "evidence": {
+        "section": "FEES",
+        "rowLabel": "TOTAL TRANSACTION FEES",
+        "sourceText": "TOTAL TRANSACTION FEES | -$42.31"
+      }
+    },
+    {
+      "identity": "fee_detail:total_account_fees:line_sum_eq_printed_total",
+      "status": "RECON_OK",
+      "stated": 99,
+      "computed": 99,
+      "delta": 0,
+      "toleranceBand": 0.02,
+      "note": "Short-statement fee rows are checked against printed fee controls.",
+      "evidence": {
+        "section": "FEES",
+        "rowLabel": "TOTAL ACCOUNT FEES",
+        "sourceText": "TOTAL ACCOUNT FEES | -$99.00"
+      }
+    },
+    {
+      "identity": "fee_detail:total:line_sum_eq_printed_total",
+      "status": "RECON_OK",
+      "stated": 141.31,
+      "computed": 141.31,
+      "delta": 0,
+      "toleranceBand": 0.02,
+      "note": "Short-statement fee rows are checked against printed fee controls.",
+      "evidence": {
+        "section": "FEES",
+        "rowLabel": "TOTAL",
+        "sourceText": "TOTAL | -$141.31"
+      }
+    },
+    {
+      "identity": "fee_detail:all_line_items_eq_total_fees",
+      "status": "RECON_OK",
+      "stated": 141.31,
+      "computed": 141.31,
+      "delta": 0,
+      "toleranceBand": 0.02,
+      "note": "All parsed short-statement fee rows compared with the selected all-in fee total.",
+      "evidence": {
+        "section": "FEES",
+        "rowLabel": "TOTAL",
+        "sourceText": "TOTAL | -$141.31"
+      }
+    },
+    {
+      "identity": "cross_reference:summary_by_batch_submitted_eq_selected_submitted",
+      "status": "RECON_OK",
+      "stated": 2400,
+      "computed": 2400,
+      "delta": 0,
+      "toleranceBand": 0.01,
+      "note": "Summary By Batch total cross-checks the selected submitted volume.",
+      "evidence": {
+        "section": "SUMMARY BY BATCH",
+        "rowLabel": "Total",
+        "sourceText": "Total | 8 | $2,900.00 | 2 | -$500.00 | 10 | $2,400.00"
+      }
+    },
+    {
+      "identity": "cross_reference:adjustment_detail_total_eq_selected_adjustments",
+      "status": "RECON_OK",
+      "stated": -1200,
+      "computed": -1200,
+      "delta": 0,
+      "toleranceBand": 0.01,
+      "note": "Adjustment detail total cross-checks the selected adjustment deduction.",
+      "evidence": {
+        "section": "ADJUSTMENTS",
+        "rowLabel": "TOTAL"
+      }
+    },
+    {
+      "identity": "orphan_total:summary_by_card_type_adjustment_distorted_submitted_total",
+      "status": "RECON_UNREFERENCED_VALUE",
+      "stated": 1200,
+      "computed": 2400,
+      "delta": -1200,
+      "toleranceBand": 0.01,
+      "note": "Card-type total is visible but distorted by the adjustment row; it is preserved as an excluded candidate instead of selected as processing volume.",
+      "evidence": {
+        "section": "SUMMARY BY CARD TYPE",
+        "pageNumber": 1,
+        "rowLabel": "Total",
+        "sourceText": "Total | 8 | $2,900.00 | 2 | -$500.00 | 10 | $1,200.00"
+      }
+    }
+  ],
+  "decision": {
+    "status": "accepted_with_warnings",
+    "reason": "Accepted with parser caveat(s): card_type_total_distorted_by_adjustments, short_statement_no_interchange_detail, Excluded unreferenced candidate total(s): orphan_total:summary_by_card_type_adjustment_distorted_submitted_total..",
+    "confidence": "high",
+    "reportable": true,
+    "validationState": {
+      "topLevelTotals": "validated",
+      "feeLedger": "validated",
+      "batchLedger": "validated",
+      "feeClassification": "validated",
+      "orphanTotals": "present",
+      "customerFacingTotalsAllowed": true,
+      "feeLedgerAllowed": true,
+      "batchDetailAllowed": true,
+      "feeClassificationAllowed": true,
+      "blockingReasons": [],
+      "warningReasons": [
+        "Excluded unreferenced candidate total(s): orphan_total:summary_by_card_type_adjustment_distorted_submitted_total."
+      ]
+    }
+  },
+  "confidence": {
+    "overall": "high",
+    "totalVolume": "high",
+    "totalFees": "high",
+    "amountFunded": "high",
+    "feeBreakdown": "high",
+    "statementIdentity": "high"
+  },
+  "warnings": [
+    {
+      "code": "card_type_total_distorted_by_adjustments",
+      "severity": "medium",
+      "message": "Card-type total shows $1,200.00, but statement summary and batch total show $2,400.00; adjustment rows explain the difference.",
+      "evidenceLine": "Total | 8 | $2,900.00 | 2 | -$500.00 | 10 | $1,200.00"
+    },
+    {
+      "code": "short_statement_no_interchange_detail",
+      "severity": "low",
+      "message": "No interchange/program detail section is present on this short statement.",
+      "evidenceLine": null
+    }
+  ],
+  "evidence": [
+    {
+      "field": "statementPeriod",
+      "sourceSection": "HEADER",
+      "pageNumber": 1,
+      "lineIndex": 4,
+      "evidenceLine": "Statement Period | 06/01/24 - 06/30/24",
+      "value": "06/01/24 - 06/30/24"
+    },
+    {
+      "field": "merchantName",
+      "sourceSection": "HEADER",
+      "pageNumber": 1,
+      "lineIndex": 2,
+      "evidenceLine": "EMERGING SOLUTIONS PLA | Page 1 of 2 | THIS IS NOT A BILL",
+      "value": "EMERGING SOLUTIONS PLA"
+    },
+    {
+      "field": "merchantNumber",
+      "sourceSection": "HEADER",
+      "pageNumber": 1,
+      "lineIndex": 6,
+      "evidenceLine": "Merchant Number | 526497540884",
+      "value": "526497540884"
+    },
+    {
+      "field": "totalVolume",
+      "sourceSection": "SUMMARY",
+      "pageNumber": 1,
+      "lineIndex": 11,
+      "evidenceLine": "Page | 1 | Total Amount Submitted | $2,400.00",
+      "value": 2400
+    },
+    {
+      "field": "totalFees",
+      "sourceSection": "SUMMARY",
+      "pageNumber": 1,
+      "lineIndex": 14,
+      "evidenceLine": "Page | 2 | Fees | -$141.31",
+      "value": 141.31
+    },
+    {
+      "field": "amountFunded",
+      "sourceSection": "SUMMARY",
+      "pageNumber": 1,
+      "lineIndex": 15,
+      "evidenceLine": "Total Amount Processed | $1,058.69",
+      "value": 1058.69
+    },
+    {
+      "field": "adjustmentsChargebacks",
+      "sourceSection": "SUMMARY",
+      "pageNumber": 1,
+      "lineIndex": 13,
+      "evidenceLine": "Page | 2 | Adjustments | -$1,200.00",
+      "value": -1200
+    },
+    {
+      "field": "feeBreakdown",
+      "sourceSection": "FEES",
+      "pageNumber": 2,
+      "lineIndex": 82,
+      "evidenceLine": "Total (Service Charges, Interchange Charges/Program Fees, and Fees) | -$141.31",
+      "value": 141.31
+    },
+    {
+      "field": "documentIr.totalVolume",
+      "sourceSection": "DOCUMENT_IR_TOP_LEVEL",
+      "pageNumber": 1,
+      "lineIndex": null,
+      "evidenceLine": "Page | 1 | Total Amount Submitted | $2,400.00",
+      "value": 2400
+    },
+    {
+      "field": "documentIr.totalFees",
+      "sourceSection": "DOCUMENT_IR_TOP_LEVEL",
+      "pageNumber": 1,
+      "lineIndex": null,
+      "evidenceLine": "Page | 2 | Fees | -$141.31",
+      "value": 141.31
+    },
+    {
+      "field": "documentIr.amountFunded",
+      "sourceSection": "DOCUMENT_IR_TOP_LEVEL",
+      "pageNumber": 1,
+      "lineIndex": null,
+      "evidenceLine": "Total Amount Processed | $1,058.69",
+      "value": 1058.69
+    },
+    {
+      "field": "documentIr.adjustments",
+      "sourceSection": "DOCUMENT_IR_TOP_LEVEL",
+      "pageNumber": 1,
+      "lineIndex": null,
+      "evidenceLine": "Page | 2 | Adjustments | -$1,200.00",
+      "value": -1200
+    },
+    {
+      "field": "documentIr.chargebacks",
+      "sourceSection": "DOCUMENT_IR_TOP_LEVEL",
+      "pageNumber": 1,
+      "lineIndex": null,
+      "evidenceLine": "Page | 2 | Chargebacks/Reversals | 0.00",
+      "value": 0
+    }
+  ]
+}

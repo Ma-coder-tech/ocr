@@ -1,4 +1,5 @@
 import type { BusinessTypeId } from "./businessTypes.js";
+import type { ParserDecision } from "./parserFoundation.js";
 import type { ProcessorDetection } from "./processorDetection.js";
 
 export type StatementSlot = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
@@ -94,6 +95,24 @@ export type StatementSection = {
 
 export type StatementEconomicBucket = "card_brand_pass_through" | "processor_markup" | "add_on_fees";
 
+export type StatementEconomicFactKind =
+  | "total_volume"
+  | "total_fees"
+  | "card_brand_total"
+  | "processor_controlled_total"
+  | "fee_line"
+  | "section_total";
+
+export type StatementEconomicFact = {
+  kind: StatementEconomicFactKind;
+  amount: number;
+  label: string;
+  sourceSection: string;
+  evidenceLine: string;
+  rowIndex: number;
+  confidence: number;
+};
+
 export type StatementEconomicFeeRow = {
   label: string;
   amount: number;
@@ -111,7 +130,87 @@ export type StatementEconomicRollup = {
   processorMarkup: number | null;
   addOnFees: number | null;
   feeRows: StatementEconomicFeeRow[];
+  facts?: StatementEconomicFact[];
   confidence: number;
+};
+
+export type ParserTraceEvent =
+  | {
+      type: "section";
+      rowIndex: number;
+      sectionType: StatementSectionType;
+      title: string;
+      evidenceLine: string;
+    }
+  | {
+      type: "table";
+      rowIndex: number;
+      tableKind: string;
+      evidenceLine: string;
+    }
+  | {
+      type: "accepted_fact";
+      rowIndex: number;
+      factKind: StatementEconomicFactKind;
+      amount: number;
+      label: string;
+      evidenceLine: string;
+    }
+  | {
+      type: "accepted_fee_row";
+      rowIndex: number;
+      bucket: StatementEconomicBucket;
+      amount: number;
+      label: string;
+      evidenceLine: string;
+    }
+  | {
+      type: "rejected_row";
+      rowIndex: number;
+      reason: string;
+      evidenceLine: string;
+    }
+  | {
+      type: "rollup";
+      accepted: boolean;
+      reason: string;
+      totalVolume: number | null;
+      totalFees: number | null;
+      feeRowCount: number;
+    };
+
+export type ParserTrace = {
+  events: ParserTraceEvent[];
+};
+
+export type TwoBucketEvidence = {
+  label: string;
+  amount: number;
+  line: string;
+  lineIndex: number;
+};
+
+export type TwoBucketAnalysisSource = "structured_rollup" | "statement_text" | "summary_fee_rows";
+
+export type TwoBucketAnalysis = {
+  source: TwoBucketAnalysisSource;
+  totalFees: number | null;
+  cardBrandTotal: number | null;
+  processorOwnedTotal: number | null;
+  processorControlledTotal: number | null;
+  unknownTotal: number | null;
+  cardBrandSharePct: number | null;
+  processorOwnedSharePct: number | null;
+  processorControlledSharePct: number | null;
+  coveragePct: number | null;
+  reconciliationDeltaUsd: number | null;
+  available: boolean;
+  reason: string;
+  evidence: {
+    totalFees: TwoBucketEvidence[];
+    cardBrand: TwoBucketEvidence[];
+    processorOwned: TwoBucketEvidence[];
+  };
 };
 
 export type StructuredFeeFindingKind =
@@ -713,6 +812,14 @@ export type AnalysisSummary = {
   dynamicFields: DynamicField[];
   insights: FeeInsight[];
   confidence: "high" | "medium" | "low";
+  parserDecision?: ParserDecision;
+  parserSource?: {
+    driverId: string;
+    driverName: string;
+    processorFamily: string;
+    statementFamily: string;
+  };
+  twoBucketAnalysis?: TwoBucketAnalysis;
   checklistReport?: ChecklistReport;
 };
 

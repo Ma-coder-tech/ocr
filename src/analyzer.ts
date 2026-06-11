@@ -22,6 +22,7 @@ import { detectProcessorIdentity } from "./processorDetection.js";
 import { withFeeClassification } from "./feeClassification.js";
 import { extractStructuredStatementFacts, type StructuredStatementFacts } from "./statementSections.js";
 import { buildHiddenMarkupAudit } from "./hiddenMarkupAudit.js";
+import { buildTwoBucketAnalysis } from "./twoBucketAnalysis.js";
 
 type ColumnStats = {
   sum: number;
@@ -343,6 +344,17 @@ function hasUsableEconomicTotals(summary: Pick<AnalysisSummary, "totalVolume" | 
   return Number.isFinite(summary.effectiveRate) && summary.effectiveRate >= 0.05 && summary.effectiveRate <= 15;
 }
 
+function withTwoBucketAnalysis(
+  doc: ParsedDocument,
+  summary: AnalysisSummary,
+  structuredFacts: StructuredStatementFacts,
+): AnalysisSummary {
+  return {
+    ...summary,
+    twoBucketAnalysis: buildTwoBucketAnalysis(doc, summary, { economicRollup: structuredFacts.economicRollup }),
+  };
+}
+
 function inferPeriod(row: Record<string, string | number>, periodKeys: string[]): string | null {
   for (const key of periodKeys) {
     const value = row[key];
@@ -480,9 +492,9 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
     const qualitativeSummary = createTextOnlyPdfSummary(doc, processorName, businessType, structuredFacts);
     const recoveredSummary = refineTextOnlyPdfSummary(doc, qualitativeSummary);
     if (recoveredSummary) {
-      return recoveredSummary;
+      return withTwoBucketAnalysis(doc, recoveredSummary, structuredFacts);
     }
-    return qualitativeSummary;
+    return withTwoBucketAnalysis(doc, qualitativeSummary, structuredFacts);
   }
 
   const feeBuckets = new Map<string, number>();
@@ -1059,9 +1071,9 @@ export function analyzeDocument(doc: ParsedDocument, businessType: BusinessTypeI
   ) {
     const recoveredSummary = refineTextOnlyPdfSummary(doc, summary);
     if (recoveredSummary) {
-      return recoveredSummary;
+      return withTwoBucketAnalysis(doc, recoveredSummary, structuredFacts);
     }
   }
 
-  return summary;
+  return withTwoBucketAnalysis(doc, summary, structuredFacts);
 }
