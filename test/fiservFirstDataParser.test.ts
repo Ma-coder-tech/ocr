@@ -20,6 +20,7 @@ const PRIORITY_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs"
 const NOVEMBER_FULL_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "Nov_2024_Statement.pdf");
 const NXGEN_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "fiserv_NXGEN_PAYMENT_SERVICES_jan_2022.pdf");
 const PHILIP_FUTURMARKET_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf");
+const ABDUL_BASHER_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "fiserv_ABDUL_BASHER_Aug_2025.pdf");
 const PHILIP_FUTURMARKET_ZERO_VOLUME_PDF_PATH = path.resolve(
   process.cwd(),
   "test",
@@ -1141,6 +1142,83 @@ describe("Fiserv First Data full statement parser", () => {
         feeClassificationAllowed: true,
         blockingReasons: [],
         warningReasons: [],
+      },
+    });
+  });
+
+  it("accepts processor-branded statements where Month End Charge accounts for all fees and Less Discount Paid is absent", async () => {
+    const doc = await parsePdf(ABDUL_BASHER_PDF_PATH);
+
+    expect(fiservFirstDataProcessorStatementDriver.supports(doc)).toBe(true);
+
+    const actual = parseFiservFirstDataProcessorStatement(doc, {
+      sourceFileName: "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+    }) as any;
+
+    expect(actual.statementIdentity).toMatchObject({
+      visibleBrand: "Merchant One",
+      statementFamily: "fiserv_first_data_processor_statement",
+      merchantName: "XPRESS FIX",
+      merchantNumber: "5189934211169970",
+      statementPeriodStart: "2025-08-01",
+      statementPeriodEnd: "2025-08-31",
+    });
+    expect(actual.selectedFinancials).toMatchObject({
+      totalVolume: 2712.11,
+      totalFees: 91.19,
+      amountFunded: 2620.92,
+      effectiveRate: 0.03362327,
+      thirdPartyTransactions: 0,
+      adjustmentsChargebacks: 0,
+    });
+    expect(actual.feeBreakdown.buckets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: "Month End Charge",
+          amount: 91.19,
+          evidenceLine: "Month End Charge | 0.00 | 0.00 | 0.00 | -$91.19 | -$91.19",
+        }),
+        expect.objectContaining({
+          label: "Less Discount Paid",
+          amount: 0,
+          evidenceLine: "No Less Discount Paid row; Month End Charge equals statement-level Fees Charged, so daily discount-paid fees are $0.00.",
+        }),
+      ]),
+    );
+    expect(actual.reconciliation).toMatchObject({
+      fundingFormula: {
+        status: "pass",
+        expected: 2620.92,
+        actual: 2620.92,
+      },
+      feeBucketFormula: {
+        status: "pass",
+        expected: 91.19,
+        actual: 91.19,
+        explanation: "91.19 + 0.00 = 91.19",
+      },
+    });
+    expect(actual.fundingBatchLedger).toMatchObject({
+      status: "reconciled",
+      rowCount: 21,
+      anomalyCount: 0,
+      submittedTotal: 2712.11,
+      feesChargedTotal: 91.19,
+      fundedTotal: 2620.92,
+    });
+    expect(actual.feeLedger).toMatchObject({
+      status: "unreconciled",
+      totalRowSum: 87.2,
+      printedTotal: 91.19,
+      delta: 3.99,
+    });
+    expect(actual.decision).toMatchObject({
+      status: "needs_review",
+      reportable: false,
+      validationState: {
+        topLevelTotals: "validated",
+        feeLedger: "failed",
+        batchLedger: "validated",
       },
     });
   });

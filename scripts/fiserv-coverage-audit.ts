@@ -89,6 +89,26 @@ const samples: AuditSample[] = [
     source: "downloads_sample",
     path: path.resolve(downloads, "Dec_2024_Statement.pdf"),
   },
+  {
+    label: "Philip Futuremarket October 2025 original",
+    source: "downloads_sample",
+    path: path.resolve(downloads, "Fiserv_2025_PHILIP FUTURMARKET LLC.pdf"),
+  },
+  {
+    label: "Philip Futuremarket September 2025 zero-volume original",
+    source: "downloads_sample",
+    path: path.resolve(downloads, "Fiserv_PHILIP FUTUREMARKET1_ LLC.pdf"),
+  },
+  {
+    label: "Karen ReneeWert December 2024",
+    source: "downloads_sample",
+    path: path.resolve(downloads, "Fiserv_Karen_ReneeWert_Statement_Dec_2024.pdf"),
+  },
+  {
+    label: "Abdul Basher August 2025",
+    source: "downloads_sample",
+    path: path.resolve(downloads, "Fiserv_ABDUL BASHER_Aug_2025.pdf"),
+  },
 ];
 
 const drivers: Array<ParserDriver<FiservParserOutput>> = [

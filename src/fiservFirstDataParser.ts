@@ -2600,7 +2600,13 @@ export function parseFiservFirstDataProcessorStatement(doc: RawExtractedDocument
   const zeroVolumeNoSubmittedAmounts =
     totalVolume === 0 && amountSubmittedRows.some((row) => /There are no Amounts Submitted for this statement period/i.test(rowContent(row)));
   const cardTypeTotalRow = zeroVolumeNoSubmittedAmounts ? null : cardTypeTotalRowCandidate;
-  const lessDiscountPaid = lessDiscountPaidRow ? requireAmount(lessDiscountPaidRow, "less discount paid") : zeroVolumeNoSubmittedAmounts ? 0 : null;
+  const monthEndCoversAllFees = Math.abs(monthEndCharge - totalFees) <= 0.01;
+  const inferredNoDiscountPaid =
+    !lessDiscountPaidRow && (zeroVolumeNoSubmittedAmounts || monthEndCoversAllFees);
+  const missingLessDiscountPaidEvidence = zeroVolumeNoSubmittedAmounts
+    ? "No Less Discount Paid row; zero submitted activity makes daily discount-paid fees $0.00."
+    : "No Less Discount Paid row; Month End Charge equals statement-level Fees Charged, so daily discount-paid fees are $0.00.";
+  const lessDiscountPaid = lessDiscountPaidRow ? requireAmount(lessDiscountPaidRow, "less discount paid") : inferredNoDiscountPaid ? 0 : null;
   if (lessDiscountPaid === null) {
     throw new Error("Parser could not find less discount paid.");
   }
@@ -2770,13 +2776,15 @@ export function parseFiservFirstDataProcessorStatement(doc: RawExtractedDocument
       amount: lessDiscountPaid,
       sourceSection: "SUMMARY",
       pageNumber: lessDiscountPaidRow?.pageNumber ?? amountSubmittedSubtotalPageNumber,
-      evidenceLine: lessDiscountPaidRow?.content ?? "No Less Discount Paid row; zero submitted activity makes daily discount-paid fees $0.00.",
+      evidenceLine: lessDiscountPaidRow?.content ?? missingLessDiscountPaidEvidence,
       selected: false,
       selectionReason: null,
       rejectionReason: lessDiscountPaidRow
         ? "Fee bucket only; not all-in total fees."
-        : "Implicit zero fee bucket only; no submitted activity produced no daily discount-paid fees.",
-      confidence: "high",
+        : zeroVolumeNoSubmittedAmounts
+          ? "Implicit zero fee bucket only; no submitted activity produced no daily discount-paid fees."
+          : "Implicit zero fee bucket only; Month End Charge already accounts for the selected all-in fees.",
+      confidence: lessDiscountPaidRow ? "high" : "medium",
     },
   ];
   if (orphanTotal) {
@@ -2817,7 +2825,7 @@ export function parseFiservFirstDataProcessorStatement(doc: RawExtractedDocument
       totalFees,
       feeLedger.printedTotal ?? feeLedger.totalRowSum,
       0.02,
-      "Fee-section grand total agrees with statement-level fees; row-level fee ledger has a recorded $0.02 rounding delta.",
+      "Fee-section printed control total agrees with statement-level fees; row-level fee ledger reconciliation is recorded separately.",
     ),
   };
   const reconciliationResults = runFiservProcessorReconciliationProfile({
@@ -2930,8 +2938,8 @@ export function parseFiservFirstDataProcessorStatement(doc: RawExtractedDocument
           label: "Less Discount Paid",
           amount: lessDiscountPaid,
           sourceSection: "SUMMARY",
-          evidenceLine: lessDiscountPaidRow?.content ?? "No Less Discount Paid row; zero submitted activity makes daily discount-paid fees $0.00.",
-          confidence: "medium",
+          evidenceLine: lessDiscountPaidRow?.content ?? missingLessDiscountPaidEvidence,
+          confidence: lessDiscountPaidRow ? "medium" : "low",
         },
       ],
       total: totalFees,
