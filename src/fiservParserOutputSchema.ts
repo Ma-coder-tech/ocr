@@ -221,6 +221,22 @@ export const feeClassificationBucketTotalSchema = z
   })
   .strict();
 
+export const feeClassificationResidualAnalysisSchema = z
+  .object({
+    basis: z.enum(["printed_total", "row_sum"]),
+    basisTotal: finiteNumber.nonnegative(),
+    identifiedCardBrandPassThroughAmount: finiteNumber.nonnegative(),
+    knownProcessorFeeAmount: finiteNumber.nonnegative(),
+    unbundledProcessorControlledAmount: finiteNumber.nonnegative(),
+    unresolvedAmount: finiteNumber.nonnegative(),
+    zeroAmount: finiteNumber.nonnegative(),
+    markupOrUnknownPoolAmount: finiteNumber,
+    residualUnclassifiedAmount: finiteNumber,
+    rowSumDeltaToBasis: finiteNumber,
+    formula: z.string().min(1),
+  })
+  .strict();
+
 export const feeClassificationSummarySchema = z
   .object({
     status: feeClassificationSummaryStatusSchema,
@@ -233,6 +249,7 @@ export const feeClassificationSummarySchema = z
     delta: finiteNumber,
     tolerance: finiteNumber.nonnegative(),
     bucketTotals: z.array(feeClassificationBucketTotalSchema),
+    residualAnalysis: feeClassificationResidualAnalysisSchema,
     notes: z.array(z.string().min(1)),
   })
   .strict();

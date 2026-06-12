@@ -95,6 +95,7 @@ describe("Fiserv processor AI fee classification", () => {
 
     expect(result.ai).toMatchObject({
       status: "applied",
+      provider: null,
       model: "test-model",
       unresolvedInputRowCount: 1,
       suggestionCount: 1,
@@ -204,6 +205,7 @@ describe("Fiserv processor AI fee classification", () => {
 
     expect(mocked.ai).toMatchObject({
       status: "applied",
+      provider: "anthropic",
       model: "claude-opus-test",
       appliedSuggestionCount: 1,
     });
@@ -233,11 +235,174 @@ describe("Fiserv processor AI fee classification", () => {
 
     expect(result.ai).toMatchObject({
       status: "failed",
+      provider: null,
       model: "claude-opus-test",
       appliedSuggestionCount: 0,
     });
     expect(result.rows).toEqual(deterministic.rows);
     expect(result.summary.unresolvedRowCount).toBe(deterministic.summary.unresolvedRowCount);
     expect(result.summary.notes).toEqual(expect.arrayContaining([expect.stringContaining("timed out")]));
+  });
+
+  it("falls back to OpenAI when Anthropic fails in auto provider mode", async () => {
+    const deterministic = classifyFiservProcessorFeeLedgerRows(rows, 26.54);
+    const attemptedModels: unknown[] = [];
+    const openAiOptions: Record<string, unknown>[] = [];
+
+    const result = await maybeRunFiservProcessorFeeAiClassification(
+      deterministic.rows,
+      deterministic.summary,
+      26.54,
+      context,
+      {
+        enabled: true,
+        apiKey: "test-anthropic-key",
+        openAiApiKey: "test-openai-key",
+        anthropicModelName: "claude-opus-test",
+        openAiModelName: "gpt-test",
+        sdk: {
+          anthropic: (modelName: string) => ({ provider: "anthropic", modelName }),
+          openai: (modelName: string) => ({ provider: "openai", modelName }),
+          Output: {
+            object: (options) => ({ outputKind: "object", ...options }),
+          },
+          generateObject: async (options: Record<string, unknown>) => {
+            attemptedModels.push(options.model);
+            if ((options.model as { provider?: string }).provider === "anthropic") {
+              throw new Error("Anthropic account credit is too low.");
+            }
+            throw new Error("OpenAI should use generateText.");
+          },
+          generateText: async (options: Record<string, unknown>) => {
+            attemptedModels.push(options.model);
+            openAiOptions.push(options);
+            return {
+              output: {
+                rows: [
+                  {
+                    rowIndex: 0,
+                    economicBucket: "processor_controlled_flat_discount_fee",
+                    confidence: "high",
+                    subcategory: "processor_percentage_markup",
+                    negotiability: "likely_negotiable",
+                    reasonCodes: ["GENERIC_PROCESSOR_LABEL", "RATE_TIMES_VOLUME"],
+                    explanation: "Generic processor label charged as a percentage of Amex volume.",
+                  },
+                ],
+              },
+            };
+          },
+        },
+      },
+    );
+
+    expect(attemptedModels).toEqual([
+      { provider: "anthropic", modelName: "claude-opus-test" },
+      { provider: "openai", modelName: "gpt-test" },
+    ]);
+    expect(openAiOptions[0]).toMatchObject({
+      providerOptions: {
+        openai: {
+          store: false,
+          reasoningEffort: "low",
+          textVerbosity: "low",
+          strictJsonSchema: true,
+        },
+      },
+    });
+    expect(openAiOptions[0]).not.toHaveProperty("temperature");
+    expect(openAiOptions[0]?.output).toMatchObject({
+      outputKind: "object",
+      name: "fee_classification_suggestions",
+    });
+    expect(result.ai).toMatchObject({
+      status: "applied",
+      provider: "openai",
+      model: "gpt-test",
+      appliedSuggestionCount: 1,
+    });
+    expect(result.ai.notes).toEqual(expect.arrayContaining([expect.stringContaining("Anthropic AI fee classification failed")]));
+    expect(result.ai.notes).toEqual(expect.arrayContaining([expect.stringContaining("Used OpenAI fallback")]));
+    expect(result.summary.unresolvedRowCount).toBe(0);
+  });
+
+  it("uses OpenAI directly when selected as the fee AI provider", async () => {
+    const deterministic = classifyFiservProcessorFeeLedgerRows(rows, 26.54);
+    const attemptedModels: unknown[] = [];
+    const providerOptions: unknown[] = [];
+    const providerApiKeys: unknown[] = [];
+    const outputSpecs: unknown[] = [];
+
+    const result = await maybeRunFiservProcessorFeeAiClassification(
+      deterministic.rows,
+      deterministic.summary,
+      26.54,
+      context,
+      {
+        enabled: true,
+        provider: "openai",
+        openAiApiKey: "test-openai-key",
+        modelName: "gpt-direct-test",
+        sdk: {
+          anthropic: (modelName: string) => ({ provider: "anthropic", modelName }),
+          createOpenAI: ({ apiKey }) => {
+            providerApiKeys.push(apiKey);
+            return (modelName: string) => ({ provider: "openai", modelName, apiKey });
+          },
+          Output: {
+            object: (options) => {
+              outputSpecs.push(options);
+              return { outputKind: "object", ...options };
+            },
+          },
+          generateText: async (options: Record<string, unknown>) => {
+            attemptedModels.push(options.model);
+            providerOptions.push(options.providerOptions);
+            expect(options).not.toHaveProperty("temperature");
+            return {
+              output: {
+                rows: [
+                  {
+                    rowIndex: 0,
+                    economicBucket: "processor_controlled_flat_discount_fee",
+                    confidence: "high",
+                    subcategory: "processor_percentage_markup",
+                    negotiability: "likely_negotiable",
+                    reasonCodes: ["GENERIC_PROCESSOR_LABEL"],
+                    explanation: "OpenAI direct provider classified the processor percentage fee.",
+                  },
+                ],
+              },
+            };
+          },
+        },
+      },
+    );
+
+    expect(providerApiKeys).toEqual(["test-openai-key"]);
+    expect(attemptedModels).toEqual([{ provider: "openai", modelName: "gpt-direct-test", apiKey: "test-openai-key" }]);
+    expect(providerOptions).toEqual([
+      {
+        openai: {
+          store: false,
+          reasoningEffort: "low",
+          textVerbosity: "low",
+          strictJsonSchema: true,
+        },
+      },
+    ]);
+    expect(outputSpecs).toEqual([
+      expect.objectContaining({
+        name: "fee_classification_suggestions",
+        description: expect.stringContaining("Conservative classifications"),
+      }),
+    ]);
+    expect(result.ai).toMatchObject({
+      status: "applied",
+      provider: "openai",
+      model: "gpt-direct-test",
+      appliedSuggestionCount: 1,
+    });
+    expect(result.summary.unresolvedRowCount).toBe(0);
   });
 });

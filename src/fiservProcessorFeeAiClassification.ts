@@ -17,11 +17,23 @@ import type { ReconciliationCheck, ReconciliationResult } from "./reconciliation
 const require = createRequire(import.meta.url);
 
 type GenerateObject = (options: Record<string, unknown>) => Promise<{ object: unknown }>;
-type AnthropicModelFactory = (modelName: string) => unknown;
+type GenerateText = (options: Record<string, unknown>) => Promise<{ output: unknown }>;
+type AiModelFactory = (modelName: string) => unknown;
+type AiProviderFactoryCreator = (options: { apiKey?: string }) => AiModelFactory;
+type AiOutputFactory = {
+  object: (options: { schema: unknown; name?: string; description?: string }) => unknown;
+};
+type FiservProcessorFeeAiProvider = "anthropic" | "openai";
+type FiservProcessorFeeAiProviderPreference = FiservProcessorFeeAiProvider | "auto";
 
 type AiSdk = {
   generateObject: GenerateObject;
-  anthropic: AnthropicModelFactory;
+  generateText?: GenerateText;
+  Output?: AiOutputFactory;
+  anthropic?: AiModelFactory;
+  openai?: AiModelFactory;
+  createAnthropic?: AiProviderFactoryCreator;
+  createOpenAI?: AiProviderFactoryCreator;
 };
 
 export type FiservProcessorFeeAiContext = {
@@ -74,6 +86,7 @@ export type FiservProcessorFeeAiRunStatus = "disabled" | "not_needed" | "applied
 
 export type FiservProcessorFeeAiRunMetadata = {
   status: FiservProcessorFeeAiRunStatus;
+  provider: FiservProcessorFeeAiProvider | null;
   model: string | null;
   unresolvedInputRowCount: number;
   suggestionCount: number;
@@ -90,8 +103,13 @@ export type FiservProcessorFeeAiClassificationResult<T extends FiservProcessorFe
 
 type AiOptions = {
   enabled?: boolean;
+  provider?: FiservProcessorFeeAiProviderPreference;
   apiKey?: string;
+  anthropicApiKey?: string;
+  openAiApiKey?: string;
   modelName?: string;
+  anthropicModelName?: string;
+  openAiModelName?: string;
   maxInputTokens?: number;
   maxOutputTokens?: number;
   timeoutMs?: number;
@@ -150,11 +168,23 @@ const CONFIDENCE_RANK = {
 } as const;
 
 function loadAiSdk(): AiSdk {
-  const ai = require("ai") as { generateObject: GenerateObject };
-  const anthropicSdk = require("@ai-sdk/anthropic") as { anthropic: AnthropicModelFactory };
+  const ai = require("ai") as { generateObject: GenerateObject; generateText: GenerateText; Output: AiOutputFactory };
+  const anthropicSdk = require("@ai-sdk/anthropic") as {
+    anthropic: AiModelFactory;
+    createAnthropic: AiProviderFactoryCreator;
+  };
+  const openAiSdk = require("@ai-sdk/openai") as {
+    openai: AiModelFactory;
+    createOpenAI: AiProviderFactoryCreator;
+  };
   return {
     generateObject: ai.generateObject,
+    generateText: ai.generateText,
+    Output: ai.Output,
     anthropic: anthropicSdk.anthropic,
+    openai: openAiSdk.openai,
+    createAnthropic: anthropicSdk.createAnthropic,
+    createOpenAI: openAiSdk.createOpenAI,
   };
 }
 
@@ -172,8 +202,42 @@ function feeAiEnabled(options: AiOptions): boolean {
   return options.enabled ?? envFlag("AI_FEE_CLASSIFICATION_ENABLED");
 }
 
-function feeAiModelName(options: AiOptions, packet: FiservProcessorFeeAiPacket): string {
-  if (options.modelName) return options.modelName;
+function feeAiProviderPreference(options: AiOptions): FiservProcessorFeeAiProviderPreference {
+  const configured = options.provider ?? process.env.AI_FEE_CLASSIFICATION_PROVIDER ?? "auto";
+  return configured === "anthropic" || configured === "openai" || configured === "auto" ? configured : "auto";
+}
+
+function providerHasApiKey(provider: FiservProcessorFeeAiProvider, options: AiOptions): boolean {
+  return Boolean(providerApiKey(provider, options));
+}
+
+function providerApiKey(provider: FiservProcessorFeeAiProvider, options: AiOptions): string | undefined {
+  if (provider === "anthropic") {
+    return options.anthropicApiKey ?? options.apiKey ?? process.env.ANTHROPIC_API_KEY;
+  }
+  return options.openAiApiKey ?? process.env.OPENAI_API_KEY;
+}
+
+function missingProviderKeyNote(options: AiOptions): string {
+  const preference = feeAiProviderPreference(options);
+  if (preference === "anthropic") return "AI fee classification requires ANTHROPIC_API_KEY.";
+  if (preference === "openai") return "AI fee classification requires OPENAI_API_KEY.";
+  return "AI fee classification requires ANTHROPIC_API_KEY or OPENAI_API_KEY.";
+}
+
+function feeAiModelName(
+  provider: FiservProcessorFeeAiProvider,
+  options: AiOptions,
+  packet: FiservProcessorFeeAiPacket,
+): string {
+  const preference = feeAiProviderPreference(options);
+  if (provider === "openai") {
+    if (options.openAiModelName) return options.openAiModelName;
+    if (preference === "openai" && options.modelName) return options.modelName;
+    return process.env.AI_FEE_CLASSIFICATION_OPENAI_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-5.5";
+  }
+
+  if (options.anthropicModelName ?? options.modelName) return options.anthropicModelName ?? options.modelName ?? "claude-opus-4-8";
   const escalationModel = process.env.AI_FEE_CLASSIFICATION_ESCALATION_MODEL;
   const escalationThreshold = Number(process.env.AI_FEE_CLASSIFICATION_ESCALATION_MIN_AMOUNT ?? 100);
   const maxUnresolvedAmount = Math.max(0, ...packet.unresolvedRows.map((row) => row.amount));
@@ -181,6 +245,21 @@ function feeAiModelName(options: AiOptions, packet: FiservProcessorFeeAiPacket):
     return escalationModel;
   }
   return process.env.AI_FEE_CLASSIFICATION_MODEL ?? process.env.ANTHROPIC_MODEL ?? "claude-opus-4-8";
+}
+
+function feeAiProviderAttempts(
+  options: AiOptions,
+  packet: FiservProcessorFeeAiPacket,
+): Array<{ provider: FiservProcessorFeeAiProvider; modelName: string }> {
+  const preference = feeAiProviderPreference(options);
+  const providers: FiservProcessorFeeAiProvider[] =
+    preference === "auto" ? ["anthropic", "openai"] : [preference];
+  return providers
+    .filter((provider) => providerHasApiKey(provider, options))
+    .map((provider) => ({
+      provider,
+      modelName: feeAiModelName(provider, options, packet),
+    }));
 }
 
 function applyMinConfidence(options: AiOptions): "high" | "medium" | "low" {
@@ -269,6 +348,99 @@ function aiResponseSchema(): unknown {
   return z.object({
     rows: z.array(rowSchema),
   });
+}
+
+function openAiProviderOptions(): Record<string, unknown> {
+  return {
+    providerOptions: {
+      openai: {
+        store: false,
+        reasoningEffort: "low",
+        textVerbosity: "low",
+        strictJsonSchema: true,
+      },
+    },
+  };
+}
+
+function aiProviderLabel(provider: FiservProcessorFeeAiProvider): string {
+  return provider === "anthropic" ? "Anthropic" : "OpenAI";
+}
+
+function aiProviderFailureMessage(provider: FiservProcessorFeeAiProvider, error: unknown): string {
+  const detail = error instanceof Error ? error.message : String(error);
+  const normalized = detail.replace(/\s+/g, " ").trim().slice(0, 500);
+  return `${aiProviderLabel(provider)} AI fee classification failed: ${normalized}`;
+}
+
+function aiFailureDetail(prefix: string, error: unknown): string {
+  const detail = error instanceof Error ? error.message : String(error);
+  const normalized = detail.replace(/\s+/g, " ").trim().slice(0, 500);
+  return `${prefix}: ${normalized}`;
+}
+
+async function generateAiSuggestionsWithProvider(
+  sdk: AiSdk,
+  provider: FiservProcessorFeeAiProvider,
+  modelName: string,
+  packet: FiservProcessorFeeAiPacket,
+  options: {
+    maxInputTokens: number;
+    maxOutputTokens: number;
+    timeoutMs: number;
+    apiKey?: string;
+  },
+): Promise<FiservProcessorFeeAiSuggestion[]> {
+  const factory =
+    provider === "anthropic"
+      ? options.apiKey && sdk.createAnthropic
+        ? sdk.createAnthropic({ apiKey: options.apiKey })
+        : sdk.anthropic
+      : options.apiKey && sdk.createOpenAI
+        ? sdk.createOpenAI({ apiKey: options.apiKey })
+        : sdk.openai;
+  if (!factory) {
+    throw new Error(`${aiProviderLabel(provider)} AI SDK provider is not available.`);
+  }
+
+  const schema = aiResponseSchema();
+  if (provider === "openai") {
+    if (!sdk.generateText || !sdk.Output) {
+      throw new Error("OpenAI structured output requires AI SDK generateText and Output.object.");
+    }
+    const result = await withTimeout(
+      sdk.generateText({
+        model: factory(modelName),
+        output: sdk.Output.object({
+          schema,
+          name: "fee_classification_suggestions",
+          description: "Conservative classifications for unresolved merchant-processing fee rows.",
+        }),
+        prompt: aiPrompt(packet),
+        maxOutputTokens: Math.max(options.maxOutputTokens, 4000),
+        ...openAiProviderOptions(),
+      }),
+      options.timeoutMs,
+    );
+    return parseAiObject(result.output).rows;
+  }
+
+  const result = await withTimeout(
+    sdk.generateObject({
+      model: factory(modelName),
+      schema,
+      prompt: aiPrompt(packet),
+      maxOutputTokens: options.maxOutputTokens,
+      temperature: 0,
+      providerOptions: {
+        anthropic: {
+          maxInputTokens: options.maxInputTokens,
+        },
+      },
+    }),
+    options.timeoutMs,
+  );
+  return parseAiObject(result.object).rows;
 }
 
 function parseAiObject(value: unknown): { rows: FiservProcessorFeeAiSuggestion[] } {
@@ -365,7 +537,12 @@ export function applyFiservProcessorFeeAiSuggestions<T extends FiservProcessorFe
   rows: Array<FiservProcessorClassifiedFeeRow<T>>,
   printedTotal: number | null,
   suggestions: FiservProcessorFeeAiSuggestion[],
-  options: { applyMinConfidence?: "high" | "medium" | "low"; modelName?: string | null } = {},
+  options: {
+    applyMinConfidence?: "high" | "medium" | "low";
+    modelName?: string | null;
+    provider?: FiservProcessorFeeAiProvider | null;
+    notes?: string[];
+  } = {},
 ): FiservProcessorFeeAiClassificationResult<T> {
   const threshold = options.applyMinConfidence ?? "medium";
   const suggestionsByRow = new Map<number, FiservProcessorFeeAiSuggestion>();
@@ -417,6 +594,7 @@ export function applyFiservProcessorFeeAiSuggestions<T extends FiservProcessorFe
 
   const summary = summarizeFiservProcessorFeeClassifications(nextRows, printedTotal);
   const notes = [
+    ...(options.notes ?? []),
     appliedSuggestionCount > 0
       ? `Applied ${appliedSuggestionCount} AI fee classification suggestion(s) at ${threshold}+ confidence.`
       : "No AI fee classification suggestions met the apply threshold.",
@@ -433,6 +611,7 @@ export function applyFiservProcessorFeeAiSuggestions<T extends FiservProcessorFe
     },
     ai: {
       status: appliedSuggestionCount > 0 ? "applied" : "no_usable_suggestions",
+      provider: options.provider ?? null,
       model: options.modelName ?? null,
       unresolvedInputRowCount: rows.filter((row) => row.classification.economicBucket === "unknown_needs_review").length,
       suggestionCount: suggestions.length,
@@ -456,6 +635,7 @@ export async function maybeRunFiservProcessorFeeAiClassification<T extends Fiser
     summary,
     ai: {
       status,
+      provider: null,
       model: null,
       unresolvedInputRowCount: packet.unresolvedRows.length,
       suggestionCount: 0,
@@ -471,60 +651,95 @@ export async function maybeRunFiservProcessorFeeAiClassification<T extends Fiser
   if (!feeAiEnabled(options)) {
     return disabledResult("disabled", "AI fee classification is disabled.");
   }
-  if (!(options.apiKey ?? process.env.ANTHROPIC_API_KEY)) {
-    return disabledResult("disabled", "AI fee classification requires ANTHROPIC_API_KEY.");
+  const providerAttempts = feeAiProviderAttempts(options, packet);
+  if (providerAttempts.length === 0) {
+    return disabledResult("disabled", missingProviderKeyNote(options));
   }
 
-  const modelName = feeAiModelName(options, packet);
   const maxInputTokens = options.maxInputTokens ?? Number(process.env.AI_FEE_CLASSIFICATION_MAX_INPUT_TOKENS ?? process.env.AI_MAX_INPUT_TOKENS ?? 12000);
   const maxOutputTokens = options.maxOutputTokens ?? Number(process.env.AI_FEE_CLASSIFICATION_MAX_OUTPUT_TOKENS ?? process.env.AI_MAX_OUTPUT_TOKENS ?? 2000);
   const timeoutMs = options.timeoutMs ?? Number(process.env.AI_FEE_CLASSIFICATION_TIMEOUT_MS ?? 8000);
-
+  let sdk: AiSdk;
+  const failureNotes: string[] = [];
   try {
-    const sdk = options.sdk ?? loadAiSdk();
-    const result = await withTimeout(
-      sdk.generateObject({
-        model: sdk.anthropic(modelName),
-        schema: aiResponseSchema(),
-        prompt: aiPrompt(packet),
-        maxOutputTokens,
-        temperature: 0,
-        providerOptions: {
-          anthropic: {
-            maxInputTokens,
-          },
-        },
-      }),
-      timeoutMs,
-    );
-    const parsed = parseAiObject(result.object);
-    return applyFiservProcessorFeeAiSuggestions(rows, printedTotal, parsed.rows, {
-      applyMinConfidence: applyMinConfidence(options),
-      modelName,
-    });
+    sdk = options.sdk ?? loadAiSdk();
   } catch (error) {
+    failureNotes.push(aiFailureDetail("AI SDK loading failed", error));
     return {
       rows,
       summary: {
         ...summary,
         notes: [
           ...summary.notes,
-          `AI fee classification failed; deterministic classifications preserved. ${
-            error instanceof Error ? error.message : String(error)
-          }`,
+          "AI fee classification failed before provider execution; deterministic classifications preserved.",
+          ...failureNotes,
         ],
       },
       ai: {
         status: "failed",
-        model: modelName,
+        provider: null,
+        model:
+          providerAttempts.length === 1
+            ? providerAttempts[0]?.modelName ?? null
+            : providerAttempts.map((attempt) => `${attempt.provider}:${attempt.modelName}`).join(", "),
         unresolvedInputRowCount: packet.unresolvedRows.length,
         suggestionCount: 0,
         appliedSuggestionCount: 0,
         skippedSuggestionCount: 0,
-        notes: [`AI fee classification failed; deterministic classifications preserved.`],
+        notes: [
+          "AI fee classification failed before provider execution; deterministic classifications preserved.",
+          ...failureNotes,
+        ],
       },
     };
   }
+
+  for (const attempt of providerAttempts) {
+    try {
+      const suggestions = await generateAiSuggestionsWithProvider(sdk, attempt.provider, attempt.modelName, packet, {
+        maxInputTokens,
+        maxOutputTokens,
+        timeoutMs,
+        apiKey: providerApiKey(attempt.provider, options),
+      });
+      return applyFiservProcessorFeeAiSuggestions(rows, printedTotal, suggestions, {
+        applyMinConfidence: applyMinConfidence(options),
+        modelName: attempt.modelName,
+        provider: attempt.provider,
+        notes: failureNotes.length > 0 ? [...failureNotes, `Used ${aiProviderLabel(attempt.provider)} fallback.`] : [],
+      });
+    } catch (error) {
+      failureNotes.push(aiProviderFailureMessage(attempt.provider, error));
+    }
+  }
+
+  return {
+    rows,
+    summary: {
+      ...summary,
+      notes: [
+        ...summary.notes,
+        "AI fee classification failed across all configured providers; deterministic classifications preserved.",
+        ...failureNotes,
+      ],
+    },
+    ai: {
+      status: "failed",
+      provider: null,
+      model:
+        providerAttempts.length === 1
+          ? providerAttempts[0]?.modelName ?? null
+          : providerAttempts.map((attempt) => `${attempt.provider}:${attempt.modelName}`).join(", "),
+      unresolvedInputRowCount: packet.unresolvedRows.length,
+      suggestionCount: 0,
+      appliedSuggestionCount: 0,
+      skippedSuggestionCount: 0,
+      notes: [
+        "AI fee classification failed across all configured providers; deterministic classifications preserved.",
+        ...failureNotes,
+      ],
+    },
+  };
 }
 
 export async function maybeRunFiservProcessorFeeAiClassificationForParserOutput<T extends FiservProcessorFeeRowForClassification, O extends ParserOutputWithFiservFeeLedger<T>>(

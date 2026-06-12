@@ -7,7 +7,7 @@
     "merchantNumber": "526497540884",
     "statementPeriodStart": "2024-06-01",
     "statementPeriodEnd": "2024-06-30",
-    "sourceFileName": "fiserv_Clover_June_2024.pdf",
+    "sourceFileName": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
     "pageCount": 2
   },
   "selectedFinancials": {
@@ -54,14 +54,27 @@
     "evidenceLine": "Total (Service Charges, Interchange Charges/Program Fees, and Fees) | -$141.31"
   },
   "pricingModel": {
-    "pricingModel": "unknown",
+    "pricingModel": "flat_rate",
     "confidence": "low",
-    "cashDiscountStatus": "unknown",
-    "flatDiscountRate": null,
-    "evidenceType": "not_detected",
-    "evidence": [],
+    "cashDiscountStatus": "not_applicable",
+    "flatDiscountRate": 0.0289,
+    "evidenceType": "fee_math_inferred",
+    "evidence": [
+      {
+        "description": "NON SWIPED DISCOUNT $1,450.00 AT .028900 , 4 TRANS AT .100000",
+        "network": "Other",
+        "volume": 1450,
+        "rate": 0.0289,
+        "statedFee": 42.31,
+        "computedFee": 42.31,
+        "delta": 0,
+        "evidenceLine": "NON SWIPED DISCOUNT $1,450.00 AT .028900 , 4 TRANS AT .100000 | Service charges | -$42.31"
+      }
+    ],
     "notes": [
-      "Pricing model detection is not implemented for the First Data short-statement fixture."
+      "Flat-rate pricing inferred conservatively from visible discount/service-charge row math.",
+      "This is not treated as confirmed cash discount because the statement does not explicitly identify a cash-discount or non-cash-adjustment program.",
+      "No itemized interchange/program detail is available on this layout, so pass-through-at-cost proof is structurally unavailable for the discount row."
     ]
   },
   "feeLedger": {
@@ -191,6 +204,19 @@
           "rowCount": 1
         }
       ],
+      "residualAnalysis": {
+        "basis": "printed_total",
+        "basisTotal": 141.31,
+        "identifiedCardBrandPassThroughAmount": 0,
+        "knownProcessorFeeAmount": 141.31,
+        "unbundledProcessorControlledAmount": 0,
+        "unresolvedAmount": 0,
+        "zeroAmount": 0,
+        "markupOrUnknownPoolAmount": 141.31,
+        "residualUnclassifiedAmount": 0,
+        "rowSumDeltaToBasis": 0,
+        "formula": "basisTotal - identifiedCardBrandPassThroughAmount - knownProcessorFeeAmount - unbundledProcessorControlledAmount - zeroAmount"
+      },
       "notes": [
         "Classification preserves the full fee ledger and does not split blended tier rows into interchange and markup without external evidence."
       ]

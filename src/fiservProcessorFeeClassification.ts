@@ -86,6 +86,20 @@ export type FiservProcessorFeeClassificationBucketTotal = {
   rowCount: number;
 };
 
+export type FiservProcessorFeeResidualAnalysis = {
+  basis: "printed_total" | "row_sum";
+  basisTotal: number;
+  identifiedCardBrandPassThroughAmount: number;
+  knownProcessorFeeAmount: number;
+  unbundledProcessorControlledAmount: number;
+  unresolvedAmount: number;
+  zeroAmount: number;
+  markupOrUnknownPoolAmount: number;
+  residualUnclassifiedAmount: number;
+  rowSumDeltaToBasis: number;
+  formula: string;
+};
+
 export type FiservProcessorFeeClassificationSummary = {
   status:
     | "not_mapped"
@@ -102,6 +116,7 @@ export type FiservProcessorFeeClassificationSummary = {
   delta: number;
   tolerance: number;
   bucketTotals: FiservProcessorFeeClassificationBucketTotal[];
+  residualAnalysis: FiservProcessorFeeResidualAnalysis;
   notes: string[];
 };
 
@@ -227,6 +242,11 @@ function comparisonCandidate(row: FiservProcessorFeeRowForClassification): {
     return { comparedValue: round8(row.amount / row.count), comparedBasis: "derived_from_count" };
   }
   return { comparedValue: null, comparedBasis: "not_compared" };
+}
+
+function residualRound2(value: number): number {
+  const rounded = round2(value);
+  return Object.is(rounded, -0) ? 0 : rounded;
 }
 
 function classification(params: {
@@ -764,6 +784,38 @@ export function summarizeFiservProcessorFeeClassifications<T extends FiservProce
 
   const totalClassifiedAmount = round2(classifiedRows.reduce((sum, row) => sum + row.amount, 0));
   const delta = printedTotal === null ? 0 : round2(printedTotal - totalClassifiedAmount);
+  const bucketAmount = (bucket: FiservProcessorFeeEconomicBucket): number =>
+    bucketTotals.find((total) => total.economicBucket === bucket)?.amount ?? 0;
+  const residualBasisTotal = printedTotal ?? totalClassifiedAmount;
+  const identifiedCardBrandPassThroughAmount = bucketAmount("card_brand_pass_through");
+  const knownProcessorFeeAmount = residualRound2(
+    bucketAmount("processor_controlled_flat_discount_fee") +
+      bucketAmount("processor_transaction_or_auth") +
+      bucketAmount("miscellaneous_or_statement_fee"),
+  );
+  const unbundledProcessorControlledAmount = bucketAmount("processor_controlled_tiered_fee");
+  const unresolvedAmount = bucketAmount("unknown_needs_review");
+  const zeroAmount = bucketAmount("zero_amount_no_charge");
+  const residualAnalysis: FiservProcessorFeeResidualAnalysis = {
+    basis: printedTotal === null ? "row_sum" : "printed_total",
+    basisTotal: residualBasisTotal,
+    identifiedCardBrandPassThroughAmount,
+    knownProcessorFeeAmount,
+    unbundledProcessorControlledAmount,
+    unresolvedAmount,
+    zeroAmount,
+    markupOrUnknownPoolAmount: residualRound2(residualBasisTotal - identifiedCardBrandPassThroughAmount),
+    residualUnclassifiedAmount: residualRound2(
+      residualBasisTotal -
+        identifiedCardBrandPassThroughAmount -
+        knownProcessorFeeAmount -
+        unbundledProcessorControlledAmount -
+        zeroAmount,
+    ),
+    rowSumDeltaToBasis: delta,
+    formula:
+      "basisTotal - identifiedCardBrandPassThroughAmount - knownProcessorFeeAmount - unbundledProcessorControlledAmount - zeroAmount",
+  };
   const unresolvedRowCount = classifiedRows.filter((row) => row.classification.economicBucket === "unknown_needs_review").length;
   const needsUnbundlingRowCount = classifiedRows.filter((row) => row.classification.needsUnbundling).length;
   const tolerance = 0.02;
@@ -791,6 +843,11 @@ export function summarizeFiservProcessorFeeClassifications<T extends FiservProce
   if (Math.abs(delta) > 0) {
     notes.push(`Classified fee rows reconcile to the printed total with a $${Math.abs(delta).toFixed(2)} rounding delta.`);
   }
+  if (Math.abs(residualAnalysis.residualUnclassifiedAmount) > tolerance) {
+    notes.push(
+      `Residual analysis leaves $${residualAnalysis.residualUnclassifiedAmount.toFixed(2)} after subtracting identified card-brand pass-through, known processor fees, and unbundled processor-controlled fees from the fee total.`,
+    );
+  }
 
   return {
     status,
@@ -803,6 +860,7 @@ export function summarizeFiservProcessorFeeClassifications<T extends FiservProce
     delta,
     tolerance,
     bucketTotals,
+    residualAnalysis,
     notes,
   };
 }

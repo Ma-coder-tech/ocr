@@ -62,14 +62,57 @@
     "evidenceLine": "Total (Service Charges, Interchange Charges/Program Fees, and Fees) | -$1,312.55"
   },
   "pricingModel": {
-    "pricingModel": "unknown",
-    "confidence": "low",
-    "cashDiscountStatus": "unknown",
+    "pricingModel": "interchange_plus",
+    "confidence": "high",
+    "cashDiscountStatus": "not_applicable",
     "flatDiscountRate": null,
-    "evidenceType": "not_detected",
-    "evidence": [],
+    "evidenceType": "fee_math_inferred",
+    "evidence": [
+      {
+        "description": "MASTERCARD ASSESSMENT FEE 0.0014 TIMES $12147.20",
+        "network": "MASTERCARD",
+        "volume": 12147.2,
+        "rate": 0.0014,
+        "statedFee": 17.01,
+        "computedFee": 17.01,
+        "delta": 0,
+        "evidenceLine": "MASTERCARD ASSESSMENT FEE 0.0014 TIMES $12147.20 | Interchange charges | -$17.01"
+      },
+      {
+        "description": "VISA ASSESSMENT FEE CR 0.0014 TIMES $8429.68",
+        "network": "VISA",
+        "volume": 8429.68,
+        "rate": 0.0014,
+        "statedFee": 11.8,
+        "computedFee": 11.8,
+        "delta": 0,
+        "evidenceLine": "VISA ASSESSMENT FEE CR 0.0014 TIMES $8429.68 | Interchange charges | -$11.80"
+      },
+      {
+        "description": "VISA ASSESSMENT FEE DB 0.0013 TIMES $25402.79",
+        "network": "VISA",
+        "volume": 25402.79,
+        "rate": 0.0013,
+        "statedFee": 33.02,
+        "computedFee": 33.02,
+        "delta": 0,
+        "evidenceLine": "VISA ASSESSMENT FEE DB 0.0013 TIMES $25402.79 | Interchange charges | -$33.02"
+      },
+      {
+        "description": "DISCOVER ASSESSMENT FEE 0.0014 TIMES $786.69",
+        "network": "DISCOVER",
+        "volume": 786.69,
+        "rate": 0.0014,
+        "statedFee": 1.1,
+        "computedFee": 1.1,
+        "delta": 0,
+        "evidenceLine": "DISCOVER ASSESSMENT FEE 0.0014 TIMES $786.69 | Interchange charges | -$1.10"
+      }
+    ],
     "notes": [
-      "Pricing model detection is not implemented for the First Data full-statement fixture."
+      "Interchange-plus/itemized cost exposure inferred from separate Interchange charges rows in the fee ledger.",
+      "This identifies the statement structure; it does not prove every interchange or assessment row was passed through at cost.",
+      "Line-level at-cost proof still depends on period-correct reference-rate matching."
     ]
   },
   "feeLedger": {
@@ -4473,6 +4516,19 @@
           "rowCount": 4
         }
       ],
+      "residualAnalysis": {
+        "basis": "printed_total",
+        "basisTotal": 1312.55,
+        "identifiedCardBrandPassThroughAmount": 955.2,
+        "knownProcessorFeeAmount": 357.35,
+        "unbundledProcessorControlledAmount": 0,
+        "unresolvedAmount": 0,
+        "zeroAmount": 0,
+        "markupOrUnknownPoolAmount": 357.35,
+        "residualUnclassifiedAmount": 0,
+        "rowSumDeltaToBasis": 0,
+        "formula": "basisTotal - identifiedCardBrandPassThroughAmount - knownProcessorFeeAmount - unbundledProcessorControlledAmount - zeroAmount"
+      },
       "notes": [
         "Classification preserves the full fee ledger and does not split blended tier rows into interchange and markup without external evidence."
       ]
@@ -5776,6 +5832,46 @@
       "lineIndex": 342,
       "evidenceLine": "Total (Service Charges, Interchange Charges/Program Fees, and Fees) | -$1,312.55",
       "value": 1312.55
+    },
+    {
+      "field": "documentIr.totalVolume",
+      "sourceSection": "DOCUMENT_IR_TOP_LEVEL",
+      "pageNumber": 1,
+      "lineIndex": null,
+      "evidenceLine": "Page | 1 | Total Amount Submitted | $52,460.55",
+      "value": 52460.55
+    },
+    {
+      "field": "documentIr.totalFees",
+      "sourceSection": "DOCUMENT_IR_TOP_LEVEL",
+      "pageNumber": 1,
+      "lineIndex": null,
+      "evidenceLine": "Page | 4 | Fees | -$1,312.55",
+      "value": 1312.55
+    },
+    {
+      "field": "documentIr.amountFunded",
+      "sourceSection": "DOCUMENT_IR_TOP_LEVEL",
+      "pageNumber": 1,
+      "lineIndex": null,
+      "evidenceLine": "Total Amount Processed | $51,148.00",
+      "value": 51148
+    },
+    {
+      "field": "documentIr.adjustments",
+      "sourceSection": "DOCUMENT_IR_TOP_LEVEL",
+      "pageNumber": 1,
+      "lineIndex": null,
+      "evidenceLine": "Page | 4 | Adjustments | 0.00",
+      "value": 0
+    },
+    {
+      "field": "documentIr.chargebacks",
+      "sourceSection": "DOCUMENT_IR_TOP_LEVEL",
+      "pageNumber": 1,
+      "lineIndex": null,
+      "evidenceLine": "Page | 3 | Chargebacks/Reversals | 0.00",
+      "value": 0
     }
   ]
 }
