@@ -1,5 +1,8 @@
 import type { DocumentIR, DocumentLine } from "./documentIr.js";
-import { classifyFiservProcessorFeeLedgerRows } from "./fiservProcessorFeeClassification.js";
+import {
+  classifyFiservProcessorFeeLedgerRows,
+  type FiservProcessorFeeClassificationContext,
+} from "./fiservProcessorFeeClassification.js";
 import { round2 } from "./reconciliation.js";
 
 export type FiservProcessorDocumentIrFeeLedgerRow = {
@@ -54,7 +57,10 @@ type TotalLine = {
 const NETWORK_HEADING_PATTERN =
   /^(MASTERCARD|MC OFLN DB|MASTERCARD DEBIT|VISA|VS OFLN DB|VISA DEBIT|AMEXCT\d+|DISCOVER ACQ|DCVR ACQ)$/;
 
-export function extractFiservProcessorFeeLedgerFromDocumentIr(ir: DocumentIR): FiservProcessorDocumentIrFeeLedger {
+export function extractFiservProcessorFeeLedgerFromDocumentIr(
+  ir: DocumentIR,
+  classificationContext: Omit<FiservProcessorFeeClassificationContext, "statementCostExposure"> = {},
+): FiservProcessorDocumentIrFeeLedger {
   const lines = feeSectionLines(ir);
   if (lines.length === 0) {
     return notMappedFeeLedger("DocumentIR could not identify a FEES CHARGED section.");
@@ -98,7 +104,7 @@ export function extractFiservProcessorFeeLedgerFromDocumentIr(ir: DocumentIR): F
       evidenceLine: grandTotal?.line.text ?? null,
     }),
   ];
-  const classified = classifyFiservProcessorFeeLedgerRows(rows, printedTotal);
+  const classified = classifyFiservProcessorFeeLedgerRows(rows, printedTotal, classificationContext);
 
   return {
     status: printedTotal === null ? "not_mapped" : Math.abs(delta) === 0 ? "reconciled" : Math.abs(delta) <= 0.02 ? "reconciled_with_rounding_delta" : "unreconciled",

@@ -66,6 +66,7 @@ cp .env.example .env
 
 - Anthropic report refinement is enabled only when `ANTHROPIC_API_KEY` is set.
 - Default report-refinement model is `claude-sonnet-4-6` (override with `ANTHROPIC_MODEL`).
+- Fiserv fee classification runs deterministic fee-name, reference-rate, OCR-normalized rate-fingerprint, and Durbin-regulated debit cap checks before any AI fallback.
 - AI-assisted fee classification is opt-in with `AI_FEE_CLASSIFICATION_ENABLED=true`; it sends only structured unresolved fee rows, not raw PDFs, and defaults to `AI_FEE_CLASSIFICATION_MODEL=claude-opus-4-8`.
 - Current storage and job state are local/in-memory; restarting the server resets job state.
 - On Vercel, runtime temp files are written under `/tmp/ocr-data`.

@@ -123,6 +123,8 @@ export const feeAtCostReasonCodeSchema = z.enum([
   "RATE_EXCEEDS_REFERENCE",
   "RATE_BELOW_REFERENCE",
   "RATE_MATCHES_REFERENCE",
+  "DURBIN_REGULATED_DEBIT_CAP_MATCH",
+  "DURBIN_REGULATED_DEBIT_CAP_NOT_EXCEEDED",
 ]);
 export const feeCostExposureSchema = z.enum(["itemized", "blended", "flat", "mixed", "hidden", "not_applicable"]);
 export const feeComparedBasisSchema = z.enum(["stated_rate", "derived_from_volume", "derived_from_count", "not_compared"]);

@@ -531,7 +531,7 @@ function makeFeeLedgerControl(params: {
   };
 }
 
-function buildFiservProcessorFeeLedger(doc: RawExtractedDocument) {
+function buildFiservProcessorFeeLedger(doc: RawExtractedDocument, classificationContext = {}) {
   const rows = [];
   let network: string | null = null;
 
@@ -621,6 +621,7 @@ function buildFiservProcessorFeeLedger(doc: RawExtractedDocument) {
   const classified = classifyFiservProcessorFeeLedgerRows(
     rows.map(({ lineIndex: _lineIndex, ...row }) => row),
     printedTotal,
+    classificationContext,
   );
 
   return {
@@ -710,7 +711,7 @@ function parseFirstDataFullFeeRow(content: string, context: { sourceSection: str
   };
 }
 
-function buildFiservFullStatementFeeLedger(doc: RawExtractedDocument, printedTotal: number) {
+function buildFiservFullStatementFeeLedger(doc: RawExtractedDocument, printedTotal: number, classificationContext = {}) {
   const feeStartIndex = doc.rows.findIndex((row) => /^FEES\b/i.test(rowContent(row)));
   if (feeStartIndex < 0) throw new Error("Parser could not find First Data full-statement FEES section.");
   const feeEndIndex = doc.rows.findIndex(
@@ -799,6 +800,7 @@ function buildFiservFullStatementFeeLedger(doc: RawExtractedDocument, printedTot
   const classified = classifyFiservProcessorFeeLedgerRows(
     rows.map(({ lineIndex: _lineIndex, ...row }) => row),
     printedTotal,
+    classificationContext,
   );
 
   return {
@@ -1281,7 +1283,7 @@ function parseFirstDataShortFeeRow(content: string, context: { sourceSection: st
   };
 }
 
-function buildFiservShortStatementFeeLedger(doc: RawExtractedDocument, printedTotal: number) {
+function buildFiservShortStatementFeeLedger(doc: RawExtractedDocument, printedTotal: number, classificationContext = {}) {
   const feeStartIndex = doc.rows.findIndex((row) => /^FEES$/i.test(rowContent(row)));
   if (feeStartIndex < 0) throw new Error("Parser could not find First Data short-statement FEES section.");
   const feeEndIndex = doc.rows.findIndex(
@@ -1365,6 +1367,7 @@ function buildFiservShortStatementFeeLedger(doc: RawExtractedDocument, printedTo
   const classified = classifyFiservProcessorFeeLedgerRows(
     rows.map(({ lineIndex: _lineIndex, ...row }) => row),
     printedTotal,
+    classificationContext,
   );
 
   return {
@@ -1754,7 +1757,12 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
     thirdPartyTransactions: 0,
   });
   const feeBucketSum = round2(interchangeBucket + serviceCharges + processorFees);
-  const feeLedger = buildFiservFullStatementFeeLedger(doc, feeGrandTotal);
+  const feeLedger = buildFiservFullStatementFeeLedger(doc, feeGrandTotal, {
+    statementPeriodStart: period.start,
+    region: "US",
+    processorName: "Fiserv / First Data",
+    merchantNumber,
+  });
   const fundingBatchLedger = buildFiservFullStatementFundingBatchLedger(doc, {
     totalFees,
     amountFunded,
@@ -2198,7 +2206,12 @@ export function parseFiservFirstDataShortStatement(doc: RawExtractedDocument, op
     thirdPartyTransactions: 0,
   });
   const feeBucketSum = round2(serviceCharges + processorFees);
-  const feeLedger = buildFiservShortStatementFeeLedger(doc, feeGrandTotal);
+  const feeLedger = buildFiservShortStatementFeeLedger(doc, feeGrandTotal, {
+    statementPeriodStart: period.start,
+    region: "US",
+    processorName: "Fiserv / First Data",
+    merchantNumber,
+  });
   const fundingBatchLedger = buildFiservShortStatementFundingBatchLedger(doc, {
     totalVolume,
     totalFees,
@@ -2658,8 +2671,14 @@ export function parseFiservFirstDataProcessorStatement(doc: RawExtractedDocument
     thirdPartyTransactions,
   });
   const feeBucketSum = round2(monthEndCharge + lessDiscountPaid);
-  const feeLedger = buildFiservProcessorFeeLedger(doc);
-  const documentIrFeeLedger = extractFiservProcessorFeeLedgerFromDocumentIr(documentIr);
+  const feeClassificationContext = {
+    statementPeriodStart: period.start,
+    region: "US",
+    processorName: "Fiserv / First Data",
+    merchantNumber,
+  };
+  const feeLedger = buildFiservProcessorFeeLedger(doc, feeClassificationContext);
+  const documentIrFeeLedger = extractFiservProcessorFeeLedgerFromDocumentIr(documentIr, feeClassificationContext);
   const documentIrFeeLedgerWarnings = documentIrFeeLedgerMismatchWarnings(documentIrFeeLedger, feeLedger);
   const legacyFundingBatchLedger = buildFiservProcessorFundingBatchLedger(doc);
   const documentIrFundingBatchLedger = extractFiservProcessorFundingBatchLedgerFromDocumentIr(documentIr);

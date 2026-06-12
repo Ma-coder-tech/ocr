@@ -5,6 +5,10 @@ import {
   type ReferenceRateMatchResult,
   type ReferenceRegion,
 } from "./referenceRateCatalog.js";
+import {
+  findFiservProcessorRateFingerprint,
+  type FiservProcessorRateFingerprintEvidence,
+} from "./fiservProcessorRateFingerprint.js";
 
 export type FiservProcessorFeeEconomicBucket =
   | "card_brand_pass_through"
@@ -36,7 +40,9 @@ export type FiservProcessorAtCostReasonCode =
   | "REFERENCE_NOT_PROOF_ELIGIBLE"
   | "RATE_EXCEEDS_REFERENCE"
   | "RATE_BELOW_REFERENCE"
-  | "RATE_MATCHES_REFERENCE";
+  | "RATE_MATCHES_REFERENCE"
+  | "DURBIN_REGULATED_DEBIT_CAP_MATCH"
+  | "DURBIN_REGULATED_DEBIT_CAP_NOT_EXCEEDED";
 
 export type FiservProcessorCostExposure = "itemized" | "blended" | "flat" | "mixed" | "hidden" | "not_applicable";
 
@@ -155,7 +161,7 @@ const PROCESSOR_ACCOUNT_OR_MISC_LABELS = new Set([
   "CHARGEBACKS",
 ]);
 
-type FiservProcessorFeeClassificationContext = {
+export type FiservProcessorFeeClassificationContext = {
   statementCostExposure: FiservProcessorCostExposure;
   referenceRateCatalog?: ReferenceRateCatalogRow[];
   statementPeriodStart?: string;
@@ -369,6 +375,63 @@ function atCostFromReferenceMatch(match: ReferenceRateMatchResult | null): {
   };
 }
 
+function atCostFromRateFingerprint(evidence: FiservProcessorRateFingerprintEvidence): {
+  atCostStatus: FiservProcessorAtCostStatus;
+  atCostReasonCode: FiservProcessorAtCostReasonCode;
+  comparedValue?: number | null;
+  comparedBasis?: FiservProcessorComparedBasis;
+  catalogFeeCode?: string | null;
+  catalogRate?: number | null;
+} {
+  const shared = {
+    comparedValue: evidence.comparedValue,
+    comparedBasis: evidence.comparedBasis,
+    catalogFeeCode: evidence.catalogFeeCode,
+    catalogRate: evidence.catalogRate,
+  };
+
+  if (evidence.status === "rate_matches_reference") {
+    return {
+      ...shared,
+      atCostStatus: "proven_at_cost",
+      atCostReasonCode: "RATE_MATCHES_REFERENCE",
+    };
+  }
+  if (evidence.status === "rate_exceeds_reference") {
+    return {
+      ...shared,
+      atCostStatus: "not_at_cost",
+      atCostReasonCode: "RATE_EXCEEDS_REFERENCE",
+    };
+  }
+  if (evidence.status === "rate_below_reference") {
+    return {
+      ...shared,
+      atCostStatus: "indeterminate",
+      atCostReasonCode: "RATE_BELOW_REFERENCE",
+    };
+  }
+  if (evidence.status === "not_proof_eligible") {
+    return {
+      ...shared,
+      atCostStatus: "indeterminate",
+      atCostReasonCode: "REFERENCE_NOT_PROOF_ELIGIBLE",
+    };
+  }
+  if (evidence.status === "durbin_cap_match") {
+    return {
+      ...shared,
+      atCostStatus: "indeterminate",
+      atCostReasonCode: "DURBIN_REGULATED_DEBIT_CAP_MATCH",
+    };
+  }
+  return {
+    ...shared,
+    atCostStatus: "indeterminate",
+    atCostReasonCode: "DURBIN_REGULATED_DEBIT_CAP_NOT_EXCEEDED",
+  };
+}
+
 export function classifyFiservProcessorFeeRow(
   row: FiservProcessorFeeRowForClassification,
   context: FiservProcessorFeeClassificationContext = { statementCostExposure: inferFiservProcessorStatementCostExposure([row]) },
@@ -377,6 +440,7 @@ export function classifyFiservProcessorFeeRow(
   const type = normalizedType(row);
   const statementCostExposure = context.statementCostExposure;
   const itemizedCostExposure: FiservProcessorCostExposure = statementCostExposure === "mixed" ? "itemized" : statementCostExposure;
+  const rateFingerprint = findFiservProcessorRateFingerprint(row, context);
 
   if (row.amount === 0) {
     return classification({
@@ -396,13 +460,18 @@ export function classifyFiservProcessorFeeRow(
 
   if (type === "INTERCHANGE CHARGES" || type === "PROGRAM FEES") {
     const isLumpLine = /^INTERCHANGE(?:\s|$)/.test(description) || /^TOTAL INTERCHANGE/.test(description);
-    const atCost = isLumpLine ? null : atCostFromReferenceMatch(referenceMatchFor(row, context));
+    const atCost = isLumpLine
+      ? null
+      : rateFingerprint
+        ? atCostFromRateFingerprint(rateFingerprint)
+        : atCostFromReferenceMatch(referenceMatchFor(row, context));
     return classification({
       economicBucket: "card_brand_pass_through",
       confidence: "high",
-      rule: "FISERV_FULL_STATEMENT_CARD_ORG_TYPE",
-      reason:
-        "The full First Data/Clover statement places this row in an Interchange charges or Program Fees type. That identifies the card-organization cost bucket, but not whether it was passed through at cost.",
+      rule: rateFingerprint?.rule ?? "FISERV_FULL_STATEMENT_CARD_ORG_TYPE",
+      reason: rateFingerprint
+        ? `${rateFingerprint.reason} The full First Data/Clover statement also places this row in an Interchange charges or Program Fees type.`
+        : "The full First Data/Clover statement places this row in an Interchange charges or Program Fees type. That identifies the card-organization cost bucket, but not whether it was passed through at cost.",
       row,
       atCostStatus: isLumpLine ? "unprovable_by_line" : atCost?.atCostStatus ?? "indeterminate",
       atCostReasonCode: isLumpLine ? "LUMP_LINE_NOT_DECOMPOSABLE" : atCost?.atCostReasonCode ?? "NO_REFERENCE_FOR_PERIOD",
@@ -476,6 +545,25 @@ export function classifyFiservProcessorFeeRow(
       atCostReasonCode: "NOT_PASS_THROUGH_CATEGORY",
       costExposure: "not_applicable",
       marginAmountKnown: true,
+    });
+  }
+
+  if (rateFingerprint) {
+    const atCost = atCostFromRateFingerprint(rateFingerprint);
+    return classification({
+      economicBucket: "card_brand_pass_through",
+      confidence: rateFingerprint.confidence,
+      rule: rateFingerprint.rule,
+      reason: rateFingerprint.reason,
+      row,
+      atCostStatus: atCost.atCostStatus,
+      atCostReasonCode: atCost.atCostReasonCode,
+      costExposure: "itemized",
+      comparedValue: atCost.comparedValue,
+      comparedBasis: atCost.comparedBasis,
+      catalogFeeCode: atCost.catalogFeeCode,
+      catalogRate: atCost.catalogRate,
+      marginAmountKnown: false,
     });
   }
 
