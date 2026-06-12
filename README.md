@@ -64,8 +64,9 @@ cp .env.example .env
 
 ## Notes
 
-- Anthropic refinement is enabled only when `ANTHROPIC_API_KEY` is set.
-- Default model is `claude-opus-4-6` (override with `ANTHROPIC_MODEL`).
+- Anthropic report refinement is enabled only when `ANTHROPIC_API_KEY` is set.
+- Default report-refinement model is `claude-sonnet-4-6` (override with `ANTHROPIC_MODEL`).
+- AI-assisted fee classification is opt-in with `AI_FEE_CLASSIFICATION_ENABLED=true`; it sends only structured unresolved fee rows, not raw PDFs, and defaults to `AI_FEE_CLASSIFICATION_MODEL=claude-opus-4-8`.
 - Current storage and job state are local/in-memory; restarting the server resets job state.
 - On Vercel, runtime temp files are written under `/tmp/ocr-data`.
 - This MVP is designed as a low-cost base that can be extended with OCR workers, persistent queue/db, auth, and billing.

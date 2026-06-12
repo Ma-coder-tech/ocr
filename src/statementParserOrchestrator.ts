@@ -1,6 +1,7 @@
 import { getBusinessTypeBenchmark, getBusinessTypeReportLabel } from "./businessTypes.js";
 import { analyzeDocument } from "./analyzer.js";
 import { withFeeClassification } from "./feeClassification.js";
+import { maybeRunFiservProcessorFeeAiClassificationForParserOutput } from "./fiservProcessorFeeAiClassification.js";
 import {
   fiservFirstDataProcessorStatementDriver,
   fiservFirstDataFullStatementDriver,
@@ -254,4 +255,19 @@ export function analyzeStatementDocument(
   if (!matched) return baseSummary;
 
   return applyValidatedParserOutput(baseSummary, matched, businessType);
+}
+
+export async function analyzeStatementDocumentWithOptionalAi(
+  doc: ParsedDocument,
+  businessType: BusinessTypeId,
+  options: { sourceFileName?: string } = {},
+): Promise<AnalysisSummary> {
+  const baseSummary = analyzeDocument(doc, businessType);
+  if (doc.sourceType !== "pdf") return baseSummary;
+
+  const matched = findValidatedPdfParser(doc, options.sourceFileName);
+  if (!matched) return baseSummary;
+
+  const enhanced = await maybeRunFiservProcessorFeeAiClassificationForParserOutput(matched.output as any);
+  return applyValidatedParserOutput(baseSummary, { ...matched, output: enhanced.output as ValidatedParserOutput }, businessType);
 }

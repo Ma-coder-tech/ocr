@@ -259,6 +259,25 @@ function classification(params: {
   };
 }
 
+export function makeFiservProcessorSyntheticFeeClassification(params: {
+  economicBucket: FiservProcessorFeeEconomicBucket;
+  confidence: "high" | "medium" | "low";
+  rule: string;
+  reason: string;
+  row: FiservProcessorFeeRowForClassification;
+  needsUnbundling?: boolean;
+  atCostStatus: FiservProcessorAtCostStatus;
+  atCostReasonCode: FiservProcessorAtCostReasonCode;
+  costExposure: FiservProcessorCostExposure;
+  comparedValue?: number | null;
+  comparedBasis?: FiservProcessorComparedBasis;
+  catalogFeeCode?: string | null;
+  catalogRate?: number | null;
+  marginAmountKnown?: boolean;
+}): FiservProcessorFeeClassification {
+  return classification(params);
+}
+
 function referenceMatchFor(
   row: FiservProcessorFeeRowForClassification,
   context: FiservProcessorFeeClassificationContext,
@@ -626,6 +645,18 @@ export function classifyFiservProcessorFeeLedgerRows<T extends FiservProcessorFe
     ...row,
     classification: classifyFiservProcessorFeeRow(row, { ...context, statementCostExposure }),
   }));
+  const summary = summarizeFiservProcessorFeeClassifications(classifiedRows, printedTotal);
+
+  return {
+    rows: classifiedRows,
+    summary,
+  };
+}
+
+export function summarizeFiservProcessorFeeClassifications<T extends FiservProcessorFeeRowForClassification>(
+  classifiedRows: Array<FiservProcessorClassifiedFeeRow<T>>,
+  printedTotal: number | null,
+): FiservProcessorFeeClassificationSummary {
   const bucketTotals = Array.from(
     classifiedRows.reduce((buckets, row) => {
       const current = buckets.get(row.classification.economicBucket) ?? { amount: 0, rowCount: 0 };
@@ -674,19 +705,16 @@ export function classifyFiservProcessorFeeLedgerRows<T extends FiservProcessorFe
   }
 
   return {
-    rows: classifiedRows,
-    summary: {
-      status,
-      rowCount: rows.length,
-      classifiedRowCount: classifiedRows.length,
-      unresolvedRowCount,
-      needsUnbundlingRowCount,
-      totalClassifiedAmount,
-      printedTotal,
-      delta,
-      tolerance,
-      bucketTotals,
-      notes,
-    },
+    status,
+    rowCount: classifiedRows.length,
+    classifiedRowCount: classifiedRows.length,
+    unresolvedRowCount,
+    needsUnbundlingRowCount,
+    totalClassifiedAmount,
+    printedTotal,
+    delta,
+    tolerance,
+    bucketTotals,
+    notes,
   };
 }
