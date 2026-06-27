@@ -82,14 +82,14 @@ function disclosureStyleFromText(text: string, hasExplicitValue: boolean): Repri
 }
 
 function feeLabelFromText(text: string): string | null {
-  const explicit = text.match(FEE_LABEL_RE);
-  if (explicit) return collapseWhitespace(explicit[1].toLowerCase());
-
   const beforeChange = text.match(/\b([A-Za-z][A-Za-z\s/-]{2,60}?(?:fee|charge|rate))\s+(?:will\s+)?(?:increase|increased|change|adjust)/i);
   if (beforeChange) return collapseWhitespace(beforeChange[1].toLowerCase());
 
   const newFee = text.match(/\bnew\s+([A-Za-z][A-Za-z\s/-]{2,60}?(?:fee|charge|rate))\b/i);
-  return newFee ? collapseWhitespace(newFee[1].toLowerCase()) : null;
+  if (newFee) return collapseWhitespace(newFee[1].toLowerCase());
+
+  const explicit = text.match(FEE_LABEL_RE);
+  return explicit ? collapseWhitespace(explicit[1].toLowerCase()) : null;
 }
 
 function confidenceFor(event: Omit<RepricingEvent, "confidence">): number {

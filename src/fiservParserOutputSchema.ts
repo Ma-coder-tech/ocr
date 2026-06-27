@@ -181,6 +181,278 @@ export const pricingModelSchema = z
   })
   .strict();
 
+export const fiservFeeAnalysisV2Schema = z
+  .object({
+    version: z.literal("2.0"),
+    normalization: z
+      .object({
+        rowCount: z.number().int().nonnegative(),
+        exactMatchCount: z.number().int().nonnegative(),
+        fuzzyMatchCount: z.number().int().nonnegative(),
+        aiCandidateCount: z.number().int().nonnegative(),
+        aiClassifiedCount: z.number().int().nonnegative().optional(),
+        unmatchedCount: z.number().int().nonnegative(),
+      })
+      .strict(),
+    notices: z.array(
+      z
+        .object({
+          kind: z.enum(["fee_increase", "new_fee", "rate_increase"]),
+          feeLabel: z.string().min(1).nullable(),
+          oldValue: z
+            .object({
+              value: finiteNumber,
+              valueType: z.enum(["money", "percentage", "basis_points"]),
+              cadence: z.enum(["monthly", "annual", "per_item", "one_time", "unknown"]),
+              source: z.enum(["explicit", "inferred"]),
+            })
+            .strict()
+            .nullable(),
+          newValue: z
+            .object({
+              value: finiteNumber,
+              valueType: z.enum(["money", "percentage", "basis_points"]),
+              cadence: z.enum(["monthly", "annual", "per_item", "one_time", "unknown"]),
+              source: z.enum(["explicit", "inferred"]),
+            })
+            .strict()
+            .nullable(),
+          deltaValue: z
+            .object({
+              value: finiteNumber,
+              valueType: z.enum(["money", "percentage", "basis_points"]),
+              cadence: z.enum(["monthly", "annual", "per_item", "one_time", "unknown"]),
+              source: z.enum(["explicit", "inferred"]),
+            })
+            .strict()
+            .nullable(),
+          effectiveDate: z.string().min(1).nullable(),
+          disclosureStyle: z.enum(["explicit_on_statement", "online_only", "acceptance_by_use", "ambiguous"]),
+          sourceSection: z.string().min(1),
+          evidenceLine: z.string().min(1),
+          evidenceLines: z.array(z.string().min(1)),
+          rowStartIndex: z.number().int(),
+          rowEndIndex: z.number().int(),
+          confidence: finiteNumber.nonnegative(),
+        })
+        .strict(),
+    ),
+    pricingModel: z
+      .object({
+        pricingModel: z.string().min(1),
+        confidence: z.enum(["high", "medium", "low"]),
+        analysisStatus: z.enum(["ic_plus_ready", "universal_only_pending_model_rules", "not_enough_detail"]),
+        evidence: z.array(z.string().min(1)),
+      })
+      .strict(),
+    buckets: z.array(
+      z
+        .object({
+          feeType: z.enum([
+            "interchange",
+            "card_brand_network",
+            "processor_pct_markup",
+            "processor_per_item",
+            "processor_fixed",
+            "pin_debit_network",
+            "pin_debit_interchange",
+            "pin_debit_network_annual",
+            "compliance_penalty",
+            "third_party_service",
+            "suspicious_pass_through_like_fee",
+            "unknown",
+            "zero_amount",
+          ]),
+          amount: finiteNumber.nonnegative(),
+          rows: z.number().int().nonnegative(),
+          pctOfFees: finiteNumber.nonnegative().nullable(),
+        })
+        .strict(),
+    ),
+    rows: z.array(
+      z
+        .object({
+          rowIndex: z.number().int().nonnegative(),
+          cardTypeSection: z.string().min(1).nullable(),
+          description: z.string().min(1),
+          normalizedDescription: z.string(),
+          canonicalName: z.string().min(1).nullable(),
+          amount: finiteNumber,
+          volumeBasis: finiteNumber.nonnegative().nullable(),
+          count: z.number().int().nonnegative().nullable(),
+          rate: finiteNumber.nonnegative().nullable(),
+          feeType: z.enum([
+            "interchange",
+            "card_brand_network",
+            "processor_pct_markup",
+            "processor_per_item",
+            "processor_fixed",
+            "pin_debit_network",
+            "pin_debit_interchange",
+            "pin_debit_network_annual",
+            "compliance_penalty",
+            "third_party_service",
+            "suspicious_pass_through_like_fee",
+            "unknown",
+            "zero_amount",
+          ]),
+          sourceFeeType: z.string().min(1).nullable(),
+          sourceSection: z.string().min(1).nullable(),
+          matchMethod: z.enum(["exact", "fuzzy", "ai_candidate", "ai_classified", "none"]),
+          matchConfidence: z.enum(["high", "medium", "low"]),
+          referenceId: z.string().min(1).nullable(),
+          proofStatus: z.enum(["proven", "likely", "processor_controlled", "indeterminate", "not_enough_detail"]),
+          rateComparison: z.enum(["matches_reference", "close_to_reference", "above_reference", "below_reference", "not_compared"]),
+          expectedAmount: finiteNumber.nullable(),
+          delta: finiteNumber.nullable(),
+          deltaPct: finiteNumber.nonnegative().nullable(),
+          comparedBasis: z.enum(["count", "volume", "stated_rate", "flat", "not_compared"]),
+          referenceRate: finiteNumber.nonnegative().nullable(),
+          tolerancePct: finiteNumber.nonnegative().nullable(),
+          reason: z.string().min(1),
+          evidenceLine: z.string().min(1),
+        })
+        .strict(),
+    ),
+    rateVerification: z
+      .object({
+        proven: z.number().int().nonnegative(),
+        likely: z.number().int().nonnegative(),
+        processorControlled: z.number().int().nonnegative(),
+        indeterminate: z.number().int().nonnegative(),
+        notEnoughDetail: z.number().int().nonnegative(),
+      })
+      .strict(),
+    processorMarkupAnalysis: z
+      .object({
+        status: z.enum(["ready", "pending_pricing_model_rules", "not_applicable"]),
+        processorControlledTotal: finiteNumber.nonnegative().nullable(),
+        processorMarkupRate: finiteNumber.nonnegative().nullable(),
+        processorPctMarkupTotal: finiteNumber.nonnegative().nullable(),
+        processorPerItemTotal: finiteNumber.nonnegative().nullable(),
+        processorFixedTotal: finiteNumber.nonnegative().nullable(),
+        junkFeeTotal: finiteNumber.nonnegative().nullable(),
+        message: z.string().min(1),
+        perItemStacking: z
+          .object({
+            detected: z.boolean(),
+            fees: z.array(z.string().min(1)),
+            totalPerItem: finiteNumber.nonnegative().nullable(),
+            perItemAsPctOfAverageTicket: finiteNumber.nonnegative().nullable(),
+          })
+          .strict(),
+        hiddenPctMarkupRows: z.array(
+          z
+            .object({
+              description: z.string().min(1),
+              rate: finiteNumber.nonnegative(),
+              amount: finiteNumber.nonnegative(),
+              volumeBasis: finiteNumber.nonnegative().nullable(),
+            })
+            .strict(),
+        ),
+        nonAmexSalesDiscountRate: finiteNumber.nonnegative().nullable(),
+        amexSalesDiscountRate: finiteNumber.nonnegative().nullable(),
+      })
+      .strict(),
+    interchangeReconciliation: z
+      .object({
+        summaryTotal: finiteNumber.nonnegative().nullable(),
+        detailTableTotal: finiteNumber.nonnegative().nullable(),
+        gap: finiteNumber.nullable(),
+        explainedGapTotal: finiteNumber.nonnegative().nullable(),
+        unexplainedGap: finiteNumber.nonnegative().nullable(),
+        status: z.enum(["not_available", "matches", "explained_structural_difference", "unexplained_difference"]),
+        components: z.array(
+          z
+            .object({
+              kind: z.enum([
+                "detail_table",
+                "card_brand_network_inside_summary_bucket",
+                "suspicious_access_inside_summary_bucket",
+                "pin_debit_interchange_inside_summary_bucket",
+                "unexplained",
+              ]),
+              amount: finiteNumber.nonnegative(),
+              rows: z.number().int().nonnegative(),
+              evidence: z.array(z.string().min(1)),
+            })
+            .strict(),
+        ),
+        notes: z.array(z.string().min(1)),
+      })
+      .strict(),
+    savingsSummary: z
+      .object({
+        annualLow: finiteNumber.nonnegative(),
+        annualHigh: finiteNumber.nonnegative(),
+        opportunities: z.number().int().nonnegative(),
+      })
+      .strict(),
+    reconciliation: z
+      .object({
+        basisTotal: finiteNumber.nonnegative(),
+        rowTotal: finiteNumber.nonnegative(),
+        residual: finiteNumber.nonnegative(),
+        status: z.enum(["pass", "warning"]),
+      })
+      .strict(),
+    findings: z.array(
+      z
+        .object({
+          kind: z.enum([
+            "rate_exceeds_reference",
+            "processor_per_item_stacking",
+            "junk_fee",
+            "pricing_model_pending_rules",
+            "normalization_ai_candidates",
+            "suspicious_uniform_rate",
+            "avoidable_compliance_fee",
+            "third_party_service_fee",
+            "hidden_percentage_markup",
+            "penalty_or_configuration_fee",
+          ]),
+          severity: z.enum(["info", "warning", "high"]),
+          title: z.string().min(1),
+          amount: finiteNumber.nullable(),
+          evidence: z.array(z.string().min(1)),
+          action: z.enum([
+            "none",
+            "complete_pci_validation",
+            "negotiate_processor_rate",
+            "request_pass_through_documentation",
+            "verify_third_party_service",
+            "fix_terminal_or_gateway_configuration",
+          ]),
+          monthlyCost: finiteNumber.nullable(),
+          annualEstimate: finiteNumber.nullable(),
+          savingsEstimate: z
+            .object({
+              low: finiteNumber.nonnegative(),
+              high: finiteNumber.nonnegative(),
+              basis: z.string().min(1),
+            })
+            .strict()
+            .nullable(),
+        })
+        .strict(),
+    ),
+    ai: z
+      .object({
+        status: z.enum(["disabled", "not_needed", "applied", "no_usable_suggestions", "failed"]),
+        provider: z.enum(["anthropic", "openai"]).nullable(),
+        model: z.string().min(1).nullable(),
+        unresolvedInputRowCount: z.number().int().nonnegative(),
+        suggestionCount: z.number().int().nonnegative(),
+        appliedSuggestionCount: z.number().int().nonnegative(),
+        skippedSuggestionCount: z.number().int().nonnegative(),
+        notes: z.array(z.string().min(1)),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 export const feeLedgerRowSchema = z
   .object({
     date: z.string().min(1).nullable(),
@@ -518,6 +790,7 @@ export const fiservParserOutputSchema = z
     reconciliationResults: z.array(reconciliationResultSchema).optional(),
     decision: parserDecisionSchema,
     confidence: confidenceSchema,
+    fiservFeeAnalysisV2: fiservFeeAnalysisV2Schema.optional(),
     warnings: z.array(warningSchema),
     evidence: z.array(evidenceSchema),
   })

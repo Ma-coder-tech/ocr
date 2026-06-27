@@ -819,6 +819,7 @@ export type AnalysisSummary = {
     processorFamily: string;
     statementFamily: string;
   };
+  fiservFeeAnalysisV2?: unknown;
   twoBucketAnalysis?: TwoBucketAnalysis;
   checklistReport?: ChecklistReport;
 };

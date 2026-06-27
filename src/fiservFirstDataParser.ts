@@ -22,8 +22,11 @@ import {
   type FiservProcessorDocumentIrFundingBatchLedger,
 } from "./fiservProcessorBatchFundingFromDocumentIr.js";
 import { runFiservProcessorReconciliationProfile } from "./fiservProcessorReconciliationProfile.js";
+import { buildFiservFeeAnalysisV2FromRawRows } from "./fiservFeeAnalysis.js";
 import { buildParserDecision } from "./parserDecision.js";
 import { fiservParserOutputSchema, type FiservParserOutput } from "./fiservParserOutputSchema.js";
+import { extractRepricingEventsFromNoticeLines, type RepricingNoticeLine } from "./repricingNotices.js";
+import type { RepricingEvent } from "./types.js";
 import {
   findLastRow,
   findRow,
@@ -221,6 +224,77 @@ function normalizedFiservText(value: string): string {
     .replace(/\bmiscellaneous\b/g, "misc")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function extractFiservNoticeLines(doc: RawExtractedDocument): RepricingNoticeLine[] {
+  const lines: RepricingNoticeLine[] = [];
+  let inNoticeBlock = false;
+  for (const [rowIndex, row] of doc.rows.entries()) {
+    const content = rowContent(row)
+      .replace(/[\uE000-\uF8FF]/g, "$")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!content) continue;
+    if (/^(?:IMPORTANT INFORMATION|IMPORTANT NOTICES|NOTICES)\b/i.test(content)) {
+      inNoticeBlock = true;
+    } else if (
+      inNoticeBlock &&
+      /^(?:SUMMARY|AMOUNTS SUBMITTED|FEES(?:\s+CHARGED)?|CARD FEES|MISC(?:ELLANEOUS)? FEES|SUMMARY BY|INTERCHANGE|TRANSACTION FEES|ACCOUNT FEES)\b/i.test(content)
+    ) {
+      inNoticeBlock = false;
+    }
+    if (inNoticeBlock) {
+      lines.push({
+        rowIndex,
+        sourceSection: "Statement notices",
+        evidenceLine: content,
+      });
+    }
+  }
+  return lines;
+}
+
+function fiservPinDebitAnnualFeeNoticeEvents(lines: RepricingNoticeLine[]): RepricingEvent[] {
+  const text = lines.map((line) => line.evidenceLine).join(" ").replace(/\s+/g, " ");
+  const effectiveMatch = text.match(/EFFECTIVE\s+WITH\s+YOUR\s+([A-Z]+)\s*(\d{4})\s*STATEMENT/i);
+  const effectiveDate = effectiveMatch ? `${effectiveMatch[1]![0]}${effectiveMatch[1]!.slice(1).toLowerCase()} ${effectiveMatch[2]} statement` : null;
+  return ["STAR", "ACCEL"].flatMap((network) => {
+    const pattern = new RegExp(`${network}\\s+PIN\\s+DEBIT\\s+NETWORK\\s+ANNUAL\\s+FEE.{0,220}?INCREASING\\s+BY\\s+\\$(\\d+(?:\\.\\d+)?)`, "i");
+    const match = text.match(pattern);
+    if (!match) return [];
+    const newAmountMatch = text.match(new RegExp(`\\$(\\d+(?:\\.\\d+)?)\\s+${network}\\s+PIN\\s+DEBIT\\s+NETWORK\\s*ANNUAL\\s+FEE`, "i"));
+    const newAmount = newAmountMatch ? Number(newAmountMatch[1]) : null;
+    const delta = Number(match[1]);
+    const rowStartIndex = lines.find((line) => line.evidenceLine.toUpperCase().includes(network))?.rowIndex ?? lines[0]?.rowIndex ?? -1;
+    const evidenceLine = match[0].trim();
+    return [
+      {
+        kind: "fee_increase" as const,
+        feeLabel: `${network} PIN DEBIT NETWORK ANNUAL FEE`,
+        oldValue:
+          newAmount === null ? null : { value: Math.round((newAmount - delta) * 100) / 100, valueType: "money" as const, cadence: "annual" as const, source: "inferred" as const },
+        newValue: newAmount === null ? null : { value: newAmount, valueType: "money" as const, cadence: "annual" as const, source: "explicit" as const },
+        deltaValue: { value: delta, valueType: "money" as const, cadence: "annual" as const, source: "explicit" as const },
+        effectiveDate,
+        disclosureStyle: /CONTINUING YOUR MERCHANT/i.test(text) ? ("acceptance_by_use" as const) : ("explicit_on_statement" as const),
+        sourceSection: "Statement notices",
+        evidenceLine,
+        evidenceLines: [evidenceLine],
+        rowStartIndex,
+        rowEndIndex: rowStartIndex,
+        confidence: 0.9,
+      },
+    ];
+  });
+}
+
+function extractFiservRepricingEvents(doc: RawExtractedDocument): RepricingEvent[] {
+  const lines = extractFiservNoticeLines(doc);
+  const fiservSpecific = fiservPinDebitAnnualFeeNoticeEvents(lines);
+  const generic = extractRepricingEventsFromNoticeLines(lines).filter(
+    (event) => !(event.feeLabel === "annual fee" && event.deltaValue?.value === 2 && fiservSpecific.length > 0),
+  );
+  return [...fiservSpecific, ...generic].sort((left, right) => left.rowStartIndex - right.rowStartIndex || right.confidence - left.confidence);
 }
 
 function hasFiservProcessorFundingFormula(content: string): boolean {
@@ -1768,6 +1842,23 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
     amountFunded,
   });
   const pricingModel = detectPricingModelFromFeeLedger(feeLedger);
+  const fiservFeeAnalysisV2 = buildFiservFeeAnalysisV2FromRawRows({
+    rows: feeLedger.rows,
+    printedTotal: feeLedger.printedTotal,
+    totalVolume: documentIrTopLevel.totalVolume,
+    totalFees: documentIrTopLevel.totalFees,
+    transactionCount: primaryTransactionCount,
+    pricingModel,
+    statementPeriodStart: period.start,
+    statementPeriodEnd: period.end,
+    notices: extractFiservRepricingEvents(doc),
+    interchangeReconciliationBasis: {
+      summaryTotal: interchangeBucket,
+      detailTableTotal: interchangeDetailTotal,
+      summaryEvidenceLine: interchangeBucketRow.content,
+      detailEvidenceLine: interchangeDetailRow.content,
+    },
+  });
 
   const selectedFinancials: SelectedStatementFinancials = {
     totalVolume: documentIrTopLevel.totalVolume,
@@ -2051,6 +2142,7 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
     reconciliation,
     decision,
     confidence,
+    fiservFeeAnalysisV2,
     warnings,
     evidence: [
       {
@@ -2219,6 +2311,17 @@ export function parseFiservFirstDataShortStatement(doc: RawExtractedDocument, op
     amountFunded,
   });
   const pricingModel = detectPricingModelFromFeeLedger(feeLedger);
+  const fiservFeeAnalysisV2 = buildFiservFeeAnalysisV2FromRawRows({
+    rows: feeLedger.rows,
+    printedTotal: feeLedger.printedTotal,
+    totalVolume: documentIrTopLevel.totalVolume,
+    totalFees: documentIrTopLevel.totalFees,
+    transactionCount: primaryTransactionCount,
+    pricingModel,
+    statementPeriodStart: period.start,
+    statementPeriodEnd: period.end,
+    notices: extractFiservRepricingEvents(doc),
+  });
 
   const selectedFinancials: SelectedStatementFinancials = {
     totalVolume: documentIrTopLevel.totalVolume,
@@ -2497,6 +2600,7 @@ export function parseFiservFirstDataShortStatement(doc: RawExtractedDocument, op
     reconciliationResults,
     decision,
     confidence,
+    fiservFeeAnalysisV2,
     warnings,
     evidence: [
       {
@@ -2689,6 +2793,17 @@ export function parseFiservFirstDataProcessorStatement(doc: RawExtractedDocument
   const fundingBatchLedger = documentIrFundingBatchLedger;
   const pricingModel = detectPricingModelFromFeeLedger(feeLedger);
   const primaryTransactionCount = cardTypeTotalRow ? (integerTokens(cardTypeTotalRow.content)[0] ?? null) : zeroVolumeNoSubmittedAmounts ? 0 : null;
+  const fiservFeeAnalysisV2 = buildFiservFeeAnalysisV2FromRawRows({
+    rows: feeLedger.rows,
+    printedTotal: feeLedger.printedTotal,
+    totalVolume: documentIrTopLevel.totalVolume,
+    totalFees: documentIrTopLevel.totalFees,
+    transactionCount: primaryTransactionCount,
+    pricingModel,
+    statementPeriodStart: period.start,
+    statementPeriodEnd: period.end,
+    notices: extractFiservRepricingEvents(doc),
+  });
   const failedFundingBatchEvidenceLine = fundingBatchLedger.rows.find((row) => row.status === "fail")?.evidenceLine ?? null;
   const failedFundingBatchLineIndex =
     failedFundingBatchEvidenceLine === null ? null : doc.rows.findIndex((row) => rowContent(row) === failedFundingBatchEvidenceLine);
@@ -2995,6 +3110,7 @@ export function parseFiservFirstDataProcessorStatement(doc: RawExtractedDocument
     reconciliationResults,
     decision,
     confidence,
+    fiservFeeAnalysisV2,
     warnings,
     evidence: [
       {

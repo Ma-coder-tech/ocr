@@ -1,6 +1,7 @@
 import { getBusinessTypeBenchmark, getBusinessTypeReportLabel } from "./businessTypes.js";
 import { analyzeDocument } from "./analyzer.js";
 import { withFeeClassification } from "./feeClassification.js";
+import { maybeRunFiservFeeAnalysisAiClassificationForParserOutput } from "./fiservFeeAnalysisAiClassification.js";
 import { maybeRunFiservProcessorFeeAiClassificationForParserOutput } from "./fiservProcessorFeeAiClassification.js";
 import {
   fiservFirstDataProcessorStatementDriver,
@@ -25,6 +26,8 @@ type ParserStatementIdentity = {
   statementFamily: string;
   statementPeriodStart: string;
   statementPeriodEnd: string;
+  merchantName?: string | null;
+  merchantNumber?: string | null;
 };
 
 type ParserSelectedFinancials = {
@@ -61,6 +64,7 @@ type ValidatedParserOutput = {
   statementIdentity: ParserStatementIdentity;
   selectedFinancials: ParserSelectedFinancials;
   feeLedger?: ParserFeeLedger;
+  fiservFeeAnalysisV2?: unknown;
   decision: ParserDecision;
   warnings: ParserWarning[];
 };
@@ -231,6 +235,7 @@ function applyValidatedParserOutput(
       processorFamily: output.statementIdentity.processorFamily,
       statementFamily: output.statementIdentity.statementFamily,
     },
+    fiservFeeAnalysisV2: output.fiservFeeAnalysisV2,
   };
 }
 
@@ -268,6 +273,7 @@ export async function analyzeStatementDocumentWithOptionalAi(
   const matched = findValidatedPdfParser(doc, options.sourceFileName);
   if (!matched) return baseSummary;
 
-  const enhanced = await maybeRunFiservProcessorFeeAiClassificationForParserOutput(matched.output as any);
-  return applyValidatedParserOutput(baseSummary, { ...matched, output: enhanced.output as ValidatedParserOutput }, businessType);
+  const feeLedgerEnhanced = await maybeRunFiservProcessorFeeAiClassificationForParserOutput(matched.output as any);
+  const v2Enhanced = await maybeRunFiservFeeAnalysisAiClassificationForParserOutput(feeLedgerEnhanced.output as any);
+  return applyValidatedParserOutput(baseSummary, { ...matched, output: v2Enhanced.output as ValidatedParserOutput }, businessType);
 }

@@ -120,6 +120,76 @@ describe("Fiserv First Data full statement parser", () => {
         }),
       ]),
     );
+    expect(actual.fiservFeeAnalysisV2).toMatchObject({
+      version: "2.0",
+      normalization: {
+        rowCount: 134,
+        fuzzyMatchCount: 37,
+        aiCandidateCount: 5,
+      },
+      pricingModel: {
+        pricingModel: "interchange_plus",
+        confidence: "high",
+        analysisStatus: "ic_plus_ready",
+      },
+      processorMarkupAnalysis: {
+        status: "ready",
+      },
+    });
+    expect(actual.fiservFeeAnalysisV2.buckets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ feeType: "interchange", amount: 806.59, rows: 68 }),
+        expect.objectContaining({ feeType: "card_brand_network", amount: 83.23, rows: 19 }),
+        expect.objectContaining({ feeType: "pin_debit_interchange", amount: 20.63, rows: 10 }),
+        expect.objectContaining({ feeType: "suspicious_pass_through_like_fee", amount: 57.97, rows: 3 }),
+        expect.objectContaining({ feeType: "processor_pct_markup", amount: 81.62, rows: 9 }),
+        expect.objectContaining({ feeType: "compliance_penalty", amount: 49.95, rows: 1 }),
+        expect.objectContaining({ feeType: "third_party_service", amount: 16.83, rows: 1 }),
+      ]),
+    );
+    expect(actual.fiservFeeAnalysisV2.interchangeReconciliation).toMatchObject({
+      summaryTotal: 955.2,
+      detailTableTotal: 806.59,
+      gap: 148.61,
+      explainedGapTotal: 148.61,
+      unexplainedGap: 0,
+      status: "explained_structural_difference",
+    });
+    expect(actual.fiservFeeAnalysisV2.processorMarkupAnalysis).toMatchObject({
+      nonAmexSalesDiscountRate: 0.001,
+      amexSalesDiscountRate: 0.0055,
+      hiddenPctMarkupRows: [
+        expect.objectContaining({
+          description: "MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $47229.33",
+          rate: 0.0003,
+          amount: 14.17,
+        }),
+      ],
+    });
+    expect(actual.fiservFeeAnalysisV2.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "suspicious_uniform_rate",
+          action: "request_pass_through_documentation",
+          amount: 42.43,
+        }),
+        expect.objectContaining({
+          kind: "avoidable_compliance_fee",
+          action: "complete_pci_validation",
+          amount: 49.95,
+        }),
+        expect.objectContaining({
+          kind: "third_party_service_fee",
+          action: "verify_third_party_service",
+          amount: 16.83,
+        }),
+        expect.objectContaining({
+          kind: "hidden_percentage_markup",
+          action: "negotiate_processor_rate",
+          amount: 14.17,
+        }),
+      ]),
+    );
     expect(actual.feeLedger.rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -321,6 +391,28 @@ describe("Fiserv First Data full statement parser", () => {
       ]),
     );
     expect(actual.pricingModel.notes).toEqual(expect.arrayContaining([expect.stringContaining("not treated as confirmed cash discount")]));
+    expect(actual.fiservFeeAnalysisV2).toMatchObject({
+      version: "2.0",
+      normalization: {
+        rowCount: 2,
+        fuzzyMatchCount: 1,
+      },
+      pricingModel: {
+        pricingModel: "flat_rate",
+        confidence: "low",
+        analysisStatus: "universal_only_pending_model_rules",
+      },
+      processorMarkupAnalysis: {
+        status: "pending_pricing_model_rules",
+      },
+    });
+    expect(actual.fiservFeeAnalysisV2.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "pricing_model_pending_rules",
+        }),
+      ]),
+    );
     expect(actual.fundingBatchLedger).toMatchObject({
       status: "reconciled",
       rowCount: 10,
@@ -1239,6 +1331,118 @@ describe("Fiserv First Data full statement parser", () => {
       { economicBucket: "processor_controlled_flat_discount_fee", amount: 5.61, rowCount: 7 },
       { economicBucket: "zero_amount_no_charge", amount: 0, rowCount: 1 },
     ]);
+    expect(actual.fiservFeeAnalysisV2).toMatchObject({
+      version: "2.0",
+      normalization: {
+        rowCount: 51,
+        exactMatchCount: 50,
+        fuzzyMatchCount: 0,
+        aiCandidateCount: 0,
+        unmatchedCount: 1,
+      },
+      pricingModel: {
+        pricingModel: "interchange_plus",
+        confidence: "high",
+        analysisStatus: "ic_plus_ready",
+      },
+      rateVerification: {
+        proven: 6,
+        likely: 2,
+        processorControlled: 21,
+        indeterminate: 20,
+        notEnoughDetail: 2,
+      },
+      processorMarkupAnalysis: {
+        status: "ready",
+        processorControlledTotal: 47.46,
+        processorMarkupRate: 0.01749929,
+        processorPctMarkupTotal: 5.61,
+        processorPerItemTotal: 27.9,
+        processorFixedTotal: 13.95,
+        junkFeeTotal: 3.95,
+        perItemStacking: {
+          detected: true,
+          fees: ["OTHER ITEM FEES ($0.10)", "CPU GTWY ($0.10)", "SALES ITEMS ($0.10)"],
+          totalPerItem: 0.3,
+          perItemAsPctOfAverageTicket: 0.00707936,
+        },
+      },
+      reconciliation: {
+        basisTotal: 91.19,
+        rowTotal: 91.2,
+        residual: 0.01,
+        status: "pass",
+      },
+    });
+    expect(actual.fiservFeeAnalysisV2.notices).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          feeLabel: "STAR PIN DEBIT NETWORK ANNUAL FEE",
+          newValue: expect.objectContaining({ value: 20.95, cadence: "annual" }),
+          deltaValue: expect.objectContaining({ value: 2 }),
+          effectiveDate: "October 2025 statement",
+          disclosureStyle: "acceptance_by_use",
+        }),
+        expect.objectContaining({
+          feeLabel: "ACCEL PIN DEBIT NETWORK ANNUAL FEE",
+          newValue: expect.objectContaining({ value: 21.95, cadence: "annual" }),
+          deltaValue: expect.objectContaining({ value: 2 }),
+          effectiveDate: "October 2025 statement",
+          disclosureStyle: "acceptance_by_use",
+        }),
+      ]),
+    );
+    expect(actual.fiservFeeAnalysisV2.buckets).toEqual(
+      expect.arrayContaining([
+        { feeType: "interchange", amount: 35.94, rows: 6, pctOfFees: 39.41 },
+        { feeType: "card_brand_network", amount: 7.8, rows: 23, pctOfFees: 8.55 },
+        { feeType: "processor_pct_markup", amount: 5.61, rows: 7, pctOfFees: 6.15 },
+        { feeType: "processor_per_item", amount: 27.9, rows: 12, pctOfFees: 30.6 },
+        { feeType: "processor_fixed", amount: 13.95, rows: 2, pctOfFees: 15.3 },
+      ]),
+    );
+    expect(actual.fiservFeeAnalysisV2.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "rate_exceeds_reference",
+          title: "AMEX ACQR TRANSACTION FEE exceeds the reference rate",
+        }),
+        expect.objectContaining({
+          kind: "processor_per_item_stacking",
+          title: "Multiple processor per-item fees are stacked",
+          amount: 27.9,
+        }),
+        expect.objectContaining({
+          kind: "junk_fee",
+          title: "Regulatory Product fee is processor-controlled",
+          amount: 3.95,
+        }),
+      ]),
+    );
+    expect(actual.fiservFeeAnalysisV2.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          cardTypeSection: "AMEXCT043",
+          description: "AMEX ACQR TRANSACTION FEE",
+          proofStatus: "indeterminate",
+          rateComparison: "above_reference",
+          referenceRate: 0.02,
+          comparedBasis: "stated_rate",
+        }),
+        expect.objectContaining({
+          cardTypeSection: "VS OFLN DB",
+          description: "ACQR PROCESSOR FEES",
+          proofStatus: "proven",
+          referenceRate: 0.0155,
+        }),
+        expect.objectContaining({
+          cardTypeSection: "VS OFLN DB",
+          description: "BIN ICA FEE",
+          feeType: "card_brand_network",
+          proofStatus: "not_enough_detail",
+        }),
+      ]),
+    );
     expect(actual.feeLedger.rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
