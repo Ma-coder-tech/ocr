@@ -30,6 +30,7 @@ import type { StatementNoticeAiExtraction } from "./statementNoticeAiExtraction.
 import type { BusinessTypeId } from "./businessTypes.js";
 import type { RepricingEvent } from "./types.js";
 import type { FiservAiFeeAssessment } from "./fiservAiFeeAssessment.js";
+import type { MerchantNarrative } from "./merchantNarrativeAi.js";
 
 export type FiservFeeProofStatus = "proven" | "likely" | "processor_controlled" | "indeterminate" | "not_enough_detail";
 
@@ -311,6 +312,7 @@ export type FiservFeeAnalysisV2 = {
   noticeText: string | null;
   aiNoticeExtraction?: StatementNoticeAiExtraction;
   benchmarkCategoryAi?: BenchmarkCategoryAiInference;
+  aiMerchantNarrative?: MerchantNarrative;
   pricingModel: {
     pricingModel: string;
     confidence: "high" | "medium" | "low";

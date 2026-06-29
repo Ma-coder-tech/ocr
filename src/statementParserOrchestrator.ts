@@ -4,6 +4,7 @@ import { withFeeClassification } from "./feeClassification.js";
 import { maybeRunBenchmarkCategoryAiInferenceForParserOutput } from "./benchmarkCategoryAiInference.js";
 import { maybeRunFiservFeeAnalysisAiClassificationForParserOutput } from "./fiservFeeAnalysisAiClassification.js";
 import { maybeRunFiservProcessorFeeAiClassificationForParserOutput } from "./fiservProcessorFeeAiClassification.js";
+import { maybeRunMerchantNarrativeAiForParserOutput } from "./merchantNarrativeAi.js";
 import { maybeRunStatementNoticeAiExtractionForParserOutput } from "./statementNoticeAiExtraction.js";
 import {
   fiservFirstDataProcessorStatementDriver,
@@ -279,5 +280,6 @@ export async function analyzeStatementDocumentWithOptionalAi(
   const v2Enhanced = await maybeRunFiservFeeAnalysisAiClassificationForParserOutput(feeLedgerEnhanced.output as any);
   const categoryEnhanced = await maybeRunBenchmarkCategoryAiInferenceForParserOutput(v2Enhanced.output as any);
   const noticeEnhanced = await maybeRunStatementNoticeAiExtractionForParserOutput(categoryEnhanced.output as any);
-  return applyValidatedParserOutput(baseSummary, { ...matched, output: noticeEnhanced.output as ValidatedParserOutput }, businessType);
+  const narrativeEnhanced = await maybeRunMerchantNarrativeAiForParserOutput(noticeEnhanced.output as any);
+  return applyValidatedParserOutput(baseSummary, { ...matched, output: narrativeEnhanced.output as ValidatedParserOutput }, businessType);
 }

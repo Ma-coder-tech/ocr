@@ -201,6 +201,55 @@ export const fiservAiFeeAssessmentSchema = z
   })
   .strict();
 
+const merchantNarrativeBulletSchema = z
+  .object({
+    text: z.string().min(1),
+    factIds: z.array(z.string().min(1)),
+  })
+  .strict();
+
+const merchantNarrativeSectionSchema = z
+  .object({
+    title: z.string().min(1),
+    summary: z.string().min(1),
+    factIds: z.array(z.string().min(1)),
+    bullets: z.array(merchantNarrativeBulletSchema),
+  })
+  .strict();
+
+const merchantNarrativeSchema = z
+  .object({
+    status: z.enum(["disabled", "not_needed", "applied", "failed"]),
+    provider: z.enum(["anthropic", "openai"]).nullable(),
+    model: z.string().min(1).nullable(),
+    attempted: z.boolean(),
+    factCount: z.number().int().nonnegative(),
+    factsUsed: z.array(z.string().min(1)),
+    sections: z
+      .object({
+        executiveSummary: merchantNarrativeSectionSchema,
+        pricingModel: merchantNarrativeSectionSchema,
+        passThroughVerification: merchantNarrativeSectionSchema,
+        processorControlledFees: merchantNarrativeSectionSchema,
+        benchmarkConclusion: merchantNarrativeSectionSchema,
+        noticesAndRepricing: merchantNarrativeSectionSchema,
+        negotiationOpportunities: merchantNarrativeSectionSchema,
+        caveats: merchantNarrativeSectionSchema,
+      })
+      .strict(),
+    actionItems: z.array(
+      z
+        .object({
+          priority: z.enum(["high", "medium", "low"]),
+          text: z.string().min(1),
+          factIds: z.array(z.string().min(1)),
+        })
+        .strict(),
+    ),
+    notes: z.array(z.string().min(1)),
+  })
+  .strict();
+
 export const feeLedgerRowClassificationSchema = z
   .object({
     economicBucket: feeEconomicBucketSchema,
@@ -362,6 +411,7 @@ export const fiservFeeAnalysisV2Schema = z
       })
       .strict()
       .optional(),
+    aiMerchantNarrative: merchantNarrativeSchema.optional(),
     pricingModel: z
       .object({
         pricingModel: z.string().min(1),
