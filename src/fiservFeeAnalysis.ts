@@ -20,6 +20,7 @@ import {
 } from "./mccBenchmarkReference.js";
 import { normalizeFiservFeeReferenceText, type FiservFeeReferenceEntry } from "./fiservFeeReference.js";
 import { round2, round8 } from "./reconciliation.js";
+import type { StatementNoticeAiExtraction } from "./statementNoticeAiExtraction.js";
 import type { RepricingEvent } from "./types.js";
 
 export type FiservFeeProofStatus = "proven" | "likely" | "processor_controlled" | "indeterminate" | "not_enough_detail";
@@ -44,6 +45,7 @@ export type FiservFeeAnalysisInput = {
   merchantName?: string | null;
   ytdGrossSales?: number | null;
   notices?: RepricingEvent[];
+  noticeText?: string | null;
   interchangeReconciliationBasis?: {
     summaryTotal: number | null;
     detailTableTotal: number | null;
@@ -293,6 +295,8 @@ export type FiservFeeAnalysisV2 = {
   version: "2.0";
   normalization: FiservFeeNormalizationSummary;
   notices: RepricingEvent[];
+  noticeText: string | null;
+  aiNoticeExtraction?: StatementNoticeAiExtraction;
   pricingModel: {
     pricingModel: string;
     confidence: "high" | "medium" | "low";
@@ -1943,6 +1947,7 @@ export function buildFiservFeeAnalysisV2(input: FiservFeeAnalysisInput): FiservF
     version: "2.0" as const,
     normalization: input.normalizationSummary,
     notices: input.notices ?? [],
+    noticeText: typeof input.noticeText === "string" && input.noticeText.trim() ? input.noticeText.trim() : null,
     pricingModel,
     buckets: bucketRows(rows, input.totalFees),
     rows,

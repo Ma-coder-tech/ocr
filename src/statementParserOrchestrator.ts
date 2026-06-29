@@ -3,6 +3,7 @@ import { analyzeDocument } from "./analyzer.js";
 import { withFeeClassification } from "./feeClassification.js";
 import { maybeRunFiservFeeAnalysisAiClassificationForParserOutput } from "./fiservFeeAnalysisAiClassification.js";
 import { maybeRunFiservProcessorFeeAiClassificationForParserOutput } from "./fiservProcessorFeeAiClassification.js";
+import { maybeRunStatementNoticeAiExtractionForParserOutput } from "./statementNoticeAiExtraction.js";
 import {
   fiservFirstDataProcessorStatementDriver,
   fiservFirstDataFullStatementDriver,
@@ -275,5 +276,6 @@ export async function analyzeStatementDocumentWithOptionalAi(
 
   const feeLedgerEnhanced = await maybeRunFiservProcessorFeeAiClassificationForParserOutput(matched.output as any);
   const v2Enhanced = await maybeRunFiservFeeAnalysisAiClassificationForParserOutput(feeLedgerEnhanced.output as any);
-  return applyValidatedParserOutput(baseSummary, { ...matched, output: v2Enhanced.output as ValidatedParserOutput }, businessType);
+  const noticeEnhanced = await maybeRunStatementNoticeAiExtractionForParserOutput(v2Enhanced.output as any);
+  return applyValidatedParserOutput(baseSummary, { ...matched, output: noticeEnhanced.output as ValidatedParserOutput }, businessType);
 }

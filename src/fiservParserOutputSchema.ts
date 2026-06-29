@@ -237,6 +237,41 @@ export const fiservFeeAnalysisV2Schema = z
         })
         .strict(),
     ),
+    noticeText: z.string().min(1).nullable().optional(),
+    aiNoticeExtraction: z
+      .object({
+        status: z.enum(["disabled", "not_needed", "applied", "no_fee_changes", "failed"]),
+        provider: z.enum(["anthropic", "openai"]).nullable(),
+        model: z.string().min(1).nullable(),
+        noticeCount: z.number().int().nonnegative(),
+        feeChangeCount: z.number().int().nonnegative(),
+        notices: z.array(
+          z
+            .object({
+              feeName: z.string().min(1).nullable(),
+              amount: z
+                .object({
+                  value: finiteNumber.nullable(),
+                  valueType: z.enum(["money", "percentage", "basis_points", "unknown"]),
+                  cadence: z.enum(["monthly", "annual", "per_item", "one_time", "unknown"]),
+                  raw: z.string().min(1).nullable(),
+                })
+                .strict()
+                .nullable(),
+              effectiveDate: z.string().min(1).nullable(),
+              condition: z.string().min(1).nullable(),
+              acceptanceClause: z.string().min(1).nullable(),
+              actionDeadline: z.string().min(1).nullable(),
+              isFeeChange: z.boolean(),
+              confidence: z.enum(["high", "medium", "low"]),
+              evidence: z.array(z.string().min(1)),
+            })
+            .strict(),
+        ),
+        notes: z.array(z.string().min(1)),
+      })
+      .strict()
+      .optional(),
     pricingModel: z
       .object({
         pricingModel: z.string().min(1),

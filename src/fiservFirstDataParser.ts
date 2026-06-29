@@ -254,6 +254,14 @@ function extractFiservNoticeLines(doc: RawExtractedDocument): RepricingNoticeLin
   return lines;
 }
 
+export function extractFiservNoticeText(doc: RawExtractedDocument): string | null {
+  const text = extractFiservNoticeLines(doc)
+    .map((line) => line.evidenceLine)
+    .join("\n")
+    .trim();
+  return text.length > 0 ? text : null;
+}
+
 function extractFiservYtdGrossSales(doc: RawExtractedDocument): number | null {
   for (const row of doc.rows) {
     const content = rowContent(row)
@@ -2059,6 +2067,7 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
     merchantName,
     ytdGrossSales: ytdSales,
     notices: extractFiservRepricingEvents(doc),
+    noticeText: extractFiservNoticeText(doc),
     interchangeReconciliationBasis: {
       summaryTotal: interchangeBucket,
       detailTableTotal: interchangeDetailTotal,
@@ -2524,6 +2533,7 @@ export function parseFiservFirstDataShortStatement(doc: RawExtractedDocument, op
     merchantName,
     ytdGrossSales: extractFiservYtdGrossSales(doc),
     notices: extractFiservRepricingEvents(doc),
+    noticeText: extractFiservNoticeText(doc),
   });
 
   const selectedFinancials: SelectedStatementFinancials = {
@@ -3008,6 +3018,7 @@ export function parseFiservFirstDataProcessorStatement(doc: RawExtractedDocument
     merchantName: merchantNameRow.content,
     ytdGrossSales: extractFiservYtdGrossSales(doc),
     notices: extractFiservRepricingEvents(doc),
+    noticeText: extractFiservNoticeText(doc),
   });
   const failedFundingBatchEvidenceLine = fundingBatchLedger.rows.find((row) => row.status === "fail")?.evidenceLine ?? null;
   const failedFundingBatchLineIndex =
