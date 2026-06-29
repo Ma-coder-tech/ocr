@@ -116,6 +116,11 @@ describe("Fiserv processor AI fee classification", () => {
       atCostStatus: "not_applicable",
       atCostReasonCode: "NOT_PASS_THROUGH_CATEGORY",
       marginAmountKnown: true,
+      aiAssessment: {
+        paidToParty: "processor_or_iso",
+        passThroughProofPosture: "not_applicable_processor_controlled",
+        negotiability: "likely_negotiable",
+      },
     });
     expect(result.rows[1].classification).toMatchObject({
       economicBucket: "processor_transaction_or_auth",
@@ -211,6 +216,11 @@ describe("Fiserv processor AI fee classification", () => {
     });
     expect(prompts[0]).toContain("SYSTEM PROCESSING FEE");
     expect(prompts[0]).toContain("Do not claim pass-through-at-cost proof");
+    expect(prompts[0]).toContain("source_backed_math_candidate");
+    expect(mocked.rows[0].classification.aiAssessment).toMatchObject({
+      paidToParty: "processor_or_iso",
+      passThroughProofPosture: "not_applicable_processor_controlled",
+    });
   });
 
   it("preserves deterministic classifications when the AI call times out", async () => {

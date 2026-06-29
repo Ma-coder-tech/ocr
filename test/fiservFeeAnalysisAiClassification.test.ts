@@ -81,6 +81,7 @@ describe("Fiserv V2 AI fee classification", () => {
           return {
             object: {
               rows: packet.unresolvedRows.map((row) => {
+                const isVisaIntegrity = row.description.includes("INTEGRITY");
                 const isAmexProgram = row.cardTypeSection === "AMEX ACQ" && !row.description.includes("ACQUIRER TRANS FEE");
                 const isAmexAcquirerTransaction = row.description.includes("ACQUIRER TRANS FEE");
                 return {
@@ -89,13 +90,35 @@ describe("Fiserv V2 AI fee classification", () => {
                   confidence: "high",
                   paidTo: isAmexProgram ? "issuer_or_interchange" : "card_network",
                   negotiability: "non_negotiable",
-                  canonicalName: isAmexProgram
+                  canonicalName: isVisaIntegrity
+                    ? "Transaction Integrity Fee"
+                    : isAmexProgram
                     ? "Amex OptBlue Restaurant Program Fee"
                     : isAmexAcquirerTransaction
                       ? "Amex Acquirer Transaction Fee"
                       : "Card Network Pass-Through Fee",
-                  suggestedReferenceId: isAmexAcquirerTransaction ? "AX-002" : null,
+                  suggestedReferenceId: isVisaIntegrity ? "VS-007" : isAmexAcquirerTransaction ? "AX-002" : null,
                   proofStatus: "indeterminate",
+                  assessment: isVisaIntegrity
+                    ? {
+                        paidToParty: "card_network",
+                        passThroughProofPosture: "source_backed_math_candidate",
+                        negotiability: "likely_non_negotiable",
+                        avoidableLikelihood: "low",
+                        merchantAction: "request_pass_through_documentation",
+                        recommendation: "Verify the Transaction Integrity Fee against the Visa reference for the statement period.",
+                        evidence: ["Visa integrity label, transaction count, stated per-item rate, and amount are present."],
+                        sourceEvidence: {
+                          sourceName: "Visa Transaction Integrity Fee",
+                          referenceId: "VS-007",
+                          referenceRate: 0.002,
+                          statementRate: 0.002,
+                          statementAmount: 0.01,
+                          mathSummary: "5 transactions x $0.002 = $0.01.",
+                          verificationNote: "AI supplied a source-backed math candidate; deterministic reference-rate verification remains final.",
+                        },
+                      }
+                    : null,
                   reasonCodes: ["SECTION_AND_LABEL_MATCH"],
                   explanation: "Classified from card section, fee label, and row math. Rate proof remains separate.",
                 };
@@ -110,6 +133,7 @@ describe("Fiserv V2 AI fee classification", () => {
     const aiRows = analysis.rows.filter((row) => row.matchMethod === "ai_classified");
 
     expect(prompt).toContain("Never return proven or likely");
+    expect(prompt).toContain("source_backed_math_candidate");
     expect(result.ai).toMatchObject({
       status: "applied",
       provider: "anthropic",
@@ -135,6 +159,25 @@ describe("Fiserv V2 AI fee classification", () => {
           referenceId: null,
           proofStatus: "indeterminate",
           rateComparison: "not_compared",
+          aiAssessment: expect.objectContaining({
+            paidToParty: "card_network",
+            passThroughProofPosture: "not_enough_evidence",
+          }),
+        }),
+      ]),
+    );
+    expect(aiRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          canonicalName: "Transaction Integrity Fee",
+          referenceId: "VS-007",
+          proofStatus: "indeterminate",
+          aiAssessment: expect.objectContaining({
+            passThroughProofPosture: "source_backed_math_candidate",
+            sourceEvidence: expect.objectContaining({
+              referenceId: "VS-007",
+            }),
+          }),
         }),
       ]),
     );

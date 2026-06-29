@@ -29,6 +29,7 @@ import type { BenchmarkCategoryAiInference } from "./benchmarkCategoryAiInferenc
 import type { StatementNoticeAiExtraction } from "./statementNoticeAiExtraction.js";
 import type { BusinessTypeId } from "./businessTypes.js";
 import type { RepricingEvent } from "./types.js";
+import type { FiservAiFeeAssessment } from "./fiservAiFeeAssessment.js";
 
 export type FiservFeeProofStatus = "proven" | "likely" | "processor_controlled" | "indeterminate" | "not_enough_detail";
 
@@ -89,6 +90,7 @@ export type FiservFeeAnalysisRow = {
   tolerancePct: number | null;
   reason: string;
   evidenceLine: string;
+  aiAssessment?: FiservAiFeeAssessment;
 };
 
 export type FiservFeeAnalysisBucket = {
@@ -123,6 +125,7 @@ export type FiservFeeAnalysisFinding = {
     | "effective_rate_positive_benchmark"
     | "effective_rate_above_benchmark"
     | "junk_fixed_fee_summary"
+    | "ai_fee_assessment"
     | "new_account_pricing_context";
   severity: "info" | "warning" | "high";
   title: string;

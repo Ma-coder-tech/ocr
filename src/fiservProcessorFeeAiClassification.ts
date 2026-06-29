@@ -13,6 +13,18 @@ import {
 import { buildParserDecision } from "./parserDecision.js";
 import type { ParserConfidence } from "./parserFoundation.js";
 import type { ReconciliationCheck, ReconciliationResult } from "./reconciliation.js";
+import {
+  FISERV_AI_AVOIDABLE_LIKELIHOOD_VALUES,
+  FISERV_AI_MERCHANT_ACTIONS,
+  FISERV_AI_NEGOTIABILITY_VALUES,
+  FISERV_AI_PAID_TO_PARTIES,
+  FISERV_AI_PASS_THROUGH_PROOF_POSTURES,
+  normalizeFiservAiFeeAssessment,
+  type FiservAiFeeAssessment,
+  type FiservAiNegotiability,
+  type FiservAiPaidToParty,
+  type FiservAiPassThroughProofPosture,
+} from "./fiservAiFeeAssessment.js";
 
 const require = createRequire(import.meta.url);
 
@@ -70,7 +82,7 @@ export type FiservProcessorFeeAiPacket = {
   instructions: string[];
 };
 
-export type FiservProcessorFeeAiNegotiability = "likely_negotiable" | "likely_non_negotiable" | "unknown";
+export type FiservProcessorFeeAiNegotiability = FiservAiNegotiability;
 
 export type FiservProcessorFeeAiSuggestion = {
   rowIndex: number;
@@ -78,6 +90,7 @@ export type FiservProcessorFeeAiSuggestion = {
   confidence: "high" | "medium" | "low";
   subcategory: string | null;
   negotiability: FiservProcessorFeeAiNegotiability;
+  assessment?: FiservAiFeeAssessment;
   reasonCodes: string[];
   explanation: string;
 };
@@ -313,6 +326,8 @@ export function buildFiservProcessorFeeAiPacket<T extends FiservProcessorFeeRowF
       "Classify only unresolved fee rows; do not override deterministic classifications.",
       "Use row math, processor/platform context, fee section/card network, and fee names.",
       "Do not claim pass-through-at-cost proof; card-brand rows remain at-cost indeterminate unless external reference proof is supplied elsewhere.",
+      "Return an assessment object for every suggestion: paid-to party, pass-through proof posture, negotiability, avoidable likelihood, merchant action, recommendation, evidence, and source evidence.",
+      "Use source_backed_math_candidate only when you can name a source or reference and explain the row math. This remains advisory until deterministic reference-rate verification confirms it.",
       "Return unknown_needs_review when the evidence is too generic or ambiguous.",
       "Treat tiered discount rows as structurally blended, but they should normally not be included in this unresolved-row packet.",
     ],
@@ -327,11 +342,38 @@ function aiPrompt(packet: FiservProcessorFeeAiPacket): string {
     ECONOMIC_BUCKETS.join(", "),
     "Confidence must be high, medium, or low.",
     "Negotiability must be likely_negotiable, likely_non_negotiable, or unknown.",
+    "Assessment passThroughProofPosture must be one of: source_backed_math_candidate, not_applicable_processor_controlled, not_pass_through, not_enough_evidence.",
+    "AI may provide source-backed pass-through evidence only as a candidate; deterministic reference-rate math remains the final proof layer.",
     "Use unknown_needs_review if the row cannot be classified from the provided evidence.",
     "Do not classify a fee as proven pass-through-at-cost. At-cost proof is handled by a separate deterministic reference-rate layer.",
     "Structured statement packet:",
     JSON.stringify(packet),
   ].join("\n\n");
+}
+
+function aiAssessmentSchema(z: any): any {
+  return z
+    .object({
+      paidToParty: z.enum(FISERV_AI_PAID_TO_PARTIES),
+      passThroughProofPosture: z.enum(FISERV_AI_PASS_THROUGH_PROOF_POSTURES),
+      negotiability: z.enum(FISERV_AI_NEGOTIABILITY_VALUES),
+      avoidableLikelihood: z.enum(FISERV_AI_AVOIDABLE_LIKELIHOOD_VALUES),
+      merchantAction: z.enum(FISERV_AI_MERCHANT_ACTIONS),
+      recommendation: z.string().nullable(),
+      evidence: z.array(z.string()),
+      sourceEvidence: z
+        .object({
+          sourceName: z.string().nullable(),
+          referenceId: z.string().nullable(),
+          referenceRate: z.number().nullable(),
+          statementRate: z.number().nullable(),
+          statementAmount: z.number().nullable(),
+          mathSummary: z.string().nullable(),
+          verificationNote: z.string(),
+        })
+        .strict(),
+    })
+    .strict();
 }
 
 function aiResponseSchema(): unknown {
@@ -342,6 +384,7 @@ function aiResponseSchema(): unknown {
     confidence: z.enum(["high", "medium", "low"]),
     subcategory: z.string().nullable(),
     negotiability: z.enum(["likely_negotiable", "likely_non_negotiable", "unknown"]),
+    assessment: aiAssessmentSchema(z).optional().nullable(),
     reasonCodes: z.array(z.string()),
     explanation: z.string(),
   });
@@ -461,19 +504,58 @@ function parseAiObject(value: unknown): { rows: FiservProcessorFeeAiSuggestion[]
     const confidence = row.confidence;
     const negotiability: FiservProcessorFeeAiNegotiability =
       row.negotiability === "likely_negotiable" || row.negotiability === "likely_non_negotiable" ? row.negotiability : "unknown";
+    const explanation = String(row.explanation ?? "").replace(/\s+/g, " ").trim().slice(0, 600);
     return {
       rowIndex,
       economicBucket,
       confidence,
       subcategory: typeof row.subcategory === "string" && row.subcategory.trim() ? row.subcategory.trim() : null,
       negotiability,
+      assessment: normalizeFiservAiFeeAssessment(
+        row.assessment,
+        assessmentDefaultsForSuggestion(economicBucket, negotiability, explanation),
+      ),
       reasonCodes: Array.isArray(row.reasonCodes)
         ? row.reasonCodes.map((code) => String(code).trim()).filter(Boolean).slice(0, 8)
         : [],
-      explanation: String(row.explanation ?? "").replace(/\s+/g, " ").trim().slice(0, 600),
+      explanation,
     };
   });
   return { rows };
+}
+
+function assessmentDefaultsForSuggestion(
+  bucket: FiservProcessorFeeEconomicBucket,
+  negotiability: FiservProcessorFeeAiNegotiability,
+  explanation: string,
+): {
+  paidToParty: FiservAiPaidToParty;
+  passThroughProofPosture: FiservAiPassThroughProofPosture;
+  negotiability: FiservProcessorFeeAiNegotiability;
+  evidence: string[];
+} {
+  if (bucket === "card_brand_pass_through") {
+    return {
+      paidToParty: "card_network",
+      passThroughProofPosture: "not_enough_evidence",
+      negotiability: "likely_non_negotiable",
+      evidence: explanation ? [explanation] : [],
+    };
+  }
+  if (bucket === "zero_amount_no_charge") {
+    return {
+      paidToParty: "unknown",
+      passThroughProofPosture: "not_enough_evidence",
+      negotiability: "unknown",
+      evidence: explanation ? [explanation] : [],
+    };
+  }
+  return {
+    paidToParty: "processor_or_iso",
+    passThroughProofPosture: "not_applicable_processor_controlled",
+    negotiability,
+    evidence: explanation ? [explanation] : [],
+  };
 }
 
 function atCostDefaultsForSuggestion(bucket: FiservProcessorFeeEconomicBucket): {
@@ -567,6 +649,12 @@ export function applyFiservProcessorFeeAiSuggestions<T extends FiservProcessorFe
     }
 
     const defaults = atCostDefaultsForSuggestion(suggestion.economicBucket);
+    const assessment =
+      suggestion.assessment ??
+      normalizeFiservAiFeeAssessment(
+        null,
+        assessmentDefaultsForSuggestion(suggestion.economicBucket, suggestion.negotiability, suggestion.explanation),
+      );
     appliedSuggestionCount += 1;
     return {
       ...row,
@@ -579,6 +667,9 @@ export function applyFiservProcessorFeeAiSuggestions<T extends FiservProcessorFe
           suggestion.explanation,
           suggestion.subcategory ? `Subcategory: ${suggestion.subcategory}.` : null,
           `Negotiability: ${suggestion.negotiability}.`,
+          `Paid to: ${assessment.paidToParty}.`,
+          `Pass-through proof posture: ${assessment.passThroughProofPosture}.`,
+          assessment.recommendation ? `Recommendation: ${assessment.recommendation}` : null,
           suggestion.reasonCodes.length > 0 ? `Reason codes: ${suggestion.reasonCodes.join(", ")}.` : null,
         ]
           .filter(Boolean)
@@ -588,6 +679,7 @@ export function applyFiservProcessorFeeAiSuggestions<T extends FiservProcessorFe
         atCostReasonCode: defaults.atCostReasonCode,
         costExposure: defaults.costExposure,
         marginAmountKnown: defaults.marginAmountKnown,
+        aiAssessment: assessment,
       }),
     };
   });

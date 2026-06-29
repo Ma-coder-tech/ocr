@@ -9,6 +9,7 @@ import {
   findFiservProcessorRateFingerprint,
   type FiservProcessorRateFingerprintEvidence,
 } from "./fiservProcessorRateFingerprint.js";
+import type { FiservAiFeeAssessment } from "./fiservAiFeeAssessment.js";
 
 export type FiservProcessorFeeEconomicBucket =
   | "card_brand_pass_through"
@@ -64,6 +65,7 @@ export type FiservProcessorFeeClassification = {
   catalogRate: number | null;
   marginAmountKnown: boolean;
   effectiveRatePct: number | null;
+  aiAssessment?: FiservAiFeeAssessment;
 };
 
 export type FiservProcessorFeeRowForClassification = {
@@ -264,6 +266,7 @@ function classification(params: {
   catalogFeeCode?: string | null;
   catalogRate?: number | null;
   marginAmountKnown?: boolean;
+  aiAssessment?: FiservAiFeeAssessment;
 }): FiservProcessorFeeClassification {
   const comparison = comparisonCandidate(params.row);
   return {
@@ -282,6 +285,7 @@ function classification(params: {
     catalogRate: params.catalogRate ?? null,
     marginAmountKnown: params.marginAmountKnown ?? false,
     effectiveRatePct: effectiveRatePct(params.row),
+    ...(params.aiAssessment ? { aiAssessment: params.aiAssessment } : {}),
   };
 }
 
@@ -300,6 +304,7 @@ export function makeFiservProcessorSyntheticFeeClassification(params: {
   catalogFeeCode?: string | null;
   catalogRate?: number | null;
   marginAmountKnown?: boolean;
+  aiAssessment?: FiservAiFeeAssessment;
 }): FiservProcessorFeeClassification {
   return classification(params);
 }

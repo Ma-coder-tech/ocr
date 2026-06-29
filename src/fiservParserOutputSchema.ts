@@ -166,6 +166,41 @@ export const feeClassificationSummaryStatusSchema = z.enum([
   "unreconciled",
 ]);
 
+export const fiservAiFeeAssessmentSchema = z
+  .object({
+    paidToParty: z.enum(["card_network", "issuer_or_interchange", "processor_or_iso", "third_party", "unknown"]),
+    passThroughProofPosture: z.enum([
+      "source_backed_math_candidate",
+      "not_applicable_processor_controlled",
+      "not_pass_through",
+      "not_enough_evidence",
+    ]),
+    negotiability: z.enum(["likely_negotiable", "likely_non_negotiable", "unknown"]),
+    avoidableLikelihood: z.enum(["high", "medium", "low", "unknown"]),
+    merchantAction: z.enum([
+      "request_fee_removal_or_reduction",
+      "request_pass_through_documentation",
+      "verify_service_or_contract",
+      "fix_terminal_or_gateway_configuration",
+      "monitor",
+      "none",
+    ]),
+    recommendation: z.string().min(1).nullable(),
+    evidence: z.array(z.string().min(1)),
+    sourceEvidence: z
+      .object({
+        sourceName: z.string().min(1).nullable(),
+        referenceId: z.string().min(1).nullable(),
+        referenceRate: finiteNumber.nonnegative().nullable(),
+        statementRate: finiteNumber.nonnegative().nullable(),
+        statementAmount: finiteNumber.nullable(),
+        mathSummary: z.string().min(1).nullable(),
+        verificationNote: z.string().min(1),
+      })
+      .strict(),
+  })
+  .strict();
+
 export const feeLedgerRowClassificationSchema = z
   .object({
     economicBucket: feeEconomicBucketSchema,
@@ -183,6 +218,7 @@ export const feeLedgerRowClassificationSchema = z
     catalogRate: finiteNumber.nullable(),
     marginAmountKnown: z.boolean(),
     effectiveRatePct: finiteNumber.nonnegative().nullable(),
+    aiAssessment: fiservAiFeeAssessmentSchema.optional(),
   })
   .strict();
 
@@ -400,6 +436,7 @@ export const fiservFeeAnalysisV2Schema = z
           tolerancePct: finiteNumber.nonnegative().nullable(),
           reason: z.string().min(1),
           evidenceLine: z.string().min(1),
+          aiAssessment: fiservAiFeeAssessmentSchema.optional(),
         })
         .strict(),
     ),
@@ -774,6 +811,7 @@ export const fiservFeeAnalysisV2Schema = z
             "effective_rate_positive_benchmark",
             "effective_rate_above_benchmark",
             "junk_fixed_fee_summary",
+            "ai_fee_assessment",
             "new_account_pricing_context",
           ]),
           severity: z.enum(["info", "warning", "high"]),

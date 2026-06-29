@@ -9,6 +9,18 @@ import {
   type FiservFeeAnalysisRow,
   type FiservFeeAnalysisV2,
 } from "./fiservFeeAnalysis.js";
+import {
+  FISERV_AI_AVOIDABLE_LIKELIHOOD_VALUES,
+  FISERV_AI_MERCHANT_ACTIONS,
+  FISERV_AI_NEGOTIABILITY_VALUES,
+  FISERV_AI_PAID_TO_PARTIES,
+  FISERV_AI_PASS_THROUGH_PROOF_POSTURES,
+  normalizeFiservAiFeeAssessment,
+  type FiservAiFeeAssessment,
+  type FiservAiNegotiability,
+  type FiservAiPaidToParty,
+  type FiservAiPassThroughProofPosture,
+} from "./fiservAiFeeAssessment.js";
 import { round2, round8 } from "./reconciliation.js";
 
 const require = createRequire(import.meta.url);
@@ -88,6 +100,7 @@ export type FiservFeeAnalysisAiSuggestion = {
   canonicalName: string | null;
   suggestedReferenceId: string | null;
   proofStatus: "indeterminate" | "not_enough_detail" | "processor_controlled";
+  assessment?: FiservAiFeeAssessment;
   reasonCodes: string[];
   explanation: string;
 };
@@ -311,6 +324,8 @@ export function buildFiservFeeAnalysisAiPacket(analysis: FiservFeeAnalysisV2, co
       "Classify only rows whose matchMethod is ai_candidate; do not override deterministic exact or fuzzy rows.",
       "Use the card-type section, fee label, amount/count/rate math, merchant context, pricing model, and reference hints.",
       "AI may classify the fee category and likely paid-to party, but AI must not invent proof that a charged amount equals a pass-through rate.",
+      "Return an assessment object for every suggestion: paid-to party, pass-through proof posture, negotiability, avoidable likelihood, merchant action, recommendation, evidence, and source evidence.",
+      "Use source_backed_math_candidate only when the row maps to a reference hint/source and the row math supports the candidate. Deterministic rate verification must still confirm it before final proof becomes proven or likely.",
       "For network/interchange/program fees without a deterministic fixed-rate reference, return proofStatus indeterminate or not_enough_detail.",
       "Return unknown when the evidence is too generic, contradictory, or not tied to a network or processor-controlled pattern.",
       "Prefer conservative classifications over impressive-sounding certainty.",
@@ -326,12 +341,39 @@ function aiPrompt(packet: FiservFeeAnalysisAiPacket): string {
     FEE_TYPES.join(", "),
     "Allowed proofStatus values: indeterminate, not_enough_detail, processor_controlled.",
     "Never return proven or likely; deterministic rate verification is a separate layer.",
+    "Assessment passThroughProofPosture must be one of: source_backed_math_candidate, not_applicable_processor_controlled, not_pass_through, not_enough_evidence.",
+    "AI can suggest source-backed pass-through proof only as source_backed_math_candidate with sourceEvidence. It cannot set the row proofStatus to proven or likely.",
     "Use processor_* fee types only when the label points to processor/ISO markup, service fees, monthly fees, gateway fees, or discount markup.",
     "Use interchange for card-program wholesale/interchange rows such as Amex OptBlue restaurant/base/tier program buckets.",
     "Use card_brand_network for network assessments, auth, account verification, acquirer processing, integrity, and network pass-through fees.",
     "Structured packet:",
     JSON.stringify(packet),
   ].join("\n\n");
+}
+
+function aiAssessmentSchema(z: any): any {
+  return z
+    .object({
+      paidToParty: z.enum(FISERV_AI_PAID_TO_PARTIES),
+      passThroughProofPosture: z.enum(FISERV_AI_PASS_THROUGH_PROOF_POSTURES),
+      negotiability: z.enum(FISERV_AI_NEGOTIABILITY_VALUES),
+      avoidableLikelihood: z.enum(FISERV_AI_AVOIDABLE_LIKELIHOOD_VALUES),
+      merchantAction: z.enum(FISERV_AI_MERCHANT_ACTIONS),
+      recommendation: z.string().nullable(),
+      evidence: z.array(z.string()),
+      sourceEvidence: z
+        .object({
+          sourceName: z.string().nullable(),
+          referenceId: z.string().nullable(),
+          referenceRate: z.number().nullable(),
+          statementRate: z.number().nullable(),
+          statementAmount: z.number().nullable(),
+          mathSummary: z.string().nullable(),
+          verificationNote: z.string(),
+        })
+        .strict(),
+    })
+    .strict();
 }
 
 function aiResponseSchema(): unknown {
@@ -345,6 +387,7 @@ function aiResponseSchema(): unknown {
     canonicalName: z.string().nullable(),
     suggestedReferenceId: z.string().nullable(),
     proofStatus: z.enum(["indeterminate", "not_enough_detail", "processor_controlled"]),
+    assessment: aiAssessmentSchema(z).optional().nullable(),
     reasonCodes: z.array(z.string()),
     explanation: z.string(),
   });
@@ -453,26 +496,95 @@ function parseAiObject(value: unknown): { rows: FiservFeeAnalysisAiSuggestion[] 
       row.paidTo === "card_network" || row.paidTo === "issuer_or_interchange" || row.paidTo === "processor_or_iso" ? row.paidTo : "unknown";
     const negotiability: FiservFeeAnalysisAiSuggestion["negotiability"] =
       row.negotiability === "non_negotiable" || row.negotiability === "negotiable" ? row.negotiability : "unknown";
+    const canonicalName = typeof row.canonicalName === "string" && row.canonicalName.trim() ? row.canonicalName.trim().slice(0, 160) : null;
+    const suggestedReferenceId =
+      typeof row.suggestedReferenceId === "string" && row.suggestedReferenceId.trim() ? row.suggestedReferenceId.trim().slice(0, 80) : null;
     const proofStatus =
       row.proofStatus === "processor_controlled" || row.proofStatus === "not_enough_detail" || row.proofStatus === "indeterminate"
         ? row.proofStatus
         : "indeterminate";
+    const explanation = String(row.explanation ?? "").replace(/\s+/g, " ").trim().slice(0, 700);
     return {
       rowIndex,
       feeType: row.feeType as FiservCanonicalFeeType,
       confidence: row.confidence,
       paidTo,
       negotiability,
-      canonicalName: typeof row.canonicalName === "string" && row.canonicalName.trim() ? row.canonicalName.trim().slice(0, 160) : null,
-      suggestedReferenceId: typeof row.suggestedReferenceId === "string" && row.suggestedReferenceId.trim() ? row.suggestedReferenceId.trim().slice(0, 80) : null,
+      canonicalName,
+      suggestedReferenceId,
       proofStatus,
+      assessment: normalizeFiservAiFeeAssessment(
+        row.assessment,
+        assessmentDefaultsForSuggestion({
+          feeType: row.feeType as FiservCanonicalFeeType,
+          paidTo,
+          negotiability,
+          suggestedReferenceId,
+          canonicalName,
+          explanation,
+        }),
+      ),
       reasonCodes: Array.isArray(row.reasonCodes)
         ? row.reasonCodes.map((code) => String(code).trim()).filter(Boolean).slice(0, 8)
         : [],
-      explanation: String(row.explanation ?? "").replace(/\s+/g, " ").trim().slice(0, 700),
+      explanation,
     };
   });
   return { rows };
+}
+
+function negotiabilityForAssessment(value: FiservFeeAnalysisAiSuggestion["negotiability"]): FiservAiNegotiability {
+  if (value === "negotiable") return "likely_negotiable";
+  if (value === "non_negotiable") return "likely_non_negotiable";
+  return "unknown";
+}
+
+function paidToPartyForAssessment(value: FiservFeeAnalysisAiSuggestion["paidTo"]): FiservAiPaidToParty {
+  return value === "card_network" || value === "issuer_or_interchange" || value === "processor_or_iso" ? value : "unknown";
+}
+
+function isProcessorControlledFeeType(feeType: FiservCanonicalFeeType): boolean {
+  return (
+    feeType === "processor_pct_markup" ||
+    feeType === "processor_per_item" ||
+    feeType === "processor_fixed" ||
+    feeType === "compliance_penalty" ||
+    feeType === "third_party_service"
+  );
+}
+
+function assessmentDefaultsForSuggestion(params: {
+  feeType: FiservCanonicalFeeType;
+  paidTo: FiservFeeAnalysisAiSuggestion["paidTo"];
+  negotiability: FiservFeeAnalysisAiSuggestion["negotiability"];
+  suggestedReferenceId: string | null;
+  canonicalName: string | null;
+  explanation: string;
+}): {
+  paidToParty: FiservAiPaidToParty;
+  passThroughProofPosture: FiservAiPassThroughProofPosture;
+  negotiability: FiservAiNegotiability;
+  evidence: string[];
+  sourceEvidence?: Partial<FiservAiFeeAssessment["sourceEvidence"]>;
+} {
+  const processorControlled = isProcessorControlledFeeType(params.feeType);
+  return {
+    paidToParty: paidToPartyForAssessment(params.paidTo),
+    passThroughProofPosture: processorControlled
+      ? "not_applicable_processor_controlled"
+      : params.suggestedReferenceId
+        ? "source_backed_math_candidate"
+        : "not_enough_evidence",
+    negotiability: negotiabilityForAssessment(params.negotiability),
+    evidence: params.explanation ? [params.explanation] : [],
+    sourceEvidence: {
+      sourceName: params.canonicalName,
+      referenceId: params.suggestedReferenceId,
+      verificationNote: params.suggestedReferenceId
+        ? "AI matched the row to a candidate reference; deterministic reference-rate math must verify before proof can become proven or likely."
+        : "AI assessment is advisory; no source-backed reference candidate was provided.",
+    },
+  };
 }
 
 function suggestionMeetsThreshold(suggestion: FiservFeeAnalysisAiSuggestion, threshold: "high" | "medium" | "low"): boolean {
@@ -480,13 +592,7 @@ function suggestionMeetsThreshold(suggestion: FiservFeeAnalysisAiSuggestion, thr
 }
 
 function guardedProofStatus(suggestion: FiservFeeAnalysisAiSuggestion): FiservFeeAnalysisRow["proofStatus"] {
-  if (
-    suggestion.feeType === "processor_pct_markup" ||
-    suggestion.feeType === "processor_per_item" ||
-    suggestion.feeType === "processor_fixed" ||
-    suggestion.feeType === "compliance_penalty" ||
-    suggestion.feeType === "third_party_service"
-  ) {
+  if (isProcessorControlledFeeType(suggestion.feeType)) {
     return "processor_controlled";
   }
   return suggestion.proofStatus === "processor_controlled" ? "indeterminate" : suggestion.proofStatus;
@@ -494,6 +600,19 @@ function guardedProofStatus(suggestion: FiservFeeAnalysisAiSuggestion): FiservFe
 
 function applySuggestionToRow(row: FiservFeeAnalysisRow, suggestion: FiservFeeAnalysisAiSuggestion): FiservFeeAnalysisRow {
   const proofStatus = guardedProofStatus(suggestion);
+  const assessment =
+    suggestion.assessment ??
+    normalizeFiservAiFeeAssessment(
+      null,
+      assessmentDefaultsForSuggestion({
+        feeType: suggestion.feeType,
+        paidTo: suggestion.paidTo,
+        negotiability: suggestion.negotiability,
+        suggestedReferenceId: suggestion.suggestedReferenceId,
+        canonicalName: suggestion.canonicalName,
+        explanation: suggestion.explanation,
+      }),
+    );
   return {
     ...row,
     feeType: suggestion.feeType,
@@ -510,14 +629,19 @@ function applySuggestionToRow(row: FiservFeeAnalysisRow, suggestion: FiservFeeAn
     referenceRate: null,
     tolerancePct: null,
     reason: [
-      `AI classified this row as ${suggestion.feeType}; proof remains ${proofStatus} because AI classification is not source-backed rate verification.`,
+      assessment.passThroughProofPosture === "source_backed_math_candidate"
+        ? `AI classified this row as ${suggestion.feeType} and supplied source-backed proof evidence, but proof remains ${proofStatus} until deterministic rate verification confirms the math.`
+        : `AI classified this row as ${suggestion.feeType}; proof remains ${proofStatus} because AI classification is not deterministic rate verification.`,
       suggestion.explanation,
       `Paid to: ${suggestion.paidTo}.`,
       `Negotiability: ${suggestion.negotiability}.`,
+      `Pass-through proof posture: ${assessment.passThroughProofPosture}.`,
+      assessment.recommendation ? `Recommendation: ${assessment.recommendation}` : null,
       suggestion.reasonCodes.length > 0 ? `Reason codes: ${suggestion.reasonCodes.join(", ")}.` : null,
     ]
       .filter(Boolean)
       .join(" "),
+    aiAssessment: assessment,
   };
 }
 
@@ -622,6 +746,28 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings">): FiservFee
       title: "Some fee labels need AI-assisted reference review",
       amount: null,
       evidence: [`${analysis.normalization.aiCandidateCount} row(s) did not match the deterministic Fiserv reference table.`],
+    }));
+  }
+  for (const row of analysis.rows.filter((candidate) => candidate.matchMethod === "ai_classified" && candidate.aiAssessment)) {
+    const assessment = row.aiAssessment!;
+    const hasAction =
+      assessment.merchantAction !== "none" ||
+      assessment.avoidableLikelihood === "high" ||
+      assessment.avoidableLikelihood === "medium";
+    if (!hasAction) continue;
+    findings.push(aiFinding({
+      kind: "ai_fee_assessment",
+      severity: assessment.avoidableLikelihood === "high" ? "high" : assessment.avoidableLikelihood === "medium" ? "warning" : "info",
+      title: assessment.recommendation ? `${row.description}: ${assessment.recommendation}` : `${row.description}: AI fee assessment`,
+      amount: row.amount,
+      evidence: [
+        `Paid to: ${assessment.paidToParty}.`,
+        `Negotiability: ${assessment.negotiability}.`,
+        `Avoidable likelihood: ${assessment.avoidableLikelihood}.`,
+        `Merchant action: ${assessment.merchantAction}.`,
+        `Pass-through proof posture: ${assessment.passThroughProofPosture}.`,
+        ...assessment.evidence,
+      ],
     }));
   }
   return findings;
