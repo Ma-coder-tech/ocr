@@ -181,8 +181,8 @@ describe("Fiserv First Data full statement parser", () => {
           amount: 42.43,
         }),
         expect.objectContaining({
-          kind: "avoidable_compliance_fee",
-          action: "complete_pci_validation",
+          kind: "penalty_or_configuration_fee",
+          action: "fix_terminal_or_gateway_configuration",
           amount: 49.95,
         }),
         expect.objectContaining({
@@ -555,8 +555,70 @@ describe("Fiserv First Data full statement parser", () => {
       },
       processorMarkupAnalysis: {
         status: "ready",
+        processorControlledTotal: 526.48,
+        processorPctMarkupTotal: 0,
+        processorPerItemTotal: 488.03,
+        junkFeeTotal: 35.95,
+      },
+      authorizationAnalysis: {
+        status: "ready",
+        authorizationCount: 4244,
+        authRatio: 1.03,
+        estimatedExcessAuthCost: 0,
+      },
+      perAuthBenchmarkAnalysis: {
+        status: "ready",
+        currentRate: 0.11,
+        competitiveLow: 0.05,
+        competitiveHigh: 0.07,
+        monthlySavings: 169.76,
+        annualSavings: 2037.12,
+        dominant: true,
+      },
+      effectiveRateBenchmarkAnalysis: {
+        categoryId: "restaurant",
+        verdict: "below_range",
       },
     });
+    expect(actual.fiservFeeAnalysisV2.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          description: "DISCOVER DUES/ASSESSMENT FEE 0.0014 TIMES $2094.14",
+          feeType: "card_brand_network",
+          proofStatus: "likely",
+          referenceRate: 0.0014,
+          rateComparison: "matches_reference",
+          amount: 2.93,
+        }),
+        expect.objectContaining({
+          description: "DISCOVER WATS AUTH FEE 62 TRANSACTIONS AT 0.11",
+          feeType: "processor_per_item",
+          amount: 6.82,
+        }),
+      ]),
+    );
+    expect(actual.fiservFeeAnalysisV2.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "authorization_ratio_healthy",
+        }),
+        expect.objectContaining({
+          kind: "per_auth_fee_benchmark",
+          amount: 466.84,
+        }),
+        expect.objectContaining({
+          kind: "effective_rate_positive_benchmark",
+        }),
+        expect.objectContaining({
+          kind: "junk_fixed_fee_summary",
+          amount: 35.95,
+        }),
+        expect.objectContaining({
+          kind: "penalty_or_configuration_fee",
+          amount: 0.1,
+        }),
+      ]),
+    );
     expect(actual.fiservFeeAnalysisV2.merchantChannelAnalysis).toMatchObject({
       merchantChannel: "mixed",
       confidence: "high",
@@ -1326,9 +1388,9 @@ describe("Fiserv First Data full statement parser", () => {
         billbackRisk: true,
       },
       savingsSummary: {
-        annualLow: 20272.56,
-        annualHigh: 24057.36,
-        opportunities: 1,
+        annualLow: 36488.81,
+        annualHigh: 40318.61,
+        opportunities: 3,
       },
     });
     expect(actual.fiservFeeAnalysisV2.bundledPricingBenchmark.cardMix).toEqual(
@@ -1520,7 +1582,7 @@ describe("Fiserv First Data full statement parser", () => {
         processorPctMarkupTotal: 5.61,
         processorPerItemTotal: 27.9,
         processorFixedTotal: 13.95,
-        junkFeeTotal: 3.95,
+        junkFeeTotal: 13.95,
         perItemStacking: {
           detected: true,
           fees: ["OTHER ITEM FEES ($0.10)", "CPU GTWY ($0.10)", "SALES ITEMS ($0.10)"],
@@ -1575,8 +1637,12 @@ describe("Fiserv First Data full statement parser", () => {
         }),
         expect.objectContaining({
           kind: "junk_fee",
-          title: "Regulatory Product fee is processor-controlled",
+          title: "REGULATORY PRODUCT is avoidable or negotiable",
           amount: 3.95,
+        }),
+        expect.objectContaining({
+          kind: "junk_fixed_fee_summary",
+          amount: 13.95,
         }),
       ]),
     );

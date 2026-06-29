@@ -9,6 +9,15 @@ import {
   buildFiservBundledPricingBenchmarkAnalysis,
   type FiservBundledPricingBenchmarkAnalysis,
 } from "./fiservBundledPricingBenchmark.js";
+import {
+  adjustedEffectiveRateBenchmark,
+  estimateAnnualVolume,
+  inferMccBenchmarkCategory,
+  loadMccBenchmarkReference,
+  matchBenchmarkPattern,
+  perAuthBenchmarkFor,
+  type MccBenchmarkPattern,
+} from "./mccBenchmarkReference.js";
 import { normalizeFiservFeeReferenceText, type FiservFeeReferenceEntry } from "./fiservFeeReference.js";
 import { round2, round8 } from "./reconciliation.js";
 import type { RepricingEvent } from "./types.js";
@@ -98,6 +107,11 @@ export type FiservFeeAnalysisFinding = {
     | "tiered_downgrade_majority_not_qualified"
     | "tiered_downgrade_cost"
     | "authorization_ratio_high"
+    | "authorization_ratio_healthy"
+    | "per_auth_fee_benchmark"
+    | "effective_rate_positive_benchmark"
+    | "effective_rate_above_benchmark"
+    | "junk_fixed_fee_summary"
     | "new_account_pricing_context";
   severity: "info" | "warning" | "high";
   title: string;
@@ -219,6 +233,53 @@ export type FiservAuthorizationAnalysis = {
   }>;
 };
 
+export type FiservEffectiveRateBenchmarkAnalysis = {
+  status: "ready" | "not_enough_detail";
+  categoryId: string;
+  categoryLabel: string;
+  categoryConfidence: "high" | "medium" | "low";
+  categorySource: "merchant_name_keyword" | "high_risk_keyword" | "default";
+  matchedKeyword: string | null;
+  annualVolume: number | null;
+  annualVolumeSource: "monthly_volume_x12" | "ytd_extrapolated" | "not_available";
+  ytdExtrapolatedAnnualVolume: number | null;
+  volumeTier: string | null;
+  effectiveRate: number | null;
+  benchmarkLow: number | null;
+  benchmarkHigh: number | null;
+  adjustment: number | null;
+  processorMarkupRate: number | null;
+  verdict: "below_range" | "within_range" | "above_range" | "significantly_above_range" | "not_enough_detail";
+  estimatedAnnualOverpayment: number | null;
+  message: string;
+  notes: string[];
+};
+
+export type FiservPerAuthBenchmarkAnalysis = {
+  status: "ready" | "not_applicable" | "not_enough_detail";
+  annualVolume: number | null;
+  volumeTier: string | null;
+  benchmarkChannel: "card_present" | "card_not_present" | "high_risk" | null;
+  currentRate: number | null;
+  competitiveLow: number | null;
+  competitiveHigh: number | null;
+  targetRate: number | null;
+  authorizationCount: number | null;
+  monthlyAuthCost: number | null;
+  monthlySavings: number | null;
+  annualSavings: number | null;
+  dominant: boolean;
+  rows: Array<{
+    description: string;
+    cardTypeSection: string | null;
+    count: number;
+    rate: number | null;
+    amount: number;
+    evidenceLine: string;
+  }>;
+  message: string;
+};
+
 export type FiservNewAccountAnalysis = {
   status: "confirmed" | "likely" | "not_detected" | "not_enough_detail";
   currentMonthVolume: number;
@@ -274,6 +335,8 @@ export type FiservFeeAnalysisV2 = {
   merchantChannelAnalysis: FiservMerchantChannelAnalysis;
   tieredDowngradeAnalysis: FiservTieredDowngradeAnalysis;
   authorizationAnalysis: FiservAuthorizationAnalysis;
+  effectiveRateBenchmarkAnalysis: FiservEffectiveRateBenchmarkAnalysis;
+  perAuthBenchmarkAnalysis: FiservPerAuthBenchmarkAnalysis;
   newAccountAnalysis: FiservNewAccountAnalysis;
   bundledPricingBenchmark: FiservBundledPricingBenchmarkAnalysis;
   interchangeReconciliation: {
@@ -756,7 +819,7 @@ function processorMarkupAnalysis(
       .filter((row) => row.feeType === "processor_fixed" || row.feeType === "compliance_penalty" || row.feeType === "third_party_service")
       .reduce((sum, row) => sum + row.amount, 0),
   );
-  const junkFeeTotal = round2(rows.filter((row) => normalizeFiservFeeReferenceText(row.description) === "REGULATORY PRODUCT").reduce((sum, row) => sum + row.amount, 0));
+  const junkFeeTotal = round2(junkPatternRows(rows).reduce((sum, item) => sum + item.row.amount, 0));
   const stackLabels = ["OTHER ITEM FEES", "CPU GTWY", "SALES ITEMS"];
   const stackRows = stackLabels
     .map((label) => rows.find((row) => normalizeFiservFeeReferenceText(row.description) === label))
@@ -1027,19 +1090,7 @@ function authorizationAnalysis(
   merchantChannel: FiservMerchantChannelAnalysis["merchantChannel"],
   transactionCount: number | null,
 ): FiservAuthorizationAnalysis {
-  if (merchantChannel === "card_present") {
-    return {
-      status: "not_applicable",
-      transactionCount,
-      authorizationCount: null,
-      authRatio: null,
-      excessAuthorizationCount: null,
-      estimatedExcessAuthCost: null,
-      primaryAuthRate: null,
-      primaryAuthRows: [],
-      flags: [],
-    };
-  }
+  void merchantChannel;
   if (transactionCount === null || transactionCount <= 0) {
     return {
       status: "not_enough_detail",
@@ -1055,6 +1106,7 @@ function authorizationAnalysis(
   }
 
   const authGroups = [
+    rows.filter((row) => /\bWATS AUTH FEE\b/i.test(row.description)),
     rows.filter((row) => /\bECI CPU-G\b|\bECI CPU\b/i.test(row.description)),
     rows.filter((row) => /\bCPU GTWY\b|\bGATEWAY AUTH\b|\bCPU-G\b/i.test(row.description)),
     rows.filter((row) => /\bACQR PROCESSOR\b|\bACQUIRER PROCESSOR\b/i.test(row.description)),
@@ -1092,7 +1144,7 @@ function authorizationAnalysis(
 
   const authorizationCount = primaryAuthRows.reduce((sum, row) => sum + row.count, 0);
   const authRatio = round2(authorizationCount / transactionCount);
-  const excessAuthorizationCount = Math.max(0, authorizationCount - transactionCount);
+  const excessAuthorizationCount = authRatio > 1.5 ? Math.max(0, authorizationCount - transactionCount) : 0;
   const primaryAuthRate = round2(primaryAuthRows.reduce((sum, row) => sum + row.amount, 0) / authorizationCount);
   const estimatedExcessAuthCost = round2(excessAuthorizationCount * primaryAuthRate);
   const flags: FiservAuthorizationAnalysis["flags"] = [];
@@ -1152,6 +1204,209 @@ function newAccountAnalysis(totalVolume: number, ytdGrossSales: number | null | 
         ? "New merchants often have limited pricing leverage immediately; review contract terms now and reprice after 3-6 months of processing history."
         : null,
   };
+}
+
+function effectiveRateBenchmarkAnalysis(params: {
+  merchantName: string | null | undefined;
+  totalVolume: number;
+  effectiveRate: number | null;
+  processorMarkupRate: number | null;
+  ytdGrossSales: number | null | undefined;
+  statementPeriodStart: string;
+}): FiservEffectiveRateBenchmarkAnalysis {
+  if (params.totalVolume <= 0 || params.effectiveRate === null) {
+    return {
+      status: "not_enough_detail",
+      categoryId: "default",
+      categoryLabel: "Default / Unknown Category",
+      categoryConfidence: "low",
+      categorySource: "default",
+      matchedKeyword: null,
+      annualVolume: null,
+      annualVolumeSource: "not_available",
+      ytdExtrapolatedAnnualVolume: null,
+      volumeTier: null,
+      effectiveRate: params.effectiveRate,
+      benchmarkLow: null,
+      benchmarkHigh: null,
+      adjustment: null,
+      processorMarkupRate: params.processorMarkupRate,
+      verdict: "not_enough_detail",
+      estimatedAnnualOverpayment: null,
+      message: "Effective-rate benchmarking requires positive statement volume and fees.",
+      notes: [],
+    };
+  }
+
+  const reference = loadMccBenchmarkReference();
+  const category = inferMccBenchmarkCategory(params.merchantName, reference);
+  const annual = estimateAnnualVolume(params.totalVolume, params.ytdGrossSales, params.statementPeriodStart);
+  const adjusted = adjustedEffectiveRateBenchmark({ category: category.category, annualVolume: annual.annualVolume, reference });
+  const benchmarkLow = adjusted.benchmark.low;
+  const benchmarkHigh = adjusted.benchmark.high;
+  const nearBenchmarkTolerance = 0.001;
+  const verdict =
+    params.effectiveRate <= benchmarkLow
+      ? "below_range"
+      : params.effectiveRate <= benchmarkHigh + nearBenchmarkTolerance
+        ? "within_range"
+        : params.effectiveRate > benchmarkHigh + 0.005
+          ? "significantly_above_range"
+          : "above_range";
+  const estimatedAnnualOverpayment =
+    verdict === "significantly_above_range" ? round2(Math.max(0, params.effectiveRate - benchmarkHigh) * params.totalVolume * 12) : null;
+  const categoryQualifier =
+    category.id === "default" ? "default category — MCC-specific benchmark not available, using general retail benchmark" : `${category.label} category`;
+  const message =
+    verdict === "below_range" || verdict === "within_range"
+      ? `This merchant's effective rate of ${(params.effectiveRate * 100).toFixed(2)}% is within the competitive range of ${(benchmarkLow * 100).toFixed(2)}% to ${(benchmarkHigh * 100).toFixed(2)}% for a ${category.label} merchant processing approximately $${annual.annualVolume.toLocaleString("en-US", { maximumFractionDigits: 0 })}/year. The processor-controlled cost of ${((params.processorMarkupRate ?? 0) * 100).toFixed(2)}% of volume is competitive.`
+      : verdict === "significantly_above_range"
+        ? `This merchant's effective rate of ${(params.effectiveRate * 100).toFixed(2)}% is significantly above the competitive range. Estimated annual overpayment: $${(estimatedAnnualOverpayment ?? 0).toFixed(2)}.`
+        : `This merchant's effective rate of ${(params.effectiveRate * 100).toFixed(2)}% is slightly above the competitive range of ${(benchmarkLow * 100).toFixed(2)}% to ${(benchmarkHigh * 100).toFixed(2)}%.`;
+
+  return {
+    status: "ready",
+    categoryId: category.id,
+    categoryLabel: category.label,
+    categoryConfidence: category.confidence,
+    categorySource: category.source,
+    matchedKeyword: category.matchedKeyword,
+    annualVolume: annual.annualVolume,
+    annualVolumeSource: annual.source,
+    ytdExtrapolatedAnnualVolume: annual.ytdExtrapolatedAnnualVolume,
+    volumeTier: adjusted.tier,
+    effectiveRate: params.effectiveRate,
+    benchmarkLow,
+    benchmarkHigh,
+    adjustment: adjusted.adjustment,
+    processorMarkupRate: params.processorMarkupRate,
+    verdict,
+    estimatedAnnualOverpayment,
+    message,
+    notes: [
+      categoryQualifier,
+      ...(adjusted.adjustmentNote ? [adjusted.adjustmentNote] : []),
+      ...(annual.ytdExtrapolatedAnnualVolume !== null
+        ? [`YTD-extrapolated annual volume is $${annual.ytdExtrapolatedAnnualVolume.toLocaleString("en-US", { maximumFractionDigits: 0 })}; benchmark tier uses monthly volume x 12.`]
+        : []),
+    ],
+  };
+}
+
+function watsAuthBenchmarkRows(rows: FiservFeeAnalysisRow[]): FiservPerAuthBenchmarkAnalysis["rows"] {
+  return rows
+    .filter((row) => /\bWATS AUTH FEE\b/i.test(row.description))
+    .map((row) => {
+      const count = rowCountFromAmountAndRate(row);
+      if (count === null || count <= 0) return null;
+      return {
+        description: row.description,
+        cardTypeSection: row.cardTypeSection,
+        count,
+        rate: row.rate,
+        amount: row.amount,
+        evidenceLine: row.evidenceLine,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+}
+
+function perAuthBenchmarkAnalysis(params: {
+  rows: FiservFeeAnalysisRow[];
+  annualVolume: number | null;
+  merchantChannel: FiservMerchantChannelAnalysis["merchantChannel"];
+  isHighRisk: boolean;
+  processorPerItemTotal: number | null;
+}): FiservPerAuthBenchmarkAnalysis {
+  const rows = watsAuthBenchmarkRows(params.rows);
+  if (rows.length === 0) {
+    return {
+      status: "not_applicable",
+      annualVolume: params.annualVolume,
+      volumeTier: null,
+      benchmarkChannel: null,
+      currentRate: null,
+      competitiveLow: null,
+      competitiveHigh: null,
+      targetRate: null,
+      authorizationCount: null,
+      monthlyAuthCost: null,
+      monthlySavings: null,
+      annualSavings: null,
+      dominant: false,
+      rows: [],
+      message: "No WATS AUTH FEE rows were detected for per-authorization benchmarking.",
+    };
+  }
+  const benchmark = perAuthBenchmarkFor({
+    annualVolume: params.annualVolume,
+    merchantChannel: params.merchantChannel,
+    isHighRisk: params.isHighRisk,
+  });
+  const authorizationCount = rows.reduce((sum, row) => sum + row.count, 0);
+  const monthlyAuthCost = round2(rows.reduce((sum, row) => sum + row.amount, 0));
+  const currentRate = authorizationCount > 0 ? round2(monthlyAuthCost / authorizationCount) : null;
+  const dominant = params.processorPerItemTotal !== null && params.processorPerItemTotal > 0 && monthlyAuthCost >= params.processorPerItemTotal * 0.5;
+  if (!benchmark.benchmark || currentRate === null || authorizationCount <= 0) {
+    return {
+      status: "not_enough_detail",
+      annualVolume: params.annualVolume,
+      volumeTier: benchmark.tier,
+      benchmarkChannel: benchmark.channel,
+      currentRate,
+      competitiveLow: null,
+      competitiveHigh: null,
+      targetRate: null,
+      authorizationCount,
+      monthlyAuthCost,
+      monthlySavings: null,
+      annualSavings: null,
+      dominant,
+      rows,
+      message: "Per-authorization benchmarking requires a volume tier and usable WATS auth count/rate detail.",
+    };
+  }
+  const targetRate = currentRate > benchmark.benchmark.high ? benchmark.benchmark.high : (benchmark.benchmark.low + benchmark.benchmark.high) / 2;
+  const monthlySavings = round2(Math.max(0, currentRate - targetRate) * authorizationCount);
+  const annualSavings = round2(monthlySavings * 12);
+  return {
+    status: "ready",
+    annualVolume: params.annualVolume,
+    volumeTier: benchmark.tier,
+    benchmarkChannel: benchmark.channel,
+    currentRate,
+    competitiveLow: benchmark.benchmark.low,
+    competitiveHigh: benchmark.benchmark.high,
+    targetRate,
+    authorizationCount,
+    monthlyAuthCost,
+    monthlySavings,
+    annualSavings,
+    dominant,
+    rows,
+    message: `The per-authorization fee is $${currentRate.toFixed(2)}. For a merchant processing approximately $${(params.annualVolume ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}/year, competitive per-auth pricing is $${benchmark.benchmark.low.toFixed(2)} to $${benchmark.benchmark.high.toFixed(2)}. Reducing from $${currentRate.toFixed(2)} to $${targetRate.toFixed(2)} would save approximately $${monthlySavings.toFixed(2)}/month ($${annualSavings.toFixed(2)}/year).`,
+  };
+}
+
+function junkPatternRows(rows: FiservFeeAnalysisRow[]): Array<{ row: FiservFeeAnalysisRow; pattern: MccBenchmarkPattern }> {
+  const reference = loadMccBenchmarkReference();
+  return rows
+    .filter((row) => row.feeType === "processor_fixed")
+    .map((row) => {
+      const pattern = matchBenchmarkPattern(row.description, reference.junk_fee_patterns.fees);
+      return pattern ? { row, pattern } : null;
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+}
+
+function penaltyPatternRows(rows: FiservFeeAnalysisRow[]): Array<{ row: FiservFeeAnalysisRow; pattern: MccBenchmarkPattern }> {
+  const reference = loadMccBenchmarkReference();
+  return rows
+    .map((row) => {
+      const pattern = matchBenchmarkPattern(row.description, reference.penalty_fee_patterns.fees);
+      return pattern ? { row, pattern } : null;
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 }
 
 function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSummary">): FiservFeeAnalysisFinding[] {
@@ -1254,6 +1509,73 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
           : null,
     }));
   }
+  if (analysis.authorizationAnalysis.status === "ready" && (analysis.authorizationAnalysis.authRatio ?? 0) <= 1.5) {
+    findings.push(finding({
+      kind: "authorization_ratio_healthy",
+      severity: "info",
+      title: "Authorization-to-transaction ratio is healthy",
+      amount: null,
+      evidence: [
+        `${analysis.authorizationAnalysis.authorizationCount ?? 0} authorization(s) versus ${analysis.authorizationAnalysis.transactionCount ?? 0} settled transaction(s).`,
+        `Authorization-to-transaction ratio is ${(analysis.authorizationAnalysis.authRatio ?? 0).toFixed(2)}:1. No excess authorization fees detected.`,
+      ],
+      action: "none",
+      monthlyCost: null,
+    }));
+  }
+  if (analysis.perAuthBenchmarkAnalysis.status === "ready" && analysis.perAuthBenchmarkAnalysis.dominant) {
+    findings.push(finding({
+      kind: "per_auth_fee_benchmark",
+      severity: (analysis.perAuthBenchmarkAnalysis.monthlySavings ?? 0) > 0 ? "warning" : "info",
+      title: (analysis.perAuthBenchmarkAnalysis.monthlySavings ?? 0) > 0 ? "Per-authorization fee is above competitive benchmark" : "Per-authorization fee is within benchmark",
+      amount: analysis.perAuthBenchmarkAnalysis.monthlyAuthCost,
+      evidence: [
+        analysis.perAuthBenchmarkAnalysis.message,
+        ...analysis.perAuthBenchmarkAnalysis.rows.slice(0, 6).map((row) => row.evidenceLine),
+      ],
+      action: (analysis.perAuthBenchmarkAnalysis.monthlySavings ?? 0) > 0 ? "negotiate_processor_rate" : "none",
+      savingsEstimate:
+        (analysis.perAuthBenchmarkAnalysis.annualSavings ?? 0) > 0
+          ? {
+              low: analysis.perAuthBenchmarkAnalysis.annualSavings ?? 0,
+              high: analysis.perAuthBenchmarkAnalysis.annualSavings ?? 0,
+              basis: "Annualized savings from reducing WATS AUTH per-authorization pricing to the competitive benchmark target.",
+            }
+          : null,
+    }));
+  }
+  if (analysis.effectiveRateBenchmarkAnalysis.status === "ready") {
+    const benchmark = analysis.effectiveRateBenchmarkAnalysis;
+    if (benchmark.verdict === "below_range" || benchmark.verdict === "within_range") {
+      findings.push(finding({
+        kind: "effective_rate_positive_benchmark",
+        severity: "info",
+        title: "Effective rate is competitive for this merchant category",
+        amount: null,
+        evidence: [benchmark.message, ...benchmark.notes],
+        action: "none",
+        monthlyCost: null,
+      }));
+    } else if (benchmark.verdict === "significantly_above_range") {
+      findings.push(finding({
+        kind: "effective_rate_above_benchmark",
+        severity: "high",
+        title: "Effective rate is significantly above benchmark",
+        amount: benchmark.estimatedAnnualOverpayment,
+        evidence: [benchmark.message, ...benchmark.notes],
+        action: "request_interchange_plus_quote",
+        monthlyCost: benchmark.estimatedAnnualOverpayment === null ? null : round2(benchmark.estimatedAnnualOverpayment / 12),
+        savingsEstimate:
+          benchmark.estimatedAnnualOverpayment === null
+            ? null
+            : {
+                low: benchmark.estimatedAnnualOverpayment,
+                high: benchmark.estimatedAnnualOverpayment,
+                basis: "Estimated annual overpayment versus the high end of the adjusted effective-rate benchmark.",
+              },
+      }));
+    }
+  }
   if (analysis.newAccountAnalysis.status === "confirmed" || analysis.newAccountAnalysis.status === "likely") {
     findings.push(finding({
       kind: "new_account_pricing_context",
@@ -1335,14 +1657,38 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
             },
     }));
   }
-  if ((analysis.processorMarkupAnalysis.junkFeeTotal ?? 0) > 0) {
+  const junkRows = junkPatternRows(analysis.rows);
+  for (const { row, pattern } of junkRows) {
     findings.push(finding({
       kind: "junk_fee",
       severity: "warning",
-      title: "Regulatory Product fee is processor-controlled",
-      amount: analysis.processorMarkupAnalysis.junkFeeTotal,
-      evidence: ["No network reference rate applies to the Regulatory Product fee."],
+      title: `${row.description} is avoidable or negotiable`,
+      amount: row.amount,
+      evidence: [
+        pattern.recommendation ?? "This fixed processor fee is avoidable or negotiable.",
+        row.evidenceLine,
+        `Estimated annual cost: $${(row.amount * 12).toFixed(2)}.`,
+      ],
       action: "negotiate_processor_rate",
+    }));
+  }
+  if (junkRows.length > 0) {
+    const totalJunk = round2(junkRows.reduce((sum, item) => sum + item.row.amount, 0));
+    findings.push(finding({
+      kind: "junk_fixed_fee_summary",
+      severity: "warning",
+      title: "Avoidable or negotiable fixed fees detected",
+      amount: totalJunk,
+      evidence: [
+        `Total avoidable or negotiable fixed fees: $${totalJunk.toFixed(2)}/month ($${(totalJunk * 12).toFixed(2)}/year).`,
+        ...junkRows.map((item) => `${item.row.description}: $${item.row.amount.toFixed(2)}/month`),
+      ],
+      action: "negotiate_processor_rate",
+      savingsEstimate: {
+        low: round2(totalJunk * 12 * 0.25),
+        high: round2(totalJunk * 12),
+        basis: "Annualized fixed-fee burden; low estimate assumes partial negotiation, high estimate assumes all avoidable fixed fees are removed.",
+      },
     }));
   }
   for (const row of analysis.rows.filter((candidate) => candidate.feeType === "suspicious_pass_through_like_fee")) {
@@ -1360,7 +1706,9 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
       },
     }));
   }
-  for (const row of analysis.rows.filter((candidate) => candidate.feeType === "compliance_penalty")) {
+  const penaltyRows = penaltyPatternRows(analysis.rows);
+  const penaltyRowIndexes = new Set(penaltyRows.map((item) => item.row.rowIndex));
+  for (const row of analysis.rows.filter((candidate) => candidate.feeType === "compliance_penalty" && !penaltyRowIndexes.has(candidate.rowIndex))) {
     findings.push(finding({
       kind: "avoidable_compliance_fee",
       severity: "high",
@@ -1414,13 +1762,20 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
       },
     }));
   }
-  for (const row of analysis.rows.filter((candidate) => /TRANSACTION INTEGRITY|MISUSE OF AUTHORIZATION|NON QUAL/i.test(candidate.description))) {
+  for (const { row, pattern } of penaltyRows) {
     findings.push(finding({
       kind: "penalty_or_configuration_fee",
       severity: "warning",
       title: `${row.description} may be avoidable through configuration or qualification fixes`,
       amount: row.amount,
-      evidence: [row.evidenceLine],
+      evidence: [
+        pattern.cause ?? "This is a penalty/configuration fee.",
+        pattern.fix ?? "Review terminal or gateway configuration.",
+        row.amount < 5
+          ? "Current impact is minimal. Monitor for recurring occurrences — if this appears frequently, it indicates a terminal or gateway configuration issue."
+          : "Recurring penalty fees may indicate a terminal or gateway configuration issue.",
+        row.evidenceLine,
+      ],
       action: "fix_terminal_or_gateway_configuration",
       savingsEstimate: {
         low: 0,
@@ -1566,6 +1921,24 @@ export function buildFiservFeeAnalysisV2(input: FiservFeeAnalysisInput): FiservF
   const downgradeAnalysis = tieredDowngradeAnalysis(rows, pricingModel, input.totalFees, channelAnalysis.merchantChannel);
   const authAnalysis = authorizationAnalysis(rows, channelAnalysis.merchantChannel, input.transactionCount);
   const accountAnalysis = newAccountAnalysis(input.totalVolume, input.ytdGrossSales);
+  const processorMarkup = processorMarkupAnalysis(rows, pricingModel, input.totalVolume, input.transactionCount);
+  const annualVolume = estimateAnnualVolume(input.totalVolume, input.ytdGrossSales, input.statementPeriodStart);
+  const category = inferMccBenchmarkCategory(input.merchantName);
+  const effectiveBenchmark = effectiveRateBenchmarkAnalysis({
+    merchantName: input.merchantName,
+    totalVolume: input.totalVolume,
+    effectiveRate: input.totalVolume > 0 ? input.totalFees / input.totalVolume : null,
+    processorMarkupRate: processorMarkup.processorMarkupRate,
+    ytdGrossSales: input.ytdGrossSales,
+    statementPeriodStart: input.statementPeriodStart,
+  });
+  const perAuthBenchmark = perAuthBenchmarkAnalysis({
+    rows,
+    annualVolume: annualVolume.annualVolume,
+    merchantChannel: channelAnalysis.merchantChannel,
+    isHighRisk: category.id === "high_risk_retail",
+    processorPerItemTotal: processorMarkup.processorPerItemTotal,
+  });
   const withoutFindings = {
     version: "2.0" as const,
     normalization: input.normalizationSummary,
@@ -1580,10 +1953,12 @@ export function buildFiservFeeAnalysisV2(input: FiservFeeAnalysisInput): FiservF
       indeterminate: rows.filter((row) => row.proofStatus === "indeterminate").length,
       notEnoughDetail: rows.filter((row) => row.proofStatus === "not_enough_detail").length,
     },
-    processorMarkupAnalysis: processorMarkupAnalysis(rows, pricingModel, input.totalVolume, input.transactionCount),
+    processorMarkupAnalysis: processorMarkup,
     merchantChannelAnalysis: channelAnalysis,
     tieredDowngradeAnalysis: downgradeAnalysis,
     authorizationAnalysis: authAnalysis,
+    effectiveRateBenchmarkAnalysis: effectiveBenchmark,
+    perAuthBenchmarkAnalysis: perAuthBenchmark,
     newAccountAnalysis: accountAnalysis,
     bundledPricingBenchmark: buildFiservBundledPricingBenchmarkAnalysis({
       pricingModel: pricingModel.pricingModel,

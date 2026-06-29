@@ -661,9 +661,12 @@
         "DUES & ASSESSMENTS",
         "DISCOVER ASSESSMENT",
         "DSCV ASSESSMENT",
-        "DSCV DUES"
+        "DSCV DUES",
+        "DISCOVER DUES/ASSESSMENT FEE",
+        "DUES/ASSESSMENT",
+        "DUES/ASSESSMENTS"
       ],
-      "reference_rate": 0.0013,
+      "reference_rate": 0.0014,
       "rate_type": "pct_volume",
       "rate_unit": "% of gross Discover volume",
       "applies_to": "All Discover gross sales volume",
@@ -672,8 +675,8 @@
       "paid_to": "Discover",
       "effective_date": "2019-01-01",
       "last_verified": "2026-06",
-      "notes": "0.13% of volume. Fiserv uses same 'DUES & ASSESSMENTS' label as MC \u2014 disambiguate by card-type section (DCVR ACQ).",
-      "verification_formula": "discover_volume \u00d7 0.0013",
+      "notes": "0.14% of volume. Fiserv may print this as DUES & ASSESSMENTS, DISCOVER DUES/ASSESSMENT FEE, or slash variants under the Discover/DCVR section.",
+      "verification_formula": "discover_volume \u00d7 0.0014",
       "tolerance_pct": 10
     },
     {

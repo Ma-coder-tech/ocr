@@ -1,0 +1,374 @@
+{
+  "document_type": "mcc_benchmark_reference",
+  "version": "1.0.0",
+  "created": "2026-06-29",
+  "last_verified": "2026-06",
+  "description": "Interchange benchmark ranges, effective rate benchmarks, and competitive IC+ pricing by MCC category and volume tier. Used by Rules 12, 13, and 14 for blended interchange estimation, effective rate benchmarking, and savings estimation. Also used by Fix 3 (per-auth benchmarking) and Fix 4 (positive benchmarking).",
+  "sources": [
+    "Visa and Mastercard published interchange schedules (2025-2026)",
+    "MerchantCostConsulting interchange analysis",
+    "Swipesum 2025 average effective swipe fee (2.36%)",
+    "Corepay 2026 processing guide (1.5%-3.5% all-in)",
+    "CardFellow industry benchmarks",
+    "Cross-verified against real Fiserv statements (Abdul Basher, Pepe's, Jamaica Fish Market, Muhammad Anwar, El Nuevo Tequila)"
+  ],
+  "confidence": "MEDIUM — ranges are approximate and will vary by specific card mix, commercial card penetration, transaction qualification, and regional factors",
+  "update_cadence": "Review after every April and October network fee cycle. Next review due by November 1, 2026.",
+
+  "mcc_categories": {
+    "restaurant": {
+      "label": "Restaurant / Food Service",
+      "mccs": [5812, 5813, 5814],
+      "keywords": ["restaurant", "resturant", "taqueria", "tequila", "mexican", "pizz", "burger", "grill", "diner", "cafe", "bistro", "sushi", "thai", "chinese", "indian", "bbq", "steakhouse", "bar & grill", "cantina", "kitchen", "eatery", "food"],
+      "interchange_ranges": {
+        "visa_credit": {"low": 0.0180, "high": 0.0220},
+        "visa_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "mc_credit": {"low": 0.0180, "high": 0.0220},
+        "mc_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "amex_optblue": {"low": 0.0185, "high": 0.0250},
+        "discover": {"low": 0.0170, "high": 0.0200}
+      },
+      "network_fee_estimate_pct": {"low": 0.0013, "high": 0.0018},
+      "effective_rate_benchmark": {"low": 0.0210, "high": 0.0260}
+    },
+
+    "grocery": {
+      "label": "Grocery / Supermarket / Specialty Food",
+      "mccs": [5411, 5421, 5422, 5441, 5451, 5462, 5499],
+      "keywords": ["grocery", "supermarket", "market", "fish market", "meat", "bakery", "deli", "food store", "produce", "seafood", "butcher"],
+      "interchange_ranges": {
+        "visa_credit": {"low": 0.0150, "high": 0.0180},
+        "visa_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "mc_credit": {"low": 0.0150, "high": 0.0180},
+        "mc_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "amex_optblue": {"low": 0.0160, "high": 0.0220},
+        "discover": {"low": 0.0155, "high": 0.0185}
+      },
+      "network_fee_estimate_pct": {"low": 0.0013, "high": 0.0018},
+      "effective_rate_benchmark": {"low": 0.0180, "high": 0.0230}
+    },
+
+    "retail": {
+      "label": "General Retail / Merchandise",
+      "mccs": [5311, 5331, 5399, 5699, 5999, 5200, 5211, 5231, 5251, 5261, 5271, 5300, 5310, 5732, 5733, 5734, 5735, 5912, 5921, 5941, 5942, 5943, 5944, 5945, 5946, 5947, 5948, 5949, 5950, 5970, 5971, 5972, 5973, 5975, 5976, 5977, 5978, 5983, 5992, 5993, 5994, 5995, 5996, 5997, 5998],
+      "keywords": ["store", "shop", "retail", "supply", "hardware", "clothing", "apparel", "electronics", "furniture", "sporting", "hobby", "gift", "florist", "pharmacy", "liquor"],
+      "interchange_ranges": {
+        "visa_credit": {"low": 0.0165, "high": 0.0195},
+        "visa_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "mc_credit": {"low": 0.0165, "high": 0.0195},
+        "mc_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "amex_optblue": {"low": 0.0180, "high": 0.0240},
+        "discover": {"low": 0.0155, "high": 0.0195}
+      },
+      "network_fee_estimate_pct": {"low": 0.0013, "high": 0.0018},
+      "effective_rate_benchmark": {"low": 0.0200, "high": 0.0250}
+    },
+
+    "professional_services": {
+      "label": "Professional Services",
+      "mccs": [8011, 8021, 8031, 8041, 8042, 8043, 8049, 8050, 8062, 8071, 8099, 8111, 8211, 8220, 8241, 8244, 8249, 8299, 8351, 8398, 8641, 8651, 8661, 8675, 8699, 8734, 8911, 8931, 8999],
+      "keywords": ["clinic", "dental", "medical", "doctor", "attorney", "law", "accounting", "consulting", "veterinary", "vet", "therapy", "chiropractic", "optometry"],
+      "interchange_ranges": {
+        "visa_credit": {"low": 0.0180, "high": 0.0210},
+        "visa_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "mc_credit": {"low": 0.0180, "high": 0.0210},
+        "mc_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "amex_optblue": {"low": 0.0190, "high": 0.0260},
+        "discover": {"low": 0.0170, "high": 0.0210}
+      },
+      "network_fee_estimate_pct": {"low": 0.0013, "high": 0.0018},
+      "effective_rate_benchmark": {"low": 0.0220, "high": 0.0270}
+    },
+
+    "gas_petroleum": {
+      "label": "Gas Station / Petroleum",
+      "mccs": [5541, 5542],
+      "keywords": ["gas", "petroleum", "fuel", "service station", "gas station", "petrol"],
+      "interchange_ranges": {
+        "visa_credit": {"low": 0.0140, "high": 0.0175},
+        "visa_debit_blended": {"low": 0.0040, "high": 0.0070},
+        "mc_credit": {"low": 0.0140, "high": 0.0175},
+        "mc_debit_blended": {"low": 0.0040, "high": 0.0070},
+        "amex_optblue": {"low": 0.0155, "high": 0.0210},
+        "discover": {"low": 0.0140, "high": 0.0180}
+      },
+      "network_fee_estimate_pct": {"low": 0.0013, "high": 0.0018},
+      "effective_rate_benchmark": {"low": 0.0170, "high": 0.0220}
+    },
+
+    "lodging": {
+      "label": "Lodging / Hotel / Hospitality",
+      "mccs": [7011, 7012, 7032, 7033],
+      "keywords": ["hotel", "motel", "inn", "lodge", "resort", "suites", "hospitality", "bed and breakfast", "airbnb"],
+      "interchange_ranges": {
+        "visa_credit": {"low": 0.0175, "high": 0.0215},
+        "visa_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "mc_credit": {"low": 0.0175, "high": 0.0215},
+        "mc_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "amex_optblue": {"low": 0.0185, "high": 0.0250},
+        "discover": {"low": 0.0170, "high": 0.0210}
+      },
+      "network_fee_estimate_pct": {"low": 0.0013, "high": 0.0018},
+      "effective_rate_benchmark": {"low": 0.0210, "high": 0.0260}
+    },
+
+    "auto_repair": {
+      "label": "Auto Repair / Service",
+      "mccs": [5511, 5521, 5531, 5532, 5533, 5571, 5599, 7531, 7534, 7535, 7538, 7542, 7549],
+      "keywords": ["auto", "repair", "mechanic", "tire", "brake", "oil change", "transmission", "body shop", "collision", "xpress fix", "car wash", "detail"],
+      "interchange_ranges": {
+        "visa_credit": {"low": 0.0165, "high": 0.0200},
+        "visa_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "mc_credit": {"low": 0.0165, "high": 0.0200},
+        "mc_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "amex_optblue": {"low": 0.0180, "high": 0.0240},
+        "discover": {"low": 0.0160, "high": 0.0200}
+      },
+      "network_fee_estimate_pct": {"low": 0.0013, "high": 0.0018},
+      "effective_rate_benchmark": {"low": 0.0200, "high": 0.0260}
+    },
+
+    "ecommerce": {
+      "label": "Ecommerce / Card-Not-Present",
+      "mccs": [],
+      "keywords": [],
+      "note": "This category is not MCC-based. It is triggered by merchant_channel = card_not_present (Rule 16). When triggered, use these ranges instead of the MCC-based ranges above.",
+      "interchange_ranges": {
+        "visa_credit": {"low": 0.0190, "high": 0.0230},
+        "visa_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "mc_credit": {"low": 0.0190, "high": 0.0230},
+        "mc_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "amex_optblue": {"low": 0.0200, "high": 0.0260},
+        "discover": {"low": 0.0175, "high": 0.0210}
+      },
+      "network_fee_estimate_pct": {"low": 0.0015, "high": 0.0020},
+      "effective_rate_benchmark": {"low": 0.0250, "high": 0.0320}
+    },
+
+    "high_risk_retail": {
+      "label": "High-Risk Retail (Smoke Shop, Vape, CBD, Hemp, Tobacco, Hookah)",
+      "mccs": [5993, 5194, 5192],
+      "keywords": ["smoke", "smoking", "vape", "vaping", "vapor", "cbd", "hemp", "cannabis", "dispensary", "tobacco", "tobacconist", "cigar", "hookah", "delta 8", "delta-8", "delta 9", "delta-9", "kratom", "head shop", "glass", "pipe"],
+      "note": "High-risk merchants face structurally higher costs at every layer: higher interchange qualification, higher processor markup (because fewer processors serve this segment), Visa/Mastercard $500/year high-risk registration fee, potential rolling reserves (5-10% of settlements held for 3-6 months), and higher chargeback monitoring fees. A 4.5% effective rate that would be alarming for a standard retailer may be competitive for high-risk. Do NOT benchmark these merchants against standard retail ranges — doing so would produce misleading savings estimates that no processor would actually honor. If the tool detects high-risk keywords but the effective rate falls in the standard retail range (under 2.5%), flag as: 'This merchant appears to be in a high-risk category but is paying standard retail rates. Verify that the processor is aware of the merchant's product mix — undisclosed high-risk products can result in account termination and fund freezes.'",
+      "interchange_ranges": {
+        "visa_credit": {"low": 0.0180, "high": 0.0220},
+        "visa_debit_blended": {"low": 0.0050, "high": 0.0085},
+        "mc_credit": {"low": 0.0180, "high": 0.0220},
+        "mc_debit_blended": {"low": 0.0050, "high": 0.0085},
+        "amex_optblue": {"low": 0.0200, "high": 0.0270},
+        "discover": {"low": 0.0175, "high": 0.0220}
+      },
+      "network_fee_estimate_pct": {"low": 0.0015, "high": 0.0022},
+      "effective_rate_benchmark": {"low": 0.0350, "high": 0.0550},
+      "additional_fees": {
+        "high_risk_registration": {"amount": 500, "frequency": "annual", "description": "Visa and Mastercard high-risk merchant registration fee, charged annually by the processor"},
+        "rolling_reserve": {"typical_pct": "5-10%", "hold_period_months": "3-6", "description": "Processor withholds a percentage of settlements as chargeback protection. Funds are released after the hold period."},
+        "chargeback_monitoring": {"typical_monthly": "10-25", "description": "Additional monthly fee for enhanced chargeback monitoring required for high-risk MCCs"}
+      }
+    },
+
+    "default": {
+      "label": "Default / Unknown Category",
+      "mccs": [],
+      "keywords": [],
+      "note": "Use this when MCC is unknown and merchant name does not match any keyword list. Mark the benchmark as 'default category — MCC-specific benchmark not available' in the output.",
+      "interchange_ranges": {
+        "visa_credit": {"low": 0.0165, "high": 0.0200},
+        "visa_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "mc_credit": {"low": 0.0165, "high": 0.0200},
+        "mc_debit_blended": {"low": 0.0050, "high": 0.0080},
+        "amex_optblue": {"low": 0.0180, "high": 0.0240},
+        "discover": {"low": 0.0160, "high": 0.0200}
+      },
+      "network_fee_estimate_pct": {"low": 0.0013, "high": 0.0018},
+      "effective_rate_benchmark": {"low": 0.0200, "high": 0.0260}
+    }
+  },
+
+  "volume_tier_adjustments": {
+    "description": "Adjust the effective_rate_benchmark based on the merchant's estimated annual volume. Higher volume = more negotiating leverage = lower competitive rates.",
+    "tiers": {
+      "under_100k": {
+        "annual_volume_range": "$0 - $100,000",
+        "adjustment_pct": 0.004,
+        "direction": "add",
+        "note": "Small merchants have less leverage. Add 0.40% to benchmark range."
+      },
+      "100k_500k": {
+        "annual_volume_range": "$100,000 - $500,000",
+        "adjustment_pct": 0.000,
+        "direction": "none",
+        "note": "Benchmark ranges are calibrated to this tier."
+      },
+      "500k_2m": {
+        "annual_volume_range": "$500,000 - $2,000,000",
+        "adjustment_pct": 0.0015,
+        "direction": "subtract",
+        "note": "Mid-volume merchants get better rates."
+      },
+      "2m_10m": {
+        "annual_volume_range": "$2,000,000 - $10,000,000",
+        "adjustment_pct": 0.003,
+        "direction": "subtract",
+        "note": "High-volume merchants get significantly better rates."
+      },
+      "over_10m": {
+        "annual_volume_range": "Over $10,000,000",
+        "adjustment_pct": 0.005,
+        "direction": "subtract",
+        "note": "Enterprise merchants get the best available rates."
+      }
+    }
+  },
+
+  "competitive_ic_plus_pricing": {
+    "description": "Competitive interchange-plus processor markup by volume tier. Used for savings estimation on bundled/flat-rate/tiered statements.",
+    "card_present": {
+      "under_100k": {"spread_pct": 0.0025, "per_auth": 0.10, "monthly_fees": 20},
+      "100k_500k": {"spread_pct": 0.0020, "per_auth": 0.10, "monthly_fees": 15},
+      "500k_2m": {"spread_pct": 0.0015, "per_auth": 0.08, "monthly_fees": 10},
+      "2m_10m": {"spread_pct": 0.0010, "per_auth": 0.07, "monthly_fees": 10},
+      "over_10m": {"spread_pct": 0.0007, "per_auth": 0.05, "monthly_fees": 0}
+    },
+    "card_not_present": {
+      "under_100k": {"spread_pct": 0.0030, "per_auth": 0.12, "monthly_fees": 25},
+      "100k_500k": {"spread_pct": 0.0025, "per_auth": 0.10, "monthly_fees": 20},
+      "500k_2m": {"spread_pct": 0.0020, "per_auth": 0.10, "monthly_fees": 15},
+      "2m_10m": {"spread_pct": 0.0015, "per_auth": 0.08, "monthly_fees": 10},
+      "over_10m": {"spread_pct": 0.0010, "per_auth": 0.06, "monthly_fees": 0}
+    },
+    "high_risk": {
+      "note": "High-risk merchants (smoke shops, vape, CBD, hemp, tobacco) face structurally higher processor markups because fewer processors serve this segment. These rates represent competitive high-risk pricing, not standard retail. Monthly fees include typical high-risk compliance/monitoring surcharges but do NOT include the $500/year Visa/MC registration fee, which is separate.",
+      "under_100k": {"spread_pct": 0.0100, "per_auth": 0.15, "monthly_fees": 75},
+      "100k_500k": {"spread_pct": 0.0080, "per_auth": 0.12, "monthly_fees": 50},
+      "500k_2m": {"spread_pct": 0.0060, "per_auth": 0.10, "monthly_fees": 40},
+      "2m_10m": {"spread_pct": 0.0050, "per_auth": 0.10, "monthly_fees": 30},
+      "over_10m": {"spread_pct": 0.0040, "per_auth": 0.08, "monthly_fees": 25}
+    }
+  },
+
+  "per_auth_benchmarks": {
+    "description": "Competitive per-authorization fee ranges by volume tier. Used for Fix 3 (WATS AUTH fee benchmarking).",
+    "card_present": {
+      "under_100k": {"competitive_low": 0.08, "competitive_high": 0.10},
+      "100k_500k": {"competitive_low": 0.07, "competitive_high": 0.10},
+      "500k_2m": {"competitive_low": 0.05, "competitive_high": 0.08},
+      "2m_10m": {"competitive_low": 0.05, "competitive_high": 0.07},
+      "over_10m": {"competitive_low": 0.03, "competitive_high": 0.05}
+    },
+    "card_not_present": {
+      "under_100k": {"competitive_low": 0.10, "competitive_high": 0.12},
+      "100k_500k": {"competitive_low": 0.08, "competitive_high": 0.10},
+      "500k_2m": {"competitive_low": 0.07, "competitive_high": 0.10},
+      "2m_10m": {"competitive_low": 0.06, "competitive_high": 0.08},
+      "over_10m": {"competitive_low": 0.05, "competitive_high": 0.06}
+    },
+    "high_risk": {
+      "note": "High-risk merchants typically pay higher per-auth fees. These ranges represent competitive high-risk pricing.",
+      "under_100k": {"competitive_low": 0.12, "competitive_high": 0.15},
+      "100k_500k": {"competitive_low": 0.10, "competitive_high": 0.12},
+      "500k_2m": {"competitive_low": 0.08, "competitive_high": 0.10},
+      "2m_10m": {"competitive_low": 0.08, "competitive_high": 0.10},
+      "over_10m": {"competitive_low": 0.06, "competitive_high": 0.08}
+    }
+  },
+
+  "junk_fee_patterns": {
+    "description": "Known processor fixed fees that are avoidable or negotiable. Used for Fix 5 (junk fixed fee flagging).",
+    "fees": [
+      {
+        "patterns": ["REGULATORY PRODUCT", "REGULATORY FEE", "REGULATORY COMPLIANCE", "REG PRODUCT FEE"],
+        "recommendation": "No regulatory mandate requires this specific fee. This is processor revenue with a compliance-sounding name. Request removal.",
+        "avoidable": true
+      },
+      {
+        "patterns": ["SUPPLY SHIPPING", "SUPPLY SHIP", "SHIPPING & HANDLING", "SHIPPING AND HANDLING"],
+        "recommendation": "This fee is for physical supplies (receipt paper, etc.) shipped by the processor. If you did not order supplies, contact your processor to dispute and opt out of automatic supply shipments.",
+        "avoidable": true
+      },
+      {
+        "patterns": ["PAPER STATEMENT", "PAPER STATEME", "PAPER STMT"],
+        "recommendation": "This is a fee for receiving a paper statement. Switching to electronic statements will eliminate this fee.",
+        "avoidable": true
+      },
+      {
+        "patterns": ["MONTHLY SERVICE CHARGE", "MONTHLY SERVICE FEE", "ACCOUNT SERVICE FEE", "MONTHLY ACCOUNT FEE"],
+        "recommendation": "This is a flat monthly account fee. It is negotiable and some processors waive it.",
+        "avoidable": false,
+        "negotiable": true
+      },
+      {
+        "patterns": ["STATEMENT FEE", "STMT FEE", "MONTHLY STATEMENT FEE"],
+        "recommendation": "Monthly statement fee. Typically $5-$10. Negotiable, often waivable.",
+        "avoidable": false,
+        "negotiable": true
+      },
+      {
+        "patterns": ["ANNUAL FEE", "MEMBERSHIP FEE", "ANNUAL MEMBERSHIP", "ACCOUNT MAINTENANCE"],
+        "recommendation": "Annual account fee. Pure processor revenue. Often waivable in negotiations.",
+        "avoidable": false,
+        "negotiable": true
+      },
+      {
+        "patterns": ["EARLY TERMINATION", "ETF", "CANCELLATION FEE", "LIQUIDATED DAMAGES"],
+        "recommendation": "Early termination fee. Charged when closing account before contract end date. Review contract terms.",
+        "avoidable": false,
+        "negotiable": false,
+        "note": "Negotiable at contract signing, not after."
+      },
+      {
+        "patterns": ["DEBIT MONTHLY FEE", "DEBIT MONTHLY", "PIN DEBIT MONTHLY"],
+        "recommendation": "Monthly fee for debit card processing access. Typically a junk fee with no corresponding service.",
+        "avoidable": false,
+        "negotiable": true
+      },
+      {
+        "patterns": ["HIGH RISK REGISTRATION", "HIGH RISK REG", "HR REGISTRATION", "VISA MC REGISTRATION", "NETWORK REGISTRATION", "CARD BRAND REGISTRATION"],
+        "recommendation": "Visa and Mastercard require a $500/year registration fee for high-risk merchant categories (tobacco, vape, CBD, etc.). This fee is legitimate but verify the amount — some processors mark it up above $500. If the merchant is not in a high-risk MCC, this fee should not be charged.",
+        "avoidable": false,
+        "negotiable": false,
+        "note": "Legitimate for high-risk MCCs. If the merchant is standard retail miscategorized as high-risk, dispute the classification."
+      },
+      {
+        "patterns": ["ROLLING RESERVE", "RESERVE HOLD", "HOLDBACK", "RESERVE WITHHOLDING"],
+        "recommendation": "A percentage of settlements is being withheld as chargeback/risk protection. Typical for high-risk merchants: 5-10% held for 3-6 months. Verify the reserve percentage and hold period match the contract. After 6-12 months of clean processing history, request a reserve reduction or elimination.",
+        "avoidable": false,
+        "negotiable": true,
+        "note": "Standard for high-risk merchants. Becomes negotiable after establishing clean processing history."
+      },
+      {
+        "patterns": ["CHARGEBACK MONITORING", "CB MONITORING", "RISK MONITORING", "EXCESSIVE CHARGEBACK"],
+        "recommendation": "Monthly chargeback or risk monitoring fee. Common for high-risk merchants. Verify the amount is in the $10-$25/month range. Amounts significantly above this may be inflated.",
+        "avoidable": false,
+        "negotiable": true
+      }
+    ]
+  },
+
+  "penalty_fee_patterns": {
+    "description": "Known penalty/compliance fees that should always trigger Rule 7 findings regardless of dollar amount. Used for Fix 6.",
+    "fees": [
+      {
+        "patterns": ["TRANSACTION INTEGRITY FEE", "TIF", "VI TRANSACTION INTEGRITY"],
+        "cause": "Visa transaction failed CPS qualification requirements.",
+        "fix": "Check terminal or gateway configuration. Ensure all required data elements (AVS, CVV2) are submitted.",
+        "network": "Visa",
+        "rate": 0.10
+      },
+      {
+        "patterns": ["MISUSE OF AUTH", "MISUSED AUTH", "VISA MISUSE"],
+        "cause": "Transaction cleared without required authorization or with auth/clearing mismatch.",
+        "fix": "Check terminal or gateway configuration. Ensure authorizations match settled transactions.",
+        "network": "Visa",
+        "rate": 0.09
+      },
+      {
+        "patterns": ["MANAGED SECURITY NON VALIDATED", "PCI NON COMPLIANCE", "PCI NON COMPLIANT", "SECURITY NON VALIDATED", "NON COMPLIANT FEE"],
+        "cause": "PCI compliance validation has not been completed.",
+        "fix": "Complete the PCI Self-Assessment Questionnaire (SAQ). Once validated, this fee is eliminated or significantly reduced.",
+        "network": "Processor",
+        "rate": null
+      }
+    ]
+  }
+}

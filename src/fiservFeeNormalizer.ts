@@ -94,7 +94,7 @@ export type FiservFeeNormalizationResult = {
 };
 
 const FALLBACK_NETWORK_LABELS = new Set(["BIN ICA FEE"]);
-const PROCESSOR_PER_ITEM_LABELS = new Set(["OTHER ITEM FEES", "CPU GTWY", "SALES ITEMS", "BATCH HEADER"]);
+const PROCESSOR_PER_ITEM_LABELS = new Set(["OTHER ITEM FEES", "CPU GTWY", "SALES ITEMS", "BATCH HEADER", "WATS AUTH FEE"]);
 const THIRD_PARTY_SERVICE_LABELS = [
   "BENTOBOX",
   "DOORDASH",
@@ -189,6 +189,7 @@ function feeTypeFromReference(entry: FiservFeeReferenceEntry | null, row: Fiserv
   }
   if (entry?.category === "pin_debit_network") return "pin_debit_network";
   if (description.match(/^DISC\s+\d+$/) || description === "OTHER VOLUME FEES") return "processor_pct_markup";
+  if (/\bWATS AUTH FEE\b/.test(description)) return "processor_per_item";
   if (PROCESSOR_PER_ITEM_LABELS.has(description)) return "processor_per_item";
   if (description.includes("TIF") || description.includes("TRANSACTION INTEGRITY") || description.includes("MISUSE")) return "compliance_penalty";
   if (entry?.category === "processor_markup") return entry.rate_type === "pct_volume" ? "processor_pct_markup" : "processor_per_item";
