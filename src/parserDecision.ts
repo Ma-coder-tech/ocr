@@ -135,16 +135,17 @@ export function buildParserValidationState(
 
 export function buildParserDecision(input: BuildParserDecisionInput): ParserDecision {
   const validationState = buildParserValidationState(input.reconciliationResults, input.feeClassification);
+  const withValidationState = (decision: Omit<ParserDecision, "validationState">): ParserDecision =>
+    validationState ? { ...decision, validationState } : decision;
   const reconciliationEntries = Object.entries(input.reconciliation);
   const missingChecks = REQUIRED_RECONCILIATION_CHECKS.filter((checkName) => !input.reconciliation[checkName]);
   if (missingChecks.length > 0) {
-    return {
+    return withValidationState({
       status: "needs_review",
       confidence: "needs_review",
       reportable: false,
       reason: `Blocked by missing required reconciliation check(s): ${missingChecks.join(", ")}.`,
-      validationState,
-    };
+    });
   }
 
   if (validationState && !validationState.customerFacingTotalsAllowed) {
@@ -159,34 +160,31 @@ export function buildParserDecision(input: BuildParserDecisionInput): ParserDeci
 
   const failedChecks = reconciliationEntries.filter(([, check]) => check.status === "fail");
   if (failedChecks.length > 0) {
-    return {
+    return withValidationState({
       status: "needs_review",
       confidence: "needs_review",
       reportable: false,
       reason: `Blocked by failed reconciliation check(s): ${failedChecks.map(([name]) => name).join(", ")}.`,
-      validationState,
-    };
+    });
   }
 
   const highWarnings = input.warnings.filter((warning) => warning.severity === "high");
   if (highWarnings.length > 0) {
-    return {
+    return withValidationState({
       status: "needs_review",
       confidence: "needs_review",
       reportable: false,
       reason: `Blocked by high-severity parser warning(s): ${highWarnings.map((warning) => warning.code).join(", ")}.`,
-      validationState,
-    };
+    });
   }
 
   if (input.confidence === "low" || input.confidence === "needs_review") {
-    return {
+    return withValidationState({
       status: "needs_review",
       confidence: input.confidence,
       reportable: false,
       reason: `Blocked by parser confidence level: ${input.confidence}.`,
-      validationState,
-    };
+    });
   }
 
   const warningChecks = reconciliationEntries.filter(([, check]) => check.status === "warning");
@@ -196,7 +194,7 @@ export function buildParserDecision(input: BuildParserDecisionInput): ParserDeci
     ...(validationState?.warningReasons ?? []),
   ];
   if (caveats.length > 0 || input.confidence === "medium") {
-    return {
+    return withValidationState({
       status: "accepted_with_warnings",
       confidence: input.confidence,
       reportable: true,
@@ -204,15 +202,13 @@ export function buildParserDecision(input: BuildParserDecisionInput): ParserDeci
         caveats.length > 0
           ? `Accepted with parser caveat(s): ${caveats.join(", ")}.`
           : "Accepted with medium parser confidence.",
-      validationState,
-    };
+    });
   }
 
-  return {
+  return withValidationState({
     status: "accepted",
     confidence: input.confidence,
     reportable: true,
     reason: "Accepted because required reconciliation checks passed and no parser warnings were raised.",
-    validationState,
-  };
+  });
 }

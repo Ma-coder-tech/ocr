@@ -4540,7 +4540,7 @@
   },
   "fundingBatchLedger": {
     "status": "reconciled",
-    "formula": "Submitted batch sales - month-end fees = Total Amount Processed",
+    "formula": "Submitted batch sales + adjustments - month-end fees = Total Amount Processed",
     "rows": [
       {
         "dateSubmitted": "09/30/24",
@@ -5544,7 +5544,7 @@
     "feesChargedDelta": 0,
     "evidenceLine": "Total | 1,797 | $52,497.03 | 3 | -$36.48 | 1,800 | $52,460.55",
     "notes": [
-      "Full First Data/Clover statements do not print per-batch funded amounts; this ledger reconciles submitted batch sales plus the month-end fee row to the printed Total Amount Processed."
+      "Full First Data/Clover statements do not print per-batch funded amounts; this ledger reconciles submitted batch sales plus adjustment rows and the month-end fee row to the printed Total Amount Processed."
     ]
   },
   "interchangeDetail": {
@@ -5744,7 +5744,7 @@
   },
   "decision": {
     "status": "accepted_with_warnings",
-    "reason": "Accepted with parser caveat(s): supportingFeeAgreement, filename_period_mismatch, interchange_detail_total_differs_from_fee_summary, reportable_sales_excluded.",
+    "reason": "Accepted with parser caveat(s): supportingFeeAgreement, interchange_detail_total_differs_from_fee_summary, reportable_sales_excluded.",
     "confidence": "high",
     "reportable": true
   },
@@ -5757,12 +5757,6 @@
     "statementIdentity": "high"
   },
   "warnings": [
-    {
-      "code": "filename_period_mismatch",
-      "severity": "medium",
-      "message": "Source filename says Jan 2024, but statement content shows 10/01/24 - 10/31/24.",
-      "evidenceLine": "Statement Period | 10/01/24 - 10/31/24"
-    },
     {
       "code": "interchange_detail_total_differs_from_fee_summary",
       "severity": "medium",

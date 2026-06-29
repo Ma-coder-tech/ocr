@@ -18,6 +18,13 @@ const SHORT_EXPECTED_PATH = path.resolve(process.cwd(), "data", "fixtures", "fis
 const PAYSAFE_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "fiserv_PAYSAFE_Febr_2024.pdf");
 const PRIORITY_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf");
 const NOVEMBER_FULL_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "Nov_2024_Statement.pdf");
+const WELLS_FARGO_FULL_PDF_PATH = path.resolve(
+  process.cwd(),
+  "test",
+  "fixtures",
+  "pdfs",
+  "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+);
 const NXGEN_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "fiserv_NXGEN_PAYMENT_SERVICES_jan_2022.pdf");
 const PHILIP_FUTURMARKET_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf");
 const ABDUL_BASHER_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "fiserv_ABDUL_BASHER_Aug_2025.pdf");
@@ -445,7 +452,7 @@ describe("Fiserv First Data full statement parser", () => {
     }) as any;
 
     expect(actual.statementIdentity).toMatchObject({
-      visibleBrand: "First Data / Fiserv-style card processing statement",
+      visibleBrand: "Clover",
       statementFamily: "fiserv_first_data_full_statement",
       merchantName: "PEPES MEXICAN RESTURANT",
       merchantNumber: "526361338886",
@@ -479,6 +486,86 @@ describe("Fiserv First Data full statement parser", () => {
       status: "needs_review",
       reportable: false,
     });
+  });
+
+  it("routes Wells Fargo-branded First Data full statements by structure instead of bank logo", async () => {
+    const doc = await parsePdf(WELLS_FARGO_FULL_PDF_PATH);
+
+    expect(fiservFirstDataFullStatementDriver.supports(doc)).toBe(true);
+    expect(fiservFirstDataProcessorStatementDriver.supports(doc)).toBe(false);
+    expect(fiservFirstDataShortStatementDriver.supports(doc)).toBe(false);
+
+    const actual = parseFiservFirstDataFullStatement(doc, {
+      sourceFileName: "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+    }) as any;
+
+    expect(actual.statementIdentity).toMatchObject({
+      visibleBrand: "Wells Fargo",
+      processorFamily: "Fiserv / First Data",
+      statementFamily: "fiserv_first_data_full_statement",
+      merchantName: "EL NUEVO TEQUILA MEXICAN",
+      merchantNumber: "324136827999",
+      statementPeriodStart: "2024-09-01",
+      statementPeriodEnd: "2024-09-30",
+    });
+    expect(actual.selectedFinancials).toMatchObject({
+      totalVolume: 177400.72,
+      totalFees: 2954.38,
+      amountFunded: 174445.26,
+      effectiveRate: 0.01665371,
+      adjustmentsChargebacks: -1.08,
+      thirdPartyTransactions: 0,
+    });
+    expect(actual.feeLedger).toMatchObject({
+      status: "reconciled",
+      totalRowSum: 2954.38,
+      printedTotal: 2954.38,
+      delta: 0,
+    });
+    expect(actual.feeLedger.rows).toHaveLength(104);
+    expect(actual.feeLedger.feeClassificationSummary).toMatchObject({
+      unresolvedRowCount: 0,
+    });
+    expect(actual.feeLedger.feeClassificationSummary.residualAnalysis).toMatchObject({
+      knownProcessorFeeAmount: 600.61,
+      markupOrUnknownPoolAmount: 600.61,
+      residualUnclassifiedAmount: 0,
+    });
+    expect(actual.fundingBatchLedger).toMatchObject({
+      status: "reconciled",
+      rowCount: 32,
+      anomalyCount: 0,
+      submittedTotal: 177400.72,
+      feesChargedTotal: 2954.38,
+      fundedTotal: 174445.26,
+      submittedDelta: 0,
+      fundedDelta: 0,
+      feesChargedDelta: 0,
+    });
+    expect(actual.fiservFeeAnalysisV2).toMatchObject({
+      version: "2.0",
+      normalization: {
+        rowCount: 104,
+        aiCandidateCount: 4,
+      },
+      pricingModel: {
+        pricingModel: "interchange_plus",
+        confidence: "high",
+        analysisStatus: "ic_plus_ready",
+      },
+      processorMarkupAnalysis: {
+        status: "ready",
+      },
+    });
+    expect(actual.fiservFeeAnalysisV2.merchantChannelAnalysis).toMatchObject({
+      merchantChannel: "mixed",
+      confidence: "high",
+    });
+    expect(actual.decision).toMatchObject({
+      status: "accepted_with_warnings",
+      reportable: true,
+    });
+    expect(actual.warnings.map((warning: any) => warning.code)).not.toContain("filename_period_mismatch");
   });
 
   it("models Paysafe as a Fiserv processor-branded statement with fee ledger and batch funding anomalies", async () => {
@@ -1195,6 +1282,80 @@ describe("Fiserv First Data full statement parser", () => {
           statedFee: 625.68,
           computedFee: 625.68,
           delta: 0,
+        }),
+      ]),
+    );
+    expect(actual.fiservFeeAnalysisV2).toMatchObject({
+      pricingModel: {
+        pricingModel: "single_tier_qualified",
+        confidence: "high",
+        analysisStatus: "universal_only_pending_model_rules",
+      },
+      bundledPricingBenchmark: {
+        status: "ready",
+        benchmarkMode: "bundled_estimate",
+        businessCategory: {
+          id: "grocery_specialty_food",
+          source: "merchant_name_inference",
+          confidence: "medium",
+        },
+        volumeTier: "500k_2m",
+        effectiveRate: 0.03825245,
+        adjustedBenchmarkRate: {
+          low: 0.0165,
+          high: 0.0215,
+        },
+        estimatedPassThroughCost: {
+          low: 859.63,
+          high: 1160.03,
+        },
+        estimatedProcessorMargin: {
+          low: 1922.79,
+          high: 2223.19,
+        },
+        estimatedCompetitiveCost: {
+          low: 1078.04,
+          high: 1393.44,
+        },
+        estimatedAnnualSavings: {
+          low: 20272.56,
+          high: 24057.36,
+        },
+        confidence: "medium",
+        unusedTierRows: 6,
+        billbackRisk: true,
+      },
+      savingsSummary: {
+        annualLow: 20272.56,
+        annualHigh: 24057.36,
+        opportunities: 1,
+      },
+    });
+    expect(actual.fiservFeeAnalysisV2.bundledPricingBenchmark.cardMix).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ cardType: "visa_debit", volume: 31717.94, pctOfVolume: 39.36 }),
+        expect.objectContaining({ cardType: "visa_credit", volume: 16465.34, pctOfVolume: 20.43 }),
+        expect.objectContaining({ cardType: "amex", volume: 6103.48, pctOfVolume: 7.57 }),
+      ]),
+    );
+    expect(actual.fiservFeeAnalysisV2.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "bundled_effective_rate_above_benchmark",
+          severity: "high",
+          action: "request_interchange_plus_quote",
+        }),
+        expect.objectContaining({
+          kind: "bundled_pricing_savings_opportunity",
+          savingsEstimate: {
+            low: 20272.56,
+            high: 24057.36,
+            basis: "Estimated annual savings from bundled-pricing benchmark model. Not pass-through proof.",
+          },
+        }),
+        expect.objectContaining({
+          kind: "single_tier_qualified_structure",
+          action: "request_pass_through_documentation",
         }),
       ]),
     );

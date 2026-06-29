@@ -40,9 +40,20 @@ export function extractFiservTopLevelFinancialsFromDocumentIr(ir: DocumentIR): F
 function extractFirstDataStatementTopLevel(ir: DocumentIR): FiservDocumentIrTopLevelFinancials {
   const summaryLines = linesForFamilySection(ir, "summary").filter((line) => line.pageNumber === 1);
   const searchLines = summaryLines.length > 0 ? summaryLines : allLines(ir).filter((line) => line.pageNumber === 1);
+  const documentLines = allLines(ir);
 
   const totalVolume = requireLineAmount(searchLines, /total amount submitted/i, "Total Amount Submitted");
-  const amountFunded = requireLineAmount(searchLines, /total amount processed/i, "Total Amount Processed");
+  const amountFunded =
+    optionalLineAmount(searchLines, /total amount processed/i) ??
+    optionalLineAmount(documentLines, /total amount processed/i) ??
+    requireLineAmount(
+      documentLines,
+      (line) => {
+        const tokens = signedMoneyTokens(line.text);
+        return /^total\b/i.test(line.text) && /-\s*\$?/.test(normalizeMoneyText(line.text)) && tokens.length >= 4;
+      },
+      "Total Amount Processed",
+    );
   const fees = requireLineAmount(
     searchLines,
     (line) => /\bfees\b/i.test(line.text) && /-\s*\$?/.test(normalizeMoneyText(line.text)),
@@ -142,11 +153,15 @@ function extractProcessorBrandedTopLevel(ir: DocumentIR): FiservDocumentIrTopLev
 }
 
 function looksLikeFirstDataSummary(ir: DocumentIR): boolean {
-  const firstPageText = allLines(ir)
-    .filter((line) => line.pageNumber === 1)
+  const text = allLines(ir)
     .map((line) => line.text)
     .join("\n");
-  return /\btotal amount submitted\b/i.test(firstPageText) && /\btotal amount processed\b/i.test(firstPageText);
+  return (
+    /\btotal amount submitted\b/i.test(text) &&
+    /\bsummary by card type\b/i.test(text) &&
+    /\btransaction fees\b/i.test(text) &&
+    (/\btotal amount processed\b/i.test(text) || /\btotal \(service charges, interchange charges\/program fees, and fees\)/i.test(text))
+  );
 }
 
 function linesForFamilySection(ir: DocumentIR, familySectionType: string): DocumentLine[] {

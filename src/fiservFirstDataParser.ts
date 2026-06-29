@@ -254,6 +254,21 @@ function extractFiservNoticeLines(doc: RawExtractedDocument): RepricingNoticeLin
   return lines;
 }
 
+function extractFiservYtdGrossSales(doc: RawExtractedDocument): number | null {
+  for (const row of doc.rows) {
+    const content = rowContent(row)
+      .replace(/[\uE000-\uF8FF]/g, "$")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!/\b(?:YTD|YEAR TO DATE|YEAR-TO-DATE)\b/i.test(content)) continue;
+    if (!/\b(?:GROSS|REPORTABLE|SALES?|VOLUME|AMOUNT)\b/i.test(content)) continue;
+    const amounts = signedMoneyTokens(content).map((amount) => Math.abs(amount)).filter((amount) => amount > 0);
+    const ytd = amounts.at(-1) ?? null;
+    if (ytd !== null) return ytd;
+  }
+  return null;
+}
+
 function fiservPinDebitAnnualFeeNoticeEvents(lines: RepricingNoticeLine[]): RepricingEvent[] {
   const text = lines.map((line) => line.evidenceLine).join(" ").replace(/\s+/g, " ");
   const effectiveMatch = text.match(/EFFECTIVE\s+WITH\s+YOUR\s+([A-Z]+)\s*(\d{4})\s*STATEMENT/i);
@@ -327,38 +342,158 @@ function hasFiservStatementPeriod(content: string): boolean {
   return /statement\s*period/i.test(content);
 }
 
+type FiservStatementFingerprint = {
+  hasCardProcessingStatementTitle: boolean;
+  hasStatementPeriod: boolean;
+  hasMerchantNumber: boolean;
+  hasSummaryByDay: boolean;
+  hasSummaryByCardType: boolean;
+  hasSummaryByBatch: boolean;
+  hasAmountsSubmittedFormula: boolean;
+  hasTransactionFees: boolean;
+  hasAccountFees: boolean;
+  hasInterchangeChargesRows: boolean;
+  hasProgramFeesRows: boolean;
+  hasInterchangeProgramBucketTotal: boolean;
+  hasServiceChargesTotal: boolean;
+  hasProcessorFeesTotal: boolean;
+  hasFeeGrandTotal: boolean;
+  hasInterchangeProgramDetailSection: boolean;
+  hasTotalAmountSubmitted: boolean;
+  hasTotalAmountProcessed: boolean;
+  hasFeesCharged: boolean;
+  hasProcessorFundingFormula: boolean;
+  hasProcessorFeeGrandTotal: boolean;
+  fullStatementScore: number;
+  shortStatementScore: number;
+  processorStatementScore: number;
+};
+
+function fiservStatementFingerprint(doc: RawExtractedDocument): FiservStatementFingerprint {
+  const rows = doc.rows.map(rowContent);
+  const text = `${doc.textPreview ?? ""} ${rows.join(" ")}`;
+  const normalizedText = normalizedFiservText(text);
+  const has = (pattern: RegExp) => rows.some((content) => pattern.test(content));
+  const hasLabel = (label: string) => doc.rows.some((row) => String(row.label ?? "").replace("TotaI", "Total") === label);
+  const hasCardProcessingStatementTitle = /your card processing statement/i.test(text);
+  const hasStatementPeriod = rows.some((content) => hasFiservStatementPeriod(content));
+  const hasMerchantNumber = rows.some((content) => /\bMerchant Number\b\s*\|?\s*\d/i.test(content));
+  const hasSummaryByDay = /\bsummary by day\b/i.test(text);
+  const hasSummaryByCardType = /\bsummary by card type\b/i.test(text);
+  const hasSummaryByBatch = /\bsummary by batch\b/i.test(text);
+  const hasTransactionFees = has(/^TRANSACTION FEES\b/i);
+  const hasAccountFees = has(/^ACCOUNT FEES\b/i);
+  const hasInterchangeChargesRows = has(/\|\s*Interchange charges\s*\|\s*-\$/i);
+  const hasProgramFeesRows = has(/\|\s*Program Fees\s*\|\s*-\$/i);
+  const hasInterchangeProgramBucketTotal = hasLabel("Total Interchange Charges/Program Fees") || has(/^Total Interchange Charges\/Program Fees\b/i);
+  const hasServiceChargesTotal = hasLabel("Total Service Charges") || has(/^Total Service Charges\b/i);
+  const hasProcessorFeesTotal = hasLabel("Total Fees") || has(/^Total Fees\b/i);
+  const hasFeeGrandTotal = has(/^Total \(Service Charges, Interchange Charges\/Program Fees, and Fees\)/i);
+  const hasInterchangeProgramDetailSection = /interchange charges\/program fees/i.test(text) && /product\/description/i.test(text);
+  const hasTotalAmountSubmitted = hasLabel("Total Amount Submitted") || has(/Total Amount Submitted/i);
+  const hasTotalAmountProcessed = hasLabel("Total Amount Processed") || has(/Total Amount Processed/i);
+  const hasFeesCharged = hasLabel("Fees Charged") || has(/Fees Charged/i);
+  const hasAmountsSubmittedFormula = hasLabel("Amounts Submitted") || /\bamounts submitted\b/i.test(text);
+  const hasProcessorFundingFormula = rows.some((content) => hasFiservProcessorFundingFormula(content));
+  const hasProcessorFeeGrandTotal = rows.some((content) => hasFiservProcessorFeeGrandTotal(content));
+
+  const fullSignals = [
+    hasStatementPeriod,
+    hasMerchantNumber,
+    hasSummaryByDay,
+    hasSummaryByCardType,
+    hasSummaryByBatch,
+    hasTransactionFees,
+    hasAccountFees,
+    hasInterchangeChargesRows,
+    hasInterchangeProgramBucketTotal,
+    hasServiceChargesTotal,
+    hasProcessorFeesTotal,
+    hasFeeGrandTotal,
+    hasInterchangeProgramDetailSection,
+    hasTotalAmountSubmitted,
+    hasTotalAmountProcessed || has(/^Total\s*\|.*-\$.*-\$/i),
+  ];
+  const shortSignals = [
+    hasStatementPeriod,
+    hasMerchantNumber,
+    hasSummaryByCardType,
+    hasSummaryByBatch,
+    hasTransactionFees,
+    hasTotalAmountSubmitted,
+    hasTotalAmountProcessed,
+    !hasInterchangeProgramBucketTotal,
+    !hasInterchangeProgramDetailSection,
+  ];
+  const processorSignals = [
+    hasCardProcessingStatementTitle,
+    hasStatementPeriod,
+    hasMerchantNumber,
+    hasAmountsSubmittedFormula,
+    hasFeesCharged,
+    hasProcessorFundingFormula,
+    hasProcessorFeeGrandTotal,
+    normalizedText.includes("amount funded"),
+  ];
+
+  return {
+    hasCardProcessingStatementTitle,
+    hasStatementPeriod,
+    hasMerchantNumber,
+    hasSummaryByDay,
+    hasSummaryByCardType,
+    hasSummaryByBatch,
+    hasAmountsSubmittedFormula,
+    hasTransactionFees,
+    hasAccountFees,
+    hasInterchangeChargesRows,
+    hasProgramFeesRows,
+    hasInterchangeProgramBucketTotal,
+    hasServiceChargesTotal,
+    hasProcessorFeesTotal,
+    hasFeeGrandTotal,
+    hasInterchangeProgramDetailSection,
+    hasTotalAmountSubmitted,
+    hasTotalAmountProcessed,
+    hasFeesCharged,
+    hasProcessorFundingFormula,
+    hasProcessorFeeGrandTotal,
+    fullStatementScore: fullSignals.filter(Boolean).length,
+    shortStatementScore: shortSignals.filter(Boolean).length,
+    processorStatementScore: processorSignals.filter(Boolean).length,
+  };
+}
+
 function isFirstDataFullStatement(doc: RawExtractedDocument): boolean {
-  const text = `${doc.textPreview} ${doc.rows.slice(0, 30).map(rowContent).join(" ")}`.toLowerCase();
+  const fingerprint = fiservStatementFingerprint(doc);
   return (
-    text.includes("your card processing statement") &&
-    text.includes("omaha, ne 68103-2394") &&
-    doc.rows.some((row: RawDocumentRow) => rowContent(row).includes("Total Amount Submitted")) &&
-    doc.rows.some((row: RawDocumentRow) => rowContent(row).includes("Total Amount Processed")) &&
-    doc.rows.some((row) => String(row.label ?? "") === "Total Interchange Charges/Program Fees")
+    fingerprint.fullStatementScore >= 11 &&
+    fingerprint.hasSummaryByCardType &&
+    fingerprint.hasTransactionFees &&
+    fingerprint.hasFeeGrandTotal &&
+    fingerprint.hasInterchangeProgramBucketTotal
   );
 }
 
 function isFirstDataShortStatement(doc: RawExtractedDocument): boolean {
-  const text = `${doc.textPreview} ${doc.rows.slice(0, 30).map(rowContent).join(" ")}`.toLowerCase();
+  const fingerprint = fiservStatementFingerprint(doc);
   return (
-    text.includes("your card processing statement") &&
-    text.includes("omaha, ne 68103-2394") &&
-    doc.rows.some((row: RawDocumentRow) => rowContent(row).includes("Page 1 of 2")) &&
-    doc.rows.some((row: RawDocumentRow) => rowContent(row).includes("Total Amount Submitted")) &&
-    doc.rows.some((row: RawDocumentRow) => rowContent(row).includes("Total Amount Processed")) &&
-    !doc.rows.some((row) => String(row.label ?? "") === "Total Interchange Charges/Program Fees")
+    fingerprint.shortStatementScore >= 7 &&
+    fingerprint.hasSummaryByCardType &&
+    fingerprint.hasTransactionFees &&
+    !fingerprint.hasInterchangeProgramBucketTotal &&
+    !fingerprint.hasInterchangeProgramDetailSection
   );
 }
 
 function isFiservProcessorBrandedStatement(doc: RawExtractedDocument): boolean {
-  const text = `${doc.textPreview} ${doc.rows.slice(0, 40).map(rowContent).join(" ")}`.toLowerCase();
+  const fingerprint = fiservStatementFingerprint(doc);
   return (
-    text.includes("your card processing statement") &&
-    doc.rows.some((row) => String(row.label ?? "") === "Amounts Submitted") &&
-    doc.rows.some((row) => String(row.label ?? "") === "Fees Charged") &&
-    doc.rows.some((row) => String(row.label ?? "").replace("TotaI", "Total") === "Total Amount Funded to Your Bank") &&
-    doc.rows.some((row) => hasFiservProcessorFundingFormula(rowContent(row))) &&
-    doc.rows.some((row) => hasFiservProcessorFeeGrandTotal(rowContent(row)))
+    fingerprint.processorStatementScore >= 6 &&
+    fingerprint.hasAmountsSubmittedFormula &&
+    fingerprint.hasFeesCharged &&
+    fingerprint.hasProcessorFundingFormula &&
+    fingerprint.hasProcessorFeeGrandTotal
   );
 }
 
@@ -466,8 +601,17 @@ function moneyPatternForAmount(amount: number): string {
 
 function detectFiservProcessorBrand(doc: RawExtractedDocument): string {
   const firstRows = doc.rows.slice(0, 12).map(rowContent);
-  const brandRow = firstRows.find((content) => /^[A-Z0-9 &,./'-]+$/.test(content) && !content.startsWith("P.O.") && !content.includes("YOUR CARD"));
-  if (!brandRow) return "Fiserv / First Data branded statement";
+  const titleIndex = firstRows.findIndex((content) => /YOUR CARD PROCESSING STATEMENT/i.test(content));
+  const candidateRows = titleIndex > 0 ? firstRows.slice(0, titleIndex) : firstRows;
+  const brandCandidates = candidateRows.filter(
+    (content) =>
+      /^[A-Z0-9a-z &,./'-]+$/.test(content) &&
+      !/^P(?:\.?O\.?|O)\s+Box\b/i.test(content) &&
+      !/\b\d{5}(?:-\d{4})?\b/.test(content) &&
+      !/YOUR CARD|STATEMENT PERIOD|MERCHANT NUMBER|CUSTOMER SERVICE/i.test(content),
+  );
+  const brandRow = brandCandidates[0];
+  if (!brandRow) return "First Data / Fiserv-style card processing statement";
   return brandRow
     .toLowerCase()
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
@@ -547,6 +691,37 @@ function findFullStatementInterchangeDetailTotalRow(doc: RawExtractedDocument): 
       return /^TOTAL\s*\|\s*\$[\d,]+\.\d{2}\s*\|/i.test(content) && amounts.length >= 2 && (amounts.at(-1) ?? 0) < 0;
     },
     "interchange detail total",
+  );
+}
+
+function findFirstDataFullStatementMerchantNameRow(doc: RawExtractedDocument): EvidenceRow {
+  return findRow(
+    doc,
+    (row) => {
+      const content = rowContent(row);
+      if (!/Page 1 of \d+/i.test(content)) return false;
+      const firstCell = cellParts(content)[0] ?? "";
+      return isFiservProcessorMerchantNameCandidate(firstCell);
+    },
+    "merchant name",
+  );
+}
+
+function merchantNameFromFirstDataFullHeader(row: EvidenceRow): string {
+  return (cellParts(row.content)[0] ?? row.content).trim();
+}
+
+function findFirstDataFullAmountFundedRow(doc: RawExtractedDocument): EvidenceRow {
+  const headline = findOptionalRow(doc, (row) => String(row.label ?? "") === "Total Amount Processed");
+  if (headline) return headline;
+  return findLastRow(
+    doc,
+    (row) => {
+      const content = rowContent(row);
+      const parts = cellParts(content);
+      return /^Total\s*\|/.test(content) && parts.length >= 5 && signedMoneyTokens(content).length >= 4;
+    },
+    "total amount processed",
   );
 }
 
@@ -829,7 +1004,8 @@ function buildFiservFullStatementFeeLedger(doc: RawExtractedDocument, printedTot
   );
 
   const controlBySection = (label: string, expectedLabel: string) => {
-    const totalRow = findRow(doc, (row) => rowContent(row).startsWith(expectedLabel), `First Data full-statement ${expectedLabel}`);
+    const totalRow = findOptionalRow(doc, (row) => rowContent(row).startsWith(expectedLabel));
+    if (!totalRow) return null;
     const sectionRows = rows.filter((row) => row.sourceSection === label);
     return makeFeeLedgerControl({
       label: expectedLabel,
@@ -842,7 +1018,8 @@ function buildFiservFullStatementFeeLedger(doc: RawExtractedDocument, printedTot
   };
 
   const controlByType = (type: string, expectedLabel: string, includeProgramFees = false) => {
-    const totalRow = findRow(doc, (row) => rowContent(row).startsWith(expectedLabel), `First Data full-statement ${expectedLabel}`);
+    const totalRow = findOptionalRow(doc, (row) => rowContent(row).startsWith(expectedLabel));
+    if (!totalRow) return null;
     const typeRows = rows.filter((row) => row.type === type || (includeProgramFees && row.type === "Program Fees"));
     return makeFeeLedgerControl({
       label: expectedLabel,
@@ -869,7 +1046,7 @@ function buildFiservFullStatementFeeLedger(doc: RawExtractedDocument, printedTot
       tolerance: 0.02,
       evidenceLine: grandTotalRow.content,
     }),
-  ];
+  ].filter((control): control is NonNullable<typeof control> => control !== null);
   const delta = round2(printedTotal - rowSum);
   const classified = classifyFiservProcessorFeeLedgerRows(
     rows.map(({ lineIndex: _lineIndex, ...row }) => row),
@@ -1257,6 +1434,37 @@ function buildFiservFullStatementFundingBatchLedger(
     if (parsed) rows.push(parsed);
   }
 
+  const adjustmentStartIndex = doc.rows.findIndex((row) => /^ADJUSTMENTS\b/i.test(rowContent(row)));
+  const adjustmentEndIndex =
+    adjustmentStartIndex < 0
+      ? -1
+      : doc.rows.findIndex((row, index) => index > adjustmentStartIndex && /^(?:FEES|TRANSACTION FEES|AMOUNTS SUBMITTED)\b/i.test(rowContent(row)));
+  if (adjustmentStartIndex >= 0) {
+    const adjustmentRows = doc.rows.slice(adjustmentStartIndex + 1, adjustmentEndIndex > adjustmentStartIndex ? adjustmentEndIndex : doc.rows.length);
+    for (const rawRow of adjustmentRows) {
+      const parts = cellParts(rowContent(rawRow));
+      if (parts.length < 3 || !/^\d{2}\/\d{2}\/\d{2}$/.test(parts[0] ?? "")) continue;
+      const adjustment = parseFiservProcessorAmount(parts.at(-1) ?? "0.00");
+      rows.push({
+        dateSubmitted: parts[0] ?? "Adjustment",
+        batchNumber: null,
+        amountSubmitted: 0,
+        thirdPartyTransactions: 0,
+        adjustments: adjustment,
+        chargebacks: 0,
+        feesCharged: 0,
+        amountFunded: adjustment,
+        formulaResult: adjustment,
+        delta: 0,
+        tolerance: 0.01,
+        status: "pass",
+        evidenceLine: rowContent(rawRow),
+        pageNumber: pageNumber(rawRow),
+        notes: ["Adjustment row is modeled separately so submitted batches reconcile to total processed/funded amount."],
+      });
+    }
+  }
+
   const totalRow = findLastRow(
     doc,
     (row, index) => index > startIndex && index < scanEnd && /^Total\s*\|/.test(rowContent(row)) && cellParts(rowContent(row)).length >= 7,
@@ -1302,7 +1510,7 @@ function buildFiservFullStatementFundingBatchLedger(
 
   return {
     status: anomalyCount > 0 ? "reconciled_with_warnings" : "reconciled",
-    formula: "Submitted batch sales - month-end fees = Total Amount Processed",
+    formula: "Submitted batch sales + adjustments - month-end fees = Total Amount Processed",
     rows,
     rowCount: rows.length,
     anomalyCount,
@@ -1317,7 +1525,7 @@ function buildFiservFullStatementFundingBatchLedger(
     feesChargedDelta,
     evidenceLine: totalRow.content,
     notes: [
-      "Full First Data/Clover statements do not print per-batch funded amounts; this ledger reconciles submitted batch sales plus the month-end fee row to the printed Total Amount Processed.",
+      "Full First Data/Clover statements do not print per-batch funded amounts; this ledger reconciles submitted batch sales plus adjustment rows and the month-end fee row to the printed Total Amount Processed.",
     ],
   };
 }
@@ -1754,12 +1962,9 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
   }
 
   const sourceFileName = options.sourceFileName ?? "unknown.pdf";
-  const merchantNameRow = findRow(
-    doc,
-    (row) => /Page 1 of \d+/i.test(rowContent(row)) && !/YOUR CARD PROCESSING STATEMENT/i.test(rowContent(row)),
-    "merchant name",
-  );
-  const merchantName = merchantNameRow.content.split("|")[0]!.trim();
+  const visibleBrand = detectFiservProcessorBrand(doc);
+  const merchantNameRow = findFirstDataFullStatementMerchantNameRow(doc);
+  const merchantName = merchantNameFromFirstDataFullHeader(merchantNameRow);
 
   const periodRow = findRow(doc, (row) => String(row.label ?? "") === "Statement Period", "statement period");
   const periodValue = String(periodRow.row.value ?? periodRow.content);
@@ -1769,7 +1974,7 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
   const merchantNumber = merchantNumberFromEvidence(merchantNumberRow);
 
   const totalVolumeRow = findRow(doc, (row) => String(row.label ?? "") === "Total Amount Submitted", "total amount submitted");
-  const amountFundedRow = findRow(doc, (row) => String(row.label ?? "") === "Total Amount Processed", "total amount processed");
+  const amountFundedRow = findFirstDataFullAmountFundedRow(doc);
   const feesRow = findRow(
     doc,
     (row) => String(row.label ?? "") === "Fees" && (signedMoneyTokens(rowContent(row)).at(-1) ?? 0) < 0,
@@ -1782,8 +1987,8 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
   const totalVolume = requireAmount(totalVolumeRow, "total amount submitted");
   const amountFunded = requireAmount(amountFundedRow, "total amount processed");
   const totalFees = requireAmount(feesRow, "fees");
-  const adjustments = requireAmount(adjustmentsRow, "adjustments");
-  const chargebacks = requireAmount(chargebacksRow, "chargebacks/reversals");
+  const adjustments = requireSignedAmount(adjustmentsRow, "adjustments");
+  const chargebacks = requireSignedAmount(chargebacksRow, "chargebacks/reversals");
   const cardTypeAmounts = signedMoneyTokens(cardTypeTotalRow.content);
   const cardTypeIntegers = integerTokens(cardTypeTotalRow.content);
   const grossSales = Math.abs(cardTypeAmounts[0] ?? 0);
@@ -1851,6 +2056,8 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
     pricingModel,
     statementPeriodStart: period.start,
     statementPeriodEnd: period.end,
+    merchantName,
+    ytdGrossSales: ytdSales,
     notices: extractFiservRepricingEvents(doc),
     interchangeReconciliationBasis: {
       summaryTotal: interchangeBucket,
@@ -2028,12 +2235,6 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
   const warnings = [
     ...documentIrWarnings,
     {
-      code: "filename_period_mismatch",
-      severity: "medium",
-      message: "Source filename says Jan 2024, but statement content shows 10/01/24 - 10/31/24.",
-      evidenceLine: periodRow.content,
-    },
-    {
       code: "interchange_detail_total_differs_from_fee_summary",
       severity: "medium",
       message: `Interchange detail total is $${interchangeDetailTotal.toFixed(2)} while fee-summary interchange/program bucket is $${interchangeBucket.toFixed(2)}.`,
@@ -2051,7 +2252,7 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
   return fiservParserOutputSchema.parse({
     statementIdentity: {
       processorFamily: "Fiserv / First Data",
-      visibleBrand: "First Data / Fiserv-style card processing statement",
+      visibleBrand,
       statementFamily: "fiserv_first_data_full_statement",
       merchantName,
       merchantNumber,
@@ -2320,6 +2521,8 @@ export function parseFiservFirstDataShortStatement(doc: RawExtractedDocument, op
     pricingModel,
     statementPeriodStart: period.start,
     statementPeriodEnd: period.end,
+    merchantName,
+    ytdGrossSales: extractFiservYtdGrossSales(doc),
     notices: extractFiservRepricingEvents(doc),
   });
 
@@ -2802,6 +3005,8 @@ export function parseFiservFirstDataProcessorStatement(doc: RawExtractedDocument
     pricingModel,
     statementPeriodStart: period.start,
     statementPeriodEnd: period.end,
+    merchantName: merchantNameRow.content,
+    ytdGrossSales: extractFiservYtdGrossSales(doc),
     notices: extractFiservRepricingEvents(doc),
   });
   const failedFundingBatchEvidenceLine = fundingBatchLedger.rows.find((row) => row.status === "fail")?.evidenceLine ?? null;

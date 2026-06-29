@@ -1,0 +1,215 @@
+{
+  "document_type": "fiserv_bundled_pricing_benchmarks",
+  "version": "2026-06",
+  "last_verified": "2026-06",
+  "description": "Directional US benchmark ranges for bundled, flat-rate, and single-tier Fiserv pricing where interchange and network fees are not itemized. These ranges are estimates, not pass-through proof.",
+  "default_category": "general_retail",
+  "network_fee_range": {
+    "low": 0.0013,
+    "high": 0.0018
+  },
+  "categories": {
+    "grocery_specialty_food": {
+      "label": "Grocery / specialty food",
+      "mccs": [5411, 5421, 5422, 5441, 5451, 5462, 5499],
+      "effective_rate_benchmark": {
+        "low": 0.018,
+        "high": 0.023
+      },
+      "interchange_ranges": {
+        "visa_credit": {
+          "low": 0.015,
+          "high": 0.018
+        },
+        "visa_debit": {
+          "low": 0.005,
+          "high": 0.008
+        },
+        "mastercard_credit": {
+          "low": 0.015,
+          "high": 0.018
+        },
+        "mastercard_debit": {
+          "low": 0.005,
+          "high": 0.008
+        },
+        "amex": {
+          "low": 0.016,
+          "high": 0.022
+        },
+        "discover": {
+          "low": 0.0155,
+          "high": 0.0185
+        },
+        "unknown": {
+          "low": 0.0165,
+          "high": 0.02
+        }
+      }
+    },
+    "restaurant": {
+      "label": "Restaurant",
+      "mccs": [5812, 5813, 5814],
+      "effective_rate_benchmark": {
+        "low": 0.021,
+        "high": 0.026
+      },
+      "interchange_ranges": {
+        "visa_credit": {
+          "low": 0.018,
+          "high": 0.022
+        },
+        "visa_debit": {
+          "low": 0.005,
+          "high": 0.008
+        },
+        "mastercard_credit": {
+          "low": 0.018,
+          "high": 0.022
+        },
+        "mastercard_debit": {
+          "low": 0.005,
+          "high": 0.008
+        },
+        "amex": {
+          "low": 0.0185,
+          "high": 0.025
+        },
+        "discover": {
+          "low": 0.017,
+          "high": 0.02
+        },
+        "unknown": {
+          "low": 0.018,
+          "high": 0.023
+        }
+      }
+    },
+    "general_retail": {
+      "label": "General retail",
+      "mccs": [5311, 5331, 5399, 5699, 5999],
+      "effective_rate_benchmark": {
+        "low": 0.02,
+        "high": 0.025
+      },
+      "interchange_ranges": {
+        "visa_credit": {
+          "low": 0.0165,
+          "high": 0.0195
+        },
+        "visa_debit": {
+          "low": 0.005,
+          "high": 0.008
+        },
+        "mastercard_credit": {
+          "low": 0.0165,
+          "high": 0.0195
+        },
+        "mastercard_debit": {
+          "low": 0.005,
+          "high": 0.008
+        },
+        "amex": {
+          "low": 0.018,
+          "high": 0.024
+        },
+        "discover": {
+          "low": 0.0155,
+          "high": 0.0195
+        },
+        "unknown": {
+          "low": 0.017,
+          "high": 0.021
+        }
+      }
+    },
+    "unknown": {
+      "label": "Unknown business category",
+      "mccs": [],
+      "effective_rate_benchmark": {
+        "low": 0.02,
+        "high": 0.03
+      },
+      "interchange_ranges": {
+        "visa_credit": {
+          "low": 0.016,
+          "high": 0.022
+        },
+        "visa_debit": {
+          "low": 0.005,
+          "high": 0.01
+        },
+        "mastercard_credit": {
+          "low": 0.016,
+          "high": 0.022
+        },
+        "mastercard_debit": {
+          "low": 0.005,
+          "high": 0.01
+        },
+        "amex": {
+          "low": 0.018,
+          "high": 0.025
+        },
+        "discover": {
+          "low": 0.0155,
+          "high": 0.02
+        },
+        "unknown": {
+          "low": 0.017,
+          "high": 0.023
+        }
+      }
+    }
+  },
+  "volume_tier_adjustments": {
+    "under_100k": {
+      "annual_volume_max": 100000,
+      "benchmark_adjustment": 0.004,
+      "competitive_spread": 0.0025,
+      "competitive_per_auth": 0.1
+    },
+    "100k_500k": {
+      "annual_volume_max": 500000,
+      "benchmark_adjustment": 0,
+      "competitive_spread": 0.002,
+      "competitive_per_auth": 0.1
+    },
+    "500k_2m": {
+      "annual_volume_max": 2000000,
+      "benchmark_adjustment": -0.0015,
+      "competitive_spread": 0.0015,
+      "competitive_per_auth": 0.08
+    },
+    "2m_10m": {
+      "annual_volume_max": 10000000,
+      "benchmark_adjustment": -0.003,
+      "competitive_spread": 0.001,
+      "competitive_per_auth": 0.07
+    },
+    "over_10m": {
+      "annual_volume_max": null,
+      "benchmark_adjustment": -0.005,
+      "competitive_spread": 0.0007,
+      "competitive_per_auth": 0.05
+    }
+  },
+  "monthly_fee_range": {
+    "low": 10,
+    "high": 25
+  },
+  "settlement_context": {
+    "label": "Visa/Mastercard 2026 merchant settlement preliminary approval",
+    "note": "Preliminary approval was reported in June 2026. Terms include an average 10 basis point credit-interchange reduction for five years and standard consumer credit caps. Use as market context only; exact statement-period proof still requires network schedules.",
+    "sources": [
+      "Payments Dive, Court approves Visa-Mastercard settlement, June 2026",
+      "Payments Dive, Visa, Mastercard defend card fee settlement, April 28 2026",
+      "Payments Dive, Visa, Mastercard reach legal pact with merchants, November 10 2025"
+    ]
+  },
+  "sources": {
+    "interchange_ranges": "Derived from published US card network interchange schedules and industry benchmark commentary; ranges are approximate.",
+    "effective_rate_benchmarks": "Directional US all-in competitive interchange-plus ranges for merchant category and annualized volume tier.",
+    "confidence": "MEDIUM at best. Actual cost varies by MCC, debit regulation mix, rewards/commercial card penetration, CNP share, authorization behavior, and processor contract terms."
+  }
+}

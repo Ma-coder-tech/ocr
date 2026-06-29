@@ -5,6 +5,10 @@ import {
   type FiservFeeNormalizationSummary,
   type FiservRawFeeRowForNormalization,
 } from "./fiservFeeNormalizer.js";
+import {
+  buildFiservBundledPricingBenchmarkAnalysis,
+  type FiservBundledPricingBenchmarkAnalysis,
+} from "./fiservBundledPricingBenchmark.js";
 import { normalizeFiservFeeReferenceText, type FiservFeeReferenceEntry } from "./fiservFeeReference.js";
 import { round2, round8 } from "./reconciliation.js";
 import type { RepricingEvent } from "./types.js";
@@ -28,6 +32,8 @@ export type FiservFeeAnalysisInput = {
   pricingModel: { pricingModel: string; confidence: string; notes?: string[] };
   statementPeriodStart: string;
   statementPeriodEnd: string;
+  merchantName?: string | null;
+  ytdGrossSales?: number | null;
   notices?: RepricingEvent[];
   interchangeReconciliationBasis?: {
     summaryTotal: number | null;
@@ -83,7 +89,16 @@ export type FiservFeeAnalysisFinding = {
     | "avoidable_compliance_fee"
     | "third_party_service_fee"
     | "hidden_percentage_markup"
-    | "penalty_or_configuration_fee";
+    | "penalty_or_configuration_fee"
+    | "bundled_effective_rate_above_benchmark"
+    | "bundled_pricing_savings_opportunity"
+    | "single_tier_qualified_structure"
+    | "card_not_present_detected"
+    | "tiered_downgrade_high_nqual"
+    | "tiered_downgrade_majority_not_qualified"
+    | "tiered_downgrade_cost"
+    | "authorization_ratio_high"
+    | "new_account_pricing_context";
   severity: "info" | "warning" | "high";
   title: string;
   amount: number | null;
@@ -94,7 +109,8 @@ export type FiservFeeAnalysisFinding = {
     | "negotiate_processor_rate"
     | "request_pass_through_documentation"
     | "verify_third_party_service"
-    | "fix_terminal_or_gateway_configuration";
+    | "fix_terminal_or_gateway_configuration"
+    | "request_interchange_plus_quote";
   monthlyCost: number | null;
   annualEstimate: number | null;
   savingsEstimate: {
@@ -114,6 +130,102 @@ export type FiservInterchangeReconciliationComponent = {
   amount: number;
   rows: number;
   evidence: string[];
+};
+
+export type FiservMerchantChannelAnalysis = {
+  status: "detected" | "defaulted";
+  merchantChannel: "card_present" | "card_not_present" | "mixed";
+  confidence: "high" | "medium" | "low";
+  signals: Array<{
+    type: "card_not_present" | "card_present";
+    description: string;
+    evidenceLine: string;
+    rowIndex: number;
+  }>;
+  benchmarkAdjustments: {
+    effectiveRateBenchmark: { low: number; high: number } | null;
+    interchangeRangeAdjustment: { low: number; high: number } | null;
+    competitiveSpread: { low: number; high: number } | null;
+    competitivePerAuth: { low: number; high: number } | null;
+  };
+  notes: string[];
+};
+
+export type FiservTieredDowngradeAnalysis = {
+  status: "ready" | "not_applicable" | "not_enough_detail";
+  baselineRate: number | null;
+  baselineSource: "lowest_visible_qual" | "lowest_visible_tier" | "not_available";
+  totalTieredVolume: number | null;
+  qualifiedVolume: number;
+  midQualifiedVolume: number;
+  nonQualifiedVolume: number;
+  qualifiedPct: number | null;
+  midQualifiedPct: number | null;
+  nonQualifiedPct: number | null;
+  notBestTierPct: number | null;
+  totalDowngradeCost: number | null;
+  totalDowngradeCostPctOfFees: number | null;
+  largestDowngradeImpact: {
+    cardTypeSection: string | null;
+    description: string;
+    tier: "qualified" | "mid_qualified" | "non_qualified";
+    volume: number;
+    rate: number;
+    amount: number;
+    downgradeCost: number;
+    amountPctOfFees: number | null;
+    downgradeCostPctOfFees: number | null;
+    evidenceLine: string;
+  } | null;
+  rows: Array<{
+    cardTypeSection: string | null;
+    description: string;
+    tier: "qualified" | "mid_qualified" | "non_qualified";
+    volume: number;
+    rate: number;
+    amount: number;
+    baselineRate: number | null;
+    downgradeCost: number | null;
+    evidenceLine: string;
+  }>;
+  flags: Array<{
+    kind: "high_non_qualified" | "majority_downgraded" | "minimal_downgrade";
+    severity: "info" | "warning" | "high";
+    message: string;
+  }>;
+  cause: string;
+};
+
+export type FiservAuthorizationAnalysis = {
+  status: "ready" | "not_applicable" | "not_enough_detail";
+  transactionCount: number | null;
+  authorizationCount: number | null;
+  authRatio: number | null;
+  excessAuthorizationCount: number | null;
+  estimatedExcessAuthCost: number | null;
+  primaryAuthRate: number | null;
+  primaryAuthRows: Array<{
+    description: string;
+    cardTypeSection: string | null;
+    count: number;
+    rate: number | null;
+    amount: number;
+    evidenceLine: string;
+  }>;
+  flags: Array<{
+    kind: "auths_exceed_settled_transactions" | "unusually_high_auth_ratio";
+    severity: "warning" | "high";
+    message: string;
+  }>;
+};
+
+export type FiservNewAccountAnalysis = {
+  status: "confirmed" | "likely" | "not_detected" | "not_enough_detail";
+  currentMonthVolume: number;
+  ytdGrossSales: number | null;
+  ytdToCurrentMonthRatio: number | null;
+  message: string;
+  recommendation: string | null;
 };
 
 export type FiservFeeAnalysisV2 = {
@@ -159,6 +271,11 @@ export type FiservFeeAnalysisV2 = {
     nonAmexSalesDiscountRate: number | null;
     amexSalesDiscountRate: number | null;
   };
+  merchantChannelAnalysis: FiservMerchantChannelAnalysis;
+  tieredDowngradeAnalysis: FiservTieredDowngradeAnalysis;
+  authorizationAnalysis: FiservAuthorizationAnalysis;
+  newAccountAnalysis: FiservNewAccountAnalysis;
+  bundledPricingBenchmark: FiservBundledPricingBenchmarkAnalysis;
   interchangeReconciliation: {
     summaryTotal: number | null;
     detailTableTotal: number | null;
@@ -448,6 +565,25 @@ function detectIcPlusFromCanonicalRows(
     confidence: confidenceFromParser(fallback.confidence),
     evidence: fallback.notes?.length ? fallback.notes : ["Pricing model inherited from existing parser inference."],
   };
+  const qualRows = nonZeroRows.filter((row) => normalizeFiservFeeReferenceText(row.originalDescription) === "QUAL DISC" && row.rate !== null);
+  const mqualOrNqualRows = nonZeroRows.filter((row) => /\b(?:MQUAL|NQUAL|MID QUAL|NON QUAL)\b/i.test(row.originalDescription));
+  const uniqueQualRates = new Set(qualRows.map((row) => row.rate?.toFixed(7)));
+  const zeroDiscountRows = rows.filter((row) => /^DISC\s+\d+$/i.test(row.originalDescription.trim()) && row.amount === 0);
+  if (inherited.pricingModel === "flat_discount_pricing" && qualRows.length >= 2 && mqualOrNqualRows.length === 0 && uniqueQualRates.size === 1) {
+    return {
+      pricingModel: zeroDiscountRows.length > 0 ? "single_tier_qualified" : "flat_rate_bundled",
+      confidence: "high",
+      analysisStatus: "universal_only_pending_model_rules",
+      evidence: [
+        `Only QUAL DISC discount rows are charged, all at ${(qualRows[0]?.rate ?? 0) * 100}% of volume.`,
+        "No charged MQUAL/NQUAL rows are visible, so this is not a full multi-tier statement from the visible fee rows.",
+        ...(zeroDiscountRows.length > 0
+          ? [`${zeroDiscountRows.length} zero-amount DISC tier row(s) are visible, suggesting unused tier infrastructure.`]
+          : []),
+        "Interchange and network fees are bundled into the discount charge, so V2 uses benchmark estimates instead of pass-through proof.",
+      ],
+    };
+  }
   return {
     ...inherited,
     analysisStatus:
@@ -575,7 +711,7 @@ function finding(params: Omit<FiservFeeAnalysisFinding, "monthlyCost" | "annualE
   monthlyCost?: number | null;
   savingsEstimate?: FiservFeeAnalysisFinding["savingsEstimate"];
 }): FiservFeeAnalysisFinding {
-  const monthlyCost = params.monthlyCost ?? params.amount;
+  const monthlyCost = Object.prototype.hasOwnProperty.call(params, "monthlyCost") ? (params.monthlyCost ?? null) : params.amount;
   return {
     ...params,
     monthlyCost,
@@ -655,6 +791,369 @@ function processorMarkupAnalysis(
   };
 }
 
+function merchantChannelAnalysis(rows: FiservFeeAnalysisRow[]): FiservMerchantChannelAnalysis {
+  const signals: FiservMerchantChannelAnalysis["signals"] = [];
+  for (const row of rows) {
+    const description = normalizeFiservFeeReferenceText(row.description);
+    const evidence = normalizeFiservFeeReferenceText(row.evidenceLine);
+    const combined = `${description} ${evidence}`;
+    const cnp =
+      /\b(ECI|ECIC|ECOM|CNP|CARD NOT PRESENT|DIGITAL COMMERCE)\b/.test(combined) ||
+      /\bFIXED NETWORK CNP FEE\b/.test(combined) ||
+      /\bAVS ECIC\b/.test(combined) ||
+      /\bECI CPU-G\b/.test(combined) ||
+      /\bVISA NETWORK FEE CNP\b/.test(combined);
+    const cp =
+      /\bCARD PRESENT\b/.test(combined) ||
+      /\bFIXED NETWORK CP FEE\b/.test(combined) ||
+      /\bVISA NETWORK FEE CP\b/.test(combined);
+    if (cnp) {
+      signals.push({
+        type: "card_not_present",
+        description: row.description,
+        evidenceLine: row.evidenceLine,
+        rowIndex: row.rowIndex,
+      });
+    }
+    if (cp) {
+      signals.push({
+        type: "card_present",
+        description: row.description,
+        evidenceLine: row.evidenceLine,
+        rowIndex: row.rowIndex,
+      });
+    }
+  }
+  const hasCnp = signals.some((signal) => signal.type === "card_not_present");
+  const hasCp = signals.some((signal) => signal.type === "card_present");
+  const merchantChannel = hasCnp && hasCp ? "mixed" : hasCnp ? "card_not_present" : "card_present";
+  const isCnpLike = merchantChannel === "card_not_present" || merchantChannel === "mixed";
+  return {
+    status: hasCnp || hasCp ? "detected" : "defaulted",
+    merchantChannel,
+    confidence: hasCnp && signals.length >= 2 ? "high" : hasCnp || hasCp ? "medium" : "low",
+    signals,
+    benchmarkAdjustments: isCnpLike
+      ? {
+          effectiveRateBenchmark: { low: 0.025, high: 0.032 },
+          interchangeRangeAdjustment: { low: 0.002, high: 0.004 },
+          competitiveSpread: { low: 0.0015, high: 0.0025 },
+          competitivePerAuth: { low: 0.1, high: 0.12 },
+        }
+      : {
+          effectiveRateBenchmark: null,
+          interchangeRangeAdjustment: null,
+          competitiveSpread: null,
+          competitivePerAuth: null,
+        },
+    notes: isCnpLike
+      ? [
+          "Card-not-present signals change the benchmark context; ecommerce/CNP merchants naturally carry higher interchange and qualification risk than card-present merchants.",
+          "Downgrade explanations should focus on AVS/CVV2, ecommerce indicators, order/invoice data, and gateway settings before assuming in-store terminal issues.",
+        ]
+      : ["No card-not-present signals were found, so the merchant channel defaults to card-present."],
+  };
+}
+
+function tierForDescription(description: string): "qualified" | "mid_qualified" | "non_qualified" | null {
+  const normalized = normalizeFiservFeeReferenceText(description);
+  if (/\bNQUAL\b|\bNON QUAL\b|\bNON-QUAL\b/.test(normalized)) return "non_qualified";
+  if (/\bMQUAL\b|\bMID QUAL\b|\bMID-QUAL\b/.test(normalized)) return "mid_qualified";
+  if (/\bQUAL DISC\b|\bQUALIFIED\b/.test(normalized)) return "qualified";
+  return null;
+}
+
+function impliedVolume(row: Pick<FiservFeeAnalysisRow, "amount" | "rate" | "volumeBasis">): number | null {
+  if (row.volumeBasis !== null && row.volumeBasis > 0) return row.volumeBasis;
+  if (row.rate !== null && row.rate > 0 && row.amount > 0) return round2(row.amount / row.rate);
+  return null;
+}
+
+function tieredDowngradeAnalysis(
+  rows: FiservFeeAnalysisRow[],
+  pricingModel: FiservFeeAnalysisV2["pricingModel"],
+  totalFees: number,
+  merchantChannel: FiservMerchantChannelAnalysis["merchantChannel"],
+): FiservTieredDowngradeAnalysis {
+  if (pricingModel.pricingModel !== "tiered_pricing") {
+    return {
+      status: "not_applicable",
+      baselineRate: null,
+      baselineSource: "not_available",
+      totalTieredVolume: null,
+      qualifiedVolume: 0,
+      midQualifiedVolume: 0,
+      nonQualifiedVolume: 0,
+      qualifiedPct: null,
+      midQualifiedPct: null,
+      nonQualifiedPct: null,
+      notBestTierPct: null,
+      totalDowngradeCost: null,
+      totalDowngradeCostPctOfFees: null,
+      largestDowngradeImpact: null,
+      rows: [],
+      flags: [],
+      cause: "Tiered downgrade analysis applies only after tiered pricing is detected.",
+    };
+  }
+
+  const tierRows = rows
+    .map((row) => {
+      const tier = tierForDescription(row.description);
+      const volume = impliedVolume(row);
+      if (!tier || volume === null || row.rate === null || row.rate <= 0 || row.amount <= 0) return null;
+      return { row, tier, volume, rate: row.rate };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+
+  if (tierRows.length === 0) {
+    return {
+      status: "not_enough_detail",
+      baselineRate: null,
+      baselineSource: "not_available",
+      totalTieredVolume: null,
+      qualifiedVolume: 0,
+      midQualifiedVolume: 0,
+      nonQualifiedVolume: 0,
+      qualifiedPct: null,
+      midQualifiedPct: null,
+      nonQualifiedPct: null,
+      notBestTierPct: null,
+      totalDowngradeCost: null,
+      totalDowngradeCostPctOfFees: null,
+      largestDowngradeImpact: null,
+      rows: [],
+      flags: [],
+      cause: "Tiered pricing was detected, but the statement did not expose usable tier rows with volume/rate/amount detail.",
+    };
+  }
+
+  const qualRates = tierRows.filter((item) => item.tier === "qualified").map((item) => item.rate);
+  const allRates = tierRows.map((item) => item.rate);
+  const baselineRate = qualRates.length > 0 ? Math.min(...qualRates) : Math.min(...allRates);
+  const baselineSource = qualRates.length > 0 ? "lowest_visible_qual" : "lowest_visible_tier";
+  const analysisRows = tierRows.map((item) => {
+    const downgradeCost = item.tier === "qualified" ? 0 : round2(Math.max(0, item.volume * (item.rate - baselineRate)));
+    return {
+      cardTypeSection: item.row.cardTypeSection,
+      description: item.row.description,
+      tier: item.tier,
+      volume: round2(item.volume),
+      rate: item.rate,
+      amount: item.row.amount,
+      baselineRate,
+      downgradeCost,
+      evidenceLine: item.row.evidenceLine,
+    };
+  });
+  const qualifiedVolume = round2(analysisRows.filter((row) => row.tier === "qualified").reduce((sum, row) => sum + row.volume, 0));
+  const midQualifiedVolume = round2(analysisRows.filter((row) => row.tier === "mid_qualified").reduce((sum, row) => sum + row.volume, 0));
+  const nonQualifiedVolume = round2(analysisRows.filter((row) => row.tier === "non_qualified").reduce((sum, row) => sum + row.volume, 0));
+  const totalTieredVolume = round2(qualifiedVolume + midQualifiedVolume + nonQualifiedVolume);
+  const pct = (value: number) => (totalTieredVolume > 0 ? round2((value / totalTieredVolume) * 100) : null);
+  const totalDowngradeCost = round2(analysisRows.reduce((sum, row) => sum + (row.downgradeCost ?? 0), 0));
+  const largest = [...analysisRows].sort((left, right) => right.amount - left.amount)[0] ?? null;
+  const flags: FiservTieredDowngradeAnalysis["flags"] = [];
+  const nonQualifiedPct = pct(nonQualifiedVolume);
+  const notBestTierPct = pct(midQualifiedVolume + nonQualifiedVolume);
+  const qualifiedPct = pct(qualifiedVolume);
+  if (nonQualifiedPct !== null && nonQualifiedPct > 30) {
+    flags.push({
+      kind: "high_non_qualified",
+      severity: "high",
+      message: `${nonQualifiedPct.toFixed(2)}% of tiered volume fell into non-qualified pricing.`,
+    });
+  }
+  if (notBestTierPct !== null && notBestTierPct > 50) {
+    flags.push({
+      kind: "majority_downgraded",
+      severity: "high",
+      message: `${notBestTierPct.toFixed(2)}% of tiered volume did not qualify for the best visible tier.`,
+    });
+  }
+  if (qualifiedPct !== null && qualifiedPct > 80) {
+    flags.push({
+      kind: "minimal_downgrade",
+      severity: "info",
+      message: `${qualifiedPct.toFixed(2)}% of tiered volume qualified, so downgrade pressure appears limited.`,
+    });
+  }
+
+  return {
+    status: "ready",
+    baselineRate,
+    baselineSource,
+    totalTieredVolume,
+    qualifiedVolume,
+    midQualifiedVolume,
+    nonQualifiedVolume,
+    qualifiedPct,
+    midQualifiedPct: pct(midQualifiedVolume),
+    nonQualifiedPct,
+    notBestTierPct,
+    totalDowngradeCost,
+    totalDowngradeCostPctOfFees: totalFees > 0 ? round2((totalDowngradeCost / totalFees) * 100) : null,
+    largestDowngradeImpact: largest
+      ? {
+          cardTypeSection: largest.cardTypeSection,
+          description: largest.description,
+          tier: largest.tier,
+          volume: largest.volume,
+          rate: largest.rate,
+          amount: largest.amount,
+          downgradeCost: largest.downgradeCost ?? 0,
+          amountPctOfFees: totalFees > 0 ? round2((largest.amount / totalFees) * 100) : null,
+          downgradeCostPctOfFees: totalFees > 0 ? round2(((largest.downgradeCost ?? 0) / totalFees) * 100) : null,
+          evidenceLine: largest.evidenceLine,
+        }
+      : null,
+    rows: analysisRows,
+    flags,
+    cause:
+      merchantChannel === "card_not_present" || merchantChannel === "mixed"
+        ? "For card-not-present merchants, downgrade causes commonly include missing AVS/CVV2, ecommerce indicators, invoice/order data, or gateway qualification settings. Tiered pricing itself creates downgrade risk; IC+ pricing exposes the economics more cleanly."
+        : "For card-present merchants, downgrade causes commonly include keyed transactions, missing signature/EMV data, late batch closure, or terminal configuration. Tiered pricing itself creates downgrade risk; IC+ pricing exposes the economics more cleanly.",
+  };
+}
+
+function rowCountFromAmountAndRate(row: Pick<FiservFeeAnalysisRow, "count" | "rate" | "amount">): number | null {
+  if (row.count !== null && row.count > 0) return row.count;
+  if (row.rate !== null && row.rate > 0 && row.amount > 0) return Math.round(row.amount / row.rate);
+  return null;
+}
+
+function authorizationAnalysis(
+  rows: FiservFeeAnalysisRow[],
+  merchantChannel: FiservMerchantChannelAnalysis["merchantChannel"],
+  transactionCount: number | null,
+): FiservAuthorizationAnalysis {
+  if (merchantChannel === "card_present") {
+    return {
+      status: "not_applicable",
+      transactionCount,
+      authorizationCount: null,
+      authRatio: null,
+      excessAuthorizationCount: null,
+      estimatedExcessAuthCost: null,
+      primaryAuthRate: null,
+      primaryAuthRows: [],
+      flags: [],
+    };
+  }
+  if (transactionCount === null || transactionCount <= 0) {
+    return {
+      status: "not_enough_detail",
+      transactionCount,
+      authorizationCount: null,
+      authRatio: null,
+      excessAuthorizationCount: null,
+      estimatedExcessAuthCost: null,
+      primaryAuthRate: null,
+      primaryAuthRows: [],
+      flags: [],
+    };
+  }
+
+  const authGroups = [
+    rows.filter((row) => /\bECI CPU-G\b|\bECI CPU\b/i.test(row.description)),
+    rows.filter((row) => /\bCPU GTWY\b|\bGATEWAY AUTH\b|\bCPU-G\b/i.test(row.description)),
+    rows.filter((row) => /\bACQR PROCESSOR\b|\bACQUIRER PROCESSOR\b/i.test(row.description)),
+    rows.filter((row) => /\bNABU\b/i.test(row.description)),
+  ];
+  const selected = authGroups.find((group) => group.length > 0) ?? [];
+  const primaryAuthRows = selected
+    .map((row) => {
+      const count = rowCountFromAmountAndRate(row);
+      if (count === null || count <= 0) return null;
+      return {
+        description: row.description,
+        cardTypeSection: row.cardTypeSection,
+        count,
+        rate: row.rate,
+        amount: row.amount,
+        evidenceLine: row.evidenceLine,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+
+  if (primaryAuthRows.length === 0) {
+    return {
+      status: "not_enough_detail",
+      transactionCount,
+      authorizationCount: null,
+      authRatio: null,
+      excessAuthorizationCount: null,
+      estimatedExcessAuthCost: null,
+      primaryAuthRate: null,
+      primaryAuthRows: [],
+      flags: [],
+    };
+  }
+
+  const authorizationCount = primaryAuthRows.reduce((sum, row) => sum + row.count, 0);
+  const authRatio = round2(authorizationCount / transactionCount);
+  const excessAuthorizationCount = Math.max(0, authorizationCount - transactionCount);
+  const primaryAuthRate = round2(primaryAuthRows.reduce((sum, row) => sum + row.amount, 0) / authorizationCount);
+  const estimatedExcessAuthCost = round2(excessAuthorizationCount * primaryAuthRate);
+  const flags: FiservAuthorizationAnalysis["flags"] = [];
+  if (authRatio > 3) {
+    flags.push({
+      kind: "unusually_high_auth_ratio",
+      severity: "high",
+      message: `Authorization count is ${authRatio.toFixed(2)}x settled transaction count; review gateway retry/decline behavior.`,
+    });
+  } else if (authRatio > 1.5) {
+    flags.push({
+      kind: "auths_exceed_settled_transactions",
+      severity: "warning",
+      message: `Authorization count is ${authRatio.toFixed(2)}x settled transaction count.`,
+    });
+  }
+
+  return {
+    status: "ready",
+    transactionCount,
+    authorizationCount,
+    authRatio,
+    excessAuthorizationCount,
+    estimatedExcessAuthCost,
+    primaryAuthRate,
+    primaryAuthRows,
+    flags,
+  };
+}
+
+function newAccountAnalysis(totalVolume: number, ytdGrossSales: number | null | undefined): FiservNewAccountAnalysis {
+  if (ytdGrossSales === null || ytdGrossSales === undefined || ytdGrossSales <= 0 || totalVolume <= 0) {
+    return {
+      status: "not_enough_detail",
+      currentMonthVolume: totalVolume,
+      ytdGrossSales: ytdGrossSales ?? null,
+      ytdToCurrentMonthRatio: null,
+      message: "YTD gross sales were not available, so first-statement status cannot be proven.",
+      recommendation: null,
+    };
+  }
+  const ratio = round8(ytdGrossSales / totalVolume);
+  const status = Math.abs(ytdGrossSales - totalVolume) <= 0.01 ? "confirmed" : ytdGrossSales <= totalVolume * 1.1 ? "likely" : "not_detected";
+  return {
+    status,
+    currentMonthVolume: totalVolume,
+    ytdGrossSales,
+    ytdToCurrentMonthRatio: ratio,
+    message:
+      status === "confirmed"
+        ? "YTD gross sales equal current statement volume, so this appears to be the first processing statement in the tax year."
+        : status === "likely"
+          ? "YTD gross sales are within 10% of current statement volume, so this is likely an early/new account statement."
+          : "YTD gross sales are materially above current statement volume, so this does not appear to be a first statement.",
+    recommendation:
+      status === "confirmed" || status === "likely"
+        ? "New merchants often have limited pricing leverage immediately; review contract terms now and reprice after 3-6 months of processing history."
+        : null,
+  };
+}
+
 function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSummary">): FiservFeeAnalysisFinding[] {
   const findings: FiservFeeAnalysisFinding[] = [];
   for (const row of analysis.rows.filter((candidate) => candidate.rateComparison === "above_reference")) {
@@ -676,6 +1175,147 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
       evidence: [analysis.processorMarkupAnalysis.message],
       action: "none",
     }));
+  }
+  if (analysis.merchantChannelAnalysis.merchantChannel === "card_not_present" || analysis.merchantChannelAnalysis.merchantChannel === "mixed") {
+    findings.push(finding({
+      kind: "card_not_present_detected",
+      severity: "info",
+      title:
+        analysis.merchantChannelAnalysis.merchantChannel === "mixed"
+          ? "Mixed card-present/card-not-present signals detected"
+          : "Card-not-present merchant signals detected",
+      amount: null,
+      evidence: analysis.merchantChannelAnalysis.signals.slice(0, 6).map((signal) => signal.evidenceLine),
+      action: "fix_terminal_or_gateway_configuration",
+    }));
+  }
+  if (analysis.tieredDowngradeAnalysis.status === "ready") {
+    const downgrade = analysis.tieredDowngradeAnalysis;
+    if ((downgrade.nonQualifiedPct ?? 0) > 30) {
+      findings.push(finding({
+        kind: "tiered_downgrade_high_nqual",
+        severity: "high",
+        title: "High non-qualified volume on tiered pricing",
+        amount: downgrade.nonQualifiedVolume,
+        evidence: [
+          `${(downgrade.nonQualifiedPct ?? 0).toFixed(2)}% of tiered volume is non-qualified.`,
+          downgrade.largestDowngradeImpact?.evidenceLine ?? "Tiered discount rows show non-qualified volume.",
+        ],
+        action: "request_interchange_plus_quote",
+        monthlyCost: null,
+      }));
+    }
+    if ((downgrade.notBestTierPct ?? 0) > 50) {
+      findings.push(finding({
+        kind: "tiered_downgrade_majority_not_qualified",
+        severity: "high",
+        title: "Most tiered volume did not qualify for the best tier",
+        amount: round2(downgrade.midQualifiedVolume + downgrade.nonQualifiedVolume),
+        evidence: [
+          `${(downgrade.notBestTierPct ?? 0).toFixed(2)}% of tiered volume is MQUAL or NQUAL.`,
+          downgrade.cause,
+        ],
+        action: "request_interchange_plus_quote",
+        monthlyCost: null,
+      }));
+    }
+    if ((downgrade.totalDowngradeCost ?? 0) > 0) {
+      findings.push(finding({
+        kind: "tiered_downgrade_cost",
+        severity: (downgrade.totalDowngradeCost ?? 0) >= 100 ? "high" : "warning",
+        title: "Tiered downgrade cost above qualified baseline",
+        amount: downgrade.totalDowngradeCost,
+        evidence: [
+          `Estimated downgrade cost this month is $${(downgrade.totalDowngradeCost ?? 0).toFixed(2)} above the lowest visible qualified tier.`,
+          "This is only the extra cost above all-qualified tiered pricing; overpayment versus competitive IC+ may be larger.",
+        ],
+        action: "request_interchange_plus_quote",
+      }));
+    }
+  }
+  if (analysis.authorizationAnalysis.status === "ready" && (analysis.authorizationAnalysis.authRatio ?? 0) > 1.5) {
+    findings.push(finding({
+      kind: "authorization_ratio_high",
+      severity: (analysis.authorizationAnalysis.authRatio ?? 0) > 3 ? "high" : "warning",
+      title: "Authorization count exceeds settled transaction count",
+      amount: analysis.authorizationAnalysis.estimatedExcessAuthCost,
+      evidence: [
+        `${analysis.authorizationAnalysis.authorizationCount ?? 0} authorization(s) versus ${analysis.authorizationAnalysis.transactionCount ?? 0} settled transaction(s).`,
+        `Auth-to-transaction ratio is ${(analysis.authorizationAnalysis.authRatio ?? 0).toFixed(2)}:1.`,
+      ],
+      action: "fix_terminal_or_gateway_configuration",
+      savingsEstimate:
+        (analysis.authorizationAnalysis.estimatedExcessAuthCost ?? 0) > 0
+          ? {
+              low: round2((analysis.authorizationAnalysis.estimatedExcessAuthCost ?? 0) * 12),
+              high: round2((analysis.authorizationAnalysis.estimatedExcessAuthCost ?? 0) * 12),
+              basis: "Annualized cost of authorizations above settled transaction count using the statement auth rate.",
+            }
+          : null,
+    }));
+  }
+  if (analysis.newAccountAnalysis.status === "confirmed" || analysis.newAccountAnalysis.status === "likely") {
+    findings.push(finding({
+      kind: "new_account_pricing_context",
+      severity: "info",
+      title: analysis.newAccountAnalysis.status === "confirmed" ? "First statement detected" : "Likely early account statement detected",
+      amount: null,
+      evidence: [analysis.newAccountAnalysis.message, analysis.newAccountAnalysis.recommendation ?? ""].filter(Boolean),
+      action: "request_interchange_plus_quote",
+    }));
+  }
+  if (analysis.bundledPricingBenchmark.status === "ready") {
+    const benchmark = analysis.bundledPricingBenchmark;
+    const effectiveRate = benchmark.effectiveRate;
+    const benchmarkHigh = benchmark.adjustedBenchmarkRate?.high ?? null;
+    if (effectiveRate !== null && benchmarkHigh !== null && effectiveRate > benchmarkHigh + 0.005) {
+      findings.push(finding({
+        kind: "bundled_effective_rate_above_benchmark",
+        severity: "high",
+        title: "Bundled effective rate is materially above benchmark",
+        amount: null,
+        evidence: [
+          `Effective rate is ${(effectiveRate * 100).toFixed(2)}%.`,
+          `Adjusted ${benchmark.businessCategory.label} benchmark range is ${((benchmark.adjustedBenchmarkRate?.low ?? 0) * 100).toFixed(2)}%-${(benchmarkHigh * 100).toFixed(2)}%.`,
+          "This is a directional benchmark because interchange detail is not itemized on the statement.",
+        ],
+        action: "request_interchange_plus_quote",
+      }));
+    }
+    if ((benchmark.estimatedAnnualSavings?.high ?? 0) > 0) {
+      findings.push(finding({
+        kind: "bundled_pricing_savings_opportunity",
+        severity: (benchmark.estimatedAnnualSavings?.low ?? 0) >= 1000 ? "high" : "warning",
+        title: "Bundled pricing shows estimated savings opportunity",
+        amount: benchmark.estimatedMonthlySavings?.high ?? null,
+        evidence: [
+          `Estimated annual savings range: $${(benchmark.estimatedAnnualSavings?.low ?? 0).toFixed(2)}-$${(benchmark.estimatedAnnualSavings?.high ?? 0).toFixed(2)}.`,
+          `Estimated competitive IC+ monthly cost range: $${(benchmark.estimatedCompetitiveCost?.low ?? 0).toFixed(2)}-$${(benchmark.estimatedCompetitiveCost?.high ?? 0).toFixed(2)}.`,
+          "Savings are estimates, not proof, because interchange and network fees are bundled.",
+        ],
+        action: "request_interchange_plus_quote",
+        savingsEstimate: {
+          low: benchmark.estimatedAnnualSavings?.low ?? 0,
+          high: benchmark.estimatedAnnualSavings?.high ?? 0,
+          basis: "Estimated annual savings from bundled-pricing benchmark model. Not pass-through proof.",
+        },
+      }));
+    }
+    if (benchmark.billbackRisk || benchmark.unusedTierRows > 0) {
+      findings.push(finding({
+        kind: "single_tier_qualified_structure",
+        severity: "warning",
+        title: benchmark.billbackRisk ? "Single qualified-tier pricing structure detected" : "Unused discount tier rows detected",
+        amount: null,
+        evidence: [
+          benchmark.billbackRisk
+            ? "Only qualified-tier discount rows are visible; separate billback/enhanced billback surcharges may exist outside this statement."
+            : "The statement uses bundled discount rows rather than itemized interchange detail.",
+          benchmark.unusedTierRows > 0 ? `${benchmark.unusedTierRows} zero-amount discount tier row(s) were detected.` : "No unused zero discount tiers were detected.",
+        ],
+        action: "request_pass_through_documentation",
+      }));
+    }
   }
   if (analysis.processorMarkupAnalysis.perItemStacking.detected) {
     findings.push(finding({
@@ -922,6 +1562,10 @@ export function buildFiservFeeAnalysisV2(input: FiservFeeAnalysisInput): FiservF
   const rowTotal = round2(rows.reduce((sum, row) => sum + row.amount, 0));
   const basisTotal = input.printedTotal ?? input.totalFees;
   const pricingModel = detectIcPlusFromCanonicalRows(input.canonicalRows, input.pricingModel);
+  const channelAnalysis = merchantChannelAnalysis(rows);
+  const downgradeAnalysis = tieredDowngradeAnalysis(rows, pricingModel, input.totalFees, channelAnalysis.merchantChannel);
+  const authAnalysis = authorizationAnalysis(rows, channelAnalysis.merchantChannel, input.transactionCount);
+  const accountAnalysis = newAccountAnalysis(input.totalVolume, input.ytdGrossSales);
   const withoutFindings = {
     version: "2.0" as const,
     normalization: input.normalizationSummary,
@@ -937,6 +1581,19 @@ export function buildFiservFeeAnalysisV2(input: FiservFeeAnalysisInput): FiservF
       notEnoughDetail: rows.filter((row) => row.proofStatus === "not_enough_detail").length,
     },
     processorMarkupAnalysis: processorMarkupAnalysis(rows, pricingModel, input.totalVolume, input.transactionCount),
+    merchantChannelAnalysis: channelAnalysis,
+    tieredDowngradeAnalysis: downgradeAnalysis,
+    authorizationAnalysis: authAnalysis,
+    newAccountAnalysis: accountAnalysis,
+    bundledPricingBenchmark: buildFiservBundledPricingBenchmarkAnalysis({
+      pricingModel: pricingModel.pricingModel,
+      rows,
+      totalVolume: input.totalVolume,
+      totalFees: input.totalFees,
+      transactionCount: input.transactionCount,
+      merchantName: input.merchantName,
+      merchantChannel: channelAnalysis.merchantChannel,
+    }),
     interchangeReconciliation: buildInterchangeReconciliation(rows, input.interchangeReconciliationBasis),
     reconciliation: {
       basisTotal,

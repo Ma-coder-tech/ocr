@@ -355,6 +355,212 @@ export const fiservFeeAnalysisV2Schema = z
         amexSalesDiscountRate: finiteNumber.nonnegative().nullable(),
       })
       .strict(),
+    merchantChannelAnalysis: z
+      .object({
+        status: z.enum(["detected", "defaulted"]),
+        merchantChannel: z.enum(["card_present", "card_not_present", "mixed"]),
+        confidence: z.enum(["high", "medium", "low"]),
+        signals: z.array(
+          z
+            .object({
+              type: z.enum(["card_not_present", "card_present"]),
+              description: z.string().min(1),
+              evidenceLine: z.string().min(1),
+              rowIndex: z.number().int().nonnegative(),
+            })
+            .strict(),
+        ),
+        benchmarkAdjustments: z
+          .object({
+            effectiveRateBenchmark: z.object({ low: finiteNumber.nonnegative(), high: finiteNumber.nonnegative() }).strict().nullable(),
+            interchangeRangeAdjustment: z.object({ low: finiteNumber.nonnegative(), high: finiteNumber.nonnegative() }).strict().nullable(),
+            competitiveSpread: z.object({ low: finiteNumber.nonnegative(), high: finiteNumber.nonnegative() }).strict().nullable(),
+            competitivePerAuth: z.object({ low: finiteNumber.nonnegative(), high: finiteNumber.nonnegative() }).strict().nullable(),
+          })
+          .strict(),
+        notes: z.array(z.string().min(1)),
+      })
+      .strict(),
+    tieredDowngradeAnalysis: z
+      .object({
+        status: z.enum(["ready", "not_applicable", "not_enough_detail"]),
+        baselineRate: finiteNumber.nonnegative().nullable(),
+        baselineSource: z.enum(["lowest_visible_qual", "lowest_visible_tier", "not_available"]),
+        totalTieredVolume: finiteNumber.nonnegative().nullable(),
+        qualifiedVolume: finiteNumber.nonnegative(),
+        midQualifiedVolume: finiteNumber.nonnegative(),
+        nonQualifiedVolume: finiteNumber.nonnegative(),
+        qualifiedPct: finiteNumber.nonnegative().nullable(),
+        midQualifiedPct: finiteNumber.nonnegative().nullable(),
+        nonQualifiedPct: finiteNumber.nonnegative().nullable(),
+        notBestTierPct: finiteNumber.nonnegative().nullable(),
+        totalDowngradeCost: finiteNumber.nonnegative().nullable(),
+        totalDowngradeCostPctOfFees: finiteNumber.nonnegative().nullable(),
+        largestDowngradeImpact: z
+          .object({
+            cardTypeSection: z.string().min(1).nullable(),
+            description: z.string().min(1),
+            tier: z.enum(["qualified", "mid_qualified", "non_qualified"]),
+            volume: finiteNumber.nonnegative(),
+            rate: finiteNumber.nonnegative(),
+            amount: finiteNumber.nonnegative(),
+            downgradeCost: finiteNumber.nonnegative(),
+            amountPctOfFees: finiteNumber.nonnegative().nullable(),
+            downgradeCostPctOfFees: finiteNumber.nonnegative().nullable(),
+            evidenceLine: z.string().min(1),
+          })
+          .strict()
+          .nullable(),
+        rows: z.array(
+          z
+            .object({
+              cardTypeSection: z.string().min(1).nullable(),
+              description: z.string().min(1),
+              tier: z.enum(["qualified", "mid_qualified", "non_qualified"]),
+              volume: finiteNumber.nonnegative(),
+              rate: finiteNumber.nonnegative(),
+              amount: finiteNumber.nonnegative(),
+              baselineRate: finiteNumber.nonnegative().nullable(),
+              downgradeCost: finiteNumber.nonnegative().nullable(),
+              evidenceLine: z.string().min(1),
+            })
+            .strict(),
+        ),
+        flags: z.array(
+          z
+            .object({
+              kind: z.enum(["high_non_qualified", "majority_downgraded", "minimal_downgrade"]),
+              severity: z.enum(["info", "warning", "high"]),
+              message: z.string().min(1),
+            })
+            .strict(),
+        ),
+        cause: z.string().min(1),
+      })
+      .strict(),
+    authorizationAnalysis: z
+      .object({
+        status: z.enum(["ready", "not_applicable", "not_enough_detail"]),
+        transactionCount: z.number().int().nonnegative().nullable(),
+        authorizationCount: z.number().int().nonnegative().nullable(),
+        authRatio: finiteNumber.nonnegative().nullable(),
+        excessAuthorizationCount: z.number().int().nonnegative().nullable(),
+        estimatedExcessAuthCost: finiteNumber.nonnegative().nullable(),
+        primaryAuthRate: finiteNumber.nonnegative().nullable(),
+        primaryAuthRows: z.array(
+          z
+            .object({
+              description: z.string().min(1),
+              cardTypeSection: z.string().min(1).nullable(),
+              count: z.number().int().nonnegative(),
+              rate: finiteNumber.nonnegative().nullable(),
+              amount: finiteNumber.nonnegative(),
+              evidenceLine: z.string().min(1),
+            })
+            .strict(),
+        ),
+        flags: z.array(
+          z
+            .object({
+              kind: z.enum(["auths_exceed_settled_transactions", "unusually_high_auth_ratio"]),
+              severity: z.enum(["warning", "high"]),
+              message: z.string().min(1),
+            })
+            .strict(),
+        ),
+      })
+      .strict(),
+    newAccountAnalysis: z
+      .object({
+        status: z.enum(["confirmed", "likely", "not_detected", "not_enough_detail"]),
+        currentMonthVolume: finiteNumber.nonnegative(),
+        ytdGrossSales: finiteNumber.nonnegative().nullable(),
+        ytdToCurrentMonthRatio: finiteNumber.nonnegative().nullable(),
+        message: z.string().min(1),
+        recommendation: z.string().min(1).nullable(),
+      })
+      .strict(),
+    bundledPricingBenchmark: z
+      .object({
+        status: z.enum(["not_applicable", "ready", "not_enough_detail"]),
+        pricingModel: z.string().min(1),
+        benchmarkMode: z.enum(["fee_level_proof", "bundled_estimate"]),
+        businessCategory: z
+          .object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+            source: z.enum(["merchant_name_inference", "default_unknown", "not_applicable"]),
+            confidence: z.enum(["high", "medium", "low"]),
+          })
+          .strict(),
+        volumeTier: z.string().min(1).nullable(),
+        effectiveRate: finiteNumber.nonnegative().nullable(),
+        adjustedBenchmarkRate: z
+          .object({
+            low: finiteNumber.nonnegative(),
+            high: finiteNumber.nonnegative(),
+          })
+          .strict()
+          .nullable(),
+        estimatedPassThroughCost: z
+          .object({
+            low: finiteNumber.nonnegative(),
+            high: finiteNumber.nonnegative(),
+          })
+          .strict()
+          .nullable(),
+        estimatedProcessorMargin: z
+          .object({
+            low: finiteNumber.nonnegative(),
+            high: finiteNumber.nonnegative(),
+          })
+          .strict()
+          .nullable(),
+        estimatedCompetitiveCost: z
+          .object({
+            low: finiteNumber.nonnegative(),
+            high: finiteNumber.nonnegative(),
+          })
+          .strict()
+          .nullable(),
+        estimatedMonthlySavings: z
+          .object({
+            low: finiteNumber.nonnegative(),
+            high: finiteNumber.nonnegative(),
+          })
+          .strict()
+          .nullable(),
+        estimatedAnnualSavings: z
+          .object({
+            low: finiteNumber.nonnegative(),
+            high: finiteNumber.nonnegative(),
+          })
+          .strict()
+          .nullable(),
+        confidence: z.enum(["medium", "low"]),
+        cardMix: z.array(
+          z
+            .object({
+              cardType: z.string().min(1),
+              volume: finiteNumber.nonnegative(),
+              pctOfVolume: finiteNumber.nonnegative().nullable(),
+              estimatedInterchangeCost: z
+                .object({
+                  low: finiteNumber.nonnegative(),
+                  high: finiteNumber.nonnegative(),
+                })
+                .strict(),
+              sourceRows: z.number().int().nonnegative(),
+            })
+            .strict(),
+        ),
+        unusedTierRows: z.number().int().nonnegative(),
+        billbackRisk: z.boolean(),
+        assumptions: z.array(z.string().min(1)),
+        warnings: z.array(z.string().min(1)),
+        sources: z.array(z.string().min(1)),
+      })
+      .strict(),
     interchangeReconciliation: z
       .object({
         summaryTotal: finiteNumber.nonnegative().nullable(),
@@ -411,6 +617,15 @@ export const fiservFeeAnalysisV2Schema = z
             "third_party_service_fee",
             "hidden_percentage_markup",
             "penalty_or_configuration_fee",
+            "bundled_effective_rate_above_benchmark",
+            "bundled_pricing_savings_opportunity",
+            "single_tier_qualified_structure",
+            "card_not_present_detected",
+            "tiered_downgrade_high_nqual",
+            "tiered_downgrade_majority_not_qualified",
+            "tiered_downgrade_cost",
+            "authorization_ratio_high",
+            "new_account_pricing_context",
           ]),
           severity: z.enum(["info", "warning", "high"]),
           title: z.string().min(1),
@@ -423,6 +638,7 @@ export const fiservFeeAnalysisV2Schema = z
             "request_pass_through_documentation",
             "verify_third_party_service",
             "fix_terminal_or_gateway_configuration",
+            "request_interchange_plus_quote",
           ]),
           monthlyCost: finiteNumber.nullable(),
           annualEstimate: finiteNumber.nullable(),
