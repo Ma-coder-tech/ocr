@@ -1,6 +1,7 @@
 import { getBusinessTypeBenchmark, getBusinessTypeReportLabel } from "./businessTypes.js";
 import { analyzeDocument } from "./analyzer.js";
 import { withFeeClassification } from "./feeClassification.js";
+import { maybeRunBenchmarkCategoryAiInferenceForParserOutput } from "./benchmarkCategoryAiInference.js";
 import { maybeRunFiservFeeAnalysisAiClassificationForParserOutput } from "./fiservFeeAnalysisAiClassification.js";
 import { maybeRunFiservProcessorFeeAiClassificationForParserOutput } from "./fiservProcessorFeeAiClassification.js";
 import { maybeRunStatementNoticeAiExtractionForParserOutput } from "./statementNoticeAiExtraction.js";
@@ -240,10 +241,10 @@ function applyValidatedParserOutput(
   };
 }
 
-function findValidatedPdfParser(doc: ParsedDocument, sourceFileName?: string): MatchedParser | null {
+function findValidatedPdfParser(doc: ParsedDocument, sourceFileName?: string, businessType?: BusinessTypeId): MatchedParser | null {
   for (const driver of pdfParserDrivers) {
     if (!driver.supports(doc)) continue;
-    const output = driver.parse(doc, { sourceFileName }) as ValidatedParserOutput;
+    const output = driver.parse(doc, { sourceFileName, businessType }) as ValidatedParserOutput;
     return { driver, output };
   }
   return null;
@@ -257,7 +258,7 @@ export function analyzeStatementDocument(
   const baseSummary = analyzeDocument(doc, businessType);
   if (doc.sourceType !== "pdf") return baseSummary;
 
-  const matched = findValidatedPdfParser(doc, options.sourceFileName);
+  const matched = findValidatedPdfParser(doc, options.sourceFileName, businessType);
   if (!matched) return baseSummary;
 
   return applyValidatedParserOutput(baseSummary, matched, businessType);
@@ -271,11 +272,12 @@ export async function analyzeStatementDocumentWithOptionalAi(
   const baseSummary = analyzeDocument(doc, businessType);
   if (doc.sourceType !== "pdf") return baseSummary;
 
-  const matched = findValidatedPdfParser(doc, options.sourceFileName);
+  const matched = findValidatedPdfParser(doc, options.sourceFileName, businessType);
   if (!matched) return baseSummary;
 
   const feeLedgerEnhanced = await maybeRunFiservProcessorFeeAiClassificationForParserOutput(matched.output as any);
   const v2Enhanced = await maybeRunFiservFeeAnalysisAiClassificationForParserOutput(feeLedgerEnhanced.output as any);
-  const noticeEnhanced = await maybeRunStatementNoticeAiExtractionForParserOutput(v2Enhanced.output as any);
+  const categoryEnhanced = await maybeRunBenchmarkCategoryAiInferenceForParserOutput(v2Enhanced.output as any);
+  const noticeEnhanced = await maybeRunStatementNoticeAiExtractionForParserOutput(categoryEnhanced.output as any);
   return applyValidatedParserOutput(baseSummary, { ...matched, output: noticeEnhanced.output as ValidatedParserOutput }, businessType);
 }

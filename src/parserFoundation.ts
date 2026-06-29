@@ -1,4 +1,5 @@
 import type { ParsedDocument } from "./parser.js";
+import type { BusinessTypeId } from "./businessTypes.js";
 
 export type RawExtractedDocument = ParsedDocument;
 export type RawDocumentRow = ParsedDocument["rows"][number];
@@ -92,6 +93,7 @@ export type ParserValidationState = {
 
 export type ParserDriverOptions = {
   sourceFileName?: string;
+  businessType?: BusinessTypeId | null;
 };
 
 export type ParserDriver<TOutput = unknown> = {

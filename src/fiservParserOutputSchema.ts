@@ -8,6 +8,36 @@ const require = createRequire(import.meta.url);
 const { z } = require("zod/v3");
 
 const finiteNumber = z.number().finite();
+const benchmarkCategorySourceSchema = z.enum(["user_selected", "deterministic", "ai_inferred", "default"]);
+const benchmarkCategoryConfidenceSchema = z.enum(["high", "medium", "low"]);
+const benchmarkCategoryResolutionSchema = z
+  .object({
+    categoryId: z.string().min(1),
+    categoryLabel: z.string().min(1),
+    benchmarkReferenceKey: z.string().min(1),
+    source: benchmarkCategorySourceSchema,
+    confidence: benchmarkCategoryConfidenceSchema,
+    matchedKeyword: z.string().min(1).nullable(),
+    userSelectedBusinessType: z.string().min(1).nullable(),
+    userSelectedMappedCategoryId: z.string().min(1).nullable(),
+    deterministicCategoryId: z.string().min(1),
+    deterministicSource: z.enum(["merchant_name_keyword", "high_risk_keyword", "default"]),
+    aiSuggestedCategoryId: z.string().min(1).nullable(),
+    evidence: z.array(z.string().min(1)),
+    alternatives: z.array(
+      z
+        .object({
+          categoryId: z.string().min(1),
+          categoryLabel: z.string().min(1),
+          source: z.enum(["deterministic", "ai_inferred", "default"]),
+          confidence: benchmarkCategoryConfidenceSchema,
+          reason: z.string().min(1).nullable(),
+        })
+        .strict(),
+    ),
+    warning: z.string().min(1).nullable(),
+  })
+  .strict();
 
 export const parserConfidenceSchema = z.enum(["high", "medium", "low", "needs_review"]);
 export const parserDecisionStatusSchema = z.enum(["accepted", "accepted_with_warnings", "needs_review", "unsupported", "failed"]);
@@ -272,6 +302,30 @@ export const fiservFeeAnalysisV2Schema = z
       })
       .strict()
       .optional(),
+    benchmarkCategoryAi: z
+      .object({
+        status: z.enum(["disabled", "not_needed", "applied", "no_usable_suggestion", "failed"]),
+        provider: z.enum(["anthropic", "openai"]).nullable(),
+        model: z.string().min(1).nullable(),
+        attempted: z.boolean(),
+        categoryId: z.string().min(1).nullable(),
+        confidence: benchmarkCategoryConfidenceSchema.nullable(),
+        applied: z.boolean(),
+        highRiskSignal: z.boolean().nullable(),
+        evidence: z.array(z.string().min(1)),
+        alternatives: z.array(
+          z
+            .object({
+              categoryId: z.string().min(1),
+              confidence: benchmarkCategoryConfidenceSchema,
+              reason: z.string().min(1).nullable(),
+            })
+            .strict(),
+        ),
+        notes: z.array(z.string().min(1)),
+      })
+      .strict()
+      .optional(),
     pricingModel: z
       .object({
         pricingModel: z.string().min(1),
@@ -505,14 +559,16 @@ export const fiservFeeAnalysisV2Schema = z
         ),
       })
       .strict(),
+    benchmarkCategoryResolution: benchmarkCategoryResolutionSchema,
     effectiveRateBenchmarkAnalysis: z
       .object({
         status: z.enum(["ready", "not_enough_detail"]),
         categoryId: z.string().min(1),
         categoryLabel: z.string().min(1),
-        categoryConfidence: z.enum(["high", "medium", "low"]),
-        categorySource: z.enum(["merchant_name_keyword", "high_risk_keyword", "default"]),
+        categoryConfidence: benchmarkCategoryConfidenceSchema,
+        categorySource: benchmarkCategorySourceSchema,
         matchedKeyword: z.string().min(1).nullable(),
+        categoryResolution: benchmarkCategoryResolutionSchema,
         annualVolume: finiteNumber.nonnegative().nullable(),
         annualVolumeSource: z.enum(["monthly_volume_x12", "ytd_extrapolated", "not_available"]),
         ytdExtrapolatedAnnualVolume: finiteNumber.nonnegative().nullable(),

@@ -12,15 +12,22 @@ import {
 import {
   adjustedEffectiveRateBenchmark,
   estimateAnnualVolume,
-  inferMccBenchmarkCategory,
   loadMccBenchmarkReference,
   matchBenchmarkPattern,
   perAuthBenchmarkFor,
   type MccBenchmarkPattern,
 } from "./mccBenchmarkReference.js";
+import {
+  resolveBenchmarkCategory,
+  type BenchmarkCategoryAiSuggestion,
+  type BenchmarkCategoryResolution,
+  type BenchmarkCategorySource,
+} from "./benchmarkCategoryResolution.js";
 import { normalizeFiservFeeReferenceText, type FiservFeeReferenceEntry } from "./fiservFeeReference.js";
 import { round2, round8 } from "./reconciliation.js";
+import type { BenchmarkCategoryAiInference } from "./benchmarkCategoryAiInference.js";
 import type { StatementNoticeAiExtraction } from "./statementNoticeAiExtraction.js";
+import type { BusinessTypeId } from "./businessTypes.js";
 import type { RepricingEvent } from "./types.js";
 
 export type FiservFeeProofStatus = "proven" | "likely" | "processor_controlled" | "indeterminate" | "not_enough_detail";
@@ -43,6 +50,8 @@ export type FiservFeeAnalysisInput = {
   statementPeriodStart: string;
   statementPeriodEnd: string;
   merchantName?: string | null;
+  userSelectedBusinessType?: BusinessTypeId | null;
+  benchmarkCategoryAiSuggestion?: BenchmarkCategoryAiSuggestion | null;
   ytdGrossSales?: number | null;
   notices?: RepricingEvent[];
   noticeText?: string | null;
@@ -240,8 +249,9 @@ export type FiservEffectiveRateBenchmarkAnalysis = {
   categoryId: string;
   categoryLabel: string;
   categoryConfidence: "high" | "medium" | "low";
-  categorySource: "merchant_name_keyword" | "high_risk_keyword" | "default";
+  categorySource: BenchmarkCategorySource;
   matchedKeyword: string | null;
+  categoryResolution: Omit<BenchmarkCategoryResolution, "category">;
   annualVolume: number | null;
   annualVolumeSource: "monthly_volume_x12" | "ytd_extrapolated" | "not_available";
   ytdExtrapolatedAnnualVolume: number | null;
@@ -297,6 +307,7 @@ export type FiservFeeAnalysisV2 = {
   notices: RepricingEvent[];
   noticeText: string | null;
   aiNoticeExtraction?: StatementNoticeAiExtraction;
+  benchmarkCategoryAi?: BenchmarkCategoryAiInference;
   pricingModel: {
     pricingModel: string;
     confidence: "high" | "medium" | "low";
@@ -340,6 +351,7 @@ export type FiservFeeAnalysisV2 = {
   tieredDowngradeAnalysis: FiservTieredDowngradeAnalysis;
   authorizationAnalysis: FiservAuthorizationAnalysis;
   effectiveRateBenchmarkAnalysis: FiservEffectiveRateBenchmarkAnalysis;
+  benchmarkCategoryResolution: Omit<BenchmarkCategoryResolution, "category">;
   perAuthBenchmarkAnalysis: FiservPerAuthBenchmarkAnalysis;
   newAccountAnalysis: FiservNewAccountAnalysis;
   bundledPricingBenchmark: FiservBundledPricingBenchmarkAnalysis;
@@ -1210,22 +1222,29 @@ function newAccountAnalysis(totalVolume: number, ytdGrossSales: number | null | 
   };
 }
 
+function serializeBenchmarkCategoryResolution(resolution: BenchmarkCategoryResolution): Omit<BenchmarkCategoryResolution, "category"> {
+  const { category: _category, ...serializable } = resolution;
+  return serializable;
+}
+
 function effectiveRateBenchmarkAnalysis(params: {
-  merchantName: string | null | undefined;
+  categoryResolution: BenchmarkCategoryResolution;
   totalVolume: number;
   effectiveRate: number | null;
   processorMarkupRate: number | null;
   ytdGrossSales: number | null | undefined;
   statementPeriodStart: string;
+  annualVolumeOverride?: ReturnType<typeof estimateAnnualVolume> | null;
 }): FiservEffectiveRateBenchmarkAnalysis {
   if (params.totalVolume <= 0 || params.effectiveRate === null) {
     return {
       status: "not_enough_detail",
-      categoryId: "default",
-      categoryLabel: "Default / Unknown Category",
-      categoryConfidence: "low",
-      categorySource: "default",
-      matchedKeyword: null,
+      categoryId: params.categoryResolution.categoryId,
+      categoryLabel: params.categoryResolution.categoryLabel,
+      categoryConfidence: params.categoryResolution.confidence,
+      categorySource: params.categoryResolution.source,
+      matchedKeyword: params.categoryResolution.matchedKeyword,
+      categoryResolution: serializeBenchmarkCategoryResolution(params.categoryResolution),
       annualVolume: null,
       annualVolumeSource: "not_available",
       ytdExtrapolatedAnnualVolume: null,
@@ -1238,13 +1257,13 @@ function effectiveRateBenchmarkAnalysis(params: {
       verdict: "not_enough_detail",
       estimatedAnnualOverpayment: null,
       message: "Effective-rate benchmarking requires positive statement volume and fees.",
-      notes: [],
+      notes: params.categoryResolution.warning ? [params.categoryResolution.warning] : [],
     };
   }
 
   const reference = loadMccBenchmarkReference();
-  const category = inferMccBenchmarkCategory(params.merchantName, reference);
-  const annual = estimateAnnualVolume(params.totalVolume, params.ytdGrossSales, params.statementPeriodStart);
+  const category = params.categoryResolution;
+  const annual = params.annualVolumeOverride ?? estimateAnnualVolume(params.totalVolume, params.ytdGrossSales, params.statementPeriodStart);
   const adjusted = adjustedEffectiveRateBenchmark({ category: category.category, annualVolume: annual.annualVolume, reference });
   const benchmarkLow = adjusted.benchmark.low;
   const benchmarkHigh = adjusted.benchmark.high;
@@ -1260,21 +1279,22 @@ function effectiveRateBenchmarkAnalysis(params: {
   const estimatedAnnualOverpayment =
     verdict === "significantly_above_range" ? round2(Math.max(0, params.effectiveRate - benchmarkHigh) * params.totalVolume * 12) : null;
   const categoryQualifier =
-    category.id === "default" ? "default category — MCC-specific benchmark not available, using general retail benchmark" : `${category.label} category`;
+    category.categoryId === "default" ? "default category — MCC-specific benchmark not available, using general retail benchmark" : `${category.categoryLabel} category`;
   const message =
     verdict === "below_range" || verdict === "within_range"
-      ? `This merchant's effective rate of ${(params.effectiveRate * 100).toFixed(2)}% is within the competitive range of ${(benchmarkLow * 100).toFixed(2)}% to ${(benchmarkHigh * 100).toFixed(2)}% for a ${category.label} merchant processing approximately $${annual.annualVolume.toLocaleString("en-US", { maximumFractionDigits: 0 })}/year. The processor-controlled cost of ${((params.processorMarkupRate ?? 0) * 100).toFixed(2)}% of volume is competitive.`
+      ? `This merchant's effective rate of ${(params.effectiveRate * 100).toFixed(2)}% is within the competitive range of ${(benchmarkLow * 100).toFixed(2)}% to ${(benchmarkHigh * 100).toFixed(2)}% for a ${category.categoryLabel} merchant processing approximately $${annual.annualVolume.toLocaleString("en-US", { maximumFractionDigits: 0 })}/year. The processor-controlled cost of ${((params.processorMarkupRate ?? 0) * 100).toFixed(2)}% of volume is competitive.`
       : verdict === "significantly_above_range"
         ? `This merchant's effective rate of ${(params.effectiveRate * 100).toFixed(2)}% is significantly above the competitive range. Estimated annual overpayment: $${(estimatedAnnualOverpayment ?? 0).toFixed(2)}.`
         : `This merchant's effective rate of ${(params.effectiveRate * 100).toFixed(2)}% is slightly above the competitive range of ${(benchmarkLow * 100).toFixed(2)}% to ${(benchmarkHigh * 100).toFixed(2)}%.`;
 
   return {
     status: "ready",
-    categoryId: category.id,
-    categoryLabel: category.label,
+    categoryId: category.categoryId,
+    categoryLabel: category.categoryLabel,
     categoryConfidence: category.confidence,
     categorySource: category.source,
     matchedKeyword: category.matchedKeyword,
+    categoryResolution: serializeBenchmarkCategoryResolution(category),
     annualVolume: annual.annualVolume,
     annualVolumeSource: annual.source,
     ytdExtrapolatedAnnualVolume: annual.ytdExtrapolatedAnnualVolume,
@@ -1289,6 +1309,7 @@ function effectiveRateBenchmarkAnalysis(params: {
     message,
     notes: [
       categoryQualifier,
+      ...(category.warning ? [category.warning] : []),
       ...(adjusted.adjustmentNote ? [adjusted.adjustmentNote] : []),
       ...(annual.ytdExtrapolatedAnnualVolume !== null
         ? [`YTD-extrapolated annual volume is $${annual.ytdExtrapolatedAnnualVolume.toLocaleString("en-US", { maximumFractionDigits: 0 })}; benchmark tier uses monthly volume x 12.`]
@@ -1927,9 +1948,13 @@ export function buildFiservFeeAnalysisV2(input: FiservFeeAnalysisInput): FiservF
   const accountAnalysis = newAccountAnalysis(input.totalVolume, input.ytdGrossSales);
   const processorMarkup = processorMarkupAnalysis(rows, pricingModel, input.totalVolume, input.transactionCount);
   const annualVolume = estimateAnnualVolume(input.totalVolume, input.ytdGrossSales, input.statementPeriodStart);
-  const category = inferMccBenchmarkCategory(input.merchantName);
-  const effectiveBenchmark = effectiveRateBenchmarkAnalysis({
+  const categoryResolution = resolveBenchmarkCategory({
     merchantName: input.merchantName,
+    userSelectedBusinessType: input.userSelectedBusinessType,
+    aiSuggestion: input.benchmarkCategoryAiSuggestion,
+  });
+  const effectiveBenchmark = effectiveRateBenchmarkAnalysis({
+    categoryResolution,
     totalVolume: input.totalVolume,
     effectiveRate: input.totalVolume > 0 ? input.totalFees / input.totalVolume : null,
     processorMarkupRate: processorMarkup.processorMarkupRate,
@@ -1940,7 +1965,7 @@ export function buildFiservFeeAnalysisV2(input: FiservFeeAnalysisInput): FiservF
     rows,
     annualVolume: annualVolume.annualVolume,
     merchantChannel: channelAnalysis.merchantChannel,
-    isHighRisk: category.id === "high_risk_retail",
+    isHighRisk: categoryResolution.categoryId === "high_risk_retail",
     processorPerItemTotal: processorMarkup.processorPerItemTotal,
   });
   const withoutFindings = {
@@ -1962,6 +1987,7 @@ export function buildFiservFeeAnalysisV2(input: FiservFeeAnalysisInput): FiservF
     merchantChannelAnalysis: channelAnalysis,
     tieredDowngradeAnalysis: downgradeAnalysis,
     authorizationAnalysis: authAnalysis,
+    benchmarkCategoryResolution: serializeBenchmarkCategoryResolution(categoryResolution),
     effectiveRateBenchmarkAnalysis: effectiveBenchmark,
     perAuthBenchmarkAnalysis: perAuthBenchmark,
     newAccountAnalysis: accountAnalysis,
@@ -1999,4 +2025,55 @@ export function buildFiservFeeAnalysisV2FromRawRows(input: Omit<FiservFeeAnalysi
     canonicalRows: normalized.rows,
     normalizationSummary: normalized.summary,
   });
+}
+
+export function applyBenchmarkCategoryAiSuggestionToFiservFeeAnalysisV2(params: {
+  analysis: FiservFeeAnalysisV2;
+  merchantName?: string | null;
+  totalVolume: number;
+  totalFees: number;
+  statementPeriodStart: string;
+  aiSuggestion: BenchmarkCategoryAiSuggestion;
+}): FiservFeeAnalysisV2 {
+  const categoryResolution = resolveBenchmarkCategory({
+    merchantName: params.merchantName,
+    userSelectedBusinessType: params.analysis.benchmarkCategoryResolution.userSelectedBusinessType,
+    aiSuggestion: params.aiSuggestion,
+  });
+  const effectiveBenchmark = effectiveRateBenchmarkAnalysis({
+    categoryResolution,
+    totalVolume: params.totalVolume,
+    effectiveRate: params.totalVolume > 0 ? params.totalFees / params.totalVolume : null,
+    processorMarkupRate: params.analysis.processorMarkupAnalysis.processorMarkupRate,
+    ytdGrossSales: null,
+    statementPeriodStart: params.statementPeriodStart,
+    annualVolumeOverride:
+      params.analysis.effectiveRateBenchmarkAnalysis.annualVolume !== null &&
+      params.analysis.effectiveRateBenchmarkAnalysis.annualVolumeSource !== "not_available"
+        ? {
+            annualVolume: params.analysis.effectiveRateBenchmarkAnalysis.annualVolume,
+            source: params.analysis.effectiveRateBenchmarkAnalysis.annualVolumeSource,
+            ytdExtrapolatedAnnualVolume: params.analysis.effectiveRateBenchmarkAnalysis.ytdExtrapolatedAnnualVolume,
+          }
+        : null,
+  });
+  const perAuthBenchmark = perAuthBenchmarkAnalysis({
+    rows: params.analysis.rows,
+    annualVolume: effectiveBenchmark.annualVolume,
+    merchantChannel: params.analysis.merchantChannelAnalysis.merchantChannel,
+    isHighRisk: categoryResolution.categoryId === "high_risk_retail",
+    processorPerItemTotal: params.analysis.processorMarkupAnalysis.processorPerItemTotal,
+  });
+  const withoutFindings = {
+    ...params.analysis,
+    benchmarkCategoryResolution: serializeBenchmarkCategoryResolution(categoryResolution),
+    effectiveRateBenchmarkAnalysis: effectiveBenchmark,
+    perAuthBenchmarkAnalysis: perAuthBenchmark,
+  };
+  const findings = findingsFor(withoutFindings);
+  return {
+    ...withoutFindings,
+    findings,
+    savingsSummary: savingsSummary(findings),
+  };
 }

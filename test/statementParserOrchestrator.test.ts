@@ -25,6 +25,12 @@ describe("statement parser orchestrator", () => {
     expect(summary.totalVolume).toBe(36912.94);
     expect(summary.totalFees).toBe(1565.73);
     expect(summary.effectiveRate).toBe(4.24);
+    expect(summary.fiservFeeAnalysisV2?.benchmarkCategoryResolution).toMatchObject({
+      categoryId: "default",
+      source: "default",
+      userSelectedBusinessType: "other",
+      userSelectedMappedCategoryId: null,
+    });
     expect(summary.feeBreakdown.map((row) => row.label)).toEqual(
       expect.arrayContaining([
         expect.stringContaining("BATCH HEADER"),
