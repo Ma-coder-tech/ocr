@@ -1,4 +1,5 @@
 import path from "node:path";
+import { zodSchema } from "ai";
 import { describe, expect, it } from "vitest";
 import {
   buildFiservFeeAnalysisAiPacket,
@@ -191,5 +192,45 @@ describe("Fiserv V2 AI fee classification", () => {
         }),
       ]),
     );
+  });
+
+  it("uses an OpenAI-compatible required nullable assessment schema", async () => {
+    const doc = await parsePdf(CLOVER_FULL_PDF_PATH);
+    const parsed = fiservFirstDataFullStatementDriver.parse(doc, { sourceFileName: "SAMPLE_MERCHANT4_CLOVER.pdf" });
+    let capturedSchema: unknown = null;
+
+    const result = await maybeRunFiservFeeAnalysisAiClassificationForParserOutput(parsed, {
+      enabled: true,
+      provider: "openai",
+      openAiApiKey: "test-openai-key",
+      openAiModelName: "gpt-test",
+      sdk: {
+        openai: (modelName: string) => ({ provider: "openai", modelName }),
+        Output: {
+          object: (options) => {
+            capturedSchema = options.schema;
+            return { outputKind: "object", ...options };
+          },
+        },
+        generateObject: async () => {
+          throw new Error("OpenAI should use generateText.");
+        },
+        generateText: async () => ({
+          output: {
+            rows: [],
+          },
+        }),
+      },
+    });
+
+    expect(result.ai.status).toBe("no_usable_suggestions");
+    expect(capturedSchema).toBeTruthy();
+
+    const json = await zodSchema(capturedSchema as Parameters<typeof zodSchema>[0]).jsonSchema;
+    const rowSchema = json.properties?.rows?.items;
+    expect(rowSchema).toMatchObject({
+      required: expect.arrayContaining(["assessment"]),
+    });
+    expect(JSON.stringify(rowSchema?.properties?.assessment)).not.toContain('"not":{}');
   });
 });

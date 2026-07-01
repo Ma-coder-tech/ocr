@@ -11,6 +11,7 @@ import {
   fiservFirstDataFullStatementDriver,
   fiservFirstDataShortStatementDriver,
 } from "./fiservFirstDataParser.js";
+import { genericFiservStatementDriver } from "./genericFiservStatementParser.js";
 import type { ParserDecision, ParserDriver, ParserConfidence } from "./parserFoundation.js";
 import type { ParsedDocument } from "./parser.js";
 import type { AnalysisSummary, BenchmarkResult, DataQualitySignal, FeeBreakdownRow } from "./types.js";
@@ -81,6 +82,7 @@ const pdfParserDrivers: ParserDriver<unknown>[] = [
   fiservFirstDataProcessorStatementDriver,
   fiservFirstDataFullStatementDriver,
   fiservFirstDataShortStatementDriver,
+  genericFiservStatementDriver,
 ];
 
 function round2(value: number): number {
@@ -245,8 +247,16 @@ function applyValidatedParserOutput(
 function findValidatedPdfParser(doc: ParsedDocument, sourceFileName?: string, businessType?: BusinessTypeId): MatchedParser | null {
   for (const driver of pdfParserDrivers) {
     if (!driver.supports(doc)) continue;
-    const output = driver.parse(doc, { sourceFileName, businessType }) as ValidatedParserOutput;
-    return { driver, output };
+    try {
+      const output = driver.parse(doc, { sourceFileName, businessType }) as ValidatedParserOutput;
+      return { driver, output };
+    } catch (error) {
+      console.warn(
+        `[statement-parser] ${driver.id} supported the document but failed to parse; trying next parser. ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
   return null;
 }

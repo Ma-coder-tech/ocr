@@ -387,7 +387,7 @@ function aiResponseSchema(): unknown {
     canonicalName: z.string().nullable(),
     suggestedReferenceId: z.string().nullable(),
     proofStatus: z.enum(["indeterminate", "not_enough_detail", "processor_controlled"]),
-    assessment: aiAssessmentSchema(z).optional().nullable(),
+    assessment: aiAssessmentSchema(z).nullable(),
     reasonCodes: z.array(z.string()),
     explanation: z.string(),
   });

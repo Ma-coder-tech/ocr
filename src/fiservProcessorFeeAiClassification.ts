@@ -384,7 +384,7 @@ function aiResponseSchema(): unknown {
     confidence: z.enum(["high", "medium", "low"]),
     subcategory: z.string().nullable(),
     negotiability: z.enum(["likely_negotiable", "likely_non_negotiable", "unknown"]),
-    assessment: aiAssessmentSchema(z).optional().nullable(),
+    assessment: aiAssessmentSchema(z).nullable(),
     reasonCodes: z.array(z.string()),
     explanation: z.string(),
   });
