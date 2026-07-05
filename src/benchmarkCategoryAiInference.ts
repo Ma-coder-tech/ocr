@@ -140,7 +140,7 @@ function modelNameForProvider(provider: BenchmarkCategoryAiProvider, options: Be
   if (provider === "openai") {
     if (options.openAiModelName) return options.openAiModelName;
     if (preference === "openai" && options.modelName) return options.modelName;
-    return process.env.AI_BENCHMARK_CATEGORY_OPENAI_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-5.5";
+    return process.env.AI_BENCHMARK_CATEGORY_OPENAI_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-5.4-mini";
   }
   if (options.anthropicModelName ?? options.modelName) return options.anthropicModelName ?? options.modelName ?? "claude-opus-4-8";
   return process.env.AI_BENCHMARK_CATEGORY_MODEL ?? process.env.ANTHROPIC_MODEL ?? "claude-opus-4-8";
@@ -203,8 +203,7 @@ function openAiProviderOptions(): Record<string, unknown> {
     providerOptions: {
       openai: {
         store: false,
-        reasoningEffort: "low",
-        textVerbosity: "low",
+        textVerbosity: "medium",
         strictJsonSchema: true,
       },
     },
@@ -248,7 +247,7 @@ function categoryPrompt(output: ParserOutputWithBenchmarkCategory, reference: Mc
   return [
     "You infer the merchant business category for payment-processing benchmark selection.",
     "Return conservative JSON only. Do not include prose outside JSON.",
-    "Use only the provided category ids. If evidence is weak, return categoryId null with low confidence.",
+    "Use only the provided category ids. If evidence is weak or ambiguous, return categoryId \"default\" with low confidence.",
     "Do not override a user-selected business type. This task is only called when no specific user-selected or deterministic category exists.",
     "Prefer concrete business evidence from merchant name, DBA, statement identity, card-present/card-not-present signals, and fee patterns.",
     "Do not classify based only on processor name or bank brand.",

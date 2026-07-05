@@ -12,8 +12,54 @@ import { parsePdf } from "../src/parser.js";
 const ABDUL_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "fiserv_ABDUL_BASHER_Aug_2025.pdf");
 const PEPE_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "SAMPLE_MERCHANT4_CLOVER.pdf");
 const EL_NUEVO_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf");
+const NXGEN_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "fiserv_NXGEN_PAYMENT_SERVICES_jan_2022.pdf");
 
 function mockedNoticeResponse(prompt: string) {
+  if (prompt.includes("Interlink System Integrity") || prompt.includes("EMV Fallback")) {
+    return {
+      object: {
+        notices: [
+          {
+            feeName: "STAR PIN DEBIT NETWORK ANNUAL FEE",
+            amount: { value: 16, valueType: "money", cadence: "annual", raw: "$16.00" },
+            noticeType: "fee_increase",
+            effectiveDate: "November 2022",
+            condition: "per participating location or website enabled with or accepting STAR transactions in June, July, and August 2022",
+            acceptanceClause: "Continuing your merchant account after the effective date will constitute acceptance.",
+            actionDeadline: null,
+            isFeeChange: true,
+            confidence: "high",
+            evidence: ["EFFECTIVE NOVEMBER 2022", "STAR NETWORK ANNUAL FEE IN THE AMOUNT OF $16.00"],
+          },
+          {
+            feeName: "ACCEL PIN DEBIT NETWORK ANNUAL FEE",
+            amount: { value: 16, valueType: "money", cadence: "annual", raw: "$16.00" },
+            noticeType: "fee_increase",
+            effectiveDate: "December 2022",
+            condition: "per participating location or website enabled with or accepting ACCEL transactions in June, July, or August 2022",
+            acceptanceClause: "Continuing your merchant account after the effective date will constitute acceptance.",
+            actionDeadline: null,
+            isFeeChange: true,
+            confidence: "high",
+            evidence: ["EFFECTIVE DECEMBER 2022", "ACCEL NETWORK ANNUAL FEE IN THE AMOUNT OF $16.00"],
+          },
+          {
+            feeName: "Interlink System Integrity and EMV Fallback Fees",
+            amount: null,
+            noticeType: "fee_delay",
+            effectiveDate: "future release date",
+            condition: "updated release date will be communicated when details become available",
+            acceptanceClause: null,
+            actionDeadline: null,
+            isFeeChange: true,
+            confidence: "high",
+            evidence: ["Interlink System Integrity and EMV Fallback Fee(s) have been postponed", "future release date"],
+          },
+        ],
+        notes: [],
+      },
+    };
+  }
   if (prompt.includes("STAR PIN DEBIT NETWORK") || prompt.includes("ACCEL PIN DEBIT NETWORK")) {
     return {
       object: {
@@ -21,6 +67,7 @@ function mockedNoticeResponse(prompt: string) {
           {
             feeName: "STAR PIN DEBIT NETWORK ANNUAL FEE",
             amount: { value: 20.95, valueType: "money", cadence: "annual", raw: "$20.95" },
+            noticeType: "fee_increase",
             effectiveDate: "October 2025 statement",
             condition: "per active location",
             acceptanceClause: "Continuing your merchant services after 30 days is deemed acceptance.",
@@ -32,6 +79,7 @@ function mockedNoticeResponse(prompt: string) {
           {
             feeName: "ACCEL PIN DEBIT NETWORK ANNUAL FEE",
             amount: { value: 21.95, valueType: "money", cadence: "annual", raw: "$21.95" },
+            noticeType: "fee_increase",
             effectiveDate: "October 2025 statement",
             condition: "per active location",
             acceptanceClause: "Continuing your merchant services after 30 days is deemed acceptance.",
@@ -52,6 +100,7 @@ function mockedNoticeResponse(prompt: string) {
           {
             feeName: "SHAZAM interchange category change",
             amount: null,
+            noticeType: "informational",
             effectiveDate: null,
             condition: null,
             acceptanceClause: null,
@@ -63,6 +112,7 @@ function mockedNoticeResponse(prompt: string) {
           {
             feeName: "CLX UI migration",
             amount: null,
+            noticeType: "informational",
             effectiveDate: null,
             condition: null,
             acceptanceClause: null,
@@ -82,6 +132,7 @@ function mockedNoticeResponse(prompt: string) {
         {
           feeName: "Wells Fargo informational statement notice",
           amount: null,
+          noticeType: "informational",
           effectiveDate: null,
           condition: null,
           acceptanceClause: null,
@@ -116,6 +167,7 @@ describe("AI statement notice extraction", () => {
     });
 
     expect(prompt).toContain("Raw notice block");
+    expect(prompt).toContain("fee_increase, fee_decrease, fee_delay, informational");
     expect(prompt).toContain("STAR PIN DEBIT NETWORK");
     expect(result.aiNoticeExtraction).toMatchObject({
       status: "applied",
@@ -249,5 +301,34 @@ describe("AI statement notice extraction", () => {
     expect(result.output.fiservFeeAnalysisV2.aiNoticeExtraction?.notices[0]).toMatchObject({
       isFeeChange: false,
     });
+  });
+
+  it("extracts Vortax fee increases and delayed Interlink/EMV notice", async () => {
+    const doc = await parsePdf(NXGEN_PDF_PATH);
+    const parsed = fiservFirstDataProcessorStatementDriver.parse(doc, { sourceFileName: "fiserv_NXGEN_PAYMENT_SERVICES_jan_2022.pdf" });
+    expect(parsed.fiservFeeAnalysisV2.noticeText).toContain("Interlink System Integrity and EMV Fallback Fee");
+
+    const result = await maybeRunStatementNoticeAiExtractionForParserOutput(parsed, {
+      provider: "anthropic",
+      anthropicApiKey: "test-key",
+      modelName: "notice-test-model",
+      sdk: {
+        createAnthropic: () => () => ({ provider: "mock-anthropic" }),
+        generateObject: async (options) => mockedNoticeResponse(String(options.prompt ?? "")),
+      },
+    });
+
+    expect(result.aiNoticeExtraction).toMatchObject({
+      status: "applied",
+      noticeCount: 3,
+      feeChangeCount: 3,
+    });
+    expect(result.aiNoticeExtraction.notices).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ feeName: "STAR PIN DEBIT NETWORK ANNUAL FEE", noticeType: "fee_increase", effectiveDate: "November 2022" }),
+        expect.objectContaining({ feeName: "ACCEL PIN DEBIT NETWORK ANNUAL FEE", noticeType: "fee_increase", effectiveDate: "December 2022" }),
+        expect.objectContaining({ feeName: "Interlink System Integrity and EMV Fallback Fees", noticeType: "fee_delay", effectiveDate: "future release date" }),
+      ]),
+    );
   });
 });

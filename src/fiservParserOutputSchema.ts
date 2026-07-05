@@ -186,6 +186,14 @@ export const fiservAiFeeAssessmentSchema = z
       "none",
     ]),
     recommendation: z.string().min(1).nullable(),
+    fixedFeeAssessment: z
+      .object({
+        avoidable: z.enum(["true", "false", "uncertain"]),
+        recommendation: z.string().min(1).nullable(),
+        confidence: z.enum(["high", "medium", "low"]),
+      })
+      .strict()
+      .nullable(),
     evidence: z.array(z.string().min(1)),
     sourceEvidence: z
       .object({
@@ -225,6 +233,7 @@ const merchantNarrativeSchema = z
     attempted: z.boolean(),
     factCount: z.number().int().nonnegative(),
     factsUsed: z.array(z.string().min(1)),
+    paragraphs: z.array(z.string().min(1)),
     sections: z
       .object({
         executiveSummary: merchantNarrativeSectionSchema,
@@ -243,6 +252,43 @@ const merchantNarrativeSchema = z
           priority: z.enum(["high", "medium", "low"]),
           text: z.string().min(1),
           factIds: z.array(z.string().min(1)),
+        })
+        .strict(),
+    ),
+    notes: z.array(z.string().min(1)),
+  })
+  .strict();
+
+const fullStatementAnomalyReviewSchema = z
+  .object({
+    status: z.enum(["disabled", "not_needed", "applied", "no_anomalies", "failed"]),
+    provider: z.enum(["anthropic", "openai"]).nullable(),
+    model: z.string().min(1).nullable(),
+    attempted: z.boolean(),
+    anomalyCount: z.number().int().nonnegative(),
+    overrideCount: z.number().int().nonnegative(),
+    appliedOverrideCount: z.number().int().nonnegative(),
+    anomalies: z.array(
+      z
+        .object({
+          description: z.string().min(1),
+          severity: z.enum(["low", "medium", "high"]),
+          estimatedImpact: finiteNumber.nonnegative().nullable(),
+          estimatedImpactRaw: z.string().min(1).nullable(),
+          recommendation: z.string().min(1),
+          confidence: z.enum(["low", "medium", "high"]),
+          evidence: z.array(z.string().min(1)),
+        })
+        .strict(),
+    ),
+    overrides: z.array(
+      z
+        .object({
+          field: z.string().min(1),
+          originalValue: z.string().min(1),
+          correctedValue: z.string().min(1),
+          reason: z.string().min(1),
+          applied: z.boolean(),
         })
         .strict(),
     ),
@@ -364,6 +410,7 @@ export const fiservFeeAnalysisV2Schema = z
           z
             .object({
               feeName: z.string().min(1).nullable(),
+              noticeType: z.enum(["fee_increase", "fee_decrease", "fee_delay", "informational"]),
               amount: z
                 .object({
                   value: finiteNumber.nullable(),
@@ -411,6 +458,7 @@ export const fiservFeeAnalysisV2Schema = z
       })
       .strict()
       .optional(),
+    aiAnomalyReview: fullStatementAnomalyReviewSchema.optional(),
     aiMerchantNarrative: merchantNarrativeSchema.optional(),
     pricingModel: z
       .object({
@@ -562,6 +610,7 @@ export const fiservFeeAnalysisV2Schema = z
         status: z.enum(["ready", "not_applicable", "not_enough_detail"]),
         baselineRate: finiteNumber.nonnegative().nullable(),
         baselineSource: z.enum(["lowest_visible_qual", "lowest_visible_tier", "not_available"]),
+        baselineInferred: z.boolean(),
         totalTieredVolume: finiteNumber.nonnegative().nullable(),
         qualifiedVolume: finiteNumber.nonnegative(),
         midQualifiedVolume: finiteNumber.nonnegative(),
@@ -571,6 +620,9 @@ export const fiservFeeAnalysisV2Schema = z
         nonQualifiedPct: finiteNumber.nonnegative().nullable(),
         notBestTierPct: finiteNumber.nonnegative().nullable(),
         totalDowngradeCost: finiteNumber.nonnegative().nullable(),
+        rawDowngradeCost: finiteNumber.nonnegative().nullable(),
+        totalDiscountCharges: finiteNumber.nonnegative().nullable(),
+        downgradeCostCapped: z.boolean(),
         totalDowngradeCostPctOfFees: finiteNumber.nonnegative().nullable(),
         largestDowngradeImpact: z
           .object({
@@ -605,7 +657,7 @@ export const fiservFeeAnalysisV2Schema = z
         flags: z.array(
           z
             .object({
-              kind: z.enum(["high_non_qualified", "majority_downgraded", "minimal_downgrade"]),
+              kind: z.enum(["high_non_qualified", "majority_downgraded", "minimal_downgrade", "downgrade_cost_capped"]),
               severity: z.enum(["info", "warning", "high"]),
               message: z.string().min(1),
             })
@@ -678,14 +730,28 @@ export const fiservFeeAnalysisV2Schema = z
         volumeTier: z.string().min(1).nullable(),
         benchmarkChannel: z.enum(["card_present", "card_not_present", "high_risk"]).nullable(),
         currentRate: finiteNumber.nonnegative().nullable(),
+        dominantRate: finiteNumber.nonnegative().nullable(),
+        dominantAuthorizationCount: z.number().int().nonnegative().nullable(),
+        dominantMonthlyAuthCost: finiteNumber.nonnegative().nullable(),
         competitiveLow: finiteNumber.nonnegative().nullable(),
         competitiveHigh: finiteNumber.nonnegative().nullable(),
         targetRate: finiteNumber.nonnegative().nullable(),
         authorizationCount: z.number().int().nonnegative().nullable(),
         monthlyAuthCost: finiteNumber.nonnegative().nullable(),
-        monthlySavings: finiteNumber.nonnegative().nullable(),
-        annualSavings: finiteNumber.nonnegative().nullable(),
+        monthlyImpact: finiteNumber.nonnegative().nullable(),
+        annualImpact: finiteNumber.nonnegative().nullable(),
         dominant: z.boolean(),
+        rateGroups: z.array(
+          z
+            .object({
+              label: z.string().min(1),
+              rate: finiteNumber.nonnegative(),
+              count: z.number().int().nonnegative(),
+              amount: finiteNumber.nonnegative(),
+              rowCount: z.number().int().nonnegative(),
+            })
+            .strict(),
+        ),
         rows: z.array(
           z
             .object({
@@ -699,6 +765,29 @@ export const fiservFeeAnalysisV2Schema = z
             .strict(),
         ),
         message: z.string().min(1),
+      })
+      .strict(),
+    disputeActivityAnalysis: z
+      .object({
+        status: z.enum(["ready", "not_applicable"]),
+        chargebackCount: z.number().int().nonnegative(),
+        chargebackFeeAmount: finiteNumber.nonnegative(),
+        achRejectCount: z.number().int().nonnegative(),
+        achRejectFeeAmount: finiteNumber.nonnegative(),
+        fundingAdjustmentCount: z.number().int().nonnegative(),
+        fundingChargebackCount: z.number().int().nonnegative(),
+        disputeCostAmount: finiteNumber.nonnegative(),
+        disputeCostPctOfVolume: finiteNumber.nonnegative().nullable(),
+        flags: z.array(
+          z
+            .object({
+              kind: z.enum(["high_dispute_cost_pct", "high_adjustment_count"]),
+              severity: z.enum(["warning", "high"]),
+              message: z.string().min(1),
+            })
+            .strict(),
+        ),
+        evidence: z.array(z.string().min(1)),
       })
       .strict(),
     newAccountAnalysis: z
@@ -754,14 +843,14 @@ export const fiservFeeAnalysisV2Schema = z
           })
           .strict()
           .nullable(),
-        estimatedMonthlySavings: z
+        estimatedMonthlyImpact: z
           .object({
             low: finiteNumber.nonnegative(),
             high: finiteNumber.nonnegative(),
           })
           .strict()
           .nullable(),
-        estimatedAnnualSavings: z
+        estimatedAnnualImpact: z
           .object({
             low: finiteNumber.nonnegative(),
             high: finiteNumber.nonnegative(),
@@ -819,11 +908,61 @@ export const fiservFeeAnalysisV2Schema = z
         notes: z.array(z.string().min(1)),
       })
       .strict(),
-    savingsSummary: z
+    estimatedAnnualSavings: z
       .object({
-        annualLow: finiteNumber.nonnegative(),
-        annualHigh: finiteNumber.nonnegative(),
-        opportunities: z.number().int().nonnegative(),
+        conservative: finiteNumber.nonnegative(),
+        estimated: finiteNumber.nonnegative(),
+        maximum: finiteNumber.nonnegative(),
+        amount: finiteNumber.nonnegative(),
+        currentAnnualFees: finiteNumber.nonnegative(),
+        estimatedCompetitiveAnnualFees: finiteNumber.nonnegative(),
+        methodology: z.literal("component_tier_sum"),
+        confidence: z.enum(["high", "medium", "low"]),
+        basis: z.string().min(1),
+        componentCount: z.number().int().nonnegative(),
+        components: z.array(
+          z
+            .object({
+              kind: z.string().min(1),
+              label: z.string().min(1),
+              annualImpact: finiteNumber.nonnegative(),
+              tier: z.enum(["confirmed", "negotiable", "investigative"]),
+              confidence: z.enum(["high", "medium", "low"]),
+              sourceFindingKind: z.string().min(1).nullable().optional(),
+            })
+            .strict(),
+        ),
+      })
+      .strict(),
+    developerReview: z
+      .object({
+        unknownFeeRows: z.array(
+          z
+            .object({
+              rowIndex: z.number().int().nonnegative(),
+              description: z.string().min(1),
+              cardTypeSection: z.string().min(1).nullable(),
+              volumeBasis: finiteNumber.nonnegative().nullable(),
+              count: z.number().int().nonnegative().nullable(),
+              rate: finiteNumber.nonnegative().nullable(),
+              amount: finiteNumber.nonnegative(),
+              feeType: z.string().min(1),
+              matchMethod: z.string().min(1),
+              evidenceLine: z.string().min(1),
+            })
+            .strict(),
+        ),
+        unmatchedProcessorFixedFees: z.array(
+          z
+            .object({
+              rowIndex: z.number().int().nonnegative(),
+              description: z.string().min(1),
+              cardTypeSection: z.string().min(1).nullable(),
+              amount: finiteNumber.nonnegative(),
+              evidenceLine: z.string().min(1),
+            })
+            .strict(),
+        ),
       })
       .strict(),
     reconciliation: z
@@ -858,10 +997,13 @@ export const fiservFeeAnalysisV2Schema = z
             "authorization_ratio_high",
             "authorization_ratio_healthy",
             "per_auth_fee_benchmark",
+            "dispute_activity_high",
             "effective_rate_positive_benchmark",
             "effective_rate_above_benchmark",
             "junk_fixed_fee_summary",
+            "unknown_fee_learning_candidate",
             "ai_fee_assessment",
+            "ai_statement_anomaly",
             "new_account_pricing_context",
           ]),
           severity: z.enum(["info", "warning", "high"]),
@@ -879,7 +1021,7 @@ export const fiservFeeAnalysisV2Schema = z
           ]),
           monthlyCost: finiteNumber.nullable(),
           annualEstimate: finiteNumber.nullable(),
-          savingsEstimate: z
+          componentImpactEstimate: z
             .object({
               low: finiteNumber.nonnegative(),
               high: finiteNumber.nonnegative(),

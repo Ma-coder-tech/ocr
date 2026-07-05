@@ -31,6 +31,7 @@ import type { BusinessTypeId } from "./businessTypes.js";
 import type { RepricingEvent } from "./types.js";
 import type { FiservAiFeeAssessment } from "./fiservAiFeeAssessment.js";
 import type { MerchantNarrative } from "./merchantNarrativeAi.js";
+import type { FullStatementAnomalyReview } from "./fullStatementAnomalyReviewAi.js";
 
 export type FiservFeeProofStatus = "proven" | "likely" | "processor_controlled" | "indeterminate" | "not_enough_detail";
 
@@ -63,6 +64,11 @@ export type FiservFeeAnalysisInput = {
     summaryEvidenceLine: string | null;
     detailEvidenceLine: string | null;
   };
+  fundingBatchRows?: Array<{
+    adjustments?: number | null;
+    chargebacks?: number | null;
+    evidenceLine?: string | null;
+  }>;
 };
 
 export type FiservFeeAnalysisRow = {
@@ -123,10 +129,13 @@ export type FiservFeeAnalysisFinding = {
     | "authorization_ratio_high"
     | "authorization_ratio_healthy"
     | "per_auth_fee_benchmark"
+    | "dispute_activity_high"
     | "effective_rate_positive_benchmark"
     | "effective_rate_above_benchmark"
     | "junk_fixed_fee_summary"
+    | "unknown_fee_learning_candidate"
     | "ai_fee_assessment"
+    | "ai_statement_anomaly"
     | "new_account_pricing_context";
   severity: "info" | "warning" | "high";
   title: string;
@@ -142,7 +151,7 @@ export type FiservFeeAnalysisFinding = {
     | "request_interchange_plus_quote";
   monthlyCost: number | null;
   annualEstimate: number | null;
-  savingsEstimate: {
+  componentImpactEstimate: {
     low: number;
     high: number;
     basis: string;
@@ -184,6 +193,7 @@ export type FiservTieredDowngradeAnalysis = {
   status: "ready" | "not_applicable" | "not_enough_detail";
   baselineRate: number | null;
   baselineSource: "lowest_visible_qual" | "lowest_visible_tier" | "not_available";
+  baselineInferred: boolean;
   totalTieredVolume: number | null;
   qualifiedVolume: number;
   midQualifiedVolume: number;
@@ -193,6 +203,9 @@ export type FiservTieredDowngradeAnalysis = {
   nonQualifiedPct: number | null;
   notBestTierPct: number | null;
   totalDowngradeCost: number | null;
+  rawDowngradeCost: number | null;
+  totalDiscountCharges: number | null;
+  downgradeCostCapped: boolean;
   totalDowngradeCostPctOfFees: number | null;
   largestDowngradeImpact: {
     cardTypeSection: string | null;
@@ -218,7 +231,7 @@ export type FiservTieredDowngradeAnalysis = {
     evidenceLine: string;
   }>;
   flags: Array<{
-    kind: "high_non_qualified" | "majority_downgraded" | "minimal_downgrade";
+    kind: "high_non_qualified" | "majority_downgraded" | "minimal_downgrade" | "downgrade_cost_capped";
     severity: "info" | "warning" | "high";
     message: string;
   }>;
@@ -277,14 +290,24 @@ export type FiservPerAuthBenchmarkAnalysis = {
   volumeTier: string | null;
   benchmarkChannel: "card_present" | "card_not_present" | "high_risk" | null;
   currentRate: number | null;
+  dominantRate: number | null;
+  dominantAuthorizationCount: number | null;
+  dominantMonthlyAuthCost: number | null;
   competitiveLow: number | null;
   competitiveHigh: number | null;
   targetRate: number | null;
   authorizationCount: number | null;
   monthlyAuthCost: number | null;
-  monthlySavings: number | null;
-  annualSavings: number | null;
+  monthlyImpact: number | null;
+  annualImpact: number | null;
   dominant: boolean;
+  rateGroups: Array<{
+    label: string;
+    rate: number;
+    count: number;
+    amount: number;
+    rowCount: number;
+  }>;
   rows: Array<{
     description: string;
     cardTypeSection: string | null;
@@ -294,6 +317,24 @@ export type FiservPerAuthBenchmarkAnalysis = {
     evidenceLine: string;
   }>;
   message: string;
+};
+
+export type FiservDisputeActivityAnalysis = {
+  status: "ready" | "not_applicable";
+  chargebackCount: number;
+  chargebackFeeAmount: number;
+  achRejectCount: number;
+  achRejectFeeAmount: number;
+  fundingAdjustmentCount: number;
+  fundingChargebackCount: number;
+  disputeCostAmount: number;
+  disputeCostPctOfVolume: number | null;
+  flags: Array<{
+    kind: "high_dispute_cost_pct" | "high_adjustment_count";
+    severity: "warning" | "high";
+    message: string;
+  }>;
+  evidence: string[];
 };
 
 export type FiservNewAccountAnalysis = {
@@ -312,6 +353,7 @@ export type FiservFeeAnalysisV2 = {
   noticeText: string | null;
   aiNoticeExtraction?: StatementNoticeAiExtraction;
   benchmarkCategoryAi?: BenchmarkCategoryAiInference;
+  aiAnomalyReview?: FullStatementAnomalyReview;
   aiMerchantNarrative?: MerchantNarrative;
   pricingModel: {
     pricingModel: string;
@@ -358,6 +400,7 @@ export type FiservFeeAnalysisV2 = {
   effectiveRateBenchmarkAnalysis: FiservEffectiveRateBenchmarkAnalysis;
   benchmarkCategoryResolution: Omit<BenchmarkCategoryResolution, "category">;
   perAuthBenchmarkAnalysis: FiservPerAuthBenchmarkAnalysis;
+  disputeActivityAnalysis: FiservDisputeActivityAnalysis;
   newAccountAnalysis: FiservNewAccountAnalysis;
   bundledPricingBenchmark: FiservBundledPricingBenchmarkAnalysis;
   interchangeReconciliation: {
@@ -370,10 +413,46 @@ export type FiservFeeAnalysisV2 = {
     components: FiservInterchangeReconciliationComponent[];
     notes: string[];
   };
-  savingsSummary: {
-    annualLow: number;
-    annualHigh: number;
-    opportunities: number;
+  estimatedAnnualSavings: {
+    conservative: number;
+    estimated: number;
+    maximum: number;
+    amount: number;
+    currentAnnualFees: number;
+    estimatedCompetitiveAnnualFees: number;
+    methodology: "component_tier_sum";
+    confidence: "high" | "medium" | "low";
+    basis: string;
+    componentCount: number;
+    components: Array<{
+      kind: string;
+      label: string;
+      annualImpact: number;
+      tier: "confirmed" | "negotiable" | "investigative";
+      confidence: "high" | "medium" | "low";
+      sourceFindingKind?: string | null;
+    }>;
+  };
+  developerReview: {
+    unknownFeeRows: Array<{
+      rowIndex: number;
+      description: string;
+      cardTypeSection: string | null;
+      volumeBasis: number | null;
+      count: number | null;
+      rate: number | null;
+      amount: number;
+      feeType: string;
+      matchMethod: string;
+      evidenceLine: string;
+    }>;
+    unmatchedProcessorFixedFees: Array<{
+      rowIndex: number;
+      description: string;
+      cardTypeSection: string | null;
+      amount: number;
+      evidenceLine: string;
+    }>;
   };
   reconciliation: {
     basisTotal: number;
@@ -620,6 +699,11 @@ function bucketRows(rows: FiservFeeAnalysisRow[], totalFees: number): FiservFeeA
     .filter((bucket) => bucket.rows > 0);
 }
 
+function isProcessorSpreadMarkupDescription(description: string): boolean {
+  const normalized = normalizeFiservFeeReferenceText(description);
+  return /^DISC\s+\d+$/.test(normalized) || normalized === "QUAL DISC" || /\bSALES DISCOUNT\b/.test(normalized) || normalized === "OTHER VOLUME FEES";
+}
+
 function detectIcPlusFromCanonicalRows(
   rows: FiservCanonicalFeeRow[],
   fallback: FiservFeeAnalysisInput["pricingModel"],
@@ -627,11 +711,11 @@ function detectIcPlusFromCanonicalRows(
   const nonZeroRows = rows.filter((row) => row.amount > 0);
   const interchangeRows = nonZeroRows.filter((row) => row.feeType === "interchange");
   const networkRows = nonZeroRows.filter((row) => row.feeType === "card_brand_network" || row.feeType === "pin_debit_network");
-  const discRows = nonZeroRows.filter((row) => /^DISC\s+\d+$/i.test(row.originalDescription.trim()) && row.rate !== null);
-  const uniqueDiscRates = new Set(discRows.map((row) => row.rate?.toFixed(7)));
-  const hasTieredLabels = nonZeroRows.some((row) => /\b(?:QUAL|MQUAL|NQUAL|QUALIFIED|MID QUAL|NON QUAL)\b/i.test(row.originalDescription));
+  const processorSpreadRows = nonZeroRows.filter((row) => isProcessorSpreadMarkupDescription(row.originalDescription) && row.rate !== null);
+  const uniqueProcessorSpreadRates = new Set(processorSpreadRows.map((row) => row.rate?.toFixed(7)));
+  const mqualOrNqualRows = nonZeroRows.filter((row) => /\b(?:MQUAL|NQUAL|MID QUAL|NON QUAL)\b/i.test(row.originalDescription));
 
-  if (interchangeRows.length > 0 && networkRows.length > 0 && discRows.length > 0 && uniqueDiscRates.size === 1 && !hasTieredLabels) {
+  if (interchangeRows.length > 0 && networkRows.length > 0 && processorSpreadRows.length > 0 && uniqueProcessorSpreadRates.size === 1 && mqualOrNqualRows.length === 0) {
     return {
       pricingModel: "interchange_plus",
       confidence: "high",
@@ -639,7 +723,7 @@ function detectIcPlusFromCanonicalRows(
       evidence: [
         "Separate interchange rows are visible.",
         "Card-brand/network rows are itemized separately.",
-        `Processor DISC markup is uniform at ${discRows[0]?.rate ?? "unknown"} across visible card sections.`,
+        `Processor spread markup is uniform at ${processorSpreadRows[0]?.rate ?? "unknown"} across visible card sections.`,
       ],
     };
   }
@@ -650,10 +734,16 @@ function detectIcPlusFromCanonicalRows(
     evidence: fallback.notes?.length ? fallback.notes : ["Pricing model inherited from existing parser inference."],
   };
   const qualRows = nonZeroRows.filter((row) => normalizeFiservFeeReferenceText(row.originalDescription) === "QUAL DISC" && row.rate !== null);
-  const mqualOrNqualRows = nonZeroRows.filter((row) => /\b(?:MQUAL|NQUAL|MID QUAL|NON QUAL)\b/i.test(row.originalDescription));
   const uniqueQualRates = new Set(qualRows.map((row) => row.rate?.toFixed(7)));
   const zeroDiscountRows = rows.filter((row) => /^DISC\s+\d+$/i.test(row.originalDescription.trim()) && row.amount === 0);
-  if (inherited.pricingModel === "flat_discount_pricing" && qualRows.length >= 2 && mqualOrNqualRows.length === 0 && uniqueQualRates.size === 1) {
+  if (
+    inherited.pricingModel === "flat_discount_pricing" &&
+    interchangeRows.length === 0 &&
+    networkRows.length === 0 &&
+    qualRows.length >= 2 &&
+    mqualOrNqualRows.length === 0 &&
+    uniqueQualRates.size === 1
+  ) {
     return {
       pricingModel: zeroDiscountRows.length > 0 ? "single_tier_qualified" : "flat_rate_bundled",
       confidence: "high",
@@ -755,6 +845,43 @@ function applyCrossRowEconomicRules(rows: FiservFeeAnalysisRow[]): FiservFeeAnal
   });
 }
 
+function suspiciousUniformRateGroups(rows: FiservFeeAnalysisRow[]): Array<{
+  family: string;
+  displayName: string;
+  rate: number;
+  networks: string[];
+  rows: FiservFeeAnalysisRow[];
+  monthlyAmount: number;
+}> {
+  const groups = new Map<string, FiservFeeAnalysisRow[]>();
+  for (const row of rows) {
+    if (row.feeType !== "suspicious_pass_through_like_fee" || row.rate === null) continue;
+    const family = comparableFeeFamily(row.description);
+    if (!family) continue;
+    const key = `${family}::${row.rate.toFixed(8)}`;
+    groups.set(key, [...(groups.get(key) ?? []), row]);
+  }
+
+  return [...groups.entries()]
+    .map(([key, group]) => {
+      const [family] = key.split("::");
+      const networks = [...new Set(group.map((row) => cardNetworkKey(row.cardTypeSection)).filter((network): network is string => Boolean(network)))].sort();
+      const displayName = family
+        .replace(/\bFEE\b/g, "FEE")
+        .replace(/\s+/g, " ")
+        .trim();
+      return {
+        family,
+        displayName: displayName || group[0]?.description || "Suspicious uniform-rate fee",
+        rate: group[0]?.rate ?? 0,
+        networks,
+        rows: group,
+        monthlyAmount: round2(group.reduce((sum, row) => sum + row.amount, 0)),
+      };
+    })
+    .filter((group) => group.networks.length >= 3);
+}
+
 function hiddenPctMarkupRows(rows: FiservFeeAnalysisRow[]): FiservFeeAnalysisV2["processorMarkupAnalysis"]["hiddenPctMarkupRows"] {
   return rows
     .filter((row) => {
@@ -762,7 +889,7 @@ function hiddenPctMarkupRows(rows: FiservFeeAnalysisRow[]): FiservFeeAnalysisV2[
       return (
         row.feeType === "processor_pct_markup" &&
         row.rate !== null &&
-        row.volumeBasis !== null &&
+        (row.volumeBasis !== null || row.rate > 0) &&
         !/\b(DISC|SALES DISCOUNT)\b/.test(description)
       );
     })
@@ -770,7 +897,7 @@ function hiddenPctMarkupRows(rows: FiservFeeAnalysisRow[]): FiservFeeAnalysisV2[
       description: row.description,
       rate: row.rate ?? 0,
       amount: row.amount,
-      volumeBasis: row.volumeBasis,
+      volumeBasis: row.volumeBasis ?? (row.rate !== null && row.rate > 0 ? round2(row.amount / row.rate) : null),
     }));
 }
 
@@ -791,16 +918,16 @@ function annualize(monthly: number | null): number | null {
   return monthly === null ? null : round2(monthly * 12);
 }
 
-function finding(params: Omit<FiservFeeAnalysisFinding, "monthlyCost" | "annualEstimate" | "savingsEstimate"> & {
+function finding(params: Omit<FiservFeeAnalysisFinding, "monthlyCost" | "annualEstimate" | "componentImpactEstimate"> & {
   monthlyCost?: number | null;
-  savingsEstimate?: FiservFeeAnalysisFinding["savingsEstimate"];
+  componentImpactEstimate?: FiservFeeAnalysisFinding["componentImpactEstimate"];
 }): FiservFeeAnalysisFinding {
   const monthlyCost = Object.prototype.hasOwnProperty.call(params, "monthlyCost") ? (params.monthlyCost ?? null) : params.amount;
   return {
     ...params,
     monthlyCost,
     annualEstimate: annualize(monthlyCost),
-    savingsEstimate: params.savingsEstimate ?? null,
+    componentImpactEstimate: params.componentImpactEstimate ?? null,
   };
 }
 
@@ -886,7 +1013,8 @@ function merchantChannelAnalysis(rows: FiservFeeAnalysisRow[]): FiservMerchantCh
       /\bFIXED NETWORK CNP FEE\b/.test(combined) ||
       /\bAVS ECIC\b/.test(combined) ||
       /\bECI CPU-G\b/.test(combined) ||
-      /\bVISA NETWORK FEE CNP\b/.test(combined);
+      /\bVISA NETWORK FEE CNP\b/.test(combined) ||
+      /\bNON[-\s]SWIPED\b/.test(combined);
     const cp =
       /\bCARD PRESENT\b/.test(combined) ||
       /\bFIXED NETWORK CP FEE\b/.test(combined) ||
@@ -964,6 +1092,7 @@ function tieredDowngradeAnalysis(
       status: "not_applicable",
       baselineRate: null,
       baselineSource: "not_available",
+      baselineInferred: false,
       totalTieredVolume: null,
       qualifiedVolume: 0,
       midQualifiedVolume: 0,
@@ -973,6 +1102,9 @@ function tieredDowngradeAnalysis(
       nonQualifiedPct: null,
       notBestTierPct: null,
       totalDowngradeCost: null,
+      rawDowngradeCost: null,
+      totalDiscountCharges: null,
+      downgradeCostCapped: false,
       totalDowngradeCostPctOfFees: null,
       largestDowngradeImpact: null,
       rows: [],
@@ -995,6 +1127,7 @@ function tieredDowngradeAnalysis(
       status: "not_enough_detail",
       baselineRate: null,
       baselineSource: "not_available",
+      baselineInferred: false,
       totalTieredVolume: null,
       qualifiedVolume: 0,
       midQualifiedVolume: 0,
@@ -1004,6 +1137,9 @@ function tieredDowngradeAnalysis(
       nonQualifiedPct: null,
       notBestTierPct: null,
       totalDowngradeCost: null,
+      rawDowngradeCost: null,
+      totalDiscountCharges: null,
+      downgradeCostCapped: false,
       totalDowngradeCostPctOfFees: null,
       largestDowngradeImpact: null,
       rows: [],
@@ -1016,7 +1152,8 @@ function tieredDowngradeAnalysis(
   const allRates = tierRows.map((item) => item.rate);
   const baselineRate = qualRates.length > 0 ? Math.min(...qualRates) : Math.min(...allRates);
   const baselineSource = qualRates.length > 0 ? "lowest_visible_qual" : "lowest_visible_tier";
-  const analysisRows = tierRows.map((item) => {
+  const baselineInferred = qualRates.length === 0;
+  const rawAnalysisRows = tierRows.map((item) => {
     const downgradeCost = item.tier === "qualified" ? 0 : round2(Math.max(0, item.volume * (item.rate - baselineRate)));
     return {
       cardTypeSection: item.row.cardTypeSection,
@@ -1030,12 +1167,20 @@ function tieredDowngradeAnalysis(
       evidenceLine: item.row.evidenceLine,
     };
   });
+  const rawDowngradeCost = round2(rawAnalysisRows.reduce((sum, row) => sum + (row.downgradeCost ?? 0), 0));
+  const totalDiscountCharges = round2(tierRows.reduce((sum, item) => sum + item.row.amount, 0));
+  const downgradeCostCapped = rawDowngradeCost > totalDiscountCharges && totalDiscountCharges > 0;
+  const capFactor = downgradeCostCapped && rawDowngradeCost > 0 ? totalDiscountCharges / rawDowngradeCost : 1;
+  const analysisRows = rawAnalysisRows.map((row) => ({
+    ...row,
+    downgradeCost: row.downgradeCost === null ? null : round2(row.downgradeCost * capFactor),
+  }));
   const qualifiedVolume = round2(analysisRows.filter((row) => row.tier === "qualified").reduce((sum, row) => sum + row.volume, 0));
   const midQualifiedVolume = round2(analysisRows.filter((row) => row.tier === "mid_qualified").reduce((sum, row) => sum + row.volume, 0));
   const nonQualifiedVolume = round2(analysisRows.filter((row) => row.tier === "non_qualified").reduce((sum, row) => sum + row.volume, 0));
   const totalTieredVolume = round2(qualifiedVolume + midQualifiedVolume + nonQualifiedVolume);
   const pct = (value: number) => (totalTieredVolume > 0 ? round2((value / totalTieredVolume) * 100) : null);
-  const totalDowngradeCost = round2(analysisRows.reduce((sum, row) => sum + (row.downgradeCost ?? 0), 0));
+  const totalDowngradeCost = downgradeCostCapped ? totalDiscountCharges : round2(analysisRows.reduce((sum, row) => sum + (row.downgradeCost ?? 0), 0));
   const largest = [...analysisRows].sort((left, right) => right.amount - left.amount)[0] ?? null;
   const flags: FiservTieredDowngradeAnalysis["flags"] = [];
   const nonQualifiedPct = pct(nonQualifiedVolume);
@@ -1062,11 +1207,19 @@ function tieredDowngradeAnalysis(
       message: `${qualifiedPct.toFixed(2)}% of tiered volume qualified, so downgrade pressure appears limited.`,
     });
   }
+  if (downgradeCostCapped) {
+    flags.push({
+      kind: "downgrade_cost_capped",
+      severity: "warning",
+      message: "Downgrade cost was capped at total discount charges. Baseline rate may be unreliable.",
+    });
+  }
 
   return {
     status: "ready",
     baselineRate,
     baselineSource,
+    baselineInferred,
     totalTieredVolume,
     qualifiedVolume,
     midQualifiedVolume,
@@ -1076,6 +1229,9 @@ function tieredDowngradeAnalysis(
     nonQualifiedPct,
     notBestTierPct,
     totalDowngradeCost,
+    rawDowngradeCost,
+    totalDiscountCharges,
+    downgradeCostCapped,
     totalDowngradeCostPctOfFees: totalFees > 0 ? round2((totalDowngradeCost / totalFees) * 100) : null,
     largestDowngradeImpact: largest
       ? {
@@ -1317,15 +1473,30 @@ function effectiveRateBenchmarkAnalysis(params: {
       ...(category.warning ? [category.warning] : []),
       ...(adjusted.adjustmentNote ? [adjusted.adjustmentNote] : []),
       ...(annual.ytdExtrapolatedAnnualVolume !== null
-        ? [`YTD-extrapolated annual volume is $${annual.ytdExtrapolatedAnnualVolume.toLocaleString("en-US", { maximumFractionDigits: 0 })}; benchmark tier uses monthly volume x 12.`]
+        ? [
+            annual.source === "ytd_extrapolated"
+              ? `YTD-extrapolated annual volume is $${annual.ytdExtrapolatedAnnualVolume.toLocaleString("en-US", { maximumFractionDigits: 0 })}; benchmark tier uses YTD to reduce month-to-month tier flip-flopping.`
+              : `YTD-extrapolated annual volume is $${annual.ytdExtrapolatedAnnualVolume.toLocaleString("en-US", { maximumFractionDigits: 0 })}; benchmark tier uses monthly volume x 12.`,
+          ]
         : []),
     ],
   };
 }
 
-function watsAuthBenchmarkRows(rows: FiservFeeAnalysisRow[]): FiservPerAuthBenchmarkAnalysis["rows"] {
+function isProcessorAuthBenchmarkLabel(description: string): boolean {
+  const normalized = normalizeFiservFeeReferenceText(description);
+  return (
+    normalized === "WATS AUTH FEE" ||
+    normalized === "ECI CPU-G" ||
+    normalized === "ECI CPU G" ||
+    normalized === "CPU GTWY" ||
+    /\b(?:GATEWAY AUTH|AUTHORIZATION FEE|AUTH FEE)\b/.test(normalized)
+  );
+}
+
+function processorAuthBenchmarkRows(rows: FiservFeeAnalysisRow[]): FiservPerAuthBenchmarkAnalysis["rows"] {
   return rows
-    .filter((row) => /\bWATS AUTH FEE\b/i.test(row.description))
+    .filter((row) => row.feeType === "processor_per_item" && isProcessorAuthBenchmarkLabel(row.description))
     .map((row) => {
       const count = rowCountFromAmountAndRate(row);
       if (count === null || count <= 0) return null;
@@ -1341,6 +1512,31 @@ function watsAuthBenchmarkRows(rows: FiservFeeAnalysisRow[]): FiservPerAuthBench
     .filter((row): row is NonNullable<typeof row> => row !== null);
 }
 
+function perAuthGroupLabel(row: FiservPerAuthBenchmarkAnalysis["rows"][number]): string {
+  const normalized = normalizeFiservFeeReferenceText(`${row.cardTypeSection ?? ""} ${row.description}`);
+  if (/\b(?:AMEX|AMERICAN EXPRESS|AXP)\b/.test(normalized)) return "Amex per-auth";
+  return "Non-Amex per-auth";
+}
+
+function perAuthRateGroups(rows: FiservPerAuthBenchmarkAnalysis["rows"]): FiservPerAuthBenchmarkAnalysis["rateGroups"] {
+  const groups = new Map<string, { label: string; rate: number; count: number; amount: number; rowCount: number }>();
+  for (const row of rows) {
+    if (row.rate === null || row.rate <= 0) continue;
+    const label = perAuthGroupLabel(row);
+    const key = `${label}::${row.rate.toFixed(4)}`;
+    const current = groups.get(key) ?? { label, rate: row.rate, count: 0, amount: 0, rowCount: 0 };
+    groups.set(key, {
+      ...current,
+      count: current.count + row.count,
+      amount: current.amount + row.amount,
+      rowCount: current.rowCount + 1,
+    });
+  }
+  return [...groups.values()]
+    .map((group) => ({ ...group, amount: round2(group.amount) }))
+    .sort((left, right) => right.count - left.count || right.amount - left.amount);
+}
+
 function perAuthBenchmarkAnalysis(params: {
   rows: FiservFeeAnalysisRow[];
   annualVolume: number | null;
@@ -1348,7 +1544,7 @@ function perAuthBenchmarkAnalysis(params: {
   isHighRisk: boolean;
   processorPerItemTotal: number | null;
 }): FiservPerAuthBenchmarkAnalysis {
-  const rows = watsAuthBenchmarkRows(params.rows);
+  const rows = processorAuthBenchmarkRows(params.rows);
   if (rows.length === 0) {
     return {
       status: "not_applicable",
@@ -1361,11 +1557,15 @@ function perAuthBenchmarkAnalysis(params: {
       targetRate: null,
       authorizationCount: null,
       monthlyAuthCost: null,
-      monthlySavings: null,
-      annualSavings: null,
+      dominantRate: null,
+      dominantAuthorizationCount: null,
+      dominantMonthlyAuthCost: null,
+      monthlyImpact: null,
+      annualImpact: null,
       dominant: false,
+      rateGroups: [],
       rows: [],
-      message: "No WATS AUTH FEE rows were detected for per-authorization benchmarking.",
+      message: "No processor per-authorization fee rows were detected for per-authorization benchmarking.",
     };
   }
   const benchmark = perAuthBenchmarkFor({
@@ -1375,7 +1575,11 @@ function perAuthBenchmarkAnalysis(params: {
   });
   const authorizationCount = rows.reduce((sum, row) => sum + row.count, 0);
   const monthlyAuthCost = round2(rows.reduce((sum, row) => sum + row.amount, 0));
-  const currentRate = authorizationCount > 0 ? round2(monthlyAuthCost / authorizationCount) : null;
+  const rateGroups = perAuthRateGroups(rows);
+  const dominantGroup = rateGroups[0] ?? null;
+  const currentRate = dominantGroup?.rate ?? (authorizationCount > 0 ? round2(monthlyAuthCost / authorizationCount) : null);
+  const dominantAuthorizationCount = dominantGroup?.count ?? null;
+  const dominantMonthlyAuthCost = dominantGroup?.amount ?? null;
   const dominant = params.processorPerItemTotal !== null && params.processorPerItemTotal > 0 && monthlyAuthCost >= params.processorPerItemTotal * 0.5;
   if (!benchmark.benchmark || currentRate === null || authorizationCount <= 0) {
     return {
@@ -1389,32 +1593,45 @@ function perAuthBenchmarkAnalysis(params: {
       targetRate: null,
       authorizationCount,
       monthlyAuthCost,
-      monthlySavings: null,
-      annualSavings: null,
+      dominantRate: currentRate,
+      dominantAuthorizationCount,
+      dominantMonthlyAuthCost,
+      monthlyImpact: null,
+      annualImpact: null,
       dominant,
+      rateGroups,
       rows,
-      message: "Per-authorization benchmarking requires a volume tier and usable WATS auth count/rate detail.",
+      message: "Per-authorization benchmarking requires a volume tier and usable processor auth count/rate detail.",
     };
   }
   const targetRate = currentRate > benchmark.benchmark.high ? benchmark.benchmark.high : (benchmark.benchmark.low + benchmark.benchmark.high) / 2;
-  const monthlySavings = round2(Math.max(0, currentRate - targetRate) * authorizationCount);
-  const annualSavings = round2(monthlySavings * 12);
+  const impactCount = dominantAuthorizationCount ?? authorizationCount;
+  const monthlyImpact = round2(Math.max(0, currentRate - targetRate) * impactCount);
+  const annualImpact = round2(monthlyImpact * 12);
+  const groupText =
+    rateGroups.length > 1
+      ? ` Visible rate groups: ${rateGroups.map((group) => `${group.label}: $${group.rate.toFixed(2)} (${group.count.toLocaleString("en-US")} auths)`).join("; ")}.`
+      : "";
   return {
     status: "ready",
     annualVolume: params.annualVolume,
     volumeTier: benchmark.tier,
     benchmarkChannel: benchmark.channel,
     currentRate,
+    dominantRate: currentRate,
+    dominantAuthorizationCount,
+    dominantMonthlyAuthCost,
     competitiveLow: benchmark.benchmark.low,
     competitiveHigh: benchmark.benchmark.high,
     targetRate,
     authorizationCount,
     monthlyAuthCost,
-    monthlySavings,
-    annualSavings,
+    monthlyImpact,
+    annualImpact,
     dominant,
+    rateGroups,
     rows,
-    message: `The per-authorization fee is $${currentRate.toFixed(2)}. For a merchant processing approximately $${(params.annualVolume ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}/year, competitive per-auth pricing is $${benchmark.benchmark.low.toFixed(2)} to $${benchmark.benchmark.high.toFixed(2)}. Reducing from $${currentRate.toFixed(2)} to $${targetRate.toFixed(2)} would save approximately $${monthlySavings.toFixed(2)}/month ($${annualSavings.toFixed(2)}/year).`,
+    message: `The dominant per-authorization fee is $${currentRate.toFixed(2)} across ${(impactCount ?? 0).toLocaleString("en-US")} authorization(s). For a merchant processing approximately $${(params.annualVolume ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}/year, competitive per-auth pricing is $${benchmark.benchmark.low.toFixed(2)} to $${benchmark.benchmark.high.toFixed(2)}. Reducing from $${currentRate.toFixed(2)} to $${targetRate.toFixed(2)} would create a component impact of approximately $${monthlyImpact.toFixed(2)}/month ($${annualImpact.toFixed(2)}/year).${groupText}`,
   };
 }
 
@@ -1439,7 +1656,210 @@ function penaltyPatternRows(rows: FiservFeeAnalysisRow[]): Array<{ row: FiservFe
     .filter((item): item is NonNullable<typeof item> => item !== null);
 }
 
-function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSummary">): FiservFeeAnalysisFinding[] {
+function developerReview(rows: FiservFeeAnalysisRow[]): FiservFeeAnalysisV2["developerReview"] {
+  const reference = loadMccBenchmarkReference();
+  const unknownFeeRows = rows
+    .filter((row) => row.feeType === "unknown" || row.matchMethod === "ai_candidate")
+    .map((row) => ({
+      rowIndex: row.rowIndex,
+      description: row.description,
+      cardTypeSection: row.cardTypeSection,
+      volumeBasis: row.volumeBasis,
+      count: row.count,
+      rate: row.rate,
+      amount: row.amount,
+      feeType: row.feeType,
+      matchMethod: row.matchMethod,
+      evidenceLine: row.evidenceLine,
+    }));
+  const unmatchedProcessorFixedFees = rows
+    .filter((row) => row.feeType === "processor_fixed" && !matchBenchmarkPattern(row.description, reference.junk_fee_patterns.fees))
+    .map((row) => ({
+      rowIndex: row.rowIndex,
+      description: row.description,
+      cardTypeSection: row.cardTypeSection,
+      amount: row.amount,
+      evidenceLine: row.evidenceLine,
+    }));
+  return { unknownFeeRows, unmatchedProcessorFixedFees };
+}
+
+function disputeActivityAnalysis(params: {
+  rows: FiservFeeAnalysisRow[];
+  fundingBatchRows?: FiservFeeAnalysisInput["fundingBatchRows"];
+  totalVolume: number;
+}): FiservDisputeActivityAnalysis {
+  const chargebackRows = params.rows.filter((row) => /\bCHARGEBACKS?\b/i.test(row.description));
+  const achRejectRows = params.rows.filter((row) => /\bACH\s+REJECT\b/i.test(row.description));
+  const chargebackFeeAmount = round2(chargebackRows.reduce((sum, row) => sum + row.amount, 0));
+  const achRejectFeeAmount = round2(achRejectRows.reduce((sum, row) => sum + row.amount, 0));
+  const chargebackCount = Math.round(
+    chargebackRows.reduce((sum, row) => {
+      const count = rowCountFromAmountAndRate(row);
+      return sum + (count ?? row.count ?? 0);
+    }, 0),
+  );
+  const achRejectCount = Math.round(
+    achRejectRows.reduce((sum, row) => {
+      const count = rowCountFromAmountAndRate(row);
+      return sum + (count ?? row.count ?? 0);
+    }, 0),
+  );
+  const fundingRows = params.fundingBatchRows ?? [];
+  const fundingAdjustmentCount = fundingRows.filter((row) => Math.abs(row.adjustments ?? 0) > 0.005).length;
+  const fundingChargebackCount = fundingRows.filter((row) => Math.abs(row.chargebacks ?? 0) > 0.005).length;
+  const disputeCostAmount = round2(chargebackFeeAmount + achRejectFeeAmount);
+  const disputeCostPctOfVolume = params.totalVolume > 0 ? round8(disputeCostAmount / params.totalVolume) : null;
+  const flags: FiservDisputeActivityAnalysis["flags"] = [];
+  if ((disputeCostPctOfVolume ?? 0) > 0.005) {
+    flags.push({
+      kind: "high_dispute_cost_pct",
+      severity: (disputeCostPctOfVolume ?? 0) > 0.01 ? "high" : "warning",
+      message: `Dispute-related fees equal ${((disputeCostPctOfVolume ?? 0) * 100).toFixed(2)}% of monthly volume.`,
+    });
+  }
+  if (fundingAdjustmentCount > 5) {
+    flags.push({
+      kind: "high_adjustment_count",
+      severity: fundingAdjustmentCount > 10 ? "high" : "warning",
+      message: `${fundingAdjustmentCount} funding batch row(s) include adjustments.`,
+    });
+  }
+  const evidence = [
+    ...chargebackRows.slice(0, 4).map((row) => row.evidenceLine),
+    ...achRejectRows.slice(0, 4).map((row) => row.evidenceLine),
+    ...fundingRows
+      .filter((row) => Math.abs(row.adjustments ?? 0) > 0.005 || Math.abs(row.chargebacks ?? 0) > 0.005)
+      .slice(0, 4)
+      .map((row) => row.evidenceLine)
+      .filter((line): line is string => Boolean(line)),
+  ];
+  const status =
+    chargebackCount > 0 || achRejectCount > 0 || fundingAdjustmentCount > 0 || fundingChargebackCount > 0 ? ("ready" as const) : ("not_applicable" as const);
+  return {
+    status,
+    chargebackCount,
+    chargebackFeeAmount,
+    achRejectCount,
+    achRejectFeeAmount,
+    fundingAdjustmentCount,
+    fundingChargebackCount,
+    disputeCostAmount,
+    disputeCostPctOfVolume,
+    flags,
+    evidence,
+  };
+}
+
+function findingAnnualImpact(finding: FiservFeeAnalysisFinding): number {
+  return round2(
+    Math.max(
+      finding.componentImpactEstimate?.high ?? 0,
+      finding.annualEstimate ?? 0,
+      finding.amount === null ? 0 : finding.amount,
+    ),
+  );
+}
+
+function savingsTierForFinding(finding: FiservFeeAnalysisFinding): "confirmed" | "negotiable" | "investigative" | null {
+  if (finding.kind === "tiered_downgrade_cost" || finding.kind === "tiered_downgrade_high_nqual" || finding.kind === "tiered_downgrade_majority_not_qualified") {
+    return null;
+  }
+  if (
+    finding.kind === "authorization_ratio_healthy" ||
+    finding.kind === "effective_rate_positive_benchmark" ||
+    finding.kind === "bundled_effective_rate_above_benchmark" ||
+    finding.kind === "card_not_present_detected" ||
+    finding.kind === "new_account_pricing_context"
+  ) {
+    return null;
+  }
+  if (finding.kind === "ai_statement_anomaly") return null;
+  if (
+    finding.kind === "avoidable_compliance_fee" ||
+    finding.kind === "junk_fee" ||
+    finding.kind === "junk_fixed_fee_summary" ||
+    finding.action === "complete_pci_validation" ||
+    isPciOrSecurityPenaltyFinding(finding)
+  ) {
+    return "confirmed";
+  }
+  if (
+    finding.kind === "per_auth_fee_benchmark" ||
+    finding.kind === "hidden_percentage_markup" ||
+    finding.kind === "processor_per_item_stacking" ||
+    finding.kind === "bundled_pricing_savings_opportunity" ||
+    finding.kind === "effective_rate_above_benchmark" ||
+    finding.action === "negotiate_processor_rate" ||
+    finding.action === "request_interchange_plus_quote"
+  ) {
+    return "negotiable";
+  }
+  if (
+    finding.kind === "suspicious_uniform_rate" ||
+    finding.kind === "rate_exceeds_reference" ||
+    finding.kind === "third_party_service_fee" ||
+    finding.action === "request_pass_through_documentation" ||
+    finding.action === "verify_third_party_service"
+  ) {
+    return "investigative";
+  }
+  if (finding.kind === "ai_fee_assessment") {
+    if (finding.severity === "high") return "confirmed";
+    if (finding.severity === "warning") return "negotiable";
+    return "investigative";
+  }
+  return null;
+}
+
+function savingsComponentAnnualImpact(finding: FiservFeeAnalysisFinding): number {
+  if (finding.kind === "tiered_downgrade_cost" || finding.kind === "tiered_downgrade_high_nqual" || finding.kind === "tiered_downgrade_majority_not_qualified") return 0;
+  if (finding.componentImpactEstimate) return round2(Math.max(finding.componentImpactEstimate.low, finding.componentImpactEstimate.high));
+  if (finding.kind === "rate_exceeds_reference" || finding.kind === "suspicious_uniform_rate" || finding.kind === "junk_fee" || finding.kind === "penalty_or_configuration_fee") {
+    return finding.annualEstimate ?? 0;
+  }
+  return 0;
+}
+
+function isPciOrSecurityPenaltyFinding(finding: FiservFeeAnalysisFinding): boolean {
+  const text = normalizeFiservFeeReferenceText([finding.title, ...finding.evidence].join(" "));
+  return /\b(PCI|NON COMPLIANCE|NON COMPLIANT|NON VALIDATED|MANAGED SECURITY|SECURITY NON)\b/.test(text);
+}
+
+function findingPriorityTier(finding: FiservFeeAnalysisFinding): number {
+  if (isPciOrSecurityPenaltyFinding(finding)) return 1;
+  if (finding.kind === "avoidable_compliance_fee") return 1;
+  if (finding.action === "complete_pci_validation") return 1;
+  if (finding.kind === "junk_fee" || finding.kind === "junk_fixed_fee_summary") return 2;
+  if (finding.kind === "suspicious_uniform_rate" || finding.kind === "rate_exceeds_reference") return 3;
+  if (
+    finding.kind === "per_auth_fee_benchmark" ||
+    finding.kind === "processor_per_item_stacking" ||
+    finding.kind === "hidden_percentage_markup" ||
+    finding.kind === "bundled_pricing_savings_opportunity" ||
+    finding.kind === "bundled_effective_rate_above_benchmark" ||
+    finding.kind === "effective_rate_above_benchmark" ||
+    finding.kind === "tiered_downgrade_cost" ||
+    finding.kind === "tiered_downgrade_high_nqual" ||
+    finding.kind === "tiered_downgrade_majority_not_qualified"
+  ) {
+    return 4;
+  }
+  return 5;
+}
+
+function sortFindingsForPresentation(findings: FiservFeeAnalysisFinding[]): FiservFeeAnalysisFinding[] {
+  return [...findings].sort((left, right) => {
+    const tierDelta = findingPriorityTier(left) - findingPriorityTier(right);
+    if (tierDelta !== 0) return tierDelta;
+    const impactDelta = findingAnnualImpact(right) - findingAnnualImpact(left);
+    if (Math.abs(impactDelta) > 0.005) return impactDelta;
+    const severityRank = { high: 0, warning: 1, info: 2 } as const;
+    return severityRank[left.severity] - severityRank[right.severity];
+  });
+}
+
+function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "estimatedAnnualSavings" | "developerReview">): FiservFeeAnalysisFinding[] {
   const findings: FiservFeeAnalysisFinding[] = [];
   for (const row of analysis.rows.filter((candidate) => candidate.rateComparison === "above_reference")) {
     findings.push(finding({
@@ -1512,9 +1932,16 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
         amount: downgrade.totalDowngradeCost,
         evidence: [
           `Estimated downgrade cost this month is $${(downgrade.totalDowngradeCost ?? 0).toFixed(2)} above the lowest visible qualified tier.`,
+          ...(downgrade.downgradeCostCapped
+            ? [
+                `Downgrade cost was capped at total discount charges of $${(downgrade.totalDiscountCharges ?? 0).toFixed(2)}; raw calculated downgrade cost was $${(downgrade.rawDowngradeCost ?? 0).toFixed(2)}.`,
+              ]
+            : []),
+          ...(downgrade.baselineInferred ? ["No qualified tier was visible, so the baseline rate is inferred from the lowest visible discount tier."] : []),
           "This is only the extra cost above all-qualified tiered pricing; overpayment versus competitive IC+ may be larger.",
         ],
         action: "request_interchange_plus_quote",
+        monthlyCost: null,
       }));
     }
   }
@@ -1529,7 +1956,7 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
         `Auth-to-transaction ratio is ${(analysis.authorizationAnalysis.authRatio ?? 0).toFixed(2)}:1.`,
       ],
       action: "fix_terminal_or_gateway_configuration",
-      savingsEstimate:
+      componentImpactEstimate:
         (analysis.authorizationAnalysis.estimatedExcessAuthCost ?? 0) > 0
           ? {
               low: round2((analysis.authorizationAnalysis.estimatedExcessAuthCost ?? 0) * 12),
@@ -1556,20 +1983,46 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
   if (analysis.perAuthBenchmarkAnalysis.status === "ready" && analysis.perAuthBenchmarkAnalysis.dominant) {
     findings.push(finding({
       kind: "per_auth_fee_benchmark",
-      severity: (analysis.perAuthBenchmarkAnalysis.monthlySavings ?? 0) > 0 ? "warning" : "info",
-      title: (analysis.perAuthBenchmarkAnalysis.monthlySavings ?? 0) > 0 ? "Per-authorization fee is above competitive benchmark" : "Per-authorization fee is within benchmark",
+      severity: (analysis.perAuthBenchmarkAnalysis.monthlyImpact ?? 0) > 0 ? "warning" : "info",
+      title: (analysis.perAuthBenchmarkAnalysis.monthlyImpact ?? 0) > 0 ? "Per-authorization fee is above competitive benchmark" : "Per-authorization fee is within benchmark",
       amount: analysis.perAuthBenchmarkAnalysis.monthlyAuthCost,
       evidence: [
         analysis.perAuthBenchmarkAnalysis.message,
         ...analysis.perAuthBenchmarkAnalysis.rows.slice(0, 6).map((row) => row.evidenceLine),
       ],
-      action: (analysis.perAuthBenchmarkAnalysis.monthlySavings ?? 0) > 0 ? "negotiate_processor_rate" : "none",
-      savingsEstimate:
-        (analysis.perAuthBenchmarkAnalysis.annualSavings ?? 0) > 0
+      action: (analysis.perAuthBenchmarkAnalysis.monthlyImpact ?? 0) > 0 ? "negotiate_processor_rate" : "none",
+      componentImpactEstimate:
+        (analysis.perAuthBenchmarkAnalysis.annualImpact ?? 0) > 0
           ? {
-              low: analysis.perAuthBenchmarkAnalysis.annualSavings ?? 0,
-              high: analysis.perAuthBenchmarkAnalysis.annualSavings ?? 0,
-              basis: "Annualized savings from reducing WATS AUTH per-authorization pricing to the competitive benchmark target.",
+              low: analysis.perAuthBenchmarkAnalysis.annualImpact ?? 0,
+              high: analysis.perAuthBenchmarkAnalysis.annualImpact ?? 0,
+              basis: "Annualized savings from reducing processor per-authorization pricing to the competitive benchmark target.",
+            }
+          : null,
+    }));
+  }
+  if (analysis.disputeActivityAnalysis.status === "ready" && analysis.disputeActivityAnalysis.flags.length > 0) {
+    const dispute = analysis.disputeActivityAnalysis;
+    findings.push(finding({
+      kind: "dispute_activity_high",
+      severity: dispute.flags.some((flag) => flag.severity === "high") ? "high" : "warning",
+      title: "Dispute and adjustment activity is elevated",
+      amount: dispute.disputeCostAmount,
+      evidence: [
+        `${dispute.chargebackCount} chargeback(s), ${dispute.achRejectCount} ACH reject(s), and ${dispute.fundingAdjustmentCount} funding adjustment row(s) detected.`,
+        dispute.disputeCostPctOfVolume === null
+          ? "Dispute cost percentage could not be calculated because volume was unavailable."
+          : `Chargeback and ACH reject fees equal ${(dispute.disputeCostPctOfVolume * 100).toFixed(2)}% of volume.`,
+        ...dispute.flags.map((flag) => flag.message),
+        ...dispute.evidence.slice(0, 6),
+      ],
+      action: "fix_terminal_or_gateway_configuration",
+      componentImpactEstimate:
+        dispute.disputeCostAmount > 0
+          ? {
+              low: round2(dispute.disputeCostAmount * 12 * 0.25),
+              high: round2(dispute.disputeCostAmount * 12),
+              basis: "Annualized chargeback and ACH reject fee burden; savings assumes dispute prevention and reject cleanup reduce these costs.",
             }
           : null,
     }));
@@ -1595,7 +2048,7 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
         evidence: [benchmark.message, ...benchmark.notes],
         action: "request_interchange_plus_quote",
         monthlyCost: benchmark.estimatedAnnualOverpayment === null ? null : round2(benchmark.estimatedAnnualOverpayment / 12),
-        savingsEstimate:
+        componentImpactEstimate:
           benchmark.estimatedAnnualOverpayment === null
             ? null
             : {
@@ -1634,21 +2087,21 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
         action: "request_interchange_plus_quote",
       }));
     }
-    if ((benchmark.estimatedAnnualSavings?.high ?? 0) > 0) {
+    if ((benchmark.estimatedAnnualImpact?.high ?? 0) > 0) {
       findings.push(finding({
         kind: "bundled_pricing_savings_opportunity",
-        severity: (benchmark.estimatedAnnualSavings?.low ?? 0) >= 1000 ? "high" : "warning",
+        severity: (benchmark.estimatedAnnualImpact?.low ?? 0) >= 1000 ? "high" : "warning",
         title: "Bundled pricing shows estimated savings opportunity",
-        amount: benchmark.estimatedMonthlySavings?.high ?? null,
+        amount: benchmark.estimatedMonthlyImpact?.high ?? null,
         evidence: [
-          `Estimated annual savings range: $${(benchmark.estimatedAnnualSavings?.low ?? 0).toFixed(2)}-$${(benchmark.estimatedAnnualSavings?.high ?? 0).toFixed(2)}.`,
+          `Estimated annual component impact range: $${(benchmark.estimatedAnnualImpact?.low ?? 0).toFixed(2)}-$${(benchmark.estimatedAnnualImpact?.high ?? 0).toFixed(2)}.`,
           `Estimated competitive IC+ monthly cost range: $${(benchmark.estimatedCompetitiveCost?.low ?? 0).toFixed(2)}-$${(benchmark.estimatedCompetitiveCost?.high ?? 0).toFixed(2)}.`,
           "Savings are estimates, not proof, because interchange and network fees are bundled.",
         ],
         action: "request_interchange_plus_quote",
-        savingsEstimate: {
-          low: benchmark.estimatedAnnualSavings?.low ?? 0,
-          high: benchmark.estimatedAnnualSavings?.high ?? 0,
+        componentImpactEstimate: {
+          low: benchmark.estimatedAnnualImpact?.low ?? 0,
+          high: benchmark.estimatedAnnualImpact?.high ?? 0,
           basis: "Estimated annual savings from bundled-pricing benchmark model. Not pass-through proof.",
         },
       }));
@@ -1677,7 +2130,7 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
       amount: analysis.processorMarkupAnalysis.processorPerItemTotal,
       evidence: analysis.processorMarkupAnalysis.perItemStacking.fees,
       action: "negotiate_processor_rate",
-      savingsEstimate:
+      componentImpactEstimate:
         analysis.processorMarkupAnalysis.processorPerItemTotal === null
           ? null
           : {
@@ -1714,25 +2167,29 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
         ...junkRows.map((item) => `${item.row.description}: $${item.row.amount.toFixed(2)}/month`),
       ],
       action: "negotiate_processor_rate",
-      savingsEstimate: {
+      componentImpactEstimate: {
         low: round2(totalJunk * 12 * 0.25),
         high: round2(totalJunk * 12),
         basis: "Annualized fixed-fee burden; low estimate assumes partial negotiation, high estimate assumes all avoidable fixed fees are removed.",
       },
     }));
   }
-  for (const row of analysis.rows.filter((candidate) => candidate.feeType === "suspicious_pass_through_like_fee")) {
+  for (const group of suspiciousUniformRateGroups(analysis.rows)) {
     findings.push(finding({
       kind: "suspicious_uniform_rate",
       severity: "high",
-      title: `${row.description} is charged at the same rate as similar rows across independent networks`,
-      amount: row.amount,
-      evidence: [row.reason, row.evidenceLine],
+      title: `${group.displayName} is charged at the same rate across independent networks`,
+      amount: group.monthlyAmount,
+      evidence: [
+        `This fee is charged at an identical rate across ${group.networks.length} independent card networks. Legitimate network fees are set independently by each network and do not share rates. Total annual impact: $${(group.monthlyAmount * 12).toFixed(2)}. Recommend verifying with processor.`,
+        `Uniform rate: ${group.rate}. Networks: ${group.networks.join(", ")}.`,
+        ...group.rows.slice(0, 8).map((row) => row.evidenceLine),
+      ],
       action: "request_pass_through_documentation",
-      savingsEstimate: {
+      componentImpactEstimate: {
         low: 0,
-        high: round2(row.amount * 12),
-        basis: "Potential savings equals annualized amount if processor cannot document this as a legitimate pass-through.",
+        high: round2(group.monthlyAmount * 12),
+        basis: "Component impact only: potential annualized amount if processor cannot document this as a legitimate pass-through. The top-level estimatedAnnualSavings field is the single savings number.",
       },
     }));
   }
@@ -1749,7 +2206,7 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
         row.evidenceLine,
       ],
       action: "complete_pci_validation",
-      savingsEstimate: {
+      componentImpactEstimate: {
         low: round2(row.amount * 12),
         high: round2(row.amount * 12),
         basis: "Completing PCI validation should eliminate or significantly reduce this fee.",
@@ -1767,7 +2224,7 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
         row.evidenceLine,
       ],
       action: "verify_third_party_service",
-      savingsEstimate: {
+      componentImpactEstimate: {
         low: 0,
         high: round2(row.amount * 12),
         basis: "Potential savings equals annualized amount if the merchant does not actively use this service.",
@@ -1775,21 +2232,70 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
     }));
   }
   for (const row of analysis.processorMarkupAnalysis.hiddenPctMarkupRows) {
+    const normalizedDescription = normalizeFiservFeeReferenceText(row.description);
+    const isSavingsAdjustment = /\bCOMM(?:ERCIAL)?\s+CARD\b/.test(normalizedDescription) && /\bI\/?C\s+SAVINGS\b/.test(normalizedDescription);
+    const retentionPct = row.volumeBasis !== null && row.volumeBasis > 0 ? row.amount / row.volumeBasis : row.rate;
     findings.push(finding({
       kind: "hidden_percentage_markup",
-      severity: "warning",
-      title: `${row.description} adds hidden percentage markup`,
+      severity: isSavingsAdjustment && retentionPct > 0.25 ? "high" : "warning",
+      title: isSavingsAdjustment ? `${row.description} retains ${(retentionPct * 100).toFixed(2)}% of commercial-card savings` : `${row.description} adds hidden percentage markup`,
       amount: row.amount,
-      evidence: [
-        `This percentage-of-volume fee is separate from the visible sales discount spread. Rate: ${row.rate}.`,
-        `Volume basis: ${row.volumeBasis ?? "not shown"}.`,
-      ],
+      evidence: isSavingsAdjustment
+        ? [
+            `Savings pool/base shown: $${(row.volumeBasis ?? 0).toFixed(2)}; processor retained $${row.amount.toFixed(2)}.`,
+            `Retention percentage: ${(retentionPct * 100).toFixed(2)}%. Retention above 25% should be challenged.`,
+          ]
+        : [
+            `This percentage-of-volume fee is separate from the visible sales discount spread. Rate: ${row.rate}.`,
+            `Volume basis: ${row.volumeBasis ?? "not shown"}.`,
+          ],
       action: "negotiate_processor_rate",
-      savingsEstimate: {
+      componentImpactEstimate: {
         low: round2(row.amount * 12 * 0.25),
         high: round2(row.amount * 12),
         basis: "Savings range assumes this hidden markup is reduced or removed.",
       },
+    }));
+  }
+  for (const row of analysis.rows.filter((candidate) => candidate.matchMethod === "ai_classified" && candidate.aiAssessment)) {
+    const assessment = row.aiAssessment!;
+    const hasAction =
+      assessment.merchantAction !== "none" ||
+      assessment.avoidableLikelihood === "high" ||
+      assessment.avoidableLikelihood === "medium";
+    if (!hasAction) continue;
+    findings.push(finding({
+      kind: "ai_fee_assessment",
+      severity: assessment.avoidableLikelihood === "high" ? "high" : assessment.avoidableLikelihood === "medium" ? "warning" : "info",
+      title: assessment.recommendation ? `${row.description}: ${assessment.recommendation}` : `${row.description}: AI fee assessment`,
+      amount: row.amount,
+      evidence: [
+        `Paid to: ${assessment.paidToParty}.`,
+        `Negotiability: ${assessment.negotiability}.`,
+        `Avoidable likelihood: ${assessment.avoidableLikelihood}.`,
+        `Merchant action: ${assessment.merchantAction}.`,
+        `Pass-through proof posture: ${assessment.passThroughProofPosture}.`,
+        assessment.fixedFeeAssessment
+          ? `Fixed fee avoidable assessment: ${assessment.fixedFeeAssessment.avoidable} (${assessment.fixedFeeAssessment.confidence}). ${assessment.fixedFeeAssessment.recommendation ?? ""}`
+          : "",
+        ...assessment.evidence,
+      ].filter(Boolean),
+      action:
+        assessment.merchantAction === "request_pass_through_documentation"
+          ? "request_pass_through_documentation"
+          : assessment.merchantAction === "fix_terminal_or_gateway_configuration"
+            ? "fix_terminal_or_gateway_configuration"
+            : assessment.merchantAction === "verify_service_or_contract"
+              ? "verify_third_party_service"
+              : "negotiate_processor_rate",
+      componentImpactEstimate:
+        assessment.avoidableLikelihood === "high" || assessment.avoidableLikelihood === "medium"
+          ? {
+              low: assessment.avoidableLikelihood === "high" ? round2(row.amount * 12) : 0,
+              high: round2(row.amount * 12),
+              basis: "Component impact only: AI-assessed fee-removal opportunity. The top-level estimatedAnnualSavings field is the single savings number.",
+            }
+          : null,
     }));
   }
   for (const { row, pattern } of penaltyRows) {
@@ -1807,7 +2313,7 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
         row.evidenceLine,
       ],
       action: "fix_terminal_or_gateway_configuration",
-      savingsEstimate: {
+      componentImpactEstimate: {
         low: 0,
         high: round2(row.amount * 12),
         basis: "Potential savings equals annualized amount if transaction data or authorization handling is corrected.",
@@ -1824,7 +2330,7 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings" | "savingsSu
       action: "none",
     }));
   }
-  return findings;
+  return sortFindingsForPresentation(findings);
 }
 
 function rowsAmount(rows: FiservFeeAnalysisRow[]): number {
@@ -1908,14 +2414,58 @@ function buildInterchangeReconciliation(
   };
 }
 
-function savingsSummary(findings: FiservFeeAnalysisFinding[]): FiservFeeAnalysisV2["savingsSummary"] {
-  const savings = findings
-    .map((item) => item.savingsEstimate)
-    .filter((item): item is NonNullable<FiservFeeAnalysisFinding["savingsEstimate"]> => item !== null);
+function estimatedAnnualSavings(
+  analysis: Omit<FiservFeeAnalysisV2, "findings" | "estimatedAnnualSavings" | "developerReview">,
+  findings: FiservFeeAnalysisFinding[],
+): FiservFeeAnalysisV2["estimatedAnnualSavings"] {
+  const currentAnnualFees = round2(analysis.reconciliation.basisTotal * 12);
+  const rawComponents = findings
+    .map((item) => {
+      const tier = savingsTierForFinding(item);
+      if (tier === null) return null;
+      const annualImpact = savingsComponentAnnualImpact(item);
+      if (annualImpact <= 0) return null;
+      const confidence = tier === "confirmed" ? "high" : tier === "negotiable" ? "medium" : "low";
+      return {
+        kind: item.kind,
+        label: item.title,
+        annualImpact,
+        tier,
+        confidence: confidence as "high" | "medium" | "low",
+        sourceFindingKind: item.kind,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+  const hasItemizedJunkFees = rawComponents.some((component) => component.kind === "junk_fee");
+  const hasBundledSavingsModel = rawComponents.some((component) => component.kind === "bundled_pricing_savings_opportunity");
+  const components = rawComponents.filter((component) => {
+    if (hasItemizedJunkFees && component.kind === "junk_fixed_fee_summary") return false;
+    if (hasBundledSavingsModel && (component.kind === "effective_rate_above_benchmark" || component.kind === "bundled_effective_rate_above_benchmark")) return false;
+    return true;
+  });
+
+  const sumTier = (tiers: Array<"confirmed" | "negotiable" | "investigative">) =>
+    round2(components.filter((component) => tiers.includes(component.tier)).reduce((sum, component) => sum + component.annualImpact, 0));
+  const conservative = sumTier(["confirmed"]);
+  const estimated = sumTier(["confirmed", "negotiable"]);
+  const maximum = sumTier(["confirmed", "negotiable", "investigative"]);
+  const amount = estimated;
+  const estimatedCompetitiveAnnualFees = round2(Math.max(0, currentAnnualFees - estimated));
+  const confidence: "high" | "medium" | "low" = conservative > 0 ? "high" : estimated > 0 ? "medium" : maximum > 0 ? "low" : "low";
+  const basis =
+    "Component-tier savings model: conservative includes confirmed removable fees; estimated includes confirmed plus negotiable items; maximum includes confirmed, negotiable, and investigative items.";
   return {
-    annualLow: round2(savings.reduce((sum, item) => sum + item.low, 0)),
-    annualHigh: round2(savings.reduce((sum, item) => sum + item.high, 0)),
-    opportunities: savings.length,
+    conservative,
+    estimated,
+    maximum,
+    amount,
+    currentAnnualFees,
+    estimatedCompetitiveAnnualFees: round2(Math.max(0, estimatedCompetitiveAnnualFees)),
+    methodology: "component_tier_sum",
+    confidence,
+    basis,
+    componentCount: components.length,
+    components,
   };
 }
 
@@ -1973,6 +2523,11 @@ export function buildFiservFeeAnalysisV2(input: FiservFeeAnalysisInput): FiservF
     isHighRisk: categoryResolution.categoryId === "high_risk_retail",
     processorPerItemTotal: processorMarkup.processorPerItemTotal,
   });
+  const disputeActivity = disputeActivityAnalysis({
+    rows,
+    fundingBatchRows: input.fundingBatchRows,
+    totalVolume: input.totalVolume,
+  });
   const withoutFindings = {
     version: "2.0" as const,
     normalization: input.normalizationSummary,
@@ -1995,6 +2550,7 @@ export function buildFiservFeeAnalysisV2(input: FiservFeeAnalysisInput): FiservF
     benchmarkCategoryResolution: serializeBenchmarkCategoryResolution(categoryResolution),
     effectiveRateBenchmarkAnalysis: effectiveBenchmark,
     perAuthBenchmarkAnalysis: perAuthBenchmark,
+    disputeActivityAnalysis: disputeActivity,
     newAccountAnalysis: accountAnalysis,
     bundledPricingBenchmark: buildFiservBundledPricingBenchmarkAnalysis({
       pricingModel: pricingModel.pricingModel,
@@ -2014,11 +2570,12 @@ export function buildFiservFeeAnalysisV2(input: FiservFeeAnalysisInput): FiservF
     },
   };
   const findings = findingsFor(withoutFindings);
-  return {
+  return finalizeFiservFeeAnalysisPresentation({
     ...withoutFindings,
     findings,
-    savingsSummary: savingsSummary(findings),
-  };
+    estimatedAnnualSavings: estimatedAnnualSavings(withoutFindings, findings),
+    developerReview: developerReview(rows),
+  });
 }
 
 export function buildFiservFeeAnalysisV2FromRawRows(input: Omit<FiservFeeAnalysisInput, "canonicalRows" | "normalizationSummary"> & {
@@ -2076,9 +2633,21 @@ export function applyBenchmarkCategoryAiSuggestionToFiservFeeAnalysisV2(params: 
     perAuthBenchmarkAnalysis: perAuthBenchmark,
   };
   const findings = findingsFor(withoutFindings);
-  return {
+  return finalizeFiservFeeAnalysisPresentation({
     ...withoutFindings,
+    estimatedAnnualSavings: estimatedAnnualSavings(withoutFindings, findings),
+    developerReview: developerReview(params.analysis.rows),
     findings,
-    savingsSummary: savingsSummary(findings),
+  });
+}
+
+export function finalizeFiservFeeAnalysisPresentation(analysis: FiservFeeAnalysisV2): FiservFeeAnalysisV2 {
+  const withoutPresentation = analysis as Omit<FiservFeeAnalysisV2, "findings" | "estimatedAnnualSavings" | "developerReview">;
+  const findings = findingsFor(withoutPresentation);
+  return {
+    ...analysis,
+    findings,
+    estimatedAnnualSavings: estimatedAnnualSavings(withoutPresentation, findings),
+    developerReview: developerReview(analysis.rows),
   };
 }

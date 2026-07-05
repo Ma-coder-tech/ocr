@@ -67,6 +67,7 @@ export type MerchantNarrative = {
   attempted: boolean;
   factCount: number;
   factsUsed: string[];
+  paragraphs: string[];
   sections: MerchantNarrativeSections;
   actionItems: MerchantNarrativeActionItem[];
   notes: string[];
@@ -181,7 +182,7 @@ function modelNameForProvider(provider: MerchantNarrativeProvider, options: Merc
   if (provider === "openai") {
     if (options.openAiModelName) return options.openAiModelName;
     if (preference === "openai" && options.modelName) return options.modelName;
-    return process.env.AI_MERCHANT_NARRATIVE_OPENAI_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-5.5";
+    return process.env.AI_MERCHANT_NARRATIVE_OPENAI_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-5.4-mini";
   }
   if (options.anthropicModelName ?? options.modelName) return options.anthropicModelName ?? options.modelName ?? "claude-opus-4-8";
   return process.env.AI_MERCHANT_NARRATIVE_MODEL ?? process.env.ANTHROPIC_MODEL ?? "claude-opus-4-8";
@@ -341,7 +342,7 @@ export function buildMerchantNarrativeFactPacket(output: ParserOutputWithMerchan
     addFact(
       facts,
       "benchmark",
-      `Bundled pricing benchmark estimates annual savings of ${money(analysis.bundledPricingBenchmark.estimatedAnnualSavings?.low ?? null)} to ${money(analysis.bundledPricingBenchmark.estimatedAnnualSavings?.high ?? null)}; confidence is ${analysis.bundledPricingBenchmark.confidence}.`,
+      `Bundled pricing benchmark component model estimates annual impact of ${money(analysis.bundledPricingBenchmark.estimatedAnnualImpact?.low ?? null)} to ${money(analysis.bundledPricingBenchmark.estimatedAnnualImpact?.high ?? null)}; the single total savings number remains the master estimatedAnnualSavings fact. Confidence is ${analysis.bundledPricingBenchmark.confidence}.`,
       "benchmark",
     );
   }
@@ -375,12 +376,24 @@ export function buildMerchantNarrativeFactPacket(output: ParserOutputWithMerchan
     );
   }
 
+  for (const anomaly of analysis.aiAnomalyReview?.anomalies.slice(0, 8) ?? []) {
+    addFact(
+      facts,
+      "ai_anomaly",
+      `Final AI review concern: ${anomaly.description}. Severity ${anomaly.severity}; confidence ${anomaly.confidence}; estimated impact ${anomaly.estimatedImpact === null ? anomaly.estimatedImpactRaw ?? "unknown" : money(anomaly.estimatedImpact)}. Recommendation: ${anomaly.recommendation}.`,
+      "anomaly",
+    );
+  }
+
   for (const row of actionableAssessmentRows(analysis.rows)) {
     const assessment = row.aiAssessment!;
+    const fixedFeeAssessment = assessment.fixedFeeAssessment
+      ? ` Fixed-fee avoidable assessment is ${assessment.fixedFeeAssessment.avoidable} with ${assessment.fixedFeeAssessment.confidence} confidence; fixed-fee recommendation: ${assessment.fixedFeeAssessment.recommendation ?? "none"}.`
+      : "";
     addFact(
       facts,
       "ai_assessment",
-      `AI fee assessment for ${row.description}: paid to ${assessment.paidToParty}, negotiability ${assessment.negotiability}, avoidable likelihood ${assessment.avoidableLikelihood}, merchant action ${assessment.merchantAction}, proof posture ${assessment.passThroughProofPosture}. Recommendation: ${assessment.recommendation ?? "none"}. Amount: ${money(row.amount)}.`,
+      `AI fee assessment for ${row.description}: paid to ${assessment.paidToParty}, negotiability ${assessment.negotiability}, avoidable likelihood ${assessment.avoidableLikelihood}, merchant action ${assessment.merchantAction}, proof posture ${assessment.passThroughProofPosture}.${fixedFeeAssessment} Recommendation: ${assessment.recommendation ?? "none"}. Amount: ${money(row.amount)}.`,
       "assess",
     );
   }
@@ -388,7 +401,7 @@ export function buildMerchantNarrativeFactPacket(output: ParserOutputWithMerchan
   addFact(
     facts,
     "savings",
-    `Savings summary contains ${analysis.savingsSummary.opportunities} opportunity/opportunities with annual low estimate ${money(analysis.savingsSummary.annualLow)} and annual high estimate ${money(analysis.savingsSummary.annualHigh)}.`,
+    `Master estimated annual savings range is conservative ${money(analysis.estimatedAnnualSavings.conservative)}, estimated ${money(analysis.estimatedAnnualSavings.estimated)}, maximum ${money(analysis.estimatedAnnualSavings.maximum)} using methodology ${analysis.estimatedAnnualSavings.methodology}. Use estimated as the headline opportunity and conservative as confirmed savings. Current annual fees are ${money(analysis.estimatedAnnualSavings.currentAnnualFees)}. Confidence is ${analysis.estimatedAnnualSavings.confidence}. All finding-level dollar impacts are components, not separate savings totals.`,
     "savings",
   );
   addFact(
@@ -413,7 +426,10 @@ export function buildMerchantNarrativeFactPacket(output: ParserOutputWithMerchan
       statementPeriodEnd: output.statementIdentity.statementPeriodEnd,
       pricingModel: analysis.pricingModel.pricingModel,
       findingCount: analysis.findings.length,
-      savingsOpportunities: analysis.savingsSummary.opportunities,
+      componentOpportunityCount: analysis.estimatedAnnualSavings.componentCount,
+      estimatedAnnualSavings: analysis.estimatedAnnualSavings.estimated,
+      conservativeAnnualSavings: analysis.estimatedAnnualSavings.conservative,
+      maximumAnnualSavings: analysis.estimatedAnnualSavings.maximum,
       effectiveRatePct: round2(output.selectedFinancials.effectiveRate * 100),
     },
   };
@@ -447,6 +463,7 @@ function narrativeResponseSchema(): unknown {
     .strict();
   return z
     .object({
+      paragraphs: z.array(z.string()).min(3).max(5),
       sections: z
         .object(Object.fromEntries(SECTION_KEYS.map((key) => [key, sectionSchema(z)])))
         .strict(),
@@ -458,10 +475,15 @@ function narrativeResponseSchema(): unknown {
 
 function narrativePrompt(packet: { facts: MerchantNarrativeFact[]; context: Record<string, unknown> }): string {
   return [
-    "You write merchant-facing explanations for a payment-processing statement analysis product.",
+    "You are a merchant services advisor writing for a business owner who is not a payments expert. Use plain language. Lead with the most impactful finding. Every recommendation must include a dollar amount. Never say the processor is stealing or committing fraud. Present evidence and let the merchant decide.",
     "Return conservative JSON only. Do not include prose outside JSON.",
     "Use ONLY the provided facts. Do not invent numbers, savings, rates, pricing models, proof status, deadlines, or recommendations.",
     "Every section summary, bullet, and action item must cite factIds from the provided facts.",
+    "Return 3-5 merchant-facing paragraphs in paragraphs[]. Lead with the single most important finding, prioritize actionable items with specific dollar amounts, adjust tone to the deal quality, and end with a prioritized action list in actionItems[].",
+    "Order recommendations using this priority: 1. PCI non-compliance or security penalty fees first because they require no negotiation to eliminate. 2. Avoidable fixed fees second because they can be removed by contacting the processor. 3. Suspicious fees that may be processor padding third because they require processor verification. 4. Rate negotiation opportunities fourth because they require active negotiation. 5. Informational items last.",
+    "Within each priority level, lead with the highest annual dollar impact. Never present a tiny rate exceedance before a larger annual PCI penalty or avoidable fixed-fee item.",
+    "If the merchant's effective rate is within the competitive benchmark range, say so in the first paragraph before listing optimization opportunities. Do not frame a competitive deal as a problem.",
+    "Use the master estimatedAnnualSavings fact as the only savings range. Lead with the estimated value, mention the conservative confirmed value, and treat maximum as upside if investigative items are validated. If mentioning a finding-level dollar impact, label it as a component impact, not a separate total savings estimate.",
     "If a fact says proof is indeterminate, not enough detail, pending, or an estimate, say that plainly.",
     "Do not present AI assessments as proof. Treat them as advisory recommendations.",
     "Write in clear language for a merchant, not internal engineering language.",
@@ -476,8 +498,7 @@ function openAiProviderOptions(): Record<string, unknown> {
     providerOptions: {
       openai: {
         store: false,
-        reasoningEffort: "low",
-        textVerbosity: "low",
+        textVerbosity: "medium",
         strictJsonSchema: true,
       },
     },
@@ -623,10 +644,13 @@ function usedFactIds(sections: MerchantNarrativeSections, actionItems: MerchantN
 function parseNarrativeAiObject(
   value: unknown,
   facts: MerchantNarrativeFact[],
-): Pick<MerchantNarrative, "sections" | "actionItems" | "factsUsed" | "notes"> {
+): Pick<MerchantNarrative, "paragraphs" | "sections" | "actionItems" | "factsUsed" | "notes"> {
   if (!value || typeof value !== "object") throw new Error("AI merchant narrative response was not an object.");
-  const object = value as { sections?: unknown; actionItems?: unknown; notes?: unknown };
+  const object = value as { paragraphs?: unknown; sections?: unknown; actionItems?: unknown; notes?: unknown };
   const allowed = factIdSet(facts);
+  const paragraphs = Array.isArray(object.paragraphs)
+    ? object.paragraphs.map((entry) => compactText(entry, 1100)).filter((entry): entry is string => Boolean(entry)).slice(0, 5)
+    : [];
   const sectionInput = object.sections && typeof object.sections === "object" ? (object.sections as Record<string, unknown>) : {};
   const sections = Object.fromEntries(SECTION_KEYS.map((key) => [key, normalizeSection(sectionInput[key], key, allowed)])) as MerchantNarrativeSections;
   const actionItems = Array.isArray(object.actionItems)
@@ -636,6 +660,7 @@ function parseNarrativeAiObject(
     ? object.notes.map((entry) => compactText(entry, 260)).filter((entry): entry is string => Boolean(entry)).slice(0, 8)
     : [];
   return {
+    paragraphs: paragraphs.length >= 3 ? paragraphs : [],
     sections,
     actionItems,
     factsUsed: usedFactIds(sections, actionItems),
@@ -653,7 +678,7 @@ function narrativeResult(params: {
   model: string | null;
   attempted: boolean;
   factCount: number;
-  parsed?: Pick<MerchantNarrative, "sections" | "actionItems" | "factsUsed" | "notes">;
+  parsed?: Pick<MerchantNarrative, "paragraphs" | "sections" | "actionItems" | "factsUsed" | "notes">;
   notes: string[];
 }): MerchantNarrative {
   return {
@@ -663,6 +688,7 @@ function narrativeResult(params: {
     attempted: params.attempted,
     factCount: params.factCount,
     factsUsed: params.parsed?.factsUsed ?? [],
+    paragraphs: params.parsed?.paragraphs ?? [],
     sections: params.parsed?.sections ?? emptySections(),
     actionItems: params.parsed?.actionItems ?? [],
     notes: [...params.notes, ...(params.parsed?.notes ?? [])],

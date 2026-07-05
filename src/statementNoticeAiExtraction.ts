@@ -30,8 +30,11 @@ export type StatementNoticeAiAmount = {
   raw: string | null;
 };
 
+export type StatementNoticeAiNoticeType = "fee_increase" | "fee_decrease" | "fee_delay" | "informational";
+
 export type StatementNoticeAiNotice = {
   feeName: string | null;
+  noticeType: StatementNoticeAiNoticeType;
   amount: StatementNoticeAiAmount | null;
   effectiveDate: string | null;
   condition: string | null;
@@ -123,7 +126,7 @@ function modelNameForProvider(provider: StatementNoticeAiProvider, options: Stat
   if (provider === "openai") {
     if (options.openAiModelName) return options.openAiModelName;
     if (preference === "openai" && options.modelName) return options.modelName;
-    return process.env.AI_NOTICE_EXTRACTION_OPENAI_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-5.5";
+    return process.env.AI_NOTICE_EXTRACTION_OPENAI_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-5.4-mini";
   }
   if (options.anthropicModelName ?? options.modelName) return options.anthropicModelName ?? options.modelName ?? "claude-opus-4-8";
   return process.env.AI_NOTICE_EXTRACTION_MODEL ?? process.env.ANTHROPIC_MODEL ?? "claude-opus-4-8";
@@ -176,6 +179,7 @@ function noticeAiResponseSchema(): unknown {
   const noticeSchema = z
     .object({
       feeName: z.string().nullable(),
+      noticeType: z.enum(["fee_increase", "fee_decrease", "fee_delay", "informational"]),
       amount: amountSchema.nullable(),
       effectiveDate: z.string().nullable(),
       condition: z.string().nullable(),
@@ -197,8 +201,7 @@ function openAiProviderOptions(): Record<string, unknown> {
     providerOptions: {
       openai: {
         store: false,
-        reasoningEffort: "low",
-        textVerbosity: "low",
+        textVerbosity: "medium",
         strictJsonSchema: true,
       },
     },
@@ -220,7 +223,9 @@ function noticeAiPrompt(noticeText: string): string {
     "Return conservative JSON only. Do not include prose outside JSON.",
     "Input is the raw notice block printed on a merchant processing statement.",
     "Extract fee changes, rate changes, new fees, effective dates, conditions, deemed-acceptance clauses, and action deadlines.",
-    "Also identify non-fee informational notices when they are clearly statement notices, with isFeeChange false.",
+    "Capture every distinct statement notice and tag noticeType as exactly one of: fee_increase, fee_decrease, fee_delay, informational.",
+    "Use fee_delay for postponed or deferred future fees/rules, including postponed network or EMV fallback charges. Use informational for non-fee notices.",
+    "Set isFeeChange true for fee_increase, fee_decrease, and fee_delay when the notice concerns a concrete fee/rate/charge; otherwise set false.",
     "Do not turn marketing, UI migration, compliance reminders, or generic network announcements into fee changes unless the notice states a concrete fee/rate/charge change.",
     "If no fee changes are announced, include a note exactly saying: No fee changes announced in this statement period.",
     "Use null when a field is absent. Evidence must be short excerpts copied from the input notice block.",
@@ -237,8 +242,15 @@ function parseNoticeAiObject(value: unknown): { notices: StatementNoticeAiNotice
   const notices = (value as { notices: unknown[] }).notices.map((candidate) => {
     const notice = candidate as Partial<StatementNoticeAiNotice>;
     const amount = notice.amount && typeof notice.amount === "object" ? (notice.amount as Partial<StatementNoticeAiAmount>) : null;
+    const noticeType =
+      notice.noticeType === "fee_increase" || notice.noticeType === "fee_decrease" || notice.noticeType === "fee_delay" || notice.noticeType === "informational"
+        ? notice.noticeType
+        : notice.isFeeChange === true
+          ? "fee_increase"
+          : "informational";
     return {
       feeName: typeof notice.feeName === "string" && notice.feeName.trim() ? notice.feeName.trim().slice(0, 160) : null,
+      noticeType,
       amount: amount
         ? {
             value: typeof amount.value === "number" && Number.isFinite(amount.value) ? amount.value : null,
@@ -257,7 +269,7 @@ function parseNoticeAiObject(value: unknown): { notices: StatementNoticeAiNotice
       condition: typeof notice.condition === "string" && notice.condition.trim() ? notice.condition.trim().slice(0, 240) : null,
       acceptanceClause: typeof notice.acceptanceClause === "string" && notice.acceptanceClause.trim() ? notice.acceptanceClause.trim().slice(0, 300) : null,
       actionDeadline: typeof notice.actionDeadline === "string" && notice.actionDeadline.trim() ? notice.actionDeadline.trim().slice(0, 120) : null,
-      isFeeChange: notice.isFeeChange === true,
+      isFeeChange: notice.isFeeChange === true || noticeType === "fee_increase" || noticeType === "fee_decrease" || noticeType === "fee_delay",
       confidence: notice.confidence === "high" || notice.confidence === "medium" || notice.confidence === "low" ? notice.confidence : "low",
       evidence: Array.isArray(notice.evidence)
         ? notice.evidence.map((line) => String(line).replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 8)

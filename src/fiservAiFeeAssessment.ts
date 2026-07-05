@@ -15,6 +15,7 @@ export const FISERV_AI_PASS_THROUGH_PROOF_POSTURES = [
 
 export const FISERV_AI_NEGOTIABILITY_VALUES = ["likely_negotiable", "likely_non_negotiable", "unknown"] as const;
 export const FISERV_AI_AVOIDABLE_LIKELIHOOD_VALUES = ["high", "medium", "low", "unknown"] as const;
+export const FISERV_AI_FIXED_FEE_AVOIDABLE_VALUES = ["true", "false", "uncertain"] as const;
 export const FISERV_AI_MERCHANT_ACTIONS = [
   "request_fee_removal_or_reduction",
   "request_pass_through_documentation",
@@ -28,7 +29,14 @@ export type FiservAiPaidToParty = (typeof FISERV_AI_PAID_TO_PARTIES)[number];
 export type FiservAiPassThroughProofPosture = (typeof FISERV_AI_PASS_THROUGH_PROOF_POSTURES)[number];
 export type FiservAiNegotiability = (typeof FISERV_AI_NEGOTIABILITY_VALUES)[number];
 export type FiservAiAvoidableLikelihood = (typeof FISERV_AI_AVOIDABLE_LIKELIHOOD_VALUES)[number];
+export type FiservAiFixedFeeAvoidable = (typeof FISERV_AI_FIXED_FEE_AVOIDABLE_VALUES)[number];
 export type FiservAiMerchantAction = (typeof FISERV_AI_MERCHANT_ACTIONS)[number];
+
+export type FiservAiFixedFeeAssessment = {
+  avoidable: FiservAiFixedFeeAvoidable;
+  recommendation: string | null;
+  confidence: "high" | "medium" | "low";
+};
 
 export type FiservAiFeeAssessment = {
   paidToParty: FiservAiPaidToParty;
@@ -37,6 +45,7 @@ export type FiservAiFeeAssessment = {
   avoidableLikelihood: FiservAiAvoidableLikelihood;
   merchantAction: FiservAiMerchantAction;
   recommendation: string | null;
+  fixedFeeAssessment: FiservAiFixedFeeAssessment | null;
   evidence: string[];
   sourceEvidence: {
     sourceName: string | null;
@@ -56,6 +65,7 @@ type AssessmentDefaults = {
   avoidableLikelihood?: FiservAiAvoidableLikelihood;
   merchantAction?: FiservAiMerchantAction;
   recommendation?: string | null;
+  fixedFeeAssessment?: FiservAiFixedFeeAssessment | null;
   evidence?: string[];
   sourceEvidence?: Partial<FiservAiFeeAssessment["sourceEvidence"]>;
 };
@@ -88,6 +98,24 @@ export function normalizeFiservAiFeeAssessment(
     ? candidate.evidence.map((item) => shortText(item, 240)).filter((item): item is string => Boolean(item)).slice(0, 6)
     : [];
   const defaultEvidence = (defaults.evidence ?? []).map((item) => item.replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 6);
+  const fixedFeeCandidate =
+    candidate.fixedFeeAssessment && typeof candidate.fixedFeeAssessment === "object"
+      ? candidate.fixedFeeAssessment
+      : ({} as Partial<FiservAiFixedFeeAssessment>);
+  const defaultFixedFee = defaults.fixedFeeAssessment ?? null;
+  const fixedFeeAssessment =
+    candidate.fixedFeeAssessment === null && defaultFixedFee === null
+      ? null
+      : defaultFixedFee || candidate.fixedFeeAssessment
+        ? {
+            avoidable: enumValue(fixedFeeCandidate.avoidable, FISERV_AI_FIXED_FEE_AVOIDABLE_VALUES, defaultFixedFee?.avoidable ?? "uncertain"),
+            recommendation: shortText(fixedFeeCandidate.recommendation, 500) ?? defaultFixedFee?.recommendation ?? null,
+            confidence:
+              fixedFeeCandidate.confidence === "high" || fixedFeeCandidate.confidence === "medium" || fixedFeeCandidate.confidence === "low"
+                ? fixedFeeCandidate.confidence
+                : defaultFixedFee?.confidence ?? "low",
+          }
+        : null;
   const sourceName = shortText(sourceCandidate.sourceName, 160) ?? defaultSource.sourceName ?? null;
   const referenceId = shortText(sourceCandidate.referenceId, 80) ?? defaultSource.referenceId ?? null;
   const referenceRate = finiteNumber(sourceCandidate.referenceRate) ?? defaultSource.referenceRate ?? null;
@@ -117,6 +145,7 @@ export function normalizeFiservAiFeeAssessment(
     ),
     merchantAction: enumValue(candidate.merchantAction, FISERV_AI_MERCHANT_ACTIONS, defaults.merchantAction ?? "none"),
     recommendation: shortText(candidate.recommendation, 500) ?? defaults.recommendation ?? null,
+    fixedFeeAssessment,
     evidence: evidence.length > 0 ? evidence : defaultEvidence,
     sourceEvidence: {
       sourceName,

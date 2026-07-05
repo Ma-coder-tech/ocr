@@ -4,6 +4,7 @@ import {
 } from "./fiservFeeNormalizer.js";
 import { loadFiservFeeReference } from "./fiservFeeReference.js";
 import {
+  finalizeFiservFeeAnalysisPresentation,
   type FiservFeeAnalysisBucket,
   type FiservFeeAnalysisFinding,
   type FiservFeeAnalysisRow,
@@ -237,7 +238,7 @@ function modelNameForProvider(provider: FiservFeeAiProvider, options: FiservFeeA
   if (provider === "openai") {
     if (options.openAiModelName) return options.openAiModelName;
     if (preference === "openai" && options.modelName) return options.modelName;
-    return process.env.AI_FEE_CLASSIFICATION_OPENAI_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-5.5";
+    return process.env.AI_FEE_CLASSIFICATION_OPENAI_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-5.4-mini";
   }
   if (options.anthropicModelName ?? options.modelName) return options.anthropicModelName ?? options.modelName ?? "claude-opus-4-8";
   return process.env.AI_FEE_CLASSIFICATION_MODEL ?? process.env.ANTHROPIC_MODEL ?? "claude-opus-4-8";
@@ -325,6 +326,7 @@ export function buildFiservFeeAnalysisAiPacket(analysis: FiservFeeAnalysisV2, co
       "Use the card-type section, fee label, amount/count/rate math, merchant context, pricing model, and reference hints.",
       "AI may classify the fee category and likely paid-to party, but AI must not invent proof that a charged amount equals a pass-through rate.",
       "Return an assessment object for every suggestion: paid-to party, pass-through proof posture, negotiability, avoidable likelihood, merchant action, recommendation, evidence, and source evidence.",
+      "When classifying a row as processor_fixed, include fixedFeeAssessment with avoidable true/false/uncertain, a specific recommendation, and confidence. Use false for a real service the merchant likely uses, true for junk/avoidable fees, and uncertain when the label is too generic.",
       "Use source_backed_math_candidate only when the row maps to a reference hint/source and the row math supports the candidate. Deterministic rate verification must still confirm it before final proof becomes proven or likely.",
       "For network/interchange/program fees without a deterministic fixed-rate reference, return proofStatus indeterminate or not_enough_detail.",
       "Return unknown when the evidence is too generic, contradictory, or not tied to a network or processor-controlled pattern.",
@@ -360,6 +362,14 @@ function aiAssessmentSchema(z: any): any {
       avoidableLikelihood: z.enum(FISERV_AI_AVOIDABLE_LIKELIHOOD_VALUES),
       merchantAction: z.enum(FISERV_AI_MERCHANT_ACTIONS),
       recommendation: z.string().nullable(),
+      fixedFeeAssessment: z
+        .object({
+          avoidable: z.enum(["true", "false", "uncertain"]),
+          recommendation: z.string().nullable(),
+          confidence: z.enum(["high", "medium", "low"]),
+        })
+        .strict()
+        .nullable(),
       evidence: z.array(z.string()),
       sourceEvidence: z
         .object({
@@ -401,8 +411,7 @@ function openAiProviderOptions(): Record<string, unknown> {
     providerOptions: {
       openai: {
         store: false,
-        reasoningEffort: "low",
-        textVerbosity: "low",
+        textVerbosity: "medium",
         strictJsonSchema: true,
       },
     },
@@ -566,8 +575,17 @@ function assessmentDefaultsForSuggestion(params: {
   negotiability: FiservAiNegotiability;
   evidence: string[];
   sourceEvidence?: Partial<FiservAiFeeAssessment["sourceEvidence"]>;
+  fixedFeeAssessment?: FiservAiFeeAssessment["fixedFeeAssessment"];
 } {
   const processorControlled = isProcessorControlledFeeType(params.feeType);
+  const fixedFeeAssessment =
+    params.feeType === "processor_fixed"
+      ? {
+          avoidable: "uncertain" as const,
+          recommendation: params.explanation || "Ask the processor what service this fixed fee pays for and whether it can be removed or reduced.",
+          confidence: "low" as const,
+        }
+      : null;
   return {
     paidToParty: paidToPartyForAssessment(params.paidTo),
     passThroughProofPosture: processorControlled
@@ -576,6 +594,7 @@ function assessmentDefaultsForSuggestion(params: {
         ? "source_backed_math_candidate"
         : "not_enough_evidence",
     negotiability: negotiabilityForAssessment(params.negotiability),
+    fixedFeeAssessment,
     evidence: params.explanation ? [params.explanation] : [],
     sourceEvidence: {
       sourceName: params.canonicalName,
@@ -636,6 +655,9 @@ function applySuggestionToRow(row: FiservFeeAnalysisRow, suggestion: FiservFeeAn
       `Paid to: ${suggestion.paidTo}.`,
       `Negotiability: ${suggestion.negotiability}.`,
       `Pass-through proof posture: ${assessment.passThroughProofPosture}.`,
+      assessment.fixedFeeAssessment
+        ? `Fixed fee avoidable assessment: ${assessment.fixedFeeAssessment.avoidable} (${assessment.fixedFeeAssessment.confidence}). ${assessment.fixedFeeAssessment.recommendation ?? ""}`
+        : null,
       assessment.recommendation ? `Recommendation: ${assessment.recommendation}` : null,
       suggestion.reasonCodes.length > 0 ? `Reason codes: ${suggestion.reasonCodes.join(", ")}.` : null,
     ]
@@ -691,13 +713,13 @@ function processorMarkupAnalysis(
   };
 }
 
-function aiFinding(params: Omit<FiservFeeAnalysisFinding, "action" | "monthlyCost" | "annualEstimate" | "savingsEstimate">): FiservFeeAnalysisFinding {
+function aiFinding(params: Omit<FiservFeeAnalysisFinding, "action" | "monthlyCost" | "annualEstimate" | "componentImpactEstimate">): FiservFeeAnalysisFinding {
   return {
     ...params,
     action: "none",
     monthlyCost: params.amount,
     annualEstimate: params.amount === null ? null : round2(params.amount * 12),
-    savingsEstimate: null,
+    componentImpactEstimate: null,
   };
 }
 
@@ -766,6 +788,9 @@ function findingsFor(analysis: Omit<FiservFeeAnalysisV2, "findings">): FiservFee
         `Avoidable likelihood: ${assessment.avoidableLikelihood}.`,
         `Merchant action: ${assessment.merchantAction}.`,
         `Pass-through proof posture: ${assessment.passThroughProofPosture}.`,
+        assessment.fixedFeeAssessment
+          ? `Fixed fee avoidable assessment: ${assessment.fixedFeeAssessment.avoidable} (${assessment.fixedFeeAssessment.confidence}). ${assessment.fixedFeeAssessment.recommendation ?? ""}`
+          : "",
         ...assessment.evidence,
       ],
     }));
@@ -830,9 +855,8 @@ export function applyFiservFeeAnalysisAiSuggestions(
   if (skippedSuggestionCount > 0) notes.push(`${skippedSuggestionCount} V2 AI fee classification suggestion(s) were left for review.`);
 
   return {
-    analysis: {
+    analysis: finalizeFiservFeeAnalysisPresentation({
       ...withoutFindings,
-      findings: findingsFor(withoutFindings),
       ai: {
         status: appliedSuggestionCount > 0 ? "applied" : "no_usable_suggestions",
         provider: options.provider ?? null,
@@ -843,7 +867,7 @@ export function applyFiservFeeAnalysisAiSuggestions(
         skippedSuggestionCount,
         notes,
       },
-    },
+    }),
     ai: {
       status: appliedSuggestionCount > 0 ? "applied" : "no_usable_suggestions",
       provider: options.provider ?? null,

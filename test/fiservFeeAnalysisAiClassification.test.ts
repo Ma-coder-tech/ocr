@@ -108,6 +108,7 @@ describe("Fiserv V2 AI fee classification", () => {
                         avoidableLikelihood: "low",
                         merchantAction: "request_pass_through_documentation",
                         recommendation: "Verify the Transaction Integrity Fee against the Visa reference for the statement period.",
+                        fixedFeeAssessment: null,
                         evidence: ["Visa integrity label, transaction count, stated per-item rate, and amount are present."],
                         sourceEvidence: {
                           sourceName: "Visa Transaction Integrity Fee",
@@ -189,6 +190,93 @@ describe("Fiserv V2 AI fee classification", () => {
       expect.arrayContaining([
         expect.objectContaining({
           kind: "normalization_ai_candidates",
+        }),
+      ]),
+    );
+  });
+
+  it("preserves AI fixed-fee avoidable assessment on processor fixed suggestions", async () => {
+    const doc = await parsePdf(CLOVER_FULL_PDF_PATH);
+    const parsed = fiservFirstDataFullStatementDriver.parse(doc, { sourceFileName: "SAMPLE_MERCHANT4_CLOVER.pdf" });
+    let prompt = "";
+
+    const result = await maybeRunFiservFeeAnalysisAiClassificationForParserOutput(parsed, {
+      enabled: true,
+      provider: "anthropic",
+      anthropicApiKey: "test-key",
+      applyMinConfidence: "medium",
+      modelName: "test-v2-model",
+      sdk: {
+        createAnthropic: () => () => ({ provider: "mock-anthropic" }),
+        generateObject: async (options) => {
+          prompt = String(options.prompt ?? "");
+          const packet = JSON.parse(prompt.split("Structured packet:\n\n").at(-1) ?? "{}") as {
+            unresolvedRows: Array<{ rowIndex: number; amount: number; description: string }>;
+          };
+          const row = packet.unresolvedRows[0];
+          return {
+            object: {
+              rows: [
+                {
+                  rowIndex: row.rowIndex,
+                  feeType: "processor_fixed",
+                  confidence: "high",
+                  paidTo: "processor_or_iso",
+                  negotiability: "negotiable",
+                  canonicalName: "Unknown Fixed Processor Fee",
+                  suggestedReferenceId: null,
+                  proofStatus: "processor_controlled",
+                  assessment: {
+                    paidToParty: "processor_or_iso",
+                    passThroughProofPosture: "not_applicable_processor_controlled",
+                    negotiability: "likely_negotiable",
+                    avoidableLikelihood: "high",
+                    merchantAction: "request_fee_removal_or_reduction",
+                    recommendation: `Ask the processor to remove or justify the ${row.amount.toFixed(2)} fixed fee.`,
+                    fixedFeeAssessment: {
+                      avoidable: "true",
+                      recommendation: "No clear active service is identified; request removal or a written service description.",
+                      confidence: "high",
+                    },
+                    evidence: [`${row.description} was treated as a processor-controlled fixed fee for this test.`],
+                    sourceEvidence: {
+                      sourceName: null,
+                      referenceId: null,
+                      referenceRate: null,
+                      statementRate: null,
+                      statementAmount: row.amount,
+                      mathSummary: null,
+                      verificationNote: "Fixed fee assessment is advisory and not pass-through proof.",
+                    },
+                  },
+                  reasonCodes: ["UNKNOWN_FIXED_FEE_ASSESSMENT"],
+                  explanation: "Label does not identify a card-brand pass-through source.",
+                },
+              ],
+            },
+          };
+        },
+      },
+    });
+
+    const fixedRow = result.output.fiservFeeAnalysisV2.rows.find((row) => row.feeType === "processor_fixed" && row.matchMethod === "ai_classified");
+
+    expect(prompt).toContain("When classifying a row as processor_fixed");
+    expect(fixedRow).toMatchObject({
+      feeType: "processor_fixed",
+      proofStatus: "processor_controlled",
+      aiAssessment: {
+        fixedFeeAssessment: {
+          avoidable: "true",
+          recommendation: "No clear active service is identified; request removal or a written service description.",
+          confidence: "high",
+        },
+      },
+    });
+    expect(result.output.fiservFeeAnalysisV2.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          evidence: expect.arrayContaining([expect.stringContaining("Fixed fee avoidable assessment: true")]),
         }),
       ]),
     );

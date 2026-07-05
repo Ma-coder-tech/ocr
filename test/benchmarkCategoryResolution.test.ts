@@ -2,6 +2,39 @@ import { describe, expect, it } from "vitest";
 import { resolveBenchmarkCategory } from "../src/benchmarkCategoryResolution.js";
 
 describe("benchmark category resolution", () => {
+  it("resolves the phase-two merchant category test cases", () => {
+    expect(resolveBenchmarkCategory({ merchantName: "EL NUEVO TEQUILA MEXICAN" })).toMatchObject({
+      categoryId: "restaurant",
+      confidence: "high",
+      source: "deterministic",
+    });
+    expect(resolveBenchmarkCategory({ merchantName: "JAMAICA FISH MARKET, INC" })).toMatchObject({
+      categoryId: "grocery",
+      confidence: "high",
+      source: "deterministic",
+    });
+    expect(resolveBenchmarkCategory({ merchantName: "ANIMAL DELTA HOUSE LLC" })).toMatchObject({
+      categoryId: "default",
+      confidence: "low",
+      source: "default",
+    });
+    expect(resolveBenchmarkCategory({ merchantName: "XPRESS FIX" })).toMatchObject({
+      categoryId: "auto_repair",
+      confidence: "medium",
+      source: "deterministic",
+    });
+    expect(resolveBenchmarkCategory({ merchantName: "PEPES MEXICAN RESTURANT" })).toMatchObject({
+      categoryId: "restaurant",
+      confidence: "high",
+      source: "deterministic",
+    });
+    expect(resolveBenchmarkCategory({ merchantName: "VORTAX" })).toMatchObject({
+      categoryId: "default",
+      confidence: "low",
+      source: "default",
+    });
+  });
+
   it("uses a specific user-selected business type before statement evidence", () => {
     const result = resolveBenchmarkCategory({
       merchantName: "Downtown CBD Vape Shop",

@@ -59,9 +59,13 @@ export function loadMccBenchmarkReference(): MccBenchmarkReference {
 
 export function annualVolumeTier(annualVolume: number | null): MccVolumeTierId | null {
   if (annualVolume === null || annualVolume < 0 || !Number.isFinite(annualVolume)) return null;
+  if (annualVolume >= 100_000 && annualVolume <= 110_000) return "under_100k";
   if (annualVolume < 100_000) return "under_100k";
+  if (annualVolume >= 500_000 && annualVolume <= 550_000) return "100k_500k";
   if (annualVolume < 500_000) return "100k_500k";
+  if (annualVolume >= 2_000_000 && annualVolume <= 2_200_000) return "500k_2m";
   if (annualVolume < 2_000_000) return "500k_2m";
+  if (annualVolume >= 10_000_000 && annualVolume <= 11_000_000) return "2m_10m";
   if (annualVolume < 10_000_000) return "2m_10m";
   return "over_10m";
 }
@@ -71,6 +75,18 @@ function keywordMatchesMerchant(merchantName: string, keyword: string): boolean 
   const normalizedKeyword = normalizeFiservFeeReferenceText(keyword);
   if (!merchant || !normalizedKeyword) return false;
   return merchant.includes(normalizedKeyword);
+}
+
+function merchantKeywordConfidence(params: { merchantName: string; categoryId: string; matchedKeyword: string }): "high" | "medium" {
+  const merchant = normalizeFiservFeeReferenceText(params.merchantName);
+  const keyword = normalizeFiservFeeReferenceText(params.matchedKeyword);
+  if (params.categoryId === "restaurant" && /\b(?:RESTAURANT|RESTURANT|MEXICAN|TEQUILA|TAQUERIA|PIZZA|PIZZERIA)\b/.test(merchant)) return "high";
+  if (params.categoryId === "grocery" && /\b(?:GROCERY|SUPERMARKET|FISH MARKET|MEAT MARKET|SEAFOOD|DELI|BAKERY)\b/.test(merchant)) return "high";
+  if (params.categoryId === "lodging" && /\b(?:HOTEL|MOTEL|INN|SUITES|RESORT)\b/.test(merchant)) return "high";
+  if (params.categoryId === "gas_petroleum" && /\b(?:GAS|PETROLEUM|FUEL|PETROL)\b/.test(merchant)) return "high";
+  if (params.categoryId === "professional_services" && /\b(?:DENTAL|MEDICAL|CLINIC|ATTORNEY|ACCOUNTING|CONSULTING|VETERINARY)\b/.test(merchant)) return "high";
+  if (params.categoryId === "retail" && keyword !== "SHOP" && keyword !== "STORE" && /\b(?:HARDWARE|APPAREL|ELECTRONICS|FURNITURE|SPORTING)\b/.test(merchant)) return "high";
+  return "medium";
 }
 
 export function inferMccBenchmarkCategory(
@@ -98,7 +114,7 @@ export function inferMccBenchmarkCategory(
       return {
         id,
         label: category.label,
-        confidence: "medium",
+        confidence: merchantKeywordConfidence({ merchantName: name, categoryId: id, matchedKeyword }),
         source: "merchant_name_keyword",
         matchedKeyword,
         category,
@@ -197,10 +213,16 @@ export function estimateAnnualVolume(monthlyVolume: number, ytdGrossSales: numbe
     ytdGrossSales !== null && ytdGrossSales !== undefined && ytdGrossSales > 0 && Number.isFinite(month) && month > 0
       ? round2((ytdGrossSales / month) * 12)
       : null;
+  if (ytdExtrapolatedAnnualVolume !== null) {
+    return {
+      annualVolume: ytdExtrapolatedAnnualVolume,
+      source: "ytd_extrapolated",
+      ytdExtrapolatedAnnualVolume,
+    };
+  }
   return {
     annualVolume: monthlyAnnualized,
     source: "monthly_volume_x12",
     ytdExtrapolatedAnnualVolume,
   };
 }
-

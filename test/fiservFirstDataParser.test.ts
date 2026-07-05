@@ -178,7 +178,8 @@ describe("Fiserv First Data full statement parser", () => {
         expect.objectContaining({
           kind: "suspicious_uniform_rate",
           action: "request_pass_through_documentation",
-          amount: 42.43,
+          amount: 57.97,
+          title: "ACCESS FEE is charged at the same rate across independent networks",
         }),
         expect.objectContaining({
           kind: "penalty_or_configuration_fee",
@@ -197,6 +198,10 @@ describe("Fiserv First Data full statement parser", () => {
         }),
       ]),
     );
+    expect(actual.fiservFeeAnalysisV2.findings[0]).toMatchObject({
+      kind: "penalty_or_configuration_fee",
+      amount: 49.95,
+    });
     expect(actual.feeLedger.rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -569,10 +574,12 @@ describe("Fiserv First Data full statement parser", () => {
       perAuthBenchmarkAnalysis: {
         status: "ready",
         currentRate: 0.11,
+        dominantRate: 0.11,
+        dominantAuthorizationCount: 4127,
         competitiveLow: 0.05,
-        competitiveHigh: 0.07,
-        monthlySavings: 169.76,
-        annualSavings: 2037.12,
+        competitiveHigh: 0.08,
+        monthlyImpact: 123.81,
+        annualImpact: 1485.72,
         dominant: true,
       },
       effectiveRateBenchmarkAnalysis: {
@@ -604,7 +611,7 @@ describe("Fiserv First Data full statement parser", () => {
         }),
         expect.objectContaining({
           kind: "per_auth_fee_benchmark",
-          amount: 466.84,
+          amount: 488,
         }),
         expect.objectContaining({
           kind: "effective_rate_positive_benchmark",
@@ -1234,10 +1241,10 @@ describe("Fiserv First Data full statement parser", () => {
       ]),
     );
     expect(actual.pricingModel).toMatchObject({
-      pricingModel: "flat_discount_pricing",
-      confidence: "high",
-      cashDiscountStatus: "not_confirmed",
-      flatDiscountRate: 0.015,
+      pricingModel: "interchange_plus",
+      confidence: "medium",
+      cashDiscountStatus: "not_applicable",
+      flatDiscountRate: null,
     });
     expect(actual.decision).toMatchObject({
       status: "accepted_with_warnings",
@@ -1379,7 +1386,7 @@ describe("Fiserv First Data full statement parser", () => {
           low: 1078.04,
           high: 1393.44,
         },
-        estimatedAnnualSavings: {
+        estimatedAnnualImpact: {
           low: 20272.56,
           high: 24057.36,
         },
@@ -1387,10 +1394,14 @@ describe("Fiserv First Data full statement parser", () => {
         unusedTierRows: 6,
         billbackRisk: true,
       },
-      savingsSummary: {
-        annualLow: 36488.81,
-        annualHigh: 40318.61,
-        opportunities: 3,
+      estimatedAnnualSavings: {
+        conservative: 60,
+        estimated: 24117.36,
+        maximum: 24117.36,
+        amount: 24117.36,
+        currentAnnualFees: 36993.84,
+        estimatedCompetitiveAnnualFees: 12876.48,
+        methodology: "component_tier_sum",
       },
     });
     expect(actual.fiservFeeAnalysisV2.bundledPricingBenchmark.cardMix).toEqual(
@@ -1409,7 +1420,7 @@ describe("Fiserv First Data full statement parser", () => {
         }),
         expect.objectContaining({
           kind: "bundled_pricing_savings_opportunity",
-          savingsEstimate: {
+          componentImpactEstimate: {
             low: 20272.56,
             high: 24057.36,
             basis: "Estimated annual savings from bundled-pricing benchmark model. Not pass-through proof.",
@@ -1565,7 +1576,7 @@ describe("Fiserv First Data full statement parser", () => {
       },
       pricingModel: {
         pricingModel: "interchange_plus",
-        confidence: "high",
+        confidence: "medium",
         analysisStatus: "ic_plus_ready",
       },
       rateVerification: {

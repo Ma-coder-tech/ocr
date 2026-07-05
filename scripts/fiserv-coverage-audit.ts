@@ -5,6 +5,7 @@ import {
   fiservFirstDataProcessorStatementDriver,
   fiservFirstDataShortStatementDriver,
 } from "../src/fiservFirstDataParser.js";
+import { genericFiservStatementDriver } from "../src/genericFiservStatementParser.js";
 import type { FiservParserOutput } from "../src/fiservParserOutputSchema.js";
 import { parsePdf } from "../src/parser.js";
 import type { ParserDriver } from "../src/parserFoundation.js";
@@ -22,6 +23,7 @@ type AuditResult = {
   driverId: string | null;
   driverName: string | null;
   error: string | null;
+  fallthroughErrors: string[];
   output: FiservParserOutput | null;
 };
 
@@ -115,6 +117,7 @@ const drivers: Array<ParserDriver<FiservParserOutput>> = [
   fiservFirstDataProcessorStatementDriver,
   fiservFirstDataFullStatementDriver,
   fiservFirstDataShortStatementDriver,
+  genericFiservStatementDriver,
 ];
 
 function money(value: number | null | undefined): string {
@@ -195,12 +198,14 @@ async function auditSample(sample: AuditSample): Promise<AuditResult> {
       driverId: null,
       driverName: null,
       error: "File does not exist.",
+      fallthroughErrors: [],
       output: null,
     };
   }
 
   try {
     const doc = await parsePdf(sample.path);
+    const fallthroughErrors: string[] = [];
     for (const driver of drivers) {
       if (!driver.supports(doc)) continue;
       try {
@@ -212,27 +217,21 @@ async function auditSample(sample: AuditSample): Promise<AuditResult> {
           driverId: driver.id,
           driverName: driver.displayName,
           error: null,
+          fallthroughErrors,
           output,
         };
       } catch (error) {
-        return {
-          sample,
-          exists: true,
-          parserStatus: "failed",
-          driverId: driver.id,
-          driverName: driver.displayName,
-          error: error instanceof Error ? error.message : String(error),
-          output: null,
-        };
+        fallthroughErrors.push(`${driver.id}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
     return {
       sample,
       exists: true,
-      parserStatus: "unsupported",
+      parserStatus: fallthroughErrors.length > 0 ? "failed" : "unsupported",
       driverId: null,
       driverName: null,
-      error: null,
+      error: fallthroughErrors.length > 0 ? "All supporting Fiserv parser drivers failed." : null,
+      fallthroughErrors,
       output: null,
     };
   } catch (error) {
@@ -243,6 +242,7 @@ async function auditSample(sample: AuditSample): Promise<AuditResult> {
       driverId: null,
       driverName: null,
       error: error instanceof Error ? error.message : String(error),
+      fallthroughErrors: [],
       output: null,
     };
   }
@@ -270,7 +270,7 @@ function row(result: AuditResult): string {
     cell(output ? statusSymbol(output.feeLedger.feeClassificationSummary.status) : null),
     cell(output ? output.pricingModel.pricingModel : null),
     cell(output ? summarizeAtCost(output) : null),
-    cell(summarizeGaps(result)),
+    cell([summarizeGaps(result), ...result.fallthroughErrors.map((error) => `fallthrough: ${error}`)].join("; ")),
   ].join(" | ");
 }
 

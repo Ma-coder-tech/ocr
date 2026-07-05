@@ -23,6 +23,7 @@ import {
 } from "./fiservProcessorBatchFundingFromDocumentIr.js";
 import { runFiservProcessorReconciliationProfile } from "./fiservProcessorReconciliationProfile.js";
 import { buildFiservFeeAnalysisV2FromRawRows } from "./fiservFeeAnalysis.js";
+import { normalizeFiservFeeReferenceText } from "./fiservFeeReference.js";
 import { buildParserDecision } from "./parserDecision.js";
 import { fiservParserOutputSchema, type FiservParserOutput } from "./fiservParserOutputSchema.js";
 import { extractRepricingEventsFromNoticeLines, type RepricingNoticeLine } from "./repricingNotices.js";
@@ -229,27 +230,37 @@ function normalizedFiservText(value: string): string {
 function extractFiservNoticeLines(doc: RawExtractedDocument): RepricingNoticeLine[] {
   const lines: RepricingNoticeLine[] = [];
   let inNoticeBlock = false;
+  let standaloneNoticeContinuationLines = 0;
   for (const [rowIndex, row] of doc.rows.entries()) {
     const content = rowContent(row)
       .replace(/[\uE000-\uF8FF]/g, "$")
       .replace(/\s+/g, " ")
       .trim();
     if (!content) continue;
+    const isHardSectionBoundary =
+      /^(?:SUMMARY|AMOUNTS SUBMITTED|FEES(?:\s+CHARGED)?|CARD FEES|MISC(?:ELLANEOUS)? FEES|SUMMARY BY|INTERCHANGE|TRANSACTION FEES|ACCOUNT FEES)\b/i.test(content);
+    const isPageFooter = /^Page\s+\d+\s+of\s+\d+|^n+n\s+\d{2}\s+\d{2}\b/i.test(content);
     if (/^(?:IMPORTANT INFORMATION|IMPORTANT NOTICES|NOTICES)\b/i.test(content)) {
       inNoticeBlock = true;
-    } else if (
-      inNoticeBlock &&
-      /^(?:SUMMARY|AMOUNTS SUBMITTED|FEES(?:\s+CHARGED)?|CARD FEES|MISC(?:ELLANEOUS)? FEES|SUMMARY BY|INTERCHANGE|TRANSACTION FEES|ACCOUNT FEES)\b/i.test(content)
-    ) {
+    } else if (inNoticeBlock && isHardSectionBoundary) {
       inNoticeBlock = false;
     }
-    if (inNoticeBlock) {
+    if (
+      !inNoticeBlock &&
+      /^(?:Please be advised|This message is to advise)\b/i.test(content) &&
+      /\b(?:fee|fees|effective|assessed|postponed|release date|terms?)\b/i.test(content)
+    ) {
+      standaloneNoticeContinuationLines = 3;
+    }
+    const inStandaloneNotice = standaloneNoticeContinuationLines > 0 && !isHardSectionBoundary && !isPageFooter;
+    if (inNoticeBlock || inStandaloneNotice) {
       lines.push({
         rowIndex,
         sourceSection: "Statement notices",
         evidenceLine: content,
       });
     }
+    if (inStandaloneNotice) standaloneNoticeContinuationLines -= 1;
   }
   return lines;
 }
@@ -1132,8 +1143,15 @@ function detectTieredPricingModelFromFeeLedger(feeLedger: FeeLedgerForPricingMod
 }
 
 function detectInterchangePlusPricingModelFromFeeLedger(feeLedger: FeeLedgerForPricingModel) {
-  const itemizedRows = feeLedger.rows.filter((row) => row.type === "Interchange charges");
-  if (itemizedRows.length < 2) {
+  const itemizedRows = feeLedger.rows.filter((row) => row.type === "Interchange charges" || normalizeFiservFeeReferenceText(row.description) === "INTERCHANGE");
+  const networkRows = feeLedger.rows.filter((row) => {
+    const description = normalizeFiservFeeReferenceText(row.description);
+    return (
+      row.type === "Program Fees" ||
+      /\b(NABU|DUES|ASSESS|ASSESSMENTS|NETWORK|ACQUIRER|ACQR|BIN ICA|DIGITAL ENABLEMENT|FIXED NETWORK|TRAN INTEGRITY)\b/.test(description)
+    );
+  });
+  if (itemizedRows.length < 1 || networkRows.length < 1) {
     return null;
   }
 
@@ -1160,7 +1178,7 @@ function detectInterchangePlusPricingModelFromFeeLedger(feeLedger: FeeLedgerForP
     evidenceType: evidence.length > 0 ? "fee_math_inferred" : "explicit_statement_label",
     evidence,
     notes: [
-      "Interchange-plus/itemized cost exposure inferred from separate Interchange charges rows in the fee ledger.",
+      "Interchange-plus/itemized cost exposure inferred from separate interchange rows and separately itemized card-brand/network rows in the fee ledger.",
       "This identifies the statement structure; it does not prove every interchange or assessment row was passed through at cost.",
       "Line-level at-cost proof still depends on period-correct reference-rate matching.",
     ],
@@ -1211,13 +1229,15 @@ function detectFlatRatePricingModelFromFeeLedger(feeLedger: FeeLedgerForPricingM
 }
 
 function detectPricingModelFromFeeLedger(feeLedger: FeeLedgerForPricingModel) {
+  const interchangePlus = detectInterchangePlusPricingModelFromFeeLedger(feeLedger);
+  if (interchangePlus) return interchangePlus;
+
   const discountRows = feeLedger.rows.filter(
     (row) => row.description === "QUAL DISC" && row.volumeBasis !== null && row.volumeBasis > 0 && row.rate !== null && row.rate > 0 && row.amount > 0,
   );
   if (discountRows.length < 2) {
     return (
       detectTieredPricingModelFromFeeLedger(feeLedger) ??
-      detectInterchangePlusPricingModelFromFeeLedger(feeLedger) ??
       detectFlatRatePricingModelFromFeeLedger(feeLedger) ??
       unknownPricingModel("No repeated rated QUAL DISC rows or MQUAL/NQUAL tiered discount rows were found for deterministic pricing model detection.")
     );
@@ -1245,7 +1265,6 @@ function detectPricingModelFromFeeLedger(feeLedger: FeeLedgerForPricingModel) {
   if (!enoughRows || !enoughMath) {
     return (
       detectTieredPricingModelFromFeeLedger(feeLedger) ??
-      detectInterchangePlusPricingModelFromFeeLedger(feeLedger) ??
       detectFlatRatePricingModelFromFeeLedger(feeLedger) ??
       unknownPricingModel("Rated QUAL DISC rows were present, but the rates or fee math were not consistent enough to classify the pricing model.")
     );
@@ -2069,6 +2088,7 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
     ytdGrossSales: ytdSales,
     notices: extractFiservRepricingEvents(doc),
     noticeText: extractFiservNoticeText(doc),
+    fundingBatchRows: fundingBatchLedger.rows,
     interchangeReconciliationBasis: {
       summaryTotal: interchangeBucket,
       detailTableTotal: interchangeDetailTotal,
@@ -2536,6 +2556,7 @@ export function parseFiservFirstDataShortStatement(doc: RawExtractedDocument, op
     ytdGrossSales: extractFiservYtdGrossSales(doc),
     notices: extractFiservRepricingEvents(doc),
     noticeText: extractFiservNoticeText(doc),
+    fundingBatchRows: fundingBatchLedger.rows,
   });
 
   const selectedFinancials: SelectedStatementFinancials = {
@@ -3022,6 +3043,7 @@ export function parseFiservFirstDataProcessorStatement(doc: RawExtractedDocument
     ytdGrossSales: extractFiservYtdGrossSales(doc),
     notices: extractFiservRepricingEvents(doc),
     noticeText: extractFiservNoticeText(doc),
+    fundingBatchRows: fundingBatchLedger.rows,
   });
   const failedFundingBatchEvidenceLine = fundingBatchLedger.rows.find((row) => row.status === "fail")?.evidenceLine ?? null;
   const failedFundingBatchLineIndex =

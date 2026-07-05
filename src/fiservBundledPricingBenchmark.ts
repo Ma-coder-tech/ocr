@@ -71,8 +71,8 @@ export type FiservBundledPricingBenchmarkAnalysis = {
   estimatedPassThroughCost: RateRange | null;
   estimatedProcessorMargin: RateRange | null;
   estimatedCompetitiveCost: RateRange | null;
-  estimatedMonthlySavings: RateRange | null;
-  estimatedAnnualSavings: RateRange | null;
+  estimatedMonthlyImpact: RateRange | null;
+  estimatedAnnualImpact: RateRange | null;
   confidence: "medium" | "low";
   cardMix: Array<{
     cardType: string;
@@ -119,8 +119,8 @@ function emptyAnalysis(
     estimatedPassThroughCost: null,
     estimatedProcessorMargin: null,
     estimatedCompetitiveCost: null,
-    estimatedMonthlySavings: null,
-    estimatedAnnualSavings: null,
+    estimatedMonthlyImpact: null,
+    estimatedAnnualImpact: null,
     confidence: "low",
     cardMix: [],
     unusedTierRows: 0,
@@ -314,10 +314,10 @@ export function buildFiservBundledPricingBenchmarkAnalysis(input: {
         }
       : { low: 0, high: 0 };
   const estimatedCompetitiveCost = addRanges(addRanges(addRanges(estimatedPassThroughCost, competitiveSpread), perAuthFees), reference.monthly_fee_range);
-  const estimatedMonthlySavings = subtractRange(input.totalFees, estimatedCompetitiveCost);
-  const estimatedAnnualSavings = {
-    low: round2(estimatedMonthlySavings.low * 12),
-    high: round2(estimatedMonthlySavings.high * 12),
+  const estimatedMonthlyImpact = subtractRange(input.totalFees, estimatedCompetitiveCost);
+  const estimatedAnnualImpact = {
+    low: round2(estimatedMonthlyImpact.low * 12),
+    high: round2(estimatedMonthlyImpact.high * 12),
   };
   const effectiveRate = round8(input.totalFees / input.totalVolume);
   const adjustedBenchmarkRate = benchmarkForChannel(category.category, volumeTier.tier, input.merchantChannel);
@@ -341,8 +341,8 @@ export function buildFiservBundledPricingBenchmarkAnalysis(input: {
     estimatedPassThroughCost: positiveRange(estimatedPassThroughCost),
     estimatedProcessorMargin: positiveRange(subtractRange(input.totalFees, estimatedPassThroughCost)),
     estimatedCompetitiveCost: positiveRange(estimatedCompetitiveCost),
-    estimatedMonthlySavings: positiveRange(estimatedMonthlySavings),
-    estimatedAnnualSavings: positiveRange(estimatedAnnualSavings),
+    estimatedMonthlyImpact: positiveRange(estimatedMonthlyImpact),
+    estimatedAnnualImpact: positiveRange(estimatedAnnualImpact),
     confidence: category.confidence === "medium" && input.transactionCount !== null && cardMix.length >= 2 ? "medium" : "low",
     cardMix,
     unusedTierRows: zeroDiscountRows.length,

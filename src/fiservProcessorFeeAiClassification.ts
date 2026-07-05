@@ -247,7 +247,7 @@ function feeAiModelName(
   if (provider === "openai") {
     if (options.openAiModelName) return options.openAiModelName;
     if (preference === "openai" && options.modelName) return options.modelName;
-    return process.env.AI_FEE_CLASSIFICATION_OPENAI_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-5.5";
+    return process.env.AI_FEE_CLASSIFICATION_OPENAI_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-5.4-mini";
   }
 
   if (options.anthropicModelName ?? options.modelName) return options.anthropicModelName ?? options.modelName ?? "claude-opus-4-8";
@@ -343,6 +343,7 @@ function aiPrompt(packet: FiservProcessorFeeAiPacket): string {
     "Confidence must be high, medium, or low.",
     "Negotiability must be likely_negotiable, likely_non_negotiable, or unknown.",
     "Assessment passThroughProofPosture must be one of: source_backed_math_candidate, not_applicable_processor_controlled, not_pass_through, not_enough_evidence.",
+    "When classifying a row as a fixed processor/ISO fee, usually miscellaneous_or_statement_fee, include fixedFeeAssessment with avoidable true/false/uncertain, a specific recommendation, and confidence. Use false for real services, true for junk/avoidable fees, and uncertain when the label is too generic.",
     "AI may provide source-backed pass-through evidence only as a candidate; deterministic reference-rate math remains the final proof layer.",
     "Use unknown_needs_review if the row cannot be classified from the provided evidence.",
     "Do not classify a fee as proven pass-through-at-cost. At-cost proof is handled by a separate deterministic reference-rate layer.",
@@ -360,6 +361,14 @@ function aiAssessmentSchema(z: any): any {
       avoidableLikelihood: z.enum(FISERV_AI_AVOIDABLE_LIKELIHOOD_VALUES),
       merchantAction: z.enum(FISERV_AI_MERCHANT_ACTIONS),
       recommendation: z.string().nullable(),
+      fixedFeeAssessment: z
+        .object({
+          avoidable: z.enum(["true", "false", "uncertain"]),
+          recommendation: z.string().nullable(),
+          confidence: z.enum(["high", "medium", "low"]),
+        })
+        .strict()
+        .nullable(),
       evidence: z.array(z.string()),
       sourceEvidence: z
         .object({
@@ -398,8 +407,7 @@ function openAiProviderOptions(): Record<string, unknown> {
     providerOptions: {
       openai: {
         store: false,
-        reasoningEffort: "low",
-        textVerbosity: "low",
+        textVerbosity: "medium",
         strictJsonSchema: true,
       },
     },
@@ -533,12 +541,22 @@ function assessmentDefaultsForSuggestion(
   passThroughProofPosture: FiservAiPassThroughProofPosture;
   negotiability: FiservProcessorFeeAiNegotiability;
   evidence: string[];
+  fixedFeeAssessment?: FiservAiFeeAssessment["fixedFeeAssessment"];
 } {
+  const fixedFeeAssessment =
+    bucket === "miscellaneous_or_statement_fee"
+      ? {
+          avoidable: "uncertain" as const,
+          recommendation: explanation || "Ask the processor what service this fixed fee pays for and whether it can be removed or reduced.",
+          confidence: "low" as const,
+        }
+      : null;
   if (bucket === "card_brand_pass_through") {
     return {
       paidToParty: "card_network",
       passThroughProofPosture: "not_enough_evidence",
       negotiability: "likely_non_negotiable",
+      fixedFeeAssessment: null,
       evidence: explanation ? [explanation] : [],
     };
   }
@@ -547,6 +565,7 @@ function assessmentDefaultsForSuggestion(
       paidToParty: "unknown",
       passThroughProofPosture: "not_enough_evidence",
       negotiability: "unknown",
+      fixedFeeAssessment: null,
       evidence: explanation ? [explanation] : [],
     };
   }
@@ -554,6 +573,7 @@ function assessmentDefaultsForSuggestion(
     paidToParty: "processor_or_iso",
     passThroughProofPosture: "not_applicable_processor_controlled",
     negotiability,
+    fixedFeeAssessment,
     evidence: explanation ? [explanation] : [],
   };
 }
@@ -669,6 +689,9 @@ export function applyFiservProcessorFeeAiSuggestions<T extends FiservProcessorFe
           `Negotiability: ${suggestion.negotiability}.`,
           `Paid to: ${assessment.paidToParty}.`,
           `Pass-through proof posture: ${assessment.passThroughProofPosture}.`,
+          assessment.fixedFeeAssessment
+            ? `Fixed fee avoidable assessment: ${assessment.fixedFeeAssessment.avoidable} (${assessment.fixedFeeAssessment.confidence}). ${assessment.fixedFeeAssessment.recommendation ?? ""}`
+            : null,
           assessment.recommendation ? `Recommendation: ${assessment.recommendation}` : null,
           suggestion.reasonCodes.length > 0 ? `Reason codes: ${suggestion.reasonCodes.join(", ")}.` : null,
         ]

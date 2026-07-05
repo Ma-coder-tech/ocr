@@ -129,6 +129,63 @@ describe("Fiserv processor AI fee classification", () => {
     });
   });
 
+  it("carries fixed processor fee avoidable assessment through processor ledger classifications", () => {
+    const deterministic = classifyFiservProcessorFeeLedgerRows(rows, 26.54);
+
+    const result = applyFiservProcessorFeeAiSuggestions(
+      deterministic.rows,
+      26.54,
+      [
+        {
+          rowIndex: 0,
+          economicBucket: "miscellaneous_or_statement_fee",
+          confidence: "high",
+          subcategory: "fixed_processor_statement_fee",
+          negotiability: "likely_negotiable",
+          assessment: {
+            paidToParty: "processor_or_iso",
+            passThroughProofPosture: "not_applicable_processor_controlled",
+            negotiability: "likely_negotiable",
+            avoidableLikelihood: "high",
+            merchantAction: "request_fee_removal_or_reduction",
+            recommendation: "Ask the processor to remove or justify this $24.74 fixed processor fee.",
+            fixedFeeAssessment: {
+              avoidable: "true",
+              recommendation: "No active service is identified; ask for removal or written service documentation.",
+              confidence: "high",
+            },
+            evidence: ["The label is generic and does not identify a card-brand pass-through source."],
+            sourceEvidence: {
+              sourceName: null,
+              referenceId: null,
+              referenceRate: null,
+              statementRate: null,
+              statementAmount: 24.74,
+              mathSummary: null,
+              verificationNote: "Fixed fee assessment is advisory.",
+            },
+          },
+          reasonCodes: ["UNKNOWN_FIXED_FEE_ASSESSMENT"],
+          explanation: "Generic processor fee with no identified service documentation.",
+        },
+      ],
+      { applyMinConfidence: "medium", modelName: "test-model" },
+    );
+
+    expect(result.rows[0].classification).toMatchObject({
+      economicBucket: "miscellaneous_or_statement_fee",
+      confidence: "high",
+      aiAssessment: {
+        fixedFeeAssessment: {
+          avoidable: "true",
+          recommendation: "No active service is identified; ask for removal or written service documentation.",
+          confidence: "high",
+        },
+      },
+    });
+    expect(result.rows[0].classification.reason).toContain("Fixed fee avoidable assessment: true");
+  });
+
   it("leaves low-confidence AI suggestions unresolved when the apply threshold is medium", () => {
     const deterministic = classifyFiservProcessorFeeLedgerRows(rows, 26.54);
 
@@ -315,8 +372,7 @@ describe("Fiserv processor AI fee classification", () => {
       providerOptions: {
         openai: {
           store: false,
-          reasoningEffort: "low",
-          textVerbosity: "low",
+          textVerbosity: "medium",
           strictJsonSchema: true,
         },
       },
@@ -396,8 +452,7 @@ describe("Fiserv processor AI fee classification", () => {
       {
         openai: {
           store: false,
-          reasoningEffort: "low",
-          textVerbosity: "low",
+          textVerbosity: "medium",
           strictJsonSchema: true,
         },
       },

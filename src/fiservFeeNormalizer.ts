@@ -93,8 +93,16 @@ export type FiservFeeNormalizationResult = {
   summary: FiservFeeNormalizationSummary;
 };
 
-const FALLBACK_NETWORK_LABELS = new Set(["BIN ICA FEE"]);
-const PROCESSOR_PER_ITEM_LABELS = new Set(["OTHER ITEM FEES", "CPU GTWY", "SALES ITEMS", "BATCH HEADER", "WATS AUTH FEE"]);
+const FALLBACK_NETWORK_LABELS = new Set([
+  "BIN ICA FEE",
+  "NABU FEES",
+  "CR DUES AND ASSESS",
+  "DB DUES AND ASSESS",
+  "DUES AND ASSESSMENTS",
+  "FIXED NETWORK CNP FEE",
+  "MC DIGITAL ENABLEMENT",
+]);
+const PROCESSOR_PER_ITEM_LABELS = new Set(["OTHER ITEM FEES", "CPU GTWY", "ECI CPU-G", "ECI CPU G", "SALES ITEMS", "BATCH HEADER", "WATS AUTH FEE"]);
 const THIRD_PARTY_SERVICE_LABELS = [
   "BENTOBOX",
   "DOORDASH",
@@ -136,6 +144,10 @@ function entryConfidence(entry: FiservFeeReferenceEntry | null, matchMethod: Fis
 
 function entryMatchesNetwork(entry: FiservFeeReferenceEntry, sectionNetwork: string | null): boolean {
   return !sectionNetwork || entry.network === "All" || entry.network === "Processor" || entry.network === sectionNetwork;
+}
+
+function isCommercialCardSavingsAdjustment(description: string): boolean {
+  return /\bCOMM(?:ERCIAL)?\s+CARD\b/.test(description) && /\bI\/?C\s+SAVINGS\b/.test(description) && /\bADJ(?:USTMENT)?\b/.test(description);
 }
 
 function fuzzyReferenceMatch(params: {
@@ -188,10 +200,14 @@ function feeTypeFromReference(entry: FiservFeeReferenceEntry | null, row: Fiserv
     return "card_brand_network";
   }
   if (entry?.category === "pin_debit_network") return "pin_debit_network";
-  if (description.match(/^DISC\s+\d+$/) || description === "OTHER VOLUME FEES") return "processor_pct_markup";
+  if (description.match(/^DISC\s+\d+$/) || description === "QUAL DISC" || description === "OTHER VOLUME FEES" || isCommercialCardSavingsAdjustment(description)) {
+    return "processor_pct_markup";
+  }
   if (/\bWATS AUTH FEE\b/.test(description)) return "processor_per_item";
   if (PROCESSOR_PER_ITEM_LABELS.has(description)) return "processor_per_item";
-  if (description.includes("TIF") || description.includes("TRANSACTION INTEGRITY") || description.includes("MISUSE")) return "compliance_penalty";
+  if (description.includes("TIF") || description.includes("TRANSACTION INTEGRITY") || description.includes("TRAN INTEGRITY") || description.includes("MISUSE")) {
+    return "compliance_penalty";
+  }
   if (entry?.category === "processor_markup") return entry.rate_type === "pct_volume" ? "processor_pct_markup" : "processor_per_item";
   if (entry?.category === "processor_misc") return "processor_fixed";
   if (row.type === "Interchange charges" || row.type === "Program Fees") return "interchange";

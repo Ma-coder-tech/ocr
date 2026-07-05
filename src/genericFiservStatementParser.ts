@@ -7,15 +7,17 @@ import { fiservParserOutputSchema, type FiservParserOutput } from "./fiservParse
 import { buildParserDecision } from "./parserDecision.js";
 import {
   maxPageCount,
-  pageNumber,
-  rowContent,
   signedMoneyTokens,
-  type FinancialCandidate,
-  type FinancialCandidateRole,
   type ParserDriver,
   type RawExtractedDocument,
-  type RawDocumentRow,
 } from "./parserFoundation.js";
+import {
+  cleanStatementText,
+  extractStatementAnatomy,
+  statementCorpus,
+  statementLines,
+  type StatementLine,
+} from "./statementAnatomy.js";
 import type { BusinessTypeId } from "./businessTypes.js";
 import { extractRepricingEventsFromNoticeLines, type RepricingNoticeLine } from "./repricingNotices.js";
 import {
@@ -31,9 +33,10 @@ import {
 } from "./reconciliation.js";
 
 type GenericLine = {
-  row: RawDocumentRow;
+  row: StatementLine["row"];
   index: number;
   content: string;
+  normalized: string;
   pageNumber: number | null;
 };
 
@@ -89,9 +92,12 @@ const NETWORK_HEADINGS = new Map<RegExp, string>([
 
 const SECTION_HEADINGS = [
   "TRANSACTION FEES",
+  "FEES CHARGED",
   "DEBIT NETWORK FEES",
   "ACCOUNT FEES",
   "EQUIPMENT",
+  "CARD FEES",
+  "MISCELLANEOUS FEES",
 ];
 
 export const genericFiservStatementDriver: ParserDriver<FiservParserOutput> = {
@@ -114,8 +120,12 @@ export function isGenericFiservFamilyStatement(doc: RawExtractedDocument): boole
     /\binterchange charges\b/i.test(text) &&
     /\bservice charges\b/i.test(text) &&
     /\btotal transaction fees\b/i.test(text);
+  const hasProcessorBrandedSummary =
+    /\bfees charged\b/i.test(text) &&
+    /\btotal amount funded to your bank\b/i.test(text) &&
+    /\btotal \(miscellaneous fees and card fees\)/i.test(text);
   const hasKnownFiservFamilyBrand = /\bbasyspro\.com\b|\bbasys\b|\bfiserv\b|\bfirst data\b|\bclover\b/i.test(text);
-  return (hasCardProcessingStatement || hasKnownFiservFamilyBrand) && hasFiservLikeFeeSummary && hasFeeRows;
+  return (hasCardProcessingStatement || hasKnownFiservFamilyBrand) && ((hasFiservLikeFeeSummary && hasFeeRows) || hasProcessorBrandedSummary);
 }
 
 export function parseGenericFiservFamilyStatement(
@@ -124,19 +134,17 @@ export function parseGenericFiservFamilyStatement(
 ): FiservParserOutput {
   const sourceFileName = options.sourceFileName ?? "uploaded-statement.pdf";
   const lines = documentLines(doc);
+  const anatomy = extractStatementAnatomy(lines);
   const sourceBaseName = path.basename(sourceFileName);
   const merchantName = extractMerchantName(lines) ?? "Unknown merchant";
   const merchantNumber = extractMerchantNumber(lines);
   const period = extractStatementPeriod(lines);
   const visibleBrand = inferVisibleBrand(lines, sourceBaseName);
-  const totalVolume = requireLineAmount(lines, /total amount submitted/i, "Total Amount Submitted");
-  const totalFees =
-    optionalLineAmount(lines, /total \(service charges,\s*interchange charges(?:\/program fees)?,\s*and fees\)/i) ??
-    requireLineAmount(lines, /\bfees\b/i, "Fees");
-  const amountFunded = requireLineAmount(lines, /total amount processed/i, "Total Amount Processed");
-  const adjustments = optionalLineAmount(lines, /\badjustments\b/i)?.amount ?? 0;
-  const chargebacks = optionalLineAmount(lines, /\bchargebacks\/reversals\b/i)?.amount ?? 0;
-  const adjustmentsChargebacks = round2(adjustments + chargebacks);
+  const totalVolume = { ...anatomy.totalVolume, label: anatomy.totalVolume.label };
+  const totalFees = { ...anatomy.totalFees, label: anatomy.totalFees.label };
+  const amountFunded = { ...anatomy.amountFunded, label: anatomy.amountFunded.label };
+  const adjustmentsChargebacks = anatomy.adjustmentsChargebacks;
+  const thirdPartyTransactions = anatomy.thirdPartyTransactions;
   const feeLedger = buildGenericFeeLedger(lines, {
     statementPeriodStart: period.start,
     processorName: visibleBrand,
@@ -144,8 +152,8 @@ export function parseGenericFiservFamilyStatement(
   });
   const fundingBatchLedger = buildGenericFundingBatchLedger(lines);
   const primaryTransactionCount = extractPrimaryTransactionCount(lines);
-  const effectiveRate = totalVolume.amount === 0 ? 0 : round8(totalFees.amount / totalVolume.amount);
-  const fundingExpected = round2(totalVolume.amount + adjustmentsChargebacks - totalFees.amount);
+  const effectiveRate = anatomy.effectiveRate;
+  const fundingExpected = round2(totalVolume.amount - (thirdPartyTransactions ?? 0) + adjustmentsChargebacks - totalFees.amount);
   const feeBucketExpected = feeLedger.printedTotal ?? feeLedger.totalRowSum;
   const feeBucketFormula = makeWarningCheck(
     totalFees.amount,
@@ -158,7 +166,7 @@ export function parseGenericFiservFamilyStatement(
       fundingExpected,
       amountFunded.amount,
       0.01,
-      `${totalVolume.amount.toFixed(2)} + ${adjustmentsChargebacks.toFixed(2)} - ${totalFees.amount.toFixed(2)} = ${fundingExpected.toFixed(2)}`,
+      `${totalVolume.amount.toFixed(2)} - ${(thirdPartyTransactions ?? 0).toFixed(2)} + ${adjustmentsChargebacks.toFixed(2)} - ${totalFees.amount.toFixed(2)} = ${fundingExpected.toFixed(2)}`,
     ),
     feeBucketFormula,
     effectiveRateFormula:
@@ -283,6 +291,7 @@ export function parseGenericFiservFamilyStatement(
     ytdGrossSales: null,
     notices: extractRepricingEventsFromNoticeLines(noticeLines),
     noticeText,
+    fundingBatchRows: fundingBatchLedger.rows,
   });
 
   return fiservParserOutputSchema.parse({
@@ -305,7 +314,7 @@ export function parseGenericFiservFamilyStatement(
       grossSales: null,
       refunds: null,
       adjustmentsChargebacks,
-      thirdPartyTransactions: null,
+      thirdPartyTransactions,
       transactionCount: {
         primaryTransactionCount,
         supportingTransactionCounts:
@@ -333,8 +342,8 @@ export function parseGenericFiservFamilyStatement(
       rowsStatus: "not_mapped_by_generic_fallback",
       evidenceLine: null,
     },
-    candidateTotals: candidateTotals({ totalVolume, totalFees, amountFunded }),
-    excludedTotals: [],
+    candidateTotals: anatomy.candidates,
+    excludedTotals: anatomy.excludedTotals,
     reconciliation,
     reconciliationResults,
     decision,
@@ -363,7 +372,7 @@ export function parseGenericFiservFamilyStatement(
 
 function buildGenericFeeLedger(lines: GenericLine[], classificationContext = {}) {
   const rows = parseGenericFeeRows(lines);
-  const printedTotal = optionalLineAmount(lines, /total \(service charges,\s*interchange charges(?:\/program fees)?,\s*and fees\)/i)?.amount ?? null;
+  const printedTotal = genericFeeGrandTotal(lines)?.amount ?? null;
   const totalRowSum = round2(rows.reduce((sum, row) => sum + row.amount, 0));
   const delta = printedTotal === null ? 0 : round2(printedTotal - totalRowSum);
   const controls = buildControls(lines, rows, printedTotal, totalRowSum);
@@ -376,7 +385,7 @@ function buildGenericFeeLedger(lines: GenericLine[], classificationContext = {})
     printedTotal,
     delta,
     tolerance: 0.05,
-    evidenceLine: optionalLineAmount(lines, /total \(service charges,\s*interchange charges(?:\/program fees)?,\s*and fees\)/i)?.line.content ?? null,
+    evidenceLine: genericFeeGrandTotal(lines)?.line.content ?? null,
     feeClassificationSummary: classified.summary,
     notes: [
       "Generic Fiserv-family fee ledger rows are extracted from visible fee sections and reconciled against the printed all-in fee total.",
@@ -389,9 +398,14 @@ function parseGenericFeeRows(lines: GenericLine[]): GenericFeeRow[] {
   const rows: GenericFeeRow[] = [];
   let activeSection = "";
   let activeNetwork: string | null = null;
-  const start = lines.findIndex((line) => /^TRANSACTION FEES\b/i.test(line.content));
+  const start = lines.findIndex((line) => isGenericFeeSectionStart(line.content));
   if (start < 0) return rows;
-  const end = lines.findIndex((line, index) => index > start && /^INTERCHANGE\b/i.test(line.content));
+  const end = lines.findIndex(
+    (line, index) =>
+      index > start &&
+      (/^INTERCHANGE(?: CHARGES\/PROGRAM FEES)?\b/i.test(line.content) ||
+        /^Total dollar amount of aggregate reportable payment card transactions/i.test(line.content)),
+  );
   const feeLines = lines.slice(start, end > start ? end : lines.length);
 
   for (const line of feeLines) {
@@ -414,7 +428,16 @@ function parseGenericFeeRows(lines: GenericLine[]): GenericFeeRow[] {
   return rows;
 }
 
+function isGenericFeeSectionStart(content: string): boolean {
+  if (/^TRANSACTION FEES\b/i.test(content)) return true;
+  if (/^FEES CHARGED\s*$/i.test(content)) return true;
+  return false;
+}
+
 function parseFeeLine(content: string, activeSection: string, activeNetwork: string | null, page: number | null): GenericFeeRow | null {
+  const processorBranded = parseProcessorBrandedFeeLine(content, activeSection, page);
+  if (processorBranded) return processorBranded;
+
   const parts = cellParts(content);
   if (parts.length < 2) return null;
   const typeIndex = parts.findIndex((part) => /^(?:Interchange charges|Service charges|Fees)$/i.test(part));
@@ -442,6 +465,33 @@ function parseFeeLine(content: string, activeSection: string, activeNetwork: str
   };
 }
 
+function parseProcessorBrandedFeeLine(content: string, activeSection: string, page: number | null): GenericFeeRow | null {
+  const parts = cellParts(content);
+  if (parts.length < 4 || !isFullDateToken(parts[0] ?? "")) return null;
+  const bucketCode = (parts[1] ?? "").toUpperCase();
+  if (bucketCode !== "CF" && bucketCode !== "MISC") return null;
+  const amount = lastAmount(content);
+  const description = (parts[2] ?? "").replace(/^\*+/, "").replace(/\s+/g, " ").trim();
+  if (!description || amount === null) return null;
+  const count = parts.slice(3, -1).map((part) => firstIntegerFromCell(part)).find((value) => value !== null) ?? null;
+  const rate = parts.slice(3, -1).map((part) => firstRateFromCell(part)).find((value) => value !== null) ?? null;
+  return {
+    date: parts[0]!,
+    type: bucketCode === "CF" ? "Card Fees" : "Fees",
+    network: inferNetwork(null, description),
+    description,
+    volumeBasis: null,
+    count,
+    rate,
+    amount,
+    bucket: bucketCode === "MISC" ? "miscellaneousFees" : "cardFees",
+    sourceSection: activeSection || "FEES CHARGED",
+    evidenceLine: content,
+    pageNumber: page,
+    confidence: "medium",
+  };
+}
+
 function buildControls(lines: GenericLine[], rows: GenericFeeRow[], printedTotal: number | null, totalRowSum: number) {
   return [
     controlFromRows(lines, rows, "Total Transaction Fees", "TRANSACTION FEES", (row) => row.sourceSection === "TRANSACTION FEES"),
@@ -449,15 +499,18 @@ function buildControls(lines: GenericLine[], rows: GenericFeeRow[], printedTotal
     controlFromRows(lines, rows, "Total Account Fees", "ACCOUNT FEES", (row) => row.sourceSection === "ACCOUNT FEES"),
     controlFromRows(lines, rows, "Total Equipment Fees", "EQUIPMENT", (row) => row.sourceSection === "EQUIPMENT"),
     controlFromRows(lines, rows, "Total Interchange Charges", "FEES", (row) => row.type === "Interchange charges"),
+    controlFromRows(lines, rows, "Total Interchange Charges/Program Fees", "FEES", (row) => row.type === "Interchange charges" || row.type === "Program Fees"),
     controlFromRows(lines, rows, "Total Service Charges", "FEES", (row) => row.type === "Service charges"),
     controlFromRows(lines, rows, "Total Fees", "FEES", (row) => row.type === "Fees"),
+    controlFromRows(lines, rows, "Total Card Fees", "CARD FEES", (row) => row.bucket === "cardFees"),
+    controlFromRows(lines, rows, "Total Miscellaneous Fees", "MISCELLANEOUS FEES", (row) => row.bucket === "miscellaneousFees"),
     makeControl({
-      label: "Total (Service Charges, Interchange Charges, and Fees)",
+      label: "Generic Fee Grand Total",
       bucket: "unknown",
       rowSum: totalRowSum,
       printedTotal,
       tolerance: 0.05,
-      evidenceLine: optionalLineAmount(lines, /total \(service charges,\s*interchange charges(?:\/program fees)?,\s*and fees\)/i)?.line.content ?? null,
+      evidenceLine: genericFeeGrandTotal(lines)?.line.content ?? null,
     }),
   ].filter((control): control is NonNullable<typeof control> => Boolean(control));
 }
@@ -498,18 +551,23 @@ function makeControl(params: {
 
 function genericFeeBreakdown(feeLedger: ReturnType<typeof buildGenericFeeLedger>, totalFees: number) {
   const amountFor = (label: string, fallback: number) => feeLedger.controls.find((control) => control.label === label)?.printedTotal ?? fallback;
-  const interchange = amountFor("Total Interchange Charges", 0);
+  const interchange = amountFor("Total Interchange Charges", amountFor("Total Interchange Charges/Program Fees", amountFor("Total Card Fees", 0)));
   const service = amountFor("Total Service Charges", 0);
-  const fees = amountFor("Total Fees", 0);
+  const fees = amountFor("Total Fees", amountFor("Total Miscellaneous Fees", 0));
   return {
     layout: "generic_fiserv_family_fee_sections",
     buckets: [
       {
         key: "cardBrandOrPassThrough",
-        label: "Interchange Charges",
+        label: feeLedger.controls.some((control) => control.label === "Total Card Fees") ? "Card Fees" : "Interchange Charges",
         amount: interchange,
         sourceSection: "FEES",
-        evidenceLine: feeLedger.controls.find((control) => control.label === "Total Interchange Charges")?.evidenceLine ?? feeLedger.evidenceLine ?? "Total Interchange Charges",
+        evidenceLine:
+          feeLedger.controls.find((control) => control.label === "Total Interchange Charges")?.evidenceLine ??
+          feeLedger.controls.find((control) => control.label === "Total Interchange Charges/Program Fees")?.evidenceLine ??
+          feeLedger.controls.find((control) => control.label === "Total Card Fees")?.evidenceLine ??
+          feeLedger.evidenceLine ??
+          "Generic card fee total",
         confidence: "medium",
       },
       {
@@ -522,7 +580,7 @@ function genericFeeBreakdown(feeLedger: ReturnType<typeof buildGenericFeeLedger>
       },
       {
         key: "processorOrAccountFees",
-        label: "Fees",
+        label: feeLedger.controls.some((control) => control.label === "Total Miscellaneous Fees") ? "Miscellaneous Fees" : "Fees",
         amount: fees,
         sourceSection: "FEES",
         evidenceLine: feeLedger.controls.find((control) => control.label === "Total Fees")?.evidenceLine ?? feeLedger.evidenceLine ?? "Total Fees",
@@ -535,7 +593,7 @@ function genericFeeBreakdown(feeLedger: ReturnType<typeof buildGenericFeeLedger>
 }
 
 function pricingModelFromGenericLedger(feeLedger: ReturnType<typeof buildGenericFeeLedger>) {
-  const hasInterchangeRows = feeLedger.rows.filter((row) => row.type === "Interchange charges").length >= 2;
+  const hasInterchangeRows = feeLedger.rows.filter((row) => row.type === "Interchange charges" || row.type === "Card Fees").length >= 2;
   return {
     pricingModel: hasInterchangeRows ? "interchange_plus" : "unknown",
     confidence: hasInterchangeRows ? "medium" : "low",
@@ -796,9 +854,17 @@ function parseGenericFundingTotalRow(content: string): {
 
   if (parts.length >= 6) {
     const submitted = positiveMoneyFromCell(parts[1]);
+    const second = signedMoneyFromCell(parts[2]) ?? 0;
+    const third = signedMoneyFromCell(parts[3]) ?? 0;
     const fees = positiveMoneyFromCell(parts[4]);
     const funded = signedMoneyFromCell(parts[5]);
-    if (submitted !== null && fees !== null && funded !== null && Math.abs(submitted - fees - funded) <= 1) {
+    const directDelta =
+      submitted !== null && fees !== null && funded !== null ? Math.abs(round2(submitted + second + third - fees - funded)) : Number.POSITIVE_INFINITY;
+    const thirdPartyDelta =
+      submitted !== null && fees !== null && funded !== null
+        ? Math.abs(round2(submitted - Math.abs(second) + third - fees - funded))
+        : Number.POSITIVE_INFINITY;
+    if (submitted !== null && fees !== null && funded !== null && Math.min(directDelta, thirdPartyDelta) <= 1) {
       return {
         controlSubmittedTotal: submitted,
         controlFeesChargedTotal: fees,
@@ -848,32 +914,22 @@ function isDateToken(input: string): boolean {
   return /^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/.test(input.trim());
 }
 
-function candidateTotals(input: { totalVolume: RequiredAmount; totalFees: RequiredAmount; amountFunded: RequiredAmount }): FinancialCandidate[] {
-  return [
-    selectedCandidate("total_volume", "Total Amount Submitted", input.totalVolume, "SUMMARY"),
-    selectedCandidate("total_fees", "Fees", input.totalFees, "SUMMARY"),
-    selectedCandidate("amount_funded", "Total Amount Processed", input.amountFunded, "SUMMARY"),
-  ];
+function isFullDateToken(input: string): boolean {
+  return /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(input.trim());
 }
 
-function selectedCandidate(
-  roleCandidate: FinancialCandidateRole,
-  label: string,
-  item: RequiredAmount,
-  sourceSection: string,
-): FinancialCandidate {
-  return {
-    roleCandidate,
-    label,
-    amount: item.amount,
-    sourceSection,
-    pageNumber: item.line.pageNumber,
-    evidenceLine: item.line.content,
-    selected: true,
-    selectionReason: "Selected by generic Fiserv-family fallback from a statement-level control line.",
-    rejectionReason: null,
-    confidence: "high",
-  };
+function firstIntegerFromCell(input: string): number | null {
+  const match = input.trim().match(/^\d{1,6}$/);
+  if (!match) return null;
+  const parsed = Number(match[0]);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function firstRateFromCell(input: string): number | null {
+  const match = input.trim().match(/^\.?\d+\.\d+$/);
+  if (!match) return null;
+  const parsed = Number(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function extractNoticeLines(lines: GenericLine[]): RepricingNoticeLine[] {
@@ -894,7 +950,7 @@ function extractNoticeLines(lines: GenericLine[]): RepricingNoticeLine[] {
 function extractStatementPeriod(lines: GenericLine[]) {
   const line = lines.find((candidate) => /\bstatement period\b/i.test(candidate.content));
   if (!line) throw new Error("Generic Fiserv fallback could not find statement period.");
-  const match = line.content.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  const match = line.content.match(/(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{2,4})\s*-\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{2,4})/);
   if (!match) throw new Error(`Generic Fiserv fallback could not parse statement period: ${line.content}`);
   return {
     start: isoDate(Number(match[1]), Number(match[2]), Number(match[3])),
@@ -940,6 +996,13 @@ function optionalLineAmount(lines: GenericLine[], pattern: RegExp): RequiredAmou
   if (!line) return null;
   const amount = lastAmount(line.content);
   return amount === null ? null : { label: line.content, amount, line };
+}
+
+function genericFeeGrandTotal(lines: GenericLine[]): RequiredAmount | null {
+  return (
+    optionalLineAmount(lines, /^total\s*\(\s*service charges,\s*interchange charges(?:\/program fees)?,\s*and fees\s*\)/i) ??
+    optionalLineAmount(lines, /^total\s*\(\s*misc(?:ellaneous)? fees and card fees\s*\)/i)
+  );
 }
 
 function optionalCardTypeTotal(lines: GenericLine[]): RequiredAmount | null {
@@ -1016,9 +1079,28 @@ function rateFromContent(content: string): number | null {
 }
 
 function lastAmount(content: string): number | null {
-  const values = signedMoneyTokens(content);
+  const lastCell = cellParts(content).at(-1);
+  if (lastCell !== undefined) {
+    const lastCellValues = signedMoneyTokens(cleanStatementText(lastCell));
+    const lastCellAmount = lastCellValues.at(-1);
+    if (lastCellAmount !== undefined) return Math.abs(lastCellAmount);
+    const compact = compactCentAmountFromCell(lastCell);
+    if (compact !== null) return compact;
+  }
+  const values = signedMoneyTokens(cleanStatementText(content));
   const amount = values.at(-1);
-  return amount === undefined ? null : Math.abs(amount);
+  if (amount !== undefined) return Math.abs(amount);
+  return compactCentAmountFromCell(lastCell);
+}
+
+function compactCentAmountFromCell(input: string | undefined): number | null {
+  if (input === undefined) return null;
+  const normalized = cleanStatementText(input)
+    .replace(/[$,\s]/g, "")
+    .trim();
+  if (!/^-?\d{3,}$/.test(normalized)) return null;
+  const parsed = Number(normalized) / 100;
+  return Number.isFinite(parsed) ? Math.abs(parsed) : null;
 }
 
 function parseMoneyToken(input: string): number | null {
@@ -1028,7 +1110,7 @@ function parseMoneyToken(input: string): number | null {
 
 function signedMoneyFromCell(input: string | undefined): number | null {
   if (input === undefined) return null;
-  const normalized = input
+  const normalized = cleanStatementText(input)
     .replace(/\(([^)]+)\)/g, "-$1")
     .replace(/[$,\s]/g, "")
     .trim();
@@ -1050,12 +1132,7 @@ function cellParts(content: string): string[] {
 }
 
 function documentLines(doc: RawExtractedDocument): GenericLine[] {
-  return doc.rows.map((row, index) => ({
-    row,
-    index,
-    content: rowContent(row),
-    pageNumber: pageNumber(row),
-  }));
+  return statementLines(doc);
 }
 
 function lineForContent(lines: GenericLine[], content: string | null): GenericLine | null {
@@ -1092,7 +1169,7 @@ function isoDate(month: number, day: number, year: number): string {
 }
 
 function corpus(doc: RawExtractedDocument): string {
-  return doc.rows.map(rowContent).join("\n");
+  return statementCorpus(doc);
 }
 
 function normalizedPlainText(input: string): string {

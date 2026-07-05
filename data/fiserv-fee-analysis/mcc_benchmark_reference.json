@@ -298,6 +298,30 @@
         "negotiable": true
       },
       {
+        "patterns": ["MIN DISCOUNT FEE", "MINIMUM MONTHLY", "MONTHLY MINIMUM"],
+        "recommendation": "This fee is charged when monthly processing volume falls below a contractual minimum. The charged amount represents the shortfall between actual fees and the minimum commitment.",
+        "avoidable": false,
+        "negotiable": true
+      },
+      {
+        "patterns": ["ADDITIONAL FEES"],
+        "recommendation": "This is a vaguely labeled fee with no clear corresponding service. Request itemization from the processor.",
+        "avoidable": false,
+        "negotiable": true
+      },
+      {
+        "patterns": ["ONLINE ACCESS FEE"],
+        "recommendation": "Monthly fee for online reporting portal access. Negotiable. Many processors include this at no cost.",
+        "avoidable": false,
+        "negotiable": true
+      },
+      {
+        "patterns": ["APPLICATION FEE"],
+        "recommendation": "Account setup fee. Typically one-time. If recurring, dispute with the processor.",
+        "avoidable": true,
+        "negotiable": true
+      },
+      {
         "patterns": ["STATEMENT FEE", "STMT FEE", "MONTHLY STATEMENT FEE"],
         "recommendation": "Monthly statement fee. Typically $5-$10. Negotiable, often waivable.",
         "avoidable": false,

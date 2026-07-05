@@ -94,11 +94,16 @@ describe("AI merchant narrative generation", () => {
           );
           return {
             object: {
+              paragraphs: [
+                "The most important finding is that the statement has processor-controlled fees that should be reviewed with the processor using the dollar amounts in the analysis.",
+                "The pricing model and pass-through evidence should be discussed in plain language before making any changes.",
+                "Priority action: ask the processor to explain processor-controlled fees and identify at least $25.00 in monthly fees that can be reduced or removed.",
+              ],
               sections,
               actionItems: [
                 {
                   priority: "high",
-                  text: "Ask the processor to explain processor-controlled fees using the statement analysis.",
+                  text: "Ask the processor to explain processor-controlled fees and target at least $25.00/month in reductions using the statement analysis.",
                   factIds: [primaryFact],
                 },
                 {
@@ -114,6 +119,8 @@ describe("AI merchant narrative generation", () => {
       },
     });
 
+    expect(prompt).toContain("You are a merchant services advisor");
+    expect(prompt).toContain("Return 3-5 merchant-facing paragraphs");
     expect(prompt).toContain("Use ONLY the provided facts");
     expect(prompt).toContain("Every section summary, bullet, and action item must cite factIds");
     expect(result.aiMerchantNarrative).toMatchObject({
@@ -123,6 +130,7 @@ describe("AI merchant narrative generation", () => {
       attempted: true,
     });
     expect(result.aiMerchantNarrative.factsUsed).not.toContain("fake_fact");
+    expect(result.aiMerchantNarrative.paragraphs).toHaveLength(3);
     expect(result.aiMerchantNarrative.sections.executiveSummary.bullets).toHaveLength(1);
     expect(result.aiMerchantNarrative.actionItems).toHaveLength(1);
     expect(result.output.fiservFeeAnalysisV2.aiMerchantNarrative).toMatchObject(result.aiMerchantNarrative);

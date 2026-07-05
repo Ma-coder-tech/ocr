@@ -4,6 +4,7 @@ import { withFeeClassification } from "./feeClassification.js";
 import { maybeRunBenchmarkCategoryAiInferenceForParserOutput } from "./benchmarkCategoryAiInference.js";
 import { maybeRunFiservFeeAnalysisAiClassificationForParserOutput } from "./fiservFeeAnalysisAiClassification.js";
 import { maybeRunFiservProcessorFeeAiClassificationForParserOutput } from "./fiservProcessorFeeAiClassification.js";
+import { maybeRunFullStatementAnomalyReviewForParserOutput } from "./fullStatementAnomalyReviewAi.js";
 import { maybeRunMerchantNarrativeAiForParserOutput } from "./merchantNarrativeAi.js";
 import { maybeRunStatementNoticeAiExtractionForParserOutput } from "./statementNoticeAiExtraction.js";
 import {
@@ -64,10 +65,17 @@ type ParserFeeLedger = {
   printedTotal: number | null;
 };
 
+type ParserFundingBatchLedger = {
+  status: string;
+  rowCount?: number | null;
+  anomalyCount?: number | null;
+};
+
 type ValidatedParserOutput = {
   statementIdentity: ParserStatementIdentity;
   selectedFinancials: ParserSelectedFinancials;
   feeLedger?: ParserFeeLedger;
+  fundingBatchLedger?: ParserFundingBatchLedger;
   fiservFeeAnalysisV2?: unknown;
   decision: ParserDecision;
   warnings: ParserWarning[];
@@ -114,6 +122,17 @@ function formatMoney(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
+function masterEstimatedAnnualSavings(output: ValidatedParserOutput, benchmarkSavings: number): number {
+  const analysis = output.fiservFeeAnalysisV2;
+  if (!analysis || typeof analysis !== "object") return benchmarkSavings;
+
+  const savings = (analysis as Record<string, any>).estimatedAnnualSavings;
+  if (!savings || typeof savings !== "object") return benchmarkSavings;
+
+  const estimated = (savings as Record<string, any>).estimated;
+  return Number.isFinite(estimated) ? round2(estimated) : benchmarkSavings;
+}
+
 function dataQualityFromParser(output: ValidatedParserOutput): DataQualitySignal[] {
   const signals: DataQualitySignal[] = [
     {
@@ -131,6 +150,61 @@ function dataQualityFromParser(output: ValidatedParserOutput): DataQualitySignal
     });
   }
 
+  if (output.statementIdentity.statementFamily === "generic_fiserv_family_statement") {
+    signals.push({
+      level: "info",
+      message: `Generic Fiserv-family parser used; totals reconciled, fee ledger status is ${output.feeLedger?.status ?? "not_mapped"}, funding ledger status is ${output.fundingBatchLedger?.status ?? "not_mapped"}.`,
+    });
+  }
+
+  const aiSignals = aiDataQualitySignals(output.fiservFeeAnalysisV2);
+  signals.push(...aiSignals);
+
+  return signals;
+}
+
+function aiDataQualitySignals(analysis: unknown): DataQualitySignal[] {
+  if (!analysis || typeof analysis !== "object") return [];
+  const record = analysis as Record<string, any>;
+  const signals: DataQualitySignal[] = [];
+  const feeAi = record.ai;
+  if (feeAi && typeof feeAi === "object" && typeof feeAi.status === "string") {
+    signals.push({
+      level: feeAi.status === "failed" ? "warning" : "info",
+      message: `AI fee analysis classification status: ${feeAi.status}${feeAi.provider ? ` via ${feeAi.provider}` : ""}.`,
+    });
+  }
+  const benchmarkAi = record.benchmarkCategoryAi;
+  if (benchmarkAi && typeof benchmarkAi === "object" && typeof benchmarkAi.status === "string") {
+    signals.push({
+      level: benchmarkAi.status === "failed" ? "warning" : "info",
+      message: `AI benchmark category status: ${benchmarkAi.status}${benchmarkAi.provider ? ` via ${benchmarkAi.provider}` : ""}.`,
+    });
+  }
+  const noticeAi = record.aiNoticeExtraction;
+  if (noticeAi && typeof noticeAi === "object" && typeof noticeAi.status === "string") {
+    const noticeCount = Number.isFinite(noticeAi.noticeCount) ? `; notices ${noticeAi.noticeCount}` : "";
+    const feeChangeCount = Number.isFinite(noticeAi.feeChangeCount) ? `; fee changes ${noticeAi.feeChangeCount}` : "";
+    signals.push({
+      level: noticeAi.status === "failed" ? "warning" : "info",
+      message: `AI notice extraction status: ${noticeAi.status}${noticeAi.provider ? ` via ${noticeAi.provider}` : ""}${noticeCount}${feeChangeCount}.`,
+    });
+  }
+  const narrativeAi = record.aiMerchantNarrative;
+  const anomalyAi = record.aiAnomalyReview;
+  if (anomalyAi && typeof anomalyAi === "object" && typeof anomalyAi.status === "string") {
+    const anomalyCount = Number.isFinite(anomalyAi.anomalyCount) ? `; anomalies ${anomalyAi.anomalyCount}` : "";
+    signals.push({
+      level: anomalyAi.status === "failed" ? "warning" : "info",
+      message: `AI full statement anomaly review status: ${anomalyAi.status}${anomalyAi.provider ? ` via ${anomalyAi.provider}` : ""}${anomalyCount}.`,
+    });
+  }
+  if (narrativeAi && typeof narrativeAi === "object" && typeof narrativeAi.status === "string") {
+    signals.push({
+      level: narrativeAi.status === "failed" ? "warning" : "info",
+      message: `AI merchant narrative status: ${narrativeAi.status}${narrativeAi.provider ? ` via ${narrativeAi.provider}` : ""}.`,
+    });
+  }
   return signals;
 }
 
@@ -193,8 +267,9 @@ function applyValidatedParserOutput(
   const estimatedAnnualFees = round2(totalFees * 12);
   const feeBreakdown = feeRowsFromLedger(output) ?? baseSummary.feeBreakdown;
   const benchmark = benchmarkFor(businessType, effectiveRate);
-  const estimatedAnnualSavings =
+  const benchmarkGapSavings =
     benchmark.status === "above" ? round2(((effectiveRate - benchmark.upperRate) / 100) * totalVolume * 12) : 0;
+  const estimatedAnnualSavings = masterEstimatedAnnualSavings(output, benchmarkGapSavings);
 
   return {
     ...baseSummary,
@@ -286,10 +361,11 @@ export async function analyzeStatementDocumentWithOptionalAi(
   const matched = findValidatedPdfParser(doc, options.sourceFileName, businessType);
   if (!matched) return baseSummary;
 
-  const feeLedgerEnhanced = await maybeRunFiservProcessorFeeAiClassificationForParserOutput(matched.output as any);
+  const noticeEnhanced = await maybeRunStatementNoticeAiExtractionForParserOutput(matched.output as any);
+  const categoryEnhanced = await maybeRunBenchmarkCategoryAiInferenceForParserOutput(noticeEnhanced.output as any);
+  const feeLedgerEnhanced = await maybeRunFiservProcessorFeeAiClassificationForParserOutput(categoryEnhanced.output as any);
   const v2Enhanced = await maybeRunFiservFeeAnalysisAiClassificationForParserOutput(feeLedgerEnhanced.output as any);
-  const categoryEnhanced = await maybeRunBenchmarkCategoryAiInferenceForParserOutput(v2Enhanced.output as any);
-  const noticeEnhanced = await maybeRunStatementNoticeAiExtractionForParserOutput(categoryEnhanced.output as any);
-  const narrativeEnhanced = await maybeRunMerchantNarrativeAiForParserOutput(noticeEnhanced.output as any);
+  const anomalyEnhanced = await maybeRunFullStatementAnomalyReviewForParserOutput(v2Enhanced.output as any);
+  const narrativeEnhanced = await maybeRunMerchantNarrativeAiForParserOutput(anomalyEnhanced.output as any);
   return applyValidatedParserOutput(baseSummary, { ...matched, output: narrativeEnhanced.output as ValidatedParserOutput }, businessType);
 }

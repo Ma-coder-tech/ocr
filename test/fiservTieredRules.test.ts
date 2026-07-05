@@ -10,10 +10,12 @@ function row(params: {
   count?: number | null;
   rate: number | null;
   amount: number;
+  type?: string | null;
+  sourceSection?: string;
 }): FiservRawFeeRowForNormalization {
   return {
     date: null,
-    type: "Service charges",
+    type: params.type ?? "Service charges",
     network: params.network,
     description: params.description,
     volumeBasis: params.volumeBasis,
@@ -21,7 +23,7 @@ function row(params: {
     rate: params.rate,
     amount: params.amount,
     bucket: "service_charges",
-    sourceSection: "CARD FEES",
+    sourceSection: params.sourceSection ?? "CARD FEES",
     evidenceLine: `${params.network} | ${params.description} | ${params.volumeBasis ?? ""} | ${params.count ?? ""} | ${params.rate ?? ""} | -$${params.amount.toFixed(2)}`,
     pageNumber: 2,
   };
@@ -112,5 +114,106 @@ describe("Fiserv V2 tiered pricing rules", () => {
         "new_account_pricing_context",
       ]),
     );
+  });
+});
+
+describe("Fiserv V2 Vortax regression rules", () => {
+  it("treats uniform QUAL DISC plus itemized interchange and network fees as interchange-plus", () => {
+    const fundingBatchRows = Array.from({ length: 15 }, (_, index) => ({
+      adjustments: index + 1,
+      chargebacks: 0,
+      evidenceLine: `07/${String(index + 1).padStart(2, "0")} | batch | adjustment`,
+    }));
+    const analysis = buildFiservFeeAnalysisV2FromRawRows({
+      rows: [
+        row({ network: "MASTERCARD", description: "QUAL DISC", volumeBasis: 22100, rate: 0.015, amount: 331.5 }),
+        row({ network: "VISA", description: "QUAL DISC", volumeBasis: 20210.13, rate: 0.015, amount: 303.15 }),
+        row({ network: "MASTERCARD", description: "INTERCHANGE", volumeBasis: 22100, rate: 0.018, amount: 397.8, type: "CF" }),
+        row({ network: "VISA", description: "INTERCHANGE", volumeBasis: 20210.13, rate: 0.017, amount: 343.57, type: "CF" }),
+        row({ network: "MASTERCARD", description: "NABU FEES", volumeBasis: null, count: 160, rate: 0.0195, amount: 3.12, type: "Program Fees" }),
+        row({ network: "VISA", description: "CR DUES AND ASSESS", volumeBasis: 20210.13, rate: 0.0014, amount: 28.29, type: "Program Fees" }),
+        row({ network: "VISA", description: "ECI CPU-G", volumeBasis: null, count: 277, rate: 0.25, amount: 69.25 }),
+        row({ network: "MASTERCARD", description: "COMM CARD I/C SAVINGS ADJ", volumeBasis: 9.96, rate: 0.75, amount: 7.47, type: "MISC", sourceSection: "ACCOUNT FEES" }),
+        row({ network: "ACCOUNT", description: "CHARGEBACKS", volumeBasis: null, count: 11, rate: 25, amount: 275, type: "MISC", sourceSection: "ACCOUNT FEES" }),
+        row({ network: "ACCOUNT", description: "ACH REJECT FEE", volumeBasis: null, count: 3, rate: 20, amount: 60, type: "MISC", sourceSection: "ACCOUNT FEES" }),
+      ],
+      printedTotal: 1819.15,
+      totalVolume: 42310.13,
+      totalFees: 1819.15,
+      transactionCount: 259,
+      pricingModel: {
+        pricingModel: "flat_discount_pricing",
+        confidence: "high",
+        notes: ["Repeated QUAL DISC rows were visible."],
+      },
+      statementPeriodStart: "2022-04-01",
+      statementPeriodEnd: "2022-04-30",
+      merchantName: "VORTAX NXGEN",
+      ytdGrossSales: null,
+      fundingBatchRows,
+    });
+
+    expect(analysis.pricingModel).toMatchObject({
+      pricingModel: "interchange_plus",
+      confidence: "high",
+      analysisStatus: "ic_plus_ready",
+    });
+    expect(analysis.processorMarkupAnalysis.nonAmexSalesDiscountRate).toBe(0.015);
+    expect(analysis.perAuthBenchmarkAnalysis).toMatchObject({
+      status: "ready",
+      currentRate: 0.25,
+      authorizationCount: 277,
+      monthlyAuthCost: 69.25,
+    });
+    expect(analysis.processorMarkupAnalysis.hiddenPctMarkupRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          description: "COMM CARD I/C SAVINGS ADJ",
+          rate: 0.75,
+          amount: 7.47,
+          volumeBasis: 9.96,
+        }),
+      ]),
+    );
+    expect(analysis.disputeActivityAnalysis).toMatchObject({
+      status: "ready",
+      chargebackCount: 11,
+      achRejectCount: 3,
+      fundingAdjustmentCount: 15,
+      disputeCostAmount: 335,
+      disputeCostPctOfVolume: 0.00791773,
+    });
+    expect(analysis.findings.map((finding) => finding.kind)).toEqual(
+      expect.arrayContaining(["per_auth_fee_benchmark", "hidden_percentage_markup", "dispute_activity_high"]),
+    );
+    expect(analysis.findings.find((finding) => finding.kind === "hidden_percentage_markup")?.evidence.join(" ")).toContain("75.00%");
+  });
+
+  it("keeps uniform QUAL DISC without itemized interchange and network detail as bundled flat-rate", () => {
+    const analysis = buildFiservFeeAnalysisV2FromRawRows({
+      rows: [
+        row({ network: "MASTERCARD", description: "QUAL DISC", volumeBasis: 1000, rate: 0.038, amount: 38 }),
+        row({ network: "VISA", description: "QUAL DISC", volumeBasis: 2000, rate: 0.038, amount: 76 }),
+      ],
+      printedTotal: 114,
+      totalVolume: 3000,
+      totalFees: 114,
+      transactionCount: 80,
+      pricingModel: {
+        pricingModel: "flat_discount_pricing",
+        confidence: "high",
+        notes: ["Repeated QUAL DISC rows were visible."],
+      },
+      statementPeriodStart: "2020-04-01",
+      statementPeriodEnd: "2020-04-30",
+      merchantName: "JAMAICA FISH MARKET",
+      ytdGrossSales: null,
+    });
+
+    expect(analysis.pricingModel).toMatchObject({
+      pricingModel: "flat_rate_bundled",
+      confidence: "high",
+    });
+    expect(analysis.processorMarkupAnalysis.status).toBe("pending_pricing_model_rules");
   });
 });
