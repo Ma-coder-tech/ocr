@@ -149,12 +149,114 @@ function migrate(): void {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS multi_statement_jobs (
+      id TEXT PRIMARY KEY,
+      merchant_id INTEGER REFERENCES merchants(id) ON DELETE CASCADE,
+      status TEXT NOT NULL,
+      business_type TEXT NOT NULL,
+      requested_statement_count INTEGER NOT NULL DEFAULT 0,
+      completed_statement_count INTEGER NOT NULL DEFAULT 0,
+      failed_statement_count INTEGER NOT NULL DEFAULT 0,
+      date_range_start TEXT,
+      date_range_end TEXT,
+      missing_periods_json TEXT NOT NULL DEFAULT '[]',
+      processor_family TEXT,
+      iso_name TEXT,
+      merchant_name_detected TEXT,
+      identity_match_status TEXT,
+      pipeline_version TEXT,
+      adapter_version TEXT,
+      comparison_engine_version TEXT,
+      report_version TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      completed_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS multi_statement_job_files (
+      id TEXT PRIMARY KEY,
+      multi_statement_job_id TEXT NOT NULL REFERENCES multi_statement_jobs(id) ON DELETE CASCADE,
+      original_file_name TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      file_size INTEGER NOT NULL,
+      content_hash TEXT,
+      status TEXT NOT NULL,
+      detected_period TEXT,
+      detected_merchant_name TEXT,
+      detected_merchant_number TEXT,
+      detected_processor TEXT,
+      detected_iso TEXT,
+      single_statement_job_id TEXT REFERENCES analysis_jobs(id) ON DELETE SET NULL,
+      statement_id INTEGER REFERENCES statements(id) ON DELETE SET NULL,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS multi_statement_inputs (
+      id TEXT PRIMARY KEY,
+      multi_statement_job_id TEXT NOT NULL REFERENCES multi_statement_jobs(id) ON DELETE CASCADE,
+      statement_id INTEGER REFERENCES statements(id) ON DELETE SET NULL,
+      statement_period TEXT NOT NULL,
+      comparison_input_json TEXT NOT NULL,
+      input_schema_version TEXT NOT NULL,
+      source_summary_hash TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(multi_statement_job_id, statement_period)
+    );
+
+    CREATE TABLE IF NOT EXISTS multi_statement_analyses (
+      id TEXT PRIMARY KEY,
+      multi_statement_job_id TEXT NOT NULL REFERENCES multi_statement_jobs(id) ON DELETE CASCADE,
+      analysis_json TEXT NOT NULL,
+      analysis_schema_version TEXT NOT NULL,
+      engine_version TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS multi_statement_reports (
+      id TEXT PRIMARY KEY,
+      multi_statement_job_id TEXT NOT NULL REFERENCES multi_statement_jobs(id) ON DELETE CASCADE,
+      report_json TEXT NOT NULL,
+      report_markdown TEXT,
+      report_schema_version TEXT NOT NULL,
+      narrative_status TEXT NOT NULL,
+      narrative_provider TEXT,
+      narrative_model TEXT,
+      narrative_json TEXT,
+      benchmark_status TEXT,
+      average_effective_rate REAL,
+      estimated_annual_savings REAL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS multi_statement_job_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      multi_statement_job_id TEXT NOT NULL REFERENCES multi_statement_jobs(id) ON DELETE CASCADE,
+      at TEXT NOT NULL,
+      stage TEXT NOT NULL,
+      message TEXT NOT NULL,
+      metadata_json TEXT
+    );
+
     CREATE INDEX IF NOT EXISTS idx_jobs_status ON analysis_jobs(status);
     CREATE INDEX IF NOT EXISTS idx_jobs_merchant ON analysis_jobs(merchant_id);
     CREATE INDEX IF NOT EXISTS idx_jobs_status_updated ON analysis_jobs(status, updated_at);
     CREATE INDEX IF NOT EXISTS idx_uploads_merchant ON statement_uploads(merchant_id);
     CREATE INDEX IF NOT EXISTS idx_job_events_job ON analysis_job_events(job_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_statements_merchant_period ON statements(merchant_id, period_key);
+    CREATE INDEX IF NOT EXISTS idx_multi_jobs_merchant ON multi_statement_jobs(merchant_id);
+    CREATE INDEX IF NOT EXISTS idx_multi_jobs_status ON multi_statement_jobs(status);
+    CREATE INDEX IF NOT EXISTS idx_multi_job_files_job ON multi_statement_job_files(multi_statement_job_id);
+    CREATE INDEX IF NOT EXISTS idx_multi_job_files_status ON multi_statement_job_files(status);
+    CREATE INDEX IF NOT EXISTS idx_multi_inputs_job_period ON multi_statement_inputs(multi_statement_job_id, statement_period);
+    CREATE INDEX IF NOT EXISTS idx_multi_analyses_job_created ON multi_statement_analyses(multi_statement_job_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_multi_reports_job_created ON multi_statement_reports(multi_statement_job_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_multi_reports_benchmark ON multi_statement_reports(benchmark_status);
+    CREATE INDEX IF NOT EXISTS idx_multi_events_job ON multi_statement_job_events(multi_statement_job_id);
   `);
 
   ensureColumn("merchants", "statement_2_period", "TEXT");
