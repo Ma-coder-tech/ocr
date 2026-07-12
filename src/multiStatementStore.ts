@@ -379,6 +379,20 @@ export function listMultiStatementJobsForMerchant(merchantId: number): MultiStat
   return rows.map((row) => mapJob(row)).filter((job): job is MultiStatementJobRecord => job !== null);
 }
 
+export function listRunnableMultiStatementJobs(): MultiStatementJobRecord[] {
+  const rows = db
+    .prepare(
+      `
+        SELECT *
+        FROM multi_statement_jobs
+        WHERE status NOT IN ('completed', 'failed', 'cancelled')
+        ORDER BY created_at ASC
+      `,
+    )
+    .all() as Array<Record<string, unknown>>;
+  return rows.map((row) => mapJob(row)).filter((job): job is MultiStatementJobRecord => job !== null);
+}
+
 export function updateMultiStatementJobStatus(
   id: string,
   patch: Partial<{

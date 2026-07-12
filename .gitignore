@@ -4,6 +4,8 @@ dist
 .DS_Store
 *.sqlite-shm
 *.sqlite-wal
+*.sqlite
+!data/feeclear.sqlite
 vitest.config.ts.timestamp-*.mjs
 data/uploads/*
 data/reports/*

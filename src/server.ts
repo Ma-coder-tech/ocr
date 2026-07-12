@@ -2,13 +2,13 @@ import "dotenv/config";
 import { createWriteStream } from "node:fs";
 import fs from "node:fs/promises";
 import http, { IncomingMessage, ServerResponse } from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { URL } from "node:url";
-import { getBusinessTypeReportLabel, isBusinessTypeId } from "./businessTypes.js";
+import { getBusinessTypeReportLabel, isBusinessTypeId, type BusinessTypeId } from "./businessTypes.js";
 import {
   claimStatementOneJob,
   createMerchantAccount,
@@ -56,8 +56,18 @@ import { parsePdf } from "./parser.js";
 import { detectPreflightFailure } from "./preflight.js";
 import { toPublicReportSummary } from "./publicReport.js";
 import { buildSingleStatementCustomerReport } from "./reporting/index.js";
+import { renderMultiStatementGlobalReportMarkdown } from "./reporting/buildMultiStatement.js";
 import { createJob, getJob, getJobByUploadId, listEvents, listStatementJobsForMerchant, pruneJobs, updateJob } from "./store.js";
 import { enqueueJob, hydrateQueuedJobs } from "./worker.js";
+import { createMultiStatementAnalysisJob } from "./multiStatementOrchestrator.js";
+import {
+  getLatestMultiStatementAnalysisForJob,
+  getLatestMultiStatementReportForJob,
+  getMultiStatementJob,
+  listMultiStatementJobEvents,
+  listMultiStatementJobFiles,
+} from "./multiStatementStore.js";
+import { enqueueMultiStatementJob, hydrateRunnableMultiStatementJobs } from "./multiStatementWorker.js";
 
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? "127.0.0.1";
@@ -221,7 +231,7 @@ function getRateLimitConfig(pathname: string, method: string): RateLimitConfig |
 
   if (
     method === "POST" &&
-    (pathname === "/api/jobs" || pathname === "/api/dashboard/statements/validate")
+    (pathname === "/api/jobs" || pathname === "/api/dashboard/statements/validate" || pathname === "/api/multi-statement/upload")
   ) {
     return { limit: 5, windowMs: 60 * 1000, key: `upload:${pathname}` };
   }
@@ -427,6 +437,84 @@ async function writeUploadedFile(file: File, finalPath: string): Promise<void> {
   await pipeline(source, createWriteStream(finalPath));
 }
 
+async function sha256File(filePath: string): Promise<string> {
+  return createHash("sha256").update(await fs.readFile(filePath)).digest("hex");
+}
+
+function uploadedPdfFilesFromForm(form: FormData): File[] {
+  const filesEntries = form.getAll("files");
+  const entries = filesEntries.length > 0 ? filesEntries : form.getAll("file");
+  const files: File[] = [];
+  for (const entry of entries) {
+    if (
+      typeof entry === "object" &&
+      entry !== null &&
+      typeof (entry as File).name === "string" &&
+      typeof (entry as File).size === "number"
+    ) {
+      files.push(entry as unknown as File);
+    }
+  }
+  return files;
+}
+
+function multiStatementJobPayload(jobId: string, includeReport: boolean) {
+  const job = getMultiStatementJob(jobId);
+  if (!job) return null;
+
+  const files = listMultiStatementJobFiles(job.id);
+  const analysis = getLatestMultiStatementAnalysisForJob(job.id);
+  const storedReport = getLatestMultiStatementReportForJob(job.id);
+  const report = includeReport && job.status === "completed" ? storedReport?.report ?? null : null;
+  const reportMarkdown = includeReport && job.status === "completed" ? storedReport?.reportMarkdown ?? null : null;
+  const includedPeriods =
+    analysis?.analysis.metadata.includedPeriods ??
+    report?.effectiveRateTrend.periods.map((period) => period.period) ??
+    [];
+
+  const filePayloads = files.map((file) => ({
+    id: file.id,
+    originalFileName: file.originalFileName,
+    status: file.status,
+    detectedPeriod: file.detectedPeriod,
+    detectedMerchantName: file.detectedMerchantName,
+    detectedMerchantNumber: file.detectedMerchantNumber,
+    detectedProcessor: file.detectedProcessor,
+    detectedIso: file.detectedIso,
+    error: file.error,
+  }));
+
+  return {
+    job: {
+      id: job.id,
+      status: job.status,
+      businessType: job.businessType,
+      requestedStatementCount: job.requestedStatementCount,
+      completedStatementCount: job.completedStatementCount,
+      failedStatementCount: job.failedStatementCount,
+      dateRangeStart: job.dateRangeStart,
+      dateRangeEnd: job.dateRangeEnd,
+      missingPeriods: job.missingPeriods,
+      identityMatchStatus: job.identityMatchStatus,
+      merchantNameDetected: job.merchantNameDetected,
+      processorFamily: job.processorFamily,
+      isoName: job.isoName,
+      error: job.error,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      completedAt: job.completedAt,
+    },
+    files: filePayloads,
+    includedPeriods,
+    missingPeriods: job.missingPeriods,
+    failedFiles: filePayloads.filter((file) => file.status === "failed"),
+    excludedFiles: filePayloads.filter((file) => file.status === "excluded"),
+    report,
+    reportMarkdown,
+    events: listMultiStatementJobEvents(job.id),
+  };
+}
+
 function detectStatementPeriodKey(summary: AnalysisSummary, textPreview: string, fileName: string, fallbackDetected?: string | null): string | null {
   return (
     parsePeriodKey(summary.statementPeriod) ??
@@ -513,6 +601,137 @@ async function handleCreateAnonymousJob(req: IncomingMessage, res: ServerRespons
   setPendingStatementJobCookie(req, res, job.id);
   enqueueJob(job.id);
   json(res, 201, { jobId: job.id });
+}
+
+async function handleMultiStatementUpload(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const merchant = await authenticatedMerchant(req);
+
+  let form: FormData;
+  try {
+    form = await readMultipartForm(req);
+  } catch {
+    json(res, 400, { error: "We could not read that upload. Please try again with PDF statement files." });
+    return;
+  }
+
+  const businessTypeEntry = form.get("businessType");
+  const requestedBusinessType = typeof businessTypeEntry === "string" ? businessTypeEntry : "";
+  const fallbackBusinessType = merchant?.businessType ?? "";
+  const businessType = isBusinessTypeId(requestedBusinessType)
+    ? requestedBusinessType
+    : isBusinessTypeId(fallbackBusinessType)
+      ? fallbackBusinessType
+      : null;
+  if (!businessType) {
+    json(res, 400, { error: "Please provide a valid business type before uploading statements." });
+    return;
+  }
+
+  const uploads = uploadedPdfFilesFromForm(form);
+  if (uploads.length < 1 || uploads.length > 12) {
+    json(res, 400, { error: "Please upload between 1 and 12 PDF statements." });
+    return;
+  }
+
+  for (const upload of uploads) {
+    if (!isPdfFileName(upload.name)) {
+      json(res, 400, { error: `${upload.name || "One file"} is not a PDF.` });
+      return;
+    }
+    if (upload.size > 20 * 1024 * 1024) {
+      json(res, 400, { error: `${upload.name || "One file"} is too large (over 20 MB).` });
+      return;
+    }
+  }
+
+  const batchId = randomUUID();
+  const batchDir = path.join(uploadDir, "multi-statement", batchId);
+  await fs.mkdir(batchDir, { recursive: true });
+
+  const files = [];
+  for (const [index, upload] of uploads.entries()) {
+    const fileName = `${String(index + 1).padStart(2, "0")}-${Date.now()}-${safeFileName(upload.name)}`;
+    const finalPath = path.join(batchDir, fileName);
+    await writeUploadedFile(upload, finalPath);
+    files.push({
+      originalFileName: upload.name,
+      filePath: finalPath,
+      fileSize: upload.size,
+      contentHash: await sha256File(finalPath),
+    });
+  }
+
+  try {
+    const result = createMultiStatementAnalysisJob({
+      merchantId: merchant?.merchantId ?? null,
+      businessType: businessType as BusinessTypeId,
+      files,
+      narrative: { enabled: true },
+    });
+    enqueueMultiStatementJob(result.jobId);
+    const payload = multiStatementJobPayload(result.jobId, false);
+    json(res, 202, payload ?? result);
+  } catch (error) {
+    json(res, 500, { error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+async function authorizeMultiStatementJob(req: IncomingMessage, res: ServerResponse, jobId: string) {
+  const job = getMultiStatementJob(jobId);
+  if (!job) {
+    json(res, 404, { error: "Multi-statement job not found." });
+    return null;
+  }
+  if (!job.merchantId) return job;
+
+  const merchant = await authenticatedMerchant(req);
+  if (!merchant || merchant.merchantId !== job.merchantId) {
+    json(res, 404, { error: "Multi-statement job not found." });
+    return null;
+  }
+  return job;
+}
+
+async function handleMultiStatementJobLookup(req: IncomingMessage, res: ServerResponse, jobId: string): Promise<void> {
+  const job = await authorizeMultiStatementJob(req, res, jobId);
+  if (!job) return;
+
+  const payload = multiStatementJobPayload(job.id, true);
+  if (!payload) {
+    json(res, 404, { error: "Multi-statement job not found." });
+    return;
+  }
+  json(res, 200, payload);
+}
+
+async function handleMultiStatementReportLookup(req: IncomingMessage, res: ServerResponse, jobId: string, format: string | null): Promise<void> {
+  const job = await authorizeMultiStatementJob(req, res, jobId);
+  if (!job) return;
+  if (job.status !== "completed") {
+    json(res, 404, { error: "Multi-statement report is not available yet." });
+    return;
+  }
+
+  const storedReport = getLatestMultiStatementReportForJob(job.id);
+  if (!storedReport) {
+    json(res, 404, { error: "Multi-statement report is not available." });
+    return;
+  }
+
+  const markdown = storedReport.reportMarkdown ?? renderMultiStatementGlobalReportMarkdown(storedReport.report);
+  if (format === "markdown" || format === "md") {
+    sendText(res, 200, "text/markdown; charset=utf-8", markdown);
+    return;
+  }
+
+  json(res, 200, {
+    jobId: job.id,
+    report: storedReport.report,
+    markdown,
+    narrativeStatus: storedReport.narrativeStatus,
+    narrativeProvider: storedReport.narrativeProvider,
+    narrativeModel: storedReport.narrativeModel,
+  });
 }
 
 async function handleSignUp(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -1332,6 +1551,28 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return;
   }
 
+  if (method === "POST" && pathname === "/api/multi-statement/upload") {
+    await handleMultiStatementUpload(req, res);
+    return;
+  }
+
+  const multiStatementReportMatch = pathname.match(/^\/api\/multi-statement\/jobs\/([^/]+)\/report$/);
+  if (method === "GET" && multiStatementReportMatch) {
+    await handleMultiStatementReportLookup(
+      req,
+      res,
+      decodeURIComponent(multiStatementReportMatch[1]),
+      url.searchParams.get("format"),
+    );
+    return;
+  }
+
+  const multiStatementJobMatch = pathname.match(/^\/api\/multi-statement\/jobs\/([^/]+)$/);
+  if (method === "GET" && multiStatementJobMatch) {
+    await handleMultiStatementJobLookup(req, res, decodeURIComponent(multiStatementJobMatch[1]));
+    return;
+  }
+
   const jobMatch = pathname.match(/^\/api\/jobs\/([^/]+)$/);
   if (method === "GET" && jobMatch) {
     await handleAnonymousJobLookup(req, res, decodeURIComponent(jobMatch[1]));
@@ -1655,6 +1896,7 @@ async function start(): Promise<void> {
   await fs.mkdir(uploadDir, { recursive: true });
   await cleanupOldFiles(uploadDir, fileRetentionHours);
   hydrateQueuedJobs();
+  hydrateRunnableMultiStatementJobs();
   deleteExpiredSessions();
   pruneJobs();
   const server = http.createServer(app);

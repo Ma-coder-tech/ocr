@@ -1,0 +1,694 @@
+{
+  "kind": "multi_statement_global",
+  "executiveSummary": {
+    "merchantName": "PEPES MEXICAN RESTURANT",
+    "isoName": "Clover / First Data",
+    "processorPlatform": "Fiserv / First Data",
+    "dateRange": "2024-11 - 2024-12",
+    "statementCount": 2,
+    "missingPeriods": [],
+    "totalVolume": {
+      "label": "Total volume across analyzed statements",
+      "value": "$109,634.41",
+      "rawValue": 109634.41,
+      "unit": "money"
+    },
+    "totalFees": {
+      "label": "Total fees across analyzed statements",
+      "value": "$2,726.05",
+      "rawValue": 2726.05,
+      "unit": "money"
+    },
+    "averageEffectiveRate": {
+      "label": "Average effective rate",
+      "value": "2.49%",
+      "rawValue": 0.02486491,
+      "unit": "percent"
+    },
+    "trendDirection": "stable",
+    "pricingModel": "interchange_plus",
+    "pricingModelConsistent": true,
+    "headlineSavings": {
+      "label": "Projected annual savings if unchanged",
+      "value": "$1,313.22",
+      "rawValue": 1313.22,
+      "unit": "money"
+    },
+    "benchmark": {
+      "status": "within",
+      "message": "within competitive range (1.95% - 2.45% for Restaurant / Food Service at this volume)",
+      "lowerRate": 0.0195,
+      "upperRate": 0.0245,
+      "estimatedAnnualOverpayment": null
+    }
+  },
+  "effectiveRateTrend": {
+    "direction": "stable",
+    "explanation": null,
+    "lowest": {
+      "period": "2024-12",
+      "rate": 0.0248,
+      "displayRate": "2.48%"
+    },
+    "highest": {
+      "period": "2024-11",
+      "rate": 0.025,
+      "displayRate": "2.50%"
+    },
+    "averageRate": 0.02486491,
+    "displayAverageRate": "2.49%",
+    "periods": [
+      {
+        "period": "2024-11",
+        "effectiveRate": 0.025,
+        "displayRate": "2.50%",
+        "volume": 53291.02,
+        "displayVolume": "$53,291.02",
+        "totalFees": 1330.96,
+        "displayTotalFees": "$1,330.96"
+      },
+      {
+        "period": "2024-12",
+        "effectiveRate": 0.0248,
+        "displayRate": "2.48%",
+        "volume": 56343.39,
+        "displayVolume": "$56,343.39",
+        "totalFees": 1395.09,
+        "displayTotalFees": "$1,395.09"
+      }
+    ]
+  },
+  "operationalContext": {
+    "inactivePeriods": [],
+    "refundTrend": {
+      "direction": "stable",
+      "finding": null,
+      "periods": [
+        {
+          "period": "2024-11",
+          "refunds": null,
+          "refundPctOfGrossSales": null,
+          "displayRefunds": "Not available"
+        },
+        {
+          "period": "2024-12",
+          "refunds": null,
+          "refundPctOfGrossSales": null,
+          "displayRefunds": "Not available"
+        }
+      ]
+    },
+    "cardMixShifts": [],
+    "priorPeriodAdjustments": [],
+    "interchangeQualification": {
+      "applicable": true,
+      "finding": null
+    }
+  },
+  "disputeTrend": {
+    "direction": "none",
+    "totalDisputeCostsAllPeriods": 0,
+    "finding": null,
+    "periods": [
+      {
+        "period": "2024-11",
+        "chargebacks": 0,
+        "chargebackFees": 0,
+        "achRejects": 0,
+        "achRejectFees": 0,
+        "totalDisputeCost": 0,
+        "displayTotalDisputeCost": "$0.00"
+      },
+      {
+        "period": "2024-12",
+        "chargebacks": 0,
+        "chargebackFees": 0,
+        "achRejects": 0,
+        "achRejectFees": 0,
+        "totalDisputeCost": 0,
+        "displayTotalDisputeCost": "$0.00"
+      }
+    ]
+  },
+  "feeChangeTimeline": [],
+  "topFindings": [
+    {
+      "priority": 1,
+      "fingerprint": "penalty_or_configuration_fee__managed_security_non_validated_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed",
+      "tier": "compliance_penalty",
+      "title": "MANAGED SECURITY NON VALIDATED may be avoidable through configuration or qualification fixes",
+      "description": "Appeared on 2 analyzed statement(s).",
+      "explanation": "PCI compliance validation has not been completed. Complete the PCI Self-Assessment Questionnaire (SAQ). Once validated, this fee is eliminated or significantly reduced.",
+      "monthsAffected": 2,
+      "cumulativeImpact": 99.9,
+      "projectedAnnualImpact": 599.4,
+      "action": "Complete PCI/security validation or correct the terminal/gateway setup.",
+      "difficulty": "no_negotiation",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "MANAGED SECURITY NON VALIDATED may be avoidable through configuration or qualification fixes: monthly impact 49.95, projected annual impact 599.40."
+        },
+        {
+          "period": "2024-12",
+          "detail": "MANAGED SECURITY NON VALIDATED may be avoidable through configuration or qualification fixes: monthly impact 49.95, projected annual impact 599.40."
+        }
+      ]
+    },
+    {
+      "priority": 2,
+      "fingerprint": "suspicious_uniform_rate__access_fee_is_charged_at_the_same_rate_across_independent_networks__investigative",
+      "tier": "suspicious",
+      "title": "ACCESS FEE is charged at the same rate across independent networks",
+      "description": "Appeared on 2 analyzed statement(s).",
+      "explanation": "This pattern suggests a processor-controlled access fee may be applied uniformly across independent networks. Ask for pass-through documentation showing the source and exact wholesale basis.",
+      "monthsAffected": 2,
+      "cumulativeImpact": 119.79,
+      "projectedAnnualImpact": 718.74,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "difficulty": "investigation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "ACCESS FEE is charged at the same rate across independent networks: monthly impact 58.79, projected annual impact 705.48."
+        },
+        {
+          "period": "2024-12",
+          "detail": "ACCESS FEE is charged at the same rate across independent networks: monthly impact 61.00, projected annual impact 732.00."
+        }
+      ]
+    },
+    {
+      "priority": 3,
+      "fingerprint": "third_party_service_fee__bentobox_online_order_fee_is_a_third_party_service_fee__investigative",
+      "tier": "suspicious",
+      "title": "BENTOBOX ONLINE ORDER FEE is a third-party service fee",
+      "description": "Appeared on 2 analyzed statement(s).",
+      "explanation": "This appears to be a third-party online-ordering service charge. Verify that the service is active, wanted, and priced correctly.",
+      "monthsAffected": 2,
+      "cumulativeImpact": 34.65,
+      "projectedAnnualImpact": 207.9,
+      "action": "Verify the third-party service is active and cancel or renegotiate it if it is not needed.",
+      "difficulty": "investigation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "BENTOBOX ONLINE ORDER FEE 17 TRANSACTIONS AT 0.99 is a third-party service fee: monthly impact 16.83, projected annual impact 201.96."
+        },
+        {
+          "period": "2024-12",
+          "detail": "BENTOBOX ONLINE ORDER FEE 18 TRANSACTIONS AT 0.99 is a third-party service fee: monthly impact 17.82, projected annual impact 213.84."
+        }
+      ]
+    },
+    {
+      "priority": 4,
+      "fingerprint": "rate_exceeds_reference__discover_auth_fee_exceeds_the_reference_rate__investigative",
+      "tier": "suspicious",
+      "title": "DISCOVER AUTH FEE exceeds the reference rate",
+      "description": "Appeared on 2 analyzed statement(s).",
+      "explanation": "This is a per-authorization fee charged by the processor. It is applied to every card transaction and is negotiable. If multiple per-auth fees are stacked, the total per-authorization cost may be higher than competitive rates.",
+      "monthsAffected": 2,
+      "cumulativeImpact": 5.56,
+      "projectedAnnualImpact": 33.36,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "difficulty": "investigation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "DISCOVER AUTH FEE 28 TRANSACTIONS AT 0.1 exceeds the reference rate: monthly impact 2.73, projected annual impact 32.76."
+        },
+        {
+          "period": "2024-12",
+          "detail": "DISCOVER AUTH FEE 29 TRANSACTIONS AT 0.1 exceeds the reference rate: monthly impact 2.83, projected annual impact 33.96."
+        }
+      ]
+    },
+    {
+      "priority": 5,
+      "fingerprint": "rate_exceeds_reference__mc_license_volume_fee_0_000217_disc_rate_exceeds_the_reference_rate__investigative",
+      "tier": "suspicious",
+      "title": "MC LICENSE VOLUME FEE exceeds the reference rate",
+      "description": "Appeared on 2 analyzed statement(s).",
+      "explanation": "This is a Mastercard acquirer license fee assessed as a percentage of volume. It is a network pass-through fee, but the rate varies by acquirer and is not publicly fixed at a single rate. If the rate exceeds commonly cited industry references, request documentation from your processor.",
+      "monthsAffected": 2,
+      "cumulativeImpact": 3.69,
+      "projectedAnnualImpact": 22.14,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "difficulty": "investigation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "MC LICENSE VOLUME FEE 0.000217 DISC RATE TIMES $12970.74 exceeds the reference rate: monthly impact 1.84, projected annual impact 22.08."
+        },
+        {
+          "period": "2024-12",
+          "detail": "MC LICENSE VOLUME FEE 0.000217 DISC RATE TIMES $12979.96 exceeds the reference rate: monthly impact 1.85, projected annual impact 22.20."
+        }
+      ]
+    },
+    {
+      "priority": 6,
+      "fingerprint": "per_auth_fee_benchmark__per_authorization_fee_is_above_competitive_benchmark__negotiable",
+      "tier": "negotiation",
+      "title": "Per-authorization fee is above competitive benchmark",
+      "description": "Appeared on 2 analyzed statement(s).",
+      "explanation": "This is processor-controlled per-authorization pricing. The finding measures potential savings from reducing the per-auth cost to the competitive benchmark target.",
+      "monthsAffected": 2,
+      "cumulativeImpact": 70.66,
+      "projectedAnnualImpact": 423.96,
+      "action": "Negotiate the processor-controlled rate.",
+      "difficulty": "negotiation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "Per-authorization fee is above competitive benchmark: monthly impact 34.66, projected annual impact 415.92."
+        },
+        {
+          "period": "2024-12",
+          "detail": "Per-authorization fee is above competitive benchmark: monthly impact 36.00, projected annual impact 432.00."
+        }
+      ]
+    },
+    {
+      "priority": 7,
+      "fingerprint": "hidden_percentage_markup__monthly_advantage_fee_mcvdb_0_0003_adds_hidden_percentage_markup__negotiable",
+      "tier": "negotiation",
+      "title": "MONTHLY ADVANTAGE FEE MCVDB adds hidden percentage markup",
+      "description": "Appeared on 2 analyzed statement(s).",
+      "explanation": "This appears to be a processor-controlled percentage markup embedded as a monthly advantage fee. It is negotiable and should be separated from true card-network pass-through costs.",
+      "monthsAffected": 2,
+      "cumulativeImpact": 29.71,
+      "projectedAnnualImpact": 178.26,
+      "action": "Negotiate the processor-controlled rate.",
+      "difficulty": "negotiation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $47996.83 adds hidden percentage markup: monthly impact 14.40, projected annual impact 172.80."
+        },
+        {
+          "period": "2024-12",
+          "detail": "MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $51022.27 adds hidden percentage markup: monthly impact 15.31, projected annual impact 183.72."
+        }
+      ]
+    },
+    {
+      "priority": 8,
+      "fingerprint": "other_minor_rate_exceedances",
+      "tier": "informational",
+      "title": "Other minor rate exceedances",
+      "description": "4 lower-dollar finding(s) are included in savings and action totals but not shown individually.",
+      "explanation": "Combined projected annual impact is $11.37.",
+      "monthsAffected": 2,
+      "cumulativeImpact": 1.9,
+      "projectedAnnualImpact": 11.37,
+      "action": "Review as part of the broader pass-through documentation request.",
+      "difficulty": "investigation_required",
+      "evidence": [
+        {
+          "period": "multiple",
+          "detail": "VI TRANSACTION INTEGRITY FEE may be avoidable through configuration or qualification fixes: $5.40/year projected."
+        },
+        {
+          "period": "multiple",
+          "detail": "NETWORK AUTHORIZATION FEE exceeds the reference rate: $5.64/year projected."
+        },
+        {
+          "period": "multiple",
+          "detail": "MC-AUTH DIGITAL ENABLEMENT MIN exceeds the reference rate: $0.24/year projected."
+        },
+        {
+          "period": "multiple",
+          "detail": "VI DIGITAL COMMERCE SVC FEE MN exceeds the reference rate: $0.09/year projected."
+        }
+      ]
+    }
+  ],
+  "recurringAvoidableFees": [
+    {
+      "feeFamilyKey": "finding:penalty_or_configuration_fee__managed_security_non_validated_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed",
+      "sourceFindingFingerprint": "penalty_or_configuration_fee__managed_security_non_validated_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed",
+      "feeName": "MANAGED SECURITY NON VALIDATED",
+      "explanation": "PCI compliance validation has not been completed. Complete the PCI Self-Assessment Questionnaire (SAQ). Once validated, this fee is eliminated or significantly reduced.",
+      "monthlyAmount": 49.95,
+      "monthsPresent": 2,
+      "cumulativeTotal": 99.9,
+      "projectedAnnual": 599.4,
+      "action": "Complete PCI/security validation or correct the terminal/gateway setup.",
+      "difficulty": "no_negotiation"
+    },
+    {
+      "feeFamilyKey": "batch_settlement_fee",
+      "feeName": "BATCH SETTLEMENT FEE",
+      "explanation": "This is a processor-controlled per-batch settlement fee. It is charged each time batches are closed or settled and is negotiable. Ask whether batching can be consolidated or whether the per-batch charge can be waived.",
+      "monthlyAmount": 8.85,
+      "monthsPresent": 2,
+      "cumulativeTotal": 17.25,
+      "projectedAnnual": 106.2,
+      "action": "Ask whether batching can be consolidated or the per-batch settlement fee can be waived.",
+      "difficulty": "negotiation_required"
+    },
+    {
+      "feeFamilyKey": "finding:penalty_or_configuration_fee__vi_transaction_integrity_fee_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed",
+      "sourceFindingFingerprint": "penalty_or_configuration_fee__vi_transaction_integrity_fee_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed",
+      "feeName": "VI TRANSACTION INTEGRITY FEE",
+      "explanation": "Visa transaction failed CPS qualification requirements. Check terminal or gateway configuration. Ensure all required data elements (AVS, CVV2) are submitted.",
+      "monthlyAmount": 0.45,
+      "monthsPresent": 2,
+      "cumulativeTotal": 0.9,
+      "projectedAnnual": 5.4,
+      "action": "Complete PCI/security validation or correct the terminal/gateway setup.",
+      "difficulty": "no_negotiation"
+    }
+  ],
+  "cumulativeSavings": {
+    "alreadyOverpaid": {
+      "conservative": 118.05,
+      "estimated": 218.42,
+      "maximum": 383.11
+    },
+    "projectedAnnualIfUnchanged": {
+      "conservative": 711,
+      "estimated": 1313.22,
+      "maximum": 2301.33
+    },
+    "componentBreakdown": [
+      {
+        "fingerprint": "penalty_or_configuration_fee__managed_security_non_validated_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed",
+        "issue": "MANAGED SECURITY NON VALIDATED may be avoidable through configuration or qualification fixes",
+        "classification": "compliance_penalty",
+        "monthsPresent": 2,
+        "totalPaid": 99.9,
+        "averageMonthlyAmount": 49.95,
+        "projectedAnnual": 599.4,
+        "action": "Complete PCI/security validation or correct the terminal/gateway setup.",
+        "difficulty": "no_negotiation"
+      },
+      {
+        "fingerprint": "penalty_or_configuration_fee__vi_transaction_integrity_fee_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed",
+        "issue": "VI TRANSACTION INTEGRITY FEE 4 TRANSACTIONS AT 0.1 may be avoidable through configuration or qualification fixes",
+        "classification": "compliance_penalty",
+        "monthsPresent": 2,
+        "totalPaid": 0.9,
+        "averageMonthlyAmount": 0.45,
+        "projectedAnnual": 5.4,
+        "action": "Complete PCI/security validation or correct the terminal/gateway setup.",
+        "difficulty": "no_negotiation"
+      },
+      {
+        "fingerprint": "suspicious_uniform_rate__access_fee_is_charged_at_the_same_rate_across_independent_networks__investigative",
+        "issue": "ACCESS FEE is charged at the same rate across independent networks",
+        "classification": "suspicious",
+        "monthsPresent": 2,
+        "totalPaid": 119.79,
+        "averageMonthlyAmount": 59.9,
+        "projectedAnnual": 718.74,
+        "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "fingerprint": "third_party_service_fee__bentobox_online_order_fee_is_a_third_party_service_fee__investigative",
+        "issue": "BENTOBOX ONLINE ORDER FEE 17 TRANSACTIONS AT 0.99 is a third-party service fee",
+        "classification": "suspicious",
+        "monthsPresent": 2,
+        "totalPaid": 34.65,
+        "averageMonthlyAmount": 17.33,
+        "projectedAnnual": 207.9,
+        "action": "Verify the third-party service is active and cancel or renegotiate it if it is not needed.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "fingerprint": "rate_exceeds_reference__discover_auth_fee_exceeds_the_reference_rate__investigative",
+        "issue": "DISCOVER AUTH FEE 28 TRANSACTIONS AT 0.1 exceeds the reference rate",
+        "classification": "suspicious",
+        "monthsPresent": 2,
+        "totalPaid": 5.56,
+        "averageMonthlyAmount": 2.78,
+        "projectedAnnual": 33.36,
+        "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "fingerprint": "rate_exceeds_reference__mc_license_volume_fee_0_000217_disc_rate_exceeds_the_reference_rate__investigative",
+        "issue": "MC LICENSE VOLUME FEE 0.000217 DISC RATE TIMES $12970.74 exceeds the reference rate",
+        "classification": "suspicious",
+        "monthsPresent": 2,
+        "totalPaid": 3.69,
+        "averageMonthlyAmount": 1.85,
+        "projectedAnnual": 22.14,
+        "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "fingerprint": "rate_exceeds_reference__network_authorization_fee_exceeds_the_reference_rate__investigative",
+        "issue": "NETWORK AUTHORIZATION FEE 28 TRANSACTIONS AT 0.019 exceeds the reference rate",
+        "classification": "suspicious",
+        "monthsPresent": 2,
+        "totalPaid": 0.94,
+        "averageMonthlyAmount": 0.47,
+        "projectedAnnual": 5.64,
+        "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "fingerprint": "rate_exceeds_reference__mc_auth_digital_enablement_min_exceeds_the_reference_rate__investigative",
+        "issue": "MC-AUTH DIGITAL ENABLEMENT MIN 6 TRANSACTIONS AT 0.02 exceeds the reference rate",
+        "classification": "suspicious",
+        "monthsPresent": 2,
+        "totalPaid": 0.04,
+        "averageMonthlyAmount": 0.02,
+        "projectedAnnual": 0.24,
+        "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "fingerprint": "rate_exceeds_reference__vi_digital_commerce_svc_fee_mn_exceeds_the_reference_rate__investigative",
+        "issue": "VI DIGITAL COMMERCE SVC FEE MN 18 TRANSACTIONS AT .007500 exceeds the reference rate",
+        "classification": "suspicious",
+        "monthsPresent": 2,
+        "totalPaid": 0.02,
+        "averageMonthlyAmount": 0.01,
+        "projectedAnnual": 0.09,
+        "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "fingerprint": "per_auth_fee_benchmark__per_authorization_fee_is_above_competitive_benchmark__negotiable",
+        "issue": "Per-authorization fee is above competitive benchmark",
+        "classification": "negotiation",
+        "monthsPresent": 2,
+        "totalPaid": 70.66,
+        "averageMonthlyAmount": 35.33,
+        "projectedAnnual": 423.96,
+        "action": "Negotiate the processor-controlled rate.",
+        "difficulty": "negotiation_required"
+      },
+      {
+        "fingerprint": "hidden_percentage_markup__monthly_advantage_fee_mcvdb_0_0003_adds_hidden_percentage_markup__negotiable",
+        "issue": "MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $47996.83 adds hidden percentage markup",
+        "classification": "negotiation",
+        "monthsPresent": 2,
+        "totalPaid": 29.71,
+        "averageMonthlyAmount": 14.86,
+        "projectedAnnual": 178.26,
+        "action": "Negotiate the processor-controlled rate.",
+        "difficulty": "negotiation_required"
+      },
+      {
+        "fingerprint": "recurring_avoidable_fee:batch_settlement_fee",
+        "issue": "BATCH SETTLEMENT FEE",
+        "classification": "avoidable_fixed",
+        "monthsPresent": 2,
+        "totalPaid": 17.25,
+        "averageMonthlyAmount": 8.85,
+        "projectedAnnual": 106.2,
+        "action": "Ask whether batching can be consolidated or the per-batch settlement fee can be waived.",
+        "difficulty": "negotiation_required"
+      }
+    ]
+  },
+  "actionItems": [
+    {
+      "priority": 1,
+      "action": "Complete PCI/security validation or correct the terminal/gateway setup.",
+      "expectedAnnualSavings": 604.8,
+      "difficulty": "no_negotiation",
+      "explanation": "PCI compliance validation has not been completed. Complete the PCI Self-Assessment Questionnaire (SAQ). Once validated, this fee is eliminated or significantly reduced. Visa transaction failed CPS qualification requirements. Check terminal or gateway configuration. Ensure all required data elements (AVS, CVV2) are submitted.",
+      "relatedFindings": [
+        "penalty_or_configuration_fee__managed_security_non_validated_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed",
+        "penalty_or_configuration_fee__vi_transaction_integrity_fee_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed"
+      ],
+      "includes": [
+        {
+          "title": "MANAGED SECURITY NON VALIDATED may be avoidable through configuration or qualification fixes",
+          "expectedAnnualSavings": 599.4,
+          "relatedFindings": [
+            "penalty_or_configuration_fee__managed_security_non_validated_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed"
+          ]
+        },
+        {
+          "title": "VI TRANSACTION INTEGRITY FEE may be avoidable through configuration or qualification fixes",
+          "expectedAnnualSavings": 5.4,
+          "relatedFindings": [
+            "penalty_or_configuration_fee__vi_transaction_integrity_fee_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed"
+          ]
+        }
+      ]
+    },
+    {
+      "priority": 2,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "expectedAnnualSavings": 780.21,
+      "difficulty": "investigation_required",
+      "explanation": "This pattern suggests a processor-controlled access fee may be applied uniformly across independent networks. Ask for pass-through documentation showing the source and exact wholesale basis. This is a per-authorization fee charged by the processor. It is applied to every card transaction and is negotiable. If multiple per-auth fees are stacked, the total per-authorization cost may be higher than competitive rates. This is a Mastercard acquirer license fee assessed as a percentage of volume. It is a network pass-through fee, but the rate varies by acquirer and is not publicly fixed at a single rate. If the rate exceeds commonly cited industry references, request documentation from your processor.",
+      "relatedFindings": [
+        "suspicious_uniform_rate__access_fee_is_charged_at_the_same_rate_across_independent_networks__investigative",
+        "rate_exceeds_reference__discover_auth_fee_exceeds_the_reference_rate__investigative",
+        "rate_exceeds_reference__mc_license_volume_fee_0_000217_disc_rate_exceeds_the_reference_rate__investigative",
+        "rate_exceeds_reference__network_authorization_fee_exceeds_the_reference_rate__investigative",
+        "rate_exceeds_reference__mc_auth_digital_enablement_min_exceeds_the_reference_rate__investigative",
+        "rate_exceeds_reference__vi_digital_commerce_svc_fee_mn_exceeds_the_reference_rate__investigative"
+      ],
+      "includes": [
+        {
+          "title": "ACCESS FEE is charged at the same rate across independent networks",
+          "expectedAnnualSavings": 718.74,
+          "relatedFindings": [
+            "suspicious_uniform_rate__access_fee_is_charged_at_the_same_rate_across_independent_networks__investigative"
+          ]
+        },
+        {
+          "title": "DISCOVER AUTH FEE exceeds the reference rate",
+          "expectedAnnualSavings": 33.36,
+          "relatedFindings": [
+            "rate_exceeds_reference__discover_auth_fee_exceeds_the_reference_rate__investigative"
+          ]
+        },
+        {
+          "title": "MC LICENSE VOLUME FEE exceeds the reference rate",
+          "expectedAnnualSavings": 22.14,
+          "relatedFindings": [
+            "rate_exceeds_reference__mc_license_volume_fee_0_000217_disc_rate_exceeds_the_reference_rate__investigative"
+          ]
+        },
+        {
+          "title": "NETWORK AUTHORIZATION FEE exceeds the reference rate",
+          "expectedAnnualSavings": 5.64,
+          "relatedFindings": [
+            "rate_exceeds_reference__network_authorization_fee_exceeds_the_reference_rate__investigative"
+          ]
+        },
+        {
+          "title": "MC-AUTH DIGITAL ENABLEMENT MIN exceeds the reference rate",
+          "expectedAnnualSavings": 0.24,
+          "relatedFindings": [
+            "rate_exceeds_reference__mc_auth_digital_enablement_min_exceeds_the_reference_rate__investigative"
+          ]
+        },
+        {
+          "title": "VI DIGITAL COMMERCE SVC FEE MN exceeds the reference rate",
+          "expectedAnnualSavings": 0.09,
+          "relatedFindings": [
+            "rate_exceeds_reference__vi_digital_commerce_svc_fee_mn_exceeds_the_reference_rate__investigative"
+          ]
+        }
+      ]
+    },
+    {
+      "priority": 3,
+      "action": "Verify the third-party service is active and cancel or renegotiate it if it is not needed.",
+      "expectedAnnualSavings": 207.9,
+      "difficulty": "investigation_required",
+      "explanation": "This appears to be a third-party online-ordering service charge. Verify that the service is active, wanted, and priced correctly.",
+      "relatedFindings": [
+        "third_party_service_fee__bentobox_online_order_fee_is_a_third_party_service_fee__investigative"
+      ],
+      "includes": [
+        {
+          "title": "BENTOBOX ONLINE ORDER FEE is a third-party service fee",
+          "expectedAnnualSavings": 207.9,
+          "relatedFindings": [
+            "third_party_service_fee__bentobox_online_order_fee_is_a_third_party_service_fee__investigative"
+          ]
+        }
+      ]
+    },
+    {
+      "priority": 4,
+      "action": "Negotiate the processor-controlled rate.",
+      "expectedAnnualSavings": 602.22,
+      "difficulty": "negotiation_required",
+      "explanation": "This is processor-controlled per-authorization pricing. The finding measures potential savings from reducing the per-auth cost to the competitive benchmark target. This appears to be a processor-controlled percentage markup embedded as a monthly advantage fee. It is negotiable and should be separated from true card-network pass-through costs.",
+      "relatedFindings": [
+        "per_auth_fee_benchmark__per_authorization_fee_is_above_competitive_benchmark__negotiable",
+        "hidden_percentage_markup__monthly_advantage_fee_mcvdb_0_0003_adds_hidden_percentage_markup__negotiable"
+      ],
+      "includes": [
+        {
+          "title": "Per-authorization fee is above competitive benchmark",
+          "expectedAnnualSavings": 423.96,
+          "relatedFindings": [
+            "per_auth_fee_benchmark__per_authorization_fee_is_above_competitive_benchmark__negotiable"
+          ]
+        },
+        {
+          "title": "MONTHLY ADVANTAGE FEE MCVDB adds hidden percentage markup",
+          "expectedAnnualSavings": 178.26,
+          "relatedFindings": [
+            "hidden_percentage_markup__monthly_advantage_fee_mcvdb_0_0003_adds_hidden_percentage_markup__negotiable"
+          ]
+        }
+      ]
+    },
+    {
+      "priority": 5,
+      "action": "Ask whether batching can be consolidated or the per-batch settlement fee can be waived.",
+      "expectedAnnualSavings": 106.2,
+      "difficulty": "negotiation_required",
+      "explanation": "This is a processor-controlled per-batch settlement fee. It is charged each time batches are closed or settled and is negotiable. Ask whether batching can be consolidated or whether the per-batch charge can be waived.",
+      "relatedFindings": [
+        "recurring_avoidable_fee:batch_settlement_fee"
+      ],
+      "includes": [
+        {
+          "title": "BATCH SETTLEMENT FEE",
+          "expectedAnnualSavings": 106.2,
+          "relatedFindings": [
+            "recurring_avoidable_fee:batch_settlement_fee"
+          ]
+        }
+      ]
+    }
+  ],
+  "actionSummary": {
+    "totalProjectedAnnualSavings": 2301.33,
+    "largestSingleOpportunity": {
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "expectedAnnualSavings": 780.21
+    },
+    "message": "Total projected annual savings if all actions are taken: $2,301.33. The largest single opportunity is Ask the processor for pass-through documentation and dispute the charge if it cannot be documented at $780.21/year."
+  },
+  "masterNarrative": [
+    "Across the two statements from 2024-11 through 2024-12, the biggest cumulative cost issue is the processor-controlled and avoidable security validation charge, MANAGED SECURITY NON VALIDATED. It appeared on both analyzed statements and totaled $99.90, with a projected annual impact of $599.40. This fee is tied to PCI compliance validation not being completed, so the practical fix is to complete the PCI Self-Assessment Questionnaire or correct the terminal/gateway setup so the charge is eliminated or significantly reduced.",
+    "A second set of costs appears to be tied to processing setup and network pass-through questions. ACCESS FEE was charged on both statements and totaled $119.79; the reviewed notes say the pattern suggests a processor-controlled access fee applied uniformly across independent networks, so pass-through documentation should be requested. DISCOVER AUTH FEE and MC LICENSE VOLUME FEE also exceeded reference levels on both statements, with cumulative impacts of $5.56 and $3.69, respectively. These items are grouped with other pass-through documentation items because the data shows they may not be priced at transparent wholesale basis. The combined annual savings tied to this documentation review are $780.21.",
+    "The monthly statement also shows processor-controlled pricing above competitive levels in two places. The per-authorization fee was above the competitive benchmark on both statements, with a cumulative impact of $70.66 and projected annual savings of $423.96 if brought down to benchmark. In addition, MONTHLY ADVANTAGE FEE MCVDB adds a hidden percentage markup and totaled $29.71, with $178.26 in projected annual savings. These are negotiation items rather than validation items, because the fees are described as processor-controlled and negotiable.",
+    "The effective rate was stable over the period, moving from 2.50% in 2024-11 to 2.48% in 2024-12, and the average across the statements was 2.49%. The data indicates the change was driven by both volume and fee mix rather than a single dramatic shift, with total volume of $109,634.41 and total fees of $2,726.05 across the period. The merchant is within the competitive range for Restaurant / Food Service at this volume, so the opportunities below are optimization items rather than a broad benchmark failure.",
+    "Two additional items round out the main opportunity list. BENTOBOX ONLINE ORDER FEE appeared on both statements and totaled $34.65; it is described as a third-party online-ordering service charge, so it should be confirmed as active and wanted before any further action. BATCH SETTLEMENT FEE also appeared on both statements and totaled $17.25; it is described as a processor-controlled per-batch settlement fee that may be reduced by consolidating batching or waived through negotiation. A smaller set of minor rate exceedances is also included in the savings totals, with $1.90 cumulative impact and $11.37 annual impact, and there is no gap month in the reviewed period.",
+    "Prioritized action items, in the order provided, are: 1) Complete PCI/security validation or correct the terminal/gateway setup, expected annual savings $604.80, difficulty no negotiation required; 2) Ask the processor for pass-through documentation and dispute the charge if it cannot be documented, expected annual savings $780.21, difficulty investigation required; 3) Verify the third-party service is active and cancel or renegotiate it if it is not needed, expected annual savings $207.90, difficulty investigation required; 4) Negotiate the processor-controlled rate, expected annual savings $602.22, difficulty negotiation required; 5) Ask whether batching can be consolidated or the per-batch settlement fee can be waived, expected annual savings $106.20, difficulty negotiation required. If all actions are taken, total projected annual savings are $2,301.33."
+  ],
+  "individualReports": [
+    {
+      "statementPeriod": "2024-11",
+      "individualReportId": "d375e242-12a8-4c7a-aa8e-40a971cc597d"
+    },
+    {
+      "statementPeriod": "2024-12",
+      "individualReportId": "322de384-24e8-4f3c-affd-f1b392d92591"
+    }
+  ],
+  "sourceAnalysis": {
+    "analysisTimestamp": "2026-07-12T03:39:42.960Z",
+    "pipelineVersion": "real-pipeline-pepe-nov-dec-2024"
+  }
+}

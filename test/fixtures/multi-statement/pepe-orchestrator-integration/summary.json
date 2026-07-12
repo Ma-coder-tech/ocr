@@ -1,0 +1,54 @@
+{
+  "dbPath": "/Users/martialmahougnonamoussou/Projects/OCR/test/fixtures/multi-statement/pepe-orchestrator-integration/pepe-orchestrator.sqlite",
+  "outDir": "/Users/martialmahougnonamoussou/Projects/OCR/test/fixtures/multi-statement/pepe-orchestrator-integration",
+  "jobId": "96073e15-5f2d-4bd9-ac43-ffe8c48ece14",
+  "jobStatus": "completed",
+  "fileStatuses": [
+    {
+      "fileName": "Nov_2024_Statement.pdf",
+      "status": "completed",
+      "period": "2024-11",
+      "merchantName": "PEPES MEXICAN RESTURANT",
+      "isoName": "Clover / First Data"
+    },
+    {
+      "fileName": "Dec_2024_Statement.pdf",
+      "status": "completed",
+      "period": "2024-12",
+      "merchantName": "PEPES MEXICAN RESTURANT",
+      "isoName": "Clover / First Data"
+    }
+  ],
+  "storedArtifacts": {
+    "comparisonInputs": 2,
+    "analysisId": "823b7181-d4cf-4fa7-b2de-4888c88be203",
+    "reportId": "a891d73c-4132-4401-a5bd-1b3bf2c650c9",
+    "narrativeStatus": "applied"
+  },
+  "reportChecks": {
+    "merchantName": "PEPES MEXICAN RESTURANT",
+    "isoName": "Clover / First Data",
+    "benchmark": "within competitive range (1.95% - 2.45% for Restaurant / Food Service at this volume)",
+    "headlineSavings": "$1,313.22",
+    "firstFinding": "MANAGED SECURITY NON VALIDATED may be avoidable through configuration or qualification fixes",
+    "hasAccessFeeFinding": true,
+    "feeChangeTimelineCount": 0,
+    "narrativeParagraphs": 6,
+    "eventStages": [
+      "created",
+      "job_created",
+      "files_registered",
+      "file_parsing",
+      "file_analyzing",
+      "file_adapted",
+      "file_parsing",
+      "file_analyzing",
+      "file_adapted",
+      "merchant_guardrail_passed",
+      "comparison_started",
+      "report_started",
+      "narrative_completed",
+      "job_completed"
+    ]
+  }
+}
