@@ -1,0 +1,4996 @@
+{
+  "merchant": {
+    "id": "",
+    "merchantNumber": "526361338886",
+    "merchantName": "PEPES MEXICAN RESTURANT",
+    "isoName": "Clover / First Data",
+    "processorPlatform": "Fiserv / First Data",
+    "address": "",
+    "merchantCategory": "restaurant_food_beverage",
+    "merchantCategoryConfidence": "low",
+    "merchantChannel": "mixed"
+  },
+  "metadata": {
+    "totalStatementsAnalyzed": 2,
+    "dateRange": {
+      "start": "2024-11",
+      "end": "2024-12"
+    },
+    "includedPeriods": [
+      "2024-11",
+      "2024-12"
+    ],
+    "missingPeriods": [],
+    "analysisTimestamp": "2026-07-11T00:55:20.612Z",
+    "pipelineVersion": "real-pipeline-nov-dec-2024"
+  },
+  "statementResults": [
+    {
+      "statementPeriod": "2024-11",
+      "effectiveRate": 0.025,
+      "totalVolume": 53291.02,
+      "totalFees": 1330.96,
+      "totalTransactions": 1828,
+      "averageTicket": 29.15,
+      "pricingModel": "interchange_plus",
+      "pricingModelConfidence": "high",
+      "processorControlledTotal": 347.36,
+      "processorControlledPct": 0.00651817,
+      "benchmark": {
+        "status": "within",
+        "segment": "Restaurant / Food Service",
+        "categoryLabel": "Restaurant / Food Service",
+        "lowerRate": 0.0195,
+        "upperRate": 0.0245,
+        "effectiveRate": 0.024975314790371815,
+        "annualVolume": 680349.77,
+        "estimatedAnnualOverpayment": null,
+        "message": "This merchant's effective rate of 2.50% is within the competitive range of 1.95% to 2.45% for a Restaurant / Food Service merchant processing approximately $680,350/year. The processor-controlled cost of 0.65% of volume is competitive."
+      },
+      "estimatedAnnualSavings": {
+        "conservative": 599.4,
+        "estimated": 1188.12,
+        "maximum": 2156.25,
+        "components": [
+          {
+            "kind": "penalty_or_configuration_fee",
+            "label": "MANAGED SECURITY NON VALIDATED may be avoidable through configuration or qualification fixes",
+            "annualImpact": 599.4,
+            "tier": "confirmed",
+            "confidence": "high",
+            "sourceFindingKind": "penalty_or_configuration_fee"
+          },
+          {
+            "kind": "suspicious_uniform_rate",
+            "label": "ACCESS FEE is charged at the same rate across independent networks",
+            "annualImpact": 705.48,
+            "tier": "investigative",
+            "confidence": "low",
+            "sourceFindingKind": "suspicious_uniform_rate"
+          },
+          {
+            "kind": "rate_exceeds_reference",
+            "label": "DISCOVER AUTH FEE 28 TRANSACTIONS AT 0.1 exceeds the reference rate",
+            "annualImpact": 32.76,
+            "tier": "investigative",
+            "confidence": "low",
+            "sourceFindingKind": "rate_exceeds_reference"
+          },
+          {
+            "kind": "rate_exceeds_reference",
+            "label": "MC LICENSE VOLUME FEE 0.000217 DISC RATE TIMES $12970.74 exceeds the reference rate",
+            "annualImpact": 22.08,
+            "tier": "investigative",
+            "confidence": "low",
+            "sourceFindingKind": "rate_exceeds_reference"
+          },
+          {
+            "kind": "rate_exceeds_reference",
+            "label": "NETWORK AUTHORIZATION FEE 28 TRANSACTIONS AT 0.019 exceeds the reference rate",
+            "annualImpact": 5.52,
+            "tier": "investigative",
+            "confidence": "low",
+            "sourceFindingKind": "rate_exceeds_reference"
+          },
+          {
+            "kind": "rate_exceeds_reference",
+            "label": "MC-AUTH DIGITAL ENABLEMENT MIN 6 TRANSACTIONS AT 0.02 exceeds the reference rate",
+            "annualImpact": 0.24,
+            "tier": "investigative",
+            "confidence": "low",
+            "sourceFindingKind": "rate_exceeds_reference"
+          },
+          {
+            "kind": "rate_exceeds_reference",
+            "label": "VI DIGITAL COMMERCE SVC FEE MN 18 TRANSACTIONS AT .007500 exceeds the reference rate",
+            "annualImpact": 0.09,
+            "tier": "investigative",
+            "confidence": "low",
+            "sourceFindingKind": "rate_exceeds_reference"
+          },
+          {
+            "kind": "per_auth_fee_benchmark",
+            "label": "Per-authorization fee is above competitive benchmark",
+            "annualImpact": 415.92,
+            "tier": "negotiable",
+            "confidence": "medium",
+            "sourceFindingKind": "per_auth_fee_benchmark"
+          },
+          {
+            "kind": "hidden_percentage_markup",
+            "label": "MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $47996.83 adds hidden percentage markup",
+            "annualImpact": 172.8,
+            "tier": "negotiable",
+            "confidence": "medium",
+            "sourceFindingKind": "hidden_percentage_markup"
+          },
+          {
+            "kind": "third_party_service_fee",
+            "label": "BENTOBOX ONLINE ORDER FEE 17 TRANSACTIONS AT 0.99 is a third-party service fee",
+            "annualImpact": 201.96,
+            "tier": "investigative",
+            "confidence": "low",
+            "sourceFindingKind": "third_party_service_fee"
+          }
+        ]
+      },
+      "findingCount": 21,
+      "anomalyCount": 1,
+      "noticeCount": 3,
+      "individualReportId": "Nov_2024_Statement.pdf"
+    },
+    {
+      "statementPeriod": "2024-12",
+      "effectiveRate": 0.0248,
+      "totalVolume": 56343.39,
+      "totalFees": 1395.09,
+      "totalTransactions": 1906,
+      "averageTicket": 29.56,
+      "pricingModel": "interchange_plus",
+      "pricingModelConfidence": "high",
+      "processorControlledTotal": 361.04,
+      "processorControlledPct": 0.00640785,
+      "benchmark": {
+        "status": "within",
+        "segment": "Restaurant / Food Service",
+        "categoryLabel": "Restaurant / Food Service",
+        "lowerRate": 0.0195,
+        "upperRate": 0.0245,
+        "effectiveRate": 0.024760490982172,
+        "annualVolume": 675614.02,
+        "estimatedAnnualOverpayment": null,
+        "message": "This merchant's effective rate of 2.48% is within the competitive range of 1.95% to 2.45% for a Restaurant / Food Service merchant processing approximately $675,614/year. The processor-controlled cost of 0.64% of volume is competitive."
+      },
+      "estimatedAnnualSavings": {
+        "conservative": 599.4,
+        "estimated": 1215.12,
+        "maximum": 2223.21,
+        "components": [
+          {
+            "kind": "penalty_or_configuration_fee",
+            "label": "MANAGED SECURITY NON VALIDATED may be avoidable through configuration or qualification fixes",
+            "annualImpact": 599.4,
+            "tier": "confirmed",
+            "confidence": "high",
+            "sourceFindingKind": "penalty_or_configuration_fee"
+          },
+          {
+            "kind": "suspicious_uniform_rate",
+            "label": "ACCESS FEE is charged at the same rate across independent networks",
+            "annualImpact": 732,
+            "tier": "investigative",
+            "confidence": "low",
+            "sourceFindingKind": "suspicious_uniform_rate"
+          },
+          {
+            "kind": "rate_exceeds_reference",
+            "label": "DISCOVER AUTH FEE 29 TRANSACTIONS AT 0.1 exceeds the reference rate",
+            "annualImpact": 33.96,
+            "tier": "investigative",
+            "confidence": "low",
+            "sourceFindingKind": "rate_exceeds_reference"
+          },
+          {
+            "kind": "rate_exceeds_reference",
+            "label": "MC LICENSE VOLUME FEE 0.000217 DISC RATE TIMES $12979.96 exceeds the reference rate",
+            "annualImpact": 22.2,
+            "tier": "investigative",
+            "confidence": "low",
+            "sourceFindingKind": "rate_exceeds_reference"
+          },
+          {
+            "kind": "rate_exceeds_reference",
+            "label": "NETWORK AUTHORIZATION FEE 29 TRANSACTIONS AT 0.019 exceeds the reference rate",
+            "annualImpact": 5.76,
+            "tier": "investigative",
+            "confidence": "low",
+            "sourceFindingKind": "rate_exceeds_reference"
+          },
+          {
+            "kind": "rate_exceeds_reference",
+            "label": "MC-AUTH DIGITAL ENABLEMENT MIN 6 TRANSACTIONS AT 0.02 exceeds the reference rate",
+            "annualImpact": 0.24,
+            "tier": "investigative",
+            "confidence": "low",
+            "sourceFindingKind": "rate_exceeds_reference"
+          },
+          {
+            "kind": "rate_exceeds_reference",
+            "label": "VI DIGITAL COMMERCE SVC FEE MN 20 TRANSACTIONS AT .007500 exceeds the reference rate",
+            "annualImpact": 0.09,
+            "tier": "investigative",
+            "confidence": "low",
+            "sourceFindingKind": "rate_exceeds_reference"
+          },
+          {
+            "kind": "per_auth_fee_benchmark",
+            "label": "Per-authorization fee is above competitive benchmark",
+            "annualImpact": 432,
+            "tier": "negotiable",
+            "confidence": "medium",
+            "sourceFindingKind": "per_auth_fee_benchmark"
+          },
+          {
+            "kind": "hidden_percentage_markup",
+            "label": "MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $51022.27 adds hidden percentage markup",
+            "annualImpact": 183.72,
+            "tier": "negotiable",
+            "confidence": "medium",
+            "sourceFindingKind": "hidden_percentage_markup"
+          },
+          {
+            "kind": "third_party_service_fee",
+            "label": "BENTOBOX ONLINE ORDER FEE 18 TRANSACTIONS AT 0.99 is a third-party service fee",
+            "annualImpact": 213.84,
+            "tier": "investigative",
+            "confidence": "low",
+            "sourceFindingKind": "third_party_service_fee"
+          }
+        ]
+      },
+      "findingCount": 21,
+      "anomalyCount": 1,
+      "noticeCount": 4,
+      "individualReportId": "Dec_2024_Statement.pdf"
+    }
+  ],
+  "effectiveRateTrend": {
+    "periods": [
+      {
+        "period": "2024-11",
+        "effectiveRate": 0.025,
+        "volume": 53291.02,
+        "totalFees": 1330.96,
+        "processorControlledPct": 0.00651817,
+        "inactivePeriod": false
+      },
+      {
+        "period": "2024-12",
+        "effectiveRate": 0.0248,
+        "volume": 56343.39,
+        "totalFees": 1395.09,
+        "processorControlledPct": 0.00640785,
+        "inactivePeriod": false
+      }
+    ],
+    "direction": "stable",
+    "lowestRate": {
+      "period": "2024-12",
+      "rate": 0.0248
+    },
+    "highestRate": {
+      "period": "2024-11",
+      "rate": 0.025
+    },
+    "averageRate": 0.02486491,
+    "rateChange": -0.0002,
+    "rateChangeExplanation": null
+  },
+  "feeComparison": [
+    {
+      "compositeKey": "accel_advantage__pin_debit_interchange",
+      "feeFamilyKey": "accel_advantage",
+      "feeDescription": "ACCEL ADVANTAGE",
+      "cardTypeSection": null,
+      "canonicalType": "pin_debit_interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 4.12,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 4.35,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 8.47,
+      "averageMonthlyAmount": 4.23
+    },
+    {
+      "compositeKey": "accel_advantage_reg__pin_debit_interchange",
+      "feeFamilyKey": "accel_advantage_reg",
+      "feeDescription": "ACCEL ADVANTAGE REG",
+      "cardTypeSection": null,
+      "canonicalType": "pin_debit_interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 6.65,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 7.03,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 13.68,
+      "averageMonthlyAmount": 6.84
+    },
+    {
+      "compositeKey": "access_fee__discover",
+      "feeFamilyKey": "access_fee",
+      "feeDescription": "Processor Discount Rate Markup",
+      "cardTypeSection": "DISCOVER",
+      "canonicalType": "suspicious_pass_through_like_fee",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.95,
+          "rate": 0.034,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.99,
+          "rate": 0.034,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 1.94,
+      "averageMonthlyAmount": 0.97
+    },
+    {
+      "compositeKey": "access_fee__mastercard",
+      "feeFamilyKey": "access_fee",
+      "feeDescription": "MASTERCARD ACCESS FEE 437 TRANSACTIONS AT 0.034",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "suspicious_pass_through_like_fee",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 14.86,
+          "rate": 0.034,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 15.23,
+          "rate": 0.034,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 30.09,
+      "averageMonthlyAmount": 15.05
+    },
+    {
+      "compositeKey": "access_fee__visa",
+      "feeFamilyKey": "access_fee",
+      "feeDescription": "VISA ACCESS FEE 1264 TRANSACTIONS AT 0.034",
+      "cardTypeSection": "VISA",
+      "canonicalType": "suspicious_pass_through_like_fee",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 42.98,
+          "rate": 0.034,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 44.78,
+          "rate": 0.034,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 87.76,
+      "averageMonthlyAmount": 43.88
+    },
+    {
+      "compositeKey": "assessment_fee_0_0014__discover",
+      "feeFamilyKey": "assessment_fee_0_0014",
+      "feeDescription": "Assessment / Dues",
+      "cardTypeSection": "DISCOVER",
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.1,
+          "rate": 0.0014,
+          "volume": 784.79
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.08,
+          "rate": 0.0014,
+          "volume": 772.68
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 2.18,
+      "averageMonthlyAmount": 1.09
+    },
+    {
+      "compositeKey": "assessment_fee_0_0014__mastercard",
+      "feeFamilyKey": "assessment_fee_0_0014",
+      "feeDescription": "Acquirer Brand Volume Fee / Assessment (Debit)",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 18.16,
+          "rate": 0.0014,
+          "volume": 12970.74
+        },
+        {
+          "period": "2024-12",
+          "amount": 18.17,
+          "rate": 0.0014,
+          "volume": 12979.96
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 36.33,
+      "averageMonthlyAmount": 18.17
+    },
+    {
+      "compositeKey": "assessment_fee_0_00165__amex_acq",
+      "feeFamilyKey": "assessment_fee_0_00165",
+      "feeDescription": "OptBlue Assessment / Network Fee",
+      "cardTypeSection": "AMEX ACQ",
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 5.84,
+          "rate": 0.00165,
+          "volume": 3537.84
+        },
+        {
+          "period": "2024-12",
+          "amount": 5.89,
+          "rate": 0.00165,
+          "volume": 3566.88
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 11.73,
+      "averageMonthlyAmount": 5.87
+    },
+    {
+      "compositeKey": "assessment_fee_cr_0_0014__visa",
+      "feeFamilyKey": "assessment_fee_cr_0_0014",
+      "feeDescription": "Assessment Fee — Credit",
+      "cardTypeSection": "VISA",
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 11.76,
+          "rate": 0.0014,
+          "volume": 8403.26
+        },
+        {
+          "period": "2024-12",
+          "amount": 12.81,
+          "rate": 0.0014,
+          "volume": 9150.37
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 24.57,
+      "averageMonthlyAmount": 12.29
+    },
+    {
+      "compositeKey": "assessment_fee_db_0_0013__visa",
+      "feeFamilyKey": "assessment_fee_db_0_0013",
+      "feeDescription": "Assessment Fee — Debit",
+      "cardTypeSection": "VISA",
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 32.95,
+          "rate": 0.0013,
+          "volume": 25344.77
+        },
+        {
+          "period": "2024-12",
+          "amount": 35.88,
+          "rate": 0.0013,
+          "volume": 27598.1
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 68.83,
+      "averageMonthlyAmount": 34.42
+    },
+    {
+      "compositeKey": "auth_connectivity_fee_375_kilobytes__mastercard",
+      "feeFamilyKey": "auth_connectivity_fee_375_kilobytes",
+      "feeDescription": "Kilobyte Access Fee",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.86,
+          "rate": 0.002294,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.86,
+          "rate": 0.002294,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 1.72,
+      "averageMonthlyAmount": 0.86
+    },
+    {
+      "compositeKey": "auth_fee__american_express",
+      "feeFamilyKey": "auth_fee",
+      "feeDescription": "Per-Item / Other Item Fee",
+      "cardTypeSection": "AMERICAN EXPRESS",
+      "canonicalType": "processor_per_item",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 4.48,
+          "rate": 0.08,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 5.04,
+          "rate": 0.08,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 9.52,
+      "averageMonthlyAmount": 4.76
+    },
+    {
+      "compositeKey": "auth_fee__discover",
+      "feeFamilyKey": "auth_fee",
+      "feeDescription": "Network Authorization Fee",
+      "cardTypeSection": "DISCOVER",
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 2.8,
+          "rate": 0.1,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 2.9,
+          "rate": 0.1,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 5.7,
+      "averageMonthlyAmount": 2.85
+    },
+    {
+      "compositeKey": "auth_fee__mastercard",
+      "feeFamilyKey": "auth_fee",
+      "feeDescription": "Per-Item / Other Item Fee",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "processor_per_item",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 43.7,
+          "rate": 0.1,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 44.8,
+          "rate": 0.1,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 88.5,
+      "averageMonthlyAmount": 44.25
+    },
+    {
+      "compositeKey": "auth_fee__visa",
+      "feeFamilyKey": "auth_fee",
+      "feeDescription": "Per-Item / Other Item Fee",
+      "cardTypeSection": "VISA",
+      "canonicalType": "processor_per_item",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 126.4,
+          "rate": 0.1,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 131.7,
+          "rate": 0.1,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 258.1,
+      "averageMonthlyAmount": 129.05
+    },
+    {
+      "compositeKey": "avs_wats_authorization_fee__other",
+      "feeFamilyKey": "avs_wats_authorization_fee",
+      "feeDescription": "Per-Item / Other Item Fee",
+      "cardTypeSection": "Other",
+      "canonicalType": "processor_per_item",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.54,
+          "rate": 0.02,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.56,
+          "rate": 0.02,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 1.1,
+      "averageMonthlyAmount": 0.55
+    },
+    {
+      "compositeKey": "axp_acquirer_trans_fee__amex_acq",
+      "feeFamilyKey": "axp_acquirer_trans_fee",
+      "feeDescription": "AXP ACQUIRER TRANS FEE 56 TRANSACTIONS AT 0.02",
+      "cardTypeSection": "AMEX ACQ",
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.12,
+          "rate": 0.02,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.26,
+          "rate": 0.02,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 2.38,
+      "averageMonthlyAmount": 1.19
+    },
+    {
+      "compositeKey": "axp_prepaid_base_t1__amex_acq",
+      "feeFamilyKey": "axp_prepaid_base_t1",
+      "feeDescription": "AXP PREPAID BASE T1",
+      "cardTypeSection": "AMEX ACQ",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.2,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.2,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 0.4,
+      "averageMonthlyAmount": 0.2
+    },
+    {
+      "compositeKey": "axp_restaurant_base_micro__amex_acq",
+      "feeFamilyKey": "axp_restaurant_base_micro",
+      "feeDescription": "AXP RESTAURANT BASE MICRO",
+      "cardTypeSection": "AMEX ACQ",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.15,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.15,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 0.3,
+      "averageMonthlyAmount": 0.15
+    },
+    {
+      "compositeKey": "axp_restaurant_base_t0__amex_acq",
+      "feeFamilyKey": "axp_restaurant_base_t0",
+      "feeDescription": "AXP RESTAURANT BASE T0",
+      "cardTypeSection": "AMEX ACQ",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 2.32,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 2.34,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 4.66,
+      "averageMonthlyAmount": 2.33
+    },
+    {
+      "compositeKey": "axp_restaurant_base_t1__amex_acq",
+      "feeFamilyKey": "axp_restaurant_base_t1",
+      "feeDescription": "AXP RESTAURANT BASE T1",
+      "cardTypeSection": "AMEX ACQ",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 9.28,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 9.36,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 18.64,
+      "averageMonthlyAmount": 9.32
+    },
+    {
+      "compositeKey": "axp_restaurant_base_t2__amex_acq",
+      "feeFamilyKey": "axp_restaurant_base_t2",
+      "feeDescription": "AXP RESTAURANT BASE T2",
+      "cardTypeSection": "AMEX ACQ",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 21.63,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 21.81,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 43.44,
+      "averageMonthlyAmount": 21.72
+    },
+    {
+      "compositeKey": "axp_restaurant_base_t3__amex_acq",
+      "feeFamilyKey": "axp_restaurant_base_t3",
+      "feeDescription": "AXP RESTAURANT BASE T3",
+      "cardTypeSection": "AMEX ACQ",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 60.52,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 61.02,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 121.54,
+      "averageMonthlyAmount": 60.77
+    },
+    {
+      "compositeKey": "axp_restaurant_nonswipe_t1__amex_acq",
+      "feeFamilyKey": "axp_restaurant_nonswipe_t1",
+      "feeDescription": "AXP RESTAURANT NONSWIPE T1",
+      "cardTypeSection": "AMEX ACQ",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.04,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.05,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 2.09,
+      "averageMonthlyAmount": 1.05
+    },
+    {
+      "compositeKey": "axp_restaurant_nonswipe_t2__amex_acq",
+      "feeFamilyKey": "axp_restaurant_nonswipe_t2",
+      "feeDescription": "AXP RESTAURANT NONSWIPE T2",
+      "cardTypeSection": "AMEX ACQ",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.73,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.74,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 3.47,
+      "averageMonthlyAmount": 1.74
+    },
+    {
+      "compositeKey": "base_ii_cr_vcher_fee_us_d_p__other",
+      "feeFamilyKey": "base_ii_cr_vcher_fee_us_d_p",
+      "feeDescription": "VI BASE II CR VCHER FEE US D/P 2 TRANSACTIONS AT 0.0155",
+      "cardTypeSection": "Other",
+      "canonicalType": "processor_per_item",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.03,
+          "rate": 0.0155,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.05,
+          "rate": 0.0155,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 0.08,
+      "averageMonthlyAmount": 0.04
+    },
+    {
+      "compositeKey": "batch_settlement_fee__other",
+      "feeFamilyKey": "batch_settlement_fee",
+      "feeDescription": "Batch Header Fee",
+      "cardTypeSection": "Other",
+      "canonicalType": "processor_per_item",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 8.4,
+          "rate": 0.15,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 8.85,
+          "rate": 0.15,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 17.25,
+      "averageMonthlyAmount": 8.63
+    },
+    {
+      "compositeKey": "bentobox_online_order_fee__third_party_service",
+      "feeFamilyKey": "bentobox_online_order_fee",
+      "feeDescription": "BENTOBOX ONLINE ORDER FEE 17 TRANSACTIONS AT 0.99",
+      "cardTypeSection": null,
+      "canonicalType": "third_party_service",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 16.83,
+          "rate": 0.99,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 17.82,
+          "rate": 0.99,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 34.65,
+      "averageMonthlyAmount": 17.33
+    },
+    {
+      "compositeKey": "clearing_connectivity_fee_334_kilobytes__other",
+      "feeFamilyKey": "clearing_connectivity_fee_334_kilobytes",
+      "feeDescription": "Kilobyte Access Fee",
+      "cardTypeSection": "Other",
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.77,
+          "rate": 0.002294,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.77,
+          "rate": 0.002294,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 1.54,
+      "averageMonthlyAmount": 0.77
+    },
+    {
+      "compositeKey": "data_usage_fee__discover",
+      "feeFamilyKey": "data_usage_fee",
+      "feeDescription": "Data Usage Fee",
+      "cardTypeSection": "DISCOVER",
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.07,
+          "rate": 0.0025,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.07,
+          "rate": 0.0025,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 0.14,
+      "averageMonthlyAmount": 0.07
+    },
+    {
+      "compositeKey": "debit_atm_card_transaction_fee__processor_per_item",
+      "feeFamilyKey": "debit_atm_card_transaction_fee",
+      "feeDescription": "DEBIT/ATM CARD TRANSACTION FEE 31 TRANSACTIONS AT 0.1",
+      "cardTypeSection": null,
+      "canonicalType": "processor_per_item",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 3.1,
+          "rate": 0.1,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 3.5,
+          "rate": 0.1,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 6.6,
+      "averageMonthlyAmount": 3.3
+    },
+    {
+      "compositeKey": "debit_returns_trans_fee__visa",
+      "feeFamilyKey": "debit_returns_trans_fee",
+      "feeDescription": "VI DEBIT RETURNS TRANS FEE 2 TRANSACTIONS AT 0.08",
+      "cardTypeSection": "VISA",
+      "canonicalType": "processor_per_item",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.16,
+          "rate": 0.08,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.24,
+          "rate": 0.08,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 0.4,
+      "averageMonthlyAmount": 0.2
+    },
+    {
+      "compositeKey": "debit_sales_disc_0_001_disc_rate__mastercard",
+      "feeFamilyKey": "debit_sales_disc_0_001_disc_rate",
+      "feeDescription": "Processor Discount Rate Markup",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "processor_pct_markup",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 6.74,
+          "rate": 0.001,
+          "volume": 6744.78
+        },
+        {
+          "period": "2024-12",
+          "amount": 6.75,
+          "rate": 0.001,
+          "volume": 6749.58
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 13.49,
+      "averageMonthlyAmount": 6.75
+    },
+    {
+      "compositeKey": "debit_sales_discount_0_001_disc_rate__discover",
+      "feeFamilyKey": "debit_sales_discount_0_001_disc_rate",
+      "feeDescription": "Processor Discount Rate Markup",
+      "cardTypeSection": "DISCOVER",
+      "canonicalType": "processor_pct_markup",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.02,
+          "rate": 0.001,
+          "volume": 18.05
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.02,
+          "rate": 0.001,
+          "volume": 17.77
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 0.04,
+      "averageMonthlyAmount": 0.02
+    },
+    {
+      "compositeKey": "debit_sales_discount_0_001_disc_rate__visa",
+      "feeFamilyKey": "debit_sales_discount_0_001_disc_rate",
+      "feeDescription": "Processor Discount Rate Markup",
+      "cardTypeSection": "VISA",
+      "canonicalType": "processor_pct_markup",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 25.34,
+          "rate": 0.001,
+          "volume": 25344.77
+        },
+        {
+          "period": "2024-12",
+          "amount": 27.6,
+          "rate": 0.001,
+          "volume": 27598.1
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 52.94,
+      "averageMonthlyAmount": 26.47
+    },
+    {
+      "compositeKey": "digital_commerce_svc_fee_mn__card_brand_network",
+      "feeFamilyKey": "digital_commerce_svc_fee_mn",
+      "feeDescription": "Digital Commerce Service Fee",
+      "cardTypeSection": null,
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.14,
+          "rate": 0.0075,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.15,
+          "rate": 0.0075,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 0.29,
+      "averageMonthlyAmount": 0.15
+    },
+    {
+      "compositeKey": "integrity_fee_detail_report__visa",
+      "feeFamilyKey": "integrity_fee_detail_report",
+      "feeDescription": "VI INTEGRITY FEE DETAIL REPORT 4 TRANSACTIONS AT .002000",
+      "cardTypeSection": "VISA",
+      "canonicalType": "unknown",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.01,
+          "rate": 0.002,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.01,
+          "rate": 0.002,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 0.02,
+      "averageMonthlyAmount": 0.01
+    },
+    {
+      "compositeKey": "interlink_reg__pin_debit_interchange",
+      "feeFamilyKey": "interlink_reg",
+      "feeDescription": "INTERLINK REG",
+      "cardTypeSection": null,
+      "canonicalType": "pin_debit_interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.31,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.39,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 2.7,
+      "averageMonthlyAmount": 1.35
+    },
+    {
+      "compositeKey": "intl_service_fee_base__processor_fixed",
+      "feeFamilyKey": "intl_service_fee_base",
+      "feeDescription": "VISA INTL SERVICE FEE - BASE 0 TRANS TOTALING $214.37",
+      "cardTypeSection": null,
+      "canonicalType": "processor_fixed",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 2.15,
+          "rate": null,
+          "volume": 214.37
+        },
+        {
+          "period": "2024-12",
+          "amount": 2.34,
+          "rate": null,
+          "volume": 233.42
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 4.49,
+      "averageMonthlyAmount": 2.25
+    },
+    {
+      "compositeKey": "license_volume_fee_0_000217_disc_rate__mastercard",
+      "feeFamilyKey": "license_volume_fee_0_000217_disc_rate",
+      "feeDescription": "Acquirer License Fee (ALF)",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 2.81,
+          "rate": 0.000217,
+          "volume": 12970.74
+        },
+        {
+          "period": "2024-12",
+          "amount": 2.82,
+          "rate": 0.000217,
+          "volume": 12979.96
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 5.63,
+      "averageMonthlyAmount": 2.82
+    },
+    {
+      "compositeKey": "maestro__pin_debit_interchange",
+      "feeFamilyKey": "maestro",
+      "feeDescription": "MAESTRO",
+      "cardTypeSection": null,
+      "canonicalType": "pin_debit_interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.51,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.54,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 1.05,
+      "averageMonthlyAmount": 0.53
+    },
+    {
+      "compositeKey": "maestro_reg__pin_debit_interchange",
+      "feeFamilyKey": "maestro_reg",
+      "feeDescription": "MAESTRO REG",
+      "cardTypeSection": null,
+      "canonicalType": "pin_debit_interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.09,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.16,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 2.25,
+      "averageMonthlyAmount": 1.13
+    },
+    {
+      "compositeKey": "maestro_reg_decline__pin_debit_interchange",
+      "feeFamilyKey": "maestro_reg_decline",
+      "feeDescription": "MAESTRO REG DECLINE",
+      "cardTypeSection": null,
+      "canonicalType": "pin_debit_interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.05,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.06,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 0.11,
+      "averageMonthlyAmount": 0.06
+    },
+    {
+      "compositeKey": "managed_security_non_validated__compliance_penalty",
+      "feeFamilyKey": "managed_security_non_validated",
+      "feeDescription": "PCI Compliance Fee",
+      "cardTypeSection": null,
+      "canonicalType": "compliance_penalty",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 49.95,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 49.95,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 99.9,
+      "averageMonthlyAmount": 49.95
+    },
+    {
+      "compositeKey": "mc_auth_digital_enablement_min__mastercard",
+      "feeFamilyKey": "mc_auth_digital_enablement_min",
+      "feeDescription": "Digital Enablement Fee",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.12,
+          "rate": 0.02,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.12,
+          "rate": 0.02,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 0.24,
+      "averageMonthlyAmount": 0.12
+    },
+    {
+      "compositeKey": "mc_bus_level_2_t_e__mastercard",
+      "feeFamilyKey": "mc_bus_level_2_t_e",
+      "feeDescription": "MC-BUS LEVEL 2 T&E",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 5.46,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 5.46,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 10.92,
+      "averageMonthlyAmount": 5.46
+    },
+    {
+      "compositeKey": "mc_bus_level_3_t_e__mastercard",
+      "feeFamilyKey": "mc_bus_level_3_t_e",
+      "feeDescription": "MC-BUS LEVEL 3 T&E",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.12,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.12,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 2.24,
+      "averageMonthlyAmount": 1.12
+    },
+    {
+      "compositeKey": "mc_bus_level_4_t_e__mastercard",
+      "feeFamilyKey": "mc_bus_level_4_t_e",
+      "feeDescription": "MC-BUS LEVEL 4 T&E",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 2.08,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 2.08,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 4.16,
+      "averageMonthlyAmount": 2.08
+    },
+    {
+      "compositeKey": "mc_bus_level_5_t_e__mastercard",
+      "feeFamilyKey": "mc_bus_level_5_t_e",
+      "feeDescription": "MC-BUS LEVEL 5 T & E",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 20.09,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 20.1,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 40.19,
+      "averageMonthlyAmount": 20.1
+    },
+    {
+      "compositeKey": "mc_com_t_e_us_purch__mastercard",
+      "feeFamilyKey": "mc_com_t_e_us_purch",
+      "feeDescription": "MC-COM T & E (US) PURCH",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 2.39,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 2.39,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 4.78,
+      "averageMonthlyAmount": 2.39
+    },
+    {
+      "compositeKey": "mc_commercial_t_e_fleet__mastercard",
+      "feeFamilyKey": "mc_commercial_t_e_fleet",
+      "feeDescription": "MC-COMMERCIAL T&E FLEET",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.61,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.61,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 3.22,
+      "averageMonthlyAmount": 1.61
+    },
+    {
+      "compositeKey": "mc_corp_t_e_us_bus__mastercard",
+      "feeFamilyKey": "mc_corp_t_e_us_bus",
+      "feeDescription": "MC-CORP T & E (US) BUS",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 8.5,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 8.51,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 17.01,
+      "averageMonthlyAmount": 8.5
+    },
+    {
+      "compositeKey": "mc_domestic_merit_iii__mastercard",
+      "feeFamilyKey": "mc_domestic_merit_iii",
+      "feeDescription": "MC-DOMESTIC MERIT III",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 6.19,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 6.2,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 12.39,
+      "averageMonthlyAmount": 6.2
+    },
+    {
+      "compositeKey": "mc_domestic_merit_iii_db__mastercard",
+      "feeFamilyKey": "mc_domestic_merit_iii_db",
+      "feeDescription": "MC-DOMESTIC MERIT III (DB)",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 8.24,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 8.25,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 16.49,
+      "averageMonthlyAmount": 8.25
+    },
+    {
+      "compositeKey": "mc_enhanced_merit_iii_base__mastercard",
+      "feeFamilyKey": "mc_enhanced_merit_iii_base",
+      "feeDescription": "MC-ENHANCED MERIT III BASE",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 6.3,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 6.3,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 12.6,
+      "averageMonthlyAmount": 6.3
+    },
+    {
+      "compositeKey": "mc_high_val_restaurant__mastercard",
+      "feeFamilyKey": "mc_high_val_restaurant",
+      "feeDescription": "MC-HIGH VAL RESTAURANT",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 17.12,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 17.13,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 34.25,
+      "averageMonthlyAmount": 17.13
+    },
+    {
+      "compositeKey": "mc_high_val_t_e__mastercard",
+      "feeFamilyKey": "mc_high_val_t_e",
+      "feeDescription": "MC-HIGH VAL T & E",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 5.88,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 5.89,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 11.77,
+      "averageMonthlyAmount": 5.89
+    },
+    {
+      "compositeKey": "mc_merit_iii_pp__mastercard",
+      "feeFamilyKey": "mc_merit_iii_pp",
+      "feeDescription": "MC-MERIT III (PP)",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.6,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.6,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 3.2,
+      "averageMonthlyAmount": 1.6
+    },
+    {
+      "compositeKey": "mc_reg_consm_wfraud_adj_mc_db__mastercard",
+      "feeFamilyKey": "mc_reg_consm_wfraud_adj_mc_db",
+      "feeDescription": "MC-REG CONSM WFRAUD ADJ MC(DB)",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.51,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.51,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 1.02,
+      "averageMonthlyAmount": 0.51
+    },
+    {
+      "compositeKey": "mc_reg_incent_frf_adj_pos_db__mastercard",
+      "feeFamilyKey": "mc_reg_incent_frf_adj_pos_db",
+      "feeDescription": "MC-REG INCENT FRF ADJ POS (DB)",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 37.85,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 37.88,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 75.73,
+      "averageMonthlyAmount": 37.87
+    },
+    {
+      "compositeKey": "mc_reg_incentive_pos_db__mastercard",
+      "feeFamilyKey": "mc_reg_incentive_pos_db",
+      "feeDescription": "MC-REG INCENTIVE POS (DB)",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.22,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.22,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 0.44,
+      "averageMonthlyAmount": 0.22
+    },
+    {
+      "compositeKey": "mc_regulated_frd_adj_comm_db__mastercard",
+      "feeFamilyKey": "mc_regulated_frd_adj_comm_db",
+      "feeDescription": "MC-REGULATED FRD ADJ COMM (DB)",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 8.14,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 8.14,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 16.28,
+      "averageMonthlyAmount": 8.14
+    },
+    {
+      "compositeKey": "mc_restaurant_db__mastercard",
+      "feeFamilyKey": "mc_restaurant_db",
+      "feeDescription": "MC-RESTAURANT (DB)",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 10.77,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 10.78,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 21.55,
+      "averageMonthlyAmount": 10.77
+    },
+    {
+      "compositeKey": "mc_small_ticket_db__mastercard",
+      "feeFamilyKey": "mc_small_ticket_db",
+      "feeDescription": "MC-SMALL TICKET (DB)",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 2.83,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 2.83,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 5.66,
+      "averageMonthlyAmount": 2.83
+    },
+    {
+      "compositeKey": "mc_world_elite_other__mastercard",
+      "feeFamilyKey": "mc_world_elite_other",
+      "feeDescription": "MC-WORLD ELITE - OTHER",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 4.5,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 4.5,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 9,
+      "averageMonthlyAmount": 4.5
+    },
+    {
+      "compositeKey": "mc_world_elite_restaurant__mastercard",
+      "feeFamilyKey": "mc_world_elite_restaurant",
+      "feeDescription": "MC-WORLD ELITE RESTAURANT",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 52.32,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 52.36,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 104.68,
+      "averageMonthlyAmount": 52.34
+    },
+    {
+      "compositeKey": "mc_world_hv_small_ticket_cp__mastercard",
+      "feeFamilyKey": "mc_world_hv_small_ticket_cp",
+      "feeDescription": "MC-WORLD HV SMALL TICKET CP",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.07,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.07,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 0.14,
+      "averageMonthlyAmount": 0.07
+    },
+    {
+      "compositeKey": "mc_worldcard_other__mastercard",
+      "feeFamilyKey": "mc_worldcard_other",
+      "feeDescription": "MC-WORLDCARD - OTHER",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 5.93,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 5.93,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 11.86,
+      "averageMonthlyAmount": 5.93
+    },
+    {
+      "compositeKey": "mc_worldcard_restaurant__mastercard",
+      "feeFamilyKey": "mc_worldcard_restaurant",
+      "feeDescription": "MC-WORLDCARD RESTAURANT",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 13.59,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 13.6,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 27.19,
+      "averageMonthlyAmount": 13.6
+    },
+    {
+      "compositeKey": "monthly_advantage_fee_mcvdb_0_0003__other",
+      "feeFamilyKey": "monthly_advantage_fee_mcvdb_0_0003",
+      "feeDescription": "MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $47996.83",
+      "cardTypeSection": "Other",
+      "canonicalType": "processor_pct_markup",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 14.4,
+          "rate": 0.0003,
+          "volume": 47996.83
+        },
+        {
+          "period": "2024-12",
+          "amount": 15.31,
+          "rate": 0.0003,
+          "volume": 51022.27
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 29.71,
+      "averageMonthlyAmount": 14.86
+    },
+    {
+      "compositeKey": "monthly_location_fee__card_brand_network",
+      "feeFamilyKey": "monthly_location_fee",
+      "feeDescription": "Merchant Location Fee",
+      "cardTypeSection": null,
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.25,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.25,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 2.5,
+      "averageMonthlyAmount": 1.25
+    },
+    {
+      "compositeKey": "network_authorization_fee__discover",
+      "feeFamilyKey": "network_authorization_fee",
+      "feeDescription": "Network Authorization Fee",
+      "cardTypeSection": "DISCOVER",
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.53,
+          "rate": 0.019,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.55,
+          "rate": 0.019,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 1.08,
+      "averageMonthlyAmount": 0.54
+    },
+    {
+      "compositeKey": "network_fee_cnp_2_02__card_brand_network",
+      "feeFamilyKey": "network_fee_cnp_2_02",
+      "feeDescription": "OptBlue Assessment / Network Fee",
+      "cardTypeSection": null,
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.58,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.58,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 1.16,
+      "averageMonthlyAmount": 0.58
+    },
+    {
+      "compositeKey": "network_fee_cp_1b_01__card_brand_network",
+      "feeFamilyKey": "network_fee_cp_1b_01",
+      "feeDescription": "OptBlue Assessment / Network Fee",
+      "cardTypeSection": null,
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 2,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 2,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 4,
+      "averageMonthlyAmount": 2
+    },
+    {
+      "compositeKey": "ntwk_acq_proc_fee_intl_cr__visa",
+      "feeFamilyKey": "ntwk_acq_proc_fee_intl_cr",
+      "feeDescription": "VI NTWK ACQ PROC FEE INTL CR 1 TRANSACTIONS AT 0.0395",
+      "cardTypeSection": "VISA",
+      "canonicalType": "unknown",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.04,
+          "rate": 0.0395,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.08,
+          "rate": 0.0395,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 0.12,
+      "averageMonthlyAmount": 0.06
+    },
+    {
+      "compositeKey": "ntwk_acq_proc_fee_intl_d_p__visa",
+      "feeFamilyKey": "ntwk_acq_proc_fee_intl_d_p",
+      "feeDescription": "VI NTWK ACQ PROC FEE INTL D/P 2 TRANSACTIONS AT 0.0355",
+      "cardTypeSection": "VISA",
+      "canonicalType": "unknown",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.07,
+          "rate": 0.0355,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.11,
+          "rate": 0.0355,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 0.18,
+      "averageMonthlyAmount": 0.09
+    },
+    {
+      "compositeKey": "pre_auth_fee_cp__other",
+      "feeFamilyKey": "pre_auth_fee_cp",
+      "feeDescription": "Per-Item / Other Item Fee",
+      "cardTypeSection": "Other",
+      "canonicalType": "processor_per_item",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.03,
+          "rate": 0.000075,
+          "volume": 391.43
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.03,
+          "rate": 0.000075,
+          "volume": 391.71
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 0.06,
+      "averageMonthlyAmount": 0.03
+    },
+    {
+      "compositeKey": "pre_auth_fee_cp_min__mastercard",
+      "feeFamilyKey": "pre_auth_fee_cp_min",
+      "feeDescription": "Per-Item / Other Item Fee",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "processor_per_item",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.86,
+          "rate": 0.01,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.86,
+          "rate": 0.01,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 3.72,
+      "averageMonthlyAmount": 1.86
+    },
+    {
+      "compositeKey": "psl_exp_svc_rw__discover",
+      "feeFamilyKey": "psl_exp_svc_rw",
+      "feeDescription": "DSCVR PSL EXP SVC RW",
+      "cardTypeSection": "DISCOVER",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.22,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.2,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 2.42,
+      "averageMonthlyAmount": 1.21
+    },
+    {
+      "compositeKey": "psl_rest_db__discover",
+      "feeFamilyKey": "psl_rest_db",
+      "feeDescription": "DSCVR PSL REST DB",
+      "cardTypeSection": "DISCOVER",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.32,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.31,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 0.63,
+      "averageMonthlyAmount": 0.32
+    },
+    {
+      "compositeKey": "psl_rest_pp__discover",
+      "feeFamilyKey": "psl_rest_pp",
+      "feeDescription": "DSCVR PSL REST PP",
+      "cardTypeSection": "DISCOVER",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 8.47,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 8.34,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 16.81,
+      "averageMonthlyAmount": 8.41
+    },
+    {
+      "compositeKey": "psl_rest_pr__discover",
+      "feeFamilyKey": "psl_rest_pr",
+      "feeDescription": "DSCVR PSL REST PR",
+      "cardTypeSection": "DISCOVER",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 3.79,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 3.73,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 7.52,
+      "averageMonthlyAmount": 3.76
+    },
+    {
+      "compositeKey": "psl_rest_rw__discover",
+      "feeFamilyKey": "psl_rest_rw",
+      "feeDescription": "DSCVR PSL REST RW",
+      "cardTypeSection": "DISCOVER",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 5.59,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 5.5,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 11.09,
+      "averageMonthlyAmount": 5.55
+    },
+    {
+      "compositeKey": "pulse_pay_choice__pin_debit_interchange",
+      "feeFamilyKey": "pulse_pay_choice",
+      "feeDescription": "PULSE PAY CHOICE",
+      "cardTypeSection": null,
+      "canonicalType": "pin_debit_interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 5.15,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 5.44,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 10.59,
+      "averageMonthlyAmount": 5.3
+    },
+    {
+      "compositeKey": "pulse_pay_choice_reg__pin_debit_interchange",
+      "feeFamilyKey": "pulse_pay_choice_reg",
+      "feeDescription": "PULSE PAY CHOICE REG",
+      "cardTypeSection": null,
+      "canonicalType": "pin_debit_interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.06,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.12,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 2.18,
+      "averageMonthlyAmount": 1.09
+    },
+    {
+      "compositeKey": "pulse_pay_limited_prepaid__pin_debit_interchange",
+      "feeFamilyKey": "pulse_pay_limited_prepaid",
+      "feeDescription": "PULSE PAY LIMITED/PREPAID",
+      "cardTypeSection": null,
+      "canonicalType": "pin_debit_interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.41,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.43,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 0.84,
+      "averageMonthlyAmount": 0.42
+    },
+    {
+      "compositeKey": "sales_discount_0_001_disc_rate__discover",
+      "feeFamilyKey": "sales_discount_0_001_disc_rate",
+      "feeDescription": "Processor Discount Rate Markup",
+      "cardTypeSection": "DISCOVER",
+      "canonicalType": "processor_pct_markup",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.77,
+          "rate": 0.001,
+          "volume": 766.74
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.75,
+          "rate": 0.001,
+          "volume": 754.91
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 1.52,
+      "averageMonthlyAmount": 0.76
+    },
+    {
+      "compositeKey": "sales_discount_0_001_disc_rate__mastercard",
+      "feeFamilyKey": "sales_discount_0_001_disc_rate",
+      "feeDescription": "Processor Discount Rate Markup",
+      "cardTypeSection": "MASTERCARD",
+      "canonicalType": "processor_pct_markup",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 6.23,
+          "rate": 0.001,
+          "volume": 6225.96
+        },
+        {
+          "period": "2024-12",
+          "amount": 6.23,
+          "rate": 0.001,
+          "volume": 6230.38
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 12.46,
+      "averageMonthlyAmount": 6.23
+    },
+    {
+      "compositeKey": "sales_discount_0_001_disc_rate__visa",
+      "feeFamilyKey": "sales_discount_0_001_disc_rate",
+      "feeDescription": "Processor Discount Rate Markup",
+      "cardTypeSection": "VISA",
+      "canonicalType": "processor_pct_markup",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 8.4,
+          "rate": 0.001,
+          "volume": 8403.26
+        },
+        {
+          "period": "2024-12",
+          "amount": 9.15,
+          "rate": 0.001,
+          "volume": 9150.37
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 17.55,
+      "averageMonthlyAmount": 8.78
+    },
+    {
+      "compositeKey": "sales_discount_0_0055_disc_rate__other",
+      "feeFamilyKey": "sales_discount_0_0055_disc_rate",
+      "feeDescription": "Processor Discount Rate Markup",
+      "cardTypeSection": "Other",
+      "canonicalType": "processor_pct_markup",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 19.46,
+          "rate": 0.0055,
+          "volume": 3537.84
+        },
+        {
+          "period": "2024-12",
+          "amount": 19.62,
+          "rate": 0.0055,
+          "volume": 3566.88
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 39.08,
+      "averageMonthlyAmount": 19.54
+    },
+    {
+      "compositeKey": "sig_debit_address_verif_fee__signature_debit",
+      "feeFamilyKey": "sig_debit_address_verif_fee",
+      "feeDescription": "SIG DEBIT ADDRESS VERIF FEE 1 TRANSACTIONS AT 0.02",
+      "cardTypeSection": "SIGNATURE DEBIT",
+      "canonicalType": "unknown",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.02,
+          "rate": 0.02,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.02,
+          "rate": 0.02,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 0.04,
+      "averageMonthlyAmount": 0.02
+    },
+    {
+      "compositeKey": "sig_debit_auth_fee__signature_debit",
+      "feeFamilyKey": "sig_debit_auth_fee",
+      "feeDescription": "Per-Item / Other Item Fee",
+      "cardTypeSection": "SIGNATURE DEBIT",
+      "canonicalType": "processor_per_item",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 3.2,
+          "rate": 0.1,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 3.5,
+          "rate": 0.1,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 6.7,
+      "averageMonthlyAmount": 3.35
+    },
+    {
+      "compositeKey": "sig_debit_sales_discount_0_001_disc_rate__signature_debit",
+      "feeFamilyKey": "sig_debit_sales_discount_0_001_disc_rate",
+      "feeDescription": "Processor Discount Rate Markup",
+      "cardTypeSection": "SIGNATURE DEBIT",
+      "canonicalType": "processor_pct_markup",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.93,
+          "rate": 0.001,
+          "volume": 926.09
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.94,
+          "rate": 0.001,
+          "volume": 944.34
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 1.87,
+      "averageMonthlyAmount": 0.94
+    },
+    {
+      "compositeKey": "st_base_s1_std_cp_db__signature_debit",
+      "feeFamilyKey": "st_base_s1_std_cp_db",
+      "feeDescription": "ST-BASE S1 STD CP (DB)",
+      "cardTypeSection": "SIGNATURE DEBIT",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.11,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.13,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 2.24,
+      "averageMonthlyAmount": 1.12
+    },
+    {
+      "compositeKey": "st_restaurant_reg_with_fraud__signature_debit",
+      "feeFamilyKey": "st_restaurant_reg_with_fraud",
+      "feeDescription": "ST-RESTAURANT REG WITH FRAUD",
+      "cardTypeSection": "SIGNATURE DEBIT",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.76,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.8,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 3.56,
+      "averageMonthlyAmount": 1.78
+    },
+    {
+      "compositeKey": "st_restaurant_s1_std_db__signature_debit",
+      "feeFamilyKey": "st_restaurant_s1_std_db",
+      "feeDescription": "ST-RESTAURANT S1 STD (DB)",
+      "cardTypeSection": "SIGNATURE DEBIT",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 7.39,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 7.53,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 14.92,
+      "averageMonthlyAmount": 7.46
+    },
+    {
+      "compositeKey": "st_restaurant_s2_chce_db__signature_debit",
+      "feeFamilyKey": "st_restaurant_s2_chce_db",
+      "feeDescription": "ST-RESTAURANT S2 CHCE (DB)",
+      "cardTypeSection": "SIGNATURE DEBIT",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.59,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.6,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 1.19,
+      "averageMonthlyAmount": 0.6
+    },
+    {
+      "compositeKey": "st_retl_key_entry_s1_std_db__signature_debit",
+      "feeFamilyKey": "st_retl_key_entry_s1_std_db",
+      "feeDescription": "ST-RETL KEY ENTRY S1 STD (DB)",
+      "cardTypeSection": "SIGNATURE DEBIT",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.57,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.58,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 1.15,
+      "averageMonthlyAmount": 0.57
+    },
+    {
+      "compositeKey": "st_small_ticket_reg_w_fraud__signature_debit",
+      "feeFamilyKey": "st_small_ticket_reg_w_fraud",
+      "feeDescription": "ST-SMALL TICKET REG W FRAUD",
+      "cardTypeSection": "SIGNATURE DEBIT",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.95,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.97,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 1.92,
+      "averageMonthlyAmount": 0.96
+    },
+    {
+      "compositeKey": "st_token_exchange_fee__processor_fixed",
+      "feeFamilyKey": "st_token_exchange_fee",
+      "feeDescription": "ST TOKEN EXCHANGE FEE 1 TRANSACTIONS AT .010000",
+      "cardTypeSection": null,
+      "canonicalType": "processor_fixed",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.01,
+          "rate": 0.01,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.01,
+          "rate": 0.01,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 0.02,
+      "averageMonthlyAmount": 0.01
+    },
+    {
+      "compositeKey": "star_access_cnp_per_tran_bps__processor_fixed",
+      "feeFamilyKey": "star_access_cnp_per_tran_bps",
+      "feeDescription": "STAR ACCESS CNP PER TRAN BPS $28.15 AT .001000",
+      "cardTypeSection": null,
+      "canonicalType": "processor_fixed",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.03,
+          "rate": 0.001,
+          "volume": 28.15
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.03,
+          "rate": 0.001,
+          "volume": 28.71
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 0.06,
+      "averageMonthlyAmount": 0.03
+    },
+    {
+      "compositeKey": "star_access_cnp_per_tran_fee__processor_fixed",
+      "feeFamilyKey": "star_access_cnp_per_tran_fee",
+      "feeDescription": "STAR ACCESS CNP PER TRAN FEE 1 TRANSACTIONS AT .015000",
+      "cardTypeSection": null,
+      "canonicalType": "processor_fixed",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.02,
+          "rate": 0.015,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.02,
+          "rate": 0.015,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_unchanged",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": false,
+      "cumulativeAmount": 0.04,
+      "averageMonthlyAmount": 0.02
+    },
+    {
+      "compositeKey": "star_access_per_tran_cp__processor_fixed",
+      "feeFamilyKey": "star_access_per_tran_cp",
+      "feeDescription": "STAR ACCESS PER TRAN CP 33 TRANSACTIONS AT .100000",
+      "cardTypeSection": null,
+      "canonicalType": "processor_fixed",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 3.3,
+          "rate": 0.1,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 3.4,
+          "rate": 0.1,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 6.7,
+      "averageMonthlyAmount": 3.35
+    },
+    {
+      "compositeKey": "star_auth_request_fee__signature_debit",
+      "feeFamilyKey": "star_auth_request_fee",
+      "feeDescription": "Per-Item / Other Item Fee",
+      "cardTypeSection": "SIGNATURE DEBIT",
+      "canonicalType": "processor_per_item",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.48,
+          "rate": 0.015,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.53,
+          "rate": 0.015,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 1.01,
+      "averageMonthlyAmount": 0.51
+    },
+    {
+      "compositeKey": "star_ne__pin_debit_interchange",
+      "feeFamilyKey": "star_ne",
+      "feeDescription": "STAR NE",
+      "cardTypeSection": null,
+      "canonicalType": "pin_debit_interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.15,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.21,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 2.36,
+      "averageMonthlyAmount": 1.18
+    },
+    {
+      "compositeKey": "transaction_integrity_fee__card_brand_network",
+      "feeFamilyKey": "transaction_integrity_fee",
+      "feeDescription": "Transaction Integrity Fee (TIF)",
+      "cardTypeSection": null,
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.4,
+          "rate": 0.1,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.5,
+          "rate": 0.1,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 0.9,
+      "averageMonthlyAmount": 0.45
+    },
+    {
+      "compositeKey": "vi_bus_purch_rtl_pp__visa",
+      "feeFamilyKey": "vi_bus_purch_rtl_pp",
+      "feeDescription": "VI-BUS PURCH RTL (PP)",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.73,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.88,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 3.61,
+      "averageMonthlyAmount": 1.81
+    },
+    {
+      "compositeKey": "vi_business_card_cp_db__visa",
+      "feeFamilyKey": "vi_business_card_cp_db",
+      "feeDescription": "VI-BUSINESS CARD CP (DB)",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 13.75,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 14.97,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 28.72,
+      "averageMonthlyAmount": 14.36
+    },
+    {
+      "compositeKey": "vi_commercial_solutions_fee_000100__processor_fixed",
+      "feeFamilyKey": "vi_commercial_solutions_fee_000100",
+      "feeDescription": "VI-COMMERCIAL SOLUTIONS FEE .000100 TIMES $4,042.51",
+      "cardTypeSection": null,
+      "canonicalType": "processor_fixed",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.4,
+          "rate": 0.0001,
+          "volume": 4042.51
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.44,
+          "rate": 0.0001,
+          "volume": 4401.91
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 0.84,
+      "averageMonthlyAmount": 0.42
+    },
+    {
+      "compositeKey": "vi_cps_restaurant_db__visa",
+      "feeFamilyKey": "vi_cps_restaurant_db",
+      "feeDescription": "VI-CPS/RESTAURANT (DB)",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 36.06,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 39.26,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 75.32,
+      "averageMonthlyAmount": 37.66
+    },
+    {
+      "compositeKey": "vi_cps_restaurant_pp__visa",
+      "feeFamilyKey": "vi_cps_restaurant_pp",
+      "feeDescription": "VI-CPS/RESTAURANT (PP)",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 10.38,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 11.3,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 21.68,
+      "averageMonthlyAmount": 10.84
+    },
+    {
+      "compositeKey": "vi_cps_small_ticket_db__visa",
+      "feeFamilyKey": "vi_cps_small_ticket_db",
+      "feeDescription": "VI-CPS SMALL TICKET (DB)",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 12.28,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 13.37,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 25.65,
+      "averageMonthlyAmount": 12.83
+    },
+    {
+      "compositeKey": "vi_cps_small_ticket_pp__visa",
+      "feeFamilyKey": "vi_cps_small_ticket_pp",
+      "feeDescription": "VI-CPS SMALL TICKET (PP)",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 4.13,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 4.5,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 8.63,
+      "averageMonthlyAmount": 4.31
+    },
+    {
+      "compositeKey": "vi_ir_regulated_db__visa",
+      "feeFamilyKey": "vi_ir_regulated_db",
+      "feeDescription": "VI-IR REGULATED (DB)",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.47,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.51,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 0.98,
+      "averageMonthlyAmount": 0.49
+    },
+    {
+      "compositeKey": "vi_non_qual_consumer_cr__visa",
+      "feeFamilyKey": "vi_non_qual_consumer_cr",
+      "feeDescription": "VI-NON QUAL CONSUMER CR",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.57,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.62,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 1.19,
+      "averageMonthlyAmount": 0.6
+    },
+    {
+      "compositeKey": "vi_purchasing_travel_svc__visa",
+      "feeFamilyKey": "vi_purchasing_travel_svc",
+      "feeDescription": "VI-PURCHASING TRAVEL SVC",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 4.01,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 4.37,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 8.38,
+      "averageMonthlyAmount": 4.19
+    },
+    {
+      "compositeKey": "vi_reg_consumer_mq_db__visa",
+      "feeFamilyKey": "vi_reg_consumer_mq_db",
+      "feeDescription": "VI-REG CONSUMER MQ (DB)",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.2,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.3,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 2.5,
+      "averageMonthlyAmount": 1.25
+    },
+    {
+      "compositeKey": "vi_sm_merch_rest_inf_sq__visa",
+      "feeFamilyKey": "vi_sm_merch_rest_inf_sq",
+      "feeDescription": "VI-SM MERCH REST INF SQ",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 15.27,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 16.63,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 31.9,
+      "averageMonthlyAmount": 15.95
+    },
+    {
+      "compositeKey": "vi_sm_merch_rest_sig_sign_prf__visa",
+      "feeFamilyKey": "vi_sm_merch_rest_sig_sign_prf",
+      "feeDescription": "VI-SM MERCH REST SIG SIGN PRF",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 152.45,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 166.01,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 318.46,
+      "averageMonthlyAmount": 159.23
+    },
+    {
+      "compositeKey": "vi_sm_merch_rest_trad_rewards__visa",
+      "feeFamilyKey": "vi_sm_merch_rest_trad_rewards",
+      "feeDescription": "VI-SM MERCH REST TRAD REWARDS",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 20.79,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 22.64,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 43.43,
+      "averageMonthlyAmount": 21.72
+    },
+    {
+      "compositeKey": "vi_us_bus_tr1_trvl__visa",
+      "feeFamilyKey": "vi_us_bus_tr1_trvl",
+      "feeDescription": "VI-US BUS TR1 TRVL",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.42,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.46,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 0.88,
+      "averageMonthlyAmount": 0.44
+    },
+    {
+      "compositeKey": "vi_us_bus_tr2_trvl__visa",
+      "feeFamilyKey": "vi_us_bus_tr2_trvl",
+      "feeDescription": "VI-US BUS TR2 TRVL",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 2.85,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 3.1,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 5.95,
+      "averageMonthlyAmount": 2.98
+    },
+    {
+      "compositeKey": "vi_us_bus_tr3_trvl__visa",
+      "feeFamilyKey": "vi_us_bus_tr3_trvl",
+      "feeDescription": "VI-US BUS TR3 TRVL",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 3.72,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 4.06,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 7.78,
+      "averageMonthlyAmount": 3.89
+    },
+    {
+      "compositeKey": "vi_us_bus_tr4_trvl__visa",
+      "feeFamilyKey": "vi_us_bus_tr4_trvl",
+      "feeDescription": "VI-US BUS TR4 TRVL",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.8,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.87,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 1.67,
+      "averageMonthlyAmount": 0.84
+    },
+    {
+      "compositeKey": "vi_us_bus_tr5_trvl__visa",
+      "feeFamilyKey": "vi_us_bus_tr5_trvl",
+      "feeDescription": "VI-US BUS TR5 TRVL",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 11.04,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 12.03,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 23.07,
+      "averageMonthlyAmount": 11.54
+    },
+    {
+      "compositeKey": "vi_us_cps_small_tckt_reg_db__visa",
+      "feeFamilyKey": "vi_us_cps_small_tckt_reg_db",
+      "feeDescription": "VI-US CPS/SMALL TCKT REG (DB)",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 48.34,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 52.64,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 100.98,
+      "averageMonthlyAmount": 50.49
+    },
+    {
+      "compositeKey": "vi_us_non_premium_base__visa",
+      "feeFamilyKey": "vi_us_non_premium_base",
+      "feeDescription": "VI-US NON-PREMIUM BASE",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.2,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.22,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 0.42,
+      "averageMonthlyAmount": 0.21
+    },
+    {
+      "compositeKey": "vi_us_premium_base__visa",
+      "feeFamilyKey": "vi_us_premium_base",
+      "feeDescription": "VI-US PREMIUM BASE",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 1.79,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.95,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 3.74,
+      "averageMonthlyAmount": 1.87
+    },
+    {
+      "compositeKey": "vi_us_regulated_comm_db__visa",
+      "feeFamilyKey": "vi_us_regulated_comm_db",
+      "feeDescription": "VI-US REGULATED COMM (DB)",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 18.6,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 20.26,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 38.86,
+      "averageMonthlyAmount": 19.43
+    },
+    {
+      "compositeKey": "vi_us_regulated_db__visa",
+      "feeFamilyKey": "vi_us_regulated_db",
+      "feeDescription": "VI-US REGULATED (DB)",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 104.32,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 113.6,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 217.92,
+      "averageMonthlyAmount": 108.96
+    },
+    {
+      "compositeKey": "vi_us_regulated_non_cps_db__visa",
+      "feeFamilyKey": "vi_us_regulated_non_cps_db",
+      "feeDescription": "VI-US REGULATED NON-CPS (DB)",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.94,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.02,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 1.96,
+      "averageMonthlyAmount": 0.98
+    },
+    {
+      "compositeKey": "vi_us_super_premium_base__visa",
+      "feeFamilyKey": "vi_us_super_premium_base",
+      "feeDescription": "VI-US SUPER PREMIUM BASE",
+      "cardTypeSection": "VISA",
+      "canonicalType": "interchange",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.86,
+          "rate": null,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.94,
+          "rate": null,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 1.8,
+      "averageMonthlyAmount": 0.9
+    },
+    {
+      "compositeKey": "vs_intl_acquirer_fee__card_brand_network",
+      "feeFamilyKey": "vs_intl_acquirer_fee",
+      "feeDescription": "International Service Assessment (ISA)",
+      "cardTypeSection": null,
+      "canonicalType": "card_brand_network",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.97,
+          "rate": null,
+          "volume": 214.37
+        },
+        {
+          "period": "2024-12",
+          "amount": 1.05,
+          "rate": null,
+          "volume": 233.42
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 2.02,
+      "averageMonthlyAmount": 1.01
+    },
+    {
+      "compositeKey": "zero_acct_ver_db_fee__visa",
+      "feeFamilyKey": "zero_acct_ver_db_fee",
+      "feeDescription": "VISA ZERO ACCT VER DB FEE 1 TRANSACTIONS AT 0.03",
+      "cardTypeSection": "VISA",
+      "canonicalType": "unknown",
+      "periods": [
+        {
+          "period": "2024-11",
+          "amount": 0.03,
+          "rate": 0.03,
+          "volume": null
+        },
+        {
+          "period": "2024-12",
+          "amount": 0.06,
+          "rate": 0.03,
+          "volume": null
+        }
+      ],
+      "presentOnAll": true,
+      "monthsPresent": 2,
+      "status": "recurring_rate_changed",
+      "firstAppeared": "2024-11",
+      "lastSeen": "2024-12",
+      "rateChanged": false,
+      "amountChanged": true,
+      "cumulativeAmount": 0.09,
+      "averageMonthlyAmount": 0.05
+    }
+  ],
+  "newFees": [],
+  "rateChanges": [],
+  "noticeTracking": [
+    {
+      "noticePeriod": "2024-11",
+      "feeName": "Informational notice",
+      "noticeType": "informational",
+      "announcedAmount": null,
+      "announcedEffectiveDate": "2024-11-22",
+      "actuallyAppeared": null,
+      "actualAmount": null,
+      "amountMatched": null,
+      "confidence": "high",
+      "matchedFeeFamilyKey": null,
+      "finding": "Informational notice; no fee execution tracking required."
+    },
+    {
+      "noticePeriod": "2024-11",
+      "feeName": "Informational notice",
+      "noticeType": "informational",
+      "announcedAmount": null,
+      "announcedEffectiveDate": null,
+      "actuallyAppeared": null,
+      "actualAmount": null,
+      "amountMatched": null,
+      "confidence": "high",
+      "matchedFeeFamilyKey": null,
+      "finding": "Informational notice; no fee execution tracking required."
+    },
+    {
+      "noticePeriod": "2024-11",
+      "feeName": "Informational notice",
+      "noticeType": "informational",
+      "announcedAmount": null,
+      "announcedEffectiveDate": "2024-11-15",
+      "actuallyAppeared": null,
+      "actualAmount": null,
+      "amountMatched": null,
+      "confidence": "high",
+      "matchedFeeFamilyKey": null,
+      "finding": "Informational notice; no fee execution tracking required."
+    },
+    {
+      "noticePeriod": "2024-12",
+      "feeName": "Mastercard Network Access and Brand Usage (NABU) fee",
+      "noticeType": "informational",
+      "announcedAmount": null,
+      "announcedEffectiveDate": "2024-12-01",
+      "actuallyAppeared": null,
+      "actualAmount": null,
+      "amountMatched": null,
+      "confidence": "high",
+      "matchedFeeFamilyKey": null,
+      "finding": "Informational notice; no fee execution tracking required."
+    },
+    {
+      "noticePeriod": "2024-12",
+      "feeName": "Informational notice",
+      "noticeType": "informational",
+      "announcedAmount": null,
+      "announcedEffectiveDate": "2025-01-31",
+      "actuallyAppeared": null,
+      "actualAmount": null,
+      "amountMatched": null,
+      "confidence": "high",
+      "matchedFeeFamilyKey": null,
+      "finding": "Informational notice; no fee execution tracking required."
+    },
+    {
+      "noticePeriod": "2024-12",
+      "feeName": "Informational notice",
+      "noticeType": "informational",
+      "announcedAmount": null,
+      "announcedEffectiveDate": null,
+      "actuallyAppeared": null,
+      "actualAmount": null,
+      "amountMatched": null,
+      "confidence": "high",
+      "matchedFeeFamilyKey": null,
+      "finding": "Informational notice; no fee execution tracking required."
+    },
+    {
+      "noticePeriod": "2024-12",
+      "feeName": "Unknown fee",
+      "noticeType": "fee_delay",
+      "announcedAmount": null,
+      "announcedEffectiveDate": null,
+      "actuallyAppeared": null,
+      "actualAmount": null,
+      "amountMatched": null,
+      "confidence": "high",
+      "matchedFeeFamilyKey": null,
+      "finding": "No statement is available for null."
+    }
+  ],
+  "processorMarkupTrend": {
+    "periods": [
+      {
+        "period": "2024-11",
+        "processorControlled": 347.36,
+        "volume": 53291.02,
+        "markupPct": 0.00651817
+      },
+      {
+        "period": "2024-12",
+        "processorControlled": 361.04,
+        "volume": 56343.39,
+        "markupPct": 0.00640785
+      }
+    ],
+    "direction": "stable",
+    "finding": "Processor-controlled markup trend is stable."
+  },
+  "volumeTrend": {
+    "periods": [
+      {
+        "period": "2024-11",
+        "volume": 53291.02,
+        "transactions": 1828,
+        "avgTicket": 29.15
+      },
+      {
+        "period": "2024-12",
+        "volume": 56343.39,
+        "transactions": 1906,
+        "avgTicket": 29.56
+      }
+    ],
+    "direction": "growing",
+    "totalVolumeAllPeriods": 109634.41,
+    "averageMonthlyVolume": 54817.21,
+    "averageMonthlyTransactions": 1867
+  },
+  "disputeTrend": {
+    "periods": [
+      {
+        "period": "2024-11",
+        "chargebacks": 0,
+        "chargebackFees": 0,
+        "achRejects": 0,
+        "achRejectFees": 0,
+        "totalDisputeCost": 0,
+        "disputeCostPct": 0
+      },
+      {
+        "period": "2024-12",
+        "chargebacks": 0,
+        "chargebackFees": 0,
+        "achRejects": 0,
+        "achRejectFees": 0,
+        "totalDisputeCost": 0,
+        "disputeCostPct": 0
+      }
+    ],
+    "direction": "none",
+    "totalDisputeCostsAllPeriods": 0,
+    "finding": null
+  },
+  "operationalTrend": {
+    "inactivePeriods": [],
+    "refundTrend": {
+      "periods": [
+        {
+          "period": "2024-11",
+          "grossSales": null,
+          "refunds": null,
+          "refundPctOfGrossSales": null
+        },
+        {
+          "period": "2024-12",
+          "grossSales": null,
+          "refunds": null,
+          "refundPctOfGrossSales": null
+        }
+      ],
+      "direction": "stable",
+      "finding": null
+    },
+    "cardMixShifts": [],
+    "interchangeQualificationTrend": {
+      "applicable": true,
+      "finding": null
+    },
+    "priorPeriodAdjustments": []
+  },
+  "pricingModelConsistency": {
+    "consistent": true,
+    "models": [
+      {
+        "period": "2024-11",
+        "model": "interchange_plus",
+        "confidence": "high"
+      },
+      {
+        "period": "2024-12",
+        "model": "interchange_plus",
+        "confidence": "high"
+      }
+    ],
+    "finding": null
+  },
+  "cumulativeSavings": {
+    "totalPeriodsCovered": 2,
+    "dateRange": "2024-11 - 2024-12",
+    "alreadyOverpaid": {
+      "conservative": 100.8,
+      "estimated": 201.17,
+      "maximum": 365.86
+    },
+    "projectedAnnualIfUnchanged": {
+      "conservative": 604.8,
+      "estimated": 1207.02,
+      "maximum": 2195.13
+    },
+    "topRecurringIssues": [
+      {
+        "fingerprint": "penalty_or_configuration_fee__managed_security_non_validated_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed",
+        "issue": "MANAGED SECURITY NON VALIDATED may be avoidable through configuration or qualification fixes",
+        "classification": "compliance_penalty",
+        "monthsPresent": 2,
+        "totalPaid": 99.9,
+        "averageMonthlyAmount": 49.95,
+        "projectedAnnual": 599.4,
+        "action": "Complete PCI/security validation or correct the terminal/gateway setup.",
+        "difficulty": "no_negotiation"
+      },
+      {
+        "fingerprint": "penalty_or_configuration_fee__vi_transaction_integrity_fee_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed",
+        "issue": "VI TRANSACTION INTEGRITY FEE 4 TRANSACTIONS AT 0.1 may be avoidable through configuration or qualification fixes",
+        "classification": "compliance_penalty",
+        "monthsPresent": 2,
+        "totalPaid": 0.9,
+        "averageMonthlyAmount": 0.45,
+        "projectedAnnual": 5.4,
+        "action": "Complete PCI/security validation or correct the terminal/gateway setup.",
+        "difficulty": "no_negotiation"
+      },
+      {
+        "fingerprint": "suspicious_uniform_rate__access_fee_is_charged_at_the_same_rate_across_independent_networks__investigative",
+        "issue": "ACCESS FEE is charged at the same rate across independent networks",
+        "classification": "suspicious",
+        "monthsPresent": 2,
+        "totalPaid": 119.79,
+        "averageMonthlyAmount": 59.9,
+        "projectedAnnual": 718.74,
+        "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "fingerprint": "third_party_service_fee__bentobox_online_order_fee_is_a_third_party_service_fee__investigative",
+        "issue": "BENTOBOX ONLINE ORDER FEE 17 TRANSACTIONS AT 0.99 is a third-party service fee",
+        "classification": "suspicious",
+        "monthsPresent": 2,
+        "totalPaid": 34.65,
+        "averageMonthlyAmount": 17.33,
+        "projectedAnnual": 207.9,
+        "action": "Verify the third-party service is active and cancel or renegotiate it if it is not needed.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "fingerprint": "rate_exceeds_reference__discover_auth_fee_exceeds_the_reference_rate__investigative",
+        "issue": "DISCOVER AUTH FEE 28 TRANSACTIONS AT 0.1 exceeds the reference rate",
+        "classification": "suspicious",
+        "monthsPresent": 2,
+        "totalPaid": 5.56,
+        "averageMonthlyAmount": 2.78,
+        "projectedAnnual": 33.36,
+        "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "fingerprint": "rate_exceeds_reference__mc_license_volume_fee_0_000217_disc_rate_exceeds_the_reference_rate__investigative",
+        "issue": "MC LICENSE VOLUME FEE 0.000217 DISC RATE TIMES $12970.74 exceeds the reference rate",
+        "classification": "suspicious",
+        "monthsPresent": 2,
+        "totalPaid": 3.69,
+        "averageMonthlyAmount": 1.85,
+        "projectedAnnual": 22.14,
+        "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "fingerprint": "rate_exceeds_reference__network_authorization_fee_exceeds_the_reference_rate__investigative",
+        "issue": "NETWORK AUTHORIZATION FEE 28 TRANSACTIONS AT 0.019 exceeds the reference rate",
+        "classification": "suspicious",
+        "monthsPresent": 2,
+        "totalPaid": 0.94,
+        "averageMonthlyAmount": 0.47,
+        "projectedAnnual": 5.64,
+        "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "fingerprint": "rate_exceeds_reference__mc_auth_digital_enablement_min_exceeds_the_reference_rate__investigative",
+        "issue": "MC-AUTH DIGITAL ENABLEMENT MIN 6 TRANSACTIONS AT 0.02 exceeds the reference rate",
+        "classification": "suspicious",
+        "monthsPresent": 2,
+        "totalPaid": 0.04,
+        "averageMonthlyAmount": 0.02,
+        "projectedAnnual": 0.24,
+        "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "fingerprint": "rate_exceeds_reference__vi_digital_commerce_svc_fee_mn_exceeds_the_reference_rate__investigative",
+        "issue": "VI DIGITAL COMMERCE SVC FEE MN 18 TRANSACTIONS AT .007500 exceeds the reference rate",
+        "classification": "suspicious",
+        "monthsPresent": 2,
+        "totalPaid": 0.02,
+        "averageMonthlyAmount": 0.01,
+        "projectedAnnual": 0.09,
+        "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "fingerprint": "per_auth_fee_benchmark__per_authorization_fee_is_above_competitive_benchmark__negotiable",
+        "issue": "Per-authorization fee is above competitive benchmark",
+        "classification": "negotiation",
+        "monthsPresent": 2,
+        "totalPaid": 70.66,
+        "averageMonthlyAmount": 35.33,
+        "projectedAnnual": 423.96,
+        "action": "Negotiate the processor-controlled rate.",
+        "difficulty": "negotiation_required"
+      },
+      {
+        "fingerprint": "hidden_percentage_markup__monthly_advantage_fee_mcvdb_0_0003_adds_hidden_percentage_markup__negotiable",
+        "issue": "MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $47996.83 adds hidden percentage markup",
+        "classification": "negotiation",
+        "monthsPresent": 2,
+        "totalPaid": 29.71,
+        "averageMonthlyAmount": 14.86,
+        "projectedAnnual": 178.26,
+        "action": "Negotiate the processor-controlled rate.",
+        "difficulty": "negotiation_required"
+      }
+    ]
+  },
+  "resolvedFees": [],
+  "globalFindings": [
+    {
+      "fingerprint": "penalty_or_configuration_fee__managed_security_non_validated_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed",
+      "priority": 1,
+      "tier": "compliance_penalty",
+      "title": "MANAGED SECURITY NON VALIDATED may be avoidable through configuration or qualification fixes",
+      "description": "MANAGED SECURITY NON VALIDATED may be avoidable through configuration or qualification fixes appeared on 2 analyzed statement(s).",
+      "monthsAffected": 2,
+      "cumulativeImpact": 99.9,
+      "projectedAnnualImpact": 599.4,
+      "action": "Complete PCI/security validation or correct the terminal/gateway setup.",
+      "difficulty": "no_negotiation",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "MANAGED SECURITY NON VALIDATED may be avoidable through configuration or qualification fixes: monthly impact 49.95, projected annual impact 599.40."
+        },
+        {
+          "period": "2024-12",
+          "detail": "MANAGED SECURITY NON VALIDATED may be avoidable through configuration or qualification fixes: monthly impact 49.95, projected annual impact 599.40."
+        }
+      ]
+    },
+    {
+      "fingerprint": "penalty_or_configuration_fee__vi_transaction_integrity_fee_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed",
+      "priority": 2,
+      "tier": "compliance_penalty",
+      "title": "VI TRANSACTION INTEGRITY FEE 4 TRANSACTIONS AT 0.1 may be avoidable through configuration or qualification fixes",
+      "description": "VI TRANSACTION INTEGRITY FEE 4 TRANSACTIONS AT 0.1 may be avoidable through configuration or qualification fixes appeared on 2 analyzed statement(s).",
+      "monthsAffected": 2,
+      "cumulativeImpact": 0.9,
+      "projectedAnnualImpact": 5.4,
+      "action": "Complete PCI/security validation or correct the terminal/gateway setup.",
+      "difficulty": "no_negotiation",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "VI TRANSACTION INTEGRITY FEE 4 TRANSACTIONS AT 0.1 may be avoidable through configuration or qualification fixes: monthly impact 0.40, projected annual impact 4.80."
+        },
+        {
+          "period": "2024-12",
+          "detail": "VI TRANSACTION INTEGRITY FEE 5 TRANSACTIONS AT 0.1 may be avoidable through configuration or qualification fixes: monthly impact 0.50, projected annual impact 6.00."
+        }
+      ]
+    },
+    {
+      "fingerprint": "suspicious_uniform_rate__access_fee_is_charged_at_the_same_rate_across_independent_networks__investigative",
+      "priority": 3,
+      "tier": "suspicious",
+      "title": "ACCESS FEE is charged at the same rate across independent networks",
+      "description": "ACCESS FEE is charged at the same rate across independent networks appeared on 2 analyzed statement(s).",
+      "monthsAffected": 2,
+      "cumulativeImpact": 119.79,
+      "projectedAnnualImpact": 718.74,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "difficulty": "investigation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "ACCESS FEE is charged at the same rate across independent networks: monthly impact 58.79, projected annual impact 705.48."
+        },
+        {
+          "period": "2024-12",
+          "detail": "ACCESS FEE is charged at the same rate across independent networks: monthly impact 61.00, projected annual impact 732.00."
+        }
+      ]
+    },
+    {
+      "fingerprint": "third_party_service_fee__bentobox_online_order_fee_is_a_third_party_service_fee__investigative",
+      "priority": 4,
+      "tier": "suspicious",
+      "title": "BENTOBOX ONLINE ORDER FEE 17 TRANSACTIONS AT 0.99 is a third-party service fee",
+      "description": "BENTOBOX ONLINE ORDER FEE 17 TRANSACTIONS AT 0.99 is a third-party service fee appeared on 2 analyzed statement(s).",
+      "monthsAffected": 2,
+      "cumulativeImpact": 34.65,
+      "projectedAnnualImpact": 207.9,
+      "action": "Verify the third-party service is active and cancel or renegotiate it if it is not needed.",
+      "difficulty": "investigation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "BENTOBOX ONLINE ORDER FEE 17 TRANSACTIONS AT 0.99 is a third-party service fee: monthly impact 16.83, projected annual impact 201.96."
+        },
+        {
+          "period": "2024-12",
+          "detail": "BENTOBOX ONLINE ORDER FEE 18 TRANSACTIONS AT 0.99 is a third-party service fee: monthly impact 17.82, projected annual impact 213.84."
+        }
+      ]
+    },
+    {
+      "fingerprint": "rate_exceeds_reference__discover_auth_fee_exceeds_the_reference_rate__investigative",
+      "priority": 5,
+      "tier": "suspicious",
+      "title": "DISCOVER AUTH FEE 28 TRANSACTIONS AT 0.1 exceeds the reference rate",
+      "description": "DISCOVER AUTH FEE 28 TRANSACTIONS AT 0.1 exceeds the reference rate appeared on 2 analyzed statement(s).",
+      "monthsAffected": 2,
+      "cumulativeImpact": 5.56,
+      "projectedAnnualImpact": 33.36,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "difficulty": "investigation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "DISCOVER AUTH FEE 28 TRANSACTIONS AT 0.1 exceeds the reference rate: monthly impact 2.73, projected annual impact 32.76."
+        },
+        {
+          "period": "2024-12",
+          "detail": "DISCOVER AUTH FEE 29 TRANSACTIONS AT 0.1 exceeds the reference rate: monthly impact 2.83, projected annual impact 33.96."
+        }
+      ]
+    },
+    {
+      "fingerprint": "rate_exceeds_reference__mc_license_volume_fee_0_000217_disc_rate_exceeds_the_reference_rate__investigative",
+      "priority": 6,
+      "tier": "suspicious",
+      "title": "MC LICENSE VOLUME FEE 0.000217 DISC RATE TIMES $12970.74 exceeds the reference rate",
+      "description": "MC LICENSE VOLUME FEE 0.000217 DISC RATE TIMES $12970.74 exceeds the reference rate appeared on 2 analyzed statement(s).",
+      "monthsAffected": 2,
+      "cumulativeImpact": 3.69,
+      "projectedAnnualImpact": 22.14,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "difficulty": "investigation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "MC LICENSE VOLUME FEE 0.000217 DISC RATE TIMES $12970.74 exceeds the reference rate: monthly impact 1.84, projected annual impact 22.08."
+        },
+        {
+          "period": "2024-12",
+          "detail": "MC LICENSE VOLUME FEE 0.000217 DISC RATE TIMES $12979.96 exceeds the reference rate: monthly impact 1.85, projected annual impact 22.20."
+        }
+      ]
+    },
+    {
+      "fingerprint": "rate_exceeds_reference__network_authorization_fee_exceeds_the_reference_rate__investigative",
+      "priority": 7,
+      "tier": "suspicious",
+      "title": "NETWORK AUTHORIZATION FEE 28 TRANSACTIONS AT 0.019 exceeds the reference rate",
+      "description": "NETWORK AUTHORIZATION FEE 28 TRANSACTIONS AT 0.019 exceeds the reference rate appeared on 2 analyzed statement(s).",
+      "monthsAffected": 2,
+      "cumulativeImpact": 0.94,
+      "projectedAnnualImpact": 5.64,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "difficulty": "investigation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "NETWORK AUTHORIZATION FEE 28 TRANSACTIONS AT 0.019 exceeds the reference rate: monthly impact 0.46, projected annual impact 5.52."
+        },
+        {
+          "period": "2024-12",
+          "detail": "NETWORK AUTHORIZATION FEE 29 TRANSACTIONS AT 0.019 exceeds the reference rate: monthly impact 0.48, projected annual impact 5.76."
+        }
+      ]
+    },
+    {
+      "fingerprint": "rate_exceeds_reference__mc_auth_digital_enablement_min_exceeds_the_reference_rate__investigative",
+      "priority": 8,
+      "tier": "suspicious",
+      "title": "MC-AUTH DIGITAL ENABLEMENT MIN 6 TRANSACTIONS AT 0.02 exceeds the reference rate",
+      "description": "MC-AUTH DIGITAL ENABLEMENT MIN 6 TRANSACTIONS AT 0.02 exceeds the reference rate appeared on 2 analyzed statement(s).",
+      "monthsAffected": 2,
+      "cumulativeImpact": 0.04,
+      "projectedAnnualImpact": 0.24,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "difficulty": "investigation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "MC-AUTH DIGITAL ENABLEMENT MIN 6 TRANSACTIONS AT 0.02 exceeds the reference rate: monthly impact 0.02, projected annual impact 0.24."
+        },
+        {
+          "period": "2024-12",
+          "detail": "MC-AUTH DIGITAL ENABLEMENT MIN 6 TRANSACTIONS AT 0.02 exceeds the reference rate: monthly impact 0.02, projected annual impact 0.24."
+        }
+      ]
+    },
+    {
+      "fingerprint": "rate_exceeds_reference__vi_digital_commerce_svc_fee_mn_exceeds_the_reference_rate__investigative",
+      "priority": 9,
+      "tier": "suspicious",
+      "title": "VI DIGITAL COMMERCE SVC FEE MN 18 TRANSACTIONS AT .007500 exceeds the reference rate",
+      "description": "VI DIGITAL COMMERCE SVC FEE MN 18 TRANSACTIONS AT .007500 exceeds the reference rate appeared on 2 analyzed statement(s).",
+      "monthsAffected": 2,
+      "cumulativeImpact": 0.02,
+      "projectedAnnualImpact": 0.09,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "difficulty": "investigation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "VI DIGITAL COMMERCE SVC FEE MN 18 TRANSACTIONS AT .007500 exceeds the reference rate: monthly impact 0.01, projected annual impact 0.09."
+        },
+        {
+          "period": "2024-12",
+          "detail": "VI DIGITAL COMMERCE SVC FEE MN 20 TRANSACTIONS AT .007500 exceeds the reference rate: monthly impact 0.01, projected annual impact 0.09."
+        }
+      ]
+    },
+    {
+      "fingerprint": "per_auth_fee_benchmark__per_authorization_fee_is_above_competitive_benchmark__negotiable",
+      "priority": 10,
+      "tier": "negotiation",
+      "title": "Per-authorization fee is above competitive benchmark",
+      "description": "Per-authorization fee is above competitive benchmark appeared on 2 analyzed statement(s).",
+      "monthsAffected": 2,
+      "cumulativeImpact": 70.66,
+      "projectedAnnualImpact": 423.96,
+      "action": "Negotiate the processor-controlled rate.",
+      "difficulty": "negotiation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "Per-authorization fee is above competitive benchmark: monthly impact 34.66, projected annual impact 415.92."
+        },
+        {
+          "period": "2024-12",
+          "detail": "Per-authorization fee is above competitive benchmark: monthly impact 36.00, projected annual impact 432.00."
+        }
+      ]
+    },
+    {
+      "fingerprint": "hidden_percentage_markup__monthly_advantage_fee_mcvdb_0_0003_adds_hidden_percentage_markup__negotiable",
+      "priority": 11,
+      "tier": "negotiation",
+      "title": "MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $47996.83 adds hidden percentage markup",
+      "description": "MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $47996.83 adds hidden percentage markup appeared on 2 analyzed statement(s).",
+      "monthsAffected": 2,
+      "cumulativeImpact": 29.71,
+      "projectedAnnualImpact": 178.26,
+      "action": "Negotiate the processor-controlled rate.",
+      "difficulty": "negotiation_required",
+      "evidence": [
+        {
+          "period": "2024-11",
+          "detail": "MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $47996.83 adds hidden percentage markup: monthly impact 14.40, projected annual impact 172.80."
+        },
+        {
+          "period": "2024-12",
+          "detail": "MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $51022.27 adds hidden percentage markup: monthly impact 15.31, projected annual impact 183.72."
+        }
+      ]
+    }
+  ],
+  "actionItems": [
+    {
+      "priority": 1,
+      "action": "Complete PCI/security validation or correct the terminal/gateway setup.",
+      "expectedSavings": 599.4,
+      "difficulty": "no_negotiation",
+      "relatedFindings": [
+        "penalty_or_configuration_fee__managed_security_non_validated_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed"
+      ]
+    },
+    {
+      "priority": 2,
+      "action": "Complete PCI/security validation or correct the terminal/gateway setup.",
+      "expectedSavings": 5.4,
+      "difficulty": "no_negotiation",
+      "relatedFindings": [
+        "penalty_or_configuration_fee__vi_transaction_integrity_fee_may_be_avoidable_through_configuration_or_qualification_fixes__confirmed"
+      ]
+    },
+    {
+      "priority": 3,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "expectedSavings": 718.74,
+      "difficulty": "investigation_required",
+      "relatedFindings": [
+        "suspicious_uniform_rate__access_fee_is_charged_at_the_same_rate_across_independent_networks__investigative"
+      ]
+    },
+    {
+      "priority": 4,
+      "action": "Verify the third-party service is active and cancel or renegotiate it if it is not needed.",
+      "expectedSavings": 207.9,
+      "difficulty": "investigation_required",
+      "relatedFindings": [
+        "third_party_service_fee__bentobox_online_order_fee_is_a_third_party_service_fee__investigative"
+      ]
+    },
+    {
+      "priority": 5,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "expectedSavings": 33.36,
+      "difficulty": "investigation_required",
+      "relatedFindings": [
+        "rate_exceeds_reference__discover_auth_fee_exceeds_the_reference_rate__investigative"
+      ]
+    },
+    {
+      "priority": 6,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "expectedSavings": 22.14,
+      "difficulty": "investigation_required",
+      "relatedFindings": [
+        "rate_exceeds_reference__mc_license_volume_fee_0_000217_disc_rate_exceeds_the_reference_rate__investigative"
+      ]
+    },
+    {
+      "priority": 7,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "expectedSavings": 5.64,
+      "difficulty": "investigation_required",
+      "relatedFindings": [
+        "rate_exceeds_reference__network_authorization_fee_exceeds_the_reference_rate__investigative"
+      ]
+    },
+    {
+      "priority": 8,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "expectedSavings": 0.24,
+      "difficulty": "investigation_required",
+      "relatedFindings": [
+        "rate_exceeds_reference__mc_auth_digital_enablement_min_exceeds_the_reference_rate__investigative"
+      ]
+    },
+    {
+      "priority": 9,
+      "action": "Ask the processor for pass-through documentation and dispute the charge if it cannot be documented.",
+      "expectedSavings": 0.09,
+      "difficulty": "investigation_required",
+      "relatedFindings": [
+        "rate_exceeds_reference__vi_digital_commerce_svc_fee_mn_exceeds_the_reference_rate__investigative"
+      ]
+    },
+    {
+      "priority": 10,
+      "action": "Negotiate the processor-controlled rate.",
+      "expectedSavings": 423.96,
+      "difficulty": "negotiation_required",
+      "relatedFindings": [
+        "per_auth_fee_benchmark__per_authorization_fee_is_above_competitive_benchmark__negotiable"
+      ]
+    },
+    {
+      "priority": 11,
+      "action": "Negotiate the processor-controlled rate.",
+      "expectedSavings": 178.26,
+      "difficulty": "negotiation_required",
+      "relatedFindings": [
+        "hidden_percentage_markup__monthly_advantage_fee_mcvdb_0_0003_adds_hidden_percentage_markup__negotiable"
+      ]
+    }
+  ],
+  "masterNarrative": ""
+}

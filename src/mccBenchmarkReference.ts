@@ -32,6 +32,8 @@ export type MccBenchmarkReference = {
   };
   per_auth_benchmarks: Record<MccBenchmarkChannel, Record<MccVolumeTierId, { competitive_low: number; competitive_high: number }>>;
   junk_fee_patterns: { fees: MccBenchmarkPattern[] };
+  processor_per_auth_patterns: { fees: MccBenchmarkPattern[] };
+  network_fee_patterns: { fees: MccBenchmarkPattern[] };
   penalty_fee_patterns: { fees: MccBenchmarkPattern[] };
 };
 
@@ -50,7 +52,14 @@ export function loadMccBenchmarkReference(): MccBenchmarkReference {
   if (cachedReference) return cachedReference;
   const referencePath = path.resolve(process.cwd(), "data", "fiserv-fee-analysis", "mcc_benchmark_reference.json");
   const parsed = JSON.parse(fs.readFileSync(referencePath, "utf8")) as MccBenchmarkReference;
-  if (!parsed.mcc_categories || !parsed.per_auth_benchmarks || !parsed.junk_fee_patterns || !parsed.penalty_fee_patterns) {
+  if (
+    !parsed.mcc_categories ||
+    !parsed.per_auth_benchmarks ||
+    !parsed.junk_fee_patterns ||
+    !parsed.processor_per_auth_patterns ||
+    !parsed.network_fee_patterns ||
+    !parsed.penalty_fee_patterns
+  ) {
     throw new Error("MCC benchmark reference is missing required benchmark sections.");
   }
   cachedReference = parsed;

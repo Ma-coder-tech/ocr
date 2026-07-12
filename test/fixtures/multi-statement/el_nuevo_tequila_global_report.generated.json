@@ -1,0 +1,687 @@
+{
+  "generatedAt": "2026-07-10T02:17:16.484Z",
+  "liveAi": true,
+  "narrativeStatus": {
+    "status": "applied",
+    "provider": "openai",
+    "model": "gpt-5.4-mini",
+    "attempted": true,
+    "factCount": 24,
+    "factsUsed": [
+      "action_01",
+      "action_02",
+      "action_03",
+      "action_04",
+      "action_05",
+      "action_06",
+      "action_summary_01",
+      "dispute_01",
+      "fee_change_01",
+      "fee_change_03",
+      "finding_01",
+      "finding_02",
+      "finding_03",
+      "finding_04",
+      "gap_01",
+      "rate_trend_01",
+      "recurring_fee_01",
+      "recurring_fee_02",
+      "recurring_fee_03",
+      "summary_01"
+    ],
+    "paragraphs": [
+      "Across the 7 statements from 2024-09 through 2025-04, your total processing volume was $1,252,400.72 and total fees were $21,293.31, for an average effective rate of 1.70%. The biggest cumulative cost issue is the processor-controlled WATS AUTH FEE, which increased in 2025-01 after prior notice and has cost $236.38 so far; because it is charged on every card authorization, it is the largest single opportunity to address. The effective rate trend is moving up overall, and the main drivers were fee changes rather than volume alone: higher volume helped in 2024-12 by diluting fixed fees, but later months were pushed up by the WATS AUTH FEE increase, the REGULATORY PRODUCT fee appearing in 2024-11, and the PCI/non-validation fee appearing in 2025-03.",
+      "There were also fees that appeared without prior notice. The REGULATORY PRODUCT fee first showed up in 2024-11 and has cost $19.75 so far; the record says no regulatory mandate requires this fee, so it should be removed or justified. The MANAGED SECURITY NON VALIDATED fee first appeared in 2025-03 and has cost $99.90 so far; this reflects incomplete PCI validation, and once the SAQ is completed this fee is eliminated or significantly reduced. In addition, fixed monthly/account fees increased without matching prior notice, with a cumulative impact of $9.00 across the analyzed statements. The timeline suggests these added and increased fees contributed meaningfully to the rising effective rate.",
+      "A separate set of recurring avoidable charges is still on the statements every month. The MONTHLY SERVICE CHARGE is a flat monthly account fee and has totaled $75.00; the PAPER STATEMENT FEE is a fee for receiving a paper statement and has totaled $70.00; and SUPPLY SHIPPING & HANDLING is for physical supplies such as receipt paper shipped by the processor and has totaled $115.65 across 7 statement(s). These fees are part of the same cost structure that is lifting your effective rate, especially in months where volume was not enough to offset fixed charges. If you want the cleanest quick wins, these are the charges that can be addressed without changing your processing volume.",
+      "The missing statement period is 2025-02, so there is one gap in the 7-month sequence. Chargeback activity also worsened over the period: the record shows 1 chargeback in 2024-10 with $25.00 in dispute cost, then 5 chargebacks in 2025-03 with $125.00, and 2 chargebacks in 2025-04 with $50.00, for total dispute costs of $200.00 across the analyzed statements. That pattern matters because it adds cost on top of the fee increases already discussed, and the highest dispute cost occurred in the same month the MANAGED SECURITY NON VALIDATED fee first appeared.",
+      "Prioritized actions, in the order provided, are: 1) Complete PCI validation to remove the fee, with expected annual savings of $599.40 and no negotiation required; 2) Switch to electronic statements, with expected annual savings of $120.00 and no negotiation required; 3) Opt out of automatic supply shipments or dispute unrequested supplies, with expected annual savings of $239.40 and investigation required; 4) Ask the processor to remove or justify the REGULATORY PRODUCT fee, with expected annual savings of $47.40 and investigation required; 5) Negotiate the processor-controlled WATS AUTH FEE, with expected annual savings of $975.84 and negotiation required; 6) Negotiate or request a waiver of the monthly account fee, with expected annual savings of $180.00 and negotiation required. If all actions are taken, projected annual savings are $2,162.04."
+    ],
+    "paragraphEvidence": [
+      {
+        "text": "Across the 7 statements from 2024-09 through 2025-04, your total processing volume was $1,252,400.72 and total fees were $21,293.31, for an average effective rate of 1.70%. The biggest cumulative cost issue is the processor-controlled WATS AUTH FEE, which increased in 2025-01 after prior notice and has cost $236.38 so far; because it is charged on every card authorization, it is the largest single opportunity to address. The effective rate trend is moving up overall, and the main drivers were fee changes rather than volume alone: higher volume helped in 2024-12 by diluting fixed fees, but later months were pushed up by the WATS AUTH FEE increase, the REGULATORY PRODUCT fee appearing in 2024-11, and the PCI/non-validation fee appearing in 2025-03.",
+        "factIds": [
+          "summary_01",
+          "finding_04",
+          "rate_trend_01",
+          "action_summary_01",
+          "finding_03",
+          "finding_01"
+        ]
+      },
+      {
+        "text": "There were also fees that appeared without prior notice. The REGULATORY PRODUCT fee first showed up in 2024-11 and has cost $19.75 so far; the record says no regulatory mandate requires this fee, so it should be removed or justified. The MANAGED SECURITY NON VALIDATED fee first appeared in 2025-03 and has cost $99.90 so far; this reflects incomplete PCI validation, and once the SAQ is completed this fee is eliminated or significantly reduced. In addition, fixed monthly/account fees increased without matching prior notice, with a cumulative impact of $9.00 across the analyzed statements. The timeline suggests these added and increased fees contributed meaningfully to the rising effective rate.",
+        "factIds": [
+          "fee_change_01",
+          "fee_change_03",
+          "finding_02",
+          "rate_trend_01"
+        ]
+      },
+      {
+        "text": "A separate set of recurring avoidable charges is still on the statements every month. The MONTHLY SERVICE CHARGE is a flat monthly account fee and has totaled $75.00; the PAPER STATEMENT FEE is a fee for receiving a paper statement and has totaled $70.00; and SUPPLY SHIPPING & HANDLING is for physical supplies such as receipt paper shipped by the processor and has totaled $115.65 across 7 statement(s). These fees are part of the same cost structure that is lifting your effective rate, especially in months where volume was not enough to offset fixed charges. If you want the cleanest quick wins, these are the charges that can be addressed without changing your processing volume.",
+        "factIds": [
+          "recurring_fee_02",
+          "recurring_fee_03",
+          "recurring_fee_01",
+          "rate_trend_01"
+        ]
+      },
+      {
+        "text": "The missing statement period is 2025-02, so there is one gap in the 7-month sequence. Chargeback activity also worsened over the period: the record shows 1 chargeback in 2024-10 with $25.00 in dispute cost, then 5 chargebacks in 2025-03 with $125.00, and 2 chargebacks in 2025-04 with $50.00, for total dispute costs of $200.00 across the analyzed statements. That pattern matters because it adds cost on top of the fee increases already discussed, and the highest dispute cost occurred in the same month the MANAGED SECURITY NON VALIDATED fee first appeared.",
+        "factIds": [
+          "gap_01",
+          "dispute_01",
+          "fee_change_03"
+        ]
+      },
+      {
+        "text": "Prioritized actions, in the order provided, are: 1) Complete PCI validation to remove the fee, with expected annual savings of $599.40 and no negotiation required; 2) Switch to electronic statements, with expected annual savings of $120.00 and no negotiation required; 3) Opt out of automatic supply shipments or dispute unrequested supplies, with expected annual savings of $239.40 and investigation required; 4) Ask the processor to remove or justify the REGULATORY PRODUCT fee, with expected annual savings of $47.40 and investigation required; 5) Negotiate the processor-controlled WATS AUTH FEE, with expected annual savings of $975.84 and negotiation required; 6) Negotiate or request a waiver of the monthly account fee, with expected annual savings of $180.00 and negotiation required. If all actions are taken, projected annual savings are $2,162.04.",
+        "factIds": [
+          "action_01",
+          "action_02",
+          "action_03",
+          "action_04",
+          "action_05",
+          "action_06",
+          "action_summary_01"
+        ]
+      }
+    ],
+    "notes": [
+      "Benchmark status was not provided, so no benchmark conclusion is stated.",
+      "Cumulative overpaid amount referenced in the fact packet is $616.68 estimated; conservative overpaid total is $380.30."
+    ]
+  },
+  "report": {
+    "kind": "multi_statement_global",
+    "executiveSummary": {
+      "merchantName": "EL NUEVO TEQUILA MEXICAN",
+      "isoName": "Wells Fargo",
+      "processorPlatform": "Fiserv / First Data",
+      "dateRange": "2024-09 - 2025-04",
+      "statementCount": 7,
+      "missingPeriods": [
+        "2025-02"
+      ],
+      "totalVolume": {
+        "label": "Total volume across analyzed statements",
+        "value": "$1,252,400.72",
+        "rawValue": 1252400.72,
+        "unit": "money"
+      },
+      "totalFees": {
+        "label": "Total fees across analyzed statements",
+        "value": "$21,293.31",
+        "rawValue": 21293.31,
+        "unit": "money"
+      },
+      "averageEffectiveRate": {
+        "label": "Average effective rate",
+        "value": "1.70%",
+        "rawValue": 0.01700199,
+        "unit": "percent"
+      },
+      "trendDirection": "increasing",
+      "pricingModel": "interchange_plus",
+      "pricingModelConsistent": true,
+      "headlineSavings": {
+        "label": "Projected annual savings if unchanged",
+        "value": "$2,162.04",
+        "rawValue": 2162.04,
+        "unit": "money"
+      },
+      "benchmark": {
+        "status": "not_available",
+        "message": "Competitive benchmark status is not part of the multi-statement comparison input yet."
+      }
+    },
+    "effectiveRateTrend": {
+      "direction": "increasing",
+      "explanation": "2024-12: effective rate dropped because higher volume diluted fixed fees. 2025-01: WATS AUTH FEE increase raised per-authorization costs. 2025-03: PCI/non-validation fee appeared. 2024-11: REGULATORY PRODUCT fee appeared.",
+      "lowest": {
+        "period": "2024-12",
+        "rate": 0.013495,
+        "displayRate": "1.35%"
+      },
+      "highest": {
+        "period": "2025-03",
+        "rate": 0.01966755,
+        "displayRate": "1.97%"
+      },
+      "averageRate": 0.01700199,
+      "displayAverageRate": "1.70%",
+      "periods": [
+        {
+          "period": "2024-09",
+          "effectiveRate": 0.01665371,
+          "displayRate": "1.67%",
+          "volume": 177400.72,
+          "displayVolume": "$177,400.72",
+          "totalFees": 2954.38,
+          "displayTotalFees": "$2,954.38"
+        },
+        {
+          "period": "2024-10",
+          "effectiveRate": 0.01718076,
+          "displayRate": "1.72%",
+          "volume": 172000,
+          "displayVolume": "$172,000.00",
+          "totalFees": 2955.09,
+          "displayTotalFees": "$2,955.09"
+        },
+        {
+          "period": "2024-11",
+          "effectiveRate": 0.01728225,
+          "displayRate": "1.73%",
+          "volume": 169000,
+          "displayVolume": "$169,000.00",
+          "totalFees": 2920.7,
+          "displayTotalFees": "$2,920.70"
+        },
+        {
+          "period": "2024-12",
+          "effectiveRate": 0.013495,
+          "displayRate": "1.35%",
+          "volume": 240000,
+          "displayVolume": "$240,000.00",
+          "totalFees": 3238.8,
+          "displayTotalFees": "$3,238.80"
+        },
+        {
+          "period": "2025-01",
+          "effectiveRate": 0.01807188,
+          "displayRate": "1.81%",
+          "volume": 165000,
+          "displayVolume": "$165,000.00",
+          "totalFees": 2981.86,
+          "displayTotalFees": "$2,981.86"
+        },
+        {
+          "period": "2025-03",
+          "effectiveRate": 0.01966755,
+          "displayRate": "1.97%",
+          "volume": 159000,
+          "displayVolume": "$159,000.00",
+          "totalFees": 3127.14,
+          "displayTotalFees": "$3,127.14"
+        },
+        {
+          "period": "2025-04",
+          "effectiveRate": 0.01832553,
+          "displayRate": "1.83%",
+          "volume": 170000,
+          "displayVolume": "$170,000.00",
+          "totalFees": 3115.34,
+          "displayTotalFees": "$3,115.34"
+        }
+      ]
+    },
+    "disputeTrend": {
+      "direction": "increasing",
+      "totalDisputeCostsAllPeriods": 200,
+      "finding": "Highest dispute cost was $125.00 in 2025-03.",
+      "periods": [
+        {
+          "period": "2024-09",
+          "chargebacks": 0,
+          "chargebackFees": 0,
+          "achRejects": 0,
+          "achRejectFees": 0,
+          "totalDisputeCost": 0,
+          "displayTotalDisputeCost": "$0.00"
+        },
+        {
+          "period": "2024-10",
+          "chargebacks": 1,
+          "chargebackFees": 25,
+          "achRejects": 0,
+          "achRejectFees": 0,
+          "totalDisputeCost": 25,
+          "displayTotalDisputeCost": "$25.00"
+        },
+        {
+          "period": "2024-11",
+          "chargebacks": 0,
+          "chargebackFees": 0,
+          "achRejects": 0,
+          "achRejectFees": 0,
+          "totalDisputeCost": 0,
+          "displayTotalDisputeCost": "$0.00"
+        },
+        {
+          "period": "2024-12",
+          "chargebacks": 0,
+          "chargebackFees": 0,
+          "achRejects": 0,
+          "achRejectFees": 0,
+          "totalDisputeCost": 0,
+          "displayTotalDisputeCost": "$0.00"
+        },
+        {
+          "period": "2025-01",
+          "chargebacks": 0,
+          "chargebackFees": 0,
+          "achRejects": 0,
+          "achRejectFees": 0,
+          "totalDisputeCost": 0,
+          "displayTotalDisputeCost": "$0.00"
+        },
+        {
+          "period": "2025-03",
+          "chargebacks": 5,
+          "chargebackFees": 125,
+          "achRejects": 0,
+          "achRejectFees": 0,
+          "totalDisputeCost": 125,
+          "displayTotalDisputeCost": "$125.00"
+        },
+        {
+          "period": "2025-04",
+          "chargebacks": 2,
+          "chargebackFees": 50,
+          "achRejects": 0,
+          "achRejectFees": 0,
+          "totalDisputeCost": 50,
+          "displayTotalDisputeCost": "$50.00"
+        }
+      ]
+    },
+    "feeChangeTimeline": [
+      {
+        "period": "2024-11",
+        "feeName": "REGULATORY PRODUCT",
+        "type": "new_fee",
+        "whatChanged": "REGULATORY PRODUCT first appeared in 2024-11.",
+        "explanation": "No regulatory mandate requires this specific fee. This is processor revenue with a compliance-sounding name. Request removal.",
+        "cumulativeImpact": 19.75,
+        "projectedAnnualImpact": 47.4,
+        "noticeFound": false,
+        "noticePeriod": null
+      },
+      {
+        "period": "2025-01",
+        "feeName": "WATS AUTH FEE",
+        "type": "rate_change",
+        "whatChanged": "WATS AUTH FEE changed from $0.11 to $0.13 in 2025-01.",
+        "explanation": "This is a per-authorization fee charged by the processor on every card transaction. The rate is processor-controlled and negotiable. Compare the rate against competitive benchmarks for your volume level.",
+        "cumulativeImpact": 236.38,
+        "projectedAnnualImpact": 975.84,
+        "noticeFound": true,
+        "noticePeriod": "2024-11"
+      },
+      {
+        "period": "2025-03",
+        "feeName": "MANAGED SECURITY NON VALIDATED",
+        "type": "new_fee",
+        "whatChanged": "MANAGED SECURITY NON VALIDATED first appeared in 2025-03.",
+        "explanation": "PCI compliance validation has not been completed. Complete the PCI Self-Assessment Questionnaire (SAQ). Once validated, this fee is eliminated or significantly reduced.",
+        "cumulativeImpact": 99.9,
+        "projectedAnnualImpact": 599.4,
+        "noticeFound": false,
+        "noticePeriod": null
+      },
+      {
+        "period": "2025-04",
+        "feeName": "MONTHLY SERVICE CHARGE",
+        "type": "amount_change",
+        "whatChanged": "MONTHLY SERVICE CHARGE changed from $10.00 to $15.00 in 2025-04.",
+        "explanation": "This is a flat monthly account fee. It is negotiable and some processors waive it.",
+        "cumulativeImpact": 5,
+        "projectedAnnualImpact": 60,
+        "noticeFound": false,
+        "noticePeriod": null
+      },
+      {
+        "period": "2025-04",
+        "feeName": "SUPPLY SHIPPING & HANDLING",
+        "type": "amount_change",
+        "whatChanged": "SUPPLY SHIPPING & HANDLING changed from $15.95 to $19.95 in 2025-04.",
+        "explanation": "This fee is for physical supplies (receipt paper, etc.) shipped by the processor. If you did not order supplies, contact your processor to dispute and opt out of automatic supply shipments.",
+        "cumulativeImpact": 4,
+        "projectedAnnualImpact": 48,
+        "noticeFound": false,
+        "noticePeriod": null
+      }
+    ],
+    "topFindings": [
+      {
+        "priority": 1,
+        "fingerprint": "managed_security_non_validated__confirmed",
+        "tier": "compliance_penalty",
+        "title": "MANAGED SECURITY NON VALIDATED",
+        "description": "MANAGED SECURITY NON VALIDATED first appeared in 2025-03 and has cost $99.90 so far.",
+        "explanation": "PCI compliance validation has not been completed. Complete the PCI Self-Assessment Questionnaire (SAQ). Once validated, this fee is eliminated or significantly reduced.",
+        "monthsAffected": 2,
+        "cumulativeImpact": 99.9,
+        "projectedAnnualImpact": 599.4,
+        "action": "Complete PCI validation to remove the fee.",
+        "difficulty": "no_negotiation",
+        "evidence": [
+          {
+            "period": "2025-03",
+            "detail": "MANAGED SECURITY NON VALIDATED charged $49.95."
+          },
+          {
+            "period": "2025-04",
+            "detail": "MANAGED SECURITY NON VALIDATED charged $49.95."
+          }
+        ]
+      },
+      {
+        "priority": 2,
+        "fingerprint": "silent_fixed_fee_increases__confirmed",
+        "tier": "avoidable_fixed",
+        "title": "Unannounced fixed-fee increases",
+        "description": "Fixed monthly/account fees increased without a matching prior notice.",
+        "explanation": "The specific fee explanations are listed in the Recurring Avoidable Fees section below.",
+        "monthsAffected": 2,
+        "cumulativeImpact": 9,
+        "projectedAnnualImpact": 108,
+        "action": "Ask processor to reverse or justify the unannounced fixed-fee increases.",
+        "difficulty": "investigation_required",
+        "evidence": [
+          {
+            "period": "2025-03",
+            "detail": "MONTHLY SERVICE CHARGE: previous amount 10"
+          },
+          {
+            "period": "2025-04",
+            "detail": "MONTHLY SERVICE CHARGE: new amount 15"
+          },
+          {
+            "period": "2025-03",
+            "detail": "SUPPLY SHIPPING & HANDLING 100000026767543: previous amount 15.95"
+          },
+          {
+            "period": "2025-04",
+            "detail": "SUPPLY SHIPPING & HANDLING 100000026767543: new amount 19.95"
+          }
+        ]
+      },
+      {
+        "priority": 3,
+        "fingerprint": "regulatory_product__confirmed",
+        "tier": "avoidable_fixed",
+        "title": "REGULATORY PRODUCT",
+        "description": "REGULATORY PRODUCT first appeared in 2024-11 and has cost $19.75 so far.",
+        "explanation": "No regulatory mandate requires this specific fee. This is processor revenue with a compliance-sounding name. Request removal.",
+        "monthsAffected": 5,
+        "cumulativeImpact": 19.75,
+        "projectedAnnualImpact": 47.4,
+        "action": "Ask processor to remove or justify this fee.",
+        "difficulty": "investigation_required",
+        "evidence": [
+          {
+            "period": "2024-11",
+            "detail": "REGULATORY PRODUCT charged $3.95."
+          },
+          {
+            "period": "2024-12",
+            "detail": "REGULATORY PRODUCT charged $3.95."
+          },
+          {
+            "period": "2025-01",
+            "detail": "REGULATORY PRODUCT charged $3.95."
+          },
+          {
+            "period": "2025-03",
+            "detail": "REGULATORY PRODUCT charged $3.95."
+          },
+          {
+            "period": "2025-04",
+            "detail": "REGULATORY PRODUCT charged $3.95."
+          }
+        ]
+      },
+      {
+        "priority": 4,
+        "fingerprint": "wats_auth_fee_increase__negotiable",
+        "tier": "negotiation",
+        "title": "WATS AUTH FEE increase",
+        "description": "WATS AUTH FEE increased in 2025-01 after prior notice.",
+        "explanation": "This is a per-authorization fee charged by the processor on every card transaction. The rate is processor-controlled and negotiable. Compare the rate against competitive benchmarks for your volume level.",
+        "monthsAffected": 3,
+        "cumulativeImpact": 236.38,
+        "projectedAnnualImpact": 975.84,
+        "action": "Negotiate the processor-controlled rate.",
+        "difficulty": "negotiation_required",
+        "evidence": [
+          {
+            "period": "2024-12",
+            "detail": "Per-Item / Other Item Fee: previous rate 0.11"
+          },
+          {
+            "period": "2025-01",
+            "detail": "Per-Item / Other Item Fee: new rate 0.13"
+          }
+        ]
+      }
+    ],
+    "recurringAvoidableFees": [
+      {
+        "feeFamilyKey": "supply_shipping_handling",
+        "feeName": "SUPPLY SHIPPING & HANDLING",
+        "explanation": "This fee is for physical supplies (receipt paper, etc.) shipped by the processor. If you did not order supplies, contact your processor to dispute and opt out of automatic supply shipments.",
+        "monthlyAmount": 19.95,
+        "monthsPresent": 7,
+        "cumulativeTotal": 115.65,
+        "projectedAnnual": 239.4,
+        "action": "Opt out of automatic supply shipments or dispute unrequested supplies.",
+        "difficulty": "investigation_required"
+      },
+      {
+        "feeFamilyKey": "monthly_service_charge",
+        "feeName": "MONTHLY SERVICE CHARGE",
+        "explanation": "This is a flat monthly account fee. It is negotiable and some processors waive it.",
+        "monthlyAmount": 15,
+        "monthsPresent": 7,
+        "cumulativeTotal": 75,
+        "projectedAnnual": 180,
+        "action": "Negotiate or request a waiver of the monthly account fee.",
+        "difficulty": "negotiation_required"
+      },
+      {
+        "feeFamilyKey": "august_paper_stateme",
+        "feeName": "PAPER STATEMENT FEE",
+        "explanation": "This is a fee for receiving a paper statement. Switching to electronic statements will eliminate this fee.",
+        "monthlyAmount": 10,
+        "monthsPresent": 7,
+        "cumulativeTotal": 70,
+        "projectedAnnual": 120,
+        "action": "Switch to electronic statements.",
+        "difficulty": "no_negotiation"
+      }
+    ],
+    "cumulativeSavings": {
+      "alreadyOverpaid": {
+        "conservative": 380.3,
+        "estimated": 616.68,
+        "maximum": 616.68
+      },
+      "projectedAnnualIfUnchanged": {
+        "conservative": 1186.2,
+        "estimated": 2162.04,
+        "maximum": 2162.04
+      },
+      "componentBreakdown": [
+        {
+          "fingerprint": "managed_security_non_validated__confirmed",
+          "issue": "MANAGED SECURITY NON VALIDATED",
+          "classification": "compliance_penalty",
+          "monthsPresent": 2,
+          "totalPaid": 99.9,
+          "averageMonthlyAmount": 49.95,
+          "projectedAnnual": 599.4,
+          "action": "Complete PCI validation to remove the fee.",
+          "difficulty": "no_negotiation"
+        },
+        {
+          "fingerprint": "regulatory_product__confirmed",
+          "issue": "REGULATORY PRODUCT",
+          "classification": "avoidable_fixed",
+          "monthsPresent": 5,
+          "totalPaid": 19.75,
+          "averageMonthlyAmount": 3.95,
+          "projectedAnnual": 47.4,
+          "action": "Ask processor to remove or justify this fee.",
+          "difficulty": "investigation_required"
+        },
+        {
+          "fingerprint": "wats_auth_fee_increase__negotiable",
+          "issue": "WATS AUTH FEE increase",
+          "classification": "negotiation",
+          "monthsPresent": 3,
+          "totalPaid": 236.38,
+          "averageMonthlyAmount": 78.79,
+          "projectedAnnual": 975.84,
+          "action": "Negotiate the processor-controlled rate.",
+          "difficulty": "negotiation_required"
+        },
+        {
+          "fingerprint": "recurring_avoidable_fee:supply_shipping_handling",
+          "issue": "SUPPLY SHIPPING & HANDLING",
+          "classification": "avoidable_fixed",
+          "monthsPresent": 7,
+          "totalPaid": 115.65,
+          "averageMonthlyAmount": 19.95,
+          "projectedAnnual": 239.4,
+          "action": "Opt out of automatic supply shipments or dispute unrequested supplies.",
+          "difficulty": "investigation_required"
+        },
+        {
+          "fingerprint": "recurring_avoidable_fee:monthly_service_charge",
+          "issue": "MONTHLY SERVICE CHARGE",
+          "classification": "avoidable_fixed",
+          "monthsPresent": 7,
+          "totalPaid": 75,
+          "averageMonthlyAmount": 15,
+          "projectedAnnual": 180,
+          "action": "Negotiate or request a waiver of the monthly account fee.",
+          "difficulty": "negotiation_required"
+        },
+        {
+          "fingerprint": "recurring_avoidable_fee:august_paper_stateme",
+          "issue": "PAPER STATEMENT FEE",
+          "classification": "avoidable_fixed",
+          "monthsPresent": 7,
+          "totalPaid": 70,
+          "averageMonthlyAmount": 10,
+          "projectedAnnual": 120,
+          "action": "Switch to electronic statements.",
+          "difficulty": "no_negotiation"
+        }
+      ]
+    },
+    "actionItems": [
+      {
+        "priority": 1,
+        "action": "Complete PCI validation to remove the fee.",
+        "expectedAnnualSavings": 599.4,
+        "difficulty": "no_negotiation",
+        "explanation": "PCI compliance validation has not been completed. Complete the PCI Self-Assessment Questionnaire (SAQ). Once validated, this fee is eliminated or significantly reduced.",
+        "relatedFindings": [
+          "managed_security_non_validated__confirmed"
+        ]
+      },
+      {
+        "priority": 2,
+        "action": "Switch to electronic statements.",
+        "expectedAnnualSavings": 120,
+        "difficulty": "no_negotiation",
+        "explanation": "This is a fee for receiving a paper statement. Switching to electronic statements will eliminate this fee.",
+        "relatedFindings": [
+          "recurring_avoidable_fee:august_paper_stateme"
+        ]
+      },
+      {
+        "priority": 3,
+        "action": "Opt out of automatic supply shipments or dispute unrequested supplies.",
+        "expectedAnnualSavings": 239.4,
+        "difficulty": "investigation_required",
+        "explanation": "This fee is for physical supplies (receipt paper, etc.) shipped by the processor. If you did not order supplies, contact your processor to dispute and opt out of automatic supply shipments.",
+        "relatedFindings": [
+          "recurring_avoidable_fee:supply_shipping_handling"
+        ]
+      },
+      {
+        "priority": 4,
+        "action": "Ask processor to remove or justify this fee.",
+        "expectedAnnualSavings": 47.4,
+        "difficulty": "investigation_required",
+        "explanation": "No regulatory mandate requires this specific fee. This is processor revenue with a compliance-sounding name. Request removal.",
+        "relatedFindings": [
+          "regulatory_product__confirmed"
+        ]
+      },
+      {
+        "priority": 5,
+        "action": "Negotiate the processor-controlled rate.",
+        "expectedAnnualSavings": 975.84,
+        "difficulty": "negotiation_required",
+        "explanation": "This is a per-authorization fee charged by the processor on every card transaction. The rate is processor-controlled and negotiable. Compare the rate against competitive benchmarks for your volume level.",
+        "relatedFindings": [
+          "wats_auth_fee_increase__negotiable"
+        ]
+      },
+      {
+        "priority": 6,
+        "action": "Negotiate or request a waiver of the monthly account fee.",
+        "expectedAnnualSavings": 180,
+        "difficulty": "negotiation_required",
+        "explanation": "This is a flat monthly account fee. It is negotiable and some processors waive it.",
+        "relatedFindings": [
+          "recurring_avoidable_fee:monthly_service_charge"
+        ]
+      }
+    ],
+    "actionSummary": {
+      "totalProjectedAnnualSavings": 2162.04,
+      "largestSingleOpportunity": {
+        "action": "Negotiate the processor-controlled rate.",
+        "expectedAnnualSavings": 975.84
+      },
+      "message": "Total projected annual savings if all actions are taken: $2,162.04. The largest single opportunity is Negotiate the processor-controlled rate at $975.84/year."
+    },
+    "masterNarrative": [
+      "Across the 7 statements from 2024-09 through 2025-04, your total processing volume was $1,252,400.72 and total fees were $21,293.31, for an average effective rate of 1.70%. The biggest cumulative cost issue is the processor-controlled WATS AUTH FEE, which increased in 2025-01 after prior notice and has cost $236.38 so far; because it is charged on every card authorization, it is the largest single opportunity to address. The effective rate trend is moving up overall, and the main drivers were fee changes rather than volume alone: higher volume helped in 2024-12 by diluting fixed fees, but later months were pushed up by the WATS AUTH FEE increase, the REGULATORY PRODUCT fee appearing in 2024-11, and the PCI/non-validation fee appearing in 2025-03.",
+      "There were also fees that appeared without prior notice. The REGULATORY PRODUCT fee first showed up in 2024-11 and has cost $19.75 so far; the record says no regulatory mandate requires this fee, so it should be removed or justified. The MANAGED SECURITY NON VALIDATED fee first appeared in 2025-03 and has cost $99.90 so far; this reflects incomplete PCI validation, and once the SAQ is completed this fee is eliminated or significantly reduced. In addition, fixed monthly/account fees increased without matching prior notice, with a cumulative impact of $9.00 across the analyzed statements. The timeline suggests these added and increased fees contributed meaningfully to the rising effective rate.",
+      "A separate set of recurring avoidable charges is still on the statements every month. The MONTHLY SERVICE CHARGE is a flat monthly account fee and has totaled $75.00; the PAPER STATEMENT FEE is a fee for receiving a paper statement and has totaled $70.00; and SUPPLY SHIPPING & HANDLING is for physical supplies such as receipt paper shipped by the processor and has totaled $115.65 across 7 statement(s). These fees are part of the same cost structure that is lifting your effective rate, especially in months where volume was not enough to offset fixed charges. If you want the cleanest quick wins, these are the charges that can be addressed without changing your processing volume.",
+      "The missing statement period is 2025-02, so there is one gap in the 7-month sequence. Chargeback activity also worsened over the period: the record shows 1 chargeback in 2024-10 with $25.00 in dispute cost, then 5 chargebacks in 2025-03 with $125.00, and 2 chargebacks in 2025-04 with $50.00, for total dispute costs of $200.00 across the analyzed statements. That pattern matters because it adds cost on top of the fee increases already discussed, and the highest dispute cost occurred in the same month the MANAGED SECURITY NON VALIDATED fee first appeared.",
+      "Prioritized actions, in the order provided, are: 1) Complete PCI validation to remove the fee, with expected annual savings of $599.40 and no negotiation required; 2) Switch to electronic statements, with expected annual savings of $120.00 and no negotiation required; 3) Opt out of automatic supply shipments or dispute unrequested supplies, with expected annual savings of $239.40 and investigation required; 4) Ask the processor to remove or justify the REGULATORY PRODUCT fee, with expected annual savings of $47.40 and investigation required; 5) Negotiate the processor-controlled WATS AUTH FEE, with expected annual savings of $975.84 and negotiation required; 6) Negotiate or request a waiver of the monthly account fee, with expected annual savings of $180.00 and negotiation required. If all actions are taken, projected annual savings are $2,162.04."
+    ],
+    "individualReports": [
+      {
+        "statementPeriod": "2024-09",
+        "individualReportId": "el-nuevo-tequila-2024-09-real-pipeline"
+      },
+      {
+        "statementPeriod": "2024-10",
+        "individualReportId": "el-nuevo-tequila-2024-10-synthetic"
+      },
+      {
+        "statementPeriod": "2024-11",
+        "individualReportId": "el-nuevo-tequila-2024-11-synthetic"
+      },
+      {
+        "statementPeriod": "2024-12",
+        "individualReportId": "el-nuevo-tequila-2024-12-synthetic"
+      },
+      {
+        "statementPeriod": "2025-01",
+        "individualReportId": "el-nuevo-tequila-2025-01-synthetic"
+      },
+      {
+        "statementPeriod": "2025-03",
+        "individualReportId": "el-nuevo-tequila-2025-03-synthetic"
+      },
+      {
+        "statementPeriod": "2025-04",
+        "individualReportId": "el-nuevo-tequila-2025-04-synthetic"
+      }
+    ],
+    "sourceAnalysis": {
+      "analysisTimestamp": "2026-07-06T00:00:00.000Z",
+      "pipelineVersion": "fixture-preview"
+    }
+  }
+}

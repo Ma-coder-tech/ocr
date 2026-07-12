@@ -819,6 +819,13 @@ export type AnalysisSummary = {
     processorFamily: string;
     statementFamily: string;
   };
+  parserStatementIdentity?: {
+    merchantName?: string | null;
+    merchantNumber?: string | null;
+    processorFamily?: string | null;
+    visibleBrand?: string | null;
+    statementFamily?: string | null;
+  };
   fiservFeeAnalysisV2?: unknown;
   twoBucketAnalysis?: TwoBucketAnalysis;
   checklistReport?: ChecklistReport;

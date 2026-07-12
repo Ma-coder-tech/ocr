@@ -486,6 +486,7 @@ function narrativePrompt(packet: { facts: MerchantNarrativeFact[]; context: Reco
     "Use the master estimatedAnnualSavings fact as the only savings range. Lead with the estimated value, mention the conservative confirmed value, and treat maximum as upside if investigative items are validated. If mentioning a finding-level dollar impact, label it as a component impact, not a separate total savings estimate.",
     "If a fact says proof is indeterminate, not enough detail, pending, or an estimate, say that plainly.",
     "Do not present AI assessments as proof. Treat them as advisory recommendations.",
+    "Never use first person (I, me, my). Write in impersonal form: 'The data shows...' or 'Based on the analysis...' or 'The reviewed statement indicates...'.",
     "Write in clear language for a merchant, not internal engineering language.",
     "Required sections: executiveSummary, pricingModel, passThroughVerification, processorControlledFees, benchmarkConclusion, noticesAndRepricing, negotiationOpportunities, caveats.",
     "Fact packet:",

@@ -315,6 +315,13 @@ function applyValidatedParserOutput(
       processorFamily: output.statementIdentity.processorFamily,
       statementFamily: output.statementIdentity.statementFamily,
     },
+    parserStatementIdentity: {
+      merchantName: output.statementIdentity.merchantName ?? null,
+      merchantNumber: output.statementIdentity.merchantNumber ?? null,
+      processorFamily: output.statementIdentity.processorFamily,
+      visibleBrand: output.statementIdentity.visibleBrand ?? null,
+      statementFamily: output.statementIdentity.statementFamily,
+    },
     fiservFeeAnalysisV2: output.fiservFeeAnalysisV2,
   };
 }

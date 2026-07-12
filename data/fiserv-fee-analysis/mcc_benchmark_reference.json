@@ -304,6 +304,12 @@
         "negotiable": true
       },
       {
+        "patterns": ["BATCH SETTLEMENT FEE", "BATCH HEADER FEE", "BATCH FEE", "SETTLEMENT FEE"],
+        "recommendation": "This is a processor-controlled per-batch settlement fee. It is charged each time batches are closed or settled and is negotiable. Ask whether batching can be consolidated or whether the per-batch charge can be waived.",
+        "avoidable": false,
+        "negotiable": true
+      },
+      {
         "patterns": ["ADDITIONAL FEES"],
         "recommendation": "This is a vaguely labeled fee with no clear corresponding service. Request itemization from the processor.",
         "avoidable": false,
@@ -365,6 +371,47 @@
         "recommendation": "Monthly chargeback or risk monitoring fee. Common for high-risk merchants. Verify the amount is in the $10-$25/month range. Amounts significantly above this may be inflated.",
         "avoidable": false,
         "negotiable": true
+      }
+    ]
+  },
+
+  "processor_per_auth_patterns": {
+    "description": "Processor-controlled per-authorization fees that are negotiable but not junk fees or penalty fees.",
+    "fees": [
+      {
+        "patterns": ["WATS AUTH FEE", "WATS AUTH", "WATS AUTHORIZATION FEE"],
+        "recommendation": "This is a per-authorization fee charged by the processor on every card transaction. The rate is processor-controlled and negotiable. Compare the rate against competitive benchmarks for your volume level.",
+        "negotiable": true
+      },
+      {
+        "patterns": ["AUTH FEE", "AUTHORIZATION FEE", "MASTERCARD AUTH FEE", "VISA AUTH FEE", "DISCOVER AUTH FEE", "AMEX AUTH FEE", "SIG DEBIT AUTH FEE"],
+        "recommendation": "This is a per-authorization fee charged by the processor. It is applied to every card transaction and is negotiable. If multiple per-auth fees are stacked, the total per-authorization cost may be higher than competitive rates.",
+        "negotiable": true
+      },
+      {
+        "patterns": ["ECI CPU-G", "ECI CPU", "ELECTRONIC COMMERCE INDICATOR"],
+        "recommendation": "This is an ecommerce gateway authorization fee charged by the processor on every online/card-not-present transaction. It is processor-controlled and negotiable.",
+        "negotiable": true
+      },
+      {
+        "patterns": ["CPU GTWY", "CPU GATEWAY", "GATEWAY FEE", "GTWY FEE"],
+        "recommendation": "This is a gateway authorization fee charged by the processor on every transaction. It is processor-controlled and negotiable. Some processors charge this in addition to other per-auth fees, resulting in stacked per-authorization costs.",
+        "negotiable": true
+      },
+      {
+        "patterns": ["AVS WATS AUTHORIZATION", "AVS WATS AUTH", "AVS CPU-G", "AVS ECIC-G", "AVS AUTHORIZATION"],
+        "recommendation": "This is a fee charged by the processor for Address Verification Service checks on each transaction. It is processor-controlled and negotiable.",
+        "negotiable": true
+      }
+    ]
+  },
+
+  "network_fee_patterns": {
+    "description": "Card-network or acquirer/network pass-through fee patterns that need plain-language explanations but should not be treated as junk or penalty fees by default.",
+    "fees": [
+      {
+        "patterns": ["MC LICENSE VOLUME FEE", "LICENSE VOLUME FEE", "MC LICENSE FEE", "MASTERCARD LICENSE VOLUME"],
+        "recommendation": "This is a Mastercard acquirer license fee assessed as a percentage of volume. It is a network pass-through fee, but the rate varies by acquirer and is not publicly fixed at a single rate. If the rate exceeds commonly cited industry references, request documentation from your processor."
       }
     ]
   },

@@ -7,6 +7,7 @@ import type {
   StructuredFeeFinding,
   SuspiciousFee,
 } from "../types.js";
+import { explainFeeFromReference } from "../feeReferenceExplanations.js";
 import type { CustomerConfidence, CustomerFeeTableRow, CustomerFinding, CustomerReportMetric, ReportKind } from "./types.js";
 
 const HIGH_CONFIDENCE_SCORE = 0.8;
@@ -437,7 +438,7 @@ function structuredFindings(findings: StructuredFeeFinding[], kind: ReportKind):
       return {
         id: `structured_${finding.kind}`,
         title: findingTitle(finding.kind, finding.label),
-        description: findingDescription(finding.kind),
+        description: feeReferenceDescription(finding.label, findingDescription(finding.kind)),
         severity: confidence === "high" ? "fix" : "watch",
         monthlyImpact: amount !== null ? formatMoney(amount) : undefined,
         evidenceSummary: safeEvidence(finding.evidenceLine),
@@ -455,13 +456,18 @@ function suspiciousFeeFindings(findings: SuspiciousFee[], kind: ReportKind): Cus
       return {
         id: `suspicious_${index}_${normalizeId(finding.label)}`,
         title: displayFeeLabel(finding.label),
-        description: safeEvidence(finding.reason),
+        description: feeReferenceDescription(finding.label, safeEvidence(finding.reason)),
         severity: high ? "fix" : "watch",
         monthlyImpact: isPositiveFinite(finding.amount) ? formatMoney(finding.amount) : undefined,
         confidence: high ? "high" : "medium",
       };
     })
     .filter((finding): finding is CustomerFinding => finding !== null);
+}
+
+function feeReferenceDescription(label: string, fallback: string): string {
+  const explanation = explainFeeFromReference(label);
+  return explanation.pattern ? explanation.explanation : fallback;
 }
 
 function findingTitle(kind: StructuredFeeFinding["kind"], fallback: string): string {
