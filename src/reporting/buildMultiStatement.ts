@@ -200,7 +200,7 @@ function difficultyLabel(value: Difficulty): string {
 }
 
 const TOP_FINDING_MIN_PROJECTED_ANNUAL = 10;
-const GENERIC_FEE_EXPLANATION = "Contact your processor for details about this fee.";
+const GENERIC_FEE_EXPLANATION = "Ask your processor for details about this fee.";
 
 function cleanFeeDisplayText(value: string): string {
   return value
@@ -247,13 +247,13 @@ function cleanFindingDescription(description: string): string {
 
 function findingExplanation(finding: MultiStatementAnalysis["globalFindings"][number]): string {
   if (finding.fingerprint === "silent_fixed_fee_increases__confirmed") {
-    return "The specific fee explanations are listed in the Recurring Avoidable Fees section below.";
+    return "The specific fee explanations are listed in the recurring fees section below.";
   }
   if (/access fee is charged at the same rate/i.test(finding.title)) {
     return "This pattern suggests a processor-controlled access fee may be applied uniformly across independent networks. Ask for pass-through documentation showing the source and exact wholesale basis.";
   }
   if (/per-authorization fee is above competitive benchmark/i.test(finding.title)) {
-    return "This is processor-controlled per-authorization pricing. The finding measures potential savings from reducing the per-auth cost to the competitive benchmark target.";
+    return "This is processor-controlled per-transaction pricing. Negotiating it down to the benchmark target would lower this cost.";
   }
   if (/monthly advantage fee/i.test(finding.title)) {
     return "This appears to be a processor-controlled percentage markup embedded as a monthly advantage fee. It is negotiable and should be separated from true card-network pass-through costs.";
@@ -363,7 +363,7 @@ function actionFromPattern(pattern: MccBenchmarkPattern | null, feeName: string)
   if (/supply shipping|shipping/i.test(feeName)) return "Opt out of automatic supply shipments or dispute unrequested supplies.";
   if (/monthly service|account service|monthly account/i.test(feeName)) return "Negotiate or request a waiver of the monthly account fee.";
   if (/batch|settlement/i.test(feeName)) return "Ask whether batching can be consolidated or the per-batch settlement fee can be waived.";
-  return pattern?.recommendation ?? "Ask processor to remove, waive, or explain this fee.";
+  return pattern?.recommendation ?? "Ask your processor to remove, waive, or explain this fee.";
 }
 
 function rateChangeLabel(change: MultiStatementAnalysis["rateChanges"][number]): {
@@ -584,7 +584,7 @@ function buildReportActionItems(
         action: item.action,
         expectedAnnualSavings: item.expectedSavings,
         difficulty: item.difficulty,
-        explanation: finding?.explanation ?? "Contact your processor for details about this fee.",
+        explanation: finding?.explanation ?? "Ask your processor for details about this fee.",
         relatedFindings: item.relatedFindings,
         includes: [
           {
@@ -754,7 +754,7 @@ export function buildMultiStatementGlobalReport(
         unit: "money",
       },
       averageEffectiveRate: {
-        label: "Average effective rate",
+        label: "Average fees as a percentage of sales",
         value: percent(analysis.effectiveRateTrend.averageRate),
         rawValue: analysis.effectiveRateTrend.averageRate,
         unit: "percent",
@@ -763,7 +763,7 @@ export function buildMultiStatementGlobalReport(
       pricingModel: pricingModels.length === 1 ? pricingModels[0] : pricingModels.join(", "),
       pricingModelConsistent: analysis.pricingModelConsistency.consistent,
       headlineSavings: {
-        label: "Projected annual savings if unchanged",
+        label: "Annual fees worth challenging if unchanged",
         value: money(headlineSavings),
         rawValue: headlineSavings,
         unit: "money",
@@ -853,28 +853,28 @@ export function buildMultiStatementGlobalReport(
 
 export function renderMultiStatementGlobalReportMarkdown(report: MultiStatementGlobalReport): string {
   const lines: string[] = [];
-  lines.push(`# Multi-Statement Processing Review: ${report.executiveSummary.merchantName || "Merchant"}`);
+  lines.push(`# Multi-statement processing review: ${report.executiveSummary.merchantName || "Merchant"}`);
   lines.push("");
-  lines.push("## Executive Summary");
+  lines.push("## Executive summary");
   lines.push(`- ISO: ${report.executiveSummary.isoName || "Not identified"}`);
   lines.push(`- Date range: ${report.executiveSummary.dateRange}`);
   lines.push(`- Statements analyzed: ${count(report.executiveSummary.statementCount)}`);
   if (report.executiveSummary.missingPeriods.length > 0) lines.push(`- Missing periods: ${report.executiveSummary.missingPeriods.join(", ")}`);
   lines.push(`- Total volume: ${report.executiveSummary.totalVolume.value}`);
   lines.push(`- Total fees: ${report.executiveSummary.totalFees.value}`);
-  lines.push(`- Average effective rate: ${report.executiveSummary.averageEffectiveRate.value}`);
-  lines.push(`- Effective rate trend: ${report.executiveSummary.trendDirection}`);
+  lines.push(`- Average fees as a percentage of sales: ${report.executiveSummary.averageEffectiveRate.value}`);
+  lines.push(`- Fee percentage trend: ${report.executiveSummary.trendDirection}`);
   lines.push(`- Benchmark status: ${report.executiveSummary.benchmark.message}`);
   lines.push(`- Pricing model: ${report.executiveSummary.pricingModel || "Not identified"}`);
-  lines.push(`- Headline projected annual savings: ${report.executiveSummary.headlineSavings.value}`);
+  lines.push(`- Annual fees worth challenging if unchanged: ${report.executiveSummary.headlineSavings.value}`);
   lines.push("");
-  lines.push("## Effective Rate Trend");
+  lines.push("## Fee percentage trend");
   for (const period of report.effectiveRateTrend.periods) {
     lines.push(`- ${period.period}: ${period.displayRate} on ${period.displayVolume} volume and ${period.displayTotalFees} fees`);
   }
   if (report.effectiveRateTrend.explanation) lines.push(`- Explanation: ${report.effectiveRateTrend.explanation}`);
   lines.push("");
-  lines.push("## Operational Context");
+  lines.push("## Operational context");
   if (report.operationalContext.inactivePeriods.length === 0 && !report.operationalContext.refundTrend.finding && report.operationalContext.cardMixShifts.length === 0 && report.operationalContext.priorPeriodAdjustments.length === 0) {
     lines.push("No material zero-volume, refund, card-mix, or prior-period adjustment issues were detected from the available parsed data.");
   } else {
@@ -886,7 +886,7 @@ export function renderMultiStatementGlobalReportMarkdown(report: MultiStatementG
     for (const adjustment of report.operationalContext.priorPeriodAdjustments) lines.push(`- ${adjustment.period}: ${adjustment.finding}`);
   }
   lines.push("");
-  lines.push("## Dispute Trend");
+  lines.push("## Dispute trend");
   lines.push(`- Direction: ${report.disputeTrend.direction}`);
   lines.push(`- Total dispute costs: ${money(report.disputeTrend.totalDisputeCostsAllPeriods)}`);
   if (report.disputeTrend.finding) lines.push(`- Finding: ${report.disputeTrend.finding}`);
@@ -894,7 +894,7 @@ export function renderMultiStatementGlobalReportMarkdown(report: MultiStatementG
     lines.push(`- ${period.period}: ${period.chargebacks} chargebacks, ${period.achRejects} ACH rejects, ${period.displayTotalDisputeCost} total dispute cost`);
   }
   lines.push("");
-  lines.push("## Fee Change Timeline");
+  lines.push("## Fee change timeline");
   for (const item of report.feeChangeTimeline) {
     const notice = item.noticeFound === null ? "notice not applicable" : item.noticeFound ? `notice found in ${item.noticePeriod}` : "no prior notice found";
     lines.push(
@@ -902,14 +902,14 @@ export function renderMultiStatementGlobalReportMarkdown(report: MultiStatementG
     );
   }
   lines.push("");
-  lines.push("## Top Findings");
+  lines.push("## Top findings");
   for (const finding of report.topFindings) {
     lines.push(
       `${finding.priority}. ${finding.title}: ${finding.description} ${finding.explanation} Cumulative impact ${money(finding.cumulativeImpact)}; projected annual impact ${money(finding.projectedAnnualImpact)}; action: ${finding.action}; difficulty: ${difficultyLabel(finding.difficulty)}.`,
     );
   }
   lines.push("");
-  lines.push("## Recurring Avoidable Fees");
+  lines.push("## Recurring fees");
   if (report.recurringAvoidableFees.length === 0) {
     lines.push("No recurring avoidable fixed fees were detected.");
   } else {
@@ -920,7 +920,7 @@ export function renderMultiStatementGlobalReportMarkdown(report: MultiStatementG
     }
   }
   lines.push("");
-  lines.push("## Cumulative Savings");
+  lines.push("## Fees worth challenging");
   lines.push(
     `- Already overpaid: conservative ${money(report.cumulativeSavings.alreadyOverpaid.conservative)}, estimated ${money(report.cumulativeSavings.alreadyOverpaid.estimated)}, maximum ${money(report.cumulativeSavings.alreadyOverpaid.maximum)}.`,
   );
@@ -928,7 +928,7 @@ export function renderMultiStatementGlobalReportMarkdown(report: MultiStatementG
     `- Projected annual if unchanged: conservative ${money(report.cumulativeSavings.projectedAnnualIfUnchanged.conservative)}, estimated ${money(report.cumulativeSavings.projectedAnnualIfUnchanged.estimated)}, maximum ${money(report.cumulativeSavings.projectedAnnualIfUnchanged.maximum)}.`,
   );
   lines.push("");
-  lines.push("## Action Items");
+  lines.push("## Action items");
   for (const item of report.actionItems) {
     const includes =
       item.includes.length > 0
@@ -938,7 +938,7 @@ export function renderMultiStatementGlobalReportMarkdown(report: MultiStatementG
   }
   lines.push(`- ${report.actionSummary.message}`);
   lines.push("");
-  lines.push("## Master Narrative");
+  lines.push("## Master narrative");
   if (report.masterNarrative.length === 0) {
     lines.push("Narrative has not been generated yet.");
   } else {

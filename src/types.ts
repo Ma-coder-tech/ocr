@@ -842,8 +842,10 @@ export type PublicReportSummary = Pick<
   | "totalFees"
   | "estimatedMonthlyVolume"
   | "estimatedMonthlyFees"
+  | "estimatedAnnualSavings"
   | "effectiveRate"
   | "benchmark"
+  | "bundledPricing"
   | "confidence"
   | "dataQuality"
 > & {

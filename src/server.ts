@@ -1233,7 +1233,7 @@ async function handleAuthenticatedJob(req: IncomingMessage, res: ServerResponse,
     summary: toPublicReportSummary(job.summary),
     customerReport: job.summary
       ? buildSingleStatementCustomerReport({
-          kind: "single_statement_full",
+          kind: "single_statement_result",
           analysis: job.summary,
           context: { unlocked: true },
         })
@@ -1397,7 +1397,7 @@ async function handleDashboardReportData(res: ServerResponse, merchant: Authenti
   const publicSummary = toPublicReportSummary(statement1.analysisSummary);
   const statementCount = getStatementsForMerchant(merchant.merchantId).length;
   const customerReport = buildSingleStatementCustomerReport({
-    kind: "single_statement_full",
+    kind: "single_statement_result",
     analysis: statement1.analysisSummary,
     context: { unlocked: true },
   });
@@ -1438,7 +1438,7 @@ async function handleStatementReportData(res: ServerResponse, merchant: Authenti
   const publicSummary = toPublicReportSummary(statement.analysisSummary);
   const statementCount = getStatementsForMerchant(merchant.merchantId).length;
   const customerReport = buildSingleStatementCustomerReport({
-    kind: "single_statement_full",
+    kind: "single_statement_result",
     analysis: statement.analysisSummary,
     context: { unlocked: true },
   });
@@ -1524,9 +1524,9 @@ async function handleAnonymousJobLookup(req: IncomingMessage, res: ServerRespons
     summary: toPublicReportSummary(job.summary),
     customerReport: job.summary
       ? buildSingleStatementCustomerReport({
-          kind: "free_teaser",
+          kind: "single_statement_result",
           analysis: job.summary,
-          context: { unlocked: false },
+          context: { unlocked: true, merchantName: job.summary.parserStatementIdentity?.merchantName ?? null },
         })
       : null,
   });

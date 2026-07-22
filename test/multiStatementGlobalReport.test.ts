@@ -92,10 +92,10 @@ describe("multi-statement global report", () => {
       "PCI compliance validation has not been completed",
     );
     expect(result.topFindings.find((finding) => finding.fingerprint === "regulatory_product__confirmed")?.explanation).toContain(
-      "No regulatory mandate requires this specific fee",
+      "We couldn't tie this fee to a published card brand requirement",
     );
     expect(result.topFindings.find((finding) => finding.fingerprint === "wats_auth_fee_increase__negotiable")?.explanation).toContain(
-      "per-authorization fee charged by the processor",
+      "processor-controlled per-transaction fee",
     );
     expect(result.recurringAvoidableFees).toEqual(
       expect.arrayContaining([
@@ -156,20 +156,20 @@ describe("multi-statement global report", () => {
   it("renders a markdown report preview with all global sections", () => {
     const markdown = renderMultiStatementGlobalReportMarkdown(report());
 
-    expect(markdown).toContain("# Multi-Statement Processing Review: EL NUEVO TEQUILA MEXICAN");
-    expect(markdown).toContain("## Executive Summary");
-    expect(markdown).toContain("## Effective Rate Trend");
-    expect(markdown).toContain("## Dispute Trend");
-    expect(markdown).toContain("## Fee Change Timeline");
-    expect(markdown).toContain("## Top Findings");
-    expect(markdown).toContain("## Recurring Avoidable Fees");
-    expect(markdown).toContain("## Cumulative Savings");
-    expect(markdown).toContain("## Action Items");
-    expect(markdown).toContain("## Master Narrative");
+    expect(markdown).toContain("# Multi-statement processing review: EL NUEVO TEQUILA MEXICAN");
+    expect(markdown).toContain("## Executive summary");
+    expect(markdown).toContain("## Fee percentage trend");
+    expect(markdown).toContain("## Dispute trend");
+    expect(markdown).toContain("## Fee change timeline");
+    expect(markdown).toContain("## Top findings");
+    expect(markdown).toContain("## Recurring fees");
+    expect(markdown).toContain("## Fees worth challenging");
+    expect(markdown).toContain("## Action items");
+    expect(markdown).toContain("## Master narrative");
     expect(markdown).toContain("2025-02");
     expect(markdown).toContain("REGULATORY PRODUCT");
     expect(markdown).toContain("WATS AUTH FEE");
-    expect(markdown).toContain("This is a per-authorization fee charged by the processor on every card transaction");
+    expect(markdown).toContain("You paid a processor-controlled per-transaction fee");
     expect(markdown).not.toContain("WATS AUTH FEE changed from $0.11 to $0.13 in 2025-01. Contact your processor for details about this fee.");
     expect(markdown).toContain("Total projected annual savings if all actions are taken: $2,163.24");
     expect(markdown).toContain("Includes: WATS AUTH FEE increase ($975.84)");

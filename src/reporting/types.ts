@@ -1,6 +1,7 @@
 import type { BusinessTypeId } from "../businessTypes.js";
 
-export type ReportKind = "free_teaser" | "single_statement_full";
+export type ReportKind = "single_statement_result" | "single_statement_full" | "free_teaser";
+export type CustomerReportState = "Actionable" | "Clean" | "Limited";
 export type CustomerReportBuildState = "complete" | "partial" | "blocked";
 export type CustomerReportSituation = "above_benchmark" | "within_with_flags" | "clean" | "data_limited";
 export type CustomerDisplayMode = "exact" | "fallback" | "hidden";
@@ -32,6 +33,12 @@ export type CustomerFinding = {
   evidenceSummary?: string;
   action?: CustomerAction;
   confidence: CustomerConfidence;
+};
+
+export type CustomerReportSavings = {
+  annualAmount: number;
+  displayAmount: string | null;
+  basis: "visible_findings";
 };
 
 export type CustomerFeeTableRow = {
@@ -81,6 +88,7 @@ export type CustomerCTA = {
 
 export type CustomerReportDTO = {
   kind: ReportKind;
+  state: CustomerReportState;
   buildState: CustomerReportBuildState;
   situation: CustomerReportSituation;
   identity: CustomerReportIdentity;
@@ -88,6 +96,8 @@ export type CustomerReportDTO = {
   metrics: CustomerReportMetric[];
   sections: CustomerReportSection[];
   findings: CustomerFinding[];
+  positiveFindings: CustomerFinding[];
+  savings: CustomerReportSavings;
   dataQuality: CustomerDataQualityNote;
   cta?: CustomerCTA;
 };
