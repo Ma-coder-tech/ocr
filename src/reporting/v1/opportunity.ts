@@ -7,6 +7,7 @@ export type OpportunityAggregationResult = {
 };
 
 export function aggregateOpportunity(findings: ReportFinding[]): OpportunityAggregationResult {
+  const graph = resolveSupersessionGraph(findings);
   const sorted = [...findings].sort((left, right) => {
     const impactDelta = annualImpact(right) - annualImpact(left);
     return impactDelta !== 0 ? impactDelta : left.id.localeCompare(right.id);
@@ -15,7 +16,6 @@ export function aggregateOpportunity(findings: ReportFinding[]): OpportunityAggr
   const included = new Set<string>();
   const excluded = new Set<string>();
   const usedAggregationKeys = new Set<string>();
-  const superseded = new Set<string>();
   let deterministicAnnual = 0;
   let estimatedAnnual = 0;
   let verificationMonthly = 0;
@@ -32,7 +32,7 @@ export function aggregateOpportunity(findings: ReportFinding[]): OpportunityAggr
       continue;
     }
 
-    if (!eligibleForOpportunity(finding) || superseded.has(finding.id)) {
+    if (!eligibleForOpportunity(finding) || graph.excludedFromGraph.has(finding.id)) {
       excluded.add(finding.id);
       continue;
     }
@@ -51,13 +51,6 @@ export function aggregateOpportunity(findings: ReportFinding[]): OpportunityAggr
 
     included.add(finding.id);
     usedAggregationKeys.add(aggregationKey);
-    for (const childId of finding.supersedesFindingIds ?? []) {
-      if (childId !== finding.id) {
-        superseded.add(childId);
-        included.delete(childId);
-        excluded.add(childId);
-      }
-    }
 
     if (finding.impactClassification === "deterministic") {
       deterministicAnnual += impact;
@@ -68,7 +61,7 @@ export function aggregateOpportunity(findings: ReportFinding[]): OpportunityAggr
   }
 
   const includedFindingIds = [...included].sort();
-  const excludedFindingIds = [...new Set([...excluded, ...findings.filter((finding) => !included.has(finding.id)).map((finding) => finding.id)])].sort();
+  const excludedFindingIds = [...new Set([...excluded, ...graph.excludedFromGraph, ...findings.filter((finding) => !included.has(finding.id)).map((finding) => finding.id)])].sort();
   const updatedFindings = findings.map((finding) => ({
     ...finding,
     includedInOpportunityTotal: included.has(finding.id),
@@ -91,6 +84,79 @@ export function aggregateOpportunity(findings: ReportFinding[]): OpportunityAggr
       excludedFindingIds: excludedFindingIds.filter((id) => !included.has(id)),
     },
   };
+}
+
+function resolveSupersessionGraph(findings: ReportFinding[]): { excludedFromGraph: Set<string> } {
+  const byId = new Map(findings.map((finding) => [finding.id, finding]));
+  const invalid = new Set<string>();
+  const edges = new Map<string, string[]>();
+
+  for (const finding of findings) {
+    const childIds = [...new Set(finding.supersedesFindingIds ?? [])].filter((childId) => childId !== finding.id);
+    const validChildren: string[] = [];
+    for (const childId of childIds) {
+      if (!byId.has(childId)) {
+        invalid.add(finding.id);
+      } else {
+        validChildren.push(childId);
+      }
+    }
+    edges.set(finding.id, validChildren);
+  }
+
+  const circular = findCircularNodes(edges);
+  const superseded = new Set<string>();
+  const memo = new Map<string, Set<string>>();
+
+  function collect(nodeId: string): Set<string> {
+    if (memo.has(nodeId)) return memo.get(nodeId)!;
+    const collected = new Set<string>();
+    if (invalid.has(nodeId) || circular.has(nodeId)) {
+      memo.set(nodeId, collected);
+      return collected;
+    }
+    for (const childId of edges.get(nodeId) ?? []) {
+      if (invalid.has(childId) || circular.has(childId)) continue;
+      collected.add(childId);
+      for (const descendantId of collect(childId)) collected.add(descendantId);
+    }
+    memo.set(nodeId, collected);
+    return collected;
+  }
+
+  for (const finding of findings) {
+    if (invalid.has(finding.id) || circular.has(finding.id)) continue;
+    for (const childId of collect(finding.id)) superseded.add(childId);
+  }
+
+  return { excludedFromGraph: new Set([...invalid, ...circular, ...superseded]) };
+}
+
+function findCircularNodes(edges: Map<string, string[]>): Set<string> {
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const stack: string[] = [];
+  const circular = new Set<string>();
+
+  function visit(nodeId: string): void {
+    if (visited.has(nodeId)) return;
+    if (visiting.has(nodeId)) {
+      const start = stack.indexOf(nodeId);
+      for (const cycleNode of stack.slice(start)) circular.add(cycleNode);
+      circular.add(nodeId);
+      return;
+    }
+
+    visiting.add(nodeId);
+    stack.push(nodeId);
+    for (const childId of edges.get(nodeId) ?? []) visit(childId);
+    stack.pop();
+    visiting.delete(nodeId);
+    visited.add(nodeId);
+  }
+
+  for (const nodeId of edges.keys()) visit(nodeId);
+  return circular;
 }
 
 function eligibleForOpportunity(finding: ReportFinding): boolean {

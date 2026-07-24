@@ -2,7 +2,7 @@ import { getBusinessTypeReportLabel } from "../../businessTypes.js";
 import type { AnalysisSummary, FeeBreakdownRow, StructuredFeeFinding } from "../../types.js";
 import { normalizeDataQuality } from "./normalizeDataQuality.js";
 import { aggregateOpportunity } from "./opportunity.js";
-import { qualifiedBenchmarkRegistry, singleStatementReportV1Policy } from "./policyConfig.js";
+import { qualifiedBenchmarkRegistry, singleStatementReportV1Policy, structuredFindingCadencePolicy } from "./policyConfig.js";
 import { normalizeReconciliation } from "./reconcile.js";
 import { resolveReportState } from "./resolveState.js";
 import { validateSingleStatementReportV1 } from "./schema.js";
@@ -430,10 +430,13 @@ function structuredFinding(finding: StructuredFeeFinding, collections: BuildColl
     excerpt: customerSafeExcerpt(finding.evidenceLine),
     confidence,
   });
-  const cadence: ChargeCadence = finding.kind === "non_emv" ? "unknown" : "monthly";
+  const cadence = cadenceForStructuredFinding(finding);
   const amount = positiveOrNull(finding.estimatedImpactUsd) ?? positiveOrNull(finding.amountUsd);
   const impactClassification: ImpactClassification = finding.kind === "non_emv" ? "verification_only" : "deterministic";
   const calculationRef = amount !== null && cadence === "monthly" ? addAnnualizedCalculation(collections, `calc_${id}`, amount, [evidenceId], confidence) : undefined;
+  const monthlyAmount = cadence === "monthly" ? amount : null;
+  const annualAmount = amount !== null && cadence === "monthly" ? round2(amount * 12) : null;
+  const cadencePolicy = structuredFindingCadencePolicy[finding.kind];
   return {
     id,
     sourceFindingType: finding.kind,
@@ -444,27 +447,36 @@ function structuredFinding(finding: StructuredFeeFinding, collections: BuildColl
     explanation: finding.kind === "non_emv" ? "This charge requires more context before RateReveal can classify it as avoidable." : "This statement shows a processor-controlled charge worth challenging.",
     merchantAction: impactClassification === "verification_only" ? "Ask the processor to document why this charge applies." : "Ask the processor to remove or justify this charge.",
     processorQuestion: `Can you explain the ${displayFeeLabel(finding.label)} charge and whether it can be removed?`,
-    currentMonthlyAmountUsd: amount,
-    currentAnnualizedAmountUsd: amount !== null && cadence === "monthly" ? round2(amount * 12) : null,
+    currentMonthlyAmountUsd: monthlyAmount,
+    currentAnnualizedAmountUsd: annualAmount,
     cadence,
     targetMonthlyAmountUsd: null,
     targetRatePct: null,
-    estimatedMonthlyImpactUsd: amount,
-    estimatedAnnualImpactUsd: amount !== null && cadence === "monthly" ? round2(amount * 12) : null,
-    impactLevel: impactLevel(amount !== null ? amount * 12 : null),
+    estimatedMonthlyImpactUsd: monthlyAmount,
+    estimatedAnnualImpactUsd: annualAmount,
+    impactLevel: impactLevel(annualAmount),
     easeLevel: "unknown",
     confidence,
     originalStatementLabels: [finding.label],
     feeRowIds: [],
     evidenceRefs: [evidenceId],
     calculationRef,
-    assumptions: cadence === "monthly" ? ["The charge is treated as a monthly statement charge for this v1 projection."] : [],
-    limitations: cadence === "unknown" ? ["Cadence is not confirmed, so this amount is excluded from eligible opportunity."] : [],
+    assumptions: cadence === "monthly" ? [`${cadencePolicy.methodologyLabel} ${cadencePolicy.limitation}`] : [],
+    limitations: cadence === "unknown" ? [cadencePolicy.limitation] : [],
     includedInOpportunityTotal: false,
     rank: 0,
     aggregationKey: stableId(["structured", finding.kind, finding.label]),
     overlapRisk: "none",
   };
+}
+
+function cadenceForStructuredFinding(finding: StructuredFeeFinding): ChargeCadence {
+  if (explicitMonthlyCadenceEvidence(finding.evidenceLine)) return "monthly";
+  return structuredFindingCadencePolicy[finding.kind].cadence;
+}
+
+function explicitMonthlyCadenceEvidence(evidenceLine: string): boolean {
+  return /\b(monthly|per\s+month|each\s+month|\/\s*mo\.?|month\s+fee)\b/i.test(evidenceLine);
 }
 
 function fiservFindings(summary: AnalysisSummary, collections: BuildCollections): ReportFinding[] {
