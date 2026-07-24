@@ -649,4 +649,73 @@ describe("SingleStatementReportV1 safety foundation", () => {
       }),
     ).toThrow(/hidden without an omission reason/);
   });
+
+  it("validates opportunity id partitions and included finding eligibility", () => {
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        structuredFeeFindings: [
+          structuredFeeFinding({ kind: "pci_non_compliance", label: "PCI Non Compliance", amountUsd: 100, rowIndex: 1 }),
+          structuredFeeFinding({ kind: "risk_fee", label: "Risk Fee", amountUsd: 20, rowIndex: 2 }),
+        ],
+      }),
+      reportId: "opportunity-integrity",
+      generatedAt: NOW,
+    });
+    const includedId = report.opportunitySummary.includedFindingIds[0]!;
+    const excludedId = report.opportunitySummary.excludedFindingIds[0]!;
+    expect(includedId).toBeTruthy();
+    expect(excludedId).toBeTruthy();
+    expect(() => validateSingleStatementReportV1(report)).not.toThrow();
+
+    expect(() =>
+      validateSingleStatementReportV1({
+        ...report,
+        opportunitySummary: { ...report.opportunitySummary, includedFindingIds: [includedId, includedId] },
+      }),
+    ).toThrow(/duplicate/);
+    expect(() =>
+      validateSingleStatementReportV1({
+        ...report,
+        opportunitySummary: { ...report.opportunitySummary, includedFindingIds: [includedId, "missing"] },
+      }),
+    ).toThrow(/unknown finding missing/);
+    expect(() =>
+      validateSingleStatementReportV1({
+        ...report,
+        opportunitySummary: { ...report.opportunitySummary, excludedFindingIds: [excludedId, includedId] },
+      }),
+    ).toThrow(/both included and excluded/);
+    expect(() =>
+      validateSingleStatementReportV1({
+        ...report,
+        opportunitySummary: { ...report.opportunitySummary, excludedFindingIds: [] },
+      }),
+    ).toThrow(/does not classify/);
+    expect(() =>
+      validateSingleStatementReportV1({
+        ...report,
+        findings: report.findings.map((item) => (item.id === includedId ? { ...item, includedInOpportunityTotal: false } : item)),
+      }),
+    ).toThrow(/includedInOpportunityTotal is false/);
+
+    const includedFinding = report.findings.find((item) => item.id === includedId)!;
+    const ineligibleCases: Array<[string, Partial<ReportFinding>, RegExp]> = [
+      ["low confidence", { confidence: "low" }, /low confidence/],
+      ["verification-only", { impactClassification: "verification_only" }, /unsupported impact classification/],
+      ["unknown cadence", { cadence: "unknown" }, /unsupported cadence unknown/],
+      ["missing calculation", { calculationRef: undefined }, /no calculationRef/],
+      ["broken calculation", { calculationRef: "missing_calc" }, /calculationRef is broken/],
+    ];
+
+    for (const [name, override, error] of ineligibleCases) {
+      expect(
+        () =>
+          validateSingleStatementReportV1({
+            ...report,
+            findings: report.findings.map((item) => (item.id === includedFinding.id ? { ...item, ...override } : item)),
+          }),
+        name,
+      ).toThrow(error);
+    }
+  });
 });

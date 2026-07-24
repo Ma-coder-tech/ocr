@@ -552,7 +552,7 @@ export function validateSingleStatementReportV1(report: SingleStatementReportV1)
   }
 
   validateVisibility(report.componentVisibility, errors);
-  validateOpportunity(report.findings, report.opportunitySummary.totalEligibleAnnualOpportunityUsd, errors);
+  validateOpportunity(report.findings, report.opportunitySummary, calculationIds, errors);
 
   if (errors.length > 0) {
     throw new Error(`SingleStatementReportV1 validation failed: ${errors.join(" ")}`);
@@ -593,21 +593,75 @@ function validateVisibility(map: ComponentVisibilityMap, errors: string[]): void
   }
 }
 
-function validateOpportunity(findings: ReportFinding[], expectedAnnual: number, errors: string[]): void {
+function validateOpportunity(
+  findings: ReportFinding[],
+  summary: SingleStatementReportV1["opportunitySummary"],
+  calculationIds: Set<string>,
+  errors: string[],
+): void {
+  const byId = new Map(findings.map((finding) => [finding.id, finding]));
+  const includedIds = new Set(summary.includedFindingIds);
+  const excludedIds = new Set(summary.excludedFindingIds);
+
+  validateUniqueIds("opportunitySummary.includedFindingIds", summary.includedFindingIds, errors);
+  validateUniqueIds("opportunitySummary.excludedFindingIds", summary.excludedFindingIds, errors);
+
+  for (const id of includedIds) {
+    if (!byId.has(id)) errors.push(`opportunitySummary.includedFindingIds references unknown finding ${id}.`);
+    if (excludedIds.has(id)) errors.push(`opportunitySummary finding ${id} appears in both included and excluded ids.`);
+  }
+  for (const id of excludedIds) {
+    if (!byId.has(id)) errors.push(`opportunitySummary.excludedFindingIds references unknown finding ${id}.`);
+  }
+
+  for (const finding of findings) {
+    const listedIncluded = includedIds.has(finding.id);
+    const listedExcluded = excludedIds.has(finding.id);
+    if (!listedIncluded && !listedExcluded) errors.push(`opportunitySummary does not classify finding ${finding.id}.`);
+    if (listedIncluded && finding.includedInOpportunityTotal !== true) {
+      errors.push(`finding ${finding.id} is in includedFindingIds but includedInOpportunityTotal is false.`);
+    }
+    if (!listedIncluded && finding.includedInOpportunityTotal === true) {
+      errors.push(`finding ${finding.id} has includedInOpportunityTotal true but is not in includedFindingIds.`);
+    }
+    if (listedIncluded) validateIncludedOpportunityFinding(finding, calculationIds, errors);
+  }
+
   const total = round2(
-    findings
-      .filter((finding) => finding.includedInOpportunityTotal)
+    summary.includedFindingIds
+      .map((id) => byId.get(id))
+      .filter((finding): finding is ReportFinding => finding !== undefined)
       .reduce((sum, finding) => {
-        if (finding.impactClassification === "verification_only") {
-          errors.push(`${finding.id} is verification-only but included.`);
-          return sum;
-        }
         return sum + annualImpact(finding);
       }, 0),
   );
-  if (Math.abs(total - expectedAnnual) > 0.01) {
-    errors.push(`Opportunity total ${expectedAnnual} does not match included findings ${total}.`);
+  if (Math.abs(total - summary.totalEligibleAnnualOpportunityUsd) > 0.01) {
+    errors.push(`Opportunity total ${summary.totalEligibleAnnualOpportunityUsd} does not match included findings ${total}.`);
   }
+}
+
+function validateUniqueIds(path: string, ids: string[], errors: string[]): void {
+  const seen = new Set<string>();
+  for (const id of ids) {
+    if (seen.has(id)) errors.push(`${path} contains duplicate finding id ${id}.`);
+    seen.add(id);
+  }
+}
+
+function validateIncludedOpportunityFinding(finding: ReportFinding, calculationIds: Set<string>, errors: string[]): void {
+  if (finding.confidence === "low") errors.push(`${finding.id} is low confidence but included in opportunity total.`);
+  if (finding.impactClassification !== "deterministic" && finding.impactClassification !== "estimated") {
+    errors.push(`${finding.id} has unsupported impact classification ${finding.impactClassification} for opportunity total.`);
+  }
+  if (finding.cadence === "one_time" || finding.cadence === "unknown") {
+    errors.push(`${finding.id} has unsupported cadence ${finding.cadence} for opportunity total.`);
+  }
+  if (!finding.calculationRef) {
+    errors.push(`${finding.id} is included in opportunity total but has no calculationRef.`);
+  } else if (!calculationIds.has(finding.calculationRef)) {
+    errors.push(`${finding.id}.calculationRef is broken.`);
+  }
+  if (annualImpact(finding) <= 0) errors.push(`${finding.id} has no positive annual impact for opportunity total.`);
 }
 
 function annualImpact(finding: ReportFinding): number {
