@@ -56,6 +56,8 @@ import { parsePdf } from "./parser.js";
 import { detectPreflightFailure } from "./preflight.js";
 import { toPublicReportSummary } from "./publicReport.js";
 import { buildSingleStatementCustomerReport } from "./reporting/index.js";
+import { buildSingleStatementReportV1, buildUnableToAnalyzeReportV1 } from "./reporting/v1/index.js";
+import type { SingleStatementReportV1 } from "./reporting/v1/index.js";
 import { renderMultiStatementGlobalReportMarkdown } from "./reporting/buildMultiStatement.js";
 import { createJob, getJob, getJobByUploadId, listEvents, listStatementJobsForMerchant, pruneJobs, updateJob } from "./store.js";
 import { enqueueJob, hydrateQueuedJobs } from "./worker.js";
@@ -74,12 +76,55 @@ const host = process.env.HOST ?? "127.0.0.1";
 const APP_ORIGIN = process.env.APP_ORIGIN ?? `http://${host}:${port}`;
 const isDevelopment = process.env.NODE_ENV === "development";
 const isVercel = Boolean(process.env.VERCEL) || Boolean(process.env.VERCEL_ENV);
+const reportV1Enabled = process.env.RATEREVEAL_REPORT_V1_ENABLED === "true";
 const dataRoot = isVercel ? path.join("/tmp", "ocr-data") : path.resolve("data");
 const uploadDir = path.join(dataRoot, "uploads");
 const publicDir = path.resolve("public");
 const fileRetentionHours = Math.max(1, Number(process.env.FILE_RETENTION_HOURS ?? 72));
 const JSON_BODY_LIMIT_BYTES = 1024 * 1024;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function reportV1ForJob(job: Job): SingleStatementReportV1 | null {
+  if (!reportV1Enabled) return null;
+  try {
+    if (job.summary) {
+      return buildSingleStatementReportV1({
+        analysis: job.summary,
+        reportId: `job_${job.id}`,
+        generatedAt: job.updatedAt,
+        sourceFileName: job.fileName,
+        context: { merchantName: job.summary.parserStatementIdentity?.merchantName ?? null },
+      });
+    }
+    if (job.status === "failed") {
+      return buildUnableToAnalyzeReportV1({
+        reportId: `job_${job.id}`,
+        generatedAt: job.updatedAt,
+        sourceFileName: job.fileName,
+        reason: job.error ?? "The analysis failed before a usable report could be produced.",
+      });
+    }
+    return null;
+  } catch (error) {
+    console.error("Failed to build SingleStatementReportV1", error);
+    return null;
+  }
+}
+
+function reportV1ForStatement(statement: { id: number; updatedAt: string; analysisSummary: AnalysisSummary }): SingleStatementReportV1 | null {
+  if (!reportV1Enabled) return null;
+  try {
+    return buildSingleStatementReportV1({
+      analysis: statement.analysisSummary,
+      reportId: `statement_${statement.id}`,
+      generatedAt: statement.updatedAt,
+      context: { merchantName: statement.analysisSummary.parserStatementIdentity?.merchantName ?? null },
+    });
+  } catch (error) {
+    console.error("Failed to build SingleStatementReportV1", error);
+    return null;
+  }
+}
 
 type RateLimitEntry = {
   count: number;
@@ -1238,6 +1283,7 @@ async function handleAuthenticatedJob(req: IncomingMessage, res: ServerResponse,
           context: { unlocked: true },
         })
       : null,
+    reportV1: reportV1ForJob(job),
     statement: statement ? statementSummaryPayload(statement) : null,
     redirectTo,
   });
@@ -1401,6 +1447,7 @@ async function handleDashboardReportData(res: ServerResponse, merchant: Authenti
     analysis: statement1.analysisSummary,
     context: { unlocked: true },
   });
+  const reportV1 = reportV1ForStatement(statement1);
 
   json(res, 200, {
     merchant: {
@@ -1422,9 +1469,12 @@ async function handleDashboardReportData(res: ServerResponse, merchant: Authenti
       benchmarkVerdict: statement1.benchmarkVerdict,
       benchmarkLow: statement1.benchmarkLow,
       benchmarkHigh: statement1.benchmarkHigh,
+      // Migration cleanup: this legacy AnalysisSummary exposure is preserved for the current frontend.
+      // reportV1 must remain a customer-safe projection and not reproduce this internal model.
       summary: statement1.analysisSummary,
       checklistReport: publicSummary?.checklistReport,
       customerReport,
+      reportV1,
     },
   });
 }
@@ -1442,6 +1492,7 @@ async function handleStatementReportData(res: ServerResponse, merchant: Authenti
     analysis: statement.analysisSummary,
     context: { unlocked: true },
   });
+  const reportV1 = reportV1ForStatement(statement);
 
   json(res, 200, {
     merchant: {
@@ -1457,10 +1508,13 @@ async function handleStatementReportData(res: ServerResponse, merchant: Authenti
       ...statementSummaryPayload(statement),
       benchmarkLow: statement.benchmarkLow,
       benchmarkHigh: statement.benchmarkHigh,
+      // Migration cleanup: this legacy AnalysisSummary exposure is preserved for the current frontend.
+      // reportV1 must remain a customer-safe projection and not reproduce this internal model.
       summary: statement.analysisSummary,
       findings: statement.analysisSummary.insights,
       checklistReport: publicSummary?.checklistReport,
       customerReport,
+      reportV1,
     },
   });
 }
@@ -1529,6 +1583,7 @@ async function handleAnonymousJobLookup(req: IncomingMessage, res: ServerRespons
           context: { unlocked: true, merchantName: job.summary.parserStatementIdentity?.merchantName ?? null },
         })
       : null,
+    reportV1: reportV1ForJob(job),
   });
 }
 
