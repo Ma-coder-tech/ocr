@@ -127,6 +127,7 @@ export type JobResponse = {
   error: string | null;
   summary: PublicSummary | null;
   customerReport: CustomerReportDTO | null;
+  reportV1?: unknown | null;
 };
 
 export type ResultsViewModel = {
