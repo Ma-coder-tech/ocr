@@ -39,9 +39,10 @@ export function normalizeDataQuality(summary: AnalysisSummary | undefined): Data
   const parserConfidence = confidenceFromLabel(summary.parserDecision?.confidence ?? summary.confidence);
   const scoreConfidence = qualityScore === null ? parserConfidence : confidenceFromScore(qualityScore);
   const overallConfidence = lowerConfidence(parserConfidence, scoreConfidence);
-  const reportable = summary.parserDecision ? summary.parserDecision.reportable : true;
-  const customerFacingTotalsAllowed = validation ? validation.customerFacingTotalsAllowed : reportable;
-  const feeClassificationAllowed = validation ? validation.feeClassificationAllowed : true;
+  const missingPdfParserDecision = summary.sourceType === "pdf" && !summary.parserDecision;
+  const reportable = summary.parserDecision ? summary.parserDecision.reportable : !missingPdfParserDecision;
+  const customerFacingTotalsAllowed = reportable && (validation ? validation.customerFacingTotalsAllowed : true);
+  const feeClassificationAllowed = reportable && (validation ? validation.feeClassificationAllowed : !missingPdfParserDecision);
 
   return {
     extractionMode,
@@ -74,7 +75,7 @@ function parserDecisionReasons(summary: AnalysisSummary): DataQualityReason[] {
           {
             code: "parser_decision_missing",
             severity: "critical",
-            message: "PDF reports require parser validation before financial conclusions are shown.",
+            message: "RateReveal could not confirm parser validation for this statement, so customer-facing financial conclusions are withheld.",
             affectedComponents: FINANCIAL_COMPONENTS,
           },
         ]

@@ -1,4 +1,4 @@
-import type { BenchmarkPresentation, ComponentVisibility, ComponentVisibilityMap, ReconciliationSummary, ReportComponentId, ReportState } from "./types.js";
+import type { BenchmarkPresentation, ComponentVisibility, ComponentVisibilityMap, OmissionReasonCode, ReconciliationSummary, ReportComponentId, ReportState } from "./types.js";
 
 const COMPONENTS: ReportComponentId[] = [
   "verdict",
@@ -21,12 +21,14 @@ export function buildComponentVisibility(params: {
   benchmark: BenchmarkPresentation;
   hasFindings: boolean;
   hasPositiveFindings: boolean;
+  unavailableReason?: OmissionReasonCode;
 }): ComponentVisibilityMap {
   const map = Object.fromEntries(COMPONENTS.map((component) => [component, show()])) as ComponentVisibilityMap;
 
   if (params.state.code === "unable_to_analyze") {
-    hide(map, ["core_metrics", "benchmark", "pricing_model", "fee_composition", "fee_inventory", "opportunity_summary", "findings", "positive_findings"], "parser_blocked");
-    limit(map, "action_toolkit", "Only retry guidance is available for this report state.");
+    const reason = params.unavailableReason ?? "insufficient_evidence";
+    hide(map, ["core_metrics", "benchmark", "pricing_model", "fee_composition", "fee_inventory", "opportunity_summary", "findings", "positive_findings"], reason);
+    limit(map, "action_toolkit", unableActionMessage(reason));
     return map;
   }
 
@@ -72,4 +74,14 @@ function hide(map: ComponentVisibilityMap, components: ReportComponentId[], reas
   for (const component of components) {
     map[component] = { status: "hide", reason };
   }
+}
+
+function unableActionMessage(reason: OmissionReasonCode): string {
+  if (reason === "parser_blocked") return "Only retry guidance is available because parser validation blocked financial reporting.";
+  if (reason === "not_verified") return "Only retry guidance is available because core totals were not verified.";
+  if (reason === "reconciliation_failed") return "Only retry guidance is available because statement totals conflicted.";
+  if (reason === "low_confidence") return "Only retry guidance is available because extraction confidence was too low.";
+  if (reason === "not_extracted") return "Only retry guidance is available because statement data could not be extracted.";
+  if (reason === "unsupported_processor") return "Only retry guidance is available because this statement type is unsupported.";
+  return "Only retry guidance is available for this report state.";
 }

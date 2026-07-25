@@ -57,7 +57,12 @@ export function resolveReportState(input: ResolveReportStateInput): ReportState 
     return state("low_confidence", "benchmark_unavailable", lowerConfidence(confidence, "medium"), input.evaluatedAt);
   }
 
-  const hasActionableFinding = input.findings.some((finding) => finding.confidence !== "low" && finding.impactClassification !== "non_financial");
+  const hasActionableFinding = input.findings.some(
+    (finding) =>
+      finding.includedInOpportunityTotal &&
+      finding.confidence !== "low" &&
+      (finding.impactClassification === "deterministic" || finding.impactClassification === "estimated"),
+  );
   if (hasActionableFinding) {
     return state("healthy_with_opportunities", "competitive_rate_with_findings", confidence, input.evaluatedAt);
   }

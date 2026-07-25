@@ -13,6 +13,7 @@ import type {
   CalculationRecord,
   ChargeCadence,
   ConfidenceLevel,
+  DataQualitySummary,
   EvidenceRef,
   FeeCategoryCode,
   FeeCompositionPresentation,
@@ -23,12 +24,16 @@ import type {
   FindingDisposition,
   ImpactClassification,
   MethodologySummary,
+  OmissionReasonCode,
+  OpportunitySummary,
   PricingModelCode,
   PricingModelPresentation,
+  ReconciliationSummary,
   ReportFinding,
   ReportIdentity,
   ReportLimitation,
   ReportMetrics,
+  ReportState,
   ReportValue,
   SingleStatementReportV1,
 } from "./types.js";
@@ -103,14 +108,29 @@ export function buildSingleStatementReportV1(input: BuildSingleStatementReportV1
     findings: opportunity.findings,
     evaluatedAt: generatedAt,
   });
-  const componentVisibility = buildComponentVisibility({
-    state: reportState,
+  const projection = applyStateSafetyProjection({
+    reportState,
+    dataQuality,
+    metrics,
     reconciliation,
     benchmark,
-    hasFindings: opportunity.findings.length > 0,
-    hasPositiveFindings: positiveFindings.length > 0,
+    pricingModel,
+    feeComposition: linkedFeeComposition,
+    feeInventory: linkedFeeInventory,
+    opportunitySummary: opportunity.opportunitySummary,
+    findings: opportunity.findings,
+    positiveFindings,
+    details: collections,
   });
-  const limitations = buildLimitations(benchmark, opportunity.findings);
+  const componentVisibility = buildComponentVisibility({
+    state: reportState,
+    reconciliation: projection.reconciliation,
+    benchmark: projection.benchmark,
+    hasFindings: projection.findings.length > 0,
+    hasPositiveFindings: projection.positiveFindings.length > 0,
+    unavailableReason: projection.unavailableReason,
+  });
+  const limitations = buildLimitations(projection.benchmark, projection.findings, reportState, projection.unavailableReason);
 
   return validateSingleStatementReportV1({
     contractVersion: "single_statement_report_v1",
@@ -120,22 +140,227 @@ export function buildSingleStatementReportV1(input: BuildSingleStatementReportV1
     reportState,
     identity: buildIdentity(input.analysis, input.context?.merchantName ?? input.analysis.parserStatementIdentity?.merchantName ?? null, input.sourceFileName ?? undefined),
     dataQuality,
-    reconciliation,
-    metrics,
-    opportunitySummary: opportunity.opportunitySummary,
+    reconciliation: projection.reconciliation,
+    metrics: projection.metrics,
+    opportunitySummary: projection.opportunitySummary,
     componentVisibility,
-    verdict: verdictFor(reportState.code, opportunity.opportunitySummary.totalEligibleAnnualOpportunityUsd),
-    benchmark,
-    pricingModel,
-    feeComposition: linkedFeeComposition,
-    feeInventory: linkedFeeInventory,
-    findings: opportunity.findings,
-    positiveFindings,
-    actionToolkit: actionToolkitFor(reportState.code, opportunity.findings),
-    details: collections,
-    methodology: methodologyFor(benchmark),
+    verdict: verdictFor(reportState.code, projection.opportunitySummary.totalEligibleAnnualOpportunityUsd, projection.unavailableReason),
+    benchmark: projection.benchmark,
+    pricingModel: projection.pricingModel,
+    feeComposition: projection.feeComposition,
+    feeInventory: projection.feeInventory,
+    findings: projection.findings,
+    positiveFindings: projection.positiveFindings,
+    actionToolkit: actionToolkitFor(reportState.code, projection.findings, projection.unavailableReason),
+    details: projection.details,
+    methodology: methodologyFor(projection.benchmark),
     limitations,
   });
+}
+
+type StateSafetyProjection = {
+  reportState: ReportState;
+  dataQuality: DataQualitySummary;
+  metrics: ReportMetrics;
+  reconciliation: ReconciliationSummary;
+  benchmark: BenchmarkPresentation;
+  pricingModel: PricingModelPresentation;
+  feeComposition: FeeCompositionPresentation;
+  feeInventory: FeeInventoryPresentation;
+  opportunitySummary: OpportunitySummary;
+  findings: ReportFinding[];
+  positiveFindings: SingleStatementReportV1["positiveFindings"];
+  details: BuildCollections;
+};
+
+type ProjectedReportSections = Omit<StateSafetyProjection, "reportState" | "dataQuality"> & {
+  unavailableReason?: OmissionReasonCode;
+};
+
+function applyStateSafetyProjection(input: StateSafetyProjection): ProjectedReportSections {
+  if (input.reportState.code === "unable_to_analyze") {
+    const reason = unavailableReasonForUnableToAnalyze(input.reportState, input.dataQuality);
+    return {
+      metrics: unavailableMetrics(),
+      reconciliation: normalizeReconciliation(undefined),
+      benchmark: unavailableBenchmark(reason),
+      pricingModel: unknownPricingModel(),
+      feeComposition: unavailableFeeComposition(reason),
+      feeInventory: unavailableFeeInventory(reason),
+      opportunitySummary: emptyOpportunitySummary(),
+      findings: [],
+      positiveFindings: [],
+      details: { evidence: [], calculations: [] },
+      unavailableReason: reason,
+    };
+  }
+
+  if (input.reportState.code === "low_confidence" || input.reportState.code === "reconciliation_failure") {
+    const findings = input.findings
+      .filter((finding) => !finding.includedInOpportunityTotal)
+      .map((finding) => ({ ...finding, includedInOpportunityTotal: false }));
+    const feeInventory = projectFeeInventoryRelationships(input.feeInventory, findings);
+    const projection = {
+      metrics: input.metrics,
+      reconciliation: input.reconciliation,
+      benchmark: input.benchmark,
+      pricingModel: input.pricingModel,
+      feeComposition: input.feeComposition,
+      feeInventory,
+      opportunitySummary: zeroEligibleOpportunity(input.opportunitySummary, findings),
+      findings,
+      positiveFindings: input.positiveFindings,
+      details: input.details,
+    };
+    return {
+      ...projection,
+      details: pruneDetailsForProjection(input.reportState.code, projection),
+    };
+  }
+
+  return {
+    metrics: input.metrics,
+    reconciliation: input.reconciliation,
+    benchmark: input.benchmark,
+    pricingModel: input.pricingModel,
+    feeComposition: input.feeComposition,
+    feeInventory: input.feeInventory,
+    opportunitySummary: input.opportunitySummary,
+    findings: input.findings,
+    positiveFindings: input.positiveFindings,
+    details: input.details,
+  };
+}
+
+function unavailableReasonForUnableToAnalyze(reportState: ReportState, dataQuality: DataQualitySummary): OmissionReasonCode {
+  if (reportState.reasons.includes("parser_blocked")) {
+    const criticalFinancialReasons = dataQuality.reasons.filter(
+      (reason) => reason.severity === "critical" && reason.affectedComponents.some((component) => component !== "methodology"),
+    );
+    if (
+      criticalFinancialReasons.some(
+        (reason) =>
+          reason.code === "parser_decision_missing" ||
+          reason.code.includes("validation") ||
+          /\b(parser|validation|reconciliation check|parser confidence|parser warning)\b/i.test(reason.message),
+      )
+    ) {
+      return "parser_blocked";
+    }
+    if (criticalFinancialReasons.some((reason) => reason.code.includes("confidence") || /\bconfidence\b/i.test(reason.message))) return "low_confidence";
+    return "insufficient_evidence";
+  }
+  if (reportState.reasons.includes("missing_core_totals")) return "not_verified";
+  if (reportState.reasons.includes("conflicting_totals") || reportState.reasons.includes("reconciliation_delta_exceeded")) return "reconciliation_failed";
+  if (reportState.reasons.includes("analysis_confidence_low")) return "low_confidence";
+  if (reportState.reasons.includes("unreadable_document")) return "not_extracted";
+  if (reportState.reasons.includes("not_a_processing_statement")) return "unsupported_processor";
+  return "insufficient_evidence";
+}
+
+function emptyOpportunitySummary(): OpportunitySummary {
+  return {
+    deterministicMonthlyImpactUsd: 0,
+    deterministicAnnualImpactUsd: 0,
+    estimatedMonthlyOpportunityUsd: 0,
+    estimatedAnnualOpportunityUsd: 0,
+    totalEligibleMonthlyOpportunityUsd: 0,
+    totalEligibleAnnualOpportunityUsd: 0,
+    verificationMonthlyAmountUsd: 0,
+    verificationAnnualizedAmountUsd: null,
+    currency: "USD",
+    annualizationBasis: "none",
+    includedFindingIds: [],
+    excludedFindingIds: [],
+  };
+}
+
+function zeroEligibleOpportunity(summary: OpportunitySummary, findings: ReportFinding[]): OpportunitySummary {
+  return {
+    ...summary,
+    deterministicMonthlyImpactUsd: 0,
+    deterministicAnnualImpactUsd: 0,
+    estimatedMonthlyOpportunityUsd: 0,
+    estimatedAnnualOpportunityUsd: 0,
+    totalEligibleMonthlyOpportunityUsd: 0,
+    totalEligibleAnnualOpportunityUsd: 0,
+    annualizationBasis: "none",
+    includedFindingIds: [],
+    excludedFindingIds: findings.map((finding) => finding.id),
+  };
+}
+
+function unavailableFeeComposition(reason: NonNullable<FeeCompositionPresentation["omissionReason"]>): FeeCompositionPresentation {
+  return { status: "unavailable", totalFees: null, rows: [], coveragePct: null, deltaUsd: null, omissionReason: reason };
+}
+
+function unavailableFeeInventory(reason: NonNullable<FeeInventoryPresentation["omissionReason"]>): FeeInventoryPresentation {
+  return { status: "unavailable", rows: [], observedRowCount: 0, displayedRowCount: 0, omissionReason: reason };
+}
+
+function projectFeeInventoryRelationships(feeInventory: FeeInventoryPresentation, findings: ReportFinding[]): FeeInventoryPresentation {
+  const retainedIds = new Set(findings.map((finding) => finding.id));
+  return {
+    ...feeInventory,
+    rows: feeInventory.rows.map((row) => {
+      const findingId = row.findingId && retainedIds.has(row.findingId) ? row.findingId : null;
+      const relatedFindingIds = (row.relatedFindingIds ?? []).filter((id) => retainedIds.has(id));
+      const hasRelationship = findingId !== null || relatedFindingIds.length > 0;
+      return {
+        ...row,
+        findingId,
+        relatedFindingIds,
+        disposition: hasRelationship ? row.disposition : diagnosticFeeDisposition(row),
+      };
+    }),
+  };
+}
+
+function diagnosticFeeDisposition(row: FeeInventoryRow): FeeInventoryRow["disposition"] {
+  if (row.category === "needs_review" || row.comparisonTargetType === "contract_documentation") return "verify";
+  return "none";
+}
+
+function pruneDetailsForProjection(stateCode: SingleStatementReportV1["reportState"]["code"], projection: ProjectedReportSections): BuildCollections {
+  const calculationIds = new Set<string>();
+  const evidenceIds = new Set<string>();
+  const addReportValueRefs = (value: ReportValue<unknown>): void => {
+    for (const ref of value.evidenceRefs) evidenceIds.add(ref);
+    if (value.calculationRef) calculationIds.add(value.calculationRef);
+  };
+
+  for (const value of Object.values(projection.metrics)) addReportValueRefs(value);
+  for (const value of Object.values(projection.reconciliation)) {
+    if (value && typeof value === "object" && "evidenceRefs" in value) addReportValueRefs(value as ReportValue<unknown>);
+  }
+  for (const ref of projection.pricingModel.evidenceRefs) evidenceIds.add(ref);
+  if (stateCode !== "reconciliation_failure" && projection.benchmark.eligible) {
+    evidenceIds.add("ev_benchmark_reference");
+    calculationIds.add("calc_benchmark_rate_gap");
+  }
+  for (const row of projection.feeInventory.rows) {
+    for (const ref of row.evidenceRefs) evidenceIds.add(ref);
+    if (row.calculationRef) calculationIds.add(row.calculationRef);
+  }
+  for (const finding of projection.findings) {
+    for (const ref of finding.evidenceRefs) evidenceIds.add(ref);
+    if (finding.calculationRef) calculationIds.add(finding.calculationRef);
+  }
+  for (const finding of projection.positiveFindings) {
+    for (const ref of finding.evidenceRefs) evidenceIds.add(ref);
+  }
+
+  const calculations = projection.details.calculations.filter((calculation) => calculationIds.has(calculation.id));
+  for (const calculation of calculations) {
+    for (const input of calculation.inputs) {
+      for (const ref of input.evidenceRefs) evidenceIds.add(ref);
+    }
+  }
+
+  return {
+    evidence: projection.details.evidence.filter((evidence) => evidenceIds.has(evidence.id)),
+    calculations,
+  };
 }
 
 export function buildUnableToAnalyzeReportV1(input: BuildUnableToAnalyzeReportV1Input): SingleStatementReportV1 {
@@ -162,12 +387,14 @@ export function buildUnableToAnalyzeReportV1(input: BuildUnableToAnalyzeReportV1
     evaluatedAt: generatedAt,
     analysisFailed: true,
   });
+  const unavailableReason = unavailableReasonForUnableToAnalyze(reportState, dataQuality);
   const componentVisibility = buildComponentVisibility({
     state: reportState,
     reconciliation,
     benchmark,
     hasFindings: false,
     hasPositiveFindings: false,
+    unavailableReason,
   });
 
   return validateSingleStatementReportV1({
@@ -189,20 +416,20 @@ export function buildUnableToAnalyzeReportV1(input: BuildUnableToAnalyzeReportV1
     metrics,
     opportunitySummary,
     componentVisibility,
-    verdict: verdictFor("unable_to_analyze", 0),
+    verdict: verdictFor("unable_to_analyze", 0, unavailableReason),
     benchmark,
     pricingModel: unknownPricingModel(),
-    feeComposition: { status: "unavailable", totalFees: null, rows: [], coveragePct: null, deltaUsd: null, omissionReason: "parser_blocked" },
-    feeInventory: { status: "unavailable", rows: [], observedRowCount: 0, displayedRowCount: 0, omissionReason: "parser_blocked" },
+    feeComposition: { status: "unavailable", totalFees: null, rows: [], coveragePct: null, deltaUsd: null, omissionReason: unavailableReason },
+    feeInventory: { status: "unavailable", rows: [], observedRowCount: 0, displayedRowCount: 0, omissionReason: unavailableReason },
     findings: [],
     positiveFindings: [],
-    actionToolkit: actionToolkitFor("unable_to_analyze", []),
+    actionToolkit: actionToolkitFor("unable_to_analyze", [], unavailableReason),
     details: { evidence: [], calculations: [] },
     methodology: methodologyFor(benchmark),
     limitations: [
       {
         code: "partial_extraction",
-        message: "RateReveal could not verify enough of this statement to produce a reliable financial report.",
+        message: unableLimitationMessage(unavailableReason),
         severity: "warning",
         affectedFindingIds: [],
       },
@@ -862,13 +1089,17 @@ function unavailableMetrics(): ReportMetrics {
   };
 }
 
-function verdictFor(code: SingleStatementReportV1["reportState"]["code"], annualOpportunity: number): SingleStatementReportV1["verdict"] {
+function verdictFor(
+  code: SingleStatementReportV1["reportState"]["code"],
+  annualOpportunity: number,
+  unavailableReason?: OmissionReasonCode,
+): SingleStatementReportV1["verdict"] {
   if (code === "unable_to_analyze") {
     return {
       tone: "blocked",
       eyebrow: "Unable to analyze",
-      title: "We could not verify enough of this statement to produce a reliable report.",
-      summary: "Upload the complete original PDF or a clearer copy.",
+      title: unableVerdictTitle(unavailableReason),
+      summary: unableVerdictSummary(unavailableReason),
       supportingPoints: [],
       primaryAction: "retry_upload",
     };
@@ -943,12 +1174,12 @@ function verdictFor(code: SingleStatementReportV1["reportState"]["code"], annual
   };
 }
 
-function actionToolkitFor(code: SingleStatementReportV1["reportState"]["code"], findings: ReportFinding[]): ActionToolkit {
-  const primaryAction = verdictFor(code, 0).primaryAction;
+function actionToolkitFor(code: SingleStatementReportV1["reportState"]["code"], findings: ReportFinding[], unavailableReason?: OmissionReasonCode): ActionToolkit {
+  const primaryAction = verdictFor(code, 0, unavailableReason).primaryAction;
   const actionable = findings.filter((finding) => finding.confidence !== "low").slice(0, 5);
   return {
     primaryAction,
-    summary: code === "unable_to_analyze" ? "Upload a clearer or complete statement." : "Use the prioritized steps supported by this report state.",
+    summary: code === "unable_to_analyze" ? unableVerdictSummary(unavailableReason) : "Use the prioritized steps supported by this report state.",
     prioritizedSteps: actionable.map((finding, index) => ({
       id: stableId(["step", finding.id]),
       order: index + 1,
@@ -964,6 +1195,26 @@ function actionToolkitFor(code: SingleStatementReportV1["reportState"]["code"], 
   };
 }
 
+function unableVerdictTitle(reason: OmissionReasonCode | undefined): string {
+  if (reason === "parser_blocked") return "Parser validation blocked this statement from a reliable financial report.";
+  if (reason === "not_verified") return "Core statement totals were not verified.";
+  if (reason === "reconciliation_failed") return "Statement totals conflicted before a reliable financial report could be produced.";
+  if (reason === "low_confidence") return "Analysis confidence was too low for customer-facing financial conclusions.";
+  if (reason === "not_extracted") return "Statement data could not be extracted.";
+  if (reason === "unsupported_processor") return "This statement type is not supported for financial reporting.";
+  return "We could not verify enough of this statement to produce a reliable report.";
+}
+
+function unableVerdictSummary(reason: OmissionReasonCode | undefined): string {
+  if (reason === "parser_blocked") return "Upload the complete original PDF or a clearer copy with parser-verifiable totals.";
+  if (reason === "not_verified") return "Upload a complete statement that clearly shows processed sales, total fees, and effective rate.";
+  if (reason === "reconciliation_failed") return "Upload the complete original statement so conflicting totals can be checked.";
+  if (reason === "low_confidence") return "Upload a clearer or more complete statement before acting on financial conclusions.";
+  if (reason === "not_extracted") return "Upload a text-based original statement or a clearer copy.";
+  if (reason === "unsupported_processor") return "Upload a supported processor statement or a statement with verifiable processing totals.";
+  return "Upload the complete original PDF or a clearer copy.";
+}
+
 function methodologyFor(benchmark: BenchmarkPresentation): MethodologySummary {
   return {
     statementCount: 1,
@@ -974,7 +1225,22 @@ function methodologyFor(benchmark: BenchmarkPresentation): MethodologySummary {
   };
 }
 
-function buildLimitations(benchmark: BenchmarkPresentation, findings: ReportFinding[]): ReportLimitation[] {
+function buildLimitations(
+  benchmark: BenchmarkPresentation,
+  findings: ReportFinding[],
+  reportState?: ReportState,
+  unavailableReason?: OmissionReasonCode,
+): ReportLimitation[] {
+  if (reportState?.code === "unable_to_analyze") {
+    return [
+      {
+        code: "partial_extraction",
+        message: unableLimitationMessage(unavailableReason),
+        severity: "warning",
+        affectedFindingIds: [],
+      },
+    ];
+  }
   const limitations: ReportLimitation[] = [
     {
       code: "single_statement_snapshot",
@@ -1003,6 +1269,28 @@ function buildLimitations(benchmark: BenchmarkPresentation, findings: ReportFind
     }
   }
   return limitations;
+}
+
+function unableLimitationMessage(reason: OmissionReasonCode | undefined): string {
+  if (reason === "parser_blocked") {
+    return "RateReveal withheld financial conclusions because parser validation did not approve this statement.";
+  }
+  if (reason === "not_verified") {
+    return "RateReveal withheld financial conclusions because core statement totals were not verified.";
+  }
+  if (reason === "reconciliation_failed") {
+    return "RateReveal withheld financial conclusions because statement totals conflicted before reporting.";
+  }
+  if (reason === "low_confidence") {
+    return "RateReveal withheld financial conclusions because extraction confidence was too low.";
+  }
+  if (reason === "not_extracted") {
+    return "RateReveal withheld financial conclusions because statement data could not be extracted.";
+  }
+  if (reason === "unsupported_processor") {
+    return "RateReveal withheld financial conclusions because this statement type is not supported for financial reporting.";
+  }
+  return "RateReveal could not verify enough of this statement to produce a reliable financial report.";
 }
 
 function addTopLevelEvidence(collections: BuildCollections, summary: AnalysisSummary) {
