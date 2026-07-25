@@ -21,6 +21,9 @@ import {
 import { type ChangeEvent, type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ResultsScreen } from "./ResultsScreen";
 import type { BusinessTypeId, JobResponse, JobStatus } from "./reportAdapter";
+import { ReportV1Gallery } from "./report-v1/ReportV1Gallery";
+import { ReportV1Gate } from "./report-v1/ReportV1Gate";
+import { guardSingleStatementReportV1 } from "./report-v1/reportV1Guard";
 
 type BusinessOption = {
   id: string;
@@ -163,6 +166,8 @@ export function App() {
   const hasStarted = jobStatus !== "idle";
   const canAnalyze = Boolean(file && selectedBusiness && !hasStarted);
   const showResults = jobStatus === "completed" && Boolean(job?.summary && job.customerReport);
+  const showV1Result = Boolean(job?.reportV1 && guardSingleStatementReportV1(job.reportV1).ok && (jobStatus === "completed" || jobStatus === "failed"));
+  const showDevGallery = import.meta.env.DEV && window.location.hash === "#report-v1-gallery";
 
   useEffect(() => {
     return () => {
@@ -262,6 +267,7 @@ export function App() {
       setJobProgress(Math.max(payload.progress, payload.status === "completed" ? 100 : 14));
 
       if (payload.status === "failed") {
+        if (payload.reportV1 && guardSingleStatementReportV1(payload.reportV1).ok) return;
         setError(payload.error ?? "We couldn't read this statement. Make sure it's a full processor statement, not a summary or receipt, and try again.");
         return;
       }
@@ -278,6 +284,10 @@ export function App() {
 
   return (
     <main className="page-shell">
+      {showDevGallery ? (
+        <ReportV1Gallery />
+      ) : (
+        <>
       <nav className="topbar" aria-label="Primary">
         <a className="brand" href="/" aria-label="RateReveal home">
           <span className="brand-mark">R</span>
@@ -294,8 +304,10 @@ export function App() {
         )}
       </nav>
 
-      {showResults && job ? (
-        <ResultsScreen job={job} selectedBusinessLabel={selectedBusiness?.benchmarkLabel ?? null} onStartOver={resetAnalysis} />
+      {(showResults || showV1Result) && job ? (
+        <ReportV1Gate reportV1={job.reportV1} onStartOver={resetAnalysis}>
+          {showResults ? <ResultsScreen job={job} selectedBusinessLabel={selectedBusiness?.benchmarkLabel ?? null} onStartOver={resetAnalysis} /> : null}
+        </ReportV1Gate>
       ) : (
         <>
           <section className="hero-section" aria-labelledby="hero-title">
@@ -437,6 +449,8 @@ export function App() {
           </ul>
         </div>
           </section>
+        </>
+      )}
         </>
       )}
     </main>
