@@ -718,4 +718,272 @@ describe("SingleStatementReportV1 safety foundation", () => {
       ).toThrow(error);
     }
   });
+
+  it("enriches Fiserv fee inventory rows with evidence, calculation details, and verification relationships", () => {
+    const evidenceLine = "Visa Assessment | volume 1000.00 | rate 0.12 | amount 12.00";
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        feeBreakdown: [],
+        fiservFeeAnalysisV2: {
+          rows: [
+            {
+              rowIndex: 7,
+              description: "Visa Assessment",
+              canonicalName: "Visa Assessment",
+              amount: 12,
+              volumeBasis: 1000,
+              count: null,
+              rate: 0.12,
+              feeType: "card_brand_network_fee",
+              sourceSection: "FEES",
+              matchConfidence: "high",
+              referenceId: "visa_assessment_reference",
+              proofStatus: "indeterminate",
+              expectedAmount: 10,
+              delta: 2,
+              reason: "Observed amount is above the explicit expected amount.",
+              evidenceLine,
+            },
+          ],
+          findings: [
+            {
+              kind: "rate_exceeds_reference",
+              severity: "high",
+              title: "Visa Assessment is above the reference amount",
+              amount: 12,
+              evidence: [evidenceLine],
+              action: "request_pass_through_documentation",
+              monthlyCost: 12,
+              annualEstimate: 144,
+              componentImpactEstimate: null,
+            },
+          ],
+        },
+      }),
+      reportId: "package-2-fiserv-row",
+      generatedAt: NOW,
+    });
+
+    const fee = report.feeInventory.rows.find((row) => row.originalLabel === "Visa Assessment")!;
+    expect(fee).toMatchObject({
+      observedAmountUsd: 12,
+      observedRatePct: 0.12,
+      comparisonTargetType: "network_schedule",
+      differenceUsd: 2,
+      findingId: expect.any(String),
+    });
+    expect(fee.relatedFindingIds).toEqual([fee.findingId]);
+    expect(report.details.evidence.find((item) => item.id === fee.evidenceRefs[0])?.statementPage).toBeNull();
+    expect(report.details.calculations.find((item) => item.id === fee.calculationRef)).toMatchObject({
+      formulaCode: "observed_minus_expected_amount",
+      result: 2,
+    });
+    expect(report.findings.find((finding) => finding.id === fee.findingId)?.feeRowIds).toContain(fee.id);
+    expect(report.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(0);
+  });
+
+  it("uses relatedFindingIds for many-to-many fee relationships while keeping the primary link non-superseded", () => {
+    const evidenceLine = "Monthly Platform Fee | amount 10.00";
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        feeBreakdown: [],
+        fiservFeeAnalysisV2: {
+          rows: [
+            {
+              rowIndex: 9,
+              description: "Monthly Platform Fee",
+              canonicalName: "Monthly Platform Fee",
+              amount: 10,
+              volumeBasis: null,
+              count: null,
+              rate: null,
+              feeType: "processor_fixed",
+              sourceSection: "FEES",
+              matchConfidence: "high",
+              referenceId: null,
+              proofStatus: "processor_controlled",
+              expectedAmount: null,
+              delta: null,
+              reason: "Processor-controlled fixed fee.",
+              evidenceLine,
+            },
+          ],
+          findings: [
+            {
+              kind: "junk_fee",
+              severity: "warning",
+              title: "Monthly Platform Fee is negotiable",
+              amount: 10,
+              evidence: [evidenceLine],
+              action: "negotiate_processor_rate",
+              monthlyCost: 10,
+              annualEstimate: 120,
+              componentImpactEstimate: null,
+            },
+          ],
+          estimatedAnnualSavings: {
+            estimated: 120,
+            confidence: "high",
+            basis: "Single supported master opportunity.",
+            components: [{ kind: "junk_fee", label: "Monthly Platform Fee is negotiable", annualImpact: 120, tier: "confirmed", confidence: "high", sourceFindingKind: "junk_fee" }],
+          },
+        },
+      }),
+      reportId: "package-2-related-findings",
+      generatedAt: NOW,
+    });
+
+    const fee = report.feeInventory.rows.find((row) => row.originalLabel === "Monthly Platform Fee")!;
+    expect(fee.relatedFindingIds?.length).toBe(2);
+    expect(fee.findingId).toBe("fiserv_v2_master_estimated_savings");
+    expect(report.findings.find((finding) => finding.id === fee.findingId)?.supersedesFindingIds?.length).toBe(1);
+    expect(report.opportunitySummary.includedFindingIds).toEqual(["fiserv_v2_master_estimated_savings"]);
+    expect(report.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(120);
+  });
+
+  it("preserves similar but distinct same-amount fee labels instead of suffix-deduping them", () => {
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        feeBreakdown: [
+          {
+            label: "Visa Assessment Fee",
+            amount: 12,
+            sharePct: 4,
+            feeClass: "card_brand_pass_through",
+            broadType: "Pass-through",
+            sourceSection: "SUMMARY FEES",
+            evidenceLine: "Visa Assessment Fee 12.00",
+            classificationConfidence: "high",
+          },
+        ],
+        fiservFeeAnalysisV2: {
+          rows: [
+            {
+              rowIndex: 11,
+              description: "Visa Assessment",
+              amount: 12,
+              feeType: "card_brand_network_fee",
+              sourceSection: "DETAIL FEES",
+              matchConfidence: "high",
+              referenceId: null,
+              proofStatus: "proven",
+              expectedAmount: null,
+              delta: null,
+              reason: "Observed network assessment.",
+              evidenceLine: "Visa Assessment 12.00",
+            },
+          ],
+        },
+      }),
+      reportId: "package-2-distinct-similar-fees",
+      generatedAt: NOW,
+    });
+
+    expect(report.feeInventory.rows.map((row) => row.originalLabel).sort()).toEqual(["Visa Assessment", "Visa Assessment Fee"]);
+  });
+
+  it("derives observed-versus-expected difference when explicit expected amount exists and delta is missing", () => {
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        feeBreakdown: [],
+        fiservFeeAnalysisV2: {
+          rows: [
+            {
+              rowIndex: 12,
+              description: "Network Access Fee",
+              amount: 15,
+              feeType: "card_brand_network_fee",
+              sourceSection: "FEES",
+              matchConfidence: "high",
+              referenceId: "network_access_reference",
+              proofStatus: "indeterminate",
+              expectedAmount: 9,
+              delta: null,
+              reason: "Explicit expected amount is available.",
+              evidenceLine: "Network Access Fee 15.00",
+            },
+          ],
+        },
+      }),
+      reportId: "package-2-missing-delta",
+      generatedAt: NOW,
+    });
+
+    const fee = report.feeInventory.rows.find((row) => row.originalLabel === "Network Access Fee")!;
+    const calculation = report.details.calculations.find((item) => item.id === fee.calculationRef)!;
+    expect(fee.differenceUsd).toBe(6);
+    expect(calculation.result).toBe(6);
+  });
+
+  it("ignores a supplied delta that disagrees with observed minus expected", () => {
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        feeBreakdown: [],
+        fiservFeeAnalysisV2: {
+          rows: [
+            {
+              rowIndex: 13,
+              description: "Network Rate Fee",
+              amount: 15,
+              feeType: "card_brand_network_fee",
+              sourceSection: "FEES",
+              matchConfidence: "high",
+              referenceId: "network_rate_reference",
+              proofStatus: "indeterminate",
+              expectedAmount: 9,
+              delta: 99,
+              reason: "Parser supplied delta disagrees with observed minus expected.",
+              evidenceLine: "Network Rate Fee 15.00",
+            },
+          ],
+        },
+      }),
+      reportId: "package-2-disagreeing-delta",
+      generatedAt: NOW,
+    });
+
+    const fee = report.feeInventory.rows.find((row) => row.originalLabel === "Network Rate Fee")!;
+    const calculation = report.details.calculations.find((item) => item.id === fee.calculationRef)!;
+    expect(fee.differenceUsd).toBe(6);
+    expect(calculation.result).toBe(6);
+  });
+
+  it("rejects fee row differences that do not match the referenced calculation result", () => {
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        feeBreakdown: [],
+        fiservFeeAnalysisV2: {
+          rows: [
+            {
+              rowIndex: 14,
+              description: "Network Difference Fee",
+              amount: 15,
+              feeType: "card_brand_network_fee",
+              sourceSection: "FEES",
+              matchConfidence: "high",
+              referenceId: "network_difference_reference",
+              proofStatus: "indeterminate",
+              expectedAmount: 9,
+              delta: 6,
+              reason: "Explicit expected amount is available.",
+              evidenceLine: "Network Difference Fee 15.00",
+            },
+          ],
+        },
+      }),
+      reportId: "package-2-difference-validation",
+      generatedAt: NOW,
+    });
+    const fee = report.feeInventory.rows.find((row) => row.originalLabel === "Network Difference Fee")!;
+
+    expect(() =>
+      validateSingleStatementReportV1({
+        ...report,
+        feeInventory: {
+          ...report.feeInventory,
+          rows: report.feeInventory.rows.map((row) => (row.id === fee.id ? { ...row, differenceUsd: 5 } : row)),
+        },
+      }),
+    ).toThrow(/differenceUsd 5 does not match calculation/);
+  });
 });
