@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ComponentVisibilityMap, ReportFinding, ReportValue, SingleStatementReportV1 } from "./types.js";
-import { round2 } from "./utils.js";
+import { round2, round4 } from "./utils.js";
 
 const businessTypeIds = [
   "restaurant_food_beverage",
@@ -295,6 +295,7 @@ const feeInventoryRowSchema = z
     differenceUsd: nullableFiniteNumber,
     calculationRef: z.string().optional(),
     findingId: z.string().nullable(),
+    relatedFindingIds: z.array(z.string()).optional(),
     evidenceRefs: z.array(z.string()),
   })
   .strict();
@@ -519,6 +520,13 @@ export function validateSingleStatementReportV1(report: SingleStatementReportV1)
   const errors: string[] = [];
   const evidenceIds = new Set(report.details.evidence.map((item) => item.id));
   const calculationIds = new Set(report.details.calculations.map((item) => item.id));
+  const findingIds = new Set(report.findings.map((item) => item.id));
+  const feeRowIds = new Set(report.feeInventory.rows.map((item) => item.id));
+
+  validateUniqueIds("details.evidence", report.details.evidence.map((item) => item.id), errors);
+  validateUniqueIds("details.calculations", report.details.calculations.map((item) => item.id), errors);
+  validateUniqueIds("findings", report.findings.map((item) => item.id), errors);
+  validateUniqueIds("feeInventory.rows", report.feeInventory.rows.map((item) => item.id), errors);
 
   visit(report, "$", (path, value) => {
     if (typeof value === "number" && !Number.isFinite(value)) errors.push(`${path} is not finite.`);
@@ -535,6 +543,7 @@ export function validateSingleStatementReportV1(report: SingleStatementReportV1)
 
   for (const finding of report.findings) {
     validateRefs(`findings.${finding.id}`, finding.evidenceRefs, evidenceIds, errors);
+    validateRefs(`findings.${finding.id}.feeRowIds`, finding.feeRowIds, feeRowIds, errors);
     if (finding.calculationRef && !calculationIds.has(finding.calculationRef)) errors.push(`findings.${finding.id}.calculationRef is broken.`);
     if (finding.includedInOpportunityTotal && finding.impactClassification === "verification_only") {
       errors.push(`findings.${finding.id} includes a verification-only amount in opportunity total.`);
@@ -544,14 +553,20 @@ export function validateSingleStatementReportV1(report: SingleStatementReportV1)
   for (const row of report.feeInventory.rows) {
     validateRefs(`feeInventory.${row.id}`, row.evidenceRefs, evidenceIds, errors);
     if (row.calculationRef && !calculationIds.has(row.calculationRef)) errors.push(`feeInventory.${row.id}.calculationRef is broken.`);
+    if (row.differenceUsd !== null && !row.calculationRef) errors.push(`feeInventory.${row.id}.differenceUsd has no calculationRef.`);
+    if (row.findingId !== null && !findingIds.has(row.findingId)) errors.push(`feeInventory.${row.id}.findingId references unknown finding ${row.findingId}.`);
+    validateRefs(`feeInventory.${row.id}.relatedFindingIds`, row.relatedFindingIds ?? [], findingIds, errors);
   }
-  for (const row of report.feeComposition.rows) validateRefs(`feeComposition.${row.category}`, row.feeRefs, evidenceIds, errors);
+  for (const row of report.feeComposition.rows) validateRefs(`feeComposition.${row.category}`, row.feeRefs, feeRowIds, errors);
   for (const positive of report.positiveFindings) validateRefs(`positiveFindings.${positive.id}`, positive.evidenceRefs, evidenceIds, errors);
   for (const calculation of report.details.calculations) {
     for (const input of calculation.inputs) validateRefs(`calculations.${calculation.id}.${input.label}`, input.evidenceRefs, evidenceIds, errors);
+    validateCalculation(calculation, errors);
   }
 
   validateVisibility(report.componentVisibility, errors);
+  validateFeeFindingRelationships(report, errors);
+  validateFeeInventoryCounts(report, errors);
   validateOpportunity(report.findings, report.opportunitySummary, calculationIds, errors);
 
   if (errors.length > 0) {
@@ -580,7 +595,82 @@ function validateReportValue(
 
 function validateRefs(path: string, refs: string[], ids: Set<string>, errors: string[]): void {
   for (const ref of refs) {
-    if (!ids.has(ref)) errors.push(`${path} evidence ref ${ref} is broken.`);
+    if (!ids.has(ref)) errors.push(`${path} ref ${ref} is broken.`);
+  }
+}
+
+function validateFeeFindingRelationships(report: SingleStatementReportV1, errors: string[]): void {
+  const findingsById = new Map(report.findings.map((finding) => [finding.id, finding]));
+  const rowsById = new Map(report.feeInventory.rows.map((row) => [row.id, row]));
+
+  for (const finding of report.findings) {
+    for (const rowId of finding.feeRowIds) {
+      const row = rowsById.get(rowId);
+      if (!row) continue;
+      const related = new Set(row.relatedFindingIds ?? []);
+      if (row.findingId !== finding.id && !related.has(finding.id)) {
+        errors.push(`finding ${finding.id} references fee row ${rowId}, but the row does not link back.`);
+      }
+    }
+  }
+
+  for (const row of report.feeInventory.rows) {
+    const rowRelated = new Set([...(row.relatedFindingIds ?? []), ...(row.findingId ? [row.findingId] : [])]);
+    for (const findingId of rowRelated) {
+      const finding = findingsById.get(findingId);
+      if (finding && !finding.feeRowIds.includes(row.id)) {
+        errors.push(`fee row ${row.id} references finding ${findingId}, but the finding does not link back.`);
+      }
+    }
+  }
+}
+
+function validateFeeInventoryCounts(report: SingleStatementReportV1, errors: string[]): void {
+  if (report.feeInventory.displayedRowCount !== report.feeInventory.rows.length) {
+    errors.push(`feeInventory.displayedRowCount ${report.feeInventory.displayedRowCount} does not match rows ${report.feeInventory.rows.length}.`);
+  }
+  if (report.feeInventory.observedRowCount < report.feeInventory.rows.length) {
+    errors.push(`feeInventory.observedRowCount ${report.feeInventory.observedRowCount} is below displayed row count ${report.feeInventory.rows.length}.`);
+  }
+}
+
+function validateCalculation(calculation: SingleStatementReportV1["details"]["calculations"][number], errors: string[]): void {
+  const inputs = new Map(calculation.inputs.map((input) => [input.label, input.value]));
+  const inputAt = (label: string): number | null => {
+    const value = inputs.get(label);
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  };
+  let expected: number | null = null;
+
+  if (calculation.formulaCode === "effective_rate") {
+    const sales = inputAt("Processed sales");
+    const fees = inputAt("Total fees");
+    if (sales !== null && fees !== null && sales > 0) expected = round4((fees / sales) * 100);
+  } else if (calculation.formulaCode === "average_ticket") {
+    const sales = inputAt("Processed sales");
+    const count = inputAt("Transaction count");
+    if (sales !== null && count !== null && count > 0) expected = round2(sales / count);
+  } else if (calculation.formulaCode === "fee_reconciliation_delta") {
+    const classified = inputAt("Classified fees total");
+    const fees = inputAt("Total fees");
+    if (classified !== null && fees !== null) expected = round2(Math.abs(classified - fees));
+  } else if (calculation.formulaCode === "monthly_charge_times_12") {
+    const monthly = inputAt("Monthly charge");
+    if (monthly !== null) expected = round2(monthly * 12);
+  } else if (calculation.formulaCode === "benchmark_rate_gap_from_upper") {
+    const effective = inputAt("Observed effective rate");
+    const upper = inputAt("Upper reference boundary");
+    if (effective !== null && upper !== null) expected = round4(Math.max(0, effective - upper));
+  } else if (calculation.formulaCode === "observed_minus_expected_amount") {
+    const observed = inputAt("Observed amount");
+    const expectedAmount = inputAt("Expected amount");
+    if (observed !== null && expectedAmount !== null) expected = round2(Math.max(0, observed - expectedAmount));
+  } else if (calculation.formulaCode === "fiserv_master_estimated_savings") {
+    expected = inputAt("Estimated annual opportunity");
+  }
+
+  if (expected !== null && Math.abs(expected - calculation.result) > 0.01) {
+    errors.push(`calculation ${calculation.id} result ${calculation.result} does not match ${calculation.formulaCode} expected ${expected}.`);
   }
 }
 

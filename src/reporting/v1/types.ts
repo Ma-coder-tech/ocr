@@ -245,6 +245,7 @@ export type FeeInventoryRow = {
   differenceUsd: number | null;
   calculationRef?: string;
   findingId: string | null;
+  relatedFindingIds?: string[];
   evidenceRefs: string[];
 };
 

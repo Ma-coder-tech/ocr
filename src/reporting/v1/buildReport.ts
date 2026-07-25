@@ -17,6 +17,7 @@ import type {
   FeeCategoryCode,
   FeeCompositionPresentation,
   FeeCompositionRow,
+  FeeInventoryRow,
   FeeInventoryPresentation,
   FindingCategory,
   FindingDisposition,
@@ -86,10 +87,11 @@ export function buildSingleStatementReportV1(input: BuildSingleStatementReportV1
   addReconciliationCalculation(collections, reconciliation);
   const benchmark = buildBenchmark(input.analysis, metrics, collections);
   const feeInventory = buildFeeInventory(input.analysis, collections);
-  const feeComposition = buildFeeComposition(input.analysis, reconciliation, feeInventory);
-  const rawFindings = buildFindings(input.analysis, collections);
+  const rawFindings = buildFindings(input.analysis, collections, feeInventory);
   const rankedFindings = rankFindings(rawFindings);
   const opportunity = aggregateOpportunity(rankedFindings);
+  const linkedFeeInventory = linkFeeInventoryToFindings(feeInventory, opportunity.findings);
+  const linkedFeeComposition = buildFeeComposition(input.analysis, reconciliation, linkedFeeInventory);
   const positiveFindings = buildPositiveFindings(input.analysis, benchmark, reconciliation, collections);
   const pricingModel = buildPricingModel(input.analysis, collections);
   const reportState = resolveReportState({
@@ -125,8 +127,8 @@ export function buildSingleStatementReportV1(input: BuildSingleStatementReportV1
     verdict: verdictFor(reportState.code, opportunity.opportunitySummary.totalEligibleAnnualOpportunityUsd),
     benchmark,
     pricingModel,
-    feeComposition,
-    feeInventory,
+    feeComposition: linkedFeeComposition,
+    feeInventory: linkedFeeInventory,
     findings: opportunity.findings,
     positiveFindings,
     actionToolkit: actionToolkitFor(reportState.code, opportunity.findings),
@@ -294,7 +296,20 @@ function buildBenchmark(summary: AnalysisSummary, metrics: ReportMetrics, collec
     excerpt: registry.limitation,
     confidence: "medium",
   });
-  void refId;
+  collections.calculations.push({
+    id: "calc_benchmark_rate_gap",
+    formulaCode: "benchmark_rate_gap_from_upper",
+    formulaLabel: "observed effective rate - upper reference boundary",
+    inputs: [
+      input("Observed effective rate", metrics.effectiveRate.value, "percent", metrics.effectiveRate.evidenceRefs),
+      input("Lower reference boundary", summary.benchmark.lowerRate, "percent", [refId]),
+      input("Upper reference boundary", summary.benchmark.upperRate, "percent", [refId]),
+    ],
+    result: round4(Math.max(0, summary.benchmark.deltaFromUpperRate)),
+    unit: "percent",
+    assumptions: [`Business-type selection factor: ${summary.benchmark.segment}.`],
+    confidence: "medium",
+  });
   return {
     status: summary.benchmark.status,
     eligible: true,
@@ -324,7 +339,12 @@ function unavailableBenchmark(reason: NonNullable<BenchmarkPresentation["omissio
 }
 
 function buildFeeInventory(summary: AnalysisSummary, collections: BuildCollections): FeeInventoryPresentation {
-  const rows = (summary.feeBreakdown ?? []).filter((row) => isPositiveFinite(row.amount)).map((row, index) => feeInventoryRow(row, index, collections));
+  const fiservRows = fiservFeeInventoryRows(summary, collections);
+  const genericRows = (summary.feeBreakdown ?? [])
+    .filter((row) => isPositiveFinite(row.amount))
+    .filter((row) => !fiservRows.some((fiservRow) => sameObservedFee(fiservRow, row)))
+    .map((row) => feeInventoryRow(row, collections));
+  const rows = [...fiservRows, ...genericRows];
   if (rows.length === 0) return { status: "unavailable", rows: [], observedRowCount: 0, displayedRowCount: 0, omissionReason: "not_extracted" };
   return {
     status: rows.some((row) => row.category === "needs_review") ? "partial" : "available",
@@ -334,11 +354,12 @@ function buildFeeInventory(summary: AnalysisSummary, collections: BuildCollectio
   };
 }
 
-function feeInventoryRow(row: FeeBreakdownRow, index: number, collections: BuildCollections): FeeInventoryPresentation["rows"][number] {
-  const id = stableId(["fee", index + 1, row.label]);
+function feeInventoryRow(row: FeeBreakdownRow, collections: BuildCollections): FeeInventoryRow {
+  const id = stableId(["fee", row.sourceSection, row.label, row.amount, row.evidenceLine]);
   const evidenceId = addEvidence(collections, {
     id: `ev_${id}`,
     type: "statement_line",
+    statementPage: null,
     statementSection: row.sourceSection ?? null,
     originalLabel: row.label,
     excerpt: customerSafeExcerpt(row.evidenceLine ?? row.label),
@@ -362,8 +383,85 @@ function feeInventoryRow(row: FeeBreakdownRow, index: number, collections: Build
     targetPerItemUsd: null,
     differenceUsd: null,
     findingId: null,
+    relatedFindingIds: [],
     evidenceRefs: [evidenceId],
   };
+}
+
+function fiservFeeInventoryRows(summary: AnalysisSummary, collections: BuildCollections): FeeInventoryRow[] {
+  return arrayOfRecords(recordOrNull(summary.fiservFeeAnalysisV2)?.rows)
+    .filter((row) => isPositiveFinite(row.amount))
+    .map((row) => fiservFeeInventoryRow(row, collections));
+}
+
+function fiservFeeInventoryRow(row: Record<string, unknown>, collections: BuildCollections): FeeInventoryRow {
+  const label = safeString(row.description) || safeString(row.canonicalName) || "Processor fee";
+  const amount = round2(numberOrNull(row.amount) ?? 0);
+  const rowIndex = numberOrNull(row.rowIndex);
+  const confidence = confidenceFromLabel(safeString(row.matchConfidence) || safeString(row.confidence) || "medium");
+  const id = stableId(["fee", "fiserv", rowIndex, safeString(row.sourceSection), label, amount]);
+  const evidenceId = addEvidence(collections, {
+    id: `ev_${id}`,
+    type: "statement_line",
+    statementPage: null,
+    statementSection: safeString(row.sourceSection) || null,
+    originalLabel: label,
+    excerpt: customerSafeExcerpt(safeString(row.evidenceLine) || label),
+    sourceId: safeString(row.referenceId) || null,
+    confidence,
+  });
+  const difference = positiveOrNull(row.delta);
+  const expectedAmount = numberOrNull(row.expectedAmount);
+  const calculationRef =
+    difference !== null && expectedAmount !== null
+      ? addObservedMinusExpectedCalculation(collections, `calc_${id}_difference`, amount, expectedAmount, [evidenceId], confidence)
+      : undefined;
+  const comparisonTargetType =
+    calculationRef && safeString(row.referenceId)
+      ? "network_schedule"
+      : safeString(row.proofStatus) === "indeterminate" || safeString(row.proofStatus) === "not_enough_detail"
+        ? "contract_documentation"
+        : "none";
+
+  return {
+    id,
+    originalLabel: label,
+    displayLabel: displayFeeLabel(label),
+    observedAmountUsd: amount,
+    cadence: "unknown",
+    category: feeCategoryFromFiservRow(row),
+    classificationConfidence: confidence,
+    classificationExplanation: safeString(row.reason) || null,
+    disposition: comparisonTargetType === "contract_documentation" || difference !== null ? "verify" : "none",
+    observedRatePct: numberOrNull(row.rate),
+    observedPerItemUsd: null,
+    observedItemCount: numberOrNull(row.count),
+    comparisonTargetType,
+    targetRatePct: null,
+    targetPerItemUsd: null,
+    differenceUsd: calculationRef ? difference : null,
+    calculationRef,
+    findingId: null,
+    relatedFindingIds: [],
+    evidenceRefs: [evidenceId],
+  };
+}
+
+function sameObservedFee(row: FeeInventoryRow, source: FeeBreakdownRow): boolean {
+  const left = stableId([row.originalLabel]);
+  const right = stableId([source.label]);
+  const labelMatches = left === right || right.endsWith(left) || left.endsWith(right);
+  return labelMatches && Math.abs(row.observedAmountUsd - round2(source.amount)) <= 0.01;
+}
+
+function feeCategoryFromFiservRow(row: Record<string, unknown>): FeeCategoryCode {
+  const feeType = safeString(row.feeType);
+  const proofStatus = safeString(row.proofStatus);
+  if (proofStatus === "indeterminate" || proofStatus === "not_enough_detail" || feeType.includes("unknown")) return "needs_review";
+  if (/card_brand|network|interchange|pin_debit/.test(feeType)) return "card_brand_network";
+  if (/processor|discount|per_item|pct_markup|fixed/.test(feeType)) return "processor_fees";
+  if (/compliance|third_party|service|penalty/.test(feeType)) return "service_compliance";
+  return "needs_review";
 }
 
 function buildFeeComposition(
@@ -388,7 +486,7 @@ function buildFeeComposition(
   for (const row of feeInventory.rows) {
     const current = totals.get(row.category) ?? { amount: 0, refs: [], confidence: "high" as ConfidenceLevel };
     current.amount += row.observedAmountUsd;
-    current.refs.push(...row.evidenceRefs);
+    current.refs.push(row.id);
     if (row.classificationConfidence === "low") current.confidence = "low";
     else if (row.classificationConfidence === "medium" && current.confidence === "high") current.confidence = "medium";
     totals.set(row.category, current);
@@ -412,14 +510,14 @@ function buildFeeComposition(
   };
 }
 
-function buildFindings(summary: AnalysisSummary, collections: BuildCollections): ReportFinding[] {
-  const structured = (summary.structuredFeeFindings ?? []).map((finding) => structuredFinding(finding, collections));
-  const fiserv = fiservFindings(summary, collections);
+function buildFindings(summary: AnalysisSummary, collections: BuildCollections, feeInventory: FeeInventoryPresentation): ReportFinding[] {
+  const structured = (summary.structuredFeeFindings ?? []).map((finding) => structuredFinding(finding, collections, feeInventory));
+  const fiserv = fiservFindings(summary, collections, feeInventory);
   const master = fiservMasterFinding(summary, fiserv, collections);
   return [...structured, ...fiserv, ...(master ? [master] : [])].filter((finding): finding is ReportFinding => finding !== null);
 }
 
-function structuredFinding(finding: StructuredFeeFinding, collections: BuildCollections): ReportFinding {
+function structuredFinding(finding: StructuredFeeFinding, collections: BuildCollections, feeInventory: FeeInventoryPresentation): ReportFinding {
   const id = stableId(["structured", finding.kind, finding.rowIndex, finding.label]);
   const confidence = confidenceFromScore(finding.confidence);
   const evidenceId = addEvidence(collections, {
@@ -437,6 +535,7 @@ function structuredFinding(finding: StructuredFeeFinding, collections: BuildColl
   const monthlyAmount = cadence === "monthly" ? amount : null;
   const annualAmount = amount !== null && cadence === "monthly" ? round2(amount * 12) : null;
   const cadencePolicy = structuredFindingCadencePolicy[finding.kind];
+  const feeRowIds = feeRowIdsForStructuredFinding(feeInventory, collections, finding);
   return {
     id,
     sourceFindingType: finding.kind,
@@ -458,7 +557,7 @@ function structuredFinding(finding: StructuredFeeFinding, collections: BuildColl
     easeLevel: "unknown",
     confidence,
     originalStatementLabels: [finding.label],
-    feeRowIds: [],
+    feeRowIds,
     evidenceRefs: [evidenceId],
     calculationRef,
     assumptions: cadence === "monthly" ? [`${cadencePolicy.methodologyLabel} ${cadencePolicy.limitation}`] : [],
@@ -479,7 +578,7 @@ function explicitMonthlyCadenceEvidence(evidenceLine: string): boolean {
   return /\b(monthly|per\s+month|each\s+month|\/\s*mo\.?|month\s+fee)\b/i.test(evidenceLine);
 }
 
-function fiservFindings(summary: AnalysisSummary, collections: BuildCollections): ReportFinding[] {
+function fiservFindings(summary: AnalysisSummary, collections: BuildCollections, feeInventory: FeeInventoryPresentation): ReportFinding[] {
   const analysis = recordOrNull(summary.fiservFeeAnalysisV2);
   if (!analysis) return [];
   const components = arrayOfRecords(recordOrNull(analysis.estimatedAnnualSavings)?.components);
@@ -492,6 +591,7 @@ function fiservFindings(summary: AnalysisSummary, collections: BuildCollections)
       const id = stableId(["fiserv", kind, index + 1, title]);
       const confidence = confidenceFromLabel(safeString(component?.confidence) || (safeString(finding.severity) === "high" ? "high" : "medium"));
       const evidenceRefs = evidenceForFinding(collections, id, finding, confidence);
+      const feeRowIds = feeRowIdsForEvidenceLines(feeInventory, collections, findingEvidenceLines(finding));
       const monthlyCost = positiveOrNull(finding.monthlyCost);
       const annualEstimate = positiveOrNull(finding.annualEstimate) ?? positiveOrNull(component?.annualImpact);
       const impactClassification = fiservImpactClassification(kind, safeString(finding.action), component);
@@ -522,7 +622,7 @@ function fiservFindings(summary: AnalysisSummary, collections: BuildCollections)
         easeLevel: "unknown",
         confidence,
         originalStatementLabels: [title],
-        feeRowIds: [],
+        feeRowIds,
         evidenceRefs,
         calculationRef,
         assumptions: cadence === "monthly" ? ["Annualized from the analyzed monthly statement."] : [],
@@ -559,6 +659,7 @@ function fiservMasterFinding(summary: AnalysisSummary, childFindings: ReportFind
     assumptions: ["This is the processor analysis master savings figure and supersedes overlapping component impacts."],
     confidence: confidenceFromLabel(safeString(savings.confidence)),
   });
+  const feeRowIds = [...new Set(childFindings.flatMap((finding) => finding.feeRowIds))].sort();
   return {
     id,
     sourceFindingType: "fiserv_master_estimated_savings",
@@ -580,7 +681,7 @@ function fiservMasterFinding(summary: AnalysisSummary, childFindings: ReportFind
     easeLevel: "unknown",
     confidence: confidenceFromLabel(safeString(savings.confidence)),
     originalStatementLabels: [],
-    feeRowIds: [],
+    feeRowIds,
     evidenceRefs: [evidenceId],
     calculationRef: calcId,
     assumptions: ["Annualized amounts are estimates from one monthly statement."],
@@ -590,6 +691,76 @@ function fiservMasterFinding(summary: AnalysisSummary, childFindings: ReportFind
     aggregationKey: "fiserv_master_estimated_savings",
     supersedesFindingIds: childFindings.filter((finding) => finding.impactClassification !== "verification_only").map((finding) => finding.id),
     overlapRisk: "none",
+  };
+}
+
+function feeRowIdsForStructuredFinding(feeInventory: FeeInventoryPresentation, collections: BuildCollections, finding: StructuredFeeFinding): string[] {
+  const amount = positiveOrNull(finding.estimatedImpactUsd) ?? positiveOrNull(finding.amountUsd);
+  if (amount === null) return [];
+  const normalizedLabel = stableId([finding.label]);
+  const normalizedEvidence = customerSafeExcerpt(finding.evidenceLine);
+  return feeInventory.rows
+    .filter((row) => {
+      const labelMatches = stableId([row.originalLabel]) === normalizedLabel;
+      const amountMatches = Math.abs(row.observedAmountUsd - round2(amount)) <= 0.01;
+      if (!labelMatches || !amountMatches) return false;
+      const evidenceMatches = row.evidenceRefs.some((ref) => {
+        const evidence = evidenceById(collections, ref);
+        return evidence?.excerpt !== null && evidence?.excerpt === normalizedEvidence;
+      });
+      return evidenceMatches || row.originalLabel === finding.label;
+    })
+    .map((row) => row.id);
+}
+
+function feeRowIdsForEvidenceLines(feeInventory: FeeInventoryPresentation, collections: BuildCollections, lines: string[]): string[] {
+  const excerpts = new Set(lines.map(customerSafeExcerpt).filter((line): line is string => Boolean(line)));
+  if (excerpts.size === 0) return [];
+  return feeInventory.rows
+    .filter((row) =>
+      row.evidenceRefs.some((ref) => {
+        const evidence = evidenceById(collections, ref);
+        return evidence?.excerpt !== null && evidence?.excerpt !== undefined && excerpts.has(evidence.excerpt);
+      }),
+    )
+    .map((row) => row.id);
+}
+
+function findingEvidenceLines(finding: Record<string, unknown>): string[] {
+  return Array.isArray(finding.evidence) ? finding.evidence.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+}
+
+function evidenceById(collections: BuildCollections, id: string): EvidenceRef | null {
+  return collections.evidence.find((evidence) => evidence.id === id) ?? null;
+}
+
+function linkFeeInventoryToFindings(feeInventory: FeeInventoryPresentation, findings: ReportFinding[]): FeeInventoryPresentation {
+  const supersededIds = new Set(findings.flatMap((finding) => finding.supersedesFindingIds ?? []));
+  const findingsByFee = new Map<string, ReportFinding[]>();
+
+  for (const finding of findings) {
+    for (const feeRowId of finding.feeRowIds) {
+      const current = findingsByFee.get(feeRowId) ?? [];
+      current.push(finding);
+      findingsByFee.set(feeRowId, current);
+    }
+  }
+
+  return {
+    ...feeInventory,
+    rows: feeInventory.rows.map((row) => {
+      const related = [...(findingsByFee.get(row.id) ?? [])].sort((left, right) => {
+        if (left.includedInOpportunityTotal !== right.includedInOpportunityTotal) return left.includedInOpportunityTotal ? -1 : 1;
+        return left.rank - right.rank || left.id.localeCompare(right.id);
+      });
+      const primary = related.find((finding) => !supersededIds.has(finding.id)) ?? null;
+      return {
+        ...row,
+        findingId: primary?.id ?? null,
+        relatedFindingIds: related.map((finding) => finding.id),
+        disposition: primary?.disposition ?? row.disposition,
+      };
+    }),
   };
 }
 
@@ -891,6 +1062,27 @@ function addAnnualizedCalculation(collections: BuildCollections, id: string, mon
     result: round2(monthlyAmount * 12),
     unit: "money",
     assumptions: ["Only one monthly statement was analyzed; annualized amount is descriptive, not guaranteed."],
+    confidence,
+  });
+  return id;
+}
+
+function addObservedMinusExpectedCalculation(
+  collections: BuildCollections,
+  id: string,
+  observedAmount: number,
+  expectedAmount: number,
+  evidenceRefs: string[],
+  confidence: ConfidenceLevel,
+): string {
+  collections.calculations.push({
+    id,
+    formulaCode: "observed_minus_expected_amount",
+    formulaLabel: "observed amount - expected amount",
+    inputs: [input("Observed amount", observedAmount, "money", evidenceRefs), input("Expected amount", expectedAmount, "money", evidenceRefs)],
+    result: round2(Math.max(0, observedAmount - expectedAmount)),
+    unit: "money",
+    assumptions: ["Difference is shown only when the backend has an explicit expected amount for the same fee row."],
     confidence,
   });
   return id;
