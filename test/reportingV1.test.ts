@@ -284,10 +284,10 @@ describe("SingleStatementReportV1 safety foundation", () => {
     expect(report.opportunitySummary.excludedFindingIds).toEqual([]);
     expect(report.findings).toEqual([]);
     expect(report.positiveFindings).toEqual([]);
-    expect(report.feeInventory).toMatchObject({ status: "unavailable", rows: [], observedRowCount: 0, displayedRowCount: 0 });
-    expect(report.feeComposition).toMatchObject({ status: "unavailable", rows: [] });
+    expect(report.feeInventory).toMatchObject({ status: "unavailable", rows: [], observedRowCount: 0, displayedRowCount: 0, omissionReason: "not_extracted" });
+    expect(report.feeComposition).toMatchObject({ status: "unavailable", rows: [], omissionReason: "not_extracted" });
     expect(report.details).toEqual({ evidence: [], calculations: [] });
-    expect(report.componentVisibility.opportunity_summary).toMatchObject({ status: "hide", reason: "parser_blocked" });
+    expect(report.componentVisibility.opportunity_summary).toMatchObject({ status: "hide", reason: "not_extracted" });
   });
 
   it("projects completed summaries that resolve unable_to_analyze into a non-financial diagnostic payload", () => {
@@ -324,8 +324,17 @@ describe("SingleStatementReportV1 safety foundation", () => {
       excludedFindingIds: [],
     });
     expect(report.findings).toEqual([]);
-    expect(report.feeInventory.rows).toEqual([]);
-    expect(report.feeComposition.rows).toEqual([]);
+    expect(report.benchmark.omissionReason).toBe("parser_blocked");
+    expect(report.feeInventory).toMatchObject({ status: "unavailable", rows: [], omissionReason: "parser_blocked" });
+    expect(report.feeComposition).toMatchObject({ status: "unavailable", rows: [], omissionReason: "parser_blocked" });
+    expect(report.componentVisibility.fee_inventory).toMatchObject({ status: "hide", reason: "parser_blocked" });
+    expect(report.verdict.title).toMatch(/Parser validation blocked/);
+    expect(report.limitations).toEqual([
+      expect.objectContaining({
+        code: "partial_extraction",
+        message: "RateReveal withheld financial conclusions because parser validation did not approve this statement.",
+      }),
+    ]);
     expect(report.details).toEqual({ evidence: [], calculations: [] });
     expect(() => validateSingleStatementReportV1(report)).not.toThrow();
   });
@@ -354,6 +363,12 @@ describe("SingleStatementReportV1 safety foundation", () => {
     );
     expect(report.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(0);
     expect(report.findings).toEqual([]);
+    expect(report.benchmark.omissionReason).toBe("parser_blocked");
+    expect(report.feeInventory.omissionReason).toBe("parser_blocked");
+    expect(report.feeComposition.omissionReason).toBe("parser_blocked");
+    expect(report.componentVisibility.benchmark).toMatchObject({ status: "hide", reason: "parser_blocked" });
+    expect(report.verdict.title).toMatch(/Parser validation blocked/);
+    expect(report.limitations[0]?.message).toBe("RateReveal withheld financial conclusions because parser validation did not approve this statement.");
   });
 
   it("suppresses eligible opportunity for low-confidence reports while preserving diagnostic fee rows", () => {
@@ -792,7 +807,12 @@ describe("SingleStatementReportV1 safety foundation", () => {
     expect(report.metrics.processedSales.value).toBeNull();
     expect(report.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(0);
     expect(report.findings).toEqual([]);
-    expect(report.feeInventory.rows).toEqual([]);
+    expect(report.benchmark.omissionReason).toBe("not_verified");
+    expect(report.feeInventory).toMatchObject({ status: "unavailable", rows: [], omissionReason: "not_verified" });
+    expect(report.feeComposition).toMatchObject({ status: "unavailable", rows: [], omissionReason: "not_verified" });
+    expect(report.componentVisibility.opportunity_summary).toMatchObject({ status: "hide", reason: "not_verified" });
+    expect(report.verdict.title).toBe("Core statement totals were not verified.");
+    expect(report.limitations[0]?.message).toBe("RateReveal withheld financial conclusions because core statement totals were not verified.");
   });
 
   it("uses full schemas and integrity checks for unsupported versions, calculations, and component visibility", () => {

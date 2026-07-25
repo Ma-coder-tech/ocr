@@ -13,6 +13,7 @@ import type {
   CalculationRecord,
   ChargeCadence,
   ConfidenceLevel,
+  DataQualitySummary,
   EvidenceRef,
   FeeCategoryCode,
   FeeCompositionPresentation,
@@ -23,6 +24,7 @@ import type {
   FindingDisposition,
   ImpactClassification,
   MethodologySummary,
+  OmissionReasonCode,
   OpportunitySummary,
   PricingModelCode,
   PricingModelPresentation,
@@ -31,6 +33,7 @@ import type {
   ReportIdentity,
   ReportLimitation,
   ReportMetrics,
+  ReportState,
   ReportValue,
   SingleStatementReportV1,
 } from "./types.js";
@@ -106,7 +109,8 @@ export function buildSingleStatementReportV1(input: BuildSingleStatementReportV1
     evaluatedAt: generatedAt,
   });
   const projection = applyStateSafetyProjection({
-    reportStateCode: reportState.code,
+    reportState,
+    dataQuality,
     metrics,
     reconciliation,
     benchmark,
@@ -125,7 +129,7 @@ export function buildSingleStatementReportV1(input: BuildSingleStatementReportV1
     hasFindings: projection.findings.length > 0,
     hasPositiveFindings: projection.positiveFindings.length > 0,
   });
-  const limitations = buildLimitations(projection.benchmark, projection.findings);
+  const limitations = buildLimitations(projection.benchmark, projection.findings, reportState, projection.unavailableReason);
 
   return validateSingleStatementReportV1({
     contractVersion: "single_statement_report_v1",
@@ -139,7 +143,7 @@ export function buildSingleStatementReportV1(input: BuildSingleStatementReportV1
     metrics: projection.metrics,
     opportunitySummary: projection.opportunitySummary,
     componentVisibility,
-    verdict: verdictFor(reportState.code, projection.opportunitySummary.totalEligibleAnnualOpportunityUsd),
+    verdict: verdictFor(reportState.code, projection.opportunitySummary.totalEligibleAnnualOpportunityUsd, projection.unavailableReason),
     benchmark: projection.benchmark,
     pricingModel: projection.pricingModel,
     feeComposition: projection.feeComposition,
@@ -154,7 +158,8 @@ export function buildSingleStatementReportV1(input: BuildSingleStatementReportV1
 }
 
 type StateSafetyProjection = {
-  reportStateCode: SingleStatementReportV1["reportState"]["code"];
+  reportState: ReportState;
+  dataQuality: DataQualitySummary;
   metrics: ReportMetrics;
   reconciliation: ReconciliationSummary;
   benchmark: BenchmarkPresentation;
@@ -167,23 +172,29 @@ type StateSafetyProjection = {
   details: BuildCollections;
 };
 
-function applyStateSafetyProjection(input: StateSafetyProjection): Omit<StateSafetyProjection, "reportStateCode"> {
-  if (input.reportStateCode === "unable_to_analyze") {
+type ProjectedReportSections = Omit<StateSafetyProjection, "reportState" | "dataQuality"> & {
+  unavailableReason?: OmissionReasonCode;
+};
+
+function applyStateSafetyProjection(input: StateSafetyProjection): ProjectedReportSections {
+  if (input.reportState.code === "unable_to_analyze") {
+    const reason = unavailableReasonForUnableToAnalyze(input.reportState, input.dataQuality);
     return {
       metrics: unavailableMetrics(),
       reconciliation: normalizeReconciliation(undefined),
-      benchmark: unavailableBenchmark("parser_blocked"),
+      benchmark: unavailableBenchmark(reason),
       pricingModel: unknownPricingModel(),
-      feeComposition: unavailableFeeComposition("parser_blocked"),
-      feeInventory: unavailableFeeInventory("parser_blocked"),
+      feeComposition: unavailableFeeComposition(reason),
+      feeInventory: unavailableFeeInventory(reason),
       opportunitySummary: emptyOpportunitySummary(),
       findings: [],
       positiveFindings: [],
       details: { evidence: [], calculations: [] },
+      unavailableReason: reason,
     };
   }
 
-  if (input.reportStateCode === "low_confidence" || input.reportStateCode === "reconciliation_failure") {
+  if (input.reportState.code === "low_confidence" || input.reportState.code === "reconciliation_failure") {
     const findings = input.findings
       .filter((finding) => !finding.includedInOpportunityTotal)
       .map((finding) => ({ ...finding, includedInOpportunityTotal: false }));
@@ -202,7 +213,7 @@ function applyStateSafetyProjection(input: StateSafetyProjection): Omit<StateSaf
     };
     return {
       ...projection,
-      details: pruneDetailsForProjection(input.reportStateCode, projection),
+      details: pruneDetailsForProjection(input.reportState.code, projection),
     };
   }
 
@@ -218,6 +229,23 @@ function applyStateSafetyProjection(input: StateSafetyProjection): Omit<StateSaf
     positiveFindings: input.positiveFindings,
     details: input.details,
   };
+}
+
+function unavailableReasonForUnableToAnalyze(reportState: ReportState, dataQuality: DataQualitySummary): OmissionReasonCode {
+  if (reportState.reasons.includes("parser_blocked")) {
+    const criticalFinancialCodes = dataQuality.reasons
+      .filter((reason) => reason.severity === "critical" && reason.affectedComponents.some((component) => component !== "methodology"))
+      .map((reason) => reason.code);
+    if (criticalFinancialCodes.some((code) => code.includes("parser") || code.includes("validation"))) return "parser_blocked";
+    if (criticalFinancialCodes.some((code) => code.includes("confidence"))) return "low_confidence";
+    return "insufficient_evidence";
+  }
+  if (reportState.reasons.includes("missing_core_totals")) return "not_verified";
+  if (reportState.reasons.includes("conflicting_totals") || reportState.reasons.includes("reconciliation_delta_exceeded")) return "reconciliation_failed";
+  if (reportState.reasons.includes("analysis_confidence_low")) return "low_confidence";
+  if (reportState.reasons.includes("unreadable_document")) return "not_extracted";
+  if (reportState.reasons.includes("not_a_processing_statement")) return "unsupported_processor";
+  return "insufficient_evidence";
 }
 
 function emptyOpportunitySummary(): OpportunitySummary {
@@ -283,10 +311,7 @@ function diagnosticFeeDisposition(row: FeeInventoryRow): FeeInventoryRow["dispos
   return "none";
 }
 
-function pruneDetailsForProjection(
-  stateCode: SingleStatementReportV1["reportState"]["code"],
-  projection: Omit<StateSafetyProjection, "reportStateCode">,
-): BuildCollections {
+function pruneDetailsForProjection(stateCode: SingleStatementReportV1["reportState"]["code"], projection: ProjectedReportSections): BuildCollections {
   const calculationIds = new Set<string>();
   const evidenceIds = new Set<string>();
   const addReportValueRefs = (value: ReportValue<unknown>): void => {
@@ -352,6 +377,7 @@ export function buildUnableToAnalyzeReportV1(input: BuildUnableToAnalyzeReportV1
     evaluatedAt: generatedAt,
     analysisFailed: true,
   });
+  const unavailableReason = unavailableReasonForUnableToAnalyze(reportState, dataQuality);
   const componentVisibility = buildComponentVisibility({
     state: reportState,
     reconciliation,
@@ -379,11 +405,11 @@ export function buildUnableToAnalyzeReportV1(input: BuildUnableToAnalyzeReportV1
     metrics,
     opportunitySummary,
     componentVisibility,
-    verdict: verdictFor("unable_to_analyze", 0),
+    verdict: verdictFor("unable_to_analyze", 0, unavailableReason),
     benchmark,
     pricingModel: unknownPricingModel(),
-    feeComposition: { status: "unavailable", totalFees: null, rows: [], coveragePct: null, deltaUsd: null, omissionReason: "parser_blocked" },
-    feeInventory: { status: "unavailable", rows: [], observedRowCount: 0, displayedRowCount: 0, omissionReason: "parser_blocked" },
+    feeComposition: { status: "unavailable", totalFees: null, rows: [], coveragePct: null, deltaUsd: null, omissionReason: unavailableReason },
+    feeInventory: { status: "unavailable", rows: [], observedRowCount: 0, displayedRowCount: 0, omissionReason: unavailableReason },
     findings: [],
     positiveFindings: [],
     actionToolkit: actionToolkitFor("unable_to_analyze", []),
@@ -392,7 +418,7 @@ export function buildUnableToAnalyzeReportV1(input: BuildUnableToAnalyzeReportV1
     limitations: [
       {
         code: "partial_extraction",
-        message: "RateReveal could not verify enough of this statement to produce a reliable financial report.",
+        message: unableLimitationMessage(unavailableReason),
         severity: "warning",
         affectedFindingIds: [],
       },
@@ -1052,13 +1078,17 @@ function unavailableMetrics(): ReportMetrics {
   };
 }
 
-function verdictFor(code: SingleStatementReportV1["reportState"]["code"], annualOpportunity: number): SingleStatementReportV1["verdict"] {
+function verdictFor(
+  code: SingleStatementReportV1["reportState"]["code"],
+  annualOpportunity: number,
+  unavailableReason?: OmissionReasonCode,
+): SingleStatementReportV1["verdict"] {
   if (code === "unable_to_analyze") {
     return {
       tone: "blocked",
       eyebrow: "Unable to analyze",
-      title: "We could not verify enough of this statement to produce a reliable report.",
-      summary: "Upload the complete original PDF or a clearer copy.",
+      title: unableVerdictTitle(unavailableReason),
+      summary: unableVerdictSummary(unavailableReason),
       supportingPoints: [],
       primaryAction: "retry_upload",
     };
@@ -1154,6 +1184,26 @@ function actionToolkitFor(code: SingleStatementReportV1["reportState"]["code"], 
   };
 }
 
+function unableVerdictTitle(reason: OmissionReasonCode | undefined): string {
+  if (reason === "parser_blocked") return "Parser validation blocked this statement from a reliable financial report.";
+  if (reason === "not_verified") return "Core statement totals were not verified.";
+  if (reason === "reconciliation_failed") return "Statement totals conflicted before a reliable financial report could be produced.";
+  if (reason === "low_confidence") return "Analysis confidence was too low for customer-facing financial conclusions.";
+  if (reason === "not_extracted") return "Statement data could not be extracted.";
+  if (reason === "unsupported_processor") return "This statement type is not supported for financial reporting.";
+  return "We could not verify enough of this statement to produce a reliable report.";
+}
+
+function unableVerdictSummary(reason: OmissionReasonCode | undefined): string {
+  if (reason === "parser_blocked") return "Upload the complete original PDF or a clearer copy with parser-verifiable totals.";
+  if (reason === "not_verified") return "Upload a complete statement that clearly shows processed sales, total fees, and effective rate.";
+  if (reason === "reconciliation_failed") return "Upload the complete original statement so conflicting totals can be checked.";
+  if (reason === "low_confidence") return "Upload a clearer or more complete statement before acting on financial conclusions.";
+  if (reason === "not_extracted") return "Upload a text-based original statement or a clearer copy.";
+  if (reason === "unsupported_processor") return "Upload a supported processor statement or a statement with verifiable processing totals.";
+  return "Upload the complete original PDF or a clearer copy.";
+}
+
 function methodologyFor(benchmark: BenchmarkPresentation): MethodologySummary {
   return {
     statementCount: 1,
@@ -1164,7 +1214,22 @@ function methodologyFor(benchmark: BenchmarkPresentation): MethodologySummary {
   };
 }
 
-function buildLimitations(benchmark: BenchmarkPresentation, findings: ReportFinding[]): ReportLimitation[] {
+function buildLimitations(
+  benchmark: BenchmarkPresentation,
+  findings: ReportFinding[],
+  reportState?: ReportState,
+  unavailableReason?: OmissionReasonCode,
+): ReportLimitation[] {
+  if (reportState?.code === "unable_to_analyze") {
+    return [
+      {
+        code: "partial_extraction",
+        message: unableLimitationMessage(unavailableReason),
+        severity: "warning",
+        affectedFindingIds: [],
+      },
+    ];
+  }
   const limitations: ReportLimitation[] = [
     {
       code: "single_statement_snapshot",
@@ -1193,6 +1258,28 @@ function buildLimitations(benchmark: BenchmarkPresentation, findings: ReportFind
     }
   }
   return limitations;
+}
+
+function unableLimitationMessage(reason: OmissionReasonCode | undefined): string {
+  if (reason === "parser_blocked") {
+    return "RateReveal withheld financial conclusions because parser validation did not approve this statement.";
+  }
+  if (reason === "not_verified") {
+    return "RateReveal withheld financial conclusions because core statement totals were not verified.";
+  }
+  if (reason === "reconciliation_failed") {
+    return "RateReveal withheld financial conclusions because statement totals conflicted before reporting.";
+  }
+  if (reason === "low_confidence") {
+    return "RateReveal withheld financial conclusions because extraction confidence was too low.";
+  }
+  if (reason === "not_extracted") {
+    return "RateReveal withheld financial conclusions because statement data could not be extracted.";
+  }
+  if (reason === "unsupported_processor") {
+    return "RateReveal withheld financial conclusions because this statement type is not supported for financial reporting.";
+  }
+  return "RateReveal could not verify enough of this statement to produce a reliable financial report.";
 }
 
 function addTopLevelEvidence(collections: BuildCollections, summary: AnalysisSummary) {
