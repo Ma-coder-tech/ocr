@@ -41,8 +41,8 @@ export function normalizeDataQuality(summary: AnalysisSummary | undefined): Data
   const overallConfidence = lowerConfidence(parserConfidence, scoreConfidence);
   const missingPdfParserDecision = summary.sourceType === "pdf" && !summary.parserDecision;
   const reportable = summary.parserDecision ? summary.parserDecision.reportable : !missingPdfParserDecision;
-  const customerFacingTotalsAllowed = validation ? validation.customerFacingTotalsAllowed : reportable;
-  const feeClassificationAllowed = validation ? validation.feeClassificationAllowed : !missingPdfParserDecision;
+  const customerFacingTotalsAllowed = reportable && (validation ? validation.customerFacingTotalsAllowed : true);
+  const feeClassificationAllowed = reportable && (validation ? validation.feeClassificationAllowed : !missingPdfParserDecision);
 
   return {
     extractionMode,

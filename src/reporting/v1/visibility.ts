@@ -21,11 +21,12 @@ export function buildComponentVisibility(params: {
   benchmark: BenchmarkPresentation;
   hasFindings: boolean;
   hasPositiveFindings: boolean;
+  unavailableReason?: OmissionReasonCode;
 }): ComponentVisibilityMap {
   const map = Object.fromEntries(COMPONENTS.map((component) => [component, show()])) as ComponentVisibilityMap;
 
   if (params.state.code === "unable_to_analyze") {
-    const reason = omissionReasonForUnableToAnalyze(params.state);
+    const reason = params.unavailableReason ?? "insufficient_evidence";
     hide(map, ["core_metrics", "benchmark", "pricing_model", "fee_composition", "fee_inventory", "opportunity_summary", "findings", "positive_findings"], reason);
     limit(map, "action_toolkit", unableActionMessage(reason));
     return map;
@@ -73,16 +74,6 @@ function hide(map: ComponentVisibilityMap, components: ReportComponentId[], reas
   for (const component of components) {
     map[component] = { status: "hide", reason };
   }
-}
-
-function omissionReasonForUnableToAnalyze(state: ReportState): OmissionReasonCode {
-  if (state.reasons.includes("parser_blocked")) return "parser_blocked";
-  if (state.reasons.includes("missing_core_totals")) return "not_verified";
-  if (state.reasons.includes("conflicting_totals") || state.reasons.includes("reconciliation_delta_exceeded")) return "reconciliation_failed";
-  if (state.reasons.includes("analysis_confidence_low")) return "low_confidence";
-  if (state.reasons.includes("unreadable_document")) return "not_extracted";
-  if (state.reasons.includes("not_a_processing_statement")) return "unsupported_processor";
-  return "insufficient_evidence";
 }
 
 function unableActionMessage(reason: OmissionReasonCode): string {

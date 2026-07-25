@@ -128,6 +128,7 @@ export function buildSingleStatementReportV1(input: BuildSingleStatementReportV1
     benchmark: projection.benchmark,
     hasFindings: projection.findings.length > 0,
     hasPositiveFindings: projection.positiveFindings.length > 0,
+    unavailableReason: projection.unavailableReason,
   });
   const limitations = buildLimitations(projection.benchmark, projection.findings, reportState, projection.unavailableReason);
 
@@ -150,7 +151,7 @@ export function buildSingleStatementReportV1(input: BuildSingleStatementReportV1
     feeInventory: projection.feeInventory,
     findings: projection.findings,
     positiveFindings: projection.positiveFindings,
-    actionToolkit: actionToolkitFor(reportState.code, projection.findings),
+    actionToolkit: actionToolkitFor(reportState.code, projection.findings, projection.unavailableReason),
     details: projection.details,
     methodology: methodologyFor(projection.benchmark),
     limitations,
@@ -233,11 +234,20 @@ function applyStateSafetyProjection(input: StateSafetyProjection): ProjectedRepo
 
 function unavailableReasonForUnableToAnalyze(reportState: ReportState, dataQuality: DataQualitySummary): OmissionReasonCode {
   if (reportState.reasons.includes("parser_blocked")) {
-    const criticalFinancialCodes = dataQuality.reasons
-      .filter((reason) => reason.severity === "critical" && reason.affectedComponents.some((component) => component !== "methodology"))
-      .map((reason) => reason.code);
-    if (criticalFinancialCodes.some((code) => code.includes("parser") || code.includes("validation"))) return "parser_blocked";
-    if (criticalFinancialCodes.some((code) => code.includes("confidence"))) return "low_confidence";
+    const criticalFinancialReasons = dataQuality.reasons.filter(
+      (reason) => reason.severity === "critical" && reason.affectedComponents.some((component) => component !== "methodology"),
+    );
+    if (
+      criticalFinancialReasons.some(
+        (reason) =>
+          reason.code === "parser_decision_missing" ||
+          reason.code.includes("validation") ||
+          /\b(parser|validation|reconciliation check|parser confidence|parser warning)\b/i.test(reason.message),
+      )
+    ) {
+      return "parser_blocked";
+    }
+    if (criticalFinancialReasons.some((reason) => reason.code.includes("confidence") || /\bconfidence\b/i.test(reason.message))) return "low_confidence";
     return "insufficient_evidence";
   }
   if (reportState.reasons.includes("missing_core_totals")) return "not_verified";
@@ -384,6 +394,7 @@ export function buildUnableToAnalyzeReportV1(input: BuildUnableToAnalyzeReportV1
     benchmark,
     hasFindings: false,
     hasPositiveFindings: false,
+    unavailableReason,
   });
 
   return validateSingleStatementReportV1({
@@ -412,7 +423,7 @@ export function buildUnableToAnalyzeReportV1(input: BuildUnableToAnalyzeReportV1
     feeInventory: { status: "unavailable", rows: [], observedRowCount: 0, displayedRowCount: 0, omissionReason: unavailableReason },
     findings: [],
     positiveFindings: [],
-    actionToolkit: actionToolkitFor("unable_to_analyze", []),
+    actionToolkit: actionToolkitFor("unable_to_analyze", [], unavailableReason),
     details: { evidence: [], calculations: [] },
     methodology: methodologyFor(benchmark),
     limitations: [
@@ -1163,12 +1174,12 @@ function verdictFor(
   };
 }
 
-function actionToolkitFor(code: SingleStatementReportV1["reportState"]["code"], findings: ReportFinding[]): ActionToolkit {
-  const primaryAction = verdictFor(code, 0).primaryAction;
+function actionToolkitFor(code: SingleStatementReportV1["reportState"]["code"], findings: ReportFinding[], unavailableReason?: OmissionReasonCode): ActionToolkit {
+  const primaryAction = verdictFor(code, 0, unavailableReason).primaryAction;
   const actionable = findings.filter((finding) => finding.confidence !== "low").slice(0, 5);
   return {
     primaryAction,
-    summary: code === "unable_to_analyze" ? "Upload a clearer or complete statement." : "Use the prioritized steps supported by this report state.",
+    summary: code === "unable_to_analyze" ? unableVerdictSummary(unavailableReason) : "Use the prioritized steps supported by this report state.",
     prioritizedSteps: actionable.map((finding, index) => ({
       id: stableId(["step", finding.id]),
       order: index + 1,

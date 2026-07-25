@@ -371,6 +371,46 @@ describe("SingleStatementReportV1 safety foundation", () => {
     expect(report.limitations[0]?.message).toBe("RateReveal withheld financial conclusions because parser validation did not approve this statement.");
   });
 
+  it("uses one canonical non-parser omission reason for critical financial restrictions", () => {
+    const base = summary();
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        parserDecision: {
+          ...base.parserDecision!,
+          status: "needs_review",
+          reportable: false,
+          reason: "Statement quality review blocked financial conclusions.",
+        },
+        dataQuality: [{ level: "critical", message: "Statement image quality was insufficient for financial reporting." }],
+      }),
+      reportId: "non-parser-financial-block",
+      generatedAt: NOW,
+    });
+
+    expect(report.reportState).toMatchObject({ code: "unable_to_analyze", reasons: ["parser_blocked"] });
+    expect(report.benchmark.omissionReason).toBe("insufficient_evidence");
+    expect(report.feeInventory.omissionReason).toBe("insufficient_evidence");
+    expect(report.feeComposition.omissionReason).toBe("insufficient_evidence");
+    expect(report.componentVisibility.benchmark).toMatchObject({ status: "hide", reason: "insufficient_evidence" });
+    expect(report.componentVisibility.fee_inventory).toMatchObject({ status: "hide", reason: "insufficient_evidence" });
+    expect(report.componentVisibility.fee_composition).toMatchObject({ status: "hide", reason: "insufficient_evidence" });
+    expect(report.componentVisibility.action_toolkit.message).toBe("Only retry guidance is available for this report state.");
+    expect(report.verdict.title).toBe("We could not verify enough of this statement to produce a reliable report.");
+    expect(report.actionToolkit.summary).toBe("Upload the complete original PDF or a clearer copy.");
+    expect(report.limitations[0]?.message).toBe("RateReveal could not verify enough of this statement to produce a reliable financial report.");
+    expect(
+      JSON.stringify({
+        benchmark: report.benchmark,
+        feeInventory: report.feeInventory,
+        feeComposition: report.feeComposition,
+        componentVisibility: report.componentVisibility,
+        verdict: report.verdict,
+        actionToolkit: report.actionToolkit,
+        limitations: report.limitations,
+      }),
+    ).not.toContain("parser_blocked");
+  });
+
   it("suppresses eligible opportunity for low-confidence reports while preserving diagnostic fee rows", () => {
     const report = buildSingleStatementReportV1({
       analysis: summary({
