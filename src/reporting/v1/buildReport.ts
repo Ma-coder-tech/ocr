@@ -342,7 +342,7 @@ function buildFeeInventory(summary: AnalysisSummary, collections: BuildCollectio
   const fiservRows = fiservFeeInventoryRows(summary, collections);
   const genericRows = (summary.feeBreakdown ?? [])
     .filter((row) => isPositiveFinite(row.amount))
-    .filter((row) => !fiservRows.some((fiservRow) => sameObservedFee(fiservRow, row)))
+    .filter((row) => !fiservRows.some((fiservRow) => sameObservedFee(fiservRow, row, collections)))
     .map((row) => feeInventoryRow(row, collections));
   const rows = [...fiservRows, ...genericRows];
   if (rows.length === 0) return { status: "unavailable", rows: [], observedRowCount: 0, displayedRowCount: 0, omissionReason: "not_extracted" };
@@ -410,10 +410,10 @@ function fiservFeeInventoryRow(row: Record<string, unknown>, collections: BuildC
     sourceId: safeString(row.referenceId) || null,
     confidence,
   });
-  const difference = positiveOrNull(row.delta);
   const expectedAmount = numberOrNull(row.expectedAmount);
+  const derivedDifference = expectedAmount !== null ? round2(Math.max(0, amount - expectedAmount)) : null;
   const calculationRef =
-    difference !== null && expectedAmount !== null
+    expectedAmount !== null && derivedDifference !== null && derivedDifference > 0
       ? addObservedMinusExpectedCalculation(collections, `calc_${id}_difference`, amount, expectedAmount, [evidenceId], confidence)
       : undefined;
   const comparisonTargetType =
@@ -432,14 +432,14 @@ function fiservFeeInventoryRow(row: Record<string, unknown>, collections: BuildC
     category: feeCategoryFromFiservRow(row),
     classificationConfidence: confidence,
     classificationExplanation: safeString(row.reason) || null,
-    disposition: comparisonTargetType === "contract_documentation" || difference !== null ? "verify" : "none",
+    disposition: comparisonTargetType === "contract_documentation" || (derivedDifference !== null && derivedDifference > 0) ? "verify" : "none",
     observedRatePct: numberOrNull(row.rate),
     observedPerItemUsd: null,
     observedItemCount: numberOrNull(row.count),
     comparisonTargetType,
     targetRatePct: null,
     targetPerItemUsd: null,
-    differenceUsd: calculationRef ? difference : null,
+    differenceUsd: calculationRef ? derivedDifference : null,
     calculationRef,
     findingId: null,
     relatedFindingIds: [],
@@ -447,11 +447,21 @@ function fiservFeeInventoryRow(row: Record<string, unknown>, collections: BuildC
   };
 }
 
-function sameObservedFee(row: FeeInventoryRow, source: FeeBreakdownRow): boolean {
+function sameObservedFee(row: FeeInventoryRow, source: FeeBreakdownRow, collections: BuildCollections): boolean {
   const left = stableId([row.originalLabel]);
   const right = stableId([source.label]);
-  const labelMatches = left === right || right.endsWith(left) || left.endsWith(right);
-  return labelMatches && Math.abs(row.observedAmountUsd - round2(source.amount)) <= 0.01;
+  if (left !== right || Math.abs(row.observedAmountUsd - round2(source.amount)) > 0.01) return false;
+  const rowEvidence = row.evidenceRefs.map((ref) => evidenceById(collections, ref)).filter((evidence): evidence is EvidenceRef => evidence !== null);
+  const sourceSection = optionalStableId(source.sourceSection);
+  const sourceExcerpt = optionalStableId(customerSafeExcerpt(source.evidenceLine ?? source.label));
+  const sectionMatches = Boolean(sourceSection && rowEvidence.some((evidence) => optionalStableId(evidence.statementSection) === sourceSection));
+  const evidenceMatches = Boolean(sourceExcerpt && rowEvidence.some((evidence) => optionalStableId(evidence.excerpt) === sourceExcerpt));
+  return sectionMatches || evidenceMatches;
+}
+
+function optionalStableId(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || String(value).trim() === "") return "";
+  return stableId([value]);
 }
 
 function feeCategoryFromFiservRow(row: Record<string, unknown>): FeeCategoryCode {

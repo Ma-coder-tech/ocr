@@ -520,6 +520,7 @@ export function validateSingleStatementReportV1(report: SingleStatementReportV1)
   const errors: string[] = [];
   const evidenceIds = new Set(report.details.evidence.map((item) => item.id));
   const calculationIds = new Set(report.details.calculations.map((item) => item.id));
+  const calculationsById = new Map(report.details.calculations.map((item) => [item.id, item]));
   const findingIds = new Set(report.findings.map((item) => item.id));
   const feeRowIds = new Set(report.feeInventory.rows.map((item) => item.id));
 
@@ -554,6 +555,12 @@ export function validateSingleStatementReportV1(report: SingleStatementReportV1)
     validateRefs(`feeInventory.${row.id}`, row.evidenceRefs, evidenceIds, errors);
     if (row.calculationRef && !calculationIds.has(row.calculationRef)) errors.push(`feeInventory.${row.id}.calculationRef is broken.`);
     if (row.differenceUsd !== null && !row.calculationRef) errors.push(`feeInventory.${row.id}.differenceUsd has no calculationRef.`);
+    if (row.differenceUsd !== null && row.calculationRef && calculationsById.has(row.calculationRef)) {
+      const calculation = calculationsById.get(row.calculationRef)!;
+      if (Math.abs(row.differenceUsd - calculation.result) > 0.01) {
+        errors.push(`feeInventory.${row.id}.differenceUsd ${row.differenceUsd} does not match calculation ${row.calculationRef} result ${calculation.result}.`);
+      }
+    }
     if (row.findingId !== null && !findingIds.has(row.findingId)) errors.push(`feeInventory.${row.id}.findingId references unknown finding ${row.findingId}.`);
     validateRefs(`feeInventory.${row.id}.relatedFindingIds`, row.relatedFindingIds ?? [], findingIds, errors);
   }
