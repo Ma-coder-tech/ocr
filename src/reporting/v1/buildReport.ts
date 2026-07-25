@@ -23,8 +23,10 @@ import type {
   FindingDisposition,
   ImpactClassification,
   MethodologySummary,
+  OpportunitySummary,
   PricingModelCode,
   PricingModelPresentation,
+  ReconciliationSummary,
   ReportFinding,
   ReportIdentity,
   ReportLimitation,
@@ -103,14 +105,27 @@ export function buildSingleStatementReportV1(input: BuildSingleStatementReportV1
     findings: opportunity.findings,
     evaluatedAt: generatedAt,
   });
-  const componentVisibility = buildComponentVisibility({
-    state: reportState,
+  const projection = applyStateSafetyProjection({
+    reportStateCode: reportState.code,
+    metrics,
     reconciliation,
     benchmark,
-    hasFindings: opportunity.findings.length > 0,
-    hasPositiveFindings: positiveFindings.length > 0,
+    pricingModel,
+    feeComposition: linkedFeeComposition,
+    feeInventory: linkedFeeInventory,
+    opportunitySummary: opportunity.opportunitySummary,
+    findings: opportunity.findings,
+    positiveFindings,
+    details: collections,
   });
-  const limitations = buildLimitations(benchmark, opportunity.findings);
+  const componentVisibility = buildComponentVisibility({
+    state: reportState,
+    reconciliation: projection.reconciliation,
+    benchmark: projection.benchmark,
+    hasFindings: projection.findings.length > 0,
+    hasPositiveFindings: projection.positiveFindings.length > 0,
+  });
+  const limitations = buildLimitations(projection.benchmark, projection.findings);
 
   return validateSingleStatementReportV1({
     contractVersion: "single_statement_report_v1",
@@ -120,22 +135,197 @@ export function buildSingleStatementReportV1(input: BuildSingleStatementReportV1
     reportState,
     identity: buildIdentity(input.analysis, input.context?.merchantName ?? input.analysis.parserStatementIdentity?.merchantName ?? null, input.sourceFileName ?? undefined),
     dataQuality,
-    reconciliation,
-    metrics,
-    opportunitySummary: opportunity.opportunitySummary,
+    reconciliation: projection.reconciliation,
+    metrics: projection.metrics,
+    opportunitySummary: projection.opportunitySummary,
     componentVisibility,
-    verdict: verdictFor(reportState.code, opportunity.opportunitySummary.totalEligibleAnnualOpportunityUsd),
-    benchmark,
-    pricingModel,
-    feeComposition: linkedFeeComposition,
-    feeInventory: linkedFeeInventory,
-    findings: opportunity.findings,
-    positiveFindings,
-    actionToolkit: actionToolkitFor(reportState.code, opportunity.findings),
-    details: collections,
-    methodology: methodologyFor(benchmark),
+    verdict: verdictFor(reportState.code, projection.opportunitySummary.totalEligibleAnnualOpportunityUsd),
+    benchmark: projection.benchmark,
+    pricingModel: projection.pricingModel,
+    feeComposition: projection.feeComposition,
+    feeInventory: projection.feeInventory,
+    findings: projection.findings,
+    positiveFindings: projection.positiveFindings,
+    actionToolkit: actionToolkitFor(reportState.code, projection.findings),
+    details: projection.details,
+    methodology: methodologyFor(projection.benchmark),
     limitations,
   });
+}
+
+type StateSafetyProjection = {
+  reportStateCode: SingleStatementReportV1["reportState"]["code"];
+  metrics: ReportMetrics;
+  reconciliation: ReconciliationSummary;
+  benchmark: BenchmarkPresentation;
+  pricingModel: PricingModelPresentation;
+  feeComposition: FeeCompositionPresentation;
+  feeInventory: FeeInventoryPresentation;
+  opportunitySummary: OpportunitySummary;
+  findings: ReportFinding[];
+  positiveFindings: SingleStatementReportV1["positiveFindings"];
+  details: BuildCollections;
+};
+
+function applyStateSafetyProjection(input: StateSafetyProjection): Omit<StateSafetyProjection, "reportStateCode"> {
+  if (input.reportStateCode === "unable_to_analyze") {
+    return {
+      metrics: unavailableMetrics(),
+      reconciliation: normalizeReconciliation(undefined),
+      benchmark: unavailableBenchmark("parser_blocked"),
+      pricingModel: unknownPricingModel(),
+      feeComposition: unavailableFeeComposition("parser_blocked"),
+      feeInventory: unavailableFeeInventory("parser_blocked"),
+      opportunitySummary: emptyOpportunitySummary(),
+      findings: [],
+      positiveFindings: [],
+      details: { evidence: [], calculations: [] },
+    };
+  }
+
+  if (input.reportStateCode === "low_confidence" || input.reportStateCode === "reconciliation_failure") {
+    const findings = input.findings
+      .filter((finding) => !finding.includedInOpportunityTotal)
+      .map((finding) => ({ ...finding, includedInOpportunityTotal: false }));
+    const feeInventory = projectFeeInventoryRelationships(input.feeInventory, findings);
+    const projection = {
+      metrics: input.metrics,
+      reconciliation: input.reconciliation,
+      benchmark: input.benchmark,
+      pricingModel: input.pricingModel,
+      feeComposition: input.feeComposition,
+      feeInventory,
+      opportunitySummary: zeroEligibleOpportunity(input.opportunitySummary, findings),
+      findings,
+      positiveFindings: input.positiveFindings,
+      details: input.details,
+    };
+    return {
+      ...projection,
+      details: pruneDetailsForProjection(input.reportStateCode, projection),
+    };
+  }
+
+  return {
+    metrics: input.metrics,
+    reconciliation: input.reconciliation,
+    benchmark: input.benchmark,
+    pricingModel: input.pricingModel,
+    feeComposition: input.feeComposition,
+    feeInventory: input.feeInventory,
+    opportunitySummary: input.opportunitySummary,
+    findings: input.findings,
+    positiveFindings: input.positiveFindings,
+    details: input.details,
+  };
+}
+
+function emptyOpportunitySummary(): OpportunitySummary {
+  return {
+    deterministicMonthlyImpactUsd: 0,
+    deterministicAnnualImpactUsd: 0,
+    estimatedMonthlyOpportunityUsd: 0,
+    estimatedAnnualOpportunityUsd: 0,
+    totalEligibleMonthlyOpportunityUsd: 0,
+    totalEligibleAnnualOpportunityUsd: 0,
+    verificationMonthlyAmountUsd: 0,
+    verificationAnnualizedAmountUsd: null,
+    currency: "USD",
+    annualizationBasis: "none",
+    includedFindingIds: [],
+    excludedFindingIds: [],
+  };
+}
+
+function zeroEligibleOpportunity(summary: OpportunitySummary, findings: ReportFinding[]): OpportunitySummary {
+  return {
+    ...summary,
+    deterministicMonthlyImpactUsd: 0,
+    deterministicAnnualImpactUsd: 0,
+    estimatedMonthlyOpportunityUsd: 0,
+    estimatedAnnualOpportunityUsd: 0,
+    totalEligibleMonthlyOpportunityUsd: 0,
+    totalEligibleAnnualOpportunityUsd: 0,
+    annualizationBasis: "none",
+    includedFindingIds: [],
+    excludedFindingIds: findings.map((finding) => finding.id),
+  };
+}
+
+function unavailableFeeComposition(reason: NonNullable<FeeCompositionPresentation["omissionReason"]>): FeeCompositionPresentation {
+  return { status: "unavailable", totalFees: null, rows: [], coveragePct: null, deltaUsd: null, omissionReason: reason };
+}
+
+function unavailableFeeInventory(reason: NonNullable<FeeInventoryPresentation["omissionReason"]>): FeeInventoryPresentation {
+  return { status: "unavailable", rows: [], observedRowCount: 0, displayedRowCount: 0, omissionReason: reason };
+}
+
+function projectFeeInventoryRelationships(feeInventory: FeeInventoryPresentation, findings: ReportFinding[]): FeeInventoryPresentation {
+  const retainedIds = new Set(findings.map((finding) => finding.id));
+  return {
+    ...feeInventory,
+    rows: feeInventory.rows.map((row) => {
+      const findingId = row.findingId && retainedIds.has(row.findingId) ? row.findingId : null;
+      const relatedFindingIds = (row.relatedFindingIds ?? []).filter((id) => retainedIds.has(id));
+      const hasRelationship = findingId !== null || relatedFindingIds.length > 0;
+      return {
+        ...row,
+        findingId,
+        relatedFindingIds,
+        disposition: hasRelationship ? row.disposition : diagnosticFeeDisposition(row),
+      };
+    }),
+  };
+}
+
+function diagnosticFeeDisposition(row: FeeInventoryRow): FeeInventoryRow["disposition"] {
+  if (row.category === "needs_review" || row.comparisonTargetType === "contract_documentation") return "verify";
+  return "none";
+}
+
+function pruneDetailsForProjection(
+  stateCode: SingleStatementReportV1["reportState"]["code"],
+  projection: Omit<StateSafetyProjection, "reportStateCode">,
+): BuildCollections {
+  const calculationIds = new Set<string>();
+  const evidenceIds = new Set<string>();
+  const addReportValueRefs = (value: ReportValue<unknown>): void => {
+    for (const ref of value.evidenceRefs) evidenceIds.add(ref);
+    if (value.calculationRef) calculationIds.add(value.calculationRef);
+  };
+
+  for (const value of Object.values(projection.metrics)) addReportValueRefs(value);
+  for (const value of Object.values(projection.reconciliation)) {
+    if (value && typeof value === "object" && "evidenceRefs" in value) addReportValueRefs(value as ReportValue<unknown>);
+  }
+  for (const ref of projection.pricingModel.evidenceRefs) evidenceIds.add(ref);
+  if (stateCode !== "reconciliation_failure" && projection.benchmark.eligible) {
+    evidenceIds.add("ev_benchmark_reference");
+    calculationIds.add("calc_benchmark_rate_gap");
+  }
+  for (const row of projection.feeInventory.rows) {
+    for (const ref of row.evidenceRefs) evidenceIds.add(ref);
+    if (row.calculationRef) calculationIds.add(row.calculationRef);
+  }
+  for (const finding of projection.findings) {
+    for (const ref of finding.evidenceRefs) evidenceIds.add(ref);
+    if (finding.calculationRef) calculationIds.add(finding.calculationRef);
+  }
+  for (const finding of projection.positiveFindings) {
+    for (const ref of finding.evidenceRefs) evidenceIds.add(ref);
+  }
+
+  const calculations = projection.details.calculations.filter((calculation) => calculationIds.has(calculation.id));
+  for (const calculation of calculations) {
+    for (const input of calculation.inputs) {
+      for (const ref of input.evidenceRefs) evidenceIds.add(ref);
+    }
+  }
+
+  return {
+    evidence: projection.details.evidence.filter((evidence) => evidenceIds.has(evidence.id)),
+    calculations,
+  };
 }
 
 export function buildUnableToAnalyzeReportV1(input: BuildUnableToAnalyzeReportV1Input): SingleStatementReportV1 {

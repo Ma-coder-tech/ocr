@@ -575,6 +575,7 @@ export function validateSingleStatementReportV1(report: SingleStatementReportV1)
   validateFeeFindingRelationships(report, errors);
   validateFeeInventoryCounts(report, errors);
   validateOpportunity(report.findings, report.opportunitySummary, calculationIds, errors);
+  validateStateInvariants(report, errors);
 
   if (errors.length > 0) {
     throw new Error(`SingleStatementReportV1 validation failed: ${errors.join(" ")}`);
@@ -734,6 +735,87 @@ function validateOpportunity(
   );
   if (Math.abs(total - summary.totalEligibleAnnualOpportunityUsd) > 0.01) {
     errors.push(`Opportunity total ${summary.totalEligibleAnnualOpportunityUsd} does not match included findings ${total}.`);
+  }
+}
+
+function validateStateInvariants(report: SingleStatementReportV1, errors: string[]): void {
+  const criticalFinancialRestriction = report.dataQuality.reasons.some(
+    (reason) =>
+      reason.severity === "critical" &&
+      reason.affectedComponents.some((component) =>
+        ["core_metrics", "benchmark", "pricing_model", "fee_composition", "fee_inventory", "opportunity_summary", "findings", "action_toolkit"].includes(component),
+      ),
+  );
+
+  if (!report.dataQuality.customerFacingTotalsAllowed && report.reportState.code !== "unable_to_analyze") {
+    errors.push("customerFacingTotalsAllowed is false but report state is not unable_to_analyze.");
+  }
+  if (criticalFinancialRestriction) {
+    if (report.reportState.code !== "unable_to_analyze") errors.push("critical financial data-quality restriction requires unable_to_analyze state.");
+    if (report.dataQuality.customerFacingTotalsAllowed) errors.push("critical financial data-quality restriction cannot allow customer-facing totals.");
+  }
+
+  if (report.componentVisibility.opportunity_summary.status === "hide") {
+    validateEligibleOpportunityIsZero("hidden opportunity summary", report.opportunitySummary, errors);
+  }
+
+  if (report.reportState.code === "unable_to_analyze") {
+    validateAllOpportunityIsZero("unable_to_analyze", report.opportunitySummary, errors);
+    if (report.opportunitySummary.excludedFindingIds.length > 0) errors.push("unable_to_analyze must not classify excluded opportunity findings.");
+    if (report.findings.length > 0) errors.push("unable_to_analyze must not expose findings.");
+    if (report.positiveFindings.length > 0) errors.push("unable_to_analyze must not expose positive findings.");
+    if (report.details.evidence.length > 0 || report.details.calculations.length > 0) errors.push("unable_to_analyze must not expose financial details.");
+    if (report.feeInventory.status !== "unavailable" || report.feeInventory.rows.length > 0 || report.feeInventory.observedRowCount !== 0 || report.feeInventory.displayedRowCount !== 0) {
+      errors.push("unable_to_analyze must have an unavailable empty fee inventory.");
+    }
+    if (report.feeComposition.status !== "unavailable" || report.feeComposition.rows.length > 0 || report.feeComposition.totalFees !== null) {
+      errors.push("unable_to_analyze must have an unavailable empty fee composition.");
+    }
+    for (const [key, value] of Object.entries(report.metrics)) {
+      if (value.value !== null) errors.push(`unable_to_analyze metrics.${key} must be unavailable.`);
+    }
+  }
+
+  if (report.reportState.code === "healthy") {
+    validateEligibleOpportunityIsZero("healthy", report.opportunitySummary, errors);
+    if (report.findings.some((finding) => finding.includedInOpportunityTotal)) errors.push("healthy must not include actionable opportunity findings.");
+  }
+
+  if (report.reportState.code === "healthy_with_opportunities") {
+    const hasEligibleActionable = report.findings.some(
+      (finding) =>
+        finding.includedInOpportunityTotal &&
+        finding.confidence !== "low" &&
+        (finding.impactClassification === "deterministic" || finding.impactClassification === "estimated"),
+    );
+    if (!hasEligibleActionable) errors.push("healthy_with_opportunities requires at least one eligible deterministic or estimated actionable finding.");
+  }
+
+  if (report.reportState.code === "verification_required") {
+    if (report.opportunitySummary.verificationMonthlyAmountUsd <= 0 && (report.opportunitySummary.verificationAnnualizedAmountUsd ?? 0) <= 0) {
+      errors.push("verification_required requires a verification amount outside eligible opportunity.");
+    }
+  }
+}
+
+function validateEligibleOpportunityIsZero(path: string, summary: SingleStatementReportV1["opportunitySummary"], errors: string[]): void {
+  if (
+    summary.deterministicMonthlyImpactUsd !== 0 ||
+    summary.deterministicAnnualImpactUsd !== 0 ||
+    summary.estimatedMonthlyOpportunityUsd !== 0 ||
+    summary.estimatedAnnualOpportunityUsd !== 0 ||
+    summary.totalEligibleMonthlyOpportunityUsd !== 0 ||
+    summary.totalEligibleAnnualOpportunityUsd !== 0 ||
+    summary.includedFindingIds.length > 0
+  ) {
+    errors.push(`${path} must have zero eligible opportunity and no included finding ids.`);
+  }
+}
+
+function validateAllOpportunityIsZero(path: string, summary: SingleStatementReportV1["opportunitySummary"], errors: string[]): void {
+  validateEligibleOpportunityIsZero(path, summary, errors);
+  if (summary.verificationMonthlyAmountUsd !== 0 || summary.verificationAnnualizedAmountUsd !== null) {
+    errors.push(`${path} must have zero verification opportunity.`);
   }
 }
 

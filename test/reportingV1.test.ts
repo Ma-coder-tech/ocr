@@ -202,6 +202,17 @@ function opportunity(overrides: Partial<OpportunitySummary> = {}): OpportunitySu
   };
 }
 
+function eligibleOpportunity(id: string, annual = 120): OpportunitySummary {
+  return opportunity({
+    deterministicMonthlyImpactUsd: annual / 12,
+    deterministicAnnualImpactUsd: annual,
+    totalEligibleMonthlyOpportunityUsd: annual / 12,
+    totalEligibleAnnualOpportunityUsd: annual,
+    annualizationBasis: "monthly_charge_times_12",
+    includedFindingIds: [id],
+  });
+}
+
 function resolveInput(overrides: Partial<ResolveReportStateInput> = {}): ResolveReportStateInput {
   return {
     dataQuality: {
@@ -268,7 +279,157 @@ describe("SingleStatementReportV1 safety foundation", () => {
     const report = buildUnableToAnalyzeReportV1({ reportId: "failed-job", generatedAt: NOW, reason: "Parser failed." });
     expect(report.reportState.code).toBe("unable_to_analyze");
     expect(report.metrics.totalFees.value).toBeNull();
+    expect(report.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(0);
+    expect(report.opportunitySummary.includedFindingIds).toEqual([]);
+    expect(report.opportunitySummary.excludedFindingIds).toEqual([]);
+    expect(report.findings).toEqual([]);
+    expect(report.positiveFindings).toEqual([]);
+    expect(report.feeInventory).toMatchObject({ status: "unavailable", rows: [], observedRowCount: 0, displayedRowCount: 0 });
+    expect(report.feeComposition).toMatchObject({ status: "unavailable", rows: [] });
+    expect(report.details).toEqual({ evidence: [], calculations: [] });
     expect(report.componentVisibility.opportunity_summary).toMatchObject({ status: "hide", reason: "parser_blocked" });
+  });
+
+  it("projects completed summaries that resolve unable_to_analyze into a non-financial diagnostic payload", () => {
+    const base = summary();
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        structuredFeeFindings: [structuredFeeFinding({ kind: "pci_non_compliance", label: "Monthly PCI Non Compliance", amountUsd: 50 })],
+        parserDecision: {
+          ...base.parserDecision!,
+          status: "needs_review",
+          reportable: false,
+          reason: "Blocked fixture.",
+          validationState: {
+            ...base.parserDecision!.validationState!,
+            customerFacingTotalsAllowed: false,
+            feeClassificationAllowed: false,
+            blockingReasons: ["Top-level statement totals did not validate."],
+          },
+        },
+      }),
+      reportId: "unable-completed-summary",
+      generatedAt: NOW,
+    });
+
+    expect(report.reportState.code).toBe("unable_to_analyze");
+    expect(report.dataQuality.reasons.some((reason) => reason.severity === "critical")).toBe(true);
+    expect(report.metrics.processedSales.value).toBeNull();
+    expect(report.opportunitySummary).toMatchObject({
+      deterministicAnnualImpactUsd: 0,
+      estimatedAnnualOpportunityUsd: 0,
+      totalEligibleAnnualOpportunityUsd: 0,
+      verificationMonthlyAmountUsd: 0,
+      includedFindingIds: [],
+      excludedFindingIds: [],
+    });
+    expect(report.findings).toEqual([]);
+    expect(report.feeInventory.rows).toEqual([]);
+    expect(report.feeComposition.rows).toEqual([]);
+    expect(report.details).toEqual({ evidence: [], calculations: [] });
+    expect(() => validateSingleStatementReportV1(report)).not.toThrow();
+  });
+
+  it("blocks PDF summaries with a missing parser decision instead of trusting totals alone", () => {
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        parserDecision: undefined,
+        structuredFeeFindings: [structuredFeeFinding({ kind: "pci_non_compliance", label: "Monthly PCI Non Compliance", amountUsd: 50 })],
+      }),
+      reportId: "missing-parser-decision",
+      generatedAt: NOW,
+    });
+
+    expect(report.reportState.code).toBe("unable_to_analyze");
+    expect(report.dataQuality.reportable).toBe(false);
+    expect(report.dataQuality.customerFacingTotalsAllowed).toBe(false);
+    expect(report.dataQuality.reasons).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "parser_decision_missing",
+          severity: "critical",
+          message: "RateReveal could not confirm parser validation for this statement, so customer-facing financial conclusions are withheld.",
+        }),
+      ]),
+    );
+    expect(report.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(0);
+    expect(report.findings).toEqual([]);
+  });
+
+  it("suppresses eligible opportunity for low-confidence reports while preserving diagnostic fee rows", () => {
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        confidence: "low",
+        parserDecision: {
+          ...summary().parserDecision!,
+          confidence: "low",
+        },
+        structuredFeeFindings: [structuredFeeFinding({ kind: "pci_non_compliance", label: "Monthly PCI Non Compliance", amountUsd: 50 })],
+      }),
+      reportId: "low-confidence-suppression",
+      generatedAt: NOW,
+    });
+
+    expect(report.reportState.code).toBe("low_confidence");
+    expect(report.componentVisibility.opportunity_summary.status).toBe("hide");
+    expect(report.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(0);
+    expect(report.opportunitySummary.includedFindingIds).toEqual([]);
+    expect(report.feeInventory.rows.length).toBeGreaterThan(0);
+    expect(report.feeInventory.rows.every((row) => row.findingId === null && (row.relatedFindingIds ?? []).length === 0)).toBe(true);
+    expect(() => validateSingleStatementReportV1(report)).not.toThrow();
+  });
+
+  it("suppresses eligible opportunity for reconciliation failures while preserving reconciliation diagnostics", () => {
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        structuredFeeFindings: [structuredFeeFinding({ kind: "pci_non_compliance", label: "Monthly PCI Non Compliance", amountUsd: 50 })],
+        twoBucketAnalysis: {
+          source: "summary_fee_rows",
+          totalFees: 300,
+          cardBrandTotal: 100,
+          processorOwnedTotal: 50,
+          processorControlledTotal: 50,
+          unknownTotal: 0,
+          cardBrandSharePct: null,
+          processorOwnedSharePct: null,
+          processorControlledSharePct: null,
+          coveragePct: 100,
+          reconciliationDeltaUsd: 150,
+          available: true,
+          reason: "Material reconciliation delta.",
+          evidence: { totalFees: [], cardBrand: [], processorOwned: [] },
+        },
+      }),
+      reportId: "reconciliation-suppression",
+      generatedAt: NOW,
+    });
+
+    expect(report.reportState.code).toBe("reconciliation_failure");
+    expect(report.componentVisibility.opportunity_summary.status).toBe("hide");
+    expect(report.reconciliation.status).toBe("fail");
+    expect(report.reconciliation.deltaUsd.value).toBe(150);
+    expect(report.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(0);
+    expect(report.opportunitySummary.includedFindingIds).toEqual([]);
+    expect(report.feeInventory.rows.length).toBeGreaterThan(0);
+    expect(() => validateSingleStatementReportV1(report)).not.toThrow();
+  });
+
+  it("keeps verification-only findings out of healthy_with_opportunities and eligible opportunity", () => {
+    const resolved = resolveReportState(
+      resolveInput({
+        findings: [finding({ id: "verify_only", impactClassification: "verification_only", currentMonthlyAmountUsd: 10, currentAnnualizedAmountUsd: 120 })],
+        opportunitySummary: opportunity({ verificationMonthlyAmountUsd: 10, verificationAnnualizedAmountUsd: 120, excludedFindingIds: ["verify_only"] }),
+      }),
+    );
+    expect(resolved.code).toBe("healthy");
+
+    const material = resolveReportState(
+      resolveInput({
+        findings: [finding({ id: "verify_only", impactClassification: "verification_only", currentMonthlyAmountUsd: 30, currentAnnualizedAmountUsd: 360 })],
+        opportunitySummary: opportunity({ verificationMonthlyAmountUsd: 30, verificationAnnualizedAmountUsd: 360, excludedFindingIds: ["verify_only"] }),
+      }),
+    );
+    expect(material.code).toBe("verification_required");
   });
 
   it("resolves all eight states with precedence and inclusive thresholds", () => {
@@ -296,9 +457,14 @@ describe("SingleStatementReportV1 safety foundation", () => {
         }),
       ).code,
     ).toBe("above_benchmark_review");
-    expect(resolveReportState(resolveInput({ findings: [finding({ id: "small", estimatedAnnualImpactUsd: 120, currentAnnualizedAmountUsd: 120 })] })).code).toBe(
-      "healthy_with_opportunities",
-    );
+    expect(
+      resolveReportState(
+        resolveInput({
+          findings: [finding({ id: "small", includedInOpportunityTotal: true, estimatedAnnualImpactUsd: 120, currentAnnualizedAmountUsd: 120 })],
+          opportunitySummary: eligibleOpportunity("small"),
+        }),
+      ).code,
+    ).toBe("healthy_with_opportunities");
     expect(resolveReportState(resolveInput()).code).toBe("healthy");
   });
 
@@ -447,7 +613,10 @@ describe("SingleStatementReportV1 safety foundation", () => {
       ["healthy", resolveInput(), "healthy", "competitive_rate_no_findings"],
       [
         "healthy_with_opportunities",
-        resolveInput({ findings: [finding({ id: "small", estimatedAnnualImpactUsd: 120, currentAnnualizedAmountUsd: 120 })] }),
+        resolveInput({
+          findings: [finding({ id: "small", includedInOpportunityTotal: true, estimatedAnnualImpactUsd: 120, currentAnnualizedAmountUsd: 120 })],
+          opportunitySummary: eligibleOpportunity("small"),
+        }),
         "healthy_with_opportunities",
         "competitive_rate_with_findings",
       ],
@@ -621,6 +790,9 @@ describe("SingleStatementReportV1 safety foundation", () => {
     expect(report.benchmark.eligible).toBe(false);
     expect(report.pricingModel.model).toBe("unknown");
     expect(report.metrics.processedSales.value).toBeNull();
+    expect(report.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(0);
+    expect(report.findings).toEqual([]);
+    expect(report.feeInventory.rows).toEqual([]);
   });
 
   it("uses full schemas and integrity checks for unsupported versions, calculations, and component visibility", () => {
@@ -717,6 +889,45 @@ describe("SingleStatementReportV1 safety foundation", () => {
         name,
       ).toThrow(error);
     }
+  });
+
+  it("validates Report V1 state invariants and rejects contradictory payloads", () => {
+    const healthy = buildSingleStatementReportV1({ analysis: summary(), reportId: "state-invariants-healthy", generatedAt: NOW });
+    expect(() =>
+      validateSingleStatementReportV1({
+        ...healthy,
+        opportunitySummary: eligibleOpportunity("missing"),
+      }),
+    ).toThrow(/healthy must have zero eligible opportunity|unknown finding missing/);
+
+    const eligible = buildSingleStatementReportV1({
+      analysis: summary({
+        structuredFeeFindings: [structuredFeeFinding({ kind: "risk_fee", label: "Monthly Risk Fee", amountUsd: 20, evidenceLine: "Monthly Risk Fee 20.00" })],
+      }),
+      reportId: "state-invariants-opportunity",
+      generatedAt: NOW,
+    });
+    expect(eligible.reportState.code).toBe("healthy_with_opportunities");
+    expect(eligible.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(240);
+    expect(eligible.opportunitySummary.includedFindingIds.length).toBe(1);
+
+    expect(() =>
+      validateSingleStatementReportV1({
+        ...eligible,
+        findings: eligible.findings.map((item) => (item.includedInOpportunityTotal ? { ...item, impactClassification: "verification_only" } : item)),
+      }),
+    ).toThrow(/unsupported impact classification verification_only|requires at least one eligible/);
+
+    const blocked = buildUnableToAnalyzeReportV1({ reportId: "state-invariants-blocked", generatedAt: NOW });
+    expect(() =>
+      validateSingleStatementReportV1({
+        ...blocked,
+        feeInventory: {
+          ...blocked.feeInventory,
+          status: "available",
+        },
+      }),
+    ).toThrow(/unavailable empty fee inventory/);
   });
 
   it("enriches Fiserv fee inventory rows with evidence, calculation details, and verification relationships", () => {
