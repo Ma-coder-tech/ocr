@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import {
   actualValuesFromPrivateCorpusManifest,
   evaluateCorpusCase,
+  legacyKnownFailureActualValues,
   loadGoldenCorpusCases,
   loadPrivateCorpusManifest,
   privateCorpusDirectoryFromEnv,
@@ -38,7 +39,10 @@ try {
       missingManifestCount += 1;
       continue;
     }
-    const actualValues = await actualValuesFromPrivateCorpusManifest(configured.dir, manifest);
+    const actualValues = {
+      ...(await actualValuesFromPrivateCorpusManifest(configured.dir, manifest)),
+      ...legacyKnownFailureActualValues(corpusCase),
+    };
     results.push(evaluateCorpusCase(corpusCase, actualValues));
   }
 

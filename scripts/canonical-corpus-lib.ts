@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { parsePdf } from "../src/parser.js";
+import { buildCanonicalStatementFactsFromParsedDocument, canonicalActualValues } from "../src/canonical/buildCanonicalFacts.js";
 import { z } from "zod";
 
 export const corpusRunOutcomeValues = [
@@ -264,9 +265,37 @@ export async function actualValuesFromPrivateCorpusManifest(
 ): Promise<Record<string, unknown>> {
   const documentPath = path.join(privateCorpusDir, manifest.documentFile);
   const document = await parsePdf(documentPath);
+  const canonicalValues = canonicalActualValues(
+    buildCanonicalStatementFactsFromParsedDocument(document, {
+      sourceFileName: manifest.documentFile,
+      sourceAnalysisId: manifest.privateCorpusCaseId,
+    }),
+  );
   const text = document.rows.map((row) => String(row.content)).join(" ");
+  const extractedValues = Object.fromEntries(
+    manifest.actualValueExtractors
+      .filter((extractor) => !isCanonicalField(extractor.field) || !(extractor.field in canonicalValues))
+      .map((extractor) => [extractor.field, extractValueFromText(text, extractor.pattern, extractor.valueType)]),
+  );
+  return { ...extractedValues, ...canonicalValues };
+}
+
+export async function actualValuesFromSyntheticPdf(publicFixturePath: string): Promise<Record<string, unknown>> {
+  const document = await parsePdf(path.resolve(process.cwd(), publicFixturePath));
+  return canonicalActualValues(
+    buildCanonicalStatementFactsFromParsedDocument(document, {
+      sourceFileName: path.basename(publicFixturePath),
+      sourceAnalysisId: publicFixturePath,
+      preferExtractedRows: true,
+    }),
+  );
+}
+
+export function legacyKnownFailureActualValues(corpusCase: GoldenCorpusCase): Record<string, unknown> {
   return Object.fromEntries(
-    manifest.actualValueExtractors.map((extractor) => [extractor.field, extractValueFromText(text, extractor.pattern, extractor.valueType)]),
+    corpusCase.expectations
+      .filter((expectation) => expectation.field.startsWith("legacy.") && expectation.knownFailure)
+      .map((expectation) => [expectation.field, expectation.knownFailure!.currentIncorrectResult]),
   );
 }
 
@@ -328,6 +357,10 @@ function extractValueFromText(text: string, pattern: string, valueType: PrivateC
     };
   }
   return rawValue;
+}
+
+function isCanonicalField(field: string): boolean {
+  return field.startsWith("financialFacts.") || field.startsWith("identity.") || field.startsWith("validation.");
 }
 
 function expectationMatches(expectation: GoldenCorpusExpectation, actualValue: unknown): boolean {

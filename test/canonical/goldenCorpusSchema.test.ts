@@ -223,4 +223,34 @@ describe("canonical golden corpus schema", () => {
       await fs.rm(tempDir, { recursive: true, force: true });
     }
   });
+
+  it("does not let private-corpus extractors override canonical unavailable transaction counts", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "ratereveal-private-corpus-test-"));
+    try {
+      await fs.copyFile(
+        path.resolve(process.cwd(), "test/fixtures/canonical/synthetic-pdfs/fiserv-summary-synthetic.pdf"),
+        path.join(tempDir, "synthetic-private.pdf"),
+      );
+
+      const actualValues = await actualValuesFromPrivateCorpusManifest(tempDir, {
+        schemaVersion: "private_corpus_manifest_v1",
+        privateCorpusCaseId: "synthetic-private-case",
+        documentFile: "synthetic-private.pdf",
+        actualValueExtractors: [
+          {
+            field: "financialFacts.transactionCounts.submittedTransactions",
+            source: "pdf_text",
+            pattern: "Total Amount Submitted(?:\\s*\\|\\s*|\\s+)\\$?([0-9,]+)",
+            valueType: "integer",
+          },
+        ],
+      });
+
+      expect(actualValues["financialFacts.transactionCounts.submittedTransactions"]).toBeNull();
+      expect(actualValues["financialFacts.averageTicket"]).toBeNull();
+      expect(actualValues["financialFacts.averageTicketBasis.allowed"]).toBe(false);
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
+  });
 });
