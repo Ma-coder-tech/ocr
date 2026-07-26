@@ -11,4 +11,7 @@ data/uploads/*
 data/reports/*
 !data/uploads/.gitkeep
 !data/reports/.gitkeep
+artifacts/
+private-corpus/
+test/fixtures/canonical/private-originals/
 .aider*

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "golden_corpus_case_v1",
+  "caseId": "GC-FISERV-COUNT-DISCREPANCY-001",
+  "title": "Private Fiserv restaurant transaction-count discrepancy",
+  "statementClass": "private_fiserv_restaurant_statement",
+  "source": {
+    "kind": "private_original",
+    "privateCorpusCaseId": "private-fiserv-restaurant-count-001",
+    "privateManifestName": "private-fiserv-restaurant-count-001.json"
+  },
+  "privacy": {
+    "containsRealMerchantInformation": false,
+    "containsRawStatementText": false,
+    "containsPrivateDocumentPath": false,
+    "containsPrivateDocumentHash": false,
+    "redactionNotes": ["Private original statement metadata is intentionally not committed."]
+  },
+  "humanVerification": {
+    "status": "approved",
+    "verifiedBy": "human_owner",
+    "verifiedAt": "2026-07-26",
+    "notes": "Human review identified that the current selected count is a narrow subset and not the submitted-transaction denominator."
+  },
+  "expectedProcessorFamily": "Fiserv / First Data",
+  "expectedReportState": null,
+  "expectations": [
+    {
+      "field": "financialFacts.transactionCounts.submittedTransactions",
+      "expectedValue": 4138,
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "human_verified_statement",
+      "evidenceNote": "Human verification found the all-in submitted transaction count differs from the current selected subset.",
+      "reviewer": {
+        "role": "human_owner",
+        "reviewedAt": "2026-07-26",
+        "approvalStatus": "approved"
+      },
+      "knownFailure": {
+        "defectId": "DEFECT-TXN-COUNT-NARROW-SUBSET-001",
+        "expectedGroundTruthValue": 4138,
+        "currentIncorrectResult": 321,
+        "severity": "high",
+        "customerImpact": "Average-ticket and transaction-dependent conclusions can be materially wrong.",
+        "evidenceNote": "The current backend selected a narrow subset count instead of the submitted-transaction count.",
+        "targetCorrectionPackage": "Package B",
+        "status": "open",
+        "dateRecorded": "2026-07-26"
+      }
+    }
+  ],
+  "tags": ["private_original", "known_failure", "transaction_count", "package_b"]
+}
