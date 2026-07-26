@@ -1,7 +1,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { parsePdf } from "../src/parser.js";
-import { evaluateCorpusCase, loadGoldenCorpusCases, type CorpusCaseRunResult, type GoldenCorpusCase } from "./canonical-corpus-lib.js";
+import {
+  actualValuesFromSyntheticPdf,
+  evaluateCorpusCase,
+  legacyKnownFailureActualValues,
+  loadGoldenCorpusCases,
+  type CorpusCaseRunResult,
+  type GoldenCorpusCase,
+} from "./canonical-corpus-lib.js";
 
 const outputDir = path.resolve(process.cwd(), "artifacts/canonical-corpus");
 const outputPath = path.join(outputDir, "forensic-harness-report.json");
@@ -32,29 +38,10 @@ console.log(JSON.stringify(summarize(results), null, 2));
 
 async function actualValuesFor(corpusCase: GoldenCorpusCase): Promise<Record<string, unknown>> {
   if (corpusCase.source.kind === "private_original") {
-    return Object.fromEntries(
-      corpusCase.expectations
-        .filter((expectation) => expectation.knownFailure)
-        .map((expectation) => [expectation.field, expectation.knownFailure!.currentIncorrectResult]),
-    );
+    return legacyKnownFailureActualValues(corpusCase);
   }
   if (corpusCase.source.kind !== "synthetic_pdf") return {};
-  const doc = await parsePdf(path.resolve(process.cwd(), corpusCase.source.publicFixturePath));
-  const text = doc.rows.map((row) => String(row.content)).join(" ");
-  return {
-    "financialFacts.processedSales": moneyFromSyntheticText(text, /Total Amount Submitted(?:\s*\|\s*|\s+)\$?([0-9,]+\.\d{2})/i),
-    "financialFacts.totalFees": moneyFromSyntheticText(text, /Fees Charged(?:\s*\|\s*|\s+)-?\$?([0-9,]+\.\d{2})/i),
-    "reportState": null,
-  };
-}
-
-function moneyFromSyntheticText(text: string, pattern: RegExp): { amountMinor: number; currency: "USD" } | null {
-  const match = text.match(pattern);
-  if (!match?.[1]) return null;
-  return {
-    amountMinor: Math.round(Number(match[1].replace(/,/g, "")) * 100),
-    currency: "USD",
-  };
+  return actualValuesFromSyntheticPdf(corpusCase.source.publicFixturePath);
 }
 
 function summarize(results: CorpusCaseRunResult[]) {

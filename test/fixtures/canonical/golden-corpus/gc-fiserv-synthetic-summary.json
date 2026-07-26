@@ -48,6 +48,44 @@
         "reviewedAt": "2026-07-26",
         "approvalStatus": "approved"
       }
+    },
+    {
+      "field": "financialFacts.effectiveRate.rateRevealCalculatedAllInRate",
+      "expectedValue": "0.035000",
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "synthetic_fixture",
+      "evidenceNote": "Synthetic all-in rate is calculated from 43.21 divided by 1234.56 under effective_rate_basis_v1.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-26",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "financialFacts.averageTicket",
+      "verificationStatus": "intentionally_unavailable",
+      "assertionRule": "must_be_unavailable",
+      "source": "approved_policy",
+      "evidenceNote": "The synthetic summary fixture contains no verified population-compatible transaction count.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-26",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "financialFacts.averageTicketBasis.allowed",
+      "expectedValue": false,
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "approved_policy",
+      "evidenceNote": "Average ticket is disabled when selected sales volume has no population-compatible verified transaction count.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-26",
+        "approvalStatus": "approved"
+      }
     }
   ],
   "tags": ["synthetic", "ci_safe", "pdf_extraction_smoke"]

@@ -25,7 +25,7 @@
   "expectedReportState": null,
   "expectations": [
     {
-      "field": "financialFacts.transactionCounts.submittedTransactions",
+      "field": "legacy.financialFacts.transactionCounts.submittedTransactions",
       "expectedValue": 4138,
       "verificationStatus": "verified",
       "assertionRule": "must_equal",
@@ -43,7 +43,7 @@
         "severity": "high",
         "customerImpact": "Average-ticket and transaction-dependent conclusions can be materially wrong.",
         "evidenceNote": "The current backend selected a narrow subset count instead of the submitted-transaction count.",
-        "targetCorrectionPackage": "Package B",
+        "targetCorrectionPackage": "Package C",
         "status": "open",
         "dateRecorded": "2026-07-26"
       }
