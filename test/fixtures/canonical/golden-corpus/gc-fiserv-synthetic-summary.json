@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "golden_corpus_case_v1",
+  "caseId": "GC-FISERV-SYNTHETIC-SUMMARY-001",
+  "title": "Synthetic Fiserv summary extraction smoke case",
+  "statementClass": "synthetic_fiserv_summary_pdf",
+  "source": {
+    "kind": "synthetic_pdf",
+    "publicFixturePath": "test/fixtures/canonical/synthetic-pdfs/fiserv-summary-synthetic.pdf"
+  },
+  "privacy": {
+    "containsRealMerchantInformation": false,
+    "containsRawStatementText": false,
+    "containsPrivateDocumentPath": false,
+    "containsPrivateDocumentHash": false,
+    "redactionNotes": ["Synthetic document created for CI extraction smoke coverage."]
+  },
+  "humanVerification": {
+    "status": "approved",
+    "verifiedBy": "human_reviewer",
+    "verifiedAt": "2026-07-26",
+    "notes": "Synthetic fixture values are authored test data, not merchant data."
+  },
+  "expectedProcessorFamily": null,
+  "expectedReportState": null,
+  "expectations": [
+    {
+      "field": "financialFacts.processedSales",
+      "expectedValue": { "amountMinor": 123456, "currency": "USD" },
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "synthetic_fixture",
+      "evidenceNote": "Synthetic summary line contains total submitted amount of 1234.56.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-26",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "financialFacts.totalFees",
+      "expectedValue": { "amountMinor": 4321, "currency": "USD" },
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "synthetic_fixture",
+      "evidenceNote": "Synthetic summary line contains fees charged of 43.21.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-26",
+        "approvalStatus": "approved"
+      }
+    }
+  ],
+  "tags": ["synthetic", "ci_safe", "pdf_extraction_smoke"]
+}
