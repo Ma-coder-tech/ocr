@@ -73,6 +73,46 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   if (analysis.financialFacts.effectiveRateBasis?.policyVersion !== "effective_rate_basis_v1") {
     errors.push("Effective rate basis is missing or unsupported.");
   }
+  if (analysis.feeLedger?.policyVersion !== "canonical_fee_ledger_v1") {
+    errors.push("Canonical fee ledger is missing or unsupported.");
+  }
+  if (analysis.feeLedger) {
+    for (const occurrence of analysis.feeLedger.sourceOccurrences) {
+      if (!evidenceIds.has(occurrence.evidenceRef)) errors.push(`Fee source occurrence ${occurrence.id} evidence ref ${occurrence.evidenceRef} is broken.`);
+    }
+    const occurrenceIds = new Set(analysis.feeLedger.sourceOccurrences.map((item) => item.id));
+    const interpretationIds = new Set(analysis.feeLedger.parserInterpretations.map((item) => item.id));
+    for (const interpretation of analysis.feeLedger.parserInterpretations) {
+      if (!occurrenceIds.has(interpretation.sourceOccurrenceId)) {
+        errors.push(`Fee parser interpretation ${interpretation.id} source occurrence ref ${interpretation.sourceOccurrenceId} is broken.`);
+      }
+      if (interpretation.printedRate?.representation === "unknown" && interpretation.printedRate.normalizedFractionalRate !== null) {
+        errors.push(`Fee parser interpretation ${interpretation.id} has unknown rate representation with normalized value.`);
+      }
+    }
+    for (const row of analysis.feeLedger.rows) {
+      for (const occurrenceId of row.sourceOccurrenceIds) {
+        if (!occurrenceIds.has(occurrenceId)) errors.push(`Fee row ${row.id} source occurrence ref ${occurrenceId} is broken.`);
+      }
+      for (const interpretationId of row.parserInterpretationIds) {
+        if (!interpretationIds.has(interpretationId)) errors.push(`Fee row ${row.id} parser interpretation ref ${interpretationId} is broken.`);
+      }
+      if (row.contributesToUniqueTotal && row.signedAmount === null) errors.push(`Fee row ${row.id} contributes to total without signed amount.`);
+      if (!row.contributesToUniqueTotal && row.role === "individual_charge" && row.signedAmount?.amountMinor !== 0) {
+        warnings.push(`Fee row ${row.id} is an individual charge that does not contribute to unique total.`);
+      }
+    }
+    for (const control of analysis.feeLedger.controls) {
+      for (const evidenceRef of control.evidenceRefs) {
+        if (!evidenceIds.has(evidenceRef)) errors.push(`Fee ledger control ${control.id} evidence ref ${evidenceRef} is broken.`);
+      }
+      if (control.expectedAmount && !isMoneyAmount(control.expectedAmount)) errors.push(`Fee ledger control ${control.id} has invalid expected amount.`);
+      if (control.actualAmount && !isMoneyAmount(control.actualAmount)) errors.push(`Fee ledger control ${control.id} has invalid actual amount.`);
+    }
+    if (analysis.feeLedger.uniqueChargeCalculationRef && !calculationIds.has(analysis.feeLedger.uniqueChargeCalculationRef)) {
+      errors.push(`Fee ledger calculation ref ${analysis.feeLedger.uniqueChargeCalculationRef} is broken.`);
+    }
+  }
   if (
     analysis.financialFacts.rateRevealCalculatedAllInRate.value !== null &&
     (analysis.financialFacts.effectiveRateBasis.numeratorFeeBasis === "unsupported" ||

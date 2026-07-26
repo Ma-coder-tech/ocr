@@ -360,7 +360,7 @@ function extractValueFromText(text: string, pattern: string, valueType: PrivateC
 }
 
 function isCanonicalField(field: string): boolean {
-  return field.startsWith("financialFacts.") || field.startsWith("identity.") || field.startsWith("validation.");
+  return field.startsWith("financialFacts.") || field.startsWith("identity.") || field.startsWith("feeLedger.") || field.startsWith("validation.");
 }
 
 function expectationMatches(expectation: GoldenCorpusExpectation, actualValue: unknown): boolean {
