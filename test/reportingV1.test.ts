@@ -123,6 +123,104 @@ function summary(overrides: Partial<AnalysisSummary> = {}): AnalysisSummary {
   } as AnalysisSummary;
 }
 
+function advancedReviewMetadata(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    ai: {
+      status: "not_needed",
+      provider: null,
+      model: null,
+      unresolvedInputRowCount: 0,
+      suggestionCount: 0,
+      appliedSuggestionCount: 0,
+      skippedSuggestionCount: 0,
+      notes: ["No V2 Fiserv fee rows required AI classification."],
+    },
+    benchmarkCategoryAi: {
+      status: "not_needed",
+      provider: null,
+      model: null,
+      attempted: false,
+      applied: false,
+      notes: ["Benchmark category was already resolved by user selection or deterministic statement evidence."],
+    },
+    aiNoticeExtraction: {
+      status: "no_fee_changes",
+      provider: "openai",
+      model: "gpt-test",
+      noticeCount: 0,
+      feeChangeCount: 0,
+      notes: ["No fee changes announced in this statement period."],
+    },
+    aiAnomalyReview: {
+      status: "applied",
+      provider: "openai",
+      model: "gpt-test",
+      attempted: true,
+      anomalyCount: 0,
+      notes: ["Required advanced statement review completed."],
+    },
+    aiMerchantNarrative: {
+      status: "failed",
+      provider: null,
+      model: null,
+      attempted: true,
+      notes: ["Optional narrative was unavailable."],
+    },
+    ...overrides,
+  };
+}
+
+function advancedFiservAnalysis(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    rows: [
+      {
+        rowIndex: 1,
+        description: "Processor Pricing Review",
+        amount: 20,
+        feeType: "processor_fixed",
+        sourceSection: "FEES",
+        matchConfidence: "high",
+        referenceId: null,
+        proofStatus: "processor_controlled",
+        expectedAmount: null,
+        delta: null,
+        reason: "Processor-controlled fee.",
+        evidenceLine: "Processor Pricing Review 20.00",
+      },
+    ],
+    findings: [
+      {
+        kind: "pricing_opportunity",
+        severity: "high",
+        title: "Processor pricing can be reviewed",
+        amount: 20,
+        evidence: ["Processor Pricing Review 20.00"],
+        action: "negotiate_processor_rate",
+        monthlyCost: 20,
+        annualEstimate: 240,
+        componentImpactEstimate: null,
+      },
+    ],
+    estimatedAnnualSavings: {
+      estimated: 240,
+      confidence: "high",
+      basis: "Supported advanced review estimate.",
+      components: [
+        {
+          kind: "pricing_opportunity",
+          label: "Processor pricing can be reviewed",
+          annualImpact: 240,
+          tier: "confirmed",
+          confidence: "high",
+          sourceFindingKind: "pricing_opportunity",
+        },
+      ],
+    },
+    ...advancedReviewMetadata(),
+    ...overrides,
+  };
+}
+
 function finding(overrides: Partial<ReportFinding>): ReportFinding {
   return {
     id: "finding",
@@ -827,6 +925,236 @@ describe("SingleStatementReportV1 safety foundation", () => {
     expect(result.opportunitySummary.excludedFindingIds).toEqual(expect.arrayContaining(["one_time", "unknown", "verify", "low", "overlap"]));
   });
 
+  it("allows a complete OpenAI-backed advanced review when Anthropic is absent or failed outside the final stage result", () => {
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        benchmark: { status: "above", lowerRate: 1.8, upperRate: 2.5, segment: "Retail benchmark", deltaFromUpperRate: 0.5 },
+        dataQuality: [
+          { level: "info", message: "AI full statement anomaly review status: applied via openai; anomalies 0." },
+          { level: "info", message: "AI notice extraction status: no_fee_changes via openai; notices 0; fee changes 0." },
+        ],
+        fiservFeeAnalysisV2: advancedFiservAnalysis({
+          aiNoticeExtraction: {
+            status: "no_fee_changes",
+            provider: "openai",
+            model: "gpt-test",
+            noticeCount: 0,
+            feeChangeCount: 0,
+            notes: ["Anthropic notice extraction failed before OpenAI completed the review."],
+          },
+        }),
+      }),
+      reportId: "package-3-2-openai-success",
+      generatedAt: NOW,
+    });
+
+    expect(report.reportState.code).toBe("above_benchmark_review");
+    expect(report.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(240);
+    expect(report.opportunitySummary.includedFindingIds).toEqual(["fiserv_v2_master_estimated_savings"]);
+    expect(JSON.stringify(report.dataQuality.reasons)).not.toMatch(/openai|anthropic|api key|billing/i);
+    expect(report.dataQuality.reasons.map((reason) => reason.message)).toContain("Advanced statement review status: applied; anomalies 0.");
+  });
+
+  it("downgrades parser-valid reports when a required advanced statement review stage is disabled", () => {
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        fiservFeeAnalysisV2: advancedFiservAnalysis({
+          aiAnomalyReview: {
+            status: "disabled",
+            provider: null,
+            model: null,
+            attempted: false,
+            anomalyCount: 0,
+            notes: ["Advanced statement review was disabled."],
+          },
+        }),
+      }),
+      reportId: "package-3-2-disabled-required-review",
+      generatedAt: NOW,
+    });
+
+    expect(report.reportState.code).toBe("low_confidence");
+    expect(report.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(0);
+    expect(report.opportunitySummary.includedFindingIds).toEqual([]);
+    expect(report.componentVisibility.opportunity_summary).toMatchObject({ status: "hide", reason: "low_confidence" });
+    expect(report.dataQuality.reasons).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "advanced_anomaly_review_incomplete",
+          severity: "warning",
+          message: "RateReveal could not complete the required advanced statement review, so savings conclusions are withheld.",
+        }),
+      ]),
+    );
+  });
+
+  it("downgrades parser-valid reports when a required advanced statement review stage fails", () => {
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        fiservFeeAnalysisV2: advancedFiservAnalysis({
+          aiAnomalyReview: {
+            status: "failed",
+            provider: null,
+            model: null,
+            attempted: true,
+            anomalyCount: 0,
+            notes: ["Advanced statement review failed across configured providers."],
+          },
+        }),
+      }),
+      reportId: "package-3-2-failed-required-review",
+      generatedAt: NOW,
+    });
+
+    expect(report.reportState.code).toBe("low_confidence");
+    expect(report.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(0);
+    expect(report.findings.every((finding) => !finding.includedInOpportunityTotal)).toBe(true);
+  });
+
+  it("requires structured proof before accepting not_needed for required advanced review stages", () => {
+    const valid = buildSingleStatementReportV1({
+      analysis: summary({
+        fiservFeeAnalysisV2: advancedFiservAnalysis({
+          ai: {
+            status: "not_needed",
+            provider: null,
+            model: null,
+            unresolvedInputRowCount: 0,
+            suggestionCount: 0,
+            appliedSuggestionCount: 0,
+            skippedSuggestionCount: 0,
+            notes: ["No V2 Fiserv fee rows required AI classification."],
+          },
+        }),
+      }),
+      reportId: "package-3-2-valid-not-needed",
+      generatedAt: NOW,
+    });
+    expect(valid.reportState.code).toBe("healthy_with_opportunities");
+    expect(valid.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(240);
+
+    const invalid = buildSingleStatementReportV1({
+      analysis: summary({
+        fiservFeeAnalysisV2: advancedFiservAnalysis({
+          ai: {
+            status: "not_needed",
+            provider: null,
+            model: null,
+            unresolvedInputRowCount: 0,
+            suggestionCount: 0,
+            appliedSuggestionCount: 0,
+            skippedSuggestionCount: 0,
+            notes: [],
+          },
+        }),
+      }),
+      reportId: "package-3-2-invalid-not-needed",
+      generatedAt: NOW,
+    });
+    expect(invalid.reportState.code).toBe("low_confidence");
+    expect(invalid.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(0);
+  });
+
+  it("downgrades older Fiserv summaries that lack structured advanced-review metadata without breaking validation", () => {
+    const report = buildSingleStatementReportV1({
+      analysis: summary({
+        fiservFeeAnalysisV2: {
+          rows: [
+            {
+              rowIndex: 1,
+              description: "Legacy Processor Fee",
+              amount: 20,
+              feeType: "processor_fixed",
+              sourceSection: "FEES",
+              matchConfidence: "high",
+              referenceId: null,
+              proofStatus: "processor_controlled",
+              expectedAmount: null,
+              delta: null,
+              reason: "Legacy summary predates structured advanced-review metadata.",
+              evidenceLine: "Legacy Processor Fee 20.00",
+            },
+          ],
+          findings: [
+            {
+              kind: "legacy_pricing_opportunity",
+              severity: "high",
+              title: "Legacy pricing opportunity",
+              amount: 20,
+              evidence: ["Legacy Processor Fee 20.00"],
+              action: "negotiate_processor_rate",
+              monthlyCost: 20,
+              annualEstimate: 240,
+              componentImpactEstimate: null,
+            },
+          ],
+          estimatedAnnualSavings: {
+            estimated: 240,
+            confidence: "high",
+            basis: "Legacy summary with no structured advanced-review metadata.",
+            components: [{ kind: "legacy_pricing_opportunity", label: "Legacy pricing opportunity", annualImpact: 240, tier: "confirmed", confidence: "high", sourceFindingKind: "legacy_pricing_opportunity" }],
+          },
+        },
+      }),
+      reportId: "package-3-2-legacy-metadata-missing",
+      generatedAt: NOW,
+    });
+
+    expect(report.reportState.code).toBe("low_confidence");
+    expect(report.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(0);
+    expect(report.opportunitySummary.includedFindingIds).toEqual([]);
+    expect(report.dataQuality.reasons.map((reason) => reason.code)).toEqual(
+      expect.arrayContaining([
+        "advanced_anomaly_review_incomplete",
+        "advanced_notice_review_incomplete",
+        "advanced_benchmark_review_incomplete",
+        "advanced_fee_classification_incomplete",
+      ]),
+    );
+  });
+
+  it("downgrades notice review failures only when statement notice text required the advanced review", () => {
+    const required = buildSingleStatementReportV1({
+      analysis: summary({
+        fiservFeeAnalysisV2: advancedFiservAnalysis({
+          noticeText: "Important fee updates may apply.",
+          aiNoticeExtraction: {
+            status: "disabled",
+            provider: null,
+            model: null,
+            noticeCount: 0,
+            feeChangeCount: 0,
+            notes: ["Advanced notice review was disabled."],
+          },
+        }),
+      }),
+      reportId: "package-3-2-notice-required",
+      generatedAt: NOW,
+    });
+    expect(required.reportState.code).toBe("low_confidence");
+    expect(required.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(0);
+
+    const notNeeded = buildSingleStatementReportV1({
+      analysis: summary({
+        fiservFeeAnalysisV2: advancedFiservAnalysis({
+          noticeText: "",
+          aiNoticeExtraction: {
+            status: "not_needed",
+            provider: null,
+            model: null,
+            noticeCount: 0,
+            feeChangeCount: 0,
+            notes: ["No statement notice block was available for advanced extraction."],
+          },
+        }),
+      }),
+      reportId: "package-3-2-notice-not-needed",
+      generatedAt: NOW,
+    });
+    expect(notNeeded.reportState.code).toBe("healthy_with_opportunities");
+    expect(notNeeded.opportunitySummary.totalEligibleAnnualOpportunityUsd).toBe(240);
+  });
+
   it("builds boundary fixtures for missing merchant, missing benchmark, unknown pricing, and unavailable values", () => {
     const report = buildSingleStatementReportV1({
       analysis: summary({
@@ -996,6 +1324,7 @@ describe("SingleStatementReportV1 safety foundation", () => {
       analysis: summary({
         feeBreakdown: [],
         fiservFeeAnalysisV2: {
+          ...advancedReviewMetadata(),
           rows: [
             {
               rowIndex: 7,
@@ -1059,6 +1388,7 @@ describe("SingleStatementReportV1 safety foundation", () => {
       analysis: summary({
         feeBreakdown: [],
         fiservFeeAnalysisV2: {
+          ...advancedReviewMetadata(),
           rows: [
             {
               rowIndex: 9,
@@ -1128,6 +1458,7 @@ describe("SingleStatementReportV1 safety foundation", () => {
           },
         ],
         fiservFeeAnalysisV2: {
+          ...advancedReviewMetadata(),
           rows: [
             {
               rowIndex: 11,
@@ -1158,6 +1489,7 @@ describe("SingleStatementReportV1 safety foundation", () => {
       analysis: summary({
         feeBreakdown: [],
         fiservFeeAnalysisV2: {
+          ...advancedReviewMetadata(),
           rows: [
             {
               rowIndex: 12,
@@ -1191,6 +1523,7 @@ describe("SingleStatementReportV1 safety foundation", () => {
       analysis: summary({
         feeBreakdown: [],
         fiservFeeAnalysisV2: {
+          ...advancedReviewMetadata(),
           rows: [
             {
               rowIndex: 13,
@@ -1224,6 +1557,7 @@ describe("SingleStatementReportV1 safety foundation", () => {
       analysis: summary({
         feeBreakdown: [],
         fiservFeeAnalysisV2: {
+          ...advancedReviewMetadata(),
           rows: [
             {
               rowIndex: 14,
