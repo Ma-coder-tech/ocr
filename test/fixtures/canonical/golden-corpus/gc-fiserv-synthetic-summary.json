@@ -86,6 +86,19 @@
         "reviewedAt": "2026-07-26",
         "approvalStatus": "approved"
       }
+    },
+    {
+      "field": "feeLedger.status",
+      "expectedValue": "unavailable",
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "synthetic_fixture",
+      "evidenceNote": "The synthetic summary fixture intentionally contains only top-level summary lines and no fee ledger rows.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-26",
+        "approvalStatus": "approved"
+      }
     }
   ],
   "tags": ["synthetic", "ci_safe", "pdf_extraction_smoke"]

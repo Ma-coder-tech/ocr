@@ -2,7 +2,7 @@ import { MONEY_POLICY_VERSION } from "./money.js";
 import type { CanonicalAnalysisVersionManifest } from "./types.js";
 
 export const CANONICAL_SCHEMA_VERSION = "canonical_statement_analysis_v1" as const;
-export const CANONICAL_BUILDER_VERSION = "canonical_fact_builder_package_b_v1" as const;
+export const CANONICAL_BUILDER_VERSION = "canonical_fact_builder_package_c_v1" as const;
 export const CANONICAL_PARSER_VERSION = "legacy_parser_adapter_v1" as const;
 
 export function buildVersionManifest(input: {

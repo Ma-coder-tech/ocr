@@ -9,6 +9,7 @@ import type { ParserDriver } from "../parserFoundation.js";
 import { attachParserInterpretation, documentIdForSource, makeEvidenceRecord } from "./evidence.js";
 import { candidate, selectedFact, unavailableFact } from "./facts.js";
 import { buildEffectiveRateFacts } from "./effectiveRateBasis.js";
+import { buildCanonicalFeeLedger } from "./feeLedger.js";
 import { moneyFromNumber } from "./money.js";
 import { buildAverageTicket, emptyTransactionCounts, transactionCountsFromParserSupport } from "./transactionCounts.js";
 import { buildVersionManifest, CANONICAL_SCHEMA_VERSION } from "./versionManifest.js";
@@ -97,6 +98,12 @@ export function canonicalActualValues(analysis: CanonicalStatementAnalysis): Rec
     "financialFacts.averageTicketBasis.allowed": analysis.financialFacts.averageTicketBasis.allowed,
     "financialFacts.averageTicketBasis.selectedCountType": analysis.financialFacts.averageTicketBasis.selectedCountType,
     "financialFacts.averageTicketBasis.selectedVolumePopulation": analysis.financialFacts.averageTicketBasis.selectedVolumePopulation,
+    "feeLedger.status": analysis.feeLedger.status,
+    "feeLedger.uniqueChargeTotal": analysis.feeLedger.uniqueChargeTotal,
+    "feeLedger.uniqueChargeRowCount": analysis.feeLedger.rows.filter((row) => row.contributesToUniqueTotal).length,
+    "feeLedger.sourceOccurrenceCount": analysis.feeLedger.sourceOccurrences.length,
+    "feeLedger.parserInterpretationCount": analysis.feeLedger.parserInterpretations.length,
+    "feeLedger.controlStatuses": analysis.feeLedger.controls.map((control) => control.status),
     "validation.status": analysis.validation.status,
   };
 }
@@ -203,6 +210,8 @@ function fromParserOutput(input: {
       transactionCounts,
       selectedVolumePopulation,
     },
+    doc: input.doc,
+    parserOutput: output,
     evidence: input.evidence,
     calculations: input.calculations,
   });
@@ -272,6 +281,8 @@ function fromExtractedRows(input: {
       transactionCounts: emptyTransactionCounts(),
       selectedVolumePopulation: processed ? "submitted_sales" : "unknown",
     },
+    doc: input.doc,
+    parserOutput: input.matched.output,
     evidence: input.evidence,
     calculations: input.calculations,
   });
@@ -281,6 +292,8 @@ function buildAnalysisEnvelope(input: {
   options: BuildOptions;
   matched: MatchedOutput;
   documentId: string;
+  doc: ParsedDocument;
+  parserOutput: Record<string, unknown> | null;
   identity: CanonicalStatementIdentity;
   financialFactsInput: {
     processedSales: CanonicalFactValue<MoneyAmount>;
@@ -376,6 +389,14 @@ function buildAnalysisEnvelope(input: {
     credits: input.financialFactsInput.credits,
     refunds: input.financialFactsInput.refunds,
   };
+  const feeLedger = buildCanonicalFeeLedger({
+    doc: input.doc,
+    parserOutput: input.parserOutput,
+    matched: input.matched,
+    documentId: input.documentId,
+    evidence: input.evidence,
+    calculations: input.calculations,
+  });
 
   return {
     canonicalSchemaVersion: CANONICAL_SCHEMA_VERSION,
@@ -384,6 +405,7 @@ function buildAnalysisEnvelope(input: {
     createdAt: new Date(0).toISOString(),
     identity: input.identity,
     financialFacts,
+    feeLedger,
     evidence: [...input.evidence.values()],
     calculations: input.calculations,
     validation: { status: "valid", errors: [], warnings: [] },

@@ -54,6 +54,8 @@ export type CanonicalFactValue<T> = {
 export type CanonicalEvidenceSourceRole =
   | "selected_fact"
   | "rejected_candidate"
+  | "fee_row"
+  | "control_total"
   | "calculation_input"
   | "parser_interpretation"
   | "advanced_review_diagnostic";
@@ -163,7 +165,7 @@ export type CanonicalEffectiveRateBasis = {
 
 export type CanonicalCalculationRecord = {
   id: string;
-  formulaCode: "ratereveal_all_in_effective_rate" | "average_ticket";
+  formulaCode: "ratereveal_all_in_effective_rate" | "average_ticket" | "canonical_fee_unique_total";
   formulaVersion: string;
   inputs: Array<{
     label: string;
@@ -174,6 +176,120 @@ export type CanonicalCalculationRecord = {
   result: MoneyAmount | DecimalString | null;
   unit: "money" | "decimal_rate";
   roundingPolicy: string;
+};
+
+export type CanonicalFeeRowRole =
+  | "individual_charge"
+  | "section_subtotal"
+  | "fee_bucket_total"
+  | "statement_control_total"
+  | "interchange_detail_row"
+  | "informational_rate_row"
+  | "zero_dollar_reference_row"
+  | "adjustment"
+  | "credit"
+  | "duplicate_representation"
+  | "supporting_evidence_only"
+  | "unknown_unresolved";
+
+export type CanonicalRateRepresentation = "percent_points" | "decimal_fraction" | "basis_points" | "unknown";
+
+export type CanonicalPrintedRate = {
+  original: string;
+  numericValue: DecimalString;
+  displayedDecimalPlaces: number;
+  representation: CanonicalRateRepresentation;
+  normalizedFractionalRate: DecimalString | null;
+};
+
+export type CanonicalFeeSourceOccurrence = {
+  id: string;
+  evidenceRef: string;
+  documentId: string;
+  pageNumber: number | null;
+  section: string | null;
+  lineId: string | null;
+  rowIndex: number | null;
+  normalizedSourceText: string | null;
+};
+
+export type CanonicalFeeParserInterpretation = {
+  id: string;
+  sourceOccurrenceId: string;
+  parserId: string | null;
+  parserVersion: string | null;
+  label: string;
+  amount: MoneyAmount | null;
+  signedAmount: MoneyAmount | null;
+  rowRole: CanonicalFeeRowRole;
+  section: string | null;
+  pageNumber: number | null;
+  printedRate: CanonicalPrintedRate | null;
+  printedPerItemRate: CanonicalPrintedRate | null;
+  itemCount: CountValue | null;
+  volume: MoneyAmount | null;
+  confidence: CanonicalConfidence;
+};
+
+export type CanonicalFeeMergeReason =
+  | "same_source_occurrence"
+  | "same_evidence_and_amount"
+  | "control_or_subtotal_excluded"
+  | "zero_amount_excluded"
+  | "ambiguous_similarity_unresolved";
+
+export type CanonicalFeeRow = {
+  id: string;
+  role: CanonicalFeeRowRole;
+  sourceOccurrenceIds: string[];
+  parserInterpretationIds: string[];
+  selectedLabel: string;
+  selectedAmount: MoneyAmount | null;
+  signedAmount: MoneyAmount | null;
+  contributesToUniqueTotal: boolean;
+  mergeReason: CanonicalFeeMergeReason | null;
+  mergeConfidence: CanonicalConfidence;
+  rejectedAmountCandidates: Array<{
+    amount: MoneyAmount;
+    interpretationId: string;
+    reason: string;
+  }>;
+  limitations: string[];
+};
+
+export type CanonicalFeeLedgerControlType =
+  | "printed_charge_sum"
+  | "rate_times_volume"
+  | "per_item_rate"
+  | "printed_subtotal"
+  | "effective_rate_comparison"
+  | "funding_formula";
+
+export type CanonicalFeeLedgerControl = {
+  id: string;
+  type: CanonicalFeeLedgerControlType;
+  label: string;
+  evidenceRefs: string[];
+  expectedAmount: MoneyAmount | null;
+  actualAmount: MoneyAmount | null;
+  deltaMinor: number | null;
+  toleranceMinor: number | null;
+  tolerancePolicyId: string;
+  status: "pass" | "pass_with_rounding" | "limited" | "verification_required" | "blocked";
+  derivationGroupId: string;
+  explanation: string;
+};
+
+export type CanonicalFeeLedger = {
+  policyVersion: "canonical_fee_ledger_v1";
+  status: "available" | "partial" | "unavailable";
+  sourceOccurrences: CanonicalFeeSourceOccurrence[];
+  parserInterpretations: CanonicalFeeParserInterpretation[];
+  rows: CanonicalFeeRow[];
+  uniqueChargeTotal: MoneyAmount | null;
+  uniqueChargeCalculationRef?: string;
+  controls: CanonicalFeeLedgerControl[];
+  limitations: string[];
 };
 
 export type CanonicalFinancialFacts = {
@@ -225,6 +341,7 @@ export type CanonicalStatementAnalysis = {
   createdAt: string;
   identity: CanonicalStatementIdentity;
   financialFacts: CanonicalFinancialFacts;
+  feeLedger: CanonicalFeeLedger;
   evidence: CanonicalEvidenceRecord[];
   calculations: CanonicalCalculationRecord[];
   validation: CanonicalValidationState;
