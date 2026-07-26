@@ -759,6 +759,14 @@ function validateStateInvariants(report: SingleStatementReportV1, errors: string
     validateEligibleOpportunityIsZero("hidden opportunity summary", report.opportunitySummary, errors);
   }
 
+  const advancedReviewIncomplete = report.dataQuality.reasons.some(
+    (reason) => reason.code.startsWith("advanced_") && reason.code.endsWith("_incomplete"),
+  );
+  if (advancedReviewIncomplete) {
+    if (report.reportState.code !== "low_confidence") errors.push("incomplete required advanced review requires low_confidence state.");
+    validateEligibleOpportunityIsZero("incomplete required advanced review", report.opportunitySummary, errors);
+  }
+
   if (report.reportState.code === "unable_to_analyze") {
     validateAllOpportunityIsZero("unable_to_analyze", report.opportunitySummary, errors);
     if (report.opportunitySummary.excludedFindingIds.length > 0) errors.push("unable_to_analyze must not classify excluded opportunity findings.");
