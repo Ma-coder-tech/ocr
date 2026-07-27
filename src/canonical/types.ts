@@ -43,7 +43,7 @@ export type CanonicalFactValue<T> = {
   value: T | null;
   status: CanonicalFactStatus;
   confidence: CanonicalConfidence | null;
-  selectedCandidateId?: string;
+  selectedCandidateId?: string | null;
   evidenceRefs: string[];
   calculationRef?: string;
   selectionReason: string | null;

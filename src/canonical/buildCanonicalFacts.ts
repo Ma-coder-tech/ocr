@@ -239,9 +239,17 @@ function fromParserOutput(input: {
   const selectedVolumePopulation = populationForProcessedSales(processedSales);
   const transactionEvidenceRefs = transactionEvidence(candidateTotals, input.matched, input.documentId, input.evidence);
   const transactionSource = record(selectedFinancials.transactionCount);
+  const supportingTransactionCounts = supportingCountsWithEvidence({
+    supportingCounts: arrayOfRecords(transactionSource.supportingTransactionCounts),
+    candidateTotals,
+    fallbackEvidenceRefs: transactionEvidenceRefs,
+    matched: input.matched,
+    documentId: input.documentId,
+    evidence: input.evidence,
+  });
   const transactionCounts = transactionCountsFromParserSupport({
     primaryCount: transactionSource.primaryTransactionCount,
-    supportingCounts: arrayOfRecords(transactionSource.supportingTransactionCounts),
+    supportingCounts: supportingTransactionCounts,
     evidenceRefs: transactionEvidenceRefs,
     parserId: input.matched.driverId,
     parserVersion: null,
@@ -642,6 +650,41 @@ function transactionEvidence(
   );
 }
 
+function supportingCountsWithEvidence(input: {
+  supportingCounts: Record<string, unknown>[];
+  candidateTotals: Record<string, unknown>[];
+  fallbackEvidenceRefs: string[];
+  matched: MatchedOutput;
+  documentId: string;
+  evidence: Map<string, CanonicalEvidenceRecord>;
+}): Record<string, unknown>[] {
+  return input.supportingCounts.map((count, index) => {
+    const explicitEvidenceLine = stringOrNull(count.evidenceLine);
+    const explicitEvidenceRefs = arrayOfStrings(count.evidenceRefs);
+    if (explicitEvidenceRefs.length > 0) {
+      return { ...count, evidenceRefs: explicitEvidenceRefs };
+    }
+    if (explicitEvidenceLine) {
+      const ref = addEvidence(
+        input.evidence,
+        input.documentId,
+        explicitEvidenceLine,
+        numberOrNull(count.pageNumber),
+        numberOrNull(count.rowIndex) ?? index,
+        "transactionCount",
+        input.matched,
+        numberOrNull(count.value),
+        {
+          lineId: stringOrNull(count.lineId),
+          section: stringOrNull(count.sourceSection),
+        },
+      );
+      return { ...count, evidenceRefs: [ref] };
+    }
+    return { ...count, evidenceRefs: input.fallbackEvidenceRefs };
+  });
+}
+
 function addEvidence(
   evidence: Map<string, CanonicalEvidenceRecord>,
   documentId: string,
@@ -651,12 +694,15 @@ function addEvidence(
   interpretedRole: string,
   matched: MatchedOutput,
   interpretedValue?: MoneyAmount | DecimalString | CountValue | string | null,
+  metadata: { lineId?: string | null; section?: string | null } = {},
 ): string {
   const base = makeEvidenceRecord({
     documentId,
     extractedText: text,
     pageNumber,
     rowIndex,
+    lineId: metadata.lineId,
+    section: metadata.section,
     sourceRole: "selected_fact",
     confidence: "medium",
   });
@@ -721,6 +767,10 @@ function numberOrNull(value: unknown): number | null {
 
 function stringOrNull(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function arrayOfStrings(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
 }
 
 function pageFromRow(row: Record<string, unknown>): number | null {

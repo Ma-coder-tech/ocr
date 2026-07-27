@@ -5,6 +5,7 @@ import {
   setCanonicalRuntimeShadowDiagnosticSinkForLocalUse,
 } from "../../src/canonical/runtimeShadow.js";
 import { buildCanonicalRuntimeAnalysis } from "../../src/canonical/runtimeAdapter.js";
+import { CanonicalStatementValidationError } from "../../src/canonical/validate.js";
 import { buildSingleStatementReportV1 } from "../../src/reporting/v1/index.js";
 import { analyzeDocument } from "../../src/analyzer.js";
 import type { ParsedDocument } from "../../src/parser.js";
@@ -152,7 +153,51 @@ describe("canonical runtime shadow fallback", () => {
 
     expect(failing.status).toBe("shadow_failed");
     expect(validation.status).toBe("canonical_validation_failed");
+    expect(validation.diagnostic?.constructionStageReached).toBe("canonical_validation_failed");
+    expect(validation.diagnostic?.validationFailureCodes).toEqual(["canonical_validation_failed"]);
     expect(summary).toEqual(analyzeDocument(document, "retail"));
+  });
+
+  it("reports safe validation-failure codes and pre-validation construction state", async () => {
+    const document = syntheticSummaryDocument();
+    const summary = analyzeDocument(document, "retail");
+    const built = buildCanonicalRuntimeAnalysis({
+      document,
+      businessType: "retail",
+      runtimeDocumentRef: "job_prevalidation_diagnostics",
+      legacySummary: summary,
+    });
+    const invalid = {
+      ...built.analysis,
+      financialFacts: {
+        ...built.analysis.financialFacts,
+        processedSales: {
+          ...built.analysis.financialFacts.processedSales,
+          evidenceRefs: [],
+        },
+      },
+    };
+    const result = await runCanonicalRuntimeShadow({
+      document,
+      businessType: "retail",
+      summary,
+      runtimeDocumentRef: "job_prevalidation_diagnostics",
+      env: { RATEREVEAL_CANONICAL_SHADOW_ENABLED: "true" },
+      buildAnalysis: () => {
+        throw new CanonicalStatementValidationError(
+          ["financialFacts.processedSales is selected without evidence or calculation."],
+          [],
+          invalid,
+        );
+      },
+    });
+
+    expect(result.status).toBe("canonical_validation_failed");
+    expect(result.diagnostic?.validationFailureCodes).toEqual(["selected_fact_without_evidence_or_calculation"]);
+    expect(result.diagnostic?.constructionStageReached).toBe("canonical_validation_failed");
+    expect(result.diagnostic?.preValidationCoreFactAvailability.processedSales).toBe("selected");
+    expect(result.diagnostic?.preValidationLedgerStatus).toBe(built.analysis.feeLedger.status);
+    expect(JSON.stringify(result.diagnostic)).not.toMatch(/processedSales is selected without evidence/i);
   });
 
   it("isolates diagnostic sink failures", async () => {

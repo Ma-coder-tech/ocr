@@ -153,6 +153,17 @@ function minimalDiagnostic(): RedactedCanonicalShadowDiagnostic {
     durationMs: 1,
     sourceType: "pdf",
     businessTypeProvided: true,
+    constructionStageReached: "canonical_analysis_validated",
+    validationFailureCodes: [],
+    preValidationCoreFactAvailability: {
+      processedSales: "selected",
+      totalFees: "selected",
+      statementPeriod: "selected",
+      effectiveRate: "selected",
+      transactionCount: "unavailable",
+      averageTicket: "unavailable",
+    },
+    preValidationLedgerStatus: "available",
     inputAdmission: [{ input: "legacy_savings_totals", status: "rejected", reasonCode: "legacy_savings_rejected" }],
     canonicalSummary: {
       validationStatus: "valid",
