@@ -19,6 +19,11 @@ export function printedMonetaryControl(input: {
   actualAmount: MoneyAmount | null;
   derivationGroupId: string;
   documentedOneCentRounding?: boolean;
+  coveredFeeRowIds?: string[];
+  basis?: CanonicalFeeLedgerControl["basis"];
+  amountBasis?: CanonicalFeeLedgerControl["amountBasis"];
+  independence?: CanonicalFeeLedgerControl["independence"];
+  reasonCode?: string;
 }): CanonicalFeeLedgerControl {
   const deltaMinor = input.expectedAmount && input.actualAmount ? input.actualAmount.amountMinor - input.expectedAmount.amountMinor : null;
   const toleranceMinor = input.documentedOneCentRounding ? 1 : 0;
@@ -42,6 +47,11 @@ export function printedMonetaryControl(input: {
             ? "pass_with_rounding"
             : "verification_required",
     derivationGroupId: input.derivationGroupId,
+    coveredFeeRowIds: input.coveredFeeRowIds ?? [],
+    basis: input.basis ?? "unknown",
+    amountBasis: input.amountBasis ?? "unknown",
+    independence: input.independence ?? "unknown",
+    reasonCode: input.reasonCode ?? (withinTolerance && deltaMinor !== 0 ? "documented_one_cent_rounding" : deltaMinor === 0 ? "exact_reconciliation" : "printed_control_requires_verification"),
     explanation:
       "Printed monetary charge rows must reconcile to printed controls exactly, with only documented one-cent printed rounding accepted.",
   };
@@ -137,6 +147,11 @@ export function diagnosticRateVolumeControl(input: {
           ? "pass"
           : "limited",
     derivationGroupId: input.derivationGroupId,
+    coveredFeeRowIds: [],
+    basis: "diagnostic",
+    amountBasis: "not_applicable",
+    independence: "derived_diagnostic",
+    reasonCode: "rate_volume_diagnostic",
     explanation:
       "Rate-times-volume checks normalize the printed rate unit and derive tolerance from displayed precision; printed monetary charges remain the observed amounts.",
   };
@@ -178,6 +193,11 @@ export function diagnosticPerItemControl(input: {
           ? "pass"
           : "limited",
     derivationGroupId: input.derivationGroupId,
+    coveredFeeRowIds: [],
+    basis: "diagnostic",
+    amountBasis: "not_applicable",
+    independence: "derived_diagnostic",
+    reasonCode: "per_item_diagnostic",
     explanation:
       "Per-item checks normalize the printed rate unit and derive tolerance from displayed precision; printed monetary charges remain the observed amounts.",
   };
@@ -209,6 +229,11 @@ export function fundingFormulaControl(input: {
     tolerancePolicyId: "fee_ledger_funding_formula_v1",
     status: !completeAndComparable ? "limited" : Math.abs(deltaMinor) <= 1 ? "pass" : "verification_required",
     derivationGroupId: input.derivationGroupId,
+    coveredFeeRowIds: [],
+    basis: "diagnostic",
+    amountBasis: "signed_net",
+    independence: "derived_diagnostic",
+    reasonCode: !completeAndComparable ? "funding_formula_incomplete" : Math.abs(deltaMinor ?? 0) <= 1 ? "funding_formula_reconciled" : "funding_formula_requires_verification",
     explanation:
       "Funding formula reconciliation allows one cent only when all printed monetary components are complete; incomplete formulas are limited rather than treated as rounding failures.",
   };

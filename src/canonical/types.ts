@@ -235,6 +235,8 @@ export type CanonicalFeeParserInterpretation = {
   printedPerItemRate: CanonicalPrintedRate | null;
   itemCount: CountValue | null;
   volume: MoneyAmount | null;
+  bucket?: string | null;
+  sourceTypeCode?: string | null;
   confidence: CanonicalConfidence;
 };
 
@@ -245,6 +247,39 @@ export type CanonicalFeeMergeReason =
   | "zero_amount_excluded"
   | "ambiguous_similarity_unresolved";
 
+export type CanonicalFeeContributionReasonCode =
+  | "individual_charge_included"
+  | "signed_adjustment_included"
+  | "signed_credit_included"
+  | "pass_through_fee_charge_included"
+  | "zero_amount_excluded"
+  | "subtotal_or_control_excluded"
+  | "rate_only_excluded"
+  | "duplicate_representation_excluded"
+  | "supporting_evidence_only_excluded"
+  | "interchange_without_control_coverage"
+  | "interchange_without_fee_section"
+  | "interchange_without_printed_amount"
+  | "interchange_amount_sign_untrusted"
+  | "unresolved_amount_conflict"
+  | "unknown_role_excluded";
+
+export type CanonicalFeeContributionDecision = {
+  contributes: boolean;
+  reasonCode: CanonicalFeeContributionReasonCode;
+  controlRefs: string[];
+  evidenceRefs: string[];
+  signedAmountBasis:
+    | "fee_charge_magnitude"
+    | "printed_signed_amount"
+    | "parser_amount"
+    | "not_applicable"
+    | "unresolved";
+  grossNetBasis: "fee_charge_gross" | "signed_net" | "not_applicable" | "unknown";
+  confidence: CanonicalConfidence;
+  limitations: string[];
+};
+
 export type CanonicalFeeRow = {
   id: string;
   role: CanonicalFeeRowRole;
@@ -254,6 +289,7 @@ export type CanonicalFeeRow = {
   selectedAmount: MoneyAmount | null;
   signedAmount: MoneyAmount | null;
   contributesToUniqueTotal: boolean;
+  contributionDecision: CanonicalFeeContributionDecision;
   mergeReason: CanonicalFeeMergeReason | null;
   mergeConfidence: CanonicalConfidence;
   rejectedAmountCandidates: Array<{
@@ -1062,6 +1098,11 @@ export type CanonicalFeeLedgerControl = {
   tolerancePolicyId: string;
   status: "pass" | "pass_with_rounding" | "limited" | "verification_required" | "blocked";
   derivationGroupId: string;
+  coveredFeeRowIds: string[];
+  basis: "section_control" | "grand_control" | "diagnostic" | "unknown";
+  amountBasis: "fee_charge_gross" | "signed_net" | "not_applicable" | "unknown";
+  independence: "printed_source_control" | "derived_diagnostic" | "unknown";
+  reasonCode: string;
   explanation: string;
 };
 
