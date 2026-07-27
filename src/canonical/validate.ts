@@ -1,11 +1,14 @@
 import { isMoneyAmount } from "./money.js";
-import type { CanonicalStatementAnalysis } from "./types.js";
+import { aggregateCanonicalOpportunityComponents } from "./opportunityEngine.js";
+import { targetSupportsApprovedEstimate, targetSupportsDeterministic } from "./opportunityPolicy.js";
+import type { CanonicalOpportunityComponent, CanonicalStatementAnalysis, MoneyAmount } from "./types.js";
 
 export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementAnalysis): CanonicalStatementAnalysis {
   const errors: string[] = [];
   const warnings: string[] = [];
   const evidenceIds = new Set(analysis.evidence.map((item) => item.id));
   const calculationIds = new Set(analysis.calculations.map((item) => item.id));
+  const calculationsById = new Map(analysis.calculations.map((item) => [item.id, item]));
 
   for (const collection of [analysis.evidence.map((item) => item.id), analysis.calculations.map((item) => item.id)]) {
     const seen = new Set<string>();
@@ -75,6 +78,21 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   }
   if (analysis.versionManifest?.feeClassificationPolicyVersion !== "fee_taxonomy_v1") {
     errors.push("Canonical version manifest must include fee_taxonomy_v1.");
+  }
+  if (analysis.versionManifest?.opportunityEnginePolicyVersion !== "canonical_opportunity_engine_v1") {
+    errors.push("Canonical version manifest must include canonical_opportunity_engine_v1.");
+  }
+  if (analysis.versionManifest?.opportunityTargetPolicyVersion !== "opportunity_target_policy_v1") {
+    errors.push("Canonical version manifest must include opportunity_target_policy_v1.");
+  }
+  if (analysis.versionManifest?.opportunityCadencePolicyVersion !== "opportunity_cadence_policy_v1") {
+    errors.push("Canonical version manifest must include opportunity_cadence_policy_v1.");
+  }
+  if (analysis.versionManifest?.opportunityBenchmarkPolicyVersion !== "opportunity_benchmark_policy_v1") {
+    errors.push("Canonical version manifest must include opportunity_benchmark_policy_v1.");
+  }
+  if (analysis.versionManifest?.opportunityAiBoundaryPolicyVersion !== "opportunity_ai_boundary_policy_v1") {
+    errors.push("Canonical version manifest must include opportunity_ai_boundary_policy_v1.");
   }
   if (analysis.financialFacts.effectiveRateBasis?.policyVersion !== "effective_rate_basis_v1") {
     errors.push("Effective rate basis is missing or unsupported.");
@@ -257,7 +275,7 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
       errors.push(`Package D fee ownership/actionability layer contains forbidden financial-impact field ${forbiddenPackageDField}.`);
     }
     const packageDCalculation = analysis.calculations.find((calculation) =>
-      /savings|opportunity|annual|benchmark/i.test(`${calculation.formulaCode} ${calculation.formulaVersion}`),
+      !String(calculation.formulaCode).startsWith("opportunity_") && /savings|opportunity|annual|benchmark/i.test(`${calculation.formulaCode} ${calculation.formulaVersion}`),
     );
     if (packageDCalculation && analysis.feeOwnershipActionability.rowClassifications.length > 0) {
       warnings.push("Canonical analysis contains legacy savings/opportunity calculations outside Package D; Package D does not create or approve them.");
@@ -271,6 +289,7 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   ) {
     errors.push("Selected effective rate requires explicit supported numerator and denominator basis plus calculationRef.");
   }
+  validateOpportunityEngine(analysis, evidenceIds, calculationIds, calculationsById, errors);
 
   const validated: CanonicalStatementAnalysis = {
     ...analysis,
@@ -284,6 +303,331 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
     throw new Error(`Canonical statement analysis validation failed: ${errors.join(" ")}`);
   }
   return validated;
+}
+
+function validateOpportunityEngine(
+  analysis: CanonicalStatementAnalysis,
+  evidenceIds: Set<string>,
+  calculationIds: Set<string>,
+  calculationsById: Map<string, CanonicalStatementAnalysis["calculations"][number]>,
+  errors: string[],
+): void {
+  const engine = analysis.opportunityEngine;
+  if (!engine || engine.policyVersion !== "canonical_opportunity_engine_v1") {
+    errors.push("Package E canonical opportunity engine is missing or unsupported.");
+    return;
+  }
+  if (engine.targetPolicyVersion !== "opportunity_target_policy_v1") errors.push("Package E target policy version is missing or unsupported.");
+  if (engine.cadencePolicyVersion !== "opportunity_cadence_policy_v1") errors.push("Package E cadence policy version is missing or unsupported.");
+  if (engine.benchmarkPolicyVersion !== "opportunity_benchmark_policy_v1") errors.push("Package E benchmark policy version is missing or unsupported.");
+  if (engine.aiBoundaryPolicyVersion !== "opportunity_ai_boundary_policy_v1") errors.push("Package E AI boundary policy version is missing or unsupported.");
+
+  const feeRowIds = new Set(analysis.feeLedger.rows.map((row) => row.id));
+  const classificationByFeeRowId = new Map(analysis.feeOwnershipActionability.rowClassifications.map((classification) => [classification.feeRowId, classification]));
+  const componentIds = new Set(engine.components.map((component) => component.id));
+  if (componentIds.size !== engine.components.length) errors.push("Package E contains duplicate component ids.");
+
+  const includedFeeRows = new Map<string, string>();
+  for (const component of engine.components) {
+    validateOpportunityComponent(component, { analysis, evidenceIds, calculationIds, calculationsById, feeRowIds, classificationByFeeRowId, componentIds, includedFeeRows, errors });
+  }
+
+  const graphErrors = supersessionGraphErrors(engine.components);
+  errors.push(...graphErrors);
+
+  const expectedSummary = aggregateCanonicalOpportunityComponents(engine.components);
+  compareMoney("Package E deterministic summary", engine.summary.deterministicEligibleAnnualAmount, expectedSummary.deterministicEligibleAnnualAmount, errors);
+  compareMoney("Package E estimated summary", engine.summary.approvedEstimatedAnnualAmount, expectedSummary.approvedEstimatedAnnualAmount, errors);
+  compareMoney("Package E total eligible summary", engine.summary.totalEligibleAnnualAmount, expectedSummary.totalEligibleAnnualAmount, errors);
+  compareMoney("Package E master savings summary", engine.summary.masterSavingsAnnualAmount, expectedSummary.masterSavingsAnnualAmount, errors);
+  compareMoney("Package E verification-only summary", engine.summary.verificationOnlyObservedAmount, expectedSummary.verificationOnlyObservedAmount, errors);
+  compareMoney("Package E excluded summary", engine.summary.excludedObservedAmount, expectedSummary.excludedObservedAmount, errors);
+  compareMoney("Package E non-annualized summary", engine.summary.nonAnnualizedObservedAmount, expectedSummary.nonAnnualizedObservedAmount, errors);
+}
+
+function validateOpportunityComponent(
+  component: CanonicalOpportunityComponent,
+  context: {
+    analysis: CanonicalStatementAnalysis;
+    evidenceIds: Set<string>;
+    calculationIds: Set<string>;
+    calculationsById: Map<string, CanonicalStatementAnalysis["calculations"][number]>;
+    feeRowIds: Set<string>;
+    classificationByFeeRowId: Map<string, CanonicalStatementAnalysis["feeOwnershipActionability"]["rowClassifications"][number]>;
+    componentIds: Set<string>;
+    includedFeeRows: Map<string, string>;
+    errors: string[];
+  },
+): void {
+  if (component.policyVersion !== "canonical_opportunity_engine_v1") context.errors.push(`Package E component ${component.id} has unsupported policy version.`);
+  if ((component.eligibility === "verification_only" || component.eligibility === "excluded") && component.inclusionStatus === "included") {
+    context.errors.push(`Package E component ${component.id} is included with ${component.eligibility} eligibility.`);
+  }
+  if ((component.eligibility === "deterministic" || component.eligibility === "approved_estimate") && component.inclusionStatus === "included") {
+    if (!component.cadence.annualizationAllowed || component.cadence.value === "unknown" || component.cadence.value === "one_time") {
+      context.errors.push(`Package E component ${component.id} is included with non-annualizable cadence ${component.cadence.value}.`);
+    }
+    if (!component.cadence.proven || component.cadence.frequencyPerYear === null || component.cadence.frequencyPerYear <= 0) {
+      context.errors.push(`Package E component ${component.id} is included without proven recurring cadence frequency.`);
+    }
+    if (component.cadence.value === "statement_frequency" && component.cadence.frequencyPerYear === null) {
+      context.errors.push(`Package E component ${component.id} annualizes statement-frequency cadence without frequency proof.`);
+    }
+    if (!component.calculation.calculationRef || !context.calculationIds.has(component.calculation.calculationRef)) {
+      context.errors.push(`Package E component ${component.id} is included without a valid calculationRef.`);
+    }
+    if (!component.calculation.result || component.calculation.result.amountMinor <= 0) {
+      context.errors.push(`Package E component ${component.id} is included without a positive calculation result.`);
+    }
+  }
+  if (component.eligibility === "deterministic" && !targetSupportsDeterministic(component.targetProvenance, component.target)) {
+    context.errors.push(`Package E deterministic component ${component.id} lacks authoritative target evidence.`);
+  }
+  if (component.eligibility === "approved_estimate" && !targetSupportsApprovedEstimate(component.targetProvenance, component.target)) {
+    context.errors.push(`Package E approved estimate component ${component.id} lacks a versioned approved model or reference.`);
+  }
+  if ((component.eligibility === "deterministic" || component.eligibility === "approved_estimate") && !targetAppliesToStatement(component, context.analysis)) {
+    context.errors.push(`Package E component ${component.id} target reference is not applicable to this statement context or period.`);
+  }
+  if (component.kind === "benchmark_concern" && component.eligibility === "deterministic") {
+    context.errors.push(`Package E benchmark component ${component.id} cannot be deterministic.`);
+  }
+  if (
+    component.kind === "hidden_processor_spread" &&
+    component.eligibility === "deterministic" &&
+    !component.feeRowRefs.some((ref) =>
+      context.analysis.feeOwnershipActionability.spreadAssertions.some(
+        (spread) => spread.baseFeeRowId === ref.feeRowId && spread.status === "proven" && spread.authoritative,
+      ),
+    )
+  ) {
+    context.errors.push(`Package E deterministic hidden spread component ${component.id} requires a Package D proven spread.`);
+  }
+  if (/master.*savings/i.test(component.id)) {
+    context.errors.push(`Package E master savings must not appear as component ${component.id}.`);
+  }
+
+  const refsInComponent = new Set<string>();
+  for (const ref of component.feeRowRefs) {
+    if (!context.feeRowIds.has(ref.feeRowId)) context.errors.push(`Package E component ${component.id} references missing fee row ${ref.feeRowId}.`);
+    if (refsInComponent.has(ref.feeRowId)) context.errors.push(`Package E component ${component.id} duplicates fee row ref ${ref.feeRowId}.`);
+    refsInComponent.add(ref.feeRowId);
+    const classification = context.classificationByFeeRowId.get(ref.feeRowId);
+    if (!classification) {
+      context.errors.push(`Package E component ${component.id} references fee row ${ref.feeRowId} without Package D classification.`);
+    } else if (classification.selected.candidateId !== ref.classificationCandidateId) {
+      context.errors.push(`Package E component ${component.id} does not reference the selected Package D candidate for fee row ${ref.feeRowId}.`);
+    }
+    if (component.inclusionStatus === "included") {
+      const existing = context.includedFeeRows.get(ref.feeRowId);
+      if (existing && component.overlap.resolution === "none") {
+        context.errors.push(`Package E included component ${component.id} duplicates fee row ${ref.feeRowId} already used by ${existing} without overlap resolution.`);
+      }
+      context.includedFeeRows.set(ref.feeRowId, component.id);
+    }
+  }
+
+  for (const evidenceRef of [...component.evidenceRefs, ...component.cadence.evidenceRefs, ...component.targetProvenance.evidenceRefs, ...component.calculation.evidenceRefs]) {
+    if (!context.evidenceIds.has(evidenceRef)) context.errors.push(`Package E component ${component.id} evidence ref ${evidenceRef} is broken.`);
+  }
+  if (component.observedAmount) {
+    if (!isMoneyAmount(component.observedAmount.amount)) context.errors.push(`Package E component ${component.id} has invalid observed amount.`);
+    for (const evidenceRef of component.observedAmount.evidenceRefs) {
+      if (!context.evidenceIds.has(evidenceRef)) context.errors.push(`Package E component ${component.id} observed amount evidence ref ${evidenceRef} is broken.`);
+    }
+  }
+  validateCalculationReconstruction(component, context.calculationsById, context.errors);
+  if (component.target.type === "zero_removal") {
+    if ((component.eligibility === "deterministic" || component.eligibility === "approved_estimate") && component.target.proofEvidenceRefs.length === 0) {
+      context.errors.push(`Package E component ${component.id} zero-removal proof evidence is missing.`);
+    }
+    for (const evidenceRef of component.target.proofEvidenceRefs) {
+      if (!context.evidenceIds.has(evidenceRef)) context.errors.push(`Package E component ${component.id} zero-removal proof evidence ref ${evidenceRef} is broken.`);
+    }
+  }
+  validateTargetUnits(component, context.errors);
+  validateTargetCurrencyAndPopulation(component, context.errors);
+  validateAiBoundary(component, context.errors);
+}
+
+function targetAppliesToStatement(component: CanonicalOpportunityComponent, analysis: CanonicalStatementAnalysis): boolean {
+  const provenance = component.targetProvenance;
+  const periodStart = analysis.identity.statementPeriod.value?.start ?? null;
+  if (!periodStart) return false;
+  if (provenance.effectiveFrom && periodStart < provenance.effectiveFrom) return false;
+  if (provenance.effectiveTo && periodStart > provenance.effectiveTo) return false;
+  const processor = String(analysis.identity.processorFamily.value ?? analysis.identity.processorName.value ?? "unknown").toLowerCase();
+  const businessType = String(analysis.identity.businessType.value ?? "unknown").toLowerCase();
+  if (provenance.applicableProcessor && provenance.applicableProcessor !== "unknown" && provenance.applicableProcessor.toLowerCase() !== processor) return false;
+  if (provenance.applicableBusinessType && provenance.applicableBusinessType !== "unknown" && provenance.applicableBusinessType.toLowerCase() !== businessType) return false;
+  if (provenance.applicableChannel && provenance.applicableChannel !== "unknown") return false;
+  if (provenance.applicableCardEnvironment && provenance.applicableCardEnvironment !== "unknown") return false;
+  return true;
+}
+
+function validateTargetCurrencyAndPopulation(component: CanonicalOpportunityComponent, errors: string[]): void {
+  const target = component.target;
+  const targetMoney =
+    target.type === "monetary" || target.type === "per_item" || target.type === "model_monetary" || target.type === "model_per_item"
+      ? target.amount
+      : null;
+  if (targetMoney && !isMoneyAmount(targetMoney)) errors.push(`Package E component ${component.id} target contains unsupported or invalid currency.`);
+  if (targetMoney && component.observedAmount && targetMoney.currency !== component.observedAmount.amount.currency) {
+    errors.push(`Package E component ${component.id} mixes currencies without conversion authority.`);
+  }
+  if ((target.type === "per_item" || target.type === "model_per_item" || target.type === "rate" || target.type === "model_rate") && !component.calculation.inputRefs.includes(target.populationRef)) {
+    errors.push(`Package E component ${component.id} target population is not linked to calculation inputs.`);
+  }
+}
+
+function validateCalculationReconstruction(
+  component: CanonicalOpportunityComponent,
+  calculationsById: Map<string, CanonicalStatementAnalysis["calculations"][number]>,
+  errors: string[],
+): void {
+  const ref = component.calculation.calculationRef;
+  if (!ref) return;
+  const calculation = calculationsById.get(ref);
+  if (!calculation) return;
+  if (calculation.formulaCode !== component.calculation.formulaCode) errors.push(`Package E component ${component.id} calculation formula does not match canonical calculation record.`);
+  if (calculation.unit !== "money" || !isMoneyAmount(calculation.result)) errors.push(`Package E component ${component.id} calculation record does not return canonical money.`);
+  if (isMoneyAmount(calculation.result) && component.calculation.result && calculation.result.amountMinor !== component.calculation.result.amountMinor) {
+    errors.push(`Package E component ${component.id} calculation result does not match canonical calculation record.`);
+  }
+  for (const input of calculation.inputs) {
+    if (input.unit === "money" && input.value !== null && !isMoneyAmount(input.value)) errors.push(`Package E component ${component.id} calculation input ${input.label} has invalid money.`);
+  }
+  const reconstructed = reconstructComponentResult(component, calculation);
+  if (reconstructed && component.calculation.result && reconstructed.amountMinor !== component.calculation.result.amountMinor) {
+    errors.push(`Package E component ${component.id} calculation does not reconstruct exactly in integer cents.`);
+  }
+}
+
+function reconstructComponentResult(
+  component: CanonicalOpportunityComponent,
+  calculation: CanonicalStatementAnalysis["calculations"][number],
+): MoneyAmount | null {
+  if (!component.observedAmount || !component.calculation.annualized) return null;
+  const observed = component.observedAmount.amount;
+  const target = component.target;
+  if (target.type === "monetary") {
+    const delta = observed.amountMinor - target.amount.amountMinor;
+    if (target.unit === "monthly_charge" && component.cadence.frequencyPerYear !== null) return { amountMinor: delta * component.cadence.frequencyPerYear, currency: observed.currency };
+    if (target.unit === "annual_charge") return { amountMinor: delta, currency: observed.currency };
+    if (target.unit === "statement_charge" && component.cadence.frequencyPerYear !== null) return { amountMinor: delta * component.cadence.frequencyPerYear, currency: observed.currency };
+  }
+  if (target.type === "zero_removal" && component.cadence.frequencyPerYear !== null) {
+    return { amountMinor: observed.amountMinor * component.cadence.frequencyPerYear, currency: observed.currency };
+  }
+  if (target.type === "model_monetary") {
+    if (target.unit === "annual_amount") return target.amount;
+    if ((target.unit === "monthly_amount" || target.unit === "statement_amount") && component.cadence.frequencyPerYear !== null) {
+      return { amountMinor: target.amount.amountMinor * component.cadence.frequencyPerYear, currency: target.amount.currency };
+    }
+  }
+  if (target.type === "per_item" || target.type === "model_per_item") {
+    const count = calculation.inputs.find((input) => input.unit === "count" && typeof input.value === "number")?.value as number | undefined;
+    if (count !== undefined && component.cadence.frequencyPerYear !== null) {
+      const targetMinor = target.amount.amountMinor * count;
+      return { amountMinor: (observed.amountMinor - targetMinor) * component.cadence.frequencyPerYear, currency: observed.currency };
+    }
+  }
+  return null;
+}
+
+function validateTargetUnits(component: CanonicalOpportunityComponent, errors: string[]): void {
+  const target = component.target as any;
+  if (target.type === "rate" || target.type === "model_rate") {
+    if (!["percent_points", "decimal_fraction", "basis_points"].includes(target.representation)) {
+      errors.push(`Package E component ${component.id} has ambiguous rate representation.`);
+    }
+    if (typeof target.populationRef !== "string" || target.populationRef.trim().length === 0) {
+      errors.push(`Package E component ${component.id} has a rate target without population reference.`);
+    }
+  }
+  if (target.type === "per_item" || target.type === "model_per_item") {
+    if (!["per_authorization", "per_transaction", "per_item"].includes(target.unit)) {
+      errors.push(`Package E component ${component.id} has ambiguous per-item unit.`);
+    }
+    if (typeof target.populationRef !== "string" || target.populationRef.trim().length === 0) {
+      errors.push(`Package E component ${component.id} has a per-item target without population reference.`);
+    }
+  }
+  if (target.type === "model_monetary" && !["monthly_amount", "annual_amount", "statement_amount"].includes(target.unit)) {
+    errors.push(`Package E component ${component.id} has ambiguous model monetary unit.`);
+  }
+  if (target.type === "monetary" && !["monthly_charge", "annual_charge", "statement_charge"].includes(target.unit)) {
+    errors.push(`Package E component ${component.id} has ambiguous monetary unit.`);
+  }
+}
+
+function validateAiBoundary(component: CanonicalOpportunityComponent, errors: string[]): void {
+  const fields = [
+    ["observed amount", component.observedAmount?.aiSourced],
+    ["target", (component.target as any).aiSourced],
+    ["target provenance", component.targetProvenance.aiSourced],
+    ["cadence", component.cadence.aiSourced],
+    ["calculation", component.calculation.aiSourced],
+  ];
+  for (const [label, aiSourced] of fields) {
+    if (aiSourced !== false) errors.push(`Package E component ${component.id} has AI-sourced ${label}.`);
+  }
+}
+
+function supersessionGraphErrors(components: CanonicalOpportunityComponent[]): string[] {
+  const errors: string[] = [];
+  const ids = new Set(components.map((component) => component.id));
+  const byId = new Map(components.map((component) => [component.id, component]));
+  const edges = new Map<string, string[]>();
+  for (const component of components) {
+    const children = [...new Set(component.overlap.supersedesComponentIds)];
+    for (const child of children) {
+      if (!ids.has(child)) errors.push(`Package E component ${component.id} supersedes missing component ${child}.`);
+      if (child === component.id) errors.push(`Package E component ${component.id} supersedes itself.`);
+      const childComponent = byId.get(child);
+      if (childComponent && (childComponent.inclusionStatus !== "superseded" || childComponent.overlap.supersededByComponentId !== component.id)) {
+        errors.push(`Package E component ${component.id} has contradictory supersession relationship with ${child}.`);
+      }
+    }
+    if (component.overlap.supersededByComponentId !== null && !ids.has(component.overlap.supersededByComponentId)) {
+      errors.push(`Package E component ${component.id} is superseded by missing component ${component.overlap.supersededByComponentId}.`);
+    }
+    edges.set(component.id, children);
+  }
+  for (const node of circularNodes(edges)) {
+    errors.push(`Package E supersession graph contains circular relationship at ${node}.`);
+  }
+  return errors;
+}
+
+function circularNodes(edges: Map<string, string[]>): Set<string> {
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const stack: string[] = [];
+  const circular = new Set<string>();
+  function visit(node: string): void {
+    if (visited.has(node)) return;
+    if (visiting.has(node)) {
+      const index = stack.indexOf(node);
+      for (const cycleNode of stack.slice(index)) circular.add(cycleNode);
+      circular.add(node);
+      return;
+    }
+    visiting.add(node);
+    stack.push(node);
+    for (const child of edges.get(node) ?? []) visit(child);
+    stack.pop();
+    visiting.delete(node);
+    visited.add(node);
+  }
+  for (const node of edges.keys()) visit(node);
+  return circular;
+}
+
+function compareMoney(label: string, actual: MoneyAmount, expected: MoneyAmount, errors: string[]): void {
+  if (!isMoneyAmount(actual) || actual.amountMinor !== expected.amountMinor || actual.currency !== expected.currency) {
+    errors.push(`${label} does not reconstruct from included Package E components.`);
+  }
 }
 
 function blocksPotentialActionability(owner: string): boolean {
