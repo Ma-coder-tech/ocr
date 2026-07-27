@@ -257,6 +257,173 @@ export type CanonicalFeeRow = {
   limitations: string[];
 };
 
+export type CanonicalFeeCategory =
+  | "interchange"
+  | "card_brand_network_assessment"
+  | "network_access_or_authorization"
+  | "processor_markup"
+  | "processor_per_item_fee"
+  | "administrative_fee"
+  | "service_fee"
+  | "compliance_fee"
+  | "equipment_or_lease"
+  | "third_party_product"
+  | "chargeback_or_dispute"
+  | "funding_adjustment"
+  | "tax_or_government"
+  | "credit"
+  | "unknown_needs_review";
+
+export type CanonicalFeeParty =
+  | "network"
+  | "card_brand"
+  | "issuer_or_interchange"
+  | "processor"
+  | "third_party"
+  | "merchant_contract"
+  | "tax_or_government"
+  | "unknown";
+
+export type CanonicalFeeActionability = "potentially_actionable" | "verify_only" | "not_actionable" | "unknown";
+
+export type CanonicalFeeDocumentationRequirement =
+  | "none"
+  | "recommended"
+  | "required_for_authority"
+  | "required_for_savings"
+  | "blocking";
+
+export type CanonicalFeeClassificationSourceType =
+  | "deterministic_rule"
+  | "safe_default"
+  | "human_override"
+  | "ai_suggestion";
+
+export type CanonicalFeeClassificationConfidence = "high" | "medium" | "low";
+
+export type CanonicalFeeOwnership = {
+  collector: CanonicalFeeParty;
+  economicBeneficiary: CanonicalFeeParty;
+  contractualController: CanonicalFeeParty;
+};
+
+export type CanonicalFeeRuleReference = {
+  referenceId: string;
+  version: string;
+  applicableProcessorOrNetwork: string;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  sourceProvenance: string;
+  requiredMatchingFields: string[];
+  negativePatterns: string[];
+  periodApplicable: boolean;
+};
+
+export type CanonicalFeeClassificationCandidate = {
+  id: string;
+  feeRowId: string;
+  category: CanonicalFeeCategory;
+  ownership: CanonicalFeeOwnership;
+  actionabilityCeiling: CanonicalFeeActionability;
+  documentationRequirement: CanonicalFeeDocumentationRequirement;
+  confidence: CanonicalFeeClassificationConfidence;
+  sourceType: CanonicalFeeClassificationSourceType;
+  ruleId: string;
+  ruleVersion: string;
+  ruleProvenance: string;
+  evidenceRefs: string[];
+  reference: CanonicalFeeRuleReference | null;
+  authoritative: boolean;
+  reason: string;
+  permissionConsequences: string[];
+  limitations: string[];
+};
+
+export type CanonicalFeeClassificationConflictStatus =
+  | "none"
+  | "unresolved"
+  | "resolved_by_stronger_evidence"
+  | "requires_human_review";
+
+export type CanonicalFeeSelectedClassification = {
+  candidateId: string;
+  category: CanonicalFeeCategory;
+  ownership: CanonicalFeeOwnership;
+  actionabilityCeiling: CanonicalFeeActionability;
+  documentationRequirement: CanonicalFeeDocumentationRequirement;
+  confidence: CanonicalFeeClassificationConfidence;
+  selectionReason: string;
+  rejectedCandidateIds: string[];
+};
+
+export type CanonicalFeeClassificationResolution = {
+  feeRowId: string;
+  selected: CanonicalFeeSelectedClassification;
+  candidates: CanonicalFeeClassificationCandidate[];
+  conflictStatus: CanonicalFeeClassificationConflictStatus;
+  conflictReason: string | null;
+};
+
+export type CanonicalFeeSpreadAssertionStatus = "suspected" | "proven" | "rejected";
+
+export type CanonicalFeeSpreadAssertion = {
+  id: string;
+  baseFeeRowId: string;
+  status: CanonicalFeeSpreadAssertionStatus;
+  owner: CanonicalFeeParty;
+  actionabilityCeiling: CanonicalFeeActionability;
+  evidenceRefs: string[];
+  reference: CanonicalFeeRuleReference | null;
+  reason: string;
+  authoritative: boolean;
+};
+
+export type CanonicalFeeHumanOverrideScope = "statement_specific" | "reusable_rule_candidate";
+
+export type CanonicalFeeHumanOverrideRecord = {
+  id: string;
+  feeRowId: string;
+  reviewerId: string;
+  reviewedAt: string;
+  evidenceRefs: string[];
+  reason: string;
+  previousClassification: CanonicalFeeSelectedClassification;
+  newClassification: CanonicalFeeSelectedClassification;
+  scope: CanonicalFeeHumanOverrideScope;
+  supersedesOverrideId: string | null;
+  supersededByOverrideId: string | null;
+  reusableRuleCreated: false;
+};
+
+export type CanonicalFeeAiSuggestion = {
+  id: string;
+  feeRowId: string;
+  provider: string | null;
+  model: string | null;
+  suggestedCategory: CanonicalFeeCategory;
+  suggestedOwnership: CanonicalFeeOwnership;
+  suggestedActionabilityCeiling: CanonicalFeeActionability;
+  confidence: CanonicalFeeClassificationConfidence;
+  reasonCodes: string[];
+  safeEvidenceRefs: string[];
+  sanitizedExplanation: string;
+  authoritative: false;
+};
+
+export type CanonicalFeeOwnershipActionability = {
+  policyVersion: "fee_ownership_actionability_v1";
+  taxonomyVersion: "fee_taxonomy_v1";
+  ruleRegistryVersion: "fee_ownership_rules_v1";
+  aiSuggestionPolicyVersion: "fee_ai_suggestion_policy_v1";
+  humanOverridePolicyVersion: "fee_human_override_policy_v1";
+  status: "available" | "partial" | "unavailable";
+  rowClassifications: CanonicalFeeClassificationResolution[];
+  spreadAssertions: CanonicalFeeSpreadAssertion[];
+  aiSuggestions: CanonicalFeeAiSuggestion[];
+  humanOverrides: CanonicalFeeHumanOverrideRecord[];
+  limitations: string[];
+};
+
 export type CanonicalFeeLedgerControlType =
   | "printed_charge_sum"
   | "rate_times_volume"
@@ -323,6 +490,11 @@ export type CanonicalAnalysisVersionManifest = {
   moneyPolicyVersion: "money_minor_units_usd_v1";
   effectiveRatePolicyVersion: "effective_rate_basis_v1";
   transactionCountPolicyVersion: "transaction_population_match_v1";
+  feeClassificationPolicyVersion: "fee_taxonomy_v1";
+  ownershipActionabilityPolicyVersion: "fee_ownership_actionability_v1";
+  feeOwnershipRuleRegistryVersion: "fee_ownership_rules_v1";
+  feeAiSuggestionPolicyVersion: "fee_ai_suggestion_policy_v1";
+  feeHumanOverridePolicyVersion: "fee_human_override_policy_v1";
   parserId: string | null;
   parserVersion: string | null;
   extractionVersion: string;
@@ -342,6 +514,7 @@ export type CanonicalStatementAnalysis = {
   identity: CanonicalStatementIdentity;
   financialFacts: CanonicalFinancialFacts;
   feeLedger: CanonicalFeeLedger;
+  feeOwnershipActionability: CanonicalFeeOwnershipActionability;
   evidence: CanonicalEvidenceRecord[];
   calculations: CanonicalCalculationRecord[];
   validation: CanonicalValidationState;

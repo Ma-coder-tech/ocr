@@ -10,6 +10,7 @@ import { attachParserInterpretation, documentIdForSource, makeEvidenceRecord } f
 import { candidate, selectedFact, unavailableFact } from "./facts.js";
 import { buildEffectiveRateFacts } from "./effectiveRateBasis.js";
 import { buildCanonicalFeeLedger } from "./feeLedger.js";
+import { buildCanonicalFeeOwnershipActionability } from "./feeOwnershipActionability.js";
 import { moneyFromNumber } from "./money.js";
 import { buildAverageTicket, emptyTransactionCounts, transactionCountsFromParserSupport } from "./transactionCounts.js";
 import { buildVersionManifest, CANONICAL_SCHEMA_VERSION } from "./versionManifest.js";
@@ -104,6 +105,14 @@ export function canonicalActualValues(analysis: CanonicalStatementAnalysis): Rec
     "feeLedger.sourceOccurrenceCount": analysis.feeLedger.sourceOccurrences.length,
     "feeLedger.parserInterpretationCount": analysis.feeLedger.parserInterpretations.length,
     "feeLedger.controlStatuses": analysis.feeLedger.controls.map((control) => control.status),
+    "feeOwnershipActionability.status": analysis.feeOwnershipActionability.status,
+    "feeOwnershipActionability.rowCount": analysis.feeOwnershipActionability.rowClassifications.length,
+    "feeOwnershipActionability.unknownOrVerifyOnlyCount": analysis.feeOwnershipActionability.rowClassifications.filter(
+      (row) => row.selected.actionabilityCeiling === "unknown" || row.selected.actionabilityCeiling === "verify_only",
+    ).length,
+    "feeOwnershipActionability.potentiallyActionableCount": analysis.feeOwnershipActionability.rowClassifications.filter(
+      (row) => row.selected.actionabilityCeiling === "potentially_actionable",
+    ).length,
     "validation.status": analysis.validation.status,
   };
 }
@@ -397,6 +406,10 @@ function buildAnalysisEnvelope(input: {
     evidence: input.evidence,
     calculations: input.calculations,
   });
+  const feeOwnershipActionability = buildCanonicalFeeOwnershipActionability(feeLedger, {
+    processorFamily: input.identity.processorFamily.value,
+    statementPeriodStart: input.identity.statementPeriod.value?.start ?? null,
+  });
 
   return {
     canonicalSchemaVersion: CANONICAL_SCHEMA_VERSION,
@@ -406,6 +419,7 @@ function buildAnalysisEnvelope(input: {
     identity: input.identity,
     financialFacts,
     feeLedger,
+    feeOwnershipActionability,
     evidence: [...input.evidence.values()],
     calculations: input.calculations,
     validation: { status: "valid", errors: [], warnings: [] },
