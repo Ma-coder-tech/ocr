@@ -218,6 +218,13 @@ async function processJob(jobId: string): Promise<void> {
       };
     }
 
+    await maybeRunCanonicalRuntimeShadow({
+      jobId: job.id,
+      parsed,
+      summary,
+      businessType: job.businessType,
+    });
+
     stageUpdate(jobId, "comparing_to_benchmark", 90, "Comparing to your business benchmark");
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
@@ -292,5 +299,25 @@ async function runAiRefinement(summary: AnalysisSummary) {
   } catch (error) {
     console.error("[ai-refinement-skip]", error instanceof Error ? error.message : error);
     return summary;
+  }
+}
+
+export async function maybeRunCanonicalRuntimeShadow(input: {
+  jobId: string;
+  parsed: ParsedDocument;
+  summary: AnalysisSummary;
+  businessType: AnalysisSummary["businessType"];
+}): Promise<void> {
+  if (process.env.RATEREVEAL_CANONICAL_SHADOW_ENABLED !== "true") return;
+  try {
+    const { runCanonicalRuntimeShadow } = await import("./canonical/runtimeShadow.js");
+    await runCanonicalRuntimeShadow({
+      document: input.parsed,
+      summary: input.summary,
+      businessType: input.businessType,
+      runtimeDocumentRef: `job_${input.jobId}`,
+    });
+  } catch {
+    return;
   }
 }
