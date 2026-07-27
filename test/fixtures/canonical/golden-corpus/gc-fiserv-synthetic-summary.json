@@ -99,6 +99,175 @@
         "reviewedAt": "2026-07-26",
         "approvalStatus": "approved"
       }
+    },
+    {
+      "field": "customerState.axes.analysisReadiness",
+      "expectedValue": "unavailable",
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "approved_policy",
+      "evidenceNote": "Package G requires a verified statement period before customer-facing financial conclusions are available.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-27",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "customerState.axes.dataIntegrity",
+      "expectedValue": "unavailable",
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "approved_policy",
+      "evidenceNote": "Missing core period support makes Package G data integrity unavailable for customer projection.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-27",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "customerState.axes.ratePosition",
+      "expectedValue": "unavailable",
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "approved_policy",
+      "evidenceNote": "No qualified benchmark reference is supplied for this synthetic summary fixture.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-27",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "customerState.axes.opportunityPosture",
+      "expectedValue": "unavailable",
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "approved_policy",
+      "evidenceNote": "Package G does not expose opportunity posture when analysis readiness is unavailable.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-27",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "customerState.axes.explanationReadiness",
+      "expectedValue": "deterministic_fallback",
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "approved_policy",
+      "evidenceNote": "Package F deterministic fallback remains available even when customer financial conclusions are unavailable.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-27",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "customerState.primaryState",
+      "expectedValue": "unable_to_analyze",
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "approved_policy",
+      "evidenceNote": "Package G resolves missing customer-projection core facts to unable_to_analyze.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-27",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "customerState.permissions.permitted",
+      "expectedValue": [],
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "approved_policy",
+      "evidenceNote": "No customer-facing Package G permissions are open when analysis readiness is unavailable.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-27",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "customerState.visibility.showCoreMetrics",
+      "expectedValue": false,
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "approved_policy",
+      "evidenceNote": "Core metrics are hidden from the customer projection when Package G cannot verify required core facts.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-27",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "customerState.visibility.visibleEligibleAnnualAmount",
+      "expectedValue": { "amountMinor": 0, "currency": "USD" },
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "approved_policy",
+      "evidenceNote": "Eligible totals remain zero in customer visibility when Package G analysis is unavailable.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-27",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "customerState.visibility.visibleVerificationOnlyObservedAmount",
+      "expectedValue": { "amountMinor": 0, "currency": "USD" },
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "approved_policy",
+      "evidenceNote": "Verification-only amounts are hidden when Package G analysis is unavailable.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-27",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "customerState.explanation.source",
+      "expectedValue": "deterministic_fallback",
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "approved_policy",
+      "evidenceNote": "Package G deterministic wording explains why the analysis is unavailable without creating financial conclusions.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-27",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "customerState.actionGuidance.actionTypes",
+      "expectedValue": [],
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "approved_policy",
+      "evidenceNote": "No action guidance is exposed without canonical fee-row support and customer-facing permissions.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-27",
+        "approvalStatus": "approved"
+      }
+    },
+    {
+      "field": "validation.status",
+      "expectedValue": "valid",
+      "verificationStatus": "verified",
+      "assertionRule": "must_equal",
+      "source": "approved_policy",
+      "evidenceNote": "The Package G projection is valid while withholding customer-facing financial conclusions.",
+      "reviewer": {
+        "role": "human_reviewer",
+        "reviewedAt": "2026-07-27",
+        "approvalStatus": "approved"
+      }
     }
   ],
   "tags": ["synthetic", "ci_safe", "pdf_extraction_smoke"]

@@ -23,7 +23,7 @@ export const moneyAmountSchema = z
 
 const decimalStringSchema = z.string().regex(/^-?\d+(?:\.\d+)?$/);
 const countValueSchema = z.number().int().nonnegative();
-const expectedScalarSchema = z.union([moneyAmountSchema, decimalStringSchema, countValueSchema, z.string(), z.boolean(), z.null()]);
+const expectedScalarSchema = z.union([moneyAmountSchema, decimalStringSchema, countValueSchema, z.string(), z.boolean(), z.null(), z.array(z.string())]);
 
 const expectedRangeSchema = z
   .object({
@@ -360,7 +360,16 @@ function extractValueFromText(text: string, pattern: string, valueType: PrivateC
 }
 
 function isCanonicalField(field: string): boolean {
-  return field.startsWith("financialFacts.") || field.startsWith("identity.") || field.startsWith("feeLedger.") || field.startsWith("validation.");
+  return (
+    field.startsWith("financialFacts.") ||
+    field.startsWith("identity.") ||
+    field.startsWith("feeLedger.") ||
+    field.startsWith("feeOwnershipActionability.") ||
+    field.startsWith("opportunityEngine.") ||
+    field.startsWith("aiCapabilities.") ||
+    field.startsWith("customerState.") ||
+    field.startsWith("validation.")
+  );
 }
 
 function expectationMatches(expectation: GoldenCorpusExpectation, actualValue: unknown): boolean {

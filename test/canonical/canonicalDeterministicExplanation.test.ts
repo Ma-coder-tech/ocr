@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { narrativeErrors } from "../../src/canonical/aiGroundingGateway.js";
 import { buildCanonicalAiCapabilities } from "../../src/canonical/buildCanonicalAiCapabilities.js";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
+import { buildCanonicalCustomerState } from "../../src/canonical/customerStateResolver.js";
 import { validateCanonicalStatementAnalysis } from "../../src/canonical/validate.js";
 import type { CanonicalAiCapabilityOutput } from "../../src/canonical/types.js";
 import type { ParsedDocument } from "../../src/parser.js";
@@ -65,6 +66,7 @@ describe("canonical deterministic explanation", () => {
       evidence: analysis.evidence,
       harnessInputs: [{ capability: "merchant_narrative", status: "completed", output: safeNarrative }],
     });
+    analysis.customerState = buildCanonicalCustomerState({ ...analysis });
     expect(analysis.aiCapabilities.summary.explanationReadiness).toBe("ai_enhanced");
     expect(analysis.aiCapabilities.summary.explanationSource).toBe("accepted_ai_narrative");
     expect(validateCanonicalStatementAnalysis(analysis).validation.status).toBe("valid");
@@ -77,6 +79,7 @@ describe("canonical deterministic explanation", () => {
       evidence: unsafe.evidence,
       harnessInputs: [{ capability: "merchant_narrative", status: "completed", output: unsafeNarrative }],
     });
+    unsafe.customerState = buildCanonicalCustomerState({ ...unsafe });
     expect(unsafe.aiCapabilities.summary.explanationReadiness).toBe("deterministic_fallback");
     expect(unsafe.aiCapabilities.summary.explanationSource).toBe("deterministic_template");
     expect(unsafe.aiCapabilities.capabilities.find((record) => record.capability === "merchant_narrative")!.status).toBe("rejected");
