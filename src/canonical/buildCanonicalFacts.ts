@@ -12,6 +12,7 @@ import { buildEffectiveRateFacts } from "./effectiveRateBasis.js";
 import { buildCanonicalFeeLedger } from "./feeLedger.js";
 import { buildCanonicalFeeOwnershipActionability } from "./feeOwnershipActionability.js";
 import { buildCanonicalOpportunityEngine } from "./opportunityEngine.js";
+import { buildCanonicalAiCapabilities } from "./buildCanonicalAiCapabilities.js";
 import { moneyFromNumber } from "./money.js";
 import { buildAverageTicket, emptyTransactionCounts, transactionCountsFromParserSupport } from "./transactionCounts.js";
 import { buildVersionManifest, CANONICAL_SCHEMA_VERSION } from "./versionManifest.js";
@@ -132,6 +133,18 @@ export function canonicalActualValues(analysis: CanonicalStatementAnalysis): Rec
     "opportunityEngine.overlapValidationStatus": analysis.opportunityEngine.components.some((component) => component.overlap.resolution === "requires_review")
       ? "requires_review"
       : "ok",
+    "aiCapabilities.financialReadiness": analysis.aiCapabilities.summary.financialReadiness,
+    "aiCapabilities.explanationReadiness": analysis.aiCapabilities.summary.explanationReadiness,
+    "aiCapabilities.explanationSource": analysis.aiCapabilities.summary.explanationSource,
+    "aiCapabilities.requiredCapabilityCount": analysis.aiCapabilities.summary.requiredCapabilityCount,
+    "aiCapabilities.completedCapabilityCount": analysis.aiCapabilities.summary.completedCapabilityCount,
+    "aiCapabilities.blockedCapabilityCount": analysis.aiCapabilities.summary.blockedCapabilityCount,
+    "aiCapabilities.rejectedOutputCount": analysis.aiCapabilities.summary.rejectedOutputCount,
+    "aiCapabilities.capabilityStatuses": analysis.aiCapabilities.capabilities
+      .map((capability) => `${capability.capability}:${capability.status}:${capability.required ? "required" : "optional"}:${capability.groundingStatus}`)
+      .sort(),
+    "aiCapabilities.limitationCodes": [...analysis.aiCapabilities.summary.limitationCodes].sort(),
+    "aiCapabilities.knownLegacyRiskCodes": [...analysis.aiCapabilities.summary.knownLegacyRiskCodes].sort(),
     "validation.status": analysis.validation.status,
   };
 }
@@ -435,6 +448,15 @@ function buildAnalysisEnvelope(input: {
     evidence: [...input.evidence.values()],
     statementPeriodVerified: input.identity.statementPeriod.status === "selected" && input.identity.statementPeriod.value !== null,
   });
+  const evidence = [...input.evidence.values()];
+  const aiCapabilities = buildCanonicalAiCapabilities({
+    identity: input.identity,
+    financialFacts,
+    feeLedger,
+    feeOwnershipActionability,
+    opportunityEngine,
+    evidence,
+  });
 
   return {
     canonicalSchemaVersion: CANONICAL_SCHEMA_VERSION,
@@ -446,7 +468,8 @@ function buildAnalysisEnvelope(input: {
     feeLedger,
     feeOwnershipActionability,
     opportunityEngine,
-    evidence: [...input.evidence.values()],
+    aiCapabilities,
+    evidence,
     calculations: input.calculations,
     validation: { status: "valid", errors: [], warnings: [] },
     versionManifest: buildVersionManifest({ parserId: input.matched.driverId }),
