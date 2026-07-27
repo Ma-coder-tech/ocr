@@ -165,7 +165,14 @@ export type CanonicalEffectiveRateBasis = {
 
 export type CanonicalCalculationRecord = {
   id: string;
-  formulaCode: "ratereveal_all_in_effective_rate" | "average_ticket" | "canonical_fee_unique_total";
+  formulaCode:
+    | "ratereveal_all_in_effective_rate"
+    | "average_ticket"
+    | "canonical_fee_unique_total"
+    | "opportunity_observed_minus_target"
+    | "opportunity_monthly_delta_times_12"
+    | "opportunity_annual_delta"
+    | "opportunity_component_sum";
   formulaVersion: string;
   inputs: Array<{
     label: string;
@@ -424,6 +431,234 @@ export type CanonicalFeeOwnershipActionability = {
   limitations: string[];
 };
 
+export type CanonicalOpportunityEligibility = "deterministic" | "approved_estimate" | "verification_only" | "excluded";
+export type CanonicalOpportunityInclusionStatus = "included" | "excluded" | "superseded";
+export type CanonicalOpportunityKind =
+  | "fee_row_review"
+  | "fee_removal"
+  | "rate_repricing"
+  | "per_item_repricing"
+  | "hidden_processor_spread"
+  | "benchmark_concern";
+
+export type CanonicalOpportunityCadenceValue = "monthly" | "annual" | "statement_frequency" | "one_time" | "unknown";
+export type CanonicalOpportunityCadenceProof =
+  | "fee_label_explicit"
+  | "contract"
+  | "processor_documentation"
+  | "statement_notice"
+  | "multiple_statements"
+  | "not_proven";
+
+export type CanonicalOpportunityCadence = {
+  value: CanonicalOpportunityCadenceValue;
+  proven: boolean;
+  annualizationAllowed: boolean;
+  frequencyPerYear: number | null;
+  proof: CanonicalOpportunityCadenceProof;
+  evidenceRefs: string[];
+  reason: string;
+  aiSourced: false;
+};
+
+export type CanonicalOpportunityTargetEvidenceSource =
+  | "merchant_contract"
+  | "processor_pricing_schedule"
+  | "written_processor_confirmation"
+  | "statement_notice"
+  | "authoritative_network_government_regulatory"
+  | "ratereveal_policy"
+  | "benchmark_registry"
+  | "none";
+
+export type CanonicalOpportunityTargetProvenance = {
+  sourceType: CanonicalOpportunityTargetEvidenceSource;
+  referenceId: string | null;
+  version: string | null;
+  policyOwner: string | null;
+  reviewer: string | null;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  applicableProcessor: string | null;
+  applicableBusinessType: string | null;
+  applicableChannel: string | null;
+  applicableCardEnvironment: string | null;
+  methodology: string | null;
+  limitations: string[];
+  opportunityApproved: boolean;
+  authoritativeForDeterministic: boolean;
+  approvedForEstimate: boolean;
+  evidenceRefs: string[];
+  aiSourced: false;
+};
+
+export type CanonicalOpportunityMonetaryTarget = {
+  type: "monetary";
+  amount: MoneyAmount;
+  unit: "monthly_charge" | "annual_charge" | "statement_charge";
+  aiSourced: false;
+};
+
+export type CanonicalOpportunityRateTarget = {
+  type: "rate";
+  rate: DecimalString;
+  representation: Exclude<CanonicalRateRepresentation, "unknown">;
+  populationRef: string;
+  aiSourced: false;
+};
+
+export type CanonicalOpportunityPerItemTarget = {
+  type: "per_item";
+  amount: MoneyAmount;
+  unit: "per_authorization" | "per_transaction" | "per_item";
+  populationRef: string;
+  aiSourced: false;
+};
+
+export type CanonicalOpportunityZeroRemovalTarget = {
+  type: "zero_removal";
+  removalCondition: string;
+  proofEvidenceRefs: string[];
+  aiSourced: false;
+};
+
+export type CanonicalOpportunityModelMonetaryTarget = {
+  type: "model_monetary";
+  modelId: string;
+  modelVersion: string;
+  amount: MoneyAmount;
+  unit: "monthly_amount" | "annual_amount" | "statement_amount";
+  aiSourced: false;
+};
+
+export type CanonicalOpportunityModelRateTarget = {
+  type: "model_rate";
+  modelId: string;
+  modelVersion: string;
+  rate: DecimalString;
+  representation: Exclude<CanonicalRateRepresentation, "unknown">;
+  populationRef: string;
+  aiSourced: false;
+};
+
+export type CanonicalOpportunityModelPerItemTarget = {
+  type: "model_per_item";
+  modelId: string;
+  modelVersion: string;
+  amount: MoneyAmount;
+  unit: "per_authorization" | "per_transaction" | "per_item";
+  populationRef: string;
+  aiSourced: false;
+};
+
+export type CanonicalOpportunityNoTarget = {
+  type: "none";
+  reason: string;
+  aiSourced: false;
+};
+
+export type CanonicalOpportunityTarget =
+  | CanonicalOpportunityMonetaryTarget
+  | CanonicalOpportunityRateTarget
+  | CanonicalOpportunityPerItemTarget
+  | CanonicalOpportunityZeroRemovalTarget
+  | CanonicalOpportunityModelMonetaryTarget
+  | CanonicalOpportunityModelRateTarget
+  | CanonicalOpportunityModelPerItemTarget
+  | CanonicalOpportunityNoTarget;
+
+export type CanonicalOpportunityFeeRowRef = {
+  feeRowId: string;
+  role: "base" | "supporting" | "overlap";
+  classificationCandidateId: string;
+};
+
+export type CanonicalOpportunityObservedAmount = {
+  amount: MoneyAmount;
+  source: "canonical_fee_row" | "canonical_spread_calculation";
+  evidenceRefs: string[];
+  aiSourced: false;
+};
+
+export type CanonicalOpportunityCalculation = {
+  calculationRef: string | null;
+  formulaCode:
+    | "none_not_eligible"
+    | "opportunity_observed_minus_target"
+    | "opportunity_monthly_delta_times_12"
+    | "opportunity_annual_delta"
+    | "opportunity_component_sum";
+  formulaVersion: "canonical_opportunity_formula_v1";
+  inputRefs: string[];
+  result: MoneyAmount | null;
+  resultUnit: "money";
+  annualized: boolean;
+  evidenceRefs: string[];
+  aiSourced: false;
+};
+
+export type CanonicalOpportunityOverlap = {
+  aggregationKey: string;
+  exclusiveGroupKey: string | null;
+  supersedesComponentIds: string[];
+  supersededByComponentId: string | null;
+  overlapsWithComponentIds: string[];
+  resolution: "none" | "deduped_by_key" | "superseded" | "requires_review";
+  reason: string | null;
+};
+
+export type CanonicalOpportunityComponent = {
+  id: string;
+  policyVersion: "canonical_opportunity_engine_v1";
+  kind: CanonicalOpportunityKind;
+  eligibility: CanonicalOpportunityEligibility;
+  inclusionStatus: CanonicalOpportunityInclusionStatus;
+  feeRowRefs: CanonicalOpportunityFeeRowRef[];
+  ownership: CanonicalFeeOwnership;
+  actionabilityCeiling: CanonicalFeeActionability;
+  observedAmount: CanonicalOpportunityObservedAmount | null;
+  target: CanonicalOpportunityTarget;
+  targetProvenance: CanonicalOpportunityTargetProvenance;
+  cadence: CanonicalOpportunityCadence;
+  calculation: CanonicalOpportunityCalculation;
+  overlap: CanonicalOpportunityOverlap;
+  confidence: "high" | "medium" | "low";
+  inclusionReasonCodes: string[];
+  exclusionReasonCodes: string[];
+  evidenceRefs: string[];
+  limitations: string[];
+};
+
+export type CanonicalOpportunitySummary = {
+  deterministicEligibleAnnualAmount: MoneyAmount;
+  approvedEstimatedAnnualAmount: MoneyAmount;
+  totalEligibleAnnualAmount: MoneyAmount;
+  verificationOnlyObservedAmount: MoneyAmount;
+  excludedObservedAmount: MoneyAmount;
+  nonAnnualizedObservedAmount: MoneyAmount;
+  masterSavingsAnnualAmount: MoneyAmount;
+  deterministicComponentIds: string[];
+  approvedEstimatedComponentIds: string[];
+  verificationOnlyComponentIds: string[];
+  excludedComponentIds: string[];
+  nonAnnualizedComponentIds: string[];
+  supersededComponentIds: string[];
+  summaryCalculationRefs: string[];
+  limitations: string[];
+};
+
+export type CanonicalOpportunityEngine = {
+  policyVersion: "canonical_opportunity_engine_v1";
+  targetPolicyVersion: "opportunity_target_policy_v1";
+  cadencePolicyVersion: "opportunity_cadence_policy_v1";
+  benchmarkPolicyVersion: "opportunity_benchmark_policy_v1";
+  aiBoundaryPolicyVersion: "opportunity_ai_boundary_policy_v1";
+  status: "available" | "partial" | "unavailable";
+  components: CanonicalOpportunityComponent[];
+  summary: CanonicalOpportunitySummary;
+  limitations: string[];
+};
+
 export type CanonicalFeeLedgerControlType =
   | "printed_charge_sum"
   | "rate_times_volume"
@@ -495,6 +730,11 @@ export type CanonicalAnalysisVersionManifest = {
   feeOwnershipRuleRegistryVersion: "fee_ownership_rules_v1";
   feeAiSuggestionPolicyVersion: "fee_ai_suggestion_policy_v1";
   feeHumanOverridePolicyVersion: "fee_human_override_policy_v1";
+  opportunityEnginePolicyVersion: "canonical_opportunity_engine_v1";
+  opportunityTargetPolicyVersion: "opportunity_target_policy_v1";
+  opportunityCadencePolicyVersion: "opportunity_cadence_policy_v1";
+  opportunityBenchmarkPolicyVersion: "opportunity_benchmark_policy_v1";
+  opportunityAiBoundaryPolicyVersion: "opportunity_ai_boundary_policy_v1";
   parserId: string | null;
   parserVersion: string | null;
   extractionVersion: string;
@@ -515,6 +755,7 @@ export type CanonicalStatementAnalysis = {
   financialFacts: CanonicalFinancialFacts;
   feeLedger: CanonicalFeeLedger;
   feeOwnershipActionability: CanonicalFeeOwnershipActionability;
+  opportunityEngine: CanonicalOpportunityEngine;
   evidence: CanonicalEvidenceRecord[];
   calculations: CanonicalCalculationRecord[];
   validation: CanonicalValidationState;

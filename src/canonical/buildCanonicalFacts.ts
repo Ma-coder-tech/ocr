@@ -11,6 +11,7 @@ import { candidate, selectedFact, unavailableFact } from "./facts.js";
 import { buildEffectiveRateFacts } from "./effectiveRateBasis.js";
 import { buildCanonicalFeeLedger } from "./feeLedger.js";
 import { buildCanonicalFeeOwnershipActionability } from "./feeOwnershipActionability.js";
+import { buildCanonicalOpportunityEngine } from "./opportunityEngine.js";
 import { moneyFromNumber } from "./money.js";
 import { buildAverageTicket, emptyTransactionCounts, transactionCountsFromParserSupport } from "./transactionCounts.js";
 import { buildVersionManifest, CANONICAL_SCHEMA_VERSION } from "./versionManifest.js";
@@ -113,6 +114,24 @@ export function canonicalActualValues(analysis: CanonicalStatementAnalysis): Rec
     "feeOwnershipActionability.potentiallyActionableCount": analysis.feeOwnershipActionability.rowClassifications.filter(
       (row) => row.selected.actionabilityCeiling === "potentially_actionable",
     ).length,
+    "opportunityEngine.status": analysis.opportunityEngine.status,
+    "opportunityEngine.componentCount": analysis.opportunityEngine.components.length,
+    "opportunityEngine.deterministicComponentCount": analysis.opportunityEngine.components.filter((component) => component.eligibility === "deterministic").length,
+    "opportunityEngine.approvedEstimatedComponentCount": analysis.opportunityEngine.components.filter((component) => component.eligibility === "approved_estimate").length,
+    "opportunityEngine.verificationOnlyComponentCount": analysis.opportunityEngine.components.filter((component) => component.eligibility === "verification_only").length,
+    "opportunityEngine.excludedComponentCount": analysis.opportunityEngine.components.filter((component) => component.eligibility === "excluded").length,
+    "opportunityEngine.totalEligibleAnnualAmount": analysis.opportunityEngine.summary.totalEligibleAnnualAmount,
+    "opportunityEngine.deterministicEligibleAnnualAmount": analysis.opportunityEngine.summary.deterministicEligibleAnnualAmount,
+    "opportunityEngine.approvedEstimatedAnnualAmount": analysis.opportunityEngine.summary.approvedEstimatedAnnualAmount,
+    "opportunityEngine.verificationOnlyObservedAmount": analysis.opportunityEngine.summary.verificationOnlyObservedAmount,
+    "opportunityEngine.nonAnnualizedObservedAmount": analysis.opportunityEngine.summary.nonAnnualizedObservedAmount,
+    "opportunityEngine.includedComponentIds": [
+      ...analysis.opportunityEngine.summary.deterministicComponentIds,
+      ...analysis.opportunityEngine.summary.approvedEstimatedComponentIds,
+    ].sort(),
+    "opportunityEngine.overlapValidationStatus": analysis.opportunityEngine.components.some((component) => component.overlap.resolution === "requires_review")
+      ? "requires_review"
+      : "ok",
     "validation.status": analysis.validation.status,
   };
 }
@@ -410,6 +429,12 @@ function buildAnalysisEnvelope(input: {
     processorFamily: input.identity.processorFamily.value,
     statementPeriodStart: input.identity.statementPeriod.value?.start ?? null,
   });
+  const opportunityEngine = buildCanonicalOpportunityEngine({
+    feeLedger,
+    feeOwnershipActionability,
+    evidence: [...input.evidence.values()],
+    statementPeriodVerified: input.identity.statementPeriod.status === "selected" && input.identity.statementPeriod.value !== null,
+  });
 
   return {
     canonicalSchemaVersion: CANONICAL_SCHEMA_VERSION,
@@ -420,6 +445,7 @@ function buildAnalysisEnvelope(input: {
     financialFacts,
     feeLedger,
     feeOwnershipActionability,
+    opportunityEngine,
     evidence: [...input.evidence.values()],
     calculations: input.calculations,
     validation: { status: "valid", errors: [], warnings: [] },
