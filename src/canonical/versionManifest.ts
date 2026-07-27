@@ -6,6 +6,15 @@ import {
   CANONICAL_AI_CAPABILITY_BOUNDARY_POLICY_VERSION,
   DETERMINISTIC_EXPLANATION_POLICY_VERSION,
 } from "./aiCapabilityTypes.js";
+import {
+  CUSTOMER_ACTION_GUIDANCE_POLICY_VERSION,
+  CUSTOMER_BENCHMARK_POLICY_VERSION,
+  CUSTOMER_PERMISSIONS_POLICY_VERSION,
+  CUSTOMER_STATE_MATERIALITY_POLICY_VERSION,
+  CUSTOMER_STATE_POLICY_VERSION,
+  CUSTOMER_VISIBILITY_POLICY_VERSION,
+  CUSTOMER_WORDING_POLICY_VERSION,
+} from "./customerStateTypes.js";
 import type { CanonicalAnalysisVersionManifest } from "./types.js";
 
 export const CANONICAL_SCHEMA_VERSION = "canonical_statement_analysis_v1" as const;
@@ -43,6 +52,13 @@ export function buildVersionManifest(input: {
     aiReadinessDegradationPolicyVersion: AI_READINESS_DEGRADATION_POLICY_VERSION,
     aiPrivacyRetentionPolicyVersion: AI_PRIVACY_RETENTION_POLICY_VERSION,
     deterministicExplanationPolicyVersion: DETERMINISTIC_EXPLANATION_POLICY_VERSION,
+    customerStatePolicyVersion: CUSTOMER_STATE_POLICY_VERSION,
+    customerStateMaterialityPolicyVersion: CUSTOMER_STATE_MATERIALITY_POLICY_VERSION,
+    customerBenchmarkPolicyVersion: CUSTOMER_BENCHMARK_POLICY_VERSION,
+    customerPermissionPolicyVersion: CUSTOMER_PERMISSIONS_POLICY_VERSION,
+    customerVisibilityPolicyVersion: CUSTOMER_VISIBILITY_POLICY_VERSION,
+    customerActionGuidancePolicyVersion: CUSTOMER_ACTION_GUIDANCE_POLICY_VERSION,
+    customerWordingPolicyVersion: CUSTOMER_WORDING_POLICY_VERSION,
     parserId: input.parserId,
     parserVersion: input.parserVersion ?? CANONICAL_PARSER_VERSION,
     extractionVersion: input.extractionVersion ?? "pdfjs_text_rows_v1",

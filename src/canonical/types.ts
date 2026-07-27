@@ -866,6 +866,182 @@ export type CanonicalAiCapabilityLayer = {
   limitations: string[];
 };
 
+export type CanonicalCustomerAnalysisReadiness = "verified" | "limited" | "withheld" | "unavailable";
+export type CanonicalCustomerDataIntegrity = "reconciled" | "partially_reconciled" | "failed" | "unavailable";
+export type CanonicalCustomerRatePosition = "below_reference" | "within_reference" | "above_reference" | "unavailable";
+export type CanonicalCustomerOpportunityPosture =
+  | "none"
+  | "verification_only"
+  | "eligible_opportunity"
+  | "material_eligible_opportunity"
+  | "unavailable";
+export type CanonicalCustomerPrimaryState =
+  | "unable_to_analyze"
+  | "analysis_withheld"
+  | "analysis_limited"
+  | "verification_needed"
+  | "competitive_no_opportunity"
+  | "competitive_with_opportunity"
+  | "rate_review_needed"
+  | "rate_review_with_opportunity"
+  | "fee_opportunity_identified"
+  | "material_fee_opportunity"
+  | "verified_benchmark_unavailable";
+
+export type CanonicalCustomerAxisProjection = {
+  analysisReadiness: CanonicalCustomerAnalysisReadiness;
+  dataIntegrity: CanonicalCustomerDataIntegrity;
+  ratePosition: CanonicalCustomerRatePosition;
+  opportunityPosture: CanonicalCustomerOpportunityPosture;
+  explanationReadiness: CanonicalAiExplanationReadiness;
+};
+
+export type CanonicalCustomerBenchmarkReference = {
+  referenceId: string;
+  version: string;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  applicableProcessor: string | null;
+  applicableBusinessType: string | null;
+  applicableChannel: string | null;
+  applicableCardEnvironment: string | null;
+  methodology: string;
+  limitations: string[];
+  evidenceRefs: string[];
+  qualified: boolean;
+  opportunityApproved: boolean;
+  aiSourced: false;
+};
+
+export type CanonicalCustomerRateComparison = {
+  policyVersion: "canonical_customer_benchmark_policy_v1";
+  status: "qualified" | "unavailable";
+  position: CanonicalCustomerRatePosition;
+  benchmarkRef: CanonicalCustomerBenchmarkReference | null;
+  calculationRef: string | null;
+  evidenceRefs: string[];
+  reasonCodes: string[];
+  aiSourced: false;
+};
+
+export type CanonicalCustomerPermissionKey =
+  | "core_metrics"
+  | "effective_rate"
+  | "benchmark"
+  | "fee_inventory"
+  | "ownership_actionability"
+  | "deterministic_opportunity"
+  | "estimated_opportunity"
+  | "verification_amounts"
+  | "evidence_calculations"
+  | "actions"
+  | "customer_explanation"
+  | "ai_enhanced_narrative";
+
+export type CanonicalCustomerPermissionDecision = {
+  key: CanonicalCustomerPermissionKey;
+  permitted: boolean;
+  reasonCodes: string[];
+  limitationCodes: string[];
+  policyVersion: "canonical_customer_permissions_v1";
+};
+
+export type CanonicalCustomerVisibility = {
+  policyVersion: "canonical_customer_visibility_v1";
+  consumerMayReduceVisibilityOnly: true;
+  showCoreMetrics: boolean;
+  showEffectiveRate: boolean;
+  showBenchmark: boolean;
+  showFeeInventory: boolean;
+  showOwnershipActionability: boolean;
+  showDeterministicOpportunity: boolean;
+  showEstimatedOpportunity: boolean;
+  showVerificationAmounts: boolean;
+  showEvidenceCalculations: boolean;
+  showActions: boolean;
+  showCustomerExplanation: boolean;
+  visibleDeterministicAnnualAmount: MoneyAmount;
+  visibleApprovedEstimatedAnnualAmount: MoneyAmount;
+  visibleEligibleAnnualAmount: MoneyAmount;
+  visibleVerificationOnlyObservedAmount: MoneyAmount;
+  visibleNonAnnualizedObservedAmount: MoneyAmount;
+  hiddenReasonCodes: string[];
+};
+
+export type CanonicalCustomerMateriality = {
+  policyVersion: "canonical_customer_state_materiality_v1";
+  material: boolean;
+  annualEligibleOpportunity: MoneyAmount;
+  annualizedTotalFees: MoneyAmount | null;
+  annualizedProcessedVolume: MoneyAmount | null;
+  totalFeesRatio: DecimalString | null;
+  processedVolumeRatio: DecimalString | null;
+  usedFallbackThreshold: boolean;
+  reasonCodes: string[];
+};
+
+export type CanonicalCustomerActionType =
+  | "review_documentation"
+  | "verify_charge"
+  | "request_explanation"
+  | "request_removal"
+  | "request_repricing"
+  | "monitor"
+  | "no_action";
+
+export type CanonicalCustomerActionGuidance = {
+  id: string;
+  policyVersion: "canonical_customer_action_guidance_v1";
+  actionType: CanonicalCustomerActionType;
+  feeRowRefs: string[];
+  classificationCandidateRefs: string[];
+  opportunityComponentRefs: string[];
+  verificationComponentRefs: string[];
+  evidenceRefs: string[];
+  calculationRefs: string[];
+  documentationRequirement: CanonicalFeeDocumentationRequirement;
+  confidence: "high" | "medium" | "low";
+  limitationCodes: string[];
+  reasonCodes: string[];
+};
+
+export type CanonicalCustomerExplanationSource = "ai_enhanced" | "deterministic_fallback" | "unavailable";
+
+export type CanonicalCustomerExplanationSection = {
+  kind: "summary" | "verified_facts" | "rate_basis" | "opportunity_limits" | "review_items" | "safe_next_step";
+  text: string;
+  factRefs: string[];
+  evidenceRefs: string[];
+};
+
+export type CanonicalCustomerExplanation = {
+  policyVersion: "canonical_customer_wording_v1";
+  source: CanonicalCustomerExplanationSource;
+  fallbackReasonCodes: string[];
+  prohibitedLanguageCheck: "passed";
+  sections: CanonicalCustomerExplanationSection[];
+};
+
+export type CanonicalCustomerStateProjection = {
+  policyVersion: "canonical_customer_state_policy_v1";
+  materialityPolicyVersion: "canonical_customer_state_materiality_v1";
+  benchmarkPolicyVersion: "canonical_customer_benchmark_policy_v1";
+  permissionPolicyVersion: "canonical_customer_permissions_v1";
+  visibilityPolicyVersion: "canonical_customer_visibility_v1";
+  actionGuidancePolicyVersion: "canonical_customer_action_guidance_v1";
+  wordingPolicyVersion: "canonical_customer_wording_v1";
+  axes: CanonicalCustomerAxisProjection;
+  primaryState: CanonicalCustomerPrimaryState;
+  rateComparison: CanonicalCustomerRateComparison;
+  materiality: CanonicalCustomerMateriality;
+  permissions: CanonicalCustomerPermissionDecision[];
+  visibility: CanonicalCustomerVisibility;
+  actionGuidance: CanonicalCustomerActionGuidance[];
+  explanation: CanonicalCustomerExplanation;
+  reasonCodes: string[];
+  limitations: string[];
+};
+
 export type CanonicalFeeLedgerControlType =
   | "printed_charge_sum"
   | "rate_times_volume"
@@ -947,6 +1123,13 @@ export type CanonicalAnalysisVersionManifest = {
   aiReadinessDegradationPolicyVersion: "ai_readiness_degradation_policy_v1";
   aiPrivacyRetentionPolicyVersion: "ai_privacy_retention_policy_v1";
   deterministicExplanationPolicyVersion: "deterministic_explanation_policy_v1";
+  customerStatePolicyVersion: "canonical_customer_state_policy_v1";
+  customerStateMaterialityPolicyVersion: "canonical_customer_state_materiality_v1";
+  customerBenchmarkPolicyVersion: "canonical_customer_benchmark_policy_v1";
+  customerPermissionPolicyVersion: "canonical_customer_permissions_v1";
+  customerVisibilityPolicyVersion: "canonical_customer_visibility_v1";
+  customerActionGuidancePolicyVersion: "canonical_customer_action_guidance_v1";
+  customerWordingPolicyVersion: "canonical_customer_wording_v1";
   parserId: string | null;
   parserVersion: string | null;
   extractionVersion: string;
@@ -969,6 +1152,7 @@ export type CanonicalStatementAnalysis = {
   feeOwnershipActionability: CanonicalFeeOwnershipActionability;
   opportunityEngine: CanonicalOpportunityEngine;
   aiCapabilities: CanonicalAiCapabilityLayer;
+  customerState: CanonicalCustomerStateProjection;
   evidence: CanonicalEvidenceRecord[];
   calculations: CanonicalCalculationRecord[];
   validation: CanonicalValidationState;

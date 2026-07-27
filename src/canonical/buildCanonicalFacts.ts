@@ -13,6 +13,7 @@ import { buildCanonicalFeeLedger } from "./feeLedger.js";
 import { buildCanonicalFeeOwnershipActionability } from "./feeOwnershipActionability.js";
 import { buildCanonicalOpportunityEngine } from "./opportunityEngine.js";
 import { buildCanonicalAiCapabilities } from "./buildCanonicalAiCapabilities.js";
+import { buildCanonicalCustomerState } from "./customerStateResolver.js";
 import { moneyFromNumber } from "./money.js";
 import { buildAverageTicket, emptyTransactionCounts, transactionCountsFromParserSupport } from "./transactionCounts.js";
 import { buildVersionManifest, CANONICAL_SCHEMA_VERSION } from "./versionManifest.js";
@@ -145,6 +146,28 @@ export function canonicalActualValues(analysis: CanonicalStatementAnalysis): Rec
       .sort(),
     "aiCapabilities.limitationCodes": [...analysis.aiCapabilities.summary.limitationCodes].sort(),
     "aiCapabilities.knownLegacyRiskCodes": [...analysis.aiCapabilities.summary.knownLegacyRiskCodes].sort(),
+    "customerState.axes.analysisReadiness": analysis.customerState.axes.analysisReadiness,
+    "customerState.axes.dataIntegrity": analysis.customerState.axes.dataIntegrity,
+    "customerState.axes.ratePosition": analysis.customerState.axes.ratePosition,
+    "customerState.axes.opportunityPosture": analysis.customerState.axes.opportunityPosture,
+    "customerState.axes.explanationReadiness": analysis.customerState.axes.explanationReadiness,
+    "customerState.primaryState": analysis.customerState.primaryState,
+    "customerState.permissions.permitted": analysis.customerState.permissions.filter((permission) => permission.permitted).map((permission) => permission.key).sort(),
+    "customerState.permissions.denied": analysis.customerState.permissions.filter((permission) => !permission.permitted).map((permission) => permission.key).sort(),
+    "customerState.permissions.reasonCodes": [...new Set(analysis.customerState.permissions.flatMap((permission) => permission.reasonCodes))].sort(),
+    "customerState.visibility.showCoreMetrics": analysis.customerState.visibility.showCoreMetrics,
+    "customerState.visibility.showEffectiveRate": analysis.customerState.visibility.showEffectiveRate,
+    "customerState.visibility.showBenchmark": analysis.customerState.visibility.showBenchmark,
+    "customerState.visibility.showDeterministicOpportunity": analysis.customerState.visibility.showDeterministicOpportunity,
+    "customerState.visibility.showEstimatedOpportunity": analysis.customerState.visibility.showEstimatedOpportunity,
+    "customerState.visibility.showVerificationAmounts": analysis.customerState.visibility.showVerificationAmounts,
+    "customerState.visibility.visibleDeterministicAnnualAmount": analysis.customerState.visibility.visibleDeterministicAnnualAmount,
+    "customerState.visibility.visibleApprovedEstimatedAnnualAmount": analysis.customerState.visibility.visibleApprovedEstimatedAnnualAmount,
+    "customerState.visibility.visibleEligibleAnnualAmount": analysis.customerState.visibility.visibleEligibleAnnualAmount,
+    "customerState.visibility.visibleVerificationOnlyObservedAmount": analysis.customerState.visibility.visibleVerificationOnlyObservedAmount,
+    "customerState.reasonCodes": [...analysis.customerState.reasonCodes].sort(),
+    "customerState.explanation.source": analysis.customerState.explanation.source,
+    "customerState.actionGuidance.actionTypes": analysis.customerState.actionGuidance.map((action) => action.actionType).sort(),
     "validation.status": analysis.validation.status,
   };
 }
@@ -457,6 +480,14 @@ function buildAnalysisEnvelope(input: {
     opportunityEngine,
     evidence,
   });
+  const customerState = buildCanonicalCustomerState({
+    identity: input.identity,
+    financialFacts,
+    feeLedger,
+    feeOwnershipActionability,
+    opportunityEngine,
+    aiCapabilities,
+  });
 
   return {
     canonicalSchemaVersion: CANONICAL_SCHEMA_VERSION,
@@ -469,6 +500,7 @@ function buildAnalysisEnvelope(input: {
     feeOwnershipActionability,
     opportunityEngine,
     aiCapabilities,
+    customerState,
     evidence,
     calculations: input.calculations,
     validation: { status: "valid", errors: [], warnings: [] },

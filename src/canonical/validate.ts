@@ -1,8 +1,21 @@
 import { isMoneyAmount } from "./money.js";
 import { validateCanonicalAiCapabilityLayer } from "./aiCapabilityValidation.js";
+import { buildCanonicalCustomerState } from "./customerStateResolver.js";
+import { customerNarrativeContradictions } from "./customerWording.js";
+import {
+  CUSTOMER_ACTION_GUIDANCE_POLICY_VERSION,
+  CUSTOMER_ACTION_TYPES,
+  CUSTOMER_BENCHMARK_POLICY_VERSION,
+  CUSTOMER_PERMISSIONS_POLICY_VERSION,
+  CUSTOMER_PRIMARY_STATE_VALUES,
+  CUSTOMER_STATE_MATERIALITY_POLICY_VERSION,
+  CUSTOMER_STATE_POLICY_VERSION,
+  CUSTOMER_VISIBILITY_POLICY_VERSION,
+  CUSTOMER_WORDING_POLICY_VERSION,
+} from "./customerStateTypes.js";
 import { aggregateCanonicalOpportunityComponents } from "./opportunityEngine.js";
 import { targetSupportsApprovedEstimate, targetSupportsDeterministic } from "./opportunityPolicy.js";
-import type { CanonicalOpportunityComponent, CanonicalStatementAnalysis, MoneyAmount } from "./types.js";
+import type { CanonicalCustomerPermissionKey, CanonicalOpportunityComponent, CanonicalStatementAnalysis, MoneyAmount } from "./types.js";
 
 export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementAnalysis): CanonicalStatementAnalysis {
   const errors: string[] = [];
@@ -109,6 +122,27 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   }
   if (analysis.versionManifest?.deterministicExplanationPolicyVersion !== "deterministic_explanation_policy_v1") {
     errors.push("Canonical version manifest must include deterministic_explanation_policy_v1.");
+  }
+  if (analysis.versionManifest?.customerStatePolicyVersion !== CUSTOMER_STATE_POLICY_VERSION) {
+    errors.push("Canonical version manifest must include canonical_customer_state_policy_v1.");
+  }
+  if (analysis.versionManifest?.customerStateMaterialityPolicyVersion !== CUSTOMER_STATE_MATERIALITY_POLICY_VERSION) {
+    errors.push("Canonical version manifest must include canonical_customer_state_materiality_v1.");
+  }
+  if (analysis.versionManifest?.customerBenchmarkPolicyVersion !== CUSTOMER_BENCHMARK_POLICY_VERSION) {
+    errors.push("Canonical version manifest must include canonical_customer_benchmark_policy_v1.");
+  }
+  if (analysis.versionManifest?.customerPermissionPolicyVersion !== CUSTOMER_PERMISSIONS_POLICY_VERSION) {
+    errors.push("Canonical version manifest must include canonical_customer_permissions_v1.");
+  }
+  if (analysis.versionManifest?.customerVisibilityPolicyVersion !== CUSTOMER_VISIBILITY_POLICY_VERSION) {
+    errors.push("Canonical version manifest must include canonical_customer_visibility_v1.");
+  }
+  if (analysis.versionManifest?.customerActionGuidancePolicyVersion !== CUSTOMER_ACTION_GUIDANCE_POLICY_VERSION) {
+    errors.push("Canonical version manifest must include canonical_customer_action_guidance_v1.");
+  }
+  if (analysis.versionManifest?.customerWordingPolicyVersion !== CUSTOMER_WORDING_POLICY_VERSION) {
+    errors.push("Canonical version manifest must include canonical_customer_wording_v1.");
   }
   if (analysis.financialFacts.effectiveRateBasis?.policyVersion !== "effective_rate_basis_v1") {
     errors.push("Effective rate basis is missing or unsupported.");
@@ -307,6 +341,7 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   }
   validateOpportunityEngine(analysis, evidenceIds, calculationIds, calculationsById, errors);
   validateCanonicalAiCapabilityLayer(analysis, errors);
+  validateCanonicalCustomerState(analysis, evidenceIds, calculationIds, errors);
 
   const validated: CanonicalStatementAnalysis = {
     ...analysis,
@@ -320,6 +355,193 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
     throw new Error(`Canonical statement analysis validation failed: ${errors.join(" ")}`);
   }
   return validated;
+}
+
+function validateCanonicalCustomerState(
+  analysis: CanonicalStatementAnalysis,
+  evidenceIds: Set<string>,
+  calculationIds: Set<string>,
+  errors: string[],
+): void {
+  const state = analysis.customerState;
+  if (!state || state.policyVersion !== CUSTOMER_STATE_POLICY_VERSION) {
+    errors.push("Package G canonical customer state projection is missing or unsupported.");
+    return;
+  }
+  if (state.materialityPolicyVersion !== CUSTOMER_STATE_MATERIALITY_POLICY_VERSION) errors.push("Package G materiality policy version is missing or unsupported.");
+  if (state.benchmarkPolicyVersion !== CUSTOMER_BENCHMARK_POLICY_VERSION) errors.push("Package G benchmark policy version is missing or unsupported.");
+  if (state.permissionPolicyVersion !== CUSTOMER_PERMISSIONS_POLICY_VERSION) errors.push("Package G permissions policy version is missing or unsupported.");
+  if (state.visibilityPolicyVersion !== CUSTOMER_VISIBILITY_POLICY_VERSION) errors.push("Package G visibility policy version is missing or unsupported.");
+  if (state.actionGuidancePolicyVersion !== CUSTOMER_ACTION_GUIDANCE_POLICY_VERSION) errors.push("Package G action-guidance policy version is missing or unsupported.");
+  if (state.wordingPolicyVersion !== CUSTOMER_WORDING_POLICY_VERSION) errors.push("Package G wording policy version is missing or unsupported.");
+  if (!(CUSTOMER_PRIMARY_STATE_VALUES as readonly string[]).includes(state.primaryState)) errors.push(`Package G primary state ${String(state.primaryState)} is unsupported.`);
+
+  const expected = buildCanonicalCustomerState({
+    identity: analysis.identity,
+    financialFacts: analysis.financialFacts,
+    feeLedger: analysis.feeLedger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    opportunityEngine: analysis.opportunityEngine,
+    aiCapabilities: analysis.aiCapabilities,
+    rateComparison: state.rateComparison,
+  });
+  if (JSON.stringify(state.axes) !== JSON.stringify(expected.axes)) errors.push("Package G axes do not reconstruct deterministically from canonical facts.");
+  if (state.primaryState !== expected.primaryState) errors.push("Package G primary state does not reconstruct deterministically from canonical facts.");
+  if (JSON.stringify(state.materiality) !== JSON.stringify(expected.materiality)) errors.push("Package G materiality does not reconstruct from canonical facts.");
+  if (JSON.stringify(permissionMap(state.permissions)) !== JSON.stringify(permissionMap(expected.permissions))) {
+    errors.push("Package G permissions do not reconstruct deterministically from canonical facts.");
+  }
+  if (JSON.stringify(state.visibility) !== JSON.stringify(expected.visibility)) errors.push("Package G visibility does not reconstruct from permissions and Package E summary.");
+  if (JSON.stringify([...state.actionGuidance].sort((left, right) => left.id.localeCompare(right.id))) !== JSON.stringify([...expected.actionGuidance].sort((left, right) => left.id.localeCompare(right.id)))) {
+    errors.push("Package G action guidance does not reconstruct from canonical support.");
+  }
+  for (const reasonCode of [...state.reasonCodes, ...state.permissions.flatMap((permission) => permission.reasonCodes), ...state.actionGuidance.flatMap((action) => action.reasonCodes)]) {
+    if (!/^[a-z0-9_]+$/.test(reasonCode)) errors.push(`Package G reason code ${reasonCode} is malformed.`);
+  }
+
+  if (state.rateComparison.policyVersion !== CUSTOMER_BENCHMARK_POLICY_VERSION) errors.push("Package G rate comparison policy version is missing or unsupported.");
+  if (state.rateComparison.status === "qualified") {
+    if (state.rateComparison.position === "unavailable") errors.push("Package G qualified benchmark has unavailable rate position.");
+    if (!state.rateComparison.benchmarkRef?.qualified || state.rateComparison.evidenceRefs.length === 0 || !state.rateComparison.calculationRef) {
+      errors.push("Package G qualified benchmark requires reference, evidence, and calculation.");
+    }
+    if (
+      !state.rateComparison.benchmarkRef?.referenceId ||
+      !state.rateComparison.benchmarkRef.version ||
+      !state.rateComparison.benchmarkRef.methodology ||
+      !benchmarkAppliesToStatement(state.rateComparison.benchmarkRef, analysis)
+    ) {
+      errors.push("Package G qualified benchmark requires versioned, applicable benchmark reference metadata.");
+    }
+    if (state.rateComparison.benchmarkRef?.aiSourced !== false || state.rateComparison.aiSourced !== false) {
+      errors.push("Package G benchmark comparison must not be AI-sourced.");
+    }
+    for (const evidenceRef of [...state.rateComparison.evidenceRefs, ...(state.rateComparison.benchmarkRef?.evidenceRefs ?? [])]) {
+      if (!evidenceIds.has(evidenceRef)) errors.push(`Package G benchmark evidence ref ${evidenceRef} is broken.`);
+    }
+    if (state.rateComparison.calculationRef && !calculationIds.has(state.rateComparison.calculationRef)) {
+      errors.push(`Package G benchmark calculation ref ${state.rateComparison.calculationRef} is broken.`);
+    }
+  }
+  if ((state.primaryState === "competitive_no_opportunity" || state.primaryState === "competitive_with_opportunity") && (state.rateComparison.status !== "qualified" || (state.axes.ratePosition !== "within_reference" && state.axes.ratePosition !== "below_reference"))) {
+    errors.push("Package G competitive state requires a qualified within/below benchmark.");
+  }
+  if ((state.primaryState === "rate_review_needed" || state.primaryState === "rate_review_with_opportunity") && (state.rateComparison.status !== "qualified" || state.axes.ratePosition !== "above_reference")) {
+    errors.push("Package G rate-review state requires a qualified above-reference benchmark.");
+  }
+  if (state.primaryState === "material_fee_opportunity" && !state.materiality.material) errors.push("Package G material state fails materiality policy.");
+  if (state.primaryState === "material_fee_opportunity" && state.axes.opportunityPosture === "verification_only") errors.push("Package G material state cannot come from verification-only components.");
+  if (opportunityState(state.primaryState) && analysis.opportunityEngine.summary.totalEligibleAnnualAmount.amountMinor <= 0) {
+    errors.push("Package G opportunity state has zero included eligible opportunity.");
+  }
+  if (state.primaryState === "competitive_no_opportunity" && analysis.opportunityEngine.summary.totalEligibleAnnualAmount.amountMinor > 0) {
+    errors.push("Package G competitive-no-opportunity state hides an included actionable opportunity.");
+  }
+  if ((state.axes.analysisReadiness === "withheld" || state.axes.analysisReadiness === "unavailable" || state.axes.analysisReadiness === "limited") && state.visibility.visibleEligibleAnnualAmount.amountMinor !== 0) {
+    errors.push("Package G withheld, unavailable, or limited analysis exposes eligible totals.");
+  }
+  if (state.axes.ratePosition === "unavailable" && state.visibility.showBenchmark) errors.push("Package G benchmark-unavailable projection exposes benchmark conclusions.");
+  if (state.axes.ratePosition === "unavailable" && /competitive/.test(state.primaryState)) errors.push("Package G benchmark-unavailable projection is labeled competitive.");
+  if (state.axes.opportunityPosture === "verification_only" && state.visibility.visibleEligibleAnnualAmount.amountMinor !== 0) {
+    errors.push("Package G verification-only posture exposes savings.");
+  }
+  if (state.visibility.visibleDeterministicAnnualAmount.amountMinor !== (state.visibility.showDeterministicOpportunity ? analysis.opportunityEngine.summary.deterministicEligibleAnnualAmount.amountMinor : 0)) {
+    errors.push("Package G deterministic visible total does not match permission ceiling.");
+  }
+  if (state.visibility.visibleApprovedEstimatedAnnualAmount.amountMinor !== (state.visibility.showEstimatedOpportunity ? analysis.opportunityEngine.summary.approvedEstimatedAnnualAmount.amountMinor : 0)) {
+    errors.push("Package G estimated visible total does not match permission ceiling.");
+  }
+
+  const feeRowIds = new Set(analysis.feeLedger.rows.map((row) => row.id));
+  const componentIds = new Set(analysis.opportunityEngine.components.map((component) => component.id));
+  const selectedClassificationIds = new Set(analysis.feeOwnershipActionability.rowClassifications.map((classification) => classification.selected.candidateId));
+  const actionIds = new Set<string>();
+  const actionKeys = new Set<string>();
+  for (const action of state.actionGuidance) {
+    if (actionIds.has(action.id)) errors.push(`Package G duplicate action id ${action.id}.`);
+    actionIds.add(action.id);
+    const actionKey = `${action.actionType}:${[...action.feeRowRefs].sort().join(",")}:${[...action.opportunityComponentRefs, ...action.verificationComponentRefs].sort().join(",")}`;
+    if (actionKeys.has(actionKey)) errors.push(`Package G duplicate or contradictory action ${action.id}.`);
+    actionKeys.add(actionKey);
+    if (action.policyVersion !== CUSTOMER_ACTION_GUIDANCE_POLICY_VERSION) errors.push(`Package G action ${action.id} has unsupported policy version.`);
+    if (!(CUSTOMER_ACTION_TYPES as readonly string[]).includes(action.actionType)) errors.push(`Package G action ${action.id} has unsupported action type.`);
+    if (action.feeRowRefs.length === 0 || action.classificationCandidateRefs.length === 0 || action.evidenceRefs.length === 0 || action.reasonCodes.length === 0) {
+      errors.push(`Package G action ${action.id} lacks required canonical support.`);
+    }
+    for (const feeRowRef of action.feeRowRefs) {
+      if (!feeRowIds.has(feeRowRef)) errors.push(`Package G action ${action.id} references missing fee row ${feeRowRef}.`);
+    }
+    for (const classificationRef of action.classificationCandidateRefs) {
+      if (!selectedClassificationIds.has(classificationRef)) errors.push(`Package G action ${action.id} references missing Package D classification ${classificationRef}.`);
+    }
+    for (const componentRef of [...action.opportunityComponentRefs, ...action.verificationComponentRefs]) {
+      if (!componentIds.has(componentRef)) errors.push(`Package G action ${action.id} references missing Package E component ${componentRef}.`);
+    }
+    for (const evidenceRef of action.evidenceRefs) {
+      if (!evidenceIds.has(evidenceRef)) errors.push(`Package G action ${action.id} evidence ref ${evidenceRef} is broken.`);
+    }
+    for (const calculationRef of action.calculationRefs) {
+      if (!calculationIds.has(calculationRef)) errors.push(`Package G action ${action.id} calculation ref ${calculationRef} is broken.`);
+    }
+    if ((action.actionType === "request_removal" || action.actionType === "request_repricing") && action.opportunityComponentRefs.length === 0) {
+      errors.push(`Package G action ${action.id} lacks strong eligible component support.`);
+    }
+  }
+
+  if (state.explanation.source !== expected.explanation.source) errors.push("Package G explanation source does not match deterministic fallback/AI-safety policy.");
+  if (state.explanation.source !== "unavailable" && state.explanation.sections.length === 0) errors.push("Package G customer explanation is missing.");
+  if (state.explanation.source === "ai_enhanced") {
+    const contradictionErrors = customerNarrativeContradictions(state.explanation.sections.map((section) => section.text), {
+      axes: state.axes,
+      primaryState: state.primaryState,
+      visibility: state.visibility,
+      benchmarkUnavailable: state.rateComparison.status === "unavailable",
+    });
+    if (contradictionErrors.length > 0) errors.push("Package G AI narrative contradicts deterministic projection.");
+  }
+  if (containsUnsafeCustomerText(state.explanation.sections.map((section) => section.text).join(" "))) {
+    errors.push("Package G customer explanation contains prohibited language.");
+  }
+  if (containsAiSourcedCustomerAuthority(state)) errors.push("Package G contains AI-sourced observed amounts, targets, cadence, ownership, calculations, state, permissions, visibility, or actions.");
+}
+
+function benchmarkAppliesToStatement(
+  benchmarkRef: NonNullable<CanonicalStatementAnalysis["customerState"]["rateComparison"]["benchmarkRef"]>,
+  analysis: CanonicalStatementAnalysis,
+): boolean {
+  const periodStart = analysis.identity.statementPeriod.value?.start ?? null;
+  if (!periodStart) return false;
+  if (benchmarkRef.effectiveFrom && periodStart < benchmarkRef.effectiveFrom) return false;
+  if (benchmarkRef.effectiveTo && periodStart > benchmarkRef.effectiveTo) return false;
+  const processor = String(analysis.identity.processorFamily.value ?? analysis.identity.processorName.value ?? "unknown").toLowerCase();
+  const businessType = String(analysis.identity.businessType.value ?? "unknown").toLowerCase();
+  if (benchmarkRef.applicableProcessor && benchmarkRef.applicableProcessor !== "unknown" && benchmarkRef.applicableProcessor.toLowerCase() !== processor) return false;
+  if (benchmarkRef.applicableBusinessType && benchmarkRef.applicableBusinessType !== "unknown" && benchmarkRef.applicableBusinessType.toLowerCase() !== businessType) return false;
+  if (benchmarkRef.applicableChannel && benchmarkRef.applicableChannel !== "unknown") return false;
+  if (benchmarkRef.applicableCardEnvironment && benchmarkRef.applicableCardEnvironment !== "unknown") return false;
+  return true;
+}
+
+function permissionMap(permissions: CanonicalStatementAnalysis["customerState"]["permissions"]): Record<CanonicalCustomerPermissionKey, boolean> {
+  return Object.fromEntries(permissions.map((permission) => [permission.key, permission.permitted])) as Record<CanonicalCustomerPermissionKey, boolean>;
+}
+
+function opportunityState(state: CanonicalStatementAnalysis["customerState"]["primaryState"]): boolean {
+  return state === "competitive_with_opportunity" || state === "rate_review_with_opportunity" || state === "fee_opportunity_identified" || state === "material_fee_opportunity";
+}
+
+function containsUnsafeCustomerText(text: string): boolean {
+  return /\bripped off\b|\bcheat(?:ed|ing)?\b|\bguarantee(?:d)?\b|\boverpaying\b|\byou can definitely remove\b|\bprocessor is cheating\b/i.test(text);
+}
+
+function containsAiSourcedCustomerAuthority(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  if (Array.isArray(value)) return value.some(containsAiSourcedCustomerAuthority);
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    if (key === "aiSourced" && nested !== false) return true;
+    if (containsAiSourcedCustomerAuthority(nested)) return true;
+  }
+  return false;
 }
 
 function validateOpportunityEngine(

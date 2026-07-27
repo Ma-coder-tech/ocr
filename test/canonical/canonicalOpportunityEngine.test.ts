@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildCanonicalStatementFactsFromParsedDocument, canonicalActualValues } from "../../src/canonical/buildCanonicalFacts.js";
 import { buildCanonicalAiCapabilities } from "../../src/canonical/buildCanonicalAiCapabilities.js";
+import { buildCanonicalCustomerState } from "../../src/canonical/customerStateResolver.js";
 import { buildCanonicalFeeLedger } from "../../src/canonical/feeLedger.js";
 import { buildCanonicalFeeOwnershipActionability, makeCanonicalFeeSpreadAssertion } from "../../src/canonical/feeOwnershipActionability.js";
 import { buildCanonicalOpportunityEngine, aggregateCanonicalOpportunityComponents, type CanonicalOpportunityInput } from "../../src/canonical/opportunityEngine.js";
@@ -587,6 +588,14 @@ function refreshPackageF(analysis: CanonicalStatementAnalysis): void {
     feeOwnershipActionability: analysis.feeOwnershipActionability,
     opportunityEngine: analysis.opportunityEngine,
     evidence: analysis.evidence,
+  });
+  analysis.customerState = buildCanonicalCustomerState({
+    identity: analysis.identity,
+    financialFacts: analysis.financialFacts,
+    feeLedger: analysis.feeLedger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    opportunityEngine: analysis.opportunityEngine,
+    aiCapabilities: analysis.aiCapabilities,
   });
 }
 
