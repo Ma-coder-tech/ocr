@@ -116,9 +116,32 @@ describe("canonical runtime shadow comparison and redaction", () => {
 
   it("rejects sensitive keys and nested sensitive values", () => {
     expect(findSensitiveDiagnosticPath({ nested: { merchantName: "Example" } })).toBe("diagnostic.nested.merchantName");
+    expect(findSensitiveDiagnosticPath({ nested: { merchant_name: "Example" } })).toBe("diagnostic.nested.merchant_name");
+    expect(findSensitiveDiagnosticPath({ nested: { merchantId: "m_123" } })).toBe("diagnostic.nested.merchantId");
+    expect(findSensitiveDiagnosticPath({ nested: { merchant_id: "m_123" } })).toBe("diagnostic.nested.merchant_id");
+    expect(findSensitiveDiagnosticPath({ nested: { merchantNumber: "12345678" } })).toBe("diagnostic.nested.merchantNumber");
+    expect(findSensitiveDiagnosticPath({ nested: { merchant_account: "12345678" } })).toBe("diagnostic.nested.merchant_account");
     expect(findSensitiveDiagnosticPath({ nested: { value: "/Users/example/uploads/statement.pdf" } })).toBe("diagnostic.nested.value");
     expect(findSensitiveDiagnosticPath({ nested: { value: "abcdef0123456789abcdef0123456789" } })).toBe("diagnostic.nested.value");
+    expect(findSensitiveDiagnosticPath({ nested: { value: "raw statement text: total fees" } })).toBe("diagnostic.nested.value");
+    expect(findSensitiveDiagnosticPath({ nested: { value: "merchant contract: customer-specific note" } })).toBe("diagnostic.nested.value");
+    expect(findSensitiveDiagnosticPath({ nested: { value: "merchant_contract" } })).toBe("diagnostic.nested.value");
+    expect(findSensitiveDiagnosticPath({ nested: [{ response: "synthetic" }] })).toBe("diagnostic.nested[0].response");
     expect(findSensitiveDiagnosticPath({ nested: [new Error("provider error: account 12345678")] })).toBe("diagnostic.nested[0].message");
+  });
+
+  it("accepts merchant_contract only as an ownership bucket value in the typed diagnostic field", () => {
+    const diagnostic = minimalDiagnostic();
+    diagnostic.canonicalSummary.ownershipBucketCounts = [{ bucket: "merchant_contract", count: 12 }];
+
+    expect(assertRedactedCanonicalShadowDiagnostic(diagnostic)).toEqual(diagnostic);
+    expect(findSensitiveDiagnosticPath({ canonicalSummary: { ownershipBucketCounts: [{ bucket: "merchant_contract", count: 12 }] } })).toBeNull();
+    expect(findSensitiveDiagnosticPath({ canonicalSummary: { actionabilityBucketCounts: [{ bucket: "merchant_contract", count: 12 }] } })).toBe(
+      "diagnostic.canonicalSummary.actionabilityBucketCounts[0].bucket",
+    );
+    expect(findSensitiveDiagnosticPath({ canonicalSummary: { ownershipBucketCounts: { merchant_contract: 12 } } })).toBe(
+      "diagnostic.canonicalSummary.ownershipBucketCounts.merchant_contract",
+    );
   });
 
   it("accepts only redacted diagnostic payloads", () => {
@@ -174,8 +197,8 @@ function minimalDiagnostic(): RedactedCanonicalShadowDiagnostic {
       feeRowCount: 0,
       uniqueFeeRowCount: 0,
       duplicateRepresentationCount: 0,
-      ownershipBucketCounts: {},
-      actionabilityBucketCounts: {},
+      ownershipBucketCounts: [],
+      actionabilityBucketCounts: [],
       opportunityTotals: {
         deterministicEligibleAnnual: { amountMinor: 0, currency: "USD", purpose: "deterministic_eligible_annual" },
         approvedEstimatedAnnual: { amountMinor: 0, currency: "USD", purpose: "approved_estimated_annual" },
