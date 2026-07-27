@@ -6,6 +6,23 @@ export type RedactedCanonicalShadowDiagnostic = {
   durationMs: number;
   sourceType: "csv" | "pdf";
   businessTypeProvided: boolean;
+  constructionStageReached:
+    | "disabled"
+    | "adapter_input_prepared"
+    | "canonical_analysis_built"
+    | "canonical_analysis_validated"
+    | "canonical_validation_failed"
+    | "shadow_failed";
+  validationFailureCodes: string[];
+  preValidationCoreFactAvailability: {
+    processedSales: "selected" | "unavailable" | "ambiguous" | "unsupported" | "not_applicable";
+    totalFees: "selected" | "unavailable" | "ambiguous" | "unsupported" | "not_applicable";
+    statementPeriod: "selected" | "unavailable" | "ambiguous" | "unsupported" | "not_applicable";
+    effectiveRate: "selected" | "unavailable" | "ambiguous" | "unsupported" | "not_applicable";
+    transactionCount: "selected" | "unavailable" | "ambiguous" | "unsupported" | "not_applicable";
+    averageTicket: "selected" | "unavailable" | "ambiguous" | "unsupported" | "not_applicable";
+  };
+  preValidationLedgerStatus: "available" | "partial" | "unavailable" | "not_built";
   inputAdmission: Array<{
     input: string;
     status: "canonical_evidence" | "provisional_with_limitation" | "diagnostic_only" | "rejected" | "unavailable";

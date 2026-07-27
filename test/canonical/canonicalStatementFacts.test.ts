@@ -49,7 +49,15 @@ describe("canonical statement facts", () => {
       evidence: [],
     });
 
-    expect(counts.cardTypeItems.value).toBe(300);
+    expect(counts.cardTypeItems.value).toBeNull();
+    expect(counts.cardTypeItems.status).toBe("unavailable");
+    expect(counts.cardTypeItems.selectedCandidateId).toBeNull();
+    expect(counts.cardTypeItems.candidates).toHaveLength(1);
+    expect(counts.cardTypeItems.candidates[0]).toMatchObject({
+      value: 300,
+      selected: false,
+      rejectionReason: "Count population is not approved as a statement-level average-ticket denominator.",
+    });
     expect(counts.submittedTransactions.value).toBeNull();
     expect(average.basis.allowed).toBe(false);
     expect(average.basis.selectedCountType).toBeNull();

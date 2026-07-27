@@ -4,6 +4,7 @@ import {
   assertRedactedCanonicalShadowDiagnostic,
   type RedactedCanonicalShadowDiagnostic,
 } from "./runtimeShadowRedaction.js";
+import { CanonicalStatementValidationError } from "./validate.js";
 import type { AnalysisSummary } from "../types.js";
 import type { ParsedDocument } from "../parser.js";
 import type { BusinessTypeId } from "../businessTypes.js";
@@ -73,6 +74,8 @@ export async function runCanonicalRuntimeShadow(input: {
   } catch (error) {
     const durationMs = Math.max(0, now() - startedAt);
     const status = isCanonicalValidationError(error) ? "canonical_validation_failed" : "shadow_failed";
+    const validationError = error instanceof CanonicalStatementValidationError ? error : null;
+    const preValidationAnalysis = validationError?.analysis ?? null;
     const diagnostic = assertRedactedCanonicalShadowDiagnostic({
       schemaVersion: "canonical_shadow_diagnostic_v1",
       policyVersion: "canonical_runtime_shadow_policy_v1",
@@ -81,6 +84,12 @@ export async function runCanonicalRuntimeShadow(input: {
       durationMs,
       sourceType: input.document.sourceType,
       businessTypeProvided: Boolean(input.businessType),
+      constructionStageReached: status === "canonical_validation_failed" ? "canonical_validation_failed" : "shadow_failed",
+      validationFailureCodes: validationError
+        ? [...new Set(validationError.errors.map(validationFailureCodeForMessage))].sort()
+        : [status === "canonical_validation_failed" ? "canonical_validation_failed" : "shadow_exception_isolated"],
+      preValidationCoreFactAvailability: preValidationAnalysis ? coreFactAvailability(preValidationAnalysis) : unavailableCoreFactAvailability(),
+      preValidationLedgerStatus: preValidationAnalysis?.feeLedger.status ?? "not_built",
       inputAdmission: canonicalRuntimeInputAdmissionTable().map(({ input: name, status: admissionStatus, reasonCode }) => ({
         input: name,
         status: admissionStatus,
@@ -111,6 +120,10 @@ function diagnosticFromAnalysis(input: {
     durationMs: input.durationMs,
     sourceType: input.sourceType,
     businessTypeProvided: input.businessTypeProvided,
+    constructionStageReached: "canonical_analysis_validated",
+    validationFailureCodes: [],
+    preValidationCoreFactAvailability: coreFactAvailability(input.analysis),
+    preValidationLedgerStatus: input.analysis.feeLedger.status,
     inputAdmission: canonicalRuntimeInputAdmissionTable().map(({ input: name, status, reasonCode }) => ({
       input: name,
       status,
@@ -179,6 +192,35 @@ function unavailableCanonicalSummary(): RedactedCanonicalShadowDiagnostic["canon
     permissionDecisionCounts: { permitted: 0, denied: 0 },
     actionGuidanceTypeCounts: {},
     explanationReadiness: null,
+  };
+}
+
+function unavailableCoreFactAvailability(): RedactedCanonicalShadowDiagnostic["preValidationCoreFactAvailability"] {
+  return {
+    processedSales: "unavailable",
+    totalFees: "unavailable",
+    statementPeriod: "unavailable",
+    effectiveRate: "unavailable",
+    transactionCount: "unavailable",
+    averageTicket: "unavailable",
+  };
+}
+
+function coreFactAvailability(
+  analysis: CanonicalStatementAnalysis,
+): RedactedCanonicalShadowDiagnostic["preValidationCoreFactAvailability"] {
+  const counts = analysis.financialFacts.transactionCounts;
+  const transactionCount =
+    counts.submittedTransactions.status === "selected" || counts.settledTransactions.status === "selected"
+      ? "selected"
+      : "unavailable";
+  return {
+    processedSales: analysis.financialFacts.processedSales.status,
+    totalFees: analysis.financialFacts.totalFees.status,
+    statementPeriod: analysis.identity.statementPeriod.status,
+    effectiveRate: analysis.financialFacts.rateRevealCalculatedAllInRate.status,
+    transactionCount,
+    averageTicket: analysis.financialFacts.averageTicket.status,
   };
 }
 
@@ -273,5 +315,19 @@ function cloneJson<T>(value: T): T {
 }
 
 function isCanonicalValidationError(error: unknown): boolean {
-  return error instanceof Error && /canonical statement analysis validation failed/i.test(error.message);
+  return error instanceof CanonicalStatementValidationError || (error instanceof Error && /canonical statement analysis validation failed/i.test(error.message));
+}
+
+function validationFailureCodeForMessage(message: string): string {
+  if (/selectedCandidateId does not identify a selected candidate/i.test(message)) return "selected_candidate_reference_broken";
+  if (/selected without evidence or calculation/i.test(message)) return "selected_fact_without_evidence_or_calculation";
+  if (/multiple selected candidates/i.test(message)) return "multiple_selected_candidates";
+  if (/broken/i.test(message)) return "broken_reference";
+  if (/Average ticket/i.test(message)) return "average_ticket_policy_violation";
+  if (/effective rate/i.test(message)) return "effective_rate_policy_violation";
+  if (/Package D/i.test(message)) return "package_d_validation_failure";
+  if (/Package E|opportunity/i.test(message)) return "package_e_validation_failure";
+  if (/Package F|AI/i.test(message)) return "package_f_validation_failure";
+  if (/Package G|customer state/i.test(message)) return "package_g_validation_failure";
+  return "canonical_validation_failed";
 }

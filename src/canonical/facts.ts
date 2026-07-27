@@ -12,7 +12,7 @@ export function selectedFact<T>(input: {
   evidenceRefs: string[];
   selectionReason: string;
   candidates?: CanonicalFactCandidate<T>[];
-  selectedCandidateId?: string;
+  selectedCandidateId?: string | null;
   calculationRef?: string;
 }): CanonicalFactValue<T> {
   return {
@@ -33,6 +33,7 @@ export function unavailableFact<T>(reason: string, candidates: CanonicalFactCand
     value: null,
     status: "unavailable",
     confidence: null,
+    selectedCandidateId: null,
     evidenceRefs: [],
     selectionReason: null,
     candidates,
@@ -45,6 +46,7 @@ export function notApplicableFact<T>(reason: string): CanonicalFactValue<T> {
     value: null,
     status: "not_applicable",
     confidence: null,
+    selectedCandidateId: null,
     evidenceRefs: [],
     selectionReason: null,
     candidates: [],
@@ -57,6 +59,7 @@ export function ambiguousFact<T>(reason: string, candidates: CanonicalFactCandid
     value: null,
     status: "ambiguous",
     confidence: "needs_review",
+    selectedCandidateId: null,
     evidenceRefs: candidates.flatMap((candidate) => candidate.evidenceRefs),
     selectionReason: null,
     candidates,

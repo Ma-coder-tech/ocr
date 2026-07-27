@@ -17,6 +17,20 @@ import { aggregateCanonicalOpportunityComponents } from "./opportunityEngine.js"
 import { targetSupportsApprovedEstimate, targetSupportsDeterministic } from "./opportunityPolicy.js";
 import type { CanonicalCustomerPermissionKey, CanonicalOpportunityComponent, CanonicalStatementAnalysis, MoneyAmount } from "./types.js";
 
+export class CanonicalStatementValidationError extends Error {
+  readonly errors: string[];
+  readonly warnings: string[];
+  readonly analysis: CanonicalStatementAnalysis;
+
+  constructor(errors: string[], warnings: string[], analysis: CanonicalStatementAnalysis) {
+    super(`Canonical statement analysis validation failed: ${errors.join(" ")}`);
+    this.name = "CanonicalStatementValidationError";
+    this.errors = errors;
+    this.warnings = warnings;
+    this.analysis = analysis;
+  }
+}
+
 export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementAnalysis): CanonicalStatementAnalysis {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -352,7 +366,7 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
     },
   };
   if (errors.length > 0) {
-    throw new Error(`Canonical statement analysis validation failed: ${errors.join(" ")}`);
+    throw new CanonicalStatementValidationError(errors, warnings, validated);
   }
   return validated;
 }

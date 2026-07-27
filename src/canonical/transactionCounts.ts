@@ -15,6 +15,7 @@ type RawSupportingCount = {
   role?: unknown;
   value?: unknown;
   reason?: unknown;
+  evidenceRefs?: unknown;
 };
 
 const COUNT_FIELD_BY_TYPE: Record<TransactionCountType, keyof CanonicalTransactionCounts | null> = {
@@ -54,38 +55,65 @@ export function transactionCountsFromParserSupport(input: {
 }): CanonicalTransactionCounts {
   const counts = emptyTransactionCounts();
   const support = input.supportingCounts.length > 0 ? input.supportingCounts : [{ role: "unknown", value: input.primaryCount }];
+  const candidatesByField = new Map<keyof CanonicalTransactionCounts, CanonicalFactValue<CountValue | null>["candidates"]>();
 
   for (const item of support) {
     const value = typeof item.value === "number" && Number.isSafeInteger(item.value) && item.value >= 0 ? item.value : null;
     if (value === null) continue;
     const type = transactionTypeFromRole(String(item.role ?? "unknown"));
     const field = COUNT_FIELD_BY_TYPE[type] ?? "unknownCounts";
-    const reason = typeof item.reason === "string" && item.reason.trim() ? item.reason : reasonForCountType(type);
+    const selectable = type === "submitted_transactions" || type === "settled_transactions";
+    const evidenceRefs = evidenceRefsForCount(item, input.evidenceRefs);
     const countCandidate = candidate<CountValue | null>({
       id: `cand_count_${type}_${value}`,
       role: type === "card_type_items" ? "card_type_total" : "unknown",
       value,
-      evidenceRefs: input.evidenceRefs,
+      evidenceRefs,
       parserId: input.parserId,
       parserVersion: input.parserVersion,
-      confidence: type === "submitted_transactions" || type === "settled_transactions" ? "high" : "medium",
-      selected: type === "submitted_transactions" || type === "settled_transactions",
-      selectionReason:
-        type === "submitted_transactions" || type === "settled_transactions"
-          ? "Count population is typed and eligible for population-compatibility evaluation."
-          : null,
-      rejectionReason:
-        type === "submitted_transactions" || type === "settled_transactions"
-          ? null
-          : "Count population is not approved as a statement-level average-ticket denominator.",
+      confidence: selectable ? "high" : "medium",
+      selected: false,
+      selectionReason: null,
+      rejectionReason: selectable
+        ? null
+        : "Count population is not approved as a statement-level average-ticket denominator.",
     });
+    candidatesByField.set(field, [...(candidatesByField.get(field) ?? []), countCandidate]);
+    if (!selectable) {
+      continue;
+    }
+  }
+
+  for (const [field, candidates] of candidatesByField.entries()) {
+    const selectableCandidates = candidates.filter((item) => item.rejectionReason === null);
+    if (selectableCandidates.length === 0) {
+      counts[field] = unavailableFact(reasonForUnavailableField(field), candidates);
+      continue;
+    }
+
+    const values = new Set(selectableCandidates.map((item) => item.value));
+    const selected = values.size === 1 && selectableCandidates.length === 1 ? selectableCandidates[0] : null;
+    if (!selected || selected.evidenceRefs.length === 0) {
+      counts[field] = unavailableFact("Transaction count was not selected because the population was conflicting or lacked source evidence.", candidatesWithRejections(candidates));
+      continue;
+    }
+
     counts[field] = selectedFact({
-      value,
-      confidence: countCandidate.confidence,
-      evidenceRefs: input.evidenceRefs,
-      selectedCandidateId: countCandidate.id,
-      selectionReason: reason,
-      candidates: [countCandidate],
+      value: selected.value,
+      confidence: selected.confidence,
+      evidenceRefs: selected.evidenceRefs,
+      selectedCandidateId: selected.id,
+      selectionReason: reasonForSelectedField(field),
+      candidates: candidates.map((item) =>
+        item.id === selected.id
+          ? { ...item, selected: true, selectionReason: reasonForSelectedField(field), rejectionReason: null }
+          : {
+              ...item,
+              selected: false,
+              selectionReason: null,
+              rejectionReason: item.rejectionReason ?? "Competing transaction-count candidate was not selected.",
+            },
+      ),
     });
   }
 
@@ -176,8 +204,38 @@ function transactionTypeFromRole(role: string): TransactionCountType {
   return "unknown";
 }
 
-function reasonForCountType(type: TransactionCountType): string {
-  if (type === "submitted_transactions") return "Verified submitted transaction count is available.";
-  if (type === "settled_transactions") return "Verified settled transaction count is available.";
-  return "Count is preserved for diagnostics but is not approved for average-ticket calculations without population-compatibility proof.";
+function evidenceRefsForCount(item: RawSupportingCount, fallbackRefs: string[]): string[] {
+  if (Array.isArray(item.evidenceRefs) && item.evidenceRefs.every((ref) => typeof ref === "string")) {
+    return [...new Set(item.evidenceRefs)];
+  }
+  return [...new Set(fallbackRefs)];
+}
+
+function candidatesWithRejections(
+  candidates: CanonicalFactValue<CountValue | null>["candidates"],
+): CanonicalFactValue<CountValue | null>["candidates"] {
+  return candidates.map((item) => ({
+    ...item,
+    selected: false,
+    selectionReason: null,
+    rejectionReason: item.rejectionReason ?? "Transaction-count candidate was not uniquely selected with source evidence.",
+  }));
+}
+
+function reasonForSelectedField(field: keyof CanonicalTransactionCounts): string {
+  if (field === "submittedTransactions") return "Verified submitted transaction count is available for population-compatibility evaluation.";
+  if (field === "settledTransactions") return "Verified settled transaction count is available for population-compatibility evaluation.";
+  return "Verified population-compatible transaction count is available.";
+}
+
+function reasonForUnavailableField(field: keyof CanonicalTransactionCounts): string {
+  if (field === "cardTypeItems") return "Card-type item count is a subtotal/supporting count, not a verified statement-level denominator.";
+  if (field === "authorizations") return "Authorization count is not verified as matching selected sales volume.";
+  if (field === "refunds") return "Refund count is not a sales transaction denominator.";
+  if (field === "chargebacks") return "Chargeback count is not a sales transaction denominator.";
+  if (field === "networkTransactions") return "Network transaction count is not verified as matching selected sales volume.";
+  if (field === "auditSpecificCounts") return "Audit-specific count is not verified as matching selected sales volume.";
+  if (field === "submittedTransactions") return "Submitted transaction count was not uniquely verified.";
+  if (field === "settledTransactions") return "Settled transaction count was not uniquely verified.";
+  return "Transaction count type is unknown or not population-compatible.";
 }
