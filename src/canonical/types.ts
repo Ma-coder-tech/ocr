@@ -659,6 +659,213 @@ export type CanonicalOpportunityEngine = {
   limitations: string[];
 };
 
+export type CanonicalAiCapabilityId =
+  | "full_statement_anomaly_review"
+  | "fee_classification_review"
+  | "notice_change_review"
+  | "benchmark_category_review"
+  | "merchant_narrative"
+  | "document_quality_review";
+
+export type CanonicalAiCapabilityStatus = "completed" | "not_needed" | "disabled" | "failed" | "timed_out" | "safety_blocked" | "rejected";
+export type CanonicalAiFinancialReadiness = "ready" | "limited" | "withheld";
+export type CanonicalAiExplanationReadiness = "ai_enhanced" | "deterministic_fallback" | "unavailable";
+export type CanonicalAiExplanationSource = "accepted_ai_narrative" | "deterministic_template" | "none";
+
+export type CanonicalAiLimitationCode =
+  | "full_statement_anomaly_review_required"
+  | "material_fee_classification_review_required"
+  | "notice_change_review_required"
+  | "benchmark_category_review_required"
+  | "benchmark_category_not_verified"
+  | "ai_narrative_unavailable"
+  | "ai_output_rejected"
+  | "provider_unavailable"
+  | "deterministic_explanation_available";
+
+export type CanonicalAiTriggerReasonCode =
+  | "required_for_customer_financial_conclusions"
+  | "material_unresolved_fee_rows"
+  | "notice_dependent_conclusions"
+  | "benchmark_applicability_unverified"
+  | "narrative_preferred"
+  | "document_quality_optional"
+  | "deterministic_absence_proven";
+
+export type CanonicalAiGroundingStatus = "grounded" | "not_applicable" | "rejected";
+
+export type CanonicalAiCapabilityTrigger = {
+  present: boolean;
+  reasonCode: CanonicalAiTriggerReasonCode;
+  reason: string;
+  evidenceRefs: string[];
+  feeRowRefs: string[];
+  opportunityComponentRefs: string[];
+  absenceProof: string | null;
+};
+
+export type CanonicalAiCapabilityOutputBase = {
+  type: CanonicalAiCapabilityId;
+  authoritative: false;
+  evidenceRefs: string[];
+  factRefs: string[];
+  limitationCodes: CanonicalAiLimitationCode[];
+};
+
+export type CanonicalAiFeeClassificationOutput = CanonicalAiCapabilityOutputBase & {
+  type: "fee_classification_review";
+  suggestions: Array<{
+    feeRowId: string;
+    suggestedCategory: CanonicalFeeCategory;
+    confidence: CanonicalFeeClassificationConfidence;
+    reasonCodes: string[];
+    safeExplanation: string;
+    authoritative: false;
+  }>;
+};
+
+export type CanonicalAiAnomalyReviewOutput = CanonicalAiCapabilityOutputBase & {
+  type: "full_statement_anomaly_review";
+  observations: Array<{
+    id: string;
+    severity: "info" | "review" | "blocking";
+    summary: string;
+    affectedFactRefs: string[];
+    evidenceRefs: string[];
+    authoritative: false;
+  }>;
+};
+
+export type CanonicalAiNoticeReviewOutput = CanonicalAiCapabilityOutputBase & {
+  type: "notice_change_review";
+  noticeSuggestions: Array<{
+    id: string;
+    noticeEvidenceRef: string;
+    safeSummary: string;
+    observedTextRefs: string[];
+    authoritative: false;
+  }>;
+};
+
+export type CanonicalAiBenchmarkCategoryOutput = CanonicalAiCapabilityOutputBase & {
+  type: "benchmark_category_review";
+  suggestions: Array<{
+    categoryId: string;
+    confidence: CanonicalFeeClassificationConfidence;
+    evidenceRefs: string[];
+    limitationCodes: CanonicalAiLimitationCode[];
+    authoritative: false;
+  }>;
+};
+
+export type CanonicalAiMerchantNarrativeOutput = CanonicalAiCapabilityOutputBase & {
+  type: "merchant_narrative";
+  sections: Array<{
+    kind: "verified_facts" | "review_items" | "opportunity_limits" | "safe_next_step";
+    text: string;
+    factRefs: string[];
+    evidenceRefs: string[];
+  }>;
+};
+
+export type CanonicalAiDocumentQualityOutput = CanonicalAiCapabilityOutputBase & {
+  type: "document_quality_review";
+  observations: Array<{
+    id: string;
+    summary: string;
+    evidenceRefs: string[];
+    authoritative: false;
+  }>;
+};
+
+export type CanonicalAiCapabilityOutput =
+  | CanonicalAiFeeClassificationOutput
+  | CanonicalAiAnomalyReviewOutput
+  | CanonicalAiNoticeReviewOutput
+  | CanonicalAiBenchmarkCategoryOutput
+  | CanonicalAiMerchantNarrativeOutput
+  | CanonicalAiDocumentQualityOutput;
+
+export type CanonicalAiInternalDiagnosticRecord = {
+  id: string;
+  capability: CanonicalAiCapabilityId;
+  createdAt: string;
+  expiresAt: string;
+  sanitized: true;
+  rawPromptPersisted: false;
+  rawResponsePersisted: false;
+  rawStatementTextPersisted: false;
+  providerFamily: "openai" | "anthropic" | "openrouter" | "none" | "other";
+  providerModelRef: string | null;
+  executionStatus: "not_started" | "completed" | "failed" | "rejected";
+  diagnosticCodes: string[];
+};
+
+export type CanonicalAiCapabilityRecord = {
+  id: string;
+  capability: CanonicalAiCapabilityId;
+  policyVersion: "canonical_ai_capability_boundary_v1";
+  required: boolean;
+  status: CanonicalAiCapabilityStatus;
+  trigger: CanonicalAiCapabilityTrigger;
+  groundingStatus: CanonicalAiGroundingStatus;
+  financialReadinessOnFailure: CanonicalAiFinancialReadiness;
+  explanationReadinessOnFailure: CanonicalAiExplanationReadiness;
+  outputRef: string | null;
+  executionRef: string | null;
+  independentReviewRefs: string[];
+  output: CanonicalAiCapabilityOutput | null;
+  limitationCodes: CanonicalAiLimitationCode[];
+  knownLegacyRiskCodes: string[];
+};
+
+export type CanonicalDeterministicExplanationSection = {
+  kind: "verified_facts" | "rate_basis" | "review_items" | "opportunity_limits" | "safe_next_step";
+  text: string;
+  factRefs: string[];
+  evidenceRefs: string[];
+};
+
+export type CanonicalDeterministicExplanationRecord = {
+  id: string;
+  policyVersion: "deterministic_explanation_policy_v1";
+  source: "deterministic_template";
+  readabilityTarget: "eighth_grade";
+  tone: "neutral_factual";
+  sections: CanonicalDeterministicExplanationSection[];
+  limitationCodes: CanonicalAiLimitationCode[];
+  prohibitedLanguageCheck: "passed";
+};
+
+export type CanonicalAiCapabilitySummary = {
+  policyVersion: "canonical_ai_capability_boundary_v1";
+  materialityPolicyVersion: "ai_materiality_policy_v1";
+  readinessPolicyVersion: "ai_readiness_degradation_policy_v1";
+  privacyRetentionPolicyVersion: "ai_privacy_retention_policy_v1";
+  deterministicExplanationPolicyVersion: "deterministic_explanation_policy_v1";
+  financialReadiness: CanonicalAiFinancialReadiness;
+  explanationReadiness: CanonicalAiExplanationReadiness;
+  explanationSource: CanonicalAiExplanationSource;
+  requiredCapabilityCount: number;
+  completedCapabilityCount: number;
+  blockedCapabilityCount: number;
+  rejectedOutputCount: number;
+  limitationCodes: CanonicalAiLimitationCode[];
+  knownLegacyRiskCodes: string[];
+};
+
+export type CanonicalAiCapabilityLayer = {
+  policyVersion: "canonical_ai_capability_boundary_v1";
+  materialityPolicyVersion: "ai_materiality_policy_v1";
+  readinessPolicyVersion: "ai_readiness_degradation_policy_v1";
+  privacyRetentionPolicyVersion: "ai_privacy_retention_policy_v1";
+  deterministicExplanationPolicyVersion: "deterministic_explanation_policy_v1";
+  capabilities: CanonicalAiCapabilityRecord[];
+  deterministicExplanation: CanonicalDeterministicExplanationRecord;
+  summary: CanonicalAiCapabilitySummary;
+  limitations: string[];
+};
+
 export type CanonicalFeeLedgerControlType =
   | "printed_charge_sum"
   | "rate_times_volume"
@@ -735,6 +942,11 @@ export type CanonicalAnalysisVersionManifest = {
   opportunityCadencePolicyVersion: "opportunity_cadence_policy_v1";
   opportunityBenchmarkPolicyVersion: "opportunity_benchmark_policy_v1";
   opportunityAiBoundaryPolicyVersion: "opportunity_ai_boundary_policy_v1";
+  aiCapabilityBoundaryPolicyVersion: "canonical_ai_capability_boundary_v1";
+  aiMaterialityPolicyVersion: "ai_materiality_policy_v1";
+  aiReadinessDegradationPolicyVersion: "ai_readiness_degradation_policy_v1";
+  aiPrivacyRetentionPolicyVersion: "ai_privacy_retention_policy_v1";
+  deterministicExplanationPolicyVersion: "deterministic_explanation_policy_v1";
   parserId: string | null;
   parserVersion: string | null;
   extractionVersion: string;
@@ -756,6 +968,7 @@ export type CanonicalStatementAnalysis = {
   feeLedger: CanonicalFeeLedger;
   feeOwnershipActionability: CanonicalFeeOwnershipActionability;
   opportunityEngine: CanonicalOpportunityEngine;
+  aiCapabilities: CanonicalAiCapabilityLayer;
   evidence: CanonicalEvidenceRecord[];
   calculations: CanonicalCalculationRecord[];
   validation: CanonicalValidationState;

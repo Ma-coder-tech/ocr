@@ -1,4 +1,5 @@
 import { isMoneyAmount } from "./money.js";
+import { validateCanonicalAiCapabilityLayer } from "./aiCapabilityValidation.js";
 import { aggregateCanonicalOpportunityComponents } from "./opportunityEngine.js";
 import { targetSupportsApprovedEstimate, targetSupportsDeterministic } from "./opportunityPolicy.js";
 import type { CanonicalOpportunityComponent, CanonicalStatementAnalysis, MoneyAmount } from "./types.js";
@@ -93,6 +94,21 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   }
   if (analysis.versionManifest?.opportunityAiBoundaryPolicyVersion !== "opportunity_ai_boundary_policy_v1") {
     errors.push("Canonical version manifest must include opportunity_ai_boundary_policy_v1.");
+  }
+  if (analysis.versionManifest?.aiCapabilityBoundaryPolicyVersion !== "canonical_ai_capability_boundary_v1") {
+    errors.push("Canonical version manifest must include canonical_ai_capability_boundary_v1.");
+  }
+  if (analysis.versionManifest?.aiMaterialityPolicyVersion !== "ai_materiality_policy_v1") {
+    errors.push("Canonical version manifest must include ai_materiality_policy_v1.");
+  }
+  if (analysis.versionManifest?.aiReadinessDegradationPolicyVersion !== "ai_readiness_degradation_policy_v1") {
+    errors.push("Canonical version manifest must include ai_readiness_degradation_policy_v1.");
+  }
+  if (analysis.versionManifest?.aiPrivacyRetentionPolicyVersion !== "ai_privacy_retention_policy_v1") {
+    errors.push("Canonical version manifest must include ai_privacy_retention_policy_v1.");
+  }
+  if (analysis.versionManifest?.deterministicExplanationPolicyVersion !== "deterministic_explanation_policy_v1") {
+    errors.push("Canonical version manifest must include deterministic_explanation_policy_v1.");
   }
   if (analysis.financialFacts.effectiveRateBasis?.policyVersion !== "effective_rate_basis_v1") {
     errors.push("Effective rate basis is missing or unsupported.");
@@ -290,6 +306,7 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
     errors.push("Selected effective rate requires explicit supported numerator and denominator basis plus calculationRef.");
   }
   validateOpportunityEngine(analysis, evidenceIds, calculationIds, calculationsById, errors);
+  validateCanonicalAiCapabilityLayer(analysis, errors);
 
   const validated: CanonicalStatementAnalysis = {
     ...analysis,

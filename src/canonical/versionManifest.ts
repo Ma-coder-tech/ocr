@@ -1,4 +1,11 @@
 import { MONEY_POLICY_VERSION } from "./money.js";
+import {
+  AI_MATERIALITY_POLICY_VERSION,
+  AI_PRIVACY_RETENTION_POLICY_VERSION,
+  AI_READINESS_DEGRADATION_POLICY_VERSION,
+  CANONICAL_AI_CAPABILITY_BOUNDARY_POLICY_VERSION,
+  DETERMINISTIC_EXPLANATION_POLICY_VERSION,
+} from "./aiCapabilityTypes.js";
 import type { CanonicalAnalysisVersionManifest } from "./types.js";
 
 export const CANONICAL_SCHEMA_VERSION = "canonical_statement_analysis_v1" as const;
@@ -31,6 +38,11 @@ export function buildVersionManifest(input: {
     opportunityCadencePolicyVersion: OPPORTUNITY_CADENCE_POLICY_VERSION,
     opportunityBenchmarkPolicyVersion: OPPORTUNITY_BENCHMARK_POLICY_VERSION,
     opportunityAiBoundaryPolicyVersion: OPPORTUNITY_AI_BOUNDARY_POLICY_VERSION,
+    aiCapabilityBoundaryPolicyVersion: CANONICAL_AI_CAPABILITY_BOUNDARY_POLICY_VERSION,
+    aiMaterialityPolicyVersion: AI_MATERIALITY_POLICY_VERSION,
+    aiReadinessDegradationPolicyVersion: AI_READINESS_DEGRADATION_POLICY_VERSION,
+    aiPrivacyRetentionPolicyVersion: AI_PRIVACY_RETENTION_POLICY_VERSION,
+    deterministicExplanationPolicyVersion: DETERMINISTIC_EXPLANATION_POLICY_VERSION,
     parserId: input.parserId,
     parserVersion: input.parserVersion ?? CANONICAL_PARSER_VERSION,
     extractionVersion: input.extractionVersion ?? "pdfjs_text_rows_v1",

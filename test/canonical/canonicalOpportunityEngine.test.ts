@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCanonicalStatementFactsFromParsedDocument, canonicalActualValues } from "../../src/canonical/buildCanonicalFacts.js";
+import { buildCanonicalAiCapabilities } from "../../src/canonical/buildCanonicalAiCapabilities.js";
 import { buildCanonicalFeeLedger } from "../../src/canonical/feeLedger.js";
 import { buildCanonicalFeeOwnershipActionability, makeCanonicalFeeSpreadAssertion } from "../../src/canonical/feeOwnershipActionability.js";
 import { buildCanonicalOpportunityEngine, aggregateCanonicalOpportunityComponents, type CanonicalOpportunityInput } from "../../src/canonical/opportunityEngine.js";
@@ -564,6 +565,7 @@ describe("canonical opportunity engine", () => {
 function replaceComponents(analysis: CanonicalStatementAnalysis, components: CanonicalOpportunityComponent[]): void {
   analysis.opportunityEngine.components = components;
   analysis.opportunityEngine.summary = aggregateCanonicalOpportunityComponents(components);
+  refreshPackageF(analysis);
 }
 
 function rebuildWithInputs(analysis: CanonicalStatementAnalysis, opportunityInputs: CanonicalOpportunityInput[]): void {
@@ -573,6 +575,18 @@ function rebuildWithInputs(analysis: CanonicalStatementAnalysis, opportunityInpu
     evidence: analysis.evidence,
     statementPeriodVerified: true,
     opportunityInputs,
+  });
+  refreshPackageF(analysis);
+}
+
+function refreshPackageF(analysis: CanonicalStatementAnalysis): void {
+  analysis.aiCapabilities = buildCanonicalAiCapabilities({
+    identity: analysis.identity,
+    financialFacts: analysis.financialFacts,
+    feeLedger: analysis.feeLedger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    opportunityEngine: analysis.opportunityEngine,
+    evidence: analysis.evidence,
   });
 }
 
@@ -900,6 +914,7 @@ function analysisWithFeeRows(rows: Record<string, unknown>[]): CanonicalStatemen
     evidence: analysis.evidence,
     statementPeriodVerified: true,
   });
+  refreshPackageF(analysis);
   return analysis;
 }
 
