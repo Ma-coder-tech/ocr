@@ -2,6 +2,7 @@ import { buildCanonicalRuntimeAnalysis, canonicalRuntimeInputAdmissionTable, typ
 import { compareCanonicalToLegacy } from "./runtimeShadowComparison.js";
 import {
   assertRedactedCanonicalShadowDiagnostic,
+  type CanonicalShadowBucketCount,
   type RedactedCanonicalShadowDiagnostic,
 } from "./runtimeShadowRedaction.js";
 import { CanonicalStatementValidationError } from "./validate.js";
@@ -145,10 +146,10 @@ function canonicalSummary(analysis: CanonicalStatementAnalysis): RedactedCanonic
     feeRowCount: analysis.feeLedger.rows.length,
     uniqueFeeRowCount: analysis.feeLedger.rows.filter((row) => row.contributesToUniqueTotal).length,
     duplicateRepresentationCount: Math.max(0, analysis.feeLedger.parserInterpretations.length - analysis.feeLedger.rows.length),
-    ownershipBucketCounts: sortedCounts(
+    ownershipBucketCounts: sortedBucketCounts(
       analysis.feeOwnershipActionability.rowClassifications.map((row) => row.selected.ownership.economicBeneficiary),
     ),
-    actionabilityBucketCounts: sortedCounts(analysis.feeOwnershipActionability.rowClassifications.map((row) => row.selected.actionabilityCeiling)),
+    actionabilityBucketCounts: sortedBucketCounts(analysis.feeOwnershipActionability.rowClassifications.map((row) => row.selected.actionabilityCeiling)),
     opportunityTotals: {
       deterministicEligibleAnnual: purposeMoney(opportunity.deterministicEligibleAnnualAmount, "deterministic_eligible_annual"),
       approvedEstimatedAnnual: purposeMoney(opportunity.approvedEstimatedAnnualAmount, "approved_estimated_annual"),
@@ -178,8 +179,8 @@ function unavailableCanonicalSummary(): RedactedCanonicalShadowDiagnostic["canon
     feeRowCount: 0,
     uniqueFeeRowCount: 0,
     duplicateRepresentationCount: 0,
-    ownershipBucketCounts: {},
-    actionabilityBucketCounts: {},
+    ownershipBucketCounts: [],
+    actionabilityBucketCounts: [],
     opportunityTotals: {
       deterministicEligibleAnnual: { ...zero, purpose: "deterministic_eligible_annual" },
       approvedEstimatedAnnual: { ...zero, purpose: "approved_estimated_annual" },
@@ -293,6 +294,16 @@ function readinessStatusForAnalysis(
     return "financially_ready";
   }
   return "schema_valid";
+}
+
+function sortedBucketCounts(values: string[]): CanonicalShadowBucketCount[] {
+  const counts: Record<string, number> = {};
+  for (const value of values) {
+    counts[value] = (counts[value] ?? 0) + 1;
+  }
+  return Object.entries(counts)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([bucket, count]) => ({ bucket, count }));
 }
 
 function sortedCounts(values: string[]): Record<string, number> {

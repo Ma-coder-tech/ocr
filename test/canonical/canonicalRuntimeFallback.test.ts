@@ -217,6 +217,57 @@ describe("canonical runtime shadow fallback", () => {
     expect(result.status).toBe("completed");
   });
 
+  it("allows merchant contract ownership buckets without losing canonical core or ledger diagnostics", async () => {
+    const document = syntheticSummaryDocument();
+    const summary = analyzeDocument(document, "retail");
+
+    for (const count of [1, 2, 3]) {
+      const result = await runCanonicalRuntimeShadow({
+        document,
+        businessType: "retail",
+        summary,
+        runtimeDocumentRef: `job_merchant_contract_bucket_${count}`,
+        env: { RATEREVEAL_CANONICAL_SHADOW_ENABLED: "true" },
+        buildAnalysis: () => ({
+          analysis: analysisWithOwnershipBuckets(document, summary, Array.from({ length: count }, () => "merchant_contract")),
+        }),
+      });
+
+      expect(result.status).toBe("completed");
+      expect(result.diagnostic?.canonicalSummary.ownershipBucketCounts).toContainEqual({ bucket: "merchant_contract", count });
+      expect(result.diagnostic?.preValidationCoreFactAvailability.processedSales).toBe("selected");
+      expect(result.diagnostic?.preValidationCoreFactAvailability.totalFees).toBe("selected");
+      expect(result.diagnostic?.preValidationLedgerStatus).toBe("unavailable");
+    }
+  });
+
+  it("emits ownership bucket diagnostics independent of input order", async () => {
+    const document = syntheticSummaryDocument();
+    const summary = analyzeDocument(document, "retail");
+    const commonInput = {
+      document,
+      businessType: "retail" as const,
+      summary,
+      env: { RATEREVEAL_CANONICAL_SHADOW_ENABLED: "true" },
+      now: () => 1,
+    };
+    const left = await runCanonicalRuntimeShadow({
+      ...commonInput,
+      runtimeDocumentRef: "job_bucket_order_left",
+      buildAnalysis: () => ({ analysis: analysisWithOwnershipBuckets(document, summary, ["processor", "merchant_contract", "processor"]) }),
+    });
+    const right = await runCanonicalRuntimeShadow({
+      ...commonInput,
+      runtimeDocumentRef: "job_bucket_order_right",
+      buildAnalysis: () => ({ analysis: analysisWithOwnershipBuckets(document, summary, ["processor", "processor", "merchant_contract"]) }),
+    });
+
+    expect(left.status).toBe("completed");
+    expect(right.status).toBe("completed");
+    expect(left.diagnostic?.canonicalSummary.ownershipBucketCounts).toEqual(right.diagnostic?.canonicalSummary.ownershipBucketCounts);
+    expect(left.diagnostic?.canonicalSummary.actionabilityBucketCounts).toEqual(right.diagnostic?.canonicalSummary.actionabilityBucketCounts);
+  });
+
   it("does not import persistence or artifact write paths from H1 shadow modules", () => {
     const files = [
       "src/canonical/runtimeAdapter.ts",
@@ -252,4 +303,28 @@ function syntheticSummaryDocument(): ParsedDocument {
       hasExtractableText: true,
     },
   };
+}
+
+function analysisWithOwnershipBuckets(document: ParsedDocument, summary: ReturnType<typeof analyzeDocument>, buckets: string[]) {
+  const built = buildCanonicalRuntimeAnalysis({
+    document,
+    businessType: "retail",
+    runtimeDocumentRef: "job_bucket_analysis",
+    legacySummary: summary,
+  }).analysis;
+  return {
+    ...built,
+    feeOwnershipActionability: {
+      ...built.feeOwnershipActionability,
+      rowClassifications: buckets.map((bucket, index) => ({
+        feeRowId: `fee_row_${index}`,
+        selected: {
+          ownership: { economicBeneficiary: bucket },
+          actionabilityCeiling: index % 2 === 0 ? "verify_only" : "potentially_actionable",
+        },
+        candidates: [],
+        conflictStatus: "none",
+      })),
+    },
+  } as typeof built;
 }

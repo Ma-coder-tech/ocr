@@ -37,8 +37,8 @@ export type RedactedCanonicalShadowDiagnostic = {
     feeRowCount: number;
     uniqueFeeRowCount: number;
     duplicateRepresentationCount: number;
-    ownershipBucketCounts: Record<string, number>;
-    actionabilityBucketCounts: Record<string, number>;
+    ownershipBucketCounts: CanonicalShadowBucketCount[];
+    actionabilityBucketCounts: CanonicalShadowBucketCount[];
     opportunityTotals: {
       deterministicEligibleAnnual: { amountMinor: number; currency: "USD"; purpose: "deterministic_eligible_annual" };
       approvedEstimatedAnnual: { amountMinor: number; currency: "USD"; purpose: "approved_estimated_annual" };
@@ -64,6 +64,11 @@ export type RedactedCanonicalShadowDiagnostic = {
   };
 };
 
+export type CanonicalShadowBucketCount = {
+  bucket: string;
+  count: number;
+};
+
 const SENSITIVE_KEY_PATTERN =
   /merchant|account|identifier|file(name)?|path|hash|raw|prompt|response|provider|model|api.?key|billing|excerpt|text|statementFilename|sourceFileName/i;
 const SENSITIVE_VALUE_PATTERNS = [
@@ -72,6 +77,9 @@ const SENSITIVE_VALUE_PATTERNS = [
   /\b[\w.-]+\.(?:pdf|csv|png|jpe?g|json|log)\b/i,
   /\b(?:sk|rk|pk)_[A-Za-z0-9_-]{12,}\b/,
   /\b(?:acct|account|merchant|mid)\b\s*[:#-]?\s*[A-Za-z0-9-]{4,}/i,
+  /^merchant_contract$/i,
+  /\bmerchant\s+contract\b\s*:/i,
+  /\b(?:raw statement text|evidence excerpt|prompt|response|model error|provider error|api.?key|billing)\b/i,
   /\b[A-Fa-f0-9]{32,}\b/,
   /\b(?:anthropic|openai|claude|gpt|provider error|stack trace)\b/i,
 ];
@@ -90,6 +98,7 @@ export function findSensitiveDiagnosticPath(value: unknown, path = "diagnostic")
     return findSensitiveDiagnosticPath(`${value.name}: ${value.message}`, `${path}.message`);
   }
   if (typeof value === "string") {
+    if (isApprovedCanonicalBucketValue(path, value)) return null;
     return SENSITIVE_VALUE_PATTERNS.some((pattern) => pattern.test(value)) ? path : null;
   }
   if (typeof value === "number" || typeof value === "boolean") return null;
@@ -108,4 +117,11 @@ export function findSensitiveDiagnosticPath(value: unknown, path = "diagnostic")
     }
   }
   return null;
+}
+
+function isApprovedCanonicalBucketValue(path: string, value: string): boolean {
+  return (
+    value === "merchant_contract" &&
+    /^diagnostic\.canonicalSummary\.ownershipBucketCounts\[\d+\]\.bucket$/.test(path)
+  );
 }
