@@ -6,6 +6,7 @@ import {
   AI_READINESS_DEGRADATION_POLICY_VERSION,
   CANONICAL_AI_CAPABILITY_BOUNDARY_POLICY_VERSION,
   CANONICAL_AI_CAPABILITIES,
+  CANONICAL_RUNTIME_SAFETY_REVIEW_POLICY_VERSION,
   DETERMINISTIC_EXPLANATION_POLICY_VERSION,
   combineFinancialReadiness,
   isSuccessfulAiCapabilityStatus,
@@ -17,6 +18,7 @@ import type {
   CanonicalAiCapabilityOutput,
   CanonicalAiCapabilityRecord,
   CanonicalAiCapabilityStatus,
+  CanonicalAiCapabilityTrigger,
   CanonicalAiExplanationReadiness,
   CanonicalAiLimitationCode,
   CanonicalEvidenceRecord,
@@ -24,6 +26,7 @@ import type {
   CanonicalFeeOwnershipActionability,
   CanonicalFinancialFacts,
   CanonicalOpportunityEngine,
+  CanonicalRuntimeSafetyReviewRecord,
   CanonicalStatementIdentity,
 } from "./types.js";
 
@@ -43,6 +46,7 @@ export function buildCanonicalAiCapabilities(input: {
   opportunityEngine: CanonicalOpportunityEngine;
   evidence: readonly CanonicalEvidenceRecord[];
   harnessInputs?: readonly CanonicalAiCapabilityHarnessInput[];
+  deterministicRuntimeSafetyReview?: CanonicalRuntimeSafetyReviewRecord | null;
 }): CanonicalAiCapabilityLayer {
   const evidenceText = input.evidence.map(
     (record) => `${record.id}\u0000${record.extractedText ?? ""} ${record.normalizedText ?? ""} ${record.customerSafe.excerpt ?? ""} ${record.sourceRole}`,
@@ -62,8 +66,15 @@ export function buildCanonicalAiCapabilities(input: {
     const output = duplicateHarness ? null : harness?.output ?? null;
     const grounding = output ? evaluateAiCapabilityGrounding(output, { evidence: [...input.evidence], feeLedger: input.feeLedger, opportunityEngine: input.opportunityEngine }) : null;
     const rejected = grounding?.status === "rejected";
+    const effectiveStatus = rejected ? "rejected" : status;
+    const trigger = triggerForCapability({
+      capability,
+      status: effectiveStatus,
+      defaultTrigger: need.trigger,
+      deterministicRuntimeSafetyReview: input.deterministicRuntimeSafetyReview ?? null,
+    });
     const limitationCodes = [
-      ...need.failureLimitationCodes,
+      ...(need.required && !isSuccessfulAiCapabilityStatus(effectiveStatus) ? need.failureLimitationCodes : []),
       ...(rejected || duplicateHarness ? (["ai_output_rejected"] as CanonicalAiLimitationCode[]) : []),
     ];
     capabilities.push({
@@ -71,8 +82,8 @@ export function buildCanonicalAiCapabilities(input: {
       capability,
       policyVersion: CANONICAL_AI_CAPABILITY_BOUNDARY_POLICY_VERSION,
       required: need.required,
-      status: rejected ? "rejected" : status,
-      trigger: need.trigger,
+      status: effectiveStatus,
+      trigger,
       groundingStatus: output ? grounding?.status ?? "rejected" : need.required || capability === "merchant_narrative" ? "not_applicable" : "not_applicable",
       financialReadinessOnFailure: need.failureFinancialReadiness,
       explanationReadinessOnFailure: capability === "merchant_narrative" ? "deterministic_fallback" : "unavailable",
@@ -108,7 +119,9 @@ export function buildCanonicalAiCapabilities(input: {
     readinessPolicyVersion: AI_READINESS_DEGRADATION_POLICY_VERSION,
     privacyRetentionPolicyVersion: AI_PRIVACY_RETENTION_POLICY_VERSION,
     deterministicExplanationPolicyVersion: DETERMINISTIC_EXPLANATION_POLICY_VERSION,
+    deterministicRuntimeSafetyReviewPolicyVersion: CANONICAL_RUNTIME_SAFETY_REVIEW_POLICY_VERSION,
     capabilities,
+    deterministicRuntimeSafetyReview: input.deterministicRuntimeSafetyReview ?? null,
     deterministicExplanation,
     summary: {
       policyVersion: CANONICAL_AI_CAPABILITY_BOUNDARY_POLICY_VERSION,
@@ -116,6 +129,7 @@ export function buildCanonicalAiCapabilities(input: {
       readinessPolicyVersion: AI_READINESS_DEGRADATION_POLICY_VERSION,
       privacyRetentionPolicyVersion: AI_PRIVACY_RETENTION_POLICY_VERSION,
       deterministicExplanationPolicyVersion: DETERMINISTIC_EXPLANATION_POLICY_VERSION,
+      deterministicRuntimeSafetyReviewPolicyVersion: CANONICAL_RUNTIME_SAFETY_REVIEW_POLICY_VERSION,
       financialReadiness,
       explanationReadiness,
       requiredCapabilityCount: capabilities.filter((capability) => capability.required).length,
@@ -130,6 +144,30 @@ export function buildCanonicalAiCapabilities(input: {
       "Package F v1 is canonical and harness-only; it does not run live providers or mutate parser, report, API, worker, frontend, persistence, Vercel, or production behavior.",
       "Raw prompts, raw responses, and raw statement text are not persisted by the canonical Package F layer.",
     ],
+  };
+}
+
+function triggerForCapability(input: {
+  capability: CanonicalAiCapabilityId;
+  status: CanonicalAiCapabilityStatus;
+  defaultTrigger: CanonicalAiCapabilityTrigger;
+  deterministicRuntimeSafetyReview: CanonicalRuntimeSafetyReviewRecord | null;
+}): CanonicalAiCapabilityTrigger {
+  const proof = input.deterministicRuntimeSafetyReview?.anomalySubstitutionProof;
+  if (
+    input.capability !== "full_statement_anomaly_review" ||
+    input.status !== "not_needed" ||
+    !input.deterministicRuntimeSafetyReview?.anomalySubstitutionAllowed ||
+    !proof
+  ) {
+    return input.defaultTrigger;
+  }
+  return {
+    ...input.defaultTrigger,
+    reasonCode: "deterministic_absence_proven",
+    reason: "Versioned deterministic runtime safety checks replace disabled or absent anomaly AI without creating AI authority.",
+    evidenceRefs: proof.evidenceRefs,
+    absenceProof: `${proof.type}:${proof.policyVersion}`,
   };
 }
 

@@ -9,6 +9,7 @@ export const AI_MATERIALITY_POLICY_VERSION = "ai_materiality_policy_v1" as const
 export const AI_READINESS_DEGRADATION_POLICY_VERSION = "ai_readiness_degradation_policy_v1" as const;
 export const AI_PRIVACY_RETENTION_POLICY_VERSION = "ai_privacy_retention_policy_v1" as const;
 export const DETERMINISTIC_EXPLANATION_POLICY_VERSION = "deterministic_explanation_policy_v1" as const;
+export const CANONICAL_RUNTIME_SAFETY_REVIEW_POLICY_VERSION = "canonical_runtime_safety_review_v1" as const;
 
 export const CANONICAL_AI_CAPABILITIES: readonly CanonicalAiCapabilityId[] = [
   "full_statement_anomaly_review",
