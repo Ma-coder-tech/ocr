@@ -15,7 +15,14 @@ import {
 } from "./customerStateTypes.js";
 import { aggregateCanonicalOpportunityComponents } from "./opportunityEngine.js";
 import { targetSupportsApprovedEstimate, targetSupportsDeterministic } from "./opportunityPolicy.js";
-import type { CanonicalCustomerPermissionKey, CanonicalOpportunityComponent, CanonicalStatementAnalysis, MoneyAmount } from "./types.js";
+import type {
+  CanonicalCustomerPermissionKey,
+  CanonicalFeeLedgerControl,
+  CanonicalFeeRow,
+  CanonicalOpportunityComponent,
+  CanonicalStatementAnalysis,
+  MoneyAmount,
+} from "./types.js";
 
 export class CanonicalStatementValidationError extends Error {
   readonly errors: string[];
@@ -170,6 +177,8 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
     }
     const occurrenceIds = new Set(analysis.feeLedger.sourceOccurrences.map((item) => item.id));
     const interpretationIds = new Set(analysis.feeLedger.parserInterpretations.map((item) => item.id));
+    const controlIds = new Set(analysis.feeLedger.controls.map((item) => item.id));
+    if (controlIds.size !== analysis.feeLedger.controls.length) errors.push("Fee ledger contains duplicate control ids.");
     for (const interpretation of analysis.feeLedger.parserInterpretations) {
       if (!occurrenceIds.has(interpretation.sourceOccurrenceId)) {
         errors.push(`Fee parser interpretation ${interpretation.id} source occurrence ref ${interpretation.sourceOccurrenceId} is broken.`);
@@ -178,6 +187,7 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
         errors.push(`Fee parser interpretation ${interpretation.id} has unknown rate representation with normalized value.`);
       }
     }
+    const contributingOccurrenceIds = new Set<string>();
     for (const row of analysis.feeLedger.rows) {
       for (const occurrenceId of row.sourceOccurrenceIds) {
         if (!occurrenceIds.has(occurrenceId)) errors.push(`Fee row ${row.id} source occurrence ref ${occurrenceId} is broken.`);
@@ -186,6 +196,56 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
         if (!interpretationIds.has(interpretationId)) errors.push(`Fee row ${row.id} parser interpretation ref ${interpretationId} is broken.`);
       }
       if (row.contributesToUniqueTotal && row.signedAmount === null) errors.push(`Fee row ${row.id} contributes to total without signed amount.`);
+      if (!row.contributionDecision) {
+        errors.push(`Fee row ${row.id} is missing contribution decision metadata.`);
+        continue;
+      }
+      if (row.contributesToUniqueTotal !== row.contributionDecision.contributes) {
+        errors.push(`Fee row ${row.id} contribution flag does not match contribution decision.`);
+      }
+      if (row.contributesToUniqueTotal && row.contributionDecision.evidenceRefs.length === 0) {
+        errors.push(`Fee row ${row.id} contributes to total without contribution source evidence.`);
+      }
+      if (
+        row.contributesToUniqueTotal &&
+        (row.contributionDecision.signedAmountBasis === "unresolved" || row.contributionDecision.signedAmountBasis === "not_applicable")
+      ) {
+        errors.push(`Fee row ${row.id} contributes with ambiguous signed amount basis.`);
+      }
+      if (row.contributesToUniqueTotal) {
+        for (const occurrenceId of row.sourceOccurrenceIds) {
+          if (contributingOccurrenceIds.has(occurrenceId)) {
+            errors.push(`Fee row ${row.id} duplicates contributing source occurrence ${occurrenceId}.`);
+          }
+          contributingOccurrenceIds.add(occurrenceId);
+        }
+      }
+      for (const evidenceRef of row.contributionDecision.evidenceRefs) {
+        if (!evidenceIds.has(evidenceRef)) errors.push(`Fee row ${row.id} contribution evidence ref ${evidenceRef} is broken.`);
+      }
+      for (const controlRef of row.contributionDecision.controlRefs) {
+        if (!controlIds.has(controlRef)) errors.push(`Fee row ${row.id} contribution control ref ${controlRef} is broken.`);
+      }
+      if (row.contributesToUniqueTotal && row.role === "interchange_detail_row") {
+        if (row.contributionDecision.reasonCode !== "pass_through_fee_charge_included") {
+          errors.push(`Fee row ${row.id} interchange contribution lacks pass-through reason code.`);
+        }
+        if (row.contributionDecision.controlRefs.length === 0 || row.contributionDecision.evidenceRefs.length === 0) {
+          errors.push(`Fee row ${row.id} interchange contribution lacks control or evidence references.`);
+        }
+      }
+      if (
+        row.contributesToUniqueTotal &&
+        (row.role === "section_subtotal" ||
+          row.role === "fee_bucket_total" ||
+          row.role === "statement_control_total" ||
+          row.role === "informational_rate_row" ||
+          row.role === "zero_dollar_reference_row" ||
+          row.role === "duplicate_representation" ||
+          row.role === "supporting_evidence_only")
+      ) {
+        errors.push(`Fee row ${row.id} has non-contributing role ${row.role} marked contributing.`);
+      }
       if (!row.contributesToUniqueTotal && row.role === "individual_charge" && row.signedAmount?.amountMinor !== 0) {
         warnings.push(`Fee row ${row.id} is an individual charge that does not contribute to unique total.`);
       }
@@ -196,6 +256,35 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
       }
       if (control.expectedAmount && !isMoneyAmount(control.expectedAmount)) errors.push(`Fee ledger control ${control.id} has invalid expected amount.`);
       if (control.actualAmount && !isMoneyAmount(control.actualAmount)) errors.push(`Fee ledger control ${control.id} has invalid actual amount.`);
+      if (control.parserReportedActualAmount && !isMoneyAmount(control.parserReportedActualAmount)) {
+        errors.push(`Fee ledger control ${control.id} has invalid parser-reported diagnostic amount.`);
+      }
+      for (const feeRowId of control.coveredFeeRowIds) {
+        if (!analysis.feeLedger.rows.some((row) => row.id === feeRowId)) errors.push(`Fee ledger control ${control.id} references missing covered fee row ${feeRowId}.`);
+      }
+      if (control.type === "printed_charge_sum" && control.reconstructedFromCoveredRows) {
+        const reconstructed = reconstructControlActualAmount(control, analysis.feeLedger.rows);
+        if (reconstructed === null) {
+          errors.push(`Fee ledger control ${control.id} cannot reconstruct actual amount from covered fee rows.`);
+        } else if (!control.actualAmount || control.actualAmount.amountMinor !== reconstructed.amountMinor || control.actualAmount.currency !== reconstructed.currency) {
+          errors.push(`Fee ledger control ${control.id} actual amount does not reconstruct from covered fee rows.`);
+        }
+      }
+      if (
+        control.type === "printed_charge_sum" &&
+        control.independence === "printed_source_control" &&
+        control.status !== "limited" &&
+        control.status !== "verification_required" &&
+        control.coveredFeeRowIds.length === 0
+      ) {
+        errors.push(`Fee ledger control ${control.id} passes without deterministic covered fee rows.`);
+      }
+    }
+    if (
+      analysis.feeLedger.status === "available" &&
+      analysis.feeLedger.controls.some((control) => control.type === "printed_charge_sum" && control.status !== "pass" && control.status !== "pass_with_rounding")
+    ) {
+      errors.push("Fee ledger is available while a blocking monetary control remains unresolved.");
     }
     if (analysis.feeLedger.uniqueChargeCalculationRef && !calculationIds.has(analysis.feeLedger.uniqueChargeCalculationRef)) {
       errors.push(`Fee ledger calculation ref ${analysis.feeLedger.uniqueChargeCalculationRef} is broken.`);
@@ -369,6 +458,26 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
     throw new CanonicalStatementValidationError(errors, warnings, validated);
   }
   return validated;
+}
+
+function reconstructControlActualAmount(control: CanonicalFeeLedgerControl, rows: CanonicalFeeRow[]): MoneyAmount | null {
+  if (control.coveredFeeRowIds.length === 0) return null;
+  const rowsById = new Map(rows.map((row) => [row.id, row]));
+  let amountMinor = 0;
+  for (const feeRowId of control.coveredFeeRowIds) {
+    const row = rowsById.get(feeRowId);
+    if (!row) return null;
+    if (control.amountBasis === "fee_charge_gross") {
+      if (!row.selectedAmount) return null;
+      amountMinor += Math.abs(row.selectedAmount.amountMinor);
+    } else if (control.amountBasis === "signed_net") {
+      if (!row.signedAmount) return null;
+      amountMinor += row.signedAmount.amountMinor;
+    } else {
+      return null;
+    }
+  }
+  return { amountMinor, currency: "USD" };
 }
 
 function validateCanonicalCustomerState(
@@ -666,10 +775,18 @@ function validateOpportunityComponent(
     if (refsInComponent.has(ref.feeRowId)) context.errors.push(`Package E component ${component.id} duplicates fee row ref ${ref.feeRowId}.`);
     refsInComponent.add(ref.feeRowId);
     const classification = context.classificationByFeeRowId.get(ref.feeRowId);
+    const feeRow = context.analysis.feeLedger.rows.find((row) => row.id === ref.feeRowId);
     if (!classification) {
       context.errors.push(`Package E component ${component.id} references fee row ${ref.feeRowId} without Package D classification.`);
     } else if (classification.selected.candidateId !== ref.classificationCandidateId) {
       context.errors.push(`Package E component ${component.id} does not reference the selected Package D candidate for fee row ${ref.feeRowId}.`);
+    }
+    if (
+      component.inclusionStatus === "included" &&
+      (component.eligibility === "deterministic" || component.eligibility === "approved_estimate") &&
+      feeRow?.contributionDecision?.reasonCode === "pass_through_fee_charge_included"
+    ) {
+      context.errors.push(`Package E component ${component.id} uses pass-through fee row ${ref.feeRowId} for eligible opportunity.`);
     }
     if (component.inclusionStatus === "included") {
       const existing = context.includedFeeRows.get(ref.feeRowId);
