@@ -1,9 +1,12 @@
 import type { AnalysisSummary } from "../types.js";
 import type { CanonicalAiCapabilityHarnessInput } from "./buildCanonicalAiCapabilities.js";
+import { validateCanonicalRuntimeFeeClassificationReview } from "./runtimeFeeClassificationReview.js";
 import type {
   CanonicalAiCapabilityId,
   CanonicalAiCapabilityOutput,
   CanonicalAiCapabilityStatus,
+  CanonicalRuntimeFeeClassificationReview,
+  CanonicalRuntimeFeeClassificationReviewStatus,
   CanonicalStatementAnalysis,
 } from "./types.js";
 
@@ -20,7 +23,14 @@ export type RuntimeAiCapabilityReasonCode =
   | "runtime_narrative_timed_out"
   | "runtime_narrative_safety_blocked"
   | "runtime_narrative_invalid_output"
-  | "runtime_narrative_output_unavailable";
+  | "runtime_narrative_output_unavailable"
+  | "runtime_fee_classification_review_not_needed"
+  | "runtime_fee_classification_review_diagnostic_only"
+  | "runtime_fee_classification_review_disabled"
+  | "runtime_fee_classification_review_failed"
+  | "runtime_fee_classification_review_timed_out"
+  | "runtime_fee_classification_review_safety_blocked"
+  | "runtime_fee_classification_review_rejected";
 
 export type RuntimeAiCapabilitySnapshot = {
   capability: CanonicalAiCapabilityId;
@@ -29,6 +39,8 @@ export type RuntimeAiCapabilitySnapshot = {
   safeCounts: Record<string, number>;
   executionRef: string | null;
   reasonCodes: RuntimeAiCapabilityReasonCode[];
+  runtimeReviewStatus?: CanonicalRuntimeFeeClassificationReviewStatus;
+  runtimeFeeClassificationReview?: CanonicalRuntimeFeeClassificationReview;
 };
 
 export type RuntimeAiCapabilityAdapterResult = {
@@ -40,7 +52,11 @@ export function buildRuntimeAiCapabilityHarnessInputs(input: {
   summary: AnalysisSummary | null | undefined;
   analysis: CanonicalStatementAnalysis;
 }): RuntimeAiCapabilityAdapterResult {
-  const analysisRecord = ownRecordField(input.summary, "fiservFeeAnalysisV2", ["aiAnomalyReview", "aiMerchantNarrative"]);
+  const analysisRecord = ownRecordField(input.summary, "fiservFeeAnalysisV2", [
+    "aiAnomalyReview",
+    "aiMerchantNarrative",
+    "runtimeFeeClassificationReview",
+  ]);
   if (!analysisRecord) return { harnessInputs: [], snapshots: [] };
 
   const candidates = [
@@ -54,6 +70,7 @@ export function buildRuntimeAiCapabilityHarnessInputs(input: {
       ]),
     ),
     merchantNarrativeCapabilityInput(ownRecordField(analysisRecord, "aiMerchantNarrative", ["status", "attempted", "factCount", "factsUsed"])),
+    feeClassificationCapabilityInput(ownRecordField(analysisRecord, "runtimeFeeClassificationReview"), input.analysis),
   ].filter((candidate): candidate is { harnessInput: CanonicalAiCapabilityHarnessInput; snapshot: RuntimeAiCapabilitySnapshot } =>
     Boolean(candidate),
   );
@@ -64,6 +81,31 @@ export function buildRuntimeAiCapabilityHarnessInputs(input: {
     harnessInputs: candidates.map((candidate) => candidate.harnessInput),
     snapshots: candidates.map((candidate) => candidate.snapshot),
   };
+}
+
+function feeClassificationCapabilityInput(
+  metadata: Record<string, unknown> | null,
+  analysis: CanonicalStatementAnalysis,
+): { harnessInput: CanonicalAiCapabilityHarnessInput; snapshot: RuntimeAiCapabilitySnapshot } | null {
+  if (!metadata) return null;
+  const capability = "fee_classification_review" as const;
+  const result = validateCanonicalRuntimeFeeClassificationReview(metadata, analysis);
+  const review = result.review;
+  const safeCounts = {
+    materialFeeRowCount: result.packet.materialFeeRowRefs.length,
+    reviewedFeeRowCount: review.reviewedFeeRowRefs.length,
+    suggestionCount: review.suggestions.length,
+  };
+  const status = packageFStatusForFeeClassificationReview(review.status);
+  return capabilityResult({
+    capability,
+    status,
+    attempted: !["disabled", "not_needed"].includes(review.status),
+    safeCounts,
+    reasonCodes: reasonCodesForFeeClassificationReview(review.status, result.ok),
+    runtimeReviewStatus: review.status,
+    runtimeFeeClassificationReview: review,
+  });
 }
 
 function anomalyCapabilityInput(
@@ -220,6 +262,8 @@ function capabilityResult(input: {
   output?: CanonicalAiCapabilityOutput;
   safeCounts: Record<string, number>;
   reasonCodes: RuntimeAiCapabilityReasonCode[];
+  runtimeReviewStatus?: CanonicalRuntimeFeeClassificationReviewStatus;
+  runtimeFeeClassificationReview?: CanonicalRuntimeFeeClassificationReview;
 }): { harnessInput: CanonicalAiCapabilityHarnessInput; snapshot: RuntimeAiCapabilitySnapshot } {
   return {
     harnessInput: {
@@ -236,8 +280,35 @@ function capabilityResult(input: {
       safeCounts: input.safeCounts,
       executionRef: null,
       reasonCodes: [...input.reasonCodes].sort(),
+      ...(input.runtimeReviewStatus ? { runtimeReviewStatus: input.runtimeReviewStatus } : {}),
+      ...(input.runtimeFeeClassificationReview ? { runtimeFeeClassificationReview: input.runtimeFeeClassificationReview } : {}),
     },
   };
+}
+
+function packageFStatusForFeeClassificationReview(
+  status: CanonicalRuntimeFeeClassificationReviewStatus,
+): CanonicalAiCapabilityStatus {
+  if (status === "not_needed") return "not_needed";
+  if (status === "disabled" || status === "failed" || status === "timed_out" || status === "rejected" || status === "safety_blocked") {
+    return status;
+  }
+  return "completed_diagnostic";
+}
+
+function reasonCodesForFeeClassificationReview(
+  status: CanonicalRuntimeFeeClassificationReviewStatus,
+  valid: boolean,
+): RuntimeAiCapabilityReasonCode[] {
+  if (!valid && status === "safety_blocked") return ["runtime_fee_classification_review_safety_blocked"];
+  if (!valid) return ["runtime_fee_classification_review_rejected"];
+  if (status === "not_needed") return ["runtime_fee_classification_review_not_needed"];
+  if (status === "disabled") return ["runtime_fee_classification_review_disabled"];
+  if (status === "failed") return ["runtime_fee_classification_review_failed"];
+  if (status === "timed_out") return ["runtime_fee_classification_review_timed_out"];
+  if (status === "safety_blocked") return ["runtime_fee_classification_review_safety_blocked"];
+  if (status === "rejected") return ["runtime_fee_classification_review_rejected"];
+  return ["runtime_fee_classification_review_diagnostic_only"];
 }
 
 function cleanAnomalyOutput(): CanonicalAiCapabilityOutput {

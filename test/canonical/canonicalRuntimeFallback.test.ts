@@ -141,6 +141,19 @@ describe("canonical runtime shadow fallback", () => {
           provider: "openai",
           model: "private-model",
         },
+        runtimeFeeClassificationReview: {
+          type: "runtime_fee_classification_review",
+          policyVersion: "canonical_runtime_fee_classification_review_v1",
+          status: "not_needed",
+          reviewedFeeRowRefs: [],
+          suggestions: [],
+          absenceProof: "deterministic_absence_proven:material_unresolved_fee_rows",
+          limitationCodes: [],
+          reasonCodes: ["runtime_fee_classification_reviewed"],
+          authoritative: false,
+          financialMutationAllowed: false,
+          providerDetailsStripped: true,
+        },
       },
     };
     const beforeSummary = JSON.parse(JSON.stringify(summary));
