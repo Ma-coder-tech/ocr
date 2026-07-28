@@ -127,6 +127,46 @@ describe("canonical runtime shadow fallback", () => {
     expect(reportAfter).toEqual(reportBefore);
   });
 
+  it("does not mutate AI-stage metadata, customer summary, or Report V1 DTO when readiness mapping runs", async () => {
+    const document = syntheticSummaryDocument();
+    const summary = {
+      ...analyzeDocument(document, "retail"),
+      fiservFeeAnalysisV2: {
+        aiAnomalyReview: {
+          status: "no_anomalies",
+          attempted: true,
+          anomalyCount: 0,
+          overrideCount: 0,
+          appliedOverrideCount: 0,
+          provider: "openai",
+          model: "private-model",
+        },
+      },
+    };
+    const beforeSummary = JSON.parse(JSON.stringify(summary));
+    const reportBefore = buildSingleStatementReportV1({
+      analysis: summary,
+      reportId: "report-shadow-ai-readiness-invariance",
+      generatedAt: "2026-07-27T00:00:00.000Z",
+    });
+
+    await runCanonicalRuntimeShadow({
+      document,
+      businessType: "retail",
+      summary,
+      runtimeDocumentRef: "job_report_ai_readiness_invariance",
+      env: { RATEREVEAL_CANONICAL_SHADOW_ENABLED: "true" },
+    });
+
+    const reportAfter = buildSingleStatementReportV1({
+      analysis: summary,
+      reportId: "report-shadow-ai-readiness-invariance",
+      generatedAt: "2026-07-27T00:00:00.000Z",
+    });
+    expect(summary).toEqual(beforeSummary);
+    expect(reportAfter).toEqual(reportBefore);
+  });
+
   it("isolates shadow construction and canonical validation failures", async () => {
     const document = syntheticSummaryDocument();
     const summary = analyzeDocument(document, "retail");
@@ -270,6 +310,7 @@ describe("canonical runtime shadow fallback", () => {
 
   it("does not import persistence or artifact write paths from H1 shadow modules", () => {
     const files = [
+      "src/canonical/runtimeAiCapabilityAdapter.ts",
       "src/canonical/runtimeAdapter.ts",
       "src/canonical/runtimeShadow.ts",
       "src/canonical/runtimeShadowComparison.ts",

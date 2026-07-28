@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildCanonicalAiCapabilities } from "../../src/canonical/buildCanonicalAiCapabilities.js";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
+import { buildCanonicalRuntimeAnalysis } from "../../src/canonical/runtimeAdapter.js";
+import { analyzeDocument } from "../../src/analyzer.js";
 import type { CanonicalAiCapabilityOutput } from "../../src/canonical/types.js";
 import type { ParsedDocument } from "../../src/parser.js";
 
@@ -8,7 +10,7 @@ describe("canonical AI financial invariance", () => {
   it("does not change canonical financial facts or Package E totals when diagnostics change", () => {
     const analysis = buildCanonicalStatementFactsFromParsedDocument(syntheticStatement(), {
       sourceFileName: "package-f-invariance.pdf",
-      businessType: "restaurant",
+      businessType: "restaurant_food_beverage",
     });
     const before = financialProjection(analysis);
     const output = groundedAnomalyOutput(analysis.evidence[0]!.id);
@@ -39,7 +41,7 @@ describe("canonical AI financial invariance", () => {
   it("does not mutate Packages B-E when capability order, suggestion order, optional narrative, or required failure states change", () => {
     const analysis = buildCanonicalStatementFactsFromParsedDocument(syntheticStatement(), {
       sourceFileName: "package-f-invariance-variants.pdf",
-      businessType: "restaurant",
+      businessType: "restaurant_food_beverage",
     });
     const before = financialProjection(analysis);
     const variants = [
@@ -91,6 +93,35 @@ describe("canonical AI financial invariance", () => {
       const variant = structuredClone(analysis);
       variant.aiCapabilities = buildCanonicalAiCapabilities({ ...variant, evidence: variant.evidence, harnessInputs });
       expect(financialProjection(variant)).toEqual(before);
+    }
+  });
+
+  it("does not mutate Packages B-E when runtime AI readiness metadata changes", () => {
+    const document = syntheticStatement();
+    const base = buildCanonicalRuntimeAnalysis({
+      document,
+      businessType: "restaurant_food_beverage",
+      runtimeDocumentRef: "job_runtime_financial_invariance_base",
+      legacySummary: runtimeSummary({}),
+    }).analysis;
+    const before = financialProjection(base);
+    const variants = [
+      { status: "no_anomalies", attempted: true, anomalyCount: 0, overrideCount: 0, appliedOverrideCount: 0, provider: "openai" },
+      { status: "applied", attempted: true, anomalyCount: 2, overrideCount: 0, appliedOverrideCount: 0, provider: "anthropic" },
+      { status: "applied", attempted: true, anomalyCount: 0, overrideCount: 1, appliedOverrideCount: 1, overrides: [{ correctedValue: "unsafe" }] },
+      { status: "disabled", attempted: false },
+      { status: "failed", attempted: true, notes: ["timeout after configured limit"] },
+      { status: "malformed", attempted: true },
+    ];
+
+    for (const aiAnomalyReview of variants) {
+      const analysis = buildCanonicalRuntimeAnalysis({
+        document,
+        businessType: "restaurant_food_beverage",
+        runtimeDocumentRef: "job_runtime_financial_invariance_variant",
+        legacySummary: runtimeSummary({ aiAnomalyReview }),
+      }).analysis;
+      expect(financialProjection(analysis)).toEqual(before);
     }
   });
 });
@@ -186,5 +217,12 @@ function syntheticStatement(): ParsedDocument {
       amountTokenCount: lines.length,
       hasExtractableText: true,
     },
+  };
+}
+
+function runtimeSummary(fiservFeeAnalysisV2: Record<string, unknown>) {
+  return {
+    ...analyzeDocument(syntheticStatement(), "restaurant_food_beverage"),
+    fiservFeeAnalysisV2,
   };
 }

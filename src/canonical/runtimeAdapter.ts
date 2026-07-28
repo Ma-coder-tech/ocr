@@ -1,4 +1,11 @@
 import { buildCanonicalStatementFactsFromParsedDocument } from "./buildCanonicalFacts.js";
+import { buildCanonicalAiCapabilities } from "./buildCanonicalAiCapabilities.js";
+import { buildCanonicalCustomerState } from "./customerStateResolver.js";
+import {
+  buildRuntimeAiCapabilityHarnessInputs,
+  type RuntimeAiCapabilitySnapshot,
+} from "./runtimeAiCapabilityAdapter.js";
+import { validateCanonicalStatementAnalysis } from "./validate.js";
 import type { BusinessTypeId } from "../businessTypes.js";
 import type { ParsedDocument } from "../parser.js";
 import type { AnalysisSummary } from "../types.js";
@@ -103,6 +110,12 @@ export const CANONICAL_RUNTIME_INPUT_ADMISSION_TABLE: readonly CanonicalRuntimeI
     canonicalUse: "No approved runtime opportunity-input source exists in H1.",
     reasonCode: "runtime_opportunity_inputs_unavailable",
   },
+  {
+    input: "runtime_ai_capability_status_metadata",
+    status: "diagnostic_only",
+    canonicalUse: "Package F readiness only; never canonical facts, fee rows, targets, cadence, calculations, opportunities, Report V1, or customer output.",
+    reasonCode: "runtime_ai_readiness_adapter",
+  },
 ] as const;
 
 export type CanonicalRuntimeAdapterInput = {
@@ -115,23 +128,56 @@ export type CanonicalRuntimeAdapterInput = {
 export type CanonicalRuntimeAdapterResult = {
   analysis: CanonicalStatementAnalysis;
   inputAdmission: CanonicalRuntimeInputAdmission[];
+  runtimeAiCapabilitySnapshots: RuntimeAiCapabilitySnapshot[];
 };
 
 export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInput): CanonicalRuntimeAdapterResult {
   const document = cloneJson(input.document);
   const businessType = input.businessType;
   const runtimeDocumentRef = opaqueRuntimeRef(input.runtimeDocumentRef);
-  void cloneJson(input.legacySummary ?? null);
+  const legacySummary = cloneJson(input.legacySummary ?? null);
 
   const analysis = buildCanonicalStatementFactsFromParsedDocument(document, {
     businessType,
     sourceAnalysisId: runtimeDocumentRef,
     sourceFileName: null,
   });
+  const runtimeAi = buildRuntimeAiCapabilityHarnessInputs({
+    summary: legacySummary,
+    analysis,
+  });
+  const aiCapabilities =
+    runtimeAi.harnessInputs.length === 0
+      ? analysis.aiCapabilities
+      : buildCanonicalAiCapabilities({
+          identity: analysis.identity,
+          financialFacts: analysis.financialFacts,
+          feeLedger: analysis.feeLedger,
+          feeOwnershipActionability: analysis.feeOwnershipActionability,
+          opportunityEngine: analysis.opportunityEngine,
+          evidence: analysis.evidence,
+          harnessInputs: runtimeAi.harnessInputs,
+        });
+  const finalAnalysis =
+    runtimeAi.harnessInputs.length === 0
+      ? analysis
+      : validateCanonicalStatementAnalysis({
+          ...analysis,
+          aiCapabilities,
+          customerState: buildCanonicalCustomerState({
+            identity: analysis.identity,
+            financialFacts: analysis.financialFacts,
+            feeLedger: analysis.feeLedger,
+            feeOwnershipActionability: analysis.feeOwnershipActionability,
+            opportunityEngine: analysis.opportunityEngine,
+            aiCapabilities,
+          }),
+        });
 
   return {
-    analysis,
+    analysis: finalAnalysis,
     inputAdmission: canonicalRuntimeInputAdmissionTable(),
+    runtimeAiCapabilitySnapshots: runtimeAi.snapshots,
   };
 }
 
