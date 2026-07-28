@@ -123,6 +123,65 @@ describe("canonical AI financial invariance", () => {
       }).analysis;
       expect(financialProjection(analysis)).toEqual(before);
     }
+
+    const feeReviewVariants = [
+      {
+        runtimeFeeClassificationReview: {
+          type: "runtime_fee_classification_review",
+          policyVersion: "canonical_runtime_fee_classification_review_v1",
+          status: "not_needed",
+          reviewedFeeRowRefs: [],
+          suggestions: [],
+          absenceProof: "deterministic_absence_proven:material_unresolved_fee_rows",
+          limitationCodes: [],
+          reasonCodes: ["runtime_fee_classification_reviewed"],
+          authoritative: false,
+          financialMutationAllowed: false,
+          providerDetailsStripped: true,
+        },
+      },
+      {
+        runtimeFeeClassificationReview: {
+          type: "runtime_fee_classification_review",
+          policyVersion: "canonical_runtime_fee_classification_review_v1",
+          status: "completed_with_diagnostic_suggestions",
+          reviewedFeeRowRefs: ["feerow_unknown"],
+          suggestions: [{ feeRowRef: "feerow_unknown", evidenceRefs: [], suggestedCategory: "processor_markup", confidence: "high", disposition: "suggest_alternative", reasonCodes: ["runtime_fee_classification_reviewed"], authoritative: false }],
+          absenceProof: null,
+          limitationCodes: [],
+          reasonCodes: ["runtime_fee_classification_reviewed"],
+          authoritative: false,
+          financialMutationAllowed: false,
+          providerDetailsStripped: true,
+        },
+      },
+      {
+        runtimeFeeClassificationReview: {
+          type: "runtime_fee_classification_review",
+          policyVersion: "canonical_runtime_fee_classification_review_v1",
+          status: "failed",
+          reviewedFeeRowRefs: [],
+          suggestions: [],
+          absenceProof: null,
+          limitationCodes: [],
+          reasonCodes: ["runtime_fee_classification_reviewed"],
+          authoritative: false,
+          financialMutationAllowed: false,
+          providerDetailsStripped: true,
+          provider: "openai",
+          amountMinor: 100,
+        },
+      },
+    ];
+    for (const fiservFeeAnalysisV2 of feeReviewVariants) {
+      const analysis = buildCanonicalRuntimeAnalysis({
+        document,
+        businessType: "restaurant_food_beverage",
+        runtimeDocumentRef: "job_runtime_fee_review_financial_invariance_variant",
+        legacySummary: runtimeSummary(fiservFeeAnalysisV2),
+      }).analysis;
+      expect(financialProjection(analysis)).toEqual(before);
+    }
   });
 });
 

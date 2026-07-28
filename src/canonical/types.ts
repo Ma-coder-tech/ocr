@@ -703,7 +703,15 @@ export type CanonicalAiCapabilityId =
   | "merchant_narrative"
   | "document_quality_review";
 
-export type CanonicalAiCapabilityStatus = "completed" | "not_needed" | "disabled" | "failed" | "timed_out" | "safety_blocked" | "rejected";
+export type CanonicalAiCapabilityStatus =
+  | "completed"
+  | "completed_diagnostic"
+  | "not_needed"
+  | "disabled"
+  | "failed"
+  | "timed_out"
+  | "safety_blocked"
+  | "rejected";
 export type CanonicalAiFinancialReadiness = "ready" | "limited" | "withheld";
 export type CanonicalAiExplanationReadiness = "ai_enhanced" | "deterministic_fallback" | "unavailable";
 export type CanonicalAiExplanationSource = "accepted_ai_narrative" | "deterministic_template" | "none";
@@ -718,6 +726,47 @@ export type CanonicalAiLimitationCode =
   | "ai_output_rejected"
   | "provider_unavailable"
   | "deterministic_explanation_available";
+
+export type CanonicalRuntimeFeeClassificationReviewStatus =
+  | "not_needed"
+  | "completed_no_suggestions"
+  | "completed_with_diagnostic_suggestions"
+  | "disabled"
+  | "failed"
+  | "timed_out"
+  | "rejected"
+  | "safety_blocked";
+
+export type CanonicalRuntimeFeeClassificationReviewDisposition =
+  | "confirm_existing"
+  | "suggest_alternative"
+  | "needs_human_review"
+  | "insufficient_evidence";
+
+export type CanonicalRuntimeFeeClassificationSuggestion = {
+  feeRowRef: string;
+  evidenceRefs: string[];
+  currentClassificationCandidateRef: string | null;
+  suggestedCategory: CanonicalFeeCategory;
+  confidence: CanonicalFeeClassificationConfidence;
+  disposition: CanonicalRuntimeFeeClassificationReviewDisposition;
+  reasonCodes: string[];
+  authoritative: false;
+};
+
+export type CanonicalRuntimeFeeClassificationReview = {
+  type: "runtime_fee_classification_review";
+  policyVersion: "canonical_runtime_fee_classification_review_v1";
+  status: CanonicalRuntimeFeeClassificationReviewStatus;
+  reviewedFeeRowRefs: string[];
+  suggestions: CanonicalRuntimeFeeClassificationSuggestion[];
+  absenceProof: string | null;
+  limitationCodes: CanonicalAiLimitationCode[];
+  reasonCodes: string[];
+  authoritative: false;
+  financialMutationAllowed: false;
+  providerDetailsStripped: true;
+};
 
 export type CanonicalRuntimeSafetyReviewStatus = "passed" | "limited" | "withheld" | "unavailable";
 export type CanonicalRuntimeSafetyReviewCheckStatus = "pass" | "limited" | "withheld" | "unavailable" | "not_applicable";

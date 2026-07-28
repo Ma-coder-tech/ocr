@@ -17,7 +17,16 @@ import {
 } from "./deterministicRuntimeSafetyReview.js";
 import type { CanonicalAiCapabilityLayer, CanonicalStatementAnalysis } from "./types.js";
 
-const SUPPORTED_AI_CAPABILITY_STATUSES = ["completed", "not_needed", "disabled", "failed", "timed_out", "safety_blocked", "rejected"] as const;
+const SUPPORTED_AI_CAPABILITY_STATUSES = [
+  "completed",
+  "completed_diagnostic",
+  "not_needed",
+  "disabled",
+  "failed",
+  "timed_out",
+  "safety_blocked",
+  "rejected",
+] as const;
 
 export function validateCanonicalAiCapabilityLayer(analysis: CanonicalStatementAnalysis, errors: string[]): void {
   const layer = analysis.aiCapabilities;
@@ -72,6 +81,9 @@ export function validateCanonicalAiCapabilityLayer(analysis: CanonicalStatementA
     }
     if (capability.status === "not_needed" && capability.trigger.absenceProof === null) errors.push(`Package F capability ${capability.id} is not_needed without absence proof.`);
     if (capability.status === "not_needed" && capability.output) errors.push(`Package F capability ${capability.id} is not_needed with output.`);
+    if (capability.status === "completed_diagnostic" && capability.output) {
+      errors.push(`Package F capability ${capability.id} has diagnostic status carrying customer-safe output.`);
+    }
     if (capability.executionRef && !/^ai_exec_[a-z0-9]{8,64}$/.test(capability.executionRef)) errors.push(`Package F capability ${capability.id} has malformed or non-opaque executionRef.`);
     for (const independentReviewRef of capability.independentReviewRefs) {
       if (!evidenceIds.has(independentReviewRef) && !calculationIds.has(independentReviewRef)) errors.push(`Package F capability ${capability.id} has broken independent-review reference ${independentReviewRef}.`);
