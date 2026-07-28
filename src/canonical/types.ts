@@ -719,6 +719,78 @@ export type CanonicalAiLimitationCode =
   | "provider_unavailable"
   | "deterministic_explanation_available";
 
+export type CanonicalRuntimeSafetyReviewStatus = "passed" | "limited" | "withheld" | "unavailable";
+export type CanonicalRuntimeSafetyReviewCheckStatus = "pass" | "limited" | "withheld" | "unavailable" | "not_applicable";
+
+export type CanonicalRuntimeSafetyReviewCheckId =
+  | "canonical_schema_valid"
+  | "core_facts_safe"
+  | "effective_rate_basis_safe"
+  | "fee_ledger_status_safe"
+  | "fee_ledger_controls_nonblocking"
+  | "package_d_review_items_preserved"
+  | "package_e_totals_reconstructed"
+  | "runtime_anomaly_ai_substitutable"
+  | "runtime_ai_override_absent"
+  | "package_g_canonical_derivation_only"
+  | "shadow_comparison_not_used";
+
+export type CanonicalRuntimeSafetyReviewReasonCode =
+  | "canonical_schema_valid"
+  | "core_facts_safe"
+  | "effective_rate_basis_safe"
+  | "fee_ledger_available"
+  | "fee_ledger_partial_limitations_explicit"
+  | "fee_ledger_unavailable"
+  | "fee_ledger_blocked_control"
+  | "package_d_unresolved_classifications_preserved"
+  | "package_e_totals_reconstructed"
+  | "runtime_anomaly_ai_absent"
+  | "runtime_anomaly_ai_disabled"
+  | "runtime_anomaly_ai_completed"
+  | "runtime_anomaly_ai_failed"
+  | "runtime_anomaly_ai_timed_out"
+  | "runtime_anomaly_ai_rejected"
+  | "runtime_anomaly_ai_safety_blocked"
+  | "runtime_ai_override_not_applied"
+  | "runtime_ai_override_blocks_substitution"
+  | "package_g_canonical_derivation_only"
+  | "shadow_comparison_not_used";
+
+export type CanonicalRuntimeSafetyReviewProof = {
+  type: "deterministic_runtime_safety_substitution";
+  policyVersion: "canonical_runtime_safety_review_v1";
+  reviewId: "canonical_runtime_safety_review";
+  reasonCodes: CanonicalRuntimeSafetyReviewReasonCode[];
+  evidenceRefs: string[];
+  calculationRefs: string[];
+  limitationCodes: CanonicalAiLimitationCode[];
+};
+
+export type CanonicalRuntimeSafetyReviewCheck = {
+  checkId: CanonicalRuntimeSafetyReviewCheckId;
+  status: CanonicalRuntimeSafetyReviewCheckStatus;
+  reasonCode: CanonicalRuntimeSafetyReviewReasonCode;
+  evidenceRefs: string[];
+  calculationRefs: string[];
+};
+
+export type CanonicalRuntimeSafetyReviewRecord = {
+  id: "canonical_runtime_safety_review";
+  policyVersion: "canonical_runtime_safety_review_v1";
+  status: CanonicalRuntimeSafetyReviewStatus;
+  checks: CanonicalRuntimeSafetyReviewCheck[];
+  anomalySubstitutionAllowed: boolean;
+  anomalySubstitutionProof: CanonicalRuntimeSafetyReviewProof | null;
+  aiAuthorityUsed: false;
+  financialMutationAllowed: false;
+  shadowComparisonUsed: false;
+  reasonCodes: CanonicalRuntimeSafetyReviewReasonCode[];
+  limitationCodes: CanonicalAiLimitationCode[];
+  evidenceRefs: string[];
+  calculationRefs: string[];
+};
+
 export type CanonicalAiTriggerReasonCode =
   | "required_for_customer_financial_conclusions"
   | "material_unresolved_fee_rows"
@@ -879,6 +951,7 @@ export type CanonicalAiCapabilitySummary = {
   readinessPolicyVersion: "ai_readiness_degradation_policy_v1";
   privacyRetentionPolicyVersion: "ai_privacy_retention_policy_v1";
   deterministicExplanationPolicyVersion: "deterministic_explanation_policy_v1";
+  deterministicRuntimeSafetyReviewPolicyVersion: "canonical_runtime_safety_review_v1";
   financialReadiness: CanonicalAiFinancialReadiness;
   explanationReadiness: CanonicalAiExplanationReadiness;
   explanationSource: CanonicalAiExplanationSource;
@@ -896,7 +969,9 @@ export type CanonicalAiCapabilityLayer = {
   readinessPolicyVersion: "ai_readiness_degradation_policy_v1";
   privacyRetentionPolicyVersion: "ai_privacy_retention_policy_v1";
   deterministicExplanationPolicyVersion: "deterministic_explanation_policy_v1";
+  deterministicRuntimeSafetyReviewPolicyVersion: "canonical_runtime_safety_review_v1";
   capabilities: CanonicalAiCapabilityRecord[];
+  deterministicRuntimeSafetyReview: CanonicalRuntimeSafetyReviewRecord | null;
   deterministicExplanation: CanonicalDeterministicExplanationRecord;
   summary: CanonicalAiCapabilitySummary;
   limitations: string[];

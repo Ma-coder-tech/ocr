@@ -5,6 +5,10 @@ import {
   buildRuntimeAiCapabilityHarnessInputs,
   type RuntimeAiCapabilitySnapshot,
 } from "./runtimeAiCapabilityAdapter.js";
+import {
+  addDeterministicAnomalySubstitution,
+  buildDeterministicRuntimeSafetyReview,
+} from "./deterministicRuntimeSafetyReview.js";
 import { validateCanonicalStatementAnalysis } from "./validate.js";
 import type { BusinessTypeId } from "../businessTypes.js";
 import type { ParsedDocument } from "../parser.js";
@@ -146,8 +150,17 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
     summary: legacySummary,
     analysis,
   });
+  const deterministicRuntimeSafetyReview = buildDeterministicRuntimeSafetyReview({
+    analysis,
+    runtimeAiCapabilitySnapshots: runtimeAi.snapshots,
+  });
+  const harnessInputs = addDeterministicAnomalySubstitution({
+    harnessInputs: runtimeAi.harnessInputs,
+    review: deterministicRuntimeSafetyReview,
+    runtimeAiCapabilitySnapshots: runtimeAi.snapshots,
+  });
   const aiCapabilities =
-    runtimeAi.harnessInputs.length === 0
+    harnessInputs.length === 0 && !deterministicRuntimeSafetyReview
       ? analysis.aiCapabilities
       : buildCanonicalAiCapabilities({
           identity: analysis.identity,
@@ -156,10 +169,11 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
           feeOwnershipActionability: analysis.feeOwnershipActionability,
           opportunityEngine: analysis.opportunityEngine,
           evidence: analysis.evidence,
-          harnessInputs: runtimeAi.harnessInputs,
+          harnessInputs,
+          deterministicRuntimeSafetyReview,
         });
   const finalAnalysis =
-    runtimeAi.harnessInputs.length === 0
+    harnessInputs.length === 0 && !deterministicRuntimeSafetyReview
       ? analysis
       : validateCanonicalStatementAnalysis({
           ...analysis,

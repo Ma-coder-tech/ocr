@@ -76,7 +76,7 @@ export function determineAiCapabilityNeeds(input: {
               opportunityComponentRefs: [],
               absenceProof: "Materiality v1 has no dollar threshold; all nonzero unresolved counted fee rows are material.",
             },
-      failureFinancialReadiness: materialFeeRows.length > 0 ? "withheld" : "ready",
+      failureFinancialReadiness: materialFeeRows.length > 0 ? "limited" : "ready",
       failureLimitationCodes: materialFeeRows.length > 0 ? ["material_fee_classification_review_required", "provider_unavailable"] : [],
     },
     {

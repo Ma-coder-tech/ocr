@@ -353,11 +353,11 @@ describe("canonical AI capability boundary", () => {
 
     const nonzeroUnknownCategory = feeClassificationNeed(analysis, 500, "unknown_needs_review", "unknown");
     expect(nonzeroUnknownCategory.required).toBe(true);
-    expect(nonzeroUnknownCategory.failureFinancialReadiness).toBe("withheld");
+    expect(nonzeroUnknownCategory.failureFinancialReadiness).toBe("limited");
 
     const nonzeroUnresolvedOwnership = feeClassificationNeed(analysis, 500, "processor_markup", "unknown");
     expect(nonzeroUnresolvedOwnership.required).toBe(true);
-    expect(nonzeroUnresolvedOwnership.failureFinancialReadiness).toBe("withheld");
+    expect(nonzeroUnresolvedOwnership.failureFinancialReadiness).toBe("limited");
   });
 });
 
