@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { AnalysisSummary } from "../types.js";
 import type { CanonicalAiCapabilityHarnessInput } from "./buildCanonicalAiCapabilities.js";
 import type {
@@ -9,7 +8,6 @@ import type {
 } from "./types.js";
 
 export type RuntimeAiCapabilityReasonCode =
-  | "runtime_anomaly_review_completed"
   | "runtime_anomaly_review_no_issues_found"
   | "runtime_anomaly_review_failed"
   | "runtime_anomaly_review_disabled"
@@ -29,7 +27,7 @@ export type RuntimeAiCapabilitySnapshot = {
   attempted: boolean;
   normalizedStatus: CanonicalAiCapabilityStatus;
   safeCounts: Record<string, number>;
-  executionRef: string;
+  executionRef: string | null;
   reasonCodes: RuntimeAiCapabilityReasonCode[];
 };
 
@@ -98,7 +96,35 @@ function anomalyCapabilityInput(
   if (status === "safety_blocked") {
     return capabilityResult({ capability, attempted, status: "safety_blocked", safeCounts, reasonCodes: ["runtime_anomaly_review_safety_blocked"] });
   }
-  if (status === "applied" || status === "no_anomalies") {
+  if (status === "no_anomalies") {
+    if (!attempted || anomalyCount === null || overrideCount === null || appliedOverrideCount === null) {
+      return capabilityResult({
+        capability,
+        attempted,
+        status: "rejected",
+        safeCounts,
+        reasonCodes: ["runtime_anomaly_review_invalid_output"],
+      });
+    }
+    if (anomalyCount !== 0 || overrideCount !== 0 || appliedOverrideCount !== 0) {
+      return capabilityResult({
+        capability,
+        attempted,
+        status: "rejected",
+        safeCounts,
+        reasonCodes: ["runtime_anomaly_review_invalid_output"],
+      });
+    }
+    return capabilityResult({
+      capability,
+      attempted,
+      status: "completed",
+      output: cleanAnomalyOutput(),
+      safeCounts,
+      reasonCodes: ["runtime_anomaly_review_no_issues_found"],
+    });
+  }
+  if (status === "applied") {
     if (!attempted || anomalyCount === null || overrideCount === null || appliedOverrideCount === null) {
       return capabilityResult({
         capability,
@@ -117,22 +143,12 @@ function anomalyCapabilityInput(
         reasonCodes: ["runtime_anomaly_review_safety_blocked"],
       });
     }
-    if (appliedOverrideCount > overrideCount) {
-      return capabilityResult({
-        capability,
-        attempted,
-        status: "rejected",
-        safeCounts,
-        reasonCodes: ["runtime_anomaly_review_invalid_output"],
-      });
-    }
     return capabilityResult({
       capability,
       attempted,
-      status: "completed",
-      output: anomalyOutput(status === "no_anomalies" ? 0 : Math.max(anomalyCount, overrideCount)),
+      status: "rejected",
       safeCounts,
-      reasonCodes: [status === "no_anomalies" ? "runtime_anomaly_review_no_issues_found" : "runtime_anomaly_review_completed"],
+      reasonCodes: ["runtime_anomaly_review_invalid_output"],
     });
   }
   if (status) {
@@ -205,13 +221,12 @@ function capabilityResult(input: {
   safeCounts: Record<string, number>;
   reasonCodes: RuntimeAiCapabilityReasonCode[];
 }): { harnessInput: CanonicalAiCapabilityHarnessInput; snapshot: RuntimeAiCapabilitySnapshot } {
-  const executionRef = executionRefFor(input);
   return {
     harnessInput: {
       capability: input.capability,
       status: input.status,
       output: input.output ?? null,
-      executionRef,
+      executionRef: null,
       independentReviewRefs: [],
     },
     snapshot: {
@@ -219,45 +234,21 @@ function capabilityResult(input: {
       attempted: input.attempted,
       normalizedStatus: input.status,
       safeCounts: input.safeCounts,
-      executionRef,
+      executionRef: null,
       reasonCodes: [...input.reasonCodes].sort(),
     },
   };
 }
 
-function anomalyOutput(anomalyCount: number): CanonicalAiCapabilityOutput {
+function cleanAnomalyOutput(): CanonicalAiCapabilityOutput {
   return {
     type: "full_statement_anomaly_review",
     authoritative: false,
     evidenceRefs: [],
     factRefs: [],
     limitationCodes: [],
-    observations: Array.from({ length: Math.min(anomalyCount, 25) }, (_, index) => ({
-      id: `obs_runtime_anomaly_${index + 1}`,
-      severity: "review" as const,
-      summary: "Runtime anomaly review completed with a non-authoritative review item.",
-      affectedFactRefs: [],
-      evidenceRefs: [],
-      authoritative: false,
-    })),
+    observations: [],
   };
-}
-
-function executionRefFor(input: {
-  capability: CanonicalAiCapabilityId;
-  attempted: boolean;
-  status: CanonicalAiCapabilityStatus;
-  safeCounts: Record<string, number>;
-  reasonCodes: readonly RuntimeAiCapabilityReasonCode[];
-}): string {
-  const stable = JSON.stringify({
-    capability: input.capability,
-    attempted: input.attempted,
-    status: input.status,
-    safeCounts: Object.fromEntries(Object.entries(input.safeCounts).sort(([left], [right]) => left.localeCompare(right))),
-    reasonCodes: [...input.reasonCodes].sort(),
-  });
-  return `ai_exec_${createHash("sha256").update(stable).digest("hex").slice(0, 16)}`;
 }
 
 function compactCounts(values: Record<string, number | null>): Record<string, number> {

@@ -37,6 +37,7 @@ describe("canonical runtime AI capability adapter", () => {
     const anomaly = ready.aiCapabilities.capabilities.find((capability) => capability.capability === "full_statement_anomaly_review")!;
     expect(anomaly).toMatchObject({ status: "completed", groundingStatus: "grounded" });
     expect(anomaly.output).toMatchObject({ type: "full_statement_anomaly_review", observations: [] });
+    expect(anomaly.executionRef).toBeNull();
     expect(ready.aiCapabilities.summary.financialReadiness).toBe("ready");
     expect(financialProjection(ready)).toEqual(financialProjection(baseline));
     expect(JSON.stringify(ready.aiCapabilities)).not.toMatch(/openai|anthropic|gpt-private|claude|rawError|api.?key|billing/i);
@@ -61,6 +62,7 @@ describe("canonical runtime AI capability adapter", () => {
       { status: "unexpected_status", attempted: true },
       { status: "no_anomalies", attempted: true, anomalyCount: 0, overrideCount: 0, appliedOverrideCount: 0, provider: "anthropic" },
       { provider: "openai", appliedOverrideCount: 0, overrideCount: 0, anomalyCount: 1, attempted: true, status: "applied", amountMinor: 999 },
+      { provider: "openai", appliedOverrideCount: 0, overrideCount: 0, anomalyCount: 0, attempted: true, status: "applied", amountMinor: 999 },
       { appliedOverrideCount: 0, status: "applied", anomalyCount: 1, attempted: true, overrideCount: 0, provider: "anthropic", target: "unsafe" },
     ];
 
@@ -99,24 +101,25 @@ describe("canonical runtime AI capability adapter", () => {
     expect(JSON.stringify(analysis)).not.toMatch(/interchange_plus|correctedValue/i);
   });
 
-  it("maps malformed successful anomaly metadata to rejected", () => {
-    const analysis = buildCanonicalRuntimeAnalysis({
-      document: syntheticStatement(),
-      businessType: "restaurant_food_beverage",
-      runtimeDocumentRef: "job_runtime_ai_invalid",
-      legacySummary: summaryWithAi({
-        aiAnomalyReview: {
-          status: "no_anomalies",
-          attempted: true,
-          anomalyCount: "0",
-          overrideCount: 0,
-          appliedOverrideCount: 0,
-        },
-      }),
-    }).analysis;
+  it("rejects malformed or contradictory no-anomalies metadata", () => {
+    const variants = [
+      { status: "no_anomalies", attempted: true, anomalyCount: "0", overrideCount: 0, appliedOverrideCount: 0 },
+      { status: "no_anomalies", attempted: true, anomalyCount: 1, overrideCount: 0, appliedOverrideCount: 0 },
+      { status: "no_anomalies", attempted: true, anomalyCount: 0, overrideCount: 1, appliedOverrideCount: 0 },
+      { status: "no_anomalies", attempted: true, anomalyCount: 0, overrideCount: 0, appliedOverrideCount: 1 },
+    ];
 
-    expect(analysis.aiCapabilities.capabilities.find((capability) => capability.capability === "full_statement_anomaly_review")!.status).toBe("rejected");
-    expect(analysis.aiCapabilities.summary.financialReadiness).toBe("withheld");
+    for (const aiAnomalyReview of variants) {
+      const analysis = buildCanonicalRuntimeAnalysis({
+        document: syntheticStatement(),
+        businessType: "restaurant_food_beverage",
+        runtimeDocumentRef: "job_runtime_ai_invalid",
+        legacySummary: summaryWithAi({ aiAnomalyReview }),
+      }).analysis;
+
+      expect(analysis.aiCapabilities.capabilities.find((capability) => capability.capability === "full_statement_anomaly_review")!.status).toBe("rejected");
+      expect(analysis.aiCapabilities.summary.financialReadiness).toBe("withheld");
+    }
   });
 
   it("ignores inherited runtime fields and rejects contradictory override metadata", () => {
@@ -154,7 +157,7 @@ describe("canonical runtime AI capability adapter", () => {
     expect(contradictory.aiCapabilities.summary.financialReadiness).toBe("withheld");
   });
 
-  it("keeps suggested override metadata non-authoritative and content-free", () => {
+  it("rejects applied review items that lack independently grounded canonical references", () => {
     const analysis = buildCanonicalRuntimeAnalysis({
       document: syntheticStatement(),
       businessType: "restaurant_food_beverage",
@@ -175,9 +178,55 @@ describe("canonical runtime AI capability adapter", () => {
     }).analysis;
     const anomaly = analysis.aiCapabilities.capabilities.find((capability) => capability.capability === "full_statement_anomaly_review")!;
 
-    expect(anomaly.status).toBe("completed");
-    expect(anomaly.output && "observations" in anomaly.output ? anomaly.output.observations : []).toHaveLength(2);
+    expect(anomaly.status).toBe("rejected");
+    expect(anomaly.output).toBeNull();
+    expect(analysis.aiCapabilities.summary.financialReadiness).toBe("withheld");
     expect(JSON.stringify(anomaly)).not.toMatch(/interchange_plus|flat_rate|raw statement text|\/Users|statement\.pdf/i);
+  });
+
+  it("does not fabricate placeholder observations that could unlock readiness", () => {
+    const analysis = buildCanonicalRuntimeAnalysis({
+      document: syntheticStatement(),
+      businessType: "restaurant_food_beverage",
+      runtimeDocumentRef: "job_runtime_ai_placeholder_guard",
+      legacySummary: summaryWithAi({
+        aiAnomalyReview: {
+          status: "applied",
+          attempted: true,
+          anomalyCount: 2,
+          overrideCount: 0,
+          appliedOverrideCount: 0,
+        },
+      }),
+    }).analysis;
+    const anomaly = analysis.aiCapabilities.capabilities.find((capability) => capability.capability === "full_statement_anomaly_review")!;
+
+    expect(anomaly.status).toBe("rejected");
+    expect(anomaly.groundingStatus).toBe("not_applicable");
+    expect(anomaly.output).toBeNull();
+    expect(analysis.aiCapabilities.summary.financialReadiness).toBe("withheld");
+  });
+
+  it("does not reuse an outcome-pattern execution ref across statement executions", () => {
+    const first = buildCanonicalRuntimeAnalysis({
+      document: syntheticStatement(),
+      businessType: "restaurant_food_beverage",
+      runtimeDocumentRef: "job_runtime_ai_exec_one",
+      legacySummary: summaryWithAi({ aiAnomalyReview: completedAnomaly() }),
+    });
+    const second = buildCanonicalRuntimeAnalysis({
+      document: syntheticStatement(),
+      businessType: "restaurant_food_beverage",
+      runtimeDocumentRef: "job_runtime_ai_exec_two",
+      legacySummary: summaryWithAi({ aiAnomalyReview: completedAnomaly() }),
+    });
+
+    const firstCapability = first.analysis.aiCapabilities.capabilities.find((capability) => capability.capability === "full_statement_anomaly_review")!;
+    const secondCapability = second.analysis.aiCapabilities.capabilities.find((capability) => capability.capability === "full_statement_anomaly_review")!;
+    expect(firstCapability.executionRef).toBeNull();
+    expect(secondCapability.executionRef).toBeNull();
+    expect(first.runtimeAiCapabilitySnapshots.find((snapshot) => snapshot.capability === "full_statement_anomaly_review")!.executionRef).toBeNull();
+    expect(second.runtimeAiCapabilitySnapshots.find((snapshot) => snapshot.capability === "full_statement_anomaly_review")!.executionRef).toBeNull();
   });
 
   it("requires structured timeout status instead of free-form timeout notes", () => {
