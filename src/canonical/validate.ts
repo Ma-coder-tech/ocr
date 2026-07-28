@@ -15,7 +15,14 @@ import {
 } from "./customerStateTypes.js";
 import { aggregateCanonicalOpportunityComponents } from "./opportunityEngine.js";
 import { targetSupportsApprovedEstimate, targetSupportsDeterministic } from "./opportunityPolicy.js";
-import type { CanonicalCustomerPermissionKey, CanonicalOpportunityComponent, CanonicalStatementAnalysis, MoneyAmount } from "./types.js";
+import type {
+  CanonicalCustomerPermissionKey,
+  CanonicalFeeLedgerControl,
+  CanonicalFeeRow,
+  CanonicalOpportunityComponent,
+  CanonicalStatementAnalysis,
+  MoneyAmount,
+} from "./types.js";
 
 export class CanonicalStatementValidationError extends Error {
   readonly errors: string[];
@@ -249,13 +256,33 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
       }
       if (control.expectedAmount && !isMoneyAmount(control.expectedAmount)) errors.push(`Fee ledger control ${control.id} has invalid expected amount.`);
       if (control.actualAmount && !isMoneyAmount(control.actualAmount)) errors.push(`Fee ledger control ${control.id} has invalid actual amount.`);
+      if (control.parserReportedActualAmount && !isMoneyAmount(control.parserReportedActualAmount)) {
+        errors.push(`Fee ledger control ${control.id} has invalid parser-reported diagnostic amount.`);
+      }
       for (const feeRowId of control.coveredFeeRowIds) {
         if (!analysis.feeLedger.rows.some((row) => row.id === feeRowId)) errors.push(`Fee ledger control ${control.id} references missing covered fee row ${feeRowId}.`);
+      }
+      if (control.type === "printed_charge_sum" && control.reconstructedFromCoveredRows) {
+        const reconstructed = reconstructControlActualAmount(control, analysis.feeLedger.rows);
+        if (reconstructed === null) {
+          errors.push(`Fee ledger control ${control.id} cannot reconstruct actual amount from covered fee rows.`);
+        } else if (!control.actualAmount || control.actualAmount.amountMinor !== reconstructed.amountMinor || control.actualAmount.currency !== reconstructed.currency) {
+          errors.push(`Fee ledger control ${control.id} actual amount does not reconstruct from covered fee rows.`);
+        }
+      }
+      if (
+        control.type === "printed_charge_sum" &&
+        control.independence === "printed_source_control" &&
+        control.status !== "limited" &&
+        control.status !== "verification_required" &&
+        control.coveredFeeRowIds.length === 0
+      ) {
+        errors.push(`Fee ledger control ${control.id} passes without deterministic covered fee rows.`);
       }
     }
     if (
       analysis.feeLedger.status === "available" &&
-      analysis.feeLedger.controls.some((control) => control.status === "verification_required" || control.status === "blocked")
+      analysis.feeLedger.controls.some((control) => control.type === "printed_charge_sum" && control.status !== "pass" && control.status !== "pass_with_rounding")
     ) {
       errors.push("Fee ledger is available while a blocking monetary control remains unresolved.");
     }
@@ -431,6 +458,26 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
     throw new CanonicalStatementValidationError(errors, warnings, validated);
   }
   return validated;
+}
+
+function reconstructControlActualAmount(control: CanonicalFeeLedgerControl, rows: CanonicalFeeRow[]): MoneyAmount | null {
+  if (control.coveredFeeRowIds.length === 0) return null;
+  const rowsById = new Map(rows.map((row) => [row.id, row]));
+  let amountMinor = 0;
+  for (const feeRowId of control.coveredFeeRowIds) {
+    const row = rowsById.get(feeRowId);
+    if (!row) return null;
+    if (control.amountBasis === "fee_charge_gross") {
+      if (!row.selectedAmount) return null;
+      amountMinor += Math.abs(row.selectedAmount.amountMinor);
+    } else if (control.amountBasis === "signed_net") {
+      if (!row.signedAmount) return null;
+      amountMinor += row.signedAmount.amountMinor;
+    } else {
+      return null;
+    }
+  }
+  return { amountMinor, currency: "USD" };
 }
 
 function validateCanonicalCustomerState(

@@ -1102,6 +1102,9 @@ export type CanonicalFeeLedgerControl = {
   basis: "section_control" | "grand_control" | "diagnostic" | "unknown";
   amountBasis: "fee_charge_gross" | "signed_net" | "not_applicable" | "unknown";
   independence: "printed_source_control" | "derived_diagnostic" | "unknown";
+  parserReportedActualAmount?: MoneyAmount | null;
+  reconstructedFromCoveredRows?: boolean;
+  reconstructionFormula?: "covered_rows_fee_charge_gross" | "covered_rows_signed_net" | "not_reconstructed";
   reasonCode: string;
   explanation: string;
 };

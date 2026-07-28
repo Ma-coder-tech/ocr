@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { buildCanonicalAiCapabilities } from "../../src/canonical/buildCanonicalAiCapabilities.js";
+import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
 import { buildCanonicalFeeLedger, mergeInterpretations } from "../../src/canonical/feeLedger.js";
 import { buildCanonicalFeeOwnershipActionability } from "../../src/canonical/feeOwnershipActionability.js";
+import { buildCanonicalCustomerState } from "../../src/canonical/customerStateResolver.js";
 import { buildCanonicalOpportunityEngine } from "../../src/canonical/opportunityEngine.js";
 import { occurrenceFromEvidence, sourceOccurrenceId } from "../../src/canonical/feeLedgerIdentity.js";
 import { makeEvidenceRecord } from "../../src/canonical/evidence.js";
+import { validateCanonicalStatementAnalysis } from "../../src/canonical/validate.js";
 import {
   diagnosticPerItemControl,
   diagnosticRateVolumeControl,
@@ -14,7 +18,7 @@ import {
   rateTimesVolumeToleranceMinor,
 } from "../../src/canonical/feeLedgerReconciliation.js";
 import { moneyFromNumber } from "../../src/canonical/money.js";
-import type { CanonicalCalculationRecord, CanonicalEvidenceRecord, CanonicalFeeParserInterpretation } from "../../src/canonical/types.js";
+import type { CanonicalCalculationRecord, CanonicalEvidenceRecord, CanonicalFeeLedger, CanonicalFeeParserInterpretation, CanonicalStatementAnalysis } from "../../src/canonical/types.js";
 import type { ParsedDocument } from "../../src/parser.js";
 
 describe("canonical fee ledger", () => {
@@ -247,6 +251,88 @@ describe("canonical fee ledger", () => {
       ["Unique canonical fee total to printed fee total", "pass", 3],
     ]);
     expect(ledger.status).toBe("available");
+  });
+
+  it("reconstructs printed controls from covered rows instead of trusting parser rowSum", () => {
+    const lines = [
+      "MM/DD | CF | Interchange Program Fee | -$3.50",
+      "MM/DD | CF | Assessment Program Fee | -$4.00",
+      "Total Card Fees | -$3.50",
+      "Total (Miscellaneous Fees and Card Fees) | -$7.50",
+    ];
+    const ledger = ledgerFromRows({
+      documentId: "doc_parser_rowsum_mismatch",
+      lines,
+      rows: [
+        feeRow({ description: "Interchange Program Fee", amount: 3.5, evidenceLine: lines[0]!, sourceSection: "FEES CHARGED", type: "CF", bucket: "cardFees" }),
+        feeRow({ description: "Assessment Program Fee", amount: 4, evidenceLine: lines[1]!, sourceSection: "FEES CHARGED", type: "CF", bucket: "cardFees" }),
+      ],
+      printedTotal: 7.5,
+      controls: [
+        { label: "Total Card Fees", rowSum: 3.5, printedTotal: 3.5, delta: 0, evidenceLine: lines[2] },
+        { label: "Total (Miscellaneous Fees and Card Fees)", rowSum: 7.5, printedTotal: 7.5, delta: 0, evidenceLine: lines[3] },
+      ],
+    });
+
+    const cardControl = ledger.controls.find((control) => control.label === "Total Card Fees")!;
+    expect(cardControl.parserReportedActualAmount).toEqual({ amountMinor: 350, currency: "USD" });
+    expect(cardControl.actualAmount).toEqual({ amountMinor: 750, currency: "USD" });
+    expect(cardControl.status).toBe("verification_required");
+    expect(ledger.rows.every((row) => !row.contributesToUniqueTotal)).toBe(true);
+    expect(ledger.rows.map((row) => row.contributionDecision.reasonCode)).toEqual([
+      "interchange_without_control_coverage",
+      "interchange_without_control_coverage",
+    ]);
+    expect(ledger.status).toBe("partial");
+  });
+
+  it("does not let unknown labels or grand controls alone establish pass-through coverage", () => {
+    const unknown = ledgerFromRows({
+      documentId: "doc_unknown_control_label",
+      lines: ["MM/DD | CF | Interchange Program Fee | -$3.50", "Total Program Magic | -$3.50"],
+      rows: [feeRow({ description: "Interchange Program Fee", amount: 3.5, evidenceLine: "MM/DD | CF | Interchange Program Fee | -$3.50", sourceSection: "FEES CHARGED", type: "CF", bucket: "cardFees" })],
+      printedTotal: 3.5,
+      controls: [{ label: "Total Program Magic", rowSum: 3.5, printedTotal: 3.5, delta: 0, evidenceLine: "Total Program Magic | -$3.50" }],
+    });
+    const grandOnly = ledgerFromRows({
+      documentId: "doc_grand_control_only",
+      lines: [
+        "MM/DD | CF | Interchange Program Fee | -$3.50",
+        "Warehouse Supplies | -$9.00",
+        "Total (Miscellaneous Fees and Card Fees) | -$3.50",
+      ],
+      rows: [
+        feeRow({ description: "Interchange Program Fee", amount: 3.5, evidenceLine: "MM/DD | CF | Interchange Program Fee | -$3.50", sourceSection: "FEES CHARGED", type: "CF", bucket: "cardFees" }),
+        feeRow({ description: "Warehouse Supplies", amount: 9, evidenceLine: "Warehouse Supplies | -$9.00", sourceSection: "Statement Notes", type: "OTHER", bucket: "other" }),
+      ],
+      printedTotal: 3.5,
+      controls: [{ label: "Total (Miscellaneous Fees and Card Fees)", rowSum: 3.5, printedTotal: 3.5, delta: 0, evidenceLine: "Total (Miscellaneous Fees and Card Fees) | -$3.50" }],
+    });
+
+    expect(unknown.controls[0]).toMatchObject({ status: "limited", coveredFeeRowIds: [], actualAmount: null });
+    expect(unknown.rows[0]?.contributionDecision.reasonCode).toBe("interchange_without_control_coverage");
+    expect(unknown.status).toBe("partial");
+    expect(grandOnly.controls[0]).toMatchObject({ status: "pass", basis: "grand_control" });
+    expect(grandOnly.controls[0]?.coveredFeeRowIds).toHaveLength(1);
+    expect(grandOnly.rows.find((row) => row.selectedLabel === "Warehouse Supplies")?.id).not.toBe(grandOnly.controls[0]?.coveredFeeRowIds[0]);
+    expect(grandOnly.rows.find((row) => row.role === "interchange_detail_row")?.contributesToUniqueTotal).toBe(false);
+  });
+
+  it("keeps available status blocked by limited printed-source controls", () => {
+    const ledger = ledgerFromRows({
+      documentId: "doc_limited_control_blocks_available",
+      lines: ["Monthly Service Fee | -$4.00", "Unrecognized Control | -$4.00", "Total Fees | -$4.00"],
+      rows: [feeRow({ description: "Monthly Service Fee", amount: 4, evidenceLine: "Monthly Service Fee | -$4.00", sourceSection: "FEES CHARGED", type: "MISC", bucket: "miscellaneousFees" })],
+      printedTotal: 4,
+      controls: [
+        { label: "Unrecognized Control", rowSum: 4, printedTotal: 4, delta: 0, evidenceLine: "Unrecognized Control | -$4.00" },
+        { label: "Total Fees", rowSum: 4, printedTotal: 4, delta: 0, evidenceLine: "Total Fees | -$4.00" },
+      ],
+    });
+
+    expect(ledger.controls[0]).toMatchObject({ status: "limited", coveredFeeRowIds: [], actualAmount: null });
+    expect(ledger.controls.at(-1)).toMatchObject({ status: "pass" });
+    expect(ledger.status).toBe("partial");
   });
 
   it("keeps pass-through contribution out of Package E eligible opportunity totals", () => {
@@ -492,9 +578,31 @@ describe("canonical fee ledger", () => {
     });
 
     expect(oneCent.controls.at(-1)).toMatchObject({ status: "pass_with_rounding", deltaMinor: 1 });
+    expect(oneCent.controls[0]).toMatchObject({
+      status: "pass_with_rounding",
+      actualAmount: { amountMinor: 1000, currency: "USD" },
+      parserReportedActualAmount: { amountMinor: 1000, currency: "USD" },
+      reconstructionFormula: "covered_rows_signed_net",
+    });
     expect(oneCent.status).toBe("available");
     expect(twoCent.controls.at(-1)).toMatchObject({ status: "verification_required", deltaMinor: 2 });
     expect(twoCent.status).toBe("partial");
+  });
+
+  it("rejects manually altered controls that do not reconstruct from covered fee rows", () => {
+    const built = buildLedgerFixture({
+      documentId: "doc_validate_reconstructed_control",
+      lines: ["Monthly Service Fee | -$4.00", "Total Fees | -$4.00"],
+      rows: [feeRow({ description: "Monthly Service Fee", amount: 4, evidenceLine: "Monthly Service Fee | -$4.00", sourceSection: "FEES CHARGED", type: "MISC", bucket: "miscellaneousFees" })],
+      printedTotal: 4,
+    });
+    const analysis = analysisWithLedger(built);
+
+    expect(validateCanonicalStatementAnalysis(analysis).validation.status).toBe("valid");
+
+    const broken = structuredClone(analysis) as CanonicalStatementAnalysis;
+    broken.feeLedger.controls[0]!.actualAmount = { amountMinor: 999, currency: "USD" };
+    expect(() => validateCanonicalStatementAnalysis(broken)).toThrow(/actual amount does not reconstruct from covered fee rows/);
   });
 
   it("normalizes equivalent percentage, decimal-fraction, and basis-point rates", () => {
@@ -684,12 +792,26 @@ function ledgerFromRows(input: {
   delta?: number;
   controls?: Record<string, unknown>[];
 }) {
-  return buildCanonicalFeeLedger({
+  return buildLedgerFixture(input).ledger;
+}
+
+function buildLedgerFixture(input: {
+  documentId: string;
+  lines: string[];
+  rows: Record<string, unknown>[];
+  printedTotal: number;
+  rowSum?: number;
+  delta?: number;
+  controls?: Record<string, unknown>[];
+}): { ledger: CanonicalFeeLedger; evidence: Map<string, CanonicalEvidenceRecord>; calculations: CanonicalCalculationRecord[] } {
+  const evidence = new Map<string, CanonicalEvidenceRecord>();
+  const calculations: CanonicalCalculationRecord[] = [];
+  const ledger = buildCanonicalFeeLedger({
     doc: feeDocument(input.lines),
     documentId: input.documentId,
     matched: { driverId: "synthetic_parser", driverName: "Synthetic parser" },
-    evidence: new Map<string, CanonicalEvidenceRecord>(),
-    calculations: [],
+    evidence,
+    calculations,
     parserOutput: {
       feeLedger: {
         rows: input.rows,
@@ -701,6 +823,60 @@ function ledgerFromRows(input: {
       },
     },
   });
+  return { ledger, evidence, calculations };
+}
+
+function analysisWithLedger(input: { ledger: CanonicalFeeLedger; evidence: Map<string, CanonicalEvidenceRecord>; calculations: CanonicalCalculationRecord[] }): CanonicalStatementAnalysis {
+  const analysis = buildCanonicalStatementFactsFromParsedDocument(validationSummaryDocument(), {
+    sourceFileName: "synthetic-fee-ledger-validation.pdf",
+    businessType: "restaurant",
+    preferExtractedRows: true,
+  });
+  analysis.feeLedger = input.ledger;
+  analysis.evidence = [...analysis.evidence, ...input.evidence.values()];
+  analysis.calculations = [...analysis.calculations, ...input.calculations];
+  analysis.feeOwnershipActionability = buildCanonicalFeeOwnershipActionability(input.ledger, {
+    processorFamily: "fiserv",
+    statementPeriodStart: "2026-01-01",
+  });
+  analysis.opportunityEngine = buildCanonicalOpportunityEngine({
+    feeLedger: input.ledger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    evidence: analysis.evidence,
+    statementPeriodVerified: true,
+  });
+  analysis.aiCapabilities = buildCanonicalAiCapabilities({
+    identity: analysis.identity,
+    financialFacts: analysis.financialFacts,
+    feeLedger: input.ledger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    opportunityEngine: analysis.opportunityEngine,
+    evidence: analysis.evidence,
+  });
+  analysis.customerState = buildCanonicalCustomerState({ ...analysis });
+  return analysis;
+}
+
+function validationSummaryDocument(): ParsedDocument {
+  return {
+    sourceType: "pdf",
+    headers: [],
+    rows: [
+      { content: "Processor: Fiserv", page: "page-1" },
+      { content: "Statement Period: 01/01/2026 - 01/31/2026", page: "page-1" },
+      { content: "Total Amount Submitted | $1,000.00", page: "page-1" },
+      { content: "Fees Charged | -$4.00", page: "page-1" },
+    ],
+    textPreview: "Processor: Fiserv Statement Period: 01/01/2026 - 01/31/2026 Total Amount Submitted $1,000.00 Fees Charged -$4.00",
+    extraction: {
+      mode: "structured",
+      qualityScore: 1,
+      reasons: ["Synthetic fee-ledger validation fixture."],
+      lineCount: 4,
+      amountTokenCount: 2,
+      hasExtractableText: true,
+    },
+  };
 }
 
 function orderIndependentSnapshot(ledger: ReturnType<typeof ledgerFromRows>) {

@@ -146,13 +146,15 @@ export function buildCanonicalFeeLedger(input: {
           basis: "grand_control",
           amountBasis: "signed_net",
           independence: "derived_diagnostic",
+          reconstructedFromCoveredRows: contributingRows.length > 0,
+          reconstructionFormula: contributingRows.length > 0 ? "covered_rows_signed_net" : "not_reconstructed",
           reasonCode: "canonical_unique_total_vs_printed_total",
         })
       : null;
   const reconciliationControls = [...parserControls, ...(canonicalTotalControl ? [canonicalTotalControl] : [])];
 
   const hasUnresolved = canonicalRows.some((row) => row.role === "unknown_unresolved" || row.limitations.length > 0);
-  const hasBlockingControl = reconciliationControls.some((control) => control.status === "verification_required" || control.status === "blocked");
+  const hasBlockingControl = reconciliationControls.some((control) => isBlockingMonetaryControl(control));
   const status: CanonicalFeeLedger["status"] =
     !uniqueChargeTotal || hasBlockingControl ? "partial" : hasUnresolved ? "partial" : "available";
 
@@ -235,9 +237,10 @@ function parserReconciliationControls(input: {
   evidence: Map<string, CanonicalEvidenceRecord>;
   documentId: string;
 }): CanonicalFeeLedgerControl[] {
+  const hasExplicitGrandControl = input.controls.some((control) => isExplicitGrandControl(stringOrNull(control.label) ?? ""));
   return input.controls.flatMap((control, index) => {
     const printedTotal = moneyFromNumber(numberOrNull(control.printedTotal) ?? Number.NaN);
-    const rowSum = moneyFromNumber(numberOrNull(control.rowSum) ?? Number.NaN);
+    const parserReportedRowSum = moneyFromNumber(numberOrNull(control.rowSum) ?? Number.NaN);
     const label = stringOrNull(control.label) ?? `Parser fee control ${index + 1}`;
     const evidenceRefs: string[] = [];
     const evidenceLine = stringOrNull(control.evidenceLine);
@@ -254,8 +257,11 @@ function parserReconciliationControls(input: {
       input.evidence.set(evidence.id, evidence);
       evidenceRefs.push(evidence.id);
     }
-    if (!printedTotal && !rowSum) return [];
-    const coveredFeeRowIds = coveredRowsForControl(label, input.rows, input.interpretations);
+    if (!printedTotal && !parserReportedRowSum) return [];
+    const basis = controlBasisForLabel(label, hasExplicitGrandControl);
+    const coveredFeeRowIds = coveredRowsForControl(label, input.rows, input.interpretations, hasExplicitGrandControl);
+    const amountBasis = controlAmountBasisForLabel(label, basis);
+    const actualAmount = reconstructedCoveredRowAmount(input.rows, coveredFeeRowIds, amountBasis);
     const delta = numberOrNull(control.delta);
     return [
       printedMonetaryControl({
@@ -263,14 +269,22 @@ function parserReconciliationControls(input: {
         label,
         evidenceRefs,
         expectedAmount: printedTotal,
-        actualAmount: rowSum,
+        actualAmount,
         derivationGroupId: "parser_printed_fee_controls",
         documentedOneCentRounding: Math.abs(delta ?? Number.NaN) === 0.01,
         coveredFeeRowIds,
-        basis: isGrandControl(label) ? "grand_control" : "section_control",
-        amountBasis: "fee_charge_gross",
+        basis,
+        amountBasis,
         independence: "printed_source_control",
-        reasonCode: isGrandControl(label) ? "parser_grand_control_reconciliation" : "parser_section_control_reconciliation",
+        parserReportedActualAmount: parserReportedRowSum,
+        reconstructedFromCoveredRows: coveredFeeRowIds.length > 0,
+        reconstructionFormula:
+          coveredFeeRowIds.length > 0
+            ? amountBasis === "signed_net"
+              ? "covered_rows_signed_net"
+              : "covered_rows_fee_charge_gross"
+            : "not_reconstructed",
+        reasonCode: basis === "grand_control" ? "parser_grand_control_reconciliation" : "parser_section_control_reconciliation",
       }),
     ];
   });
@@ -361,6 +375,7 @@ function interchangeContributionDecision(
   const coverage = controls.filter(
     (control) =>
       control.coveredFeeRowIds.includes(row.id) &&
+      control.basis === "section_control" &&
       control.independence === "printed_source_control" &&
       (control.status === "pass" || control.status === "pass_with_rounding"),
   );
@@ -466,14 +481,54 @@ function coveredRowsForControl(
   label: string,
   rows: CanonicalFeeRow[],
   interpretations: CanonicalFeeParserInterpretation[],
+  hasExplicitGrandControl: boolean,
 ): string[] {
   const matched = rows.filter((row) => {
+    if (!controlEligibleRow(row)) return false;
     const rowInterpretations = interpretations.filter((interpretation) => row.parserInterpretationIds.includes(interpretation.id));
     if (rowInterpretations.length === 0) return false;
-    if (isGrandControl(label)) return row.role !== "section_subtotal" && row.role !== "fee_bucket_total" && row.role !== "statement_control_total";
-    return rowInterpretations.some((interpretation) => interpretationCoveredByControl(label, interpretation));
+    if (controlBasisForLabel(label, hasExplicitGrandControl) === "grand_control") {
+      return rowInterpretations.some((interpretation) => interpretationCoveredByGrandControl(label, interpretation, hasExplicitGrandControl));
+    }
+    return recognizedSectionControlLabel(label) && rowInterpretations.some((interpretation) => interpretationCoveredByControl(label, interpretation));
   });
   return matched.map((row) => row.id).sort();
+}
+
+function controlEligibleRow(row: CanonicalFeeRow): boolean {
+  return (
+    row.role !== "section_subtotal" &&
+    row.role !== "fee_bucket_total" &&
+    row.role !== "statement_control_total" &&
+    row.role !== "informational_rate_row" &&
+    row.role !== "zero_dollar_reference_row" &&
+    row.role !== "duplicate_representation" &&
+    row.role !== "supporting_evidence_only"
+  );
+}
+
+function reconstructedCoveredRowAmount(
+  rows: CanonicalFeeRow[],
+  coveredFeeRowIds: string[],
+  amountBasis: CanonicalFeeLedgerControl["amountBasis"],
+): MoneyAmount | null {
+  if (coveredFeeRowIds.length === 0) return null;
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const amounts: MoneyAmount[] = [];
+  for (const feeRowId of [...coveredFeeRowIds].sort()) {
+    const row = byId.get(feeRowId);
+    if (!row) return null;
+    if (amountBasis === "fee_charge_gross") {
+      if (!row.selectedAmount) return null;
+      amounts.push({ ...row.selectedAmount, amountMinor: Math.abs(row.selectedAmount.amountMinor) });
+    } else if (amountBasis === "signed_net") {
+      if (!row.signedAmount) return null;
+      amounts.push(row.signedAmount);
+    } else {
+      return null;
+    }
+  }
+  return addMoney(amounts);
 }
 
 function interpretationCoveredByControl(label: string, interpretation: CanonicalFeeParserInterpretation): boolean {
@@ -494,9 +549,72 @@ function interpretationCoveredByControl(label: string, interpretation: Canonical
   return false;
 }
 
-function isGrandControl(label: string): boolean {
+function interpretationCoveredByGrandControl(
+  label: string,
+  interpretation: CanonicalFeeParserInterpretation,
+  hasExplicitGrandControl: boolean,
+): boolean {
+  const normalized = label.toLowerCase();
+  if (normalized.includes("miscellaneous fees and card fees") || normalized.includes("misc fees and card fees")) {
+    return interpretationCoveredByControl("card fees", interpretation) || interpretationCoveredByControl("miscellaneous fees", interpretation);
+  }
+  if (normalized.startsWith("total (")) {
+    return interpretationCoveredByControl(normalized, interpretation);
+  }
+  if (normalized.includes("grand") || (normalized === "total fees" && !hasExplicitGrandControl)) {
+    return recognizedFeeChargeInterpretation(interpretation);
+  }
+  return false;
+}
+
+function recognizedFeeChargeInterpretation(interpretation: CanonicalFeeParserInterpretation): boolean {
+  return SECTION_CONTROL_LABELS.some((label) => interpretationCoveredByControl(label, interpretation));
+}
+
+const SECTION_CONTROL_LABELS = [
+  "card fees",
+  "miscellaneous fees",
+  "transaction fees",
+  "debit network fees",
+  "account fees",
+  "equipment fees",
+  "interchange fees",
+  "service charges",
+  "total fees",
+] as const;
+
+function recognizedSectionControlLabel(label: string): boolean {
+  const normalized = label.toLowerCase();
+  return SECTION_CONTROL_LABELS.some((sectionLabel) => normalized.includes(sectionLabel) || normalized === sectionLabel);
+}
+
+function controlBasisForLabel(label: string, hasExplicitGrandControl: boolean): CanonicalFeeLedgerControl["basis"] {
+  return isGrandControl(label, hasExplicitGrandControl) ? "grand_control" : "section_control";
+}
+
+function controlAmountBasisForLabel(
+  label: string,
+  basis: CanonicalFeeLedgerControl["basis"],
+): CanonicalFeeLedgerControl["amountBasis"] {
+  if (basis === "grand_control" || label.toLowerCase() === "total fees") return "signed_net";
+  return "fee_charge_gross";
+}
+
+function isGrandControl(label: string, hasExplicitGrandControl: boolean): boolean {
+  const normalized = label.toLowerCase();
+  return (
+    isExplicitGrandControl(label) ||
+    (normalized === "total fees" && !hasExplicitGrandControl)
+  );
+}
+
+function isExplicitGrandControl(label: string): boolean {
   const normalized = label.toLowerCase();
   return normalized.includes("grand") || normalized.startsWith("total (") || normalized.includes("miscellaneous fees and card fees");
+}
+
+function isBlockingMonetaryControl(control: CanonicalFeeLedgerControl): boolean {
+  return control.type === "printed_charge_sum" && control.status !== "pass" && control.status !== "pass_with_rounding";
 }
 
 function stableControlId(label: string, index: number): string {

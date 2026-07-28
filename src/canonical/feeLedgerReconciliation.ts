@@ -23,6 +23,9 @@ export function printedMonetaryControl(input: {
   basis?: CanonicalFeeLedgerControl["basis"];
   amountBasis?: CanonicalFeeLedgerControl["amountBasis"];
   independence?: CanonicalFeeLedgerControl["independence"];
+  parserReportedActualAmount?: MoneyAmount | null;
+  reconstructedFromCoveredRows?: boolean;
+  reconstructionFormula?: CanonicalFeeLedgerControl["reconstructionFormula"];
   reasonCode?: string;
 }): CanonicalFeeLedgerControl {
   const deltaMinor = input.expectedAmount && input.actualAmount ? input.actualAmount.amountMinor - input.expectedAmount.amountMinor : null;
@@ -51,6 +54,9 @@ export function printedMonetaryControl(input: {
     basis: input.basis ?? "unknown",
     amountBasis: input.amountBasis ?? "unknown",
     independence: input.independence ?? "unknown",
+    parserReportedActualAmount: input.parserReportedActualAmount ?? null,
+    reconstructedFromCoveredRows: input.reconstructedFromCoveredRows ?? false,
+    reconstructionFormula: input.reconstructionFormula ?? "not_reconstructed",
     reasonCode: input.reasonCode ?? (withinTolerance && deltaMinor !== 0 ? "documented_one_cent_rounding" : deltaMinor === 0 ? "exact_reconciliation" : "printed_control_requires_verification"),
     explanation:
       "Printed monetary charge rows must reconcile to printed controls exactly, with only documented one-cent printed rounding accepted.",
