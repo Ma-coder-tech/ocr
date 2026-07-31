@@ -1,4 +1,8 @@
-import { buildCanonicalRuntimeAnalysis, canonicalRuntimeInputAdmissionTable, type CanonicalRuntimeAdapterInput } from "./runtimeAdapter.js";
+import {
+  buildCanonicalRuntimeAnalysisWithRuntimeAi,
+  canonicalRuntimeInputAdmissionTable,
+  type CanonicalRuntimeAdapterInput,
+} from "./runtimeAdapter.js";
 import { compareCanonicalToLegacy } from "./runtimeShadowComparison.js";
 import {
   assertRedactedCanonicalShadowDiagnostic,
@@ -42,7 +46,7 @@ export async function runCanonicalRuntimeShadow(input: {
   env?: NodeJS.ProcessEnv;
   sink?: CanonicalShadowDiagnosticSink;
   now?: () => number;
-  buildAnalysis?: (adapterInput: CanonicalRuntimeAdapterInput) => { analysis: CanonicalStatementAnalysis };
+  buildAnalysis?: (adapterInput: CanonicalRuntimeAdapterInput) => { analysis: CanonicalStatementAnalysis } | Promise<{ analysis: CanonicalStatementAnalysis }>;
 }): Promise<CanonicalRuntimeShadowResult> {
   if (!canonicalRuntimeShadowEnabled(input.env ?? process.env)) {
     return { status: "disabled", diagnostic: null, durationMs: 0 };
@@ -59,7 +63,7 @@ export async function runCanonicalRuntimeShadow(input: {
       runtimeDocumentRef: input.runtimeDocumentRef,
       legacySummary: cloneJson(input.summary),
     };
-    const result = input.buildAnalysis ? input.buildAnalysis(adapterInput) : buildCanonicalRuntimeAnalysis(adapterInput);
+    const result = input.buildAnalysis ? await input.buildAnalysis(adapterInput) : await buildCanonicalRuntimeAnalysisWithRuntimeAi(adapterInput);
     const durationMs = Math.max(0, now() - startedAt);
     const diagnostic = diagnosticFromAnalysis({
       status: "completed",

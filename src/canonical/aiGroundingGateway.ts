@@ -79,6 +79,10 @@ export function narrativeErrors(texts: readonly string[], opportunityEngine: Can
 
 function collectEvidenceRefs(output: CanonicalAiCapabilityOutput): string[] {
   const refs = [...output.evidenceRefs];
+  if (output.type === "whole_statement_fee_intelligence_review") {
+    refs.push(...output.rowInterpretations.flatMap((item) => item.evidenceRefs));
+    refs.push(...output.acceptanceRecords.flatMap((item) => item.evidenceRefs));
+  }
   if (output.type === "full_statement_anomaly_review") refs.push(...output.observations.flatMap((item) => item.evidenceRefs));
   if (output.type === "notice_change_review") refs.push(...output.noticeSuggestions.flatMap((item) => [item.noticeEvidenceRef, ...item.observedTextRefs]));
   if (output.type === "benchmark_category_review") refs.push(...output.suggestions.flatMap((item) => item.evidenceRefs));
@@ -88,6 +92,14 @@ function collectEvidenceRefs(output: CanonicalAiCapabilityOutput): string[] {
 }
 
 function collectFeeRowRefs(output: CanonicalAiCapabilityOutput): string[] {
+  if (output.type === "whole_statement_fee_intelligence_review") {
+    return [
+      ...output.rowInterpretations.map((item) => item.feeRowRef),
+      ...output.acceptanceRecords.map((item) => item.feeRowRef),
+      ...output.coverageProof.expectedFeeRowRefs,
+      ...output.coverageProof.reviewedFeeRowRefs,
+    ];
+  }
   if (output.type !== "fee_classification_review") return [];
   return output.suggestions.map((item) => item.feeRowId);
 }

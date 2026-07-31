@@ -54,6 +54,21 @@ export function determineAiCapabilityNeeds(input: {
       failureLimitationCodes: ["full_statement_anomaly_review_required", "provider_unavailable"],
     },
     {
+      capability: "whole_statement_fee_intelligence_review",
+      required: true,
+      trigger: {
+        present: true,
+        reasonCode: "required_for_customer_financial_conclusions",
+        reason: "Every admitted canonical fee row requires mandatory semantic AI review before completed customer financial conclusions can be produced.",
+        evidenceRefs: evidenceRefsForAllFeeRows(input.feeLedger),
+        feeRowRefs: input.feeLedger.rows.map((row) => row.id),
+        opportunityComponentRefs: [],
+        absenceProof: null,
+      },
+      failureFinancialReadiness: "limited",
+      failureLimitationCodes: ["whole_statement_fee_intelligence_review_required", "provider_unavailable"],
+    },
+    {
       capability: "fee_classification_review",
       required: materialFeeRows.length > 0,
       trigger:
@@ -161,6 +176,18 @@ export function determineAiCapabilityNeeds(input: {
       failureLimitationCodes: [],
     },
   ];
+}
+
+function evidenceRefsForAllFeeRows(feeLedger: CanonicalFeeLedger): string[] {
+  const evidenceRefByOccurrenceId = new Map(feeLedger.sourceOccurrences.map((occurrence) => [occurrence.id, occurrence.evidenceRef]));
+  return [
+    ...new Set(
+      feeLedger.rows.flatMap((row) => [
+        ...row.sourceOccurrenceIds.map((id) => evidenceRefByOccurrenceId.get(id)).filter((id): id is string => Boolean(id)),
+        ...(row.contributionDecision?.evidenceRefs ?? []),
+      ]),
+    ),
+  ].sort();
 }
 
 function materialUnresolvedFeeRows(

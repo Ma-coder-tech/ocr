@@ -13,6 +13,7 @@ export const CANONICAL_RUNTIME_SAFETY_REVIEW_POLICY_VERSION = "canonical_runtime
 
 export const CANONICAL_AI_CAPABILITIES: readonly CanonicalAiCapabilityId[] = [
   "full_statement_anomaly_review",
+  "whole_statement_fee_intelligence_review",
   "fee_classification_review",
   "notice_change_review",
   "benchmark_category_review",

@@ -30,7 +30,13 @@ export type RuntimeAiCapabilityReasonCode =
   | "runtime_fee_classification_review_failed"
   | "runtime_fee_classification_review_timed_out"
   | "runtime_fee_classification_review_safety_blocked"
-  | "runtime_fee_classification_review_rejected";
+  | "runtime_fee_classification_review_rejected"
+  | "whole_statement_fee_intelligence_completed"
+  | "whole_statement_fee_intelligence_disabled"
+  | "whole_statement_fee_intelligence_failed"
+  | "whole_statement_fee_intelligence_timed_out"
+  | "whole_statement_fee_intelligence_safety_blocked"
+  | "whole_statement_fee_intelligence_rejected";
 
 export type RuntimeAiCapabilitySnapshot = {
   capability: CanonicalAiCapabilityId;
