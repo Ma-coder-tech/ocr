@@ -5,6 +5,8 @@ import type {
   CanonicalAiCapabilityId,
   CanonicalAiCapabilityOutput,
   CanonicalAiCapabilityStatus,
+  CanonicalWholeStatementFeeIntelligenceCoverageProof,
+  CanonicalWholeStatementFeeIntelligenceStatus,
   CanonicalRuntimeFeeClassificationReview,
   CanonicalRuntimeFeeClassificationReviewStatus,
   CanonicalStatementAnalysis,
@@ -47,6 +49,19 @@ export type RuntimeAiCapabilitySnapshot = {
   reasonCodes: RuntimeAiCapabilityReasonCode[];
   runtimeReviewStatus?: CanonicalRuntimeFeeClassificationReviewStatus;
   runtimeFeeClassificationReview?: CanonicalRuntimeFeeClassificationReview;
+  runtimeWholeStatementFeeIntelligenceReview?: CanonicalRuntimeWholeStatementFeeIntelligenceReview;
+};
+
+export type CanonicalRuntimeWholeStatementFeeIntelligenceReview = {
+  type: "whole_statement_fee_intelligence_runtime_review";
+  policyVersion: "whole_statement_fee_intelligence_runtime_review_v1";
+  reviewStatus: CanonicalWholeStatementFeeIntelligenceStatus;
+  coverageProof: CanonicalWholeStatementFeeIntelligenceCoverageProof;
+  rowInterpretationCount: number;
+  acceptanceRecordCount: number;
+  reasonCodes: string[];
+  authoritative: false;
+  providerDetailsStripped: true;
 };
 
 export type RuntimeAiCapabilityAdapterResult = {

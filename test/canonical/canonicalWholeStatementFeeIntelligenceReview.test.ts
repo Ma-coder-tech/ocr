@@ -356,6 +356,122 @@ describe("canonical whole-statement fee intelligence review", () => {
     expect(financialProjection(result.analysis)).toEqual(financialProjection(baseline));
   });
 
+  it("preserves unsuccessful runtime coverage diagnostics without creating trusted AI output or mutating B-E/Report V1", async () => {
+    const document = syntheticRuntimeFeeStatement();
+    const legacySummary = analyzeDocument(document, "restaurant_food_beverage");
+    const legacyBefore = JSON.parse(JSON.stringify(legacySummary));
+    const reportBefore = buildSingleStatementReportV1({
+      analysis: legacySummary,
+      reportId: "report-h1-4b-runtime-diagnostic",
+      generatedAt: "2026-07-31T00:00:00.000Z",
+    });
+    const baseline = buildCanonicalStatementFactsFromParsedDocument(document, {
+      businessType: "restaurant_food_beverage",
+      sourceAnalysisId: "job_h1_4b_runtime_diagnostic",
+      sourceFileName: null,
+    });
+
+    const incomplete = await buildCanonicalRuntimeAnalysisWithRuntimeAi({
+      document,
+      businessType: "restaurant_food_beverage",
+      runtimeDocumentRef: "job_h1_4b_runtime_diagnostic",
+      legacySummary,
+      wholeStatementFeeIntelligence: {
+        enabled: true,
+        adapter: async (packet) => ({
+          ...validReview(packet),
+          rowInterpretations: validReview(packet).rowInterpretations.slice(1),
+        }),
+      },
+    });
+    const incompleteCapability = wholeStatementCapability(incomplete.analysis);
+    const incompleteRuntimeReview = wholeStatementRuntimeReview(incomplete);
+
+    expect(incompleteCapability.status).toBe("rejected");
+    expect(incompleteCapability.output).toBeNull();
+    expect(incompleteCapability.limitationCodes).toContain("whole_statement_fee_intelligence_review_required");
+    expect(incomplete.analysis.aiCapabilities.summary.financialReadiness).toBe("limited");
+    expect(incompleteRuntimeReview.reviewStatus).toBe("rejected");
+    expect(incompleteRuntimeReview.coverageProof.exactCoverage).toBe(false);
+    expect(incompleteRuntimeReview.coverageProof.expectedFeeRowRefs.length).toBeGreaterThan(0);
+    expect(incompleteRuntimeReview.coverageProof.reviewedFeeRowRefs).toHaveLength(
+      incompleteRuntimeReview.coverageProof.expectedFeeRowRefs.length - 1,
+    );
+    expect(incompleteRuntimeReview.coverageProof.missingFeeRowRefs).toHaveLength(1);
+    expect(incompleteRuntimeReview.coverageProof.reviewedFeeRowRefs).not.toContain(
+      incompleteRuntimeReview.coverageProof.missingFeeRowRefs[0],
+    );
+    expect(incompleteRuntimeReview.coverageProof.duplicatedFeeRowRefs).toEqual([]);
+    expect(incompleteRuntimeReview.coverageProof.unknownFeeRowRefs).toEqual([]);
+    expect(incompleteRuntimeReview.coverageProof.malformedFeeRowRefs).toEqual([]);
+    expect(incompleteRuntimeReview.coverageProof.malformedFeeRowRefCount).toBe(0);
+    expect(incompleteRuntimeReview.acceptanceRecordCount).toBe(0);
+    expect(incompleteRuntimeReview.authoritative).toBe(false);
+    expect(financialProjection(incomplete.analysis)).toEqual(financialProjection(baseline));
+
+    const safetyBlocked = await buildCanonicalRuntimeAnalysisWithRuntimeAi({
+      document,
+      businessType: "restaurant_food_beverage",
+      runtimeDocumentRef: "job_h1_4b_runtime_safety_diagnostic",
+      legacySummary,
+      wholeStatementFeeIntelligence: {
+        enabled: true,
+        adapter: async (packet) => {
+          const review = validReview(packet);
+          return {
+            ...review,
+            rawPrompt: "raw prompt with unsafe-file.pdf",
+            rowInterpretations: [
+              { ...review.rowInterpretations[0]!, feeRowRef: "../unsafe-file.pdf" },
+              ...review.rowInterpretations.slice(1),
+            ],
+          };
+        },
+      },
+    });
+    const safetyCapability = wholeStatementCapability(safetyBlocked.analysis);
+    const safetyRuntimeReview = wholeStatementRuntimeReview(safetyBlocked);
+
+    expect(safetyCapability.status).toBe("safety_blocked");
+    expect(safetyCapability.output).toBeNull();
+    expect(safetyCapability.limitationCodes).toContain("whole_statement_fee_intelligence_review_required");
+    expect(safetyBlocked.analysis.aiCapabilities.summary.financialReadiness).toBe("limited");
+    expect(safetyRuntimeReview.reviewStatus).toBe("safety_blocked");
+    expect(safetyRuntimeReview.coverageProof.exactCoverage).toBe(false);
+    expect(safetyRuntimeReview.coverageProof.malformedFeeRowRefs).toEqual(["malformed_fee_row_ref"]);
+    expect(safetyRuntimeReview.coverageProof.malformedFeeRowRefCount).toBe(1);
+    expect(safetyRuntimeReview.acceptanceRecordCount).toBe(0);
+    expect(JSON.stringify(safetyRuntimeReview)).not.toMatch(/raw prompt|unsafe-file|openai|anthropic|gpt|claude/i);
+    expect(financialProjection(safetyBlocked.analysis)).toEqual(financialProjection(baseline));
+
+    const completed = await buildCanonicalRuntimeAnalysisWithRuntimeAi({
+      document,
+      businessType: "restaurant_food_beverage",
+      runtimeDocumentRef: "job_h1_4b_runtime_completed",
+      legacySummary,
+      wholeStatementFeeIntelligence: {
+        enabled: true,
+        adapter: async (packet) => validReview(packet),
+      },
+    });
+    const completedCapability = wholeStatementCapability(completed.analysis);
+    const completedRuntimeReview = wholeStatementRuntimeReview(completed);
+    expect(completedCapability.status).toBe("completed");
+    expect(completedCapability.output?.type).toBe("whole_statement_fee_intelligence_review");
+    expect(completedRuntimeReview.reviewStatus).toBe("completed");
+    expect(completedRuntimeReview.coverageProof.exactCoverage).toBe(true);
+    expect(completedRuntimeReview.acceptanceRecordCount).toBeGreaterThan(0);
+    expect(financialProjection(completed.analysis)).toEqual(financialProjection(baseline));
+
+    const reportAfter = buildSingleStatementReportV1({
+      analysis: legacySummary,
+      reportId: "report-h1-4b-runtime-diagnostic",
+      generatedAt: "2026-07-31T00:00:00.000Z",
+    });
+    expect(legacySummary).toEqual(legacyBefore);
+    expect(reportAfter).toEqual(reportBefore);
+  });
+
   it("runs a 12-case synthetic H1.4b invariance matrix without mutating B-E or legacy Report V1 output", async () => {
     const cases = [
       { name: "completed safe review", options: { enabled: true, adapter: async (packet: CanonicalWholeStatementFeeIntelligencePacket) => validReview(packet) }, expectedStatus: "completed", completed: true },
@@ -450,6 +566,18 @@ function analysisWithWholeStatementOutput(
       aiCapabilities,
     }),
   };
+}
+
+function wholeStatementCapability(analysis: CanonicalStatementAnalysis) {
+  return analysis.aiCapabilities.capabilities.find(
+    (record) => record.capability === "whole_statement_fee_intelligence_review",
+  )!;
+}
+
+function wholeStatementRuntimeReview(result: Awaited<ReturnType<typeof buildCanonicalRuntimeAnalysisWithRuntimeAi>>) {
+  return result.runtimeAiCapabilitySnapshots.find(
+    (snapshot) => snapshot.capability === "whole_statement_fee_intelligence_review",
+  )!.runtimeWholeStatementFeeIntelligenceReview!;
 }
 
 function fullStatementOutput(analysis: CanonicalStatementAnalysis): CanonicalAiCapabilityOutput {
@@ -689,6 +817,39 @@ function syntheticStatement(): ParsedDocument {
       qualityScore: 0.99,
       warnings: [],
       pageCount: 1,
+    },
+  };
+}
+
+function syntheticRuntimeFeeStatement(): ParsedDocument {
+  return {
+    sourceType: "pdf",
+    headers: ["content"],
+    rows: [
+      { content: "SYNTHETIC STATEMENT - NOT REAL BUSINESS DATA" },
+      { content: "Fiserv synthetic processing statement" },
+      { content: "Synthetic Reference | TEST0001" },
+      { content: "Customer Service | 800-000-0000 | Statement Period | 02/01/24 - 02/29/24" },
+      { content: "Total Amount Submitted | $1,565.73" },
+      { content: "Total Amount Processed | $1,565.73" },
+      { content: "Fees Charged | -$15.00" },
+      { content: "Total Amount Funded To Your Bank | $1,550.73" },
+      { content: "FEES CHARGED" },
+      { content: "Date | Type | Description | Volume | Rate | Total" },
+      { content: "02/29/24 | CF | SYNTHETIC CARD FEE | $1,000.00 | -10.00" },
+      { content: "Total Card Fees | -$10.00" },
+      { content: "02/29/24 | MISC | SYNTHETIC STATEMENT FEE | -5.00" },
+      { content: "Total Miscellaneous Fees | -5.00" },
+      { content: "Total (Miscellaneous Fees and Card Fees) | -$15.00" },
+    ],
+    textPreview: "SYNTHETIC STATEMENT Fiserv Total Amount Submitted $1,565.73 Fees Charged -$15.00 Total Amount Funded To Your Bank $1,550.73 FEES CHARGED Total (Miscellaneous Fees and Card Fees) -$15.00",
+    extraction: {
+      mode: "structured",
+      qualityScore: 0.99,
+      reasons: ["Synthetic test document."],
+      lineCount: 15,
+      amountTokenCount: 9,
+      hasExtractableText: true,
     },
   };
 }

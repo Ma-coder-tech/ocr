@@ -3,6 +3,7 @@ import { buildCanonicalAiCapabilities } from "./buildCanonicalAiCapabilities.js"
 import { buildCanonicalCustomerState } from "./customerStateResolver.js";
 import {
   buildRuntimeAiCapabilityHarnessInputs,
+  type CanonicalRuntimeWholeStatementFeeIntelligenceReview,
   type RuntimeAiCapabilitySnapshot,
 } from "./runtimeAiCapabilityAdapter.js";
 import {
@@ -313,5 +314,22 @@ function snapshotForWholeStatementFeeIntelligence(output: CanonicalAiWholeStatem
     },
     executionRef: null,
     reasonCodes: [`whole_statement_fee_intelligence_${output.reviewStatus}` as const],
+    runtimeWholeStatementFeeIntelligenceReview: runtimeReviewForWholeStatementFeeIntelligence(output),
+  };
+}
+
+function runtimeReviewForWholeStatementFeeIntelligence(
+  output: CanonicalAiWholeStatementFeeIntelligenceOutput,
+): CanonicalRuntimeWholeStatementFeeIntelligenceReview {
+  return {
+    type: "whole_statement_fee_intelligence_runtime_review",
+    policyVersion: "whole_statement_fee_intelligence_runtime_review_v1",
+    reviewStatus: output.reviewStatus,
+    coverageProof: output.coverageProof,
+    rowInterpretationCount: output.rowInterpretations.length,
+    acceptanceRecordCount: output.acceptanceRecords.length,
+    reasonCodes: [...output.reasonCodes],
+    authoritative: false,
+    providerDetailsStripped: true,
   };
 }
