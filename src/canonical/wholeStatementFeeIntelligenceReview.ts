@@ -13,6 +13,17 @@ import type {
   CanonicalWholeStatementFeeIntelligenceRowInterpretation,
   CanonicalWholeStatementFeeIntelligenceStatus,
 } from "./types.js";
+import {
+  buildFeeKnowledgeSourcePacket,
+  isVerifiedDocumentationDecision,
+  normalizeFeeKnowledgeRegistry,
+  type LegacyWholeStatementSourceRegistry,
+} from "./feeKnowledgeRegistry.js";
+import type {
+  ApprovedFeeKnowledgeSourceRegistry,
+  FeeKnowledgeClaimSupportRecord,
+  FeeKnowledgeSourcePacket,
+} from "./feeKnowledgeTypes.js";
 
 export const WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION =
   "whole_statement_fee_intelligence_review_v1" as const;
@@ -54,12 +65,13 @@ export type CanonicalWholeStatementFeeIntelligencePacket = {
     currentLimitations: string[];
   }>;
   approvedExternalSourceRefs: string[];
+  sourceProvenancePacket: FeeKnowledgeSourcePacket;
   forbidden: string[];
 };
 
-export type ApprovedWholeStatementFeeIntelligenceSourceRegistry = {
-  approvedExternalSourceRefs: readonly string[];
-};
+export type ApprovedWholeStatementFeeIntelligenceSourceRegistry =
+  | ApprovedFeeKnowledgeSourceRegistry
+  | LegacyWholeStatementSourceRegistry;
 
 export type CanonicalWholeStatementFeeIntelligenceValidationResult =
   | {
@@ -100,6 +112,7 @@ const INTERPRETATION_ALLOWED_KEYS = [
   "evidenceProvenance",
   "evidenceRefs",
   "externalSourceRef",
+  "externalClaimSupportRef",
   "conflicts",
   "missingEvidence",
   "recommendedDisposition",
@@ -155,6 +168,7 @@ const CONFIDENCES: readonly CanonicalFeeClassificationConfidence[] = ["high", "m
 const PROVENANCE: readonly CanonicalWholeStatementFeeIntelligenceEvidenceProvenance[] = [
   "statement_evidence",
   "approved_external_documentation",
+  "runtime_verified_documentation",
   "industry_inference",
   "merchant_evidence",
   "human_review",
@@ -188,9 +202,16 @@ const FORBIDDEN_VALUE_PATTERN =
 export function buildWholeStatementFeeIntelligencePacket(
   analysis: Pick<CanonicalStatementAnalysis, "identity" | "feeLedger" | "feeOwnershipActionability" | "evidence">,
   registry: ApprovedWholeStatementFeeIntelligenceSourceRegistry = { approvedExternalSourceRefs: [] },
+  sourceProvenancePacketOverride?: FeeKnowledgeSourcePacket,
 ): CanonicalWholeStatementFeeIntelligencePacket {
   const evidenceRefByOccurrenceId = new Map(analysis.feeLedger.sourceOccurrences.map((occurrence) => [occurrence.id, occurrence.evidenceRef]));
   const classificationByRow = new Map(analysis.feeOwnershipActionability.rowClassifications.map((classification) => [classification.feeRowId, classification]));
+  const normalizedRegistry = normalizeFeeKnowledgeRegistry(registry);
+  const sourceProvenancePacket = sourceProvenancePacketOverride ?? buildFeeKnowledgeSourcePacket({ analysis, registry: normalizedRegistry });
+  const approvedExternalSourceRefs = unique([
+    ...normalizedRegistry.sources.map((source) => source.sourceId),
+    ...sourceProvenancePacket.claimSupports.map((support) => support.claimSupportId),
+  ]).sort();
 
   return {
     policyVersion: WHOLE_STATEMENT_FEE_INTELLIGENCE_PACKET_POLICY_VERSION,
@@ -228,10 +249,12 @@ export function buildWholeStatementFeeIntelligencePacket(
         ),
       };
     }),
-    approvedExternalSourceRefs: unique([...registry.approvedExternalSourceRefs]).sort(),
+    approvedExternalSourceRefs,
+    sourceProvenancePacket,
     forbidden: [
       "Do not include amounts, totals, transaction counts, cadence, savings, opportunity, state, permissions, customer wording, provider/model identifiers, raw prompts/responses, file paths, filenames, or merchant identifiers.",
-      "Use approved_external_documentation only when externalSourceRef is in approvedExternalSourceRefs.",
+      "Use approved_external_documentation only when externalSourceRef resolves to a row-scoped approved claim-support record.",
+      "Use runtime_verified_documentation only when externalClaimSupportRef resolves to a row-scoped runtime-verified claim-support record.",
       "Use industry_inference when public documentation is unavailable; do not present inference as processor documentation.",
     ],
   };
@@ -241,8 +264,9 @@ export function validateWholeStatementFeeIntelligenceReview(
   rawReview: unknown,
   analysis: Pick<CanonicalStatementAnalysis, "identity" | "feeLedger" | "feeOwnershipActionability" | "evidence">,
   registry: ApprovedWholeStatementFeeIntelligenceSourceRegistry = { approvedExternalSourceRefs: [] },
+  sourceProvenancePacket?: FeeKnowledgeSourcePacket,
 ): CanonicalWholeStatementFeeIntelligenceValidationResult {
-  const packet = buildWholeStatementFeeIntelligencePacket(analysis, registry);
+  const packet = buildWholeStatementFeeIntelligencePacket(analysis, registry, sourceProvenancePacket);
   const errors: string[] = [];
 
   if (!isPlainRecord(rawReview)) {
@@ -346,7 +370,6 @@ function interpretationArray(
   }
   const packetRows = new Map(packet.admittedFeeRows.map((row) => [row.feeRowRef, row]));
   const evidenceIds = new Set(analysis.evidence.map((record) => record.id));
-  const approvedExternalSourceRefs = new Set(registry.approvedExternalSourceRefs);
   return value.flatMap((item, index): CanonicalWholeStatementFeeIntelligenceRowInterpretation[] => {
     const path = `rowInterpretations[${index}]`;
     if (!isPlainRecord(item)) {
@@ -366,6 +389,7 @@ function interpretationArray(
     const evidenceProvenance = enumValue(source.evidenceProvenance, PROVENANCE);
     const evidenceRefs = stringArray(source.evidenceRefs, `${path}.evidenceRefs`, errors);
     const externalSourceRef = source.externalSourceRef === null ? null : stringValue(source.externalSourceRef);
+    const externalClaimSupportRef = source.externalClaimSupportRef === undefined || source.externalClaimSupportRef === null ? null : stringValue(source.externalClaimSupportRef);
     const conflicts = stringArray(source.conflicts, `${path}.conflicts`, errors).map((item) => sanitizeText(item, 160));
     const missingEvidence = stringArray(source.missingEvidence, `${path}.missingEvidence`, errors).map((item) => sanitizeText(item, 160));
     const recommendedDisposition = enumValue(source.recommendedDisposition, DISPOSITIONS);
@@ -388,10 +412,18 @@ function interpretationArray(
       if (!evidenceIds.has(evidenceRef)) errors.push(`whole_statement_fee_intelligence_${path}_evidence_ref_unknown`);
       if (!allowedEvidence.has(evidenceRef)) errors.push(`whole_statement_fee_intelligence_${path}_evidence_ref_not_row_scoped`);
     }
-    if (evidenceProvenance === "approved_external_documentation" && !externalSourceRef) {
+    if ((evidenceProvenance === "approved_external_documentation" || evidenceProvenance === "runtime_verified_documentation") && !externalSourceRef && !externalClaimSupportRef) {
       errors.push(`whole_statement_fee_intelligence_${path}_external_source_ref_missing`);
-    } else if (evidenceProvenance !== "approved_external_documentation" && externalSourceRef !== null) {
+    } else if (evidenceProvenance !== "approved_external_documentation" && evidenceProvenance !== "runtime_verified_documentation" && (externalSourceRef !== null || externalClaimSupportRef !== null)) {
       errors.push(`whole_statement_fee_intelligence_${path}_external_source_ref_without_documentation`);
+    }
+    if (evidenceProvenance === "approved_external_documentation") {
+      const ref = externalClaimSupportRef ?? externalSourceRef;
+      if (!ref) errors.push(`whole_statement_fee_intelligence_${path}_approved_documentation_ref_invalid`);
+    }
+    if (evidenceProvenance === "runtime_verified_documentation") {
+      const ref = externalClaimSupportRef ?? externalSourceRef;
+      if (!ref) errors.push(`whole_statement_fee_intelligence_${path}_runtime_documentation_ref_invalid`);
     }
     if (evidenceProvenance === "industry_inference" && proposedActionabilityCeiling === "potentially_actionable") {
       errors.push(`whole_statement_fee_intelligence_${path}_inference_actionability_too_strong`);
@@ -431,6 +463,7 @@ function interpretationArray(
         evidenceProvenance,
         evidenceRefs: unique(evidenceRefs).sort(),
         externalSourceRef,
+        externalClaimSupportRef,
         conflicts: unique(conflicts).sort(),
         missingEvidence: unique(missingEvidence).sort(),
         recommendedDisposition,
@@ -445,7 +478,7 @@ function acceptanceRecordFor(
   packet: CanonicalWholeStatementFeeIntelligencePacket,
   registry: ApprovedWholeStatementFeeIntelligenceSourceRegistry,
 ): CanonicalWholeStatementFeeIntelligenceAcceptanceRecord {
-  const accepted = acceptanceStatusFor(interpretation, registry);
+  const accepted = acceptanceStatusFor(interpretation, registry, packet);
   const acceptedSemanticFields =
     accepted === "accepted" || accepted === "accepted_with_conditions"
       ? {
@@ -469,6 +502,7 @@ function acceptanceRecordFor(
     acceptedSemanticFields,
     evidenceRefs: unique(interpretation.evidenceRefs).sort(),
     externalSourceRef: interpretation.externalSourceRef,
+    externalClaimSupportRef: interpretation.externalClaimSupportRef,
     reasonCodes: acceptanceReasonCodes(interpretation, accepted, packet),
     conflicts: unique(interpretation.conflicts).sort(),
     actionabilityCeiling: cappedActionability(interpretation),
@@ -479,19 +513,86 @@ function acceptanceRecordFor(
 function acceptanceStatusFor(
   interpretation: CanonicalWholeStatementFeeIntelligenceRowInterpretation,
   registry: ApprovedWholeStatementFeeIntelligenceSourceRegistry,
+  packet?: CanonicalWholeStatementFeeIntelligencePacket,
 ): CanonicalWholeStatementFeeIntelligenceAcceptanceRecord["status"] {
+  void registry;
+  const evidenceReconciliation = packet ? evidenceReconciliationFor(interpretation, packet) : "compatible";
   if (interpretation.recommendedDisposition === "human_review") return "human_review";
   if (interpretation.recommendedDisposition === "conflicting_evidence" || interpretation.conflicts.length > 0) return "needs_verification";
   if (interpretation.recommendedDisposition === "insufficient_evidence" || interpretation.missingEvidence.length > 0) return "needs_verification";
   if (
     interpretation.evidenceProvenance === "approved_external_documentation" &&
-    (!interpretation.externalSourceRef || !registry.approvedExternalSourceRefs.includes(interpretation.externalSourceRef))
+    !interpretation.externalSourceRef &&
+    !interpretation.externalClaimSupportRef
   ) {
     return "rejected";
   }
+  if (interpretation.evidenceProvenance === "runtime_verified_documentation" && !interpretation.externalClaimSupportRef) return "rejected";
+  if (packet && interpretation.evidenceProvenance === "approved_external_documentation") {
+    const authorization = sourceAuthorizationsFor(packet).get(interpretation.feeRowRef);
+    const ref = interpretation.externalClaimSupportRef ?? interpretation.externalSourceRef;
+    if (!ref || !authorization?.approved.has(ref)) return "rejected";
+  }
+  if (packet && interpretation.evidenceProvenance === "runtime_verified_documentation") {
+    const authorization = sourceAuthorizationsFor(packet).get(interpretation.feeRowRef);
+    const ref = interpretation.externalClaimSupportRef ?? interpretation.externalSourceRef;
+    if (!ref || !authorization?.runtimeVerified.has(ref)) return "rejected";
+  }
+  if (evidenceReconciliation === "contradiction") return "rejected";
+  if (evidenceReconciliation === "needs_verification") return "needs_verification";
   if (interpretation.evidenceProvenance === "merchant_evidence") return "rejected";
-  if (interpretation.evidenceProvenance === "industry_inference" || interpretation.confidence !== "high") return "accepted_with_conditions";
+  if (evidenceReconciliation === "compatible_with_conditions" || interpretation.evidenceProvenance === "industry_inference" || interpretation.confidence !== "high") return "accepted_with_conditions";
   return "accepted";
+}
+
+function evidenceReconciliationFor(
+  interpretation: CanonicalWholeStatementFeeIntelligenceRowInterpretation,
+  packet: CanonicalWholeStatementFeeIntelligencePacket,
+): "compatible" | "compatible_with_conditions" | "needs_verification" | "contradiction" {
+  if (interpretation.evidenceProvenance !== "approved_external_documentation" && interpretation.evidenceProvenance !== "runtime_verified_documentation") {
+    return "compatible";
+  }
+  const support = referencedClaimSupport(packet, interpretation);
+  if (!support) return "needs_verification";
+  if (!isVerifiedDocumentationDecision(support.evidenceDecision)) return "needs_verification";
+  if (support.contradictions.length > 0 || support.semanticSupport.decision === "contradicts") return "contradiction";
+  if (
+    !support.applicability.processorOrNetwork ||
+    support.applicability.statementPeriod === false ||
+    support.applicability.jurisdiction === false ||
+    support.applicability.transactionContext === false
+  ) {
+    return "needs_verification";
+  }
+  if (support.exclusions.length > 0 || support.structuredClaim.exclusions.length > 0) return "needs_verification";
+  if (support.structuredClaim.proposedCategory && support.structuredClaim.proposedCategory !== interpretation.proposedCategory) return "contradiction";
+  if (support.structuredClaim.likelyEconomicOwner && support.structuredClaim.likelyEconomicOwner !== interpretation.likelyEconomicOwner) return "contradiction";
+  if (support.structuredClaim.likelyContractualController && support.structuredClaim.likelyContractualController !== interpretation.likelyContractualController) return "contradiction";
+  if (actionabilityRank(interpretation.proposedActionabilityCeiling) > actionabilityRank(support.structuredClaim.actionabilityCeiling)) return "needs_verification";
+  if (actionabilityRank(interpretation.proposedActionabilityCeiling) > actionabilityRank(support.actionabilityCeiling)) return "needs_verification";
+  if (confidenceRank(interpretation.confidence) > confidenceRank(support.structuredClaim.maximumConfidence)) return "needs_verification";
+  if (support.structuredClaim.conditions.length > 0) return "compatible_with_conditions";
+  return "compatible";
+}
+
+function referencedClaimSupport(
+  packet: CanonicalWholeStatementFeeIntelligencePacket,
+  interpretation: CanonicalWholeStatementFeeIntelligenceRowInterpretation,
+): FeeKnowledgeClaimSupportRecord | null {
+  const ref = interpretation.externalClaimSupportRef ?? interpretation.externalSourceRef;
+  if (!ref) return null;
+  const rowSupports = packet.sourceProvenancePacket.claimSupports.filter((support) => support.feeRowRef === interpretation.feeRowRef);
+  return rowSupports.find((support) => support.claimSupportId === ref) ??
+    rowSupports.find((support) => support.sourceId === ref || support.claimId === ref) ??
+    null;
+}
+
+function actionabilityRank(value: CanonicalFeeActionability): number {
+  return { unknown: 0, not_actionable: 1, verify_only: 2, potentially_actionable: 3 }[value];
+}
+
+function confidenceRank(value: CanonicalFeeClassificationConfidence): number {
+  return { low: 1, medium: 2, high: 3 }[value];
 }
 
 function acceptanceReasonCodes(
@@ -503,6 +604,7 @@ function acceptanceReasonCodes(
   const codes = [`whole_statement_fee_intelligence_${status}`];
   if (interpretation.evidenceProvenance === "industry_inference") codes.push("whole_statement_fee_intelligence_industry_inference_limited");
   if (interpretation.evidenceProvenance === "approved_external_documentation") codes.push("whole_statement_fee_intelligence_approved_documentation");
+  if (interpretation.evidenceProvenance === "runtime_verified_documentation") codes.push("whole_statement_fee_intelligence_runtime_verified_documentation");
   if (interpretation.evidenceProvenance === "merchant_evidence") codes.push("whole_statement_fee_intelligence_merchant_evidence_unavailable");
   if (interpretation.conflicts.length > 0) codes.push("whole_statement_fee_intelligence_conflict_preserved");
   if (interpretation.missingEvidence.length > 0) codes.push("whole_statement_fee_intelligence_missing_evidence_preserved");
@@ -520,6 +622,45 @@ function cappedActionability(
     return "verify_only";
   }
   return interpretation.proposedActionabilityCeiling;
+}
+
+function sourceAuthorizationsFor(
+  packet: CanonicalWholeStatementFeeIntelligencePacket,
+): Map<string, { approved: Set<string>; runtimeVerified: Set<string> }> {
+  const supports = new Map(packet.sourceProvenancePacket.claimSupports.map((support) => [support.claimSupportId, support]));
+  const byRow = new Map<string, { approved: Set<string>; runtimeVerified: Set<string> }>();
+  for (const rowPacket of packet.sourceProvenancePacket.rowPackets) {
+    const approved = new Set<string>(rowPacket.applicableApprovedClaimSupportRefs);
+    const runtimeVerified = new Set<string>(rowPacket.runtimeVerifiedClaimSupportRefs);
+    for (const choice of rowPacket.permittedProvenanceChoices) {
+      if (choice.provenance === "approved_external_documentation") {
+        if (choice.sourceId) approved.add(choice.sourceId);
+        if (choice.claimId) approved.add(choice.claimId);
+        if (choice.claimSupportId) approved.add(choice.claimSupportId);
+      }
+      if (choice.provenance === "runtime_verified_documentation") {
+        if (choice.sourceId) runtimeVerified.add(choice.sourceId);
+        if (choice.claimId) runtimeVerified.add(choice.claimId);
+        if (choice.claimSupportId) runtimeVerified.add(choice.claimSupportId);
+      }
+    }
+    for (const supportRef of rowPacket.applicableApprovedClaimSupportRefs) {
+      const support = supports.get(supportRef);
+      if (support && isVerifiedDocumentationDecision(support.evidenceDecision)) {
+        approved.add(support.sourceId);
+        approved.add(support.claimId);
+      }
+    }
+    for (const supportRef of rowPacket.runtimeVerifiedClaimSupportRefs) {
+      const support = supports.get(supportRef);
+      if (support && isVerifiedDocumentationDecision(support.evidenceDecision)) {
+        runtimeVerified.add(support.sourceId);
+        runtimeVerified.add(support.claimId);
+      }
+    }
+    byRow.set(rowPacket.feeRowRef, { approved, runtimeVerified });
+  }
+  return byRow;
 }
 
 function coverageProofFor(

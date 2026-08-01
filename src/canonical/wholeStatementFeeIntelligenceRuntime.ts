@@ -7,6 +7,12 @@ import {
   type ApprovedWholeStatementFeeIntelligenceSourceRegistry,
   type CanonicalWholeStatementFeeIntelligencePacket,
 } from "./wholeStatementFeeIntelligenceReview.js";
+import { buildFeeKnowledgeSourcePacket } from "./feeKnowledgeRegistry.js";
+import {
+  defaultFeeKnowledgeResearchQuestions,
+  runFeeKnowledgeResearch,
+  type FeeKnowledgeResearchOptions,
+} from "./feeKnowledgeResearch.js";
 import type {
   CanonicalAiWholeStatementFeeIntelligenceOutput,
   CanonicalStatementAnalysis,
@@ -51,6 +57,7 @@ export type WholeStatementFeeIntelligenceRuntimeOptions = {
   sdk?: AiSdk;
   adapter?: WholeStatementFeeIntelligenceRuntimeAdapter;
   sourceRegistry?: ApprovedWholeStatementFeeIntelligenceSourceRegistry;
+  feeKnowledgeResearch?: FeeKnowledgeResearchOptions;
 };
 
 export async function runWholeStatementFeeIntelligenceRuntime(input: {
@@ -59,8 +66,6 @@ export async function runWholeStatementFeeIntelligenceRuntime(input: {
 }): Promise<CanonicalAiWholeStatementFeeIntelligenceOutput> {
   const options = input.options ?? {};
   const registry = options.sourceRegistry ?? { approvedExternalSourceRefs: [] };
-  const packet = buildWholeStatementFeeIntelligencePacket(input.analysis, registry);
-
   if (!runtimeEnabled(options)) {
     return failedWholeStatementFeeIntelligenceOutput(
       input.analysis,
@@ -68,6 +73,21 @@ export async function runWholeStatementFeeIntelligenceRuntime(input: {
       "whole_statement_fee_intelligence_disabled",
     );
   }
+  const research = await runFeeKnowledgeResearch({
+    analysis: input.analysis,
+    registry,
+    questions: defaultFeeKnowledgeResearchQuestions(input.analysis, registry),
+    options: options.feeKnowledgeResearch,
+  });
+  const sourceProvenancePacket = buildFeeKnowledgeSourcePacket({
+    analysis: input.analysis,
+    registry,
+    runtimeClaimSupports: research.claimSupports,
+    researchAttempts: research.attempts,
+    researchCandidates: research.candidates,
+  });
+  const packet = buildWholeStatementFeeIntelligencePacket(input.analysis, registry, sourceProvenancePacket);
+
   if (packet.admittedFeeRows.length === 0) {
     return failedWholeStatementFeeIntelligenceOutput(
       input.analysis,
@@ -82,7 +102,7 @@ export async function runWholeStatementFeeIntelligenceRuntime(input: {
       (abortSignal) => (options.adapter ? options.adapter(packet, { abortSignal }) : executeProviderReview(packet, options, abortSignal)),
       timeoutMs,
     );
-    const validation = validateWholeStatementFeeIntelligenceReview(raw, input.analysis, registry);
+    const validation = validateWholeStatementFeeIntelligenceReview(raw, input.analysis, registry, sourceProvenancePacket);
     return validation.output;
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
@@ -157,7 +177,7 @@ function buildPrompt(packet: CanonicalWholeStatementFeeIntelligencePacket): stri
     "Review every admitted merchant-statement fee row in this sanitized canonical packet.",
     "Return only the requested structured object. Do not include amounts, totals, merchant identifiers, provider names, model names, prompts, raw text, file paths, customer-facing wording, opportunity, savings, state, permissions, or actions.",
     "For each admittedFeeRows item, return exactly one rowInterpretations item with the same feeRowRef and row-scoped evidenceRefs.",
-    "Use approved_external_documentation only when externalSourceRef is listed in approvedExternalSourceRefs. Otherwise use statement_evidence, industry_inference, merchant_evidence, or human_review.",
+    "Use approved_external_documentation or runtime_verified_documentation only when the row-scoped sourceProvenancePacket permits the exact source/claim-support reference. Otherwise use statement_evidence, industry_inference, merchant_evidence, or human_review.",
     "Industry inference must be limited and cannot support potentially_actionable.",
     JSON.stringify(packet),
   ].join("\n\n");
@@ -211,12 +231,14 @@ function reviewResponseSchema(): unknown {
       evidenceProvenance: z.enum([
         "statement_evidence",
         "approved_external_documentation",
+        "runtime_verified_documentation",
         "industry_inference",
         "merchant_evidence",
         "human_review",
       ]),
       evidenceRefs: z.array(z.string()),
       externalSourceRef: z.string().nullable(),
+      externalClaimSupportRef: z.string().nullable().optional(),
       conflicts: z.array(z.string()),
       missingEvidence: z.array(z.string()),
       recommendedDisposition: z.enum(["supported", "insufficient_evidence", "conflicting_evidence", "human_review"]),
