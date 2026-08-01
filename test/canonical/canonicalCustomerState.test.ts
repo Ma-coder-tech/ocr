@@ -4,6 +4,11 @@ import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canoni
 import { buildCanonicalCustomerState } from "../../src/canonical/customerStateResolver.js";
 import { buildCanonicalFeeLedger } from "../../src/canonical/feeLedger.js";
 import { buildCanonicalFeeOwnershipActionability } from "../../src/canonical/feeOwnershipActionability.js";
+import {
+  WHOLE_STATEMENT_FEE_INTELLIGENCE_ACCEPTANCE_POLICY_VERSION,
+  WHOLE_STATEMENT_FEE_INTELLIGENCE_COVERAGE_POLICY_VERSION,
+  WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION,
+} from "../../src/canonical/wholeStatementFeeIntelligenceReview.js";
 import { aggregateCanonicalOpportunityComponents, buildCanonicalOpportunityEngine, type CanonicalOpportunityInput } from "../../src/canonical/opportunityEngine.js";
 import { selectedFact, unavailableFact } from "../../src/canonical/facts.js";
 import { validateCanonicalStatementAnalysis } from "../../src/canonical/validate.js";
@@ -435,7 +440,10 @@ function refreshReadyAi(analysis: CanonicalStatementAnalysis): void {
   analysis.aiCapabilities = buildCanonicalAiCapabilities({
     ...analysis,
     evidence: analysis.evidence,
-    harnessInputs: [{ capability: "full_statement_anomaly_review", status: "completed", output: fullAnomalyOutput(analysis) }],
+    harnessInputs: [
+      { capability: "full_statement_anomaly_review", status: "completed", output: fullAnomalyOutput(analysis) },
+      { capability: "whole_statement_fee_intelligence_review", status: "completed", output: wholeStatementOutput(analysis) },
+    ],
   });
 }
 
@@ -628,6 +636,72 @@ function fullAnomalyOutput(analysis: CanonicalStatementAnalysis): CanonicalAiCap
     factRefs: ["financialFacts.processedSales", "financialFacts.totalFees"],
     limitationCodes: [],
     observations: [{ id: "pkg_g_obs", severity: "info", summary: "Canonical totals reconcile for the synthetic test.", affectedFactRefs: ["financialFacts.processedSales", "financialFacts.totalFees"], evidenceRefs: [evidenceRef], authoritative: false }],
+  };
+}
+
+function wholeStatementOutput(analysis: CanonicalStatementAnalysis): CanonicalAiCapabilityOutput {
+  const rowRefs = analysis.feeLedger.rows.map((row) => row.id).sort();
+  const evidenceByRow = new Map(
+    analysis.feeLedger.rows.map((row) => [
+      row.id,
+      [...new Set(row.contributionDecision.evidenceRefs)].sort(),
+    ]),
+  );
+  return {
+    type: "whole_statement_fee_intelligence_review",
+    reviewPolicyVersion: WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION,
+    authoritative: false,
+    evidenceRefs: [...new Set([...evidenceByRow.values()].flat())].sort(),
+    factRefs: [],
+    limitationCodes: [],
+    reviewStatus: "completed",
+    coverageProof: {
+      policyVersion: WHOLE_STATEMENT_FEE_INTELLIGENCE_COVERAGE_POLICY_VERSION,
+      expectedFeeRowRefs: rowRefs,
+      reviewedFeeRowRefs: rowRefs,
+      missingFeeRowRefs: [],
+      duplicatedFeeRowRefs: [],
+      unknownFeeRowRefs: [],
+      malformedFeeRowRefs: [],
+      exactCoverage: true,
+    },
+    rowInterpretations: rowRefs.map((feeRowRef) => ({
+      feeRowRef,
+      proposedCategory: "processor_markup",
+      likelyEconomicOwner: "processor",
+      likelyContractualController: "merchant_contract",
+      proposedActionabilityCeiling: "not_actionable",
+      confidence: "high",
+      conciseRationale: "Statement row label and section context support this semantic interpretation.",
+      evidenceProvenance: "statement_evidence",
+      evidenceRefs: evidenceByRow.get(feeRowRef) ?? [],
+      externalSourceRef: null,
+      conflicts: [],
+      missingEvidence: [],
+      recommendedDisposition: "supported",
+      authoritative: false,
+    })),
+    acceptanceRecords: rowRefs.map((feeRowRef) => ({
+      feeRowRef,
+      policyVersion: WHOLE_STATEMENT_FEE_INTELLIGENCE_ACCEPTANCE_POLICY_VERSION,
+      status: "accepted",
+      acceptedSemanticFields: {
+        category: "processor_markup",
+        likelyEconomicOwner: "processor",
+        likelyContractualController: "merchant_contract",
+        actionabilityCeiling: "not_actionable",
+        evidenceProvenance: "statement_evidence",
+      },
+      evidenceRefs: evidenceByRow.get(feeRowRef) ?? [],
+      externalSourceRef: null,
+      reasonCodes: ["whole_statement_fee_intelligence_accepted"],
+      conflicts: [],
+      actionabilityCeiling: "not_actionable",
+      immutableFeeRowRef: feeRowRef,
+    })),
+    reasonCodes: ["whole_statement_fee_intelligence_reviewed"],
+    financialMutationAllowed: false,
+    providerDetailsStripped: true,
   };
 }
 

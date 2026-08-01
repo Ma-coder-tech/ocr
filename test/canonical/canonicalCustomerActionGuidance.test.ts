@@ -7,6 +7,11 @@ import { buildCanonicalFeeOwnershipActionability } from "../../src/canonical/fee
 import { buildCanonicalOpportunityEngine, type CanonicalOpportunityInput } from "../../src/canonical/opportunityEngine.js";
 import { selectedFact } from "../../src/canonical/facts.js";
 import { validateCanonicalStatementAnalysis } from "../../src/canonical/validate.js";
+import {
+  WHOLE_STATEMENT_FEE_INTELLIGENCE_ACCEPTANCE_POLICY_VERSION,
+  WHOLE_STATEMENT_FEE_INTELLIGENCE_COVERAGE_POLICY_VERSION,
+  WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION,
+} from "../../src/canonical/wholeStatementFeeIntelligenceReview.js";
 import type { CanonicalAiCapabilityOutput, CanonicalOpportunityTargetProvenance, CanonicalStatementAnalysis, MoneyAmount } from "../../src/canonical/types.js";
 import type { ParsedDocument } from "../../src/parser.js";
 
@@ -142,7 +147,14 @@ function addMonetaryFeeRemoval(analysis: CanonicalStatementAnalysis): void {
 }
 
 function ready(analysis: CanonicalStatementAnalysis): void {
-  analysis.aiCapabilities = buildCanonicalAiCapabilities({ ...analysis, evidence: analysis.evidence, harnessInputs: [{ capability: "full_statement_anomaly_review", status: "completed", output: anomalyOutput(analysis) }] });
+  analysis.aiCapabilities = buildCanonicalAiCapabilities({
+    ...analysis,
+    evidence: analysis.evidence,
+    harnessInputs: [
+      { capability: "full_statement_anomaly_review", status: "completed", output: anomalyOutput(analysis) },
+      { capability: "whole_statement_fee_intelligence_review", status: "completed", output: wholeStatementOutput(analysis) },
+    ],
+  });
   analysis.customerState = buildCanonicalCustomerState({ ...analysis });
 }
 
@@ -187,6 +199,73 @@ function analysisWithLedger(options: { label?: string; section?: string; confide
 function anomalyOutput(analysis: CanonicalStatementAnalysis): CanonicalAiCapabilityOutput {
   const evidenceRef = analysis.evidence[0]!.id;
   return { type: "full_statement_anomaly_review", authoritative: false, evidenceRefs: [evidenceRef], factRefs: ["financialFacts.processedSales"], limitationCodes: [], observations: [{ id: "obs_actions", severity: "info", summary: "Synthetic core metrics are reviewed.", affectedFactRefs: ["financialFacts.processedSales"], evidenceRefs: [evidenceRef], authoritative: false }] };
+}
+
+function wholeStatementOutput(analysis: CanonicalStatementAnalysis): CanonicalAiCapabilityOutput {
+  const rowRefs = analysis.feeLedger.rows.map((row) => row.id).sort();
+  const occurrenceEvidence = new Map(analysis.feeLedger.sourceOccurrences.map((occurrence) => [occurrence.id, occurrence.evidenceRef]));
+  const evidenceByRow = new Map(
+    analysis.feeLedger.rows.map((row) => [
+      row.id,
+      [...new Set([...row.sourceOccurrenceIds.map((id) => occurrenceEvidence.get(id)).filter((id): id is string => Boolean(id)), ...row.contributionDecision.evidenceRefs])].sort(),
+    ]),
+  );
+  return {
+    type: "whole_statement_fee_intelligence_review",
+    reviewPolicyVersion: WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION,
+    authoritative: false,
+    evidenceRefs: [...new Set([...evidenceByRow.values()].flat())].sort(),
+    factRefs: [],
+    limitationCodes: [],
+    reviewStatus: "completed",
+    coverageProof: {
+      policyVersion: WHOLE_STATEMENT_FEE_INTELLIGENCE_COVERAGE_POLICY_VERSION,
+      expectedFeeRowRefs: rowRefs,
+      reviewedFeeRowRefs: rowRefs,
+      missingFeeRowRefs: [],
+      duplicatedFeeRowRefs: [],
+      unknownFeeRowRefs: [],
+      malformedFeeRowRefs: [],
+      exactCoverage: true,
+    },
+    rowInterpretations: rowRefs.map((feeRowRef) => ({
+      feeRowRef,
+      proposedCategory: "processor_markup",
+      likelyEconomicOwner: "processor",
+      likelyContractualController: "merchant_contract",
+      proposedActionabilityCeiling: "not_actionable",
+      confidence: "high",
+      conciseRationale: "Statement row label and section context support this semantic interpretation.",
+      evidenceProvenance: "statement_evidence",
+      evidenceRefs: evidenceByRow.get(feeRowRef) ?? [],
+      externalSourceRef: null,
+      conflicts: [],
+      missingEvidence: [],
+      recommendedDisposition: "supported",
+      authoritative: false,
+    })),
+    acceptanceRecords: rowRefs.map((feeRowRef) => ({
+      feeRowRef,
+      policyVersion: WHOLE_STATEMENT_FEE_INTELLIGENCE_ACCEPTANCE_POLICY_VERSION,
+      status: "accepted",
+      acceptedSemanticFields: {
+        category: "processor_markup",
+        likelyEconomicOwner: "processor",
+        likelyContractualController: "merchant_contract",
+        actionabilityCeiling: "not_actionable",
+        evidenceProvenance: "statement_evidence",
+      },
+      evidenceRefs: evidenceByRow.get(feeRowRef) ?? [],
+      externalSourceRef: null,
+      reasonCodes: ["whole_statement_fee_intelligence_accepted"],
+      conflicts: [],
+      actionabilityCeiling: "not_actionable",
+      immutableFeeRowRef: feeRowRef,
+    })),
+    reasonCodes: ["whole_statement_fee_intelligence_reviewed"],
+    financialMutationAllowed: false,
+    providerDetailsStripped: true,
+  };
 }
 
 function provenance(analysis: CanonicalStatementAnalysis): CanonicalOpportunityTargetProvenance {

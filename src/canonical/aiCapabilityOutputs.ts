@@ -28,6 +28,81 @@ const PROVIDER_DETAIL_KEYS = ["provider", "model", "adapter", "apiKey", "rawProm
 export function validateTypedAiCapabilityOutput(output: CanonicalAiCapabilityOutput): string[] {
   const errors: string[] = [];
   if (output.authoritative !== false) errors.push(`AI output ${output.type} must be non-authoritative.`);
+  if (output.type === "whole_statement_fee_intelligence_review") {
+    errors.push(
+      ...unknownKeyErrors(
+        output,
+        [
+          "type",
+          "reviewPolicyVersion",
+          "authoritative",
+          "evidenceRefs",
+          "factRefs",
+          "limitationCodes",
+          "reviewStatus",
+          "coverageProof",
+          "rowInterpretations",
+          "acceptanceRecords",
+          "reasonCodes",
+          "financialMutationAllowed",
+          "providerDetailsStripped",
+        ],
+        output.type,
+      ),
+    );
+    if (output.authoritative !== false || output.financialMutationAllowed !== false || output.providerDetailsStripped !== true) {
+      errors.push("AI whole-statement fee intelligence output weakens the authority boundary.");
+    }
+    if (output.reviewStatus === "completed" && !output.coverageProof.exactCoverage) {
+      errors.push("AI whole-statement fee intelligence completed without exact fee-row coverage.");
+    }
+    for (const interpretation of output.rowInterpretations) {
+      errors.push(
+        ...unknownKeyErrors(
+          interpretation,
+          [
+            "feeRowRef",
+            "proposedCategory",
+            "likelyEconomicOwner",
+            "likelyContractualController",
+            "proposedActionabilityCeiling",
+            "confidence",
+            "conciseRationale",
+            "evidenceProvenance",
+            "evidenceRefs",
+            "externalSourceRef",
+            "conflicts",
+            "missingEvidence",
+            "recommendedDisposition",
+            "authoritative",
+          ],
+          `${output.type}.rowInterpretation`,
+        ),
+      );
+      if (interpretation.authoritative !== false) errors.push("AI whole-statement fee intelligence interpretation must be non-authoritative.");
+    }
+    for (const acceptance of output.acceptanceRecords) {
+      errors.push(
+        ...unknownKeyErrors(
+          acceptance,
+          [
+            "feeRowRef",
+            "policyVersion",
+            "status",
+            "acceptedSemanticFields",
+            "evidenceRefs",
+            "externalSourceRef",
+            "reasonCodes",
+            "conflicts",
+            "actionabilityCeiling",
+            "immutableFeeRowRef",
+          ],
+          `${output.type}.acceptanceRecord`,
+        ),
+      );
+      if (acceptance.feeRowRef !== acceptance.immutableFeeRowRef) errors.push("AI whole-statement fee intelligence acceptance is not tied to immutable fee row.");
+    }
+  }
   if (output.type === "fee_classification_review") {
     errors.push(...unknownKeyErrors(output, ["type", "authoritative", "evidenceRefs", "factRefs", "limitationCodes", "suggestions"], output.type));
     for (const suggestion of output.suggestions) {
@@ -72,7 +147,7 @@ export function validateTypedAiCapabilityOutput(output: CanonicalAiCapabilityOut
       if (observation.authoritative !== false) errors.push("AI document quality observation must be non-authoritative.");
     }
   }
-  for (const path of findForbiddenKeys(output, "")) {
+  for (const path of findForbiddenKeys(output, "", output.type)) {
     errors.push(`AI capability output contains forbidden financial-impact or provider field ${path}.`);
   }
   return errors;
@@ -85,19 +160,30 @@ function unknownKeyErrors(value: Record<string, unknown>, allowedKeys: readonly 
     .map((key) => `AI capability output ${context} contains unknown field ${key}.`);
 }
 
-function findForbiddenKeys(value: unknown, path: string): string[] {
+function findForbiddenKeys(value: unknown, path: string, outputType: CanonicalAiCapabilityOutput["type"]): string[] {
   if (!value || typeof value !== "object") return [];
   const hits: string[] = [];
   if (Array.isArray(value)) {
-    value.forEach((item, index) => hits.push(...findForbiddenKeys(item, `${path}[${index}]`)));
+    value.forEach((item, index) => hits.push(...findForbiddenKeys(item, `${path}[${index}]`, outputType)));
     return hits;
   }
   for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
     const nestedPath = path ? `${path}.${key}` : key;
-    if ((FORBIDDEN_AI_FINANCIAL_KEYS as readonly string[]).includes(key) || (PROVIDER_DETAIL_KEYS as readonly string[]).includes(key)) {
+    if (
+      ((FORBIDDEN_AI_FINANCIAL_KEYS as readonly string[]).includes(key) && !isAllowedWholeStatementSemanticKey(outputType, key, nestedPath)) ||
+      (PROVIDER_DETAIL_KEYS as readonly string[]).includes(key)
+    ) {
       hits.push(nestedPath);
     }
-    hits.push(...findForbiddenKeys(nested, nestedPath));
+    hits.push(...findForbiddenKeys(nested, nestedPath, outputType));
   }
   return hits;
+}
+
+function isAllowedWholeStatementSemanticKey(outputType: CanonicalAiCapabilityOutput["type"], key: string, path: string): boolean {
+  return (
+    outputType === "whole_statement_fee_intelligence_review" &&
+    (key === "actionabilityCeiling" || key === "proposedActionabilityCeiling") &&
+    /\b(rowInterpretations|acceptanceRecords|acceptedSemanticFields)\b/.test(path)
+  );
 }

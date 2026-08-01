@@ -3,8 +3,13 @@ import { buildCanonicalAiCapabilities } from "./buildCanonicalAiCapabilities.js"
 import { buildCanonicalCustomerState } from "./customerStateResolver.js";
 import {
   buildRuntimeAiCapabilityHarnessInputs,
+  type CanonicalRuntimeWholeStatementFeeIntelligenceReview,
   type RuntimeAiCapabilitySnapshot,
 } from "./runtimeAiCapabilityAdapter.js";
+import {
+  runWholeStatementFeeIntelligenceRuntime,
+  type WholeStatementFeeIntelligenceRuntimeOptions,
+} from "./wholeStatementFeeIntelligenceRuntime.js";
 import {
   addDeterministicAnomalySubstitution,
   buildDeterministicRuntimeSafetyReview,
@@ -13,7 +18,14 @@ import { validateCanonicalStatementAnalysis } from "./validate.js";
 import type { BusinessTypeId } from "../businessTypes.js";
 import type { ParsedDocument } from "../parser.js";
 import type { AnalysisSummary } from "../types.js";
-import type { CanonicalStatementAnalysis } from "./types.js";
+import type {
+  CanonicalAiCapabilityHarnessInput,
+} from "./buildCanonicalAiCapabilities.js";
+import type {
+  CanonicalAiCapabilityStatus,
+  CanonicalAiWholeStatementFeeIntelligenceOutput,
+  CanonicalStatementAnalysis,
+} from "./types.js";
 
 export type CanonicalRuntimeInputAdmissionStatus =
   | "canonical_evidence"
@@ -127,6 +139,7 @@ export type CanonicalRuntimeAdapterInput = {
   businessType: BusinessTypeId;
   runtimeDocumentRef: string;
   legacySummary?: AnalysisSummary | null;
+  wholeStatementFeeIntelligence?: WholeStatementFeeIntelligenceRuntimeOptions;
 };
 
 export type CanonicalRuntimeAdapterResult = {
@@ -195,6 +208,75 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
   };
 }
 
+export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: CanonicalRuntimeAdapterInput): Promise<CanonicalRuntimeAdapterResult> {
+  const document = cloneJson(input.document);
+  const businessType = input.businessType;
+  const runtimeDocumentRef = opaqueRuntimeRef(input.runtimeDocumentRef);
+  const legacySummary = cloneJson(input.legacySummary ?? null);
+
+  const analysis = buildCanonicalStatementFactsFromParsedDocument(document, {
+    businessType,
+    sourceAnalysisId: runtimeDocumentRef,
+    sourceFileName: null,
+  });
+  const runtimeAi = buildRuntimeAiCapabilityHarnessInputs({
+    summary: legacySummary,
+    analysis,
+  });
+  const wholeStatementOutput = await runWholeStatementFeeIntelligenceRuntime({
+    analysis,
+    options: input.wholeStatementFeeIntelligence,
+  });
+  const wholeStatementHarnessInput: CanonicalAiCapabilityHarnessInput = {
+    capability: "whole_statement_fee_intelligence_review",
+    status: wholeStatementOutput.reviewStatus,
+    output: wholeStatementOutput.reviewStatus === "completed" ? wholeStatementOutput : null,
+    executionRef: null,
+    independentReviewRefs: [],
+  };
+  const wholeStatementSnapshot = snapshotForWholeStatementFeeIntelligence(wholeStatementOutput);
+  const snapshots = [...runtimeAi.snapshots, wholeStatementSnapshot].sort((left, right) =>
+    left.capability.localeCompare(right.capability),
+  );
+  const deterministicRuntimeSafetyReview = buildDeterministicRuntimeSafetyReview({
+    analysis,
+    runtimeAiCapabilitySnapshots: snapshots,
+  });
+  const harnessInputs = addDeterministicAnomalySubstitution({
+    harnessInputs: [...runtimeAi.harnessInputs, wholeStatementHarnessInput],
+    review: deterministicRuntimeSafetyReview,
+    runtimeAiCapabilitySnapshots: snapshots,
+  });
+  const aiCapabilities = buildCanonicalAiCapabilities({
+    identity: analysis.identity,
+    financialFacts: analysis.financialFacts,
+    feeLedger: analysis.feeLedger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    opportunityEngine: analysis.opportunityEngine,
+    evidence: analysis.evidence,
+    harnessInputs,
+    deterministicRuntimeSafetyReview,
+  });
+  const finalAnalysis = validateCanonicalStatementAnalysis({
+    ...analysis,
+    aiCapabilities,
+    customerState: buildCanonicalCustomerState({
+      identity: analysis.identity,
+      financialFacts: analysis.financialFacts,
+      feeLedger: analysis.feeLedger,
+      feeOwnershipActionability: analysis.feeOwnershipActionability,
+      opportunityEngine: analysis.opportunityEngine,
+      aiCapabilities,
+    }),
+  });
+
+  return {
+    analysis: finalAnalysis,
+    inputAdmission: canonicalRuntimeInputAdmissionTable(),
+    runtimeAiCapabilitySnapshots: snapshots,
+  };
+}
+
 export function canonicalRuntimeInputAdmissionTable(): CanonicalRuntimeInputAdmission[] {
   return CANONICAL_RUNTIME_INPUT_ADMISSION_TABLE.map((row) => ({ ...row }));
 }
@@ -215,4 +297,39 @@ export function opaqueRuntimeRef(value: string): string {
 
 function cloneJson<T>(value: T): T {
   return value === undefined ? value : JSON.parse(JSON.stringify(value));
+}
+
+function snapshotForWholeStatementFeeIntelligence(output: CanonicalAiWholeStatementFeeIntelligenceOutput): RuntimeAiCapabilitySnapshot {
+  return {
+    capability: "whole_statement_fee_intelligence_review",
+    attempted: output.reviewStatus !== "disabled",
+    normalizedStatus: output.reviewStatus as CanonicalAiCapabilityStatus,
+    safeCounts: {
+      expectedFeeRowCount: output.coverageProof.expectedFeeRowRefs.length,
+      reviewedFeeRowCount: output.coverageProof.reviewedFeeRowRefs.length,
+      acceptedRecordCount: output.acceptanceRecords.filter((record) => record.status === "accepted" || record.status === "accepted_with_conditions").length,
+      needsVerificationCount: output.acceptanceRecords.filter((record) => record.status === "needs_verification").length,
+      humanReviewCount: output.acceptanceRecords.filter((record) => record.status === "human_review").length,
+      rejectedRecordCount: output.acceptanceRecords.filter((record) => record.status === "rejected").length,
+    },
+    executionRef: null,
+    reasonCodes: [`whole_statement_fee_intelligence_${output.reviewStatus}` as const],
+    runtimeWholeStatementFeeIntelligenceReview: runtimeReviewForWholeStatementFeeIntelligence(output),
+  };
+}
+
+function runtimeReviewForWholeStatementFeeIntelligence(
+  output: CanonicalAiWholeStatementFeeIntelligenceOutput,
+): CanonicalRuntimeWholeStatementFeeIntelligenceReview {
+  return {
+    type: "whole_statement_fee_intelligence_runtime_review",
+    policyVersion: "whole_statement_fee_intelligence_runtime_review_v1",
+    reviewStatus: output.reviewStatus,
+    coverageProof: output.coverageProof,
+    rowInterpretationCount: output.rowInterpretations.length,
+    acceptanceRecordCount: output.acceptanceRecords.length,
+    reasonCodes: [...output.reasonCodes],
+    authoritative: false,
+    providerDetailsStripped: true,
+  };
 }

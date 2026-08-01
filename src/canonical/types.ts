@@ -697,6 +697,7 @@ export type CanonicalOpportunityEngine = {
 
 export type CanonicalAiCapabilityId =
   | "full_statement_anomaly_review"
+  | "whole_statement_fee_intelligence_review"
   | "fee_classification_review"
   | "notice_change_review"
   | "benchmark_category_review"
@@ -718,6 +719,7 @@ export type CanonicalAiExplanationSource = "accepted_ai_narrative" | "determinis
 
 export type CanonicalAiLimitationCode =
   | "full_statement_anomaly_review_required"
+  | "whole_statement_fee_intelligence_review_required"
   | "material_fee_classification_review_required"
   | "notice_change_review_required"
   | "benchmark_category_review_required"
@@ -869,6 +871,95 @@ export type CanonicalAiCapabilityOutputBase = {
   limitationCodes: CanonicalAiLimitationCode[];
 };
 
+export type CanonicalWholeStatementFeeIntelligenceStatus =
+  | "completed"
+  | "disabled"
+  | "failed"
+  | "timed_out"
+  | "rejected"
+  | "safety_blocked";
+
+export type CanonicalWholeStatementFeeIntelligenceEvidenceProvenance =
+  | "statement_evidence"
+  | "approved_external_documentation"
+  | "industry_inference"
+  | "merchant_evidence"
+  | "human_review";
+
+export type CanonicalWholeStatementFeeIntelligenceDisposition =
+  | "supported"
+  | "insufficient_evidence"
+  | "conflicting_evidence"
+  | "human_review";
+
+export type CanonicalWholeStatementFeeIntelligenceAcceptanceStatus =
+  | "accepted"
+  | "accepted_with_conditions"
+  | "needs_verification"
+  | "rejected"
+  | "human_review";
+
+export type CanonicalWholeStatementFeeIntelligenceRowInterpretation = {
+  feeRowRef: string;
+  proposedCategory: CanonicalFeeCategory;
+  likelyEconomicOwner: CanonicalFeeParty;
+  likelyContractualController: CanonicalFeeParty;
+  proposedActionabilityCeiling: CanonicalFeeActionability;
+  confidence: CanonicalFeeClassificationConfidence;
+  conciseRationale: string;
+  evidenceProvenance: CanonicalWholeStatementFeeIntelligenceEvidenceProvenance;
+  evidenceRefs: string[];
+  externalSourceRef: string | null;
+  conflicts: string[];
+  missingEvidence: string[];
+  recommendedDisposition: CanonicalWholeStatementFeeIntelligenceDisposition;
+  authoritative: false;
+};
+
+export type CanonicalWholeStatementFeeIntelligenceCoverageProof = {
+  policyVersion: "whole_statement_fee_intelligence_coverage_v1";
+  expectedFeeRowRefs: string[];
+  reviewedFeeRowRefs: string[];
+  missingFeeRowRefs: string[];
+  duplicatedFeeRowRefs: string[];
+  unknownFeeRowRefs: string[];
+  malformedFeeRowRefs: string[];
+  malformedFeeRowRefCount: number;
+  exactCoverage: boolean;
+};
+
+export type CanonicalWholeStatementFeeIntelligenceAcceptanceRecord = {
+  feeRowRef: string;
+  policyVersion: "whole_statement_fee_intelligence_acceptance_v1";
+  status: CanonicalWholeStatementFeeIntelligenceAcceptanceStatus;
+  acceptedSemanticFields: {
+    category: CanonicalFeeCategory | null;
+    likelyEconomicOwner: CanonicalFeeParty | null;
+    likelyContractualController: CanonicalFeeParty | null;
+    actionabilityCeiling: CanonicalFeeActionability | null;
+    evidenceProvenance: CanonicalWholeStatementFeeIntelligenceEvidenceProvenance | null;
+  };
+  evidenceRefs: string[];
+  externalSourceRef: string | null;
+  reasonCodes: string[];
+  conflicts: string[];
+  actionabilityCeiling: CanonicalFeeActionability;
+  immutableFeeRowRef: string;
+};
+
+export type CanonicalAiWholeStatementFeeIntelligenceOutput = CanonicalAiCapabilityOutputBase & {
+  type: "whole_statement_fee_intelligence_review";
+  reviewPolicyVersion: "whole_statement_fee_intelligence_review_v1";
+  reviewStatus: CanonicalWholeStatementFeeIntelligenceStatus;
+  coverageProof: CanonicalWholeStatementFeeIntelligenceCoverageProof;
+  rowInterpretations: CanonicalWholeStatementFeeIntelligenceRowInterpretation[];
+  acceptanceRecords: CanonicalWholeStatementFeeIntelligenceAcceptanceRecord[];
+  reasonCodes: string[];
+  authoritative: false;
+  financialMutationAllowed: false;
+  providerDetailsStripped: true;
+};
+
 export type CanonicalAiFeeClassificationOutput = CanonicalAiCapabilityOutputBase & {
   type: "fee_classification_review";
   suggestions: Array<{
@@ -936,6 +1027,7 @@ export type CanonicalAiDocumentQualityOutput = CanonicalAiCapabilityOutputBase &
 };
 
 export type CanonicalAiCapabilityOutput =
+  | CanonicalAiWholeStatementFeeIntelligenceOutput
   | CanonicalAiFeeClassificationOutput
   | CanonicalAiAnomalyReviewOutput
   | CanonicalAiNoticeReviewOutput

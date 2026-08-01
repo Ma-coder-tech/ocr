@@ -5,6 +5,8 @@ import type {
   CanonicalAiCapabilityId,
   CanonicalAiCapabilityOutput,
   CanonicalAiCapabilityStatus,
+  CanonicalWholeStatementFeeIntelligenceCoverageProof,
+  CanonicalWholeStatementFeeIntelligenceStatus,
   CanonicalRuntimeFeeClassificationReview,
   CanonicalRuntimeFeeClassificationReviewStatus,
   CanonicalStatementAnalysis,
@@ -30,7 +32,13 @@ export type RuntimeAiCapabilityReasonCode =
   | "runtime_fee_classification_review_failed"
   | "runtime_fee_classification_review_timed_out"
   | "runtime_fee_classification_review_safety_blocked"
-  | "runtime_fee_classification_review_rejected";
+  | "runtime_fee_classification_review_rejected"
+  | "whole_statement_fee_intelligence_completed"
+  | "whole_statement_fee_intelligence_disabled"
+  | "whole_statement_fee_intelligence_failed"
+  | "whole_statement_fee_intelligence_timed_out"
+  | "whole_statement_fee_intelligence_safety_blocked"
+  | "whole_statement_fee_intelligence_rejected";
 
 export type RuntimeAiCapabilitySnapshot = {
   capability: CanonicalAiCapabilityId;
@@ -41,6 +49,19 @@ export type RuntimeAiCapabilitySnapshot = {
   reasonCodes: RuntimeAiCapabilityReasonCode[];
   runtimeReviewStatus?: CanonicalRuntimeFeeClassificationReviewStatus;
   runtimeFeeClassificationReview?: CanonicalRuntimeFeeClassificationReview;
+  runtimeWholeStatementFeeIntelligenceReview?: CanonicalRuntimeWholeStatementFeeIntelligenceReview;
+};
+
+export type CanonicalRuntimeWholeStatementFeeIntelligenceReview = {
+  type: "whole_statement_fee_intelligence_runtime_review";
+  policyVersion: "whole_statement_fee_intelligence_runtime_review_v1";
+  reviewStatus: CanonicalWholeStatementFeeIntelligenceStatus;
+  coverageProof: CanonicalWholeStatementFeeIntelligenceCoverageProof;
+  rowInterpretationCount: number;
+  acceptanceRecordCount: number;
+  reasonCodes: string[];
+  authoritative: false;
+  providerDetailsStripped: true;
 };
 
 export type RuntimeAiCapabilityAdapterResult = {

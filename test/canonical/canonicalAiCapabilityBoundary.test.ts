@@ -3,6 +3,11 @@ import { buildCanonicalAiCapabilities } from "../../src/canonical/buildCanonical
 import { canonicalActualValues, buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
 import { determineAiCapabilityNeeds } from "../../src/canonical/aiCapabilityPolicy.js";
 import { validateCanonicalStatementAnalysis } from "../../src/canonical/validate.js";
+import {
+  WHOLE_STATEMENT_FEE_INTELLIGENCE_ACCEPTANCE_POLICY_VERSION,
+  WHOLE_STATEMENT_FEE_INTELLIGENCE_COVERAGE_POLICY_VERSION,
+  WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION,
+} from "../../src/canonical/wholeStatementFeeIntelligenceReview.js";
 import type { CanonicalAiCapabilityOutput, CanonicalStatementAnalysis } from "../../src/canonical/types.js";
 import type { ParsedDocument } from "../../src/parser.js";
 
@@ -17,6 +22,7 @@ describe("canonical AI capability boundary", () => {
       "full_statement_anomaly_review",
       "merchant_narrative",
       "notice_change_review",
+      "whole_statement_fee_intelligence_review",
     ]);
     expect(analysis.aiCapabilities.capabilities.find((record) => record.capability === "full_statement_anomaly_review")).toMatchObject({
       required: true,
@@ -50,7 +56,10 @@ describe("canonical AI capability boundary", () => {
     analysis.aiCapabilities = buildCanonicalAiCapabilities({
       ...analysis,
       evidence: analysis.evidence,
-      harnessInputs: [{ capability: "full_statement_anomaly_review", status: "completed", output }],
+      harnessInputs: [
+        { capability: "full_statement_anomaly_review", status: "completed", output },
+        { capability: "whole_statement_fee_intelligence_review", status: "completed", output: outputForCapability("whole_statement_fee_intelligence_review", analysis) },
+      ],
     });
 
     expect(analysis.aiCapabilities.summary.financialReadiness).toBe("ready");
@@ -105,7 +114,7 @@ describe("canonical AI capability boundary", () => {
     ready.aiCapabilities = buildCanonicalAiCapabilities({
       ...ready,
       evidence: ready.evidence,
-      harnessInputs: [{ capability: "full_statement_anomaly_review", status: "completed", output: outputForCapability("full_statement_anomaly_review", ready) }],
+      harnessInputs: readyHarnessInputs(ready),
     });
     expect(ready.aiCapabilities.summary.financialReadiness).toBe("ready");
 
@@ -114,7 +123,10 @@ describe("canonical AI capability boundary", () => {
       analysis.aiCapabilities = buildCanonicalAiCapabilities({
         ...analysis,
         evidence: analysis.evidence,
-        harnessInputs: [{ capability: "full_statement_anomaly_review", status }],
+        harnessInputs: [
+          { capability: "full_statement_anomaly_review", status },
+          { capability: "whole_statement_fee_intelligence_review", status: "completed", output: outputForCapability("whole_statement_fee_intelligence_review", analysis) },
+        ],
       });
       expect(analysis.aiCapabilities.summary.financialReadiness, status).toBe("withheld");
     }
@@ -123,7 +135,10 @@ describe("canonical AI capability boundary", () => {
     invalidOutput.aiCapabilities = buildCanonicalAiCapabilities({
       ...invalidOutput,
       evidence: invalidOutput.evidence,
-      harnessInputs: [{ capability: "full_statement_anomaly_review", status: "completed", output: { ...outputForCapability("full_statement_anomaly_review", invalidOutput), impactUsd: 1 } as any }],
+      harnessInputs: [
+        { capability: "full_statement_anomaly_review", status: "completed", output: { ...outputForCapability("full_statement_anomaly_review", invalidOutput), impactUsd: 1 } as any },
+        { capability: "whole_statement_fee_intelligence_review", status: "completed", output: outputForCapability("whole_statement_fee_intelligence_review", invalidOutput) },
+      ],
     });
     expect(invalidOutput.aiCapabilities.summary.financialReadiness).toBe("withheld");
 
@@ -131,7 +146,7 @@ describe("canonical AI capability boundary", () => {
     unknownBenchmark.aiCapabilities = buildCanonicalAiCapabilities({
       ...unknownBenchmark,
       evidence: unknownBenchmark.evidence,
-      harnessInputs: [{ capability: "full_statement_anomaly_review", status: "completed", output: outputForCapability("full_statement_anomaly_review", unknownBenchmark) }],
+      harnessInputs: readyHarnessInputs(unknownBenchmark),
     });
     expect(unknownBenchmark.aiCapabilities.summary.financialReadiness).toBe("limited");
 
@@ -143,7 +158,7 @@ describe("canonical AI capability boundary", () => {
     notice.aiCapabilities = buildCanonicalAiCapabilities({
       ...notice,
       evidence: notice.evidence,
-      harnessInputs: [{ capability: "full_statement_anomaly_review", status: "completed", output: outputForCapability("full_statement_anomaly_review", notice) }],
+      harnessInputs: readyHarnessInputs(notice),
     });
     expect(notice.aiCapabilities.summary.financialReadiness).toBe("limited");
 
@@ -153,7 +168,7 @@ describe("canonical AI capability boundary", () => {
       evidence: optionalFailure.evidence,
       harnessInputs: [
         { capability: "document_quality_review", status: "failed" },
-        { capability: "full_statement_anomaly_review", status: "completed", output: outputForCapability("full_statement_anomaly_review", optionalFailure) },
+        ...readyHarnessInputs(optionalFailure),
       ],
     });
     expect(optionalFailure.aiCapabilities.summary.financialReadiness).toBe("ready");
@@ -165,6 +180,7 @@ describe("canonical AI capability boundary", () => {
       harnessInputs: [
         { capability: "full_statement_anomaly_review", status: "completed", output: outputForCapability("full_statement_anomaly_review", duplicateOutcomes) },
         { capability: "full_statement_anomaly_review", status: "failed" },
+        { capability: "whole_statement_fee_intelligence_review", status: "completed", output: outputForCapability("whole_statement_fee_intelligence_review", duplicateOutcomes) },
       ],
     });
     expect(duplicateOutcomes.aiCapabilities.summary.financialReadiness).toBe("withheld");
@@ -175,7 +191,7 @@ describe("canonical AI capability boundary", () => {
       evidence: firstOrder.evidence,
       harnessInputs: [
         { capability: "merchant_narrative", status: "completed", output: outputForCapability("merchant_narrative", firstOrder) },
-        { capability: "full_statement_anomaly_review", status: "completed", output: outputForCapability("full_statement_anomaly_review", firstOrder) },
+        ...readyHarnessInputs(firstOrder),
       ],
     });
     const secondOrder = packageFAnalysis();
@@ -183,7 +199,7 @@ describe("canonical AI capability boundary", () => {
       ...secondOrder,
       evidence: secondOrder.evidence,
       harnessInputs: [
-        { capability: "full_statement_anomaly_review", status: "completed", output: outputForCapability("full_statement_anomaly_review", secondOrder) },
+        ...readyHarnessInputs(secondOrder),
         { capability: "merchant_narrative", status: "completed", output: outputForCapability("merchant_narrative", secondOrder) },
       ],
     });
@@ -304,6 +320,7 @@ describe("canonical AI capability boundary", () => {
   it("rejects forbidden or unknown fields for every capability-specific output", () => {
     const capabilities = [
       "full_statement_anomaly_review",
+      "whole_statement_fee_intelligence_review",
       "fee_classification_review",
       "notice_change_review",
       "benchmark_category_review",
@@ -378,8 +395,81 @@ function expectOutputRejected(capability: CanonicalAiCapabilityOutput["type"], o
   expect(() => validateCanonicalStatementAnalysis(analysis), capability).toThrow(pattern);
 }
 
+function readyHarnessInputs(analysis: CanonicalStatementAnalysis) {
+  return [
+    { capability: "full_statement_anomaly_review" as const, status: "completed" as const, output: outputForCapability("full_statement_anomaly_review", analysis) },
+    { capability: "whole_statement_fee_intelligence_review" as const, status: "completed" as const, output: outputForCapability("whole_statement_fee_intelligence_review", analysis) },
+  ];
+}
+
 function outputForCapability(capability: CanonicalAiCapabilityOutput["type"], analysis: CanonicalStatementAnalysis): CanonicalAiCapabilityOutput {
   const evidenceRef = analysis.evidence[0]!.id;
+  if (capability === "whole_statement_fee_intelligence_review") {
+    const rowRefs = analysis.feeLedger.rows.map((row) => row.id).sort();
+    const occurrenceEvidence = new Map(analysis.feeLedger.sourceOccurrences.map((occurrence) => [occurrence.id, occurrence.evidenceRef]));
+    const evidenceByRow = new Map(
+      analysis.feeLedger.rows.map((row) => [
+        row.id,
+        [...new Set([...row.sourceOccurrenceIds.map((id) => occurrenceEvidence.get(id)).filter((id): id is string => Boolean(id)), ...row.contributionDecision.evidenceRefs])].sort(),
+      ]),
+    );
+    return {
+      type: capability,
+      reviewPolicyVersion: WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION,
+      authoritative: false,
+      evidenceRefs: [...new Set([...evidenceByRow.values()].flat())].sort(),
+      factRefs: [],
+      limitationCodes: [],
+      reviewStatus: "completed",
+      coverageProof: {
+        policyVersion: WHOLE_STATEMENT_FEE_INTELLIGENCE_COVERAGE_POLICY_VERSION,
+        expectedFeeRowRefs: rowRefs,
+        reviewedFeeRowRefs: rowRefs,
+        missingFeeRowRefs: [],
+        duplicatedFeeRowRefs: [],
+        unknownFeeRowRefs: [],
+        malformedFeeRowRefs: [],
+        exactCoverage: true,
+      },
+      rowInterpretations: rowRefs.map((feeRowRef) => ({
+        feeRowRef,
+        proposedCategory: "processor_markup",
+        likelyEconomicOwner: "processor",
+        likelyContractualController: "merchant_contract",
+        proposedActionabilityCeiling: "not_actionable",
+        confidence: "high",
+        conciseRationale: "Statement row label and section context support this semantic interpretation.",
+        evidenceProvenance: "statement_evidence",
+        evidenceRefs: evidenceByRow.get(feeRowRef) ?? [],
+        externalSourceRef: null,
+        conflicts: [],
+        missingEvidence: [],
+        recommendedDisposition: "supported",
+        authoritative: false,
+      })),
+      acceptanceRecords: rowRefs.map((feeRowRef) => ({
+        feeRowRef,
+        policyVersion: WHOLE_STATEMENT_FEE_INTELLIGENCE_ACCEPTANCE_POLICY_VERSION,
+        status: "accepted",
+        acceptedSemanticFields: {
+          category: "processor_markup",
+          likelyEconomicOwner: "processor",
+          likelyContractualController: "merchant_contract",
+          actionabilityCeiling: "not_actionable",
+          evidenceProvenance: "statement_evidence",
+        },
+        evidenceRefs: evidenceByRow.get(feeRowRef) ?? [],
+        externalSourceRef: null,
+        reasonCodes: ["whole_statement_fee_intelligence_accepted"],
+        conflicts: [],
+        actionabilityCeiling: "not_actionable",
+        immutableFeeRowRef: feeRowRef,
+      })),
+      reasonCodes: ["whole_statement_fee_intelligence_reviewed"],
+      financialMutationAllowed: false,
+      providerDetailsStripped: true,
+    };
+  }
   if (capability === "full_statement_anomaly_review") {
     return {
       type: capability,

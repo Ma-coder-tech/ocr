@@ -38,7 +38,7 @@ describe("canonical runtime AI capability adapter", () => {
     expect(anomaly).toMatchObject({ status: "completed", groundingStatus: "grounded" });
     expect(anomaly.output).toMatchObject({ type: "full_statement_anomaly_review", observations: [] });
     expect(anomaly.executionRef).toBeNull();
-    expect(ready.aiCapabilities.summary.financialReadiness).toBe("ready");
+    expect(ready.aiCapabilities.summary.financialReadiness).toBe("limited");
     expect(financialProjection(ready)).toEqual(financialProjection(baseline));
     expect(JSON.stringify(ready.aiCapabilities)).not.toMatch(/openai|anthropic|gpt-private|claude|rawError|api.?key|billing/i);
   });
@@ -311,7 +311,7 @@ describe("canonical runtime AI capability adapter", () => {
 
     expect(narrative.aiCapabilities.capabilities.find((capability) => capability.capability === "merchant_narrative")!.status).toBe("rejected");
     expect(narrative.aiCapabilities.summary.explanationReadiness).toBe("deterministic_fallback");
-    expect(narrative.aiCapabilities.summary.financialReadiness).toBe("ready");
+    expect(narrative.aiCapabilities.summary.financialReadiness).toBe("limited");
     expect(financialProjection(narrative)).toEqual(financialProjection(base));
     expect(JSON.stringify(narrative.aiCapabilities)).not.toMatch(/openai|gpt-private/i);
   });
