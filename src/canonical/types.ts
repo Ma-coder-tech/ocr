@@ -882,6 +882,7 @@ export type CanonicalWholeStatementFeeIntelligenceStatus =
 export type CanonicalWholeStatementFeeIntelligenceEvidenceProvenance =
   | "statement_evidence"
   | "approved_external_documentation"
+  | "runtime_verified_documentation"
   | "industry_inference"
   | "merchant_evidence"
   | "human_review";
@@ -910,6 +911,7 @@ export type CanonicalWholeStatementFeeIntelligenceRowInterpretation = {
   evidenceProvenance: CanonicalWholeStatementFeeIntelligenceEvidenceProvenance;
   evidenceRefs: string[];
   externalSourceRef: string | null;
+  externalClaimSupportRef: string | null;
   conflicts: string[];
   missingEvidence: string[];
   recommendedDisposition: CanonicalWholeStatementFeeIntelligenceDisposition;
@@ -941,6 +943,7 @@ export type CanonicalWholeStatementFeeIntelligenceAcceptanceRecord = {
   };
   evidenceRefs: string[];
   externalSourceRef: string | null;
+  externalClaimSupportRef: string | null;
   reasonCodes: string[];
   conflicts: string[];
   actionabilityCeiling: CanonicalFeeActionability;

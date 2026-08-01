@@ -668,6 +668,7 @@ function interpretationForRow(
     evidenceProvenance: externalSourceRef ? "approved_external_documentation" : industry ? "industry_inference" : "statement_evidence",
     evidenceRefs: row.evidenceRefs,
     externalSourceRef,
+    externalClaimSupportRef: null,
     conflicts: [] as string[],
     missingEvidence: [] as string[],
     recommendedDisposition: "supported",
