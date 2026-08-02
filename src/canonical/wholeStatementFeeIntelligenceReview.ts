@@ -196,8 +196,15 @@ const LIMITATION_CODES: readonly CanonicalAiLimitationCode[] = [
 const FORBIDDEN_KEY_PATTERN =
   /(?:amount|currency|total|transactionCount|processedSales|target|cadence|calculation|formula|savings|opportunity|eligibility|annualImpact|override|correctedValue|packageG|state|permissions|actions|customerWording|provider|model|adapter|prompt|response|rawError|merchant(?:Name|Id|Number|Account)?|filename|fileName|path|raw(?:Statement)?Text|excerpt)/i;
 
-const FORBIDDEN_VALUE_PATTERN =
-  /(?:\/Users\/|\/private\/|[A-Za-z]:\\|\.pdf\b|\.csv\b|account(?:\s|_)?(?:number|id)?|merchant(?:\s|_)?(?:name|id|number|account)|api(?:\s|-)?key|billing|openai|anthropic|claude|gpt|raw(?:\s|-)?(?:prompt|response|error)|\$|\b\d+(?:,\d{3})*(?:\.\d+)?%?\b)/i;
+const FORBIDDEN_SENSITIVE_VALUE_PATTERN =
+  /(?:\/Users\/|\/private\/|[A-Za-z]:\\|\.pdf\b|\.csv\b|account(?:\s|_)?(?:number|id|routing)?|merchant(?:\s|_)?(?:name|id|number|account)|api(?:\s|-)?key|secret|credential|bearer\s+[a-z0-9._-]+|sk-[a-z0-9._-]+|openai|anthropic|claude|gpt|raw(?:\s|-)?(?:prompt|response|error))/i;
+
+const FORBIDDEN_FINANCIAL_VALUE_PATTERN =
+  /(?:[$€£¥]|\b\d+(?:,\d{3})*(?:\.\d+)?\s?%|\b\d+(?:,\d{3})*(?:\.\d+)?\s?(?:usd|dollars?|cents?|basis\s*points?|bps|rate)\b|\b(?:usd|dollars?|cents?|currency|basis\s*points?|bps|rate)\s?\d+(?:,\d{3})*(?:\.\d+)?\b)/i;
+
+const STANDALONE_NUMERIC_VALUE_PATTERN = /\b\d+(?:,\d{3})*(?:\.\d+)?\b/;
+
+const EXPLANATORY_VALUE_PATH_PATTERN = /(?:\.conciseRationale|\.conflicts\[\d+\]|\.missingEvidence\[\d+\])$/;
 
 export function buildWholeStatementFeeIntelligencePacket(
   analysis: Pick<CanonicalStatementAnalysis, "identity" | "feeLedger" | "feeOwnershipActionability" | "evidence">,
@@ -307,11 +314,12 @@ export function validateWholeStatementFeeIntelligenceReview(
     errors.push("whole_statement_fee_intelligence_unsuccessful_status_has_interpretations");
   }
 
-  if (errors.length > 0 || !reviewStatus) {
+  const validationErrors = unique(errors).sort();
+  if (validationErrors.length > 0 || !reviewStatus) {
     return rejectedResult(
       packet,
-      errors,
-      reviewHasSafetyBlockedContent(source, errors) ? "safety_blocked" : "rejected",
+      validationErrors,
+      reviewHasSafetyBlockedContent(source, validationErrors) ? "safety_blocked" : "rejected",
       coverageProof,
     );
   }
@@ -377,7 +385,6 @@ function interpretationArray(
       return [];
     }
     errors.push(...unknownKeyErrors(item, INTERPRETATION_ALLOWED_KEYS, path));
-    errors.push(...recursiveForbiddenContentErrors(item, path));
     const source = item as Record<string, unknown>;
     const feeRowRef = stringValue(source.feeRowRef);
     const proposedCategory = enumValue(source.proposedCategory, CATEGORIES);
@@ -428,14 +435,6 @@ function interpretationArray(
     if (evidenceProvenance === "industry_inference" && proposedActionabilityCeiling === "potentially_actionable") {
       errors.push(`whole_statement_fee_intelligence_${path}_inference_actionability_too_strong`);
     }
-    if (
-      conflicts.length > 0 &&
-      recommendedDisposition !== "conflicting_evidence" &&
-      recommendedDisposition !== "human_review"
-    ) {
-      errors.push(`whole_statement_fee_intelligence_${path}_conflict_disposition_invalid`);
-    }
-
     if (
       !feeRowRef ||
       !proposedCategory ||
@@ -731,7 +730,7 @@ function rejectedResult(
       coverageProof,
       rowInterpretations: [],
       acceptanceRecords: [],
-      reasonCodes: ["whole_statement_fee_intelligence_rejected"],
+      reasonCodes: unique(["whole_statement_fee_intelligence_rejected", ...diagnosticReasonCodes(errors)]).sort(),
       authoritative: false,
       financialMutationAllowed: false,
       providerDetailsStripped: true,
@@ -741,10 +740,21 @@ function rejectedResult(
 
 function reviewHasSafetyBlockedContent(source: Record<string, unknown>, errors: readonly string[]): boolean {
   return (
-    errors.some((error) => /forbidden|merchant|path|raw|prompt|response/i.test(error)) ||
+    errors.some((error) => /forbidden_(?:key|sensitive_value|financial_value)|merchant|path|raw|prompt|response/i.test(error)) ||
     (Object.hasOwn(source, "financialMutationAllowed") && source.financialMutationAllowed !== false) ||
     (Object.hasOwn(source, "providerDetailsStripped") && source.providerDetailsStripped !== true)
   );
+}
+
+function diagnosticReasonCodes(errors: readonly string[]): string[] {
+  const codes: string[] = [];
+  if (errors.some((error) => error.includes("forbidden_key"))) codes.push("whole_statement_fee_intelligence_forbidden_key");
+  if (errors.some((error) => error.includes("forbidden_sensitive_value"))) codes.push("whole_statement_fee_intelligence_forbidden_sensitive_value");
+  if (errors.some((error) => error.includes("forbidden_financial_value"))) codes.push("whole_statement_fee_intelligence_forbidden_financial_value");
+  if (errors.some((error) => error.includes("forbidden_unscoped_numeric_value"))) codes.push("whole_statement_fee_intelligence_forbidden_unscoped_numeric_value");
+  if (errors.some((error) => error.includes("financial_mutation"))) codes.push("whole_statement_fee_intelligence_financial_mutation_blocked");
+  if (errors.some((error) => error.includes("provider_details"))) codes.push("whole_statement_fee_intelligence_provider_details_blocked");
+  return codes;
 }
 
 function signedAmountDirection(amountMinor: number | null): "charge" | "credit" | "zero" | "unknown" {
@@ -795,7 +805,7 @@ function reasonCodeArray(value: unknown, path: string, errors: string[]): string
 
 function recursiveForbiddenContentErrors(value: unknown, path: string): string[] {
   if (!value || typeof value !== "object") {
-    if (typeof value === "string" && FORBIDDEN_VALUE_PATTERN.test(value)) return [`whole_statement_fee_intelligence_forbidden_value:${path}`];
+    if (typeof value === "string") return forbiddenStringContentErrors(value, path);
     return [];
   }
   if (!isPlainRecord(value) && !Array.isArray(value)) return [`whole_statement_fee_intelligence_non_plain_object:${path}`];
@@ -807,6 +817,20 @@ function recursiveForbiddenContentErrors(value: unknown, path: string): string[]
       errors.push(`whole_statement_fee_intelligence_forbidden_key:${nestedPath}`);
     }
     errors.push(...recursiveForbiddenContentErrors(nested, nestedPath));
+  }
+  return errors;
+}
+
+function forbiddenStringContentErrors(value: string, path: string): string[] {
+  const errors: string[] = [];
+  if (FORBIDDEN_SENSITIVE_VALUE_PATTERN.test(value)) {
+    errors.push(`whole_statement_fee_intelligence_forbidden_sensitive_value:${path}`);
+  }
+  if (FORBIDDEN_FINANCIAL_VALUE_PATTERN.test(value)) {
+    errors.push(`whole_statement_fee_intelligence_forbidden_financial_value:${path}`);
+  }
+  if (!EXPLANATORY_VALUE_PATH_PATTERN.test(path) && STANDALONE_NUMERIC_VALUE_PATTERN.test(value)) {
+    errors.push(`whole_statement_fee_intelligence_forbidden_unscoped_numeric_value:${path}`);
   }
   return errors;
 }
