@@ -199,6 +199,58 @@ describe("canonical whole-statement fee intelligence review", () => {
     expect(privacyResult.output.acceptanceRecords).toEqual([]);
   });
 
+  it("allows harmless explanatory row ordinals while preserving field-aware safety diagnostics", () => {
+    const analysis = everyRowAnalysis();
+    const packet = buildWholeStatementFeeIntelligencePacket(analysis);
+    const base = validReview(packet);
+    const ordinalReview = {
+      ...base,
+      rowInterpretations: [
+        {
+          ...base.rowInterpretations[0]!,
+          conciseRationale: "Statement row 1 billing service label and section context support this interpretation.",
+          conflicts: ["No conflict after comparing row 2 context."],
+          missingEvidence: ["Contract support item 3 is not available."],
+          recommendedDisposition: "supported",
+        },
+        ...base.rowInterpretations.slice(1),
+      ],
+    };
+    const ordinalResult = validateWholeStatementFeeIntelligenceReview(ordinalReview, analysis);
+    expect(ordinalResult.errors).toEqual([]);
+    expect(ordinalResult.ok).toBe(true);
+    expect(ordinalResult.output.reviewStatus).toBe("completed");
+    expect(ordinalResult.output.coverageProof.exactCoverage).toBe(true);
+    expect(ordinalResult.output.rowInterpretations).toHaveLength(packet.admittedFeeRows.length);
+    expect(ordinalResult.output.acceptanceRecords.find((record) => record.feeRowRef === "feerow_known_charge")?.status).toBe("needs_verification");
+    expect(ordinalResult.output.acceptanceRecords.filter((record) => record.feeRowRef !== "feerow_known_charge").every((record) => record.status === "accepted")).toBe(true);
+
+    const financialLeak = {
+      ...base,
+      rowInterpretations: [{ ...base.rowInterpretations[0]!, conciseRationale: "It mentions $123." }, ...base.rowInterpretations.slice(1)],
+    };
+    const financialResult = validateWholeStatementFeeIntelligenceReview(financialLeak, analysis);
+    expect(financialResult.ok).toBe(false);
+    expect(financialResult.output.reviewStatus).toBe("safety_blocked");
+    expect(financialResult.errors.filter((error) => error === "whole_statement_fee_intelligence_forbidden_financial_value:review.rowInterpretations[0].conciseRationale")).toHaveLength(1);
+    expect(financialResult.output.reasonCodes).toContain("whole_statement_fee_intelligence_forbidden_financial_value");
+    expect(financialResult.output.acceptanceRecords).toEqual([]);
+
+    const sensitiveLeak = {
+      ...base,
+      rowInterpretations: [
+        { ...base.rowInterpretations[0]!, conciseRationale: "See /Users/example/statement.pdf for raw response context." },
+        ...base.rowInterpretations.slice(1),
+      ],
+    };
+    const sensitiveResult = validateWholeStatementFeeIntelligenceReview(sensitiveLeak, analysis);
+    expect(sensitiveResult.ok).toBe(false);
+    expect(sensitiveResult.output.reviewStatus).toBe("safety_blocked");
+    expect(sensitiveResult.errors).toContain("whole_statement_fee_intelligence_forbidden_sensitive_value:review.rowInterpretations[0].conciseRationale");
+    expect(sensitiveResult.output.reasonCodes).toContain("whole_statement_fee_intelligence_forbidden_sensitive_value");
+    expect(JSON.stringify(sensitiveResult.output)).not.toMatch(/\/Users|statement\.pdf|raw response/i);
+  });
+
   it("blocks forbidden financial/provider/raw/sensitive fields and unsupported strong inference", () => {
     const analysis = everyRowAnalysis();
     const packet = buildWholeStatementFeeIntelligencePacket(analysis);
