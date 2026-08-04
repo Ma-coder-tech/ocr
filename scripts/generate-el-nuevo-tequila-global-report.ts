@@ -5,6 +5,7 @@ import { maybeRunMultiStatementNarrativeAiForGlobalReport } from "../src/multiSt
 import { compareMultiStatementAnalyses } from "../src/multiStatementComparisonEngine.js";
 import type { ComparisonStatementInput } from "../src/multiStatementComparisonInput.js";
 import { buildMultiStatementGlobalReport, renderMultiStatementGlobalReportMarkdown } from "../src/reporting/buildMultiStatement.js";
+import { blockUnmanifestedLiveEvaluationEntrypoint } from "../src/evaluationIntegrity/index.js";
 
 type Fixture = {
   statements: ComparisonStatementInput[];
@@ -24,6 +25,7 @@ let report = buildMultiStatementGlobalReport(analysis);
 let narrativeStatus: unknown = { status: "not_requested" };
 
 if (liveAi) {
+  blockUnmanifestedLiveEvaluationEntrypoint("generate-el-nuevo-tequila-global-report --live-ai");
   const narrative = await maybeRunMultiStatementNarrativeAiForGlobalReport(report);
   report = narrative.report;
   narrativeStatus = narrative.aiMultiStatementNarrative;

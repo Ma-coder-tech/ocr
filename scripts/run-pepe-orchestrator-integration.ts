@@ -3,6 +3,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import type { BusinessTypeId } from "../src/businessTypes.js";
+import { blockUnmanifestedLiveEvaluationEntrypoint } from "../src/evaluationIntegrity/index.js";
+
+const liveAi = process.argv.includes("--live-ai");
+if (liveAi) blockUnmanifestedLiveEvaluationEntrypoint("run-pepe-orchestrator-integration --live-ai");
 
 const outDir = path.join(
   process.cwd(),
@@ -13,8 +17,8 @@ const outDir = path.join(
 );
 
 process.env.FEECLEAR_DB_PATH ??= path.join(outDir, "pepe-orchestrator.sqlite");
-process.env.AI_FEE_CLASSIFICATION_ENABLED ??= "true";
-process.env.AI_MULTI_STATEMENT_NARRATIVE_ENABLED ??= "true";
+process.env.AI_FEE_CLASSIFICATION_ENABLED = "false";
+process.env.AI_MULTI_STATEMENT_NARRATIVE_ENABLED = "false";
 process.env.AI_MULTI_STATEMENT_NARRATIVE_PROVIDER ??= "auto";
 process.env.AI_MULTI_STATEMENT_NARRATIVE_TIMEOUT_MS ??= "60000";
 
@@ -31,9 +35,10 @@ const pdfs = [
 
 await fs.mkdir(outDir, { recursive: true });
 
-const [{ runMultiStatementAnalysis }, store] = await Promise.all([
+const [{ runMultiStatementAnalysis }, store, { analyzeStatementDocument }] = await Promise.all([
   import("../src/multiStatementOrchestrator.js"),
   import("../src/multiStatementStore.js"),
+  import("../src/statementParserOrchestrator.js"),
 ]);
 const { renderMultiStatementGlobalReportMarkdown } = await import("../src/reporting/buildMultiStatement.js");
 
@@ -56,10 +61,12 @@ const result = await runMultiStatementAnalysis({
   comparisonEngineVersion: "comparison-engine-v1",
   reportVersion: "global-report-v1",
   narrative: {
-    enabled: true,
+    enabled: false,
     provider: (process.env.AI_MULTI_STATEMENT_NARRATIVE_PROVIDER as "auto" | "openai" | "anthropic" | undefined) ?? "auto",
     timeoutMs: Number(process.env.AI_MULTI_STATEMENT_NARRATIVE_TIMEOUT_MS ?? 60000),
   },
+}, {
+  analyzeStatement: async (document, selectedBusinessType, options) => analyzeStatementDocument(document, selectedBusinessType, options),
 });
 
 const job = store.getMultiStatementJob(result.jobId);
@@ -89,8 +96,8 @@ assert(comparisonInputs.length === 2, `Expected 2 comparison inputs, got ${compa
 assert(Boolean(analysis), "Expected stored MultiStatementAnalysis.");
 assert(Boolean(storedReport), "Expected stored report record.");
 assert(
-  storedReport?.narrativeStatus === "applied",
-  `Expected applied narrative, got ${storedReport?.narrativeStatus ?? "missing"}.`,
+  storedReport?.narrativeStatus === "disabled",
+  `Expected disabled narrative in deterministic mode, got ${storedReport?.narrativeStatus ?? "missing"}.`,
 );
 assert(
   Array.isArray(report!.masterNarrative) && report!.masterNarrative.length >= 4,

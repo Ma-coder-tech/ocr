@@ -2,12 +2,16 @@ import "dotenv/config";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { parsePdf } from "../src/parser.js";
-import { analyzeStatementDocumentWithOptionalAi } from "../src/statementParserOrchestrator.js";
+import { analyzeStatementDocument } from "../src/statementParserOrchestrator.js";
 import { buildComparisonStatementInput } from "../src/multiStatementComparisonInput.js";
 import { compareMultiStatementAnalyses } from "../src/multiStatementComparisonEngine.js";
 import { maybeRunMultiStatementNarrativeAiForGlobalReport } from "../src/multiStatementNarrativeAi.js";
 import { buildMultiStatementGlobalReport, renderMultiStatementGlobalReportMarkdown } from "../src/reporting/buildMultiStatement.js";
 import type { BusinessTypeId } from "../src/businessTypes.js";
+import { blockUnmanifestedLiveEvaluationEntrypoint } from "../src/evaluationIntegrity/index.js";
+
+const liveAi = process.argv.includes("--live-ai");
+if (liveAi) blockUnmanifestedLiveEvaluationEntrypoint("run-two-pdf-multi-statement-report --live-ai");
 
 type PdfInput = {
   path: string;
@@ -30,7 +34,7 @@ const inputs: PdfInput[] = [
 
 async function analyzeInput(input: PdfInput) {
   const parsed = await parsePdf(input.path);
-  const summary = await analyzeStatementDocumentWithOptionalAi(parsed, businessType, {
+  const summary = analyzeStatementDocument(parsed, businessType, {
     sourceFileName: input.sourceFileName,
   });
   const adapted = buildComparisonStatementInput(summary, {
@@ -60,10 +64,12 @@ const comparison = compareMultiStatementAnalyses(
   },
 );
 let report = buildMultiStatementGlobalReport(comparison);
-const narrative = await maybeRunMultiStatementNarrativeAiForGlobalReport(report, {
-  provider: (process.env.AI_MULTI_STATEMENT_NARRATIVE_PROVIDER as "anthropic" | "openai" | "auto" | undefined) ?? "openai",
-  timeoutMs: Number(process.env.AI_MULTI_STATEMENT_NARRATIVE_TIMEOUT_MS ?? 30000),
-});
+const narrative = liveAi
+  ? await maybeRunMultiStatementNarrativeAiForGlobalReport(report, {
+      provider: (process.env.AI_MULTI_STATEMENT_NARRATIVE_PROVIDER as "anthropic" | "openai" | "auto" | undefined) ?? "openai",
+      timeoutMs: Number(process.env.AI_MULTI_STATEMENT_NARRATIVE_TIMEOUT_MS ?? 30000),
+    })
+  : { report, aiMultiStatementNarrative: { status: "disabled" as const } };
 report = narrative.report;
 
 await fs.writeFile(path.join(outDir, "nov-dec-2024.comparison-analysis.json"), `${JSON.stringify(comparison, null, 2)}\n`);
