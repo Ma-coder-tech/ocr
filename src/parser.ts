@@ -455,6 +455,10 @@ export async function parseCsv(filePath: string): Promise<ParsedDocument> {
 
 export async function parsePdf(filePath: string, jobId?: string): Promise<ParsedDocument> {
   const buffer = await fs.readFile(filePath);
+  return parsePdfBytes(buffer, jobId);
+}
+
+export async function parsePdfBytes(bytes: Uint8Array, jobId?: string): Promise<ParsedDocument> {
   if (jobId) {
     console.log(`[job:${jobId}] pdf-layout-parse-start timeout=${PDF_PARSE_TIMEOUT_MS}ms`);
   } else {
@@ -468,7 +472,7 @@ export async function parsePdf(filePath: string, jobId?: string): Promise<Parsed
     }, PDF_PARSE_TIMEOUT_MS);
   });
 
-  const lines = await Promise.race([extractPdfLines(buffer), timeoutPromise]).finally(() => {
+  const lines = await Promise.race([extractPdfLines(Buffer.from(bytes)), timeoutPromise]).finally(() => {
     if (timer) {
       clearTimeout(timer);
     }

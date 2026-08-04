@@ -60,6 +60,12 @@ export type WholeStatementFeeIntelligenceRuntimeOptions = {
   feeKnowledgeResearch?: FeeKnowledgeResearchOptions;
 };
 
+export function wholeStatementFeeIntelligenceProviderAdapter(
+  options: WholeStatementFeeIntelligenceRuntimeOptions = {},
+): WholeStatementFeeIntelligenceRuntimeAdapter {
+  return (packet, context) => executeProviderReview(packet, options, context.abortSignal);
+}
+
 export async function runWholeStatementFeeIntelligenceRuntime(input: {
   analysis: CanonicalStatementAnalysis;
   options?: WholeStatementFeeIntelligenceRuntimeOptions;

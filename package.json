@@ -20,6 +20,8 @@
     "corpus:test": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs ./node_modules/vitest/vitest.mjs run test/canonical",
     "corpus:audit": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/canonical-forensic-harness.ts",
     "corpus:secure": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/canonical-secure-corpus-runner.ts",
+    "evaluation:integrity:dry-run": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluation-run-integrity-dry-run.ts",
+    "evaluation:integrity:run": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluation-run-integrity-run.ts",
     "fiserv:coverage": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/fiserv-coverage-audit.ts",
     "bakeoff:pdf": "npm run build && node scripts/pdf-bakeoff.mjs",
     "bakeoff:azure": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/azure-layout-bakeoff.ts",

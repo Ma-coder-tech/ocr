@@ -2,7 +2,7 @@ import "dotenv/config";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { parsePdf } from "../src/parser.js";
-import { analyzeStatementDocumentWithOptionalAi } from "../src/statementParserOrchestrator.js";
+import { analyzeStatementDocument } from "../src/statementParserOrchestrator.js";
 import {
   buildComparisonStatementInput,
   type ComparisonStatementFee,
@@ -372,7 +372,7 @@ function expectedResults(statements: ComparisonStatementInput[]): ExpectedMoney 
 async function main() {
   await fs.mkdir(OUT_DIR, { recursive: true });
   const doc = await parsePdf(PDF_PATH);
-  const summary = await analyzeStatementDocumentWithOptionalAi(doc, "restaurant_food_beverage", {
+  const summary = analyzeStatementDocument(doc, "restaurant_food_beverage", {
     sourceFileName: path.basename(PDF_PATH),
   });
   const adapted = buildComparisonStatementInput(summary, {
