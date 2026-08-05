@@ -1,4 +1,12 @@
 import type { AnalysisSummary } from "../types.js";
+import {
+  createValidatedDiagnosticReferenceSets,
+  diagnosticSignalsFromValidationErrors,
+  passedDiagnosticSignals,
+  type CanonicalAiAdmissionDiagnosticSignal,
+  type CanonicalAiAdmissionOpaqueReferences,
+  type CanonicalAiAdmissionTrustedReferenceSets,
+} from "./aiAdmissionDiagnostics.js";
 import type { CanonicalAiCapabilityHarnessInput } from "./buildCanonicalAiCapabilities.js";
 import { validateCanonicalRuntimeFeeClassificationReview } from "./runtimeFeeClassificationReview.js";
 import type {
@@ -47,6 +55,9 @@ export type RuntimeAiCapabilitySnapshot = {
   safeCounts: Record<string, number>;
   executionRef: string | null;
   reasonCodes: RuntimeAiCapabilityReasonCode[];
+  diagnosticSignals?: CanonicalAiAdmissionDiagnosticSignal[];
+  diagnosticReferences?: Partial<CanonicalAiAdmissionOpaqueReferences>;
+  trustedDiagnosticReferenceSets?: CanonicalAiAdmissionTrustedReferenceSets;
   runtimeReviewStatus?: CanonicalRuntimeFeeClassificationReviewStatus;
   runtimeFeeClassificationReview?: CanonicalRuntimeFeeClassificationReview;
   runtimeWholeStatementFeeIntelligenceReview?: CanonicalRuntimeWholeStatementFeeIntelligenceReview;
@@ -124,6 +135,15 @@ function feeClassificationCapabilityInput(
     attempted: !["disabled", "not_needed"].includes(review.status),
     safeCounts,
     reasonCodes: reasonCodesForFeeClassificationReview(review.status, result.ok),
+    diagnosticSignals: diagnosticSignalsForFeeClassificationReview(review.status, result.ok, result.ok ? [] : result.errors),
+    diagnosticReferences: {
+      feeRowRefs: review.reviewedFeeRowRefs,
+      evidenceRefs: review.suggestions.flatMap((suggestion) => suggestion.evidenceRefs),
+    },
+    trustedDiagnosticReferenceSets: createValidatedDiagnosticReferenceSets({
+      feeRowRefs: result.packet.materialFeeRowRefs,
+      evidenceRefs: Object.values(result.packet.evidenceRefsByFeeRowRef).flat(),
+    }),
     runtimeReviewStatus: review.status,
     runtimeFeeClassificationReview: review,
   });
@@ -283,6 +303,9 @@ function capabilityResult(input: {
   output?: CanonicalAiCapabilityOutput;
   safeCounts: Record<string, number>;
   reasonCodes: RuntimeAiCapabilityReasonCode[];
+  diagnosticSignals?: CanonicalAiAdmissionDiagnosticSignal[];
+  diagnosticReferences?: Partial<CanonicalAiAdmissionOpaqueReferences>;
+  trustedDiagnosticReferenceSets?: CanonicalAiAdmissionTrustedReferenceSets;
   runtimeReviewStatus?: CanonicalRuntimeFeeClassificationReviewStatus;
   runtimeFeeClassificationReview?: CanonicalRuntimeFeeClassificationReview;
 }): { harnessInput: CanonicalAiCapabilityHarnessInput; snapshot: RuntimeAiCapabilitySnapshot } {
@@ -301,10 +324,54 @@ function capabilityResult(input: {
       safeCounts: input.safeCounts,
       executionRef: null,
       reasonCodes: [...input.reasonCodes].sort(),
+      diagnosticSignals: input.diagnosticSignals ?? defaultDiagnosticSignals(input.status, input.reasonCodes),
+      ...(input.diagnosticReferences ? { diagnosticReferences: input.diagnosticReferences } : {}),
+      ...(input.trustedDiagnosticReferenceSets ? { trustedDiagnosticReferenceSets: input.trustedDiagnosticReferenceSets } : {}),
       ...(input.runtimeReviewStatus ? { runtimeReviewStatus: input.runtimeReviewStatus } : {}),
       ...(input.runtimeFeeClassificationReview ? { runtimeFeeClassificationReview: input.runtimeFeeClassificationReview } : {}),
     },
   };
+}
+
+function defaultDiagnosticSignals(
+  status: CanonicalAiCapabilityStatus,
+  reasonCodes: readonly RuntimeAiCapabilityReasonCode[],
+): CanonicalAiAdmissionDiagnosticSignal[] {
+  if (reasonCodes.includes("runtime_anomaly_review_no_issues_found")) {
+    return [
+      {
+        stage: "schema_validation",
+        state: "passed",
+        reasonCode: "runtime_status_count_consistency_validated",
+        fieldPath: "runtime.aiAnomalyReview",
+      },
+    ];
+  }
+  if (reasonCodes.includes("runtime_anomaly_review_invalid_output")) {
+    return [
+      {
+        stage: "schema_validation",
+        state: "failed",
+        reasonCode: "runtime_status_count_consistency_invalid",
+        fieldPath: "runtime.aiAnomalyReview",
+      },
+    ];
+  }
+  if (status === "safety_blocked") {
+    return [
+      {
+        stage: "privacy_safety",
+        state: "failed",
+        reasonCode: reasonCodes.includes("runtime_anomaly_review_safety_blocked")
+          ? "runtime_anomaly_review_safety_blocked"
+          : reasonCodes.includes("runtime_narrative_safety_blocked")
+            ? "runtime_narrative_safety_blocked"
+            : "runtime_fee_classification_review_safety_blocked",
+        fieldPath: reasonCodes.includes("runtime_narrative_safety_blocked") ? "runtime.aiMerchantNarrative" : "runtime.aiAnomalyReview",
+      },
+    ];
+  }
+  return [];
 }
 
 function packageFStatusForFeeClassificationReview(
@@ -315,6 +382,29 @@ function packageFStatusForFeeClassificationReview(
     return status;
   }
   return "completed_diagnostic";
+}
+
+function diagnosticSignalsForFeeClassificationReview(
+  status: CanonicalRuntimeFeeClassificationReviewStatus,
+  valid: boolean,
+  errors: readonly string[],
+): CanonicalAiAdmissionDiagnosticSignal[] {
+  if (status === "safety_blocked") {
+    return [
+      ...(!valid ? diagnosticSignalsFromValidationErrors(errors) : []),
+      {
+        stage: "privacy_safety",
+        state: "failed",
+        reasonCode: "runtime_fee_classification_review_safety_blocked",
+        fieldPath: "review",
+      },
+    ];
+  }
+  if (!valid) return diagnosticSignalsFromValidationErrors(errors);
+  if (status === "completed_no_suggestions" || status === "completed_with_diagnostic_suggestions") {
+    return passedDiagnosticSignals(["schema_validation", "evidence_citation", "linkage", "deterministic_reconciliation", "privacy_safety"]);
+  }
+  return [];
 }
 
 function reasonCodesForFeeClassificationReview(
