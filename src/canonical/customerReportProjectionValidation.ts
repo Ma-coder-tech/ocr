@@ -15,6 +15,7 @@ import {
   type CustomerActionProjection,
   type CustomerSectionVisibility,
 } from "./customerReportProjectionTypes.js";
+import { isApprovedCustomerLimitation } from "./customerReportProjectionLimitations.js";
 
 const TOP_LEVEL_KEYS = [
   "reportVersion",
@@ -42,12 +43,15 @@ const TOP_LEVEL_KEYS = [
 const FORBIDDEN_VALUE_PATTERNS: RegExp[] = [
   /\bmerchant\s*(name|id|number|account)\b/i,
   /\baccount\s*(number|id)\b/i,
-  /\b(?:\/users\/|\/private\/|\/tmp\/|[a-z]:\\|\.pdf\b|\.png\b|\.sqlite\b)\b/i,
+  /(?:^|\s)(?:\/(?:users|private|tmp|var)\/|[a-z]:\\)/i,
+  /\.(?:pdf|png|sqlite|json|log)\b/i,
   /\b[a-f0-9]{32,}\b/i,
   /\braw\s+statement\b/i,
   /\bevidence\s+excerpt\b/i,
   /\b(provider|model|prompt|response|api[-_\s]?key|billing error)\b/i,
-  /\b(candidate|rejected candidate|sidecar|shadow|policy version|capability record|grounding gateway|package [b-g]|report v1|legacy savings)\b/i,
+  /\b(openai|anthropic|gpt(?:-[0-9a-z.]+)?|claude|gemini|responses api|web search)\b/i,
+  /\b(candidate|rejected candidate|sidecar|shadow|capability record|grounding gateway|package [b-g]|report v1|legacy)\b/i,
+  /\b(harness|policy|adapter|implementation|runtime|feature flag|worker|persistence)\b/i,
   /\b(canonical|qualified comparison|limited fee inventory|fee ledger is partial|classification review|this fixture permits|how this view was prepared)\b/i,
   /\b(overpaying|cheating|guaranteed savings|definitely remove|bad rate)\b/i,
 ];
@@ -64,6 +68,15 @@ const FORBIDDEN_KEY_PATTERNS: RegExp[] = [
 const COMPETITIVE_STATES = new Set(["competitive_no_opportunity", "competitive_with_opportunity"]);
 const OPPORTUNITY_HIDDEN_STATES = new Set(["unable_to_analyze", "analysis_withheld", "analysis_limited"]);
 const STRONG_ACTIONS = new Set(["request_removal", "request_repricing"]);
+const CUSTOMER_SECTION_LIMITATION_CODES = new Set([
+  "opportunity_support_unavailable",
+  "fee_reconciliation_incomplete",
+  "fee_section_content_unsafe",
+  "benchmark_unavailable",
+  "rate_basis_limited",
+  "fee_requires_review",
+  "documentation_needed",
+]);
 const KNOWN_DTO_KEYS = new Set<string>([
   ...TOP_LEVEL_KEYS,
   ...CUSTOMER_PERMISSION_KEYS,
@@ -121,6 +134,7 @@ const KNOWN_DTO_KEYS = new Set<string>([
   "notSavingsCopy",
   "code",
   "severity",
+  "affectedSections",
   "type",
   "targetDisplayIds",
   "source",
@@ -155,6 +169,7 @@ export function validateCanonicalCustomerReportProjection(
   validateVisibility(projection.visibility, errors);
   validateStateCompatibility(projection, errors);
   validateSections(projection, errors);
+  validateLimitations(projection, errors);
   validateCoreMath(projection, errors);
   validateSourceMetadata(projection, errors);
   validateActions(projection.actions, projection, errors);
@@ -257,6 +272,34 @@ function validateSections(projection: CanonicalCustomerReportProjectionV1, error
       if (item.evidenceStatus === "needs_verification") errors.push("verification_item_in_opportunity_total");
     }
   }
+  validateSectionLimitationCodes(projection, errors);
+}
+
+function validateSectionLimitationCodes(value: unknown, errors: string[]): void {
+  if (Array.isArray(value)) {
+    value.forEach((item) => validateSectionLimitationCodes(item, errors));
+    return;
+  }
+  if (!isPlainObject(value)) return;
+  for (const [key, nested] of Object.entries(value)) {
+    if (key === "limitationCodes") {
+      if (!Array.isArray(nested) || nested.some((code) => !CUSTOMER_SECTION_LIMITATION_CODES.has(code))) {
+        errors.push("unapproved_section_limitation_code");
+      }
+      continue;
+    }
+    validateSectionLimitationCodes(nested, errors);
+  }
+}
+
+function validateLimitations(projection: CanonicalCustomerReportProjectionV1, errors: string[]) {
+  if (!Array.isArray(projection.limitations)) {
+    errors.push("limitations_not_array");
+    return;
+  }
+  for (const limitation of projection.limitations) {
+    if (!isApprovedCustomerLimitation(limitation)) errors.push("unmapped_customer_limitation");
+  }
 }
 
 function validateCoreMath(projection: CanonicalCustomerReportProjectionV1, errors: string[]) {
@@ -314,7 +357,7 @@ function rejectUnsafeContent(value: unknown, errors: string[], path = "projectio
     if (path.endsWith(".reasonCode") && isSafeCode(value)) return;
     if (path.endsWith(".reasonCodes[]") && isSafeCode(value)) return;
     if (path.endsWith(".limitationCodes[]") && isSafeCode(value)) return;
-    if (FORBIDDEN_VALUE_PATTERNS.some((pattern) => pattern.test(value))) errors.push(`unsafe_content_${path}`);
+    if (containsForbiddenCustomerProjectionContent(value)) errors.push(`unsafe_content_${path}`);
     return;
   }
   if (Array.isArray(value)) {
@@ -340,7 +383,11 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 function isSafeCode(value: unknown): value is string {
-  return typeof value === "string" && /^[a-z][a-z0-9_]*$/.test(value) && !FORBIDDEN_VALUE_PATTERNS.some((pattern) => pattern.test(value));
+  return typeof value === "string" && /^[a-z][a-z0-9_]*$/.test(value) && !containsForbiddenCustomerProjectionContent(value);
+}
+
+export function containsForbiddenCustomerProjectionContent(value: string): boolean {
+  return FORBIDDEN_VALUE_PATTERNS.some((pattern) => pattern.test(value));
 }
 
 function financialReadinessForState(state: string, readiness: string) {

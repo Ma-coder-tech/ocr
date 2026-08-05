@@ -12,7 +12,56 @@ export const CANONICAL_CUSTOMER_REPORT_PROTECTED_CONTRACTS = [CANONICAL_CUSTOMER
 
 export type CanonicalCustomerReportProjectionBuildOptions = {
   purpose: "synthetic_fixture_validation_only";
+  limitationRecords?: readonly CanonicalProjectionLimitationRecord[];
 };
+
+export type CustomerProjectionAffectedSection =
+  | "projection"
+  | "identity"
+  | "headline"
+  | "core_metrics"
+  | "effective_rate"
+  | "benchmark"
+  | "fee_inventory"
+  | "opportunities"
+  | "actions"
+  | "explanation";
+
+export type CanonicalProjectionLimitationCode =
+  | "narrative_content_unsafe"
+  | "opportunity_support_unavailable"
+  | "fee_reconciliation_incomplete"
+  | "fee_section_content_unsafe"
+  | "benchmark_unavailable"
+  | "core_facts_unsafe"
+  | "identity_unsafe"
+  | "core_reconciliation_missing"
+  | "internal_runtime_detail";
+
+export type CanonicalProjectionLimitationParameters = {
+  unresolvedRowCount?: number;
+};
+
+export type CanonicalProjectionLimitationRecord = {
+  code: CanonicalProjectionLimitationCode;
+  parameters: CanonicalProjectionLimitationParameters;
+  audience: "customer" | "internal";
+  severity: "info" | "review" | "blocked";
+  affectedSections: CustomerProjectionAffectedSection[];
+  customerVisibility: "visible" | "hidden";
+};
+
+export type CustomerVisibleLimitationCode =
+  | "opportunity_support_unavailable"
+  | "fee_reconciliation_incomplete"
+  | "fee_section_content_unsafe"
+  | "benchmark_unavailable";
+
+export type CustomerSectionLimitationCode =
+  | CustomerVisibleLimitationCode
+  | "rate_basis_limited"
+  | "fee_requires_review"
+  | "documentation_needed";
 
 export type CustomerMoney = {
   amountMinor: number;
@@ -118,7 +167,7 @@ export type EffectiveRateProjection =
       status: "shown";
       rate: CustomerPercent;
       basisLabel: string;
-      limitationCodes: string[];
+      limitationCodes: CustomerSectionLimitationCode[];
     };
 
 export type BenchmarkProjection =
@@ -136,7 +185,7 @@ export type BenchmarkProjection =
       position: "below_reference" | "within_reference" | "above_reference";
       rangeLabel: string;
       methodologyLabel: string;
-      limitationCodes: string[];
+      limitationCodes: CustomerSectionLimitationCode[];
     };
 
 export type FeeInventoryProjection =
@@ -149,7 +198,7 @@ export type FeeInventoryProjection =
       totalVisibleAmount: CustomerMoney | null;
       rows: CustomerFeeRowProjection[];
       omittedRowCount: number;
-      limitationCodes: string[];
+      limitationCodes: CustomerSectionLimitationCode[];
     };
 
 export type CustomerFeeRowProjection = {
@@ -165,7 +214,7 @@ export type CustomerFeeRowProjection = {
   source: CustomerSyntheticSource | null;
   conditions: string[];
   status: "included" | "verification_only" | "excluded" | "unresolved";
-  limitationCodes: string[];
+  limitationCodes: CustomerSectionLimitationCode[];
 };
 
 export type OpportunityProjection =
@@ -182,7 +231,7 @@ export type OpportunityProjection =
       deterministicAmount: CustomerMoney | null;
       estimatedAmount: CustomerMoney | null;
       items: CustomerOpportunityItem[];
-      limitationCodes: string[];
+      limitationCodes: CustomerSectionLimitationCode[];
     };
 
 export type CustomerOpportunityItem = {
@@ -195,7 +244,7 @@ export type CustomerOpportunityItem = {
   source: CustomerSyntheticSource;
   conditions: string[];
   cadence: "annual" | "monthly" | "statement_frequency";
-  supportedAction: Extract<CanonicalCustomerActionType, "request_removal" | "request_repricing" | "request_explanation">;
+  supportedAction: Extract<CanonicalCustomerActionType, "request_removal" | "request_repricing">;
   reasonCodes: string[];
 };
 
@@ -214,7 +263,7 @@ export type VerificationProjection =
       label: "Amount to verify";
       items: CustomerVerificationItem[];
       notSavingsCopy: string;
-      limitationCodes: string[];
+      limitationCodes: CustomerSectionLimitationCode[];
     };
 
 export type CustomerVerificationItem = {
@@ -228,10 +277,11 @@ export type CustomerVerificationItem = {
 };
 
 export type CustomerLimitationProjection = {
-  code: string;
+  code: CustomerVisibleLimitationCode;
   title: string;
   body: string;
-  severity: "info" | "review" | "blocked";
+  severity: "info" | "review";
+  affectedSections: CustomerProjectionAffectedSection[];
 };
 
 export type CustomerActionProjection = {

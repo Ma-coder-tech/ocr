@@ -337,7 +337,7 @@ describe("canonical customer report projection validation", () => {
     expect(validateCanonicalCustomerReportProjection(wrong).errors).toContain("unsupported_projection_readiness");
   });
 
-  it("requires an explicit synthetic-fixture purpose and fails closed on known raw internal limitations", () => {
+  it("requires an explicit synthetic-fixture purpose and withholds unsafe identity before returning a DTO", () => {
     const analysis = syntheticCanonicalAnalysis();
 
     expect(() => (buildCanonicalCustomerReportProjection as unknown as (value: unknown) => unknown)(analysis)).toThrow(
@@ -345,7 +345,7 @@ describe("canonical customer report projection validation", () => {
     );
     expect(() =>
       buildCanonicalCustomerReportProjection(analysis, { purpose: "synthetic_fixture_validation_only" }),
-    ).toThrow(/canonical_customer_projection_invalid:.*unsafe_content_projection\.limitations\[\]\.body/);
+    ).toThrow("canonical_customer_projection_withheld:identity_unsafe");
   });
 
   it("does not mutate canonical analysis or Package B-E hashes when projection fails closed", () => {
@@ -354,7 +354,7 @@ describe("canonical customer report projection validation", () => {
 
     expect(() =>
       buildCanonicalCustomerReportProjection(analysis, { purpose: "synthetic_fixture_validation_only" }),
-    ).toThrow(/canonical_customer_projection_invalid/);
+    ).toThrow(/canonical_customer_projection_withheld/);
 
     expect(analysis).toEqual(before);
     const invariance = provePackagesBEFinancialInvariance(before, analysis);
