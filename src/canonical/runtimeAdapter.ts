@@ -1,4 +1,9 @@
 import { buildCanonicalStatementFactsFromParsedDocument } from "./buildCanonicalFacts.js";
+import {
+  buildCanonicalAiAdmissionAudit,
+  passedDiagnosticSignals,
+  type CanonicalAiAdmissionAudit,
+} from "./aiAdmissionDiagnostics.js";
 import { buildCanonicalAiCapabilities } from "./buildCanonicalAiCapabilities.js";
 import { buildCanonicalCustomerState } from "./customerStateResolver.js";
 import {
@@ -144,6 +149,7 @@ export type CanonicalRuntimeAdapterInput = {
 
 export type CanonicalRuntimeAdapterResult = {
   analysis: CanonicalStatementAnalysis;
+  aiAdmissionAudit: CanonicalAiAdmissionAudit;
   inputAdmission: CanonicalRuntimeInputAdmission[];
   runtimeAiCapabilitySnapshots: RuntimeAiCapabilitySnapshot[];
 };
@@ -203,6 +209,10 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
 
   return {
     analysis: finalAnalysis,
+    aiAdmissionAudit: buildCanonicalAiAdmissionAudit({
+      capabilities: finalAnalysis.aiCapabilities.capabilities,
+      attempts: runtimeAi.snapshots,
+    }),
     inputAdmission: canonicalRuntimeInputAdmissionTable(),
     runtimeAiCapabilitySnapshots: runtimeAi.snapshots,
   };
@@ -272,6 +282,10 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
 
   return {
     analysis: finalAnalysis,
+    aiAdmissionAudit: buildCanonicalAiAdmissionAudit({
+      capabilities: finalAnalysis.aiCapabilities.capabilities,
+      attempts: snapshots,
+    }),
     inputAdmission: canonicalRuntimeInputAdmissionTable(),
     runtimeAiCapabilitySnapshots: snapshots,
   };
@@ -314,6 +328,16 @@ function snapshotForWholeStatementFeeIntelligence(output: CanonicalAiWholeStatem
     },
     executionRef: null,
     reasonCodes: [`whole_statement_fee_intelligence_${output.reviewStatus}` as const],
+    diagnosticSignals:
+      output.reviewStatus === "completed"
+        ? passedDiagnosticSignals(["schema_validation", "evidence_citation", "linkage", "deterministic_reconciliation", "privacy_safety"])
+        : output.reviewStatus === "safety_blocked"
+          ? [{ stage: "privacy_safety", state: "failed", reasonCode: "whole_statement_fee_intelligence_safety_blocked", fieldPath: "review" }]
+          : [],
+    diagnosticReferences: {
+      feeRowRefs: [...output.coverageProof.expectedFeeRowRefs, ...output.coverageProof.reviewedFeeRowRefs],
+      evidenceRefs: output.evidenceRefs,
+    },
     runtimeWholeStatementFeeIntelligenceReview: runtimeReviewForWholeStatementFeeIntelligence(output),
   };
 }
