@@ -925,7 +925,7 @@ function validateResearchProof(
       || item.triggerReason !== expectedQuestion.triggerReason) return false;
     const allowedReasons = ATTEMPT_REASON_BY_STATUS[item.status as keyof typeof ATTEMPT_REASON_BY_STATUS] as readonly string[];
     if (item.resultCount !== item.candidateRefs.length || !safeCodeArray(item.reasonCodes) || item.reasonCodes.length !== 1 || !allowedReasons.includes(item.reasonCodes[0])) return false;
-    const candidateRetentionAllowed = ["completed", "failed", "timed_out"].includes(item.status as string);
+    const candidateRetentionAllowed = ["completed", "failed", "timed_out", "safety_blocked"].includes(item.status as string);
     if (!candidateRetentionAllowed && item.resultCount !== 0) return false;
     if (expectedQuestion.questionOrdinal > expectedResearchQuestions.limits.maxSearchCalls) {
       if (item.status !== "budget_exhausted") return false;
@@ -959,6 +959,15 @@ function validateResearchProof(
   }
   for (const attempt of attempts.values()) if ((attempt.candidateRefs as string[]).some((ref) => !candidates.has(ref))) return false;
   for (const candidate of candidates.values()) if ((candidate.claimSupportRefs as string[]).some((ref) => !supports.has(ref))) return false;
+  for (const attempt of attempts.values()) {
+    if (attempt.status !== "safety_blocked") continue;
+    for (const candidateRef of attempt.candidateRefs as string[]) {
+      const candidate = candidates.get(candidateRef);
+      if (!candidate
+        || candidate.verificationStatus !== "safety_blocked"
+        || (candidate.retrievalStatus !== "safety_blocked" && candidate.semanticVerificationStatus !== "safety_blocked")) return false;
+    }
+  }
   if (disposition === "admitted") {
     for (const attempt of attempts.values()) {
       for (const candidateRef of attempt.candidateRefs as string[]) {
@@ -970,6 +979,13 @@ function validateResearchProof(
   const rejected = admission.rejectedClaimSupportRefs as string[];
   if (!setEquals(new Set([...accepted, ...rejected]), new Set(supports.keys()))) return false;
   if (accepted.some((ref) => supports.get(ref)?.disposition !== "accepted") || rejected.some((ref) => supports.get(ref)?.disposition !== "rejected")) return false;
+  const acceptedSet = new Set(accepted);
+  for (const attempt of attempts.values()) {
+    if (attempt.status !== "safety_blocked") continue;
+    for (const candidateRef of attempt.candidateRefs as string[]) {
+      if ((candidates.get(candidateRef)!.claimSupportRefs as string[]).some((ref) => acceptedSet.has(ref))) return false;
+    }
+  }
   for (const ref of accepted) {
     const support = supports.get(ref);
     if (!support || !isAcceptedSupport(support)) return false;
