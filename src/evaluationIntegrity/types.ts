@@ -1,9 +1,33 @@
 import type { ParserConfidence, ParserDecisionStatus } from "../parserFoundation.js";
 import type { ReconciliationStatus } from "../reconciliation.js";
+import type {
+  CanonicalAiWholeStatementFeeIntelligenceOutput,
+  CanonicalFeeActionability,
+  CanonicalFeeCategory,
+  CanonicalFeeClassificationConfidence,
+  CanonicalFeeParty,
+} from "../canonical/types.js";
+import type {
+  FeeKnowledgeCandidateVerificationStatus,
+  FeeKnowledgeEvidenceDecision,
+  FeeKnowledgeResearchAttemptRecord,
+  FeeKnowledgeResearchNonSuccessStatus,
+  FeeKnowledgeRetrievalStatus,
+  FeeKnowledgeSemanticSupportDecision,
+  FeeKnowledgeStructuredClaim,
+} from "../canonical/feeKnowledgeTypes.js";
 
 export const EVALUATION_SOURCE_MANIFEST_VERSION = "evaluation_source_manifest_v1" as const;
 export const EVALUATION_PREFLIGHT_VERSION = "deterministic_evaluation_preflight_v1" as const;
 export const EVALUATION_INTEGRITY_ARTIFACT_VERSION = "evaluation_run_integrity_artifact_v1" as const;
+export const EVALUATION_INTEGRITY_ARTIFACT_V2_VERSION = "evaluation_run_integrity_artifact_v2" as const;
+export const EVALUATION_CANONICAL_ADMISSION_RESULT_VERSION = "evaluation_canonical_admission_result_v1" as const;
+export const EVALUATION_CANONICAL_ADMISSION_VERSION = "canonical_whole_statement_fee_intelligence_admission_v1" as const;
+export const EVALUATION_PACKAGE_F_RECORD_VERSION = "evaluation_package_f_whole_statement_capability_v1" as const;
+export const EVALUATION_PACKAGE_5A_PROJECTION_VERSION = "evaluation_package_5a_admission_projection_v1" as const;
+export const EVALUATION_RESEARCH_EVIDENCE_PROOF_VERSION = "evaluation_research_evidence_proof_v1" as const;
+export const EVALUATION_CANONICAL_REFERENCE_PROOF_VERSION = "evaluation_canonical_reference_proof_v1" as const;
+export const EVALUATION_EXPECTED_RESEARCH_QUESTION_PROJECTION_VERSION = "evaluation_expected_research_question_projection_v1" as const;
 export const EVALUATION_PRODUCT_SCOPE_POLICY_VERSION = "ratereveal_fiserv_family_scope_v1" as const;
 export const FINANCIAL_INVARIANCE_PROJECTION_VERSION = "packages_b_e_financial_invariance_projection_v2" as const;
 export const EVALUATION_COST_LEDGER_VERSION = "evaluation_cost_budget_ledger_v2" as const;
@@ -391,5 +415,247 @@ export type EvaluationRunIntegrityArtifact = {
   }>;
   finalStatus: "completed" | "blocked" | "failed" | "timed_out";
   reasonCodes: string[];
+  artifactContentHash: string;
+};
+
+export type EvaluationAdmissionDisposition = "admitted" | "rejected" | "safety_blocked";
+export type EvaluationAdmissionStageState = "passed" | "failed" | "not_observed" | "not_applicable";
+export type EvaluationArtifactV2ResultReasonCode =
+  | "canonical_admission_admitted"
+  | "canonical_admission_rejected"
+  | "canonical_admission_safety_blocked";
+export type EvaluationArtifactV2AdmissionReasonCode = EvaluationArtifactV2ResultReasonCode;
+export type EvaluationArtifactV2ValidationErrorCode =
+  | "whole_statement_output_invalid"
+  | "whole_statement_schema_invalid"
+  | "whole_statement_evidence_invalid"
+  | "whole_statement_linkage_invalid"
+  | "whole_statement_privacy_safety_blocked"
+  | "whole_statement_research_incomplete";
+export type EvaluationArtifactV2ProjectionReasonCode =
+  | "artifact_v2_source_quality_failed"
+  | "artifact_v2_fingerprint_mismatch"
+  | "artifact_v2_locator_mismatch"
+  | "artifact_v2_applicability_failed"
+  | "artifact_v2_research_parentage_invalid"
+  | "artifact_v2_deterministic_contradiction";
+
+export type EvaluationCanonicalAdmissionRecord = {
+  type: typeof EVALUATION_CANONICAL_ADMISSION_VERSION;
+  capabilityId: "whole_statement_fee_intelligence_review";
+  executionRef: string;
+  executionStatus: "completed" | "failed" | "timed_out";
+  validationStatus: "passed" | "failed";
+  groundingStatus: "grounded" | "rejected";
+  admissionDisposition: EvaluationAdmissionDisposition;
+  acceptedClaimSupportRefs: string[];
+  rejectedClaimSupportRefs: string[];
+  researchAttemptRefs: string[];
+  validationErrorCodes: EvaluationArtifactV2ValidationErrorCode[];
+  reasonCodes: EvaluationArtifactV2AdmissionReasonCode[];
+  safeCounts: {
+    reviewedFeeRowCount: number;
+    acceptedRecordCount: number;
+    needsVerificationRecordCount: number;
+    humanReviewRecordCount: number;
+    rejectedRecordCount: number;
+    researchAttemptCount: number;
+    evidenceCandidateCount: number;
+    claimSupportCount: number;
+  };
+  package5aDiagnosticRef: string;
+  authoritative: false;
+  financialMutationAllowed: false;
+};
+
+export type EvaluationPackageFWholeStatementRecord = {
+  type: typeof EVALUATION_PACKAGE_F_RECORD_VERSION;
+  capabilityId: "whole_statement_fee_intelligence_review";
+  executionRef: string;
+  output: CanonicalAiWholeStatementFeeIntelligenceOutput;
+  sourceReferencesValidatedAgainstProof: true;
+  authoritative: false;
+  financialMutationAllowed: false;
+};
+
+export type EvaluationPackage5AAdmissionProjection = {
+  type: typeof EVALUATION_PACKAGE_5A_PROJECTION_VERSION;
+  diagnosticRef: string;
+  capabilityId: "whole_statement_fee_intelligence_review";
+  executionRef: string;
+  executionState: "completed" | "failed" | "timed_out";
+  admissionState: "admitted" | "rejected";
+  finalCanonicalStatus: "completed" | "failed" | "timed_out" | "rejected" | "safety_blocked";
+  stageStates: {
+    responseParse: EvaluationAdmissionStageState;
+    schemaValidation: EvaluationAdmissionStageState;
+    evidenceCitation: EvaluationAdmissionStageState;
+    sourceQuality: EvaluationAdmissionStageState;
+    linkage: EvaluationAdmissionStageState;
+    deterministicReconciliation: EvaluationAdmissionStageState;
+    privacySafety: EvaluationAdmissionStageState;
+  };
+  reasonCodes: string[];
+  projectionReasonCodes: EvaluationArtifactV2ProjectionReasonCode[];
+  diagnosticRefs: string[];
+  rawPromptPersisted: false;
+  rawResponsePersisted: false;
+  rawStatementTextPersisted: false;
+  providerDetailsPersisted: false;
+};
+
+export type EvaluationResearchAttemptProof = {
+  researchAttemptRef: string;
+  questionRef: string;
+  feeRowRef: string;
+  questionOrdinal: number;
+  sanitizedQuestionCategory: FeeKnowledgeResearchAttemptRecord["sanitizedQuestionCategory"];
+  triggerReason: FeeKnowledgeResearchAttemptRecord["triggerReason"];
+  status: FeeKnowledgeResearchNonSuccessStatus;
+  resultCount: number;
+  candidateRefs: string[];
+  reasonCodes: string[];
+};
+
+export type EvaluationResearchCandidateProof = {
+  candidateRef: string;
+  researchAttemptRef: string;
+  questionRef: string;
+  feeRowRef: string;
+  verificationStatus: FeeKnowledgeCandidateVerificationStatus;
+  retrievalStatus: FeeKnowledgeRetrievalStatus;
+  semanticVerificationStatus: "not_started" | "completed" | "failed" | "timed_out" | "parse_failed" | "safety_blocked" | "unsupported";
+  claimSupportRefs: string[];
+  reasonCodes: string[];
+};
+
+export type EvaluationResearchSafeStructuredClaim = Pick<
+  FeeKnowledgeStructuredClaim,
+  | "claimKind"
+  | "proposedCategory"
+  | "likelyEconomicOwner"
+  | "likelyContractualController"
+  | "maximumConfidence"
+  | "actionabilityCeiling"
+  | "applicationBasis"
+> & {
+  proposedCategory: CanonicalFeeCategory | null;
+  likelyEconomicOwner: CanonicalFeeParty | null;
+  likelyContractualController: CanonicalFeeParty | null;
+  maximumConfidence: CanonicalFeeClassificationConfidence;
+  actionabilityCeiling: CanonicalFeeActionability;
+};
+
+export type EvaluationResearchClaimSupportProof = {
+  claimSupportRef: string;
+  origin: "runtime_research" | "approved_registry";
+  runtimeSourceRef: string | null;
+  runtimeClaimRef: string | null;
+  candidateRef: string | null;
+  researchAttemptRef: string | null;
+  questionRef: string | null;
+  approvedSourceRef: string | null;
+  approvedClaimRef: string | null;
+  approvedRegistryVersionRef: string | null;
+  approvedSourceLifecycle: "active" | "expired" | "superseded" | "revoked" | "contradicted" | null;
+  approvedSourceApplicable: boolean | null;
+  approvedRegistryVerificationRef: string | null;
+  approvedContentFingerprint: string | null;
+  approvedRegistryProofLevel: "verification_reference_only" | "content_fingerprint_verified" | null;
+  approvedRegistryScopeBasis: "exact_processor_or_network" | "unrestricted_broader_official" | "processor_or_network_mismatch" | null;
+  feeRowRef: string;
+  runtimeDocumentFingerprint: string | null;
+  locatorTextHash: string;
+  structuredClaim: EvaluationResearchSafeStructuredClaim;
+  semanticDecision: FeeKnowledgeSemanticSupportDecision["decision"];
+  applicability: {
+    processorOrNetwork: boolean;
+    jurisdiction: boolean | null;
+    transactionContext: boolean | null;
+    statementPeriod: boolean;
+  };
+  rateOrAmountComparison: "not_calculable" | "matches_published_rule" | "does_not_match_published_rule" | "not_evaluated";
+  hasDeterministicCalculationProof: boolean;
+  hasConditions: boolean;
+  hasStructuredClaimExclusions: boolean;
+  hasSupportExclusions: boolean;
+  finalConfidence: CanonicalFeeClassificationConfidence;
+  finalActionabilityCeiling: CanonicalFeeActionability;
+  evidenceDecision: FeeKnowledgeEvidenceDecision;
+  contradictionCodes: string[];
+  reasonCodes: string[];
+  disposition: "accepted" | "rejected";
+  claimSupportDecisionRef: string;
+};
+
+export type EvaluationResearchEvidenceProof = {
+  type: typeof EVALUATION_RESEARCH_EVIDENCE_PROOF_VERSION;
+  attempts: EvaluationResearchAttemptProof[];
+  candidates: EvaluationResearchCandidateProof[];
+  claimSupports: EvaluationResearchClaimSupportProof[];
+};
+
+export type EvaluationExpectedResearchQuestionProjection = {
+  type: typeof EVALUATION_EXPECTED_RESEARCH_QUESTION_PROJECTION_VERSION;
+  questions: Array<{
+    questionRef: string;
+    feeRowRef: string;
+    questionOrdinal: number;
+    sanitizedQuestionCategory: FeeKnowledgeResearchAttemptRecord["sanitizedQuestionCategory"];
+    triggerReason: FeeKnowledgeResearchAttemptRecord["triggerReason"];
+  }>;
+  limits: {
+    policyVersion: "fee_knowledge_research_policy_v1";
+    maxSearchCalls: number;
+    maxRetrievalCandidates: number;
+    totalDeadlineMs: number;
+    maxResultCandidatesPerSearch: number;
+  };
+};
+
+export type EvaluationCanonicalReferenceProof = {
+  type: typeof EVALUATION_CANONICAL_REFERENCE_PROOF_VERSION;
+  canonicalFeeRowRefs: string[];
+  canonicalEvidenceRefs: string[];
+  canonicalFeeRowEvidencePopulation: Array<{
+    feeRowRef: string;
+    evidenceRefs: string[];
+    contributesToUniqueTotal: boolean;
+  }>;
+  approvedFactRefs: string[];
+  candidateRefs: string[];
+  claimSupportRefs: string[];
+  claimSupportDecisionRefs: string[];
+  expectedResearchQuestions: EvaluationExpectedResearchQuestionProjection;
+  canonicalReferenceProjectionHash: string;
+  preparedSanitizedPacketContentHash: string;
+  wholeStatementPacketContentHash: string;
+};
+
+export type EvaluationCanonicalAdmissionResult = {
+  type: typeof EVALUATION_CANONICAL_ADMISSION_RESULT_VERSION;
+  resultId: string;
+  sourceDocumentId: string;
+  capabilityId: "whole_statement_fee_intelligence_review";
+  executionRef: string;
+  admission: EvaluationCanonicalAdmissionRecord;
+  packageF: EvaluationPackageFWholeStatementRecord | null;
+  package5a: EvaluationPackage5AAdmissionProjection;
+  researchEvidence: EvaluationResearchEvidenceProof;
+  canonicalReferenceProof: EvaluationCanonicalReferenceProof;
+  lifecycleAdmissionRef: string;
+  admissionDisposition: EvaluationAdmissionDisposition;
+  reasonCodes: EvaluationArtifactV2ResultReasonCode[];
+  authoritative: false;
+  financialMutationAllowed: false;
+  customerPublished: false;
+  resultContentHash: string;
+};
+
+export type EvaluationCanonicalAdmissionResultInput = Omit<EvaluationCanonicalAdmissionResult, "resultContentHash">;
+
+export type EvaluationRunIntegrityArtifactV2 = Omit<EvaluationRunIntegrityArtifact, "type" | "artifactContentHash"> & {
+  type: typeof EVALUATION_INTEGRITY_ARTIFACT_V2_VERSION;
+  canonicalAdmissionResults: EvaluationCanonicalAdmissionResult[];
   artifactContentHash: string;
 };

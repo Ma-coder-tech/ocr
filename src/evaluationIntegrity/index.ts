@@ -1,4 +1,5 @@
 export * from "./artifact.js";
+export * from "./canonicalAdmissionArtifact.js";
 export * from "./costLedger.js";
 export * from "./errors.js";
 export * from "./execution.js";

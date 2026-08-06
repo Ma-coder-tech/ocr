@@ -80,3 +80,5 @@ export function verifyEvaluationRunIntegrityArtifact(artifact: EvaluationRunInte
   const { artifactContentHash, ...content } = artifact;
   return artifact.manifestHash === artifact.approvedManifestHash && artifact.parentPreflightProof.verified && sha256Canonical(content) === artifactContentHash;
 }
+
+export const buildEvaluationRunIntegrityArtifactV1 = buildEvaluationRunIntegrityArtifact;
