@@ -754,11 +754,134 @@ describe("Evaluation Run Integrity Artifact V2", () => {
     ["not_needed", "fee_knowledge_research_not_needed"],
     ["budget_exhausted", "fee_knowledge_research_budget_exhausted"],
     ["unsupported_model", "fee_knowledge_web_search_model_unsupported"],
-    ["safety_blocked", "fee_knowledge_research_safety_blocked"],
   ])("rejects retained candidates for non-discovery attempt status %s", (status, reason) => {
     const artifact = rejectedArtifact() as unknown as Record<string, any>;
     Object.assign(artifact.canonicalAdmissionResults[0].researchEvidence.attempts[0], { status, reasonCodes: [reason] });
     expectResignedInvalid(artifact);
+  });
+
+  it("accepts a pre-discovery safety block with no retained candidates", () => {
+    const artifact = safetyBlockedResearchArtifact("pre_discovery");
+    const result = artifact.canonicalAdmissionResults[0]!;
+    expect(result.researchEvidence.attempts[0]).toMatchObject({
+      status: "safety_blocked",
+      resultCount: 0,
+      candidateRefs: [],
+      reasonCodes: ["fee_knowledge_research_safety_blocked"],
+    });
+    expect(verifyEvaluationRunIntegrityArtifactV2(artifact)).toBe(true);
+  });
+
+  it.each([
+    ["retrieval", "safety_blocked", "not_started", "fee_knowledge_url_private_ip"],
+    ["semantic", "retrieved_text", "safety_blocked", "fee_knowledge_semantic_safety_blocked"],
+  ] as const)("accepts a post-discovery %s safety block with exact candidate parentage", (mode, retrievalStatus, semanticStatus, safetyReason) => {
+    const artifact = safetyBlockedResearchArtifact(mode);
+    const result = artifact.canonicalAdmissionResults[0]!;
+    const attempt = result.researchEvidence.attempts[0]!;
+    const candidate = result.researchEvidence.candidates[0]!;
+    expect(candidate).toMatchObject({
+      researchAttemptRef: attempt.researchAttemptRef,
+      questionRef: attempt.questionRef,
+      feeRowRef: attempt.feeRowRef,
+      verificationStatus: "safety_blocked",
+      retrievalStatus,
+      semanticVerificationStatus: semanticStatus,
+      claimSupportRefs: [],
+    });
+    expect(candidate.reasonCodes).toContain(safetyReason);
+    expect(verifyEvaluationRunIntegrityArtifactV2(artifact)).toBe(true);
+  });
+
+  it("rejects a non-safety candidate retained by a safety-blocked attempt", () => {
+    const artifact = safetyBlockedResearchArtifact("retrieval") as unknown as Record<string, any>;
+    Object.assign(artifact.canonicalAdmissionResults[0].researchEvidence.candidates[0], {
+      verificationStatus: "verified_candidate_limited",
+      retrievalStatus: "retrieved_text",
+      semanticVerificationStatus: "completed",
+      reasonCodes: ["fee_knowledge_text_retrieved", "fee_knowledge_unsupported"],
+    });
+    expectResignedInvalid(artifact);
+  });
+
+  it("rejects accepted claim support carried by a retained safety-blocked candidate", () => {
+    const artifact = safetyBlockedResearchArtifact("retrieval") as unknown as Record<string, any>;
+    const result = artifact.canonicalAdmissionResults[0];
+    const acceptedSupport = structuredClone((validArtifact() as unknown as Record<string, any>)
+      .canonicalAdmissionResults[0].researchEvidence.claimSupports[0]);
+    result.researchEvidence.candidates[0].claimSupportRefs = [acceptedSupport.claimSupportRef];
+    result.researchEvidence.claimSupports = [acceptedSupport];
+    result.admission.acceptedClaimSupportRefs = [acceptedSupport.claimSupportRef];
+    result.admission.safeCounts.claimSupportCount = 1;
+    result.canonicalReferenceProof.claimSupportRefs = [acceptedSupport.claimSupportRef];
+    refreshSupportDecisionProof(result);
+    expectResignedInvalid(artifact);
+  });
+
+  it("allows only rejected support on a retained safety-blocked candidate", () => {
+    const artifact = safetyBlockedResearchArtifact("semantic") as unknown as Record<string, any>;
+    const result = artifact.canonicalAdmissionResults[0];
+    const rejectedSupport = claimSupport("a", "rejected", "unsupported");
+    result.researchEvidence.candidates[0].claimSupportRefs = [rejectedSupport.claimSupportRef];
+    result.researchEvidence.claimSupports = [rejectedSupport];
+    result.admission.rejectedClaimSupportRefs = [rejectedSupport.claimSupportRef];
+    result.admission.safeCounts.claimSupportCount = 1;
+    result.canonicalReferenceProof.claimSupportRefs = [rejectedSupport.claimSupportRef];
+    refreshSupportDecisionProof(result);
+    resign(artifact);
+    expect(verifyEvaluationRunIntegrityArtifactV2(artifact)).toBe(true);
+  });
+
+  it("rejects the wrong safety-attempt reason family", () => {
+    const artifact = safetyBlockedResearchArtifact("retrieval") as unknown as Record<string, any>;
+    artifact.canonicalAdmissionResults[0].researchEvidence.attempts[0].reasonCodes = ["fee_knowledge_research_failed"];
+    expectResignedInvalid(artifact);
+  });
+
+  it.each([
+    ["retrieval", ["fee_knowledge_retrieval_fetch_failed", "fee_knowledge_semantic_support_not_run"]],
+    ["semantic", ["fee_knowledge_semantic_failed", "fee_knowledge_text_retrieved"]],
+  ] as const)("rejects a forged %s safety reason", (mode, reasonCodes) => {
+    const artifact = safetyBlockedResearchArtifact(mode) as unknown as Record<string, any>;
+    artifact.canonicalAdmissionResults[0].researchEvidence.candidates[0].reasonCodes = [...reasonCodes].sort();
+    expectResignedInvalid(artifact);
+  });
+
+  it.each(["researchAttemptRef", "questionRef", "feeRowRef"] as const)("rejects foreign safety-candidate %s parentage", (field) => {
+    const artifact = safetyBlockedResearchArtifact("retrieval") as unknown as Record<string, any>;
+    const candidate = artifact.canonicalAdmissionResults[0].researchEvidence.candidates[0];
+    candidate[field] = field === "researchAttemptRef"
+      ? "research_attempt_foreign"
+      : field === "questionRef"
+        ? `question_${"f".repeat(64)}`
+        : "feerow_foreign";
+    expectResignedInvalid(artifact);
+  });
+
+  it("applies normal candidate-count limits to safety-blocked retention", () => {
+    const artifact = safetyBlockedResearchArtifact("retrieval") as unknown as Record<string, any>;
+    const result = artifact.canonicalAdmissionResults[0];
+    const candidateRefs = Array.from({ length: FEE_KNOWLEDGE_RESEARCH_LIMITS.maxResultCandidatesPerSearch + 1 }, (_, index) => `candidate_safety_${index + 1}`);
+    Object.assign(result.researchEvidence.attempts[0], { candidateRefs, resultCount: candidateRefs.length });
+    expectResignedInvalid(artifact);
+  });
+
+  it("never admits or attaches Package F to a safety-blocked research graph", () => {
+    const safetyArtifact = safetyBlockedResearchArtifact("retrieval");
+    expect(safetyArtifact.canonicalAdmissionResults[0]!.admissionDisposition).toBe("safety_blocked");
+    expect(safetyArtifact.canonicalAdmissionResults[0]!.packageF).toBeNull();
+
+    const packageF = safetyBlockedResearchArtifact("retrieval") as unknown as Record<string, any>;
+    packageF.canonicalAdmissionResults[0].packageF = structuredClone((validArtifact() as unknown as Record<string, any>)
+      .canonicalAdmissionResults[0].packageF);
+    expectResignedInvalid(packageF);
+
+    const admitted = validArtifact() as unknown as Record<string, any>;
+    Object.assign(admitted.canonicalAdmissionResults[0].researchEvidence.attempts[0], {
+      status: "safety_blocked",
+      reasonCodes: ["fee_knowledge_research_safety_blocked"],
+    });
+    expectResignedInvalid(admitted);
   });
 
   it("rejects admission when an unused second candidate has incomplete retrieval", () => {
@@ -1446,6 +1569,41 @@ function safetyBlockedArtifact(): EvaluationRunIntegrityArtifactV2 {
   const event = lifecycleAdmissionEvent(artifact as unknown as EvaluationRunIntegrityArtifactV2);
   event.state = "blocked";
   event.reasonCodes = ["canonical_admission_safety_blocked"];
+  resign(artifact);
+  return artifact as unknown as EvaluationRunIntegrityArtifactV2;
+}
+
+function safetyBlockedResearchArtifact(mode: "pre_discovery" | "retrieval" | "semantic"): EvaluationRunIntegrityArtifactV2 {
+  const artifact = safetyBlockedArtifact() as unknown as Record<string, any>;
+  const result = artifact.canonicalAdmissionResults[0];
+  const attempt = result.researchEvidence.attempts[0];
+  const candidate = structuredClone(result.researchEvidence.candidates[0]);
+  Object.assign(attempt, {
+    status: "safety_blocked",
+    resultCount: mode === "pre_discovery" ? 0 : 1,
+    candidateRefs: mode === "pre_discovery" ? [] : [candidate.candidateRef],
+    reasonCodes: ["fee_knowledge_research_safety_blocked"],
+  });
+  if (mode !== "pre_discovery") {
+    Object.assign(candidate, {
+      verificationStatus: "safety_blocked",
+      retrievalStatus: mode === "retrieval" ? "safety_blocked" : "retrieved_text",
+      semanticVerificationStatus: mode === "retrieval" ? "not_started" : "safety_blocked",
+      claimSupportRefs: [],
+      reasonCodes: mode === "retrieval"
+        ? ["fee_knowledge_semantic_support_not_run", "fee_knowledge_url_private_ip"]
+        : ["fee_knowledge_semantic_safety_blocked", "fee_knowledge_text_retrieved"],
+    });
+  }
+  result.researchEvidence.candidates = mode === "pre_discovery" ? [] : [candidate];
+  result.researchEvidence.claimSupports = [];
+  result.admission.acceptedClaimSupportRefs = [];
+  result.admission.rejectedClaimSupportRefs = [];
+  result.admission.safeCounts.evidenceCandidateCount = result.researchEvidence.candidates.length;
+  result.admission.safeCounts.claimSupportCount = 0;
+  result.canonicalReferenceProof.candidateRefs = result.researchEvidence.candidates.map((item: Record<string, any>) => item.candidateRef);
+  result.canonicalReferenceProof.claimSupportRefs = [];
+  refreshSupportDecisionProof(result);
   resign(artifact);
   return artifact as unknown as EvaluationRunIntegrityArtifactV2;
 }
