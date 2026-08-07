@@ -73,6 +73,148 @@ describe("canonical whole-statement fee intelligence review", () => {
     expect(JSON.stringify(packet)).not.toMatch(/\$|statement\.pdf|merchant account/i);
   });
 
+  it("sanitizes outbound whole-statement fee labels without removing harmless fee terminology", () => {
+    const analysis = everyRowAnalysis();
+    const labelsByRow = new Map([
+      ["feerow_known_charge", "Monthly Fee $10.00"],
+      ["feerow_section_subtotal", "Processor Fee 2.95%"],
+      ["feerow_bucket_total", "Assessment 10 bps"],
+      ["feerow_statement_control_total", "Monthly Fee 12.50"],
+      ["feerow_interchange_detail", "Authorization 0.10"],
+      ["feerow_info_rate", "Assessment .15"],
+      ["feerow_zero_reference", "Discount 1.69% .10"],
+      ["feerow_adjustment", "Processor Fee $10.00 0.25"],
+      ["feerow_credit", "Merchant ID: 123456789"],
+      ["feerow_duplicate", "Statement path /Users/private/statement.pdf"],
+      ["feerow_supporting", "Monthly API key sk-testsecret123456"],
+      ["feerow_verification_only", "PCI DSS 4.0 Fee $12.00"],
+      ["feerow_unresolved", "Level 2 Data Fee Rate 0.35"],
+    ]);
+    analysis.feeLedger.rows = analysis.feeLedger.rows.map((row) => ({
+      ...row,
+      selectedLabel: labelsByRow.get(row.id) ?? row.selectedLabel,
+    }));
+
+    const packet = buildWholeStatementFeeIntelligencePacket(analysis);
+    const byRow = new Map(packet.admittedFeeRows.map((row) => [row.feeRowRef, row.selectedLabel]));
+
+    expect(byRow.get("feerow_known_charge")).toBe("Monthly Fee [redacted]");
+    expect(byRow.get("feerow_section_subtotal")).toBe("Processor Fee [redacted]");
+    expect(byRow.get("feerow_bucket_total")).toBe("Assessment [redacted]");
+    expect(byRow.get("feerow_statement_control_total")).toBe("[fee_label_withheld]");
+    expect(byRow.get("feerow_interchange_detail")).toBe("[fee_label_withheld]");
+    expect(byRow.get("feerow_info_rate")).toBe("[fee_label_withheld]");
+    expect(byRow.get("feerow_zero_reference")).toBe("[fee_label_withheld]");
+    expect(byRow.get("feerow_adjustment")).toBe("[fee_label_withheld]");
+    expect(byRow.get("feerow_credit")).toBe("[fee_label_withheld]");
+    expect(byRow.get("feerow_duplicate")).toBe("[fee_label_withheld]");
+    expect(byRow.get("feerow_supporting")).toBe("[fee_label_withheld]");
+    expect(byRow.get("feerow_verification_only")).toBe("PCI DSS 4.0 Fee [redacted]");
+    expect(byRow.get("feerow_unresolved")).toBe("Level 2 Data Fee [redacted]");
+    expect(outboundFeeLabelPrivacyMatches([...byRow.values()])).toEqual({
+      currencyOrRate: 0,
+      residualFinancialNumeric: 0,
+      genericLongIdentifier: 0,
+      merchantOrAccountIdentifier: 0,
+      pathOrFilename: 0,
+      credential: 0,
+      providerOrRawContent: 0,
+    });
+
+    analysis.feeLedger.rows = analysis.feeLedger.rows.map((row) => ({
+      ...row,
+      selectedLabel: ({
+        feerow_known_charge: "PCI DSS 4.0 Fee",
+        feerow_section_subtotal: "Level 2 Data Fee",
+        feerow_bucket_total: "Billing Support Fee",
+        feerow_statement_control_total: "Merchant Account Maintenance Fee",
+      } as Record<string, string>)[row.id] ?? row.selectedLabel,
+    }));
+    const safePacket = buildWholeStatementFeeIntelligencePacket(analysis);
+    expect(safePacket.admittedFeeRows.slice(0, 4).map((row) => row.selectedLabel)).toEqual([
+      "PCI DSS 4.0 Fee",
+      "Level 2 Data Fee",
+      "Billing Support Fee",
+      "Merchant Account Maintenance Fee",
+    ]);
+  });
+
+  it("detects residual numeric and generic long identifier fee-label leaks independently", () => {
+    expect(outboundFeeLabelPrivacyMatches([
+      "Monthly Fee 12.50",
+      "Assessment .15",
+      "Discount [redacted] .10",
+      "Device 123456789",
+      "MID123456789",
+      "Device123456789",
+      "Reference123456789012",
+      "ABC123456789XYZ",
+      "PCI DSS 4.0 Fee",
+      "Level 2 Data Fee",
+    ])).toEqual({
+      currencyOrRate: 0,
+      residualFinancialNumeric: 3,
+      genericLongIdentifier: 5,
+      merchantOrAccountIdentifier: 0,
+      pathOrFilename: 0,
+      credential: 0,
+      providerOrRawContent: 0,
+    });
+  });
+
+  it("does not hand residual numeric or generic long identifier labels to the whole-statement adapter", async () => {
+    const analysis = everyRowAnalysis();
+    const labelsByRow = new Map([
+      ["feerow_known_charge", "MID123456789"],
+      ["feerow_section_subtotal", "Device123456789"],
+      ["feerow_bucket_total", "Reference123456789012"],
+      ["feerow_statement_control_total", "ABC123456789XYZ"],
+      ["feerow_interchange_detail", "Monthly Fee 12.50"],
+      ["feerow_info_rate", "Authorization 0.10"],
+      ["feerow_zero_reference", "Assessment .15"],
+      ["feerow_adjustment", "Discount 1.69% .10"],
+      ["feerow_credit", "Processor Fee $10.00 0.25"],
+      ["feerow_duplicate", "Statement path /Users/private/statement.pdf"],
+      ["feerow_supporting", "Monthly API key sk-testsecret123456"],
+      ["feerow_verification_only", "PCI DSS 4.0 Fee"],
+      ["feerow_unresolved", "Level 2 Data Fee"],
+    ]);
+    analysis.feeLedger.rows = analysis.feeLedger.rows.map((row) => ({
+      ...row,
+      selectedLabel: labelsByRow.get(row.id) ?? row.selectedLabel,
+    }));
+
+    let observedPacket: CanonicalWholeStatementFeeIntelligencePacket | null = null;
+    await runWholeStatementFeeIntelligenceRuntime({
+      analysis,
+      options: {
+        enabled: true,
+        adapter: async (packet) => {
+          observedPacket = structuredClone(packet);
+          return validReview(packet);
+        },
+      },
+    });
+
+    expect(observedPacket).not.toBeNull();
+    const labels = observedPacket!.admittedFeeRows.map((row) => row.selectedLabel);
+    expect(labels).toContain("MID [redacted-id]");
+    expect(labels).toContain("Device [redacted-id]");
+    expect(labels).toContain("Reference [redacted-id]");
+    expect(labels).toContain("ABC [redacted-id] XYZ");
+    expect(labels).toContain("PCI DSS 4.0 Fee");
+    expect(labels).toContain("Level 2 Data Fee");
+    expect(outboundFeeLabelPrivacyMatches(labels)).toEqual({
+      currencyOrRate: 0,
+      residualFinancialNumeric: 0,
+      genericLongIdentifier: 0,
+      merchantOrAccountIdentifier: 0,
+      pathOrFilename: 0,
+      credential: 0,
+      providerOrRawContent: 0,
+    });
+  });
+
   it("accepts exact row coverage and creates deterministic semantic acceptance records without financial authority", () => {
     const analysis = everyRowAnalysis();
     const packet = buildWholeStatementFeeIntelligencePacket(analysis, {
@@ -837,6 +979,30 @@ function evidenceRecord(id: string, index: number) {
 
 function money(amountMinor: number): MoneyAmount {
   return { amountMinor, currency: "USD" };
+}
+
+function outboundFeeLabelPrivacyMatches(labels: string[]) {
+  const residualProbe = (value: string) =>
+    value
+      .replace(/\[redacted(?:-id)?\]/gi, " ")
+      .replace(/\d{8,}/g, "long identifier")
+      .replace(/\bPCI\s+DSS\s+\d+(?:\.\d+)?\b/gi, "safe descriptor")
+      .replace(/\bLevel\s+\d+\b/gi, "safe descriptor");
+  return {
+    currencyOrRate: labels.filter((value) =>
+      /(?:[$€£¥]\s*\d|\bUSD\s+\d|\d+(?:\.\d+)?(?:\s*%|\s*(?:percent(?:age)?|bps|basis\s*points?)\b)|\b(?:rate|amount|total|unit\s*price)\s*[:=]?\s*(?:\d|\.\d)|\bAT\s+\.?\d{2,}\b|\b\d+\s+TRANS\b)/i.test(value)
+    ).length,
+    residualFinancialNumeric: labels.filter((value) =>
+      /(?:\b\d+(?:,\d{3})*(?:\.\d+)?\b|\B\.\d+\b)/.test(residualProbe(value))
+    ).length,
+    genericLongIdentifier: labels.filter((value) => /\d{8,}/.test(value)).length,
+    merchantOrAccountIdentifier: labels.filter((value) =>
+      /\b(?:merchant|account)\s*(?:id|number|no\.?|#)\s*[:#-]?\s*[A-Za-z0-9][A-Za-z0-9_-]{3,}\b/i.test(value)
+    ).length,
+    pathOrFilename: labels.filter((value) => /(?:\/Users\/|\/private\/|[A-Za-z]:\\|\b\S+\.(?:pdf|csv|xlsx?|docx?|txt)\b)/i.test(value)).length,
+    credential: labels.filter((value) => /(?:api(?:\s|-)?key|credential|secret|password|bearer\s+[A-Za-z0-9._-]{8,}|sk-[A-Za-z0-9_-]{8,})/i.test(value)).length,
+    providerOrRawContent: labels.filter((value) => /\b(?:openai|anthropic|openrouter|claude|gpt[-\w]*|raw\s*(?:prompt|response|error)|prompt\s*[:=]|response\s*[:=]|error\s*[:=])/i.test(value)).length,
+  };
 }
 
 function financialProjection(analysis: CanonicalStatementAnalysis): Record<string, unknown> {
