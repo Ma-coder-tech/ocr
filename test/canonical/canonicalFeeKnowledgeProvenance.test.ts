@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
 import { buildCanonicalRuntimeAnalysisWithRuntimeAi } from "../../src/canonical/runtimeAdapter.js";
+import { calculateRuntimeClaimSupportDecisionRef } from "../../src/canonical/feeKnowledgeClaimSupportDecision.js";
 import { buildSingleStatementReportV1 } from "../../src/reporting/v1/index.js";
 import { analyzeDocument } from "../../src/analyzer.js";
 import {
@@ -937,6 +938,10 @@ async function runtimeEvidenceReview(input: {
     verification.claimSupport.structuredClaim.actionabilityCeiling = input.support?.actionabilityCeiling ?? "verify_only";
     verification.claimSupport.exclusions = input.support?.exclusions ?? [];
     verification.claimSupport.actionabilityCeiling = input.support?.actionabilityCeiling ?? "verify_only";
+    verification.candidate.claimSupportDecisionRef = calculateRuntimeClaimSupportDecisionRef({
+      support: verification.claimSupport,
+      candidate: verification.candidate,
+    });
   }
   const sourcePacket = buildFeeKnowledgeSourcePacket({
     analysis,

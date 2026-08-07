@@ -3,10 +3,17 @@ import type { CostReservationInput } from "./costLedger.js";
 import type { PackagesBEProjectionInput } from "./invariance.js";
 import {
   createOneTimeStatementEvaluationTransport,
+  finalizeOneTimeStatementEvaluation,
+  oneTimeResearchTerminalStatus,
   prepareOneTimeStatementEvaluationSource,
+  type FinalizedOneTimeStatementEvaluation,
   type OneTimeStatementEvaluationServices,
+  type OneTimeResearchLimits,
   type PreparedOneTimeStatementEvaluation,
 } from "./oneTimeStatementEvaluationAdapter.js";
+import type { ApprovedFeeKnowledgeSourceRegistry } from "../canonical/feeKnowledgeTypes.js";
+import type { FeeKnowledgeResearchQuestion } from "../canonical/feeKnowledgeResearch.js";
+import type { CanonicalStatementAnalysis } from "../canonical/types.js";
 import { sha256Canonical } from "./stable.js";
 import type { CostToolEvent, EvaluationExecutionStage, EvaluationManifestDocument } from "./types.js";
 
@@ -49,6 +56,10 @@ export type RepositoryProviderTransportResult = {
     customerPublicationRef?: string | null;
     reasonCodes?: string[];
   };
+  researchTerminal?: {
+    status: "failed" | "timed_out" | "safety_blocked";
+    reasonCode: string;
+  };
 };
 
 export type RepositoryProviderTransport = (
@@ -66,6 +77,8 @@ export type PreparedRepositoryEvaluationSource = {
 export type RepositoryEvaluationAdapter = {
   invoke(input: RepositoryProviderTransportInput): Promise<RepositoryProviderTransportResult>;
   canonicalStateFor(sourceDocumentId: string): PackagesBEProjectionInput;
+  finalizeOneTimeFor(sourceDocumentId: string, executionStatus: "completed" | "failed" | "timed_out" | "safety_blocked"): FinalizedOneTimeStatementEvaluation;
+  oneTimeResearchTerminalFor(sourceDocumentId: string): "failed" | "timed_out" | "safety_blocked" | null;
 };
 
 export async function prepareRepositoryEvaluationSource(input: {
@@ -73,6 +86,9 @@ export async function prepareRepositoryEvaluationSource(input: {
   manifestRow: EvaluationManifestDocument;
   verifiedSourceBytes: Uint8Array;
   businessType?: BusinessTypeId;
+  oneTimeRegistryForTesting?: ApprovedFeeKnowledgeSourceRegistry | null;
+  oneTimeResearchQuestionsForTesting?: (analysis: CanonicalStatementAnalysis) => FeeKnowledgeResearchQuestion[];
+  oneTimeResearchLimitsForTesting?: OneTimeResearchLimits;
 }): Promise<PreparedRepositoryEvaluationSource> {
   assertAdapterId(input.adapterId);
   if (input.adapterId === "one_time_statement_evaluation_v1") {
@@ -80,6 +96,9 @@ export async function prepareRepositoryEvaluationSource(input: {
       manifestRow: input.manifestRow,
       verifiedSourceBytes: input.verifiedSourceBytes,
       businessType: input.businessType ?? "restaurant_food_beverage",
+      registry: input.oneTimeRegistryForTesting,
+      researchQuestionsForTesting: input.oneTimeResearchQuestionsForTesting,
+      researchLimitsForTesting: input.oneTimeResearchLimitsForTesting,
     });
     return {
       adapterId: input.adapterId,
@@ -142,6 +161,31 @@ export function createRepositoryEvaluationAdapter(input: {
       if (!state) throw new Error(`Canonical state was not prepared for approved source ${sourceDocumentId}.`);
       return structuredClone(state);
     },
+    finalizeOneTimeFor(sourceDocumentId, executionStatus) {
+      if (input.adapterId !== "one_time_statement_evaluation_v1") throw new Error("one_time_finalization_not_supported");
+      const prepared = oneTimeBySource.get(sourceDocumentId);
+      if (!prepared) throw new Error("approved_one_time_statement_context_unavailable");
+      const finalized = finalizeOneTimeStatementEvaluation(prepared, executionStatus);
+      canonicalStateBySource.set(sourceDocumentId, packagesBEFromFinalized(finalized));
+      return finalized;
+    },
+    oneTimeResearchTerminalFor(sourceDocumentId) {
+      if (input.adapterId !== "one_time_statement_evaluation_v1") return null;
+      const prepared = oneTimeBySource.get(sourceDocumentId);
+      if (!prepared) throw new Error("approved_one_time_statement_context_unavailable");
+      return oneTimeResearchTerminalStatus(prepared);
+    },
+  };
+}
+
+function packagesBEFromFinalized(finalized: FinalizedOneTimeStatementEvaluation): PackagesBEProjectionInput {
+  const analysis = finalized.admission.analysis;
+  return {
+    financialFacts: structuredClone(analysis.financialFacts),
+    feeLedger: structuredClone(analysis.feeLedger),
+    feeOwnershipActionability: structuredClone(analysis.feeOwnershipActionability),
+    opportunityEngine: structuredClone(analysis.opportunityEngine),
+    calculations: structuredClone(analysis.calculations),
   };
 }
 

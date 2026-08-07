@@ -5,6 +5,7 @@ import {
   repositoryEvaluationAdapterIds,
   runManifestDrivenLiveEvaluation,
   type RepositoryEvaluationAdapterId,
+  ONE_TIME_RESEARCH_REQUEST_SLOTS,
 } from "../src/evaluationIntegrity/index.js";
 import { isBusinessTypeId, type BusinessTypeId } from "../src/businessTypes.js";
 
@@ -45,23 +46,23 @@ const requestedExecutions = manifest.documents
   .map((item) => ({ sourceDocumentId: item.sourceDocumentId, stages: item.allowedExecutionStages }));
 const calls = manifest.documents
   .filter((item) => item.selectedDuplicateRepresentative)
-  .flatMap((item) => item.allowedExecutionStages
+  .flatMap((item) => orderedPaidStages(item.allowedExecutionStages)
     .filter((stage): stage is (typeof paidEvaluationStages)[number] => paidEvaluationStages.includes(stage as never))
-    .map((stage) => {
+    .flatMap((stage) => Array.from({ length: adapterId === "one_time_statement_evaluation_v1" ? requestSlots(stage) : 1 }, (_, ordinal) => {
       const policy = costPolicy[stage];
       if (!policy) throw new Error(`Missing cost policy for approved paid stage: ${stage}`);
       return {
         sourceDocumentId: item.sourceDocumentId,
         stage,
         reservation: {
-          callId: `evaluation_${item.sourceDocumentId}_${stage}`,
+          callId: `evaluation_${item.sourceDocumentId}_${stage}_${ordinal + 1}`,
           attempt: 1,
           retryOfCallId: null,
           capability: capabilityForStage(stage),
           ...policy,
         },
       };
-    }));
+    })));
 
 const result = await runManifestDrivenLiveEvaluation({
   manifestPath,
@@ -128,4 +129,16 @@ function capabilityForStage(stage: (typeof paidEvaluationStages)[number]) {
     semantic_verification: "semantic_verification",
   } as const;
   return mapping[stage];
+}
+
+function requestSlots(stage: (typeof paidEvaluationStages)[number]): number {
+  if (stage === "web_search_discovery") return ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch;
+  if (stage === "document_retrieval") return ONE_TIME_RESEARCH_REQUEST_SLOTS.retrieval;
+  if (stage === "semantic_verification") return ONE_TIME_RESEARCH_REQUEST_SLOTS.semanticVerification;
+  return 1;
+}
+
+function orderedPaidStages(stages: readonly string[]): string[] {
+  const order = ["web_search_discovery", "document_retrieval", "semantic_verification", "whole_statement_ai_review"];
+  return [...stages].sort((left, right) => order.indexOf(left) - order.indexOf(right));
 }

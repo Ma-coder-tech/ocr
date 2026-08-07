@@ -1,24 +1,42 @@
 import { createHash } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import type { BusinessTypeId } from "../businessTypes.js";
 import {
   FEE_KNOWLEDGE_RESEARCH_LIMITS,
   defaultFeeKnowledgeResearchQuestions,
+  FeeKnowledgeSearchProviderError,
+  feeKnowledgeQuestionRef,
   openAiSemanticSupportAdapter,
   openAiWebSearchAdapter,
   verifyCandidate,
   type FeeKnowledgeDiscoveryCandidate,
   type FeeKnowledgeResearchQuestion,
+  type FeeKnowledgeResearchLimits,
   type FeeKnowledgeSearchAdapter,
   type FeeKnowledgeSemanticSupportAdapter,
 } from "../canonical/feeKnowledgeResearch.js";
+import { runtimeSupportAccepted } from "../canonical/feeKnowledgeClaimSupportDecision.js";
 import { retrieveFeeKnowledgeDocument, type RetrievedDocument } from "../canonical/feeKnowledgeRetrieval.js";
 import { buildFeeKnowledgeSourcePacket } from "../canonical/feeKnowledgeRegistry.js";
+import {
+  FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
+  type ApprovedFeeKnowledgeSourceRegistry,
+  type FeeKnowledgeClaimSupportRecord,
+  type FeeKnowledgeResearchAttemptRecord,
+  type FeeKnowledgeResearchCandidateRecord,
+  type FeeKnowledgeSourcePacket,
+} from "../canonical/feeKnowledgeTypes.js";
 import { buildCanonicalRuntimeAnalysis } from "../canonical/runtimeAdapter.js";
 import {
   buildWholeStatementFeeIntelligencePacket,
   validateWholeStatementFeeIntelligenceReview,
   type CanonicalWholeStatementFeeIntelligencePacket,
+  type CanonicalWholeStatementFeeIntelligenceValidationResult,
 } from "../canonical/wholeStatementFeeIntelligenceReview.js";
+import {
+  admitWholeStatementFeeIntelligence,
+  type CanonicalWholeStatementAdmissionResult,
+} from "../canonical/wholeStatementFeeIntelligenceAdmission.js";
 import {
   wholeStatementFeeIntelligenceProviderAdapter,
   type WholeStatementFeeIntelligenceRuntimeAdapter,
@@ -34,12 +52,14 @@ import type { EvaluationManifestDocument } from "./types.js";
 export const ONE_TIME_STATEMENT_EVALUATION_PACKET_VERSION = "one_time_statement_evaluation_packet_v1" as const;
 export const ONE_TIME_EXTERNAL_REQUEST_RESULT_VERSION = "one_time_external_request_result_v1" as const;
 
+export type OneTimeResearchLimits = FeeKnowledgeResearchLimits;
+
 export type OneTimeStatementEvaluationPacket = {
   type: typeof ONE_TIME_STATEMENT_EVALUATION_PACKET_VERSION;
   wholeStatementReview: CanonicalWholeStatementFeeIntelligencePacket;
   research: {
     questions: FeeKnowledgeResearchQuestion[];
-    limits: typeof FEE_KNOWLEDGE_RESEARCH_LIMITS;
+    limits: OneTimeResearchLimits;
   };
 };
 
@@ -65,26 +85,61 @@ export type PreparedOneTimeStatementEvaluation = {
   privateContext: OneTimePrivateContext | null;
 };
 
+export type FinalizedOneTimeStatementEvaluation = {
+  preparedPacket: OneTimeStatementEvaluationPacket;
+  wholeStatementPacketSent: CanonicalWholeStatementFeeIntelligencePacket | null;
+  sourcePacket: FeeKnowledgeSourcePacket;
+  registry: ApprovedFeeKnowledgeSourceRegistry | null;
+  admission: CanonicalWholeStatementAdmissionResult;
+};
+
 type CandidateContext = {
   candidateId: string;
   attemptId: string;
   candidate: FeeKnowledgeDiscoveryCandidate;
   question: FeeKnowledgeResearchQuestion;
+  questionOrdinal: number;
 };
 
 type RetrievedContext = CandidateContext & { retrieved: RetrievedDocument };
+type OneTimeResearchTerminalStatus = "failed" | "timed_out" | "safety_blocked";
 
 type OneTimePrivateContext = {
   analysis: CanonicalStatementAnalysis;
   packet: OneTimeStatementEvaluationPacket;
+  initialPacketHash: string;
+  sentWholeStatementPacket: CanonicalWholeStatementFeeIntelligencePacket | null;
+  sentSourcePacket: FeeKnowledgeSourcePacket | null;
+  registry: ApprovedFeeKnowledgeSourceRegistry | null;
   discovered: CandidateContext[];
   retrieved: RetrievedContext[];
+  attempts: FeeKnowledgeResearchAttemptRecord[];
+  candidates: FeeKnowledgeResearchCandidateRecord[];
+  claimSupports: FeeKnowledgeClaimSupportRecord[];
+  validation: CanonicalWholeStatementFeeIntelligenceValidationResult | null;
+  searchCursor: number;
+  retrievalCursor: number;
+  semanticCursor: number;
+  lastStageRank: number;
+  wholeStatementReviewCount: number;
+  researchDeadlineStartedAt: number | null;
+  researchDeadlineAt: number | null;
+  researchTerminalStatus: OneTimeResearchTerminalStatus | null;
 };
+
+export const ONE_TIME_RESEARCH_REQUEST_SLOTS = {
+  webSearch: FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls,
+  retrieval: FEE_KNOWLEDGE_RESEARCH_LIMITS.maxRetrievalCandidates,
+  semanticVerification: FEE_KNOWLEDGE_RESEARCH_LIMITS.maxRetrievalCandidates,
+} as const;
 
 export async function prepareOneTimeStatementEvaluationSource(input: {
   manifestRow: EvaluationManifestDocument;
   verifiedSourceBytes: Uint8Array;
   businessType: BusinessTypeId;
+  registry?: ApprovedFeeKnowledgeSourceRegistry | null;
+  researchQuestionsForTesting?: (analysis: CanonicalStatementAnalysis) => FeeKnowledgeResearchQuestion[];
+  researchLimitsForTesting?: OneTimeResearchLimits;
 }): Promise<PreparedOneTimeStatementEvaluation> {
   if (input.manifestRow.paidStageEligibility !== "eligible") {
     return {
@@ -111,15 +166,19 @@ export async function prepareOneTimeStatementEvaluationSource(input: {
     runtimeDocumentRef: input.manifestRow.sourceDocumentId,
     legacySummary: summary,
   });
-  const sourcePacket = buildFeeKnowledgeSourcePacket({ analysis: canonical.analysis, registry: null });
-  const wholeStatementReview = buildWholeStatementFeeIntelligencePacket(canonical.analysis, { approvedExternalSourceRefs: [] }, sourcePacket);
-  const questions = defaultFeeKnowledgeResearchQuestions(canonical.analysis, null);
+  const registry = input.registry ?? null;
+  const sourcePacket = buildFeeKnowledgeSourcePacket({ analysis: canonical.analysis, registry });
+  const wholeStatementReview = buildWholeStatementFeeIntelligencePacket(canonical.analysis, registry ?? { approvedExternalSourceRefs: [] }, sourcePacket);
+  const questions = input.researchQuestionsForTesting
+    ? input.researchQuestionsForTesting(structuredClone(canonical.analysis))
+    : defaultFeeKnowledgeResearchQuestions(canonical.analysis, registry);
+  const limits = structuredClone(input.researchLimitsForTesting ?? FEE_KNOWLEDGE_RESEARCH_LIMITS);
   const packet: OneTimeStatementEvaluationPacket = {
     type: ONE_TIME_STATEMENT_EVALUATION_PACKET_VERSION,
     wholeStatementReview,
     research: {
       questions,
-      limits: FEE_KNOWLEDGE_RESEARCH_LIMITS,
+      limits,
     },
   };
   return {
@@ -128,9 +187,111 @@ export async function prepareOneTimeStatementEvaluationSource(input: {
     privateContext: {
       analysis: canonical.analysis,
       packet,
+      initialPacketHash: canonicalHash(packet),
+      sentWholeStatementPacket: null,
+      sentSourcePacket: null,
+      registry,
       discovered: [],
       retrieved: [],
+      attempts: questions.slice(limits.maxSearchCalls).map((question, offset) => attemptRecord(
+        question,
+        limits.maxSearchCalls + offset,
+        "budget_exhausted",
+        [],
+        ["fee_knowledge_research_budget_exhausted"],
+      )),
+      candidates: [],
+      claimSupports: [],
+      validation: null,
+      searchCursor: 0,
+      retrievalCursor: 0,
+      semanticCursor: 0,
+      lastStageRank: -1,
+      wholeStatementReviewCount: 0,
+      researchDeadlineStartedAt: null,
+      researchDeadlineAt: null,
+      researchTerminalStatus: null,
     },
+  };
+}
+
+export function oneTimeResearchTerminalStatus(
+  prepared: PreparedOneTimeStatementEvaluation,
+): OneTimeResearchTerminalStatus | null {
+  const context = prepared.privateContext;
+  if (!context) return null;
+  if (context.researchTerminalStatus) return context.researchTerminalStatus;
+  if (context.attempts.some((attempt) => attempt.status === "safety_blocked")
+    || context.candidates.some((candidate) => candidate.retrievalStatus === "safety_blocked" || candidate.semanticVerificationStatus === "safety_blocked")) {
+    return "safety_blocked";
+  }
+  if (context.attempts.some((attempt) => attempt.status === "timed_out")
+    || context.candidates.some((candidate) => candidate.retrievalStatus === "timed_out" || candidate.semanticVerificationStatus === "timed_out")) {
+    return "timed_out";
+  }
+  if (context.attempts.some((attempt) => ["failed", "unsupported_model"].includes(attempt.status))
+    || context.candidates.some((candidate) => (!["not_started", "retrieved_text"].includes(candidate.retrievalStatus)
+      || ["failed", "parse_failed", "unsupported"].includes(candidate.semanticVerificationStatus)))) {
+    return "failed";
+  }
+  return null;
+}
+
+export function finalizeOneTimeStatementEvaluation(
+  prepared: PreparedOneTimeStatementEvaluation,
+  executionStatus: "completed" | "failed" | "timed_out" | "safety_blocked",
+): FinalizedOneTimeStatementEvaluation {
+  const context = prepared.privateContext;
+  if (!context) throw new Error("approved_one_time_statement_context_unavailable");
+  const existingQuestionRefs = new Set(context.attempts.map((attempt) => attempt.questionRef));
+  for (const [questionOrdinal, question] of context.packet.research.questions.entries()) {
+    const questionRef = feeKnowledgeQuestionRef(question, questionOrdinal);
+    if (existingQuestionRefs.has(questionRef)) continue;
+    const status = questionOrdinal >= context.packet.research.limits.maxSearchCalls
+      ? "budget_exhausted"
+      : executionStatus === "timed_out" ? "timed_out"
+        : executionStatus === "safety_blocked" ? "safety_blocked" : "failed";
+    context.attempts.push(attemptRecord(
+      question,
+      questionOrdinal,
+      status,
+      [],
+      [status === "budget_exhausted" ? "fee_knowledge_research_budget_exhausted"
+        : status === "timed_out" ? "fee_knowledge_research_timed_out"
+          : status === "safety_blocked" ? "fee_knowledge_research_safety_blocked"
+            : "fee_knowledge_research_failed"],
+    ));
+  }
+  for (const candidate of [...context.candidates]) {
+    if (candidate.retrievalStatus === "not_started") {
+      const discovered = context.discovered.find((item) => item.candidateId === candidate.candidateId);
+      if (discovered) updateFailedCandidate(context, discovered, "retrieval", executionStatus === "timed_out" ? "timed_out" : executionStatus === "safety_blocked" ? "safety_blocked" : "failed");
+    } else if (candidate.retrievalStatus === "retrieved_text" && candidate.semanticVerificationStatus === "not_started") {
+      const retrieved = context.retrieved.find((item) => item.candidateId === candidate.candidateId);
+      if (retrieved) updateFailedCandidate(context, retrieved, "semantic", executionStatus === "timed_out" ? "timed_out" : executionStatus === "safety_blocked" ? "safety_blocked" : "failed");
+    }
+  }
+  const sourcePacket = context.sentSourcePacket ? structuredClone(context.sentSourcePacket) : currentSourcePacket(context);
+  const validation = context.validation ?? validateWholeStatementFeeIntelligenceReview(
+    fallbackWholeStatementReview(executionStatus),
+    context.analysis,
+    context.registry ?? { approvedExternalSourceRefs: [] },
+    sourcePacket,
+  );
+  const admission = admitWholeStatementFeeIntelligence({
+    analysis: context.analysis,
+    validation,
+    sourcePacket,
+    registry: context.registry,
+    executionStatus: executionStatus === "safety_blocked" ? "completed" : executionStatus,
+  });
+  context.analysis = admission.analysis;
+  return {
+    preparedPacket: structuredClone(context.packet),
+    wholeStatementPacketSent: structuredClone(context.sentWholeStatementPacket),
+    sourcePacket: structuredClone(sourcePacket),
+    registry: structuredClone(context.registry),
+    admission: structuredClone(admission),
   };
 }
 
@@ -143,23 +304,35 @@ export function createOneTimeStatementEvaluationTransport(input: {
     const prepared = input.preparedBySource.get(request.sourceDocumentId);
     const context = prepared?.privateContext;
     if (!prepared || !context) throw new Error("approved_one_time_statement_context_unavailable");
-    if (canonicalHash(request.sanitizedPacket) !== canonicalHash(context.packet)) throw new Error("approved_sanitized_packet_mismatch");
+    if (canonicalHash(request.sanitizedPacket) !== context.initialPacketHash) throw new Error("approved_sanitized_packet_mismatch");
+    assertOneTimeStageTransition(context, request.stage);
     const started = Date.now();
-    const abortSignal = new AbortController().signal;
-    const serviceContext = { abortSignal, approvedCallMetadata: structuredClone(request.approvedCallMetadata) };
 
     if (request.stage === "whole_statement_ai_review") {
+      const serviceContext = {
+        abortSignal: new AbortController().signal,
+        approvedCallMetadata: structuredClone(request.approvedCallMetadata),
+      };
+      const sourcePacket = currentSourcePacket(context);
+      const reviewPacket = buildWholeStatementFeeIntelligencePacket(context.analysis, context.registry ?? { approvedExternalSourceRefs: [] }, sourcePacket);
+      context.sentSourcePacket = structuredClone(sourcePacket);
+      context.sentWholeStatementPacket = structuredClone(reviewPacket);
+      context.packet = {
+        ...context.packet,
+        wholeStatementReview: structuredClone(context.sentWholeStatementPacket),
+      };
       const response = unwrapExternalRequestResult(
-        await services.wholeStatementReview(context.packet.wholeStatementReview, serviceContext),
+        await services.wholeStatementReview(structuredClone(context.sentWholeStatementPacket), serviceContext),
         started,
         "whole_statement_ai_review",
       );
       const validation = validateWholeStatementFeeIntelligenceReview(
         response.value,
         context.analysis,
-        { approvedExternalSourceRefs: [] },
-        context.packet.wholeStatementReview.sourceProvenancePacket,
+        context.registry ?? { approvedExternalSourceRefs: [] },
+        sourcePacket,
       );
+      context.validation = validation;
       const accepted = validation.ok && validation.output.reviewStatus === "completed";
       return result({
         value: { reviewStatus: validation.output.reviewStatus, validationAccepted: validation.ok },
@@ -173,9 +346,10 @@ export function createOneTimeStatementEvaluationTransport(input: {
     }
 
     if (request.stage === "web_search_discovery") {
-      context.discovered = [];
-      const questions = context.packet.research.questions.slice(0, FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls);
-      if (questions.length === 0) {
+      const questions = context.packet.research.questions.slice(0, context.packet.research.limits.maxSearchCalls);
+      const questionOrdinal = context.searchCursor++;
+      const question = questions[questionOrdinal];
+      if (!question) {
         return result({
           value: { candidateCount: 0 },
           schemaValid: true,
@@ -183,38 +357,48 @@ export function createOneTimeStatementEvaluationTransport(input: {
           accounting: noRequestAccounting(started),
         });
       }
-      const attemptId = `evaluation_search_${shortHash([request.reservedCallId, ...questions.map((question) => question.feeRowRef)])}`;
-      const response = unwrapExternalRequestResult(
-        await services.webSearchDiscovery(
-          { attemptId, questions, limits: FEE_KNOWLEDGE_RESEARCH_LIMITS },
-          serviceContext,
-        ),
-        started,
-        "web_search",
-      );
-      const question = questions[0]!;
-      context.discovered = dedupeCandidates(response.value
-        .slice(0, FEE_KNOWLEDGE_RESEARCH_LIMITS.maxResultCandidatesPerSearch)
-        .map((candidate) => ({
+      const attemptId = `research_${shortHash([feeKnowledgeQuestionRef(question, questionOrdinal), String(questionOrdinal)])}`;
+      let response: ReturnType<typeof unwrapExternalRequestResult<FeeKnowledgeDiscoveryCandidate[]>>;
+      try {
+        response = await runWithinPreparedResearchDeadline(context, async (abortSignal) => unwrapExternalRequestResult(
+          await services.webSearchDiscovery(
+            { attemptId, questions: [question], limits: context.packet.research.limits },
+            { abortSignal, approvedCallMetadata: structuredClone(request.approvedCallMetadata) },
+          ),
+          started,
+          "web_search",
+        ));
+      } catch (error) {
+        const status = researchProviderFailureStatus(error);
+        upsertContextAttempt(context, attemptRecord(question, questionOrdinal, status, [], [researchProviderFailureReason(status)]));
+        markResearchTerminal(context, status === "safety_blocked" ? "safety_blocked" : status === "timed_out" ? "timed_out" : "failed");
+        throw error;
+      }
+      const remaining = context.packet.research.limits.maxRetrievalCandidates - context.discovered.length;
+      const discovered = dedupeCandidates(response.value
+        .slice(0, Math.min(remaining, context.packet.research.limits.maxResultCandidatesPerSearch))
+        .map((candidate, candidateOrdinal) => ({
           attemptId,
           candidate,
           question,
-          candidateId: `evaluation_candidate_${shortHash([attemptId, candidate.url])}`,
-        })))
-        .slice(0, 1);
+          questionOrdinal,
+          candidateId: `candidate_${shortHash([attemptId, candidate.url, String(candidateOrdinal)])}`,
+        })));
+      context.discovered.push(...discovered);
+      context.attempts.push(attemptRecord(question, questionOrdinal, "completed", discovered.map((item) => item.candidateId), ["fee_knowledge_research_completed"]));
+      context.candidates.push(...discovered.map(discoveredCandidateRecord));
       return result({
-        value: { candidateCount: context.discovered.length },
+        value: { attemptId, questionRef: feeKnowledgeQuestionRef(question, questionOrdinal), candidateCount: discovered.length },
         generated: true,
         schemaValid: true,
         reasonCodes: ["fee_knowledge_discovery_completed"],
         accounting: response.accounting,
-        researchRetrievalRefs: context.discovered.map((item) => item.candidateId),
+        researchRetrievalRefs: discovered.map((item) => item.candidateId),
       });
     }
 
     if (request.stage === "document_retrieval") {
-      context.retrieved = [];
-      const candidate = context.discovered[0];
+      const candidate = context.discovered[context.retrievalCursor++];
       if (!candidate) {
         return result({
           value: { retrievedCount: 0 },
@@ -222,11 +406,34 @@ export function createOneTimeStatementEvaluationTransport(input: {
           accounting: noRequestAccounting(started),
         });
       }
-      const response = unwrapExternalRequestResult(
-        await services.documentRetrieval(candidate.candidate.url, serviceContext),
-        started,
-        "document_retrieval",
-      );
+      let response: ReturnType<typeof unwrapExternalRequestResult<RetrievedDocument>>;
+      try {
+        response = await runWithinPreparedResearchDeadline(context, async (abortSignal) => unwrapExternalRequestResult(
+          await services.documentRetrieval(candidate.candidate.url, {
+            abortSignal,
+            approvedCallMetadata: structuredClone(request.approvedCallMetadata),
+          }),
+          started,
+          "document_retrieval",
+        ));
+      } catch (error) {
+        updateFailedCandidate(context, candidate, "retrieval", providerFailureStatus(error));
+        markResearchTerminal(context, providerFailureStatus(error));
+        throw error;
+      }
+      updateRetrievedCandidate(context, candidate, response.value);
+      const retrievalTerminal = retrievalTerminalStatus(response.value.status);
+      if (retrievalTerminal) {
+        updateAttemptTerminal(context, candidate.attemptId, retrievalTerminal);
+        markResearchTerminal(context, retrievalTerminal);
+        return result({
+          value: { retrievedCount: context.retrieved.length, retrievalStatus: response.value.status },
+          reasonCodes: response.value.reasonCodes,
+          accounting: response.accounting,
+          researchRetrievalRefs: [candidate.candidateId],
+          researchTerminal: { status: retrievalTerminal, reasonCode: response.value.reasonCodes[0] ?? researchTerminalReason(retrievalTerminal) },
+        });
+      }
       context.retrieved.push({ ...candidate, retrieved: response.value });
       return result({
         value: { retrievedCount: context.retrieved.length },
@@ -237,7 +444,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
     }
 
     if (request.stage === "semantic_verification") {
-      const item = context.retrieved[0];
+      const item = context.retrieved[context.semanticCursor++];
       if (!item) {
         return result({
           value: { verifiedCount: 0, supportedCount: 0 },
@@ -248,32 +455,64 @@ export function createOneTimeStatementEvaluationTransport(input: {
         });
       }
       let semanticAccounting: RepositoryProviderTransportResult["accounting"] | null = null;
-      const verified = await verifyCandidate({
-        candidateId: item.candidateId,
-        attemptId: item.attemptId,
-        candidate: item.candidate,
-        retrieved: item.retrieved,
-        question: item.question,
-        semanticSupportAdapter: async (...args) => {
-          const response = unwrapExternalRequestResult(
-            await services.semanticVerification(args[0], { ...serviceContext, abortSignal: args[1].abortSignal }),
-            started,
-            "semantic_verification",
-          );
-          semanticAccounting = response.accounting;
-          return response.value;
-        },
-        priorClaimSupports: [],
-        abortSignal,
-      });
+      let verified: Awaited<ReturnType<typeof verifyCandidate>>;
+      try {
+        verified = await runWithinPreparedResearchDeadline(context, async (abortSignal) => verifyCandidate({
+            candidateId: item.candidateId,
+            attemptId: item.attemptId,
+            candidate: item.candidate,
+            retrieved: item.retrieved,
+            question: item.question,
+            questionOrdinal: item.questionOrdinal,
+            semanticSupportAdapter: async (...args) => {
+              const response = unwrapExternalRequestResult(
+                await services.semanticVerification(args[0], {
+                  abortSignal: args[1].abortSignal,
+                  approvedCallMetadata: structuredClone(request.approvedCallMetadata),
+                }),
+                started,
+                "semantic_verification",
+              );
+              semanticAccounting = response.accounting;
+              return response.value;
+            },
+            priorClaimSupports: context.claimSupports,
+            abortSignal,
+          }));
+      } catch (error) {
+        updateFailedCandidate(context, item, "semantic", providerFailureStatus(error));
+        markResearchTerminal(context, providerFailureStatus(error));
+        throw error;
+      }
       const supportedCount = verified.claimSupport ? 1 : 0;
+      const candidateIndex = context.candidates.findIndex((candidate) => candidate.candidateId === item.candidateId);
+      context.candidates[candidateIndex] = verified.candidate;
+      if (verified.claimSupport) context.claimSupports.push(verified.claimSupport);
+      const policyAccepted = Boolean(verified.claimSupport && runtimeSupportAccepted(verified.claimSupport));
+      const semanticTerminal = semanticTerminalStatus(verified.candidate.semanticVerificationStatus);
+      if (semanticTerminal) {
+        updateAttemptTerminal(context, item.attemptId, semanticTerminal);
+        markResearchTerminal(context, semanticTerminal);
+        return result({
+          value: { verifiedCount: 1, supportedCount, semanticStatus: verified.candidate.semanticVerificationStatus },
+          generated: semanticAccounting !== null,
+          schemaValid: verified.candidate.semanticVerificationStatus !== "parse_failed",
+          policyAccepted: false,
+          reasonCodes: verified.candidate.reasonCodes,
+          accounting: semanticAccounting ?? noRequestAccounting(started),
+          semanticVerificationRef: `semantic:${request.reservedCallId}`,
+          researchTerminal: { status: semanticTerminal, reasonCode: verified.candidate.reasonCodes[0] ?? researchTerminalReason(semanticTerminal) },
+        });
+      }
       return result({
         value: { verifiedCount: 1, supportedCount },
         generated: semanticAccounting !== null,
         schemaValid: true,
-        evidenceValidated: supportedCount > 0,
-        policyAccepted: false,
-        reasonCodes: ["fee_knowledge_semantic_verification_completed"],
+        evidenceValidated: policyAccepted,
+        policyAccepted,
+        reasonCodes: verified.candidate.semanticVerificationStatus === "parse_failed"
+          ? ["fee_knowledge_semantic_json_invalid"]
+          : ["fee_knowledge_semantic_verification_completed"],
         accounting: semanticAccounting ?? noRequestAccounting(started),
         semanticVerificationRef: `semantic:${request.reservedCallId}`,
       });
@@ -368,6 +607,7 @@ function result(input: {
   accounting: RepositoryProviderTransportResult["accounting"];
   researchRetrievalRefs?: string[];
   semanticVerificationRef?: string | null;
+  researchTerminal?: RepositoryProviderTransportResult["researchTerminal"];
 }): RepositoryProviderTransportResult {
   return {
     value: input.value,
@@ -383,6 +623,7 @@ function result(input: {
       semanticVerificationRef: input.semanticVerificationRef ?? null,
       reasonCodes: input.reasonCodes,
     },
+    researchTerminal: input.researchTerminal,
   };
 }
 
@@ -408,6 +649,300 @@ function unavailablePackagesBE(): PackagesBEProjectionInput {
 
 function dedupeCandidates(items: CandidateContext[]): CandidateContext[] {
   return [...new Map(items.map((item) => [item.candidate.url, item])).values()];
+}
+
+function attemptRecord(
+  question: FeeKnowledgeResearchQuestion,
+  questionOrdinal: number,
+  status: FeeKnowledgeResearchAttemptRecord["status"],
+  candidateIds: readonly string[],
+  reasonCodes: readonly string[],
+): FeeKnowledgeResearchAttemptRecord {
+  return {
+    type: "fee_knowledge_research_attempt",
+    policyVersion: FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
+    attemptId: `research_${shortHash([feeKnowledgeQuestionRef(question, questionOrdinal), String(questionOrdinal)])}`,
+    questionRef: feeKnowledgeQuestionRef(question, questionOrdinal),
+    feeRowRef: question.feeRowRef,
+    sanitizedQuestionCategory: question.sanitizedQuestionCategory,
+    triggerReason: question.triggerReason,
+    status,
+    resultCount: candidateIds.length,
+    candidateIds: [...candidateIds].sort(),
+    reasonCodes: [...new Set(reasonCodes)].sort(),
+    providerDetailsStripped: true,
+  };
+}
+
+function discoveredCandidateRecord(item: CandidateContext): FeeKnowledgeResearchCandidateRecord {
+  return {
+    type: "fee_knowledge_research_candidate",
+    policyVersion: FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
+    candidateId: item.candidateId,
+    questionRef: feeKnowledgeQuestionRef(item.question, item.questionOrdinal),
+    feeRowRef: item.question.feeRowRef,
+    attemptId: item.attemptId,
+    retrievalStatus: "not_started",
+    semanticVerificationStatus: "not_started",
+    canonicalUrl: null,
+    title: safeCandidateText(item.candidate.title, 160),
+    publisher: safeCandidateText(item.candidate.publisher, 120),
+    verificationStatus: "provisional",
+    reasonCodes: ["fee_knowledge_semantic_support_not_run"],
+    safeApplicability: {
+      processorOrNetworkMatched: false,
+      periodApplicable: Boolean(item.question.statementPeriodYear),
+      jurisdictionApplicable: null,
+      contextApplicable: null,
+    },
+    sourceFingerprint: null,
+    locatorHash: null,
+    claimSupportDecisionRef: null,
+    displayPermission: "internal_only",
+  };
+}
+
+function updateRetrievedCandidate(context: OneTimePrivateContext, item: CandidateContext, retrieved: RetrievedDocument): void {
+  const index = context.candidates.findIndex((candidate) => candidate.candidateId === item.candidateId);
+  const current = context.candidates[index];
+  if (!current) throw new Error("fee_knowledge_candidate_context_missing");
+  context.candidates[index] = {
+    ...current,
+    canonicalUrl: retrieved.canonicalUrl,
+    retrievalStatus: retrieved.status,
+    verificationStatus: retrieved.status === "retrieved_text" ? "provisional"
+      : retrieved.status === "safety_blocked" ? "safety_blocked"
+        : retrieved.status === "retrieval_succeeded_text_unavailable" ? "source_unavailable" : "rejected",
+    reasonCodes: [...new Set([...retrieved.reasonCodes, "fee_knowledge_semantic_support_not_run"])].sort(),
+    sourceFingerprint: retrieved.documentFingerprint,
+  };
+}
+
+function updateFailedCandidate(
+  context: OneTimePrivateContext,
+  item: CandidateContext,
+  stage: "retrieval" | "semantic",
+  status: OneTimeResearchTerminalStatus,
+): void {
+  const index = context.candidates.findIndex((candidate) => candidate.candidateId === item.candidateId);
+  const current = context.candidates[index];
+  if (!current) return;
+  const attemptIndex = context.attempts.findIndex((attempt) => attempt.attemptId === item.attemptId);
+  const attempt = context.attempts[attemptIndex];
+  if (attempt) {
+    context.attempts[attemptIndex] = {
+      ...attempt,
+      status,
+      reasonCodes: [researchTerminalReason(status)],
+    };
+  }
+  context.candidates[index] = stage === "retrieval"
+    ? {
+        ...current,
+        retrievalStatus: status,
+        semanticVerificationStatus: "not_started",
+        verificationStatus: "rejected",
+        reasonCodes: [status === "timed_out" ? "fee_knowledge_retrieval_timed_out"
+          : status === "safety_blocked" ? "fee_knowledge_url_policy_blocked"
+            : "fee_knowledge_retrieval_fetch_failed", "fee_knowledge_semantic_support_not_run"].sort(),
+      }
+    : {
+        ...current,
+        semanticVerificationStatus: status,
+        verificationStatus: status === "safety_blocked" ? "safety_blocked" : "verified_candidate_limited",
+        reasonCodes: [...new Set([
+          ...current.reasonCodes.filter((reason) => reason !== "fee_knowledge_semantic_support_not_run"),
+          status === "timed_out" ? "fee_knowledge_semantic_timed_out"
+            : status === "safety_blocked" ? "fee_knowledge_semantic_safety_blocked"
+              : "fee_knowledge_semantic_failed",
+        ])].sort(),
+      };
+}
+
+function currentSourcePacket(context: OneTimePrivateContext): FeeKnowledgeSourcePacket {
+  return buildFeeKnowledgeSourcePacket({
+    analysis: context.analysis,
+    registry: context.registry,
+    runtimeClaimSupports: context.claimSupports,
+    researchAttempts: context.attempts,
+    researchCandidates: context.candidates,
+  });
+}
+
+function assertOneTimeStageTransition(
+  context: OneTimePrivateContext,
+  stage: RepositoryProviderTransportInput["stage"],
+): void {
+  if (context.researchTerminalStatus !== null) throw new Error("one_time_research_already_terminal");
+  const ranks = {
+    web_search_discovery: 0,
+    document_retrieval: 1,
+    semantic_verification: 2,
+    whole_statement_ai_review: 3,
+  } as const;
+  if (!(stage in ranks)) throw new Error("one_time_evaluation_stage_not_supported");
+  const rank = ranks[stage as keyof typeof ranks];
+  if (rank < context.lastStageRank) throw new Error("one_time_evaluation_stage_order_invalid");
+  if (stage === "whole_statement_ai_review") {
+    if (context.wholeStatementReviewCount !== 0) throw new Error("one_time_whole_statement_review_duplicate");
+    const expectedQuestionRefs = new Set(context.packet.research.questions.map(feeKnowledgeQuestionRef));
+    const attemptedQuestionRefs = new Set(context.attempts.map((attempt) => attempt.questionRef));
+    if (expectedQuestionRefs.size !== attemptedQuestionRefs.size
+      || [...expectedQuestionRefs].some((questionRef) => !attemptedQuestionRefs.has(questionRef))
+      || context.retrievalCursor < context.discovered.length
+      || context.semanticCursor < context.retrieved.length) {
+      throw new Error("one_time_whole_statement_review_before_research_complete");
+    }
+    context.wholeStatementReviewCount += 1;
+  }
+  context.lastStageRank = rank;
+}
+
+function upsertContextAttempt(
+  context: OneTimePrivateContext,
+  attempt: FeeKnowledgeResearchAttemptRecord,
+): void {
+  const index = context.attempts.findIndex((item) => item.questionRef === attempt.questionRef);
+  if (index < 0) context.attempts.push(attempt);
+  else context.attempts[index] = attempt;
+}
+
+function researchProviderFailureStatus(error: unknown): FeeKnowledgeResearchAttemptRecord["status"] {
+  if (error instanceof FeeKnowledgeSearchProviderError
+    && ["unsupported_model", "safety_blocked", "failed", "timed_out"].includes(error.status)) {
+    return error.status;
+  }
+  return providerFailureStatus(error);
+}
+
+function researchProviderFailureReason(status: FeeKnowledgeResearchAttemptRecord["status"]): string {
+  if (status === "unsupported_model") return "fee_knowledge_web_search_model_unsupported";
+  if (status === "safety_blocked") return "fee_knowledge_research_safety_blocked";
+  if (status === "timed_out") return "fee_knowledge_research_timed_out";
+  return "fee_knowledge_research_failed";
+}
+
+async function runWithinPreparedResearchDeadline<T>(
+  context: OneTimePrivateContext,
+  operation: (abortSignal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  if (context.researchTerminalStatus !== null) throw researchDeadlineError();
+  const now = performance.now();
+  if (context.researchDeadlineStartedAt === null) {
+    context.researchDeadlineStartedAt = now;
+    context.researchDeadlineAt = now + context.packet.research.limits.totalDeadlineMs;
+  }
+  const remainingMs = Math.max(0, (context.researchDeadlineAt ?? now) - now);
+  if (remainingMs <= 0) {
+    markResearchTerminal(context, "timed_out");
+    throw researchDeadlineError();
+  }
+  const controller = new AbortController();
+  let settled = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        markResearchTerminal(context, "timed_out");
+        controller.abort(researchDeadlineError());
+        reject(researchDeadlineError());
+      }, remainingMs);
+      timer.unref?.();
+      operation(controller.signal).then(
+        (value) => {
+          if (settled) return;
+          settled = true;
+          resolve(value);
+        },
+        (error) => {
+          if (settled) return;
+          settled = true;
+          reject(error);
+        },
+      );
+    });
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function researchDeadlineError(): Error & { code: string } {
+  const error = new Error("prepared_research_deadline_exceeded") as Error & { code: string };
+  error.name = "AbortError";
+  error.code = "provider_timeout";
+  return error;
+}
+
+function retrievalTerminalStatus(status: RetrievedDocument["status"]): OneTimeResearchTerminalStatus | null {
+  if (status === "retrieved_text") return null;
+  if (status === "timed_out") return "timed_out";
+  if (status === "safety_blocked") return "safety_blocked";
+  return "failed";
+}
+
+function semanticTerminalStatus(
+  status: FeeKnowledgeResearchCandidateRecord["semanticVerificationStatus"],
+): OneTimeResearchTerminalStatus | null {
+  if (status === "completed") return null;
+  if (status === "timed_out") return "timed_out";
+  if (status === "safety_blocked") return "safety_blocked";
+  return "failed";
+}
+
+function updateAttemptTerminal(
+  context: OneTimePrivateContext,
+  attemptId: string,
+  status: OneTimeResearchTerminalStatus,
+): void {
+  const index = context.attempts.findIndex((attempt) => attempt.attemptId === attemptId);
+  const attempt = context.attempts[index];
+  if (!attempt) return;
+  context.attempts[index] = {
+    ...attempt,
+    status,
+    reasonCodes: [researchTerminalReason(status)],
+  };
+}
+
+function markResearchTerminal(context: OneTimePrivateContext, status: OneTimeResearchTerminalStatus): void {
+  if (context.researchTerminalStatus === null) context.researchTerminalStatus = status;
+}
+
+function researchTerminalReason(status: OneTimeResearchTerminalStatus): string {
+  if (status === "timed_out") return "fee_knowledge_research_timed_out";
+  if (status === "safety_blocked") return "fee_knowledge_research_safety_blocked";
+  return "fee_knowledge_research_failed";
+}
+
+function providerFailureStatus(error: unknown): "failed" | "timed_out" {
+  const value = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  return value.name === "AbortError" || value.code === "provider_timeout" ? "timed_out" : "failed";
+}
+
+function safeCandidateText(value: string | null, maxLength: number): string | null {
+  if (!value) return null;
+  const safe = value.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim();
+  if (!safe || /(?:https?:\/\/|\/Users\/|\/private\/|api.?key|openai|anthropic|gpt|claude|merchant)/i.test(safe)) return null;
+  return safe.slice(0, maxLength);
+}
+
+function fallbackWholeStatementReview(executionStatus: "completed" | "failed" | "timed_out" | "safety_blocked"): unknown {
+  return {
+    type: "whole_statement_fee_intelligence_review",
+    reviewPolicyVersion: "whole_statement_fee_intelligence_review_v1",
+    reviewStatus: executionStatus === "timed_out" ? "timed_out"
+      : executionStatus === "safety_blocked" ? "safety_blocked" : "failed",
+    evidenceRefs: [],
+    factRefs: [],
+    limitationCodes: ["provider_unavailable"],
+    rowInterpretations: [],
+    reasonCodes: ["whole_statement_fee_intelligence_reviewed"],
+    authoritative: false,
+    financialMutationAllowed: false,
+    providerDetailsStripped: true,
+  };
 }
 
 function shortHash(parts: string[]): string {
