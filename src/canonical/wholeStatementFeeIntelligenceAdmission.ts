@@ -3,6 +3,7 @@ import {
   buildCanonicalAiAdmissionAudit,
   createValidatedDiagnosticReferenceSets,
   diagnosticSignalsFromValidationErrors,
+  extendTrustedCanonicalAiAdmissionAuditWithDeterministicFeeClassificationAttempt,
   passedDiagnosticSignals,
   validateCanonicalAiAdmissionAudit,
   type CanonicalAiAdmissionAudit,
@@ -14,8 +15,16 @@ import {
   calculateRuntimeClaimSupportDecisionRef,
 } from "./feeKnowledgeClaimSupportDecision.js";
 import type { ApprovedFeeKnowledgeSourceRegistry, FeeKnowledgeSourcePacket } from "./feeKnowledgeTypes.js";
-import type { RuntimeAiCapabilitySnapshot } from "./runtimeAiCapabilityAdapter.js";
-import type { CanonicalAiWholeStatementFeeIntelligenceOutput, CanonicalStatementAnalysis } from "./types.js";
+import {
+  deterministicReuseFeeClassificationCapabilityInput,
+  type RuntimeAiCapabilitySnapshot,
+} from "./runtimeAiCapabilityAdapter.js";
+import { deriveRuntimeFeeClassificationReviewFromAdmittedWholeStatement } from "./runtimeFeeClassificationReviewReuse.js";
+import type {
+  CanonicalAiWholeStatementFeeIntelligenceOutput,
+  CanonicalRuntimeFeeClassificationReview,
+  CanonicalStatementAnalysis,
+} from "./types.js";
 import { validateCanonicalStatementAnalysis } from "./validate.js";
 import type { CanonicalWholeStatementFeeIntelligenceValidationResult } from "./wholeStatementFeeIntelligenceReview.js";
 
@@ -51,6 +60,8 @@ export type CanonicalWholeStatementAdmissionResult = {
   admission: CanonicalWholeStatementFeeIntelligenceAdmission;
   analysis: CanonicalStatementAnalysis;
   aiAdmissionAudit: CanonicalAiAdmissionAudit;
+  runtimeFeeClassificationReview: CanonicalRuntimeFeeClassificationReview;
+  runtimeFeeClassificationReusePacketRef: string | null;
 };
 
 export function admitWholeStatementFeeIntelligence(input: {
@@ -136,16 +147,42 @@ export function admitWholeStatementFeeIntelligence(input: {
       : structuredClone(input.analysis);
   if (protectedFinancialHash(analysis) !== before) throw new Error("packages_b_e_changed_during_whole_statement_admission");
 
-  return {
+  const fallbackFeeClassificationReuse = deriveRuntimeFeeClassificationReviewFromAdmittedWholeStatement({
+    analysis,
+    source: {
+      executionStatus,
+      admissionDisposition: admitted ? "rejected" : safetyBlocked ? "safety_blocked" : "rejected",
+      wholeStatementOutput: null,
+    },
+  });
+  const feeClassificationComposition = composeFeeClassificationReuse({
     analysis,
     aiAdmissionAudit,
+    originalAnalysis: input.analysis,
+    output: input.validation.output,
+    executionStatus,
+    admissionDisposition: admitted ? "admitted" : safetyBlocked ? "safety_blocked" : "rejected",
+    beforeProtectedFinancialHash: before,
+    safetyBlocked,
+  });
+  const finalAnalysis = feeClassificationComposition?.analysis ?? analysis;
+  const finalAiAdmissionAudit = feeClassificationComposition?.aiAdmissionAudit ?? aiAdmissionAudit;
+  const feeClassificationReuse = feeClassificationComposition?.feeClassificationReuse ?? fallbackFeeClassificationReuse;
+  const finalDiagnostic = finalAiAdmissionAudit.attempts.find((attempt) => attempt.capability === "whole_statement_fee_intelligence_review")!;
+  if (!finalDiagnostic.executionRef) throw new Error("whole_statement_execution_reference_missing");
+
+  return {
+    analysis: finalAnalysis,
+    aiAdmissionAudit: finalAiAdmissionAudit,
+    runtimeFeeClassificationReview: feeClassificationReuse.review,
+    runtimeFeeClassificationReusePacketRef: feeClassificationReuse.packetRef,
     admission: {
       type: CANONICAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_ADMISSION_VERSION,
       executionStatus,
       validationStatus: input.validation.ok ? "passed" : "failed",
       groundingStatus: admitted ? "grounded" : incompleteResearch || incompleteCandidates ? "incomplete" : "rejected",
       admissionDisposition: admitted ? "admitted" : safetyBlocked ? "safety_blocked" : "rejected",
-      executionRef: diagnostic.executionRef,
+      executionRef: finalDiagnostic.executionRef,
       wholeStatementOutput: admitted ? input.validation.output : null,
       validationErrors,
       acceptedClaimSupportRefs,
@@ -166,11 +203,61 @@ export function admitWholeStatementFeeIntelligence(input: {
         ...input.sourcePacket.registryValidation.reasonCodes,
         ...(auditErrors.length ? ["whole_statement_package5a_audit_invalid"] : []),
       ])].sort(),
-      package5aDiagnosticRef: diagnostic.id,
+      package5aDiagnosticRef: finalDiagnostic.id,
       authoritative: false,
       financialMutationAllowed: false,
     },
   };
+}
+
+function composeFeeClassificationReuse(input: {
+  analysis: CanonicalStatementAnalysis;
+  aiAdmissionAudit: CanonicalAiAdmissionAudit;
+  originalAnalysis: CanonicalStatementAnalysis;
+  output: CanonicalAiWholeStatementFeeIntelligenceOutput;
+  executionStatus: "completed" | "failed" | "timed_out";
+  admissionDisposition: "admitted" | "rejected" | "safety_blocked";
+  beforeProtectedFinancialHash: string;
+  safetyBlocked: boolean;
+}): {
+  analysis: CanonicalStatementAnalysis;
+  aiAdmissionAudit: CanonicalAiAdmissionAudit;
+  feeClassificationReuse: ReturnType<typeof deriveRuntimeFeeClassificationReviewFromAdmittedWholeStatement>;
+} | null {
+  try {
+    const feeClassificationReuse = deriveRuntimeFeeClassificationReviewFromAdmittedWholeStatement({
+      analysis: input.analysis,
+      source: {
+        executionStatus: input.executionStatus,
+        admissionDisposition: input.admissionDisposition,
+        wholeStatementOutput: input.admissionDisposition === "admitted" ? input.output : null,
+      },
+    });
+    const feeClassificationCapability = deterministicReuseFeeClassificationCapabilityInput({
+      analysis: input.analysis,
+      review: feeClassificationReuse.review,
+      packetRef: feeClassificationReuse.packetRef,
+    });
+    const provisionalFinalAnalysis = rebuildWithExtraCapability(input.analysis, feeClassificationCapability.harnessInput);
+    const finalAiAdmissionAudit = extendTrustedCanonicalAiAdmissionAuditWithDeterministicFeeClassificationAttempt({
+      audit: input.aiAdmissionAudit,
+      capabilities: provisionalFinalAnalysis.aiCapabilities.capabilities,
+      attempt: feeClassificationCapability.snapshot,
+    });
+    if (!finalAiAdmissionAudit) return null;
+    const finalDiagnostic = finalAiAdmissionAudit.attempts.find((attempt) => attempt.capability === "whole_statement_fee_intelligence_review");
+    if (!finalDiagnostic?.executionRef) return null;
+    const finalBaseAnalysis = input.admissionDisposition === "admitted"
+      ? rebuildWholeStatementCapability(input.originalAnalysis, input.output, finalDiagnostic.executionRef, "completed")
+      : input.safetyBlocked
+        ? rebuildWholeStatementCapability(input.originalAnalysis, null, finalDiagnostic.executionRef, "safety_blocked")
+        : structuredClone(input.originalAnalysis);
+    const finalAnalysis = rebuildWithExtraCapability(finalBaseAnalysis, feeClassificationCapability.harnessInput);
+    if (protectedFinancialHash(finalAnalysis) !== input.beforeProtectedFinancialHash) return null;
+    return { analysis: finalAnalysis, aiAdmissionAudit: finalAiAdmissionAudit, feeClassificationReuse };
+  } catch {
+    return null;
+  }
 }
 
 export function validateResearchLinkage(packet: FeeKnowledgeSourcePacket): string[] {
@@ -289,6 +376,42 @@ function rebuildWholeStatementCapability(
   if (!harnessInputs.some((item) => item.capability === "whole_statement_fee_intelligence_review")) {
     harnessInputs.push({ capability: "whole_statement_fee_intelligence_review", status, output, executionRef, independentReviewRefs: [] });
   }
+  const aiCapabilities = buildCanonicalAiCapabilities({
+    identity: analysis.identity,
+    financialFacts: analysis.financialFacts,
+    feeLedger: analysis.feeLedger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    opportunityEngine: analysis.opportunityEngine,
+    evidence: analysis.evidence,
+    harnessInputs,
+    deterministicRuntimeSafetyReview: analysis.aiCapabilities.deterministicRuntimeSafetyReview,
+  });
+  return validateCanonicalStatementAnalysis({
+    ...structuredClone(analysis),
+    aiCapabilities,
+    customerState: buildCanonicalCustomerState({
+      identity: analysis.identity,
+      financialFacts: analysis.financialFacts,
+      feeLedger: analysis.feeLedger,
+      feeOwnershipActionability: analysis.feeOwnershipActionability,
+      opportunityEngine: analysis.opportunityEngine,
+      aiCapabilities,
+    }),
+  });
+}
+
+function rebuildWithExtraCapability(
+  analysis: CanonicalStatementAnalysis,
+  harnessInput: CanonicalAiCapabilityHarnessInput,
+): CanonicalStatementAnalysis {
+  const harnessInputs: CanonicalAiCapabilityHarnessInput[] = analysis.aiCapabilities.capabilities.map((record) => ({
+    capability: record.capability,
+    status: record.capability === harnessInput.capability ? harnessInput.status : record.status,
+    output: record.capability === harnessInput.capability ? harnessInput.output : record.output,
+    executionRef: record.capability === harnessInput.capability ? harnessInput.executionRef : record.executionRef,
+    independentReviewRefs: record.capability === harnessInput.capability ? harnessInput.independentReviewRefs : record.independentReviewRefs,
+  }));
+  if (!harnessInputs.some((item) => item.capability === harnessInput.capability)) harnessInputs.push(harnessInput);
   const aiCapabilities = buildCanonicalAiCapabilities({
     identity: analysis.identity,
     financialFacts: analysis.financialFacts,
