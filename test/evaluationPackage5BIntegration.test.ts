@@ -34,13 +34,18 @@ const eligibleStages: EvaluationExecutionStage[] = [
 describe("Package 5B manifest-driven admission", () => {
   it("admits a fully validated statement-only review into Package F and persists a verifiable V2 artifact", async () => {
     const fixture = await approvedOneTimePdfFixture();
+    const expectedCalls = fullOneTimeCalls();
+    let wholeStatementInvocations = 0;
     const result = await runManifestDrivenLiveEvaluation({
       ...fixture.runnerInput,
-      calls: fullOneTimeCalls(),
+      calls: expectedCalls,
       outputArtifactPath: path.join(fixture.directory, "package-5b-statement-only.json"),
       oneTimeResearchQuestionsForTesting: () => [],
       oneTimeServicesForTesting: {
-        wholeStatementReview: async (packet) => external(validReview(packet), "request_whole_statement"),
+        wholeStatementReview: async (packet) => {
+          wholeStatementInvocations += 1;
+          return external(validReview(packet), "request_whole_statement");
+        },
       },
     });
 
@@ -54,6 +59,17 @@ describe("Package 5B manifest-driven admission", () => {
     expect(admission.package5a.executionRef).toBe(admission.executionRef);
     expect(admission.lifecycleAdmissionRef).toBe(admission.executionRef);
     expect(admission.researchEvidence.attempts).toEqual([]);
+    expect(wholeStatementInvocations).toBe(1);
+    expect(artifact.providerCallOutcomes.filter((outcome) => outcome.stage === "whole_statement_ai_review" && outcome.status === "success"))
+      .toHaveLength(1);
+    expect(artifact.providerCallOutcomes.some((outcome) => /fee_classification|package_5c/i.test(outcome.stage))).toBe(false);
+    expect(artifact.providerCallOutcomes.map((outcome) => outcome.callId).sort())
+      .toEqual(expectedCalls.map((call) => call.reservation.callId).sort());
+    expect(result.costLedger.entries.map((entry) => entry.callId).sort())
+      .toEqual(expectedCalls.map((call) => call.reservation.callId).sort());
+    expect(result.costLedger.entries.filter((entry) => entry.requestId !== null).map((entry) => entry.requestId)).toEqual(["request_whole_statement"]);
+    expect(result.costLedger.entries.filter((entry) => /fee_classification|package_5c/i.test(entry.callId))).toEqual([]);
+    expect(result.costLedger.entries.filter((entry) => entry.requestId !== null)).toHaveLength(1);
     expect(result.packageFinancialInvariance[0]!.result.packages.every((item) => item.beforeHash === item.afterHash)).toBe(true);
     expect(JSON.parse(await readFile(result.artifactPath, "utf8"))).toEqual(result.artifact);
   }, 30_000);

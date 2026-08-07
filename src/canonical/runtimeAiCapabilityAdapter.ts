@@ -41,6 +41,7 @@ export type RuntimeAiCapabilityReasonCode =
   | "runtime_fee_classification_review_timed_out"
   | "runtime_fee_classification_review_safety_blocked"
   | "runtime_fee_classification_review_rejected"
+  | "runtime_fee_classification_review_reused_whole_statement"
   | "whole_statement_fee_intelligence_completed"
   | "whole_statement_fee_intelligence_disabled"
   | "whole_statement_fee_intelligence_failed"
@@ -113,6 +114,42 @@ export function buildRuntimeAiCapabilityHarnessInputs(input: {
     harnessInputs: candidates.map((candidate) => candidate.harnessInput),
     snapshots: candidates.map((candidate) => candidate.snapshot),
   };
+}
+
+export function deterministicReuseFeeClassificationCapabilityInput(input: {
+  review: CanonicalRuntimeFeeClassificationReview;
+  analysis: CanonicalStatementAnalysis;
+  packetRef: string | null;
+}): { harnessInput: CanonicalAiCapabilityHarnessInput; snapshot: RuntimeAiCapabilitySnapshot } {
+  const capability = "fee_classification_review" as const;
+  const result = validateCanonicalRuntimeFeeClassificationReview(input.review, input.analysis);
+  const review = result.review;
+  const safeCounts = {
+    materialFeeRowCount: result.packet.materialFeeRowRefs.length,
+    reviewedFeeRowCount: review.reviewedFeeRowRefs.length,
+    suggestionCount: review.suggestions.length,
+  };
+  const packetRefs = input.packetRef ? [input.packetRef] : [];
+  return capabilityResult({
+    capability,
+    status: packageFStatusForFeeClassificationReview(review.status),
+    attempted: false,
+    safeCounts,
+    reasonCodes: reasonCodesForFeeClassificationReview(review.status, result.ok, input.packetRef ? "deterministic_reuse" : "runtime"),
+    diagnosticSignals: diagnosticSignalsForFeeClassificationReview(review.status, result.ok, result.ok ? [] : result.errors),
+    diagnosticReferences: {
+      feeRowRefs: review.reviewedFeeRowRefs,
+      evidenceRefs: review.suggestions.flatMap((suggestion) => suggestion.evidenceRefs),
+      packetRefs,
+    },
+    trustedDiagnosticReferenceSets: createValidatedDiagnosticReferenceSets({
+      feeRowRefs: result.packet.materialFeeRowRefs,
+      evidenceRefs: Object.values(result.packet.evidenceRefsByFeeRowRef).flat(),
+      packetRefs,
+    }),
+    runtimeReviewStatus: review.status,
+    runtimeFeeClassificationReview: review,
+  });
 }
 
 function feeClassificationCapabilityInput(
@@ -410,9 +447,13 @@ function diagnosticSignalsForFeeClassificationReview(
 function reasonCodesForFeeClassificationReview(
   status: CanonicalRuntimeFeeClassificationReviewStatus,
   valid: boolean,
+  source: "runtime" | "deterministic_reuse" = "runtime",
 ): RuntimeAiCapabilityReasonCode[] {
   if (!valid && status === "safety_blocked") return ["runtime_fee_classification_review_safety_blocked"];
   if (!valid) return ["runtime_fee_classification_review_rejected"];
+  if (source === "deterministic_reuse" && status === "completed_with_diagnostic_suggestions") {
+    return ["runtime_fee_classification_review_reused_whole_statement"];
+  }
   if (status === "not_needed") return ["runtime_fee_classification_review_not_needed"];
   if (status === "disabled") return ["runtime_fee_classification_review_disabled"];
   if (status === "failed") return ["runtime_fee_classification_review_failed"];

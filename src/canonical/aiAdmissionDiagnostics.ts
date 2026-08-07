@@ -77,6 +77,7 @@ export const CANONICAL_AI_ADMISSION_REASON_CODES = [
   "runtime_fee_classification_review_timed_out",
   "runtime_fee_classification_review_safety_blocked",
   "runtime_fee_classification_review_rejected",
+  "runtime_fee_classification_review_reused_whole_statement",
   "whole_statement_fee_intelligence_completed",
   "whole_statement_fee_intelligence_disabled",
   "whole_statement_fee_intelligence_failed",
@@ -390,6 +391,7 @@ const TRUSTED_FACT_REFS = new Set([
   "customerState.actionGuidance",
 ]);
 const TRUSTED_AUDIT_REFERENCE_PROVENANCE = new WeakMap<object, Map<string, CanonicalAiAdmissionOpaqueReferences>>();
+const TRUSTED_AUDIT_ORIGINAL_SNAPSHOT = new WeakMap<object, CanonicalAiAdmissionAudit>();
 const TRUSTED_DIAGNOSTIC_REFERENCE_SET_PROVENANCE = new WeakSet<object>();
 
 export function createValidatedDiagnosticReferenceSets(
@@ -430,11 +432,65 @@ export function buildCanonicalAiAdmissionAudit(input: {
     rawStatementTextPersisted: false,
     providerDetailsPersisted: false,
   };
-  TRUSTED_AUDIT_REFERENCE_PROVENANCE.set(
-    audit,
-    new Map(attempts.map((attempt) => [attempt.id, structuredClone(attempt.references)])),
-  );
+  markTrustedAdmissionAudit(audit, new Map(attempts.map((attempt) => [attempt.id, structuredClone(attempt.references)])));
   return audit;
+}
+
+export function extendTrustedCanonicalAiAdmissionAuditWithDeterministicFeeClassificationAttempt(input: {
+  audit: CanonicalAiAdmissionAudit;
+  capabilities: readonly CanonicalAiCapabilityRecord[];
+  attempt: CanonicalAiAdmissionAttemptSource;
+}): CanonicalAiAdmissionAudit | null {
+  const existingReferenceProvenance = TRUSTED_AUDIT_REFERENCE_PROVENANCE.get(input.audit);
+  if (!existingReferenceProvenance || input.attempt.capability !== "fee_classification_review") return null;
+  if (!matchesTrustedOriginalSnapshot(input.audit)) return null;
+  const existingFeeAttempts = input.audit.attempts.filter((attempt) => attempt.capability === "fee_classification_review");
+  if (existingFeeAttempts.length !== 1) return null;
+  const capability = input.capabilities.find((record) => record.capability === "fee_classification_review");
+  const feeAttempt = attemptRecord(input.attempt, capability, 1, false);
+  const attempts = input.audit.attempts.map((attempt) =>
+    attempt.capability === "fee_classification_review" ? feeAttempt : structuredClone(attempt),
+  );
+  const audit: CanonicalAiAdmissionAudit = {
+    type: "canonical_ai_admission_audit",
+    policyVersion: CANONICAL_AI_ADMISSION_AUDIT_POLICY_VERSION,
+    attempts,
+    rawPromptPersisted: false,
+    rawResponsePersisted: false,
+    rawStatementTextPersisted: false,
+    providerDetailsPersisted: false,
+  };
+  markTrustedAdmissionAudit(
+    audit,
+    new Map(attempts.map((attempt) => [
+      attempt.id,
+      structuredClone(
+        attempt.id === feeAttempt.id ? feeAttempt.references : existingReferenceProvenance.get(attempt.id) ?? attempt.references,
+      ),
+    ])),
+  );
+  return validateCanonicalAiAdmissionAudit(audit).length === 0 ? audit : null;
+}
+
+function markTrustedAdmissionAudit(
+  audit: CanonicalAiAdmissionAudit,
+  referenceProvenance: Map<string, CanonicalAiAdmissionOpaqueReferences>,
+): void {
+  TRUSTED_AUDIT_REFERENCE_PROVENANCE.set(audit, referenceProvenance);
+  TRUSTED_AUDIT_ORIGINAL_SNAPSHOT.set(audit, structuredClone(audit));
+}
+
+function matchesTrustedOriginalSnapshot(audit: CanonicalAiAdmissionAudit): boolean {
+  const original = TRUSTED_AUDIT_ORIGINAL_SNAPSHOT.get(audit);
+  return Boolean(original) && stableJson(original) === stableJson(audit);
+}
+
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) =>
+    `${JSON.stringify(key)}:${stableJson((value as Record<string, unknown>)[key])}`
+  ).join(",")}}`;
 }
 
 export function diagnosticSignalsFromValidationErrors(errors: readonly string[]): CanonicalAiAdmissionDiagnosticSignal[] {
