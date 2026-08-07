@@ -205,6 +205,36 @@ const FORBIDDEN_FINANCIAL_VALUE_PATTERN =
 const STANDALONE_NUMERIC_VALUE_PATTERN = /\b\d+(?:,\d{3})*(?:\.\d+)?\b/;
 
 const EXPLANATORY_VALUE_PATH_PATTERN = /(?:\.conciseRationale|\.conflicts\[\d+\]|\.missingEvidence\[\d+\])$/;
+const WITHHELD_FEE_LABEL = "[fee_label_withheld]" as const;
+
+const UNSAFE_OUTBOUND_FEE_LABEL_PATTERNS = [
+  /(?:\/Users\/|\/private\/|[A-Za-z]:\\)/i,
+  /\b\S+\.(?:pdf|csv|xlsx?|docx?|txt)\b/i,
+  /\b(?:merchant|account)\s+(?:id|number|no\.?|#)\s*[:#-]?\s*[A-Za-z0-9][A-Za-z0-9_-]{3,}\b/i,
+  /\b(?:api(?:\s|-)?key|credential|secret|password|bearer\s+[A-Za-z0-9._-]{8,}|sk-[A-Za-z0-9_-]{8,})\b/i,
+  /\b(?:openai|anthropic|openrouter|claude|gpt[-\w]*)\b/i,
+  /\braw(?:\s|-)?(?:prompt|response|error)\b/i,
+  /\b(?:prompt|response|error)\s*[:=]/i,
+] as const;
+
+const OUTBOUND_FEE_LABEL_FINANCIAL_VALUE_PATTERNS = [
+  /\b(?:USD|US\$|EUR|GBP|CAD)\s*\d+(?:,\d{3})*(?:\.\d+)?\b/gi,
+  /\b\d+(?:,\d{3})*(?:\.\d+)?\s*(?:USD|EUR|GBP|CAD|dollars?|cents?)\b/gi,
+  /[$€£¥]\s*\d+(?:,\d{3})*(?:\.\d+)?\b/gi,
+  /\b\d+(?:,\d{3})*(?:\.\d+)?(?:\s*%|\s*(?:percent(?:age)?|basis\s*points?|bps)\b)/gi,
+  /\b(?:rate|amount|fee\s*amount|total|unit\s*price|unit-price)\s*[:=-]?\s*(?:[$€£¥]?\s*)?(?:\d+(?:,\d{3})*(?:\.\d+)?|\.\d+)\b/gi,
+  /\b(?:at|x)\s+(?:\d+(?:,\d{3})*\.\d+|\.\d{2,})\b/gi,
+  /\b\d+(?:,\d{3})*\s+(?:trans(?:actions?)?|txns?|items?)\b/gi,
+  /\b(?:trans(?:actions?)?|txns?|items?)\s+(?:at\s+)?(?:\d+(?:,\d{3})*(?:\.\d+)?|\.\d+)\b/gi,
+] as const;
+
+const GENERIC_VALUE_ONLY_LABEL_PATTERN = /^(?:rate|amount|fee amount|total|unit price|unit-price)$/i;
+const GENERIC_LONG_IDENTIFIER_PATTERN = /\d{8,}/g;
+const RESIDUAL_NUMERIC_VALUE_PATTERN = /(?:\b\d+(?:,\d{3})*(?:\.\d+)?\b|\B\.\d+\b)/;
+const SAFE_OUTBOUND_FEE_LABEL_DESCRIPTOR_PATTERNS = [
+  /\bPCI\s+DSS\s+\d+(?:\.\d+)?\b/gi,
+  /\bLevel\s+\d+\b/gi,
+] as const;
 
 export function buildWholeStatementFeeIntelligencePacket(
   analysis: Pick<CanonicalStatementAnalysis, "identity" | "feeLedger" | "feeOwnershipActionability" | "evidence">,
@@ -235,7 +265,7 @@ export function buildWholeStatementFeeIntelligencePacket(
       return {
         feeRowRef: row.id,
         role: row.role,
-        selectedLabel: sanitizeText(row.selectedLabel, 140),
+        selectedLabel: sanitizeOutboundFeeLabel(row.selectedLabel, 140),
         contributesToUniqueTotal: row.contributesToUniqueTotal,
         contributionReasonCode: row.contributionDecision.reasonCode,
         selectedAmountPresent: row.selectedAmount !== null,
@@ -848,6 +878,52 @@ function sanitizeText(input: string, maxLength: number): string {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, maxLength);
+}
+
+function sanitizeOutboundFeeLabel(input: unknown, maxLength: number): string {
+  if (typeof input !== "string") return WITHHELD_FEE_LABEL;
+  const normalized = input.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+  if (!normalized || UNSAFE_OUTBOUND_FEE_LABEL_PATTERNS.some((pattern) => pattern.test(normalized))) return WITHHELD_FEE_LABEL;
+
+  let redacted = normalized.replace(GENERIC_LONG_IDENTIFIER_PATTERN, " [redacted-id] ");
+  for (const pattern of OUTBOUND_FEE_LABEL_FINANCIAL_VALUE_PATTERNS) {
+    pattern.lastIndex = 0;
+    redacted = redacted.replace(pattern, " [redacted] ");
+  }
+
+  const cleaned = redacted
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,;:])/g, "$1")
+    .replace(/(?:\s*[,;]\s*){2,}/g, " ")
+    .replace(/(?:^|[-:,;|])\s*\[redacted\]\s*$/i, "")
+    .replace(/\s+-\s*$/g, "")
+    .trim();
+
+  if (!usefulSanitizedFeeLabel(cleaned)) return WITHHELD_FEE_LABEL;
+  if (UNSAFE_OUTBOUND_FEE_LABEL_PATTERNS.some((pattern) => pattern.test(cleaned))) return WITHHELD_FEE_LABEL;
+  if (OUTBOUND_FEE_LABEL_FINANCIAL_VALUE_PATTERNS.some((pattern) => {
+    pattern.lastIndex = 0;
+    return pattern.test(cleaned);
+  })) {
+    return WITHHELD_FEE_LABEL;
+  }
+  if (hasUnsafeResidualNumericFeeLabelValue(cleaned)) return WITHHELD_FEE_LABEL;
+  return cleaned.slice(0, maxLength);
+}
+
+function usefulSanitizedFeeLabel(input: string): boolean {
+  const terminology = input.replace(/\[redacted\]/gi, " ").replace(/\s+/g, " ").trim();
+  if (!/[A-Za-z]{2,}/.test(terminology)) return false;
+  return !GENERIC_VALUE_ONLY_LABEL_PATTERN.test(terminology);
+}
+
+function hasUnsafeResidualNumericFeeLabelValue(input: string): boolean {
+  let probe = input.replace(/\[redacted(?:-id)?\]/gi, " ");
+  for (const pattern of SAFE_OUTBOUND_FEE_LABEL_DESCRIPTOR_PATTERNS) {
+    pattern.lastIndex = 0;
+    probe = probe.replace(pattern, " safe-descriptor ");
+  }
+  return RESIDUAL_NUMERIC_VALUE_PATTERN.test(probe);
 }
 
 function sanitizeCoverageRef(input: string): string {

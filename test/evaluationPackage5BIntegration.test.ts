@@ -7,7 +7,7 @@ import { retrieveFeeKnowledgeDocument } from "../src/canonical/feeKnowledgeRetri
 import { buildCanonicalClaimSupportDecision } from "../src/canonical/feeKnowledgeClaimSupportDecision.js";
 import { FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION } from "../src/canonical/feeKnowledgeTypes.js";
 import type { ApprovedFeeKnowledgeSourceRegistry } from "../src/canonical/feeKnowledgeTypes.js";
-import type { FeeKnowledgeResearchQuestion } from "../src/canonical/feeKnowledgeResearch.js";
+import { type FeeKnowledgeResearchQuestion } from "../src/canonical/feeKnowledgeResearch.js";
 import type { CanonicalStatementAnalysis } from "../src/canonical/types.js";
 import { parsePdfBytes } from "../src/parser.js";
 import { analyzeStatementDocument } from "../src/statementParserOrchestrator.js";
@@ -73,6 +73,85 @@ describe("Package 5B manifest-driven admission", () => {
     expect(result.packageFinancialInvariance[0]!.result.packages.every((item) => item.beforeHash === item.afterHash)).toBe(true);
     expect(JSON.parse(await readFile(result.artifactPath, "utf8"))).toEqual(result.artifact);
   }, 30_000);
+
+  it("redacts amount-bearing Clover fee labels before one-time Package 5B outbound services", async () => {
+    const fixture = await approvedShortCloverPdfFixture();
+    const document = await parsePdfBytes(fixture.bytes);
+    const summary = analyzeStatementDocument(document, "restaurant_food_beverage");
+    expect(summary.parserSource?.driverId).toBe("fiserv_first_data_short_statement");
+    const baselineAnalysis = buildCanonicalRuntimeAnalysis({
+      document,
+      businessType: "restaurant_food_beverage",
+      runtimeDocumentRef: "doc_one_time_clover_short",
+      legacySummary: summary,
+    }).analysis;
+    const baselineFeeLedger = structuredClone(baselineAnalysis.feeLedger);
+    let wholeStatementInvocations = 0;
+    let preparedPacket: any = null;
+    let packetObservedByWholeStatementService: any = null;
+    const searchedQuestions: FeeKnowledgeResearchQuestion[] = [];
+
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: fullOneTimeCalls("doc_one_time_clover_short"),
+      outputArtifactPath: path.join(fixture.directory, "package-5b-clover-outbound-privacy.json"),
+      afterPacketPreparedForTesting: (_sourceDocumentId, packet) => { preparedPacket = structuredClone(packet); },
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async ({ questions }) => {
+          searchedQuestions.push(...questions);
+          return external([], `request_search_privacy_${searchedQuestions.length}`);
+        },
+        wholeStatementReview: async (packet) => {
+          wholeStatementInvocations += 1;
+          packetObservedByWholeStatementService = structuredClone(packet);
+          return external(validReview(packet), "request_whole_privacy");
+        },
+      },
+    });
+
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    expect(preparedPacket).not.toBeNull();
+    expect(packetObservedByWholeStatementService).not.toBeNull();
+    expect(wholeStatementInvocations).toBe(1);
+    expect(result.providerCallOutcomes.some((outcome) => /fee_classification|package_5c/i.test(outcome.stage))).toBe(false);
+    expect(result.packageFinancialInvariance).toHaveLength(1);
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+    expect(result.packageFinancialInvariance[0]!.result.packages.every((item) => item.beforeHash === item.afterHash)).toBe(true);
+
+    const sentLabels = packetObservedByWholeStatementService.admittedFeeRows.map((row: any) => row.selectedLabel);
+    expect(packetObservedByWholeStatementService.admittedFeeRows).toHaveLength(baselineFeeLedger.rows.length);
+    expect(baselineFeeLedger).toEqual(baselineAnalysis.feeLedger);
+    expect(sentLabels.some((label: string) => /NON SWIPED DISCOUNT/i.test(label))).toBe(true);
+    expect(sentLabels.some((label: string) => label.includes("[redacted]"))).toBe(true);
+    expect(outboundFeeLabelPrivacyMatches(sentLabels)).toEqual({
+      currencyOrRate: 0,
+      residualFinancialNumeric: 0,
+      genericLongIdentifier: 0,
+      merchantOrAccountIdentifier: 0,
+      pathOrFilename: 0,
+      credential: 0,
+      providerOrRawContent: 0,
+    });
+    expect(outboundFeeLabelPrivacyMatches(preparedPacket.wholeStatementReview.admittedFeeRows.map((row: any) => row.selectedLabel))).toEqual({
+      currencyOrRate: 0,
+      residualFinancialNumeric: 0,
+      genericLongIdentifier: 0,
+      merchantOrAccountIdentifier: 0,
+      pathOrFilename: 0,
+      credential: 0,
+      providerOrRawContent: 0,
+    });
+    expect(searchedQuestions.length).toBeGreaterThan(0);
+    expect(outboundFeeLabelPrivacyMatches(searchedQuestions.map((question) => question.feeLabel))).toEqual({
+      currencyOrRate: 0,
+      residualFinancialNumeric: 0,
+      genericLongIdentifier: 0,
+      merchantOrAccountIdentifier: 0,
+      pathOrFilename: 0,
+      credential: 0,
+      providerOrRawContent: 0,
+    });
+  }, 60_000);
 
   it("rejects an out-of-order or duplicate whole-statement call plan before any service invocation", async () => {
     for (const mode of ["out_of_order", "duplicate_whole"] as const) {
@@ -1088,6 +1167,30 @@ function external<T>(value: T, requestId: string) {
   return { type: "one_time_external_request_result_v1" as const, value, accounting: { requestId, durationMs: 1, inputTokens: 1, outputTokens: 1, toolEvents: [], observedOrEstimatedFinalCostUsd: 0.01, billingDisposition: "observed" as const } };
 }
 
+function outboundFeeLabelPrivacyMatches(labels: string[]) {
+  const residualProbe = (value: string) =>
+    value
+      .replace(/\[redacted(?:-id)?\]/gi, " ")
+      .replace(/\d{8,}/g, "long identifier")
+      .replace(/\bPCI\s+DSS\s+\d+(?:\.\d+)?\b/gi, "safe descriptor")
+      .replace(/\bLevel\s+\d+\b/gi, "safe descriptor");
+  return {
+    currencyOrRate: labels.filter((value) =>
+      /(?:[$€£¥]\s*\d|\bUSD\s+\d|\d+(?:\.\d+)?(?:\s*%|\s*(?:percent(?:age)?|bps|basis\s*points?)\b)|\b(?:rate|amount|total|unit\s*price)\s*[:=]?\s*(?:\d|\.\d)|\bAT\s+\.?\d{2,}\b|\b\d+\s+TRANS\b)/i.test(value)
+    ).length,
+    residualFinancialNumeric: labels.filter((value) =>
+      /(?:\b\d+(?:,\d{3})*(?:\.\d+)?\b|\B\.\d+\b)/.test(residualProbe(value))
+    ).length,
+    genericLongIdentifier: labels.filter((value) => /\d{8,}/.test(value)).length,
+    merchantOrAccountIdentifier: labels.filter((value) =>
+      /\b(?:merchant|account)\s*(?:id|number|no\.?|#)\s*[:#-]?\s*[A-Za-z0-9][A-Za-z0-9_-]{3,}\b/i.test(value)
+    ).length,
+    pathOrFilename: labels.filter((value) => /(?:\/Users\/|\/private\/|[A-Za-z]:\\|\b\S+\.(?:pdf|csv|xlsx?|docx?|txt)\b)/i.test(value)).length,
+    credential: labels.filter((value) => /(?:api(?:\s|-)?key|credential|secret|password|bearer\s+[A-Za-z0-9._-]{8,}|sk-[A-Za-z0-9_-]{8,})/i.test(value)).length,
+    providerOrRawContent: labels.filter((value) => /\b(?:openai|anthropic|openrouter|claude|gpt[-\w]*|raw\s*(?:prompt|response|error)|prompt\s*[:=]|response\s*[:=]|error\s*[:=])/i.test(value)).length,
+  };
+}
+
 function semanticSupport(structuredClaim: any) {
   return {
     type: "fee_knowledge_semantic_support_decision" as const,
@@ -1186,6 +1289,50 @@ async function approvedOneTimePdfFixture() {
       manifestPath,
       approvedManifestHash: manifest.manifestContentHash,
       requestedExecutions: requests,
+      approvedBudgetUsd: 10,
+      adapterId: "one_time_statement_evaluation_v1" as const,
+      businessType: "restaurant_food_beverage" as const,
+      resolveSourceBytes: async () => bytes,
+    },
+  };
+}
+
+async function approvedShortCloverPdfFixture() {
+  const bytes = await readFile(path.resolve(process.cwd(), "test/fixtures/pdfs/SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf"));
+  const sourceDocumentId = "doc_one_time_clover_short";
+  const preflight = createDeterministicPreflightArtifact({
+    artifactId: "preflight_package_5b_clover_privacy_v1",
+    documents: [{
+      sourceDocumentId,
+      internalSourceRef: "source_one_time_clover_short",
+      sha256: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+      byteCount: bytes.byteLength,
+      displayFileName: "approved-clover-short.pdf",
+      parsedProcessor: "fiserv_family",
+      parsedStatementPeriod: { start: "2024-06-01", end: "2024-06-30" },
+      parserEligibility: "eligible",
+      processorLayoutFamily: "fiserv_family",
+      productScopeEligibility: "eligible",
+      productScopeReasonCode: "fiserv_family_supported",
+      paidStageEligibility: "eligible",
+      paidStageExclusionReason: null,
+      selectedDriver: "fiserv_first_data_short_statement",
+      allowedExecutionStages: eligibleStages,
+      parserRecordId: "parser_package_5b_clover_privacy",
+      parserDecision: preserveParserDecision({ decision: { status: "accepted", reportable: true, confidence: "high", reason: "Approved deterministic parser fixture." }, controls: [] }),
+    }],
+  });
+  const manifest = buildEvaluationSourceManifest(preflight);
+  const directory = await mkdtemp(path.join(tmpdir(), "package-5b-clover-privacy-"));
+  const manifestPath = path.join(directory, "manifest.json");
+  await writeFile(manifestPath, `${JSON.stringify(manifest)}\n`);
+  return {
+    bytes,
+    directory,
+    runnerInput: {
+      manifestPath,
+      approvedManifestHash: manifest.manifestContentHash,
+      requestedExecutions: [{ sourceDocumentId, stages: eligibleStages }],
       approvedBudgetUsd: 10,
       adapterId: "one_time_statement_evaluation_v1" as const,
       businessType: "restaurant_food_beverage" as const,
