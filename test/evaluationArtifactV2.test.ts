@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../src/canonical/buildCanonicalFacts.js";
 import { buildFeeKnowledgeSourcePacket } from "../src/canonical/feeKnowledgeRegistry.js";
+import { calculateRuntimeClaimSupportDecisionRef } from "../src/canonical/feeKnowledgeClaimSupportDecision.js";
 import {
   FEE_KNOWLEDGE_RESEARCH_LIMITS,
   verifyCandidate,
@@ -1862,6 +1863,10 @@ async function realRuntimeCanonicalArtifact(options: {
     };
   }
   if (options.finalSupportConfidence) support.confidence = options.finalSupportConfidence;
+  verification.candidate.claimSupportDecisionRef = calculateRuntimeClaimSupportDecisionRef({
+    support,
+    candidate: verification.candidate,
+  });
   const rejectedAttemptRef = "research_attempt_real_rejected";
   const rejectedVerification = options.includeRejectedSupport
     ? await verifyCandidate({

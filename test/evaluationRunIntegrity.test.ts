@@ -24,8 +24,10 @@ import {
   excludedFinancialProjectionKeys,
   runManifestDrivenLiveEvaluation,
   recordAiLifecycleState,
+  ONE_TIME_RESEARCH_REQUEST_SLOTS,
   sha256Canonical,
   verifyEvaluationRunIntegrityArtifact,
+  verifyEvaluationRunIntegrityArtifactV2,
   type DeterministicPreflightDocument,
   type EvaluationExecutionStage,
   type ObservedEvaluationSource,
@@ -866,37 +868,37 @@ describe("evaluation-run integrity", () => {
 
     expect(adapterConstructions).toBe(1);
     expect(invocations.whole).toBe(1);
-    expect(invocations.search).toBe(1);
-    expect(searchedQuestionCount).toBeGreaterThan(1);
-    expect(invocations.retrieval).toBe(1);
-    expect(invocations.semantic).toBe(1);
-    expect(wholePacket).toEqual(preparedPacket.wholeStatementReview);
-    expect(result.finalStatus).toBe("completed");
+    expect(invocations.search).toBe(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
+    expect(searchedQuestionCount).toBe(1);
+    expect(invocations.retrieval).toBe(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
+    expect(invocations.semantic).toBeGreaterThan(0);
+    expect(invocations.semantic).toBeLessThanOrEqual(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
+    expect(wholePacket.admittedFeeRows).toEqual(preparedPacket.wholeStatementReview.admittedFeeRows);
+    expect(wholePacket.sourceProvenancePacket.researchAttempts.length).toBeGreaterThan(0);
+    expect(result.finalStatus).toBe("blocked");
     expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
     expect(result.packageFinancialInvariance[0]!.result.packages.every((item) => item.beforeHash === item.afterHash)).toBe(true);
-    expect(result.providerCallOutcomes.map((item) => item.stage)).toEqual([
-      "whole_statement_ai_review", "web_search_discovery", "document_retrieval", "semantic_verification",
-    ]);
-    expect(result.costLedger.entries.map((item) => item.requestId)).toEqual([
-      "request_whole", "request_search", "request_retrieval", "request_semantic",
-    ]);
-    expect(approvedCallMetadata).toEqual(oneTimePaidCalls().map((call) => expect.objectContaining({
-      callId: call.reservation.callId,
-      provider: call.reservation.provider,
-      model: call.reservation.model,
-      toolClass: call.reservation.toolClass,
-    })));
-    expect(result.costLedger.entries.every((item) => item.status === "success" && item.billingDisposition === "observed" && item.observedOrEstimatedFinalCostUsd === 0.1)).toBe(true);
-    expect(result.costLedger.entries.map((item) => item.toolEvents)).toEqual([
-      [{ type: "whole_statement_ai_review", count: 1 }],
-      [{ type: "web_search", count: 1 }],
-      [{ type: "document_retrieval", count: 1 }],
-      [{ type: "semantic_verification", count: 1 }],
-    ]);
+    expect(result.providerCallOutcomes.map((item) => item.stage)).toEqual(oneTimePaidCalls().map((call) => call.stage));
+    expect(result.costLedger.entries.filter((item) => item.requestId === "request_search")).toHaveLength(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
+    expect(result.costLedger.entries.filter((item) => item.requestId === "request_retrieval")).toHaveLength(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
+    expect(result.costLedger.entries.filter((item) => item.requestId === "request_semantic")).toHaveLength(invocations.semantic);
+    expect(result.costLedger.entries.at(-1)?.requestId).toBe("request_whole");
+    expect(approvedCallMetadata.map((metadata) => metadata.callId)).toEqual(
+      result.costLedger.entries.filter((entry) => entry.requestId !== null).map((entry) => entry.callId),
+    );
+    const reservationByCall = new Map(oneTimePaidCalls().map((call) => [call.reservation.callId, call.reservation]));
+    expect(approvedCallMetadata.every((metadata) => {
+      const reservation = reservationByCall.get(metadata.callId);
+      return reservation?.provider === metadata.provider
+        && reservation.model === metadata.model
+        && reservation.toolClass === metadata.toolClass;
+    })).toBe(true);
+    expect(result.costLedger.entries.every((item) => item.status === "success")).toBe(true);
+    expect(result.costLedger.entries.filter((item) => item.requestId !== null).every((item) => item.billingDisposition === "observed" && item.observedOrEstimatedFinalCostUsd === 0.1)).toBe(true);
     const lifecycle = result.lifecycleLedger.documents[0]!;
-    expect(lifecycle.aiStates.canonical_admitted.state).toBe("not_reached");
+    expect(lifecycle.aiStates.canonical_admitted.state).toBe("withheld");
     expect(lifecycle.aiStates.customer_published.state).toBe("not_reached");
-    expect(verifyEvaluationRunIntegrityArtifact(result.artifact)).toBe(true);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
     const serviceExposed = JSON.stringify({ preparedPacket, wholePacket });
     const audited = JSON.stringify(result.artifact);
     expect(serviceExposed).not.toContain(fixture.sourcePath);
@@ -938,14 +940,12 @@ describe("evaluation-run integrity", () => {
       },
     });
 
-    expect(invocations).toEqual({ whole: 1, search: 1, retrieval: 0, semantic: 0 });
-    expect(result.costLedger.entries.slice(0, 2).map((item) => item.requestId)).toEqual(["request_whole_empty", "request_search_empty"]);
-    expect(result.costLedger.entries.slice(2)).toEqual([
-      expect.objectContaining({ status: "success", requestId: null, observedOrEstimatedFinalCostUsd: 0, billingDisposition: "provider_confirmed_zero" }),
-      expect.objectContaining({ status: "success", requestId: null, observedOrEstimatedFinalCostUsd: 0, billingDisposition: "provider_confirmed_zero" }),
-    ]);
-    expect(result.costLedger).toMatchObject({ cumulativeObservedUsd: 0.2, cumulativeBudgetCommittedUsd: 0.2, cumulativeReleasedUsd: 1.8 });
-    expect(verifyEvaluationRunIntegrityArtifact(result.artifact)).toBe(true);
+    expect(invocations).toEqual({ whole: 1, search: ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch, retrieval: 0, semantic: 0 });
+    expect(result.costLedger.entries.filter((item) => item.requestId === "request_search_empty")).toHaveLength(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
+    expect(result.costLedger.entries.at(-1)?.requestId).toBe("request_whole_empty");
+    expect(result.costLedger.entries.filter((item) => item.requestId === null).every((item) => item.status === "success" && item.observedOrEstimatedFinalCostUsd === 0 && item.billingDisposition === "provider_confirmed_zero")).toBe(true);
+    expect(result.costLedger).toMatchObject({ cumulativeObservedUsd: 0.3, cumulativeBudgetCommittedUsd: 0.3, cumulativeReleasedUsd: 6.2 });
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
   }, 30_000);
 
   it("writes and verifies the one-time failure artifact before cancelling unsent fake calls", async () => {
@@ -966,7 +966,7 @@ describe("evaluation-run integrity", () => {
       resolveSourceBytes: async () => fixture.bytes,
       oneTimeServicesForTesting: {
         wholeStatementReview: async () => { invocations.whole += 1; throw timeout; },
-        webSearchDiscovery: async () => { invocations.search += 1; return []; },
+        webSearchDiscovery: async () => { invocations.search += 1; throw timeout; },
         documentRetrieval: async () => { invocations.retrieval += 1; throw new Error("must not run"); },
         semanticVerification: async (request) => {
           invocations.semantic += 1;
@@ -982,14 +982,14 @@ describe("evaluation-run integrity", () => {
       },
     });
 
-    expect(invocations).toEqual({ whole: 1, search: 0, retrieval: 0, semantic: 0 });
+    expect(invocations).toEqual({ whole: 0, search: 1, retrieval: 0, semantic: 0 });
     expect(result.finalStatus).toBe("timed_out");
     expect(result.costLedger.entries[0]).toMatchObject({ status: "timeout", billingDisposition: "unknown", requestId: "request_fake_timeout" });
     expect(result.costLedger.entries.slice(1).every((item) => item.status === "cancelled_before_send" && item.billingDisposition === "provider_confirmed_zero")).toBe(true);
-    expect(result.costLedger).toMatchObject({ cumulativeBudgetCommittedUsd: 0.5, cumulativeReleasedUsd: 1.5 });
+    expect(result.costLedger).toMatchObject({ cumulativeBudgetCommittedUsd: 0.5, cumulativeReleasedUsd: 6 });
     expect(result.providerCallOutcomes.slice(1).every((item) => item.status === "cancelled_before_send")).toBe(true);
     expect(JSON.stringify(result.artifact)).not.toContain("private fake timeout detail");
-    expect(verifyEvaluationRunIntegrityArtifact(result.artifact)).toBe(true);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
     expect(JSON.parse(await readFile(result.artifactPath, "utf8"))).toEqual(result.artifact);
   }, 30_000);
 
@@ -1051,19 +1051,34 @@ describe("evaluation-run integrity", () => {
     const calls = [
       {
         sourceDocumentId: "doc_one_time_fiserv",
-        stage: "whole_statement_ai_review" as const,
-        reservation: costReservation({ callId: "one_time_initial", capability: "ai_sdk", estimatedMaximumCostUsd: 0.6 }),
+        stage: "web_search_discovery" as const,
+        reservation: costReservation({ callId: "one_time_initial", capability: "web_search", estimatedMaximumCostUsd: 0.6 }),
       },
       {
         sourceDocumentId: "doc_one_time_fiserv",
-        stage: "whole_statement_ai_review" as const,
+        stage: "web_search_discovery" as const,
         reservation: costReservation({
           callId: "one_time_retry",
           attempt: 2,
           retryOfCallId: "one_time_initial",
-          capability: "ai_sdk",
+          capability: "web_search",
           estimatedMaximumCostUsd: 0.41,
         }),
+      },
+      {
+        sourceDocumentId: "doc_one_time_fiserv",
+        stage: "document_retrieval" as const,
+        reservation: costReservation({ callId: "one_time_retrieval", capability: "retrieval", estimatedMaximumCostUsd: 0.1 }),
+      },
+      {
+        sourceDocumentId: "doc_one_time_fiserv",
+        stage: "semantic_verification" as const,
+        reservation: costReservation({ callId: "one_time_semantic", capability: "semantic_verification", estimatedMaximumCostUsd: 0.1 }),
+      },
+      {
+        sourceDocumentId: "doc_one_time_fiserv",
+        stage: "whole_statement_ai_review" as const,
+        reservation: costReservation({ callId: "one_time_whole", capability: "ai_sdk", estimatedMaximumCostUsd: 0.1 }),
       },
     ];
 
@@ -1963,12 +1978,13 @@ function approvedPaidCalls() {
 }
 
 function oneTimePaidCalls() {
-  return [
-    ["whole_statement_ai_review", "ai_sdk"],
-    ["web_search_discovery", "web_search"],
-    ["document_retrieval", "retrieval"],
-    ["semantic_verification", "semantic_verification"],
-  ].map(([stage, capability], index) => ({
+  const stages = [
+    ...Array.from({ length: ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch }, () => ["web_search_discovery", "web_search"] as const),
+    ...Array.from({ length: ONE_TIME_RESEARCH_REQUEST_SLOTS.retrieval }, () => ["document_retrieval", "retrieval"] as const),
+    ...Array.from({ length: ONE_TIME_RESEARCH_REQUEST_SLOTS.semanticVerification }, () => ["semantic_verification", "semantic_verification"] as const),
+    ["whole_statement_ai_review", "ai_sdk"] as const,
+  ];
+  return stages.map(([stage, capability], index) => ({
     sourceDocumentId: "doc_one_time_fiserv",
     stage: stage as "whole_statement_ai_review" | "web_search_discovery" | "document_retrieval" | "semantic_verification",
     reservation: costReservation({

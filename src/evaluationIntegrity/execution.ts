@@ -3,6 +3,11 @@ import { mkdir, readFile, realpath, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildEvaluationRunIntegrityArtifact, verifyEvaluationRunIntegrityArtifact } from "./artifact.js";
+import {
+  buildEvaluationRunIntegrityArtifactV2,
+  verifyEvaluationRunIntegrityArtifactV2,
+  writeAndVerifyEvaluationRunIntegrityArtifactV2,
+} from "./canonicalAdmissionArtifact.js";
 import { EvaluationCostBudgetLedger, type CostReservationInput } from "./costLedger.js";
 import { EvaluationIntegrityError } from "./errors.js";
 import { provePackagesBEFinancialInvariance, type PackagesBEProjectionInput } from "./invariance.js";
@@ -16,7 +21,12 @@ import {
   type RepositoryProviderTransport,
   type RepositoryProviderTransportResult,
 } from "./repositoryAdapter.js";
-import type { OneTimeStatementEvaluationServices } from "./oneTimeStatementEvaluationAdapter.js";
+import type { OneTimeResearchLimits, OneTimeStatementEvaluationServices } from "./oneTimeStatementEvaluationAdapter.js";
+import type { FinalizedOneTimeStatementEvaluation } from "./oneTimeStatementEvaluationAdapter.js";
+import { projectOneTimeCanonicalAdmissionResult } from "./oneTimeCanonicalAdmissionProjection.js";
+import type { ApprovedFeeKnowledgeSourceRegistry } from "../canonical/feeKnowledgeTypes.js";
+import type { FeeKnowledgeResearchQuestion } from "../canonical/feeKnowledgeResearch.js";
+import type { CanonicalStatementAnalysis } from "../canonical/types.js";
 import type { BusinessTypeId } from "../businessTypes.js";
 import {
   paidEvaluationStages,
@@ -26,6 +36,7 @@ import {
   type EvaluationLifecycleLedger,
   type EvaluationManifestDocument,
   type EvaluationRunIntegrityArtifact,
+  type EvaluationRunIntegrityArtifactV2,
   type EvaluationSourceManifest,
   type EvaluationSourceSnapshot,
   type RequestedDocumentExecution,
@@ -49,7 +60,7 @@ export type ManifestDrivenEvaluationResult = {
   liveRunBlocked: boolean;
   blockedPackages: EvaluationRunIntegrityArtifact["packageFinancialInvariance"][number]["result"]["packages"][number]["package"][];
   financialMismatchPaths: string[];
-  artifact: EvaluationRunIntegrityArtifact;
+  artifact: EvaluationRunIntegrityArtifact | EvaluationRunIntegrityArtifactV2;
   artifactPath: string;
 };
 
@@ -74,10 +85,19 @@ export async function runManifestDrivenLiveEvaluation(input: {
   resolveSourceBytes: (manifestRow: EvaluationManifestDocument) => Promise<Uint8Array>;
   transportForTesting?: RepositoryProviderTransport;
   oneTimeServicesForTesting?: Partial<OneTimeStatementEvaluationServices>;
+  oneTimeRegistryForTesting?: ApprovedFeeKnowledgeSourceRegistry | null;
+  oneTimeResearchQuestionsForTesting?: (analysis: CanonicalStatementAnalysis) => FeeKnowledgeResearchQuestion[];
+  oneTimeResearchLimitsForTesting?: OneTimeResearchLimits;
   onAdapterCreatedForTesting?: () => void;
   afterSourceResolution?: (snapshots: ReadonlyArray<EvaluationSourceSnapshot>) => void | Promise<void>;
   beforePacketPreparationForTesting?: (sourceDocumentId: string, bytes: Uint8Array) => void | Promise<void>;
   afterPacketPreparedForTesting?: (sourceDocumentId: string, sanitizedPacket: unknown) => void | Promise<void>;
+  onCanonicalAdmissionProjectedForTesting?: (result: ReturnType<typeof projectOneTimeCanonicalAdmissionResult>) => void | Promise<void>;
+  onOneTimeFinalizedForTesting?: (sourceDocumentId: string, finalized: FinalizedOneTimeStatementEvaluation) => void | Promise<void>;
+  beforeArtifactV2WriteForTesting?: (input: {
+    canonicalAdmissionResults: Array<ReturnType<typeof projectOneTimeCanonicalAdmissionResult>>;
+    lifecycleLedger: EvaluationLifecycleLedger;
+  }) => void | Promise<void>;
 }): Promise<ManifestDrivenEvaluationResult> {
   await assertOutsideRepositoryArtifactPath(input.outputArtifactPath);
   const manifest = await loadExactApprovedManifest({
@@ -100,7 +120,7 @@ export async function runManifestDrivenLiveEvaluation(input: {
     observedSources: snapshots.map((snapshot) => snapshot.observation),
     requestedExecutions: input.requestedExecutions,
   });
-  assertCallPlan(executionPermit, input.calls);
+  assertCallPlan(executionPermit, input.calls, input.adapterId);
 
   const lifecycleLedger = createLifecycleLedger(manifest);
   const ledger = new EvaluationCostBudgetLedger(input.approvedBudgetUsd);
@@ -124,6 +144,9 @@ export async function runManifestDrivenLiveEvaluation(input: {
         manifestRow: row,
         verifiedSourceBytes: packetBytes,
         businessType: input.businessType,
+        oneTimeRegistryForTesting: input.oneTimeRegistryForTesting,
+        oneTimeResearchQuestionsForTesting: input.oneTimeResearchQuestionsForTesting,
+        oneTimeResearchLimitsForTesting: input.oneTimeResearchLimitsForTesting,
       });
       assertSnapshotStillMatches(row, snapshot);
       assertSanitizedPacketSourceIdentityExcluded(prepared.sanitizedPacket);
@@ -147,11 +170,14 @@ export async function runManifestDrivenLiveEvaluation(input: {
 
   const providerCallOutcomes: EvaluationRunIntegrityArtifact["providerCallOutcomes"] = [];
   const results: Array<{ callId: string; value: unknown }> = [];
+  const sourceExecutionFailures = new Map<string, "failed" | "timed_out" | "safety_blocked">();
   let finalStatus: EvaluationRunIntegrityArtifact["finalStatus"] = "completed";
   let reasonCodes = ["evaluation_completed"];
 
   for (let index = 0; index < input.calls.length; index += 1) {
     const call = input.calls[index]!;
+    const currentReservation = ledger.snapshot().entries.find((entry) => entry.callId === call.reservation.callId);
+    if (currentReservation?.status === "cancelled_before_send") continue;
     const sourceDocument = manifest.documents.find((item) => item.sourceDocumentId === call.sourceDocumentId)!;
     const capabilityRef = `capability:${call.reservation.callId}`;
     const providerRef = `provider:${call.reservation.callId}`;
@@ -201,9 +227,19 @@ export async function runManifestDrivenLiveEvaluation(input: {
         reasonCodes: [reasonCode],
       });
       recordFailedLifecycle(lifecycleLedger, sourceDocument, call, costExceeded ? "failure" : failure.status, reasonCode, capabilityRef, providerRef);
-      cancelReservedCalls(ledger, input.calls.slice(index + 1), providerCallOutcomes, "cancelled_after_provider_failure");
-      finalStatus = !costExceeded && failure.status === "timeout" ? "timed_out" : "failed";
+      cancelReservedCalls(
+        ledger,
+        input.adapterId === "one_time_statement_evaluation_v1"
+          ? input.calls.slice(index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId)
+          : input.calls.slice(index + 1),
+        providerCallOutcomes,
+        "cancelled_after_provider_failure",
+      );
+      const sourceStatus = !costExceeded && failure.status === "timeout" ? "timed_out" : "failed";
+      sourceExecutionFailures.set(call.sourceDocumentId, sourceStatus);
+      finalStatus = sourceStatus;
       reasonCodes = [reasonCode];
+      if (input.adapterId === "one_time_statement_evaluation_v1") continue;
       break;
     }
 
@@ -222,9 +258,18 @@ export async function runManifestDrivenLiveEvaluation(input: {
         reasonCodes: ["cost_exceeded_reservation"],
       });
       recordFailedLifecycle(lifecycleLedger, sourceDocument, call, "failure", "cost_exceeded_reservation", capabilityRef, providerRef);
-      cancelReservedCalls(ledger, input.calls.slice(index + 1), providerCallOutcomes, "cancelled_after_cost_exceeded_reservation");
+      cancelReservedCalls(
+        ledger,
+        input.adapterId === "one_time_statement_evaluation_v1"
+          ? input.calls.slice(index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId)
+          : input.calls.slice(index + 1),
+        providerCallOutcomes,
+        "cancelled_after_cost_exceeded_reservation",
+      );
+      sourceExecutionFailures.set(call.sourceDocumentId, "failed");
       finalStatus = "failed";
       reasonCodes = ["cost_exceeded_reservation"];
+      if (input.adapterId === "one_time_statement_evaluation_v1") continue;
       break;
     }
     providerCallOutcomes.push({
@@ -269,6 +314,25 @@ export async function runManifestDrivenLiveEvaluation(input: {
       break;
     }
     recordAdmissionLifecycle(lifecycleLedger, sourceDocument, result, capabilityRef, providerRef);
+    if (result.researchTerminal) {
+      cancelReservedCalls(
+        ledger,
+        input.calls.slice(index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId),
+        providerCallOutcomes,
+        `cancelled_after_research_${result.researchTerminal.status}`,
+      );
+      sourceExecutionFailures.set(call.sourceDocumentId, result.researchTerminal.status);
+      if (result.researchTerminal.status === "timed_out") {
+        finalStatus = "timed_out";
+        reasonCodes = ["provider_call_timed_out"];
+      } else if (result.researchTerminal.status === "failed") {
+        finalStatus = "failed";
+        reasonCodes = ["provider_call_failed"];
+      } else if (finalStatus === "completed") {
+        finalStatus = "blocked";
+        reasonCodes = ["canonical_admission_safety_blocked"];
+      }
+    }
   }
 
   const packageFinancialInvariance = executionPermit.documents.map((document) => ({
@@ -283,33 +347,99 @@ export async function runManifestDrivenLiveEvaluation(input: {
     reasonCodes = ["packages_b_e_financial_invariance_failed"];
   }
 
-  const artifact = await writeVerifiedFinalArtifact({
+  const sourceExecutionStatuses = new Map(executionPermit.documents.map((document) => [
+    document.sourceDocumentId,
+    deriveSourceExecutionStatus(
+      document.sourceDocumentId,
+      providerCallOutcomes,
+      sourceExecutionFailures,
+      adapter.oneTimeResearchTerminalFor(document.sourceDocumentId),
+    ),
+  ] as const));
+  if (input.adapterId === "one_time_statement_evaluation_v1" && [...sourceExecutionStatuses.values()].includes("timed_out")) {
+    finalStatus = "timed_out";
+    reasonCodes = ["provider_call_timed_out"];
+  } else if (input.adapterId === "one_time_statement_evaluation_v1" && [...sourceExecutionStatuses.values()].includes("failed")) {
+    finalStatus = "failed";
+    reasonCodes = ["provider_call_failed"];
+  } else if (input.adapterId === "one_time_statement_evaluation_v1" && [...sourceExecutionStatuses.values()].includes("safety_blocked")) {
+    finalStatus = "blocked";
+    reasonCodes = ["canonical_admission_safety_blocked"];
+  }
+
+  const canonicalAdmissionResults = [] as Array<ReturnType<typeof projectOneTimeCanonicalAdmissionResult>>;
+  const preparedSanitizedPackets = [] as Array<{ resultId: string; packet: import("./oneTimeStatementEvaluationAdapter.js").OneTimeStatementEvaluationPacket }>;
+  if (input.adapterId === "one_time_statement_evaluation_v1") {
+    for (const document of executionPermit.documents) {
+      const executionStatus = sourceExecutionStatuses.get(document.sourceDocumentId) ?? "failed";
+      const finalized = adapter.finalizeOneTimeFor(document.sourceDocumentId, executionStatus);
+      await input.onOneTimeFinalizedForTesting?.(document.sourceDocumentId, structuredClone(finalized));
+      const projected = projectOneTimeCanonicalAdmissionResult({ sourceDocumentId: document.sourceDocumentId, finalized });
+      await input.onCanonicalAdmissionProjectedForTesting?.(structuredClone(projected));
+      canonicalAdmissionResults.push(projected);
+      preparedSanitizedPackets.push({ resultId: projected.resultId, packet: finalized.preparedPacket });
+      recordCanonicalAdmissionLifecycle(lifecycleLedger, manifest, projected);
+    }
+    if (finalStatus === "completed") {
+      const rejected = canonicalAdmissionResults.find((result) => result.admissionDisposition !== "admitted");
+      if (rejected) {
+        finalStatus = "blocked";
+        reasonCodes = [rejected.admission.validationErrorCodes[0] ?? "canonical_admission_rejected"];
+      }
+    }
+    canonicalAdmissionResults.sort((left, right) => left.resultId.localeCompare(right.resultId));
+    preparedSanitizedPackets.sort((left, right) => left.resultId.localeCompare(right.resultId));
+  }
+
+  const finalInvariance = executionPermit.documents.map((document) => ({
+    sourceDocumentId: document.sourceDocumentId,
+    result: provePackagesBEFinancialInvariance(
+      beforeStates.get(document.sourceDocumentId)!,
+      adapter.canonicalStateFor(document.sourceDocumentId),
+    ),
+  }));
+  if (finalInvariance.some((item) => !item.result.invariant)) {
+    finalStatus = "blocked";
+    reasonCodes = ["packages_b_e_financial_invariance_failed"];
+  }
+
+  const artifactInput = {
     outputArtifactPath: input.outputArtifactPath,
     manifest,
     approvedManifestHash: input.approvedManifestHash,
     executionPermit,
     lifecycleLedger,
-    packageFinancialInvariance,
+    packageFinancialInvariance: finalInvariance,
     costBudgetLedger: ledger.snapshot(),
     providerCallOutcomes,
     finalStatus,
     reasonCodes,
-  });
-  const blockedPackages = [...new Set(packageFinancialInvariance.flatMap((item) =>
+  };
+  const artifact = input.adapterId === "one_time_statement_evaluation_v1"
+    ? await (async () => {
+        await input.beforeArtifactV2WriteForTesting?.(structuredClone({ canonicalAdmissionResults, lifecycleLedger }));
+        return writeVerifiedFinalArtifactV2({
+          ...artifactInput,
+          canonicalAdmissionResults,
+          preparedSanitizedPackets,
+        });
+      })()
+    : await writeVerifiedFinalArtifact(artifactInput);
+  const blockedPackages = [...new Set(finalInvariance.flatMap((item) =>
     item.result.packages.filter((proof) => !proof.invariant).map((proof) => proof.package),
   ))].sort();
-  const financialMismatchPaths = [...new Set(packageFinancialInvariance.flatMap((item) => item.result.mismatchPaths))].sort();
+  const financialMismatchPaths = [...new Set(finalInvariance.flatMap((item) => item.result.mismatchPaths))].sort();
 
   return {
     manifest,
     executionPermit,
     lifecycleLedger: artifact.lifecycleLedger,
-    packageFinancialInvariance,
+    packageFinancialInvariance: finalInvariance,
     costLedger: artifact.costBudgetLedger,
     providerCallOutcomes,
     finalStatus,
     reasonCodes,
-    liveRunBlocked: packageFinancialInvariance.some((item) => item.result.liveRunBlocked),
+    liveRunBlocked: finalInvariance.some((item) => item.result.liveRunBlocked),
     blockedPackages,
     financialMismatchPaths,
     artifact,
@@ -358,6 +488,83 @@ async function writeVerifiedFinalArtifact(input: {
   return independentlyReadFinal;
 }
 
+async function writeVerifiedFinalArtifactV2(input: {
+  outputArtifactPath: string;
+  manifest: EvaluationSourceManifest;
+  approvedManifestHash: string;
+  executionPermit: ApprovedExecutionPermit;
+  lifecycleLedger: EvaluationLifecycleLedger;
+  packageFinancialInvariance: EvaluationRunIntegrityArtifact["packageFinancialInvariance"];
+  costBudgetLedger: CostBudgetLedgerSnapshot;
+  providerCallOutcomes: EvaluationRunIntegrityArtifact["providerCallOutcomes"];
+  finalStatus: EvaluationRunIntegrityArtifact["finalStatus"];
+  reasonCodes: string[];
+  canonicalAdmissionResults: Array<ReturnType<typeof projectOneTimeCanonicalAdmissionResult>>;
+  preparedSanitizedPackets: Array<{ resultId: string; packet: import("./oneTimeStatementEvaluationAdapter.js").OneTimeStatementEvaluationPacket }>;
+}): Promise<EvaluationRunIntegrityArtifactV2> {
+  for (const document of input.lifecycleLedger.documents) {
+    const manifestRow = input.manifest.documents.find((item) => item.sourceDocumentId === document.sourceDocumentId)!;
+    recordLifecycleStage(input.lifecycleLedger, lifecycleRefs({
+      sourceDocumentId: document.sourceDocumentId,
+      stage: "final_artifact",
+      state: "completed",
+      reasonCodes: ["final_integrity_artifact_written_and_verified"],
+      manifestRowRef: manifestRow.sourceDocumentId,
+      preflightRecordRef: manifestRow.parentPreflightArtifactId,
+      parserRecordRef: manifestRow.parserRecordId,
+      finalArtifactRef: "self:artifactContentHash",
+    }));
+  }
+  const artifact = buildEvaluationRunIntegrityArtifactV2({
+    manifest: input.manifest,
+    approvedManifestHash: input.approvedManifestHash,
+    executionPermit: input.executionPermit,
+    lifecycleLedger: input.lifecycleLedger,
+    packageFinancialInvariance: input.packageFinancialInvariance,
+    costBudgetLedger: input.costBudgetLedger,
+    providerCallOutcomes: input.providerCallOutcomes,
+    finalStatus: input.finalStatus,
+    reasonCodes: input.reasonCodes,
+    canonicalAdmissionResults: input.canonicalAdmissionResults,
+    preparedSanitizedPackets: input.preparedSanitizedPackets,
+  });
+  if (!verifyEvaluationRunIntegrityArtifactV2(artifact)) throw new Error("final_integrity_artifact_v2_verification_failed");
+  await writeAndVerifyEvaluationRunIntegrityArtifactV2({ artifact, outputPath: path.resolve(input.outputArtifactPath) });
+  const independentlyRead = JSON.parse(await readFile(path.resolve(input.outputArtifactPath), "utf8")) as EvaluationRunIntegrityArtifactV2;
+  if (!verifyEvaluationRunIntegrityArtifactV2(independentlyRead)) throw new Error("published_integrity_artifact_v2_verification_failed");
+  return independentlyRead;
+}
+
+function recordCanonicalAdmissionLifecycle(
+  ledger: EvaluationLifecycleLedger,
+  manifest: EvaluationSourceManifest,
+  result: ReturnType<typeof projectOneTimeCanonicalAdmissionResult>,
+): void {
+  const source = manifest.documents.find((item) => item.sourceDocumentId === result.sourceDocumentId);
+  if (!source) throw new Error("canonical_admission_manifest_source_missing");
+  const reason = result.reasonCodes[0]!;
+  const state = result.admissionDisposition === "admitted" ? "completed"
+    : result.admissionDisposition === "safety_blocked" ? "blocked" : "withheld";
+  recordAiLifecycleState({
+    ledger,
+    sourceDocumentId: source.sourceDocumentId,
+    stateName: "canonical_admitted",
+    state,
+    reasonCodes: [reason],
+  });
+  recordLifecycleStage(ledger, lifecycleRefs({
+    sourceDocumentId: source.sourceDocumentId,
+    stage: "canonical_admission",
+    state,
+    reasonCodes: [reason],
+    manifestRowRef: source.sourceDocumentId,
+    preflightRecordRef: source.parentPreflightArtifactId,
+    parserRecordRef: source.parserRecordId,
+    capabilityExecutionRef: result.executionRef,
+    canonicalAdmissionRef: result.lifecycleAdmissionRef,
+  }));
+}
+
 function recordSuccessfulLifecycle(
   ledger: EvaluationLifecycleLedger,
   source: EvaluationManifestDocument,
@@ -383,10 +590,12 @@ function recordSuccessfulLifecycle(
   if (result.lifecycle?.evidenceValidated) recordAiLifecycleState({ ledger, sourceDocumentId: source.sourceDocumentId, stateName: "evidence_validated", state: "completed", reasonCodes: reasons });
   if (result.lifecycle?.policyAccepted) recordAiLifecycleState({ ledger, sourceDocumentId: source.sourceDocumentId, stateName: "policy_accepted", state: "completed", reasonCodes: reasons });
   if (call.stage === "web_search_discovery" || call.stage === "document_retrieval") {
+    const researchState = result.researchTerminal?.status === "safety_blocked" ? "blocked"
+      : result.researchTerminal ? "failed" : "completed";
     recordLifecycleStage(ledger, lifecycleRefs({
       sourceDocumentId: source.sourceDocumentId,
       stage: "research_retrieval",
-      state: "completed",
+      state: researchState,
       reasonCodes: reasons,
       manifestRowRef: source.sourceDocumentId,
       preflightRecordRef: source.parentPreflightArtifactId,
@@ -397,10 +606,12 @@ function recordSuccessfulLifecycle(
     }));
   }
   if (call.stage === "semantic_verification") {
+    const semanticState = result.researchTerminal?.status === "safety_blocked" ? "blocked"
+      : result.researchTerminal ? "failed" : "completed";
     recordLifecycleStage(ledger, lifecycleRefs({
       sourceDocumentId: source.sourceDocumentId,
       stage: "semantic_verification",
-      state: "completed",
+      state: semanticState,
       reasonCodes: reasons,
       manifestRowRef: source.sourceDocumentId,
       preflightRecordRef: source.parentPreflightArtifactId,
@@ -528,6 +739,22 @@ function finalizeCallOrDetectCostOverrun(
   }
 }
 
+function deriveSourceExecutionStatus(
+  sourceDocumentId: string,
+  outcomes: EvaluationRunIntegrityArtifact["providerCallOutcomes"],
+  explicitFailures: ReadonlyMap<string, "failed" | "timed_out" | "safety_blocked">,
+  graphTerminal: "failed" | "timed_out" | "safety_blocked" | null,
+): "completed" | "failed" | "timed_out" | "safety_blocked" {
+  if (graphTerminal) return graphTerminal;
+  const explicit = explicitFailures.get(sourceDocumentId);
+  if (explicit) return explicit;
+  const sourceOutcomes = outcomes.filter((outcome) => outcome.sourceDocumentId === sourceDocumentId);
+  if (sourceOutcomes.some((outcome) => outcome.status === "timeout")) return "timed_out";
+  if (sourceOutcomes.some((outcome) => outcome.status === "failure")) return "failed";
+  const wholeStatementOutcome = sourceOutcomes.find((outcome) => outcome.stage === "whole_statement_ai_review");
+  return wholeStatementOutcome?.status === "success" ? "completed" : "failed";
+}
+
 function providerFailure(error: unknown, fallbackDurationMs: number): {
   status: "failure" | "timeout";
   reasonCode: string;
@@ -557,7 +784,11 @@ function providerFailure(error: unknown, fallbackDurationMs: number): {
   };
 }
 
-function assertCallPlan(permit: ApprovedExecutionPermit, calls: ManifestDrivenEvaluationCall[]): void {
+function assertCallPlan(
+  permit: ApprovedExecutionPermit,
+  calls: ManifestDrivenEvaluationCall[],
+  adapterId: RepositoryEvaluationAdapterId,
+): void {
   const callIds = calls.map((call) => call.reservation.callId);
   if (new Set(callIds).size !== callIds.length) throw new Error("Manifest-driven evaluation call IDs must be unique.");
   const capabilityByStage = {
@@ -579,6 +810,27 @@ function assertCallPlan(permit: ApprovedExecutionPermit, calls: ManifestDrivenEv
         callId: call.reservation.callId,
         stage: call.stage,
       });
+    }
+  }
+  if (adapterId === "one_time_statement_evaluation_v1") {
+    const stageOrder = ["web_search_discovery", "document_retrieval", "semantic_verification", "whole_statement_ai_review"] as const;
+    for (const document of permit.documents) {
+      const documentCalls = calls.filter((call) => call.sourceDocumentId === document.sourceDocumentId);
+      const ranks = documentCalls.map((call) => stageOrder.indexOf(call.stage));
+      if (ranks.some((rank, index) => index > 0 && rank < ranks[index - 1]!)) {
+        throw new EvaluationIntegrityError("manifest_schema_invalid", "One-time evaluation calls are out of stage order.", {
+          sourceDocumentId: document.sourceDocumentId,
+        });
+      }
+      const counts = Object.fromEntries(stageOrder.map((stage) => [stage, documentCalls.filter((call) => call.stage === stage).length])) as Record<(typeof stageOrder)[number], number>;
+      if (counts.whole_statement_ai_review !== 1
+        || counts.web_search_discovery < 1
+        || counts.document_retrieval < 1
+        || counts.semantic_verification < 1) {
+        throw new EvaluationIntegrityError("manifest_schema_invalid", "One-time evaluation call plan does not contain the exact approved stage population.", {
+          sourceDocumentId: document.sourceDocumentId,
+        });
+      }
     }
   }
 }

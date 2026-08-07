@@ -51,6 +51,7 @@ export type FeeKnowledgeCandidateVerificationStatus =
 export type FeeKnowledgeResearchAttemptStatus = "completed" | "disabled" | "not_needed" | "failed" | "timed_out" | "safety_blocked";
 export type FeeKnowledgeResearchNonSuccessStatus = FeeKnowledgeResearchAttemptStatus | "budget_exhausted" | "unsupported_model";
 export type FeeKnowledgeRetrievalStatus =
+  | "not_started"
   | "retrieved_text"
   | "retrieval_succeeded_text_unavailable"
   | "unavailable"
@@ -173,6 +174,7 @@ export type FeeKnowledgeResearchAttemptRecord = {
   type: "fee_knowledge_research_attempt";
   policyVersion: typeof FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION;
   attemptId: string;
+  questionRef: string;
   feeRowRef: string;
   sanitizedQuestionCategory: "classification" | "published_rule" | "applicability" | "contradiction";
   triggerReason:
@@ -193,8 +195,11 @@ export type FeeKnowledgeResearchCandidateRecord = {
   type: "fee_knowledge_research_candidate";
   policyVersion: typeof FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION;
   candidateId: string;
+  questionRef: string;
   feeRowRef: string;
   attemptId: string;
+  retrievalStatus: FeeKnowledgeRetrievalStatus;
+  semanticVerificationStatus: "not_started" | "completed" | "failed" | "timed_out" | "parse_failed" | "safety_blocked" | "unsupported";
   canonicalUrl: string | null;
   title: string | null;
   publisher: string | null;
@@ -207,6 +212,8 @@ export type FeeKnowledgeResearchCandidateRecord = {
     contextApplicable: boolean | null;
   };
   sourceFingerprint: string | null;
+  locatorHash: string | null;
+  claimSupportDecisionRef: string | null;
   displayPermission: FeeKnowledgeDisplayPermission;
 };
 
@@ -331,6 +338,10 @@ export type FeeKnowledgeSourcePacket = {
   policyVersion: typeof FEE_KNOWLEDGE_SOURCE_PACKET_VERSION;
   registryVersion: string;
   researchPolicyVersion: typeof FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION;
+  registryValidation: {
+    status: "valid" | "invalid";
+    reasonCodes: string[];
+  };
   rowPackets: FeeKnowledgeRowSourcePacket[];
   sourceMatches: FeeKnowledgeSourceMatchRecord[];
   researchAttempts: FeeKnowledgeResearchAttemptRecord[];

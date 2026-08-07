@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { CanonicalStatementAnalysis } from "./types.js";
+import { calculateRuntimeClaimSupportDecisionRef } from "./feeKnowledgeClaimSupportDecision.js";
 import {
   FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION,
   FEE_KNOWLEDGE_DOMAIN_IDENTITY_POLICY_VERSION,
@@ -284,7 +285,35 @@ export function buildFeeKnowledgeSourcePacket(input: {
     }
   }
 
-  for (const support of input.runtimeClaimSupports ?? []) {
+  const feeRowIds = new Set(input.analysis.feeLedger.rows.map((row) => row.id));
+  const hasResearchAttemptGraph = (input.researchAttempts ?? []).length > 0;
+  const attemptsById = new Map((input.researchAttempts ?? []).map((attempt) => [attempt.attemptId, attempt]));
+  const candidatesById = new Map((input.researchCandidates ?? []).map((candidate) => [candidate.candidateId, candidate]));
+  const runtimeSupports = input.runtimeClaimSupports ?? [];
+  const supportsByCandidate = new Map<string, FeeKnowledgeClaimSupportRecord[]>();
+  for (const support of runtimeSupports) {
+    if (!support.candidateId) continue;
+    supportsByCandidate.set(support.candidateId, [...(supportsByCandidate.get(support.candidateId) ?? []), support]);
+  }
+  const invalidRuntimeSupport = runtimeSupports.some((support) => {
+    if (!feeRowIds.has(support.feeRowRef)) return true;
+    if (!support.candidateId) return true;
+    const candidate = candidatesById.get(support.candidateId);
+    const attempt = candidate ? attemptsById.get(candidate.attemptId) : null;
+    return !candidate
+      || candidate.feeRowRef !== support.feeRowRef
+      || candidate.sourceFingerprint !== support.documentFingerprint
+      || candidate.locatorHash !== support.locatorTextHash
+      || candidate.claimSupportDecisionRef !== calculateRuntimeClaimSupportDecisionRef({ support, candidate })
+      || (hasResearchAttemptGraph && (!attempt
+        || attempt.feeRowRef !== support.feeRowRef
+        || candidate.questionRef !== attempt.questionRef));
+  }) || (input.researchCandidates ?? []).some((candidate) => {
+    const supports = supportsByCandidate.get(candidate.candidateId) ?? [];
+    return supports.length === 0 ? candidate.claimSupportDecisionRef !== null : supports.length !== 1;
+  });
+
+  for (const support of invalidRuntimeSupport ? [] : input.runtimeClaimSupports ?? []) {
     claimSupports.push(support);
     provenanceDecisions.push({
       type: "fee_knowledge_provenance_decision",
@@ -363,6 +392,13 @@ export function buildFeeKnowledgeSourcePacket(input: {
     policyVersion: FEE_KNOWLEDGE_SOURCE_PACKET_VERSION,
     registryVersion: registry.registryVersion,
     researchPolicyVersion: FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
+    registryValidation: {
+      status: registryResult.ok && !invalidRuntimeSupport ? "valid" : "invalid",
+      reasonCodes: [
+        ...(registryResult.ok ? [] : ["fee_knowledge_registry_invalid"]),
+        ...(invalidRuntimeSupport ? ["fee_knowledge_runtime_linkage_invalid"] : []),
+      ],
+    },
     rowPackets,
     sourceMatches: sourceMatches.sort(byRowThenId),
     researchAttempts: [...(input.researchAttempts ?? [])].sort((left, right) => left.attemptId.localeCompare(right.attemptId)),

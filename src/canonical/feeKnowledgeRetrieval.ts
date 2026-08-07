@@ -39,6 +39,7 @@ export type RetrieveDocumentOptions = {
   fetchImpl?: SafeFetch;
   resolveHost?: (hostname: string) => Promise<string[]>;
   limits?: Partial<typeof FEE_KNOWLEDGE_RETRIEVAL_LIMITS>;
+  pdfParserForTesting?: (bytes: Uint8Array) => Promise<void>;
 };
 
 export async function retrieveFeeKnowledgeDocument(
@@ -97,7 +98,7 @@ export async function retrieveFeeKnowledgeDocument(
     }
     const fingerprint = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
     if (contentType.startsWith("application/pdf")) {
-      return pdfDocument(current.url.href, redirectChain, contentType, bytes, fingerprint);
+      return pdfDocument(current.url.href, redirectChain, contentType, bytes, fingerprint, options.pdfParserForTesting);
     }
     return textDocument(current.url.href, redirectChain, contentType, bytes, fingerprint);
   }
@@ -138,8 +139,10 @@ async function pdfDocument(
   contentType: string,
   bytes: Uint8Array,
   fingerprint: string,
+  parserForTesting?: (bytes: Uint8Array) => Promise<void>,
 ): Promise<RetrievedDocument> {
   try {
+    await parserForTesting?.(bytes);
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
     const task = pdfjs.getDocument({ data: bytes });
     const pdf = await task.promise;
@@ -204,7 +207,16 @@ async function pdfDocument(
       reasonCodes: ["fee_knowledge_pdf_text_retrieved"],
     };
   } catch (error) {
-    return unavailable(canonicalUrl, redirectChain, /password|encrypted/i.test(String(error)) ? "encrypted" : "malformed", ["fee_knowledge_pdf_parse_failed"], contentType, bytes.byteLength, fingerprint);
+    const encrypted = /password|encrypted/i.test(String(error));
+    return unavailable(
+      canonicalUrl,
+      redirectChain,
+      encrypted ? "encrypted" : "malformed",
+      [encrypted ? "fee_knowledge_pdf_encrypted" : "fee_knowledge_pdf_parse_failed"],
+      contentType,
+      bytes.byteLength,
+      fingerprint,
+    );
   }
 }
 

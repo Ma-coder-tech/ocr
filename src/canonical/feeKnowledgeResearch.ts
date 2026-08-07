@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { CanonicalFeeCategory, CanonicalStatementAnalysis } from "./types.js";
+import { calculateRuntimeClaimSupportDecisionRef } from "./feeKnowledgeClaimSupportDecision.js";
 import { REVIEWED_DOMAIN_IDENTITY_POLICY, buildFeeKnowledgeSourcePacket, isVerifiedDocumentationDecision, type LegacyWholeStatementSourceRegistry } from "./feeKnowledgeRegistry.js";
 import {
   FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION,
@@ -23,13 +24,21 @@ import {
   type SafeFetch,
 } from "./feeKnowledgeRetrieval.js";
 
+export type FeeKnowledgeResearchLimits = {
+  policyVersion: typeof FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION;
+  maxSearchCalls: number;
+  maxRetrievalCandidates: number;
+  totalDeadlineMs: number;
+  maxResultCandidatesPerSearch: number;
+};
+
 export const FEE_KNOWLEDGE_RESEARCH_LIMITS = {
   policyVersion: FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
   maxSearchCalls: 2,
   maxRetrievalCandidates: 5,
   totalDeadlineMs: 15000,
   maxResultCandidatesPerSearch: 5,
-} as const;
+} as const satisfies FeeKnowledgeResearchLimits;
 
 const DEFAULT_OPENAI_WEB_SEARCH_MODEL = "gpt-5";
 const WEB_SEARCH_MODEL_PATTERN = /^(gpt-5(?:$|-)|gpt-4\.1(?:$|-)|gpt-4o(?:-search-preview)?(?:$|-)|o3(?:$|-)|o4-mini(?:$|-))/i;
@@ -50,6 +59,14 @@ export type FeeKnowledgeResearchQuestion = {
   semanticQuestion: string;
 };
 
+export function feeKnowledgeQuestionRef(question: FeeKnowledgeResearchQuestion, questionOrdinal: number): string {
+  return `question_${canonicalSha256({
+    type: "evaluation_sanitized_research_question_identity_v1",
+    questionOrdinal: questionOrdinal + 1,
+    ...question,
+  })}`;
+}
+
 export type FeeKnowledgeDiscoveryCandidate = {
   url: string;
   title: string | null;
@@ -60,7 +77,7 @@ export type FeeKnowledgeSearchAdapter = (
   request: {
     attemptId: string;
     questions: readonly FeeKnowledgeResearchQuestion[];
-    limits: typeof FEE_KNOWLEDGE_RESEARCH_LIMITS;
+    limits: FeeKnowledgeResearchLimits;
   },
   context: { abortSignal: AbortSignal },
 ) => Promise<FeeKnowledgeDiscoveryCandidate[]>;
@@ -124,6 +141,7 @@ export async function runFeeKnowledgeResearch(input: {
           type: "fee_knowledge_research_attempt",
           policyVersion: FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
           attemptId: "research_not_needed",
+          questionRef: `question_${"0".repeat(64)}`,
           feeRowRef: "__statement__",
           sanitizedQuestionCategory: "classification",
           triggerReason: "not_needed",
@@ -139,14 +157,14 @@ export async function runFeeKnowledgeResearch(input: {
     };
   }
 
+  const attempts: FeeKnowledgeResearchAttemptRecord[] = [];
+  const candidates: FeeKnowledgeResearchCandidateRecord[] = [];
+  const claimSupports: FeeKnowledgeClaimSupportRecord[] = [];
   return withAbortTimeout(async (abortSignal) => {
     const searchAdapter = options.adapter ?? openAiWebSearchAdapter({ apiKey: options.openAiApiKey, modelName: options.openAiModelName, fetchImpl: options.fetchImpl });
     const semanticSupportAdapter =
       options.semanticSupportAdapter ?? openAiSemanticSupportAdapter({ apiKey: options.openAiApiKey, modelName: options.openAiModelName, fetchImpl: options.fetchImpl });
     const sourcePacket = buildFeeKnowledgeSourcePacket({ analysis: input.analysis, registry: input.registry });
-    const attempts: FeeKnowledgeResearchAttemptRecord[] = [];
-    const candidates: FeeKnowledgeResearchCandidateRecord[] = [];
-    const claimSupports: FeeKnowledgeClaimSupportRecord[] = [];
     const selectedQuestions = input.questions.slice(0, FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls);
     const skippedQuestions = input.questions.slice(FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls);
     let remainingCandidates = FEE_KNOWLEDGE_RESEARCH_LIMITS.maxRetrievalCandidates;
@@ -159,35 +177,64 @@ export async function runFeeKnowledgeResearch(input: {
         remainingCandidates -= bounded.length;
         const candidateIds: string[] = [];
         for (const [candidateIndex, candidate] of bounded.entries()) {
-          const candidateId = `candidate_${stableId([question.feeRowRef, candidate.url, String(candidateIndex)])}`;
+          const candidateId = `candidate_${stableId([attemptId, candidate.url, String(candidateIndex)])}`;
+          const pendingIndex = candidates.push(candidateRecord({ candidateId, candidate, question, questionOrdinal: index }, attemptId, {
+            canonicalUrl: null,
+            verificationStatus: "provisional",
+            reasonCodes: ["fee_knowledge_semantic_support_not_run"],
+            safeApplicability: {
+              processorOrNetworkMatched: false,
+              periodApplicable: Boolean(question.statementPeriodYear),
+              jurisdictionApplicable: null,
+              contextApplicable: null,
+            },
+            sourceFingerprint: null,
+            retrievalStatus: "not_started",
+            semanticVerificationStatus: "not_started",
+            locatorHash: null,
+            claimSupportDecisionRef: null,
+          })) - 1;
+          candidateIds.push(candidateId);
           const retrieved = await retrieveFeeKnowledgeDocument(candidate.url, {
             abortSignal,
             fetchImpl: options.fetchImpl,
             resolveHost: options.resolveHost,
           });
+          candidates[pendingIndex] = candidateAfterRetrieval(candidates[pendingIndex]!, retrieved);
           const verification = await verifyCandidate({
             candidateId,
             attemptId,
             candidate,
             retrieved,
             question,
+            questionOrdinal: index,
             semanticSupportAdapter,
             domainIdentityPolicy: options.domainIdentityPolicy,
             priorClaimSupports: [...sourcePacket.claimSupports, ...claimSupports],
             abortSignal,
           });
-          candidates.push(verification.candidate);
-          candidateIds.push(candidateId);
+          candidates[pendingIndex] = verification.candidate;
           if (verification.claimSupport) claimSupports.push(verification.claimSupport);
+          if (["failed", "timed_out", "safety_blocked"].includes(verification.candidate.semanticVerificationStatus)) {
+            throw new FeeKnowledgeSearchProviderError(
+              verification.candidate.semanticVerificationStatus as "failed" | "timed_out" | "safety_blocked",
+              "Fee knowledge semantic verification did not complete successfully.",
+            );
+          }
         }
         attempts.push(attemptRecord(question, index, "completed", candidateIds, ["fee_knowledge_research_completed"]));
       } catch (error) {
         const providerStatus = error instanceof FeeKnowledgeSearchProviderError ? error.status : undefined;
-        attempts.push(
-          attemptRecord(question, index, providerStatus ?? "failed", [], [
-            providerStatus === "unsupported_model" ? "fee_knowledge_web_search_model_unsupported" : "fee_knowledge_research_failed",
-          ]),
-        );
+        const retainedCandidateIds = candidates
+          .filter((candidate) => candidate.attemptId === attemptId)
+          .map((candidate) => candidate.candidateId);
+        upsertAttempt(attempts, attemptRecord(
+          question,
+          index,
+          providerStatus ?? (abortSignal.aborted ? "timed_out" : "failed"),
+          retainedCandidateIds,
+          [researchFailureReason(providerStatus ?? (abortSignal.aborted ? "timed_out" : "failed"))],
+        ));
       }
     }
 
@@ -195,16 +242,16 @@ export async function runFeeKnowledgeResearch(input: {
       attempts.push(attemptRecord(question, selectedQuestions.length + offset, "budget_exhausted", [], ["fee_knowledge_research_budget_exhausted"]));
     }
 
-    return { attempts, candidates, claimSupports };
+    return snapshotResearchResult({ attempts, candidates, claimSupports });
   }, options.timeoutMs ?? FEE_KNOWLEDGE_RESEARCH_LIMITS.totalDeadlineMs).catch((error) => {
     const timedOut = /timed out|aborted|abort/i.test(error instanceof Error ? error.message : String(error));
-    return {
-      attempts: input.questions.map((question, index) =>
-        attemptRecord(question, index, timedOut ? "timed_out" : "failed", [], [timedOut ? "fee_knowledge_research_timed_out" : "fee_knowledge_research_failed"]),
-      ),
-      candidates: [],
-      claimSupports: [],
-    };
+    return terminalResearchSnapshot({
+      questions: input.questions,
+      attempts,
+      candidates,
+      claimSupports,
+      status: timedOut ? "timed_out" : "failed",
+    });
   });
 }
 
@@ -353,6 +400,7 @@ export async function verifyCandidate(input: {
   candidate: FeeKnowledgeDiscoveryCandidate;
   retrieved: RetrievedDocument;
   question: FeeKnowledgeResearchQuestion;
+  questionOrdinal?: number;
   semanticSupportAdapter?: FeeKnowledgeSemanticSupportAdapter;
   semanticSupport?: FeeKnowledgeSemanticSupportDecision;
   domainIdentityPolicy?: FeeKnowledgeDomainIdentityPolicy;
@@ -372,9 +420,13 @@ export async function verifyCandidate(input: {
       candidate: candidateRecord(input, attemptId, {
         canonicalUrl,
         verificationStatus: input.retrieved.status === "safety_blocked" ? "safety_blocked" : input.retrieved.status === "retrieval_succeeded_text_unavailable" ? "source_unavailable" : "rejected",
-        reasonCodes: input.retrieved.reasonCodes,
+        reasonCodes: [...input.retrieved.reasonCodes, "fee_knowledge_semantic_support_not_run"],
         safeApplicability: safeBase,
         sourceFingerprint: input.retrieved.documentFingerprint,
+        retrievalStatus: input.retrieved.status,
+        semanticVerificationStatus: "not_started",
+        locatorHash: null,
+        claimSupportDecisionRef: null,
       }),
       claimSupport: null,
     };
@@ -402,9 +454,13 @@ export async function verifyCandidate(input: {
       candidate: candidateRecord(input, attemptId, {
         canonicalUrl,
         verificationStatus: "provisional",
-        reasonCodes: ["fee_knowledge_claim_support_missing"],
+        reasonCodes: [...input.retrieved.reasonCodes, "fee_knowledge_claim_support_missing", "fee_knowledge_semantic_support_not_run"],
         safeApplicability: { processorOrNetworkMatched: processorMatched, periodApplicable, jurisdictionApplicable: null, contextApplicable: null },
         sourceFingerprint: input.retrieved.documentFingerprint,
+        retrievalStatus: input.retrieved.status,
+        semanticVerificationStatus: "not_started",
+        locatorHash: null,
+        claimSupportDecisionRef: null,
       }),
       claimSupport: null,
     };
@@ -441,12 +497,38 @@ export async function verifyCandidate(input: {
     contradictions,
   });
   const verified = isVerifiedDocumentationDecision(evidenceDecision);
+  const semanticVerificationStatus: FeeKnowledgeResearchCandidateRecord["semanticVerificationStatus"] =
+    semanticSupport.reasonCodes.includes("fee_knowledge_semantic_json_invalid") ? "parse_failed"
+      : semanticSupport.reasonCodes.includes("fee_knowledge_semantic_timed_out") ? "timed_out"
+        : semanticSupport.reasonCodes.includes("fee_knowledge_semantic_safety_blocked") ? "safety_blocked"
+          : semanticSupport.reasonCodes.some((reason) => [
+              "fee_knowledge_semantic_failed",
+              "fee_knowledge_semantic_support_provider_unavailable",
+              "fee_knowledge_semantic_support_provider_failed",
+            ].includes(reason)) ? "failed"
+          : "completed";
+  const semanticStateReason = semanticVerificationStatus === "parse_failed" ? "fee_knowledge_semantic_parse_failed"
+    : semanticVerificationStatus === "timed_out" ? "fee_knowledge_semantic_timed_out"
+      : semanticVerificationStatus === "safety_blocked" ? "fee_knowledge_semantic_safety_blocked"
+        : semanticVerificationStatus === "failed" ? "fee_knowledge_semantic_failed"
+          : `fee_knowledge_${evidenceDecision}`;
   const candidate: FeeKnowledgeResearchCandidateRecord = candidateRecord(input, attemptId, {
     canonicalUrl,
-    verificationStatus: verified ? "runtime_verified_documentation" : evidenceDecision === "conflicting_evidence" ? "conflicting_evidence" : evidenceDecision === "source_inapplicable" ? "source_inapplicable" : "verified_candidate_limited",
-    reasonCodes: [`fee_knowledge_${evidenceDecision}`],
+    verificationStatus: semanticVerificationStatus === "safety_blocked" ? "safety_blocked"
+      : verified ? "runtime_verified_documentation"
+        : evidenceDecision === "conflicting_evidence" ? "conflicting_evidence"
+          : evidenceDecision === "source_inapplicable" ? "source_inapplicable" : "verified_candidate_limited",
+    reasonCodes: [
+      ...input.retrieved.reasonCodes,
+      ...(semanticVerificationStatus === "completed" ? [`fee_knowledge_${evidenceDecision}`] : []),
+      semanticStateReason,
+    ],
     safeApplicability: { processorOrNetworkMatched: processorMatched, periodApplicable, jurisdictionApplicable: null, contextApplicable: null },
     sourceFingerprint: input.retrieved.documentFingerprint,
+    retrievalStatus: input.retrieved.status,
+    semanticVerificationStatus,
+    locatorHash: citation.locator.textHash,
+    claimSupportDecisionRef: null,
   });
   const claimSupport: FeeKnowledgeClaimSupportRecord = {
     type: "fee_knowledge_claim_support",
@@ -474,9 +556,12 @@ export async function verifyCandidate(input: {
     contradictions,
     exclusions: [...(processorMatched ? [] : ["Publisher or processor identity is not exact."]), ...(periodApplicable ? [] : ["Document period does not apply to the statement period."])],
     evidenceDecision,
-    confidence: verified ? "medium" : evidenceDecision === "conflicting_evidence" ? "low" : "low",
-    actionabilityCeiling: verified ? "verify_only" : "unknown",
+    confidence: verified ? (structuredClaim.maximumConfidence === "low" ? "low" : "medium") : "low",
+    actionabilityCeiling: verified
+      ? structuredClaim.actionabilityCeiling === "potentially_actionable" ? "verify_only" : structuredClaim.actionabilityCeiling
+      : "unknown",
   };
+  candidate.claimSupportDecisionRef = calculateRuntimeClaimSupportDecisionRef({ support: claimSupport, candidate });
   return { candidate, claimSupport };
 }
 
@@ -485,6 +570,7 @@ function candidateRecord(
     candidateId: string;
     candidate: FeeKnowledgeDiscoveryCandidate;
     question: FeeKnowledgeResearchQuestion;
+    questionOrdinal?: number;
   },
   attemptId: string,
   values: {
@@ -493,14 +579,21 @@ function candidateRecord(
     reasonCodes: readonly string[];
     safeApplicability: FeeKnowledgeResearchCandidateRecord["safeApplicability"];
     sourceFingerprint: string | null;
+    retrievalStatus: FeeKnowledgeResearchCandidateRecord["retrievalStatus"];
+    semanticVerificationStatus: FeeKnowledgeResearchCandidateRecord["semanticVerificationStatus"];
+    locatorHash: string | null;
+    claimSupportDecisionRef: string | null;
   },
 ): FeeKnowledgeResearchCandidateRecord {
   return {
     type: "fee_knowledge_research_candidate",
     policyVersion: FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
     candidateId: input.candidateId,
+    questionRef: feeKnowledgeQuestionRef(input.question, input.questionOrdinal ?? 0),
     feeRowRef: input.question.feeRowRef,
     attemptId,
+    retrievalStatus: values.retrievalStatus,
+    semanticVerificationStatus: values.semanticVerificationStatus,
     canonicalUrl: values.canonicalUrl,
     title: sanitizeText(input.candidate.title ?? "", 160) || null,
     publisher: sanitizeText(input.candidate.publisher ?? "", 120) || null,
@@ -508,8 +601,100 @@ function candidateRecord(
     reasonCodes: [...new Set(values.reasonCodes)].sort(),
     safeApplicability: values.safeApplicability,
     sourceFingerprint: values.sourceFingerprint,
+    locatorHash: values.locatorHash,
+    claimSupportDecisionRef: values.claimSupportDecisionRef,
     displayPermission: "internal_only",
   };
+}
+
+function candidateAfterRetrieval(
+  candidate: FeeKnowledgeResearchCandidateRecord,
+  retrieved: RetrievedDocument,
+): FeeKnowledgeResearchCandidateRecord {
+  return {
+    ...candidate,
+    canonicalUrl: retrieved.canonicalUrl,
+    retrievalStatus: retrieved.status,
+    verificationStatus: retrieved.status === "retrieved_text" ? "provisional"
+      : retrieved.status === "safety_blocked" ? "safety_blocked"
+        : retrieved.status === "retrieval_succeeded_text_unavailable" ? "source_unavailable" : "rejected",
+    reasonCodes: [...new Set([...retrieved.reasonCodes, "fee_knowledge_semantic_support_not_run"])].sort(),
+    sourceFingerprint: retrieved.documentFingerprint,
+  };
+}
+
+function snapshotResearchResult(result: FeeKnowledgeResearchResult): FeeKnowledgeResearchResult {
+  return structuredClone({
+    attempts: result.attempts,
+    candidates: result.candidates,
+    claimSupports: result.claimSupports,
+  });
+}
+
+function terminalResearchSnapshot(input: {
+  questions: readonly FeeKnowledgeResearchQuestion[];
+  attempts: readonly FeeKnowledgeResearchAttemptRecord[];
+  candidates: readonly FeeKnowledgeResearchCandidateRecord[];
+  claimSupports: readonly FeeKnowledgeClaimSupportRecord[];
+  status: "failed" | "timed_out";
+}): FeeKnowledgeResearchResult {
+  const candidates = structuredClone([...input.candidates]);
+  for (let index = 0; index < candidates.length; index += 1) {
+    const candidate = candidates[index]!;
+    if (candidate.retrievalStatus === "not_started") {
+      candidates[index] = {
+        ...candidate,
+        retrievalStatus: input.status,
+        semanticVerificationStatus: "not_started",
+        verificationStatus: "rejected",
+        reasonCodes: [
+          input.status === "timed_out" ? "fee_knowledge_retrieval_timed_out" : "fee_knowledge_retrieval_fetch_failed",
+          "fee_knowledge_semantic_support_not_run",
+        ].sort(),
+      };
+    } else if (candidate.retrievalStatus === "retrieved_text" && candidate.semanticVerificationStatus === "not_started") {
+      candidates[index] = {
+        ...candidate,
+        semanticVerificationStatus: input.status,
+        verificationStatus: "verified_candidate_limited",
+        reasonCodes: [...new Set([
+          ...candidate.reasonCodes.filter((reason) => reason !== "fee_knowledge_semantic_support_not_run"),
+          input.status === "timed_out" ? "fee_knowledge_semantic_timed_out" : "fee_knowledge_semantic_failed",
+        ])].sort(),
+      };
+    }
+  }
+  const attemptsByQuestion = new Map(input.attempts.map((attempt) => [attempt.questionRef, structuredClone(attempt)]));
+  for (const [index, question] of input.questions.entries()) {
+    const questionRef = feeKnowledgeQuestionRef(question, index);
+    if (attemptsByQuestion.has(questionRef)) continue;
+    const beyondBudget = index >= FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls;
+    const status = beyondBudget ? "budget_exhausted" : input.status;
+    const candidateIds = candidates.filter((candidate) => candidate.questionRef === questionRef).map((candidate) => candidate.candidateId);
+    attemptsByQuestion.set(questionRef, attemptRecord(question, index, status, candidateIds, [researchFailureReason(status)]));
+  }
+  return snapshotResearchResult({
+    attempts: input.questions.map((question, index) => attemptsByQuestion.get(feeKnowledgeQuestionRef(question, index))!),
+    candidates,
+    claimSupports: structuredClone([...input.claimSupports]),
+  });
+}
+
+function upsertAttempt(
+  attempts: FeeKnowledgeResearchAttemptRecord[],
+  attempt: FeeKnowledgeResearchAttemptRecord,
+): void {
+  const index = attempts.findIndex((item) => item.questionRef === attempt.questionRef);
+  if (index < 0) attempts.push(attempt);
+  else attempts[index] = attempt;
+}
+
+function researchFailureReason(status: FeeKnowledgeResearchAttemptRecord["status"]): string {
+  if (status === "unsupported_model") return "fee_knowledge_web_search_model_unsupported";
+  if (status === "safety_blocked") return "fee_knowledge_research_safety_blocked";
+  if (status === "budget_exhausted") return "fee_knowledge_research_budget_exhausted";
+  if (status === "timed_out") return "fee_knowledge_research_timed_out";
+  return "fee_knowledge_research_failed";
 }
 
 function attemptRecord(
@@ -523,6 +708,7 @@ function attemptRecord(
     type: "fee_knowledge_research_attempt",
     policyVersion: FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
     attemptId: attemptIdFor(question, index),
+    questionRef: feeKnowledgeQuestionRef(question, index),
     feeRowRef: question.feeRowRef,
     sanitizedQuestionCategory: question.sanitizedQuestionCategory,
     triggerReason: question.triggerReason,
@@ -645,6 +831,7 @@ function validateWebSearchModel(model: string): void {
 function semanticDecisionFromRaw(raw: unknown, structuredClaim: FeeKnowledgeStructuredClaim): FeeKnowledgeSemanticSupportDecision {
   const text = outputText(raw);
   const parsed = parseJsonObject(text);
+  if (!parsed) return unsupportedSemanticDecision(structuredClaim, "fee_knowledge_semantic_json_invalid");
   const decision = typeof parsed?.decision === "string" ? parsed.decision : "unsupported";
   const allowed = ["supports", "partially_supports", "does_not_support", "contradicts", "unsupported"];
   return {
@@ -849,4 +1036,18 @@ function verifiedPublisherDomain(host: string, processorOrNetwork: string, polic
 
 function stableId(parts: readonly string[]): string {
   return createHash("sha256").update(parts.join("\0")).digest("hex").slice(0, 16);
+}
+
+function canonicalSha256(value: unknown): string {
+  const canonicalize = (item: unknown): unknown => {
+    if (Array.isArray(item)) return item.map(canonicalize);
+    if (item && typeof item === "object") {
+      return Object.fromEntries(Object.entries(item as Record<string, unknown>)
+        .filter(([, child]) => child !== undefined)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, child]) => [key, canonicalize(child)]));
+    }
+    return item;
+  };
+  return createHash("sha256").update(JSON.stringify(canonicalize(value))).digest("hex");
 }
