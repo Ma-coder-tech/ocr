@@ -331,6 +331,13 @@ export type CostToolEvent = {
   count: number;
 };
 
+export type EvaluationPricingPolicy = {
+  uncachedInputUsdPerMillionTokens: number;
+  cachedInputUsdPerMillionTokens: number;
+  outputUsdPerMillionTokens: number;
+  toolUseUsd: number;
+};
+
 export type CostLedgerEntry = {
   callId: string;
   attempt: number;
@@ -353,6 +360,7 @@ export type CostLedgerEntry = {
   durationMs: number | null;
   status: CostCallStatus;
   inputTokens: number | null;
+  cachedInputTokens: number | null;
   outputTokens: number | null;
   toolEvents: CostToolEvent[];
   estimatedMaximumCostUsd: number;

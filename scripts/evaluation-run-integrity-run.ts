@@ -19,6 +19,12 @@ type StageCostPolicy = {
   maximumInputTokens: number | null;
   maximumOutputTokens: number | null;
   maximumToolUses: number | null;
+  pricing: {
+    uncachedInputUsdPerMillionTokens: number;
+    cachedInputUsdPerMillionTokens: number;
+    outputUsdPerMillionTokens: number;
+    toolUseUsd: number;
+  };
   estimatedMaximumCostUsd: number;
 };
 

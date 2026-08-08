@@ -41,6 +41,8 @@ export const FEE_KNOWLEDGE_RESEARCH_LIMITS = {
 } as const satisfies FeeKnowledgeResearchLimits;
 
 const DEFAULT_OPENAI_WEB_SEARCH_MODEL = "gpt-5";
+export const OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS = 2_000;
+export const OPENAI_SEMANTIC_VERIFICATION_MAX_OUTPUT_TOKENS = 1_000;
 const WEB_SEARCH_MODEL_PATTERN = /^(gpt-5(?:$|-)|gpt-4\.1(?:$|-)|gpt-4o(?:-search-preview)?(?:$|-)|o3(?:$|-)|o4-mini(?:$|-))/i;
 
 export type FeeKnowledgeResearchQuestion = {
@@ -92,6 +94,14 @@ export type FeeKnowledgeSemanticSupportAdapter = (
   },
   context: { abortSignal: AbortSignal },
 ) => Promise<FeeKnowledgeSemanticSupportDecision>;
+
+export type OpenAiResponsesSafeUsage = {
+  requestId: string | null;
+  inputTokens: number | null;
+  cachedInputTokens: number | null;
+  outputTokens: number | null;
+  webSearchToolCalls: number;
+};
 
 export type FeeKnowledgeResearchOptions = {
   enabled?: boolean;
@@ -307,6 +317,10 @@ export function openAiWebSearchAdapter(options: {
   apiKey?: string;
   modelName?: string;
   fetchImpl?: SafeFetch;
+  maximumInputTokens?: number;
+  maximumOutputTokens?: number;
+  maximumToolUses?: number;
+  onUsage?: (usage: OpenAiResponsesSafeUsage) => void;
 }): FeeKnowledgeSearchAdapter {
   return async (request, context) => {
     const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
@@ -336,6 +350,9 @@ export function openAiWebSearchAdapter(options: {
         })),
       }),
     ].join("\n");
+    assertUtf8InputBound(input, options.maximumInputTokens);
+    const maximumOutputTokens = positiveInteger(options.maximumOutputTokens ?? OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS, "web-search maximum output tokens");
+    const maximumToolUses = positiveInteger(options.maximumToolUses ?? 1, "web-search maximum tool uses");
     const response = await fetchImpl("https://api.openai.com/v1/responses", {
       method: "POST",
       signal: context.abortSignal,
@@ -348,9 +365,12 @@ export function openAiWebSearchAdapter(options: {
         input,
         tools: [{ type: "web_search" }],
         tool_choice: "auto",
+        max_output_tokens: maximumOutputTokens,
+        max_tool_calls: maximumToolUses,
       }),
     });
     const raw = await safeJson(response);
+    options.onUsage?.(openAiResponsesSafeUsage(raw));
     if (!response.ok) {
       throw new FeeKnowledgeSearchProviderError(classifyProviderError(raw) === "unsupported_model" ? "unsupported_model" : "failed", `OpenAI fee knowledge discovery failed with HTTP ${response.status}`);
     }
@@ -363,31 +383,71 @@ export function openAiSemanticSupportAdapter(options: {
   apiKey?: string;
   modelName?: string;
   fetchImpl?: SafeFetch;
+  maximumInputTokens?: number;
+  maximumOutputTokens?: number;
+  maximumToolUses?: number;
+  onUsage?: (usage: OpenAiResponsesSafeUsage) => void;
 }): FeeKnowledgeSemanticSupportAdapter {
   return async (request, context) => {
     const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
     if (!apiKey) return unsupportedSemanticDecision(request.structuredClaim, "fee_knowledge_semantic_support_provider_unavailable");
     const fetchImpl = options.fetchImpl ?? fetch;
+    const input = [
+      "Decide whether the cited excerpt semantically supports the structured fee-knowledge claim.",
+      "Return compact JSON only with decision supports, partially_supports, does_not_support, contradicts, or unsupported and safe reasonCodes.",
+      JSON.stringify({
+        structuredClaim: request.structuredClaim,
+        excerpt: request.boundedEvidenceExcerpt,
+        applicability: request.applicability,
+      }),
+    ].join("\n");
+    assertUtf8InputBound(input, options.maximumInputTokens);
+    const maximumOutputTokens = positiveInteger(options.maximumOutputTokens ?? OPENAI_SEMANTIC_VERIFICATION_MAX_OUTPUT_TOKENS, "semantic-verification maximum output tokens");
+    if ((options.maximumToolUses ?? 0) !== 0) throw new Error("Semantic verification maximum tool uses must be zero.");
     const response = await fetchImpl("https://api.openai.com/v1/responses", {
       method: "POST",
       signal: context.abortSignal,
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
       body: JSON.stringify({
         model: options.modelName ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_WEB_SEARCH_MODEL,
-        input: [
-          "Decide whether the cited excerpt semantically supports the structured fee-knowledge claim.",
-          "Return compact JSON only with decision supports, partially_supports, does_not_support, contradicts, or unsupported and safe reasonCodes.",
-          JSON.stringify({
-            structuredClaim: request.structuredClaim,
-            excerpt: request.boundedEvidenceExcerpt,
-            applicability: request.applicability,
-          }),
-        ].join("\n"),
+        input,
+        max_output_tokens: maximumOutputTokens,
       }),
     });
+    const raw = await safeJson(response);
+    options.onUsage?.(openAiResponsesSafeUsage(raw));
     if (!response.ok) return unsupportedSemanticDecision(request.structuredClaim, "fee_knowledge_semantic_support_provider_failed");
-    return semanticDecisionFromRaw(await safeJson(response), request.structuredClaim);
+    return semanticDecisionFromRaw(raw, request.structuredClaim);
   };
+}
+
+export function openAiResponsesSafeUsage(raw: unknown): OpenAiResponsesSafeUsage {
+  const root = asRecord(raw);
+  const usage = asRecord(root?.usage);
+  const details = asRecord(usage?.input_tokens_details);
+  const output = Array.isArray(root?.output) ? root.output : [];
+  return {
+    requestId: typeof root?.id === "string" && root.id.length > 0 ? root.id : null,
+    inputTokens: safeUsageInteger(usage?.input_tokens),
+    cachedInputTokens: safeUsageInteger(details?.cached_tokens) ?? 0,
+    outputTokens: safeUsageInteger(usage?.output_tokens),
+    webSearchToolCalls: output.filter((item) => asRecord(item)?.type === "web_search_call").length,
+  };
+}
+
+function assertUtf8InputBound(input: string, maximumInputTokens: number | undefined): void {
+  if (maximumInputTokens === undefined) return;
+  const maximum = positiveInteger(maximumInputTokens, "maximum input tokens");
+  if (Buffer.byteLength(input, "utf8") > maximum) throw new Error("Approved maximum input tokens exceeded before provider send.");
+}
+
+function positiveInteger(value: number, label: string): number {
+  if (!Number.isInteger(value) || value <= 0) throw new Error(`${label} must be a positive integer.`);
+  return value;
+}
+
+function safeUsageInteger(value: unknown): number | null {
+  return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : null;
 }
 
 export function extractDiscoveryCandidates(raw: unknown): FeeKnowledgeDiscoveryCandidate[] {

@@ -5,6 +5,8 @@ import {
   FEE_KNOWLEDGE_RESEARCH_LIMITS,
   defaultFeeKnowledgeResearchQuestions,
   FeeKnowledgeSearchProviderError,
+  OPENAI_SEMANTIC_VERIFICATION_MAX_OUTPUT_TOKENS,
+  OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS,
   feeKnowledgeQuestionRef,
   openAiSemanticSupportAdapter,
   openAiWebSearchAdapter,
@@ -14,6 +16,7 @@ import {
   type FeeKnowledgeResearchLimits,
   type FeeKnowledgeSearchAdapter,
   type FeeKnowledgeSemanticSupportAdapter,
+  type OpenAiResponsesSafeUsage,
 } from "../canonical/feeKnowledgeResearch.js";
 import { runtimeSupportAccepted } from "../canonical/feeKnowledgeClaimSupportDecision.js";
 import { retrieveFeeKnowledgeDocument, type RetrievedDocument } from "../canonical/feeKnowledgeRetrieval.js";
@@ -39,6 +42,7 @@ import {
 } from "../canonical/wholeStatementFeeIntelligenceAdmission.js";
 import {
   wholeStatementFeeIntelligenceProviderAdapter,
+  type WholeStatementFeeIntelligenceProviderUsage,
   type WholeStatementFeeIntelligenceRuntimeAdapter,
 } from "../canonical/wholeStatementFeeIntelligenceRuntime.js";
 import type { CanonicalStatementAnalysis } from "../canonical/types.js";
@@ -48,6 +52,11 @@ import type { CostReservationInput } from "./costLedger.js";
 import type { PackagesBEProjectionInput } from "./invariance.js";
 import type { RepositoryProviderTransportInput, RepositoryProviderTransportResult } from "./repositoryAdapter.js";
 import type { EvaluationManifestDocument } from "./types.js";
+import {
+  accountingFromProviderUsage,
+  assertApprovedLiveCallMetadata,
+  type SafeProviderUsage,
+} from "./providerAccounting.js";
 
 export const ONE_TIME_STATEMENT_EVALUATION_PACKET_VERSION = "one_time_statement_evaluation_packet_v1" as const;
 export const ONE_TIME_EXTERNAL_REQUEST_RESULT_VERSION = "one_time_external_request_result_v1" as const;
@@ -524,25 +533,80 @@ export function createOneTimeStatementEvaluationTransport(input: {
 
 function defaultServices(overrides: Partial<OneTimeStatementEvaluationServices> = {}): OneTimeStatementEvaluationServices {
   return {
-    wholeStatementReview: overrides.wholeStatementReview ?? ((packet, context) => {
-      const provider = context.approvedCallMetadata.provider.toLowerCase().includes("anthropic") ? "anthropic" : "openai";
-      const modelName = context.approvedCallMetadata.model ?? undefined;
-      return wholeStatementFeeIntelligenceProviderAdapter({
-        provider,
-        anthropicModelName: provider === "anthropic" ? modelName : undefined,
-        openAiModelName: provider === "openai" ? modelName : undefined,
+    wholeStatementReview: overrides.wholeStatementReview ?? (async (packet, context) => {
+      const providerSettings = livePackage5BProviderSettings(context.approvedCallMetadata);
+      const started = Date.now();
+      let usage: WholeStatementFeeIntelligenceProviderUsage | null = null;
+      const value = await wholeStatementFeeIntelligenceProviderAdapter({
+        ...providerSettings,
+        onProviderUsage: (observed) => { usage = observed; },
       })(packet, context);
+      return externalResult(value, accountingFromProviderUsage({
+        usage: wholeStatementSafeUsage(usage),
+        approvedCallMetadata: context.approvedCallMetadata,
+        durationMs: Math.max(0, Date.now() - started),
+      }));
     }),
-    webSearchDiscovery: overrides.webSearchDiscovery ?? ((request, context) => openAiWebSearchAdapter({
-      modelName: context.approvedCallMetadata.model ?? undefined,
-    })(request, context)),
-    documentRetrieval: overrides.documentRetrieval ?? ((url, options) => retrieveFeeKnowledgeDocument(url, {
-      abortSignal: options.abortSignal,
-      limits: { maxRedirects: 0 } as unknown as Parameters<typeof retrieveFeeKnowledgeDocument>[1]["limits"],
-    })),
-    semanticVerification: overrides.semanticVerification ?? ((request, context) => openAiSemanticSupportAdapter({
-      modelName: context.approvedCallMetadata.model ?? undefined,
-    })(request, context)),
+    webSearchDiscovery: overrides.webSearchDiscovery ?? (async (request, context) => {
+      assertApprovedLiveCallMetadata("web_search_discovery", context.approvedCallMetadata);
+      const started = Date.now();
+      let usage: OpenAiResponsesSafeUsage | null = null;
+      const value = await openAiWebSearchAdapter({
+        modelName: context.approvedCallMetadata.model ?? undefined,
+        maximumInputTokens: context.approvedCallMetadata.maximumInputTokens ?? undefined,
+        maximumOutputTokens: OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS,
+        maximumToolUses: context.approvedCallMetadata.maximumToolUses ?? undefined,
+        onUsage: (observed) => { usage = observed; },
+      })(request, context);
+      return externalResult(value, accountingFromProviderUsage({
+        usage: responsesSafeUsage(usage),
+        approvedCallMetadata: context.approvedCallMetadata,
+        durationMs: Math.max(0, Date.now() - started),
+      }));
+    }),
+    documentRetrieval: overrides.documentRetrieval ?? (async (url, options) => {
+      assertApprovedLiveCallMetadata("document_retrieval", options.approvedCallMetadata);
+      const started = Date.now();
+      const value = await retrieveFeeKnowledgeDocument(url, {
+        abortSignal: options.abortSignal,
+        limits: { maxRedirects: 0 } as unknown as Parameters<typeof retrieveFeeKnowledgeDocument>[1]["limits"],
+      });
+      return externalResult(value, noRequestAccounting(started));
+    }),
+    semanticVerification: overrides.semanticVerification ?? (async (request, context) => {
+      assertApprovedLiveCallMetadata("semantic_verification", context.approvedCallMetadata);
+      const started = Date.now();
+      let usage: OpenAiResponsesSafeUsage | null = null;
+      const value = await openAiSemanticSupportAdapter({
+        modelName: context.approvedCallMetadata.model ?? undefined,
+        maximumInputTokens: context.approvedCallMetadata.maximumInputTokens ?? undefined,
+        maximumOutputTokens: OPENAI_SEMANTIC_VERIFICATION_MAX_OUTPUT_TOKENS,
+        maximumToolUses: context.approvedCallMetadata.maximumToolUses ?? undefined,
+        onUsage: (observed) => { usage = observed; },
+      })(request, context);
+      return externalResult(value, accountingFromProviderUsage({
+        usage: responsesSafeUsage(usage),
+        approvedCallMetadata: context.approvedCallMetadata,
+        durationMs: Math.max(0, Date.now() - started),
+      }));
+    }),
+  };
+}
+
+export function livePackage5BProviderSettings(metadata: CostReservationInput): {
+  provider: "openai";
+  openAiModelName: string;
+  maxInputTokens: number;
+  maxOutputTokens: number;
+  maxRetries: 0;
+} {
+  assertApprovedLiveCallMetadata("whole_statement_ai_review", metadata);
+  return {
+    provider: "openai",
+    openAiModelName: metadata.model!,
+    maxInputTokens: metadata.maximumInputTokens!,
+    maxOutputTokens: metadata.maximumOutputTokens!,
+    maxRetries: 0,
   };
 }
 
@@ -557,9 +621,7 @@ function unwrapExternalRequestResult<T>(
       accounting: {
         ...response.accounting,
         durationMs: response.accounting.durationMs,
-        toolEvents: response.accounting.toolEvents?.length
-          ? response.accounting.toolEvents
-          : [{ type: toolType, count: 1 }],
+        toolEvents: response.accounting.toolEvents ?? [],
       },
     };
   }
@@ -569,6 +631,7 @@ function unwrapExternalRequestResult<T>(
       requestId: null,
       durationMs: Math.max(0, Date.now() - started),
       inputTokens: null,
+      cachedInputTokens: null,
       outputTokens: null,
       toolEvents: [{ type: toolType, count: 1 }],
       observedOrEstimatedFinalCostUsd: null,
@@ -590,10 +653,35 @@ function noRequestAccounting(started: number): RepositoryProviderTransportResult
     requestId: null,
     durationMs: Math.max(0, Date.now() - started),
     inputTokens: 0,
+    cachedInputTokens: 0,
     outputTokens: 0,
     toolEvents: [],
     observedOrEstimatedFinalCostUsd: 0,
     billingDisposition: "provider_confirmed_zero",
+  };
+}
+
+function externalResult<T>(
+  value: T,
+  accounting: RepositoryProviderTransportResult["accounting"],
+): OneTimeExternalRequestResult<T> {
+  return { type: ONE_TIME_EXTERNAL_REQUEST_RESULT_VERSION, value, accounting };
+}
+
+function wholeStatementSafeUsage(usage: WholeStatementFeeIntelligenceProviderUsage | null): SafeProviderUsage | null {
+  return usage && {
+    ...usage,
+    toolEvents: [],
+  };
+}
+
+function responsesSafeUsage(usage: OpenAiResponsesSafeUsage | null): SafeProviderUsage | null {
+  return usage && {
+    requestId: usage.requestId,
+    inputTokens: usage.inputTokens,
+    cachedInputTokens: usage.cachedInputTokens,
+    outputTokens: usage.outputTokens,
+    toolEvents: usage.webSearchToolCalls > 0 ? [{ type: "web_search", count: usage.webSearchToolCalls }] : [],
   };
 }
 

@@ -5,7 +5,9 @@ import type {
   CostCapability,
   CostLedgerEntry,
   CostToolEvent,
+  EvaluationPricingPolicy,
 } from "./types.js";
+import { calculateWorstCaseCostUsd } from "./providerAccounting.js";
 import { EVALUATION_COST_LEDGER_VERSION } from "./types.js";
 
 export const EVALUATION_COST_CURRENCY = "USD" as const;
@@ -24,6 +26,7 @@ export type CostReservationInput = {
   maximumInputTokens: number | null;
   maximumOutputTokens: number | null;
   maximumToolUses: number | null;
+  pricing?: EvaluationPricingPolicy | null;
   estimatedMaximumCostUsd: number;
   startedAt?: string;
 };
@@ -34,6 +37,7 @@ type FinalizeInput = {
   endedAt?: string;
   durationMs: number;
   inputTokens?: number | null;
+  cachedInputTokens?: number | null;
   outputTokens?: number | null;
   toolEvents?: CostToolEvent[];
   observedOrEstimatedFinalCostUsd?: number | null;
@@ -56,6 +60,19 @@ export class EvaluationCostBudgetLedger {
     assertReservationProvenance(input, this.entries);
     const reservationUnits = usdUnits(input.estimatedMaximumCostUsd);
     if (reservationUnits <= 0) throw new Error("Every provider call requires a positive maximum cost reservation.");
+    if (input.pricing) {
+      const calculatedWorstCaseUnits = usdUnits(calculateWorstCaseCostUsd(input));
+      if (reservationUnits < calculatedWorstCaseUnits) {
+        throw new EvaluationIntegrityError(
+          "insufficient_budget_reservation",
+          "The call reservation is below its policy-calculated worst-case cost.",
+          {
+            requestedReservationUsd: unitsUsd(reservationUnits),
+            calculatedWorstCaseUsd: unitsUsd(calculatedWorstCaseUnits),
+          },
+        );
+      }
+    }
     const committedBefore = this.committedUnits();
     if (committedBefore + reservationUnits > this.approvedBudgetUnits) {
       throw new EvaluationIntegrityError(
@@ -89,6 +106,7 @@ export class EvaluationCostBudgetLedger {
       durationMs: null,
       status: "reserved",
       inputTokens: null,
+      cachedInputTokens: null,
       outputTokens: null,
       toolEvents: [],
       estimatedMaximumCostUsd: unitsUsd(reservationUnits),
@@ -119,6 +137,7 @@ export class EvaluationCostBudgetLedger {
     entry.endedAt = input.endedAt ?? new Date().toISOString();
     entry.durationMs = input.durationMs;
     entry.inputTokens = input.inputTokens ?? null;
+    entry.cachedInputTokens = input.cachedInputTokens ?? null;
     entry.outputTokens = input.outputTokens ?? null;
     entry.toolEvents = [...(input.toolEvents ?? [])].sort((left, right) => left.type.localeCompare(right.type));
     entry.observedOrEstimatedFinalCostUsd = observedUnits === null ? null : unitsUsd(observedUnits);
@@ -153,6 +172,20 @@ export class EvaluationCostBudgetLedger {
       blocked: committed >= this.approvedBudgetUnits,
       entries: structuredClone(this.entries),
     };
+  }
+
+  assertReadyToSend(callId: string): CostLedgerEntry {
+    const entry = this.entries.find((item) => item.callId === callId);
+    if (!entry) throw new Error(`Cost ledger call ID was not reserved: ${callId}`);
+    if (entry.status !== "reserved") throw new Error(`Cost ledger call is not sendable: ${callId}`);
+    const committed = this.committedUnits();
+    if (committed > this.approvedBudgetUnits) {
+      throw new EvaluationIntegrityError(
+        "insufficient_budget_reservation",
+        "Committed spend exceeds the approved run budget before provider send.",
+      );
+    }
+    return structuredClone(entry);
   }
 
   private reservedHistoricalUnits(): number {

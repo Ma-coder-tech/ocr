@@ -9,6 +9,7 @@ export * from "./manifest.js";
 export * from "./oneTimeStatementEvaluationAdapter.js";
 export * from "./oneTimeCanonicalAdmissionProjection.js";
 export * from "./parserDecision.js";
+export * from "./providerAccounting.js";
 export * from "./repositoryAdapter.js";
 export * from "./stable.js";
 export * from "./types.js";
