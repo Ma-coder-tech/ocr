@@ -196,6 +196,48 @@ describe("live-evaluation budget enforcement", () => {
     expect(JSON.stringify(error)).not.toContain(rawSecret);
   });
 
+  it.each([
+    ["source title containing policy", { sourceTitle: "Official network policy guide" }],
+    ["output text containing policy", { outputText: "This policy explains the published fee." }],
+    ["citation URL containing policy", { citationUrl: "https://www.example.com/policy/official-fees" }],
+    ["ordinary cannot-comply prose", { outputText: "A quoted example says cannot comply with an old rule." }],
+  ] as const)("does not infer refusal from %s", async (_case, options) => {
+    const adapter = openAiWebSearchAdapter({
+      apiKey: "synthetic-key",
+      modelName: "gpt-5",
+      fetchImpl: async () => jsonResponse(successfulSearchPayload(options)),
+    });
+
+    const candidates = await adapter(searchRequest(), { abortSignal: new AbortController().signal });
+
+    expect(candidates.length).toBeGreaterThan(0);
+  });
+
+  it("classifies only structural refusal content and retains the safe response ID", async () => {
+    const rawSecret = "refusal text with private provider detail";
+    const adapter = openAiWebSearchAdapter({
+      apiKey: "synthetic-key",
+      modelName: "gpt-5",
+      fetchImpl: async () => jsonResponse({
+        id: "resp_structural_refusal",
+        usage: { input_tokens: 10, output_tokens: 5 },
+        output: [
+          { type: "web_search_call", action: { type: "search", sources: [] } },
+          { type: "message", content: [{ type: "refusal", refusal: rawSecret }] },
+        ],
+      }),
+    });
+
+    const error = await adapter(searchRequest(), { abortSignal: new AbortController().signal }).catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      reasonCode: "provider_refused",
+      reasonCodes: ["provider_refused"],
+      accounting: { requestId: "resp_structural_refusal" },
+    });
+    expect(JSON.stringify(error)).not.toContain(rawSecret);
+  });
+
   it("normalizes an AI SDK schema rejection without retaining provider request data", async () => {
     let observedOptions: Record<string, unknown> | null = null;
     const rawSecret = "raw-package-5b-request-data-must-not-persist";
@@ -241,20 +283,25 @@ describe("live-evaluation budget enforcement", () => {
   });
 
   it("fails a successful Responses payload that did not execute web search", async () => {
+    const rawProviderText = "No tool call despite ordinary policy prose.";
     const adapter = openAiWebSearchAdapter({
       apiKey: "synthetic-key",
       modelName: "gpt-5",
       fetchImpl: async () => jsonResponse({
         id: "resp_without_search",
         usage: { input_tokens: 10, output_tokens: 5 },
-        output: [{ type: "message", content: [{ type: "output_text", text: "No tool call." }] }],
+        output: [{ type: "message", content: [{ type: "output_text", text: rawProviderText }] }],
       }),
     });
 
-    await expect(adapter(searchRequest(), { abortSignal: new AbortController().signal })).rejects.toMatchObject({
-      status: "failed",
-      message: "OpenAI fee knowledge discovery completed without a web_search_call.",
+    const error = await adapter(searchRequest(), { abortSignal: new AbortController().signal }).catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      reasonCode: "provider_required_tool_missing",
+      reasonCodes: ["provider_required_tool_missing"],
+      accounting: { requestId: "resp_without_search" },
     });
+    expect(JSON.stringify(error)).not.toContain(rawProviderText);
   });
 
   it("puts the hard output ceiling in semantic Responses requests and captures zero tool calls", async () => {
@@ -562,6 +609,39 @@ function jsonResponse(value: unknown, init: { status?: number; headers?: Record<
     status: init.status ?? 200,
     headers: { "content-type": "application/json", ...init.headers },
   });
+}
+
+function successfulSearchPayload(options: {
+  sourceTitle?: string;
+  outputText?: string;
+  citationUrl?: string;
+}) {
+  const output: unknown[] = [{
+    type: "web_search_call",
+    action: {
+      type: "search",
+      sources: [{
+        type: "url",
+        url: "https://www.example.com/official-fees",
+        title: options.sourceTitle ?? "Official fees",
+      }],
+    },
+  }];
+  if (options.outputText || options.citationUrl) {
+    output.push({
+      type: "message",
+      content: [{
+        type: "output_text",
+        text: options.outputText ?? "Official source citation.",
+        annotations: options.citationUrl ? [{ type: "url_citation", url: options.citationUrl, title: "Official citation" }] : [],
+      }],
+    });
+  }
+  return {
+    id: "resp_non_refusal",
+    usage: { input_tokens: 10, output_tokens: 5 },
+    output,
+  };
 }
 
 function allObjectPropertiesRequired(value: unknown): boolean {

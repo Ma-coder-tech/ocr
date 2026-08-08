@@ -465,7 +465,11 @@ describe("canonical fee knowledge and provenance", () => {
 	        modelName: "gpt-5",
 	        fetchImpl: async () => jsonResponse({ output: [{ type: "message", content: [{ type: "refusal", refusal: "no" }] }] }),
 	      })(request, { abortSignal: new AbortController().signal }),
-	    ).rejects.toMatchObject({ status: "failed" });
+	    ).rejects.toMatchObject({
+	      reasonCode: "provider_refused",
+	      reasonCodes: ["provider_refused"],
+	      accounting: { requestId: null },
+	    });
 	  });
 
 	  it("actively aborts timed-out research and ignores late provider completion", async () => {
