@@ -1,11 +1,14 @@
 import type { CostReservationInput } from "./costLedger.js";
 import type { CostToolEvent, EvaluationExecutionStage, EvaluationPricingPolicy } from "./types.js";
+import { safeProviderPostResponseFailureError } from "../canonical/providerFailureDiagnostics.js";
 
 export const LIVE_TRIAL_OUTPUT_LIMITS = {
   whole_statement_ai_review: 5_000,
   web_search_discovery: 2_000,
   semantic_verification: 1_000,
 } as const;
+
+export const WEB_SEARCH_ACCOUNTING_MAX_ACTIONS = 2;
 
 export type SafeProviderUsage = {
   requestId: string | null;
@@ -49,6 +52,7 @@ export function accountingFromProviderUsage(input: {
   billingDisposition: "observed" | "unknown";
 } {
   const usage = input.usage;
+  if (usage) assertToolUsageWithinApprovedLimit(usage, input.approvedCallMetadata);
   if (!usage || !completeUsage(usage)) {
     return {
       requestId: usage?.requestId ?? null,
@@ -61,7 +65,7 @@ export function accountingFromProviderUsage(input: {
       billingDisposition: "unknown",
     };
   }
-  assertUsageWithinApprovedLimits(usage, input.approvedCallMetadata);
+  assertTokenUsageWithinApprovedLimits(usage, input.approvedCallMetadata);
   const pricing = requiredPricing(input.approvedCallMetadata.pricing);
   const uncachedInputTokens = usage.inputTokens - usage.cachedInputTokens;
   const toolUses = usage.toolEvents.reduce((total, event) => total + event.count, 0);
@@ -99,7 +103,7 @@ export function assertApprovedLiveCallMetadata(
   if (expectedOutput === undefined || metadata.maximumOutputTokens !== expectedOutput) {
     throw new Error("approved_maximum_output_tokens_inconsistent");
   }
-  const expectedToolUses = stage === "web_search_discovery" ? 1 : 0;
+  const expectedToolUses = stage === "web_search_discovery" ? WEB_SEARCH_ACCOUNTING_MAX_ACTIONS : 0;
   if (metadata.maximumToolUses !== expectedToolUses) throw new Error("approved_maximum_tool_uses_inconsistent");
   const calculated = calculateWorstCaseCostUsd(metadata);
   if (metadata.estimatedMaximumCostUsd + 1e-9 < calculated) {
@@ -113,18 +117,35 @@ export function assertUtf8InputWithinApprovedTokenBound(input: string, maximumIn
   if (conservativeTokenUpperBound > maximum) throw new Error("approved_maximum_input_tokens_exceeded_before_send");
 }
 
-function assertUsageWithinApprovedLimits(usage: SafeProviderUsage & {
+function assertToolUsageWithinApprovedLimit(usage: SafeProviderUsage, metadata: CostReservationInput): void {
+  const maximumTools = requiredNonnegativeInteger(metadata.maximumToolUses, "maximum tool uses");
+  const toolUses = usage.toolEvents.reduce((total, event) => total + event.count, 0);
+  if (toolUses > maximumTools) throw usageLimitError(usage);
+}
+
+function assertTokenUsageWithinApprovedLimits(usage: SafeProviderUsage & {
   inputTokens: number;
   cachedInputTokens: number;
   outputTokens: number;
 }, metadata: CostReservationInput): void {
   const maximumInput = requiredNonnegativeInteger(metadata.maximumInputTokens, "maximum input tokens");
   const maximumOutput = requiredNonnegativeInteger(metadata.maximumOutputTokens, "maximum output tokens");
-  const maximumTools = requiredNonnegativeInteger(metadata.maximumToolUses, "maximum tool uses");
-  const toolUses = usage.toolEvents.reduce((total, event) => total + event.count, 0);
-  if (usage.inputTokens > maximumInput || usage.outputTokens > maximumOutput || toolUses > maximumTools) {
-    throw new Error("provider_usage_exceeded_approved_transport_limits");
-  }
+  if (usage.inputTokens > maximumInput || usage.outputTokens > maximumOutput) throw usageLimitError(usage);
+}
+
+function usageLimitError(usage: SafeProviderUsage): Error {
+  const error = safeProviderPostResponseFailureError(
+    "provider_usage_exceeded_approved_transport_limits",
+    usage.requestId,
+  );
+  Object.assign(error.accounting, {
+    inputTokens: usage.inputTokens,
+    cachedInputTokens: usage.cachedInputTokens,
+    outputTokens: usage.outputTokens,
+    toolEvents: structuredClone(usage.toolEvents),
+    observedOrEstimatedFinalCostUsd: null,
+  });
+  return error;
 }
 
 function completeUsage(usage: SafeProviderUsage): usage is SafeProviderUsage & {

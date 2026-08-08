@@ -10,6 +10,7 @@ import type { CanonicalFactValue } from "../src/canonical/types.js";
 import {
   EvaluationCostBudgetLedger,
   EvaluationIntegrityError,
+  accountingFromProviderUsage,
   buildEvaluationRunIntegrityArtifact,
   buildEvaluationSourceManifest,
   blockUnmanifestedLiveEvaluationEntrypoint,
@@ -359,7 +360,7 @@ describe("evaluation-run integrity", () => {
       toolClass: "web_search",
       maximumInputTokens: 1000,
       maximumOutputTokens: 500,
-      maximumToolUses: 1,
+      maximumToolUses: 2,
       attemptKind: "retry",
     });
   });
@@ -1075,6 +1076,84 @@ describe("evaluation-run integrity", () => {
       reasonCodes: ["provider_required_tool_missing"],
     });
     expect(JSON.stringify(result.artifact)).not.toContain(rawProviderText);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+  }, 30_000);
+
+  it("fails closed above two observable web actions while retaining only safe usage accounting", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    const invocations = { whole: 0, search: 0, retrieval: 0, semantic: 0 };
+    const result = await runManifestDrivenLiveEvaluation({
+      manifestPath: fixture.manifestPath,
+      approvedManifestHash: fixture.manifest.manifestContentHash,
+      requestedExecutions: fixture.requests,
+      approvedBudgetUsd: 10,
+      calls: oneTimePaidCalls(),
+      outputArtifactPath: path.join(fixture.directory, "one-time-web-action-limit-artifact.json"),
+      adapterId: "one_time_statement_evaluation_v1",
+      resolveSourceBytes: async () => fixture.bytes,
+      oneTimeServicesForTesting: {
+        wholeStatementReview: async () => {
+          invocations.whole += 1;
+          return externalRequestResult({}, "request_whole_after_web_action_limit", "whole_statement_ai_review");
+        },
+        webSearchDiscovery: async (_request, context) => {
+          invocations.search += 1;
+          accountingFromProviderUsage({
+            approvedCallMetadata: {
+              ...context.approvedCallMetadata,
+              maximumInputTokens: 400_000,
+              maximumOutputTokens: 2_000,
+              maximumToolUses: 2,
+              estimatedMaximumCostUsd: 0.54,
+              pricing: {
+                uncachedInputUsdPerMillionTokens: 1.25,
+                cachedInputUsdPerMillionTokens: 0.125,
+                outputUsdPerMillionTokens: 10,
+                toolUseUsd: 0.01,
+              },
+            },
+            durationMs: 30,
+            usage: {
+              requestId: "resp_three_web_actions",
+              inputTokens: 8_720,
+              cachedInputTokens: 4_352,
+              outputTokens: 1_564,
+              toolEvents: [
+                { type: "web_search.search", count: 1 },
+                { type: "web_search.open_page", count: 1 },
+                { type: "web_search.find_in_page", count: 1 },
+              ],
+            },
+          });
+          throw new Error("accounting limit must fail");
+        },
+        documentRetrieval: async () => { invocations.retrieval += 1; throw new Error("must not run"); },
+        semanticVerification: async () => { invocations.semantic += 1; throw new Error("must not run"); },
+      },
+    });
+
+    expect(invocations).toEqual({ whole: 1, search: 1, retrieval: 0, semantic: 0 });
+    expect(result.providerCallOutcomes[0]).toMatchObject({
+      stage: "web_search_discovery",
+      status: "failure",
+      requestId: "resp_three_web_actions",
+      reasonCodes: ["provider_usage_exceeded_approved_transport_limits"],
+    });
+    expect(result.costLedger.entries[0]).toMatchObject({
+      status: "failure",
+      billingDisposition: "unknown",
+      requestId: "resp_three_web_actions",
+      inputTokens: 8_720,
+      cachedInputTokens: 4_352,
+      outputTokens: 1_564,
+      toolEvents: [
+        { type: "web_search.find_in_page", count: 1 },
+        { type: "web_search.open_page", count: 1 },
+        { type: "web_search.search", count: 1 },
+      ],
+    });
+    expect(result.providerCallOutcomes.slice(1, -1).every((outcome) => outcome.status === "cancelled_before_send")).toBe(true);
+    expect(result.providerCallOutcomes.at(-1)).toMatchObject({ stage: "whole_statement_ai_review", status: "success" });
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
   }, 30_000);
 
@@ -2049,7 +2128,7 @@ function costReservation(input: {
     toolClass: capability,
     maximumInputTokens: 1000,
     maximumOutputTokens: 500,
-    maximumToolUses: capability === "web_search" || capability === "retrieval" ? 1 : 0,
+    maximumToolUses: capability === "web_search" ? 2 : capability === "retrieval" ? 1 : 0,
     estimatedMaximumCostUsd: input.estimatedMaximumCostUsd,
   };
 }
