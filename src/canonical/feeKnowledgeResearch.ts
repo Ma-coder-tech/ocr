@@ -24,7 +24,7 @@ import {
   type SafeFetch,
 } from "./feeKnowledgeRetrieval.js";
 import { LIVE_EVALUATION_TIMEOUT_POLICY } from "../evaluationIntegrity/liveEvaluationTimeoutPolicy.js";
-import { safeProviderFailureError } from "./providerFailureDiagnostics.js";
+import { safeProviderFailureError, safeProviderPostResponseFailureError } from "./providerFailureDiagnostics.js";
 
 export type FeeKnowledgeResearchLimits = {
   policyVersion: typeof FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION;
@@ -384,9 +384,9 @@ export function openAiWebSearchAdapter(options: {
     if (!response.ok) {
       throw safeProviderFailureError(null, { status: response.status, headers: response.headers, body: raw });
     }
-    if (providerRefused(raw)) throw new FeeKnowledgeSearchProviderError("failed", "OpenAI fee knowledge discovery refused.");
+    if (providerRefused(raw)) throw safeProviderPostResponseFailureError("provider_refused", usage.requestId);
     if (usage.webSearchToolCalls === 0) {
-      throw new FeeKnowledgeSearchProviderError("failed", "OpenAI fee knowledge discovery completed without a web_search_call.");
+      throw safeProviderPostResponseFailureError("provider_required_tool_missing", usage.requestId);
     }
     return extractDiscoveryCandidates(raw).slice(0, request.limits.maxResultCandidatesPerSearch);
   };
@@ -892,8 +892,11 @@ async function safeJson(response: Response): Promise<unknown> {
 }
 
 function providerRefused(raw: unknown): boolean {
-  const text = JSON.stringify(raw ?? {}).toLowerCase();
-  return /"refusal"|refused|cannot comply|policy/.test(text);
+  return arrayField(recordField(raw, "output")).some((item) => {
+    const message = asRecord(item);
+    return message?.type === "message"
+      && arrayField(message.content).some((content) => asRecord(content)?.type === "refusal");
+  });
 }
 
 function validateWebSearchModel(model: string): void {

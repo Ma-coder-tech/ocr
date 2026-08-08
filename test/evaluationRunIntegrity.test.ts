@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { retrieveFeeKnowledgeDocument } from "../src/canonical/feeKnowledgeRetrieval.js";
+import { openAiWebSearchAdapter } from "../src/canonical/feeKnowledgeResearch.js";
 import { safeProviderFailureError } from "../src/canonical/providerFailureDiagnostics.js";
 import { FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION } from "../src/canonical/feeKnowledgeTypes.js";
 import type { CanonicalFactValue } from "../src/canonical/types.js";
@@ -1036,6 +1037,44 @@ describe("evaluation-run integrity", () => {
       "provider_schema_rejected",
     ]));
     expect(JSON.stringify(result.artifact)).not.toContain(rawSecret);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+  }, 30_000);
+
+  it("persists required-tool failure without provider response text", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    const rawProviderText = "private arbitrary policy output without a web search call";
+    const result = await runManifestDrivenLiveEvaluation({
+      manifestPath: fixture.manifestPath,
+      approvedManifestHash: fixture.manifest.manifestContentHash,
+      requestedExecutions: fixture.requests,
+      approvedBudgetUsd: 10,
+      calls: oneTimePaidCalls(),
+      outputArtifactPath: path.join(fixture.directory, "one-time-required-tool-failure-artifact.json"),
+      adapterId: "one_time_statement_evaluation_v1",
+      resolveSourceBytes: async () => fixture.bytes,
+      oneTimeServicesForTesting: {
+        wholeStatementReview: async () => externalRequestResult({}, "request_whole_after_required_tool_failure", "whole_statement_ai_review"),
+        webSearchDiscovery: async (request, context) => openAiWebSearchAdapter({
+          apiKey: "synthetic-key",
+          modelName: "gpt-5",
+          fetchImpl: async () => new Response(JSON.stringify({
+            id: "resp_safe_required_tool",
+            usage: { input_tokens: 10, output_tokens: 5 },
+            output: [{ type: "message", content: [{ type: "output_text", text: rawProviderText }] }],
+          }), { status: 200, headers: { "content-type": "application/json" } }),
+        })(request, context),
+        documentRetrieval: async () => { throw new Error("must not run"); },
+        semanticVerification: async () => { throw new Error("must not run"); },
+      },
+    });
+
+    const failedSearch = result.artifact.providerCallOutcomes.find((outcome) => outcome.stage === "web_search_discovery");
+    expect(failedSearch).toMatchObject({
+      status: "failure",
+      requestId: "resp_safe_required_tool",
+      reasonCodes: ["provider_required_tool_missing"],
+    });
+    expect(JSON.stringify(result.artifact)).not.toContain(rawProviderText);
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
   }, 30_000);
 

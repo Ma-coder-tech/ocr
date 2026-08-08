@@ -7,6 +7,8 @@ export const SAFE_PROVIDER_FAILURE_REASON_CODES = [
   "provider_server_error",
   "provider_network_failed",
   "provider_call_timed_out",
+  "provider_refused",
+  "provider_required_tool_missing",
 ] as const;
 
 export type SafeProviderFailureReasonCode = (typeof SAFE_PROVIDER_FAILURE_REASON_CODES)[number];
@@ -70,6 +72,17 @@ export function safeProviderFailureError(error: unknown, response?: {
   body?: unknown;
 }): SafeProviderFailureError {
   return new SafeProviderFailureError(normalizeProviderFailure(error, response));
+}
+
+export function safeProviderPostResponseFailureError(
+  reasonCode: "provider_refused" | "provider_required_tool_missing",
+  responseId: unknown,
+): SafeProviderFailureError {
+  return new SafeProviderFailureError({
+    reasonCode,
+    reasonCodes: [reasonCode],
+    requestId: safeRequestId(responseId),
+  });
 }
 
 export function safeProviderReasonCodes(error: unknown, fallback: string): string[] {
@@ -137,7 +150,11 @@ function requestIdFromHeaders(value: unknown): string | null {
     const headers = asRecord(value);
     requestId = headers?.["x-request-id"] ?? headers?.["X-Request-Id"] ?? headers?.["X-Request-ID"];
   }
-  return typeof requestId === "string" && /^[A-Za-z0-9._:-]{1,128}$/.test(requestId) ? requestId : null;
+  return safeRequestId(requestId);
+}
+
+function safeRequestId(value: unknown): string | null {
+  return typeof value === "string" && /^[A-Za-z0-9._:-]{1,128}$/.test(value) ? value : null;
 }
 
 function safeHttpStatus(value: unknown): number | null {
