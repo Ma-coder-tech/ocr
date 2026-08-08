@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { zodSchema } from "ai";
 import {
   OPENAI_SEMANTIC_VERIFICATION_MAX_OUTPUT_TOKENS,
   OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS,
@@ -29,7 +30,21 @@ describe("live-evaluation budget enforcement", () => {
     let generateObjectCalls = 0;
     let anthropicFactoryCalls = 0;
     let observedOptions: Record<string, unknown> | null = null;
+    let observedSchema: unknown = null;
     let observedUsage: unknown = null;
+    const structuredOutput = {
+      type: "whole_statement_fee_intelligence_review",
+      reviewPolicyVersion: "whole_statement_fee_intelligence_review_v1",
+      reviewStatus: "completed",
+      evidenceRefs: [],
+      factRefs: [],
+      limitationCodes: [],
+      rowInterpretations: [],
+      reasonCodes: ["whole_statement_fee_intelligence_completed"],
+      authoritative: false,
+      financialMutationAllowed: false,
+      providerDetailsStripped: true,
+    };
     const approvedSettings = livePackage5BProviderSettings(reservation({
       callId: "package_5b",
       capability: "ai_sdk",
@@ -57,7 +72,7 @@ describe("live-evaluation budget enforcement", () => {
           generateTextCalls += 1;
           observedOptions = options;
           return {
-            output: { safe: true },
+            output: structuredOutput,
             usage: {
               inputTokens: 100,
               inputTokenDetails: { cacheReadTokens: 20 },
@@ -70,7 +85,10 @@ describe("live-evaluation budget enforcement", () => {
           generateObjectCalls += 1;
           throw new Error("Anthropic must not be reached");
         },
-        Output: { object: () => ({}) },
+        Output: { object: ({ schema }) => {
+          observedSchema = schema;
+          return { type: "mock_output_object" };
+        } },
         createOpenAI: () => () => ({}),
         createAnthropic: () => {
           anthropicFactoryCalls += 1;
@@ -79,7 +97,7 @@ describe("live-evaluation budget enforcement", () => {
       },
     });
 
-    await adapter({ type: "synthetic_package_5b", admittedFeeRows: [] } as any, {
+    const output = await adapter({ type: "synthetic_package_5b", admittedFeeRows: [] } as any, {
       abortSignal: new AbortController().signal,
     });
 
@@ -88,6 +106,13 @@ describe("live-evaluation budget enforcement", () => {
     expect(anthropicFactoryCalls).toBe(0);
     expect(approvedSettings).toMatchObject({ provider: "openai", openAiModelName: "gpt-5.4-mini", maxRetries: 0 });
     expect(observedOptions).toMatchObject({ maxRetries: 0, maxOutputTokens: 5_000 });
+    expect(observedOptions).toHaveProperty("output", { type: "mock_output_object" });
+    expect(observedOptions).not.toHaveProperty("experimental_output");
+    const jsonSchema = zodSchema(observedSchema as never).jsonSchema;
+    expect(allObjectPropertiesRequired(jsonSchema)).toBe(true);
+    expect(JSON.stringify(jsonSchema)).toContain('"externalClaimSupportRef"');
+    expect((observedSchema as { safeParse: (value: unknown) => { success: boolean } }).safeParse(structuredOutput).success).toBe(true);
+    expect(output).toEqual(structuredOutput);
     expect(observedUsage).toEqual({
       requestId: "resp_package_5b",
       inputTokens: 100,
@@ -113,23 +138,26 @@ describe("live-evaluation budget enforcement", () => {
         return jsonResponse({
           id: "resp_search",
           usage: { input_tokens: 1200, output_tokens: 80, input_tokens_details: { cached_tokens: 200 } },
-          output: [{ type: "web_search_call", action: { type: "search", sources: [] } }],
+          output: [{ type: "web_search_call", action: { type: "search", sources: [{ type: "url", url: "https://www.example.com/official-fees", title: "Official fees" }] } }],
         });
       },
     });
 
-    await adapter(searchRequest(), { abortSignal: new AbortController().signal });
+    const candidates = await adapter(searchRequest(), { abortSignal: new AbortController().signal });
 
     expect(sends).toBe(1);
     expect(body).toMatchObject({
-      tools: [{ type: "web_search", external_web_access: true }],
+      tools: [{ type: "web_search" }],
       tool_choice: "required",
       include: ["web_search_call.action.sources"],
       reasoning: { effort: "low" },
       max_output_tokens: 2_000,
       max_tool_calls: 1,
     });
+    expect(body?.tools).toEqual([{ type: "web_search" }]);
+    expect(JSON.stringify(body)).not.toContain("external_web_access");
     expect(JSON.stringify(body)).not.toMatch(/merchant_live_123|1234\.56/);
+    expect(candidates).toEqual([{ url: "https://www.example.com/official-fees", title: "Official fees", publisher: null }]);
     expect(usage).toEqual({
       requestId: "resp_search",
       inputTokens: 1200,
@@ -137,6 +165,79 @@ describe("live-evaluation budget enforcement", () => {
       outputTokens: 80,
       webSearchToolCalls: 1,
     });
+  });
+
+  it.each([
+    [400, "provider_invalid_request"],
+    [401, "provider_auth_failed"],
+    [403, "provider_auth_failed"],
+    [429, "provider_rate_limited"],
+  ] as const)("normalizes web-search HTTP %i without retaining the provider body", async (status, reasonCode) => {
+    const rawSecret = `raw-provider-detail-${status}-must-not-persist`;
+    const adapter = openAiWebSearchAdapter({
+      apiKey: "synthetic-key",
+      modelName: "gpt-5",
+      fetchImpl: async () => jsonResponse({
+        error: {
+          type: status === 429 ? "rate_limit_error" : status === 401 || status === 403 ? "authentication_error" : "invalid_request_error",
+          code: status === 429 ? "rate_limit_exceeded" : status === 401 || status === 403 ? "invalid_api_key" : "invalid_request_error",
+          message: rawSecret,
+        },
+      }, { status, headers: { "x-request-id": `req_safe_${status}` } }),
+    });
+
+    const error = await adapter(searchRequest(), { abortSignal: new AbortController().signal }).catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      reasonCode,
+      accounting: { requestId: `req_safe_${status}` },
+    });
+    expect(error.reasonCodes).toContain(`provider_http_status_${status}`);
+    expect(JSON.stringify(error)).not.toContain(rawSecret);
+  });
+
+  it("normalizes an AI SDK schema rejection without retaining provider request data", async () => {
+    let observedOptions: Record<string, unknown> | null = null;
+    const rawSecret = "raw-package-5b-request-data-must-not-persist";
+    const adapter = wholeStatementFeeIntelligenceProviderAdapter({
+      provider: "openai",
+      openAiApiKey: "synthetic-openai-key",
+      openAiModelName: "gpt-5.4-mini",
+      maxOutputTokens: 5_000,
+      maxRetries: 0,
+      sdk: {
+        generateText: async (options) => {
+          observedOptions = options;
+          throw {
+            statusCode: 400,
+            responseHeaders: { "x-request-id": "req_safe_package_5b" },
+            data: { error: { type: "invalid_request_error", code: "invalid_json_schema", message: rawSecret } },
+            responseBody: rawSecret,
+          };
+        },
+        generateObject: async () => { throw new Error("must not run"); },
+        Output: { object: () => ({ type: "mock_output_object" }) },
+        createOpenAI: () => () => ({}),
+      },
+    });
+
+    const error = await adapter({ type: "synthetic_package_5b", admittedFeeRows: [] } as any, {
+      abortSignal: new AbortController().signal,
+    }).catch((caught) => caught);
+
+    expect(observedOptions).toMatchObject({ maxRetries: 0, output: { type: "mock_output_object" } });
+    expect(observedOptions).not.toHaveProperty("experimental_output");
+    expect(error).toMatchObject({
+      reasonCode: "provider_schema_rejected",
+      accounting: { requestId: "req_safe_package_5b" },
+    });
+    expect(error.reasonCodes).toEqual(expect.arrayContaining([
+      "provider_error_code_invalid_json_schema",
+      "provider_error_type_invalid_request_error",
+      "provider_http_status_400",
+      "provider_schema_rejected",
+    ]));
+    expect(JSON.stringify(error)).not.toContain(rawSecret);
   });
 
   it("fails a successful Responses payload that did not execute web search", async () => {
@@ -456,9 +557,21 @@ function semanticRequest() {
   };
 }
 
-function jsonResponse(value: unknown): Response {
+function jsonResponse(value: unknown, init: { status?: number; headers?: Record<string, string> } = {}): Response {
   return new Response(JSON.stringify(value), {
-    status: 200,
-    headers: { "content-type": "application/json" },
+    status: init.status ?? 200,
+    headers: { "content-type": "application/json", ...init.headers },
   });
+}
+
+function allObjectPropertiesRequired(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(allObjectPropertiesRequired);
+  if (!value || typeof value !== "object") return true;
+  const record = value as Record<string, unknown>;
+  if (record.type === "object" && record.properties && typeof record.properties === "object") {
+    const properties = Object.keys(record.properties as Record<string, unknown>).sort();
+    const required = Array.isArray(record.required) ? [...record.required].sort() : [];
+    if (JSON.stringify(properties) !== JSON.stringify(required)) return false;
+  }
+  return Object.values(record).every(allObjectPropertiesRequired);
 }

@@ -13,7 +13,6 @@ import {
 import {
   defaultFeeKnowledgeResearchQuestions,
   extractDiscoveryCandidates,
-  FeeKnowledgeSearchProviderError,
   openAiWebSearchAdapter,
   runFeeKnowledgeResearch,
   verifyCandidate,
@@ -456,7 +455,10 @@ describe("canonical fee knowledge and provenance", () => {
 	        modelName: "gpt-5",
 	        fetchImpl: async () => new Response(JSON.stringify({ error: { message: "model does not support web_search tool" } }), { status: 400 }),
 	      })(request, { abortSignal: new AbortController().signal }),
-	    ).rejects.toBeInstanceOf(FeeKnowledgeSearchProviderError);
+	    ).rejects.toMatchObject({
+	      reasonCode: "provider_invalid_request",
+	      reasonCodes: ["provider_http_status_400", "provider_invalid_request"],
+	    });
 	    await expect(
 	      openAiWebSearchAdapter({
 	        apiKey: "key",

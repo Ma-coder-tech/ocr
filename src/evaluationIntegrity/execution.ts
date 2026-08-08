@@ -21,6 +21,7 @@ import {
   type RepositoryProviderTransport,
   type RepositoryProviderTransportResult,
 } from "./repositoryAdapter.js";
+import { safeProviderReasonCode, safeProviderReasonCodes } from "../canonical/providerFailureDiagnostics.js";
 import type { OneTimeResearchLimits, OneTimeStatementEvaluationServices } from "./oneTimeStatementEvaluationAdapter.js";
 import type { FinalizedOneTimeStatementEvaluation } from "./oneTimeStatementEvaluationAdapter.js";
 import { projectOneTimeCanonicalAdmissionResult } from "./oneTimeCanonicalAdmissionProjection.js";
@@ -219,13 +220,14 @@ export async function runManifestDrivenLiveEvaluation(input: {
         billingDisposition: "unknown",
       });
       const reasonCode = costExceeded ? "cost_exceeded_reservation" : failure.reasonCode;
+      const failureReasonCodes = costExceeded ? [reasonCode] : failure.reasonCodes;
       providerCallOutcomes.push({
         callId: call.reservation.callId,
         sourceDocumentId: call.sourceDocumentId,
         stage: call.stage,
         status: costExceeded ? "failure" : failure.status,
         requestId: failure.accounting.requestId ?? null,
-        reasonCodes: [reasonCode],
+        reasonCodes: failureReasonCodes,
       });
       recordFailedLifecycle(lifecycleLedger, sourceDocument, call, costExceeded ? "failure" : failure.status, reasonCode, capabilityRef, providerRef);
       cancelReservedCalls(
@@ -251,6 +253,7 @@ export async function runManifestDrivenLiveEvaluation(input: {
         billingDisposition: "unknown",
       });
       const reasonCode = costExceeded ? "cost_exceeded_reservation" : result.providerFailure.reasonCode;
+      const failureReasonCodes = costExceeded ? [reasonCode] : result.providerFailure.reasonCodes ?? [reasonCode];
       const status = costExceeded ? "failure" : result.providerFailure.status;
       providerCallOutcomes.push({
         callId: call.reservation.callId,
@@ -258,7 +261,7 @@ export async function runManifestDrivenLiveEvaluation(input: {
         stage: call.stage,
         status,
         requestId: result.accounting.requestId ?? null,
-        reasonCodes: [reasonCode],
+        reasonCodes: [...new Set(failureReasonCodes)].sort(),
       });
       recordFailedLifecycle(lifecycleLedger, sourceDocument, call, status, reasonCode, capabilityRef, providerRef);
       if (costExceeded) {
@@ -803,6 +806,7 @@ function deriveSourceExecutionStatus(
 function providerFailure(error: unknown, fallbackDurationMs: number): {
   status: "failure" | "timeout";
   reasonCode: string;
+  reasonCodes: string[];
   accounting: {
     requestId?: string | null;
     durationMs: number;
@@ -817,7 +821,8 @@ function providerFailure(error: unknown, fallbackDurationMs: number): {
   const accounting = safe.accounting && typeof safe.accounting === "object" ? safe.accounting as Record<string, unknown> : {};
   return {
     status: timeout ? "timeout" : "failure",
-    reasonCode: timeout ? "provider_call_timed_out" : "provider_call_failed",
+    reasonCode: safeProviderReasonCode(error, timeout ? "provider_call_timed_out" : "provider_call_failed"),
+    reasonCodes: safeProviderReasonCodes(error, timeout ? "provider_call_timed_out" : "provider_call_failed"),
     accounting: {
       requestId: typeof accounting.requestId === "string" ? accounting.requestId : null,
       durationMs: typeof accounting.durationMs === "number" ? accounting.durationMs : fallbackDurationMs,

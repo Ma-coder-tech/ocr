@@ -193,7 +193,7 @@ describe("canonical research admission integration", () => {
       candidateId: "candidate_provider_unavailable",
       semanticSupportAdapter: openAiSemanticSupportAdapter({ apiKey: "" }),
     });
-    const httpFailure = await verifyCandidate({
+    const httpFailure = verifyCandidate({
       ...base,
       candidateId: "candidate_provider_http_failure",
       semanticSupportAdapter: openAiSemanticSupportAdapter({
@@ -209,11 +209,10 @@ describe("canonical research admission integration", () => {
     expect(unavailable.claimSupport?.semanticSupport.reasonCodes).toContain("fee_knowledge_semantic_support_provider_unavailable");
     expect(buildRuntimeClaimSupportDecisionPayload({ support: unavailable.claimSupport!, candidate: unavailable.candidate }).reasonCodes)
       .toEqual([`fee_knowledge_${unavailable.claimSupport!.evidenceDecision}`]);
-    expect(httpFailure.candidate.semanticVerificationStatus).toBe("failed");
-    expect(httpFailure.candidate.reasonCodes).toContain("fee_knowledge_semantic_failed");
-    expect(httpFailure.claimSupport?.semanticSupport.reasonCodes).toContain("fee_knowledge_semantic_support_provider_failed");
-    expect(buildRuntimeClaimSupportDecisionPayload({ support: httpFailure.claimSupport!, candidate: httpFailure.candidate }).reasonCodes)
-      .toEqual([`fee_knowledge_${httpFailure.claimSupport!.evidenceDecision}`]);
+    await expect(httpFailure).rejects.toMatchObject({
+      reasonCode: "provider_server_error",
+      reasonCodes: ["provider_http_status_503", "provider_server_error"],
+    });
   });
 
   it("preserves unsupported-model and discovery safety-block statuses exactly", async () => {

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { retrieveFeeKnowledgeDocument } from "../src/canonical/feeKnowledgeRetrieval.js";
+import { safeProviderFailureError } from "../src/canonical/providerFailureDiagnostics.js";
 import { FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION } from "../src/canonical/feeKnowledgeTypes.js";
 import type { CanonicalFactValue } from "../src/canonical/types.js";
 import {
@@ -996,6 +997,46 @@ describe("evaluation-run integrity", () => {
     expect(JSON.stringify(result.artifact)).not.toContain("private fake timeout detail");
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
     expect(JSON.parse(await readFile(result.artifactPath, "utf8"))).toEqual(result.artifact);
+  }, 30_000);
+
+  it("persists only normalized provider failure diagnostics and a safe request ID", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    const rawSecret = "raw-openai-body-with-private-request-data";
+    const providerError = safeProviderFailureError(null, {
+      status: 400,
+      headers: new Headers({ "x-request-id": "req_safe_artifact_400" }),
+      body: { error: { type: "invalid_request_error", code: "invalid_json_schema", message: rawSecret } },
+    });
+    const result = await runManifestDrivenLiveEvaluation({
+      manifestPath: fixture.manifestPath,
+      approvedManifestHash: fixture.manifest.manifestContentHash,
+      requestedExecutions: fixture.requests,
+      approvedBudgetUsd: 10,
+      calls: oneTimePaidCalls(),
+      outputArtifactPath: path.join(fixture.directory, "one-time-safe-provider-failure-artifact.json"),
+      adapterId: "one_time_statement_evaluation_v1",
+      resolveSourceBytes: async () => fixture.bytes,
+      oneTimeServicesForTesting: {
+        wholeStatementReview: async () => externalRequestResult({}, "request_whole_after_safe_failure", "whole_statement_ai_review"),
+        webSearchDiscovery: async () => { throw providerError; },
+        documentRetrieval: async () => { throw new Error("must not run"); },
+        semanticVerification: async () => { throw new Error("must not run"); },
+      },
+    });
+
+    const failedSearch = result.artifact.providerCallOutcomes.find((outcome) => outcome.stage === "web_search_discovery");
+    expect(failedSearch).toMatchObject({
+      status: "failure",
+      requestId: "req_safe_artifact_400",
+    });
+    expect(failedSearch?.reasonCodes).toEqual(expect.arrayContaining([
+      "provider_error_code_invalid_json_schema",
+      "provider_error_type_invalid_request_error",
+      "provider_http_status_400",
+      "provider_schema_rejected",
+    ]));
+    expect(JSON.stringify(result.artifact)).not.toContain(rawSecret);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
   }, 30_000);
 
   it("does not construct or invoke the adapter when product scope rejects a paid stage", async () => {

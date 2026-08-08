@@ -24,6 +24,7 @@ import {
   type SafeFetch,
 } from "./feeKnowledgeRetrieval.js";
 import { LIVE_EVALUATION_TIMEOUT_POLICY } from "../evaluationIntegrity/liveEvaluationTimeoutPolicy.js";
+import { safeProviderFailureError } from "./providerFailureDiagnostics.js";
 
 export type FeeKnowledgeResearchLimits = {
   policyVersion: typeof FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION;
@@ -354,29 +355,34 @@ export function openAiWebSearchAdapter(options: {
     assertUtf8InputBound(input, options.maximumInputTokens);
     const maximumOutputTokens = positiveInteger(options.maximumOutputTokens ?? OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS, "web-search maximum output tokens");
     const maximumToolUses = positiveInteger(options.maximumToolUses ?? 1, "web-search maximum tool uses");
-    const response = await fetchImpl("https://api.openai.com/v1/responses", {
-      method: "POST",
-      signal: context.abortSignal,
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        input,
-        tools: [{ type: "web_search", external_web_access: true }],
-        tool_choice: "required",
-        include: ["web_search_call.action.sources"],
-        reasoning: { effort: "low" },
-        max_output_tokens: maximumOutputTokens,
-        max_tool_calls: maximumToolUses,
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetchImpl("https://api.openai.com/v1/responses", {
+        method: "POST",
+        signal: context.abortSignal,
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          input,
+          tools: [{ type: "web_search" }],
+          tool_choice: "required",
+          include: ["web_search_call.action.sources"],
+          reasoning: { effort: "low" },
+          max_output_tokens: maximumOutputTokens,
+          max_tool_calls: maximumToolUses,
+        }),
+      });
+    } catch (error) {
+      throw safeProviderFailureError(error);
+    }
     const raw = await safeJson(response);
     const usage = openAiResponsesSafeUsage(raw);
     options.onUsage?.(usage);
     if (!response.ok) {
-      throw new FeeKnowledgeSearchProviderError(classifyProviderError(raw) === "unsupported_model" ? "unsupported_model" : "failed", `OpenAI fee knowledge discovery failed with HTTP ${response.status}`);
+      throw safeProviderFailureError(null, { status: response.status, headers: response.headers, body: raw });
     }
     if (providerRefused(raw)) throw new FeeKnowledgeSearchProviderError("failed", "OpenAI fee knowledge discovery refused.");
     if (usage.webSearchToolCalls === 0) {
@@ -411,19 +417,24 @@ export function openAiSemanticSupportAdapter(options: {
     assertUtf8InputBound(input, options.maximumInputTokens);
     const maximumOutputTokens = positiveInteger(options.maximumOutputTokens ?? OPENAI_SEMANTIC_VERIFICATION_MAX_OUTPUT_TOKENS, "semantic-verification maximum output tokens");
     if ((options.maximumToolUses ?? 0) !== 0) throw new Error("Semantic verification maximum tool uses must be zero.");
-    const response = await fetchImpl("https://api.openai.com/v1/responses", {
-      method: "POST",
-      signal: context.abortSignal,
-      headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        model: options.modelName ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_WEB_SEARCH_MODEL,
-        input,
-        max_output_tokens: maximumOutputTokens,
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetchImpl("https://api.openai.com/v1/responses", {
+        method: "POST",
+        signal: context.abortSignal,
+        headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          model: options.modelName ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_WEB_SEARCH_MODEL,
+          input,
+          max_output_tokens: maximumOutputTokens,
+        }),
+      });
+    } catch (error) {
+      throw safeProviderFailureError(error);
+    }
     const raw = await safeJson(response);
     options.onUsage?.(openAiResponsesSafeUsage(raw));
-    if (!response.ok) return unsupportedSemanticDecision(request.structuredClaim, "fee_knowledge_semantic_support_provider_failed");
+    if (!response.ok) throw safeProviderFailureError(null, { status: response.status, headers: response.headers, body: raw });
     if (providerRefused(raw)) return unsupportedSemanticDecision(request.structuredClaim, "fee_knowledge_semantic_support_provider_failed");
     return semanticDecisionFromRaw(raw, request.structuredClaim);
   };
@@ -878,11 +889,6 @@ async function safeJson(response: Response): Promise<unknown> {
       return null;
     }
   }
-}
-
-function classifyProviderError(raw: unknown): "unsupported_model" | "failed" {
-  const text = JSON.stringify(raw ?? {}).toLowerCase();
-  return /unsupported|tool|web_search|model/.test(text) ? "unsupported_model" : "failed";
 }
 
 function providerRefused(raw: unknown): boolean {
