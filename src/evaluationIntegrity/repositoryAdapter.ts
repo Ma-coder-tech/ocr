@@ -65,6 +65,7 @@ export type RepositoryProviderTransportResult = {
     status: "failure" | "timeout";
     scope: "candidate_local" | "research_graph";
     reasonCode: string;
+    reasonCodes?: string[];
   };
   researchStageStatus?: "failed" | "timed_out" | "safety_blocked";
 };

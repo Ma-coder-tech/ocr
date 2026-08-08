@@ -17,6 +17,7 @@ import type {
   CanonicalAiWholeStatementFeeIntelligenceOutput,
   CanonicalStatementAnalysis,
 } from "./types.js";
+import { safeProviderFailureError } from "./providerFailureDiagnostics.js";
 
 const require = createRequire(import.meta.url);
 
@@ -171,7 +172,7 @@ async function executeProviderReview(
         const result = await sdk.generateText({
           model: modelFor(attempt.provider, attempt.modelName, options, sdk),
           prompt,
-          experimental_output: sdk.Output.object({
+          output: sdk.Output.object({
             schema: reviewResponseSchema(),
             name: "whole_statement_fee_intelligence_review",
             description: "Provider-neutral every-row fee semantic review.",
@@ -194,7 +195,7 @@ async function executeProviderReview(
       options.onProviderUsage?.(providerUsage(result));
       return result.object;
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
+      lastError = safeProviderFailureError(error);
     }
   }
   throw lastError ?? new Error("Whole-statement fee intelligence provider failed.");
@@ -289,7 +290,7 @@ function reviewResponseSchema(): unknown {
       ]),
       evidenceRefs: z.array(z.string()),
       externalSourceRef: z.string().nullable(),
-      externalClaimSupportRef: z.string().nullable().optional(),
+      externalClaimSupportRef: z.string().nullable(),
       conflicts: z.array(z.string()),
       missingEvidence: z.array(z.string()),
       recommendedDisposition: z.enum(["supported", "insufficient_evidence", "conflicting_evidence", "human_review"]),

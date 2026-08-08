@@ -51,6 +51,7 @@ import { analyzeStatementDocument } from "../statementParserOrchestrator.js";
 import type { CostReservationInput } from "./costLedger.js";
 import type { PackagesBEProjectionInput } from "./invariance.js";
 import type { RepositoryProviderTransportInput, RepositoryProviderTransportResult } from "./repositoryAdapter.js";
+import { safeProviderReasonCode, safeProviderReasonCodes } from "../canonical/providerFailureDiagnostics.js";
 import type { EvaluationManifestDocument } from "./types.js";
 import {
   LIVE_EVALUATION_TIMEOUT_POLICY,
@@ -766,16 +767,18 @@ function providerFailureResult(input: {
   researchTerminal?: RepositoryProviderTransportResult["researchTerminal"];
 }): RepositoryProviderTransportResult {
   const status = providerFailureStatus(input.error) === "timed_out" ? "timeout" : "failure";
+  const reasonCode = safeProviderReasonCode(input.error, input.reasonCode);
+  const reasonCodes = safeProviderReasonCodes(input.error, input.reasonCode);
   return result({
     value: { status, scope: input.scope },
     generated: false,
     schemaValid: false,
     evidenceValidated: false,
     policyAccepted: false,
-    reasonCodes: [input.reasonCode],
+    reasonCodes,
     accounting: accountingFromFailure(input.error, input.started),
     researchTerminal: input.researchTerminal,
-    providerFailure: { status, scope: input.scope, reasonCode: input.reasonCode },
+    providerFailure: { status, scope: input.scope, reasonCode, reasonCodes },
   });
 }
 
