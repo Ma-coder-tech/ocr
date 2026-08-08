@@ -23,6 +23,7 @@ import {
   type RetrievedDocument,
   type SafeFetch,
 } from "./feeKnowledgeRetrieval.js";
+import { LIVE_EVALUATION_TIMEOUT_POLICY } from "../evaluationIntegrity/liveEvaluationTimeoutPolicy.js";
 
 export type FeeKnowledgeResearchLimits = {
   policyVersion: typeof FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION;
@@ -36,7 +37,7 @@ export const FEE_KNOWLEDGE_RESEARCH_LIMITS = {
   policyVersion: FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
   maxSearchCalls: 2,
   maxRetrievalCandidates: 5,
-  totalDeadlineMs: 15000,
+  totalDeadlineMs: LIVE_EVALUATION_TIMEOUT_POLICY.researchGraphTotalMs,
   maxResultCandidatesPerSearch: 5,
 } as const satisfies FeeKnowledgeResearchLimits;
 
@@ -225,10 +226,10 @@ export async function runFeeKnowledgeResearch(input: {
           });
           candidates[pendingIndex] = verification.candidate;
           if (verification.claimSupport) claimSupports.push(verification.claimSupport);
-          if (["failed", "timed_out", "safety_blocked"].includes(verification.candidate.semanticVerificationStatus)) {
+          if (verification.candidate.semanticVerificationStatus === "safety_blocked") {
             throw new FeeKnowledgeSearchProviderError(
-              verification.candidate.semanticVerificationStatus as "failed" | "timed_out" | "safety_blocked",
-              "Fee knowledge semantic verification did not complete successfully.",
+              "safety_blocked",
+              "Fee knowledge semantic verification was blocked by safety policy.",
             );
           }
         }
@@ -363,18 +364,24 @@ export function openAiWebSearchAdapter(options: {
       body: JSON.stringify({
         model,
         input,
-        tools: [{ type: "web_search" }],
-        tool_choice: "auto",
+        tools: [{ type: "web_search", external_web_access: true }],
+        tool_choice: "required",
+        include: ["web_search_call.action.sources"],
+        reasoning: { effort: "low" },
         max_output_tokens: maximumOutputTokens,
         max_tool_calls: maximumToolUses,
       }),
     });
     const raw = await safeJson(response);
-    options.onUsage?.(openAiResponsesSafeUsage(raw));
+    const usage = openAiResponsesSafeUsage(raw);
+    options.onUsage?.(usage);
     if (!response.ok) {
       throw new FeeKnowledgeSearchProviderError(classifyProviderError(raw) === "unsupported_model" ? "unsupported_model" : "failed", `OpenAI fee knowledge discovery failed with HTTP ${response.status}`);
     }
     if (providerRefused(raw)) throw new FeeKnowledgeSearchProviderError("failed", "OpenAI fee knowledge discovery refused.");
+    if (usage.webSearchToolCalls === 0) {
+      throw new FeeKnowledgeSearchProviderError("failed", "OpenAI fee knowledge discovery completed without a web_search_call.");
+    }
     return extractDiscoveryCandidates(raw).slice(0, request.limits.maxResultCandidatesPerSearch);
   };
 }
@@ -417,6 +424,7 @@ export function openAiSemanticSupportAdapter(options: {
     const raw = await safeJson(response);
     options.onUsage?.(openAiResponsesSafeUsage(raw));
     if (!response.ok) return unsupportedSemanticDecision(request.structuredClaim, "fee_knowledge_semantic_support_provider_failed");
+    if (providerRefused(raw)) return unsupportedSemanticDecision(request.structuredClaim, "fee_knowledge_semantic_support_provider_failed");
     return semanticDecisionFromRaw(raw, request.structuredClaim);
   };
 }

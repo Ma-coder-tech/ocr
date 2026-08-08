@@ -948,7 +948,7 @@ describe("evaluation-run integrity", () => {
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
   }, 30_000);
 
-  it("writes and verifies the one-time failure artifact before cancelling unsent fake calls", async () => {
+  it("retains an unknown web-search reservation, cancels only research, and still invokes Package 5B", async () => {
     const fixture = await approvedOneTimePdfFixture();
     const invocations = { whole: 0, search: 0, retrieval: 0, semantic: 0 };
     const timeout = Object.assign(new Error("private fake timeout detail"), {
@@ -965,7 +965,10 @@ describe("evaluation-run integrity", () => {
       adapterId: "one_time_statement_evaluation_v1",
       resolveSourceBytes: async () => fixture.bytes,
       oneTimeServicesForTesting: {
-        wholeStatementReview: async () => { invocations.whole += 1; throw timeout; },
+        wholeStatementReview: async () => {
+          invocations.whole += 1;
+          return externalRequestResult({}, "request_whole_after_research_timeout", "whole_statement_ai_review");
+        },
         webSearchDiscovery: async () => { invocations.search += 1; throw timeout; },
         documentRetrieval: async () => { invocations.retrieval += 1; throw new Error("must not run"); },
         semanticVerification: async (request) => {
@@ -982,12 +985,14 @@ describe("evaluation-run integrity", () => {
       },
     });
 
-    expect(invocations).toEqual({ whole: 0, search: 1, retrieval: 0, semantic: 0 });
-    expect(result.finalStatus).toBe("timed_out");
+    expect(invocations).toEqual({ whole: 1, search: 1, retrieval: 0, semantic: 0 });
+    expect(result.finalStatus).toBe("blocked");
     expect(result.costLedger.entries[0]).toMatchObject({ status: "timeout", billingDisposition: "unknown", requestId: "request_fake_timeout" });
-    expect(result.costLedger.entries.slice(1).every((item) => item.status === "cancelled_before_send" && item.billingDisposition === "provider_confirmed_zero")).toBe(true);
-    expect(result.costLedger).toMatchObject({ cumulativeBudgetCommittedUsd: 0.5, cumulativeReleasedUsd: 6 });
-    expect(result.providerCallOutcomes.slice(1).every((item) => item.status === "cancelled_before_send")).toBe(true);
+    expect(result.costLedger.entries.slice(1, -1).every((item) => item.status === "cancelled_before_send" && item.billingDisposition === "provider_confirmed_zero")).toBe(true);
+    expect(result.costLedger.entries.at(-1)).toMatchObject({ status: "success", requestId: "request_whole_after_research_timeout" });
+    expect(result.costLedger).toMatchObject({ cumulativeBudgetCommittedUsd: 0.6, cumulativeReleasedUsd: 5.9 });
+    expect(result.providerCallOutcomes.slice(1, -1).every((item) => item.status === "cancelled_before_send")).toBe(true);
+    expect(result.providerCallOutcomes.at(-1)).toMatchObject({ stage: "whole_statement_ai_review", status: "success" });
     expect(JSON.stringify(result.artifact)).not.toContain("private fake timeout detail");
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
     expect(JSON.parse(await readFile(result.artifactPath, "utf8"))).toEqual(result.artifact);

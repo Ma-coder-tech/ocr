@@ -53,6 +53,13 @@ import type { PackagesBEProjectionInput } from "./invariance.js";
 import type { RepositoryProviderTransportInput, RepositoryProviderTransportResult } from "./repositoryAdapter.js";
 import type { EvaluationManifestDocument } from "./types.js";
 import {
+  LIVE_EVALUATION_TIMEOUT_POLICY,
+  liveEvaluationEffectiveTimeoutMs,
+  liveEvaluationTimeoutError,
+  runWithLiveEvaluationTimeout,
+  type LiveEvaluationTimeoutScope,
+} from "./liveEvaluationTimeoutPolicy.js";
+import {
   accountingFromProviderUsage,
   assertApprovedLiveCallMetadata,
   type SafeProviderUsage,
@@ -229,21 +236,7 @@ export function oneTimeResearchTerminalStatus(
 ): OneTimeResearchTerminalStatus | null {
   const context = prepared.privateContext;
   if (!context) return null;
-  if (context.researchTerminalStatus) return context.researchTerminalStatus;
-  if (context.attempts.some((attempt) => attempt.status === "safety_blocked")
-    || context.candidates.some((candidate) => candidate.retrievalStatus === "safety_blocked" || candidate.semanticVerificationStatus === "safety_blocked")) {
-    return "safety_blocked";
-  }
-  if (context.attempts.some((attempt) => attempt.status === "timed_out")
-    || context.candidates.some((candidate) => candidate.retrievalStatus === "timed_out" || candidate.semanticVerificationStatus === "timed_out")) {
-    return "timed_out";
-  }
-  if (context.attempts.some((attempt) => ["failed", "unsupported_model"].includes(attempt.status))
-    || context.candidates.some((candidate) => (!["not_started", "retrieved_text"].includes(candidate.retrievalStatus)
-      || ["failed", "parse_failed", "unsupported"].includes(candidate.semanticVerificationStatus)))) {
-    return "failed";
-  }
-  return null;
+  return context.researchTerminalStatus;
 }
 
 export function finalizeOneTimeStatementEvaluation(
@@ -318,10 +311,6 @@ export function createOneTimeStatementEvaluationTransport(input: {
     const started = Date.now();
 
     if (request.stage === "whole_statement_ai_review") {
-      const serviceContext = {
-        abortSignal: new AbortController().signal,
-        approvedCallMetadata: structuredClone(request.approvedCallMetadata),
-      };
       const sourcePacket = currentSourcePacket(context);
       const reviewPacket = buildWholeStatementFeeIntelligencePacket(context.analysis, context.registry ?? { approvedExternalSourceRefs: [] }, sourcePacket);
       context.sentSourcePacket = structuredClone(sourcePacket);
@@ -330,10 +319,16 @@ export function createOneTimeStatementEvaluationTransport(input: {
         ...context.packet,
         wholeStatementReview: structuredClone(context.sentWholeStatementPacket),
       };
-      const response = unwrapExternalRequestResult(
-        await services.wholeStatementReview(structuredClone(context.sentWholeStatementPacket), serviceContext),
-        started,
+      const response = await runWithinStandaloneStageTimeout(
         "whole_statement_ai_review",
+        async (abortSignal) => unwrapExternalRequestResult(
+          await services.wholeStatementReview(structuredClone(reviewPacket), {
+            abortSignal,
+            approvedCallMetadata: structuredClone(request.approvedCallMetadata),
+          }),
+          started,
+          "whole_statement_ai_review",
+        ),
       );
       const validation = validateWholeStatementFeeIntelligenceReview(
         response.value,
@@ -369,7 +364,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
       const attemptId = `research_${shortHash([feeKnowledgeQuestionRef(question, questionOrdinal), String(questionOrdinal)])}`;
       let response: ReturnType<typeof unwrapExternalRequestResult<FeeKnowledgeDiscoveryCandidate[]>>;
       try {
-        response = await runWithinPreparedResearchDeadline(context, async (abortSignal) => unwrapExternalRequestResult(
+        response = await runWithinPreparedResearchDeadline(context, "web_search_discovery", async (abortSignal) => unwrapExternalRequestResult(
           await services.webSearchDiscovery(
             { attemptId, questions: [question], limits: context.packet.research.limits },
             { abortSignal, approvedCallMetadata: structuredClone(request.approvedCallMetadata) },
@@ -379,9 +374,17 @@ export function createOneTimeStatementEvaluationTransport(input: {
         ));
       } catch (error) {
         const status = researchProviderFailureStatus(error);
+        const reasonCode = timeoutReasonCode(error) ?? researchProviderFailureReason(status);
+        const terminalStatus = status === "safety_blocked" ? "safety_blocked" : status === "timed_out" ? "timed_out" : "failed";
         upsertContextAttempt(context, attemptRecord(question, questionOrdinal, status, [], [researchProviderFailureReason(status)]));
-        markResearchTerminal(context, status === "safety_blocked" ? "safety_blocked" : status === "timed_out" ? "timed_out" : "failed");
-        throw error;
+        markResearchTerminal(context, terminalStatus);
+        return providerFailureResult({
+          started,
+          error,
+          reasonCode,
+          scope: "research_graph",
+          researchTerminal: { status: terminalStatus, reasonCode },
+        });
       }
       const remaining = context.packet.research.limits.maxRetrievalCandidates - context.discovered.length;
       const discovered = dedupeCandidates(response.value
@@ -417,7 +420,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
       }
       let response: ReturnType<typeof unwrapExternalRequestResult<RetrievedDocument>>;
       try {
-        response = await runWithinPreparedResearchDeadline(context, async (abortSignal) => unwrapExternalRequestResult(
+        response = await runWithinPreparedResearchDeadline(context, "document_retrieval", async (abortSignal) => unwrapExternalRequestResult(
           await services.documentRetrieval(candidate.candidate.url, {
             abortSignal,
             approvedCallMetadata: structuredClone(request.approvedCallMetadata),
@@ -426,21 +429,36 @@ export function createOneTimeStatementEvaluationTransport(input: {
           "document_retrieval",
         ));
       } catch (error) {
-        updateFailedCandidate(context, candidate, "retrieval", providerFailureStatus(error));
-        markResearchTerminal(context, providerFailureStatus(error));
-        throw error;
+        const status = providerFailureStatus(error);
+        const reasonCode = timeoutReasonCode(error) ?? (status === "timed_out" ? "fee_knowledge_retrieval_timed_out" : "fee_knowledge_retrieval_fetch_failed");
+        updateFailedCandidate(
+          context,
+          candidate,
+          "retrieval",
+          status,
+          status === "timed_out" ? "fee_knowledge_retrieval_timed_out" : reasonCode,
+        );
+        if (timeoutScope(error) === "research_graph") {
+          markResearchTerminal(context, "timed_out");
+          return providerFailureResult({
+            started,
+            error,
+            reasonCode,
+            scope: "research_graph",
+            researchTerminal: { status: "timed_out", reasonCode },
+          });
+        }
+        return providerFailureResult({ started, error, reasonCode, scope: "candidate_local" });
       }
       updateRetrievedCandidate(context, candidate, response.value);
       const retrievalTerminal = retrievalTerminalStatus(response.value.status);
       if (retrievalTerminal) {
-        updateAttemptTerminal(context, candidate.attemptId, retrievalTerminal);
-        markResearchTerminal(context, retrievalTerminal);
         return result({
           value: { retrievedCount: context.retrieved.length, retrievalStatus: response.value.status },
           reasonCodes: response.value.reasonCodes,
           accounting: response.accounting,
           researchRetrievalRefs: [candidate.candidateId],
-          researchTerminal: { status: retrievalTerminal, reasonCode: response.value.reasonCodes[0] ?? researchTerminalReason(retrievalTerminal) },
+          researchStageStatus: retrievalTerminal,
         });
       }
       context.retrieved.push({ ...candidate, retrieved: response.value });
@@ -466,7 +484,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
       let semanticAccounting: RepositoryProviderTransportResult["accounting"] | null = null;
       let verified: Awaited<ReturnType<typeof verifyCandidate>>;
       try {
-        verified = await runWithinPreparedResearchDeadline(context, async (abortSignal) => verifyCandidate({
+        verified = await runWithinPreparedResearchDeadline(context, "semantic_verification", async (abortSignal) => verifyCandidate({
             candidateId: item.candidateId,
             attemptId: item.attemptId,
             candidate: item.candidate,
@@ -489,9 +507,26 @@ export function createOneTimeStatementEvaluationTransport(input: {
             abortSignal,
           }));
       } catch (error) {
-        updateFailedCandidate(context, item, "semantic", providerFailureStatus(error));
-        markResearchTerminal(context, providerFailureStatus(error));
-        throw error;
+        const status = providerFailureStatus(error);
+        const reasonCode = timeoutReasonCode(error) ?? (status === "timed_out" ? "fee_knowledge_semantic_timed_out" : "fee_knowledge_semantic_failed");
+        updateFailedCandidate(
+          context,
+          item,
+          "semantic",
+          status,
+          status === "timed_out" ? "fee_knowledge_semantic_timed_out" : reasonCode,
+        );
+        if (timeoutScope(error) === "research_graph") {
+          markResearchTerminal(context, "timed_out");
+          return providerFailureResult({
+            started,
+            error,
+            reasonCode,
+            scope: "research_graph",
+            researchTerminal: { status: "timed_out", reasonCode },
+          });
+        }
+        return providerFailureResult({ started, error, reasonCode, scope: "candidate_local" });
       }
       const supportedCount = verified.claimSupport ? 1 : 0;
       const candidateIndex = context.candidates.findIndex((candidate) => candidate.candidateId === item.candidateId);
@@ -500,8 +535,10 @@ export function createOneTimeStatementEvaluationTransport(input: {
       const policyAccepted = Boolean(verified.claimSupport && runtimeSupportAccepted(verified.claimSupport));
       const semanticTerminal = semanticTerminalStatus(verified.candidate.semanticVerificationStatus);
       if (semanticTerminal) {
-        updateAttemptTerminal(context, item.attemptId, semanticTerminal);
-        markResearchTerminal(context, semanticTerminal);
+        if (semanticTerminal === "safety_blocked") {
+          updateAttemptTerminal(context, item.attemptId, semanticTerminal);
+          markResearchTerminal(context, semanticTerminal);
+        }
         return result({
           value: { verifiedCount: 1, supportedCount, semanticStatus: verified.candidate.semanticVerificationStatus },
           generated: semanticAccounting !== null,
@@ -510,7 +547,10 @@ export function createOneTimeStatementEvaluationTransport(input: {
           reasonCodes: verified.candidate.reasonCodes,
           accounting: semanticAccounting ?? noRequestAccounting(started),
           semanticVerificationRef: `semantic:${request.reservedCallId}`,
-          researchTerminal: { status: semanticTerminal, reasonCode: verified.candidate.reasonCodes[0] ?? researchTerminalReason(semanticTerminal) },
+          researchStageStatus: semanticTerminal,
+          researchTerminal: semanticTerminal === "safety_blocked"
+            ? { status: semanticTerminal, reasonCode: verified.candidate.reasonCodes[0] ?? researchTerminalReason(semanticTerminal) }
+            : undefined,
         });
       }
       return result({
@@ -569,7 +609,6 @@ function defaultServices(overrides: Partial<OneTimeStatementEvaluationServices> 
       const started = Date.now();
       const value = await retrieveFeeKnowledgeDocument(url, {
         abortSignal: options.abortSignal,
-        limits: { maxRedirects: 0 } as unknown as Parameters<typeof retrieveFeeKnowledgeDocument>[1]["limits"],
       });
       return externalResult(value, noRequestAccounting(started));
     }),
@@ -696,6 +735,8 @@ function result(input: {
   researchRetrievalRefs?: string[];
   semanticVerificationRef?: string | null;
   researchTerminal?: RepositoryProviderTransportResult["researchTerminal"];
+  providerFailure?: RepositoryProviderTransportResult["providerFailure"];
+  researchStageStatus?: RepositoryProviderTransportResult["researchStageStatus"];
 }): RepositoryProviderTransportResult {
   return {
     value: input.value,
@@ -712,6 +753,49 @@ function result(input: {
       reasonCodes: input.reasonCodes,
     },
     researchTerminal: input.researchTerminal,
+    providerFailure: input.providerFailure,
+    researchStageStatus: input.researchStageStatus,
+  };
+}
+
+function providerFailureResult(input: {
+  started: number;
+  error: unknown;
+  reasonCode: string;
+  scope: NonNullable<RepositoryProviderTransportResult["providerFailure"]>["scope"];
+  researchTerminal?: RepositoryProviderTransportResult["researchTerminal"];
+}): RepositoryProviderTransportResult {
+  const status = providerFailureStatus(input.error) === "timed_out" ? "timeout" : "failure";
+  return result({
+    value: { status, scope: input.scope },
+    generated: false,
+    schemaValid: false,
+    evidenceValidated: false,
+    policyAccepted: false,
+    reasonCodes: [input.reasonCode],
+    accounting: accountingFromFailure(input.error, input.started),
+    researchTerminal: input.researchTerminal,
+    providerFailure: { status, scope: input.scope, reasonCode: input.reasonCode },
+  });
+}
+
+function accountingFromFailure(
+  error: unknown,
+  started: number,
+): RepositoryProviderTransportResult["accounting"] {
+  const safe = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  const accounting = safe.accounting && typeof safe.accounting === "object"
+    ? safe.accounting as Record<string, unknown>
+    : {};
+  return {
+    requestId: typeof accounting.requestId === "string" ? accounting.requestId : null,
+    durationMs: typeof accounting.durationMs === "number" ? accounting.durationMs : Math.max(0, Date.now() - started),
+    inputTokens: typeof accounting.inputTokens === "number" ? accounting.inputTokens : null,
+    cachedInputTokens: typeof accounting.cachedInputTokens === "number" ? accounting.cachedInputTokens : null,
+    outputTokens: typeof accounting.outputTokens === "number" ? accounting.outputTokens : null,
+    toolEvents: Array.isArray(accounting.toolEvents) ? accounting.toolEvents as RepositoryProviderTransportResult["accounting"]["toolEvents"] : [],
+    observedOrEstimatedFinalCostUsd: typeof accounting.observedOrEstimatedFinalCostUsd === "number" ? accounting.observedOrEstimatedFinalCostUsd : null,
+    billingDisposition: "unknown",
   };
 }
 
@@ -811,28 +895,20 @@ function updateFailedCandidate(
   item: CandidateContext,
   stage: "retrieval" | "semantic",
   status: OneTimeResearchTerminalStatus,
+  reasonCode?: string,
 ): void {
   const index = context.candidates.findIndex((candidate) => candidate.candidateId === item.candidateId);
   const current = context.candidates[index];
   if (!current) return;
-  const attemptIndex = context.attempts.findIndex((attempt) => attempt.attemptId === item.attemptId);
-  const attempt = context.attempts[attemptIndex];
-  if (attempt) {
-    context.attempts[attemptIndex] = {
-      ...attempt,
-      status,
-      reasonCodes: [researchTerminalReason(status)],
-    };
-  }
   context.candidates[index] = stage === "retrieval"
     ? {
         ...current,
         retrievalStatus: status,
         semanticVerificationStatus: "not_started",
         verificationStatus: "rejected",
-        reasonCodes: [status === "timed_out" ? "fee_knowledge_retrieval_timed_out"
+        reasonCodes: [reasonCode ?? (status === "timed_out" ? "fee_knowledge_retrieval_timed_out"
           : status === "safety_blocked" ? "fee_knowledge_url_policy_blocked"
-            : "fee_knowledge_retrieval_fetch_failed", "fee_knowledge_semantic_support_not_run"].sort(),
+            : "fee_knowledge_retrieval_fetch_failed"), "fee_knowledge_semantic_support_not_run"].sort(),
       }
     : {
         ...current,
@@ -840,9 +916,9 @@ function updateFailedCandidate(
         verificationStatus: status === "safety_blocked" ? "safety_blocked" : "verified_candidate_limited",
         reasonCodes: [...new Set([
           ...current.reasonCodes.filter((reason) => reason !== "fee_knowledge_semantic_support_not_run"),
-          status === "timed_out" ? "fee_knowledge_semantic_timed_out"
+          reasonCode ?? (status === "timed_out" ? "fee_knowledge_semantic_timed_out"
             : status === "safety_blocked" ? "fee_knowledge_semantic_safety_blocked"
-              : "fee_knowledge_semantic_failed",
+              : "fee_knowledge_semantic_failed"),
         ])].sort(),
       };
 }
@@ -857,11 +933,39 @@ function currentSourcePacket(context: OneTimePrivateContext): FeeKnowledgeSource
   });
 }
 
+function completeResearchAfterTerminal(context: OneTimePrivateContext): void {
+  const status = context.researchTerminalStatus;
+  if (!status) return;
+  const existingQuestionRefs = new Set(context.attempts.map((attempt) => attempt.questionRef));
+  for (const [questionOrdinal, question] of context.packet.research.questions.entries()) {
+    const questionRef = feeKnowledgeQuestionRef(question, questionOrdinal);
+    if (existingQuestionRefs.has(questionRef)) continue;
+    const skippedStatus = questionOrdinal >= context.packet.research.limits.maxSearchCalls ? "budget_exhausted" : status;
+    context.attempts.push(attemptRecord(
+      question,
+      questionOrdinal,
+      skippedStatus,
+      [],
+      [skippedStatus === "budget_exhausted" ? "fee_knowledge_research_budget_exhausted" : researchTerminalReason(status)],
+    ));
+  }
+  for (const candidate of context.discovered.slice(context.retrievalCursor)) {
+    updateFailedCandidate(context, candidate, "retrieval", status);
+  }
+  for (const candidate of context.retrieved.slice(context.semanticCursor)) {
+    updateFailedCandidate(context, candidate, "semantic", status);
+  }
+  context.retrievalCursor = context.discovered.length;
+  context.semanticCursor = context.retrieved.length;
+}
+
 function assertOneTimeStageTransition(
   context: OneTimePrivateContext,
   stage: RepositoryProviderTransportInput["stage"],
 ): void {
-  if (context.researchTerminalStatus !== null) throw new Error("one_time_research_already_terminal");
+  if (context.researchTerminalStatus !== null && stage !== "whole_statement_ai_review") {
+    throw new Error("one_time_research_already_terminal");
+  }
   const ranks = {
     web_search_discovery: 0,
     document_retrieval: 1,
@@ -873,6 +977,7 @@ function assertOneTimeStageTransition(
   if (rank < context.lastStageRank) throw new Error("one_time_evaluation_stage_order_invalid");
   if (stage === "whole_statement_ai_review") {
     if (context.wholeStatementReviewCount !== 0) throw new Error("one_time_whole_statement_review_duplicate");
+    completeResearchAfterTerminal(context);
     const expectedQuestionRefs = new Set(context.packet.research.questions.map(feeKnowledgeQuestionRef));
     const attemptedQuestionRefs = new Set(context.attempts.map((attempt) => attempt.questionRef));
     if (expectedQuestionRefs.size !== attemptedQuestionRefs.size
@@ -912,9 +1017,10 @@ function researchProviderFailureReason(status: FeeKnowledgeResearchAttemptRecord
 
 async function runWithinPreparedResearchDeadline<T>(
   context: OneTimePrivateContext,
+  stage: "web_search_discovery" | "document_retrieval" | "semantic_verification",
   operation: (abortSignal: AbortSignal) => Promise<T>,
 ): Promise<T> {
-  if (context.researchTerminalStatus !== null) throw researchDeadlineError();
+  if (context.researchTerminalStatus !== null) throw liveEvaluationTimeoutError(stage, "research_graph");
   const now = performance.now();
   if (context.researchDeadlineStartedAt === null) {
     context.researchDeadlineStartedAt = now;
@@ -923,44 +1029,31 @@ async function runWithinPreparedResearchDeadline<T>(
   const remainingMs = Math.max(0, (context.researchDeadlineAt ?? now) - now);
   if (remainingMs <= 0) {
     markResearchTerminal(context, "timed_out");
-    throw researchDeadlineError();
+    throw liveEvaluationTimeoutError(stage, "research_graph");
   }
-  const controller = new AbortController();
-  let settled = false;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  try {
-    return await new Promise<T>((resolve, reject) => {
-      timer = setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        markResearchTerminal(context, "timed_out");
-        controller.abort(researchDeadlineError());
-        reject(researchDeadlineError());
-      }, remainingMs);
-      timer.unref?.();
-      operation(controller.signal).then(
-        (value) => {
-          if (settled) return;
-          settled = true;
-          resolve(value);
-        },
-        (error) => {
-          if (settled) return;
-          settled = true;
-          reject(error);
-        },
-      );
-    });
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+  const timeoutMs = liveEvaluationEffectiveTimeoutMs({ stage, remainingResearchGraphMs: remainingMs });
+  const timeoutScope: LiveEvaluationTimeoutScope = remainingMs <= LIVE_EVALUATION_TIMEOUT_POLICY.perCallMs[stage]
+    ? "research_graph"
+    : "per_call";
+  return runWithLiveEvaluationTimeout({
+    stage,
+    scope: timeoutScope,
+    timeoutMs,
+    operation,
+    onTimeout: timeoutScope === "research_graph" ? () => markResearchTerminal(context, "timed_out") : undefined,
+  });
 }
 
-function researchDeadlineError(): Error & { code: string } {
-  const error = new Error("prepared_research_deadline_exceeded") as Error & { code: string };
-  error.name = "AbortError";
-  error.code = "provider_timeout";
-  return error;
+async function runWithinStandaloneStageTimeout<T>(
+  stage: "whole_statement_ai_review",
+  operation: (abortSignal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  return runWithLiveEvaluationTimeout({
+    stage,
+    scope: "per_call",
+    timeoutMs: liveEvaluationEffectiveTimeoutMs({ stage }),
+    operation,
+  });
 }
 
 function retrievalTerminalStatus(status: RetrievedDocument["status"]): OneTimeResearchTerminalStatus | null {
@@ -979,6 +1072,10 @@ function semanticTerminalStatus(
   return "failed";
 }
 
+function markResearchTerminal(context: OneTimePrivateContext, status: OneTimeResearchTerminalStatus): void {
+  if (context.researchTerminalStatus === null) context.researchTerminalStatus = status;
+}
+
 function updateAttemptTerminal(
   context: OneTimePrivateContext,
   attemptId: string,
@@ -994,8 +1091,16 @@ function updateAttemptTerminal(
   };
 }
 
-function markResearchTerminal(context: OneTimePrivateContext, status: OneTimeResearchTerminalStatus): void {
-  if (context.researchTerminalStatus === null) context.researchTerminalStatus = status;
+function timeoutScope(error: unknown): LiveEvaluationTimeoutScope | null {
+  const value = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  return value.evaluationTimeoutScope === "per_call" || value.evaluationTimeoutScope === "research_graph"
+    ? value.evaluationTimeoutScope
+    : null;
+}
+
+function timeoutReasonCode(error: unknown): string | null {
+  const value = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  return typeof value.reasonCode === "string" ? value.reasonCode : null;
 }
 
 function researchTerminalReason(status: OneTimeResearchTerminalStatus): string {
