@@ -1290,7 +1290,7 @@ function fullOneTimeCalls(sourceDocumentId = "doc_one_time_fiserv") {
       toolClass: capability,
       maximumInputTokens: 1000,
       maximumOutputTokens: 500,
-      maximumToolUses: capability === "web_search" || capability === "retrieval" ? 1 : 0,
+      maximumToolUses: capability === "web_search" ? 2 : capability === "retrieval" ? 1 : 0,
       estimatedMaximumCostUsd: 0.5,
     },
   })));

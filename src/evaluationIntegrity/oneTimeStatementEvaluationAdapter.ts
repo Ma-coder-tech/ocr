@@ -596,11 +596,10 @@ function defaultServices(overrides: Partial<OneTimeStatementEvaluationServices> 
         modelName: context.approvedCallMetadata.model ?? undefined,
         maximumInputTokens: context.approvedCallMetadata.maximumInputTokens ?? undefined,
         maximumOutputTokens: OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS,
-        maximumToolUses: context.approvedCallMetadata.maximumToolUses ?? undefined,
         onUsage: (observed) => { usage = observed; },
       })(request, context);
       return externalResult(value, accountingFromProviderUsage({
-        usage: responsesSafeUsage(usage),
+        usage: openAiResponsesSafeUsageForAccounting(usage),
         approvedCallMetadata: context.approvedCallMetadata,
         durationMs: Math.max(0, Date.now() - started),
       }));
@@ -625,7 +624,7 @@ function defaultServices(overrides: Partial<OneTimeStatementEvaluationServices> 
         onUsage: (observed) => { usage = observed; },
       })(request, context);
       return externalResult(value, accountingFromProviderUsage({
-        usage: responsesSafeUsage(usage),
+        usage: openAiResponsesSafeUsageForAccounting(usage),
         approvedCallMetadata: context.approvedCallMetadata,
         durationMs: Math.max(0, Date.now() - started),
       }));
@@ -715,13 +714,19 @@ function wholeStatementSafeUsage(usage: WholeStatementFeeIntelligenceProviderUsa
   };
 }
 
-function responsesSafeUsage(usage: OpenAiResponsesSafeUsage | null): SafeProviderUsage | null {
-  return usage && {
+export function openAiResponsesSafeUsageForAccounting(usage: OpenAiResponsesSafeUsage | null): SafeProviderUsage | null {
+  if (!usage) return null;
+  const counts = new Map<string, number>();
+  for (const actionType of usage.webSearchActionTypes) {
+    const type = `web_search.${actionType}`;
+    counts.set(type, (counts.get(type) ?? 0) + 1);
+  }
+  return {
     requestId: usage.requestId,
     inputTokens: usage.inputTokens,
     cachedInputTokens: usage.cachedInputTokens,
     outputTokens: usage.outputTokens,
-    toolEvents: usage.webSearchToolCalls > 0 ? [{ type: "web_search", count: usage.webSearchToolCalls }] : [],
+    toolEvents: [...counts].map(([type, count]) => ({ type, count })),
   };
 }
 

@@ -3,8 +3,10 @@ import { zodSchema } from "ai";
 import {
   OPENAI_SEMANTIC_VERIFICATION_MAX_OUTPUT_TOKENS,
   OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS,
+  WEB_SEARCH_PROVIDER_MAX_TOOL_CALLS,
   openAiSemanticSupportAdapter,
   openAiWebSearchAdapter,
+  type OpenAiResponsesSafeUsage,
 } from "../src/canonical/feeKnowledgeResearch.js";
 import { wholeStatementFeeIntelligenceProviderAdapter } from "../src/canonical/wholeStatementFeeIntelligenceRuntime.js";
 import {
@@ -14,6 +16,8 @@ import {
   calculateWorstCaseCostUsd,
   executeBudgetedProviderCall,
   livePackage5BProviderSettings,
+  openAiResponsesSafeUsageForAccounting,
+  WEB_SEARCH_ACCOUNTING_MAX_ACTIONS,
   type CostReservationInput,
 } from "../src/evaluationIntegrity/index.js";
 
@@ -130,7 +134,6 @@ describe("live-evaluation budget enforcement", () => {
       modelName: "gpt-5",
       maximumInputTokens: 400_000,
       maximumOutputTokens: OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS,
-      maximumToolUses: 1,
       onUsage: (observed) => { usage = observed; },
       fetchImpl: async (_url, init) => {
         sends += 1;
@@ -164,6 +167,105 @@ describe("live-evaluation budget enforcement", () => {
       cachedInputTokens: 200,
       outputTokens: 80,
       webSearchToolCalls: 1,
+      webSearchActionTypes: ["search"],
+    });
+  });
+
+  it("accepts the proven two-action live shape while keeping the provider request cap at one", async () => {
+    let body: Record<string, unknown> | null = null;
+    let usage: OpenAiResponsesSafeUsage | null = null;
+    const adapter = openAiWebSearchAdapter({
+      apiKey: "synthetic-key",
+      modelName: "gpt-5",
+      maximumInputTokens: 400_000,
+      maximumOutputTokens: OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS,
+      onUsage: (observed) => { usage = observed; },
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body));
+        return jsonResponse({
+          id: "resp_two_web_actions",
+          status: "completed",
+          usage: { input_tokens: 8_720, output_tokens: 1_564, input_tokens_details: { cached_tokens: 4_352 } },
+          output: [
+            {
+              type: "web_search_call",
+              status: "completed",
+              action: {
+                type: "search",
+                sources: [
+                  { type: "url", url: "https://usa.visa.com/support/consumer/visa-rules.html", title: "Visa rules" },
+                  { type: "url", url: "https://www.visa.com/support/small-business.html", title: "Visa small business" },
+                  { type: "url", url: "https://www.visa.com/about-visa.html", title: "About Visa" },
+                ],
+              },
+            },
+            {
+              type: "web_search_call",
+              status: "searching",
+              action: { type: "open_page", url: "https://www.visa.com/support/small-business.html" },
+            },
+          ],
+        });
+      },
+    });
+
+    const candidates = await adapter(searchRequest(), { abortSignal: new AbortController().signal });
+    const safeUsage = openAiResponsesSafeUsageForAccounting(usage);
+    if (!safeUsage) throw new Error("expected safe usage");
+    const metadata = reservation({ callId: "two_action_search" });
+    const accounting = accountingFromProviderUsage({
+      usage: safeUsage,
+      approvedCallMetadata: metadata,
+      durationMs: 25,
+    });
+
+    expect(body).toMatchObject({ max_tool_calls: WEB_SEARCH_PROVIDER_MAX_TOOL_CALLS });
+    expect(WEB_SEARCH_PROVIDER_MAX_TOOL_CALLS).toBe(1);
+    expect(WEB_SEARCH_ACCOUNTING_MAX_ACTIONS).toBe(2);
+    expect(candidates).toHaveLength(3);
+    expect(usage).toMatchObject({
+      requestId: "resp_two_web_actions",
+      webSearchToolCalls: 2,
+      webSearchActionTypes: ["search", "open_page"],
+    });
+    expect(JSON.stringify(usage)).not.toContain("visa.com");
+    expect(safeUsage.toolEvents).toEqual([
+      { type: "web_search.search", count: 1 },
+      { type: "web_search.open_page", count: 1 },
+    ]);
+    expect(calculateWorstCaseCostUsd(metadata)).toBe(0.54);
+    expect(accounting.observedOrEstimatedFinalCostUsd).toBe(0.041644);
+    const modeledReservations = 5 * 0.3225 + 10 * 0.54 + 25 * 0.001 + 25 * 0.01512;
+    expect(Number(modeledReservations.toFixed(6))).toBe(7.4155);
+    expect(Number((7.5 - modeledReservations).toFixed(6))).toBe(0.0845);
+
+    let error: unknown;
+    try {
+      accountingFromProviderUsage({
+        usage: {
+          ...safeUsage,
+          toolEvents: [...safeUsage.toolEvents, { type: "web_search.find_in_page", count: 1 }],
+        },
+        approvedCallMetadata: metadata,
+        durationMs: 30,
+      });
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toMatchObject({
+      reasonCode: "provider_usage_exceeded_approved_transport_limits",
+      reasonCodes: ["provider_usage_exceeded_approved_transport_limits"],
+      accounting: {
+        requestId: "resp_two_web_actions",
+        inputTokens: 8_720,
+        cachedInputTokens: 4_352,
+        outputTokens: 1_564,
+        toolEvents: [
+          { type: "web_search.search", count: 1 },
+          { type: "web_search.open_page", count: 1 },
+          { type: "web_search.find_in_page", count: 1 },
+        ],
+      },
     });
   });
 
@@ -338,6 +440,7 @@ describe("live-evaluation budget enforcement", () => {
       cachedInputTokens: 50,
       outputTokens: 40,
       webSearchToolCalls: 0,
+      webSearchActionTypes: [],
     });
   });
 
@@ -375,8 +478,8 @@ describe("live-evaluation budget enforcement", () => {
       callId: "search_limit",
       maximumInputTokens: 400_000,
       maximumOutputTokens: 2_000,
-      maximumToolUses: 1,
-      estimatedMaximumCostUsd: 0.53,
+      maximumToolUses: 2,
+      estimatedMaximumCostUsd: 0.54,
     });
 
     await expect(send({ ...valid, maximumOutputTokens: null })).rejects.toThrow("approved_maximum_output_tokens_inconsistent");
@@ -390,8 +493,8 @@ describe("live-evaluation budget enforcement", () => {
       callId: "observed_search",
       maximumInputTokens: 400_000,
       maximumOutputTokens: 2_000,
-      maximumToolUses: 1,
-      estimatedMaximumCostUsd: 0.53,
+      maximumToolUses: 2,
+      estimatedMaximumCostUsd: 0.54,
     });
     const accounting = accountingFromProviderUsage({
       approvedCallMetadata: metadata,
@@ -405,7 +508,7 @@ describe("live-evaluation budget enforcement", () => {
       },
     });
 
-    expect(calculateWorstCaseCostUsd(metadata)).toBe(0.53);
+    expect(calculateWorstCaseCostUsd(metadata)).toBe(0.54);
     expect(accounting).toMatchObject({
       requestId: "resp_accounted",
       inputTokens: 1_000,
@@ -422,15 +525,15 @@ describe("live-evaluation budget enforcement", () => {
       callId: "observed",
       maximumInputTokens: 400_000,
       maximumOutputTokens: 2_000,
-      maximumToolUses: 1,
-      estimatedMaximumCostUsd: 0.53,
+      maximumToolUses: 2,
+      estimatedMaximumCostUsd: 0.54,
     });
     const unknown = reservation({
       callId: "unknown",
       maximumInputTokens: 400_000,
       maximumOutputTokens: 2_000,
-      maximumToolUses: 1,
-      estimatedMaximumCostUsd: 0.53,
+      maximumToolUses: 2,
+      estimatedMaximumCostUsd: 0.54,
     });
     ledger.reserve(observed);
     ledger.reserve(unknown);
@@ -447,13 +550,13 @@ describe("live-evaluation budget enforcement", () => {
     ledger.finalize("unknown", { status: "failure", durationMs: 10, billingDisposition: "unknown" });
 
     expect(ledger.snapshot()).toMatchObject({
-      cumulativeReservedUsd: 1.06,
+      cumulativeReservedUsd: 1.08,
       cumulativeObservedUsd: 0.012025,
-      cumulativeBudgetCommittedUsd: 0.542025,
-      cumulativeReleasedUsd: 0.517975,
+      cumulativeBudgetCommittedUsd: 0.552025,
+      cumulativeReleasedUsd: 0.527975,
       entries: [
         { cachedInputTokens: 200, billingDisposition: "observed" },
-        { observedOrEstimatedFinalCostUsd: null, billingDisposition: "unknown", worstCaseReservedCostUsd: 0.53 },
+        { observedOrEstimatedFinalCostUsd: null, billingDisposition: "unknown", worstCaseReservedCostUsd: 0.54 },
       ],
     });
   });
@@ -467,8 +570,8 @@ describe("live-evaluation budget enforcement", () => {
         callId: "first",
         maximumInputTokens: 400_000,
         maximumOutputTokens: 2_000,
-        maximumToolUses: 1,
-        estimatedMaximumCostUsd: 0.53,
+        maximumToolUses: 2,
+        estimatedMaximumCostUsd: 0.54,
       }),
       invoke: async () => {
         sends += 1;
@@ -481,8 +584,8 @@ describe("live-evaluation budget enforcement", () => {
         callId: "second",
         maximumInputTokens: 400_000,
         maximumOutputTokens: 2_000,
-        maximumToolUses: 1,
-        estimatedMaximumCostUsd: 0.53,
+        maximumToolUses: 2,
+        estimatedMaximumCostUsd: 0.54,
       }),
       invoke: async () => {
         sends += 1;
@@ -545,9 +648,9 @@ function reservation(overrides: Partial<CostReservationInput> & Pick<CostReserva
     toolClass: "web_search",
     maximumInputTokens: 400_000,
     maximumOutputTokens: 2_000,
-    maximumToolUses: 1,
+    maximumToolUses: 2,
     pricing: openAiPricing,
-    estimatedMaximumCostUsd: 0.53,
+    estimatedMaximumCostUsd: 0.54,
     ...overrides,
   };
 }

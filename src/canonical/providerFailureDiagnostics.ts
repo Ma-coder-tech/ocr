@@ -9,6 +9,7 @@ export const SAFE_PROVIDER_FAILURE_REASON_CODES = [
   "provider_call_timed_out",
   "provider_refused",
   "provider_required_tool_missing",
+  "provider_usage_exceeded_approved_transport_limits",
 ] as const;
 
 export type SafeProviderFailureReasonCode = (typeof SAFE_PROVIDER_FAILURE_REASON_CODES)[number];
@@ -75,7 +76,7 @@ export function safeProviderFailureError(error: unknown, response?: {
 }
 
 export function safeProviderPostResponseFailureError(
-  reasonCode: "provider_refused" | "provider_required_tool_missing",
+  reasonCode: "provider_refused" | "provider_required_tool_missing" | "provider_usage_exceeded_approved_transport_limits",
   responseId: unknown,
 ): SafeProviderFailureError {
   return new SafeProviderFailureError({

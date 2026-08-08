@@ -44,8 +44,11 @@ export const FEE_KNOWLEDGE_RESEARCH_LIMITS = {
 
 const DEFAULT_OPENAI_WEB_SEARCH_MODEL = "gpt-5";
 export const OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS = 2_000;
+export const WEB_SEARCH_PROVIDER_MAX_TOOL_CALLS = 1;
 export const OPENAI_SEMANTIC_VERIFICATION_MAX_OUTPUT_TOKENS = 1_000;
 const WEB_SEARCH_MODEL_PATTERN = /^(gpt-5(?:$|-)|gpt-4\.1(?:$|-)|gpt-4o(?:-search-preview)?(?:$|-)|o3(?:$|-)|o4-mini(?:$|-))/i;
+
+export type OpenAiWebSearchActionType = "search" | "open_page" | "find_in_page" | "other";
 
 export type FeeKnowledgeResearchQuestion = {
   feeRowRef: string;
@@ -103,6 +106,7 @@ export type OpenAiResponsesSafeUsage = {
   cachedInputTokens: number | null;
   outputTokens: number | null;
   webSearchToolCalls: number;
+  webSearchActionTypes: OpenAiWebSearchActionType[];
 };
 
 export type FeeKnowledgeResearchOptions = {
@@ -321,7 +325,6 @@ export function openAiWebSearchAdapter(options: {
   fetchImpl?: SafeFetch;
   maximumInputTokens?: number;
   maximumOutputTokens?: number;
-  maximumToolUses?: number;
   onUsage?: (usage: OpenAiResponsesSafeUsage) => void;
 }): FeeKnowledgeSearchAdapter {
   return async (request, context) => {
@@ -354,7 +357,6 @@ export function openAiWebSearchAdapter(options: {
     ].join("\n");
     assertUtf8InputBound(input, options.maximumInputTokens);
     const maximumOutputTokens = positiveInteger(options.maximumOutputTokens ?? OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS, "web-search maximum output tokens");
-    const maximumToolUses = positiveInteger(options.maximumToolUses ?? 1, "web-search maximum tool uses");
     let response: Response;
     try {
       response = await fetchImpl("https://api.openai.com/v1/responses", {
@@ -372,7 +374,7 @@ export function openAiWebSearchAdapter(options: {
           include: ["web_search_call.action.sources"],
           reasoning: { effort: "low" },
           max_output_tokens: maximumOutputTokens,
-          max_tool_calls: maximumToolUses,
+          max_tool_calls: WEB_SEARCH_PROVIDER_MAX_TOOL_CALLS,
         }),
       });
     } catch (error) {
@@ -445,13 +447,20 @@ export function openAiResponsesSafeUsage(raw: unknown): OpenAiResponsesSafeUsage
   const usage = asRecord(root?.usage);
   const details = asRecord(usage?.input_tokens_details);
   const output = Array.isArray(root?.output) ? root.output : [];
+  const webSearchCalls = output.filter((item) => asRecord(item)?.type === "web_search_call");
   return {
     requestId: typeof root?.id === "string" && root.id.length > 0 ? root.id : null,
     inputTokens: safeUsageInteger(usage?.input_tokens),
     cachedInputTokens: safeUsageInteger(details?.cached_tokens) ?? 0,
     outputTokens: safeUsageInteger(usage?.output_tokens),
-    webSearchToolCalls: output.filter((item) => asRecord(item)?.type === "web_search_call").length,
+    webSearchToolCalls: webSearchCalls.length,
+    webSearchActionTypes: webSearchCalls.map(webSearchActionType),
   };
+}
+
+function webSearchActionType(value: unknown): OpenAiWebSearchActionType {
+  const type = asRecord(asRecord(value)?.action)?.type;
+  return type === "search" || type === "open_page" || type === "find_in_page" ? type : "other";
 }
 
 function assertUtf8InputBound(input: string, maximumInputTokens: number | undefined): void {
