@@ -5,6 +5,7 @@ export * from "./errors.js";
 export * from "./execution.js";
 export * from "./invariance.js";
 export * from "./lifecycle.js";
+export * from "./liveEvaluationTimeoutPolicy.js";
 export * from "./manifest.js";
 export * from "./oneTimeStatementEvaluationAdapter.js";
 export * from "./oneTimeCanonicalAdmissionProjection.js";

@@ -61,6 +61,12 @@ export type RepositoryProviderTransportResult = {
     status: "failed" | "timed_out" | "safety_blocked";
     reasonCode: string;
   };
+  providerFailure?: {
+    status: "failure" | "timeout";
+    scope: "candidate_local" | "research_graph";
+    reasonCode: string;
+  };
+  researchStageStatus?: "failed" | "timed_out" | "safety_blocked";
 };
 
 export type RepositoryProviderTransport = (

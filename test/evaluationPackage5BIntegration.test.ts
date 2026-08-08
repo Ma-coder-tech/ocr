@@ -536,6 +536,7 @@ describe("Package 5B manifest-driven admission", () => {
     const fixture = await approvedOneTimePdfFixture();
     const labels = new Map<string, string>();
     let semanticCalls = 0;
+    let wholeStatementCalls = 0;
     const timeout = Object.assign(new Error("private timeout"), { name: "AbortError", accounting: { requestId: "request_semantic_timeout", durationMs: 5 } });
     const result = await runManifestDrivenLiveEvaluation({
       ...fixture.runnerInput,
@@ -544,9 +545,9 @@ describe("Package 5B manifest-driven admission", () => {
       oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis, 0), researchQuestion(analysis, 1)],
       onCanonicalAdmissionProjectedForTesting: (value) => {
         expect(value.admissionDisposition).toBe("rejected");
-        expect(value.admission).toMatchObject({ executionStatus: "timed_out", validationStatus: "failed", groundingStatus: "rejected" });
-        expect(value.package5a).toMatchObject({ executionState: "timed_out", admissionState: "rejected", finalCanonicalStatus: "timed_out" });
-        expect(value.researchEvidence.attempts.map((attempt) => attempt.status).sort()).toEqual(["completed", "timed_out"]);
+        expect(value.admission).toMatchObject({ executionStatus: "completed", validationStatus: "failed", groundingStatus: "rejected" });
+        expect(value.package5a).toMatchObject({ executionState: "completed", admissionState: "rejected", finalCanonicalStatus: "rejected" });
+        expect(value.researchEvidence.attempts.map((attempt) => attempt.status).sort()).toEqual(["completed", "completed"]);
         expect(value.researchEvidence.candidates.map((candidate) => candidate.semanticVerificationStatus).sort()).toEqual(["completed", "timed_out"]);
         expect(value.researchEvidence.claimSupports).toHaveLength(1);
       },
@@ -566,10 +567,15 @@ describe("Package 5B manifest-driven admission", () => {
           if (semanticCalls === 2) throw timeout;
           return external({ type: "fee_knowledge_semantic_support_decision", policyVersion: FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION, decision: "supports", structuredClaim, reasonCodes: ["synthetic_semantic_support"], providerDetailsStripped: true }, "request_semantic_first");
         },
+        wholeStatementReview: async (packet) => {
+          wholeStatementCalls += 1;
+          return external(validReview(packet, true), "request_whole_after_partial_semantic_timeout");
+        },
       },
     });
 
-    expect(result.finalStatus).toBe("timed_out");
+    expect(result.finalStatus).toBe("blocked");
+    expect(wholeStatementCalls).toBe(1);
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
     if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
     const proof = result.artifact.canonicalAdmissionResults[0]!.researchEvidence;
@@ -605,7 +611,7 @@ describe("Package 5B manifest-driven admission", () => {
       },
     });
 
-    expect(result.finalStatus).toBe("failed");
+    expect(result.finalStatus).toBe("blocked");
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
     if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
     const admission = result.artifact.canonicalAdmissionResults[0]!;
@@ -613,6 +619,136 @@ describe("Package 5B manifest-driven admission", () => {
     expect(admission.researchEvidence.candidates).toHaveLength(2);
     expect(admission.researchEvidence.candidates.some((candidate) => candidate.retrievalStatus === "failed")).toBe(true);
     expect(admission.packageF).toBeNull();
+  }, 30_000);
+
+  it("continues later candidates after candidate-local retrieval timeout and malformed semantics", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    let feeLabel = "fee";
+    let retrievalCalls = 0;
+    let semanticCalls = 0;
+    let wholeStatementCalls = 0;
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: fullOneTimeCalls(),
+      outputArtifactPath: path.join(fixture.directory, "package-5b-candidate-local-timeout.json"),
+      oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis)],
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async ({ questions: [question] }) => {
+          feeLabel = question!.feeLabel;
+          return external(["one", "two", "three"].map((suffix) => ({
+            url: `https://www.fiserv.com/candidate/${suffix}`,
+            title: `Official guide ${suffix}`,
+            publisher: "Fiserv",
+          })), "request_search_candidate_local");
+        },
+        documentRetrieval: async (url) => {
+          retrievalCalls += 1;
+          if (url.endsWith("/two")) {
+            throw Object.assign(new Error("synthetic candidate timeout"), {
+              name: "AbortError",
+              accounting: { requestId: "request_retrieval_candidate_timeout", durationMs: 5 },
+            });
+          }
+          return external(retrievedTextDocument(url, feeLabel), `request_retrieval_candidate_${retrievalCalls}`);
+        },
+        semanticVerification: async ({ structuredClaim }) => {
+          semanticCalls += 1;
+          if (semanticCalls === 1) {
+            return external({
+              ...semanticSupport(structuredClaim),
+              decision: "unsupported" as const,
+              reasonCodes: ["fee_knowledge_semantic_json_invalid"],
+            }, "request_semantic_candidate_malformed");
+          }
+          return external(semanticSupport(structuredClaim), `request_semantic_candidate_${semanticCalls}`);
+        },
+        wholeStatementReview: async (packet) => {
+          wholeStatementCalls += 1;
+          return external(validReview(packet, true), "request_whole_candidate_local");
+        },
+      },
+    });
+
+    expect(retrievalCalls).toBe(3);
+    expect(semanticCalls).toBe(2);
+    expect(wholeStatementCalls).toBe(1);
+    expect(result.finalStatus).toBe("blocked");
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+    expect(result.providerCallOutcomes.find((outcome) => outcome.requestId === "request_retrieval_candidate_timeout"))
+      .toMatchObject({ status: "timeout", stage: "document_retrieval" });
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const candidates = result.artifact.canonicalAdmissionResults[0]!.researchEvidence.candidates;
+    expect(candidates.filter((candidate) => candidate.retrievalStatus === "retrieved_text")).toHaveLength(2);
+    expect(candidates.filter((candidate) => candidate.retrievalStatus === "timed_out")).toHaveLength(1);
+    expect(candidates.filter((candidate) => candidate.semanticVerificationStatus === "parse_failed")).toHaveLength(1);
+    expect(candidates.filter((candidate) => candidate.semanticVerificationStatus === "completed")).toHaveLength(1);
+    expect(candidates.find((candidate) => candidate.semanticVerificationStatus === "parse_failed")?.verificationStatus)
+      .not.toBe("runtime_verified_documentation");
+  }, 30_000);
+
+  it("keeps an unsafe URL candidate local and admits evidence only from a later safe candidate", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    let feeLabel = "fee";
+    let retrievalCalls = 0;
+    let semanticCalls = 0;
+    let wholeStatementCalls = 0;
+    let wholeStatementPacket: any = null;
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: fullOneTimeCalls(),
+      outputArtifactPath: path.join(fixture.directory, "package-5b-unsafe-then-safe.json"),
+      oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis)],
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async ({ questions: [question] }) => {
+          feeLabel = question!.feeLabel;
+          return external([
+            { url: "https://unsafe.synthetic.invalid/private", title: "Rejected source", publisher: "Unknown" },
+            { url: "https://www.fiserv.com/safe-candidate", title: "Official guide", publisher: "Fiserv" },
+          ], "request_search_unsafe_then_safe");
+        },
+        documentRetrieval: async (url) => {
+          retrievalCalls += 1;
+          return url.includes("unsafe.synthetic.invalid")
+            ? external(terminalRetrievedDocument("safety_blocked", "fee_knowledge_url_private_host"), "request_retrieval_unsafe")
+            : external(retrievedTextDocument(url, feeLabel), "request_retrieval_safe");
+        },
+        semanticVerification: async ({ structuredClaim }) => {
+          semanticCalls += 1;
+          return external(semanticSupport(structuredClaim), "request_semantic_safe");
+        },
+        wholeStatementReview: async (packet) => {
+          wholeStatementCalls += 1;
+          wholeStatementPacket = structuredClone(packet);
+          return external(validReview(packet, true), "request_whole_unsafe_then_safe");
+        },
+      },
+    });
+
+    expect(retrievalCalls).toBe(2);
+    expect(semanticCalls).toBe(1);
+    expect(wholeStatementCalls).toBe(1);
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    const unsafeCandidate = admission.researchEvidence.candidates.find((candidate) => candidate.retrievalStatus === "safety_blocked")!;
+    const safeCandidate = admission.researchEvidence.candidates.find((candidate) => candidate.retrievalStatus === "retrieved_text")!;
+    expect(unsafeCandidate).toMatchObject({
+      retrievalStatus: "safety_blocked",
+      semanticVerificationStatus: "not_started",
+      verificationStatus: "safety_blocked",
+    });
+    expect(unsafeCandidate.reasonCodes).toContain("fee_knowledge_url_private_host");
+    expect(unsafeCandidate.claimSupportRefs).toEqual([]);
+    expect(admission.researchEvidence.claimSupports.every((support) => support.candidateRef !== unsafeCandidate.candidateRef)).toBe(true);
+    expect(admission.admission.acceptedClaimSupportRefs.every((ref) => !unsafeCandidate.claimSupportRefs.includes(ref))).toBe(true);
+    expect(safeCandidate.semanticVerificationStatus).toBe("completed");
+    expect(admission.researchEvidence.claimSupports.some((support) => support.candidateRef === safeCandidate.candidateRef)).toBe(true);
+    const provenancePacket = wholeStatementPacket.sourceProvenancePacket;
+    expect(provenancePacket.claimSupports.every((support: any) => support.candidateId !== unsafeCandidate.candidateRef)).toBe(true);
+    expect(provenancePacket.rowPackets.every((row: any) => !row.verifiedCandidateRefs.includes(unsafeCandidate.candidateRef))).toBe(true);
+    expect(provenancePacket.provenanceDecisions.find((decision: any) => decision.candidateId === unsafeCandidate.candidateRef))
+      .toMatchObject({ decision: "insufficient_evidence", claimSupportId: null });
   }, 30_000);
 
   it("writes a verifiable rejected result when whole-statement execution times out", async () => {
@@ -714,7 +850,7 @@ describe("Package 5B manifest-driven admission", () => {
     }
   }, 90_000);
 
-  it("actively enforces the prepared deadline and classifies every unstarted question without invoking whole-statement review", async () => {
+  it("enforces the research-graph deadline while preserving whole-statement review", async () => {
     const fixture = await approvedOneTimePdfFixture();
     let abortObserved = false;
     let wholeStatementCalls = 0;
@@ -738,16 +874,16 @@ describe("Package 5B manifest-driven admission", () => {
         webSearchDiscovery: async (_request, context) => new Promise((_resolve) => {
           context.abortSignal.addEventListener("abort", () => { abortObserved = true; }, { once: true });
         }),
-        wholeStatementReview: async () => {
+        wholeStatementReview: async (packet) => {
           wholeStatementCalls += 1;
-          return {};
+          return external(validReview(packet), "request_whole_after_graph_timeout");
         },
       },
     });
 
     expect(abortObserved).toBe(true);
-    expect(wholeStatementCalls).toBe(0);
-    expect(result.finalStatus).toBe("timed_out");
+    expect(wholeStatementCalls).toBe(1);
+    expect(result.finalStatus).toBe("blocked");
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
     if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
     const admission = result.artifact.canonicalAdmissionResults[0]!;
@@ -756,7 +892,7 @@ describe("Package 5B manifest-driven admission", () => {
       .sort((left, right) => left.questionOrdinal - right.questionOrdinal)
       .map((attempt) => attempt.status)).toEqual(["timed_out", "timed_out", "budget_exhausted"]);
     expect(admission.packageF).toBeNull();
-    expect(result.artifact.providerCallOutcomes.some((outcome) => outcome.stage === "whole_statement_ai_review" && outcome.status === "success")).toBe(false);
+    expect(result.artifact.providerCallOutcomes.some((outcome) => outcome.stage === "whole_statement_ai_review" && outcome.status === "success")).toBe(true);
   }, 30_000);
 
   it("preserves completed research and ignores a late abort-insensitive semantic result", async () => {
@@ -792,9 +928,9 @@ describe("Package 5B manifest-driven admission", () => {
           if (semanticCalls === 1) return external(semanticSupport(structuredClaim), "request_semantic_deadline_one");
           return new Promise((resolve) => setTimeout(() => resolve(external(semanticSupport(structuredClaim), "request_semantic_deadline_late")), 1300));
         },
-        wholeStatementReview: async () => {
+        wholeStatementReview: async (packet) => {
           wholeStatementCalls += 1;
-          return {};
+          return external(validReview(packet, true), "request_whole_after_late_semantic");
         },
       },
     });
@@ -802,12 +938,12 @@ describe("Package 5B manifest-driven admission", () => {
     const beforeLateResolution = await readFile(artifactPath, "utf8");
     await new Promise((resolve) => setTimeout(resolve, 1400));
     expect(await readFile(artifactPath, "utf8")).toBe(beforeLateResolution);
-    expect(wholeStatementCalls).toBe(0);
-    expect(result.finalStatus).toBe("timed_out");
+    expect(wholeStatementCalls).toBe(1);
+    expect(result.finalStatus).toBe("blocked");
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
     if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
     const admission = result.artifact.canonicalAdmissionResults[0]!;
-    expect(admission.researchEvidence.attempts.map((attempt) => attempt.status).sort()).toEqual(["completed", "timed_out"]);
+    expect(admission.researchEvidence.attempts.map((attempt) => attempt.status).sort()).toEqual(["completed", "completed"]);
     expect(admission.researchEvidence.candidates.map((candidate) => candidate.semanticVerificationStatus).sort()).toEqual(["completed", "timed_out"]);
     expect(admission.researchEvidence.claimSupports).toHaveLength(1);
     expect(admission.packageF).toBeNull();
@@ -824,7 +960,7 @@ describe("Package 5B manifest-driven admission", () => {
       ["unavailable", "fee_knowledge_http_404", "failed", "failed"],
       ["malformed", "fee_knowledge_pdf_parse_failed", "failed", "failed"],
     ] as const;
-    for (const [retrievalStatus, terminalReason, attemptStatus, finalStatus] of cases) {
+    for (const [retrievalStatus, terminalReason] of cases) {
       const fixture = await approvedOneTimePdfFixture();
       let wholeStatementCalls = 0;
       const result = await runManifestDrivenLiveEvaluation({
@@ -835,19 +971,22 @@ describe("Package 5B manifest-driven admission", () => {
         oneTimeServicesForTesting: {
           webSearchDiscovery: async () => external([{ url: "https://www.fiserv.com/terminal", title: "Official fee guide", publisher: "Fiserv" }], `request_search_${retrievalStatus}`),
           documentRetrieval: async () => external(terminalRetrievedDocument(retrievalStatus, terminalReason), `request_retrieval_${retrievalStatus}`),
-          wholeStatementReview: async () => {
+          wholeStatementReview: async (packet) => {
             wholeStatementCalls += 1;
-            return {};
+            return external(validReview(packet), `request_whole_retrieval_${retrievalStatus}`);
           },
         },
       });
 
-      expect(result.finalStatus).toBe(finalStatus);
-      expect(wholeStatementCalls).toBe(0);
+      expect(result.finalStatus).toBe("blocked");
+      expect(wholeStatementCalls).toBe(1);
       expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
       if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
       const admission = result.artifact.canonicalAdmissionResults[0]!;
-      expect(admission.researchEvidence.attempts[0]).toMatchObject({ status: attemptStatus, resultCount: 1 });
+      expect(admission.researchEvidence.attempts[0]).toMatchObject({
+        status: "completed",
+        resultCount: 1,
+      });
       expect(admission.researchEvidence.candidates[0]).toMatchObject({ retrievalStatus, semanticVerificationStatus: "not_started" });
       expect(admission.packageF).toBeNull();
       expect(result.artifact.providerCallOutcomes.find((outcome) => outcome.stage === "document_retrieval")?.status).toBe("success");
@@ -875,7 +1014,7 @@ describe("Package 5B manifest-driven admission", () => {
       ["parse_failed", "fee_knowledge_semantic_json_invalid", "failed", "failed"],
       ["completed", "synthetic_unsupported", "completed", "completed"],
     ] as const;
-    for (const [semanticStatus, semanticReason, attemptStatus, finalStatus] of cases) {
+    for (const [semanticStatus, semanticReason] of cases) {
       const fixture = await approvedOneTimePdfFixture();
       let feeLabel = "fee";
       let wholeStatementCalls = 0;
@@ -902,11 +1041,11 @@ describe("Package 5B manifest-driven admission", () => {
         },
       });
 
-      expect(result.finalStatus).toBe(finalStatus);
+      expect(result.finalStatus).toBe(semanticStatus === "completed" ? "completed" : "blocked");
       expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
       if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
       const admission = result.artifact.canonicalAdmissionResults[0]!;
-      expect(admission.researchEvidence.attempts[0]?.status).toBe(attemptStatus);
+      expect(admission.researchEvidence.attempts[0]?.status).toBe(semanticStatus === "safety_blocked" ? "safety_blocked" : "completed");
       expect(admission.researchEvidence.candidates[0]?.semanticVerificationStatus).toBe(semanticStatus);
       expect(result.artifact.providerCallOutcomes.find((outcome) => outcome.stage === "semantic_verification")?.status).toBe("success");
       if (semanticStatus === "completed") {
@@ -914,7 +1053,7 @@ describe("Package 5B manifest-driven admission", () => {
         expect(admission.admissionDisposition).toBe("admitted");
         expect(admission.researchEvidence.claimSupports[0]?.disposition).toBe("rejected");
       } else {
-        expect(wholeStatementCalls).toBe(0);
+        expect(wholeStatementCalls).toBe(semanticStatus === "safety_blocked" ? 0 : 1);
         expect(admission.packageF).toBeNull();
       }
       if (semanticStatus === "safety_blocked") {

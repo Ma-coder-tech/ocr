@@ -527,6 +527,44 @@ describe("canonical fee knowledge and provenance", () => {
 	    expect(targetMismatch.reasonCodes).toContain("fee_knowledge_connection_target_unvalidated");
 	  });
 
+	  it.each([1, 2, 3])("follows %i safe redirects with every hop revalidated", async (redirectCount) => {
+	    const resolvedHosts: string[] = [];
+	    const fetchedUrls: string[] = [];
+	    const document = await retrieveFeeKnowledgeDocument("https://redirect-0.syntheticprocessor.test/fees", {
+	      abortSignal: new AbortController().signal,
+	      resolveHost: async (host) => {
+	        resolvedHosts.push(host);
+	        return ["93.184.216.34"];
+	      },
+	      fetchImpl: async (url, init) => {
+	        const currentUrl = String(url);
+	        fetchedUrls.push(currentUrl);
+	        expect(new URL(currentUrl).protocol).toBe("https:");
+	        expect((init as RequestInit & { validatedIpAddresses?: string[] }).validatedIpAddresses).toEqual(["93.184.216.34"]);
+	        const hop = Number(new URL(currentUrl).hostname.match(/redirect-(\d+)/)?.[1]);
+	        if (hop < redirectCount) {
+	          return new Response("", {
+	            status: 302,
+	            headers: { location: `https://redirect-${hop + 1}.syntheticprocessor.test/fees` },
+	          });
+	        }
+	        return new Response("Synthetic Processor Monthly Service Fee", {
+	          status: 200,
+	          headers: {
+	            "content-type": "text/plain",
+	            "x-ratereveal-connected-address": "93.184.216.34",
+	          },
+	        });
+	      },
+	    });
+
+	    expect(document.status).toBe("retrieved_text");
+	    expect(document.redirectChain).toHaveLength(redirectCount);
+	    expect(fetchedUrls).toHaveLength(redirectCount + 1);
+	    expect(resolvedHosts).toHaveLength(redirectCount + 1);
+	    expect(new Set(resolvedHosts).size).toBe(redirectCount + 1);
+	  });
+
 	  it("creates HTML/PDF locators and revalidates citations against fingerprint and locator hash", async () => {
 	    const html = await retrieveFeeKnowledgeDocument("https://syntheticprocessor.test/fees", {
 	      abortSignal: new AbortController().signal,

@@ -1,0 +1,19 @@
+{
+  "type": "live_research_timeout_regression_fixture_v1",
+  "sourceArtifactSha256": "aa56359eaa4b167e423264ed0e7e632ad5e60693fa22a73b148109cc288b7009",
+  "sourceFinalStatus": "timed_out",
+  "sourceReasonCode": "provider_call_timed_out",
+  "selectedStatementCount": 5,
+  "observedOutcomes": {
+    "webSearchTimeouts": 5,
+    "laterWebSearchCancellations": 5,
+    "retrievalCancellations": 25,
+    "semanticCancellations": 25,
+    "wholeStatementCancellations": 5
+  },
+  "requiredCorrectedBehavior": {
+    "researchFailureCancelsOnlyResearchCalls": true,
+    "wholeStatementReviewRemainsEligible": true,
+    "unknownBillingRetainsReservation": true
+  }
+}

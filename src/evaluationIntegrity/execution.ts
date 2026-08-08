@@ -244,6 +244,51 @@ export async function runManifestDrivenLiveEvaluation(input: {
       break;
     }
 
+    if (result.providerFailure) {
+      const costExceeded = finalizeCallOrDetectCostOverrun(ledger, call.reservation.callId, {
+        ...result.accounting,
+        status: result.providerFailure.status,
+        billingDisposition: "unknown",
+      });
+      const reasonCode = costExceeded ? "cost_exceeded_reservation" : result.providerFailure.reasonCode;
+      const status = costExceeded ? "failure" : result.providerFailure.status;
+      providerCallOutcomes.push({
+        callId: call.reservation.callId,
+        sourceDocumentId: call.sourceDocumentId,
+        stage: call.stage,
+        status,
+        requestId: result.accounting.requestId ?? null,
+        reasonCodes: [reasonCode],
+      });
+      recordFailedLifecycle(lifecycleLedger, sourceDocument, call, status, reasonCode, capabilityRef, providerRef);
+      if (costExceeded) {
+        cancelReservedCalls(
+          ledger,
+          input.calls.slice(index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId),
+          providerCallOutcomes,
+          "cancelled_after_cost_exceeded_reservation",
+        );
+        sourceExecutionFailures.set(call.sourceDocumentId, "failed");
+        finalStatus = "failed";
+        reasonCodes = [reasonCode];
+      } else if (result.providerFailure.scope === "research_graph") {
+        const safetyBlocked = result.researchTerminal?.status === "safety_blocked";
+        cancelReservedCalls(
+          ledger,
+          input.calls.slice(index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId
+            && (safetyBlocked || pending.stage !== "whole_statement_ai_review")),
+          providerCallOutcomes,
+          `cancelled_after_research_${result.researchTerminal?.status ?? "failed"}`,
+        );
+        if (safetyBlocked) {
+          sourceExecutionFailures.set(call.sourceDocumentId, "safety_blocked");
+          finalStatus = "blocked";
+          reasonCodes = [reasonCode];
+        }
+      }
+      continue;
+    }
+
     const costExceeded = finalizeCallOrDetectCostOverrun(ledger, call.reservation.callId, {
       ...result.accounting,
       status: "success",
@@ -316,20 +361,16 @@ export async function runManifestDrivenLiveEvaluation(input: {
     }
     recordAdmissionLifecycle(lifecycleLedger, sourceDocument, result, capabilityRef, providerRef);
     if (result.researchTerminal) {
+      const safetyBlocked = result.researchTerminal.status === "safety_blocked";
       cancelReservedCalls(
         ledger,
-        input.calls.slice(index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId),
+        input.calls.slice(index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId
+          && (safetyBlocked || pending.stage !== "whole_statement_ai_review")),
         providerCallOutcomes,
         `cancelled_after_research_${result.researchTerminal.status}`,
       );
-      sourceExecutionFailures.set(call.sourceDocumentId, result.researchTerminal.status);
-      if (result.researchTerminal.status === "timed_out") {
-        finalStatus = "timed_out";
-        reasonCodes = ["provider_call_timed_out"];
-      } else if (result.researchTerminal.status === "failed") {
-        finalStatus = "failed";
-        reasonCodes = ["provider_call_failed"];
-      } else if (finalStatus === "completed") {
+      if (safetyBlocked) {
+        sourceExecutionFailures.set(call.sourceDocumentId, "safety_blocked");
         finalStatus = "blocked";
         reasonCodes = ["canonical_admission_safety_blocked"];
       }
@@ -591,8 +632,9 @@ function recordSuccessfulLifecycle(
   if (result.lifecycle?.evidenceValidated) recordAiLifecycleState({ ledger, sourceDocumentId: source.sourceDocumentId, stateName: "evidence_validated", state: "completed", reasonCodes: reasons });
   if (result.lifecycle?.policyAccepted) recordAiLifecycleState({ ledger, sourceDocumentId: source.sourceDocumentId, stateName: "policy_accepted", state: "completed", reasonCodes: reasons });
   if (call.stage === "web_search_discovery" || call.stage === "document_retrieval") {
-    const researchState = result.researchTerminal?.status === "safety_blocked" ? "blocked"
-      : result.researchTerminal ? "failed" : "completed";
+    const researchStatus = result.researchStageStatus ?? result.researchTerminal?.status;
+    const researchState = researchStatus === "safety_blocked" ? "blocked"
+      : researchStatus ? "failed" : "completed";
     recordLifecycleStage(ledger, lifecycleRefs({
       sourceDocumentId: source.sourceDocumentId,
       stage: "research_retrieval",
@@ -607,8 +649,9 @@ function recordSuccessfulLifecycle(
     }));
   }
   if (call.stage === "semantic_verification") {
-    const semanticState = result.researchTerminal?.status === "safety_blocked" ? "blocked"
-      : result.researchTerminal ? "failed" : "completed";
+    const semanticStatus = result.researchStageStatus ?? result.researchTerminal?.status;
+    const semanticState = semanticStatus === "safety_blocked" ? "blocked"
+      : semanticStatus ? "failed" : "completed";
     recordLifecycleStage(ledger, lifecycleRefs({
       sourceDocumentId: source.sourceDocumentId,
       stage: "semantic_verification",
@@ -746,14 +789,15 @@ function deriveSourceExecutionStatus(
   explicitFailures: ReadonlyMap<string, "failed" | "timed_out" | "safety_blocked">,
   graphTerminal: "failed" | "timed_out" | "safety_blocked" | null,
 ): "completed" | "failed" | "timed_out" | "safety_blocked" {
-  if (graphTerminal) return graphTerminal;
   const explicit = explicitFailures.get(sourceDocumentId);
   if (explicit) return explicit;
   const sourceOutcomes = outcomes.filter((outcome) => outcome.sourceDocumentId === sourceDocumentId);
+  const wholeStatementOutcome = sourceOutcomes.find((outcome) => outcome.stage === "whole_statement_ai_review");
+  if (wholeStatementOutcome?.status === "success") return "completed";
+  if (graphTerminal) return graphTerminal;
   if (sourceOutcomes.some((outcome) => outcome.status === "timeout")) return "timed_out";
   if (sourceOutcomes.some((outcome) => outcome.status === "failure")) return "failed";
-  const wholeStatementOutcome = sourceOutcomes.find((outcome) => outcome.stage === "whole_statement_ai_review");
-  return wholeStatementOutcome?.status === "success" ? "completed" : "failed";
+  return "failed";
 }
 
 function providerFailure(error: unknown, fallbackDurationMs: number): {

@@ -121,13 +121,38 @@ describe("live-evaluation budget enforcement", () => {
     await adapter(searchRequest(), { abortSignal: new AbortController().signal });
 
     expect(sends).toBe(1);
-    expect(body).toMatchObject({ max_output_tokens: 2_000, max_tool_calls: 1 });
+    expect(body).toMatchObject({
+      tools: [{ type: "web_search", external_web_access: true }],
+      tool_choice: "required",
+      include: ["web_search_call.action.sources"],
+      reasoning: { effort: "low" },
+      max_output_tokens: 2_000,
+      max_tool_calls: 1,
+    });
+    expect(JSON.stringify(body)).not.toMatch(/merchant_live_123|1234\.56/);
     expect(usage).toEqual({
       requestId: "resp_search",
       inputTokens: 1200,
       cachedInputTokens: 200,
       outputTokens: 80,
       webSearchToolCalls: 1,
+    });
+  });
+
+  it("fails a successful Responses payload that did not execute web search", async () => {
+    const adapter = openAiWebSearchAdapter({
+      apiKey: "synthetic-key",
+      modelName: "gpt-5",
+      fetchImpl: async () => jsonResponse({
+        id: "resp_without_search",
+        usage: { input_tokens: 10, output_tokens: 5 },
+        output: [{ type: "message", content: [{ type: "output_text", text: "No tool call." }] }],
+      }),
+    });
+
+    await expect(adapter(searchRequest(), { abortSignal: new AbortController().signal })).rejects.toMatchObject({
+      status: "failed",
+      message: "OpenAI fee knowledge discovery completed without a web_search_call.",
     });
   });
 
@@ -166,6 +191,30 @@ describe("live-evaluation budget enforcement", () => {
       outputTokens: 40,
       webSearchToolCalls: 0,
     });
+  });
+
+  it("degrades malformed and refused semantic responses without enabling tools", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    const responses = [
+      { output: [{ type: "message", content: [{ type: "output_text", text: "not json" }] }] },
+      { output: [{ type: "message", content: [{ type: "refusal", refusal: "declined" }] }] },
+    ];
+    const adapter = openAiSemanticSupportAdapter({
+      apiKey: "synthetic-key",
+      modelName: "gpt-5",
+      maximumToolUses: 0,
+      fetchImpl: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return jsonResponse(responses.shift());
+      },
+    });
+
+    const malformed = await adapter(semanticRequest() as any, { abortSignal: new AbortController().signal });
+    const refused = await adapter(semanticRequest() as any, { abortSignal: new AbortController().signal });
+
+    expect(malformed).toMatchObject({ decision: "unsupported", reasonCodes: ["fee_knowledge_semantic_json_invalid"] });
+    expect(refused).toMatchObject({ decision: "unsupported", reasonCodes: ["fee_knowledge_semantic_support_provider_failed"] });
+    expect(bodies.every((body) => !("tools" in body) && !("tool_choice" in body))).toBe(true);
   });
 
   it("blocks missing, invalid, or inconsistent output ceilings before a provider send", async () => {
