@@ -38,6 +38,7 @@ export type RepositoryProviderTransportResult = {
     requestId?: string | null;
     durationMs: number;
     inputTokens?: number | null;
+    cachedInputTokens?: number | null;
     outputTokens?: number | null;
     toolEvents?: CostToolEvent[];
     observedOrEstimatedFinalCostUsd?: number | null;

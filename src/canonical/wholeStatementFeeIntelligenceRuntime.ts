@@ -20,8 +20,15 @@ import type {
 
 const require = createRequire(import.meta.url);
 
-type GenerateObject = (options: Record<string, unknown>) => Promise<{ object: unknown }>;
-type GenerateText = (options: Record<string, unknown>) => Promise<{ output: unknown }>;
+type ProviderUsage = {
+  inputTokens?: number;
+  inputTokenDetails?: { cacheReadTokens?: number };
+  cachedInputTokens?: number;
+  outputTokens?: number;
+};
+type ProviderResultMetadata = { usage?: ProviderUsage; response?: { id?: string } };
+type GenerateObject = (options: Record<string, unknown>) => Promise<{ object: unknown } & ProviderResultMetadata>;
+type GenerateText = (options: Record<string, unknown>) => Promise<{ output: unknown } & ProviderResultMetadata>;
 type AiModelFactory = (modelName: string) => unknown;
 type AiProviderFactoryCreator = (options: { apiKey?: string }) => AiModelFactory;
 type AiOutputFactory = {
@@ -53,11 +60,21 @@ export type WholeStatementFeeIntelligenceRuntimeOptions = {
   anthropicModelName?: string;
   openAiModelName?: string;
   maxOutputTokens?: number;
+  maxInputTokens?: number;
+  maxRetries?: number;
   timeoutMs?: number;
   sdk?: AiSdk;
   adapter?: WholeStatementFeeIntelligenceRuntimeAdapter;
   sourceRegistry?: ApprovedWholeStatementFeeIntelligenceSourceRegistry;
   feeKnowledgeResearch?: FeeKnowledgeResearchOptions;
+  onProviderUsage?: (usage: WholeStatementFeeIntelligenceProviderUsage) => void;
+};
+
+export type WholeStatementFeeIntelligenceProviderUsage = {
+  requestId: string | null;
+  inputTokens: number | null;
+  cachedInputTokens: number | null;
+  outputTokens: number | null;
 };
 
 export function wholeStatementFeeIntelligenceProviderAdapter(
@@ -148,6 +165,7 @@ async function executeProviderReview(
   for (const attempt of attempts) {
     try {
       const prompt = buildPrompt(packet);
+      assertPromptWithinInputLimit(prompt, options.maxInputTokens);
       if (attempt.provider === "openai") {
         if (!sdk.generateText || !sdk.Output) throw new Error("Structured output unavailable.");
         const result = await sdk.generateText({
@@ -160,7 +178,9 @@ async function executeProviderReview(
           }),
           abortSignal,
           maxOutputTokens: options.maxOutputTokens ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_MAX_OUTPUT_TOKENS ?? 5000),
+          maxRetries: options.maxRetries,
         });
+        options.onProviderUsage?.(providerUsage(result));
         return result.output;
       }
       const result = await sdk.generateObject({
@@ -169,13 +189,38 @@ async function executeProviderReview(
         prompt,
         abortSignal,
         maxOutputTokens: options.maxOutputTokens ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_MAX_OUTPUT_TOKENS ?? 5000),
+        maxRetries: options.maxRetries,
       });
+      options.onProviderUsage?.(providerUsage(result));
       return result.object;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
     }
   }
   throw lastError ?? new Error("Whole-statement fee intelligence provider failed.");
+}
+
+function assertPromptWithinInputLimit(prompt: string, maximumInputTokens: number | undefined): void {
+  if (maximumInputTokens === undefined) return;
+  if (!Number.isInteger(maximumInputTokens) || maximumInputTokens <= 0) throw new Error("Whole-statement maximum input tokens must be a positive integer.");
+  if (Buffer.byteLength(prompt, "utf8") > maximumInputTokens) throw new Error("Whole-statement prompt exceeds approved maximum input tokens.");
+}
+
+function providerUsage(result: ProviderResultMetadata): WholeStatementFeeIntelligenceProviderUsage {
+  return {
+    requestId: safeString(result.response?.id),
+    inputTokens: safeInteger(result.usage?.inputTokens),
+    cachedInputTokens: safeInteger(result.usage?.inputTokenDetails?.cacheReadTokens ?? result.usage?.cachedInputTokens) ?? 0,
+    outputTokens: safeInteger(result.usage?.outputTokens),
+  };
+}
+
+function safeInteger(value: unknown): number | null {
+  return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : null;
+}
+
+function safeString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 function buildPrompt(packet: CanonicalWholeStatementFeeIntelligencePacket): string {

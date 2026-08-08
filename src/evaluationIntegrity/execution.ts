@@ -203,6 +203,7 @@ export async function runManifestDrivenLiveEvaluation(input: {
     const started = Date.now();
     let result: RepositoryProviderTransportResult;
     try {
+      ledger.assertReadyToSend(call.reservation.callId);
       result = await adapter.invoke({
         sanitizedPacket: packets.get(call.sourceDocumentId),
         sourceDocumentId: call.sourceDocumentId,
