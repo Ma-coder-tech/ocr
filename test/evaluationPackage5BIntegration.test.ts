@@ -94,8 +94,8 @@ describe("Package 5B manifest-driven admission", () => {
         oneTimeResearchQuestionsForTesting: () => [],
       });
 
-      expect(result.finalStatus).toBe("blocked");
-      expect(result.reasonCodes).toEqual(["whole_statement_provider_unavailable"]);
+      expect(result.finalStatus).toBe("completed");
+      expect(result.reasonCodes).toEqual(["evaluation_completed"]);
       expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
       if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
       const admission = result.artifact.canonicalAdmissionResults[0]!;
@@ -126,6 +126,102 @@ describe("Package 5B manifest-driven admission", () => {
       });
       expect(result.costLedger.cumulativeObservedUsd).toBe(0);
       expect(result.costLedger.cumulativeBudgetCommittedUsd).toBe(0);
+      expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+    } finally {
+      if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousOpenAiKey;
+    }
+  }, 30_000);
+
+  it("classifies missing OpenAI readiness before web discovery send without blocking deterministic statement success", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const result = await runManifestDrivenLiveEvaluation({
+        ...fixture.runnerInput,
+        calls: openAiReadinessCalls(),
+        outputArtifactPath: path.join(fixture.directory, "integrated-web-readiness-unavailable.json"),
+        oneTimeResearchQuestionsForTesting: (analysis) => Array.from({ length: 4 }, (_, index) => researchQuestion(analysis, index)),
+      });
+
+      expect(result.finalStatus).toBe("completed");
+      expect(result.costLedger.cumulativeObservedUsd).toBe(0);
+      expect(result.costLedger.cumulativeBudgetCommittedUsd).toBe(0);
+      expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+      if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+      const admission = result.artifact.canonicalAdmissionResults[0]!;
+      expect(admission.admissionDisposition).toBe("rejected");
+      expect(admission.admission.validationErrorCodes).toEqual(["whole_statement_research_incomplete"]);
+      expect(admission.researchEvidence.attempts
+        .sort((left, right) => left.questionOrdinal - right.questionOrdinal)
+        .map((attempt) => [attempt.status, attempt.reasonCodes[0]])).toEqual([
+          ["provider_unavailable", "fee_knowledge_web_search_provider_unavailable_before_send"],
+          ["provider_unavailable", "fee_knowledge_web_search_provider_unavailable_before_send"],
+          ["not_selected_planning", "fee_knowledge_research_not_selected_planning"],
+          ["not_selected_planning", "fee_knowledge_research_not_selected_planning"],
+        ]);
+      expect(admission.researchEvidence.candidates).toEqual([]);
+      expect(admission.researchEvidence.claimSupports).toEqual([]);
+      expect(result.providerCallOutcomes.filter((outcome) => outcome.stage === "web_search_discovery"))
+        .toHaveLength(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
+      expect(result.providerCallOutcomes
+        .filter((outcome) => outcome.stage === "web_search_discovery")
+        .every((outcome) => outcome.status === "success"
+          && outcome.requestId === null
+          && outcome.reasonCodes.includes("fee_knowledge_web_search_provider_unavailable_before_send"))).toBe(true);
+      expect(result.providerCallOutcomes.some((outcome) => outcome.reasonCodes.includes("provider_call_failed"))).toBe(false);
+      expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+    } finally {
+      if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousOpenAiKey;
+    }
+  }, 30_000);
+
+  it("classifies missing OpenAI readiness before semantic verification send without admitting unavailable evidence", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    let feeLabel = "fee";
+    try {
+      const result = await runManifestDrivenLiveEvaluation({
+        ...fixture.runnerInput,
+        calls: openAiReadinessCalls(),
+        outputArtifactPath: path.join(fixture.directory, "integrated-semantic-readiness-unavailable.json"),
+        oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis)],
+        oneTimeServicesForTesting: {
+          webSearchDiscovery: async ({ questions: [question] }) => {
+            feeLabel = question!.feeLabel;
+            return external([{ url: "https://www.fiserv.com/semantic-provider-unavailable", title: "Official fee guide", publisher: "Fiserv" }], "request_search_semantic_readiness");
+          },
+          documentRetrieval: async (url) => external(retrievedTextDocument(url, feeLabel), "request_retrieval_semantic_readiness"),
+          wholeStatementReview: async (packet) => external(validReview(packet), "request_whole_semantic_readiness"),
+        },
+      });
+
+      expect(result.finalStatus).toBe("completed");
+      expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+      if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+      const admission = result.artifact.canonicalAdmissionResults[0]!;
+      expect(admission.admissionDisposition).toBe("rejected");
+      expect(admission.researchEvidence.claimSupports).toEqual([]);
+      expect(admission.researchEvidence.candidates[0]).toMatchObject({
+        retrievalStatus: "retrieved_text",
+        semanticVerificationStatus: "provider_unavailable",
+        verificationStatus: "verified_candidate_limited",
+      });
+      expect(admission.researchEvidence.candidates[0]?.reasonCodes).toContain("fee_knowledge_semantic_provider_unavailable_before_send");
+      const semanticOutcome = result.providerCallOutcomes.find((outcome) => outcome.stage === "semantic_verification");
+      expect(semanticOutcome).toMatchObject({
+        status: "success",
+        requestId: null,
+      });
+      expect(semanticOutcome?.reasonCodes).toContain("fee_knowledge_semantic_provider_unavailable_before_send");
+      const semanticLedger = result.costLedger.entries.find((entry) => entry.callId === semanticOutcome?.callId);
+      expect(semanticLedger).toMatchObject({
+        observedOrEstimatedFinalCostUsd: 0,
+        billingDisposition: "provider_confirmed_zero",
+      });
       expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
     } finally {
       if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
@@ -552,7 +648,7 @@ describe("Package 5B manifest-driven admission", () => {
           expect(value.admission.validationErrorCodes).toEqual(["whole_statement_research_incomplete"]);
           expect(value.package5a).toMatchObject({ executionState: "completed", admissionState: "rejected", finalCanonicalStatus: "rejected" });
           expect(value.package5a.stageStates).toEqual({ responseParse: "not_observed", schemaValidation: "not_observed", evidenceCitation: "not_observed", sourceQuality: "not_applicable", linkage: "not_observed", deterministicReconciliation: "not_observed", privacySafety: "not_observed" });
-          expect(value.researchEvidence.attempts.map((attempt) => [attempt.questionOrdinal, attempt.status]).sort((left, right) => Number(left[0]) - Number(right[0]))).toEqual([[1, "completed"], [2, "completed"], [3, "budget_exhausted"], [4, "budget_exhausted"]]);
+          expect(value.researchEvidence.attempts.map((attempt) => [attempt.questionOrdinal, attempt.status]).sort((left, right) => Number(left[0]) - Number(right[0]))).toEqual([[1, "completed"], [2, "completed"], [3, "not_selected_planning"], [4, "not_selected_planning"]]);
           expect(value.researchEvidence.candidates.every((candidate) => candidate.retrievalStatus === "retrieved_text" && candidate.semanticVerificationStatus === "completed")).toBe(true);
           expect(value.researchEvidence.claimSupports.every((support) => support.disposition === "accepted")).toBe(true);
         } : undefined,
@@ -584,12 +680,12 @@ describe("Package 5B manifest-driven admission", () => {
         });
         expect(admission.admission.acceptedClaimSupportRefs).toEqual([]);
       } else {
-        expect(result.finalStatus).not.toBe("completed");
+        expect(result.finalStatus).toBe(mode === "safety" ? "blocked" : "completed");
         expect(admission.admissionDisposition).not.toBe("admitted");
         expect(admission.packageF).toBeNull();
       }
       expect(admission.customerPublished).toBe(false);
-      if (mode === "budget") expect(admission.researchEvidence.attempts.some((attempt) => attempt.status === "budget_exhausted")).toBe(true);
+      if (mode === "budget") expect(admission.researchEvidence.attempts.some((attempt) => attempt.status === "not_selected_planning")).toBe(true);
       if (mode === "safety") expect(admission.researchEvidence.candidates.some((candidate) => candidate.retrievalStatus === "safety_blocked")).toBe(true);
     }
   }, 60_000);
@@ -696,7 +792,7 @@ describe("Package 5B manifest-driven admission", () => {
       },
     });
 
-    expect(result.finalStatus).toBe("blocked");
+    expect(result.finalStatus).toBe("completed");
     expect(wholeStatementCalls).toBeGreaterThan(0);
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
     if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
@@ -733,7 +829,7 @@ describe("Package 5B manifest-driven admission", () => {
       },
     });
 
-    expect(result.finalStatus).toBe("blocked");
+    expect(result.finalStatus).toBe("completed");
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
     if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
     const admission = result.artifact.canonicalAdmissionResults[0]!;
@@ -794,7 +890,7 @@ describe("Package 5B manifest-driven admission", () => {
     expect(retrievalCalls).toBe(3);
     expect(semanticCalls).toBe(2);
     expect(wholeStatementCalls).toBeGreaterThan(0);
-    expect(result.finalStatus).toBe("blocked");
+    expect(result.finalStatus).toBe("completed");
     expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
     expect(result.providerCallOutcomes.find((outcome) => outcome.requestId === "request_retrieval_candidate_timeout"))
       .toMatchObject({ status: "timeout", stage: "document_retrieval" });
@@ -891,7 +987,7 @@ describe("Package 5B manifest-driven admission", () => {
         },
       },
     });
-    expect(result.finalStatus).toBe("blocked");
+    expect(result.finalStatus).toBe("completed");
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
     if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
     const admission = result.artifact.canonicalAdmissionResults[0]!;
@@ -907,9 +1003,9 @@ describe("Package 5B manifest-driven admission", () => {
 
   it("keeps execution, admission, and Package F outcomes independent for every source document", async () => {
     const cases = [
-      { mode: "second_timeout", expectedOverall: "blocked", expected: [["doc_multi_a", "admitted", "completed"], ["doc_multi_b", "rejected", "completed"]] },
-      { mode: "first_rejected", expectedOverall: "blocked", expected: [["doc_multi_a", "rejected", "completed"], ["doc_multi_b", "admitted", "completed"]] },
-      { mode: "first_failed", expectedOverall: "blocked", expected: [["doc_multi_a", "rejected", "completed"], ["doc_multi_b", "admitted", "completed"]] },
+      { mode: "second_timeout", expectedOverall: "completed", expected: [["doc_multi_a", "admitted", "completed"], ["doc_multi_b", "rejected", "completed"]] },
+      { mode: "first_rejected", expectedOverall: "completed", expected: [["doc_multi_a", "rejected", "completed"], ["doc_multi_b", "admitted", "completed"]] },
+      { mode: "first_failed", expectedOverall: "completed", expected: [["doc_multi_a", "rejected", "completed"], ["doc_multi_b", "admitted", "completed"]] },
     ] as const;
     let admittedSecondPackageF: unknown = null;
 
@@ -1022,14 +1118,14 @@ describe("Package 5B manifest-driven admission", () => {
     });
 
     expect(wholeStatementCalls).toBeGreaterThan(0);
-    expect(result.finalStatus).toBe("blocked");
+    expect(result.finalStatus).toBe("completed");
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
     if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
     const admission = result.artifact.canonicalAdmissionResults[0]!;
     expect(admission.canonicalReferenceProof.expectedResearchQuestions.limits.totalDeadlineMs).toBe(25);
     expect(admission.researchEvidence.attempts
       .sort((left, right) => left.questionOrdinal - right.questionOrdinal)
-      .map((attempt) => attempt.status)).toEqual(["timed_out", "timed_out", "budget_exhausted"]);
+      .map((attempt) => attempt.status)).toEqual(["timed_out", "timed_out", "not_selected_planning"]);
     expect(admission.packageF).toBeNull();
     expect(result.artifact.providerCallOutcomes.filter((outcome) => outcome.stage === "web_search_discovery")).toHaveLength(2);
     expect(result.artifact.providerCallOutcomes.some((outcome) => outcome.stage === "whole_statement_ai_review" && outcome.status === "success")).toBe(true);
@@ -1118,7 +1214,7 @@ describe("Package 5B manifest-driven admission", () => {
         },
       });
 
-      expect(result.finalStatus).toBe("blocked");
+      expect(result.finalStatus).toBe(retrievalStatus === "safety_blocked" ? "blocked" : "completed");
       expect(wholeStatementCalls).toBeGreaterThan(0);
       expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
       if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
@@ -1181,7 +1277,7 @@ describe("Package 5B manifest-driven admission", () => {
         },
       });
 
-      expect(result.finalStatus).toBe(semanticStatus === "completed" ? "completed" : "blocked");
+      expect(result.finalStatus).toBe(semanticStatus === "safety_blocked" ? "blocked" : "completed");
       expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
       if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
       const admission = result.artifact.canonicalAdmissionResults[0]!;
@@ -1466,6 +1562,61 @@ function package5BReadinessCalls(sourceDocumentId = "doc_one_time_fiserv") {
         estimatedMaximumCostUsd: 0.4,
       },
     });
+}
+
+function openAiReadinessCalls(sourceDocumentId = "doc_one_time_fiserv") {
+  return fullOneTimeCalls(sourceDocumentId).map((call) => {
+    if (call.stage === "document_retrieval") return call;
+    if (call.stage === "whole_statement_ai_review") {
+      return {
+        ...call,
+        reservation: {
+          ...call.reservation,
+          providerRoute: "openai_ai_sdk_generate_text_structured_output",
+          provider: "openai",
+          model: "gpt-5.4-mini",
+          toolClass: "ai_sdk_structured_output",
+          maximumInputTokens: 30_000,
+          maximumOutputTokens: 5_000,
+          maximumToolUses: 0,
+          pricing: {
+            uncachedInputUsdPerMillionTokens: 0.75,
+            cachedInputUsdPerMillionTokens: 0.075,
+            outputUsdPerMillionTokens: 4.5,
+            toolUseUsd: 0,
+          },
+          estimatedMaximumCostUsd: 0.4,
+        },
+      };
+    }
+    const expectedOutput = call.stage === "web_search_discovery" ? 2_000
+      : call.stage === "semantic_verification" ? 1_000 : 5_000;
+    const expectedToolUses = call.stage === "web_search_discovery" ? 2 : 0;
+    return {
+      ...call,
+      reservation: {
+        ...call.reservation,
+        providerRoute: call.stage === "whole_statement_ai_review"
+          ? "openai_ai_sdk_generate_text_structured_output"
+          : "openai_responses",
+        provider: "openai",
+        model: "gpt-5.4-mini",
+        toolClass: call.stage === "whole_statement_ai_review"
+          ? "ai_sdk_structured_output"
+          : call.stage === "web_search_discovery" ? "web_search" : "semantic_verification",
+        maximumInputTokens: 100_000,
+        maximumOutputTokens: expectedOutput,
+        maximumToolUses: expectedToolUses,
+        pricing: {
+          uncachedInputUsdPerMillionTokens: 0,
+          cachedInputUsdPerMillionTokens: 0,
+          outputUsdPerMillionTokens: 0,
+          toolUseUsd: 0,
+        },
+        estimatedMaximumCostUsd: 0.01,
+      },
+    };
+  });
 }
 
 function sourceDocumentIdFromCall(callId: string): string {

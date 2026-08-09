@@ -60,18 +60,20 @@ const PROJECTION_REASONS = [
   "artifact_v2_source_quality_failed", "artifact_v2_fingerprint_mismatch", "artifact_v2_locator_mismatch",
   "artifact_v2_applicability_failed", "artifact_v2_research_parentage_invalid", "artifact_v2_deterministic_contradiction",
 ] as const;
-const ATTEMPT_STATUSES = ["completed", "disabled", "not_needed", "failed", "timed_out", "safety_blocked", "budget_exhausted", "unsupported_model"] as const;
+const ATTEMPT_STATUSES = ["completed", "disabled", "not_needed", "failed", "timed_out", "safety_blocked", "budget_exhausted", "not_selected_planning", "provider_unavailable", "unsupported_model"] as const;
 const QUESTION_CATEGORIES = ["classification", "published_rule", "applicability", "contradiction"] as const;
 const QUESTION_TRIGGER_REASONS = ["missing_applicable_registry_claim", "expired_or_superseded_source", "contradicted_source", "material_unfamiliar_label", "not_needed", "disabled"] as const;
 const ATTEMPT_REASON_BY_STATUS = {
   completed: ["fee_knowledge_research_completed"], disabled: ["fee_knowledge_research_disabled"], not_needed: ["fee_knowledge_research_not_needed"],
   failed: ["fee_knowledge_research_failed"], timed_out: ["fee_knowledge_research_timed_out"],
   safety_blocked: ["fee_knowledge_research_safety_blocked"], budget_exhausted: ["fee_knowledge_research_budget_exhausted"],
+  not_selected_planning: ["fee_knowledge_research_not_selected_planning"],
+  provider_unavailable: ["fee_knowledge_web_search_provider_unavailable_before_send"],
   unsupported_model: ["fee_knowledge_web_search_model_unsupported"],
 } as const;
 const CANDIDATE_STATUSES = ["runtime_verified_documentation", "verified_candidate_limited", "provisional", "rejected", "safety_blocked", "source_unavailable", "source_inapplicable", "conflicting_evidence"] as const;
 const RETRIEVAL_STATUSES = ["retrieved_text", "retrieval_succeeded_text_unavailable", "unavailable", "failed", "timed_out", "safety_blocked", "unsupported_content_type", "oversized", "malformed", "encrypted"] as const;
-const SEMANTIC_STATUSES = ["not_started", "completed", "failed", "timed_out", "parse_failed", "safety_blocked", "unsupported"] as const;
+const SEMANTIC_STATUSES = ["not_started", "completed", "failed", "timed_out", "parse_failed", "safety_blocked", "provider_unavailable", "unsupported"] as const;
 const EVIDENCE_DECISIONS = ["verified_classification", "verified_rule", "verified_application", "possible_interpretation", "needs_verification", "conflicting_evidence", "unsupported", "source_unavailable", "source_inapplicable"] as const;
 const SEMANTIC_DECISIONS = ["supports", "partially_supports", "does_not_support", "contradicts", "unsupported"] as const;
 const VERIFIED_EVIDENCE_DECISIONS = new Set(["verified_classification", "verified_rule", "verified_application"]);
@@ -88,6 +90,7 @@ const CANDIDATE_REASON_CODES = new Set([
   ...EVIDENCE_DECISIONS.map((decision) => `fee_knowledge_${decision}`),
   "fee_knowledge_retrieval_timed_out", "fee_knowledge_semantic_parse_failed", "fee_knowledge_semantic_timed_out",
   "fee_knowledge_semantic_safety_blocked", "fee_knowledge_semantic_unsupported", "fee_knowledge_semantic_failed",
+  "fee_knowledge_semantic_provider_unavailable_before_send",
   ...[400, 401, 403, 404, 408, 409, 410, 413, 415, 422, 425, 429, 500, 501, 502, 503, 504].map((status) => `fee_knowledge_http_${status}`),
 ]);
 const HTTP_UNAVAILABLE_REASONS = [400, 401, 403, 404, 408, 409, 410, 413, 415, 422, 425, 429, 500, 501, 502, 503, 504]
@@ -116,6 +119,7 @@ const SEMANTIC_REASON_BY_STATUS: Record<(typeof SEMANTIC_STATUSES)[number], read
   timed_out: ["fee_knowledge_semantic_timed_out"],
   parse_failed: ["fee_knowledge_semantic_parse_failed"],
   safety_blocked: ["fee_knowledge_semantic_safety_blocked"],
+  provider_unavailable: ["fee_knowledge_semantic_provider_unavailable_before_send"],
   unsupported: ["fee_knowledge_semantic_unsupported"],
 };
 const INVARIANCE_PACKAGE_PROJECTIONS = [
@@ -1030,8 +1034,8 @@ function validateResearchProof(
     const candidateRetentionAllowed = ["completed", "failed", "timed_out", "safety_blocked"].includes(item.status as string);
     if (!candidateRetentionAllowed && item.resultCount !== 0) return false;
     if (expectedQuestion.questionOrdinal > expectedResearchQuestions.limits.maxSearchCalls) {
-      if (item.status !== "budget_exhausted") return false;
-    } else if (item.status === "budget_exhausted") return false;
+      if (!["budget_exhausted", "not_selected_planning"].includes(item.status as string)) return false;
+    } else if (["budget_exhausted", "not_selected_planning"].includes(item.status as string)) return false;
     if (candidateRetentionAllowed) {
       if (item.resultCount > expectedResearchQuestions.limits.maxResultCandidatesPerSearch) return false;
       retainedCandidateCount += item.resultCount as number;

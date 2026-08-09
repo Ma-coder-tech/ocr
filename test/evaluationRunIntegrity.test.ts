@@ -885,7 +885,7 @@ describe("evaluation-run integrity", () => {
     expect(invocations.semantic).toBeLessThanOrEqual(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
     expect(wholePacket.admittedFeeRows.length).toBeLessThanOrEqual(preparedPacket.wholeStatementReview.admittedFeeRows.length);
     expect(wholePacket.sourceProvenancePacket.researchAttempts.length).toBeGreaterThan(0);
-    expect(result.finalStatus).toBe("blocked");
+    expect(result.finalStatus).toBe("completed");
     expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
     expect(result.packageFinancialInvariance[0]!.result.packages.every((item) => item.beforeHash === item.afterHash)).toBe(true);
     const expectedOneTimeCalls = oneTimePaidCalls();
@@ -1032,7 +1032,7 @@ describe("evaluation-run integrity", () => {
 
     expect(invocations.whole).toBeGreaterThan(0);
     expect(invocations).toMatchObject({ search: ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch, retrieval: 0, semantic: 0 });
-    expect(result.finalStatus).toBe("blocked");
+    expect(result.finalStatus).toBe("completed");
     expect(result.costLedger.entries[0]).toMatchObject({ status: "timeout", billingDisposition: "unknown", requestId: "request_fake_timeout" });
     expect(result.costLedger.entries.filter((item) => item.capability === "web_search").every((item) => item.status === "timeout")).toBe(true);
     expect(result.costLedger.entries.filter((item) => ["retrieval", "semantic_verification"].includes(item.capability)).every((item) => item.status === "success" && item.requestId === null)).toBe(true);

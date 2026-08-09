@@ -107,8 +107,10 @@ export type OneTimeProviderReadiness =
 export type OneTimeStatementEvaluationServices = {
   wholeStatementReviewReadiness: (context: { approvedCallMetadata: CostReservationInput }) => OneTimeProviderReadiness;
   wholeStatementReview: (packet: Parameters<WholeStatementFeeIntelligenceRuntimeAdapter>[0], context: OneTimeServiceContext) => Promise<ServiceResponse<unknown>>;
+  webSearchDiscoveryReadiness: (context: { approvedCallMetadata: CostReservationInput }) => OneTimeProviderReadiness;
   webSearchDiscovery: (request: Parameters<FeeKnowledgeSearchAdapter>[0], context: OneTimeServiceContext) => Promise<ServiceResponse<FeeKnowledgeDiscoveryCandidate[]>>;
   documentRetrieval: (url: string, options: Parameters<typeof retrieveFeeKnowledgeDocument>[1] & { approvedCallMetadata: CostReservationInput }) => Promise<ServiceResponse<RetrievedDocument>>;
+  semanticVerificationReadiness: (context: { approvedCallMetadata: CostReservationInput }) => OneTimeProviderReadiness;
   semanticVerification: (request: Parameters<FeeKnowledgeSemanticSupportAdapter>[0], context: OneTimeServiceContext) => Promise<ServiceResponse<Awaited<ReturnType<FeeKnowledgeSemanticSupportAdapter>>>>;
 };
 
@@ -232,9 +234,9 @@ export async function prepareOneTimeStatementEvaluationSource(input: {
       attempts: questions.slice(limits.maxSearchCalls).map((question, offset) => attemptRecord(
         question,
         limits.maxSearchCalls + offset,
-        "budget_exhausted",
+        "not_selected_planning",
         [],
-        ["fee_knowledge_research_budget_exhausted"],
+        ["fee_knowledge_research_not_selected_planning"],
       )),
       candidates: [],
       claimSupports: [],
@@ -270,7 +272,7 @@ export function finalizeOneTimeStatementEvaluation(
     const questionRef = feeKnowledgeQuestionRef(question, questionOrdinal);
     if (existingQuestionRefs.has(questionRef)) continue;
     const status = questionOrdinal >= context.packet.research.limits.maxSearchCalls
-      ? "budget_exhausted"
+      ? "not_selected_planning"
       : executionStatus === "timed_out" ? "timed_out"
         : executionStatus === "safety_blocked" ? "safety_blocked" : "failed";
     context.attempts.push(attemptRecord(
@@ -278,7 +280,7 @@ export function finalizeOneTimeStatementEvaluation(
       questionOrdinal,
       status,
       [],
-      [status === "budget_exhausted" ? "fee_knowledge_research_budget_exhausted"
+      [status === "not_selected_planning" ? "fee_knowledge_research_not_selected_planning"
         : status === "timed_out" ? "fee_knowledge_research_timed_out"
           : status === "safety_blocked" ? "fee_knowledge_research_safety_blocked"
             : "fee_knowledge_research_failed"],
@@ -559,6 +561,26 @@ export function createOneTimeStatementEvaluationTransport(input: {
         });
       }
       const attemptId = `research_${shortHash([feeKnowledgeQuestionRef(question, questionOrdinal), String(questionOrdinal)])}`;
+      const readiness = services.webSearchDiscoveryReadiness({
+        approvedCallMetadata: structuredClone(request.approvedCallMetadata),
+      });
+      if (readiness.status === "unavailable_before_send") {
+        upsertContextAttempt(context, attemptRecord(
+          question,
+          questionOrdinal,
+          "provider_unavailable",
+          [],
+          readiness.reasonCodes,
+        ));
+        return result({
+          value: { attemptId, questionRef: feeKnowledgeQuestionRef(question, questionOrdinal), candidateCount: 0, providerReadiness: readiness.status },
+          generated: false,
+          schemaValid: true,
+          policyAccepted: false,
+          reasonCodes: readiness.reasonCodes,
+          accounting: noRequestAccounting(started),
+        });
+      }
       let response: ReturnType<typeof unwrapExternalRequestResult<FeeKnowledgeDiscoveryCandidate[]>>;
       try {
         response = await runWithinPreparedResearchDeadline(context, "web_search_discovery", async (abortSignal) => unwrapExternalRequestResult(
@@ -681,6 +703,21 @@ export function createOneTimeStatementEvaluationTransport(input: {
           accounting: noRequestAccounting(started),
         });
       }
+      const readiness = services.semanticVerificationReadiness({
+        approvedCallMetadata: structuredClone(request.approvedCallMetadata),
+      });
+      if (readiness.status === "unavailable_before_send") {
+        updateSemanticProviderUnavailable(context, item, readiness.reasonCodes[0] ?? "fee_knowledge_semantic_provider_unavailable_before_send");
+        return result({
+          value: { verifiedCount: 0, supportedCount: 0, semanticStatus: "provider_unavailable", providerReadiness: readiness.status },
+          generated: false,
+          schemaValid: true,
+          policyAccepted: false,
+          reasonCodes: readiness.reasonCodes,
+          accounting: noRequestAccounting(started),
+          semanticVerificationRef: `semantic:${request.reservedCallId}`,
+        });
+      }
       let semanticAccounting: RepositoryProviderTransportResult["accounting"] | null = null;
       let verified: Awaited<ReturnType<typeof verifyCandidate>>;
       try {
@@ -776,6 +813,14 @@ function defaultServices(overrides: Partial<OneTimeStatementEvaluationServices> 
     ?? (overrides.wholeStatementReview
       ? (() => ({ status: "ready_to_send", reasonCodes: ["whole_statement_fee_intelligence_provider_ready_to_send"] }) satisfies OneTimeProviderReadiness)
       : ((context: { approvedCallMetadata: CostReservationInput }) => livePackage5BProviderReadiness(context.approvedCallMetadata)));
+  const webSearchDiscoveryReadiness = overrides.webSearchDiscoveryReadiness
+    ?? (overrides.webSearchDiscovery
+      ? (() => ({ status: "ready_to_send", reasonCodes: ["fee_knowledge_web_search_provider_ready_to_send"] }) satisfies OneTimeProviderReadiness)
+      : ((context: { approvedCallMetadata: CostReservationInput }) => liveOpenAiProviderReadiness("web_search_discovery", context.approvedCallMetadata)));
+  const semanticVerificationReadiness = overrides.semanticVerificationReadiness
+    ?? (overrides.semanticVerification
+      ? (() => ({ status: "ready_to_send", reasonCodes: ["fee_knowledge_semantic_provider_ready_to_send"] }) satisfies OneTimeProviderReadiness)
+      : ((context: { approvedCallMetadata: CostReservationInput }) => liveOpenAiProviderReadiness("semantic_verification", context.approvedCallMetadata)));
   return {
     wholeStatementReviewReadiness: readinessOverride,
     wholeStatementReview: overrides.wholeStatementReview ?? (async (packet, context) => {
@@ -792,6 +837,7 @@ function defaultServices(overrides: Partial<OneTimeStatementEvaluationServices> 
         durationMs: Math.max(0, Date.now() - started),
       }));
     }),
+    webSearchDiscoveryReadiness,
     webSearchDiscovery: overrides.webSearchDiscovery ?? (async (request, context) => {
       assertApprovedLiveCallMetadata("web_search_discovery", context.approvedCallMetadata);
       const started = Date.now();
@@ -816,6 +862,7 @@ function defaultServices(overrides: Partial<OneTimeStatementEvaluationServices> 
       });
       return externalResult(value, noRequestAccounting(started));
     }),
+    semanticVerificationReadiness,
     semanticVerification: overrides.semanticVerification ?? (async (request, context) => {
       assertApprovedLiveCallMetadata("semantic_verification", context.approvedCallMetadata);
       const started = Date.now();
@@ -854,26 +901,52 @@ export function livePackage5BProviderSettings(metadata: CostReservationInput): {
 }
 
 export function livePackage5BProviderReadiness(metadata: CostReservationInput): OneTimeProviderReadiness {
+  return liveOpenAiProviderReadiness("whole_statement_ai_review", metadata);
+}
+
+function liveOpenAiProviderReadiness(
+  stage: "whole_statement_ai_review" | "web_search_discovery" | "semantic_verification",
+  metadata: CostReservationInput,
+): OneTimeProviderReadiness {
   try {
-    assertApprovedLiveCallMetadata("whole_statement_ai_review", metadata);
+    assertApprovedLiveCallMetadata(stage, metadata);
   } catch {
     return {
       status: "unavailable_before_send",
       diagnosticClass: "configuration_invalid",
-      reasonCodes: ["whole_statement_fee_intelligence_provider_configuration_invalid_before_send"],
+      reasonCodes: [providerReadinessReason(stage, "configuration_invalid")],
     };
   }
   if (!process.env.OPENAI_API_KEY?.trim()) {
     return {
       status: "unavailable_before_send",
       diagnosticClass: "missing_credential",
-      reasonCodes: ["whole_statement_fee_intelligence_provider_credential_unavailable_before_send"],
+      reasonCodes: [providerReadinessReason(stage, "missing_credential")],
     };
   }
   return {
     status: "ready_to_send",
-    reasonCodes: ["whole_statement_fee_intelligence_provider_ready_to_send"],
+    reasonCodes: [providerReadinessReason(stage, "ready")],
   };
+}
+
+function providerReadinessReason(
+  stage: "whole_statement_ai_review" | "web_search_discovery" | "semantic_verification",
+  state: "ready" | "missing_credential" | "configuration_invalid",
+): string {
+  if (stage === "whole_statement_ai_review") {
+    if (state === "ready") return "whole_statement_fee_intelligence_provider_ready_to_send";
+    if (state === "missing_credential") return "whole_statement_fee_intelligence_provider_credential_unavailable_before_send";
+    return "whole_statement_fee_intelligence_provider_configuration_invalid_before_send";
+  }
+  if (stage === "web_search_discovery") {
+    if (state === "ready") return "fee_knowledge_web_search_provider_ready_to_send";
+    if (state === "missing_credential") return "fee_knowledge_web_search_provider_unavailable_before_send";
+    return "fee_knowledge_web_search_provider_configuration_invalid_before_send";
+  }
+  if (state === "ready") return "fee_knowledge_semantic_provider_ready_to_send";
+  if (state === "missing_credential") return "fee_knowledge_semantic_provider_unavailable_before_send";
+  return "fee_knowledge_semantic_provider_configuration_invalid_before_send";
 }
 
 function unwrapExternalRequestResult<T>(
@@ -1287,6 +1360,25 @@ function updateFailedCandidate(
       };
 }
 
+function updateSemanticProviderUnavailable(
+  context: OneTimePrivateContext,
+  item: RetrievedContext,
+  reasonCode: string,
+): void {
+  const index = context.candidates.findIndex((candidate) => candidate.candidateId === item.candidateId);
+  const current = context.candidates[index];
+  if (!current) return;
+  context.candidates[index] = {
+    ...current,
+    semanticVerificationStatus: "provider_unavailable",
+    verificationStatus: "verified_candidate_limited",
+    reasonCodes: [...new Set([
+      ...current.reasonCodes.filter((reason) => reason !== "fee_knowledge_semantic_support_not_run"),
+      reasonCode,
+    ])].sort(),
+  };
+}
+
 function currentSourcePacket(context: OneTimePrivateContext): FeeKnowledgeSourcePacket {
   return buildFeeKnowledgeSourcePacket({
     analysis: context.analysis,
@@ -1304,13 +1396,13 @@ function completeResearchAfterTerminal(context: OneTimePrivateContext): void {
   for (const [questionOrdinal, question] of context.packet.research.questions.entries()) {
     const questionRef = feeKnowledgeQuestionRef(question, questionOrdinal);
     if (existingQuestionRefs.has(questionRef)) continue;
-    const skippedStatus = questionOrdinal >= context.packet.research.limits.maxSearchCalls ? "budget_exhausted" : status;
+    const skippedStatus = questionOrdinal >= context.packet.research.limits.maxSearchCalls ? "not_selected_planning" : status;
     context.attempts.push(attemptRecord(
       question,
       questionOrdinal,
       skippedStatus,
       [],
-      [skippedStatus === "budget_exhausted" ? "fee_knowledge_research_budget_exhausted" : researchTerminalReason(status)],
+      [skippedStatus === "not_selected_planning" ? "fee_knowledge_research_not_selected_planning" : researchTerminalReason(status)],
     ));
   }
   for (const candidate of context.discovered.slice(context.retrievalCursor)) {
@@ -1374,6 +1466,9 @@ function researchProviderFailureStatus(error: unknown): FeeKnowledgeResearchAtte
 
 function researchProviderFailureReason(status: FeeKnowledgeResearchAttemptRecord["status"]): string {
   if (status === "unsupported_model") return "fee_knowledge_web_search_model_unsupported";
+  if (status === "provider_unavailable") return "fee_knowledge_web_search_provider_unavailable_before_send";
+  if (status === "not_selected_planning") return "fee_knowledge_research_not_selected_planning";
+  if (status === "budget_exhausted") return "fee_knowledge_research_budget_exhausted";
   if (status === "safety_blocked") return "fee_knowledge_research_safety_blocked";
   if (status === "timed_out") return "fee_knowledge_research_timed_out";
   return "fee_knowledge_research_failed";
@@ -1421,6 +1516,7 @@ function semanticTerminalStatus(
   status: FeeKnowledgeResearchCandidateRecord["semanticVerificationStatus"],
 ): OneTimeResearchTerminalStatus | null {
   if (status === "completed") return null;
+  if (status === "provider_unavailable") return null;
   if (status === "timed_out") return "timed_out";
   if (status === "safety_blocked") return "safety_blocked";
   return "failed";

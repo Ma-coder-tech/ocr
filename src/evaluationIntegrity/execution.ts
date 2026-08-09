@@ -438,12 +438,9 @@ export async function runManifestDrivenLiveEvaluation(input: {
       preparedSanitizedPackets.push({ resultId: projected.resultId, packet: finalized.preparedPacket });
       recordCanonicalAdmissionLifecycle(lifecycleLedger, manifest, projected);
     }
-    if (finalStatus === "completed") {
-      const rejected = canonicalAdmissionResults.find((result) => result.admissionDisposition !== "admitted");
-      if (rejected) {
-        finalStatus = "blocked";
-        reasonCodes = [rejected.admission.validationErrorCodes[0] ?? "canonical_admission_rejected"];
-      }
+    if (finalStatus === "completed" && canonicalAdmissionResults.some((result) => result.admissionDisposition === "safety_blocked")) {
+      finalStatus = "blocked";
+      reasonCodes = ["canonical_admission_safety_blocked"];
     }
     canonicalAdmissionResults.sort((left, right) => left.resultId.localeCompare(right.resultId));
     preparedSanitizedPackets.sort((left, right) => left.resultId.localeCompare(right.resultId));

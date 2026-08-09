@@ -588,7 +588,7 @@ export type EvaluationResearchCandidateProof = {
   feeRowRef: string;
   verificationStatus: FeeKnowledgeCandidateVerificationStatus;
   retrievalStatus: FeeKnowledgeRetrievalStatus;
-  semanticVerificationStatus: "not_started" | "completed" | "failed" | "timed_out" | "parse_failed" | "safety_blocked" | "unsupported";
+  semanticVerificationStatus: "not_started" | "completed" | "failed" | "timed_out" | "parse_failed" | "safety_blocked" | "provider_unavailable" | "unsupported";
   claimSupportRefs: string[];
   reasonCodes: string[];
   safeRetrievalDiagnostics?: FeeKnowledgeRetrievalSafeDiagnostics | null;

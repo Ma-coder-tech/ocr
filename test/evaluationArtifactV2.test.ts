@@ -728,7 +728,7 @@ describe("Evaluation Run Integrity Artifact V2", () => {
   });
 
   it("rejects incomplete research execution inside an admitted result", () => {
-    for (const [status, reason] of [["budget_exhausted", "fee_knowledge_research_budget_exhausted"], ["failed", "fee_knowledge_research_failed"], ["timed_out", "fee_knowledge_research_timed_out"], ["safety_blocked", "fee_knowledge_research_safety_blocked"], ["unsupported_model", "fee_knowledge_web_search_model_unsupported"]]) {
+    for (const [status, reason] of [["budget_exhausted", "fee_knowledge_research_budget_exhausted"], ["not_selected_planning", "fee_knowledge_research_not_selected_planning"], ["provider_unavailable", "fee_knowledge_web_search_provider_unavailable_before_send"], ["failed", "fee_knowledge_research_failed"], ["timed_out", "fee_knowledge_research_timed_out"], ["safety_blocked", "fee_knowledge_research_safety_blocked"], ["unsupported_model", "fee_knowledge_web_search_model_unsupported"]]) {
       const artifact = validArtifact() as unknown as Record<string, any>;
       Object.assign(artifact.canonicalAdmissionResults[0].researchEvidence.attempts[0], { status, reasonCodes: [reason] });
       resign(artifact);
@@ -754,6 +754,8 @@ describe("Evaluation Run Integrity Artifact V2", () => {
     ["disabled", "fee_knowledge_research_disabled"],
     ["not_needed", "fee_knowledge_research_not_needed"],
     ["budget_exhausted", "fee_knowledge_research_budget_exhausted"],
+    ["not_selected_planning", "fee_knowledge_research_not_selected_planning"],
+    ["provider_unavailable", "fee_knowledge_web_search_provider_unavailable_before_send"],
     ["unsupported_model", "fee_knowledge_web_search_model_unsupported"],
   ])("rejects retained candidates for non-discovery attempt status %s", (status, reason) => {
     const artifact = rejectedArtifact() as unknown as Record<string, any>;
