@@ -42,6 +42,7 @@ import {
   classifyWholeStatementFeeIntelligenceWorkUnitFailure,
   mergeWholeStatementFeeIntelligenceWorkUnitResults,
   notSelectedWholeStatementFeeIntelligenceWorkUnitResult,
+  providerUnavailableWholeStatementFeeIntelligenceWorkUnitResult,
   wholeStatementFeeIntelligenceWorkUnitResultFromValidation,
   type WholeStatementFeeIntelligenceMergedWorkPlan,
   type WholeStatementFeeIntelligenceWorkUnit,
@@ -99,8 +100,12 @@ export type OneTimeExternalRequestResult<T> = {
 
 type ServiceResponse<T> = T | OneTimeExternalRequestResult<T>;
 type OneTimeServiceContext = { abortSignal: AbortSignal; approvedCallMetadata: CostReservationInput };
+export type OneTimeProviderReadiness =
+  | { status: "ready_to_send"; reasonCodes: string[] }
+  | { status: "unavailable_before_send"; reasonCodes: string[]; diagnosticClass: "missing_credential" | "provider_route_unavailable" | "configuration_invalid" };
 
 export type OneTimeStatementEvaluationServices = {
+  wholeStatementReviewReadiness: (context: { approvedCallMetadata: CostReservationInput }) => OneTimeProviderReadiness;
   wholeStatementReview: (packet: Parameters<WholeStatementFeeIntelligenceRuntimeAdapter>[0], context: OneTimeServiceContext) => Promise<ServiceResponse<unknown>>;
   webSearchDiscovery: (request: Parameters<FeeKnowledgeSearchAdapter>[0], context: OneTimeServiceContext) => Promise<ServiceResponse<FeeKnowledgeDiscoveryCandidate[]>>;
   documentRetrieval: (url: string, options: Parameters<typeof retrieveFeeKnowledgeDocument>[1] & { approvedCallMetadata: CostReservationInput }) => Promise<ServiceResponse<RetrievedDocument>>;
@@ -349,6 +354,42 @@ export function createOneTimeStatementEvaluationTransport(input: {
         .map(notSelectedWholeStatementFeeIntelligenceWorkUnitResult);
       const childProviderCallOutcomes: NonNullable<RepositoryProviderTransportResult["childProviderCallOutcomes"]> = [];
       if (selectedUnits.length > 0 && !request.childBudgetController) throw new Error("package_5b_child_budget_controller_missing");
+      const readiness = selectedUnits.length > 0
+        ? services.wholeStatementReviewReadiness({ approvedCallMetadata: structuredClone(request.approvedCallMetadata) })
+        : { status: "ready_to_send", reasonCodes: ["whole_statement_fee_intelligence_provider_ready_to_send"] } satisfies OneTimeProviderReadiness;
+      if (readiness.status === "unavailable_before_send") {
+        workUnitResults.push(...selectedUnits.map((unit) =>
+          providerUnavailableWholeStatementFeeIntelligenceWorkUnitResult({
+            workUnitRef: unit.workUnitRef,
+            reasonCodes: readiness.reasonCodes,
+          })
+        ));
+        const merged = mergeWholeStatementFeeIntelligenceWorkUnitResults({
+          analysis: context.analysis,
+          registry: context.registry ?? { approvedExternalSourceRefs: [] },
+          sourcePacket,
+          fullPacket: reviewPacket,
+          plan: workPlan,
+          results: workUnitResults,
+        });
+        context.wholeStatementWorkPlan = structuredClone(merged);
+        context.validation = merged.validation;
+        return result({
+          value: {
+            reviewStatus: merged.validation.output.reviewStatus,
+            validationAccepted: false,
+            workPlan: summarizeWholeStatementWorkPlan(merged),
+            providerReadiness: { status: readiness.status, diagnosticClass: readiness.diagnosticClass },
+          },
+          generated: false,
+          schemaValid: true,
+          evidenceValidated: false,
+          policyAccepted: false,
+          reasonCodes: merged.reasonCodes,
+          accounting: noRequestAccounting(started),
+          childProviderCallOutcomes,
+        });
+      }
       for (const unit of selectedUnits) {
         const unitReservation = package5BWorkUnitReservation(request.approvedCallMetadata, unit);
         try {
@@ -389,7 +430,9 @@ export function createOneTimeStatementEvaluationTransport(input: {
             sourceDocumentId: request.sourceDocumentId,
             status: costExceeded ? "failure" : "success",
             requestId: response.accounting.requestId ?? null,
-            reasonCodes: costExceeded ? ["cost_exceeded_reservation"] : ["whole_statement_fee_intelligence_work_unit_provider_call_completed"],
+            reasonCodes: costExceeded
+              ? ["cost_exceeded_reservation"]
+              : ["whole_statement_fee_intelligence_work_unit_provider_call_completed", "whole_statement_fee_intelligence_work_unit_response_received"],
           }));
           if (costExceeded) {
             workUnitResults.push({
@@ -426,6 +469,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
           }));
         } catch (error) {
           const classified = classifyWholeStatementFeeIntelligenceWorkUnitFailure(error);
+          const sendStateReason = workUnitFailureSendStateReason(classified);
           const costExceeded = request.childBudgetController!.finalize(unitReservation.callId, {
             requestId: classified.requestId,
             durationMs: classified.durationMs ?? Math.max(0, Date.now() - unitStarted),
@@ -442,7 +486,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
             sourceDocumentId: request.sourceDocumentId,
             status: costExceeded ? "failure" : classified.status === "timed_out" ? "timeout" : "failure",
             requestId: classified.requestId,
-            reasonCodes: costExceeded ? ["cost_exceeded_reservation"] : classified.reasonCodes,
+            reasonCodes: costExceeded ? ["cost_exceeded_reservation"] : [...classified.reasonCodes, sendStateReason],
           }));
           workUnitResults.push({
             workUnitRef: unit.workUnitRef,
@@ -455,7 +499,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
             outputTokens: classified.outputTokens,
             durationMs: classified.durationMs ?? Math.max(0, Date.now() - unitStarted),
             billingDisposition: "unknown",
-            reasonCodes: classified.reasonCodes,
+            reasonCodes: [...classified.reasonCodes, sendStateReason],
           });
         }
       }
@@ -713,7 +757,12 @@ export function createOneTimeStatementEvaluationTransport(input: {
 }
 
 function defaultServices(overrides: Partial<OneTimeStatementEvaluationServices> = {}): OneTimeStatementEvaluationServices {
+  const readinessOverride = overrides.wholeStatementReviewReadiness
+    ?? (overrides.wholeStatementReview
+      ? (() => ({ status: "ready_to_send", reasonCodes: ["whole_statement_fee_intelligence_provider_ready_to_send"] }) satisfies OneTimeProviderReadiness)
+      : ((context: { approvedCallMetadata: CostReservationInput }) => livePackage5BProviderReadiness(context.approvedCallMetadata)));
   return {
+    wholeStatementReviewReadiness: readinessOverride,
     wholeStatementReview: overrides.wholeStatementReview ?? (async (packet, context) => {
       const providerSettings = livePackage5BProviderSettings(context.approvedCallMetadata);
       const started = Date.now();
@@ -786,6 +835,29 @@ export function livePackage5BProviderSettings(metadata: CostReservationInput): {
     maxInputTokens: metadata.maximumInputTokens!,
     maxOutputTokens: metadata.maximumOutputTokens!,
     maxRetries: 0,
+  };
+}
+
+export function livePackage5BProviderReadiness(metadata: CostReservationInput): OneTimeProviderReadiness {
+  try {
+    assertApprovedLiveCallMetadata("whole_statement_ai_review", metadata);
+  } catch {
+    return {
+      status: "unavailable_before_send",
+      diagnosticClass: "configuration_invalid",
+      reasonCodes: ["whole_statement_fee_intelligence_provider_configuration_invalid_before_send"],
+    };
+  }
+  if (!process.env.OPENAI_API_KEY?.trim()) {
+    return {
+      status: "unavailable_before_send",
+      diagnosticClass: "missing_credential",
+      reasonCodes: ["whole_statement_fee_intelligence_provider_credential_unavailable_before_send"],
+    };
+  }
+  return {
+    status: "ready_to_send",
+    reasonCodes: ["whole_statement_fee_intelligence_provider_ready_to_send"],
   };
 }
 
@@ -879,6 +951,17 @@ function summarizeWholeStatementWorkPlan(merged: WholeStatementFeeIntelligenceMe
     missingRowCount: merged.output.coverageProof.missingFeeRowRefs.length,
     reasonCodes: merged.reasonCodes,
   };
+}
+
+function workUnitFailureSendStateReason(input: {
+  requestId: string | null;
+  inputTokens: number | null;
+  cachedInputTokens: number | null;
+  outputTokens: number | null;
+}): string {
+  return input.requestId || input.inputTokens !== null || input.cachedInputTokens !== null || input.outputTokens !== null
+    ? "whole_statement_fee_intelligence_work_unit_request_definitely_sent"
+    : "whole_statement_fee_intelligence_work_unit_send_status_uncertain";
 }
 
 function package5BWorkUnitReservation(

@@ -53,7 +53,8 @@ const PACKAGE_5A_REASON_CODES = new Set<string>(CANONICAL_AI_ADMISSION_REASON_CO
 const RESULT_REASONS = ["canonical_admission_admitted", "canonical_admission_rejected", "canonical_admission_safety_blocked"] as const;
 const VALIDATION_ERRORS = [
   "whole_statement_output_invalid", "whole_statement_schema_invalid", "whole_statement_evidence_invalid",
-  "whole_statement_linkage_invalid", "whole_statement_privacy_safety_blocked", "whole_statement_research_incomplete",
+  "whole_statement_linkage_invalid", "whole_statement_privacy_safety_blocked", "whole_statement_provider_unavailable",
+  "whole_statement_research_incomplete",
 ] as const;
 const PROJECTION_REASONS = [
   "artifact_v2_source_quality_failed", "artifact_v2_fingerprint_mismatch", "artifact_v2_locator_mismatch",
@@ -555,7 +556,7 @@ function validatePackage5bWorkPlan(value: unknown, result: Record<string, unknow
     const status = stringValue((unit as Record<string, unknown>).status);
     if (status === "completed") completed += 1;
     if (status === "failed" || status === "timed_out" || status === "rejected" || status === "safety_blocked") unavailable += 1;
-    if (status === "not_selected_budget" || status === "not_selected_policy") notSelected += 1;
+    if (status === "not_selected_budget" || status === "not_selected_policy" || status === "not_attempted_provider_unavailable") notSelected += 1;
     else selected += 1;
     for (const rowRef of (unit as Record<string, unknown>).expectedFeeRowRefs as string[]) expectedRows.add(rowRef);
   }
@@ -569,8 +570,8 @@ function validatePackage5bWorkPlan(value: unknown, result: Record<string, unknow
 function validatePackage5bWorkUnit(value: unknown): boolean {
   if (!isRecord(value) || !hasExactKeys(value, PACKAGE_5B_WORK_UNIT_KEYS)) return false;
   if (!/^whole_stmt_work_[a-f0-9]{32}$/.test(stringValue(value.workUnitRef))) return false;
-  if (!nonnegativeInteger(value.ordinal) || !enumValue(value.status, ["planned", "selected", "not_selected_policy", "not_selected_budget", "completed", "failed", "timed_out", "rejected", "safety_blocked"])) return false;
-  if (!enumValue(value.outcomeClass, ["not_attempted", "completed_exact_unit_coverage", "provider_transport_failed", "provider_refused", "provider_schema_failed", "output_length_exhausted", "incomplete_response", "timeout_watchdog", "budget_not_selected", "policy_not_selected", "validation_rejected", "safety_blocked"])) return false;
+  if (!nonnegativeInteger(value.ordinal) || !enumValue(value.status, ["planned", "selected", "not_selected_policy", "not_selected_budget", "not_attempted_provider_unavailable", "completed", "failed", "timed_out", "rejected", "safety_blocked"])) return false;
+  if (!enumValue(value.outcomeClass, ["not_attempted", "completed_exact_unit_coverage", "provider_transport_failed", "provider_refused", "provider_schema_failed", "output_length_exhausted", "incomplete_response", "timeout_watchdog", "budget_not_selected", "policy_not_selected", "provider_unavailable_before_send", "validation_rejected", "safety_blocked"])) return false;
   if (!safeRefArray(value.expectedFeeRowRefs, FEE_ROW_REF)) return false;
   for (const key of ["expectedRowCount", "reviewedRowCount", "missingRowCount", "duplicatedRowCount", "unknownRowCount", "estimatedInputBytes", "estimatedOutputTokens"] as const) {
     if (!nonnegativeInteger(value[key])) return false;

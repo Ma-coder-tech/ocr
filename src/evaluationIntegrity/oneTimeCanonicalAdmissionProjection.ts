@@ -119,7 +119,7 @@ export function projectOneTimeCanonicalAdmissionResult(input: {
   };
   const disposition = canonical.admission.admissionDisposition;
   const admitted = disposition === "admitted";
-  const validationErrorCodes = admitted ? [] : [...mappedValidationErrors(canonical.admission)];
+  const validationErrorCodes = admitted ? [] : [...mappedValidationErrors(canonical.admission, input.finalized.wholeStatementWorkPlan)];
   const projectedAcceptedRefs = supports.filter((support) => support.disposition === "accepted").map((support) => support.claimSupportRef).sort();
   const projectedRejectedRefs = supports.filter((support) => support.disposition === "rejected").map((support) => support.claimSupportRef).sort();
   const acceptedClaimSupportRefs = [...canonical.admission.acceptedClaimSupportRefs].sort();
@@ -209,7 +209,7 @@ function projectPackage5bWorkPlan(
   const selectedFeeRowRefs = new Set<string>();
   for (const unit of merged.plan.units) {
     const status = resultByUnit.get(unit.workUnitRef)?.status ?? unit.status;
-    if (status === "not_selected_budget" || status === "not_selected_policy") continue;
+    if (status === "not_selected_budget" || status === "not_selected_policy" || status === "not_attempted_provider_unavailable") continue;
     for (const rowRef of unit.expectedFeeRowRefs) selectedFeeRowRefs.add(rowRef);
   }
   return {
@@ -344,9 +344,14 @@ function canonicalEvidencePopulation(analysis: CanonicalStatementAnalysis) {
   })).sort((left, right) => left.feeRowRef.localeCompare(right.feeRowRef));
 }
 
-function mappedValidationErrors(admission: FinalizedOneTimeStatementEvaluation["admission"]["admission"]) {
+function mappedValidationErrors(
+  admission: FinalizedOneTimeStatementEvaluation["admission"]["admission"],
+  workPlan: FinalizedOneTimeStatementEvaluation["wholeStatementWorkPlan"],
+) {
   if (admission.admissionDisposition === "safety_blocked") return ["whole_statement_privacy_safety_blocked"] as const;
   if (admission.reasonCodes.includes("whole_statement_research_incomplete")) return ["whole_statement_research_incomplete"] as const;
+  if (admission.reasonCodes.some((reason) => reason.includes("provider_unavailable"))
+    || workPlan?.reasonCodes.some((reason) => reason.includes("provider_unavailable"))) return ["whole_statement_provider_unavailable"] as const;
   if (admission.reasonCodes.some((reason) => reason.includes("linkage") || reason.includes("parentage"))) return ["whole_statement_linkage_invalid"] as const;
   if (admission.validationErrors.some((error) => /evidence|citation/i.test(error))) return ["whole_statement_evidence_invalid"] as const;
   if (admission.validationErrors.some((error) => /schema|unknown|type|policy/i.test(error))) return ["whole_statement_schema_invalid"] as const;
