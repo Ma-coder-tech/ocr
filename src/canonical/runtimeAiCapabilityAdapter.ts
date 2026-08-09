@@ -43,6 +43,7 @@ export type RuntimeAiCapabilityReasonCode =
   | "runtime_fee_classification_review_rejected"
   | "runtime_fee_classification_review_reused_whole_statement"
   | "whole_statement_fee_intelligence_completed"
+  | "whole_statement_fee_intelligence_partial"
   | "whole_statement_fee_intelligence_disabled"
   | "whole_statement_fee_intelligence_failed"
   | "whole_statement_fee_intelligence_timed_out"

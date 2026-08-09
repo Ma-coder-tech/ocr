@@ -5,6 +5,7 @@ import { isIP } from "node:net";
 import {
   FEE_KNOWLEDGE_RETRIEVAL_POLICY_VERSION,
   type FeeKnowledgeEvidenceLocator,
+  type FeeKnowledgeRetrievalSafeDiagnostics,
   type FeeKnowledgeRetrievalStatus,
 } from "./feeKnowledgeTypes.js";
 
@@ -32,6 +33,7 @@ export type RetrievedDocument = {
   text: string;
   locators: FeeKnowledgeEvidenceLocator[];
   reasonCodes: string[];
+  safeDiagnostics?: FeeKnowledgeRetrievalSafeDiagnostics;
 };
 
 export type RetrieveDocumentOptions = {
@@ -49,12 +51,32 @@ export async function retrieveFeeKnowledgeDocument(
   const limits = { ...FEE_KNOWLEDGE_RETRIEVAL_LIMITS, ...(options.limits ?? {}) };
   const fetchImpl = options.fetchImpl ?? fetch;
   let current = normalizeCandidateUrl(urlValue);
-  if (!current.ok) return unavailable(null, [], "safety_blocked", [current.reason]);
+  if (!current.ok) {
+    return unavailable(null, [], "safety_blocked", [current.reason], null, 0, null, retrievalDiagnostics({
+      initialUrl: null,
+      finalUrl: null,
+      outcomeClass: outcomeClassForUrlPolicyReason(current.reason),
+      reasonCodes: [current.reason],
+      blockedAddressClass: blockedClassForUrlPolicyReason(current.reason),
+    }));
+  }
+  const initialUrl = current.url;
   const redirectChain: string[] = [];
 
   for (let redirectCount = 0; redirectCount <= limits.maxRedirects; redirectCount += 1) {
     const safety = await assertSafeUrl(current.url, options.resolveHost, limits.allowedPorts);
-    if (!safety.ok) return unavailable(current.url.href, redirectChain, "safety_blocked", [safety.reason]);
+    if (!safety.ok) {
+      const retrievalStatus = safety.outcomeClass === "dns_resolution_failed" ? "failed" : "safety_blocked";
+      return unavailable(current.url.href, redirectChain, retrievalStatus, [safety.reason], null, 0, null, retrievalDiagnostics({
+        initialUrl,
+        finalUrl: current.url,
+        outcomeClass: safety.outcomeClass,
+        reasonCodes: [safety.reason],
+        blockedAddressClass: safety.blockedAddressClass,
+        addresses: safety.addresses,
+        redirectCount: redirectChain.length,
+      }));
+    }
     let response: Response;
     try {
       response = options.fetchImpl
@@ -66,43 +88,140 @@ export async function retrieveFeeKnowledgeDocument(
           } as RequestInit)
         : await pinnedHttpsFetch(current.url, safety.addresses, options.abortSignal);
     } catch (error) {
-      if (options.abortSignal.aborted) return unavailable(current.url.href, redirectChain, "timed_out", ["fee_knowledge_retrieval_aborted"]);
-      return unavailable(current.url.href, redirectChain, "failed", [safeReason(error, "fee_knowledge_retrieval_fetch_failed")]);
+      const failure = classifyFetchFailure(error, options.abortSignal);
+      return unavailable(current.url.href, redirectChain, failure.status, failure.reasonCodes, null, 0, null, retrievalDiagnostics({
+        initialUrl,
+        finalUrl: current.url,
+        outcomeClass: failure.outcomeClass,
+        reasonCodes: failure.reasonCodes,
+        attemptedNetwork: true,
+        addresses: safety.addresses,
+        redirectCount: redirectChain.length,
+      }));
     }
     const reportedAddress = response.headers.get("x-ratereveal-connected-address");
     if (reportedAddress && !safety.addresses.includes(reportedAddress)) {
-      return unavailable(current.url.href, redirectChain, "safety_blocked", ["fee_knowledge_connection_target_unvalidated"]);
+      return unavailable(current.url.href, redirectChain, "safety_blocked", ["fee_knowledge_connection_target_unvalidated"], null, 0, null, retrievalDiagnostics({
+        initialUrl,
+        finalUrl: current.url,
+        outcomeClass: "destination_policy_blocked",
+        reasonCodes: ["fee_knowledge_connection_target_unvalidated"],
+        attemptedNetwork: true,
+        addresses: safety.addresses,
+        redirectCount: redirectChain.length,
+      }));
     }
     const location = response.headers.get("location");
     if (isRedirect(response.status) && location) {
-      if (redirectCount === limits.maxRedirects) return unavailable(current.url.href, redirectChain, "safety_blocked", ["fee_knowledge_redirect_limit_exceeded"]);
+      if (redirectCount === limits.maxRedirects) {
+        return unavailable(current.url.href, redirectChain, "safety_blocked", ["fee_knowledge_redirect_limit_exceeded"], null, 0, null, retrievalDiagnostics({
+          initialUrl,
+          finalUrl: current.url,
+          outcomeClass: "redirect_rejected",
+          reasonCodes: ["fee_knowledge_redirect_limit_exceeded"],
+          attemptedNetwork: true,
+          addresses: safety.addresses,
+          redirectCount: redirectChain.length,
+          httpStatus: response.status,
+        }));
+      }
       const next = normalizeCandidateUrl(new URL(location, current.url).href);
-      if (!next.ok) return unavailable(current.url.href, redirectChain, "safety_blocked", [next.reason]);
+      if (!next.ok) {
+        return unavailable(current.url.href, redirectChain, "safety_blocked", [next.reason], null, 0, null, retrievalDiagnostics({
+          initialUrl,
+          finalUrl: current.url,
+          outcomeClass: "redirect_rejected",
+          reasonCodes: [next.reason],
+          attemptedNetwork: true,
+          addresses: safety.addresses,
+          blockedAddressClass: blockedClassForUrlPolicyReason(next.reason),
+          redirectCount: redirectChain.length,
+          httpStatus: response.status,
+        }));
+      }
       redirectChain.push(current.url.href);
       current = next;
       continue;
     }
-    if (!response.ok) return unavailable(current.url.href, redirectChain, "unavailable", [`fee_knowledge_http_${response.status}`]);
+    if (!response.ok) return unavailable(current.url.href, redirectChain, "unavailable", [`fee_knowledge_http_${response.status}`], null, 0, null, retrievalDiagnostics({
+      initialUrl,
+      finalUrl: current.url,
+      outcomeClass: "http_response_failed",
+      reasonCodes: [`fee_knowledge_http_${response.status}`],
+      attemptedNetwork: true,
+      addresses: safety.addresses,
+      redirectCount: redirectChain.length,
+      httpStatus: response.status,
+    }));
     const contentType = normalizedContentType(response.headers.get("content-type"));
     if (!contentType || !limits.allowedContentTypes.some((allowed) => contentType.startsWith(allowed))) {
-      return unavailable(current.url.href, redirectChain, "unsupported_content_type", ["fee_knowledge_content_type_unsupported"], contentType);
+      return unavailable(current.url.href, redirectChain, "unsupported_content_type", ["fee_knowledge_content_type_unsupported"], contentType, 0, null, retrievalDiagnostics({
+        initialUrl,
+        finalUrl: current.url,
+        outcomeClass: "content_rejected",
+        reasonCodes: ["fee_knowledge_content_type_unsupported"],
+        attemptedNetwork: true,
+        addresses: safety.addresses,
+        redirectCount: redirectChain.length,
+        httpStatus: response.status,
+        contentType,
+      }));
     }
     const declaredLength = numberHeader(response.headers.get("content-length"));
     const maxBytes = contentType.startsWith("application/pdf") ? limits.maxPdfBytes : limits.maxHtmlBytes;
     if (declaredLength !== null && declaredLength > maxBytes) {
-      return unavailable(current.url.href, redirectChain, "oversized", ["fee_knowledge_content_length_oversized"], contentType, declaredLength);
+      return unavailable(current.url.href, redirectChain, "oversized", ["fee_knowledge_content_length_oversized"], contentType, declaredLength, null, retrievalDiagnostics({
+        initialUrl,
+        finalUrl: current.url,
+        outcomeClass: "size_limit_exceeded",
+        reasonCodes: ["fee_knowledge_content_length_oversized"],
+        attemptedNetwork: true,
+        addresses: safety.addresses,
+        redirectCount: redirectChain.length,
+        httpStatus: response.status,
+        contentType,
+        byteLength: declaredLength,
+      }));
     }
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.byteLength > maxBytes) {
-      return unavailable(current.url.href, redirectChain, "oversized", ["fee_knowledge_response_oversized"], contentType, bytes.byteLength);
+      return unavailable(current.url.href, redirectChain, "oversized", ["fee_knowledge_response_oversized"], contentType, bytes.byteLength, null, retrievalDiagnostics({
+        initialUrl,
+        finalUrl: current.url,
+        outcomeClass: "size_limit_exceeded",
+        reasonCodes: ["fee_knowledge_response_oversized"],
+        attemptedNetwork: true,
+        addresses: safety.addresses,
+        redirectCount: redirectChain.length,
+        httpStatus: response.status,
+        contentType,
+        byteLength: bytes.byteLength,
+      }));
     }
     const fingerprint = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+    const diagnosticsBase = {
+      initialUrl,
+      finalUrl: current.url,
+      attemptedNetwork: true,
+      addresses: safety.addresses,
+      redirectCount: redirectChain.length,
+      httpStatus: response.status,
+      contentType,
+      byteLength: bytes.byteLength,
+      documentFingerprint: fingerprint,
+    };
     if (contentType.startsWith("application/pdf")) {
-      return pdfDocument(current.url.href, redirectChain, contentType, bytes, fingerprint, options.pdfParserForTesting);
+      return pdfDocument(current.url.href, redirectChain, contentType, bytes, fingerprint, options.pdfParserForTesting, diagnosticsBase);
     }
-    return textDocument(current.url.href, redirectChain, contentType, bytes, fingerprint);
+    return textDocument(current.url.href, redirectChain, contentType, bytes, fingerprint, diagnosticsBase);
   }
-  return unavailable(current.url.href, redirectChain, "safety_blocked", ["fee_knowledge_redirect_loop"]);
+  return unavailable(current.url.href, redirectChain, "safety_blocked", ["fee_knowledge_redirect_loop"], null, 0, null, retrievalDiagnostics({
+    initialUrl,
+    finalUrl: current.url,
+    outcomeClass: "redirect_rejected",
+    reasonCodes: ["fee_knowledge_redirect_loop"],
+    redirectCount: redirectChain.length,
+  }));
 }
 
 export function validateClaimCitation(input: {
@@ -140,6 +259,7 @@ async function pdfDocument(
   bytes: Uint8Array,
   fingerprint: string,
   parserForTesting?: (bytes: Uint8Array) => Promise<void>,
+  diagnosticsBase?: RetrievalDiagnosticsInput,
 ): Promise<RetrievedDocument> {
   try {
     await parserForTesting?.(bytes);
@@ -190,6 +310,11 @@ async function pdfDocument(
         text: "",
         locators: [],
         reasonCodes: ["fee_knowledge_pdf_text_unavailable"],
+        safeDiagnostics: retrievalDiagnostics({
+          ...diagnosticsBase,
+          outcomeClass: "successful_retrieval_text_unavailable",
+          reasonCodes: ["fee_knowledge_pdf_text_unavailable"],
+        }),
       };
     }
     return {
@@ -205,6 +330,11 @@ async function pdfDocument(
       text,
       locators,
       reasonCodes: ["fee_knowledge_pdf_text_retrieved"],
+      safeDiagnostics: retrievalDiagnostics({
+        ...diagnosticsBase,
+        outcomeClass: "successful_usable_retrieval",
+        reasonCodes: ["fee_knowledge_pdf_text_retrieved"],
+      }),
     };
   } catch (error) {
     const encrypted = /password|encrypted/i.test(String(error));
@@ -216,6 +346,11 @@ async function pdfDocument(
       contentType,
       bytes.byteLength,
       fingerprint,
+      retrievalDiagnostics({
+        ...diagnosticsBase,
+        outcomeClass: "extraction_failed",
+        reasonCodes: [encrypted ? "fee_knowledge_pdf_encrypted" : "fee_knowledge_pdf_parse_failed"],
+      }),
     );
   }
 }
@@ -226,6 +361,7 @@ function textDocument(
   contentType: string,
   bytes: Uint8Array,
   fingerprint: string,
+  diagnosticsBase?: RetrievalDiagnosticsInput,
 ): RetrievedDocument {
   const raw = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
   const title = titleFromHtml(raw);
@@ -246,6 +382,11 @@ function textDocument(
       text: "",
       locators: [],
       reasonCodes: ["fee_knowledge_text_unavailable"],
+      safeDiagnostics: retrievalDiagnostics({
+        ...diagnosticsBase,
+        outcomeClass: "successful_retrieval_text_unavailable",
+        reasonCodes: ["fee_knowledge_text_unavailable"],
+      }),
     };
   }
   return {
@@ -261,6 +402,11 @@ function textDocument(
     text,
     locators,
     reasonCodes: ["fee_knowledge_text_retrieved"],
+    safeDiagnostics: retrievalDiagnostics({
+      ...diagnosticsBase,
+      outcomeClass: "successful_usable_retrieval",
+      reasonCodes: ["fee_knowledge_text_retrieved"],
+    }),
   };
 }
 
@@ -272,7 +418,9 @@ function unavailable(
   contentType: string | null = null,
   byteLength = 0,
   documentFingerprint: string | null = null,
+  safeDiagnostics?: FeeKnowledgeRetrievalSafeDiagnostics,
 ): RetrievedDocument {
+  const sortedReasons = [...new Set(reasonCodes)].sort();
   return {
     type: "fee_knowledge_retrieved_document",
     policyVersion: FEE_KNOWLEDGE_RETRIEVAL_POLICY_VERSION,
@@ -285,7 +433,23 @@ function unavailable(
     title: null,
     text: "",
     locators: [],
-    reasonCodes: [...new Set(reasonCodes)].sort(),
+    reasonCodes: sortedReasons,
+    safeDiagnostics: safeDiagnostics ?? retrievalDiagnostics({
+      initialUrl: canonicalUrl ? new URL(canonicalUrl) : null,
+      finalUrl: canonicalUrl ? new URL(canonicalUrl) : null,
+      outcomeClass: status === "timed_out" ? "watchdog_timeout"
+        : status === "unavailable" ? "http_response_failed"
+          : status === "unsupported_content_type" ? "content_rejected"
+            : status === "oversized" ? "size_limit_exceeded"
+              : status === "malformed" || status === "encrypted" ? "extraction_failed"
+                : status === "safety_blocked" ? "destination_policy_blocked"
+                  : "unknown_transport_failure",
+      reasonCodes: sortedReasons,
+      redirectCount: redirectChain.length,
+      contentType,
+      byteLength,
+      documentFingerprint,
+    }),
   };
 }
 
@@ -307,15 +471,26 @@ async function assertSafeUrl(
   url: URL,
   resolveHost: RetrieveDocumentOptions["resolveHost"],
   allowedPorts: readonly number[],
-): Promise<{ ok: true; addresses: string[] } | { ok: false; reason: string }> {
-  if (url.protocol !== "https:") return { ok: false, reason: "fee_knowledge_url_scheme_unsafe" };
+): Promise<{ ok: true; addresses: string[] } | {
+  ok: false;
+  reason: string;
+  outcomeClass: FeeKnowledgeRetrievalSafeDiagnostics["outcomeClass"];
+  blockedAddressClass: FeeKnowledgeRetrievalSafeDiagnostics["blockedAddressClass"];
+  addresses?: string[];
+}> {
+  if (url.protocol !== "https:") return { ok: false, reason: "fee_knowledge_url_scheme_unsafe", outcomeClass: "destination_policy_blocked", blockedAddressClass: "unsafe_scheme" };
   const port = url.port ? Number(url.port) : 443;
-  if (!allowedPorts.includes(port)) return { ok: false, reason: "fee_knowledge_url_port_unsafe" };
+  if (!allowedPorts.includes(port)) return { ok: false, reason: "fee_knowledge_url_port_unsafe", outcomeClass: "destination_policy_blocked", blockedAddressClass: "unsafe_port" };
   const hostname = url.hostname.toLowerCase();
-  if (hostname === "localhost" || hostname.endsWith(".local")) return { ok: false, reason: "fee_knowledge_url_private_host" };
-  const addresses = isIP(hostname) ? [hostname] : await (resolveHost ? resolveHost(hostname) : defaultResolve(hostname));
-  if (addresses.length === 0) return { ok: false, reason: "fee_knowledge_dns_empty" };
-  if (addresses.some((address) => privateAddress(address))) return { ok: false, reason: "fee_knowledge_url_private_ip" };
+  if (hostname === "localhost" || hostname.endsWith(".local")) return { ok: false, reason: "fee_knowledge_url_private_host", outcomeClass: "destination_policy_blocked", blockedAddressClass: "unsafe_host" };
+  let addresses: string[];
+  try {
+    addresses = isIP(hostname) ? [hostname] : await (resolveHost ? resolveHost(hostname) : defaultResolve(hostname));
+  } catch {
+    return { ok: false, reason: "fee_knowledge_retrieval_dns_resolution_failed", outcomeClass: "dns_resolution_failed", blockedAddressClass: null };
+  }
+  if (addresses.length === 0) return { ok: false, reason: "fee_knowledge_retrieval_dns_empty", outcomeClass: "dns_resolution_failed", blockedAddressClass: null, addresses };
+  if (addresses.some((address) => privateAddress(address))) return { ok: false, reason: "fee_knowledge_url_private_ip", outcomeClass: "destination_policy_blocked", blockedAddressClass: "private_or_reserved", addresses };
   return { ok: true, addresses };
 }
 
@@ -334,7 +509,13 @@ async function pinnedHttpsFetch(url: URL, validatedAddresses: readonly string[],
         path: `${url.pathname}${url.search}`,
         method: "GET",
         headers: { accept: "text/html, text/plain, application/pdf;q=0.9, */*;q=0.1" },
-        lookup: (_hostname, _options, callback) => callback(null, selectedAddress, family),
+        lookup: (_hostname, options, callback) => {
+          if ((options as { all?: boolean }).all) {
+            callback(null, [{ address: selectedAddress, family }] as never, family);
+            return;
+          }
+          callback(null, selectedAddress, family);
+        },
       },
       (res) => {
         const chunks: Buffer[] = [];
@@ -533,12 +714,128 @@ function safeExcerpt(value: string, maxLength = 360): string {
     .slice(0, maxLength);
 }
 
-function safeReason(error: unknown, fallback: string): string {
-  const message = error instanceof Error ? error.message : String(error);
-  if (/abort|timeout/i.test(message)) return "fee_knowledge_retrieval_aborted";
-  return fallback;
-}
-
 function hash(parts: readonly string[]): string {
   return createHash("sha256").update(parts.join("\0")).digest("hex").slice(0, 16);
+}
+
+type RetrievalDiagnosticsInput = {
+  initialUrl?: URL | null;
+  finalUrl?: URL | null;
+  outcomeClass?: FeeKnowledgeRetrievalSafeDiagnostics["outcomeClass"];
+  reasonCodes?: readonly string[];
+  attemptedNetwork?: boolean;
+  addresses?: readonly string[];
+  blockedAddressClass?: FeeKnowledgeRetrievalSafeDiagnostics["blockedAddressClass"];
+  redirectCount?: number;
+  httpStatus?: number | null;
+  contentType?: string | null;
+  byteLength?: number;
+  documentFingerprint?: string | null;
+};
+
+function classifyFetchFailure(
+  error: unknown,
+  abortSignal: AbortSignal,
+): {
+  status: "failed" | "timed_out";
+  outcomeClass: FeeKnowledgeRetrievalSafeDiagnostics["outcomeClass"];
+  reasonCodes: string[];
+} {
+  const record = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  const code = typeof record.code === "string" ? record.code : "";
+  const message = error instanceof Error ? error.message : String(error);
+  if (abortSignal.aborted || /abort|timeout|timed out/i.test(message) || ["ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT"].includes(code)) {
+    return {
+      status: "timed_out",
+      outcomeClass: "watchdog_timeout",
+      reasonCodes: ["fee_knowledge_retrieval_aborted", "fee_knowledge_retrieval_timed_out", "fee_knowledge_retrieval_watchdog_timed_out"],
+    };
+  }
+  if (/certificate|tls|ssl/i.test(message) || code.startsWith("CERT_") || ["DEPTH_ZERO_SELF_SIGNED_CERT", "ERR_TLS_CERT_ALTNAME_INVALID"].includes(code)) {
+    return {
+      status: "failed",
+      outcomeClass: "tls_failed",
+      reasonCodes: ["fee_knowledge_retrieval_fetch_failed", "fee_knowledge_retrieval_tls_failed"],
+    };
+  }
+  if (["ECONNREFUSED", "ECONNRESET", "EHOSTUNREACH", "ENETUNREACH", "EPIPE"].includes(code)) {
+    return {
+      status: "failed",
+      outcomeClass: "connection_failed",
+      reasonCodes: ["fee_knowledge_retrieval_connection_failed", "fee_knowledge_retrieval_fetch_failed"],
+    };
+  }
+  if (["ENOTFOUND", "EAI_AGAIN"].includes(code)) {
+    return {
+      status: "failed",
+      outcomeClass: "dns_resolution_failed",
+      reasonCodes: ["fee_knowledge_retrieval_dns_resolution_failed", "fee_knowledge_retrieval_fetch_failed"],
+    };
+  }
+  return {
+    status: "failed",
+    outcomeClass: "unknown_transport_failure",
+    reasonCodes: ["fee_knowledge_retrieval_fetch_failed"],
+  };
+}
+
+function retrievalDiagnostics(input: RetrievalDiagnosticsInput): FeeKnowledgeRetrievalSafeDiagnostics {
+  const reasonCodes = [...new Set(input.reasonCodes ?? ["fee_knowledge_retrieval_fetch_failed"])].sort();
+  const source = input.initialUrl ?? null;
+  const final = input.finalUrl ?? input.initialUrl ?? null;
+  const addresses = input.addresses ?? [];
+  return {
+    policyVersion: FEE_KNOWLEDGE_RETRIEVAL_POLICY_VERSION,
+    outcomeClass: input.outcomeClass ?? "unknown_transport_failure",
+    reasonCodes,
+    sourceDomain: safeSourceDomain(source),
+    finalSourceDomain: safeSourceDomain(final),
+    sourceOriginHash: source ? originHash(source) : null,
+    finalSourceOriginHash: final ? originHash(final) : null,
+    sourceHostnameHash: source ? hostnameHash(source.hostname) : null,
+    finalSourceHostnameHash: final ? hostnameHash(final.hostname) : null,
+    protocol: source?.protocol === "https:" ? "https" : null,
+    finalProtocol: final?.protocol === "https:" ? "https" : null,
+    redirectCount: Math.max(0, input.redirectCount ?? 0),
+    attemptedNetwork: input.attemptedNetwork ?? false,
+    resolvedAddressCount: addresses.length > 0 ? addresses.length : null,
+    resolvedAddressFamilies: [...new Set(addresses.map((address) => isIP(address) === 6 ? "ipv6" as const : "ipv4" as const))].sort(),
+    blockedAddressClass: input.blockedAddressClass ?? null,
+    httpStatus: input.httpStatus ?? null,
+    contentType: input.contentType ?? null,
+    byteLength: Math.max(0, input.byteLength ?? 0),
+    documentFingerprint: input.documentFingerprint ?? null,
+  };
+}
+
+function outcomeClassForUrlPolicyReason(reason: string): FeeKnowledgeRetrievalSafeDiagnostics["outcomeClass"] {
+  return reason === "fee_knowledge_url_invalid" ? "destination_policy_blocked" : "destination_policy_blocked";
+}
+
+function blockedClassForUrlPolicyReason(reason: string): FeeKnowledgeRetrievalSafeDiagnostics["blockedAddressClass"] {
+  if (reason === "fee_knowledge_url_invalid") return "invalid_url";
+  if (reason === "fee_knowledge_url_scheme_unsafe") return "unsafe_scheme";
+  if (reason === "fee_knowledge_url_credentials_unsafe") return "credentials";
+  if (reason === "fee_knowledge_url_host_missing") return "missing_host";
+  if (reason === "fee_knowledge_url_port_unsafe") return "unsafe_port";
+  if (reason === "fee_knowledge_url_private_host") return "unsafe_host";
+  if (reason === "fee_knowledge_url_private_ip") return "private_or_reserved";
+  return null;
+}
+
+function safeSourceDomain(url: URL | null): string | null {
+  if (!url || url.protocol !== "https:") return null;
+  const hostname = url.hostname.toLowerCase();
+  if (hostname === "localhost" || hostname.endsWith(".local") || isIP(hostname)) return null;
+  if (!/^[a-z0-9.-]{3,253}$/.test(hostname) || hostname.includes("..")) return null;
+  return hostname;
+}
+
+function originHash(url: URL): string {
+  const port = url.port ? `:${url.port}` : "";
+  return `sha256:${createHash("sha256").update(`${url.protocol}//${url.hostname.toLowerCase()}${port}`).digest("hex")}`;
+}
+
+function hostnameHash(hostname: string): string {
+  return `sha256:${createHash("sha256").update(hostname.toLowerCase()).digest("hex")}`;
 }

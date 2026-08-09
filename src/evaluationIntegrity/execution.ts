@@ -125,7 +125,7 @@ export async function runManifestDrivenLiveEvaluation(input: {
 
   const lifecycleLedger = createLifecycleLedger(manifest);
   const ledger = new EvaluationCostBudgetLedger(input.approvedBudgetUsd);
-  for (const call of input.calls) ledger.reserve(call.reservation);
+  for (const call of input.calls) ledger.reserve(reservationForExecution(call, input.adapterId));
 
   const snapshotById = new Map(snapshots.map((snapshot) => [snapshot.observation.sourceDocumentId, snapshot]));
   const packets = new Map<string, unknown>();
@@ -205,12 +205,20 @@ export async function runManifestDrivenLiveEvaluation(input: {
     let result: RepositoryProviderTransportResult;
     try {
       ledger.assertReadyToSend(call.reservation.callId);
+      const childBudgetController = input.adapterId === "one_time_statement_evaluation_v1" && call.stage === "whole_statement_ai_review"
+        ? {
+            reserve: (reservation: CostReservationInput) => { ledger.reserve(reservation); },
+            assertReadyToSend: (callId: string) => { ledger.assertReadyToSend(callId); },
+            finalize: (callId: string, finalizeInput: Parameters<EvaluationCostBudgetLedger["finalize"]>[1]) => finalizeCallOrDetectCostOverrun(ledger, callId, finalizeInput),
+          }
+        : null;
       result = await adapter.invoke({
         sanitizedPacket: packets.get(call.sourceDocumentId),
         sourceDocumentId: call.sourceDocumentId,
         stage: call.stage,
         reservedCallId: call.reservation.callId,
-        approvedCallMetadata: structuredClone(call.reservation),
+        approvedCallMetadata: structuredClone(reservationForExecution(call, input.adapterId)),
+        ...(childBudgetController ? { childBudgetController } : {}),
       });
     } catch (error) {
       const failure = providerFailure(error, Math.max(0, Date.now() - started));
@@ -223,6 +231,7 @@ export async function runManifestDrivenLiveEvaluation(input: {
       const failureReasonCodes = costExceeded ? [reasonCode] : failure.reasonCodes;
       providerCallOutcomes.push({
         callId: call.reservation.callId,
+        ...outcomeOperationFields(reservationForExecution(call, input.adapterId)),
         sourceDocumentId: call.sourceDocumentId,
         stage: call.stage,
         status: costExceeded ? "failure" : failure.status,
@@ -257,6 +266,7 @@ export async function runManifestDrivenLiveEvaluation(input: {
       const status = costExceeded ? "failure" : result.providerFailure.status;
       providerCallOutcomes.push({
         callId: call.reservation.callId,
+        ...outcomeOperationFields(reservationForExecution(call, input.adapterId)),
         sourceDocumentId: call.sourceDocumentId,
         stage: call.stage,
         status,
@@ -300,6 +310,7 @@ export async function runManifestDrivenLiveEvaluation(input: {
     if (costExceeded) {
       providerCallOutcomes.push({
         callId: call.reservation.callId,
+        ...outcomeOperationFields(reservationForExecution(call, input.adapterId)),
         sourceDocumentId: call.sourceDocumentId,
         stage: call.stage,
         status: "failure",
@@ -321,8 +332,10 @@ export async function runManifestDrivenLiveEvaluation(input: {
       if (input.adapterId === "one_time_statement_evaluation_v1") continue;
       break;
     }
+    providerCallOutcomes.push(...(result.childProviderCallOutcomes ?? []));
     providerCallOutcomes.push({
       callId: call.reservation.callId,
+      ...outcomeOperationFields(reservationForExecution(call, input.adapterId)),
       sourceDocumentId: call.sourceDocumentId,
       stage: call.stage,
       status: "success",
@@ -763,6 +776,7 @@ function cancelReservedCalls(
     });
     outcomes.push({
       callId: call.reservation.callId,
+      ...outcomeOperationFields(entry),
       sourceDocumentId: call.sourceDocumentId,
       stage: call.stage,
       status: "cancelled_before_send",
@@ -786,6 +800,33 @@ function finalizeCallOrDetectCostOverrun(
   }
 }
 
+function reservationForExecution(
+  call: ManifestDrivenEvaluationCall,
+  adapterId: RepositoryEvaluationAdapterId,
+): CostReservationInput {
+  if (adapterId !== "one_time_statement_evaluation_v1" || call.stage !== "whole_statement_ai_review") {
+    return structuredClone(call.reservation);
+  }
+  return {
+    ...structuredClone(call.reservation),
+    operationKind: "package_5b_budget_envelope",
+    operationRef: "package_5b_budget_envelope",
+    reservationScope: "budget_envelope",
+  };
+}
+
+function outcomeOperationFields(input: Pick<CostReservationInput, "parentCallId" | "operationKind" | "operationRef">): {
+  parentCallId: string | null;
+  operationKind: NonNullable<CostReservationInput["operationKind"]>;
+  operationRef: string | null;
+} {
+  return {
+    parentCallId: input.parentCallId ?? null,
+    operationKind: input.operationKind ?? "manifest_call",
+    operationRef: input.operationRef ?? null,
+  };
+}
+
 function deriveSourceExecutionStatus(
   sourceDocumentId: string,
   outcomes: EvaluationRunIntegrityArtifact["providerCallOutcomes"],
@@ -795,7 +836,10 @@ function deriveSourceExecutionStatus(
   const explicit = explicitFailures.get(sourceDocumentId);
   if (explicit) return explicit;
   const sourceOutcomes = outcomes.filter((outcome) => outcome.sourceDocumentId === sourceDocumentId);
-  const wholeStatementOutcome = sourceOutcomes.find((outcome) => outcome.stage === "whole_statement_ai_review");
+  const wholeStatementOutcome = sourceOutcomes.find((outcome) =>
+    outcome.stage === "whole_statement_ai_review"
+    && outcome.operationKind !== "package_5b_work_unit"
+  );
   if (wholeStatementOutcome?.status === "success") return "completed";
   if (graphTerminal) return graphTerminal;
   if (sourceOutcomes.some((outcome) => outcome.status === "timeout")) return "timed_out";

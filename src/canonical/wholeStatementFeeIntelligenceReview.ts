@@ -121,6 +121,7 @@ const INTERPRETATION_ALLOWED_KEYS = [
 
 const REVIEW_STATUSES: readonly CanonicalWholeStatementFeeIntelligenceStatus[] = [
   "completed",
+  "partial",
   "disabled",
   "failed",
   "timed_out",
@@ -304,6 +305,17 @@ export function validateWholeStatementFeeIntelligenceReview(
   sourceProvenancePacket?: FeeKnowledgeSourcePacket,
 ): CanonicalWholeStatementFeeIntelligenceValidationResult {
   const packet = buildWholeStatementFeeIntelligencePacket(analysis, registry, sourceProvenancePacket);
+  return validateWholeStatementFeeIntelligenceReviewForPacket(rawReview, packet, analysis, registry, sourceProvenancePacket);
+}
+
+export function validateWholeStatementFeeIntelligenceReviewForPacket(
+  rawReview: unknown,
+  packet: CanonicalWholeStatementFeeIntelligencePacket,
+  analysis: Pick<CanonicalStatementAnalysis, "identity" | "feeLedger" | "feeOwnershipActionability" | "evidence">,
+  registry: ApprovedWholeStatementFeeIntelligenceSourceRegistry = { approvedExternalSourceRefs: [] },
+  sourceProvenancePacket?: FeeKnowledgeSourcePacket,
+): CanonicalWholeStatementFeeIntelligenceValidationResult {
+  void sourceProvenancePacket;
   const errors: string[] = [];
 
   if (!isPlainRecord(rawReview)) {
@@ -330,17 +342,23 @@ export function validateWholeStatementFeeIntelligenceReview(
   const reasonCodes = reasonCodeArray(source.reasonCodes, "reasonCodes", errors);
   const rowInterpretations = interpretationArray(source.rowInterpretations, packet, analysis, registry, errors);
   const coverageProof = coverageProofFor(packet.admittedFeeRows.map((row) => row.feeRowRef), rowInterpretations, errors, reviewStatus === "completed");
-  const acceptanceRecords = coverageProof.exactCoverage
+  const cleanReviewedCoverage = coverageProof.duplicatedFeeRowRefs.length === 0
+    && coverageProof.unknownFeeRowRefs.length === 0
+    && coverageProof.malformedFeeRowRefs.length === 0;
+  const acceptanceRecords = cleanReviewedCoverage
     ? rowInterpretations.map((interpretation) => acceptanceRecordFor(interpretation, packet, registry))
     : [];
 
   if (reviewStatus === "completed" && !coverageProof.exactCoverage) {
     errors.push("whole_statement_fee_intelligence_completion_without_exact_coverage");
   }
+  if (reviewStatus === "partial" && (!cleanReviewedCoverage || rowInterpretations.length === 0 || coverageProof.exactCoverage)) {
+    errors.push("whole_statement_fee_intelligence_partial_coverage_invalid");
+  }
   if (reviewStatus === "completed" && rowInterpretations.length === 0 && packet.admittedFeeRows.length > 0) {
     errors.push("whole_statement_fee_intelligence_completed_without_rows");
   }
-  if (reviewStatus && reviewStatus !== "completed" && rowInterpretations.length !== 0) {
+  if (reviewStatus && reviewStatus !== "completed" && reviewStatus !== "partial" && rowInterpretations.length !== 0) {
     errors.push("whole_statement_fee_intelligence_unsuccessful_status_has_interpretations");
   }
 

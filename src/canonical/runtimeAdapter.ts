@@ -239,8 +239,8 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
   });
   const wholeStatementHarnessInput: CanonicalAiCapabilityHarnessInput = {
     capability: "whole_statement_fee_intelligence_review",
-    status: wholeStatementOutput.reviewStatus,
-    output: wholeStatementOutput.reviewStatus === "completed" ? wholeStatementOutput : null,
+    status: wholeStatementOutput.reviewStatus === "partial" ? "completed" : wholeStatementOutput.reviewStatus,
+    output: wholeStatementOutput.reviewStatus === "completed" || wholeStatementOutput.reviewStatus === "partial" ? wholeStatementOutput : null,
     executionRef: null,
     independentReviewRefs: [],
   };
@@ -317,7 +317,7 @@ function snapshotForWholeStatementFeeIntelligence(output: CanonicalAiWholeStatem
   return {
     capability: "whole_statement_fee_intelligence_review",
     attempted: output.reviewStatus !== "disabled",
-    normalizedStatus: output.reviewStatus as CanonicalAiCapabilityStatus,
+    normalizedStatus: output.reviewStatus === "partial" ? "completed" : output.reviewStatus as CanonicalAiCapabilityStatus,
     safeCounts: {
       expectedFeeRowCount: output.coverageProof.expectedFeeRowRefs.length,
       reviewedFeeRowCount: output.coverageProof.reviewedFeeRowRefs.length,

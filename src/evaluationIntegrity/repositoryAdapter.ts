@@ -1,5 +1,5 @@
 import type { BusinessTypeId } from "../businessTypes.js";
-import type { CostReservationInput } from "./costLedger.js";
+import type { CostFinalizeInput, CostReservationInput } from "./costLedger.js";
 import type { PackagesBEProjectionInput } from "./invariance.js";
 import {
   createOneTimeStatementEvaluationTransport,
@@ -15,7 +15,7 @@ import type { ApprovedFeeKnowledgeSourceRegistry } from "../canonical/feeKnowled
 import type { FeeKnowledgeResearchQuestion } from "../canonical/feeKnowledgeResearch.js";
 import type { CanonicalStatementAnalysis } from "../canonical/types.js";
 import { sha256Canonical } from "./stable.js";
-import type { CostToolEvent, EvaluationExecutionStage, EvaluationManifestDocument } from "./types.js";
+import type { CostOperationKind, CostToolEvent, EvaluationExecutionStage, EvaluationManifestDocument } from "./types.js";
 
 export const repositoryEvaluationAdapterIds = [
   "one_time_statement_evaluation_v1",
@@ -29,6 +29,25 @@ export type RepositoryProviderTransportInput = {
   stage: EvaluationExecutionStage;
   reservedCallId: string;
   approvedCallMetadata: CostReservationInput;
+  childBudgetController?: RepositoryProviderChildBudgetController;
+};
+
+export type RepositoryProviderChildBudgetController = {
+  reserve(reservation: CostReservationInput): void;
+  assertReadyToSend(callId: string): void;
+  finalize(callId: string, input: CostFinalizeInput): boolean;
+};
+
+export type RepositoryProviderCallOutcome = {
+  callId: string;
+  parentCallId: string | null;
+  operationKind: CostOperationKind;
+  operationRef: string | null;
+  sourceDocumentId: string;
+  stage: EvaluationExecutionStage;
+  status: "success" | "failure" | "timeout" | "cancelled_before_send";
+  requestId: string | null;
+  reasonCodes: string[];
 };
 
 export type RepositoryProviderTransportResult = {
@@ -68,6 +87,7 @@ export type RepositoryProviderTransportResult = {
     reasonCodes?: string[];
   };
   researchStageStatus?: "failed" | "timed_out" | "safety_blocked";
+  childProviderCallOutcomes?: RepositoryProviderCallOutcome[];
 };
 
 export type RepositoryProviderTransport = (
@@ -160,6 +180,7 @@ export function createRepositoryEvaluationAdapter(input: {
         stage: request.stage,
         reservedCallId: request.reservedCallId,
         approvedCallMetadata: structuredClone(request.approvedCallMetadata),
+        ...(request.childBudgetController ? { childBudgetController: request.childBudgetController } : {}),
       });
       if (result.canonicalState) canonicalStateBySource.set(request.sourceDocumentId, structuredClone(result.canonicalState));
       return structuredClone(result);

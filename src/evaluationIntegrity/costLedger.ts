@@ -4,6 +4,8 @@ import type {
   CostCallStatus,
   CostCapability,
   CostLedgerEntry,
+  CostOperationKind,
+  CostReservationScope,
   CostToolEvent,
   EvaluationPricingPolicy,
 } from "./types.js";
@@ -15,6 +17,10 @@ export const EVALUATION_COST_FIXED_POINT_SCALE = 1_000_000_000;
 
 export type CostReservationInput = {
   callId: string;
+  parentCallId?: string | null;
+  operationKind?: CostOperationKind;
+  operationRef?: string | null;
+  reservationScope?: CostReservationScope;
   attempt: number;
   retryOfCallId?: string | null;
   capability: CostCapability;
@@ -31,7 +37,7 @@ export type CostReservationInput = {
   startedAt?: string;
 };
 
-type FinalizeInput = {
+export type CostFinalizeInput = {
   status: Exclude<CostCallStatus, "reserved">;
   requestId?: string | null;
   endedAt?: string;
@@ -74,7 +80,23 @@ export class EvaluationCostBudgetLedger {
       }
     }
     const committedBefore = this.committedUnits();
-    if (committedBefore + reservationUnits > this.approvedBudgetUnits) {
+    const envelopeParent = this.coveringEnvelopeFor(input);
+    if (envelopeParent) {
+      const childReservedUnits = this.entries
+        .filter((entry) => entry.parentCallId === envelopeParent.callId)
+        .reduce((sum, entry) => sum + usdUnits(entry.estimatedMaximumCostUsd), 0);
+      if (childReservedUnits + reservationUnits > usdUnits(envelopeParent.estimatedMaximumCostUsd)) {
+        throw new EvaluationIntegrityError(
+          "insufficient_budget_reservation",
+          "Remaining Package 5B envelope budget cannot cover the work-unit reservation.",
+          {
+            parentCallId: envelopeParent.callId,
+            remainingBudgetUsd: unitsUsd(usdUnits(envelopeParent.estimatedMaximumCostUsd) - childReservedUnits),
+            requestedReservationUsd: unitsUsd(reservationUnits),
+          },
+        );
+      }
+    } else if (committedBefore + reservationUnits > this.approvedBudgetUnits) {
       throw new EvaluationIntegrityError(
         "insufficient_budget_reservation",
         "Remaining approved budget cannot cover the call's worst-case reservation.",
@@ -86,6 +108,10 @@ export class EvaluationCostBudgetLedger {
     }
     const entry: CostLedgerEntry = {
       callId: input.callId,
+      parentCallId: input.parentCallId ?? null,
+      operationKind: input.operationKind ?? "manifest_call",
+      operationRef: input.operationRef ?? null,
+      reservationScope: input.reservationScope ?? "provider_send",
       attempt: input.attempt,
       attemptKind: input.retryOfCallId ? "retry" : "initial",
       retryOfCallId: input.retryOfCallId ?? null,
@@ -115,15 +141,15 @@ export class EvaluationCostBudgetLedger {
       billingDisposition: "pending",
       cumulativeReservedUsd: unitsUsd(this.reservedHistoricalUnits() + reservationUnits),
       cumulativeObservedUsd: unitsUsd(this.observedUnits()),
-      cumulativeBudgetCommittedUsd: unitsUsd(committedBefore + reservationUnits),
+      cumulativeBudgetCommittedUsd: unitsUsd(envelopeParent ? committedBefore : committedBefore + reservationUnits),
       cumulativeReleasedUsd: unitsUsd(this.releasedUnits()),
-      remainingBudgetUsd: unitsUsd(this.approvedBudgetUnits - committedBefore - reservationUnits),
+      remainingBudgetUsd: unitsUsd(this.approvedBudgetUnits - committedBefore - (envelopeParent ? 0 : reservationUnits)),
     };
     this.entries.push(entry);
     return structuredClone(entry);
   }
 
-  finalize(callId: string, input: FinalizeInput): CostLedgerEntry {
+  finalize(callId: string, input: CostFinalizeInput): CostLedgerEntry {
     const entry = this.entries.find((item) => item.callId === callId);
     if (!entry) throw new Error(`Cost ledger call ID was not reserved: ${callId}`);
     if (entry.status !== "reserved") throw new Error(`Cost ledger call was already finalized: ${callId}`);
@@ -201,6 +227,13 @@ export class EvaluationCostBudgetLedger {
 
   private committedUnits(): number {
     return this.entries.reduce((sum, entry) => {
+      if (this.isCoveredChildWhileEnvelopeOpen(entry)) return sum;
+      if (entry.reservationScope === "budget_envelope"
+        && entry.status !== "reserved"
+        && entry.billingDisposition !== "pending"
+        && entry.billingDisposition !== "unknown") {
+        return sum;
+      }
       if (entry.status === "reserved" || entry.billingDisposition === "pending" || entry.billingDisposition === "unknown") {
         return sum + usdUnits(entry.estimatedMaximumCostUsd);
       }
@@ -210,13 +243,24 @@ export class EvaluationCostBudgetLedger {
   }
 
   private releasedUnits(): number {
-    return this.entries.reduce((sum, entry) => {
-      const reserved = usdUnits(entry.estimatedMaximumCostUsd);
-      if (entry.status === "reserved" || entry.billingDisposition === "pending" || entry.billingDisposition === "unknown") return sum;
-      if (entry.billingDisposition === "provider_confirmed_zero") return sum + reserved;
-      const observed = usdUnits(entry.observedOrEstimatedFinalCostUsd ?? entry.estimatedMaximumCostUsd);
-      return sum + Math.max(0, reserved - observed);
-    }, 0);
+    return Math.max(0, this.reservedHistoricalUnits() - this.committedUnits());
+  }
+
+  private coveringEnvelopeFor(input: CostReservationInput): CostLedgerEntry | null {
+    const parentCallId = input.parentCallId ?? null;
+    if (!parentCallId) return null;
+    const parent = this.entries.find((entry) => entry.callId === parentCallId);
+    if (!parent || parent.reservationScope !== "budget_envelope") return null;
+    if (parent.status !== "reserved") throw new Error("A child reservation cannot use a finalized budget envelope.");
+    return parent;
+  }
+
+  private isCoveredChildWhileEnvelopeOpen(entry: CostLedgerEntry): boolean {
+    if (!entry.parentCallId) return false;
+    const parent = this.entries.find((item) => item.callId === entry.parentCallId);
+    return Boolean(parent
+      && parent.reservationScope === "budget_envelope"
+      && (parent.status === "reserved" || parent.billingDisposition === "pending" || parent.billingDisposition === "unknown"));
   }
 }
 
@@ -225,7 +269,7 @@ export async function executeBudgetedProviderCall<T>(input: {
   reservation: CostReservationInput;
   invoke: () => Promise<{
     value: T;
-    accounting: Omit<FinalizeInput, "status" | "billingDisposition"> & {
+    accounting: Omit<CostFinalizeInput, "status" | "billingDisposition"> & {
       billingDisposition?: "observed" | "provider_confirmed_zero";
     };
   }>;
@@ -262,6 +306,14 @@ function unitsUsd(value: number): number {
 
 function assertReservationProvenance(input: CostReservationInput, entries: CostLedgerEntry[]): void {
   if (!Number.isInteger(input.attempt) || input.attempt < 1) throw new Error("Cost-ledger attempt must be a positive integer.");
+  const operationKind = input.operationKind ?? "manifest_call";
+  const reservationScope = input.reservationScope ?? "provider_send";
+  if (!["manifest_call", "package_5b_budget_envelope", "package_5b_work_unit"].includes(operationKind)) throw new Error("Cost-ledger operation kind is invalid.");
+  if (!["provider_send", "budget_envelope"].includes(reservationScope)) throw new Error("Cost-ledger reservation scope is invalid.");
+  if (reservationScope === "budget_envelope" && operationKind !== "package_5b_budget_envelope") throw new Error("Budget envelopes must identify their owning operation kind.");
+  if (operationKind === "package_5b_work_unit" && !input.parentCallId) throw new Error("Package 5B work-unit reservations must identify their parent envelope.");
+  if (input.parentCallId && !input.operationRef) throw new Error("Child reservations must identify a safe operation reference.");
+  if (input.operationRef !== null && input.operationRef !== undefined && !/^[A-Za-z0-9_.:-]{1,160}$/.test(input.operationRef)) throw new Error("Cost-ledger operation reference is not safe.");
   for (const [name, value] of [
     ["pricing policy reference", input.pricingPolicyRef],
     ["provider route", input.providerRoute],

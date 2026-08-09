@@ -78,7 +78,9 @@ const CANDIDATE_REASON_CODES = new Set([
   "fee_knowledge_claim_support_missing", "fee_knowledge_connection_target_unvalidated", "fee_knowledge_content_length_oversized",
   "fee_knowledge_content_type_unsupported", "fee_knowledge_pdf_parse_failed", "fee_knowledge_pdf_text_retrieved", "fee_knowledge_pdf_text_unavailable",
   "fee_knowledge_redirect_limit_exceeded", "fee_knowledge_redirect_loop", "fee_knowledge_response_oversized", "fee_knowledge_retrieval_aborted",
-  "fee_knowledge_retrieval_fetch_failed", "fee_knowledge_text_retrieved", "fee_knowledge_text_unavailable", "fee_knowledge_url_credentials_unsafe",
+  "fee_knowledge_retrieval_connection_failed", "fee_knowledge_retrieval_dns_empty", "fee_knowledge_retrieval_dns_resolution_failed",
+  "fee_knowledge_retrieval_fetch_failed", "fee_knowledge_retrieval_tls_failed", "fee_knowledge_retrieval_watchdog_timed_out",
+  "fee_knowledge_text_retrieved", "fee_knowledge_text_unavailable", "fee_knowledge_url_credentials_unsafe",
   "fee_knowledge_url_host_missing", "fee_knowledge_url_invalid", "fee_knowledge_url_port_unsafe", "fee_knowledge_url_private_host",
   "fee_knowledge_url_private_ip", "fee_knowledge_url_scheme_unsafe", "fee_knowledge_dns_empty", "fee_knowledge_validated_address_invalid",
   "fee_knowledge_validated_address_missing", "fee_knowledge_pdf_encrypted", "fee_knowledge_semantic_support_not_run",
@@ -93,8 +95,8 @@ const RETRIEVAL_REASON_BY_STATUS: Record<(typeof RETRIEVAL_STATUSES)[number], re
   retrieved_text: ["fee_knowledge_text_retrieved", "fee_knowledge_pdf_text_retrieved"],
   retrieval_succeeded_text_unavailable: ["fee_knowledge_text_unavailable", "fee_knowledge_pdf_text_unavailable"],
   unavailable: HTTP_UNAVAILABLE_REASONS,
-  failed: ["fee_knowledge_retrieval_fetch_failed"],
-  timed_out: ["fee_knowledge_retrieval_aborted", "fee_knowledge_retrieval_timed_out"],
+  failed: ["fee_knowledge_retrieval_fetch_failed", "fee_knowledge_retrieval_connection_failed", "fee_knowledge_retrieval_tls_failed", "fee_knowledge_retrieval_dns_resolution_failed", "fee_knowledge_retrieval_dns_empty"],
+  timed_out: ["fee_knowledge_retrieval_aborted", "fee_knowledge_retrieval_timed_out", "fee_knowledge_retrieval_watchdog_timed_out"],
   safety_blocked: [
     "fee_knowledge_url_credentials_unsafe", "fee_knowledge_url_host_missing", "fee_knowledge_url_invalid", "fee_knowledge_url_port_unsafe",
     "fee_knowledge_url_private_host", "fee_knowledge_url_private_ip", "fee_knowledge_url_scheme_unsafe", "fee_knowledge_redirect_limit_exceeded",
@@ -161,7 +163,11 @@ const LIMITATION_CODES = [
   "benchmark_category_not_verified", "ai_narrative_unavailable", "ai_output_rejected", "provider_unavailable",
   "deterministic_explanation_available",
 ] as const;
-const WHOLE_STATEMENT_OUTPUT_REASON_CODES = ["whole_statement_fee_intelligence_reviewed"] as const;
+const WHOLE_STATEMENT_OUTPUT_REASON_CODES = [
+  "whole_statement_fee_intelligence_reviewed",
+  "whole_statement_fee_intelligence_partial_work_unit_coverage",
+] as const;
+const WHOLE_STATEMENT_OUTPUT_REASON_CODE_SET = new Set<string>(WHOLE_STATEMENT_OUTPUT_REASON_CODES);
 const CONTRADICTION_CODES = [
   "semantic_support_contradicts_claim",
   "runtime_or_registry_category_conflict",
@@ -178,9 +184,10 @@ const TOP_LEVEL_V2_KEYS = [
 ] as const;
 const RESULT_KEYS = [
   "type", "resultId", "sourceDocumentId", "capabilityId", "executionRef", "admission", "packageF", "package5a",
-  "researchEvidence", "canonicalReferenceProof", "lifecycleAdmissionRef", "admissionDisposition", "reasonCodes", "authoritative",
+  "package5bWorkPlan", "researchEvidence", "canonicalReferenceProof", "lifecycleAdmissionRef", "admissionDisposition", "reasonCodes", "authoritative",
   "financialMutationAllowed", "customerPublished", "resultContentHash",
 ] as const;
+const LEGACY_RESULT_KEYS_WITHOUT_PACKAGE_5B_WORK_PLAN = RESULT_KEYS.filter((key) => key !== "package5bWorkPlan");
 const ADMISSION_KEYS = [
   "type", "capabilityId", "executionRef", "executionStatus", "validationStatus", "groundingStatus", "admissionDisposition",
   "acceptedClaimSupportRefs", "rejectedClaimSupportRefs", "researchAttemptRefs", "validationErrorCodes", "reasonCodes",
@@ -190,6 +197,18 @@ const SAFE_COUNT_KEYS = [
   "reviewedFeeRowCount", "acceptedRecordCount", "needsVerificationRecordCount", "humanReviewRecordCount", "rejectedRecordCount", "researchAttemptCount", "evidenceCandidateCount", "claimSupportCount",
 ] as const;
 const PACKAGE_F_KEYS = ["type", "capabilityId", "executionRef", "output", "sourceReferencesValidatedAgainstProof", "authoritative", "financialMutationAllowed"] as const;
+const PACKAGE_5B_WORK_PLAN_KEYS = [
+  "type", "policyVersion", "mode", "statementPacketContentHash", "expectedFeeRowCount", "plannedFeeRowCount", "selectedFeeRowCount",
+  "reviewedFeeRowCount", "missingFeeRowCount", "plannedWorkUnitCount", "selectedWorkUnitCount", "completedWorkUnitCount",
+  "unavailableWorkUnitCount", "notSelectedWorkUnitCount", "units", "rawPromptPersisted", "rawResponsePersisted",
+  "providerDetailsPersisted", "reasonCodes",
+] as const;
+const PACKAGE_5B_WORK_UNIT_KEYS = [
+  "workUnitRef", "ordinal", "status", "outcomeClass", "expectedFeeRowRefs", "expectedRowCount", "reviewedRowCount",
+  "missingRowCount", "duplicatedRowCount", "unknownRowCount", "estimatedInputBytes", "estimatedOutputTokens",
+  "outputTokenCeiling", "requestId", "inputTokens", "cachedInputTokens", "outputTokens", "durationMs", "billingDisposition",
+  "reasonCodes",
+] as const;
 const PACKAGE_5A_KEYS = [
   "type", "diagnosticRef", "capabilityId", "executionRef", "executionState", "admissionState", "finalCanonicalStatus",
   "stageStates", "reasonCodes", "projectionReasonCodes", "diagnosticRefs", "rawPromptPersisted", "rawResponsePersisted", "rawStatementTextPersisted",
@@ -201,6 +220,17 @@ const STAGE_STATE_KEYS = [
 const RESEARCH_KEYS = ["type", "attempts", "candidates", "claimSupports"] as const;
 const ATTEMPT_KEYS = ["researchAttemptRef", "questionRef", "feeRowRef", "questionOrdinal", "sanitizedQuestionCategory", "triggerReason", "status", "resultCount", "candidateRefs", "reasonCodes"] as const;
 const CANDIDATE_KEYS = ["candidateRef", "researchAttemptRef", "questionRef", "feeRowRef", "verificationStatus", "retrievalStatus", "semanticVerificationStatus", "claimSupportRefs", "reasonCodes"] as const;
+const CANDIDATE_KEYS_WITH_SAFE_RETRIEVAL_DIAGNOSTICS = ["candidateRef", "researchAttemptRef", "questionRef", "feeRowRef", "verificationStatus", "retrievalStatus", "semanticVerificationStatus", "claimSupportRefs", "reasonCodes", "safeRetrievalDiagnostics"] as const;
+const SAFE_RETRIEVAL_DIAGNOSTIC_KEYS = [
+  "policyVersion", "outcomeClass", "reasonCodes", "sourceDomain", "finalSourceDomain", "sourceOriginHash", "finalSourceOriginHash",
+  "sourceHostnameHash", "finalSourceHostnameHash", "protocol", "finalProtocol", "redirectCount", "attemptedNetwork",
+  "resolvedAddressCount", "resolvedAddressFamilies", "blockedAddressClass", "httpStatus", "contentType", "byteLength", "documentFingerprint",
+] as const;
+const SAFE_RETRIEVAL_OUTCOME_CLASSES = [
+  "successful_usable_retrieval", "successful_retrieval_text_unavailable", "dns_resolution_failed", "destination_policy_blocked",
+  "connection_failed", "tls_failed", "http_response_failed", "redirect_rejected", "content_rejected", "size_limit_exceeded",
+  "extraction_failed", "watchdog_timeout", "unknown_transport_failure",
+] as const;
 const SUPPORT_KEYS = [
   "claimSupportRef", "origin", "runtimeSourceRef", "runtimeClaimRef", "candidateRef", "researchAttemptRef", "questionRef", "approvedSourceRef", "approvedClaimRef",
   "approvedRegistryVersionRef", "approvedSourceLifecycle", "approvedSourceApplicable", "approvedRegistryVerificationRef", "approvedContentFingerprint",
@@ -403,7 +433,7 @@ function validateAdmissionResult(
   artifact: Record<string, unknown>,
   sourceIds: Set<string>,
 ): value is EvaluationCanonicalAdmissionResult {
-  if (!isRecord(value) || !hasExactKeys(value, RESULT_KEYS)) return debugReject("result_shape");
+  if (!isRecord(value) || !(hasExactKeys(value, RESULT_KEYS) || hasExactKeys(value, LEGACY_RESULT_KEYS_WITHOUT_PACKAGE_5B_WORK_PLAN))) return debugReject("result_shape");
   if (value.type !== EVALUATION_CANONICAL_ADMISSION_RESULT_VERSION || !RESULT_REF.test(stringValue(value.resultId))) return false;
   if (!sourceIds.has(stringValue(value.sourceDocumentId)) || value.capabilityId !== "whole_statement_fee_intelligence_review") return false;
   if (!EXECUTION_REF.test(stringValue(value.executionRef)) || value.lifecycleAdmissionRef !== value.executionRef) return false;
@@ -415,6 +445,7 @@ function validateAdmissionResult(
   if (!SHA256.test(stringValue(resultContentHash)) || sha256Canonical(content) !== resultContentHash) return false;
   if (!validateAdmission(value.admission, value)) return debugReject("admission");
   if (!validatePackage5a(value.package5a, value)) return debugReject("package5a");
+  if (!validatePackage5bWorkPlan(value.package5bWorkPlan ?? null, value)) return debugReject("package5b_work_plan");
   if (!validateCanonicalReferenceProof(value.canonicalReferenceProof)) return debugReject("reference_proof");
   if (!validateResearchProof(
     value.researchEvidence,
@@ -462,29 +493,95 @@ function validatePackageF(value: unknown, result: Record<string, unknown>): bool
   if (value.type !== EVALUATION_PACKAGE_F_RECORD_VERSION || value.capabilityId !== result.capabilityId || value.executionRef !== result.executionRef) return false;
   if (value.sourceReferencesValidatedAgainstProof !== true || value.authoritative !== false || value.financialMutationAllowed !== false || !isRecord(value.output)) return false;
   if (validateTypedAiCapabilityOutput(value.output as never).length > 0 || !validateWholeStatementOutput(value.output)) return false;
-  if (value.output.reviewStatus !== "completed") return false;
+  if (!enumValue(value.output.reviewStatus, ["completed", "partial"])) return false;
   return true;
 }
 
 function validateWholeStatementOutput(output: Record<string, unknown>): boolean {
   const keys = ["type", "reviewPolicyVersion", "authoritative", "evidenceRefs", "factRefs", "limitationCodes", "reviewStatus", "coverageProof", "rowInterpretations", "acceptanceRecords", "reasonCodes", "financialMutationAllowed", "providerDetailsStripped"] as const;
   if (!hasExactKeys(output, keys) || output.type !== "whole_statement_fee_intelligence_review" || output.reviewPolicyVersion !== "whole_statement_fee_intelligence_review_v1") return false;
-  if (output.authoritative !== false || output.financialMutationAllowed !== false || output.providerDetailsStripped !== true || output.reviewStatus !== "completed") return false;
-  if (!safeRefArray(output.evidenceRefs, SAFE_REFERENCE) || !canonicalFactRefArray(output.factRefs) || !closedCodeArray(output.limitationCodes, LIMITATION_CODES) || !closedCodeArray(output.reasonCodes, WHOLE_STATEMENT_OUTPUT_REASON_CODES)) return false;
+  if (output.authoritative !== false || output.financialMutationAllowed !== false || output.providerDetailsStripped !== true || !enumValue(output.reviewStatus, ["completed", "partial"])) return false;
+  if (!safeRefArray(output.evidenceRefs, SAFE_REFERENCE) || !canonicalFactRefArray(output.factRefs) || !closedCodeArray(output.limitationCodes, LIMITATION_CODES) || !closedSetArray(output.reasonCodes, WHOLE_STATEMENT_OUTPUT_REASON_CODE_SET)) return false;
   if (!isRecord(output.coverageProof) || !hasExactKeys(output.coverageProof, ["policyVersion", "expectedFeeRowRefs", "reviewedFeeRowRefs", "missingFeeRowRefs", "duplicatedFeeRowRefs", "unknownFeeRowRefs", "malformedFeeRowRefs", "malformedFeeRowRefCount", "exactCoverage"])) return false;
   const coverage = output.coverageProof;
-  if (coverage.policyVersion !== "whole_statement_fee_intelligence_coverage_v1" || coverage.exactCoverage !== true || coverage.malformedFeeRowRefCount !== 0) return false;
+  if (coverage.policyVersion !== "whole_statement_fee_intelligence_coverage_v1" || coverage.malformedFeeRowRefCount !== 0) return false;
   for (const key of ["expectedFeeRowRefs", "reviewedFeeRowRefs", "missingFeeRowRefs", "duplicatedFeeRowRefs", "unknownFeeRowRefs", "malformedFeeRowRefs"] as const) {
     if (!safeRefArray(coverage[key], FEE_ROW_REF)) return false;
   }
-  if (JSON.stringify(coverage.expectedFeeRowRefs) !== JSON.stringify(coverage.reviewedFeeRowRefs)) return false;
-  if ((coverage.missingFeeRowRefs as unknown[]).length || (coverage.duplicatedFeeRowRefs as unknown[]).length || (coverage.unknownFeeRowRefs as unknown[]).length || (coverage.malformedFeeRowRefs as unknown[]).length) return false;
+  if (output.reviewStatus === "completed") {
+    if (coverage.exactCoverage !== true || JSON.stringify(coverage.expectedFeeRowRefs) !== JSON.stringify(coverage.reviewedFeeRowRefs)) return false;
+    if ((coverage.missingFeeRowRefs as unknown[]).length || (coverage.duplicatedFeeRowRefs as unknown[]).length || (coverage.unknownFeeRowRefs as unknown[]).length || (coverage.malformedFeeRowRefs as unknown[]).length) return false;
+  } else if (coverage.exactCoverage !== false
+    || (coverage.reviewedFeeRowRefs as unknown[]).length === 0
+    || (coverage.missingFeeRowRefs as unknown[]).length === 0
+    || (coverage.duplicatedFeeRowRefs as unknown[]).length
+    || (coverage.unknownFeeRowRefs as unknown[]).length
+    || (coverage.malformedFeeRowRefs as unknown[]).length) {
+    return false;
+  }
   if (!Array.isArray(output.rowInterpretations) || !Array.isArray(output.acceptanceRecords)) return false;
   if (!isSorted(output.rowInterpretations.map((row) => isRecord(row) ? stringValue(row.feeRowRef) : ""))) return false;
   if (!isSorted(output.acceptanceRecords.map((row) => isRecord(row) ? stringValue(row.feeRowRef) : ""))) return false;
   for (const row of output.rowInterpretations) if (!validateInterpretation(row)) return false;
   for (const row of output.acceptanceRecords) if (!validateAcceptance(row)) return false;
   return true;
+}
+
+function validatePackage5bWorkPlan(value: unknown, result: Record<string, unknown>): boolean {
+  if (value === null) return true;
+  if (!isRecord(value) || !hasExactKeys(value, PACKAGE_5B_WORK_PLAN_KEYS)) return debugReject("package5b_work_plan_shape");
+  if (value.type !== "evaluation_package_5b_work_plan_projection_v1" || value.policyVersion !== "whole_statement_fee_intelligence_work_plan_v1") return debugReject("package5b_work_plan_version");
+  if (!enumValue(value.mode, ["production_selective", "comprehensive"]) || !SHA256.test(`sha256:${stringValue(value.statementPacketContentHash)}`)) return debugReject("package5b_work_plan_identity");
+  if (value.rawPromptPersisted !== false || value.rawResponsePersisted !== false || value.providerDetailsPersisted !== false) return debugReject("package5b_work_plan_privacy");
+  for (const key of ["expectedFeeRowCount", "plannedFeeRowCount", "selectedFeeRowCount", "reviewedFeeRowCount", "missingFeeRowCount", "plannedWorkUnitCount", "selectedWorkUnitCount", "completedWorkUnitCount", "unavailableWorkUnitCount", "notSelectedWorkUnitCount"] as const) {
+    if (!nonnegativeInteger(value[key])) return debugReject(`package5b_work_plan_count_${key}`);
+  }
+  if (!Array.isArray(value.units) || value.units.length !== value.plannedWorkUnitCount) return debugReject("package5b_work_plan_unit_count");
+  if (!safeCodeArray(value.reasonCodes)) return debugReject("package5b_work_plan_reasons");
+  const packageF = isRecord(result.packageF) ? result.packageF : null;
+  const output = isRecord(packageF?.output) ? packageF.output : null;
+  if (output && isRecord(output.coverageProof)) {
+    if (value.reviewedFeeRowCount !== (output.coverageProof.reviewedFeeRowRefs as unknown[])?.length) return debugReject("package5b_work_plan_reviewed_count");
+    if (value.missingFeeRowCount !== (output.coverageProof.missingFeeRowRefs as unknown[])?.length) return debugReject("package5b_work_plan_missing_count");
+  }
+  let selected = 0;
+  let completed = 0;
+  let unavailable = 0;
+  let notSelected = 0;
+  const expectedRows = new Set<string>();
+  for (const [index, unit] of value.units.entries()) {
+    if (!validatePackage5bWorkUnit(unit)) return debugReject("package5b_work_plan_unit");
+    if ((unit as Record<string, unknown>).ordinal !== index + 1) return debugReject("package5b_work_plan_unit_order");
+    const status = stringValue((unit as Record<string, unknown>).status);
+    if (status === "completed") completed += 1;
+    if (status === "failed" || status === "timed_out" || status === "rejected" || status === "safety_blocked") unavailable += 1;
+    if (status === "not_selected_budget" || status === "not_selected_policy") notSelected += 1;
+    else selected += 1;
+    for (const rowRef of (unit as Record<string, unknown>).expectedFeeRowRefs as string[]) expectedRows.add(rowRef);
+  }
+  return value.expectedFeeRowCount === expectedRows.size
+    && value.selectedWorkUnitCount === selected
+    && value.completedWorkUnitCount === completed
+    && value.unavailableWorkUnitCount === unavailable
+    && value.notSelectedWorkUnitCount === notSelected;
+}
+
+function validatePackage5bWorkUnit(value: unknown): boolean {
+  if (!isRecord(value) || !hasExactKeys(value, PACKAGE_5B_WORK_UNIT_KEYS)) return false;
+  if (!/^whole_stmt_work_[a-f0-9]{32}$/.test(stringValue(value.workUnitRef))) return false;
+  if (!nonnegativeInteger(value.ordinal) || !enumValue(value.status, ["planned", "selected", "not_selected_policy", "not_selected_budget", "completed", "failed", "timed_out", "rejected", "safety_blocked"])) return false;
+  if (!enumValue(value.outcomeClass, ["not_attempted", "completed_exact_unit_coverage", "provider_transport_failed", "provider_refused", "provider_schema_failed", "output_length_exhausted", "incomplete_response", "timeout_watchdog", "budget_not_selected", "policy_not_selected", "validation_rejected", "safety_blocked"])) return false;
+  if (!safeRefArray(value.expectedFeeRowRefs, FEE_ROW_REF)) return false;
+  for (const key of ["expectedRowCount", "reviewedRowCount", "missingRowCount", "duplicatedRowCount", "unknownRowCount", "estimatedInputBytes", "estimatedOutputTokens"] as const) {
+    if (!nonnegativeInteger(value[key])) return false;
+  }
+  if (value.outputTokenCeiling !== null && !nonnegativeInteger(value.outputTokenCeiling)) return false;
+  for (const key of ["inputTokens", "cachedInputTokens", "outputTokens", "durationMs"] as const) {
+    if (value[key] !== null && !nonnegativeInteger(value[key])) return false;
+  }
+  if (value.requestId !== null && !/^[A-Za-z0-9_.:-]{1,160}$/.test(stringValue(value.requestId))) return false;
+  if (!enumValue(value.billingDisposition, ["observed", "provider_confirmed_zero", "unknown", "pending"])) return false;
+  return safeCodeArray(value.reasonCodes) && value.expectedRowCount === (value.expectedFeeRowRefs as unknown[]).length;
 }
 
 function validateInterpretation(value: unknown): boolean {
@@ -606,10 +703,14 @@ function validateProjectionLinkage(result: Record<string, any>): boolean {
   const output = result.packageF?.output as Record<string, any> | undefined;
   if (output) {
     const coverage = output.coverageProof as Record<string, string[]>;
-    if (!setEquals(new Set(coverage.expectedFeeRowRefs), canonicalFeeRows) || !setEquals(new Set(coverage.reviewedFeeRowRefs), canonicalFeeRows)) return false;
-    const interpretationByRow = uniqueMapByFeeRow(output.rowInterpretations, canonicalFeeRows);
-    const acceptanceByRow = uniqueMapByFeeRow(output.acceptanceRecords, canonicalFeeRows);
-    if (!interpretationByRow || !acceptanceByRow || interpretationByRow.size !== canonicalFeeRows.size || acceptanceByRow.size !== canonicalFeeRows.size) return false;
+    const reviewedFeeRows = new Set<string>(coverage.reviewedFeeRowRefs);
+    if (!setEquals(new Set(coverage.expectedFeeRowRefs), canonicalFeeRows)) return false;
+    if (![...reviewedFeeRows].every((ref) => canonicalFeeRows.has(ref))) return false;
+    if (output.reviewStatus === "completed" && !setEquals(reviewedFeeRows, canonicalFeeRows)) return false;
+    if (output.reviewStatus === "partial" && (reviewedFeeRows.size === 0 || reviewedFeeRows.size >= canonicalFeeRows.size)) return false;
+    const interpretationByRow = uniqueMapByFeeRow(output.rowInterpretations, reviewedFeeRows);
+    const acceptanceByRow = uniqueMapByFeeRow(output.acceptanceRecords, reviewedFeeRows);
+    if (!interpretationByRow || !acceptanceByRow || interpretationByRow.size !== reviewedFeeRows.size || acceptanceByRow.size !== reviewedFeeRows.size) return false;
     if (!(output.factRefs as string[]).every((ref) => approvedFacts.has(ref))) return false;
     const usedEvidence = new Set<string>();
     for (const row of output.rowInterpretations as Array<Record<string, any>>) {
@@ -942,7 +1043,8 @@ function validateResearchProof(
   if (retainedCandidateCount > expectedResearchQuestions.limits.maxRetrievalCandidates) return false;
   if (!setEquals(questions, new Set(expectedQuestions.keys()))) return false;
   for (const item of value.candidates) {
-    if (!isRecord(item) || !hasExactKeys(item, CANDIDATE_KEYS) || !CANDIDATE_REF.test(stringValue(item.candidateRef)) || !RESEARCH_ATTEMPT_REF.test(stringValue(item.researchAttemptRef)) || !QUESTION_REF.test(stringValue(item.questionRef)) || !FEE_ROW_REF.test(stringValue(item.feeRowRef)) || !enumValue(item.verificationStatus, CANDIDATE_STATUSES) || !enumValue(item.retrievalStatus, RETRIEVAL_STATUSES) || !enumValue(item.semanticVerificationStatus, SEMANTIC_STATUSES) || !safeRefArray(item.claimSupportRefs, CLAIM_SUPPORT_REF) || !closedSetArray(item.reasonCodes, CANDIDATE_REASON_CODES) || (item.reasonCodes as string[]).length === 0 || candidates.has(item.candidateRef as string)) return false;
+    const candidateKeysValid = isRecord(item) && (hasExactKeys(item, CANDIDATE_KEYS) || hasExactKeys(item, CANDIDATE_KEYS_WITH_SAFE_RETRIEVAL_DIAGNOSTICS));
+    if (!candidateKeysValid || !CANDIDATE_REF.test(stringValue(item.candidateRef)) || !RESEARCH_ATTEMPT_REF.test(stringValue(item.researchAttemptRef)) || !QUESTION_REF.test(stringValue(item.questionRef)) || !FEE_ROW_REF.test(stringValue(item.feeRowRef)) || !enumValue(item.verificationStatus, CANDIDATE_STATUSES) || !enumValue(item.retrievalStatus, RETRIEVAL_STATUSES) || !enumValue(item.semanticVerificationStatus, SEMANTIC_STATUSES) || !safeRefArray(item.claimSupportRefs, CLAIM_SUPPORT_REF) || !closedSetArray(item.reasonCodes, CANDIDATE_REASON_CODES) || (item.reasonCodes as string[]).length === 0 || !validateSafeRetrievalDiagnostics(item) || candidates.has(item.candidateRef as string)) return false;
     if (!validateCandidateState(item)) return false;
     const parent = attempts.get(item.researchAttemptRef as string);
     if (!parent || candidateParents.get(item.candidateRef as string) !== item.researchAttemptRef || parent.questionRef !== item.questionRef || parent.feeRowRef !== item.feeRowRef) return false;
@@ -1106,6 +1208,43 @@ export function calculateEvaluationClaimSupportDecisionRef(
     disposition: value.disposition,
   };
   return `claim_support_decision_${sha256Canonical(payload).slice("sha256:".length)}`;
+}
+
+function validateSafeRetrievalDiagnostics(candidate: Record<string, unknown>): boolean {
+  if (!Object.hasOwn(candidate, "safeRetrievalDiagnostics")) return true;
+  const value = candidate.safeRetrievalDiagnostics;
+  if (value === null) return true;
+  if (!isRecord(value) || !hasExactKeys(value, SAFE_RETRIEVAL_DIAGNOSTIC_KEYS)) return false;
+  if (value.policyVersion !== "fee_knowledge_retrieval_policy_v1") return false;
+  if (!enumValue(value.outcomeClass, SAFE_RETRIEVAL_OUTCOME_CLASSES)) return false;
+  if (!closedSetArray(value.reasonCodes, CANDIDATE_REASON_CODES) || (value.reasonCodes as string[]).length === 0) return false;
+  if (!(value.reasonCodes as string[]).every((reason) => (candidate.reasonCodes as string[]).includes(reason))) return false;
+  if (!nullableSafeDomain(value.sourceDomain) || !nullableSafeDomain(value.finalSourceDomain)) return false;
+  for (const key of ["sourceOriginHash", "finalSourceOriginHash", "sourceHostnameHash", "finalSourceHostnameHash", "documentFingerprint"] as const) {
+    if (value[key] !== null && !SHA256.test(stringValue(value[key]))) return false;
+  }
+  if (!nullableEnum(value.protocol, ["https"]) || !nullableEnum(value.finalProtocol, ["https"])) return false;
+  if (!safeNonNegativeInteger(value.redirectCount) || !safeNonNegativeInteger(value.byteLength)) return false;
+  if (typeof value.attemptedNetwork !== "boolean") return false;
+  if (value.resolvedAddressCount !== null && !safeNonNegativeInteger(value.resolvedAddressCount)) return false;
+  if (!Array.isArray(value.resolvedAddressFamilies)
+    || value.resolvedAddressFamilies.length > 2
+    || !closedCodeArray(value.resolvedAddressFamilies, ["ipv4", "ipv6"])) return false;
+  if (!nullableEnum(value.blockedAddressClass, ["private_or_reserved", "unsafe_host", "unsafe_port", "unsafe_scheme", "credentials", "missing_host", "invalid_url"])) return false;
+  if (value.httpStatus !== null && (!Number.isInteger(value.httpStatus) || (value.httpStatus as number) < 100 || (value.httpStatus as number) > 599)) return false;
+  if (value.contentType !== null && (typeof value.contentType !== "string" || !/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(value.contentType))) return false;
+
+  const retrieval = candidate.retrievalStatus as string;
+  const outcome = value.outcomeClass as string;
+  if (outcome === "successful_usable_retrieval" && retrieval !== "retrieved_text") return false;
+  if (outcome === "successful_retrieval_text_unavailable" && retrieval !== "retrieval_succeeded_text_unavailable") return false;
+  if (outcome === "watchdog_timeout" && retrieval !== "timed_out") return false;
+  if (outcome === "dns_resolution_failed" && retrieval !== "failed") return false;
+  if (outcome === "destination_policy_blocked" && retrieval !== "safety_blocked") return false;
+  if (["content_rejected"].includes(outcome) && retrieval !== "unsupported_content_type") return false;
+  if (["size_limit_exceeded"].includes(outcome) && retrieval !== "oversized") return false;
+  if (outcome === "extraction_failed" && !["malformed", "encrypted"].includes(retrieval)) return false;
+  return true;
 }
 
 function validateCandidateState(value: Record<string, unknown>): boolean {
@@ -1303,9 +1442,12 @@ function validateClosedTrustedV1(value: Record<string, any>): boolean {
   }
   const cost = value.costBudgetLedger;
   if (!hasExactKeys(cost, ["type", "currency", "fixedPointScale", "approvedBudgetUsd", "cumulativeReservedUsd", "cumulativeObservedUsd", "cumulativeBudgetCommittedUsd", "cumulativeReleasedUsd", "remainingBudgetUsd", "blocked", "entries"]) || !Array.isArray(cost.entries)) return false;
-  const costEntryKeys = ["callId", "attempt", "attemptKind", "retryOfCallId", "capability", "currency", "fixedPointScale", "pricingPolicyRef", "providerRoute", "provider", "model", "toolClass", "maximumInputTokens", "maximumOutputTokens", "maximumToolUses", "requestId", "startedAt", "endedAt", "durationMs", "status", "inputTokens", "cachedInputTokens", "outputTokens", "toolEvents", "estimatedMaximumCostUsd", "worstCaseReservedCostUsd", "observedOrEstimatedFinalCostUsd", "billingDisposition", "cumulativeReservedUsd", "cumulativeObservedUsd", "cumulativeBudgetCommittedUsd", "cumulativeReleasedUsd", "remainingBudgetUsd"] as const;
+  const legacyCostEntryKeys = ["callId", "attempt", "attemptKind", "retryOfCallId", "capability", "currency", "fixedPointScale", "pricingPolicyRef", "providerRoute", "provider", "model", "toolClass", "maximumInputTokens", "maximumOutputTokens", "maximumToolUses", "requestId", "startedAt", "endedAt", "durationMs", "status", "inputTokens", "cachedInputTokens", "outputTokens", "toolEvents", "estimatedMaximumCostUsd", "worstCaseReservedCostUsd", "observedOrEstimatedFinalCostUsd", "billingDisposition", "cumulativeReservedUsd", "cumulativeObservedUsd", "cumulativeBudgetCommittedUsd", "cumulativeReleasedUsd", "remainingBudgetUsd"] as const;
+  const costEntryKeys = ["callId", "parentCallId", "operationKind", "operationRef", "reservationScope", "attempt", "attemptKind", "retryOfCallId", "capability", "currency", "fixedPointScale", "pricingPolicyRef", "providerRoute", "provider", "model", "toolClass", "maximumInputTokens", "maximumOutputTokens", "maximumToolUses", "requestId", "startedAt", "endedAt", "durationMs", "status", "inputTokens", "cachedInputTokens", "outputTokens", "toolEvents", "estimatedMaximumCostUsd", "worstCaseReservedCostUsd", "observedOrEstimatedFinalCostUsd", "billingDisposition", "cumulativeReservedUsd", "cumulativeObservedUsd", "cumulativeBudgetCommittedUsd", "cumulativeReleasedUsd", "remainingBudgetUsd"] as const;
   for (const entry of cost.entries) {
-    if (!isRecord(entry) || !hasExactKeys(entry, costEntryKeys) || !Array.isArray(entry.toolEvents)) return false;
+    if (!isRecord(entry) || !(hasExactKeys(entry, costEntryKeys) || hasExactKeys(entry, legacyCostEntryKeys)) || !Array.isArray(entry.toolEvents)) return false;
+    if (Object.hasOwn(entry, "operationKind") && !enumValue(entry.operationKind, ["manifest_call", "package_5b_budget_envelope", "package_5b_work_unit"])) return false;
+    if (Object.hasOwn(entry, "reservationScope") && !enumValue(entry.reservationScope, ["provider_send", "budget_envelope"])) return false;
     if (!enumValue(entry.attemptKind, ["initial", "retry"]) || !enumValue(entry.capability, ["direct_responses", "ai_sdk", "web_search", "retrieval", "semantic_verification"]) || entry.currency !== "USD") return false;
     if (!enumValue(entry.status, ["reserved", "success", "failure", "timeout", "cancelled_before_send"]) || !enumValue(entry.billingDisposition, ["pending", "observed", "provider_confirmed_zero", "unknown"])) return false;
     if (entry.toolEvents.some((item: unknown) => !isRecord(item) || !hasExactKeys(item, ["type", "count"]))) return false;
@@ -1314,7 +1456,10 @@ function validateClosedTrustedV1(value: Record<string, any>): boolean {
   if (!hasExactKeys(permit, ["type", "manifestPath", "approvedManifestHash", "recalculatedManifestHash", "selectedCount", "documents", "diagnostics"]) || !Array.isArray(permit.documents) || !Array.isArray(permit.diagnostics)) return false;
   for (const document of permit.documents) if (!isRecord(document) || !hasExactKeys(document, ["sourceDocumentId", "internalSourceRef", "sha256", "byteCount", "selectedDriver", "processorLayoutFamily", "productScopeEligibility", "paidStageEligibility", "stages"]) || !enumValue(document.processorLayoutFamily, ["fiserv_family", "nxgen_vortax", "unknown"]) || !enumValue(document.productScopeEligibility, ["eligible", "ineligible"]) || !enumValue(document.paidStageEligibility, ["eligible", "ineligible"]) || !Array.isArray(document.stages) || document.stages.some((stage: unknown) => !enumValue(stage, EXECUTION_STAGES))) return false;
   for (const diagnostic of permit.diagnostics) if (!isRecord(diagnostic) || !hasExactKeys(diagnostic, ["code", "sourceDocumentId", "detail"])) return false;
-  for (const outcome of value.providerCallOutcomes) if (!isRecord(outcome) || !hasExactKeys(outcome, ["callId", "sourceDocumentId", "stage", "status", "requestId", "reasonCodes"]) || !enumValue(outcome.stage, EXECUTION_STAGES) || !enumValue(outcome.status, ["success", "failure", "timeout", "cancelled_before_send"]) || !safeCodeArray(outcome.reasonCodes)) return false;
+  for (const outcome of value.providerCallOutcomes) {
+    if (!isRecord(outcome) || !(hasExactKeys(outcome, ["callId", "parentCallId", "operationKind", "operationRef", "sourceDocumentId", "stage", "status", "requestId", "reasonCodes"]) || hasExactKeys(outcome, ["callId", "sourceDocumentId", "stage", "status", "requestId", "reasonCodes"])) || !enumValue(outcome.stage, EXECUTION_STAGES) || !enumValue(outcome.status, ["success", "failure", "timeout", "cancelled_before_send"]) || !safeCodeArray(outcome.reasonCodes)) return false;
+    if (Object.hasOwn(outcome, "operationKind") && !enumValue(outcome.operationKind, ["manifest_call", "package_5b_budget_envelope", "package_5b_work_unit"])) return false;
+  }
   return true;
 }
 
@@ -1355,6 +1500,10 @@ function safeReferenceValue(value: unknown): value is string {
 
 function safeCodeArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string" && SAFE_CODE.test(item)) && isSortedUnique(value);
+}
+
+function nonnegativeInteger(value: unknown): value is number {
+  return Number.isInteger(value) && Number(value) >= 0;
 }
 
 function closedCodeArray<T extends string>(value: unknown, allowed: readonly T[]): value is T[] {
@@ -1405,6 +1554,18 @@ function enumValue<T extends string>(value: unknown, allowed: readonly T[]): val
 
 function nullableEnum<T extends string>(value: unknown, allowed: readonly T[]): value is T | null {
   return value === null || enumValue(value, allowed);
+}
+
+function nullableSafeDomain(value: unknown): value is string | null {
+  return value === null
+    || (typeof value === "string"
+      && /^[a-z0-9.-]{3,253}$/.test(value)
+      && !value.includes("..")
+      && !SENSITIVE_VALUE.test(value));
+}
+
+function safeNonNegativeInteger(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 0;
 }
 
 function nullableBoolean(value: unknown): value is boolean | null {
