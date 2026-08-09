@@ -873,6 +873,7 @@ export type CanonicalAiCapabilityOutputBase = {
 
 export type CanonicalWholeStatementFeeIntelligenceStatus =
   | "completed"
+  | "partial"
   | "disabled"
   | "failed"
   | "timed_out"

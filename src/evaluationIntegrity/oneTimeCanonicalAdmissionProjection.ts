@@ -22,6 +22,7 @@ import {
   EVALUATION_RESEARCH_EVIDENCE_PROOF_VERSION,
   type EvaluationCanonicalAdmissionResultInput,
   type EvaluationPackage5AAdmissionProjection,
+  type EvaluationPackage5BWorkPlanProjection,
   type EvaluationResearchClaimSupportProof,
 } from "./types.js";
 
@@ -88,6 +89,7 @@ export function projectOneTimeCanonicalAdmissionResult(input: {
     semanticVerificationStatus: candidate.semanticVerificationStatus,
     claimSupportRefs: [...(supportsByCandidate.get(candidate.candidateId) ?? [])].sort(),
     reasonCodes: [...candidate.reasonCodes].sort(),
+    safeRetrievalDiagnostics: candidate.safeRetrievalDiagnostics ? structuredClone(candidate.safeRetrievalDiagnostics) : null,
   })).sort((left, right) => left.candidateRef.localeCompare(right.candidateRef));
 
   const analysis = canonical.analysis;
@@ -181,6 +183,9 @@ export function projectOneTimeCanonicalAdmissionResult(input: {
       financialMutationAllowed: false,
     } : null,
     package5a: projectPackage5a(diagnostic, disposition, output !== null && usesExternalEvidence(output), resultReason),
+    package5bWorkPlan: input.finalized.wholeStatementWorkPlan
+      ? projectPackage5bWorkPlan(input.finalized.wholeStatementWorkPlan)
+      : null,
     researchEvidence: {
       type: EVALUATION_RESEARCH_EVIDENCE_PROOF_VERSION,
       attempts,
@@ -194,6 +199,64 @@ export function projectOneTimeCanonicalAdmissionResult(input: {
     authoritative: false,
     financialMutationAllowed: false,
     customerPublished: false,
+  };
+}
+
+function projectPackage5bWorkPlan(
+  merged: NonNullable<FinalizedOneTimeStatementEvaluation["wholeStatementWorkPlan"]>,
+): EvaluationPackage5BWorkPlanProjection {
+  const resultByUnit = new Map(merged.workUnitResults.map((result) => [result.workUnitRef, result]));
+  const selectedFeeRowRefs = new Set<string>();
+  for (const unit of merged.plan.units) {
+    const status = resultByUnit.get(unit.workUnitRef)?.status ?? unit.status;
+    if (status === "not_selected_budget" || status === "not_selected_policy") continue;
+    for (const rowRef of unit.expectedFeeRowRefs) selectedFeeRowRefs.add(rowRef);
+  }
+  return {
+    type: "evaluation_package_5b_work_plan_projection_v1",
+    policyVersion: merged.plan.policyVersion,
+    mode: merged.plan.mode,
+    statementPacketContentHash: merged.plan.statementPacketContentHash,
+    expectedFeeRowCount: merged.plan.expectedFeeRowRefs.length,
+    plannedFeeRowCount: merged.plan.plannedFeeRowRefs.length,
+    selectedFeeRowCount: selectedFeeRowRefs.size,
+    reviewedFeeRowCount: merged.output.coverageProof.reviewedFeeRowRefs.length,
+    missingFeeRowCount: merged.output.coverageProof.missingFeeRowRefs.length,
+    plannedWorkUnitCount: merged.plan.units.length,
+    selectedWorkUnitCount: merged.selectedWorkUnitCount,
+    completedWorkUnitCount: merged.completedWorkUnitCount,
+    unavailableWorkUnitCount: merged.unavailableWorkUnitCount,
+    notSelectedWorkUnitCount: merged.notSelectedWorkUnitCount,
+    units: merged.plan.units.map((unit) => {
+      const result = resultByUnit.get(unit.workUnitRef);
+      const coverage = result?.validation?.output.coverageProof;
+      return {
+        workUnitRef: unit.workUnitRef,
+        ordinal: unit.ordinal,
+        status: result?.status ?? unit.status,
+        outcomeClass: result?.outcomeClass ?? "not_attempted",
+        expectedFeeRowRefs: unit.expectedFeeRowRefs.slice().sort(),
+        expectedRowCount: unit.expectedFeeRowRefs.length,
+        reviewedRowCount: coverage?.reviewedFeeRowRefs.length ?? 0,
+        missingRowCount: coverage?.missingFeeRowRefs.length ?? unit.expectedFeeRowRefs.length,
+        duplicatedRowCount: coverage?.duplicatedFeeRowRefs.length ?? 0,
+        unknownRowCount: coverage?.unknownFeeRowRefs.length ?? 0,
+        estimatedInputBytes: unit.estimatedInputBytes,
+        estimatedOutputTokens: unit.estimatedOutputTokens,
+        outputTokenCeiling: unit.outputTokenCeiling,
+        requestId: result?.requestId ?? null,
+        inputTokens: result?.inputTokens ?? null,
+        cachedInputTokens: result?.cachedInputTokens ?? null,
+        outputTokens: result?.outputTokens ?? null,
+        durationMs: result?.durationMs ?? null,
+        billingDisposition: result?.billingDisposition ?? "unknown",
+        reasonCodes: [...new Set(result?.reasonCodes ?? unit.selectionReasonCodes)].sort(),
+      };
+    }).sort((left, right) => left.ordinal - right.ordinal),
+    rawPromptPersisted: false,
+    rawResponsePersisted: false,
+    providerDetailsPersisted: false,
+    reasonCodes: merged.reasonCodes,
   };
 }
 

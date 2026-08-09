@@ -2695,6 +2695,7 @@ function admissionResult(): EvaluationCanonicalAdmissionResultInput {
       rawStatementTextPersisted: false,
       providerDetailsPersisted: false,
     },
+    package5bWorkPlan: null,
     researchEvidence: {
       type: "evaluation_research_evidence_proof_v1",
       attempts: [{

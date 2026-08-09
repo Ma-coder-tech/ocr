@@ -63,6 +63,44 @@ export type FeeKnowledgeRetrievalStatus =
   | "malformed"
   | "encrypted";
 
+export type FeeKnowledgeRetrievalOutcomeClass =
+  | "successful_usable_retrieval"
+  | "successful_retrieval_text_unavailable"
+  | "dns_resolution_failed"
+  | "destination_policy_blocked"
+  | "connection_failed"
+  | "tls_failed"
+  | "http_response_failed"
+  | "redirect_rejected"
+  | "content_rejected"
+  | "size_limit_exceeded"
+  | "extraction_failed"
+  | "watchdog_timeout"
+  | "unknown_transport_failure";
+
+export type FeeKnowledgeRetrievalSafeDiagnostics = {
+  policyVersion: typeof FEE_KNOWLEDGE_RETRIEVAL_POLICY_VERSION;
+  outcomeClass: FeeKnowledgeRetrievalOutcomeClass;
+  reasonCodes: string[];
+  sourceDomain: string | null;
+  finalSourceDomain: string | null;
+  sourceOriginHash: string | null;
+  finalSourceOriginHash: string | null;
+  sourceHostnameHash: string | null;
+  finalSourceHostnameHash: string | null;
+  protocol: "https" | null;
+  finalProtocol: "https" | null;
+  redirectCount: number;
+  attemptedNetwork: boolean;
+  resolvedAddressCount: number | null;
+  resolvedAddressFamilies: Array<"ipv4" | "ipv6">;
+  blockedAddressClass: "private_or_reserved" | "unsafe_host" | "unsafe_port" | "unsafe_scheme" | "credentials" | "missing_host" | "invalid_url" | null;
+  httpStatus: number | null;
+  contentType: string | null;
+  byteLength: number;
+  documentFingerprint: string | null;
+};
+
 export type FeeKnowledgePeriod = {
   from: string | null;
   through: string | null;
@@ -212,6 +250,7 @@ export type FeeKnowledgeResearchCandidateRecord = {
     contextApplicable: boolean | null;
   };
   sourceFingerprint: string | null;
+  safeRetrievalDiagnostics?: FeeKnowledgeRetrievalSafeDiagnostics | null;
   locatorHash: string | null;
   claimSupportDecisionRef: string | null;
   displayPermission: FeeKnowledgeDisplayPermission;

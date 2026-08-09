@@ -615,6 +615,7 @@ export async function verifyCandidate(input: {
     sourceFingerprint: input.retrieved.documentFingerprint,
     retrievalStatus: input.retrieved.status,
     semanticVerificationStatus,
+    safeRetrievalDiagnostics: input.retrieved.safeDiagnostics,
     locatorHash: citation.locator.textHash,
     claimSupportDecisionRef: null,
   });
@@ -669,6 +670,7 @@ function candidateRecord(
     sourceFingerprint: string | null;
     retrievalStatus: FeeKnowledgeResearchCandidateRecord["retrievalStatus"];
     semanticVerificationStatus: FeeKnowledgeResearchCandidateRecord["semanticVerificationStatus"];
+    safeRetrievalDiagnostics?: FeeKnowledgeResearchCandidateRecord["safeRetrievalDiagnostics"];
     locatorHash: string | null;
     claimSupportDecisionRef: string | null;
   },
@@ -689,6 +691,7 @@ function candidateRecord(
     reasonCodes: [...new Set(values.reasonCodes)].sort(),
     safeApplicability: values.safeApplicability,
     sourceFingerprint: values.sourceFingerprint,
+    safeRetrievalDiagnostics: values.safeRetrievalDiagnostics ?? null,
     locatorHash: values.locatorHash,
     claimSupportDecisionRef: values.claimSupportDecisionRef,
     displayPermission: "internal_only",

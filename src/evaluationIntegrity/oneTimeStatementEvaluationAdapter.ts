@@ -33,9 +33,19 @@ import { buildCanonicalRuntimeAnalysis } from "../canonical/runtimeAdapter.js";
 import {
   buildWholeStatementFeeIntelligencePacket,
   validateWholeStatementFeeIntelligenceReview,
+  validateWholeStatementFeeIntelligenceReviewForPacket,
   type CanonicalWholeStatementFeeIntelligencePacket,
   type CanonicalWholeStatementFeeIntelligenceValidationResult,
 } from "../canonical/wholeStatementFeeIntelligenceReview.js";
+import {
+  buildWholeStatementFeeIntelligenceWorkPlan,
+  classifyWholeStatementFeeIntelligenceWorkUnitFailure,
+  mergeWholeStatementFeeIntelligenceWorkUnitResults,
+  notSelectedWholeStatementFeeIntelligenceWorkUnitResult,
+  wholeStatementFeeIntelligenceWorkUnitResultFromValidation,
+  type WholeStatementFeeIntelligenceMergedWorkPlan,
+  type WholeStatementFeeIntelligenceWorkUnit,
+} from "../canonical/wholeStatementFeeIntelligenceWorkPlan.js";
 import {
   admitWholeStatementFeeIntelligence,
   type CanonicalWholeStatementAdmissionResult,
@@ -54,7 +64,6 @@ import type { RepositoryProviderTransportInput, RepositoryProviderTransportResul
 import { safeProviderReasonCode, safeProviderReasonCodes } from "../canonical/providerFailureDiagnostics.js";
 import type { EvaluationManifestDocument } from "./types.js";
 import {
-  LIVE_EVALUATION_TIMEOUT_POLICY,
   liveEvaluationEffectiveTimeoutMs,
   liveEvaluationTimeoutError,
   runWithLiveEvaluationTimeout,
@@ -63,8 +72,10 @@ import {
 import {
   accountingFromProviderUsage,
   assertApprovedLiveCallMetadata,
+  calculateWorstCaseCostUsd,
   type SafeProviderUsage,
 } from "./providerAccounting.js";
+import { EvaluationIntegrityError } from "./errors.js";
 
 export const ONE_TIME_STATEMENT_EVALUATION_PACKET_VERSION = "one_time_statement_evaluation_packet_v1" as const;
 export const ONE_TIME_EXTERNAL_REQUEST_RESULT_VERSION = "one_time_external_request_result_v1" as const;
@@ -105,6 +116,7 @@ export type PreparedOneTimeStatementEvaluation = {
 export type FinalizedOneTimeStatementEvaluation = {
   preparedPacket: OneTimeStatementEvaluationPacket;
   wholeStatementPacketSent: CanonicalWholeStatementFeeIntelligencePacket | null;
+  wholeStatementWorkPlan: WholeStatementFeeIntelligenceMergedWorkPlan | null;
   sourcePacket: FeeKnowledgeSourcePacket;
   registry: ApprovedFeeKnowledgeSourceRegistry | null;
   admission: CanonicalWholeStatementAdmissionResult;
@@ -126,6 +138,7 @@ type OneTimePrivateContext = {
   packet: OneTimeStatementEvaluationPacket;
   initialPacketHash: string;
   sentWholeStatementPacket: CanonicalWholeStatementFeeIntelligencePacket | null;
+  wholeStatementWorkPlan: WholeStatementFeeIntelligenceMergedWorkPlan | null;
   sentSourcePacket: FeeKnowledgeSourcePacket | null;
   registry: ApprovedFeeKnowledgeSourceRegistry | null;
   discovered: CandidateContext[];
@@ -206,6 +219,7 @@ export async function prepareOneTimeStatementEvaluationSource(input: {
       packet,
       initialPacketHash: canonicalHash(packet),
       sentWholeStatementPacket: null,
+      wholeStatementWorkPlan: null,
       sentSourcePacket: null,
       registry,
       discovered: [],
@@ -292,6 +306,7 @@ export function finalizeOneTimeStatementEvaluation(
   return {
     preparedPacket: structuredClone(context.packet),
     wholeStatementPacketSent: structuredClone(context.sentWholeStatementPacket),
+    wholeStatementWorkPlan: structuredClone(context.wholeStatementWorkPlan),
     sourcePacket: structuredClone(sourcePacket),
     registry: structuredClone(context.registry),
     admission: structuredClone(admission),
@@ -314,39 +329,161 @@ export function createOneTimeStatementEvaluationTransport(input: {
     if (request.stage === "whole_statement_ai_review") {
       const sourcePacket = currentSourcePacket(context);
       const reviewPacket = buildWholeStatementFeeIntelligencePacket(context.analysis, context.registry ?? { approvedExternalSourceRefs: [] }, sourcePacket);
+      const workPlan = buildWholeStatementFeeIntelligenceWorkPlan({
+        packet: reviewPacket,
+        mode: "comprehensive",
+        limits: {
+          maxAggregateInputBytes: null,
+          maxAggregateOutputTokens: null,
+        },
+      });
       context.sentSourcePacket = structuredClone(sourcePacket);
       context.sentWholeStatementPacket = structuredClone(reviewPacket);
       context.packet = {
         ...context.packet,
         wholeStatementReview: structuredClone(context.sentWholeStatementPacket),
       };
-      const response = await runWithinStandaloneStageTimeout(
-        "whole_statement_ai_review",
-        async (abortSignal) => unwrapExternalRequestResult(
-          await services.wholeStatementReview(structuredClone(reviewPacket), {
-            abortSignal,
-            approvedCallMetadata: structuredClone(request.approvedCallMetadata),
-          }),
-          started,
-          "whole_statement_ai_review",
-        ),
-      );
-      const validation = validateWholeStatementFeeIntelligenceReview(
-        response.value,
-        context.analysis,
-        context.registry ?? { approvedExternalSourceRefs: [] },
+      const selectedUnits = workPlan.units.filter((unit) => unit.status === "selected");
+      const workUnitResults = workPlan.units
+        .filter((unit) => unit.status !== "selected")
+        .map(notSelectedWholeStatementFeeIntelligenceWorkUnitResult);
+      const childProviderCallOutcomes: NonNullable<RepositoryProviderTransportResult["childProviderCallOutcomes"]> = [];
+      if (selectedUnits.length > 0 && !request.childBudgetController) throw new Error("package_5b_child_budget_controller_missing");
+      for (const unit of selectedUnits) {
+        const unitReservation = package5BWorkUnitReservation(request.approvedCallMetadata, unit);
+        try {
+          request.childBudgetController!.reserve(unitReservation);
+        } catch (error) {
+          if (!isInsufficientBudgetReservation(error)) throw error;
+          workUnitResults.push(package5BWorkUnitNotSelectedByResourceBudget(unit.workUnitRef));
+          childProviderCallOutcomes.push(package5BWorkUnitOutcome({
+            reservation: unitReservation,
+            sourceDocumentId: request.sourceDocumentId,
+            status: "cancelled_before_send",
+            requestId: null,
+            reasonCodes: ["whole_statement_fee_intelligence_work_unit_not_selected_budget"],
+          }));
+          continue;
+        }
+        const unitStarted = Date.now();
+        try {
+          request.childBudgetController!.assertReadyToSend(unitReservation.callId);
+          const response = await runWithinStandaloneStageTimeout(
+            "whole_statement_ai_review",
+            async (abortSignal) => unwrapExternalRequestResult(
+              await services.wholeStatementReview(structuredClone(unit.packet), {
+                abortSignal,
+                approvedCallMetadata: structuredClone(unitReservation),
+              }),
+              unitStarted,
+              "whole_statement_ai_review",
+            ),
+          );
+          const costExceeded = request.childBudgetController!.finalize(unitReservation.callId, {
+            ...response.accounting,
+            status: "success",
+            billingDisposition: response.accounting.billingDisposition ?? "unknown",
+          });
+          childProviderCallOutcomes.push(package5BWorkUnitOutcome({
+            reservation: unitReservation,
+            sourceDocumentId: request.sourceDocumentId,
+            status: costExceeded ? "failure" : "success",
+            requestId: response.accounting.requestId ?? null,
+            reasonCodes: costExceeded ? ["cost_exceeded_reservation"] : ["whole_statement_fee_intelligence_work_unit_provider_call_completed"],
+          }));
+          if (costExceeded) {
+            workUnitResults.push({
+              workUnitRef: unit.workUnitRef,
+              status: "failed",
+              outcomeClass: "provider_transport_failed",
+              validation: null,
+              requestId: response.accounting.requestId ?? null,
+              inputTokens: response.accounting.inputTokens ?? null,
+              cachedInputTokens: response.accounting.cachedInputTokens ?? null,
+              outputTokens: response.accounting.outputTokens ?? null,
+              durationMs: response.accounting.durationMs,
+              billingDisposition: "unknown",
+              reasonCodes: ["cost_exceeded_reservation"],
+            });
+            continue;
+          }
+          const validation = validateWholeStatementFeeIntelligenceReviewForPacket(
+            response.value,
+            unit.packet,
+            context.analysis,
+            context.registry ?? { approvedExternalSourceRefs: [] },
+            unit.packet.sourceProvenancePacket,
+          );
+          workUnitResults.push(wholeStatementFeeIntelligenceWorkUnitResultFromValidation({
+            unit,
+            validation,
+            requestId: response.accounting.requestId ?? null,
+            inputTokens: response.accounting.inputTokens ?? null,
+            cachedInputTokens: response.accounting.cachedInputTokens ?? null,
+            outputTokens: response.accounting.outputTokens ?? null,
+            durationMs: response.accounting.durationMs,
+            billingDisposition: response.accounting.billingDisposition ?? "unknown",
+          }));
+        } catch (error) {
+          const classified = classifyWholeStatementFeeIntelligenceWorkUnitFailure(error);
+          const costExceeded = request.childBudgetController!.finalize(unitReservation.callId, {
+            requestId: classified.requestId,
+            durationMs: classified.durationMs ?? Math.max(0, Date.now() - unitStarted),
+            inputTokens: classified.inputTokens,
+            cachedInputTokens: classified.cachedInputTokens,
+            outputTokens: classified.outputTokens,
+            toolEvents: [],
+            observedOrEstimatedFinalCostUsd: null,
+            status: classified.status === "timed_out" ? "timeout" : "failure",
+            billingDisposition: "unknown",
+          });
+          childProviderCallOutcomes.push(package5BWorkUnitOutcome({
+            reservation: unitReservation,
+            sourceDocumentId: request.sourceDocumentId,
+            status: costExceeded ? "failure" : classified.status === "timed_out" ? "timeout" : "failure",
+            requestId: classified.requestId,
+            reasonCodes: costExceeded ? ["cost_exceeded_reservation"] : classified.reasonCodes,
+          }));
+          workUnitResults.push({
+            workUnitRef: unit.workUnitRef,
+            status: classified.status,
+            outcomeClass: classified.outcomeClass,
+            validation: null,
+            requestId: classified.requestId,
+            inputTokens: classified.inputTokens,
+            cachedInputTokens: classified.cachedInputTokens,
+            outputTokens: classified.outputTokens,
+            durationMs: classified.durationMs ?? Math.max(0, Date.now() - unitStarted),
+            billingDisposition: "unknown",
+            reasonCodes: classified.reasonCodes,
+          });
+        }
+      }
+      const merged = mergeWholeStatementFeeIntelligenceWorkUnitResults({
+        analysis: context.analysis,
+        registry: context.registry ?? { approvedExternalSourceRefs: [] },
         sourcePacket,
-      );
+        fullPacket: reviewPacket,
+        plan: workPlan,
+        results: workUnitResults,
+      });
+      const validation = merged.validation;
+      context.wholeStatementWorkPlan = structuredClone(merged);
       context.validation = validation;
-      const accepted = validation.ok && validation.output.reviewStatus === "completed";
+      const accepted = validation.ok && (validation.output.reviewStatus === "completed" || validation.output.reviewStatus === "partial");
       return result({
-        value: { reviewStatus: validation.output.reviewStatus, validationAccepted: validation.ok },
+        value: {
+          reviewStatus: validation.output.reviewStatus,
+          validationAccepted: validation.ok,
+          workPlan: summarizeWholeStatementWorkPlan(merged),
+        },
         generated: true,
         schemaValid: validation.ok,
         evidenceValidated: accepted,
         policyAccepted: accepted,
-        reasonCodes: validation.output.reasonCodes,
-        accounting: response.accounting,
+        reasonCodes: merged.reasonCodes,
+        accounting: noRequestAccounting(started),
+        childProviderCallOutcomes,
       });
     }
 
@@ -378,14 +515,17 @@ export function createOneTimeStatementEvaluationTransport(input: {
         const reasonCode = timeoutReasonCode(error) ?? researchProviderFailureReason(status);
         const terminalStatus = status === "safety_blocked" ? "safety_blocked" : status === "timed_out" ? "timed_out" : "failed";
         upsertContextAttempt(context, attemptRecord(question, questionOrdinal, status, [], [researchProviderFailureReason(status)]));
-        markResearchTerminal(context, terminalStatus);
-        return providerFailureResult({
-          started,
-          error,
-          reasonCode,
-          scope: "research_graph",
-          researchTerminal: { status: terminalStatus, reasonCode },
-        });
+        if (terminalStatus === "safety_blocked") {
+          markResearchTerminal(context, terminalStatus);
+          return providerFailureResult({
+            started,
+            error,
+            reasonCode,
+            scope: "research_graph",
+            researchTerminal: { status: terminalStatus, reasonCode },
+          });
+        }
+        return providerFailureResult({ started, error, reasonCode, scope: "candidate_local" });
       }
       const remaining = context.packet.research.limits.maxRetrievalCandidates - context.discovered.length;
       const discovered = dedupeCandidates(response.value
@@ -700,6 +840,119 @@ function noRequestAccounting(started: number): RepositoryProviderTransportResult
   };
 }
 
+function combineWholeStatementAccounting(
+  parts: readonly RepositoryProviderTransportResult["accounting"][],
+): RepositoryProviderTransportResult["accounting"] {
+  const sum = (selector: (item: RepositoryProviderTransportResult["accounting"]) => number | null): number | null => {
+    const values = parts.map(selector);
+    return values.every((value): value is number => typeof value === "number") ? values.reduce((total, value) => total + value, 0) : null;
+  };
+  const observedCosts = parts.map((part) => part.observedOrEstimatedFinalCostUsd);
+  const requestIds = parts.map((part) => part.requestId).filter((id): id is string => Boolean(id));
+  return {
+    requestId: requestIds.length === 1 ? requestIds[0]! : null,
+    durationMs: parts.reduce((total, part) => total + (part.durationMs ?? 0), 0),
+    inputTokens: sum((part) => part.inputTokens ?? null),
+    cachedInputTokens: sum((part) => part.cachedInputTokens ?? null),
+    outputTokens: sum((part) => part.outputTokens ?? null),
+    toolEvents: parts.flatMap((part) => part.toolEvents ?? []),
+    observedOrEstimatedFinalCostUsd: observedCosts.every((value): value is number => typeof value === "number")
+      ? observedCosts.reduce((total, value) => total + value, 0)
+      : null,
+    billingDisposition: parts.every((part) => part.billingDisposition === "observed") ? "observed"
+      : parts.every((part) => part.billingDisposition === "provider_confirmed_zero") ? "provider_confirmed_zero" : "unknown",
+  };
+}
+
+function summarizeWholeStatementWorkPlan(merged: WholeStatementFeeIntelligenceMergedWorkPlan) {
+  return {
+    policyVersion: merged.plan.policyVersion,
+    mode: merged.plan.mode,
+    plannedWorkUnitCount: merged.plan.units.length,
+    selectedWorkUnitCount: merged.selectedWorkUnitCount,
+    completedWorkUnitCount: merged.completedWorkUnitCount,
+    unavailableWorkUnitCount: merged.unavailableWorkUnitCount,
+    notSelectedWorkUnitCount: merged.notSelectedWorkUnitCount,
+    plannedRowCount: merged.plan.plannedFeeRowRefs.length,
+    selectedRowCount: merged.plan.selectedFeeRowRefs.length,
+    reviewedRowCount: merged.output.coverageProof.reviewedFeeRowRefs.length,
+    missingRowCount: merged.output.coverageProof.missingFeeRowRefs.length,
+    reasonCodes: merged.reasonCodes,
+  };
+}
+
+function package5BWorkUnitReservation(
+  parent: CostReservationInput,
+  unit: WholeStatementFeeIntelligenceWorkUnit,
+): CostReservationInput {
+  if (!parent.pricing) throw new Error("package_5b_pricing_policy_required_for_work_unit_reservations");
+  const maximumInputTokens = Math.min(parent.maximumInputTokens ?? unit.estimatedInputBytes, unit.estimatedInputBytes);
+  const maximumOutputTokens = parent.maximumOutputTokens ?? unit.estimatedOutputTokens;
+  const maximumToolUses = parent.maximumToolUses ?? 0;
+  const reservation: CostReservationInput = {
+    ...structuredClone(parent),
+    callId: `${parent.callId}__${unit.workUnitRef}`,
+    parentCallId: parent.callId,
+    operationKind: "package_5b_work_unit",
+    operationRef: unit.workUnitRef,
+    reservationScope: "provider_send",
+    attempt: 1,
+    retryOfCallId: null,
+    maximumInputTokens,
+    maximumOutputTokens,
+    maximumToolUses,
+    estimatedMaximumCostUsd: calculateWorstCaseCostUsd({
+      maximumInputTokens,
+      maximumOutputTokens,
+      maximumToolUses,
+      pricing: parent.pricing,
+    }),
+  };
+  return reservation;
+}
+
+function package5BWorkUnitOutcome(input: {
+  reservation: CostReservationInput;
+  sourceDocumentId: string;
+  status: "success" | "failure" | "timeout" | "cancelled_before_send";
+  requestId: string | null;
+  reasonCodes: string[];
+}): NonNullable<RepositoryProviderTransportResult["childProviderCallOutcomes"]>[number] {
+  return {
+    callId: input.reservation.callId,
+    parentCallId: input.reservation.parentCallId ?? null,
+    operationKind: input.reservation.operationKind ?? "manifest_call",
+    operationRef: input.reservation.operationRef ?? null,
+    sourceDocumentId: input.sourceDocumentId,
+    stage: "whole_statement_ai_review",
+    status: input.status,
+    requestId: input.requestId,
+    reasonCodes: [...new Set(input.reasonCodes)].sort(),
+  };
+}
+
+function package5BWorkUnitNotSelectedByResourceBudget(
+  workUnitRef: string,
+): ReturnType<typeof notSelectedWholeStatementFeeIntelligenceWorkUnitResult> {
+  return {
+    workUnitRef,
+    status: "not_selected_budget",
+    outcomeClass: "budget_not_selected",
+    validation: null,
+    requestId: null,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    durationMs: 0,
+    billingDisposition: "provider_confirmed_zero",
+    reasonCodes: ["whole_statement_fee_intelligence_work_unit_not_selected_budget"],
+  };
+}
+
+function isInsufficientBudgetReservation(error: unknown): boolean {
+  return error instanceof EvaluationIntegrityError && error.code === "insufficient_budget_reservation";
+}
+
 function externalResult<T>(
   value: T,
   accounting: RepositoryProviderTransportResult["accounting"],
@@ -743,6 +996,7 @@ function result(input: {
   researchTerminal?: RepositoryProviderTransportResult["researchTerminal"];
   providerFailure?: RepositoryProviderTransportResult["providerFailure"];
   researchStageStatus?: RepositoryProviderTransportResult["researchStageStatus"];
+  childProviderCallOutcomes?: RepositoryProviderTransportResult["childProviderCallOutcomes"];
 }): RepositoryProviderTransportResult {
   return {
     value: input.value,
@@ -761,6 +1015,7 @@ function result(input: {
     researchTerminal: input.researchTerminal,
     providerFailure: input.providerFailure,
     researchStageStatus: input.researchStageStatus,
+    childProviderCallOutcomes: input.childProviderCallOutcomes,
   };
 }
 
@@ -876,6 +1131,7 @@ function discoveredCandidateRecord(item: CandidateContext): FeeKnowledgeResearch
       contextApplicable: null,
     },
     sourceFingerprint: null,
+    safeRetrievalDiagnostics: null,
     locatorHash: null,
     claimSupportDecisionRef: null,
     displayPermission: "internal_only",
@@ -895,6 +1151,7 @@ function updateRetrievedCandidate(context: OneTimePrivateContext, item: Candidat
         : retrieved.status === "retrieval_succeeded_text_unavailable" ? "source_unavailable" : "rejected",
     reasonCodes: [...new Set([...retrieved.reasonCodes, "fee_knowledge_semantic_support_not_run"])].sort(),
     sourceFingerprint: retrieved.documentFingerprint,
+    safeRetrievalDiagnostics: retrieved.safeDiagnostics ? structuredClone(retrieved.safeDiagnostics) : null,
   };
 }
 
@@ -1034,21 +1291,11 @@ async function runWithinPreparedResearchDeadline<T>(
     context.researchDeadlineStartedAt = now;
     context.researchDeadlineAt = now + context.packet.research.limits.totalDeadlineMs;
   }
-  const remainingMs = Math.max(0, (context.researchDeadlineAt ?? now) - now);
-  if (remainingMs <= 0) {
-    markResearchTerminal(context, "timed_out");
-    throw liveEvaluationTimeoutError(stage, "research_graph");
-  }
-  const timeoutMs = liveEvaluationEffectiveTimeoutMs({ stage, remainingResearchGraphMs: remainingMs });
-  const timeoutScope: LiveEvaluationTimeoutScope = remainingMs <= LIVE_EVALUATION_TIMEOUT_POLICY.perCallMs[stage]
-    ? "research_graph"
-    : "per_call";
   return runWithLiveEvaluationTimeout({
     stage,
-    scope: timeoutScope,
-    timeoutMs,
+    scope: "per_call",
+    timeoutMs: liveEvaluationEffectiveTimeoutMs({ stage }),
     operation,
-    onTimeout: timeoutScope === "research_graph" ? () => markResearchTerminal(context, "timed_out") : undefined,
   });
 }
 

@@ -98,7 +98,7 @@ export function admitWholeStatementFeeIntelligence(input: {
     || input.validation.errors.some((error) => /forbidden|privacy|safety|sensitive/i.test(error));
   const eligible = executionStatus === "completed"
     && input.validation.ok
-    && input.validation.output.reviewStatus === "completed"
+    && (input.validation.output.reviewStatus === "completed" || input.validation.output.reviewStatus === "partial")
     && !incompleteResearch
     && !incompleteCandidates
     && linkageErrors.length === 0
@@ -465,7 +465,7 @@ function admissionSnapshot(input: {
       rejectedRecordCount: input.output.acceptanceRecords.filter((record) => record.status === "rejected").length,
     },
     executionRef: null,
-    reasonCodes: [completed ? "whole_statement_fee_intelligence_completed" : normalizedStatus === "timed_out" ? "whole_statement_fee_intelligence_timed_out" : normalizedStatus === "failed" ? "whole_statement_fee_intelligence_failed" : normalizedStatus === "safety_blocked" ? "whole_statement_fee_intelligence_safety_blocked" : "whole_statement_fee_intelligence_rejected"],
+    reasonCodes: [completed ? input.output.reviewStatus === "partial" ? "whole_statement_fee_intelligence_partial" : "whole_statement_fee_intelligence_completed" : normalizedStatus === "timed_out" ? "whole_statement_fee_intelligence_timed_out" : normalizedStatus === "failed" ? "whole_statement_fee_intelligence_failed" : normalizedStatus === "safety_blocked" ? "whole_statement_fee_intelligence_safety_blocked" : "whole_statement_fee_intelligence_rejected"],
     diagnosticSignals: completed
       ? passedDiagnosticSignals(input.sourcePacket.claimSupports.length > 0 ? [...passedStages, "source_quality"] : passedStages)
       : normalizedStatus === "safety_blocked"

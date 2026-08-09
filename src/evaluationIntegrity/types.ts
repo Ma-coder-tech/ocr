@@ -12,6 +12,7 @@ import type {
   FeeKnowledgeEvidenceDecision,
   FeeKnowledgeResearchAttemptRecord,
   FeeKnowledgeResearchNonSuccessStatus,
+  FeeKnowledgeRetrievalSafeDiagnostics,
   FeeKnowledgeRetrievalStatus,
   FeeKnowledgeSemanticSupportDecision,
   FeeKnowledgeStructuredClaim,
@@ -326,6 +327,10 @@ export type CostCapability =
 
 export type CostCallStatus = "reserved" | "success" | "failure" | "timeout" | "cancelled_before_send";
 
+export type CostReservationScope = "provider_send" | "budget_envelope";
+
+export type CostOperationKind = "manifest_call" | "package_5b_budget_envelope" | "package_5b_work_unit";
+
 export type CostToolEvent = {
   type: string;
   count: number;
@@ -340,6 +345,10 @@ export type EvaluationPricingPolicy = {
 
 export type CostLedgerEntry = {
   callId: string;
+  parentCallId: string | null;
+  operationKind: CostOperationKind;
+  operationRef: string | null;
+  reservationScope: CostReservationScope;
   attempt: number;
   attemptKind: "initial" | "retry";
   retryOfCallId: string | null;
@@ -415,6 +424,9 @@ export type EvaluationRunIntegrityArtifact = {
   executionPermit: ApprovedExecutionPermit;
   providerCallOutcomes: Array<{
     callId: string;
+    parentCallId: string | null;
+    operationKind: CostOperationKind;
+    operationRef: string | null;
     sourceDocumentId: string;
     stage: EvaluationExecutionStage;
     status: "success" | "failure" | "timeout" | "cancelled_before_send";
@@ -486,6 +498,49 @@ export type EvaluationPackageFWholeStatementRecord = {
   financialMutationAllowed: false;
 };
 
+export type EvaluationPackage5BWorkPlanProjection = {
+  type: "evaluation_package_5b_work_plan_projection_v1";
+  policyVersion: "whole_statement_fee_intelligence_work_plan_v1";
+  mode: "production_selective" | "comprehensive";
+  statementPacketContentHash: string;
+  expectedFeeRowCount: number;
+  plannedFeeRowCount: number;
+  selectedFeeRowCount: number;
+  reviewedFeeRowCount: number;
+  missingFeeRowCount: number;
+  plannedWorkUnitCount: number;
+  selectedWorkUnitCount: number;
+  completedWorkUnitCount: number;
+  unavailableWorkUnitCount: number;
+  notSelectedWorkUnitCount: number;
+  units: Array<{
+    workUnitRef: string;
+    ordinal: number;
+    status: string;
+    outcomeClass: string;
+    expectedFeeRowRefs: string[];
+    expectedRowCount: number;
+    reviewedRowCount: number;
+    missingRowCount: number;
+    duplicatedRowCount: number;
+    unknownRowCount: number;
+    estimatedInputBytes: number;
+    estimatedOutputTokens: number;
+    outputTokenCeiling: number | null;
+    requestId: string | null;
+    inputTokens: number | null;
+    cachedInputTokens: number | null;
+    outputTokens: number | null;
+    durationMs: number | null;
+    billingDisposition: "observed" | "provider_confirmed_zero" | "unknown" | "pending";
+    reasonCodes: string[];
+  }>;
+  rawPromptPersisted: false;
+  rawResponsePersisted: false;
+  providerDetailsPersisted: false;
+  reasonCodes: string[];
+};
+
 export type EvaluationPackage5AAdmissionProjection = {
   type: typeof EVALUATION_PACKAGE_5A_PROJECTION_VERSION;
   diagnosticRef: string;
@@ -535,6 +590,7 @@ export type EvaluationResearchCandidateProof = {
   semanticVerificationStatus: "not_started" | "completed" | "failed" | "timed_out" | "parse_failed" | "safety_blocked" | "unsupported";
   claimSupportRefs: string[];
   reasonCodes: string[];
+  safeRetrievalDiagnostics?: FeeKnowledgeRetrievalSafeDiagnostics | null;
 };
 
 export type EvaluationResearchSafeStructuredClaim = Pick<
@@ -649,6 +705,7 @@ export type EvaluationCanonicalAdmissionResult = {
   admission: EvaluationCanonicalAdmissionRecord;
   packageF: EvaluationPackageFWholeStatementRecord | null;
   package5a: EvaluationPackage5AAdmissionProjection;
+  package5bWorkPlan: EvaluationPackage5BWorkPlanProjection | null;
   researchEvidence: EvaluationResearchEvidenceProof;
   canonicalReferenceProof: EvaluationCanonicalReferenceProof;
   lifecycleAdmissionRef: string;

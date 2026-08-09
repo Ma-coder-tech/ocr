@@ -501,6 +501,10 @@ describe("canonical fee knowledge and provenance", () => {
 	  });
 
 	  it("blocks DNS rebinding, private redirects, reserved address ranges, and unvalidated connection targets", async () => {
+	    const dnsFailure = await retrieveFeeKnowledgeDocument("https://missing.syntheticprocessor.test/fees", {
+	      abortSignal: new AbortController().signal,
+	      resolveHost: async () => { throw Object.assign(new Error("not found"), { code: "ENOTFOUND" }); },
+	    });
 	    const rebinding = await retrieveFeeKnowledgeDocument("https://syntheticprocessor.test/fees", {
 	      abortSignal: new AbortController().signal,
 	      resolveHost: async () => ["93.184.216.34", "127.0.0.1"],
@@ -526,10 +530,20 @@ describe("canonical fee knowledge and provenance", () => {
 	      },
 	    });
 
+	    expect(dnsFailure.status).toBe("failed");
+	    expect(dnsFailure.reasonCodes).toContain("fee_knowledge_retrieval_dns_resolution_failed");
+	    expect(dnsFailure.safeDiagnostics).toMatchObject({
+	      outcomeClass: "dns_resolution_failed",
+	      sourceDomain: "missing.syntheticprocessor.test",
+	      attemptedNetwork: false,
+	    });
 	    expect(rebinding.status).toBe("safety_blocked");
+	    expect(rebinding.safeDiagnostics).toMatchObject({ outcomeClass: "destination_policy_blocked", blockedAddressClass: "private_or_reserved" });
 	    expect(privateRedirect.status).toBe("safety_blocked");
+	    expect(privateRedirect.safeDiagnostics).toMatchObject({ outcomeClass: "destination_policy_blocked", blockedAddressClass: "private_or_reserved" });
 	    expect(ipv6Private.status).toBe("safety_blocked");
 	    expect(targetMismatch.status).toBe("safety_blocked");
+	    expect(targetMismatch.safeDiagnostics).toMatchObject({ outcomeClass: "destination_policy_blocked" });
 	    expect(targetMismatch.reasonCodes).toContain("fee_knowledge_connection_target_unvalidated");
 	  });
 
