@@ -12,6 +12,7 @@ import {
   type CanonicalWholeStatementFeeIntelligencePacket,
   type CanonicalWholeStatementFeeIntelligenceValidationResult,
 } from "./wholeStatementFeeIntelligenceReview.js";
+import { wholeStatementFeeIntelligenceProviderInputBytes } from "./wholeStatementFeeIntelligenceProviderInput.js";
 
 export const WHOLE_STATEMENT_FEE_INTELLIGENCE_WORK_PLAN_POLICY_VERSION =
   "whole_statement_fee_intelligence_work_plan_v1" as const;
@@ -137,7 +138,7 @@ export function buildWholeStatementFeeIntelligenceWorkPlan(input: {
   chunks.forEach((rowChunk, index) => {
     const expectedFeeRowRefs = rowChunk.map((row) => row.feeRowRef).sort();
     const packet = slicePacketForRows(input.packet, expectedFeeRowRefs);
-    const estimatedInputBytes = Buffer.byteLength(JSON.stringify(packet), "utf8");
+    const estimatedInputBytes = wholeStatementFeeIntelligenceProviderInputBytes(packet);
     const estimatedOutputTokens = limits.outputTokenOverheadPerUnit + expectedFeeRowRefs.length * limits.outputTokensPerRowEstimate;
     const policyBlocked = selectedUnits >= limits.maxSelectedUnits || selectedRows + expectedFeeRowRefs.length > limits.maxSelectedRows;
     const budgetBlocked =

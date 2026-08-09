@@ -391,6 +391,21 @@ export function createOneTimeStatementEvaluationTransport(input: {
         });
       }
       for (const unit of selectedUnits) {
+        if (request.approvedCallMetadata.maximumInputTokens !== null && unit.estimatedInputBytes > request.approvedCallMetadata.maximumInputTokens) {
+          const reasonCodes = [
+            "whole_statement_fee_intelligence_work_unit_not_selected_budget",
+            "whole_statement_fee_intelligence_work_unit_input_bound_exceeded_before_send",
+          ];
+          workUnitResults.push(package5BWorkUnitNotSelectedByResourceBudget(unit.workUnitRef, reasonCodes));
+          childProviderCallOutcomes.push(package5BWorkUnitOutcome({
+            reservation: package5BWorkUnitReservation(request.approvedCallMetadata, unit),
+            sourceDocumentId: request.sourceDocumentId,
+            status: "cancelled_before_send",
+            requestId: null,
+            reasonCodes,
+          }));
+          continue;
+        }
         const unitReservation = package5BWorkUnitReservation(request.approvedCallMetadata, unit);
         try {
           request.childBudgetController!.reserve(unitReservation);
@@ -1016,6 +1031,7 @@ function package5BWorkUnitOutcome(input: {
 
 function package5BWorkUnitNotSelectedByResourceBudget(
   workUnitRef: string,
+  reasonCodes = ["whole_statement_fee_intelligence_work_unit_not_selected_budget"],
 ): ReturnType<typeof notSelectedWholeStatementFeeIntelligenceWorkUnitResult> {
   return {
     workUnitRef,
@@ -1028,7 +1044,7 @@ function package5BWorkUnitNotSelectedByResourceBudget(
     outputTokens: 0,
     durationMs: 0,
     billingDisposition: "provider_confirmed_zero",
-    reasonCodes: ["whole_statement_fee_intelligence_work_unit_not_selected_budget"],
+    reasonCodes: [...new Set(reasonCodes)].sort(),
   };
 }
 

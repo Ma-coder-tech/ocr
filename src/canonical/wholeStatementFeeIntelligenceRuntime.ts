@@ -19,6 +19,7 @@ import type {
   CanonicalStatementAnalysis,
 } from "./types.js";
 import { safeProviderFailureError, type SafeProviderFailureOperationPhase } from "./providerFailureDiagnostics.js";
+import { serializeWholeStatementFeeIntelligenceProviderInput } from "./wholeStatementFeeIntelligenceProviderInput.js";
 
 const require = createRequire(import.meta.url);
 
@@ -264,14 +265,7 @@ function safeString(value: unknown): string | null {
 }
 
 function buildPrompt(packet: CanonicalWholeStatementFeeIntelligencePacket): string {
-  return [
-    "Review every admitted merchant-statement fee row in this sanitized canonical packet.",
-    "Return only the requested structured object. Do not include amounts, totals, merchant identifiers, provider names, model names, prompts, raw text, file paths, customer-facing wording, opportunity, savings, state, permissions, or actions.",
-    "For each admittedFeeRows item, return exactly one rowInterpretations item with the same feeRowRef and row-scoped evidenceRefs.",
-    "Use approved_external_documentation or runtime_verified_documentation only when the row-scoped sourceProvenancePacket permits the exact source/claim-support reference. Otherwise use statement_evidence, industry_inference, merchant_evidence, or human_review.",
-    "Industry inference must be limited and cannot support potentially_actionable.",
-    JSON.stringify(packet),
-  ].join("\n\n");
+  return serializeWholeStatementFeeIntelligenceProviderInput(packet);
 }
 
 function reviewResponseSchema(): unknown {

@@ -15,6 +15,7 @@ import {
   wholeStatementFeeIntelligenceWorkUnitResultFromValidation,
   type WholeStatementFeeIntelligenceWorkUnitResult,
 } from "../../src/canonical/wholeStatementFeeIntelligenceWorkPlan.js";
+import { wholeStatementFeeIntelligenceProviderInputBytes } from "../../src/canonical/wholeStatementFeeIntelligenceProviderInput.js";
 import type { CanonicalStatementAnalysis } from "../../src/canonical/types.js";
 import { parsePdfBytes, type ParsedDocument } from "../../src/parser.js";
 import { calculateWorstCaseCostUsd } from "../../src/evaluationIntegrity/providerAccounting.js";
@@ -188,7 +189,7 @@ describe("whole-statement fee intelligence work plan", () => {
     expect(plan.units.some((unit) => unit.status === "failed")).toBe(false);
   });
 
-  it("calculates the real 134-row comprehensive live canary budget from first-class work-unit reservations", async () => {
+  it("calculates the real 134-row comprehensive live canary budget from exact serialized provider-input reservations", async () => {
     const bytes = await readFile(REAL_134_ROW_STATEMENT_PATH);
     const document = await parsePdfBytes(bytes);
     const summary = analyzeStatementDocument(document, "restaurant_food_beverage");
@@ -224,17 +225,30 @@ describe("whole-statement fee intelligence work plan", () => {
 
     expect(analysis.feeLedger.rows).toHaveLength(134);
     expect(workUnits.map((unit) => unit.rowCount)).toEqual([18, 18, 18, 18, 18, 18, 18, 8]);
-    expect(workUnits.map((unit) => unit.worstCaseCostUsd)).toEqual([
-      0.0414165,
-      0.04166475,
-      0.041382,
-      0.0413865,
-      0.041649,
-      0.0414195,
-      0.041373,
-      0.031461,
+    expect(plan.units.map((unit) => unit.estimatedInputBytes)).toEqual(plan.units.map((unit) =>
+      wholeStatementFeeIntelligenceProviderInputBytes(unit.packet)
+    ));
+    expect(workUnits.map((unit) => unit.maximumInputTokens)).toEqual([
+      26013,
+      26344,
+      25967,
+      25973,
+      26323,
+      26017,
+      25955,
+      12739,
     ]);
-    expect(worstCaseTotalUsd).toBe(0.32175225);
+    expect(workUnits.map((unit) => unit.worstCaseCostUsd)).toEqual([
+      0.04200975,
+      0.042258,
+      0.04197525,
+      0.04197975,
+      0.04224225,
+      0.04201275,
+      0.04196625,
+      0.03205425,
+    ]);
+    expect(worstCaseTotalUsd).toBe(0.32649825);
     expect(worstCaseTotalUsd).toBeLessThan(2);
   }, 30_000);
 });

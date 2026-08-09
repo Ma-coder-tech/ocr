@@ -133,6 +133,66 @@ describe("Package 5B manifest-driven admission", () => {
     }
   }, 30_000);
 
+  it("does not send Package 5B work units whose serialized provider input exceeds the approved bound", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "synthetic-present-key";
+    let wholeStatementInvocations = 0;
+    try {
+      const result = await runManifestDrivenLiveEvaluation({
+        ...fixture.runnerInput,
+        calls: package5BReadinessCalls().map((call) => call.stage !== "whole_statement_ai_review"
+          ? call
+          : {
+            ...call,
+            reservation: {
+              ...call.reservation,
+              maximumInputTokens: 1,
+            },
+          }),
+        outputArtifactPath: path.join(fixture.directory, "package-5b-provider-input-bound.json"),
+        oneTimeResearchQuestionsForTesting: () => [],
+        oneTimeServicesForTesting: {
+          wholeStatementReview: async (packet) => {
+            wholeStatementInvocations += 1;
+            return external(validReview(packet), "request_should_not_send");
+          },
+        },
+      });
+
+      expect(wholeStatementInvocations).toBe(0);
+      expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+      if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+      const admission = result.artifact.canonicalAdmissionResults[0]!;
+      expect(admission.packageF).toBeNull();
+      expect(admission.package5bWorkPlan?.reviewedFeeRowCount).toBe(0);
+      expect(admission.package5bWorkPlan?.missingFeeRowCount).toBe(admission.package5bWorkPlan?.expectedFeeRowCount);
+      expect(new Set(admission.package5bWorkPlan?.units.map((unit) => unit.status))).toEqual(new Set(["not_selected_budget"]));
+      expect(new Set(admission.package5bWorkPlan?.units.map((unit) => unit.outcomeClass))).toEqual(new Set(["budget_not_selected"]));
+      expect(admission.package5bWorkPlan?.units.every((unit) =>
+        unit.requestId === null &&
+        unit.inputTokens === 0 &&
+        unit.outputTokens === 0 &&
+        unit.billingDisposition === "provider_confirmed_zero" &&
+        unit.reasonCodes.includes("whole_statement_fee_intelligence_work_unit_input_bound_exceeded_before_send")
+      )).toBe(true);
+      expect(result.costLedger.entries.filter((entry) => entry.operationKind === "package_5b_work_unit")).toEqual([]);
+      const workUnitOutcomes = result.providerCallOutcomes.filter((outcome) => outcome.operationKind === "package_5b_work_unit");
+      expect(workUnitOutcomes).toHaveLength(admission.package5bWorkPlan?.plannedWorkUnitCount ?? 0);
+      expect(workUnitOutcomes.every((outcome) =>
+        outcome.status === "cancelled_before_send" &&
+        outcome.requestId === null &&
+        outcome.reasonCodes.includes("whole_statement_fee_intelligence_work_unit_input_bound_exceeded_before_send") &&
+        outcome.reasonCodes.includes("whole_statement_fee_intelligence_work_unit_not_selected_budget")
+      )).toBe(true);
+      expect(result.costLedger.cumulativeObservedUsd).toBe(0);
+      expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+    } finally {
+      if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousOpenAiKey;
+    }
+  }, 30_000);
+
   it("redacts amount-bearing Clover fee labels before one-time Package 5B outbound services", async () => {
     const fixture = await approvedShortCloverPdfFixture();
     const document = await parsePdfBytes(fixture.bytes);
