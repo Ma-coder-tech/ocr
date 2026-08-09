@@ -117,12 +117,15 @@ describe("live-evaluation budget enforcement", () => {
     expect(JSON.stringify(jsonSchema)).toContain('"externalClaimSupportRef"');
     expect((observedSchema as { safeParse: (value: unknown) => { success: boolean } }).safeParse(structuredOutput).success).toBe(true);
     expect(output).toEqual(structuredOutput);
-    expect(observedUsage).toEqual({
+    expect(observedUsage).toMatchObject({
       requestId: "resp_package_5b",
       inputTokens: 100,
       cachedInputTokens: 20,
       outputTokens: 10,
+      httpSendInitiated: false,
+      providerResponseReceived: false,
     });
+    expect(observedUsage).toHaveProperty("localTraceId", expect.stringMatching(/^[a-f0-9]{16}$/));
   });
 
   it("puts hard output and tool ceilings in the web-search Responses request and captures usage", async () => {

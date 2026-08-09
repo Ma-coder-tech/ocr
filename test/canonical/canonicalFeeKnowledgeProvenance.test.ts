@@ -457,7 +457,7 @@ describe("canonical fee knowledge and provenance", () => {
 	      })(request, { abortSignal: new AbortController().signal }),
 	    ).rejects.toMatchObject({
 	      reasonCode: "provider_invalid_request",
-	      reasonCodes: ["provider_http_status_400", "provider_invalid_request"],
+	      reasonCodes: ["provider_http_status_400", "provider_http_status_class_4xx", "provider_invalid_request"],
 	    });
 	    await expect(
 	      openAiWebSearchAdapter({

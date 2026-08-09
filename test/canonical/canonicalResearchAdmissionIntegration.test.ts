@@ -211,7 +211,7 @@ describe("canonical research admission integration", () => {
       .toEqual([`fee_knowledge_${unavailable.claimSupport!.evidenceDecision}`]);
     await expect(httpFailure).rejects.toMatchObject({
       reasonCode: "provider_server_error",
-      reasonCodes: ["provider_http_status_503", "provider_server_error"],
+      reasonCodes: ["provider_http_status_503", "provider_http_status_class_5xx", "provider_server_error"],
     });
   });
 

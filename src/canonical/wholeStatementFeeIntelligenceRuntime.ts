@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
 import {
   WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION,
@@ -17,7 +18,8 @@ import type {
   CanonicalAiWholeStatementFeeIntelligenceOutput,
   CanonicalStatementAnalysis,
 } from "./types.js";
-import { safeProviderFailureError } from "./providerFailureDiagnostics.js";
+import { safeProviderFailureError, type SafeProviderFailureOperationPhase } from "./providerFailureDiagnostics.js";
+import { serializeWholeStatementFeeIntelligenceProviderInput } from "./wholeStatementFeeIntelligenceProviderInput.js";
 
 const require = createRequire(import.meta.url);
 
@@ -31,7 +33,8 @@ type ProviderResultMetadata = { usage?: ProviderUsage; response?: { id?: string 
 type GenerateObject = (options: Record<string, unknown>) => Promise<{ object: unknown } & ProviderResultMetadata>;
 type GenerateText = (options: Record<string, unknown>) => Promise<{ output: unknown } & ProviderResultMetadata>;
 type AiModelFactory = (modelName: string) => unknown;
-type AiProviderFactoryCreator = (options: { apiKey?: string }) => AiModelFactory;
+type AiProviderFetch = typeof fetch;
+type AiProviderFactoryCreator = (options: { apiKey?: string; headers?: Record<string, string>; fetch?: AiProviderFetch }) => AiModelFactory;
 type AiOutputFactory = {
   object: (options: { schema: unknown; name?: string; description?: string }) => unknown;
 };
@@ -76,6 +79,20 @@ export type WholeStatementFeeIntelligenceProviderUsage = {
   inputTokens: number | null;
   cachedInputTokens: number | null;
   outputTokens: number | null;
+  localTraceId?: string | null;
+  httpStatus?: number | null;
+  httpSendInitiated?: boolean;
+  providerResponseReceived?: boolean;
+};
+
+type ProviderTransportTrace = {
+  localTraceId: string;
+  provider: RuntimeProvider;
+  transport: "ai_sdk_generate_text_structured_output" | "ai_sdk_generate_object_structured_output";
+  httpSendInitiated: boolean;
+  providerResponseReceived: boolean;
+  httpStatus: number | null;
+  requestId: string | null;
 };
 
 export function wholeStatementFeeIntelligenceProviderAdapter(
@@ -164,13 +181,22 @@ async function executeProviderReview(
   const sdk = options.sdk ?? loadAiSdk();
   let lastError: Error | null = null;
   for (const attempt of attempts) {
+    const trace = createProviderTransportTrace(
+      attempt.provider,
+      attempt.provider === "openai" ? "ai_sdk_generate_text_structured_output" : "ai_sdk_generate_object_structured_output",
+    );
+    let operationPhase: SafeProviderFailureOperationPhase = "request_serialization";
     try {
+      operationPhase = "request_serialization";
       const prompt = buildPrompt(packet);
       assertPromptWithinInputLimit(prompt, options.maxInputTokens);
+      operationPhase = "request_construction";
       if (attempt.provider === "openai") {
         if (!sdk.generateText || !sdk.Output) throw new Error("Structured output unavailable.");
+        const model = modelFor(attempt.provider, attempt.modelName, options, sdk, trace);
+        operationPhase = "request_initiation";
         const result = await sdk.generateText({
-          model: modelFor(attempt.provider, attempt.modelName, options, sdk),
+          model,
           prompt,
           output: sdk.Output.object({
             schema: reviewResponseSchema(),
@@ -181,21 +207,31 @@ async function executeProviderReview(
           maxOutputTokens: options.maxOutputTokens ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_MAX_OUTPUT_TOKENS ?? 5000),
           maxRetries: options.maxRetries,
         });
-        options.onProviderUsage?.(providerUsage(result));
+        options.onProviderUsage?.(providerUsage(result, trace));
         return result.output;
       }
+      const model = modelFor(attempt.provider, attempt.modelName, options, sdk, trace);
+      operationPhase = "request_initiation";
       const result = await sdk.generateObject({
-        model: modelFor(attempt.provider, attempt.modelName, options, sdk),
+        model,
         schema: reviewResponseSchema(),
         prompt,
         abortSignal,
         maxOutputTokens: options.maxOutputTokens ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_MAX_OUTPUT_TOKENS ?? 5000),
         maxRetries: options.maxRetries,
       });
-      options.onProviderUsage?.(providerUsage(result));
+      options.onProviderUsage?.(providerUsage(result, trace));
       return result.object;
     } catch (error) {
-      lastError = safeProviderFailureError(error);
+      lastError = safeProviderFailureError(error, traceResponse(trace), {
+        operationPhase: operationPhaseForFailure(operationPhase, trace),
+        transport: trace.transport,
+        localTraceId: trace.localTraceId,
+        httpSendInitiated: trace.httpSendInitiated,
+        providerResponseReceived: trace.providerResponseReceived,
+        httpStatus: trace.httpStatus,
+        requestId: trace.requestId,
+      });
     }
   }
   throw lastError ?? new Error("Whole-statement fee intelligence provider failed.");
@@ -207,12 +243,16 @@ function assertPromptWithinInputLimit(prompt: string, maximumInputTokens: number
   if (Buffer.byteLength(prompt, "utf8") > maximumInputTokens) throw new Error("Whole-statement prompt exceeds approved maximum input tokens.");
 }
 
-function providerUsage(result: ProviderResultMetadata): WholeStatementFeeIntelligenceProviderUsage {
+function providerUsage(result: ProviderResultMetadata, trace?: ProviderTransportTrace): WholeStatementFeeIntelligenceProviderUsage {
   return {
-    requestId: safeString(result.response?.id),
+    requestId: safeString(result.response?.id) ?? trace?.requestId ?? null,
     inputTokens: safeInteger(result.usage?.inputTokens),
     cachedInputTokens: safeInteger(result.usage?.inputTokenDetails?.cacheReadTokens ?? result.usage?.cachedInputTokens) ?? 0,
     outputTokens: safeInteger(result.usage?.outputTokens),
+    localTraceId: trace?.localTraceId ?? null,
+    httpStatus: trace?.httpStatus ?? null,
+    httpSendInitiated: trace?.httpSendInitiated ?? false,
+    providerResponseReceived: trace?.providerResponseReceived ?? false,
   };
 }
 
@@ -225,14 +265,7 @@ function safeString(value: unknown): string | null {
 }
 
 function buildPrompt(packet: CanonicalWholeStatementFeeIntelligencePacket): string {
-  return [
-    "Review every admitted merchant-statement fee row in this sanitized canonical packet.",
-    "Return only the requested structured object. Do not include amounts, totals, merchant identifiers, provider names, model names, prompts, raw text, file paths, customer-facing wording, opportunity, savings, state, permissions, or actions.",
-    "For each admittedFeeRows item, return exactly one rowInterpretations item with the same feeRowRef and row-scoped evidenceRefs.",
-    "Use approved_external_documentation or runtime_verified_documentation only when the row-scoped sourceProvenancePacket permits the exact source/claim-support reference. Otherwise use statement_evidence, industry_inference, merchant_evidence, or human_review.",
-    "Industry inference must be limited and cannot support potentially_actionable.",
-    JSON.stringify(packet),
-  ].join("\n\n");
+  return serializeWholeStatementFeeIntelligenceProviderInput(packet);
 }
 
 function reviewResponseSchema(): unknown {
@@ -373,16 +406,74 @@ function modelNameForProvider(provider: RuntimeProvider, options: WholeStatement
   return process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_MODEL ?? process.env.ANTHROPIC_MODEL ?? "claude-opus-4-8";
 }
 
-function modelFor(provider: RuntimeProvider, modelName: string, options: WholeStatementFeeIntelligenceRuntimeOptions, sdk: AiSdk): unknown {
+function modelFor(
+  provider: RuntimeProvider,
+  modelName: string,
+  options: WholeStatementFeeIntelligenceRuntimeOptions,
+  sdk: AiSdk,
+  trace: ProviderTransportTrace,
+): unknown {
   const key = providerApiKey(provider, options);
   if (provider === "anthropic") {
     const factory = key && sdk.createAnthropic ? sdk.createAnthropic({ apiKey: key }) : undefined;
     if (!factory) throw new Error("Anthropic model factory unavailable.");
     return factory(modelName);
   }
-  const factory = key && sdk.createOpenAI ? sdk.createOpenAI({ apiKey: key }) : undefined;
+  const factory = key && sdk.createOpenAI ? sdk.createOpenAI({
+    apiKey: key,
+    headers: { "x-ratereveal-trace-id": trace.localTraceId },
+    fetch: tracedProviderFetch(trace),
+  }) : undefined;
   if (!factory) throw new Error("OpenAI model factory unavailable.");
   return factory(modelName);
+}
+
+function createProviderTransportTrace(
+  provider: RuntimeProvider,
+  transport: ProviderTransportTrace["transport"],
+): ProviderTransportTrace {
+  return {
+    localTraceId: randomBytes(8).toString("hex"),
+    provider,
+    transport,
+    httpSendInitiated: false,
+    providerResponseReceived: false,
+    httpStatus: null,
+    requestId: null,
+  };
+}
+
+function tracedProviderFetch(trace: ProviderTransportTrace): AiProviderFetch {
+  return async (input, init) => {
+    trace.httpSendInitiated = true;
+    try {
+      const response = await globalThis.fetch(input, init);
+      trace.providerResponseReceived = true;
+      trace.httpStatus = response.status;
+      trace.requestId = safeString(response.headers.get("x-request-id")) ?? trace.requestId;
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  };
+}
+
+function traceResponse(trace: ProviderTransportTrace): { status?: unknown; headers?: unknown } | undefined {
+  if (!trace.providerResponseReceived) return undefined;
+  return {
+    status: trace.httpStatus,
+    headers: trace.requestId ? { "x-request-id": trace.requestId } : undefined,
+  };
+}
+
+function operationPhaseForFailure(
+  fallback: SafeProviderFailureOperationPhase,
+  trace: ProviderTransportTrace,
+): SafeProviderFailureOperationPhase {
+  if (trace.providerResponseReceived && trace.httpStatus !== null && trace.httpStatus >= 400) return "provider_response";
+  if (trace.providerResponseReceived) return "sdk_structured_output_handling";
+  if (trace.httpSendInitiated) return "response_wait";
+  return fallback;
 }
 
 async function withAbortTimeout<T>(operation: (abortSignal: AbortSignal) => Promise<T>, timeoutMs: number): Promise<T> {
