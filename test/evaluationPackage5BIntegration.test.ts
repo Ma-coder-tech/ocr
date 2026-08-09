@@ -82,6 +82,47 @@ describe("Package 5B manifest-driven admission", () => {
     expect(JSON.parse(await readFile(result.artifactPath, "utf8"))).toEqual(result.artifact);
   }, 30_000);
 
+  it("derives approved Package 5B work-unit pricing from a pricing-null budget envelope", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    const calls = package5BReadinessCalls().map((call) => call.stage !== "whole_statement_ai_review"
+      ? call
+      : {
+          ...call,
+          reservation: {
+            ...call.reservation,
+            pricing: null,
+            estimatedMaximumCostUsd: 1,
+          },
+        });
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls,
+      outputArtifactPath: path.join(fixture.directory, "package-5b-derived-work-unit-pricing.json"),
+      oneTimeResearchQuestionsForTesting: () => [],
+      oneTimeServicesForTesting: {
+        wholeStatementReview: async (packet) => external(validReview(packet), "request_whole_derived_pricing"),
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const workUnitEntries = result.costLedger.entries.filter((entry) => entry.operationKind === "package_5b_work_unit");
+    expect(workUnitEntries.length).toBeGreaterThan(0);
+    expect(workUnitEntries.every((entry) =>
+      entry.pricingPolicyRef === "sanitized_pricing_policy_v1" &&
+      entry.provider === "openai" &&
+      entry.providerRoute === "openai_ai_sdk_generate_text_structured_output" &&
+      entry.model === "gpt-5.4-mini" &&
+      entry.toolClass === "ai_sdk_structured_output" &&
+      entry.maximumInputTokens !== null &&
+      entry.maximumOutputTokens !== null &&
+      entry.estimatedMaximumCostUsd > 0 &&
+      entry.status === "success"
+    )).toBe(true);
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+  }, 30_000);
+
   it("treats missing Package 5B credentials as pre-send provider unavailability with zero child exposure", async () => {
     const fixture = await approvedOneTimePdfFixture();
     const previousOpenAiKey = process.env.OPENAI_API_KEY;
@@ -131,6 +172,58 @@ describe("Package 5B manifest-driven admission", () => {
       if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
       else process.env.OPENAI_API_KEY = previousOpenAiKey;
     }
+  }, 30_000);
+
+  it("keeps successful retrieval diagnostics when retrieved text is not semantically eligible", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    let semanticCalls = 0;
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: fullOneTimeCalls(),
+      outputArtifactPath: path.join(fixture.directory, "retrieval-diagnostics-not-eligible.json"),
+      oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis)],
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async () => external([{ url: "https://www.fiserv.com/official-fee-guide/not-matching", title: "Official fee guide", publisher: "Fiserv" }], "request_search_not_eligible"),
+        documentRetrieval: async (url, options) => external(await retrieveFeeKnowledgeDocument(url, {
+          abortSignal: options.abortSignal,
+          resolveHost: async () => ["93.184.216.34"],
+          fetchImpl: async () => new Response("<p>Fiserv official merchant services guide for 2024.</p>", { status: 200, headers: { "content-type": "text/html" } }),
+        }), "request_retrieval_not_eligible"),
+        semanticVerification: async ({ structuredClaim }) => {
+          semanticCalls += 1;
+          return external(semanticSupport(structuredClaim), "request_semantic_should_not_run");
+        },
+        wholeStatementReview: async (packet) => external(validReview(packet), "request_whole_not_eligible"),
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(semanticCalls).toBe(0);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    const candidate = admission.researchEvidence.candidates[0]!;
+    expect(candidate).toMatchObject({
+      retrievalStatus: "retrieved_text",
+      semanticVerificationStatus: "not_eligible",
+      verificationStatus: "provisional",
+      claimSupportRefs: [],
+    });
+    expect(candidate.reasonCodes).toEqual(expect.arrayContaining([
+      "fee_knowledge_text_retrieved",
+      "fee_knowledge_claim_support_missing",
+      "fee_knowledge_semantic_not_eligible_claim_support_missing",
+    ]));
+    expect(candidate.safeRetrievalDiagnostics).toMatchObject({
+      sourceDomain: "www.fiserv.com",
+      outcomeClass: "successful_usable_retrieval",
+      attemptedNetwork: true,
+      httpStatus: 200,
+      contentType: "text/html",
+    });
+    expect(JSON.stringify(candidate.safeRetrievalDiagnostics)).not.toContain("/official-fee-guide/");
+    expect(admission.researchEvidence.claimSupports).toEqual([]);
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
   }, 30_000);
 
   it("classifies missing OpenAI readiness before web discovery send without blocking deterministic statement success", async () => {

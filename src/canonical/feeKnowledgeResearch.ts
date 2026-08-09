@@ -513,6 +513,7 @@ export async function verifyCandidate(input: {
         sourceFingerprint: input.retrieved.documentFingerprint,
         retrievalStatus: input.retrieved.status,
         semanticVerificationStatus: "not_started",
+        safeRetrievalDiagnostics: input.retrieved.safeDiagnostics,
         locatorHash: null,
         claimSupportDecisionRef: null,
       }),
@@ -542,11 +543,12 @@ export async function verifyCandidate(input: {
       candidate: candidateRecord(input, attemptId, {
         canonicalUrl,
         verificationStatus: "provisional",
-        reasonCodes: [...input.retrieved.reasonCodes, "fee_knowledge_claim_support_missing", "fee_knowledge_semantic_support_not_run"],
+        reasonCodes: [...input.retrieved.reasonCodes, "fee_knowledge_claim_support_missing", "fee_knowledge_semantic_not_eligible_claim_support_missing"],
         safeApplicability: { processorOrNetworkMatched: processorMatched, periodApplicable, jurisdictionApplicable: null, contextApplicable: null },
         sourceFingerprint: input.retrieved.documentFingerprint,
         retrievalStatus: input.retrieved.status,
-        semanticVerificationStatus: "not_started",
+        semanticVerificationStatus: "not_eligible",
+        safeRetrievalDiagnostics: input.retrieved.safeDiagnostics,
         locatorHash: null,
         claimSupportDecisionRef: null,
       }),
@@ -713,6 +715,7 @@ function candidateAfterRetrieval(
         : retrieved.status === "retrieval_succeeded_text_unavailable" ? "source_unavailable" : "rejected",
     reasonCodes: [...new Set([...retrieved.reasonCodes, "fee_knowledge_semantic_support_not_run"])].sort(),
     sourceFingerprint: retrieved.documentFingerprint,
+    safeRetrievalDiagnostics: retrieved.safeDiagnostics,
   };
 }
 

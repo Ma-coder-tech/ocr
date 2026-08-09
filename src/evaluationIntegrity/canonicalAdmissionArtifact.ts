@@ -73,7 +73,7 @@ const ATTEMPT_REASON_BY_STATUS = {
 } as const;
 const CANDIDATE_STATUSES = ["runtime_verified_documentation", "verified_candidate_limited", "provisional", "rejected", "safety_blocked", "source_unavailable", "source_inapplicable", "conflicting_evidence"] as const;
 const RETRIEVAL_STATUSES = ["retrieved_text", "retrieval_succeeded_text_unavailable", "unavailable", "failed", "timed_out", "safety_blocked", "unsupported_content_type", "oversized", "malformed", "encrypted"] as const;
-const SEMANTIC_STATUSES = ["not_started", "completed", "failed", "timed_out", "parse_failed", "safety_blocked", "provider_unavailable", "unsupported"] as const;
+const SEMANTIC_STATUSES = ["not_started", "not_eligible", "completed", "failed", "timed_out", "parse_failed", "safety_blocked", "provider_unavailable", "unsupported"] as const;
 const EVIDENCE_DECISIONS = ["verified_classification", "verified_rule", "verified_application", "possible_interpretation", "needs_verification", "conflicting_evidence", "unsupported", "source_unavailable", "source_inapplicable"] as const;
 const SEMANTIC_DECISIONS = ["supports", "partially_supports", "does_not_support", "contradicts", "unsupported"] as const;
 const VERIFIED_EVIDENCE_DECISIONS = new Set(["verified_classification", "verified_rule", "verified_application"]);
@@ -87,6 +87,7 @@ const CANDIDATE_REASON_CODES = new Set([
   "fee_knowledge_url_host_missing", "fee_knowledge_url_invalid", "fee_knowledge_url_port_unsafe", "fee_knowledge_url_private_host",
   "fee_knowledge_url_private_ip", "fee_knowledge_url_scheme_unsafe", "fee_knowledge_dns_empty", "fee_knowledge_validated_address_invalid",
   "fee_knowledge_validated_address_missing", "fee_knowledge_pdf_encrypted", "fee_knowledge_semantic_support_not_run",
+  "fee_knowledge_semantic_not_eligible_claim_support_missing",
   ...EVIDENCE_DECISIONS.map((decision) => `fee_knowledge_${decision}`),
   "fee_knowledge_retrieval_timed_out", "fee_knowledge_semantic_parse_failed", "fee_knowledge_semantic_timed_out",
   "fee_knowledge_semantic_safety_blocked", "fee_knowledge_semantic_unsupported", "fee_knowledge_semantic_failed",
@@ -114,6 +115,7 @@ const RETRIEVAL_REASON_BY_STATUS: Record<(typeof RETRIEVAL_STATUSES)[number], re
 };
 const SEMANTIC_REASON_BY_STATUS: Record<(typeof SEMANTIC_STATUSES)[number], readonly string[]> = {
   not_started: ["fee_knowledge_semantic_support_not_run"],
+  not_eligible: ["fee_knowledge_semantic_not_eligible_claim_support_missing"],
   completed: EVIDENCE_DECISIONS.map((decision) => `fee_knowledge_${decision}`),
   failed: ["fee_knowledge_semantic_failed"],
   timed_out: ["fee_knowledge_semantic_timed_out"],
