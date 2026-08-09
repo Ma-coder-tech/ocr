@@ -4,7 +4,10 @@ import { buildCanonicalAiCapabilities } from "../../src/canonical/buildCanonical
 import { buildCanonicalCustomerState } from "../../src/canonical/customerStateResolver.js";
 import { buildCanonicalRuntimeAnalysisWithRuntimeAi } from "../../src/canonical/runtimeAdapter.js";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
-import { runWholeStatementFeeIntelligenceRuntime } from "../../src/canonical/wholeStatementFeeIntelligenceRuntime.js";
+import {
+  runWholeStatementFeeIntelligenceRuntime,
+  wholeStatementFeeIntelligenceProviderAdapter,
+} from "../../src/canonical/wholeStatementFeeIntelligenceRuntime.js";
 import { buildSingleStatementReportV1 } from "../../src/reporting/v1/index.js";
 import {
   WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION,
@@ -486,6 +489,86 @@ describe("canonical whole-statement fee intelligence review", () => {
     expect(openai.reviewStatus).toBe("completed");
     expect(anthropicSignal).toBeInstanceOf(AbortSignal);
     expect(openAiSignal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("classifies OpenAI structured-output failures before HTTP send as local request construction", async () => {
+    const packet = buildWholeStatementFeeIntelligencePacket(everyRowAnalysis());
+    const adapter = wholeStatementFeeIntelligenceProviderAdapter({
+      enabled: true,
+      provider: "openai",
+      openAiApiKey: "test-key",
+      sdk: {
+        generateObject: async () => {
+          throw new Error("Anthropic must not be reached");
+        },
+        generateText: async () => {
+          throw new Error("OpenAI generateText should not be reached without a model factory");
+        },
+        Output: { object: () => ({}) },
+      },
+    });
+
+    await expect(adapter(packet, { abortSignal: new AbortController().signal }))
+      .rejects.toMatchObject({
+        reasonCodes: expect.arrayContaining([
+          "provider_http_send_not_initiated",
+          "provider_phase_request_construction",
+          "provider_response_not_received",
+          "provider_transport_ai_sdk_generate_text_structured_output",
+        ]),
+        accounting: { requestId: null },
+      });
+  });
+
+  it("preserves safe OpenAI transport trace diagnostics when structured output fails after a provider response", async () => {
+    const originalFetch = globalThis.fetch;
+    const packet = buildWholeStatementFeeIntelligencePacket(everyRowAnalysis());
+    let openAiOptions: { headers?: Record<string, string>; fetch?: typeof fetch } | null = null;
+    globalThis.fetch = (async () => new Response("{}", {
+      status: 200,
+      headers: { "x-request-id": "req_pkg5b_trace_test" },
+    })) as typeof fetch;
+    try {
+      const adapter = wholeStatementFeeIntelligenceProviderAdapter({
+        enabled: true,
+        provider: "openai",
+        openAiApiKey: "test-key",
+        sdk: {
+          generateObject: async () => {
+            throw new Error("Anthropic must not be reached");
+          },
+          generateText: async () => {
+            if (!openAiOptions?.fetch) throw new Error("OpenAI traced fetch missing");
+            await openAiOptions.fetch("https://api.openai.invalid/v1/responses", { method: "POST" });
+            const error = new Error("synthetic structured output handling failure");
+            error.name = "AI_TypeValidationError";
+            throw error;
+          },
+          Output: { object: () => ({}) },
+          createOpenAI: (options) => {
+            openAiOptions = options;
+            return () => ({});
+          },
+        },
+      });
+
+      await expect(adapter(packet, { abortSignal: new AbortController().signal }))
+        .rejects.toMatchObject({
+          reasonCodes: expect.arrayContaining([
+            "provider_http_send_initiated",
+            "provider_http_status_200",
+            "provider_http_status_class_2xx",
+            "provider_phase_sdk_structured_output_handling",
+            "provider_response_received",
+            "provider_sdk_error_class_ai_typevalidationerror",
+            "provider_transport_ai_sdk_generate_text_structured_output",
+          ]),
+          accounting: { requestId: "req_pkg5b_trace_test" },
+        });
+      expect(openAiOptions?.headers?.["x-ratereveal-trace-id"]).toMatch(/^[a-f0-9]{16}$/);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   it("aborts the provider transport on timeout and ignores late provider completion", async () => {
