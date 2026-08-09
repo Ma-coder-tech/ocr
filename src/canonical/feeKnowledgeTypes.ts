@@ -242,7 +242,7 @@ export type FeeKnowledgeResearchCandidateRecord = {
   feeRowRef: string;
   attemptId: string;
   retrievalStatus: FeeKnowledgeRetrievalStatus;
-  semanticVerificationStatus: "not_started" | "completed" | "failed" | "timed_out" | "parse_failed" | "safety_blocked" | "provider_unavailable" | "unsupported";
+  semanticVerificationStatus: "not_started" | "not_eligible" | "completed" | "failed" | "timed_out" | "parse_failed" | "safety_blocked" | "provider_unavailable" | "unsupported";
   canonicalUrl: string | null;
   title: string | null;
   publisher: string | null;

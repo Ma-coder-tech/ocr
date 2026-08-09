@@ -72,6 +72,8 @@ import {
 } from "./liveEvaluationTimeoutPolicy.js";
 import {
   accountingFromProviderUsage,
+  approvedPackage5BPricingPolicy,
+  assertApprovedPackage5BBudgetEnvelopeMetadata,
   assertApprovedLiveCallMetadata,
   calculateWorstCaseCostUsd,
   type SafeProviderUsage,
@@ -392,6 +394,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
           childProviderCallOutcomes,
         });
       }
+      const workUnitOutputCeiling = package5BWorkUnitOutputCeiling(request.approvedCallMetadata, selectedUnits);
       for (const unit of selectedUnits) {
         if (request.approvedCallMetadata.maximumInputTokens !== null && unit.estimatedInputBytes > request.approvedCallMetadata.maximumInputTokens) {
           const reasonCodes = [
@@ -400,7 +403,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
           ];
           workUnitResults.push(package5BWorkUnitNotSelectedByResourceBudget(unit.workUnitRef, reasonCodes));
           childProviderCallOutcomes.push(package5BWorkUnitOutcome({
-            reservation: package5BWorkUnitReservation(request.approvedCallMetadata, unit),
+            reservation: package5BWorkUnitReservation(request.approvedCallMetadata, unit, workUnitOutputCeiling),
             sourceDocumentId: request.sourceDocumentId,
             status: "cancelled_before_send",
             requestId: null,
@@ -408,7 +411,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
           }));
           continue;
         }
-        const unitReservation = package5BWorkUnitReservation(request.approvedCallMetadata, unit);
+        const unitReservation = package5BWorkUnitReservation(request.approvedCallMetadata, unit, workUnitOutputCeiling);
         try {
           request.childBudgetController!.reserve(unitReservation);
         } catch (error) {
@@ -791,12 +794,14 @@ export function createOneTimeStatementEvaluationTransport(input: {
         });
       }
       return result({
-        value: { verifiedCount: 1, supportedCount },
+        value: { verifiedCount: 1, supportedCount, semanticStatus: verified.candidate.semanticVerificationStatus },
         generated: semanticAccounting !== null,
         schemaValid: true,
         evidenceValidated: policyAccepted,
         policyAccepted,
-        reasonCodes: verified.candidate.semanticVerificationStatus === "parse_failed"
+        reasonCodes: verified.candidate.semanticVerificationStatus === "not_eligible"
+          ? verified.candidate.reasonCodes
+          : verified.candidate.semanticVerificationStatus === "parse_failed"
           ? ["fee_knowledge_semantic_json_invalid"]
           : ["fee_knowledge_semantic_verification_completed"],
         accounting: semanticAccounting ?? noRequestAccounting(started),
@@ -901,7 +906,27 @@ export function livePackage5BProviderSettings(metadata: CostReservationInput): {
 }
 
 export function livePackage5BProviderReadiness(metadata: CostReservationInput): OneTimeProviderReadiness {
-  return liveOpenAiProviderReadiness("whole_statement_ai_review", metadata);
+  try {
+    assertApprovedPackage5BBudgetEnvelopeMetadata(metadata);
+    if (!approvedPackage5BPricingPolicy(metadata)) throw new Error("approved_pricing_policy_missing");
+  } catch {
+    return {
+      status: "unavailable_before_send",
+      diagnosticClass: "configuration_invalid",
+      reasonCodes: [providerReadinessReason("whole_statement_ai_review", "configuration_invalid")],
+    };
+  }
+  if (!process.env.OPENAI_API_KEY?.trim()) {
+    return {
+      status: "unavailable_before_send",
+      diagnosticClass: "missing_credential",
+      reasonCodes: [providerReadinessReason("whole_statement_ai_review", "missing_credential")],
+    };
+  }
+  return {
+    status: "ready_to_send",
+    reasonCodes: [providerReadinessReason("whole_statement_ai_review", "ready")],
+  };
 }
 
 function liveOpenAiProviderReadiness(
@@ -1055,10 +1080,15 @@ function workUnitFailureSendStateReason(input: {
 function package5BWorkUnitReservation(
   parent: CostReservationInput,
   unit: WholeStatementFeeIntelligenceWorkUnit,
+  aggregateOutputCeiling: number | null,
 ): CostReservationInput {
-  if (!parent.pricing) throw new Error("package_5b_pricing_policy_required_for_work_unit_reservations");
+  const pricing = approvedPackage5BPricingPolicy(parent);
+  if (!pricing) throw new Error("package_5b_pricing_policy_required_for_work_unit_reservations");
   const maximumInputTokens = Math.min(parent.maximumInputTokens ?? unit.estimatedInputBytes, unit.estimatedInputBytes);
-  const maximumOutputTokens = parent.maximumOutputTokens ?? unit.estimatedOutputTokens;
+  const maximumOutputTokens = Math.min(
+    parent.maximumOutputTokens ?? unit.estimatedOutputTokens,
+    aggregateOutputCeiling ?? unit.outputTokenCeiling ?? unit.estimatedOutputTokens,
+  );
   const maximumToolUses = parent.maximumToolUses ?? 0;
   const reservation: CostReservationInput = {
     ...structuredClone(parent),
@@ -1072,14 +1102,34 @@ function package5BWorkUnitReservation(
     maximumInputTokens,
     maximumOutputTokens,
     maximumToolUses,
+    pricing,
     estimatedMaximumCostUsd: calculateWorstCaseCostUsd({
       maximumInputTokens,
       maximumOutputTokens,
       maximumToolUses,
-      pricing: parent.pricing,
+      pricing,
     }),
   };
   return reservation;
+}
+
+function package5BWorkUnitOutputCeiling(
+  parent: CostReservationInput,
+  units: readonly WholeStatementFeeIntelligenceWorkUnit[],
+): number | null {
+  const pricing = approvedPackage5BPricingPolicy(parent);
+  if (!pricing || parent.maximumOutputTokens === null) return null;
+  const maximumToolUses = parent.maximumToolUses ?? 0;
+  const aggregateFullOutputCost = units.reduce((sum, unit) => {
+    const maximumInputTokens = Math.min(parent.maximumInputTokens ?? unit.estimatedInputBytes, unit.estimatedInputBytes);
+    return sum + calculateWorstCaseCostUsd({
+      maximumInputTokens,
+      maximumOutputTokens: parent.maximumOutputTokens,
+      maximumToolUses,
+      pricing,
+    });
+  }, 0);
+  return aggregateFullOutputCost <= parent.estimatedMaximumCostUsd + 1e-9 ? parent.maximumOutputTokens : null;
 }
 
 function package5BWorkUnitOutcome(input: {
@@ -1516,6 +1566,7 @@ function semanticTerminalStatus(
   status: FeeKnowledgeResearchCandidateRecord["semanticVerificationStatus"],
 ): OneTimeResearchTerminalStatus | null {
   if (status === "completed") return null;
+  if (status === "not_eligible") return null;
   if (status === "provider_unavailable") return null;
   if (status === "timed_out") return "timed_out";
   if (status === "safety_blocked") return "safety_blocked";

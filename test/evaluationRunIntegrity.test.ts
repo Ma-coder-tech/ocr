@@ -926,7 +926,7 @@ describe("evaluation-run integrity", () => {
     expect(result.costLedger.entries.filter((item) => item.requestId !== null && item.operationKind !== "package_5b_work_unit")
       .every((item) => item.billingDisposition === "observed" && item.observedOrEstimatedFinalCostUsd === 0.1)).toBe(true);
     expect(result.costLedger.entries.filter((item) => item.operationKind === "package_5b_work_unit" && item.status === "success")
-      .every((item) => item.billingDisposition === "observed" && item.observedOrEstimatedFinalCostUsd === 0.1)).toBe(true);
+      .every((item) => item.billingDisposition === "observed" && item.observedOrEstimatedFinalCostUsd === FAKE_WHOLE_STATEMENT_OBSERVED_COST_USD)).toBe(true);
     expect(result.costLedger.entries.filter((item) => item.operationKind === "package_5b_work_unit" && item.status === "cancelled_before_send")
       .every((item) => item.billingDisposition === "provider_confirmed_zero" && item.observedOrEstimatedFinalCostUsd === 0)).toBe(true);
     const lifecycle = result.lifecycleLedger.documents[0]!;
@@ -987,7 +987,7 @@ describe("evaluation-run integrity", () => {
     expect(result.costLedger.entries.filter((item) => item.requestId === "request_search_empty")).toHaveLength(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
     expect(result.costLedger.entries.at(-1)).toMatchObject({ status: "success" });
     expect(result.costLedger.entries.filter((item) => item.requestId === null && item.capability !== "ai_sdk").every((item) => item.status === "success" && item.observedOrEstimatedFinalCostUsd === 0 && item.billingDisposition === "provider_confirmed_zero")).toBe(true);
-    const expectedObservedCost = 0.1 * (ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch + invocations.whole);
+    const expectedObservedCost = 0.1 * ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch + FAKE_WHOLE_STATEMENT_OBSERVED_COST_USD * invocations.whole;
     expect(result.costLedger.cumulativeObservedUsd).toBeCloseTo(expectedObservedCost);
     expect(result.costLedger.cumulativeBudgetCommittedUsd).toBeCloseTo(expectedObservedCost);
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
@@ -2217,7 +2217,12 @@ function oneTimePaidCalls() {
   }));
 }
 
+const FAKE_WHOLE_STATEMENT_OBSERVED_COST_USD = 0.001;
+
 function externalRequestResult<T>(value: T, requestId: string, toolType: string) {
+  const observedOrEstimatedFinalCostUsd = toolType === "whole_statement_ai_review"
+    ? FAKE_WHOLE_STATEMENT_OBSERVED_COST_USD
+    : 0.1;
   return {
     type: "one_time_external_request_result_v1" as const,
     value,
@@ -2227,7 +2232,7 @@ function externalRequestResult<T>(value: T, requestId: string, toolType: string)
       inputTokens: 10,
       outputTokens: 2,
       toolEvents: [{ type: toolType, count: 1 }],
-      observedOrEstimatedFinalCostUsd: 0.1,
+      observedOrEstimatedFinalCostUsd,
       billingDisposition: "observed" as const,
     },
   };

@@ -10,6 +10,13 @@ export const LIVE_TRIAL_OUTPUT_LIMITS = {
 
 export const WEB_SEARCH_ACCOUNTING_MAX_ACTIONS = 2;
 
+export const OPENAI_PACKAGE_5B_STRUCTURED_OUTPUT_PRICING: EvaluationPricingPolicy = {
+  uncachedInputUsdPerMillionTokens: 0.75,
+  cachedInputUsdPerMillionTokens: 0.075,
+  outputUsdPerMillionTokens: 4.5,
+  toolUseUsd: 0,
+};
+
 export type SafeProviderUsage = {
   requestId: string | null;
   inputTokens: number | null;
@@ -109,6 +116,33 @@ export function assertApprovedLiveCallMetadata(
   if (metadata.estimatedMaximumCostUsd + 1e-9 < calculated) {
     throw new Error("approved_worst_case_reservation_insufficient");
   }
+}
+
+export function assertApprovedPackage5BBudgetEnvelopeMetadata(metadata: CostReservationInput): void {
+  if (metadata.provider.trim().toLowerCase() !== "openai") throw new Error("approved_live_provider_must_be_openai");
+  if (metadata.providerRoute !== "openai_ai_sdk_generate_text_structured_output") throw new Error("approved_provider_route_inconsistent");
+  if (metadata.toolClass !== "ai_sdk_structured_output") throw new Error("approved_tool_class_inconsistent");
+  if (!metadata.model?.trim()) throw new Error("approved_live_model_missing");
+  if (metadata.maximumInputTokens !== null) requiredPositiveInteger(metadata.maximumInputTokens, "approved maximum input tokens");
+  if (metadata.maximumOutputTokens !== LIVE_TRIAL_OUTPUT_LIMITS.whole_statement_ai_review) {
+    throw new Error("approved_maximum_output_tokens_inconsistent");
+  }
+  if ((metadata.maximumToolUses ?? 0) !== 0) throw new Error("approved_maximum_tool_uses_inconsistent");
+}
+
+export function approvedPackage5BPricingPolicy(
+  metadata: Pick<CostReservationInput, "provider" | "providerRoute" | "model" | "toolClass" | "pricing">,
+): EvaluationPricingPolicy | null {
+  if (metadata.pricing) return requiredPricing(metadata.pricing);
+  if (
+    metadata.provider.trim().toLowerCase() === "openai" &&
+    metadata.providerRoute === "openai_ai_sdk_generate_text_structured_output" &&
+    metadata.toolClass === "ai_sdk_structured_output" &&
+    metadata.model === "gpt-5.4-mini"
+  ) {
+    return OPENAI_PACKAGE_5B_STRUCTURED_OUTPUT_PRICING;
+  }
+  return null;
 }
 
 export function assertUtf8InputWithinApprovedTokenBound(input: string, maximumInputTokens: number | null): void {
