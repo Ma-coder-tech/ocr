@@ -255,7 +255,7 @@ export async function runFeeKnowledgeResearch(input: {
     }
 
     for (const [offset, question] of skippedQuestions.entries()) {
-      attempts.push(attemptRecord(question, selectedQuestions.length + offset, "budget_exhausted", [], ["fee_knowledge_research_budget_exhausted"]));
+      attempts.push(attemptRecord(question, selectedQuestions.length + offset, "not_selected_planning", [], ["fee_knowledge_research_not_selected_planning"]));
     }
 
     return snapshotResearchResult({ attempts, candidates, claimSupports });
@@ -590,16 +590,18 @@ export async function verifyCandidate(input: {
       : semanticSupport.reasonCodes.includes("fee_knowledge_semantic_timed_out") ? "timed_out"
         : semanticSupport.reasonCodes.includes("fee_knowledge_semantic_safety_blocked") ? "safety_blocked"
           : semanticSupport.reasonCodes.some((reason) => [
+              "fee_knowledge_semantic_provider_unavailable_before_send",
               "fee_knowledge_semantic_failed",
               "fee_knowledge_semantic_support_provider_unavailable",
               "fee_knowledge_semantic_support_provider_failed",
-            ].includes(reason)) ? "failed"
+            ].includes(reason)) ? semanticSupport.reasonCodes.includes("fee_knowledge_semantic_provider_unavailable_before_send") ? "provider_unavailable" : "failed"
           : "completed";
   const semanticStateReason = semanticVerificationStatus === "parse_failed" ? "fee_knowledge_semantic_parse_failed"
     : semanticVerificationStatus === "timed_out" ? "fee_knowledge_semantic_timed_out"
       : semanticVerificationStatus === "safety_blocked" ? "fee_knowledge_semantic_safety_blocked"
-        : semanticVerificationStatus === "failed" ? "fee_knowledge_semantic_failed"
-          : `fee_knowledge_${evidenceDecision}`;
+        : semanticVerificationStatus === "provider_unavailable" ? "fee_knowledge_semantic_provider_unavailable_before_send"
+          : semanticVerificationStatus === "failed" ? "fee_knowledge_semantic_failed"
+            : `fee_knowledge_${evidenceDecision}`;
   const candidate: FeeKnowledgeResearchCandidateRecord = candidateRecord(input, attemptId, {
     canonicalUrl,
     verificationStatus: semanticVerificationStatus === "safety_blocked" ? "safety_blocked"
@@ -759,8 +761,8 @@ function terminalResearchSnapshot(input: {
   for (const [index, question] of input.questions.entries()) {
     const questionRef = feeKnowledgeQuestionRef(question, index);
     if (attemptsByQuestion.has(questionRef)) continue;
-    const beyondBudget = index >= FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls;
-    const status = beyondBudget ? "budget_exhausted" : input.status;
+    const beyondSelectedPlan = index >= FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls;
+    const status = beyondSelectedPlan ? "not_selected_planning" : input.status;
     const candidateIds = candidates.filter((candidate) => candidate.questionRef === questionRef).map((candidate) => candidate.candidateId);
     attemptsByQuestion.set(questionRef, attemptRecord(question, index, status, candidateIds, [researchFailureReason(status)]));
   }
@@ -784,6 +786,8 @@ function researchFailureReason(status: FeeKnowledgeResearchAttemptRecord["status
   if (status === "unsupported_model") return "fee_knowledge_web_search_model_unsupported";
   if (status === "safety_blocked") return "fee_knowledge_research_safety_blocked";
   if (status === "budget_exhausted") return "fee_knowledge_research_budget_exhausted";
+  if (status === "not_selected_planning") return "fee_knowledge_research_not_selected_planning";
+  if (status === "provider_unavailable") return "fee_knowledge_web_search_provider_unavailable_before_send";
   if (status === "timed_out") return "fee_knowledge_research_timed_out";
   return "fee_knowledge_research_failed";
 }

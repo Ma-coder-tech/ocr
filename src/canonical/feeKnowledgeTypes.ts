@@ -49,7 +49,12 @@ export type FeeKnowledgeCandidateVerificationStatus =
   | "source_inapplicable"
   | "conflicting_evidence";
 export type FeeKnowledgeResearchAttemptStatus = "completed" | "disabled" | "not_needed" | "failed" | "timed_out" | "safety_blocked";
-export type FeeKnowledgeResearchNonSuccessStatus = FeeKnowledgeResearchAttemptStatus | "budget_exhausted" | "unsupported_model";
+export type FeeKnowledgeResearchNonSuccessStatus =
+  | FeeKnowledgeResearchAttemptStatus
+  | "budget_exhausted"
+  | "not_selected_planning"
+  | "provider_unavailable"
+  | "unsupported_model";
 export type FeeKnowledgeRetrievalStatus =
   | "not_started"
   | "retrieved_text"
@@ -237,7 +242,7 @@ export type FeeKnowledgeResearchCandidateRecord = {
   feeRowRef: string;
   attemptId: string;
   retrievalStatus: FeeKnowledgeRetrievalStatus;
-  semanticVerificationStatus: "not_started" | "completed" | "failed" | "timed_out" | "parse_failed" | "safety_blocked" | "unsupported";
+  semanticVerificationStatus: "not_started" | "completed" | "failed" | "timed_out" | "parse_failed" | "safety_blocked" | "provider_unavailable" | "unsupported";
   canonicalUrl: string | null;
   title: string | null;
   publisher: string | null;

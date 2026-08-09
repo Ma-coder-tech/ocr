@@ -678,7 +678,7 @@ describe("canonical fee knowledge and provenance", () => {
 	    expect(packet.provenanceDecisions.find((decision) => decision.candidateId === unavailable.candidate.candidateId)?.decision).toBe("insufficient_evidence");
 	  });
 
-	  it("triggers research deterministically, preserves row association, and records budget exhaustion", async () => {
+	  it("triggers research deterministically, preserves row association, and records planning skips", async () => {
 	    const analysis = syntheticAnalysisWithRows([
 	      feeRow("feerow_unknown_a", "ev_a", "src_a", "Unknown Assessment", "individual_charge", true, -1000),
 	      feeRow("feerow_unknown_b", "ev_b", "src_b", "Access Review Fee", "individual_charge", true, -900),
@@ -699,7 +699,7 @@ describe("canonical fee knowledge and provenance", () => {
 	    });
 	    expect(questions).toHaveLength(3);
 	    expect(result.attempts.filter((attempt) => attempt.status === "completed")).toHaveLength(2);
-	    expect(result.attempts.filter((attempt) => attempt.status === "budget_exhausted")).toHaveLength(1);
+	    expect(result.attempts.filter((attempt) => attempt.status === "not_selected_planning")).toHaveLength(1);
 	    expect(new Set(result.candidates.map((candidate) => candidate.feeRowRef))).toEqual(new Set(result.attempts.filter((attempt) => attempt.status === "completed").map((attempt) => attempt.feeRowRef)));
 	    expect(result.candidates.every((candidate) => candidate.attemptId.startsWith("research_"))).toBe(true);
 	  });
