@@ -451,6 +451,7 @@ export type EvaluationArtifactV2ValidationErrorCode =
   | "whole_statement_evidence_invalid"
   | "whole_statement_linkage_invalid"
   | "whole_statement_privacy_safety_blocked"
+  | "whole_statement_provider_unavailable"
   | "whole_statement_research_incomplete";
 export type EvaluationArtifactV2ProjectionReasonCode =
   | "artifact_v2_source_quality_failed"

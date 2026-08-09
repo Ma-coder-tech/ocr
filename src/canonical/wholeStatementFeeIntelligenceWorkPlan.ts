@@ -23,6 +23,7 @@ export type WholeStatementFeeIntelligenceWorkUnitStatus =
   | "selected"
   | "not_selected_policy"
   | "not_selected_budget"
+  | "not_attempted_provider_unavailable"
   | "completed"
   | "failed"
   | "timed_out"
@@ -40,6 +41,7 @@ export type WholeStatementFeeIntelligenceWorkUnitOutcomeClass =
   | "timeout_watchdog"
   | "budget_not_selected"
   | "policy_not_selected"
+  | "provider_unavailable_before_send"
   | "validation_rejected"
   | "safety_blocked";
 
@@ -210,6 +212,28 @@ export function notSelectedWholeStatementFeeIntelligenceWorkUnitResult(
   };
 }
 
+export function providerUnavailableWholeStatementFeeIntelligenceWorkUnitResult(input: {
+  workUnitRef: string;
+  reasonCodes?: readonly string[];
+}): WholeStatementFeeIntelligenceWorkUnitResult {
+  return {
+    workUnitRef: input.workUnitRef,
+    status: "not_attempted_provider_unavailable",
+    outcomeClass: "provider_unavailable_before_send",
+    validation: null,
+    requestId: null,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    durationMs: 0,
+    billingDisposition: "provider_confirmed_zero",
+    reasonCodes: unique([
+      "whole_statement_fee_intelligence_provider_unavailable_before_send",
+      ...(input.reasonCodes ?? []),
+    ]).sort(),
+  };
+}
+
 export function classifyWholeStatementFeeIntelligenceWorkUnitFailure(error: unknown): {
   status: "failed" | "timed_out" | "safety_blocked";
   outcomeClass: WholeStatementFeeIntelligenceWorkUnitOutcomeClass;
@@ -337,7 +361,11 @@ export function mergeWholeStatementFeeIntelligenceWorkUnitResults(input: {
     input.registry,
     input.sourcePacket,
   );
-  const notSelectedWorkUnitCount = input.results.filter((result) => result.status === "not_selected_budget" || result.status === "not_selected_policy").length;
+  const notSelectedWorkUnitCount = input.results.filter((result) =>
+    result.status === "not_selected_budget" ||
+    result.status === "not_selected_policy" ||
+    result.status === "not_attempted_provider_unavailable"
+  ).length;
   const unavailableWorkUnitCount = input.results.filter((result) => ["failed", "timed_out", "rejected", "safety_blocked"].includes(result.status)).length;
   return {
     plan: input.plan,

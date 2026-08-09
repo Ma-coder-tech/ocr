@@ -82,6 +82,57 @@ describe("Package 5B manifest-driven admission", () => {
     expect(JSON.parse(await readFile(result.artifactPath, "utf8"))).toEqual(result.artifact);
   }, 30_000);
 
+  it("treats missing Package 5B credentials as pre-send provider unavailability with zero child exposure", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const result = await runManifestDrivenLiveEvaluation({
+        ...fixture.runnerInput,
+        calls: package5BReadinessCalls(),
+        outputArtifactPath: path.join(fixture.directory, "package-5b-provider-readiness-unavailable.json"),
+        oneTimeResearchQuestionsForTesting: () => [],
+      });
+
+      expect(result.finalStatus).toBe("blocked");
+      expect(result.reasonCodes).toEqual(["whole_statement_provider_unavailable"]);
+      expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+      if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+      const admission = result.artifact.canonicalAdmissionResults[0]!;
+      expect(admission.admission.validationErrorCodes).toEqual(["whole_statement_provider_unavailable"]);
+      expect(admission.packageF).toBeNull();
+      expect(admission.package5bWorkPlan?.reviewedFeeRowCount).toBe(0);
+      expect(admission.package5bWorkPlan?.missingFeeRowCount).toBe(admission.package5bWorkPlan?.expectedFeeRowCount);
+      expect(admission.package5bWorkPlan?.selectedWorkUnitCount).toBe(0);
+      expect(admission.package5bWorkPlan?.notSelectedWorkUnitCount).toBe(admission.package5bWorkPlan?.plannedWorkUnitCount);
+      expect(new Set(admission.package5bWorkPlan?.units.map((unit) => unit.status)))
+        .toEqual(new Set(["not_attempted_provider_unavailable"]));
+      expect(new Set(admission.package5bWorkPlan?.units.map((unit) => unit.outcomeClass)))
+        .toEqual(new Set(["provider_unavailable_before_send"]));
+      expect(admission.package5bWorkPlan?.units.every((unit) =>
+        unit.requestId === null &&
+        unit.inputTokens === 0 &&
+        unit.outputTokens === 0 &&
+        unit.billingDisposition === "provider_confirmed_zero" &&
+        unit.reasonCodes.includes("whole_statement_fee_intelligence_provider_credential_unavailable_before_send")
+      )).toBe(true);
+      expect(result.costLedger.entries.filter((entry) => entry.operationKind === "package_5b_work_unit")).toEqual([]);
+      expect(result.providerCallOutcomes.filter((outcome) => outcome.operationKind === "package_5b_work_unit")).toEqual([]);
+      const envelope = result.costLedger.entries.find((entry) => entry.operationKind === "package_5b_budget_envelope");
+      expect(envelope).toMatchObject({
+        status: "success",
+        observedOrEstimatedFinalCostUsd: 0,
+        billingDisposition: "provider_confirmed_zero",
+      });
+      expect(result.costLedger.cumulativeObservedUsd).toBe(0);
+      expect(result.costLedger.cumulativeBudgetCommittedUsd).toBe(0);
+      expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+    } finally {
+      if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousOpenAiKey;
+    }
+  }, 30_000);
+
   it("redacts amount-bearing Clover fee labels before one-time Package 5B outbound services", async () => {
     const fixture = await approvedShortCloverPdfFixture();
     const document = await parsePdfBytes(fixture.bytes);
@@ -1330,6 +1381,31 @@ function fullOneTimeCalls(sourceDocumentId = "doc_one_time_fiserv") {
       estimatedMaximumCostUsd: stage === "whole_statement_ai_review" ? 1 : 0.5,
     },
   })));
+}
+
+function package5BReadinessCalls(sourceDocumentId = "doc_one_time_fiserv") {
+  return fullOneTimeCalls(sourceDocumentId).map((call) => call.stage !== "whole_statement_ai_review"
+    ? call
+    : {
+      ...call,
+      reservation: {
+        ...call.reservation,
+        providerRoute: "openai_ai_sdk_generate_text_structured_output",
+        provider: "openai",
+        model: "gpt-5.4-mini",
+        toolClass: "ai_sdk_structured_output",
+        maximumInputTokens: 30_000,
+        maximumOutputTokens: 5_000,
+        maximumToolUses: 0,
+        pricing: {
+          uncachedInputUsdPerMillionTokens: 0.75,
+          cachedInputUsdPerMillionTokens: 0.075,
+          outputUsdPerMillionTokens: 4.5,
+          toolUseUsd: 0,
+        },
+        estimatedMaximumCostUsd: 0.4,
+      },
+    });
 }
 
 function sourceDocumentIdFromCall(callId: string): string {
