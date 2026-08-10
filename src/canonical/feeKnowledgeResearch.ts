@@ -25,6 +25,11 @@ import {
   type SafeFetch,
 } from "./feeKnowledgeRetrieval.js";
 import { buildRetrievedDocumentIntelligence, buildStatementGroundedIntelligence } from "./feeKnowledgeIntelligence.js";
+import {
+  candidateEvidenceLocatorHash,
+  runFeeKnowledgeInvestigativeIntelligence,
+  type FeeKnowledgeInvestigativeIntelligenceOptions,
+} from "./feeKnowledgeInvestigativeIntelligence.js";
 import { LIVE_EVALUATION_TIMEOUT_POLICY } from "../evaluationIntegrity/liveEvaluationTimeoutPolicy.js";
 import { safeProviderFailureError, safeProviderPostResponseFailureError } from "./providerFailureDiagnostics.js";
 
@@ -121,6 +126,7 @@ export type FeeKnowledgeResearchOptions = {
   resolveHost?: RetrieveDocumentOptions["resolveHost"];
   timeoutMs?: number;
   domainIdentityPolicy?: FeeKnowledgeDomainIdentityPolicy;
+  investigativeIntelligence?: FeeKnowledgeInvestigativeIntelligenceOptions;
 };
 
 export type FeeKnowledgeResearchResult = {
@@ -189,10 +195,21 @@ export async function runFeeKnowledgeResearch(input: {
     const searchAdapter = options.adapter ?? openAiWebSearchAdapter({ apiKey: options.openAiApiKey, modelName: options.openAiModelName, fetchImpl: options.fetchImpl });
     const semanticSupportAdapter =
       options.semanticSupportAdapter ?? openAiSemanticSupportAdapter({ apiKey: options.openAiApiKey, modelName: options.openAiModelName, fetchImpl: options.fetchImpl });
+    const investigativeOptions = options.investigativeIntelligence
+      ? { openAiApiKey: options.openAiApiKey, openAiModelName: options.openAiModelName, fetchImpl: options.fetchImpl, ...options.investigativeIntelligence }
+      : undefined;
     const sourcePacket = buildFeeKnowledgeSourcePacket({ analysis: input.analysis, registry: input.registry });
     const selectedQuestions = input.questions.slice(0, FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls);
     const skippedQuestions = input.questions.slice(FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls);
     let remainingCandidates = FEE_KNOWLEDGE_RESEARCH_LIMITS.maxRetrievalCandidates;
+    intelligence.push(...await runFeeKnowledgeInvestigativeIntelligence({
+      scope: "statement",
+      analysis: input.analysis,
+      questions: selectedQuestions,
+      existingIntelligence: intelligence,
+      options: investigativeOptions,
+      abortSignal,
+    }));
 
     for (const [index, question] of selectedQuestions.entries()) {
       const attemptId = attemptIdFor(question, index);
@@ -232,6 +249,22 @@ export async function runFeeKnowledgeResearch(input: {
             question,
             retrieved,
           }));
+          intelligence.push(...await runFeeKnowledgeInvestigativeIntelligence({
+            scope: "retrieved_document",
+            analysis: input.analysis,
+            questions: [question],
+            existingIntelligence: intelligence,
+            options: investigativeOptions,
+            candidate: {
+              candidateId,
+              attemptId,
+              question,
+              candidateRecord: candidates[pendingIndex]!,
+              retrieved,
+            },
+            abortSignal,
+          }));
+          const aiCandidateEvidenceLocatorHash = candidateEvidenceLocatorHash(intelligence, candidateId);
           const verification = await verifyCandidate({
             candidateId,
             attemptId,
@@ -242,6 +275,7 @@ export async function runFeeKnowledgeResearch(input: {
             semanticSupportAdapter,
             domainIdentityPolicy: options.domainIdentityPolicy,
             priorClaimSupports: [...sourcePacket.claimSupports, ...claimSupports],
+            candidateEvidenceLocatorHash: aiCandidateEvidenceLocatorHash,
             abortSignal,
           });
           candidates[pendingIndex] = verification.candidate;
@@ -511,6 +545,7 @@ export async function verifyCandidate(input: {
   semanticSupport?: FeeKnowledgeSemanticSupportDecision;
   domainIdentityPolicy?: FeeKnowledgeDomainIdentityPolicy;
   priorClaimSupports?: readonly FeeKnowledgeClaimSupportRecord[];
+  candidateEvidenceLocatorHash?: string | null;
   abortSignal?: AbortSignal;
 }): Promise<{ candidate: FeeKnowledgeResearchCandidateRecord; claimSupport: FeeKnowledgeClaimSupportRecord | null }> {
   const attemptId = input.attemptId ?? `research_${stableId([input.question.feeRowRef, input.question.sanitizedQuestionCategory])}`;
@@ -549,6 +584,9 @@ export async function verifyCandidate(input: {
         expectedLocatorTextHash: firstCitation.locator.textHash,
       })
     : firstCitation;
+  const aiCandidateCitation = citation.exists || !input.candidateEvidenceLocatorHash
+    ? citation
+    : citationFromLocatorHash(input.retrieved, input.candidateEvidenceLocatorHash);
   const host = new URL(canonicalUrl).hostname.toLowerCase();
   const publisherDomainVerified = input.question.processorOrNetwork ? verifiedPublisherDomain(host, input.question.processorOrNetwork, input.domainIdentityPolicy) : false;
   const processorMentioned = input.question.processorOrNetwork ? normalizeText(input.retrieved.text).includes(normalizeText(input.question.processorOrNetwork)) : false;
@@ -556,7 +594,7 @@ export async function verifyCandidate(input: {
   const periodApplicable =
     !input.question.statementPeriodYear || normalizeText(input.retrieved.text).includes(input.question.statementPeriodYear) || !/\b20\d{2}\b/.test(input.retrieved.text);
 
-  if (!citation.exists || !citation.locator) {
+  if (!aiCandidateCitation.exists || !aiCandidateCitation.locator) {
     return {
       candidate: candidateRecord(input, attemptId, {
         canonicalUrl,
@@ -582,8 +620,8 @@ export async function verifyCandidate(input: {
           {
             structuredClaim,
             documentFingerprint: input.retrieved.documentFingerprint,
-            locatorTextHash: citation.locator.textHash,
-            boundedEvidenceExcerpt: citation.excerpt,
+            locatorTextHash: aiCandidateCitation.locator.textHash,
+            boundedEvidenceExcerpt: aiCandidateCitation.excerpt,
             applicability: { processorOrNetwork: processorMatched, jurisdiction: null, transactionContext: null, statementPeriod: periodApplicable },
           },
           { abortSignal: input.abortSignal ?? new AbortController().signal },
@@ -638,22 +676,22 @@ export async function verifyCandidate(input: {
     retrievalStatus: input.retrieved.status,
     semanticVerificationStatus,
     safeRetrievalDiagnostics: input.retrieved.safeDiagnostics,
-    locatorHash: citation.locator.textHash,
+    locatorHash: aiCandidateCitation.locator.textHash,
     claimSupportDecisionRef: null,
   });
   const claimSupport: FeeKnowledgeClaimSupportRecord = {
     type: "fee_knowledge_claim_support",
     policyVersion: FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION,
-    claimSupportId: `claimsupport_${stableId([input.question.feeRowRef, input.candidateId, citation.locator.locatorId, evidenceDecision])}`,
+    claimSupportId: `claimsupport_${stableId([input.question.feeRowRef, input.candidateId, aiCandidateCitation.locator.locatorId, evidenceDecision])}`,
     feeRowRef: input.question.feeRowRef,
     sourceId: `runtime_source_${stableId([canonicalUrl])}`,
     claimId: `runtime_claim_${stableId([input.question.feeLabel, input.question.semanticQuestion, structuredClaim.claimKind])}`,
     candidateId: input.candidateId,
     structuredClaim,
     documentFingerprint: input.retrieved.documentFingerprint,
-    evidenceLocator: citation.locator,
-    locatorTextHash: citation.locator.textHash,
-    boundedSafeExcerpt: citation.excerpt,
+    evidenceLocator: aiCandidateCitation.locator,
+    locatorTextHash: aiCandidateCitation.locator.textHash,
+    boundedSafeExcerpt: aiCandidateCitation.excerpt,
     semanticSupport,
     aiSemanticMatchExplanation: "Runtime-discovered source independently retrieved; deterministic citation, fingerprint, locator, applicability, and contradiction checks govern authority.",
     citationExists: true,
@@ -718,6 +756,21 @@ function candidateRecord(
     claimSupportDecisionRef: values.claimSupportDecisionRef,
     displayPermission: "internal_only",
   };
+}
+
+function citationFromLocatorHash(
+  document: RetrievedDocument,
+  locatorTextHash: string,
+): { exists: boolean; locator: NonNullable<RetrievedDocument["locators"][number]> | null; excerpt: string } {
+  if (document.status !== "retrieved_text" || !/^[A-Za-z0-9_.:-]{1,160}$/.test(locatorTextHash)) {
+    return { exists: false, locator: null, excerpt: "" };
+  }
+  const locator = document.locators.find((item) => item.textHash === locatorTextHash) ?? null;
+  if (!locator) return { exists: false, locator: null, excerpt: "" };
+  const start = locator.textStart ?? 0;
+  const end = locator.textEnd ?? Math.min(document.text.length, start + 1200);
+  if (start < 0 || end <= start) return { exists: false, locator: null, excerpt: "" };
+  return { exists: true, locator, excerpt: sanitizeText(document.text.slice(start, Math.min(end, start + 1200)), 1200) };
 }
 
 function candidateAfterRetrieval(
