@@ -402,6 +402,89 @@ describe("evaluation-run integrity", () => {
     });
   });
 
+  it("composes a Package 5B parent envelope and child reservations as one effective budget group", () => {
+    const ledger = new EvaluationCostBudgetLedger(0.2);
+    const parent = costReservation({
+      callId: "package_5b_parent",
+      capability: "ai_sdk",
+      estimatedMaximumCostUsd: 0.1,
+    });
+    ledger.reserve({
+      ...parent,
+      operationKind: "package_5b_budget_envelope",
+      operationRef: "package_5b_budget_envelope",
+      reservationScope: "budget_envelope",
+      pricing: null,
+      maximumOutputTokens: 5_000,
+    });
+    ledger.reserve(package5BChildReservation("package_5b_parent", "unit_a", 0.07));
+    ledger.finalize("package_5b_parent__unit_a", {
+      status: "success",
+      requestId: "request_unit_a",
+      durationMs: 10,
+      inputTokens: 100,
+      outputTokens: 20,
+      observedOrEstimatedFinalCostUsd: 0.03,
+      billingDisposition: "observed",
+    });
+    ledger.reserve(package5BChildReservation("package_5b_parent", "unit_b", 0.07));
+    ledger.finalize("package_5b_parent__unit_b", {
+      status: "success",
+      requestId: "request_unit_b",
+      durationMs: 10,
+      inputTokens: 100,
+      outputTokens: 20,
+      observedOrEstimatedFinalCostUsd: 0.03,
+      billingDisposition: "observed",
+    });
+
+    expect(() => ledger.reserve(package5BChildReservation("package_5b_parent", "unit_c", 0.11))).not.toThrow();
+    expect(ledger.snapshot()).toMatchObject({
+      cumulativeReservedUsd: 0.25,
+      cumulativeBudgetCommittedUsd: 0.17,
+      remainingBudgetUsd: 0.03,
+      blocked: false,
+    });
+    expect(() => ledger.reserve(package5BChildReservation("package_5b_parent", "unit_d", 0.04)))
+      .toThrow("Remaining approved budget cannot cover the Package 5B work-unit reservation.");
+  });
+
+  it("releases the parent Package 5B envelope without erasing observed child spend", () => {
+    const ledger = new EvaluationCostBudgetLedger(0.2);
+    ledger.reserve({
+      ...costReservation({ callId: "package_5b_parent_release", capability: "ai_sdk", estimatedMaximumCostUsd: 0.1 }),
+      operationKind: "package_5b_budget_envelope",
+      operationRef: "package_5b_budget_envelope",
+      reservationScope: "budget_envelope",
+      pricing: null,
+      maximumOutputTokens: 5_000,
+    });
+    ledger.reserve(package5BChildReservation("package_5b_parent_release", "unit_a", 0.07));
+    ledger.finalize("package_5b_parent_release__unit_a", {
+      status: "success",
+      requestId: "request_unit_a",
+      durationMs: 10,
+      inputTokens: 100,
+      outputTokens: 20,
+      observedOrEstimatedFinalCostUsd: 0.03,
+      billingDisposition: "observed",
+    });
+    ledger.finalize("package_5b_parent_release", {
+      status: "success",
+      durationMs: 10,
+      observedOrEstimatedFinalCostUsd: 0,
+      billingDisposition: "provider_confirmed_zero",
+    });
+
+    expect(ledger.snapshot()).toMatchObject({
+      cumulativeReservedUsd: 0.1,
+      cumulativeObservedUsd: 0.03,
+      cumulativeBudgetCommittedUsd: 0.03,
+      cumulativeReleasedUsd: 0.07,
+      remainingBudgetUsd: 0.17,
+    });
+  });
+
   it("keeps Packages B-E invariant when only true runtime metadata changes", () => {
     const before = financialPackages();
     const after = structuredClone(before);
@@ -2229,6 +2312,23 @@ function costReservation(input: {
       toolUseUsd: 0,
     },
     estimatedMaximumCostUsd: input.estimatedMaximumCostUsd,
+  };
+}
+
+function package5BChildReservation(parentCallId: string, operationRef: string, estimatedMaximumCostUsd: number) {
+  return {
+    ...costReservation({
+      callId: `${parentCallId}__${operationRef}`,
+      capability: "ai_sdk",
+      estimatedMaximumCostUsd,
+    }),
+    parentCallId,
+    operationKind: "package_5b_work_unit" as const,
+    operationRef,
+    reservationScope: "provider_send" as const,
+    pricing: null,
+    maximumInputTokens: 10_000,
+    maximumOutputTokens: 5_000,
   };
 }
 

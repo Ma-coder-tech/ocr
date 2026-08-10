@@ -79,24 +79,24 @@ export class EvaluationCostBudgetLedger {
         );
       }
     }
-    const committedBefore = this.committedUnits();
     const envelopeParent = this.coveringEnvelopeFor(input);
+    const committedBefore = this.committedUnits();
+    const committedAfter = envelopeParent
+      ? this.committedUnitsIfEnvelopeChildReserved(envelopeParent, reservationUnits)
+      : committedBefore + reservationUnits;
     if (envelopeParent) {
-      const childReservedUnits = this.entries
-        .filter((entry) => entry.parentCallId === envelopeParent.callId)
-        .reduce((sum, entry) => sum + usdUnits(entry.estimatedMaximumCostUsd), 0);
-      if (childReservedUnits + reservationUnits > usdUnits(envelopeParent.estimatedMaximumCostUsd)) {
+      if (committedAfter > this.approvedBudgetUnits) {
         throw new EvaluationIntegrityError(
           "insufficient_budget_reservation",
-          "Remaining Package 5B envelope budget cannot cover the work-unit reservation.",
+          "Remaining approved budget cannot cover the Package 5B work-unit reservation.",
           {
             parentCallId: envelopeParent.callId,
-            remainingBudgetUsd: unitsUsd(usdUnits(envelopeParent.estimatedMaximumCostUsd) - childReservedUnits),
+            remainingBudgetUsd: unitsUsd(this.approvedBudgetUnits - committedBefore),
             requestedReservationUsd: unitsUsd(reservationUnits),
           },
         );
       }
-    } else if (committedBefore + reservationUnits > this.approvedBudgetUnits) {
+    } else if (committedAfter > this.approvedBudgetUnits) {
       throw new EvaluationIntegrityError(
         "insufficient_budget_reservation",
         "Remaining approved budget cannot cover the call's worst-case reservation.",
@@ -139,13 +139,14 @@ export class EvaluationCostBudgetLedger {
       worstCaseReservedCostUsd: unitsUsd(reservationUnits),
       observedOrEstimatedFinalCostUsd: null,
       billingDisposition: "pending",
-      cumulativeReservedUsd: unitsUsd(this.reservedHistoricalUnits() + reservationUnits),
+      cumulativeReservedUsd: 0,
       cumulativeObservedUsd: unitsUsd(this.observedUnits()),
-      cumulativeBudgetCommittedUsd: unitsUsd(envelopeParent ? committedBefore : committedBefore + reservationUnits),
+      cumulativeBudgetCommittedUsd: 0,
       cumulativeReleasedUsd: unitsUsd(this.releasedUnits()),
-      remainingBudgetUsd: unitsUsd(this.approvedBudgetUnits - committedBefore - (envelopeParent ? 0 : reservationUnits)),
+      remainingBudgetUsd: 0,
     };
     this.entries.push(entry);
+    this.refreshEntryRollups(entry);
     return structuredClone(entry);
   }
 
@@ -168,11 +169,7 @@ export class EvaluationCostBudgetLedger {
     entry.toolEvents = [...(input.toolEvents ?? [])].sort((left, right) => left.type.localeCompare(right.type));
     entry.observedOrEstimatedFinalCostUsd = observedUnits === null ? null : unitsUsd(observedUnits);
     entry.billingDisposition = input.billingDisposition;
-    entry.cumulativeReservedUsd = unitsUsd(this.reservedHistoricalUnits());
-    entry.cumulativeObservedUsd = unitsUsd(this.observedUnits());
-    entry.cumulativeBudgetCommittedUsd = unitsUsd(this.committedUnits());
-    entry.cumulativeReleasedUsd = unitsUsd(this.releasedUnits());
-    entry.remainingBudgetUsd = unitsUsd(this.approvedBudgetUnits - this.committedUnits());
+    this.refreshEntryRollups(entry);
     if (exceededReservation) {
       throw new EvaluationIntegrityError("cost_exceeded_reservation", "Observed cost exceeded the pre-call maximum reservation.", {
         callId,
@@ -190,7 +187,7 @@ export class EvaluationCostBudgetLedger {
       currency: EVALUATION_COST_CURRENCY,
       fixedPointScale: EVALUATION_COST_FIXED_POINT_SCALE,
       approvedBudgetUsd: this.approvedBudgetUsd,
-      cumulativeReservedUsd: unitsUsd(this.reservedHistoricalUnits()),
+      cumulativeReservedUsd: unitsUsd(this.effectiveReservedUnits()),
       cumulativeObservedUsd: unitsUsd(this.observedUnits()),
       cumulativeBudgetCommittedUsd: unitsUsd(committed),
       cumulativeReleasedUsd: unitsUsd(this.releasedUnits()),
@@ -214,8 +211,15 @@ export class EvaluationCostBudgetLedger {
     return structuredClone(entry);
   }
 
-  private reservedHistoricalUnits(): number {
-    return this.entries.reduce((sum, entry) => sum + usdUnits(entry.estimatedMaximumCostUsd), 0);
+  private effectiveReservedUnits(): number {
+    return this.entries.reduce((sum, entry) => {
+      if (entry.parentCallId && this.parentEnvelope(entry)) return sum;
+      if (entry.reservationScope !== "budget_envelope") return sum + usdUnits(entry.estimatedMaximumCostUsd);
+      return sum + Math.max(
+        usdUnits(entry.estimatedMaximumCostUsd),
+        this.childrenOf(entry).reduce((childSum, child) => childSum + usdUnits(child.estimatedMaximumCostUsd), 0),
+      );
+    }, 0);
   }
 
   private observedUnits(): number {
@@ -227,23 +231,18 @@ export class EvaluationCostBudgetLedger {
 
   private committedUnits(): number {
     return this.entries.reduce((sum, entry) => {
-      if (this.isCoveredChildWhileEnvelopeOpen(entry)) return sum;
-      if (entry.reservationScope === "budget_envelope"
-        && entry.status !== "reserved"
-        && entry.billingDisposition !== "pending"
-        && entry.billingDisposition !== "unknown") {
+      const parent = this.parentEnvelope(entry);
+      if (parent && this.envelopeOwnsChildExposure(parent)) return sum;
+      if (entry.reservationScope === "budget_envelope") {
+        if (this.envelopeOwnsChildExposure(entry)) return sum + this.envelopeGroupCommittedUnits(entry);
         return sum;
       }
-      if (entry.status === "reserved" || entry.billingDisposition === "pending" || entry.billingDisposition === "unknown") {
-        return sum + usdUnits(entry.estimatedMaximumCostUsd);
-      }
-      if (entry.billingDisposition === "provider_confirmed_zero") return sum;
-      return sum + usdUnits(entry.observedOrEstimatedFinalCostUsd ?? entry.estimatedMaximumCostUsd);
+      return sum + this.entryCommittedUnits(entry);
     }, 0);
   }
 
   private releasedUnits(): number {
-    return Math.max(0, this.reservedHistoricalUnits() - this.committedUnits());
+    return Math.max(0, this.effectiveReservedUnits() - this.committedUnits());
   }
 
   private coveringEnvelopeFor(input: CostReservationInput): CostLedgerEntry | null {
@@ -255,12 +254,50 @@ export class EvaluationCostBudgetLedger {
     return parent;
   }
 
-  private isCoveredChildWhileEnvelopeOpen(entry: CostLedgerEntry): boolean {
-    if (!entry.parentCallId) return false;
+  private committedUnitsIfEnvelopeChildReserved(parent: CostLedgerEntry, reservationUnits: number): number {
+    const before = this.committedUnits();
+    const currentGroup = this.envelopeGroupCommittedUnits(parent);
+    const currentChildExposure = this.childrenOf(parent)
+      .reduce((sum, child) => sum + this.entryCommittedUnits(child), 0);
+    const nextGroup = Math.max(this.entryCommittedUnits(parent), currentChildExposure + reservationUnits);
+    return before - currentGroup + nextGroup;
+  }
+
+  private envelopeGroupCommittedUnits(parent: CostLedgerEntry): number {
+    const parentExposure = this.entryCommittedUnits(parent);
+    const childExposure = this.childrenOf(parent).reduce((sum, child) => sum + this.entryCommittedUnits(child), 0);
+    return Math.max(parentExposure, childExposure);
+  }
+
+  private entryCommittedUnits(entry: CostLedgerEntry): number {
+    if (entry.status === "reserved" || entry.billingDisposition === "pending" || entry.billingDisposition === "unknown") {
+      return usdUnits(entry.estimatedMaximumCostUsd);
+    }
+    if (entry.billingDisposition === "provider_confirmed_zero") return 0;
+    return usdUnits(entry.observedOrEstimatedFinalCostUsd ?? entry.estimatedMaximumCostUsd);
+  }
+
+  private childrenOf(parent: CostLedgerEntry): CostLedgerEntry[] {
+    return this.entries.filter((entry) => entry.parentCallId === parent.callId);
+  }
+
+  private parentEnvelope(entry: CostLedgerEntry): CostLedgerEntry | null {
+    if (!entry.parentCallId) return null;
     const parent = this.entries.find((item) => item.callId === entry.parentCallId);
-    return Boolean(parent
-      && parent.reservationScope === "budget_envelope"
-      && (parent.status === "reserved" || parent.billingDisposition === "pending" || parent.billingDisposition === "unknown"));
+    return parent?.reservationScope === "budget_envelope" ? parent : null;
+  }
+
+  private envelopeOwnsChildExposure(parent: CostLedgerEntry): boolean {
+    return parent.status === "reserved" || parent.billingDisposition === "pending" || parent.billingDisposition === "unknown";
+  }
+
+  private refreshEntryRollups(entry: CostLedgerEntry): void {
+    const committed = this.committedUnits();
+    entry.cumulativeReservedUsd = unitsUsd(this.effectiveReservedUnits());
+    entry.cumulativeObservedUsd = unitsUsd(this.observedUnits());
+    entry.cumulativeBudgetCommittedUsd = unitsUsd(committed);
+    entry.cumulativeReleasedUsd = unitsUsd(this.releasedUnits());
+    entry.remainingBudgetUsd = unitsUsd(this.approvedBudgetUnits - committed);
   }
 }
 

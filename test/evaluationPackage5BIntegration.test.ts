@@ -243,6 +243,8 @@ describe("Package 5B manifest-driven admission", () => {
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
     if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
     const admission = result.artifact.canonicalAdmissionResults[0]!;
+    expect(admission.admissionDisposition).toBe("admitted");
+    expect(admission.packageF?.output.reviewStatus).toBe("completed");
     const candidate = admission.researchEvidence.candidates[0]!;
     expect(candidate).toMatchObject({
       retrievalStatus: "retrieved_text",
@@ -778,10 +780,9 @@ describe("Package 5B manifest-driven admission", () => {
           ? Array.from({ length: 4 }, (_, index) => researchQuestion(analysis, index))
           : [researchQuestion(analysis)],
         onCanonicalAdmissionProjectedForTesting: mode === "budget" ? (value) => {
-          expect(value.admissionDisposition).toBe("rejected");
-          expect(value.admission.validationErrorCodes).toEqual(["whole_statement_research_incomplete"]);
-          expect(value.package5a).toMatchObject({ executionState: "completed", admissionState: "rejected", finalCanonicalStatus: "rejected" });
-          expect(value.package5a.stageStates).toEqual({ responseParse: "not_observed", schemaValidation: "not_observed", evidenceCitation: "not_observed", sourceQuality: "not_applicable", linkage: "not_observed", deterministicReconciliation: "not_observed", privacySafety: "not_observed" });
+          expect(value.admissionDisposition).toBe("admitted");
+          expect(value.admission.validationErrorCodes).toEqual([]);
+          expect(value.package5a).toMatchObject({ executionState: "completed", admissionState: "admitted", finalCanonicalStatus: "completed" });
           expect(value.researchEvidence.attempts.map((attempt) => [attempt.questionOrdinal, attempt.status]).sort((left, right) => Number(left[0]) - Number(right[0]))).toEqual([[1, "completed"], [2, "completed"], [3, "not_selected_planning"], [4, "not_selected_planning"]]);
           expect(value.researchEvidence.candidates.every((candidate) => candidate.retrievalStatus === "retrieved_text" && candidate.semanticVerificationStatus === "completed")).toBe(true);
           expect(value.researchEvidence.claimSupports.every((support) => support.disposition === "accepted")).toBe(true);
@@ -805,21 +806,25 @@ describe("Package 5B manifest-driven admission", () => {
       expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
       if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
       const admission = result.artifact.canonicalAdmissionResults[0]!;
-      if (mode === "unsupported" || mode === "contradiction") {
+      if (mode === "unsupported" || mode === "contradiction" || mode === "budget") {
         expect(result.finalStatus).toBe("completed");
         expect(admission.admissionDisposition).toBe("admitted");
-        expect(admission.researchEvidence.claimSupports[0]).toMatchObject({
-          evidenceDecision: mode === "unsupported" ? "unsupported" : "conflicting_evidence",
-          disposition: "rejected",
-        });
-        expect(admission.admission.acceptedClaimSupportRefs).toEqual([]);
+        if (mode === "budget") {
+          expect(admission.researchEvidence.attempts.some((attempt) => attempt.status === "not_selected_planning")).toBe(true);
+          expect(admission.admission.acceptedClaimSupportRefs.length).toBeGreaterThan(0);
+        } else {
+          expect(admission.researchEvidence.claimSupports[0]).toMatchObject({
+            evidenceDecision: mode === "unsupported" ? "unsupported" : "conflicting_evidence",
+            disposition: "rejected",
+          });
+          expect(admission.admission.acceptedClaimSupportRefs).toEqual([]);
+        }
       } else {
         expect(result.finalStatus).toBe(mode === "safety" ? "blocked" : "completed");
         expect(admission.admissionDisposition).not.toBe("admitted");
         expect(admission.packageF).toBeNull();
       }
       expect(admission.customerPublished).toBe(false);
-      if (mode === "budget") expect(admission.researchEvidence.attempts.some((attempt) => attempt.status === "not_selected_planning")).toBe(true);
       if (mode === "safety") expect(admission.researchEvidence.candidates.some((candidate) => candidate.retrievalStatus === "safety_blocked")).toBe(true);
     }
   }, 60_000);
@@ -897,7 +902,7 @@ describe("Package 5B manifest-driven admission", () => {
       oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis, 0), researchQuestion(analysis, 1)],
       onCanonicalAdmissionProjectedForTesting: (value) => {
         expect(value.admissionDisposition).toBe("rejected");
-        expect(value.admission).toMatchObject({ executionStatus: "completed", validationStatus: "failed", groundingStatus: "rejected" });
+        expect(value.admission).toMatchObject({ executionStatus: "completed", validationStatus: "passed", groundingStatus: "incomplete" });
         expect(value.package5a).toMatchObject({ executionState: "completed", admissionState: "rejected", finalCanonicalStatus: "rejected" });
         expect(value.researchEvidence.attempts.map((attempt) => attempt.status).sort()).toEqual(["completed", "completed"]);
         expect(value.researchEvidence.candidates.map((candidate) => candidate.semanticVerificationStatus).sort()).toEqual(["completed", "timed_out"]);

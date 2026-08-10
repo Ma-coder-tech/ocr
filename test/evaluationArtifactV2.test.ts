@@ -728,7 +728,7 @@ describe("Evaluation Run Integrity Artifact V2", () => {
   });
 
   it("rejects incomplete research execution inside an admitted result", () => {
-    for (const [status, reason] of [["budget_exhausted", "fee_knowledge_research_budget_exhausted"], ["not_selected_planning", "fee_knowledge_research_not_selected_planning"], ["provider_unavailable", "fee_knowledge_web_search_provider_unavailable_before_send"], ["failed", "fee_knowledge_research_failed"], ["timed_out", "fee_knowledge_research_timed_out"], ["safety_blocked", "fee_knowledge_research_safety_blocked"], ["unsupported_model", "fee_knowledge_web_search_model_unsupported"]]) {
+    for (const [status, reason] of [["budget_exhausted", "fee_knowledge_research_budget_exhausted"], ["provider_unavailable", "fee_knowledge_web_search_provider_unavailable_before_send"], ["failed", "fee_knowledge_research_failed"], ["timed_out", "fee_knowledge_research_timed_out"], ["safety_blocked", "fee_knowledge_research_safety_blocked"], ["unsupported_model", "fee_knowledge_web_search_model_unsupported"]]) {
       const artifact = validArtifact() as unknown as Record<string, any>;
       Object.assign(artifact.canonicalAdmissionResults[0].researchEvidence.attempts[0], { status, reasonCodes: [reason] });
       resign(artifact);
@@ -950,12 +950,16 @@ describe("Evaluation Run Integrity Artifact V2", () => {
       { retrievalStatus: "encrypted", semanticVerificationStatus: "not_started", verificationStatus: "rejected", reasonCodes: ["fee_knowledge_pdf_encrypted", "fee_knowledge_semantic_support_not_run"] },
     ];
     for (const changes of cases) {
-      const valid = candidateStateArtifact();
+      const valid = changes.semanticVerificationStatus === "completed"
+        ? rejectedArtifact() as unknown as Record<string, any>
+        : candidateStateArtifact();
       Object.assign(valid.canonicalAdmissionResults[0].researchEvidence.candidates[1], changes);
       resign(valid);
       expect(verifyEvaluationRunIntegrityArtifactV2(valid)).toBe(true);
 
-      const hostile = candidateStateArtifact();
+      const hostile = changes.semanticVerificationStatus === "completed"
+        ? rejectedArtifact() as unknown as Record<string, any>
+        : candidateStateArtifact();
       Object.assign(hostile.canonicalAdmissionResults[0].researchEvidence.candidates[1], changes, {
         reasonCodes: changes.semanticVerificationStatus === "not_started" ? ["fee_knowledge_semantic_support_not_run"] : ["fee_knowledge_unsupported"],
       });
@@ -974,12 +978,16 @@ describe("Evaluation Run Integrity Artifact V2", () => {
       { semanticVerificationStatus: "unsupported", verificationStatus: "verified_candidate_limited", reasonCodes: ["fee_knowledge_semantic_unsupported", "fee_knowledge_text_retrieved"] },
     ];
     for (const changes of cases) {
-      const valid = candidateStateArtifact();
+      const valid = changes.semanticVerificationStatus === "completed"
+        ? rejectedArtifact() as unknown as Record<string, any>
+        : candidateStateArtifact();
       Object.assign(valid.canonicalAdmissionResults[0].researchEvidence.candidates[1], changes);
       resign(valid);
       expect(verifyEvaluationRunIntegrityArtifactV2(valid)).toBe(true);
 
-      const hostile = candidateStateArtifact();
+      const hostile = changes.semanticVerificationStatus === "completed"
+        ? rejectedArtifact() as unknown as Record<string, any>
+        : candidateStateArtifact();
       Object.assign(hostile.canonicalAdmissionResults[0].researchEvidence.candidates[1], changes, { reasonCodes: ["fee_knowledge_text_retrieved"] });
       expectResignedInvalid(hostile);
     }
