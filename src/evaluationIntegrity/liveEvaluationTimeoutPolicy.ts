@@ -1,6 +1,8 @@
 export type LiveEvaluationTimedStage =
   | "web_search_discovery"
   | "document_retrieval"
+  | "statement_investigative_intelligence"
+  | "retrieved_document_investigative_intelligence"
   | "semantic_verification"
   | "whole_statement_ai_review";
 
@@ -19,6 +21,8 @@ export const LIVE_EVALUATION_TIMEOUT_POLICY = {
   perCallMs: {
     web_search_discovery: 90_000,
     document_retrieval: 30_000,
+    statement_investigative_intelligence: 120_000,
+    retrieved_document_investigative_intelligence: 120_000,
     semantic_verification: 60_000,
     whole_statement_ai_review: 300_000,
   },
@@ -41,6 +45,8 @@ export function liveEvaluationTimeoutReasonCode(
   if (scope === "research_graph") return "fee_knowledge_research_graph_timed_out";
   if (stage === "web_search_discovery") return "fee_knowledge_web_search_timed_out";
   if (stage === "document_retrieval") return "fee_knowledge_retrieval_timed_out";
+  if (stage === "statement_investigative_intelligence") return "fee_knowledge_statement_investigative_timed_out";
+  if (stage === "retrieved_document_investigative_intelligence") return "fee_knowledge_retrieved_document_investigative_timed_out";
   if (stage === "semantic_verification") return "fee_knowledge_semantic_timed_out";
   return "whole_statement_ai_review_timed_out";
 }

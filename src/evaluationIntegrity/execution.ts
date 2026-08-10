@@ -644,7 +644,7 @@ function recordSuccessfulLifecycle(
   if (result.lifecycle?.schemaValid) recordAiLifecycleState({ ledger, sourceDocumentId: source.sourceDocumentId, stateName: "schema_valid", state: "completed", reasonCodes: reasons });
   if (result.lifecycle?.evidenceValidated) recordAiLifecycleState({ ledger, sourceDocumentId: source.sourceDocumentId, stateName: "evidence_validated", state: "completed", reasonCodes: reasons });
   if (result.lifecycle?.policyAccepted) recordAiLifecycleState({ ledger, sourceDocumentId: source.sourceDocumentId, stateName: "policy_accepted", state: "completed", reasonCodes: reasons });
-  if (call.stage === "web_search_discovery" || call.stage === "document_retrieval") {
+  if (call.stage === "web_search_discovery" || call.stage === "document_retrieval" || call.stage === "retrieved_document_investigative_intelligence") {
     const researchStatus = result.researchStageStatus ?? result.researchTerminal?.status;
     const researchState = researchStatus === "safety_blocked" ? "blocked"
       : researchStatus ? "failed" : "completed";
@@ -883,9 +883,11 @@ function assertCallPlan(
   const callIds = calls.map((call) => call.reservation.callId);
   if (new Set(callIds).size !== callIds.length) throw new Error("Manifest-driven evaluation call IDs must be unique.");
   const capabilityByStage = {
+    statement_investigative_intelligence: "investigative_intelligence",
     whole_statement_ai_review: "ai_sdk",
     web_search_discovery: "web_search",
     document_retrieval: "retrieval",
+    retrieved_document_investigative_intelligence: "investigative_intelligence",
     semantic_verification: "semantic_verification",
   } as const;
   for (const call of calls) {
@@ -904,7 +906,7 @@ function assertCallPlan(
     }
   }
   if (adapterId === "one_time_statement_evaluation_v1") {
-    const stageOrder = ["web_search_discovery", "document_retrieval", "semantic_verification", "whole_statement_ai_review"] as const;
+    const stageOrder = ["statement_investigative_intelligence", "web_search_discovery", "document_retrieval", "retrieved_document_investigative_intelligence", "semantic_verification", "whole_statement_ai_review"] as const;
     for (const document of permit.documents) {
       const documentCalls = calls.filter((call) => call.sourceDocumentId === document.sourceDocumentId);
       const ranks = documentCalls.map((call) => stageOrder.indexOf(call.stage));
@@ -914,10 +916,14 @@ function assertCallPlan(
         });
       }
       const counts = Object.fromEntries(stageOrder.map((stage) => [stage, documentCalls.filter((call) => call.stage === stage).length])) as Record<(typeof stageOrder)[number], number>;
-      if (counts.whole_statement_ai_review !== 1
-        || counts.web_search_discovery < 1
-        || counts.document_retrieval < 1
-        || counts.semantic_verification < 1) {
+      const requiredStageMissing = stageOrder.some((stage) => {
+        if (!document.stages.includes(stage)) return false;
+        const count = counts[stage];
+        return stage === "whole_statement_ai_review" || stage === "statement_investigative_intelligence"
+          ? count !== 1
+          : count < 1;
+      });
+      if (requiredStageMissing) {
         throw new EvaluationIntegrityError("manifest_schema_invalid", "One-time evaluation call plan does not contain the exact approved stage population.", {
           sourceDocumentId: document.sourceDocumentId,
         });

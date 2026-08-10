@@ -23,6 +23,13 @@ import { retrieveFeeKnowledgeDocument, type RetrievedDocument } from "../canonic
 import { buildFeeKnowledgeSourcePacket } from "../canonical/feeKnowledgeRegistry.js";
 import { buildRetrievedDocumentIntelligence, buildStatementGroundedIntelligence } from "../canonical/feeKnowledgeIntelligence.js";
 import {
+  OPENAI_INVESTIGATIVE_INTELLIGENCE_MAX_OUTPUT_TOKENS,
+  candidateEvidenceLocatorHash,
+  openAiInvestigativeIntelligenceAdapter,
+  runFeeKnowledgeInvestigativeIntelligence,
+  type FeeKnowledgeInvestigativeIntelligenceAdapter,
+} from "../canonical/feeKnowledgeInvestigativeIntelligence.js";
+import {
   FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
   type ApprovedFeeKnowledgeSourceRegistry,
   type FeeKnowledgeClaimSupportRecord,
@@ -110,11 +117,15 @@ export type OneTimeProviderReadiness =
   | { status: "unavailable_before_send"; reasonCodes: string[]; diagnosticClass: "missing_credential" | "provider_route_unavailable" | "configuration_invalid" };
 
 export type OneTimeStatementEvaluationServices = {
+  statementInvestigativeIntelligenceReadiness: (context: { approvedCallMetadata: CostReservationInput }) => OneTimeProviderReadiness;
+  statementInvestigativeIntelligence: (request: Parameters<FeeKnowledgeInvestigativeIntelligenceAdapter>[0], context: OneTimeServiceContext) => Promise<ServiceResponse<Awaited<ReturnType<FeeKnowledgeInvestigativeIntelligenceAdapter>>>>;
   wholeStatementReviewReadiness: (context: { approvedCallMetadata: CostReservationInput }) => OneTimeProviderReadiness;
   wholeStatementReview: (packet: Parameters<WholeStatementFeeIntelligenceRuntimeAdapter>[0], context: OneTimeServiceContext) => Promise<ServiceResponse<unknown>>;
   webSearchDiscoveryReadiness: (context: { approvedCallMetadata: CostReservationInput }) => OneTimeProviderReadiness;
   webSearchDiscovery: (request: Parameters<FeeKnowledgeSearchAdapter>[0], context: OneTimeServiceContext) => Promise<ServiceResponse<FeeKnowledgeDiscoveryCandidate[]>>;
   documentRetrieval: (url: string, options: Parameters<typeof retrieveFeeKnowledgeDocument>[1] & { approvedCallMetadata: CostReservationInput }) => Promise<ServiceResponse<RetrievedDocument>>;
+  retrievedDocumentInvestigativeIntelligenceReadiness: (context: { approvedCallMetadata: CostReservationInput }) => OneTimeProviderReadiness;
+  retrievedDocumentInvestigativeIntelligence: (request: Parameters<FeeKnowledgeInvestigativeIntelligenceAdapter>[0], context: OneTimeServiceContext) => Promise<ServiceResponse<Awaited<ReturnType<FeeKnowledgeInvestigativeIntelligenceAdapter>>>>;
   semanticVerificationReadiness: (context: { approvedCallMetadata: CostReservationInput }) => OneTimeProviderReadiness;
   semanticVerification: (request: Parameters<FeeKnowledgeSemanticSupportAdapter>[0], context: OneTimeServiceContext) => Promise<ServiceResponse<Awaited<ReturnType<FeeKnowledgeSemanticSupportAdapter>>>>;
 };
@@ -160,8 +171,10 @@ type OneTimePrivateContext = {
   intelligence: FeeKnowledgeIntelligenceRecord[];
   claimSupports: FeeKnowledgeClaimSupportRecord[];
   validation: CanonicalWholeStatementFeeIntelligenceValidationResult | null;
+  statementInvestigativeCompleted: boolean;
   searchCursor: number;
   retrievalCursor: number;
+  retrievedDocumentInvestigativeCursor: number;
   semanticCursor: number;
   lastStageRank: number;
   wholeStatementReviewCount: number;
@@ -171,8 +184,10 @@ type OneTimePrivateContext = {
 };
 
 export const ONE_TIME_RESEARCH_REQUEST_SLOTS = {
+  statementInvestigation: 1,
   webSearch: FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls,
   retrieval: FEE_KNOWLEDGE_RESEARCH_LIMITS.maxRetrievalCandidates,
+  retrievedDocumentInvestigation: FEE_KNOWLEDGE_RESEARCH_LIMITS.maxRetrievalCandidates,
   semanticVerification: FEE_KNOWLEDGE_RESEARCH_LIMITS.maxRetrievalCandidates,
 } as const;
 
@@ -248,8 +263,10 @@ export async function prepareOneTimeStatementEvaluationSource(input: {
       intelligence: buildStatementGroundedIntelligence({ analysis: canonical.analysis, questions }),
       claimSupports: [],
       validation: null,
+      statementInvestigativeCompleted: false,
       searchCursor: 0,
       retrievalCursor: 0,
+      retrievedDocumentInvestigativeCursor: 0,
       semanticCursor: 0,
       lastStageRank: -1,
       wholeStatementReviewCount: 0,
@@ -559,6 +576,64 @@ export function createOneTimeStatementEvaluationTransport(input: {
       });
     }
 
+    if (request.stage === "statement_investigative_intelligence") {
+      if (context.statementInvestigativeCompleted) {
+        return result({
+          value: { intelligenceCount: context.intelligence.length, scope: "statement", status: "not_needed" },
+          generated: false,
+          schemaValid: true,
+          policyAccepted: false,
+          reasonCodes: ["fee_knowledge_statement_investigative_not_needed"],
+          accounting: noRequestAccounting(started),
+        });
+      }
+      const readiness = services.statementInvestigativeIntelligenceReadiness({
+        approvedCallMetadata: structuredClone(request.approvedCallMetadata),
+      });
+      const existingIntelligence = structuredClone(context.intelligence);
+      let investigativeAccounting: RepositoryProviderTransportResult["accounting"] | null = null;
+      const records = await runWithinPreparedResearchDeadline(context, "statement_investigative_intelligence", async (abortSignal) =>
+        runFeeKnowledgeInvestigativeIntelligence({
+          scope: "statement",
+          analysis: context.analysis,
+          questions: context.packet.research.questions,
+          existingIntelligence,
+          options: {
+            enabled: true,
+            adapter: async (investigativeRequest, investigativeContext) => {
+              if (readiness.status === "unavailable_before_send") throw new Error(readiness.reasonCodes[0] ?? "fee_knowledge_ai_investigative_unavailable_before_send");
+              const response = unwrapExternalRequestResult(
+                await services.statementInvestigativeIntelligence(investigativeRequest, {
+                  abortSignal: investigativeContext.abortSignal,
+                  approvedCallMetadata: structuredClone(request.approvedCallMetadata),
+                }),
+                started,
+                "investigative_intelligence",
+              );
+              investigativeAccounting = response.accounting;
+              return response.value;
+            },
+          },
+          abortSignal,
+        }));
+      context.intelligence.push(...records);
+      context.statementInvestigativeCompleted = true;
+      const generated = investigativeAccounting !== null;
+      const reasonCodes = readiness.status === "unavailable_before_send"
+        ? readiness.reasonCodes
+        : records.length > 0
+          ? ["fee_knowledge_statement_investigative_completed"]
+          : ["fee_knowledge_statement_investigative_no_findings"];
+      return result({
+        value: { intelligenceCount: records.length, totalIntelligenceCount: context.intelligence.length, scope: "statement" },
+        generated,
+        schemaValid: true,
+        policyAccepted: false,
+        reasonCodes,
+        accounting: investigativeAccounting ?? noRequestAccounting(started),
+      });
+    }
+
     if (request.stage === "web_search_discovery") {
       const questions = context.packet.research.questions.slice(0, context.packet.research.limits.maxSearchCalls);
       const questionOrdinal = context.searchCursor++;
@@ -709,6 +784,70 @@ export function createOneTimeStatementEvaluationTransport(input: {
       });
     }
 
+    if (request.stage === "retrieved_document_investigative_intelligence") {
+      const item = context.retrieved[context.retrievedDocumentInvestigativeCursor++];
+      if (!item) {
+        return result({
+          value: { intelligenceCount: 0, scope: "retrieved_document", status: "not_needed" },
+          generated: false,
+          schemaValid: true,
+          policyAccepted: false,
+          reasonCodes: ["fee_knowledge_retrieved_document_investigative_not_needed"],
+          accounting: noRequestAccounting(started),
+        });
+      }
+      const readiness = services.retrievedDocumentInvestigativeIntelligenceReadiness({
+        approvedCallMetadata: structuredClone(request.approvedCallMetadata),
+      });
+      const existingIntelligence = structuredClone(context.intelligence);
+      let investigativeAccounting: RepositoryProviderTransportResult["accounting"] | null = null;
+      const records = await runWithinPreparedResearchDeadline(context, "retrieved_document_investigative_intelligence", async (abortSignal) =>
+        runFeeKnowledgeInvestigativeIntelligence({
+          scope: "retrieved_document",
+          analysis: context.analysis,
+          questions: [item.question],
+          existingIntelligence,
+          candidate: {
+            candidateId: item.candidateId,
+            attemptId: item.attemptId,
+            question: item.question,
+            candidateRecord: context.candidates.find((candidate) => candidate.candidateId === item.candidateId) ?? null,
+            retrieved: item.retrieved,
+          },
+          options: {
+            enabled: true,
+            adapter: async (investigativeRequest, investigativeContext) => {
+              if (readiness.status === "unavailable_before_send") throw new Error(readiness.reasonCodes[0] ?? "fee_knowledge_ai_investigative_unavailable_before_send");
+              const response = unwrapExternalRequestResult(
+                await services.retrievedDocumentInvestigativeIntelligence(investigativeRequest, {
+                  abortSignal: investigativeContext.abortSignal,
+                  approvedCallMetadata: structuredClone(request.approvedCallMetadata),
+                }),
+                started,
+                "investigative_intelligence",
+              );
+              investigativeAccounting = response.accounting;
+              return response.value;
+            },
+          },
+          abortSignal,
+        }));
+      context.intelligence.push(...records);
+      return result({
+        value: { intelligenceCount: records.length, totalIntelligenceCount: context.intelligence.length, scope: "retrieved_document", candidateId: item.candidateId },
+        generated: investigativeAccounting !== null,
+        schemaValid: true,
+        policyAccepted: false,
+        reasonCodes: readiness.status === "unavailable_before_send"
+          ? readiness.reasonCodes
+          : records.length > 0
+            ? ["fee_knowledge_retrieved_document_investigative_completed"]
+            : ["fee_knowledge_retrieved_document_investigative_no_findings"],
+        accounting: investigativeAccounting ?? noRequestAccounting(started),
+        researchRetrievalRefs: [item.candidateId],
+      });
+    }
+
     if (request.stage === "semantic_verification") {
       const item = context.retrieved[context.semanticCursor++];
       if (!item) {
@@ -758,6 +897,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
               return response.value;
             },
             priorClaimSupports: context.claimSupports,
+            candidateEvidenceLocatorHash: candidateEvidenceLocatorHash(context.intelligence, item.candidateId),
             abortSignal,
           }));
       } catch (error) {
@@ -828,6 +968,14 @@ export function createOneTimeStatementEvaluationTransport(input: {
 }
 
 function defaultServices(overrides: Partial<OneTimeStatementEvaluationServices> = {}): OneTimeStatementEvaluationServices {
+  const statementInvestigativeIntelligenceReadiness = overrides.statementInvestigativeIntelligenceReadiness
+    ?? (overrides.statementInvestigativeIntelligence
+      ? (() => ({ status: "ready_to_send", reasonCodes: ["fee_knowledge_statement_investigative_provider_ready_to_send"] }) satisfies OneTimeProviderReadiness)
+      : ((context: { approvedCallMetadata: CostReservationInput }) => liveOpenAiProviderReadiness("statement_investigative_intelligence", context.approvedCallMetadata)));
+  const retrievedDocumentInvestigativeIntelligenceReadiness = overrides.retrievedDocumentInvestigativeIntelligenceReadiness
+    ?? (overrides.retrievedDocumentInvestigativeIntelligence
+      ? (() => ({ status: "ready_to_send", reasonCodes: ["fee_knowledge_retrieved_document_investigative_provider_ready_to_send"] }) satisfies OneTimeProviderReadiness)
+      : ((context: { approvedCallMetadata: CostReservationInput }) => liveOpenAiProviderReadiness("retrieved_document_investigative_intelligence", context.approvedCallMetadata)));
   const readinessOverride = overrides.wholeStatementReviewReadiness
     ?? (overrides.wholeStatementReview
       ? (() => ({ status: "ready_to_send", reasonCodes: ["whole_statement_fee_intelligence_provider_ready_to_send"] }) satisfies OneTimeProviderReadiness)
@@ -841,6 +989,23 @@ function defaultServices(overrides: Partial<OneTimeStatementEvaluationServices> 
       ? (() => ({ status: "ready_to_send", reasonCodes: ["fee_knowledge_semantic_provider_ready_to_send"] }) satisfies OneTimeProviderReadiness)
       : ((context: { approvedCallMetadata: CostReservationInput }) => liveOpenAiProviderReadiness("semantic_verification", context.approvedCallMetadata)));
   return {
+    statementInvestigativeIntelligenceReadiness,
+    statementInvestigativeIntelligence: overrides.statementInvestigativeIntelligence ?? (async (request, context) => {
+      assertApprovedLiveCallMetadata("statement_investigative_intelligence", context.approvedCallMetadata);
+      const started = Date.now();
+      let usage: OpenAiResponsesSafeUsage | null = null;
+      const value = await openAiInvestigativeIntelligenceAdapter({
+        openAiModelName: context.approvedCallMetadata.model ?? undefined,
+        maximumInputBytes: context.approvedCallMetadata.maximumInputTokens ?? undefined,
+        maximumOutputTokens: OPENAI_INVESTIGATIVE_INTELLIGENCE_MAX_OUTPUT_TOKENS,
+        onUsage: (observed) => { usage = observed; },
+      })(request, context);
+      return externalResult(value, accountingFromProviderUsage({
+        usage: openAiResponsesSafeUsageForAccounting(usage),
+        approvedCallMetadata: context.approvedCallMetadata,
+        durationMs: Math.max(0, Date.now() - started),
+      }));
+    }),
     wholeStatementReviewReadiness: readinessOverride,
     wholeStatementReview: overrides.wholeStatementReview ?? (async (packet, context) => {
       const providerSettings = livePackage5BProviderSettings(context.approvedCallMetadata);
@@ -880,6 +1045,23 @@ function defaultServices(overrides: Partial<OneTimeStatementEvaluationServices> 
         abortSignal: options.abortSignal,
       });
       return externalResult(value, noRequestAccounting(started));
+    }),
+    retrievedDocumentInvestigativeIntelligenceReadiness,
+    retrievedDocumentInvestigativeIntelligence: overrides.retrievedDocumentInvestigativeIntelligence ?? (async (request, context) => {
+      assertApprovedLiveCallMetadata("retrieved_document_investigative_intelligence", context.approvedCallMetadata);
+      const started = Date.now();
+      let usage: OpenAiResponsesSafeUsage | null = null;
+      const value = await openAiInvestigativeIntelligenceAdapter({
+        openAiModelName: context.approvedCallMetadata.model ?? undefined,
+        maximumInputBytes: context.approvedCallMetadata.maximumInputTokens ?? undefined,
+        maximumOutputTokens: OPENAI_INVESTIGATIVE_INTELLIGENCE_MAX_OUTPUT_TOKENS,
+        onUsage: (observed) => { usage = observed; },
+      })(request, context);
+      return externalResult(value, accountingFromProviderUsage({
+        usage: openAiResponsesSafeUsageForAccounting(usage),
+        approvedCallMetadata: context.approvedCallMetadata,
+        durationMs: Math.max(0, Date.now() - started),
+      }));
     }),
     semanticVerificationReadiness,
     semanticVerification: overrides.semanticVerification ?? (async (request, context) => {
@@ -944,7 +1126,7 @@ export function livePackage5BProviderReadiness(metadata: CostReservationInput): 
 }
 
 function liveOpenAiProviderReadiness(
-  stage: "whole_statement_ai_review" | "web_search_discovery" | "semantic_verification",
+  stage: "whole_statement_ai_review" | "statement_investigative_intelligence" | "web_search_discovery" | "retrieved_document_investigative_intelligence" | "semantic_verification",
   metadata: CostReservationInput,
 ): OneTimeProviderReadiness {
   try {
@@ -970,7 +1152,7 @@ function liveOpenAiProviderReadiness(
 }
 
 function providerReadinessReason(
-  stage: "whole_statement_ai_review" | "web_search_discovery" | "semantic_verification",
+  stage: "whole_statement_ai_review" | "statement_investigative_intelligence" | "web_search_discovery" | "retrieved_document_investigative_intelligence" | "semantic_verification",
   state: "ready" | "missing_credential" | "configuration_invalid",
 ): string {
   if (stage === "whole_statement_ai_review") {
@@ -982,6 +1164,16 @@ function providerReadinessReason(
     if (state === "ready") return "fee_knowledge_web_search_provider_ready_to_send";
     if (state === "missing_credential") return "fee_knowledge_web_search_provider_unavailable_before_send";
     return "fee_knowledge_web_search_provider_configuration_invalid_before_send";
+  }
+  if (stage === "statement_investigative_intelligence") {
+    if (state === "ready") return "fee_knowledge_statement_investigative_provider_ready_to_send";
+    if (state === "missing_credential") return "fee_knowledge_statement_investigative_provider_unavailable_before_send";
+    return "fee_knowledge_statement_investigative_provider_configuration_invalid_before_send";
+  }
+  if (stage === "retrieved_document_investigative_intelligence") {
+    if (state === "ready") return "fee_knowledge_retrieved_document_investigative_provider_ready_to_send";
+    if (state === "missing_credential") return "fee_knowledge_retrieved_document_investigative_provider_unavailable_before_send";
+    return "fee_knowledge_retrieved_document_investigative_provider_configuration_invalid_before_send";
   }
   if (state === "ready") return "fee_knowledge_semantic_provider_ready_to_send";
   if (state === "missing_credential") return "fee_knowledge_semantic_provider_unavailable_before_send";
@@ -1483,6 +1675,7 @@ function completeResearchAfterTerminal(context: OneTimePrivateContext): void {
     updateFailedCandidate(context, candidate, "semantic", status);
   }
   context.retrievalCursor = context.discovered.length;
+  context.retrievedDocumentInvestigativeCursor = context.retrieved.length;
   context.semanticCursor = context.retrieved.length;
 }
 
@@ -1494,10 +1687,12 @@ function assertOneTimeStageTransition(
     throw new Error("one_time_research_already_terminal");
   }
   const ranks = {
-    web_search_discovery: 0,
-    document_retrieval: 1,
-    semantic_verification: 2,
-    whole_statement_ai_review: 3,
+    statement_investigative_intelligence: 0,
+    web_search_discovery: 1,
+    document_retrieval: 2,
+    retrieved_document_investigative_intelligence: 3,
+    semantic_verification: 4,
+    whole_statement_ai_review: 5,
   } as const;
   if (!(stage in ranks)) throw new Error("one_time_evaluation_stage_not_supported");
   const rank = ranks[stage as keyof typeof ranks];
@@ -1547,7 +1742,7 @@ function researchProviderFailureReason(status: FeeKnowledgeResearchAttemptRecord
 
 async function runWithinPreparedResearchDeadline<T>(
   context: OneTimePrivateContext,
-  stage: "web_search_discovery" | "document_retrieval" | "semantic_verification",
+  stage: "statement_investigative_intelligence" | "web_search_discovery" | "document_retrieval" | "retrieved_document_investigative_intelligence" | "semantic_verification",
   operation: (abortSignal: AbortSignal) => Promise<T>,
 ): Promise<T> {
   if (context.researchTerminalStatus !== null) throw liveEvaluationTimeoutError(stage, "research_graph");

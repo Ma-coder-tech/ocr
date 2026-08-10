@@ -22,10 +22,12 @@ const manifestPath = path.join(outputDir, "evaluation-source-manifest-v1.json");
 const artifactPath = path.join(outputDir, "evaluation-run-integrity-dry-run.json");
 const fullStages: EvaluationExecutionStage[] = [
   "parser",
-  "whole_statement_ai_review",
+  "statement_investigative_intelligence",
   "web_search_discovery",
   "document_retrieval",
+  "retrieved_document_investigative_intelligence",
   "semantic_verification",
+  "whole_statement_ai_review",
   "canonical_admission",
   "customer_publication",
   "final_artifact",

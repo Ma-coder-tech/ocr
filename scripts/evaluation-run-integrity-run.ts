@@ -130,22 +130,26 @@ function validateSourceBindings(bindings: SourceBinding[], expectedRefs: string[
 
 function capabilityForStage(stage: (typeof paidEvaluationStages)[number]) {
   const mapping = {
+    statement_investigative_intelligence: "investigative_intelligence",
     whole_statement_ai_review: "ai_sdk",
     web_search_discovery: "web_search",
     document_retrieval: "retrieval",
+    retrieved_document_investigative_intelligence: "investigative_intelligence",
     semantic_verification: "semantic_verification",
   } as const;
   return mapping[stage];
 }
 
 function requestSlots(stage: (typeof paidEvaluationStages)[number]): number {
+  if (stage === "statement_investigative_intelligence") return 1;
   if (stage === "web_search_discovery") return ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch;
   if (stage === "document_retrieval") return ONE_TIME_RESEARCH_REQUEST_SLOTS.retrieval;
+  if (stage === "retrieved_document_investigative_intelligence") return ONE_TIME_RESEARCH_REQUEST_SLOTS.retrievedDocumentInvestigation;
   if (stage === "semantic_verification") return ONE_TIME_RESEARCH_REQUEST_SLOTS.semanticVerification;
   return 1;
 }
 
 function orderedPaidStages(stages: readonly string[]): string[] {
-  const order = ["web_search_discovery", "document_retrieval", "semantic_verification", "whole_statement_ai_review"];
+  const order = ["statement_investigative_intelligence", "web_search_discovery", "document_retrieval", "retrieved_document_investigative_intelligence", "semantic_verification", "whole_statement_ai_review"];
   return [...stages].sort((left, right) => order.indexOf(left) - order.indexOf(right));
 }

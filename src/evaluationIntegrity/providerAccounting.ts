@@ -4,6 +4,8 @@ import { safeProviderPostResponseFailureError } from "../canonical/providerFailu
 
 export const LIVE_TRIAL_OUTPUT_LIMITS = {
   whole_statement_ai_review: 5_000,
+  statement_investigative_intelligence: 3_200,
+  retrieved_document_investigative_intelligence: 3_200,
   web_search_discovery: 2_000,
   semantic_verification: 1_000,
 } as const;
