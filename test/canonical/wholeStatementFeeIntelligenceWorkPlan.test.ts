@@ -46,6 +46,56 @@ describe("whole-statement fee intelligence work plan", () => {
     expect(classified.reasonCodes).not.toContain("whole_statement_fee_intelligence_work_unit_send_status_uncertain");
   });
 
+  it("classifies post-response AI SDK structured-output failures without calling them network failures", () => {
+    const error = Object.assign(new Error("No object generated."), {
+      name: "SafeProviderFailureError",
+      reasonCode: "provider_structured_output_failed",
+      reasonCodes: [
+        "provider_http_send_initiated",
+        "provider_http_status_200",
+        "provider_http_status_class_2xx",
+        "provider_phase_sdk_structured_output_handling",
+        "provider_response_received",
+        "provider_sdk_error_class_ai_nooutputgeneratederror",
+        "provider_structured_output_failed",
+        "provider_transport_ai_sdk_generate_text_structured_output",
+      ],
+      accounting: {
+        requestId: "req_safe_structured_output",
+        inputTokens: 100,
+        cachedInputTokens: 10,
+        outputTokens: 2_500,
+      },
+    });
+
+    const classified = classifyWholeStatementFeeIntelligenceWorkUnitFailure(error);
+
+    expect(classified).toMatchObject({
+      status: "failed",
+      outcomeClass: "provider_schema_failed",
+      requestId: "req_safe_structured_output",
+      inputTokens: 100,
+      cachedInputTokens: 10,
+      outputTokens: 2_500,
+    });
+    expect(classified.reasonCodes).toContain("provider_structured_output_failed");
+    expect(classified.reasonCodes).not.toContain("provider_network_failed");
+  });
+
+  it("sizes Package 5B output ceilings from empirical structured-output headroom", () => {
+    const planFor = (rowCount: number) => {
+      const analysis = expandedAnalysis(rowCount);
+      const sourcePacket = buildFeeKnowledgeSourcePacket({ analysis, registry: null });
+      const packet = buildWholeStatementFeeIntelligencePacket(analysis, { approvedExternalSourceRefs: [] }, sourcePacket);
+      return buildWholeStatementFeeIntelligenceWorkPlan({ packet, mode: "comprehensive", limits: { maxRowsPerUnit: rowCount } });
+    };
+
+    expect(planFor(8).units[0]!.estimatedOutputTokens).toBe(2_500);
+    expect(planFor(10).units[0]!.estimatedOutputTokens).toBe(2_600);
+    expect(planFor(18).units[0]!.estimatedOutputTokens).toBe(4_120);
+    expect(planFor(30).units[0]!.estimatedOutputTokens).toBe(5_000);
+  });
+
   it("uses the exact latest five-statement live artifact row counts as offline sizing fixtures", async () => {
     const artifact = await latestLiveArtifact();
     const rowCounts = artifact.canonicalAdmissionResults
@@ -198,7 +248,7 @@ describe("whole-statement fee intelligence work plan", () => {
     const plan = buildWholeStatementFeeIntelligenceWorkPlan({
       packet,
       mode: "comprehensive",
-      limits: { maxRowsPerUnit: 18, maxAggregateOutputTokens: 4_500 },
+      limits: { maxRowsPerUnit: 18, maxAggregateOutputTokens: 7_000 },
     });
 
     expect(plan.units.some((unit) => unit.status === "not_selected_budget")).toBe(true);
@@ -230,11 +280,11 @@ describe("whole-statement fee intelligence work plan", () => {
       ordinal: unit.ordinal,
       rowCount: unit.expectedFeeRowRefs.length,
       maximumInputTokens: unit.estimatedInputBytes,
-      maximumOutputTokens: 5_000,
+      maximumOutputTokens: unit.estimatedOutputTokens,
       maximumToolUses: 0,
       worstCaseCostUsd: calculateWorstCaseCostUsd({
         maximumInputTokens: unit.estimatedInputBytes,
-        maximumOutputTokens: 5_000,
+        maximumOutputTokens: unit.estimatedOutputTokens,
         maximumToolUses: 0,
         pricing,
       }),
@@ -256,17 +306,27 @@ describe("whole-statement fee intelligence work plan", () => {
       25955,
       12739,
     ]);
-    expect(workUnits.map((unit) => unit.worstCaseCostUsd)).toEqual([
-      0.04200975,
-      0.042258,
-      0.04197525,
-      0.04197975,
-      0.04224225,
-      0.04201275,
-      0.04196625,
-      0.03205425,
+    expect(workUnits.map((unit) => unit.maximumOutputTokens)).toEqual([
+      4_120,
+      4_120,
+      4_120,
+      4_120,
+      4_120,
+      4_120,
+      4_120,
+      2_500,
     ]);
-    expect(worstCaseTotalUsd).toBe(0.32649825);
+    expect(workUnits.map((unit) => unit.worstCaseCostUsd)).toEqual([
+      0.03804975,
+      0.038298,
+      0.03801525,
+      0.03801975,
+      0.03828225,
+      0.03805275,
+      0.03800625,
+      0.02080425,
+    ]);
+    expect(worstCaseTotalUsd).toBe(0.28752825);
     expect(worstCaseTotalUsd).toBeLessThan(2);
   }, 30_000);
 });

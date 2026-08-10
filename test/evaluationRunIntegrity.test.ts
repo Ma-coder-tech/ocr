@@ -1085,6 +1085,47 @@ describe("evaluation-run integrity", () => {
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
   }, 30_000);
 
+  it("classifies HTTP 200 AI SDK structured-output handling errors without network language", () => {
+    const error = Object.assign(new Error("No output generated."), {
+      name: "AI_NoOutputGeneratedError",
+      usage: {
+        inputTokens: 1_234,
+        inputTokenDetails: { cacheReadTokens: 100 },
+        outputTokens: 1_916,
+      },
+    });
+    const safe = safeProviderFailureError(error, {
+      status: 200,
+      headers: new Headers({ "x-request-id": "req_safe_no_output" }),
+    }, {
+      operationPhase: "sdk_structured_output_handling",
+      transport: "ai_sdk_generate_text_structured_output",
+      httpSendInitiated: true,
+      providerResponseReceived: true,
+      httpStatus: 200,
+      requestId: "req_safe_no_output",
+    });
+
+    expect(safe.reasonCode).toBe("provider_structured_output_failed");
+    expect(safe.reasonCodes).toEqual(expect.arrayContaining([
+      "provider_http_send_initiated",
+      "provider_http_status_200",
+      "provider_http_status_class_2xx",
+      "provider_phase_sdk_structured_output_handling",
+      "provider_response_received",
+      "provider_sdk_error_class_ai_nooutputgeneratederror",
+      "provider_structured_output_failed",
+      "provider_transport_ai_sdk_generate_text_structured_output",
+    ]));
+    expect(safe.reasonCodes).not.toContain("provider_network_failed");
+    expect(safe.accounting).toMatchObject({
+      requestId: "req_safe_no_output",
+      inputTokens: 1_234,
+      cachedInputTokens: 100,
+      outputTokens: 1_916,
+    });
+  });
+
   it("persists required-tool failure without provider response text", async () => {
     const fixture = await approvedOneTimePdfFixture();
     const rawProviderText = "private arbitrary policy output without a web search call";
