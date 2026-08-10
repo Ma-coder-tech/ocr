@@ -10,6 +10,7 @@ import {
   type FeeKnowledgeClaimSupportRecord,
   type FeeKnowledgeDomainIdentityPolicy,
   type FeeKnowledgeEvidenceDecision,
+  type FeeKnowledgeIntelligenceRecord,
   type FeeKnowledgeResearchAttemptRecord,
   type FeeKnowledgeResearchCandidateRecord,
   type FeeKnowledgeSemanticSupportDecision,
@@ -23,6 +24,7 @@ import {
   type RetrievedDocument,
   type SafeFetch,
 } from "./feeKnowledgeRetrieval.js";
+import { buildRetrievedDocumentIntelligence, buildStatementGroundedIntelligence } from "./feeKnowledgeIntelligence.js";
 import { LIVE_EVALUATION_TIMEOUT_POLICY } from "../evaluationIntegrity/liveEvaluationTimeoutPolicy.js";
 import { safeProviderFailureError, safeProviderPostResponseFailureError } from "./providerFailureDiagnostics.js";
 
@@ -124,6 +126,7 @@ export type FeeKnowledgeResearchOptions = {
 export type FeeKnowledgeResearchResult = {
   attempts: FeeKnowledgeResearchAttemptRecord[];
   candidates: FeeKnowledgeResearchCandidateRecord[];
+  intelligence: FeeKnowledgeIntelligenceRecord[];
   claimSupports: FeeKnowledgeClaimSupportRecord[];
 };
 
@@ -147,6 +150,7 @@ export async function runFeeKnowledgeResearch(input: {
     return {
       attempts: input.questions.map((question, index) => attemptRecord(question, index, "disabled", [], ["fee_knowledge_research_disabled"])),
       candidates: [],
+      intelligence: buildStatementGroundedIntelligence({ analysis: input.analysis, questions: input.questions }),
       claimSupports: [],
     };
   }
@@ -169,12 +173,17 @@ export async function runFeeKnowledgeResearch(input: {
         },
       ],
       candidates: [],
+      intelligence: [],
       claimSupports: [],
     };
   }
 
   const attempts: FeeKnowledgeResearchAttemptRecord[] = [];
   const candidates: FeeKnowledgeResearchCandidateRecord[] = [];
+  const intelligence: FeeKnowledgeIntelligenceRecord[] = buildStatementGroundedIntelligence({
+    analysis: input.analysis,
+    questions: input.questions,
+  });
   const claimSupports: FeeKnowledgeClaimSupportRecord[] = [];
   return withAbortTimeout(async (abortSignal) => {
     const searchAdapter = options.adapter ?? openAiWebSearchAdapter({ apiKey: options.openAiApiKey, modelName: options.openAiModelName, fetchImpl: options.fetchImpl });
@@ -217,6 +226,12 @@ export async function runFeeKnowledgeResearch(input: {
             resolveHost: options.resolveHost,
           });
           candidates[pendingIndex] = candidateAfterRetrieval(candidates[pendingIndex]!, retrieved);
+          intelligence.push(...buildRetrievedDocumentIntelligence({
+            candidateId,
+            attemptId,
+            question,
+            retrieved,
+          }));
           const verification = await verifyCandidate({
             candidateId,
             attemptId,
@@ -230,7 +245,9 @@ export async function runFeeKnowledgeResearch(input: {
             abortSignal,
           });
           candidates[pendingIndex] = verification.candidate;
-          if (verification.claimSupport) claimSupports.push(verification.claimSupport);
+          if (verification.claimSupport) {
+            claimSupports.push(verification.claimSupport);
+          }
           if (verification.candidate.semanticVerificationStatus === "safety_blocked") {
             throw new FeeKnowledgeSearchProviderError(
               "safety_blocked",
@@ -258,13 +275,14 @@ export async function runFeeKnowledgeResearch(input: {
       attempts.push(attemptRecord(question, selectedQuestions.length + offset, "not_selected_planning", [], ["fee_knowledge_research_not_selected_planning"]));
     }
 
-    return snapshotResearchResult({ attempts, candidates, claimSupports });
+    return snapshotResearchResult({ attempts, candidates, intelligence, claimSupports });
   }, options.timeoutMs ?? FEE_KNOWLEDGE_RESEARCH_LIMITS.totalDeadlineMs).catch((error) => {
     const timedOut = /timed out|aborted|abort/i.test(error instanceof Error ? error.message : String(error));
     return terminalResearchSnapshot({
       questions: input.questions,
       attempts,
       candidates,
+      intelligence,
       claimSupports,
       status: timedOut ? "timed_out" : "failed",
     });
@@ -723,6 +741,7 @@ function snapshotResearchResult(result: FeeKnowledgeResearchResult): FeeKnowledg
   return structuredClone({
     attempts: result.attempts,
     candidates: result.candidates,
+    intelligence: result.intelligence,
     claimSupports: result.claimSupports,
   });
 }
@@ -731,6 +750,7 @@ function terminalResearchSnapshot(input: {
   questions: readonly FeeKnowledgeResearchQuestion[];
   attempts: readonly FeeKnowledgeResearchAttemptRecord[];
   candidates: readonly FeeKnowledgeResearchCandidateRecord[];
+  intelligence: readonly FeeKnowledgeIntelligenceRecord[];
   claimSupports: readonly FeeKnowledgeClaimSupportRecord[];
   status: "failed" | "timed_out";
 }): FeeKnowledgeResearchResult {
@@ -772,6 +792,7 @@ function terminalResearchSnapshot(input: {
   return snapshotResearchResult({
     attempts: input.questions.map((question, index) => attemptsByQuestion.get(feeKnowledgeQuestionRef(question, index))!),
     candidates,
+    intelligence: structuredClone([...input.intelligence]),
     claimSupports: structuredClone([...input.claimSupports]),
   });
 }

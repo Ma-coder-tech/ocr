@@ -12,6 +12,7 @@ export const FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION = "fee_knowledge_research_pol
 export const FEE_KNOWLEDGE_RETRIEVAL_POLICY_VERSION = "fee_knowledge_retrieval_policy_v1" as const;
 export const FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION = "fee_knowledge_claim_support_v1" as const;
 export const FEE_KNOWLEDGE_DOMAIN_IDENTITY_POLICY_VERSION = "fee_knowledge_domain_identity_policy_v1" as const;
+export const FEE_KNOWLEDGE_INTELLIGENCE_POLICY_VERSION = "fee_knowledge_intelligence_v1" as const;
 
 export type FeeKnowledgeSourceLifecycle = "active" | "expired" | "superseded" | "revoked" | "contradicted";
 export type FeeKnowledgeSourceKind =
@@ -39,6 +40,48 @@ export type FeeKnowledgeProvenanceDecision =
   | "insufficient_evidence"
   | "conflicting_evidence"
   | "human_review";
+export type FeeKnowledgeIntelligenceOrigin =
+  | "statement_grounded"
+  | "retrieved_document"
+  | "semantic_verification"
+  | "deterministic_math";
+export type FeeKnowledgeIntelligenceState =
+  | "ai_interpretation"
+  | "ai_hypothesis"
+  | "anomaly_flag"
+  | "investigation_lead"
+  | "source_derived_candidate_evidence"
+  | "externally_supported"
+  | "externally_verified"
+  | "math_verified"
+  | "fully_verified"
+  | "unresolved_review_needed"
+  | "rejected";
+export type FeeKnowledgeIntelligenceSubject =
+  | "fee_meaning"
+  | "fee_alias"
+  | "fee_ownership"
+  | "processor_vs_network"
+  | "published_rate"
+  | "applicability_condition"
+  | "markup_hypothesis"
+  | "anomaly"
+  | "negotiability"
+  | "investigation_question"
+  | "source_relevance"
+  | "conflict";
+export type FeeKnowledgeIntelligenceProofRequirement =
+  | "statement_grounded_labeling_only"
+  | "external_verification_required"
+  | "deterministic_math_required"
+  | "external_and_math_required"
+  | "human_review_required";
+export type FeeKnowledgeMerchantActionability =
+  | "merchant_display_provisional"
+  | "merchant_display_supported"
+  | "merchant_display_verified"
+  | "internal_only"
+  | "human_review_only";
 export type FeeKnowledgeCandidateVerificationStatus =
   | "runtime_verified_documentation"
   | "verified_candidate_limited"
@@ -261,6 +304,42 @@ export type FeeKnowledgeResearchCandidateRecord = {
   displayPermission: FeeKnowledgeDisplayPermission;
 };
 
+export type FeeKnowledgeIntelligenceRecord = {
+  type: "fee_knowledge_intelligence";
+  policyVersion: typeof FEE_KNOWLEDGE_INTELLIGENCE_POLICY_VERSION;
+  intelligenceId: string;
+  feeRowRef: string;
+  origin: FeeKnowledgeIntelligenceOrigin;
+  state: FeeKnowledgeIntelligenceState;
+  subject: FeeKnowledgeIntelligenceSubject;
+  summary: string;
+  reasonCodes: string[];
+  confidence: CanonicalFeeClassificationConfidence;
+  actionabilityCeiling: CanonicalFeeActionability;
+  merchantActionability: FeeKnowledgeMerchantActionability;
+  proofRequirement: FeeKnowledgeIntelligenceProofRequirement;
+  basis: {
+    statementEvidenceRefs: string[];
+    researchAttemptRefs: string[];
+    candidateRefs: string[];
+    claimSupportRefs: string[];
+    deterministicFactRefs: string[];
+  };
+  candidateEvidence: {
+    candidateRef: string;
+    documentFingerprint: string;
+    locatorHash: string | null;
+    sourceDomain: string | null;
+    supportStatus: "candidate_only" | "semantic_supported" | "semantic_rejected" | "semantic_not_run" | "inapplicable";
+  } | null;
+  mathVerification: {
+    status: "not_required" | "required_not_run" | "passed" | "failed";
+    deterministicCalculationRef: string | null;
+  };
+  supersededByIntelligenceRef: string | null;
+  displayPermission: FeeKnowledgeDisplayPermission;
+};
+
 export type FeeKnowledgeEvidenceLocator = {
   locatorId: string;
   kind: "html_heading" | "html_paragraph" | "html_table" | "pdf_page" | "plain_text";
@@ -390,6 +469,7 @@ export type FeeKnowledgeSourcePacket = {
   sourceMatches: FeeKnowledgeSourceMatchRecord[];
   researchAttempts: FeeKnowledgeResearchAttemptRecord[];
   researchCandidates: FeeKnowledgeResearchCandidateRecord[];
+  intelligence: FeeKnowledgeIntelligenceRecord[];
   claimSupports: FeeKnowledgeClaimSupportRecord[];
   provenanceDecisions: FeeKnowledgeProvenanceDecisionRecord[];
   customerSafeSources: FeeKnowledgeCustomerSafeSourceProjection[];

@@ -124,6 +124,7 @@ export async function runWholeStatementFeeIntelligenceRuntime(input: {
     analysis: input.analysis,
     registry,
     runtimeClaimSupports: research.claimSupports,
+    runtimeIntelligence: research.intelligence,
     researchAttempts: research.attempts,
     researchCandidates: research.candidates,
   });

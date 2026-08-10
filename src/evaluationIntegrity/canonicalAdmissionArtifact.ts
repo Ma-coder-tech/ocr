@@ -39,6 +39,7 @@ const QUESTION_REF = /^question_[a-f0-9]{64}$/;
 const FEE_ROW_REF = /^(?:fee_row|feerow)_[a-z0-9_]{1,100}$/;
 const CANDIDATE_REF = /^candidate_(?:[a-z][a-z0-9_]{0,100}|[a-f0-9]{16,64})$/;
 const CLAIM_SUPPORT_REF = /^(?:claim_support_[a-z0-9_]{1,100}|claimsupport_[a-f0-9]{16,64})$/;
+const INTELLIGENCE_REF = /^intel_[a-f0-9]{32}$/;
 const SAFE_REFERENCE = /^[a-z][a-z0-9_:-]{2,120}$/;
 const SAFE_CODE = /^[a-z][a-z0-9_]{2,120}$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
@@ -76,7 +77,24 @@ const RETRIEVAL_STATUSES = ["retrieved_text", "retrieval_succeeded_text_unavaila
 const SEMANTIC_STATUSES = ["not_started", "not_eligible", "completed", "failed", "timed_out", "parse_failed", "safety_blocked", "provider_unavailable", "unsupported"] as const;
 const EVIDENCE_DECISIONS = ["verified_classification", "verified_rule", "verified_application", "possible_interpretation", "needs_verification", "conflicting_evidence", "unsupported", "source_unavailable", "source_inapplicable"] as const;
 const SEMANTIC_DECISIONS = ["supports", "partially_supports", "does_not_support", "contradicts", "unsupported"] as const;
+const INTELLIGENCE_ORIGINS = ["statement_grounded", "retrieved_document", "semantic_verification", "deterministic_math"] as const;
+const INTELLIGENCE_STATES = ["ai_interpretation", "ai_hypothesis", "anomaly_flag", "investigation_lead", "source_derived_candidate_evidence", "externally_supported", "externally_verified", "math_verified", "fully_verified", "unresolved_review_needed", "rejected"] as const;
+const INTELLIGENCE_SUBJECTS = ["fee_meaning", "fee_alias", "fee_ownership", "processor_vs_network", "published_rate", "applicability_condition", "markup_hypothesis", "anomaly", "negotiability", "investigation_question", "source_relevance", "conflict"] as const;
+const MERCHANT_ACTIONABILITIES = ["merchant_display_provisional", "merchant_display_supported", "merchant_display_verified", "internal_only", "human_review_only"] as const;
+const PROOF_REQUIREMENTS = ["statement_grounded_labeling_only", "external_verification_required", "deterministic_math_required", "external_and_math_required", "human_review_required"] as const;
+const CANDIDATE_EVIDENCE_SUPPORT_STATUSES = ["candidate_only", "semantic_supported", "semantic_rejected", "semantic_not_run", "inapplicable"] as const;
+const MATH_VERIFICATION_STATUSES = ["not_required", "required_not_run", "passed", "failed"] as const;
 const VERIFIED_EVIDENCE_DECISIONS = new Set(["verified_classification", "verified_rule", "verified_application"]);
+const INTELLIGENCE_REASON_CODES = new Set([
+  "fee_knowledge_statement_grounded_unfamiliar_fee",
+  "fee_knowledge_statement_grounded_markup_investigation_lead",
+  "fee_knowledge_statement_grounded_anomaly_flag",
+  "fee_knowledge_document_candidate_evidence_constructed",
+  "fee_knowledge_document_fee_label_term_matched",
+  "fee_knowledge_document_context_term_matched",
+  "fee_knowledge_document_relevance_unresolved",
+  ...EVIDENCE_DECISIONS.map((decision) => `fee_knowledge_intelligence_${decision}`),
+]);
 const CANDIDATE_REASON_CODES = new Set([
   "fee_knowledge_claim_support_missing", "fee_knowledge_connection_target_unvalidated", "fee_knowledge_content_length_oversized",
   "fee_knowledge_content_type_unsupported", "fee_knowledge_pdf_parse_failed", "fee_knowledge_pdf_text_retrieved", "fee_knowledge_pdf_text_unavailable",
@@ -137,6 +155,7 @@ const SUPPORT_REASON_CODES = new Set([
 const FEE_CATEGORIES = ["interchange", "card_brand_network_assessment", "network_access_or_authorization", "processor_markup", "processor_per_item_fee", "administrative_fee", "service_fee", "compliance_fee", "equipment_or_lease", "third_party_product", "chargeback_or_dispute", "funding_adjustment", "tax_or_government", "credit", "unknown_needs_review"] as const;
 const FEE_PARTIES = ["network", "card_brand", "issuer_or_interchange", "processor", "third_party", "merchant_contract", "tax_or_government", "unknown"] as const;
 const FEE_ACTIONABILITIES = ["potentially_actionable", "verify_only", "not_actionable", "unknown"] as const;
+const FEE_CONFIDENCES = ["high", "medium", "low"] as const;
 const EVIDENCE_PROVENANCE = ["statement_evidence", "approved_external_documentation", "runtime_verified_documentation", "industry_inference", "merchant_evidence", "human_review"] as const;
 const CANONICAL_FACT_REFERENCES = new Set([
   "identity.merchantName",
@@ -225,6 +244,7 @@ const STAGE_STATE_KEYS = [
   "responseParse", "schemaValidation", "evidenceCitation", "sourceQuality", "linkage", "deterministicReconciliation", "privacySafety",
 ] as const;
 const RESEARCH_KEYS = ["type", "attempts", "candidates", "claimSupports"] as const;
+const RESEARCH_KEYS_WITH_INTELLIGENCE = ["type", "attempts", "candidates", "intelligence", "claimSupports"] as const;
 const ATTEMPT_KEYS = ["researchAttemptRef", "questionRef", "feeRowRef", "questionOrdinal", "sanitizedQuestionCategory", "triggerReason", "status", "resultCount", "candidateRefs", "reasonCodes"] as const;
 const CANDIDATE_KEYS = ["candidateRef", "researchAttemptRef", "questionRef", "feeRowRef", "verificationStatus", "retrievalStatus", "semanticVerificationStatus", "claimSupportRefs", "reasonCodes"] as const;
 const CANDIDATE_KEYS_WITH_SAFE_RETRIEVAL_DIAGNOSTICS = ["candidateRef", "researchAttemptRef", "questionRef", "feeRowRef", "verificationStatus", "retrievalStatus", "semanticVerificationStatus", "claimSupportRefs", "reasonCodes", "safeRetrievalDiagnostics"] as const;
@@ -238,6 +258,11 @@ const SAFE_RETRIEVAL_OUTCOME_CLASSES = [
   "connection_failed", "tls_failed", "http_response_failed", "redirect_rejected", "content_rejected", "size_limit_exceeded",
   "extraction_failed", "watchdog_timeout", "unknown_transport_failure",
 ] as const;
+const INTELLIGENCE_KEYS = [
+  "intelligenceRef", "feeRowRef", "origin", "state", "subject", "confidence", "actionabilityCeiling", "merchantActionability",
+  "proofRequirement", "candidateRefs", "claimSupportRefs", "reasonCodes", "candidateEvidence", "mathVerificationStatus",
+] as const;
+const CANDIDATE_EVIDENCE_KEYS = ["candidateRef", "documentFingerprint", "locatorHash", "sourceDomain", "supportStatus"] as const;
 const SUPPORT_KEYS = [
   "claimSupportRef", "origin", "runtimeSourceRef", "runtimeClaimRef", "candidateRef", "researchAttemptRef", "questionRef", "approvedSourceRef", "approvedClaimRef",
   "approvedRegistryVersionRef", "approvedSourceLifecycle", "approvedSourceApplicable", "approvedRegistryVerificationRef", "approvedContentFingerprint",
@@ -1014,15 +1039,19 @@ function validateResearchProof(
   disposition: EvaluationAdmissionDisposition,
   expectedResearchQuestions: EvaluationExpectedResearchQuestionProjection,
 ): boolean {
-  if (!isRecord(value) || !hasExactKeys(value, RESEARCH_KEYS) || value.type !== EVALUATION_RESEARCH_EVIDENCE_PROOF_VERSION) return false;
+  const researchKeysValid = isRecord(value) && (hasExactKeys(value, RESEARCH_KEYS) || hasExactKeys(value, RESEARCH_KEYS_WITH_INTELLIGENCE));
+  if (!researchKeysValid || value.type !== EVALUATION_RESEARCH_EVIDENCE_PROOF_VERSION) return false;
   if (!validateExpectedResearchQuestionProjection(expectedResearchQuestions)) return false;
   if (!Array.isArray(value.attempts) || !Array.isArray(value.candidates) || !Array.isArray(value.claimSupports)) return false;
+  const intelligenceItems = Array.isArray(value.intelligence) ? value.intelligence : [];
   if (!isSorted(value.attempts.map((item) => isRecord(item) ? stringValue(item.researchAttemptRef) : ""))) return false;
   if (!isSorted(value.candidates.map((item) => isRecord(item) ? stringValue(item.candidateRef) : ""))) return false;
+  if (Array.isArray(value.intelligence) && !isSorted(value.intelligence.map((item) => isRecord(item) ? stringValue(item.intelligenceRef) : ""))) return false;
   if (!isSorted(value.claimSupports.map((item) => isRecord(item) ? stringValue(item.claimSupportRef) : ""))) return false;
   const attempts = new Map<string, Record<string, unknown>>();
   const candidates = new Map<string, Record<string, unknown>>();
   const supports = new Map<string, Record<string, unknown>>();
+  const intelligenceRefs = new Set<string>();
   const questions = new Set<string>();
   const expectedQuestions = new Map(expectedResearchQuestions.questions.map((question) => [question.questionRef, question]));
   const candidateParents = new Map<string, string>();
@@ -1069,6 +1098,18 @@ function validateResearchProof(
       if (!parent || supportParents.get(item.claimSupportRef as string) !== item.candidateRef || parent.researchAttemptRef !== item.researchAttemptRef || parent.questionRef !== item.questionRef || parent.feeRowRef !== item.feeRowRef) return false;
     } else if (supportParents.has(item.claimSupportRef as string)) return false;
     supports.set(item.claimSupportRef as string, item);
+  }
+  for (const item of intelligenceItems) {
+    if (!validateResearchIntelligence(item) || intelligenceRefs.has(item.intelligenceRef as string)) return false;
+    if ((item.candidateRefs as string[]).some((ref) => !candidates.has(ref))) return false;
+    if ((item.claimSupportRefs as string[]).some((ref) => !supports.has(ref))) return false;
+    if (item.candidateEvidence !== null) {
+      const evidence = item.candidateEvidence as Record<string, unknown>;
+      if (!candidates.has(evidence.candidateRef as string)) return false;
+    }
+    if (["externally_verified", "math_verified", "fully_verified"].includes(item.state as string)
+      && (item.claimSupportRefs as string[]).length === 0) return false;
+    intelligenceRefs.add(item.intelligenceRef as string);
   }
   for (const attempt of attempts.values()) if ((attempt.candidateRefs as string[]).some((ref) => !candidates.has(ref))) return false;
   for (const candidate of candidates.values()) if ((candidate.claimSupportRefs as string[]).some((ref) => !supports.has(ref))) return false;
@@ -1152,6 +1193,30 @@ function validateClaimSupport(value: unknown): value is Record<string, unknown> 
   if (!/^claim_support_decision_[a-f0-9]{64}$/.test(stringValue(value.claimSupportDecisionRef)) || value.claimSupportDecisionRef !== calculateEvaluationClaimSupportDecisionRef(value as EvaluationResearchClaimSupportProof)) return false;
   if ((value.disposition === "accepted") !== isAcceptedSupport(value)) return false;
   return true;
+}
+
+function validateResearchIntelligence(value: unknown): value is Record<string, unknown> {
+  if (!isRecord(value) || !hasExactKeys(value, INTELLIGENCE_KEYS)) return false;
+  if (!INTELLIGENCE_REF.test(stringValue(value.intelligenceRef)) || !FEE_ROW_REF.test(stringValue(value.feeRowRef))) return false;
+  if (!enumValue(value.origin, INTELLIGENCE_ORIGINS)
+    || !enumValue(value.state, INTELLIGENCE_STATES)
+    || !enumValue(value.subject, INTELLIGENCE_SUBJECTS)
+    || !enumValue(value.confidence, FEE_CONFIDENCES)
+    || !enumValue(value.actionabilityCeiling, FEE_ACTIONABILITIES)
+    || !enumValue(value.merchantActionability, MERCHANT_ACTIONABILITIES)
+    || !enumValue(value.proofRequirement, PROOF_REQUIREMENTS)
+    || !enumValue(value.mathVerificationStatus, MATH_VERIFICATION_STATUSES)) return false;
+  if (!safeRefArray(value.candidateRefs, CANDIDATE_REF) || !safeRefArray(value.claimSupportRefs, CLAIM_SUPPORT_REF)) return false;
+  if (!closedSetArray(value.reasonCodes, INTELLIGENCE_REASON_CODES) || (value.reasonCodes as string[]).length === 0) return false;
+  if (["externally_verified", "math_verified", "fully_verified"].includes(value.state as string)
+    && value.merchantActionability === "merchant_display_provisional") return false;
+  if (value.candidateEvidence === null) return true;
+  if (!isRecord(value.candidateEvidence) || !hasExactKeys(value.candidateEvidence, CANDIDATE_EVIDENCE_KEYS)) return false;
+  const evidence = value.candidateEvidence;
+  if (!CANDIDATE_REF.test(stringValue(evidence.candidateRef)) || !SHA256.test(stringValue(evidence.documentFingerprint))) return false;
+  if (evidence.locatorHash !== null && !LOCATOR_TEXT_HASH.test(stringValue(evidence.locatorHash))) return false;
+  if (!nullableSafeDomain(evidence.sourceDomain)) return false;
+  return enumValue(evidence.supportStatus, CANDIDATE_EVIDENCE_SUPPORT_STATUSES);
 }
 
 export function deriveEvaluationApprovedRegistryScopeBasis(input: {
