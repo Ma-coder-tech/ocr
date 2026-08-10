@@ -320,7 +320,7 @@ function safeInvestigativePacket(request: FeeKnowledgeInvestigativeIntelligenceR
       retrievalStatus: request.candidate.retrieved.status,
       contentType: request.candidate.retrieved.contentType,
       byteLength: request.candidate.retrieved.byteLength,
-      locators: request.candidate.retrieved.locators.slice(0, MAX_DOCUMENT_LOCATORS).map((locator) => ({
+      locators: selectedLocatorsForInvestigation(request.candidate).map((locator) => ({
         locatorId: locator.locatorId,
         kind: locator.kind,
         pageNumber: locator.pageNumber,
@@ -330,6 +330,33 @@ function safeInvestigativePacket(request: FeeKnowledgeInvestigativeIntelligenceR
       })),
     } : null,
   };
+}
+
+function selectedLocatorsForInvestigation(candidate: NonNullable<FeeKnowledgeInvestigativeIntelligenceRequest["candidate"]>) {
+  const scored = candidate.retrieved.locators.map((locator, index) => {
+    const excerpt = excerptForLocator(candidate.retrieved.text, locator.textStart, locator.textEnd);
+    return { locator, index, score: investigativeLocatorScore(excerpt, candidate.question) };
+  });
+  scored.sort((left, right) => right.score - left.score || left.index - right.index);
+  return scored.slice(0, MAX_DOCUMENT_LOCATORS).map((item) => item.locator);
+}
+
+function investigativeLocatorScore(excerpt: string, question: FeeKnowledgeResearchQuestion): number {
+  const normalized = normalizeText(excerpt);
+  const terms = new Set([
+    ...meaningfulTokens(question.feeLabel),
+    ...meaningfulTokens(question.processorOrNetwork),
+    ...meaningfulTokens(question.semanticQuestion),
+    question.deterministicCategory ?? "",
+  ].filter(Boolean));
+  let score = 0;
+  for (const term of terms) {
+    if (normalized.includes(term)) score += term.length >= 8 ? 4 : 2;
+  }
+  if (normalized.length >= 80) score += 2;
+  if (/\b(acquirer|acquiring|processor|processing|network|authorization|assessment|interchange|fee|merchant)\b/.test(normalized)) score += 3;
+  if (/^(skip to main content|.*main menu|.*close learn what)/.test(normalized)) score -= 6;
+  return score;
 }
 
 function normalizeFinding(value: unknown): FeeKnowledgeInvestigativeFinding | null {
@@ -425,6 +452,18 @@ function safeText(value: unknown, maxLength: number): string | null {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, maxLength) || null;
+}
+
+function meaningfulTokens(value: unknown): string[] {
+  if (typeof value !== "string") return [];
+  return normalizeText(value)
+    .split(/\s+/)
+    .filter((token) => token.length >= 4 && !["this", "that", "with", "from", "into", "only", "find", "official", "material"].includes(token))
+    .slice(0, 24);
+}
+
+function normalizeText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 function safeRef(value: unknown): string | null {
