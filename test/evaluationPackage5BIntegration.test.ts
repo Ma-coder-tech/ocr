@@ -16,6 +16,7 @@ import {
   ONE_TIME_RESEARCH_REQUEST_SLOTS,
   buildEvaluationSourceManifest,
   createDeterministicPreflightArtifact,
+  livePackage5BProviderSettings,
   preserveParserDecision,
   projectOneTimeCanonicalAdmissionResult,
   runManifestDrivenLiveEvaluation,
@@ -122,6 +123,46 @@ describe("Package 5B manifest-driven admission", () => {
     )).toBe(true);
     expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
   }, 30_000);
+
+  it("accepts integrated Package 5B work-unit provider settings with deterministic output ceilings below the parent envelope", () => {
+    const integratedPaysafeUnitReservation = {
+      callId: "evaluation_doc_fiserv_paysafe_febr_2024_pdf_whole_statement_ai_review_1__whole_stmt_work_604fd6e53c82fcb7dd377c3416a02aee",
+      parentCallId: "evaluation_doc_fiserv_paysafe_febr_2024_pdf_whole_statement_ai_review_1",
+      operationKind: "package_5b_work_unit" as const,
+      operationRef: "whole_stmt_work_604fd6e53c82fcb7dd377c3416a02aee",
+      reservationScope: "provider_send" as const,
+      attempt: 1,
+      retryOfCallId: null,
+      capability: "ai_sdk" as const,
+      pricingPolicyRef: "openai_official_pricing_2026-08-08_v1",
+      providerRoute: "openai_ai_sdk_generate_text_structured_output",
+      provider: "openai",
+      model: "gpt-5.4-mini",
+      toolClass: "ai_sdk_structured_output",
+      maximumInputTokens: 46_792,
+      maximumOutputTokens: 1_916,
+      maximumToolUses: 0,
+      pricing: null,
+      estimatedMaximumCostUsd: 0.043716,
+    };
+
+    expect(livePackage5BProviderSettings(integratedPaysafeUnitReservation)).toEqual({
+      provider: "openai",
+      openAiModelName: "gpt-5.4-mini",
+      maxInputTokens: 46_792,
+      maxOutputTokens: 1_916,
+      maxRetries: 0,
+    });
+    expect(() => livePackage5BProviderSettings({
+      ...integratedPaysafeUnitReservation,
+      estimatedMaximumCostUsd: 0.001,
+    })).toThrow("approved_worst_case_reservation_insufficient");
+    expect(() => livePackage5BProviderSettings({
+      ...integratedPaysafeUnitReservation,
+      maximumOutputTokens: 5_001,
+      estimatedMaximumCostUsd: 0.1,
+    })).toThrow("approved_maximum_output_tokens_inconsistent");
+  });
 
   it("treats missing Package 5B credentials as pre-send provider unavailability with zero child exposure", async () => {
     const fixture = await approvedOneTimePdfFixture();

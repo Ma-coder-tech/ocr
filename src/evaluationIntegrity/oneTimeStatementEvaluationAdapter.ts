@@ -74,6 +74,7 @@ import {
   accountingFromProviderUsage,
   approvedPackage5BPricingPolicy,
   assertApprovedPackage5BBudgetEnvelopeMetadata,
+  assertApprovedPackage5BProviderSendMetadata,
   assertApprovedLiveCallMetadata,
   calculateWorstCaseCostUsd,
   type SafeProviderUsage,
@@ -489,22 +490,25 @@ export function createOneTimeStatementEvaluationTransport(input: {
           }));
         } catch (error) {
           const classified = classifyWholeStatementFeeIntelligenceWorkUnitFailure(error);
-          const sendStateReason = workUnitFailureSendStateReason(classified);
+          const knownBeforeSend = classified.status === "not_attempted_provider_unavailable";
+          const sendStateReason = knownBeforeSend
+            ? "whole_statement_fee_intelligence_provider_unavailable_before_send"
+            : workUnitFailureSendStateReason(classified);
           const costExceeded = request.childBudgetController!.finalize(unitReservation.callId, {
             requestId: classified.requestId,
             durationMs: classified.durationMs ?? Math.max(0, Date.now() - unitStarted),
-            inputTokens: classified.inputTokens,
-            cachedInputTokens: classified.cachedInputTokens,
-            outputTokens: classified.outputTokens,
+            inputTokens: knownBeforeSend ? 0 : classified.inputTokens,
+            cachedInputTokens: knownBeforeSend ? 0 : classified.cachedInputTokens,
+            outputTokens: knownBeforeSend ? 0 : classified.outputTokens,
             toolEvents: [],
-            observedOrEstimatedFinalCostUsd: null,
-            status: classified.status === "timed_out" ? "timeout" : "failure",
-            billingDisposition: "unknown",
+            observedOrEstimatedFinalCostUsd: knownBeforeSend ? 0 : null,
+            status: knownBeforeSend ? "cancelled_before_send" : classified.status === "timed_out" ? "timeout" : "failure",
+            billingDisposition: knownBeforeSend ? "provider_confirmed_zero" : "unknown",
           });
           childProviderCallOutcomes.push(package5BWorkUnitOutcome({
             reservation: unitReservation,
             sourceDocumentId: request.sourceDocumentId,
-            status: costExceeded ? "failure" : classified.status === "timed_out" ? "timeout" : "failure",
+            status: costExceeded ? "failure" : knownBeforeSend ? "cancelled_before_send" : classified.status === "timed_out" ? "timeout" : "failure",
             requestId: classified.requestId,
             reasonCodes: costExceeded ? ["cost_exceeded_reservation"] : [...classified.reasonCodes, sendStateReason],
           }));
@@ -514,11 +518,11 @@ export function createOneTimeStatementEvaluationTransport(input: {
             outcomeClass: classified.outcomeClass,
             validation: null,
             requestId: classified.requestId,
-            inputTokens: classified.inputTokens,
-            cachedInputTokens: classified.cachedInputTokens,
-            outputTokens: classified.outputTokens,
+            inputTokens: knownBeforeSend ? 0 : classified.inputTokens,
+            cachedInputTokens: knownBeforeSend ? 0 : classified.cachedInputTokens,
+            outputTokens: knownBeforeSend ? 0 : classified.outputTokens,
             durationMs: classified.durationMs ?? Math.max(0, Date.now() - unitStarted),
-            billingDisposition: "unknown",
+            billingDisposition: knownBeforeSend ? "provider_confirmed_zero" : "unknown",
             reasonCodes: [...classified.reasonCodes, sendStateReason],
           });
         }
@@ -895,7 +899,7 @@ export function livePackage5BProviderSettings(metadata: CostReservationInput): {
   maxOutputTokens: number;
   maxRetries: 0;
 } {
-  assertApprovedLiveCallMetadata("whole_statement_ai_review", metadata);
+  assertApprovedPackage5BProviderSendMetadata(metadata);
   return {
     provider: "openai",
     openAiModelName: metadata.model!,

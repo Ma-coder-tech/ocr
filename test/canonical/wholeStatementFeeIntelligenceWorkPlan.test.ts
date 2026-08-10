@@ -11,6 +11,7 @@ import {
 } from "../../src/canonical/wholeStatementFeeIntelligenceReview.js";
 import {
   buildWholeStatementFeeIntelligenceWorkPlan,
+  classifyWholeStatementFeeIntelligenceWorkUnitFailure,
   mergeWholeStatementFeeIntelligenceWorkUnitResults,
   wholeStatementFeeIntelligenceWorkUnitResultFromValidation,
   type WholeStatementFeeIntelligenceWorkUnitResult,
@@ -28,6 +29,23 @@ const LIVE_ARTIFACT_SHA256 = "c3e286e20f3d2a8235d6d721873f2f0be8703288ac224b1002
 const REAL_134_ROW_STATEMENT_PATH = "test/fixtures/pdfs/SAMPLE_MERCHANT4_CLOVER.pdf";
 
 describe("whole-statement fee intelligence work plan", () => {
+  it("classifies local Package 5B provider-send metadata failures as pre-send unavailability", () => {
+    const classified = classifyWholeStatementFeeIntelligenceWorkUnitFailure(
+      new Error("approved_maximum_output_tokens_inconsistent"),
+    );
+
+    expect(classified).toMatchObject({
+      status: "not_attempted_provider_unavailable",
+      outcomeClass: "provider_unavailable_before_send",
+      requestId: null,
+      inputTokens: null,
+      cachedInputTokens: null,
+      outputTokens: null,
+    });
+    expect(classified.reasonCodes).toContain("whole_statement_fee_intelligence_provider_unavailable_before_send");
+    expect(classified.reasonCodes).not.toContain("whole_statement_fee_intelligence_work_unit_send_status_uncertain");
+  });
+
   it("uses the exact latest five-statement live artifact row counts as offline sizing fixtures", async () => {
     const artifact = await latestLiveArtifact();
     const rowCounts = artifact.canonicalAdmissionResults
