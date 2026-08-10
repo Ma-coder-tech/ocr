@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { buildFeeKnowledgeSourcePacket } from "../../src/canonical/feeKnowledgeRegistry.js";
-import { buildStatementGroundedIntelligence } from "../../src/canonical/feeKnowledgeIntelligence.js";
+import { buildFeeKnowledgeIntelligenceRecord, buildStatementGroundedIntelligence } from "../../src/canonical/feeKnowledgeIntelligence.js";
 import { buildWholeStatementFeeIntelligencePacket } from "../../src/canonical/wholeStatementFeeIntelligenceReview.js";
 import { buildWholeStatementFeeIntelligenceWorkPlan } from "../../src/canonical/wholeStatementFeeIntelligenceWorkPlan.js";
 import { buildCanonicalRuntimeAnalysis } from "../../src/canonical/runtimeAdapter.js";
@@ -11,6 +11,7 @@ import {
   type FeeKnowledgeSemanticSupportAdapter,
 } from "../../src/canonical/feeKnowledgeResearch.js";
 import {
+  candidateEvidenceLocatorHash,
   openAiInvestigativeIntelligenceAdapter,
   parseInvestigativeProviderOutput,
   serializeInvestigativeProviderInput,
@@ -519,6 +520,51 @@ describe("fee knowledge intelligence state model", () => {
     expect(input.indexOf("Find an acquirer")).toBeGreaterThan(-1);
     expect(input.indexOf("Find an acquirer")).toBeLessThan(input.indexOf("Skip to main content"));
   }, 30_000);
+
+  it("prefers AI-discovered candidate evidence locators over deterministic fallback locators", () => {
+    const deterministic = buildFeeKnowledgeIntelligenceRecord({
+      feeRowRef: "fee_row",
+      origin: "retrieved_document",
+      state: "source_derived_candidate_evidence",
+      subject: "source_relevance",
+      summary: "Deterministic fallback locator.",
+      reasonCodes: ["fee_knowledge_document_candidate_evidence_constructed"],
+      confidence: "low",
+      actionabilityCeiling: "verify_only",
+      merchantActionability: "internal_only",
+      proofRequirement: "external_verification_required",
+      candidateRef: "candidate_1",
+      candidateEvidence: {
+        candidateRef: "candidate_1",
+        documentFingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        locatorHash: "navigation_hash",
+        sourceDomain: "discover.test",
+        supportStatus: "candidate_only",
+      },
+    });
+    const ai = buildFeeKnowledgeIntelligenceRecord({
+      feeRowRef: "fee_row",
+      origin: "retrieved_document",
+      state: "source_derived_candidate_evidence",
+      subject: "source_relevance",
+      summary: "AI selected substantive locator.",
+      reasonCodes: ["fee_knowledge_ai_investigative_intelligence", "fee_knowledge_ai_retrieved_document_investigated"],
+      confidence: "medium",
+      actionabilityCeiling: "verify_only",
+      merchantActionability: "internal_only",
+      proofRequirement: "external_verification_required",
+      candidateRef: "candidate_1",
+      candidateEvidence: {
+        candidateRef: "candidate_1",
+        documentFingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        locatorHash: "substantive_hash",
+        sourceDomain: "discover.test",
+        supportStatus: "candidate_only",
+      },
+    });
+
+    expect(candidateEvidenceLocatorHash([deterministic, ai], "candidate_1")).toBe("substantive_hash");
+  });
 });
 
 async function analysisFromPdf(path: string, ref: string) {

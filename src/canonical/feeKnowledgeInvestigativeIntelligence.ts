@@ -164,12 +164,13 @@ export function parseInvestigativeProviderOutput(raw: unknown): { findings: FeeK
 }
 
 export function candidateEvidenceLocatorHash(records: readonly FeeKnowledgeIntelligenceRecord[], candidateId: string): string | null {
-  const match = records.find((item) =>
+  const candidates = records.filter((item) =>
     item.basis.candidateRefs.includes(candidateId) &&
     item.state === "source_derived_candidate_evidence" &&
     item.candidateEvidence?.supportStatus === "candidate_only" &&
     item.candidateEvidence.locatorHash
   );
+  const match = candidates.find((item) => item.reasonCodes.includes("fee_knowledge_ai_investigative_intelligence")) ?? candidates[0];
   return match?.candidateEvidence?.locatorHash ?? null;
 }
 
