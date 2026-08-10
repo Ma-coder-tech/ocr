@@ -130,6 +130,27 @@ export function assertApprovedPackage5BBudgetEnvelopeMetadata(metadata: CostRese
   if ((metadata.maximumToolUses ?? 0) !== 0) throw new Error("approved_maximum_tool_uses_inconsistent");
 }
 
+export function assertApprovedPackage5BProviderSendMetadata(metadata: CostReservationInput): void {
+  if (metadata.provider.trim().toLowerCase() !== "openai") throw new Error("approved_live_provider_must_be_openai");
+  if (metadata.providerRoute !== "openai_ai_sdk_generate_text_structured_output") throw new Error("approved_provider_route_inconsistent");
+  if (metadata.toolClass !== "ai_sdk_structured_output") throw new Error("approved_tool_class_inconsistent");
+  if (!metadata.model?.trim()) throw new Error("approved_live_model_missing");
+  requiredPricing(approvedPackage5BPricingPolicy(metadata));
+  requiredPositiveInteger(metadata.maximumInputTokens, "approved maximum input tokens");
+  const maximumOutputTokens = requiredPositiveInteger(metadata.maximumOutputTokens, "approved maximum output tokens");
+  if (maximumOutputTokens > LIVE_TRIAL_OUTPUT_LIMITS.whole_statement_ai_review) {
+    throw new Error("approved_maximum_output_tokens_inconsistent");
+  }
+  if ((metadata.maximumToolUses ?? 0) !== 0) throw new Error("approved_maximum_tool_uses_inconsistent");
+  const calculated = calculateWorstCaseCostUsd({
+    ...metadata,
+    pricing: approvedPackage5BPricingPolicy(metadata),
+  });
+  if (metadata.estimatedMaximumCostUsd + 1e-9 < calculated) {
+    throw new Error("approved_worst_case_reservation_insufficient");
+  }
+}
+
 export function approvedPackage5BPricingPolicy(
   metadata: Pick<CostReservationInput, "provider" | "providerRoute" | "model" | "toolClass" | "pricing">,
 ): EvaluationPricingPolicy | null {

@@ -236,7 +236,7 @@ export function providerUnavailableWholeStatementFeeIntelligenceWorkUnitResult(i
 }
 
 export function classifyWholeStatementFeeIntelligenceWorkUnitFailure(error: unknown): {
-  status: "failed" | "timed_out" | "safety_blocked";
+  status: "failed" | "timed_out" | "safety_blocked" | "not_attempted_provider_unavailable";
   outcomeClass: WholeStatementFeeIntelligenceWorkUnitOutcomeClass;
   reasonCodes: string[];
   requestId: string | null;
@@ -248,16 +248,26 @@ export function classifyWholeStatementFeeIntelligenceWorkUnitFailure(error: unkn
   const record = error && typeof error === "object" ? error as Record<string, unknown> : {};
   const reasonCodes = safeReasonCodes(record.reasonCodes, typeof record.reasonCode === "string" ? record.reasonCode : "provider_transport_failed");
   const primary = reasonCodes[0] ?? "provider_transport_failed";
+  const message = error instanceof Error ? error.message : "";
+  const localConfigurationFailure = /^approved_|^package_5b_pricing_policy_required/.test(message)
+    || reasonCodes.some((code) => code.includes("configuration_invalid") || code.includes("unavailable_before_send"));
   const timedOut = primary.includes("timed_out") || /timeout|timed out/i.test(error instanceof Error ? error.message : "");
   const safetyBlocked = primary.includes("safety") || primary.includes("refused");
   return {
-    status: timedOut ? "timed_out" : safetyBlocked ? "safety_blocked" : "failed",
-    outcomeClass: timedOut ? "timeout_watchdog"
+    status: localConfigurationFailure ? "not_attempted_provider_unavailable"
+      : timedOut ? "timed_out" : safetyBlocked ? "safety_blocked" : "failed",
+    outcomeClass: localConfigurationFailure ? "provider_unavailable_before_send"
+      : timedOut ? "timeout_watchdog"
       : primary.includes("refused") ? "provider_refused"
         : primary.includes("schema") || primary.includes("parse") ? "provider_schema_failed"
           : primary.includes("length") || primary.includes("context") || primary.includes("maximum") ? "output_length_exhausted"
             : safetyBlocked ? "safety_blocked" : "provider_transport_failed",
-    reasonCodes,
+    reasonCodes: localConfigurationFailure
+      ? unique([
+        ...reasonCodes.filter((code) => code !== "provider_transport_failed"),
+        "whole_statement_fee_intelligence_provider_unavailable_before_send",
+      ]).sort()
+      : reasonCodes,
     requestId: safeString((record.accounting as Record<string, unknown> | undefined)?.requestId),
     inputTokens: safeNumber((record.accounting as Record<string, unknown> | undefined)?.inputTokens),
     cachedInputTokens: safeNumber((record.accounting as Record<string, unknown> | undefined)?.cachedInputTokens),

@@ -52,9 +52,9 @@ describe("live-evaluation budget enforcement", () => {
     const approvedSettings = livePackage5BProviderSettings(reservation({
       callId: "package_5b",
       capability: "ai_sdk",
-      providerRoute: "openai_responses_via_ai_sdk",
+      providerRoute: "openai_ai_sdk_generate_text_structured_output",
       model: "gpt-5.4-mini",
-      toolClass: "structured_output",
+      toolClass: "ai_sdk_structured_output",
       maximumInputTokens: 400_000,
       maximumOutputTokens: 5_000,
       maximumToolUses: 0,
