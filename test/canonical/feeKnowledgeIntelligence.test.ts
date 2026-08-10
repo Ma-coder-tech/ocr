@@ -13,6 +13,7 @@ import {
 import {
   openAiInvestigativeIntelligenceAdapter,
   parseInvestigativeProviderOutput,
+  serializeInvestigativeProviderInput,
   type FeeKnowledgeInvestigativeIntelligenceAdapter,
 } from "../../src/canonical/feeKnowledgeInvestigativeIntelligence.js";
 import type { ApprovedFeeKnowledgeSourceRegistry, FeeKnowledgeDomainIdentityPolicy } from "../../src/canonical/feeKnowledgeTypes.js";
@@ -446,6 +447,75 @@ describe("fee knowledge intelligence state model", () => {
     const required = (bodies[0] as { text: { format: { schema: { properties: { findings: { items: { required: string[] } } } } } } })
       .text.format.schema.properties.findings.items.required;
     expect(required).toContain("locatorTextHash");
+  }, 30_000);
+
+  it("prioritizes substantive retrieved-document locators over navigation snippets for AI investigation", async () => {
+    const analysis = await analysisFromPdf(STATEMENT_2, "statement_2_investigative_locator_selection");
+    const [baseQuestion] = defaultFeeKnowledgeResearchQuestions(analysis, null);
+    if (!baseQuestion) throw new Error("expected at least one research question");
+    const question = {
+      ...baseQuestion,
+      feeLabel: "DCVR ACQ - DISC NETWORK AUTH FEE",
+      processorOrNetwork: "Discover Global Network",
+      semanticQuestion: "Find official Discover Network material explaining Discover acquirers or processors.",
+    };
+    const text = [
+      "Skip to main content",
+      "Our Network Main Menu",
+      "Solutions Main Menu",
+      "Find an acquirer that can help your business accept Discover Network payments through a processor or bank.",
+    ].join("\n\n");
+
+    const input = serializeInvestigativeProviderInput({
+      scope: "retrieved_document",
+      analysis,
+      questions: [question],
+      existingIntelligence: [],
+      candidate: {
+        candidateId: "candidate_locator_selection",
+        attemptId: "research_locator_selection",
+        question,
+        retrieved: {
+          status: "retrieved_text",
+          reasonCodes: ["fee_knowledge_text_retrieved"],
+          canonicalUrl: "https://www.discover.test/acquirer",
+          text,
+          contentType: "text/html",
+          byteLength: text.length,
+          documentFingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          safeDiagnostics: {
+            policyVersion: "fee_knowledge_retrieval_policy_v1",
+            outcomeClass: "successful_usable_retrieval",
+            reasonCodes: ["fee_knowledge_text_retrieved"],
+            sourceDomain: "www.discover.test",
+            finalSourceDomain: "www.discover.test",
+            sourceOriginHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            finalSourceOriginHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            sourceHostnameHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            finalSourceHostnameHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            protocol: "https",
+            finalProtocol: "https",
+            redirectCount: 0,
+            attemptedNetwork: true,
+            resolvedAddressCount: 1,
+            resolvedAddressFamilies: ["ipv4"],
+            blockedAddressClass: null,
+            httpStatus: 200,
+            contentType: "text/html",
+            byteLength: text.length,
+            documentFingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          },
+          locators: [
+            { locatorId: "nav_skip", kind: "html_paragraph", pageNumber: null, sectionLabel: null, paragraphIndex: 0, tableIndex: null, rowIndex: null, textStart: 0, textEnd: 20, textHash: "navskip" },
+            { locatorId: "nav_menu", kind: "html_paragraph", pageNumber: null, sectionLabel: null, paragraphIndex: 1, tableIndex: null, rowIndex: null, textStart: 22, textEnd: 43, textHash: "navmenu" },
+            { locatorId: "substantive", kind: "html_paragraph", pageNumber: null, sectionLabel: null, paragraphIndex: 3, tableIndex: null, rowIndex: null, textStart: 65, textEnd: text.length, textHash: "substantivehash" },
+          ],
+        },
+      },
+    });
+
+    expect(input.indexOf("Find an acquirer")).toBeGreaterThan(-1);
+    expect(input.indexOf("Find an acquirer")).toBeLessThan(input.indexOf("Skip to main content"));
   }, 30_000);
 });
 
