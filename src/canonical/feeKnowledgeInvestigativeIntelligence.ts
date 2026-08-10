@@ -15,7 +15,7 @@ import type { RetrievedDocument, SafeFetch } from "./feeKnowledgeRetrieval.js";
 import { buildFeeKnowledgeIntelligenceRecord } from "./feeKnowledgeIntelligence.js";
 import { safeProviderFailureError } from "./providerFailureDiagnostics.js";
 
-export const OPENAI_INVESTIGATIVE_INTELLIGENCE_MAX_OUTPUT_TOKENS = 1_400;
+export const OPENAI_INVESTIGATIVE_INTELLIGENCE_MAX_OUTPUT_TOKENS = 2_200;
 const DEFAULT_OPENAI_INVESTIGATIVE_MODEL = "gpt-5";
 const MAX_STATEMENT_ROWS = 12;
 const MAX_EXISTING_INTELLIGENCE = 12;
@@ -126,6 +126,7 @@ export function openAiInvestigativeIntelligenceAdapter(
         body: JSON.stringify({
           model: options.openAiModelName ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_INVESTIGATIVE_MODEL,
           input,
+          reasoning: { effort: "low" },
           text: { format: investigativeOutputJsonSchema() },
           max_output_tokens: options.maximumOutputTokens ?? OPENAI_INVESTIGATIVE_INTELLIGENCE_MAX_OUTPUT_TOKENS,
         }),
