@@ -80,13 +80,11 @@ export function admitWholeStatementFeeIntelligence(input: {
     registry: input.registry ?? null,
   }));
   const supportReferenceErrors = validateOutputSupportReferences(input.validation.output, supportDecisions);
-  const incompleteResearch = input.sourcePacket.researchAttempts.some((attempt) => attempt.status !== "completed");
+  const incompleteResearch = input.sourcePacket.researchAttempts.some((attempt) =>
+    ["failed", "timed_out", "budget_exhausted", "provider_unavailable", "unsupported_model"].includes(attempt.status)
+  );
   const incompleteCandidates = input.sourcePacket.researchCandidates.some((candidate) =>
-    candidate.retrievalStatus !== "retrieved_text"
-      || !["completed", "unsupported"].includes(candidate.semanticVerificationStatus)
-      || !candidate.sourceFingerprint
-      || !candidate.locatorHash
-      || !candidate.claimSupportDecisionRef,
+    candidateIsIncompleteForAdmission(candidate)
   );
   const validationErrors = safeValidationErrors(input.validation.ok ? [] : input.validation.errors);
   const researchSafetyBlocked = input.sourcePacket.researchAttempts.some((attempt) => attempt.status === "safety_blocked")
@@ -99,6 +97,7 @@ export function admitWholeStatementFeeIntelligence(input: {
   const eligible = executionStatus === "completed"
     && input.validation.ok
     && (input.validation.output.reviewStatus === "completed" || input.validation.output.reviewStatus === "partial")
+    && !safetyBlocked
     && !incompleteResearch
     && !incompleteCandidates
     && linkageErrors.length === 0
@@ -119,18 +118,19 @@ export function admitWholeStatementFeeIntelligence(input: {
     : safetyBlocked
       ? rebuildWholeStatementCapability(input.analysis, null, `ai_exec_${"0".repeat(32)}`, "safety_blocked")
       : structuredClone(input.analysis);
+  const finalValidationErrors = [
+    ...validationErrors,
+    ...linkageErrors,
+    ...supportReferenceErrors,
+    ...(safetyBlocked ? ["whole_statement_fee_intelligence_privacy_safety_blocked"] : []),
+  ];
   const snapshot = admissionSnapshot({
     output: input.validation.output,
     admitted: eligible,
     sourcePacket: input.sourcePacket,
     executionStatus,
     safetyBlocked,
-    validationErrors: [
-      ...validationErrors,
-      ...linkageErrors,
-      ...supportReferenceErrors,
-      ...(safetyBlocked ? ["whole_statement_fee_intelligence_privacy_safety_blocked"] : []),
-    ],
+    validationErrors: finalValidationErrors,
   });
   const aiAdmissionAudit = buildCanonicalAiAdmissionAudit({
     capabilities: provisional.aiCapabilities.capabilities,
@@ -180,11 +180,11 @@ export function admitWholeStatementFeeIntelligence(input: {
       type: CANONICAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_ADMISSION_VERSION,
       executionStatus,
       validationStatus: input.validation.ok ? "passed" : "failed",
-      groundingStatus: admitted ? "grounded" : incompleteResearch || incompleteCandidates ? "incomplete" : "rejected",
+      groundingStatus: admitted ? "grounded" : safetyBlocked || incompleteResearch || incompleteCandidates ? "incomplete" : "rejected",
       admissionDisposition: admitted ? "admitted" : safetyBlocked ? "safety_blocked" : "rejected",
       executionRef: finalDiagnostic.executionRef,
       wholeStatementOutput: admitted ? input.validation.output : null,
-      validationErrors,
+      validationErrors: finalValidationErrors,
       acceptedClaimSupportRefs,
       rejectedClaimSupportRefs,
       researchAttemptRefs: input.sourcePacket.researchAttempts.map((attempt) => attempt.attemptId).sort(),
@@ -208,6 +208,20 @@ export function admitWholeStatementFeeIntelligence(input: {
       financialMutationAllowed: false,
     },
   };
+}
+
+function candidateIsIncompleteForAdmission(
+  candidate: FeeKnowledgeSourcePacket["researchCandidates"][number],
+): boolean {
+  if (candidate.retrievalStatus !== "retrieved_text") return true;
+  if (!candidate.sourceFingerprint) return true;
+  if (candidate.semanticVerificationStatus === "not_eligible") {
+    return candidate.claimSupportDecisionRef !== null;
+  }
+  if (["completed", "unsupported"].includes(candidate.semanticVerificationStatus)) {
+    return !candidate.locatorHash || !candidate.claimSupportDecisionRef;
+  }
+  return true;
 }
 
 function composeFeeClassificationReuse(input: {

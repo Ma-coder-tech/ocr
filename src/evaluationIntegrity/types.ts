@@ -467,7 +467,7 @@ export type EvaluationCanonicalAdmissionRecord = {
   executionRef: string;
   executionStatus: "completed" | "failed" | "timed_out";
   validationStatus: "passed" | "failed";
-  groundingStatus: "grounded" | "rejected";
+  groundingStatus: "grounded" | "rejected" | "incomplete";
   admissionDisposition: EvaluationAdmissionDisposition;
   acceptedClaimSupportRefs: string[];
   rejectedClaimSupportRefs: string[];

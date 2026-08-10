@@ -376,7 +376,9 @@ export function verifyEvaluationRunIntegrityArtifactV2(value: unknown): value is
 }
 
 function debugReject(stage: string): false {
-  void stage;
+  if (process.env.EVALUATION_ARTIFACT_DEBUG?.trim()) {
+    console.error(`[evaluation-artifact-v2] rejected at ${stage}`);
+  }
   return false;
 }
 
@@ -470,27 +472,30 @@ function validateAdmissionResult(
 }
 
 function validateAdmission(value: unknown, result: Record<string, unknown>): boolean {
-  if (!isRecord(value) || !hasExactKeys(value, ADMISSION_KEYS)) return false;
-  if (value.type !== EVALUATION_CANONICAL_ADMISSION_VERSION || value.capabilityId !== result.capabilityId || value.executionRef !== result.executionRef) return false;
-  if (value.admissionDisposition !== result.admissionDisposition || value.authoritative !== false || value.financialMutationAllowed !== false) return false;
-  if (value.package5aDiagnosticRef !== (result.package5a as Record<string, unknown>)?.diagnosticRef) return false;
-  if (!enumValue(value.executionStatus, ["completed", "failed", "timed_out"])) return false;
-  if (!enumValue(value.validationStatus, ["passed", "failed"]) || !enumValue(value.groundingStatus, ["grounded", "rejected"])) return false;
-  if (!safeRefArray(value.acceptedClaimSupportRefs, CLAIM_SUPPORT_REF) || !safeRefArray(value.rejectedClaimSupportRefs, CLAIM_SUPPORT_REF)) return false;
-  if (!safeRefArray(value.researchAttemptRefs, RESEARCH_ATTEMPT_REF) || !closedCodeArray(value.validationErrorCodes, VALIDATION_ERRORS)) return false;
+  if (!isRecord(value) || !hasExactKeys(value, ADMISSION_KEYS)) return debugReject("admission_shape");
+  if (value.type !== EVALUATION_CANONICAL_ADMISSION_VERSION || value.capabilityId !== result.capabilityId || value.executionRef !== result.executionRef) return debugReject("admission_identity");
+  if (value.admissionDisposition !== result.admissionDisposition || value.authoritative !== false || value.financialMutationAllowed !== false) return debugReject("admission_authority");
+  if (value.package5aDiagnosticRef !== (result.package5a as Record<string, unknown>)?.diagnosticRef) return debugReject("admission_package5a_ref");
+  if (!enumValue(value.executionStatus, ["completed", "failed", "timed_out"])) return debugReject("admission_execution_status");
+  if (!enumValue(value.validationStatus, ["passed", "failed"]) || !enumValue(value.groundingStatus, ["grounded", "rejected", "incomplete"])) return debugReject("admission_validation_grounding");
+  if (!safeRefArray(value.acceptedClaimSupportRefs, CLAIM_SUPPORT_REF) || !safeRefArray(value.rejectedClaimSupportRefs, CLAIM_SUPPORT_REF)) return debugReject("admission_support_refs");
+  if (!safeRefArray(value.researchAttemptRefs, RESEARCH_ATTEMPT_REF) || !closedCodeArray(value.validationErrorCodes, VALIDATION_ERRORS)) return debugReject("admission_research_refs_or_errors");
   const expectedReason = dispositionReason(value.admissionDisposition);
-  if (!exactEnumArray(value.reasonCodes, [expectedReason], RESULT_REASONS)) return false;
-  if (!isRecord(value.safeCounts) || !hasExactKeys(value.safeCounts, SAFE_COUNT_KEYS)) return false;
-  if (Object.values(value.safeCounts).some((count) => !Number.isInteger(count) || Number(count) < 0)) return false;
+  if (!exactEnumArray(value.reasonCodes, [expectedReason], RESULT_REASONS)) return debugReject("admission_reasons");
+  if (!isRecord(value.safeCounts) || !hasExactKeys(value.safeCounts, SAFE_COUNT_KEYS)) return debugReject("admission_safe_counts_shape");
+  if (Object.values(value.safeCounts).some((count) => !Number.isInteger(count) || Number(count) < 0)) return debugReject("admission_safe_counts_values");
   const accepted = new Set(value.acceptedClaimSupportRefs as string[]);
-  if ((value.rejectedClaimSupportRefs as string[]).some((ref) => accepted.has(ref))) return false;
+  if ((value.rejectedClaimSupportRefs as string[]).some((ref) => accepted.has(ref))) return debugReject("admission_support_partition");
   const disposition = value.admissionDisposition as EvaluationAdmissionDisposition;
   if (disposition === "admitted") {
-    if (value.executionStatus !== "completed" || value.validationStatus !== "passed" || value.groundingStatus !== "grounded" || (value.validationErrorCodes as string[]).length !== 0) return false;
+    if (value.executionStatus !== "completed" || value.validationStatus !== "passed" || value.groundingStatus !== "grounded" || (value.validationErrorCodes as string[]).length !== 0) return debugReject("admission_admitted_state");
   } else {
-    if (value.validationStatus !== "failed" || value.groundingStatus !== "rejected" || (value.validationErrorCodes as string[]).length === 0) return false;
-    if (disposition === "safety_blocked" && !(value.validationErrorCodes as string[]).includes("whole_statement_privacy_safety_blocked")) return false;
-    if (disposition === "rejected" && (value.validationErrorCodes as string[]).includes("whole_statement_privacy_safety_blocked")) return false;
+    if (!(
+      (value.validationStatus === "failed" && value.groundingStatus === "rejected" && (value.validationErrorCodes as string[]).length > 0) ||
+      (value.validationStatus === "passed" && ["rejected", "incomplete"].includes(value.groundingStatus as string) && (value.validationErrorCodes as string[]).length > 0)
+    )) return debugReject("admission_rejected_state");
+    if (disposition === "safety_blocked" && !(value.validationErrorCodes as string[]).includes("whole_statement_privacy_safety_blocked")) return debugReject("admission_safety_error_missing");
+    if (disposition === "rejected" && (value.validationErrorCodes as string[]).includes("whole_statement_privacy_safety_blocked")) return debugReject("admission_rejected_has_safety_error");
   }
   return true;
 }
@@ -1042,7 +1047,6 @@ function validateResearchProof(
       if (item.resultCount > expectedResearchQuestions.limits.maxResultCandidatesPerSearch) return false;
       retainedCandidateCount += item.resultCount as number;
     }
-    if (disposition === "admitted" && item.status !== "completed") return false;
     for (const ref of item.candidateRefs as string[]) if (candidateParents.has(ref)) return false; else candidateParents.set(ref, item.researchAttemptRef as string);
     questions.add(item.questionRef as string);
     attempts.set(item.researchAttemptRef as string, item);
@@ -1079,9 +1083,7 @@ function validateResearchProof(
   }
   if (disposition === "admitted") {
     for (const attempt of attempts.values()) {
-      for (const candidateRef of attempt.candidateRefs as string[]) {
-        if (!isFullyProcessedCandidateForAdmission(candidates.get(candidateRef), supports)) return false;
-      }
+      if (["failed", "timed_out", "budget_exhausted", "provider_unavailable", "unsupported_model", "safety_blocked"].includes(attempt.status as string)) return false;
     }
   }
   const accepted = admission.acceptedClaimSupportRefs as string[];
@@ -1258,6 +1260,7 @@ function validateCandidateState(value: Record<string, unknown>): boolean {
   const reasons = value.reasonCodes as string[];
   const retrieval = value.retrievalStatus as (typeof RETRIEVAL_STATUSES)[number];
   const semantic = value.semanticVerificationStatus as (typeof SEMANTIC_STATUSES)[number];
+  const claimSupportRefs = Array.isArray(value.claimSupportRefs) ? value.claimSupportRefs as unknown[] : [];
   const retrievalFamily = RETRIEVAL_REASON_BY_STATUS[retrieval];
   const semanticFamily = SEMANTIC_REASON_BY_STATUS[semantic];
   if (!retrievalFamily.some((reason) => reasons.includes(reason)) || !semanticFamily.some((reason) => reasons.includes(reason))) return false;
@@ -1268,6 +1271,9 @@ function validateCandidateState(value: Record<string, unknown>): boolean {
     if (status !== semantic && family.some((reason) => reasons.includes(reason))) return false;
   }
   if (retrieval !== "retrieved_text" && semantic !== "not_started") return false;
+  if (retrieval !== "retrieved_text" && claimSupportRefs.length !== 0) return false;
+  if (semantic === "not_eligible" && claimSupportRefs.length !== 0) return false;
+  if (semantic === "completed" && claimSupportRefs.length === 0) return false;
   if (retrieval === "retrieval_succeeded_text_unavailable" && value.verificationStatus !== "source_unavailable") return false;
   if (retrieval === "safety_blocked" && value.verificationStatus !== "safety_blocked") return false;
   if (retrieval !== "retrieved_text" && retrieval !== "retrieval_succeeded_text_unavailable" && retrieval !== "safety_blocked" && value.verificationStatus !== "rejected") return false;
