@@ -481,6 +481,7 @@ export function openAiSemanticSupportAdapter(options: {
           model: options.modelName ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_WEB_SEARCH_MODEL,
           input,
           max_output_tokens: maximumOutputTokens,
+          text: { format: semanticSupportOutputJsonSchema() },
         }),
       });
     } catch (error) {
@@ -1011,6 +1012,30 @@ function semanticDecisionFromRaw(raw: unknown, structuredClaim: FeeKnowledgeStru
     structuredClaim,
     reasonCodes: arrayField(parsed?.reasonCodes).map(String).filter(safeReasonCode).slice(0, 6),
     providerDetailsStripped: true,
+  };
+}
+
+function semanticSupportOutputJsonSchema(): Record<string, unknown> {
+  return {
+    type: "json_schema",
+    name: "fee_knowledge_semantic_support_decision",
+    strict: true,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["decision", "reasonCodes"],
+      properties: {
+        decision: {
+          type: "string",
+          enum: ["supports", "partially_supports", "does_not_support", "contradicts", "unsupported"],
+        },
+        reasonCodes: {
+          type: "array",
+          maxItems: 6,
+          items: { type: "string", pattern: "^[a-z0-9_]{3,120}$" },
+        },
+      },
+    },
   };
 }
 
