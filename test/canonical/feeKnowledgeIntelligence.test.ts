@@ -545,7 +545,7 @@ describe("fee knowledge intelligence state model", () => {
     const ai = buildFeeKnowledgeIntelligenceRecord({
       feeRowRef: "fee_row",
       origin: "retrieved_document",
-      state: "source_derived_candidate_evidence",
+      state: "investigation_lead",
       subject: "source_relevance",
       summary: "AI selected substantive locator.",
       reasonCodes: ["fee_knowledge_ai_investigative_intelligence", "fee_knowledge_ai_retrieved_document_investigated"],

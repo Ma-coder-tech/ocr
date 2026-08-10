@@ -166,7 +166,6 @@ export function parseInvestigativeProviderOutput(raw: unknown): { findings: FeeK
 export function candidateEvidenceLocatorHash(records: readonly FeeKnowledgeIntelligenceRecord[], candidateId: string): string | null {
   const candidates = records.filter((item) =>
     item.basis.candidateRefs.includes(candidateId) &&
-    item.state === "source_derived_candidate_evidence" &&
     item.candidateEvidence?.supportStatus === "candidate_only" &&
     item.candidateEvidence.locatorHash
   );
