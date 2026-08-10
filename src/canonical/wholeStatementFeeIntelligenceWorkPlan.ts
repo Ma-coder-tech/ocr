@@ -54,6 +54,8 @@ export type WholeStatementFeeIntelligenceWorkPlanLimits = {
   maxAggregateOutputTokens: number | null;
   outputTokensPerRowEstimate: number;
   outputTokenOverheadPerUnit: number;
+  minimumOutputTokensPerUnit: number;
+  maximumOutputTokensPerUnit: number;
 };
 
 export type WholeStatementFeeIntelligenceWorkUnit = {
@@ -116,8 +118,10 @@ const DEFAULT_LIMITS: WholeStatementFeeIntelligenceWorkPlanLimits = {
   maxSelectedRows: 360,
   maxAggregateInputBytes: null,
   maxAggregateOutputTokens: null,
-  outputTokensPerRowEstimate: 92,
-  outputTokenOverheadPerUnit: 260,
+  outputTokensPerRowEstimate: 190,
+  outputTokenOverheadPerUnit: 700,
+  minimumOutputTokensPerUnit: 2_500,
+  maximumOutputTokensPerUnit: 5_000,
 };
 
 export function buildWholeStatementFeeIntelligenceWorkPlan(input: {
@@ -139,7 +143,7 @@ export function buildWholeStatementFeeIntelligenceWorkPlan(input: {
     const expectedFeeRowRefs = rowChunk.map((row) => row.feeRowRef).sort();
     const packet = slicePacketForRows(input.packet, expectedFeeRowRefs);
     const estimatedInputBytes = wholeStatementFeeIntelligenceProviderInputBytes(packet);
-    const estimatedOutputTokens = limits.outputTokenOverheadPerUnit + expectedFeeRowRefs.length * limits.outputTokensPerRowEstimate;
+    const estimatedOutputTokens = estimatedOutputTokensForWorkUnit(expectedFeeRowRefs.length, limits);
     const policyBlocked = selectedUnits >= limits.maxSelectedUnits || selectedRows + expectedFeeRowRefs.length > limits.maxSelectedRows;
     const budgetBlocked =
       !policyBlocked &&
@@ -249,18 +253,20 @@ export function classifyWholeStatementFeeIntelligenceWorkUnitFailure(error: unkn
   const reasonCodes = safeReasonCodes(record.reasonCodes, typeof record.reasonCode === "string" ? record.reasonCode : "provider_transport_failed");
   const primary = reasonCodes[0] ?? "provider_transport_failed";
   const message = error instanceof Error ? error.message : "";
+  const hasReason = (pattern: RegExp) => reasonCodes.some((code) => pattern.test(code));
   const localConfigurationFailure = /^approved_|^package_5b_pricing_policy_required/.test(message)
     || reasonCodes.some((code) => code.includes("configuration_invalid") || code.includes("unavailable_before_send"));
   const timedOut = primary.includes("timed_out") || /timeout|timed out/i.test(error instanceof Error ? error.message : "");
-  const safetyBlocked = primary.includes("safety") || primary.includes("refused");
+  const safetyBlocked = hasReason(/safety|refused/);
   return {
     status: localConfigurationFailure ? "not_attempted_provider_unavailable"
       : timedOut ? "timed_out" : safetyBlocked ? "safety_blocked" : "failed",
     outcomeClass: localConfigurationFailure ? "provider_unavailable_before_send"
       : timedOut ? "timeout_watchdog"
-      : primary.includes("refused") ? "provider_refused"
-        : primary.includes("schema") || primary.includes("parse") ? "provider_schema_failed"
-          : primary.includes("length") || primary.includes("context") || primary.includes("maximum") ? "output_length_exhausted"
+      : hasReason(/refused/) ? "provider_refused"
+        : hasReason(/output_exhausted|finish_reason_length/) ? "output_length_exhausted"
+        : hasReason(/schema|parse|structured_output/) ? "provider_schema_failed"
+          : hasReason(/length|context|maximum/) ? "output_length_exhausted"
             : safetyBlocked ? "safety_blocked" : "provider_transport_failed",
     reasonCodes: localConfigurationFailure
       ? unique([
@@ -470,7 +476,22 @@ function normalizeLimits(input: Partial<WholeStatementFeeIntelligenceWorkPlanLim
     maxAggregateOutputTokens: nonnegativeIntegerOrNull(input?.maxAggregateOutputTokens ?? DEFAULT_LIMITS.maxAggregateOutputTokens),
     outputTokensPerRowEstimate: positiveInteger(input?.outputTokensPerRowEstimate, DEFAULT_LIMITS.outputTokensPerRowEstimate),
     outputTokenOverheadPerUnit: positiveInteger(input?.outputTokenOverheadPerUnit, DEFAULT_LIMITS.outputTokenOverheadPerUnit),
+    minimumOutputTokensPerUnit: positiveInteger(input?.minimumOutputTokensPerUnit, DEFAULT_LIMITS.minimumOutputTokensPerUnit),
+    maximumOutputTokensPerUnit: positiveInteger(input?.maximumOutputTokensPerUnit, DEFAULT_LIMITS.maximumOutputTokensPerUnit),
   };
+}
+
+function estimatedOutputTokensForWorkUnit(
+  rowCount: number,
+  limits: WholeStatementFeeIntelligenceWorkPlanLimits,
+): number {
+  return Math.min(
+    limits.maximumOutputTokensPerUnit,
+    Math.max(
+      limits.minimumOutputTokensPerUnit,
+      limits.outputTokenOverheadPerUnit + rowCount * limits.outputTokensPerRowEstimate,
+    ),
+  );
 }
 
 function workUnitRef(
