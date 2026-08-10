@@ -1075,8 +1075,14 @@ function workUnitFailureSendStateReason(input: {
   inputTokens: number | null;
   cachedInputTokens: number | null;
   outputTokens: number | null;
+  reasonCodes?: readonly string[];
 }): string {
-  return input.requestId || input.inputTokens !== null || input.cachedInputTokens !== null || input.outputTokens !== null
+  const traceShowsSend = input.reasonCodes?.some((code) =>
+    code === "provider_http_send_initiated"
+    || code === "provider_response_received"
+    || /^provider_http_status_\d{3}$/.test(code)
+  ) ?? false;
+  return input.requestId || input.inputTokens !== null || input.cachedInputTokens !== null || input.outputTokens !== null || traceShowsSend
     ? "whole_statement_fee_intelligence_work_unit_request_definitely_sent"
     : "whole_statement_fee_intelligence_work_unit_send_status_uncertain";
 }

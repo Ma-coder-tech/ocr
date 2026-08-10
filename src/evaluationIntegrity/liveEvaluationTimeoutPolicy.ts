@@ -4,7 +4,7 @@ export type LiveEvaluationTimedStage =
   | "semantic_verification"
   | "whole_statement_ai_review";
 
-export const LIVE_EVALUATION_TIMEOUT_POLICY_VERSION = "live_evaluation_timeout_policy_v1" as const;
+export const LIVE_EVALUATION_TIMEOUT_POLICY_VERSION = "live_evaluation_timeout_policy_v2" as const;
 
 export type LiveEvaluationTimeoutPolicy = {
   policyVersion: typeof LIVE_EVALUATION_TIMEOUT_POLICY_VERSION;
@@ -20,7 +20,7 @@ export const LIVE_EVALUATION_TIMEOUT_POLICY = {
     web_search_discovery: 90_000,
     document_retrieval: 30_000,
     semantic_verification: 60_000,
-    whole_statement_ai_review: 120_000,
+    whole_statement_ai_review: 300_000,
   },
   researchGraphTotalMs: 660_000,
 } as const satisfies LiveEvaluationTimeoutPolicy;
