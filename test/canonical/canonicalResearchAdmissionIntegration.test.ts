@@ -141,6 +141,63 @@ describe("canonical research admission integration", () => {
     expect(result.claimSupport?.evidenceDecision).toBe("unsupported");
   });
 
+  it("requests strict structured output for semantic verification", async () => {
+    const bodies: unknown[] = [];
+    const current = question("feerow_aaaaaaaaaaaaaaaaaaaaaaaa", "Alpha Fee");
+    const adapter = openAiSemanticSupportAdapter({
+      apiKey: "synthetic_test_key",
+      fetchImpl: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify({
+          id: "resp_test_semantic_schema",
+          output: [{
+            type: "message",
+            content: [{
+              type: "output_text",
+              text: JSON.stringify({ decision: "unsupported", reasonCodes: ["synthetic_semantic_unsupported"] }),
+            }],
+          }],
+          usage: { input_tokens: 1, output_tokens: 1, input_tokens_details: { cached_tokens: 0 } },
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      },
+    });
+
+    await adapter({
+      structuredClaim: {
+        claimKind: "classification",
+        feeLabel: current.feeLabel,
+        processorOrNetwork: current.processorOrNetwork,
+        statementPeriodYear: current.statementPeriodYear,
+        proposedCategory: current.deterministicCategory,
+        likelyEconomicOwner: current.deterministicEconomicOwner,
+        likelyContractualController: current.deterministicContractualController,
+        conditions: [],
+        exclusions: [],
+        maximumConfidence: current.deterministicConfidence,
+        actionabilityCeiling: current.deterministicActionabilityCeiling,
+        ruleValue: null,
+        applicationBasis: "not_evaluated",
+      },
+      documentFingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      locatorTextHash: "locator_hash",
+      boundedEvidenceExcerpt: "Fiserv official guide discusses Alpha Fee.",
+      applicability: { processorOrNetwork: true, jurisdiction: null, transactionContext: null, statementPeriod: true },
+    }, { abortSignal: new AbortController().signal });
+
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({
+      text: {
+        format: {
+          type: "json_schema",
+          name: "fee_knowledge_semantic_support_decision",
+          strict: true,
+        },
+      },
+    });
+    const required = (bodies[0] as { text: { format: { schema: { required: string[] } } } }).text.format.schema.required;
+    expect(required).toEqual(["decision", "reasonCodes"]);
+  });
+
   it("marks invalid registries with a stable registry failure code", () => {
     const packet = buildFeeKnowledgeSourcePacket({ analysis: analysis(), registry: { registrySchemaVersion: "fee_knowledge_registry_v1", registryVersion: "../invalid", policyVersion: "fee_knowledge_policy_v1", sources: [] } });
     expect(packet.registryValidation).toEqual({ status: "invalid", reasonCodes: ["fee_knowledge_registry_invalid"] });
