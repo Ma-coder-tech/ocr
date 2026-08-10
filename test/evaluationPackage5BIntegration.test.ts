@@ -1135,6 +1135,45 @@ describe("Package 5B manifest-driven admission", () => {
     )).toBe(true);
   }, 30_000);
 
+  it("uses safe provider trace reason codes to distinguish sent Package 5B timeouts without request IDs", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: fullOneTimeCalls(),
+      outputArtifactPath: path.join(fixture.directory, "package-5b-sent-timeout-without-request-id.json"),
+      oneTimeResearchQuestionsForTesting: () => [],
+      oneTimeServicesForTesting: {
+        wholeStatementReview: async () => {
+          throw Object.assign(new Error("provider timeout after HTTP send"), {
+            name: "SafeProviderFailureError",
+            reasonCodes: [
+              "provider_call_timed_out",
+              "provider_http_send_initiated",
+              "provider_response_not_received",
+            ],
+            accounting: { durationMs: 2 },
+          });
+        },
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    const timedOutUnit = admission.package5bWorkPlan?.units.find((unit) => unit.outcomeClass === "timeout_watchdog");
+    expect(timedOutUnit?.requestId).toBeNull();
+    expect(timedOutUnit?.reasonCodes).toContain("provider_http_send_initiated");
+    expect(timedOutUnit?.reasonCodes).toContain("whole_statement_fee_intelligence_work_unit_request_definitely_sent");
+    expect(timedOutUnit?.reasonCodes).not.toContain("whole_statement_fee_intelligence_work_unit_send_status_uncertain");
+    const workUnitOutcome = result.artifact.providerCallOutcomes.find((outcome) =>
+      outcome.stage === "whole_statement_ai_review" && outcome.operationKind === "package_5b_work_unit",
+    );
+    expect(workUnitOutcome?.requestId).toBeNull();
+    expect(workUnitOutcome?.reasonCodes).toContain("provider_http_send_initiated");
+    expect(workUnitOutcome?.reasonCodes).toContain("whole_statement_fee_intelligence_work_unit_request_definitely_sent");
+  }, 30_000);
+
   it("keeps execution, admission, and Package F outcomes independent for every source document", async () => {
     const cases = [
       { mode: "second_timeout", expectedOverall: "completed", expected: [["doc_multi_a", "admitted", "completed"], ["doc_multi_b", "rejected", "completed"]] },
