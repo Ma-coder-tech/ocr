@@ -15,7 +15,7 @@ import type { RetrievedDocument, SafeFetch } from "./feeKnowledgeRetrieval.js";
 import { buildFeeKnowledgeIntelligenceRecord } from "./feeKnowledgeIntelligence.js";
 import { safeProviderFailureError } from "./providerFailureDiagnostics.js";
 
-export const OPENAI_INVESTIGATIVE_INTELLIGENCE_MAX_OUTPUT_TOKENS = 2_200;
+export const OPENAI_INVESTIGATIVE_INTELLIGENCE_MAX_OUTPUT_TOKENS = 3_200;
 const DEFAULT_OPENAI_INVESTIGATIVE_MODEL = "gpt-5";
 const MAX_STATEMENT_ROWS = 12;
 const MAX_EXISTING_INTELLIGENCE = 12;
@@ -147,7 +147,7 @@ export function serializeInvestigativeProviderInput(request: FeeKnowledgeInvesti
     "You may propose provisional intelligence, aliases, ownership hypotheses, anomaly flags, markup leads, source relevance, candidate rates/rules/definitions, contradictions, or unresolved findings.",
     "Do not treat your own reasoning as verified fact. Do not invent citations, rates, overcharge amounts, URLs, merchant identifiers, or financial totals. Do not mutate deterministic fee-row facts.",
     "If a retrieved document locator appears relevant, cite only its locatorTextHash and explain as candidate evidence; strict verification/admission will decide support later.",
-    "Return JSON only: {\"findings\":[{feeRowRef,state,subject,summary,reasonCodes,confidence,actionabilityCeiling,merchantActionability,proofRequirement,candidateRef,locatorTextHash,supportStatus}]}",
+    "Return JSON only with at most 4 concise findings: {\"findings\":[{feeRowRef,state,subject,summary,reasonCodes,confidence,actionabilityCeiling,merchantActionability,proofRequirement,candidateRef,locatorTextHash,supportStatus}]}",
     JSON.stringify(safeInvestigativePacket(request)),
   ].join("\n\n");
 }
@@ -538,7 +538,7 @@ function investigativeOutputJsonSchema(): Record<string, unknown> {
       properties: {
         findings: {
           type: "array",
-          maxItems: 8,
+          maxItems: 4,
           items: {
             type: "object",
             additionalProperties: false,
