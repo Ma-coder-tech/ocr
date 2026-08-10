@@ -40,9 +40,11 @@ export const EVALUATION_COST_LEDGER_VERSION = "evaluation_cost_budget_ledger_v2"
 
 export const evaluationExecutionStages = [
   "parser",
+  "statement_investigative_intelligence",
   "whole_statement_ai_review",
   "web_search_discovery",
   "document_retrieval",
+  "retrieved_document_investigative_intelligence",
   "semantic_verification",
   "canonical_admission",
   "customer_publication",
@@ -52,9 +54,11 @@ export const evaluationExecutionStages = [
 export type EvaluationExecutionStage = (typeof evaluationExecutionStages)[number];
 
 export const paidEvaluationStages = [
+  "statement_investigative_intelligence",
   "whole_statement_ai_review",
   "web_search_discovery",
   "document_retrieval",
+  "retrieved_document_investigative_intelligence",
   "semantic_verification",
 ] as const satisfies readonly EvaluationExecutionStage[];
 
@@ -326,6 +330,7 @@ export type FinancialInvarianceResult = {
 export type CostCapability =
   | "direct_responses"
   | "ai_sdk"
+  | "investigative_intelligence"
   | "web_search"
   | "retrieval"
   | "semantic_verification";

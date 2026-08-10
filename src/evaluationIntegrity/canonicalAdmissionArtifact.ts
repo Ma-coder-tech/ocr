@@ -214,7 +214,7 @@ const CONTRADICTION_CODES = [
   "runtime_or_registry_category_conflict",
   "source_or_claim_contradicted",
 ] as const;
-const EXECUTION_STAGES = ["parser", "whole_statement_ai_review", "web_search_discovery", "document_retrieval", "semantic_verification", "canonical_admission", "customer_publication", "final_artifact"] as const;
+const EXECUTION_STAGES = ["parser", "statement_investigative_intelligence", "whole_statement_ai_review", "web_search_discovery", "document_retrieval", "retrieved_document_investigative_intelligence", "semantic_verification", "canonical_admission", "customer_publication", "final_artifact"] as const;
 const LIFECYCLE_STAGES = ["manifest_row", "preflight_record", "parser_record", "capability_execution", "provider_request", "research_retrieval", "semantic_verification", "canonical_admission", "customer_publication", "final_artifact"] as const;
 const LIFECYCLE_STATES = ["not_reached", "blocked", "failed", "completed", "withheld"] as const;
 
@@ -1541,7 +1541,7 @@ function validateClosedTrustedV1(value: Record<string, any>): boolean {
     if (!isRecord(entry) || !(hasExactKeys(entry, costEntryKeys) || hasExactKeys(entry, legacyCostEntryKeys)) || !Array.isArray(entry.toolEvents)) return false;
     if (Object.hasOwn(entry, "operationKind") && !enumValue(entry.operationKind, ["manifest_call", "package_5b_budget_envelope", "package_5b_work_unit"])) return false;
     if (Object.hasOwn(entry, "reservationScope") && !enumValue(entry.reservationScope, ["provider_send", "budget_envelope"])) return false;
-    if (!enumValue(entry.attemptKind, ["initial", "retry"]) || !enumValue(entry.capability, ["direct_responses", "ai_sdk", "web_search", "retrieval", "semantic_verification"]) || entry.currency !== "USD") return false;
+    if (!enumValue(entry.attemptKind, ["initial", "retry"]) || !enumValue(entry.capability, ["direct_responses", "ai_sdk", "investigative_intelligence", "web_search", "retrieval", "semantic_verification"]) || entry.currency !== "USD") return false;
     if (!enumValue(entry.status, ["reserved", "success", "failure", "timeout", "cancelled_before_send"]) || !enumValue(entry.billingDisposition, ["pending", "observed", "provider_confirmed_zero", "unknown"])) return false;
     if (entry.toolEvents.some((item: unknown) => !isRecord(item) || !hasExactKeys(item, ["type", "count"]))) return false;
   }
