@@ -430,6 +430,12 @@ function slicePacketForRows(
   const candidateRefs = new Set(researchCandidates.map((item) => item.candidateId));
   const claimSupports = sourcePacket.claimSupports.filter((item) => rowRefs.has(item.feeRowRef) && (item.candidateId === null || candidateRefs.has(item.candidateId)));
   const claimSupportRefs = new Set(claimSupports.map((item) => item.claimSupportId));
+  const intelligence = sourcePacket.intelligence.filter((item) =>
+    rowRefs.has(item.feeRowRef) &&
+    item.basis.candidateRefs.every((ref) => candidateRefs.has(ref)) &&
+    item.basis.claimSupportRefs.every((ref) => claimSupportRefs.has(ref)) &&
+    (!item.candidateEvidence || candidateRefs.has(item.candidateEvidence.candidateRef)),
+  );
   const provenanceDecisions = sourcePacket.provenanceDecisions.filter((item) =>
     rowRefs.has(item.feeRowRef) &&
     (item.candidateId === null || candidateRefs.has(item.candidateId)) &&
@@ -458,6 +464,7 @@ function slicePacketForRows(
       sourceMatches,
       researchAttempts,
       researchCandidates,
+      intelligence,
       claimSupports,
       provenanceDecisions,
       customerSafeSources: sourcePacket.customerSafeSources.filter((source) =>

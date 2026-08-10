@@ -297,14 +297,14 @@ describe("whole-statement fee intelligence work plan", () => {
       wholeStatementFeeIntelligenceProviderInputBytes(unit.packet)
     ));
     expect(workUnits.map((unit) => unit.maximumInputTokens)).toEqual([
-      26013,
-      26344,
-      25967,
+      26031,
+      26362,
+      25985,
+      25991,
+      26341,
+      26035,
       25973,
-      26323,
-      26017,
-      25955,
-      12739,
+      12757,
     ]);
     expect(workUnits.map((unit) => unit.maximumOutputTokens)).toEqual([
       4_120,
@@ -317,16 +317,16 @@ describe("whole-statement fee intelligence work plan", () => {
       2_500,
     ]);
     expect(workUnits.map((unit) => unit.worstCaseCostUsd)).toEqual([
-      0.03804975,
-      0.038298,
-      0.03801525,
+      0.03806325,
+      0.0383115,
+      0.03802875,
+      0.03803325,
+      0.03829575,
+      0.03806625,
       0.03801975,
-      0.03828225,
-      0.03805275,
-      0.03800625,
-      0.02080425,
+      0.02081775,
     ]);
-    expect(worstCaseTotalUsd).toBe(0.28752825);
+    expect(worstCaseTotalUsd).toBe(0.28763625);
     expect(worstCaseTotalUsd).toBeLessThan(2);
   }, 30_000);
 });

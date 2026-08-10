@@ -10,6 +10,11 @@ import type {
 import type {
   FeeKnowledgeCandidateVerificationStatus,
   FeeKnowledgeEvidenceDecision,
+  FeeKnowledgeIntelligenceOrigin,
+  FeeKnowledgeIntelligenceProofRequirement,
+  FeeKnowledgeIntelligenceState,
+  FeeKnowledgeIntelligenceSubject,
+  FeeKnowledgeMerchantActionability,
   FeeKnowledgeResearchAttemptRecord,
   FeeKnowledgeResearchNonSuccessStatus,
   FeeKnowledgeRetrievalSafeDiagnostics,
@@ -657,7 +662,31 @@ export type EvaluationResearchEvidenceProof = {
   type: typeof EVALUATION_RESEARCH_EVIDENCE_PROOF_VERSION;
   attempts: EvaluationResearchAttemptProof[];
   candidates: EvaluationResearchCandidateProof[];
+  intelligence: EvaluationResearchIntelligenceProof[];
   claimSupports: EvaluationResearchClaimSupportProof[];
+};
+
+export type EvaluationResearchIntelligenceProof = {
+  intelligenceRef: string;
+  feeRowRef: string;
+  origin: FeeKnowledgeIntelligenceOrigin;
+  state: FeeKnowledgeIntelligenceState;
+  subject: FeeKnowledgeIntelligenceSubject;
+  confidence: CanonicalFeeClassificationConfidence;
+  actionabilityCeiling: CanonicalFeeActionability;
+  merchantActionability: FeeKnowledgeMerchantActionability;
+  proofRequirement: FeeKnowledgeIntelligenceProofRequirement;
+  candidateRefs: string[];
+  claimSupportRefs: string[];
+  reasonCodes: string[];
+  candidateEvidence: {
+    candidateRef: string;
+    documentFingerprint: string;
+    locatorHash: string | null;
+    sourceDomain: string | null;
+    supportStatus: "candidate_only" | "semantic_supported" | "semantic_rejected" | "semantic_not_run" | "inapplicable";
+  } | null;
+  mathVerificationStatus: "not_required" | "required_not_run" | "passed" | "failed";
 };
 
 export type EvaluationExpectedResearchQuestionProjection = {

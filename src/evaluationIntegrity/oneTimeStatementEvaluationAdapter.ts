@@ -21,10 +21,12 @@ import {
 import { runtimeSupportAccepted } from "../canonical/feeKnowledgeClaimSupportDecision.js";
 import { retrieveFeeKnowledgeDocument, type RetrievedDocument } from "../canonical/feeKnowledgeRetrieval.js";
 import { buildFeeKnowledgeSourcePacket } from "../canonical/feeKnowledgeRegistry.js";
+import { buildRetrievedDocumentIntelligence, buildStatementGroundedIntelligence } from "../canonical/feeKnowledgeIntelligence.js";
 import {
   FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
   type ApprovedFeeKnowledgeSourceRegistry,
   type FeeKnowledgeClaimSupportRecord,
+  type FeeKnowledgeIntelligenceRecord,
   type FeeKnowledgeResearchAttemptRecord,
   type FeeKnowledgeResearchCandidateRecord,
   type FeeKnowledgeSourcePacket,
@@ -155,6 +157,7 @@ type OneTimePrivateContext = {
   retrieved: RetrievedContext[];
   attempts: FeeKnowledgeResearchAttemptRecord[];
   candidates: FeeKnowledgeResearchCandidateRecord[];
+  intelligence: FeeKnowledgeIntelligenceRecord[];
   claimSupports: FeeKnowledgeClaimSupportRecord[];
   validation: CanonicalWholeStatementFeeIntelligenceValidationResult | null;
   searchCursor: number;
@@ -242,6 +245,7 @@ export async function prepareOneTimeStatementEvaluationSource(input: {
         ["fee_knowledge_research_not_selected_planning"],
       )),
       candidates: [],
+      intelligence: buildStatementGroundedIntelligence({ analysis: canonical.analysis, questions }),
       claimSupports: [],
       validation: null,
       searchCursor: 0,
@@ -680,6 +684,12 @@ export function createOneTimeStatementEvaluationTransport(input: {
         return providerFailureResult({ started, error, reasonCode, scope: "candidate_local" });
       }
       updateRetrievedCandidate(context, candidate, response.value);
+      context.intelligence.push(...buildRetrievedDocumentIntelligence({
+        candidateId: candidate.candidateId,
+        attemptId: candidate.attemptId,
+        question: candidate.question,
+        retrieved: response.value,
+      }));
       const retrievalTerminal = retrievalTerminalStatus(response.value.status);
       if (retrievalTerminal) {
         return result({
@@ -1444,6 +1454,7 @@ function currentSourcePacket(context: OneTimePrivateContext): FeeKnowledgeSource
     analysis: context.analysis,
     registry: context.registry,
     runtimeClaimSupports: context.claimSupports,
+    runtimeIntelligence: context.intelligence,
     researchAttempts: context.attempts,
     researchCandidates: context.candidates,
   });

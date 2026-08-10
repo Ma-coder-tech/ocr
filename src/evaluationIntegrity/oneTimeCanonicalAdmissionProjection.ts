@@ -24,6 +24,7 @@ import {
   type EvaluationPackage5AAdmissionProjection,
   type EvaluationPackage5BWorkPlanProjection,
   type EvaluationResearchClaimSupportProof,
+  type EvaluationResearchIntelligenceProof,
 } from "./types.js";
 
 export function projectOneTimeCanonicalAdmissionResult(input: {
@@ -91,6 +92,22 @@ export function projectOneTimeCanonicalAdmissionResult(input: {
     reasonCodes: [...candidate.reasonCodes].sort(),
     safeRetrievalDiagnostics: candidate.safeRetrievalDiagnostics ? structuredClone(candidate.safeRetrievalDiagnostics) : null,
   })).sort((left, right) => left.candidateRef.localeCompare(right.candidateRef));
+  const intelligence = sourcePacket.intelligence.map((item): EvaluationResearchIntelligenceProof => ({
+    intelligenceRef: item.intelligenceId,
+    feeRowRef: item.feeRowRef,
+    origin: item.origin,
+    state: item.state,
+    subject: item.subject,
+    confidence: item.confidence,
+    actionabilityCeiling: item.actionabilityCeiling,
+    merchantActionability: item.merchantActionability,
+    proofRequirement: item.proofRequirement,
+    candidateRefs: [...item.basis.candidateRefs].sort(),
+    claimSupportRefs: [...item.basis.claimSupportRefs].sort(),
+    reasonCodes: [...item.reasonCodes].sort(),
+    candidateEvidence: item.candidateEvidence ? structuredClone(item.candidateEvidence) : null,
+    mathVerificationStatus: item.mathVerification.status,
+  })).sort((left, right) => left.intelligenceRef.localeCompare(right.intelligenceRef));
 
   const analysis = canonical.analysis;
   const canonicalFeeRowEvidencePopulation = canonicalEvidencePopulation(analysis);
@@ -190,6 +207,7 @@ export function projectOneTimeCanonicalAdmissionResult(input: {
       type: EVALUATION_RESEARCH_EVIDENCE_PROOF_VERSION,
       attempts,
       candidates,
+      intelligence,
       claimSupports: supports,
     },
     canonicalReferenceProof,

@@ -12,6 +12,7 @@ import {
   type FeeKnowledgeClaimSupportRecord,
   type FeeKnowledgeCustomerSafeSourceProjection,
   type FeeKnowledgeDomainIdentityPolicy,
+  type FeeKnowledgeIntelligenceRecord,
   type FeeKnowledgeProvenanceDecisionRecord,
   type FeeKnowledgeResearchCandidateRecord,
   type FeeKnowledgeRowSourcePacket,
@@ -21,6 +22,7 @@ import {
   type FeeKnowledgeSourceMatchRecord,
   type FeeKnowledgeSourcePacket,
 } from "./feeKnowledgeTypes.js";
+import { buildIntelligenceFromClaimSupport } from "./feeKnowledgeIntelligence.js";
 
 export const EMPTY_FEE_KNOWLEDGE_REGISTRY: ApprovedFeeKnowledgeSourceRegistry = {
   registrySchemaVersion: FEE_KNOWLEDGE_REGISTRY_SCHEMA_VERSION,
@@ -229,6 +231,7 @@ export function buildFeeKnowledgeSourcePacket(input: {
   analysis: Pick<CanonicalStatementAnalysis, "identity" | "feeLedger" | "feeOwnershipActionability">;
   registry?: ApprovedFeeKnowledgeSourceRegistry | LegacyWholeStatementSourceRegistry | null;
   runtimeClaimSupports?: readonly FeeKnowledgeClaimSupportRecord[];
+  runtimeIntelligence?: readonly FeeKnowledgeIntelligenceRecord[];
   researchAttempts?: FeeKnowledgeSourcePacket["researchAttempts"];
   researchCandidates?: readonly FeeKnowledgeResearchCandidateRecord[];
 }): FeeKnowledgeSourcePacket {
@@ -239,6 +242,7 @@ export function buildFeeKnowledgeSourcePacket(input: {
   const classifications = new Map(input.analysis.feeOwnershipActionability.rowClassifications.map((item) => [item.feeRowId, item]));
   const sourceMatches: FeeKnowledgeSourceMatchRecord[] = [];
   const claimSupports: FeeKnowledgeClaimSupportRecord[] = [];
+  const intelligence: FeeKnowledgeIntelligenceRecord[] = [];
   const provenanceDecisions: FeeKnowledgeProvenanceDecisionRecord[] = [];
   const customerSafeSources: FeeKnowledgeCustomerSafeSourceProjection[] = [];
 
@@ -277,6 +281,7 @@ export function buildFeeKnowledgeSourcePacket(input: {
           (processorMatch || source.processorIds.length + source.networkIds.length + claim.processorIds.length + claim.networkIds.length === 0);
         const support = claimSupportFromRegistry(row.id, source, claim, match, authoritative);
         claimSupports.push(support);
+        intelligence.push(buildIntelligenceFromClaimSupport({ support, candidate: null }));
         provenanceDecisions.push(provenanceDecisionFromSupport(row.id, source, claim, support, authoritative ? "approved_documentation" : support.evidenceDecision === "conflicting_evidence" ? "conflicting_evidence" : "insufficient_evidence"));
         if (source.displayPermission === "displayable" && claim.displayPermission === "displayable") {
           customerSafeSources.push(customerSafeProjection(source, claim, support));
@@ -315,6 +320,7 @@ export function buildFeeKnowledgeSourcePacket(input: {
 
   for (const support of invalidRuntimeSupport ? [] : input.runtimeClaimSupports ?? []) {
     claimSupports.push(support);
+    intelligence.push(buildIntelligenceFromClaimSupport({ support, candidate: support.candidateId ? candidatesById.get(support.candidateId) ?? null : null }));
     provenanceDecisions.push({
       type: "fee_knowledge_provenance_decision",
       policyVersion: FEE_KNOWLEDGE_POLICY_VERSION,
@@ -341,6 +347,11 @@ export function buildFeeKnowledgeSourcePacket(input: {
   for (const candidate of input.researchCandidates ?? []) {
     if (provenanceDecisions.some((decision) => decision.candidateId === candidate.candidateId)) continue;
     provenanceDecisions.push(provenanceDecisionFromCandidate(candidate));
+  }
+  const claimSupportIntelligenceRefs = new Set(intelligence.map((item) => item.intelligenceId));
+  for (const item of input.runtimeIntelligence ?? []) {
+    if (!feeRowIds.has(item.feeRowRef) || claimSupportIntelligenceRefs.has(item.intelligenceId)) continue;
+    intelligence.push(item);
   }
 
   const rowPackets = input.analysis.feeLedger.rows.map((row): FeeKnowledgeRowSourcePacket => {
@@ -403,6 +414,7 @@ export function buildFeeKnowledgeSourcePacket(input: {
     sourceMatches: sourceMatches.sort(byRowThenId),
     researchAttempts: [...(input.researchAttempts ?? [])].sort((left, right) => left.attemptId.localeCompare(right.attemptId)),
     researchCandidates: [...(input.researchCandidates ?? [])].sort((left, right) => left.candidateId.localeCompare(right.candidateId)),
+    intelligence: intelligence.sort((left, right) => left.intelligenceId.localeCompare(right.intelligenceId)),
     claimSupports: claimSupports.sort((left, right) => left.claimSupportId.localeCompare(right.claimSupportId)),
     provenanceDecisions: provenanceDecisions.sort((left, right) => left.decisionId.localeCompare(right.decisionId)),
     customerSafeSources: customerSafeSources.sort((left, right) => left.sourceId.localeCompare(right.sourceId)),
