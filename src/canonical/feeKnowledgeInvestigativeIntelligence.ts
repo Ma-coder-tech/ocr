@@ -126,6 +126,7 @@ export function openAiInvestigativeIntelligenceAdapter(
         body: JSON.stringify({
           model: options.openAiModelName ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_INVESTIGATIVE_MODEL,
           input,
+          text: { format: investigativeOutputJsonSchema() },
           max_output_tokens: options.maximumOutputTokens ?? OPENAI_INVESTIGATIVE_INTELLIGENCE_MAX_OUTPUT_TOKENS,
         }),
       });
@@ -484,3 +485,58 @@ const ACTIONABILITY = ["potentially_actionable", "verify_only", "not_actionable"
 const MERCHANT_ACTIONABILITY = ["merchant_display_provisional", "merchant_display_supported", "merchant_display_verified", "internal_only", "human_review_only"] as const;
 const PROOF_REQUIREMENTS = ["statement_grounded_labeling_only", "external_verification_required", "deterministic_math_required", "external_and_math_required", "human_review_required"] as const;
 const SUPPORT_STATUSES = ["candidate_only", "semantic_supported", "semantic_rejected", "semantic_not_run", "inapplicable"] as const;
+
+function investigativeOutputJsonSchema(): Record<string, unknown> {
+  return {
+    type: "json_schema",
+    name: "fee_knowledge_investigative_findings",
+    strict: true,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["findings"],
+      properties: {
+        findings: {
+          type: "array",
+          maxItems: 8,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "feeRowRef",
+              "state",
+              "subject",
+              "summary",
+              "reasonCodes",
+              "confidence",
+              "actionabilityCeiling",
+              "merchantActionability",
+              "proofRequirement",
+              "candidateRef",
+              "locatorTextHash",
+              "supportStatus",
+            ],
+            properties: {
+              feeRowRef: { type: "string", pattern: "^[A-Za-z0-9_.:-]{1,160}$" },
+              state: { type: "string", enum: STATES },
+              subject: { type: "string", enum: SUBJECTS },
+              summary: { type: "string", minLength: 1, maxLength: 260 },
+              reasonCodes: {
+                type: "array",
+                maxItems: 8,
+                items: { type: "string", pattern: "^[a-z0-9_]{3,120}$" },
+              },
+              confidence: { type: "string", enum: CONFIDENCES },
+              actionabilityCeiling: { type: "string", enum: ACTIONABILITY },
+              merchantActionability: { type: "string", enum: MERCHANT_ACTIONABILITY },
+              proofRequirement: { type: "string", enum: PROOF_REQUIREMENTS },
+              candidateRef: { type: ["string", "null"], pattern: "^[A-Za-z0-9_.:-]{1,160}$" },
+              locatorTextHash: { type: ["string", "null"], pattern: "^[A-Za-z0-9_.:-]{1,160}$" },
+              supportStatus: { type: "string", enum: SUPPORT_STATUSES },
+            },
+          },
+        },
+      },
+    },
+  };
+}

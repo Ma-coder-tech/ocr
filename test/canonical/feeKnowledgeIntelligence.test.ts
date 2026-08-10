@@ -11,6 +11,7 @@ import {
   type FeeKnowledgeSemanticSupportAdapter,
 } from "../../src/canonical/feeKnowledgeResearch.js";
 import {
+  openAiInvestigativeIntelligenceAdapter,
   parseInvestigativeProviderOutput,
   type FeeKnowledgeInvestigativeIntelligenceAdapter,
 } from "../../src/canonical/feeKnowledgeInvestigativeIntelligence.js";
@@ -401,6 +402,51 @@ describe("fee knowledge intelligence state model", () => {
       locatorTextHash: null,
     });
   });
+
+  it("requests strict structured output for provider-backed investigative intelligence", async () => {
+    const bodies: unknown[] = [];
+    const adapter = openAiInvestigativeIntelligenceAdapter({
+      openAiApiKey: "test_key",
+      fetchImpl: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify({
+          id: "resp_test_investigative_schema",
+          output: [{
+            type: "message",
+            content: [{
+              type: "output_text",
+              text: JSON.stringify({ findings: [] }),
+            }],
+          }],
+          usage: { input_tokens: 1, output_tokens: 1, input_tokens_details: { cached_tokens: 0 } },
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      },
+    });
+    const analysis = await analysisFromPdf(STATEMENT_2, "statement_2_investigative_schema_contract");
+    const [question] = defaultFeeKnowledgeResearchQuestions(analysis, null);
+    if (!question) throw new Error("expected at least one research question");
+
+    await adapter({
+      scope: "statement",
+      analysis,
+      questions: [question],
+      existingIntelligence: [],
+    }, { abortSignal: new AbortController().signal });
+
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({
+      text: {
+        format: {
+          type: "json_schema",
+          name: "fee_knowledge_investigative_findings",
+          strict: true,
+        },
+      },
+    });
+    const required = (bodies[0] as { text: { format: { schema: { properties: { findings: { items: { required: string[] } } } } } } })
+      .text.format.schema.properties.findings.items.required;
+    expect(required).toContain("locatorTextHash");
+  }, 30_000);
 });
 
 async function analysisFromPdf(path: string, ref: string) {
