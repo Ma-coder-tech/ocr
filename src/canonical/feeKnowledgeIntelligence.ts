@@ -30,7 +30,7 @@ export function buildStatementGroundedIntelligence(input: {
     const label = safeSummary(row.selectedLabel || question.feeLabel);
     const unfamiliar = question.triggerReason === "material_unfamiliar_label" || selected?.category === "unknown_needs_review" || row.role === "unknown_unresolved";
     if (unfamiliar) {
-      records.push(record({
+      records.push(buildFeeKnowledgeIntelligenceRecord({
         feeRowRef: row.id,
         origin: "statement_grounded",
         state: "ai_hypothesis",
@@ -45,7 +45,7 @@ export function buildStatementGroundedIntelligence(input: {
       }));
     }
     if (selected?.actionabilityCeiling === "potentially_actionable" || /mark.?up|surcharge|non.?qual|monthly|annual|service|pci/i.test(label)) {
-      records.push(record({
+      records.push(buildFeeKnowledgeIntelligenceRecord({
         feeRowRef: row.id,
         origin: "statement_grounded",
         state: "investigation_lead",
@@ -60,7 +60,7 @@ export function buildStatementGroundedIntelligence(input: {
       }));
     }
     if (row.role === "unknown_unresolved" || /misc|other|adjust|unknown|non.?qual/i.test(label)) {
-      records.push(record({
+      records.push(buildFeeKnowledgeIntelligenceRecord({
         feeRowRef: row.id,
         origin: "statement_grounded",
         state: "anomaly_flag",
@@ -91,7 +91,7 @@ export function buildRetrievedDocumentIntelligence(input: FeeKnowledgeDocumentIn
   const hasRateLikeTerm = /\b(?:rate|rates|fee|fees|assessment|schedule|program|rule|rules|basis point|bps|percent)\b/.test(documentText);
   const records: FeeKnowledgeIntelligenceRecord[] = [];
   if (hasLabelToken || (hasProcessorToken && hasRateLikeTerm) || (hasNetworkTerm && semanticTokens.some((token) => documentText.includes(token)))) {
-    records.push(record({
+    records.push(buildFeeKnowledgeIntelligenceRecord({
       feeRowRef: input.question.feeRowRef,
       origin: "retrieved_document",
       state: "source_derived_candidate_evidence",
@@ -118,7 +118,7 @@ export function buildRetrievedDocumentIntelligence(input: FeeKnowledgeDocumentIn
       },
     }));
   } else {
-    records.push(record({
+    records.push(buildFeeKnowledgeIntelligenceRecord({
       feeRowRef: input.question.feeRowRef,
       origin: "retrieved_document",
       state: "unresolved_review_needed",
@@ -152,7 +152,7 @@ export function buildIntelligenceFromClaimSupport(input: {
     input.support.evidenceDecision === "verified_application";
   const rateCompared = input.support.rateOrAmountComparison === "matches_published_rule" ||
     input.support.rateOrAmountComparison === "does_not_match_published_rule";
-  return record({
+  return buildFeeKnowledgeIntelligenceRecord({
     feeRowRef: input.support.feeRowRef,
     origin: rateCompared ? "deterministic_math" : "semantic_verification",
     state: verified && rateCompared ? "fully_verified" : verified ? "externally_verified" : input.support.semanticSupport.decision === "supports" ? "externally_supported" : "rejected",
@@ -181,7 +181,7 @@ export function buildIntelligenceFromClaimSupport(input: {
   });
 }
 
-function record(input: {
+export function buildFeeKnowledgeIntelligenceRecord(input: {
   feeRowRef: string;
   origin: FeeKnowledgeIntelligenceRecord["origin"];
   state: FeeKnowledgeIntelligenceRecord["state"];
