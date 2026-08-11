@@ -43,10 +43,10 @@ export type FeeKnowledgeResearchLimits = {
 
 export const FEE_KNOWLEDGE_RESEARCH_LIMITS = {
   policyVersion: FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
-  maxSearchCalls: 2,
-  maxRetrievalCandidates: 5,
+  maxSearchCalls: 4,
+  maxRetrievalCandidates: 8,
   totalDeadlineMs: LIVE_EVALUATION_TIMEOUT_POLICY.researchGraphTotalMs,
-  maxResultCandidatesPerSearch: 5,
+  maxResultCandidatesPerSearch: 4,
 } as const satisfies FeeKnowledgeResearchLimits;
 
 const DEFAULT_OPENAI_WEB_SEARCH_MODEL = "gpt-5";
@@ -199,8 +199,10 @@ export async function runFeeKnowledgeResearch(input: {
       ? { openAiApiKey: options.openAiApiKey, openAiModelName: options.openAiModelName, fetchImpl: options.fetchImpl, ...options.investigativeIntelligence }
       : undefined;
     const sourcePacket = buildFeeKnowledgeSourcePacket({ analysis: input.analysis, registry: input.registry });
-    const selectedQuestions = input.questions.slice(0, FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls);
-    const skippedQuestions = input.questions.slice(FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls);
+    const researchPlan = planFeeKnowledgeResearchQuestions(input.questions, FEE_KNOWLEDGE_RESEARCH_LIMITS);
+    const selectedQuestions = researchPlan.selectedQuestions;
+    const selectedQuestionItems = researchPlan.selected;
+    const skippedQuestions = researchPlan.notSelectedQuestions;
     let remainingCandidates = FEE_KNOWLEDGE_RESEARCH_LIMITS.maxRetrievalCandidates;
     intelligence.push(...await runFeeKnowledgeInvestigativeIntelligence({
       scope: "statement",
@@ -211,11 +213,14 @@ export async function runFeeKnowledgeResearch(input: {
       abortSignal,
     }));
 
-    for (const [index, question] of selectedQuestions.entries()) {
+    for (const item of selectedQuestionItems) {
+      const question = item.question;
+      const index = item.originalIndex;
       const attemptId = attemptIdFor(question, index);
       try {
         const discovered = await searchAdapter({ attemptId, questions: [question], limits: FEE_KNOWLEDGE_RESEARCH_LIMITS }, { abortSignal });
-        const bounded = dedupeCandidates(discovered).slice(0, Math.min(remainingCandidates, FEE_KNOWLEDGE_RESEARCH_LIMITS.maxResultCandidatesPerSearch));
+        const bounded = rankFeeKnowledgeDiscoveryCandidates(dedupeCandidates(discovered), question)
+          .slice(0, Math.min(remainingCandidates, FEE_KNOWLEDGE_RESEARCH_LIMITS.maxResultCandidatesPerSearch));
         remainingCandidates -= bounded.length;
         const candidateIds: string[] = [];
         for (const [candidateIndex, candidate] of bounded.entries()) {
@@ -305,8 +310,8 @@ export async function runFeeKnowledgeResearch(input: {
       }
     }
 
-    for (const [offset, question] of skippedQuestions.entries()) {
-      attempts.push(attemptRecord(question, selectedQuestions.length + offset, "not_selected_planning", [], ["fee_knowledge_research_not_selected_planning"]));
+    for (const item of skippedQuestions) {
+      attempts.push(attemptRecord(item.question, item.originalIndex, "not_selected_planning", [], ["fee_knowledge_research_not_selected_planning"]));
     }
 
     return snapshotResearchResult({ attempts, candidates, intelligence, claimSupports });
@@ -332,8 +337,8 @@ export function defaultFeeKnowledgeResearchQuestions(
   const sourcePacket = buildFeeKnowledgeSourcePacket({ analysis, registry });
   const classifications = new Map(analysis.feeOwnershipActionability.rowClassifications.map((classification) => [classification.feeRowId, classification.selected?.category ?? null]));
   const selectedByRow = new Map(analysis.feeOwnershipActionability.rowClassifications.map((classification) => [classification.feeRowId, classification.selected]));
-  const questions: FeeKnowledgeResearchQuestion[] = analysis.feeLedger.rows
-    .map((row): FeeKnowledgeResearchQuestion | null => {
+  const questions: Array<{ question: FeeKnowledgeResearchQuestion; score: number; rowAmountMinor: number }> = analysis.feeLedger.rows
+    .map((row): { question: FeeKnowledgeResearchQuestion; score: number; rowAmountMinor: number } | null => {
       const rowPacket = sourcePacket.rowPackets.find((packet) => packet.feeRowRef === row.id);
       const rowMatches = sourcePacket.sourceMatches.filter((match) => match.feeRowRef === row.id);
       const deterministicCategory = classifications.get(row.id) ?? null;
@@ -351,7 +356,7 @@ export function defaultFeeKnowledgeResearchQuestions(
                   ? "material_unfamiliar_label"
                   : null;
       if (!triggerReason || !materialRow(row)) return null;
-      return {
+      const question = {
         feeRowRef: row.id,
         sanitizedQuestionCategory: "classification" as const,
         triggerReason,
@@ -364,11 +369,60 @@ export function defaultFeeKnowledgeResearchQuestions(
         deterministicContractualController: selected?.ownership.contractualController ?? null,
         deterministicActionabilityCeiling: selected?.actionabilityCeiling ?? "verify_only",
         deterministicConfidence: selected?.confidence ?? "medium",
-        semanticQuestion: "Find official documentation that explains this payment processing fee label or published rule.",
+        semanticQuestion: semanticQuestionForResearch({
+          feeLabel: row.selectedLabel,
+          triggerReason,
+          deterministicCategory,
+          selected,
+        }),
+      };
+      return {
+        question,
+        score: researchQuestionPriorityScore({
+          question,
+          label: row.selectedLabel,
+          role: row.role,
+          contributesToUniqueTotal: row.contributesToUniqueTotal,
+          amountMinor: row.selectedAmount?.amountMinor ?? 0,
+        }),
+        rowAmountMinor: Math.abs(row.selectedAmount?.amountMinor ?? 0),
       };
     })
-    .filter((question): question is FeeKnowledgeResearchQuestion => Boolean(question));
-  return questions.sort((left, right) => priority(left.triggerReason) - priority(right.triggerReason) || left.feeRowRef.localeCompare(right.feeRowRef));
+    .filter((question): question is { question: FeeKnowledgeResearchQuestion; score: number; rowAmountMinor: number } => Boolean(question));
+  return questions
+    .sort((left, right) =>
+      right.score - left.score ||
+      right.rowAmountMinor - left.rowAmountMinor ||
+      left.question.feeRowRef.localeCompare(right.question.feeRowRef))
+    .map((item) => item.question);
+}
+
+export type PlannedFeeKnowledgeResearchQuestion = {
+  question: FeeKnowledgeResearchQuestion;
+  originalIndex: number;
+  score: number;
+  reasonCodes: string[];
+};
+
+export function planFeeKnowledgeResearchQuestions(
+  questions: readonly FeeKnowledgeResearchQuestion[],
+  limits: Pick<FeeKnowledgeResearchLimits, "maxSearchCalls">,
+): { selectedQuestions: FeeKnowledgeResearchQuestion[]; selected: PlannedFeeKnowledgeResearchQuestion[]; notSelectedQuestions: PlannedFeeKnowledgeResearchQuestion[] } {
+  const ranked = questions
+    .map((question, originalIndex): PlannedFeeKnowledgeResearchQuestion => ({
+      question,
+      originalIndex,
+      score: researchQuestionPriorityScore({ question }),
+      reasonCodes: researchQuestionPriorityReasonCodes(question),
+    }))
+    .sort((left, right) => right.score - left.score || left.originalIndex - right.originalIndex);
+  const selected = ranked.slice(0, limits.maxSearchCalls);
+  const notSelectedQuestions = ranked.slice(limits.maxSearchCalls);
+  return {
+    selectedQuestions: selected.map((item) => item.question),
+    selected,
+    notSelectedQuestions,
+  };
 }
 
 export function openAiWebSearchAdapter(options: {
@@ -385,28 +439,7 @@ export function openAiWebSearchAdapter(options: {
     const model = options.modelName ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_WEB_SEARCH_MODEL;
     validateWebSearchModel(model);
     const fetchImpl = options.fetchImpl ?? fetch;
-    const input = [
-      "Find official payment processor, card-network, or regulatory documentation URLs only.",
-      "Return sources that may explain the sanitized fee labels. Search results are discovery candidates only.",
-      JSON.stringify({
-        questionCount: request.questions.length,
-        questions: request.questions.map((question) => ({
-          category: question.sanitizedQuestionCategory,
-          processorOrNetwork: question.processorOrNetwork,
-          feeLabel: question.feeLabel,
-          proposedCategory: question.deterministicCategory,
-          likelyEconomicOwner: question.deterministicEconomicOwner,
-          likelyContractualController: question.deterministicContractualController,
-          conditions: [],
-          exclusions: [],
-          maximumConfidence: question.deterministicConfidence,
-          actionabilityCeiling: question.deterministicActionabilityCeiling,
-          statementSection: question.statementSection,
-          statementPeriodYear: question.statementPeriodYear,
-          semanticQuestion: question.semanticQuestion,
-        })),
-      }),
-    ].join("\n");
+    const input = buildFeeKnowledgeWebSearchInput(request.questions);
     assertUtf8InputBound(input, options.maximumInputTokens);
     const maximumOutputTokens = positiveInteger(options.maximumOutputTokens ?? OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS, "web-search maximum output tokens");
     let response: Response;
@@ -444,6 +477,54 @@ export function openAiWebSearchAdapter(options: {
     }
     return extractDiscoveryCandidates(raw).slice(0, request.limits.maxResultCandidatesPerSearch);
   };
+}
+
+export function buildFeeKnowledgeWebSearchInput(questions: readonly FeeKnowledgeResearchQuestion[]): string {
+  return [
+    "Find authoritative payment-processing evidence for RateReveal fee-knowledge research.",
+    "Prefer sources that are both authoritative and applicable to THIS question, not merely generic payments education.",
+    "Strong candidates include official processor pages/PDFs, official card-network fee schedules/rules, regulator materials, or official documentation pages with fee definitions/rates/rules.",
+    "If the primary official destination is inaccessible or generic, look for alternative official PDFs, current/archived official schedules, processor documentation, or other authoritative sources. Preserve weaker material only as lower-confidence discovery candidates.",
+    "Do not include private business identifiers, private numeric identifiers, credentials, or private URLs. Search results are discovery candidates only; verification/admission will decide support.",
+    JSON.stringify({
+      questionCount: questions.length,
+      questions: questions.map((question) => ({
+        category: question.sanitizedQuestionCategory,
+        triggerReason: question.triggerReason,
+        processorOrNetwork: question.processorOrNetwork,
+        feeLabel: question.feeLabel,
+        searchTerms: researchSearchTerms(question),
+        sourcePreferences: sourcePreferenceHints(question),
+        applicabilityTargets: {
+          processorOrNetwork: question.processorOrNetwork,
+          proposedCategory: question.deterministicCategory,
+          likelyEconomicOwner: question.deterministicEconomicOwner,
+          likelyContractualController: question.deterministicContractualController,
+          statementPeriodYear: question.statementPeriodYear,
+          statementSection: question.statementSection,
+        },
+        confidenceAndActionability: {
+          deterministicConfidence: question.deterministicConfidence,
+          deterministicActionabilityCeiling: question.deterministicActionabilityCeiling,
+        },
+        semanticQuestion: question.semanticQuestion,
+      })),
+    }),
+  ].join("\n");
+}
+
+export function rankFeeKnowledgeDiscoveryCandidates(
+  candidates: readonly FeeKnowledgeDiscoveryCandidate[],
+  question: FeeKnowledgeResearchQuestion,
+): FeeKnowledgeDiscoveryCandidate[] {
+  return candidates
+    .map((candidate, index) => ({
+      candidate,
+      index,
+      score: discoveryCandidateScore(candidate, question),
+    }))
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .map((item) => item.candidate);
 }
 
 export function openAiSemanticSupportAdapter(options: {
@@ -1159,6 +1240,195 @@ function priority(reason: FeeKnowledgeResearchQuestion["triggerReason"]): number
     not_needed: 5,
   }[reason];
 }
+
+function semanticQuestionForResearch(input: {
+  feeLabel: string;
+  triggerReason: FeeKnowledgeResearchQuestion["triggerReason"];
+  deterministicCategory: CanonicalFeeCategory | null;
+  selected: CanonicalStatementAnalysis["feeOwnershipActionability"]["rowClassifications"][number]["selected"] | null | undefined;
+}): string {
+  const label = safeContextText(input.feeLabel) ?? "this payment processing fee";
+  if (input.triggerReason === "contradicted_source") {
+    return `Find authoritative documentation that resolves conflicting classification or rule evidence for ${label}.`;
+  }
+  if (input.triggerReason === "expired_or_superseded_source") {
+    return `Find current authoritative documentation for ${label}, including active fee schedules or rule versions.`;
+  }
+  if (input.selected?.actionabilityCeiling === "potentially_actionable" || input.deterministicCategory === "processor_markup") {
+    return `Find authoritative processor or network documentation that explains ${label}, its ownership, and whether it is a processor markup or published network/card-brand fee.`;
+  }
+  if (input.deterministicCategory === "interchange" || input.deterministicCategory === "card_brand_network_assessment") {
+    return `Find official card-network documentation that defines ${label} or an applicable published rate/rule.`;
+  }
+  return `Find official documentation that explains this payment processing fee label, likely aliases, ownership, or published rule.`;
+}
+
+function researchQuestionPriorityScore(input: {
+  question: FeeKnowledgeResearchQuestion;
+  label?: string;
+  role?: string | null;
+  contributesToUniqueTotal?: boolean;
+  amountMinor?: number;
+}): number {
+  const question = input.question;
+  const normalized = normalizeText([question.feeLabel, input.label ?? "", question.semanticQuestion, question.statementSection ?? ""].join(" "));
+  let score = 0;
+  score += {
+    contradicted_source: 1000,
+    expired_or_superseded_source: 900,
+    material_unfamiliar_label: 760,
+    missing_applicable_registry_claim: 420,
+    disabled: 0,
+    not_needed: 0,
+  }[question.triggerReason];
+  if (question.deterministicActionabilityCeiling === "potentially_actionable") score += 260;
+  if (question.deterministicCategory === "processor_markup") score += 240;
+  if (question.deterministicCategory === "unknown_needs_review") score += 220;
+  if (question.deterministicCategory === "card_brand_network_assessment" || question.deterministicCategory === "interchange") score += 180;
+  if (question.deterministicConfidence === "low") score += 120;
+  if (question.deterministicConfidence === "medium") score += 40;
+  if (input.role === "unknown_unresolved") score += 160;
+  if (input.contributesToUniqueTotal) score += 45;
+  if ((input.amountMinor ?? 0) !== 0) score += Math.min(160, Math.floor(Math.log10(Math.abs(input.amountMinor ?? 0) + 1) * 35));
+  if (/\b(?:non\s?qual|nonqualified|downgrade|surcharge|basis|access|assessment|authorization|auth|pci|monthly|annual|service|batch|chargeback|retrieval|dues|network|interchange|visa|mastercard|discover|amex|american express)\b/.test(normalized)) score += 120;
+  if (/\b(?:other|misc|unknown|adjustment|review)\b/.test(normalized)) score += 90;
+  if (question.statementPeriodYear) score += 20;
+  if (question.processorOrNetwork) score += 20;
+  return score;
+}
+
+function researchQuestionPriorityReasonCodes(question: FeeKnowledgeResearchQuestion): string[] {
+  const reasonCodes = [`fee_knowledge_research_priority_${question.triggerReason}`];
+  if (question.deterministicActionabilityCeiling === "potentially_actionable") reasonCodes.push("fee_knowledge_research_priority_actionable");
+  if (question.deterministicCategory === "processor_markup") reasonCodes.push("fee_knowledge_research_priority_markup");
+  if (question.deterministicCategory === "unknown_needs_review") reasonCodes.push("fee_knowledge_research_priority_unknown");
+  if (question.deterministicCategory === "card_brand_network_assessment" || question.deterministicCategory === "interchange") reasonCodes.push("fee_knowledge_research_priority_network_fee");
+  if (question.deterministicConfidence !== "high") reasonCodes.push("fee_knowledge_research_priority_uncertain");
+  return [...new Set(reasonCodes)].sort();
+}
+
+function researchSearchTerms(question: FeeKnowledgeResearchQuestion): string[] {
+  const terms = [
+    question.processorOrNetwork,
+    question.feeLabel,
+    question.deterministicCategory,
+    question.deterministicEconomicOwner,
+    question.deterministicContractualController,
+    question.statementPeriodYear,
+    ...networkAliases(question),
+    ...categorySearchTerms(question),
+  ];
+  return [...new Set(terms
+    .filter((term): term is string => Boolean(term))
+    .map((term) => sanitizeText(term, 80))
+    .filter(Boolean))]
+    .slice(0, 14);
+}
+
+function sourcePreferenceHints(question: FeeKnowledgeResearchQuestion): string[] {
+  const hints = ["official documentation", "fee schedule", "rules", "rate table", "PDF"];
+  if (question.processorOrNetwork) hints.push(`${question.processorOrNetwork} official`);
+  for (const network of networkAliases(question)) hints.push(`${network} official`);
+  if (question.deterministicCategory === "processor_markup") hints.push("processor pricing guide", "merchant services fee schedule");
+  if (question.deterministicCategory === "interchange") hints.push("interchange reimbursement fee schedule");
+  if (question.deterministicCategory === "card_brand_network_assessment") hints.push("assessment fee schedule", "card brand fee schedule");
+  return [...new Set(hints.map((hint) => sanitizeText(hint, 100)).filter(Boolean))].slice(0, 12);
+}
+
+function categorySearchTerms(question: FeeKnowledgeResearchQuestion): string[] {
+  if (question.deterministicCategory === "processor_markup") return ["processor markup", "merchant services fee", "pricing schedule"];
+  if (question.deterministicCategory === "interchange") return ["interchange", "reimbursement fee", "interchange rate"];
+  if (question.deterministicCategory === "card_brand_network_assessment") return ["assessment", "network fee", "card brand fee"];
+  if (question.deterministicCategory === "network_access_or_authorization") return ["network fee", "pass-through fee", "assessment"];
+  return ["fee definition", "fee schedule"];
+}
+
+function networkAliases(question: FeeKnowledgeResearchQuestion): string[] {
+  const text = normalizeText([question.feeLabel, question.processorOrNetwork ?? "", question.semanticQuestion].join(" "));
+  const aliases: string[] = [];
+  if (/\bvisa\b/.test(text)) aliases.push("Visa");
+  if (/\bmaster\s?card\b/.test(text)) aliases.push("Mastercard");
+  if (/\bdiscover\b/.test(text)) aliases.push("Discover");
+  if (/\b(?:amex|american express)\b/.test(text)) aliases.push("American Express");
+  return aliases;
+}
+
+function discoveryCandidateScore(candidate: FeeKnowledgeDiscoveryCandidate, question: FeeKnowledgeResearchQuestion): number {
+  let score = 0;
+  const url = safeUrl(candidate.url);
+  const host = url?.hostname.toLowerCase() ?? "";
+  const path = url ? normalizeText(url.pathname) : "";
+  const title = normalizeText(candidate.title ?? "");
+  const publisher = normalizeText(candidate.publisher ?? "");
+  const haystack = normalizeText([host, path, title, publisher].join(" "));
+  const labelTokens = meaningfulQueryTokens(question.feeLabel);
+  const queryTokens = meaningfulQueryTokens([question.semanticQuestion, question.deterministicCategory ?? "", ...categorySearchTerms(question)].join(" "));
+  const networks = networkAliases(question).map(normalizeText);
+  if (url?.protocol === "https:") score += 20;
+  score += officialDomainScore(host, question);
+  if (host.endsWith(".gov")) score += 120;
+  if (/\b(?:fee|fees|rate|rates|schedule|rules?|interchange|assessment|program|pricing|guide|merchant)\b/.test(haystack)) score += 90;
+  if (/\b(?:pdf|download|library|rules|schedule|interchange|assessment|fee)\b/.test(path)) score += 65;
+  if (question.statementPeriodYear && haystack.includes(question.statementPeriodYear)) score += 55;
+  for (const network of networks) {
+    if (haystack.includes(network)) score += 130;
+  }
+  for (const token of labelTokens) {
+    if (haystack.includes(token)) score += token.length >= 8 ? 60 : 30;
+  }
+  for (const token of queryTokens) {
+    if (haystack.includes(token)) score += 18;
+  }
+  if (question.processorOrNetwork && haystack.includes(normalizeText(question.processorOrNetwork))) score += 90;
+  if (/\b(?:blog|news|press|learn|insights|faq|support|contact|login|careers|about|glossary)\b/.test(haystack)) score -= 75;
+  if (/\b(?:what is|guide to|explained|education|small business)\b/.test(title)) score -= 60;
+  if (!/\b(?:fee|rate|schedule|rule|interchange|assessment|pricing|program)\b/.test(haystack)) score -= 40;
+  return score;
+}
+
+function officialDomainScore(host: string, question: FeeKnowledgeResearchQuestion): number {
+  if (!host) return 0;
+  let score = 0;
+  const networkDomains = [
+    ["visa", ["visa.com"]],
+    ["mastercard", ["mastercard.com"]],
+    ["discover", ["discover.com", "discovernetwork.com"]],
+    ["american express", ["americanexpress.com", "aexp-static.com"]],
+  ] as const;
+  for (const [network, domains] of networkDomains) {
+    const networkRelevant = networkAliases(question).map(normalizeText).includes(network);
+    if (domains.some((domain) => host === domain || host.endsWith(`.${domain}`))) score += networkRelevant ? 320 : 120;
+  }
+  const processor = normalizeText(question.processorOrNetwork ?? "");
+  if (processor && (
+    (processor.includes("fiserv") && (host.endsWith("fiserv.com") || host.endsWith("firstdata.com"))) ||
+    (processor.includes("paysafe") && host.endsWith("paysafe.com")) ||
+    (processor.includes("basys") && (host.endsWith("basyspro.com") || host.endsWith("basys.com"))) ||
+    (processor.includes("merchant one") && host.endsWith("merchantone.com")) ||
+    (processor.includes("clover") && host.endsWith("clover.com"))
+  )) score += 300;
+  return score;
+}
+
+function safeUrl(value: string): URL | null {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
+function meaningfulQueryTokens(value: string): string[] {
+  return normalizeText(value)
+    .split(/\s+/)
+    .filter((token) => token.length >= 3 && !STOP_WORDS.has(token))
+    .slice(0, 16);
+}
+
+const STOP_WORDS = new Set([
+  "the", "and", "for", "with", "this", "that", "fee", "fees", "find", "official", "documentation",
+  "payment", "processing", "label", "rule", "rate", "likely", "published", "merchant",
+]);
 
 function safeReasonCode(value: string): boolean {
   return /^[a-z0-9_]{3,120}$/i.test(value);

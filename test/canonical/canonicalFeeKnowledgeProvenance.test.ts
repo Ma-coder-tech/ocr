@@ -698,8 +698,8 @@ describe("canonical fee knowledge and provenance", () => {
 	      },
 	    });
 	    expect(questions).toHaveLength(3);
-	    expect(result.attempts.filter((attempt) => attempt.status === "completed")).toHaveLength(2);
-	    expect(result.attempts.filter((attempt) => attempt.status === "not_selected_planning")).toHaveLength(1);
+	    expect(result.attempts.filter((attempt) => attempt.status === "completed")).toHaveLength(3);
+	    expect(result.attempts.filter((attempt) => attempt.status === "not_selected_planning")).toHaveLength(0);
 	    expect(new Set(result.candidates.map((candidate) => candidate.feeRowRef))).toEqual(new Set(result.attempts.filter((attempt) => attempt.status === "completed").map((attempt) => attempt.feeRowRef)));
 	    expect(result.candidates.every((candidate) => candidate.attemptId.startsWith("research_"))).toBe(true);
 	  });
