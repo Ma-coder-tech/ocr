@@ -21,6 +21,17 @@ const MAX_STATEMENT_ROWS = 12;
 const MAX_EXISTING_INTELLIGENCE = 12;
 const MAX_DOCUMENT_LOCATORS = 6;
 const MAX_EXCERPT_CHARS = 900;
+const FINDING_REASON_CODES = new Set([
+  "fee_knowledge_ai_investigative_intelligence",
+  "fee_knowledge_ai_alias_hypothesis",
+  "fee_knowledge_ai_ownership_hypothesis",
+  "fee_knowledge_ai_markup_hypothesis",
+  "fee_knowledge_ai_anomaly_flag",
+  "fee_knowledge_ai_candidate_rate_or_rule",
+  "fee_knowledge_ai_source_insufficient",
+  "fee_knowledge_ai_source_contradicts",
+  "fee_knowledge_ai_candidate_evidence_locator",
+]);
 
 export type FeeKnowledgeInvestigativeScope = "statement" | "retrieved_document";
 
@@ -372,7 +383,7 @@ function normalizeFinding(value: unknown): FeeKnowledgeInvestigativeFinding | nu
     state,
     subject,
     summary: safeText(record.summary, 220) || "AI investigative intelligence requires review.",
-    reasonCodes: arrayField(record.reasonCodes).map(String).filter(safeReasonCode).slice(0, 8),
+    reasonCodes: arrayField(record.reasonCodes).map(String).filter(approvedFindingReasonCode).slice(0, 8),
     confidence: enumValue(record.confidence, CONFIDENCES) ?? "low",
     actionabilityCeiling: enumValue(record.actionabilityCeiling, ACTIONABILITY) ?? "verify_only",
     merchantActionability: enumValue(record.merchantActionability, MERCHANT_ACTIONABILITY) ?? "internal_only",
@@ -475,6 +486,10 @@ function safeReasonCode(value: string): boolean {
   return /^[a-z0-9_]{3,120}$/i.test(value);
 }
 
+function approvedFindingReasonCode(value: string): boolean {
+  return safeReasonCode(value) && FINDING_REASON_CODES.has(value);
+}
+
 function arrayField(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
@@ -564,7 +579,7 @@ function investigativeOutputJsonSchema(): Record<string, unknown> {
               reasonCodes: {
                 type: "array",
                 maxItems: 8,
-                items: { type: "string", pattern: "^[a-z0-9_]{3,120}$" },
+                items: { type: "string", enum: [...FINDING_REASON_CODES].sort() },
               },
               confidence: { type: "string", enum: CONFIDENCES },
               actionabilityCeiling: { type: "string", enum: ACTIONABILITY },
