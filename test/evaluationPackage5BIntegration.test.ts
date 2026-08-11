@@ -941,6 +941,102 @@ describe("Package 5B manifest-driven admission", () => {
     expect(proof.claimSupports).toHaveLength(1);
   }, 30_000);
 
+  it("keeps retrieved-document investigative timeout candidate-local and still runs semantic verification and Package 5B", async () => {
+    const fixture = await approvedOneTimePdfFixture([
+      ...eligibleStages,
+      "retrieved_document_investigative_intelligence",
+    ]);
+    let feeLabel = "fee";
+    let retrievedDocumentInvestigations = 0;
+    let semanticCalls = 0;
+    let wholeStatementCalls = 0;
+    const timeout = Object.assign(new Error("private retrieved-document investigation timeout"), {
+      name: "AbortError",
+      accounting: { requestId: "request_retrieved_doc_investigation_timeout", durationMs: 5 },
+    });
+    const baseCalls = fullOneTimeCalls();
+    const semanticIndex = baseCalls.findIndex((call) => call.stage === "semantic_verification");
+    const retrievedDocumentInvestigationCalls = Array.from({ length: ONE_TIME_RESEARCH_REQUEST_SLOTS.retrievedDocumentInvestigation }, (_, ordinal) => ({
+      sourceDocumentId: "doc_one_time_fiserv",
+      stage: "retrieved_document_investigative_intelligence" as const,
+      reservation: {
+        callId: `package_5b_doc_one_time_fiserv_retrieved_document_investigative_intelligence_${ordinal + 1}`,
+        attempt: 1,
+        retryOfCallId: null,
+        capability: "investigative_intelligence" as const,
+        pricingPolicyRef: "sanitized_pricing_policy_v1",
+        providerRoute: "sanitized_route",
+        provider: "sanitized_provider",
+        model: "sanitized_model",
+        toolClass: "investigative_intelligence",
+        maximumInputTokens: 1000000,
+        maximumOutputTokens: 50000,
+        maximumToolUses: 0,
+        pricing: {
+          uncachedInputUsdPerMillionTokens: 0,
+          cachedInputUsdPerMillionTokens: 0,
+          outputUsdPerMillionTokens: 2,
+          toolUseUsd: 0,
+        },
+        estimatedMaximumCostUsd: 0.5,
+      },
+    }));
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: [
+        ...baseCalls.slice(0, semanticIndex),
+        ...retrievedDocumentInvestigationCalls,
+        ...baseCalls.slice(semanticIndex),
+      ],
+      outputArtifactPath: path.join(fixture.directory, "package-5b-retrieved-document-investigation-timeout.json"),
+      oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis)],
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async ({ questions: [question] }) => {
+          feeLabel = question!.feeLabel;
+          return external([
+            { url: "https://www.fiserv.com/guide/retrieved-doc-timeout", title: "Official fee guide", publisher: "Fiserv" },
+          ], "request_search_retrieved_doc_timeout");
+        },
+        documentRetrieval: async (url) => external(retrievedTextDocument(url, feeLabel), "request_retrieval_retrieved_doc_timeout"),
+        retrievedDocumentInvestigativeIntelligence: async () => {
+          retrievedDocumentInvestigations += 1;
+          throw timeout;
+        },
+        semanticVerification: async ({ structuredClaim }) => {
+          semanticCalls += 1;
+          return external(semanticSupport(structuredClaim), "request_semantic_after_retrieved_doc_timeout");
+        },
+        wholeStatementReview: async (packet) => {
+          wholeStatementCalls += 1;
+          return external(validReview(packet, true), "request_whole_after_retrieved_doc_timeout");
+        },
+      },
+    });
+
+    expect(retrievedDocumentInvestigations).toBe(1);
+    expect(semanticCalls).toBe(1);
+    expect(wholeStatementCalls).toBeGreaterThan(0);
+    expect(result.finalStatus).toBe("completed");
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+    expect(result.providerCallOutcomes.find((outcome) => outcome.requestId === "request_retrieved_doc_investigation_timeout"))
+      .toMatchObject({ status: "timeout", stage: "retrieved_document_investigative_intelligence" });
+    expect(result.providerCallOutcomes.some((outcome) => outcome.stage === "semantic_verification" && outcome.status === "success"))
+      .toBe(true);
+    expect(result.providerCallOutcomes.some((outcome) =>
+      outcome.stage === "whole_statement_ai_review" && outcome.operationKind === "package_5b_work_unit" && outcome.status === "success",
+    )).toBe(true);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    expect(admission.researchEvidence.candidates).toHaveLength(1);
+    expect(admission.researchEvidence.candidates[0]).toMatchObject({
+      retrievalStatus: "retrieved_text",
+      semanticVerificationStatus: "completed",
+    });
+    expect(admission.researchEvidence.claimSupports).toHaveLength(1);
+    expect(admission.package5bWorkPlan?.units.some((unit) => unit.status === "completed")).toBe(true);
+  }, 30_000);
+
   it("withholds admission when an unused second selected candidate fails retrieval", async () => {
     const fixture = await approvedOneTimePdfFixture();
     let label = "";
@@ -1892,7 +1988,7 @@ function retrievedTextDocument(url: string, feeLabel: string) {
   };
 }
 
-async function approvedOneTimePdfFixture() {
+async function approvedOneTimePdfFixture(stages: EvaluationExecutionStage[] = eligibleStages) {
   const bytes = await readFile(path.resolve(process.cwd(), "test/fixtures/pdfs/Nov_2024_Statement.pdf"));
   const sourceDocumentId = "doc_one_time_fiserv";
   const preflight = createDeterministicPreflightArtifact({
@@ -1912,7 +2008,7 @@ async function approvedOneTimePdfFixture() {
       paidStageEligibility: "eligible",
       paidStageExclusionReason: null,
       selectedDriver: "fiserv_first_data_full_statement",
-      allowedExecutionStages: eligibleStages,
+      allowedExecutionStages: stages,
       parserRecordId: "parser_package_5b",
       parserDecision: preserveParserDecision({ decision: { status: "accepted", reportable: true, confidence: "high", reason: "Approved deterministic parser fixture." }, controls: [] }),
     }],
@@ -1921,7 +2017,7 @@ async function approvedOneTimePdfFixture() {
   const directory = await mkdtemp(path.join(tmpdir(), "package-5b-integration-"));
   const manifestPath = path.join(directory, "manifest.json");
   await writeFile(manifestPath, `${JSON.stringify(manifest)}\n`);
-  const requests: RequestedDocumentExecution[] = [{ sourceDocumentId, stages: eligibleStages }];
+  const requests: RequestedDocumentExecution[] = [{ sourceDocumentId, stages }];
   return {
     bytes,
     directory,

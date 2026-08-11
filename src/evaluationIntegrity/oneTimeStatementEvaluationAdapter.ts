@@ -801,37 +801,47 @@ export function createOneTimeStatementEvaluationTransport(input: {
       });
       const existingIntelligence = structuredClone(context.intelligence);
       let investigativeAccounting: RepositoryProviderTransportResult["accounting"] | null = null;
-      const records = await runWithinPreparedResearchDeadline(context, "retrieved_document_investigative_intelligence", async (abortSignal) =>
-        runFeeKnowledgeInvestigativeIntelligence({
-          scope: "retrieved_document",
-          analysis: context.analysis,
-          questions: [item.question],
-          existingIntelligence,
-          candidate: {
-            candidateId: item.candidateId,
-            attemptId: item.attemptId,
-            question: item.question,
-            candidateRecord: context.candidates.find((candidate) => candidate.candidateId === item.candidateId) ?? null,
-            retrieved: item.retrieved,
-          },
-          options: {
-            enabled: true,
-            adapter: async (investigativeRequest, investigativeContext) => {
-              if (readiness.status === "unavailable_before_send") throw new Error(readiness.reasonCodes[0] ?? "fee_knowledge_ai_investigative_unavailable_before_send");
-              const response = unwrapExternalRequestResult(
-                await services.retrievedDocumentInvestigativeIntelligence(investigativeRequest, {
-                  abortSignal: investigativeContext.abortSignal,
-                  approvedCallMetadata: structuredClone(request.approvedCallMetadata),
-                }),
-                started,
-                "investigative_intelligence",
-              );
-              investigativeAccounting = response.accounting;
-              return response.value;
+      let records: FeeKnowledgeIntelligenceRecord[];
+      try {
+        records = await runWithinPreparedResearchDeadline(context, "retrieved_document_investigative_intelligence", async (abortSignal) =>
+          runFeeKnowledgeInvestigativeIntelligence({
+            scope: "retrieved_document",
+            analysis: context.analysis,
+            questions: [item.question],
+            existingIntelligence,
+            candidate: {
+              candidateId: item.candidateId,
+              attemptId: item.attemptId,
+              question: item.question,
+              candidateRecord: context.candidates.find((candidate) => candidate.candidateId === item.candidateId) ?? null,
+              retrieved: item.retrieved,
             },
-          },
-          abortSignal,
-        }));
+            options: {
+              enabled: true,
+              propagateAdapterErrors: true,
+              adapter: async (investigativeRequest, investigativeContext) => {
+                if (readiness.status === "unavailable_before_send") throw new Error(readiness.reasonCodes[0] ?? "fee_knowledge_ai_investigative_unavailable_before_send");
+                const response = unwrapExternalRequestResult(
+                  await services.retrievedDocumentInvestigativeIntelligence(investigativeRequest, {
+                    abortSignal: investigativeContext.abortSignal,
+                    approvedCallMetadata: structuredClone(request.approvedCallMetadata),
+                  }),
+                  started,
+                  "investigative_intelligence",
+                );
+                investigativeAccounting = response.accounting;
+                return response.value;
+              },
+            },
+            abortSignal,
+          }));
+      } catch (error) {
+        const status = providerFailureStatus(error);
+        const reasonCode = timeoutReasonCode(error) ?? (status === "timed_out"
+          ? "fee_knowledge_retrieved_document_investigative_timed_out"
+          : "fee_knowledge_ai_investigative_provider_failed");
+        return providerFailureResult({ started, error, reasonCode, scope: "candidate_local" });
+      }
       context.intelligence.push(...records);
       return result({
         value: { intelligenceCount: records.length, totalIntelligenceCount: context.intelligence.length, scope: "retrieved_document", candidateId: item.candidateId },
