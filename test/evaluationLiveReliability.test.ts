@@ -18,6 +18,8 @@ describe("live evaluation reliability policy", () => {
       perCallMs: {
         web_search_discovery: 90_000,
         document_retrieval: 30_000,
+        statement_investigative_intelligence: 120_000,
+        retrieved_document_investigative_intelligence: 120_000,
         semantic_verification: 60_000,
         whole_statement_ai_review: 300_000,
       },
@@ -36,6 +38,8 @@ describe("live evaluation reliability policy", () => {
   it.each([
     ["web_search_discovery", 90_000, "fee_knowledge_web_search_timed_out"],
     ["document_retrieval", 30_000, "fee_knowledge_retrieval_timed_out"],
+    ["statement_investigative_intelligence", 120_000, "fee_knowledge_statement_investigative_timed_out"],
+    ["retrieved_document_investigative_intelligence", 120_000, "fee_knowledge_retrieved_document_investigative_timed_out"],
     ["semantic_verification", 60_000, "fee_knowledge_semantic_timed_out"],
     ["whole_statement_ai_review", 300_000, "whole_statement_ai_review_timed_out"],
   ] as const)("aborts %s once at its exact per-call deadline", async (stage, timeoutMs, reasonCode) => {

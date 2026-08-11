@@ -78,6 +78,7 @@ export type FeeKnowledgeInvestigativeIntelligenceOptions = {
   adapter?: FeeKnowledgeInvestigativeIntelligenceAdapter;
   fetchImpl?: SafeFetch;
   onUsage?: (usage: OpenAiResponsesSafeUsage) => void;
+  propagateAdapterErrors?: boolean;
 };
 
 export async function runFeeKnowledgeInvestigativeIntelligence(input: {
@@ -108,6 +109,7 @@ export async function runFeeKnowledgeInvestigativeIntelligence(input: {
       candidate: input.candidate,
     });
   } catch (error) {
+    if (options.propagateAdapterErrors) throw error;
     return providerUnavailableRecords({
       error,
       scope: input.scope,
