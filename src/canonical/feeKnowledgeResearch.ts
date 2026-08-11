@@ -1202,9 +1202,13 @@ function providerRefused(raw: unknown): boolean {
 }
 
 function validateWebSearchModel(model: string): void {
-  if (!WEB_SEARCH_MODEL_PATTERN.test(model)) {
+  if (!isOpenAiWebSearchModelSupported(model)) {
     throw new FeeKnowledgeSearchProviderError("unsupported_model", `Configured OpenAI model ${model} is not approved for fee knowledge web_search.`);
   }
+}
+
+export function isOpenAiWebSearchModelSupported(model: string): boolean {
+  return WEB_SEARCH_MODEL_PATTERN.test(model);
 }
 
 function semanticDecisionFromRaw(raw: unknown, structuredClaim: FeeKnowledgeStructuredClaim): FeeKnowledgeSemanticSupportDecision {

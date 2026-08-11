@@ -9,6 +9,7 @@ import {
   OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS,
   buildAdaptiveFeeKnowledgeResearchQuestion,
   feeKnowledgeQuestionRef,
+  isOpenAiWebSearchModelSupported,
   openAiSemanticSupportAdapter,
   openAiWebSearchAdapter,
   rankFeeKnowledgeDiscoveryCandidates,
@@ -666,10 +667,13 @@ export function createOneTimeStatementEvaluationTransport(input: {
         approvedCallMetadata: structuredClone(request.approvedCallMetadata),
       });
       if (readiness.status === "unavailable_before_send") {
+        const attemptStatus: FeeKnowledgeResearchAttemptRecord["status"] = readiness.reasonCodes.includes("fee_knowledge_web_search_model_unsupported")
+          ? "unsupported_model"
+          : "provider_unavailable";
         upsertContextAttempt(context, attemptRecord(
           question,
           questionOrdinal,
-          "provider_unavailable",
+          attemptStatus,
           [],
           readiness.reasonCodes,
         ));
@@ -697,6 +701,16 @@ export function createOneTimeStatementEvaluationTransport(input: {
         const reasonCode = timeoutReasonCode(error) ?? researchProviderFailureReason(status);
         const terminalStatus = status === "safety_blocked" ? "safety_blocked" : status === "timed_out" ? "timed_out" : "failed";
         upsertContextAttempt(context, attemptRecord(question, questionOrdinal, status, [], [researchProviderFailureReason(status)]));
+        if (status === "unsupported_model") {
+          return result({
+            value: { attemptId, questionRef: feeKnowledgeQuestionRef(question, questionOrdinal), candidateCount: 0, providerReadiness: "unavailable_before_send" },
+            generated: false,
+            schemaValid: true,
+            policyAccepted: false,
+            reasonCodes: [reasonCode],
+            accounting: noRequestAccounting(started),
+          });
+        }
         if (terminalStatus === "safety_blocked") {
           markResearchTerminal(context, terminalStatus);
           return providerFailureResult({
@@ -1185,6 +1199,13 @@ function liveOpenAiProviderReadiness(
       status: "unavailable_before_send",
       diagnosticClass: "missing_credential",
       reasonCodes: [providerReadinessReason(stage, "missing_credential")],
+    };
+  }
+  if (stage === "web_search_discovery" && metadata.model && !isOpenAiWebSearchModelSupported(metadata.model)) {
+    return {
+      status: "unavailable_before_send",
+      diagnosticClass: "configuration_invalid",
+      reasonCodes: ["fee_knowledge_web_search_model_unsupported"],
     };
   }
   return {
