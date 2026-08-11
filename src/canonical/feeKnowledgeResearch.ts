@@ -869,12 +869,15 @@ export async function verifyCandidate(input: {
         : semanticVerificationStatus === "provider_unavailable" ? "fee_knowledge_semantic_provider_unavailable_before_send"
           : semanticVerificationStatus === "failed" ? "fee_knowledge_semantic_failed"
             : `fee_knowledge_${evidenceDecision}`;
+  const verificationStatus: FeeKnowledgeResearchCandidateRecord["verificationStatus"] =
+    semanticVerificationStatus === "safety_blocked" ? "safety_blocked"
+      : semanticVerificationStatus !== "completed" ? "rejected"
+        : verified ? "runtime_verified_documentation"
+          : evidenceDecision === "conflicting_evidence" ? "conflicting_evidence"
+            : evidenceDecision === "source_inapplicable" ? "source_inapplicable" : "verified_candidate_limited";
   const candidate: FeeKnowledgeResearchCandidateRecord = candidateRecord(input, attemptId, {
     canonicalUrl,
-    verificationStatus: semanticVerificationStatus === "safety_blocked" ? "safety_blocked"
-      : verified ? "runtime_verified_documentation"
-        : evidenceDecision === "conflicting_evidence" ? "conflicting_evidence"
-          : evidenceDecision === "source_inapplicable" ? "source_inapplicable" : "verified_candidate_limited",
+    verificationStatus,
     reasonCodes: [
       ...input.retrieved.reasonCodes,
       ...(semanticVerificationStatus === "completed" ? [`fee_knowledge_${evidenceDecision}`] : []),
@@ -888,6 +891,9 @@ export async function verifyCandidate(input: {
     locatorHash: aiCandidateCitation.locator.textHash,
     claimSupportDecisionRef: null,
   });
+  if (semanticVerificationStatus !== "completed") {
+    return { candidate, claimSupport: null };
+  }
   const claimSupport: FeeKnowledgeClaimSupportRecord = {
     type: "fee_knowledge_claim_support",
     policyVersion: FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION,
