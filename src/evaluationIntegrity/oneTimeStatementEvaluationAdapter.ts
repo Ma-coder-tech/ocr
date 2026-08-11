@@ -7,6 +7,7 @@ import {
   FeeKnowledgeSearchProviderError,
   OPENAI_SEMANTIC_VERIFICATION_MAX_OUTPUT_TOKENS,
   OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS,
+  buildAdaptiveFeeKnowledgeResearchQuestion,
   feeKnowledgeQuestionRef,
   openAiSemanticSupportAdapter,
   openAiWebSearchAdapter,
@@ -174,6 +175,8 @@ type OneTimePrivateContext = {
   validation: CanonicalWholeStatementFeeIntelligenceValidationResult | null;
   statementInvestigativeCompleted: boolean;
   searchCursor: number;
+  adaptiveSearchQueue: Array<{ question: FeeKnowledgeResearchQuestion; questionOrdinal: number }>;
+  adaptiveFollowUpCount: number;
   retrievalCursor: number;
   retrievedDocumentInvestigativeCursor: number;
   semanticCursor: number;
@@ -186,7 +189,7 @@ type OneTimePrivateContext = {
 
 export const ONE_TIME_RESEARCH_REQUEST_SLOTS = {
   statementInvestigation: 1,
-  webSearch: FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls,
+  webSearch: FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls + FEE_KNOWLEDGE_RESEARCH_LIMITS.maxAdaptiveFollowUpCalls,
   retrieval: FEE_KNOWLEDGE_RESEARCH_LIMITS.maxRetrievalCandidates,
   retrievedDocumentInvestigation: FEE_KNOWLEDGE_RESEARCH_LIMITS.maxRetrievalCandidates,
   semanticVerification: FEE_KNOWLEDGE_RESEARCH_LIMITS.maxRetrievalCandidates,
@@ -266,6 +269,8 @@ export async function prepareOneTimeStatementEvaluationSource(input: {
       validation: null,
       statementInvestigativeCompleted: false,
       searchCursor: 0,
+      adaptiveSearchQueue: [],
+      adaptiveFollowUpCount: 0,
       retrievalCursor: 0,
       retrievedDocumentInvestigativeCursor: 0,
       semanticCursor: 0,
@@ -646,10 +651,8 @@ export function createOneTimeStatementEvaluationTransport(input: {
     }
 
     if (request.stage === "web_search_discovery") {
-      const questions = context.packet.research.questions.slice(0, context.packet.research.limits.maxSearchCalls);
-      const questionOrdinal = context.searchCursor++;
-      const question = questions[questionOrdinal];
-      if (!question) {
+      const plannedSearch = nextSearchQuestion(context);
+      if (!plannedSearch) {
         return result({
           value: { candidateCount: 0 },
           schemaValid: true,
@@ -657,6 +660,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
           accounting: noRequestAccounting(started),
         });
       }
+      const { question, questionOrdinal } = plannedSearch;
       const attemptId = `research_${shortHash([feeKnowledgeQuestionRef(question, questionOrdinal), String(questionOrdinal)])}`;
       const readiness = services.webSearchDiscoveryReadiness({
         approvedCallMetadata: structuredClone(request.approvedCallMetadata),
@@ -706,11 +710,15 @@ export function createOneTimeStatementEvaluationTransport(input: {
         return providerFailureResult({ started, error, reasonCode, scope: "candidate_local" });
       }
       const remaining = context.packet.research.limits.maxRetrievalCandidates - context.discovered.length;
+      const candidateLimit = question.adaptiveFollowUp
+        ? Math.min(context.packet.research.limits.maxAdaptiveFollowUpCandidates, remaining)
+        : initialDiscoveryCandidateLimit(context);
       const discovered = rankFeeKnowledgeDiscoveryCandidates(
         [...new Map(response.value.map((candidate) => [candidate.url, candidate])).values()],
         question,
       )
-        .slice(0, Math.min(remaining, context.packet.research.limits.maxResultCandidatesPerSearch))
+        .filter((candidate) => !context.discovered.some((existing) => existing.candidate.url === candidate.url))
+        .slice(0, Math.max(0, candidateLimit))
         .map((candidate, candidateOrdinal) => ({
           attemptId,
           candidate,
@@ -781,6 +789,11 @@ export function createOneTimeStatementEvaluationTransport(input: {
       }));
       const retrievalTerminal = retrievalTerminalStatus(response.value.status);
       if (retrievalTerminal) {
+        queueAdaptiveFollowUpIfNeeded(context, {
+          parent: candidate,
+          candidate: context.candidates.find((item) => item.candidateId === candidate.candidateId) ?? null,
+          claimSupport: null,
+        });
         return result({
           value: { retrievedCount: context.retrieved.length, retrievalStatus: response.value.status },
           reasonCodes: response.value.reasonCodes,
@@ -950,6 +963,11 @@ export function createOneTimeStatementEvaluationTransport(input: {
       const candidateIndex = context.candidates.findIndex((candidate) => candidate.candidateId === item.candidateId);
       context.candidates[candidateIndex] = verified.candidate;
       if (verified.claimSupport) context.claimSupports.push(verified.claimSupport);
+      queueAdaptiveFollowUpIfNeeded(context, {
+        parent: item,
+        candidate: verified.candidate,
+        claimSupport: verified.claimSupport,
+      });
       const policyAccepted = Boolean(verified.claimSupport && runtimeSupportAccepted(verified.claimSupport));
       const semanticTerminal = semanticTerminalStatus(verified.candidate.semanticVerificationStatus);
       if (semanticTerminal) {
@@ -1544,6 +1562,59 @@ function dedupeCandidates(items: CandidateContext[]): CandidateContext[] {
   return [...new Map(items.map((item) => [item.candidate.url, item])).values()];
 }
 
+function nextSearchQuestion(
+  context: OneTimePrivateContext,
+): { question: FeeKnowledgeResearchQuestion; questionOrdinal: number } | null {
+  if (context.searchCursor < context.packet.research.limits.maxSearchCalls) {
+    const questionOrdinal = context.searchCursor++;
+    const question = context.packet.research.questions[questionOrdinal];
+    return question ? { question, questionOrdinal } : null;
+  }
+  return context.adaptiveSearchQueue.shift() ?? null;
+}
+
+function initialDiscoveryCandidateLimit(context: OneTimePrivateContext): number {
+  const limits = context.packet.research.limits;
+  const remaining = limits.maxRetrievalCandidates - context.discovered.length;
+  if (remaining <= 0) return 0;
+  const adaptiveReserve = limits.maxRetrievalCandidates > limits.maxAdaptiveFollowUpCandidates + limits.maxResultCandidatesPerSearch
+    ? limits.maxAdaptiveFollowUpCandidates
+    : 0;
+  return Math.min(Math.max(0, remaining - adaptiveReserve), limits.maxResultCandidatesPerSearch);
+}
+
+function queueAdaptiveFollowUpIfNeeded(
+  context: OneTimePrivateContext,
+  input: {
+    parent: CandidateContext;
+    candidate: FeeKnowledgeResearchCandidateRecord | null;
+    claimSupport: FeeKnowledgeClaimSupportRecord | null;
+  },
+): void {
+  if (context.adaptiveFollowUpCount >= context.packet.research.limits.maxAdaptiveFollowUpCalls) return;
+  if (context.discovered.length >= context.packet.research.limits.maxRetrievalCandidates) return;
+  if (input.claimSupport && runtimeSupportAccepted(input.claimSupport)) return;
+  const parentQuestionRef = feeKnowledgeQuestionRef(input.parent.question, input.parent.questionOrdinal);
+  const question = buildAdaptiveFeeKnowledgeResearchQuestion({
+    parentQuestion: input.parent.question,
+    parentQuestionRef,
+    parentAttemptId: input.parent.attemptId,
+    candidate: input.candidate,
+    claimSupport: input.claimSupport,
+  });
+  if (!question) return;
+  if (context.packet.research.questions.some((existing) =>
+    existing.adaptiveFollowUp?.parentQuestionRef === parentQuestionRef
+    && JSON.stringify(existing.adaptiveFollowUp.missingDimensions) === JSON.stringify(question.adaptiveFollowUp?.missingDimensions)
+  )) {
+    return;
+  }
+  const questionOrdinal = context.packet.research.questions.length;
+  context.packet.research.questions.push(question);
+  context.adaptiveSearchQueue.push({ question, questionOrdinal });
+  context.adaptiveFollowUpCount += 1;
+}
+
 function attemptRecord(
   question: FeeKnowledgeResearchQuestion,
   questionOrdinal: number,
@@ -1720,10 +1791,17 @@ function assertOneTimeStageTransition(
   } as const;
   if (!(stage in ranks)) throw new Error("one_time_evaluation_stage_not_supported");
   const rank = ranks[stage as keyof typeof ranks];
-  if (rank < context.lastStageRank) throw new Error("one_time_evaluation_stage_order_invalid");
+  const adaptiveResearchCycle =
+    context.adaptiveFollowUpCount > 0
+    && stage !== "statement_investigative_intelligence"
+    && stage !== "whole_statement_ai_review";
+  if (rank < context.lastStageRank && !adaptiveResearchCycle) {
+    throw new Error("one_time_evaluation_stage_order_invalid");
+  }
   if (stage === "whole_statement_ai_review") {
     if (context.wholeStatementReviewCount !== 0) throw new Error("one_time_whole_statement_review_duplicate");
     completeResearchAfterTerminal(context);
+    completeUnattemptedAdaptiveFollowUps(context);
     const expectedQuestionRefs = new Set(context.packet.research.questions.map(feeKnowledgeQuestionRef));
     const attemptedQuestionRefs = new Set(context.attempts.map((attempt) => attempt.questionRef));
     if (expectedQuestionRefs.size !== attemptedQuestionRefs.size
@@ -1734,7 +1812,24 @@ function assertOneTimeStageTransition(
     }
     context.wholeStatementReviewCount += 1;
   }
-  context.lastStageRank = rank;
+  context.lastStageRank = Math.max(context.lastStageRank, rank);
+}
+
+function completeUnattemptedAdaptiveFollowUps(context: OneTimePrivateContext): void {
+  const existingQuestionRefs = new Set(context.attempts.map((attempt) => attempt.questionRef));
+  for (const [questionOrdinal, question] of context.packet.research.questions.entries()) {
+    if (!question.adaptiveFollowUp) continue;
+    const questionRef = feeKnowledgeQuestionRef(question, questionOrdinal);
+    if (existingQuestionRefs.has(questionRef)) continue;
+    context.attempts.push(attemptRecord(
+      question,
+      questionOrdinal,
+      "not_selected_planning",
+      [],
+      ["fee_knowledge_research_not_selected_planning"],
+    ));
+  }
+  context.adaptiveSearchQueue = [];
 }
 
 function upsertContextAttempt(

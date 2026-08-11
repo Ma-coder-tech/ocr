@@ -706,7 +706,9 @@ export type EvaluationExpectedResearchQuestionProjection = {
   limits: {
     policyVersion: "fee_knowledge_research_policy_v1";
     maxSearchCalls: number;
+    maxAdaptiveFollowUpCalls?: number;
     maxRetrievalCandidates: number;
+    maxAdaptiveFollowUpCandidates?: number;
     totalDeadlineMs: number;
     maxResultCandidatesPerSearch: number;
   };

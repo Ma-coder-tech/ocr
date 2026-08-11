@@ -53,23 +53,11 @@ const requestedExecutions = manifest.documents
   .map((item) => ({ sourceDocumentId: item.sourceDocumentId, stages: item.allowedExecutionStages }));
 const calls = manifest.documents
   .filter((item) => item.selectedDuplicateRepresentative)
-  .flatMap((item) => orderedPaidStages(item.allowedExecutionStages)
-    .filter((stage): stage is (typeof paidEvaluationStages)[number] => paidEvaluationStages.includes(stage as never))
-    .flatMap((stage) => Array.from({ length: adapterId === "one_time_statement_evaluation_v1" ? requestSlots(stage) : 1 }, (_, ordinal) => {
-      const policy = costPolicy[stage];
-      if (!policy) throw new Error(`Missing cost policy for approved paid stage: ${stage}`);
-      return {
-        sourceDocumentId: item.sourceDocumentId,
-        stage,
-        reservation: {
-          callId: `evaluation_${item.sourceDocumentId}_${stage}_${ordinal + 1}`,
-          attempt: 1,
-          retryOfCallId: null,
-          capability: capabilityForStage(stage),
-          ...policy,
-        },
-      };
-    })));
+  .flatMap((item) => adapterId === "one_time_statement_evaluation_v1"
+    ? oneTimeStatementCalls(item.sourceDocumentId, item.allowedExecutionStages)
+    : orderedPaidStages(item.allowedExecutionStages)
+        .filter((stage): stage is (typeof paidEvaluationStages)[number] => paidEvaluationStages.includes(stage as never))
+        .flatMap((stage) => callBatch(item.sourceDocumentId, stage, 1, 0)));
 
 const result = await runManifestDrivenLiveEvaluation({
   manifestPath,
@@ -147,6 +135,48 @@ function requestSlots(stage: (typeof paidEvaluationStages)[number]): number {
   if (stage === "retrieved_document_investigative_intelligence") return ONE_TIME_RESEARCH_REQUEST_SLOTS.retrievedDocumentInvestigation;
   if (stage === "semantic_verification") return ONE_TIME_RESEARCH_REQUEST_SLOTS.semanticVerification;
   return 1;
+}
+
+function oneTimeStatementCalls(sourceDocumentId: string, allowedStages: readonly string[]) {
+  const allowed = new Set(allowedStages);
+  const calls = [];
+  if (allowed.has("statement_investigative_intelligence")) calls.push(...callBatch(sourceDocumentId, "statement_investigative_intelligence", 1, 0));
+  if (allowed.has("web_search_discovery")) calls.push(...callBatch(sourceDocumentId, "web_search_discovery", FEE_INITIAL_SEARCH_CALLS, 0));
+  if (allowed.has("document_retrieval")) calls.push(...callBatch(sourceDocumentId, "document_retrieval", FEE_INITIAL_RETRIEVAL_CANDIDATES, 0));
+  if (allowed.has("retrieved_document_investigative_intelligence")) calls.push(...callBatch(sourceDocumentId, "retrieved_document_investigative_intelligence", FEE_INITIAL_RETRIEVAL_CANDIDATES, 0));
+  if (allowed.has("semantic_verification")) calls.push(...callBatch(sourceDocumentId, "semantic_verification", FEE_INITIAL_RETRIEVAL_CANDIDATES, 0));
+  if (allowed.has("web_search_discovery")) calls.push(...callBatch(sourceDocumentId, "web_search_discovery", FEE_ADAPTIVE_SEARCH_CALLS, FEE_INITIAL_SEARCH_CALLS));
+  if (allowed.has("document_retrieval")) calls.push(...callBatch(sourceDocumentId, "document_retrieval", FEE_ADAPTIVE_RETRIEVAL_CANDIDATES, FEE_INITIAL_RETRIEVAL_CANDIDATES));
+  if (allowed.has("retrieved_document_investigative_intelligence")) calls.push(...callBatch(sourceDocumentId, "retrieved_document_investigative_intelligence", FEE_ADAPTIVE_RETRIEVAL_CANDIDATES, FEE_INITIAL_RETRIEVAL_CANDIDATES));
+  if (allowed.has("semantic_verification")) calls.push(...callBatch(sourceDocumentId, "semantic_verification", FEE_ADAPTIVE_RETRIEVAL_CANDIDATES, FEE_INITIAL_RETRIEVAL_CANDIDATES));
+  if (allowed.has("whole_statement_ai_review")) calls.push(...callBatch(sourceDocumentId, "whole_statement_ai_review", 1, 0));
+  return calls;
+}
+
+const FEE_INITIAL_SEARCH_CALLS = ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch - 1;
+const FEE_ADAPTIVE_SEARCH_CALLS = 1;
+const FEE_ADAPTIVE_RETRIEVAL_CANDIDATES = 2;
+const FEE_INITIAL_RETRIEVAL_CANDIDATES = Math.max(0, ONE_TIME_RESEARCH_REQUEST_SLOTS.retrieval - FEE_ADAPTIVE_RETRIEVAL_CANDIDATES);
+
+function callBatch(
+  sourceDocumentId: string,
+  stage: (typeof paidEvaluationStages)[number],
+  count: number,
+  ordinalOffset: number,
+) {
+  const policy = costPolicy[stage];
+  if (!policy) throw new Error(`Missing cost policy for approved paid stage: ${stage}`);
+  return Array.from({ length: count }, (_, ordinal) => ({
+    sourceDocumentId,
+    stage,
+    reservation: {
+      callId: `evaluation_${sourceDocumentId}_${stage}_${ordinalOffset + ordinal + 1}`,
+      attempt: 1,
+      retryOfCallId: null,
+      capability: capabilityForStage(stage),
+      ...policy,
+    },
+  }));
 }
 
 function orderedPaidStages(stages: readonly string[]): string[] {

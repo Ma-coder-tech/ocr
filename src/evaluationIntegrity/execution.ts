@@ -909,8 +909,11 @@ function assertCallPlan(
     const stageOrder = ["statement_investigative_intelligence", "web_search_discovery", "document_retrieval", "retrieved_document_investigative_intelligence", "semantic_verification", "whole_statement_ai_review"] as const;
     for (const document of permit.documents) {
       const documentCalls = calls.filter((call) => call.sourceDocumentId === document.sourceDocumentId);
-      const ranks = documentCalls.map((call) => stageOrder.indexOf(call.stage));
-      if (ranks.some((rank, index) => index > 0 && rank < ranks[index - 1]!)) {
+      const firstWholeStatementIndex = documentCalls.findIndex((call) => call.stage === "whole_statement_ai_review");
+      const wholeStatementNotLast = firstWholeStatementIndex >= 0 && firstWholeStatementIndex !== documentCalls.length - 1;
+      const statementInvestigationIndex = documentCalls.findIndex((call) => call.stage === "statement_investigative_intelligence");
+      const statementInvestigationOutOfPlace = statementInvestigationIndex > 0;
+      if (wholeStatementNotLast || statementInvestigationOutOfPlace) {
         throw new EvaluationIntegrityError("manifest_schema_invalid", "One-time evaluation calls are out of stage order.", {
           sourceDocumentId: document.sourceDocumentId,
         });

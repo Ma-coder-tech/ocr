@@ -7,6 +7,7 @@ import { buildWholeStatementFeeIntelligenceWorkPlan } from "../../src/canonical/
 import { buildCanonicalRuntimeAnalysis } from "../../src/canonical/runtimeAdapter.js";
 import {
   FEE_KNOWLEDGE_RESEARCH_LIMITS,
+  buildAdaptiveFeeKnowledgeResearchQuestion,
   buildFeeKnowledgeWebSearchInput,
   defaultFeeKnowledgeResearchQuestions,
   planFeeKnowledgeResearchQuestions,
@@ -29,6 +30,7 @@ const STATEMENT_1 = "test/fixtures/pdfs/fiserv_PAYSAFE_Febr_2024.pdf";
 const STATEMENT_2 = "test/fixtures/pdfs/fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf";
 const STATEMENT_3 = "test/fixtures/pdfs/fiserv_ABDUL_BASHER_Aug_2025.pdf";
 const STATEMENT_4 = "test/fixtures/pdfs/fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf";
+const STATEMENT_5 = "test/fixtures/pdfs/SAMPLE_MERCHANT4_CLOVER.pdf";
 
 describe("fee knowledge intelligence state model", () => {
   it("replays statement #1 and #2 into statement-grounded provisional intelligence without mutating financial truth", async () => {
@@ -578,8 +580,68 @@ describe("fee knowledge intelligence state model", () => {
     expect(candidateEvidenceLocatorHash([deterministic, ai], "candidate_1")).toBe("substantive_hash");
   });
 
-  it("replays statements #2, #3, and #4 with broader evidence-acquisition planning", async () => {
-    for (const fixturePath of [STATEMENT_2, STATEMENT_3, STATEMENT_4]) {
+  it("builds bounded adaptive follow-up questions from rejected or inaccessible evidence", async () => {
+    const analysis = await analysisFromPdf(STATEMENT_2, "statement_2_adaptive_followup_replay");
+    const parentQuestion = defaultFeeKnowledgeResearchQuestions(analysis, null)[0]!;
+    const parentQuestionRef = "question_" + "a".repeat(64);
+    const inaccessibleFollowUp = buildAdaptiveFeeKnowledgeResearchQuestion({
+      parentQuestion,
+      parentQuestionRef,
+      parentAttemptId: "research_parent",
+      candidate: {
+        candidateId: "candidate_blocked",
+        retrievalStatus: "unavailable",
+        verificationStatus: "source_unavailable",
+        semanticVerificationStatus: "not_started",
+        reasonCodes: ["fee_knowledge_http_403"],
+        safeRetrievalDiagnostics: { httpStatus: 403 },
+      } as any,
+      claimSupport: null,
+    });
+
+    expect(inaccessibleFollowUp).not.toBeNull();
+    expect(inaccessibleFollowUp!.triggerReason).toBe("adaptive_inaccessible_authoritative_source");
+    expect(inaccessibleFollowUp!.adaptiveFollowUp).toMatchObject({
+      parentQuestionRef,
+      parentAttemptId: "research_parent",
+      parentCandidateId: "candidate_blocked",
+      missingDimensions: ["authoritative_source_inaccessible"],
+      sourceReasonCodes: ["fee_knowledge_http_403"],
+    });
+    const inaccessiblePrompt = buildFeeKnowledgeWebSearchInput([inaccessibleFollowUp!]);
+    expect(inaccessiblePrompt).toContain("alternate official PDFs");
+    expect(inaccessiblePrompt).toContain("adaptiveFollowUp");
+
+    const rejectedFollowUp = buildAdaptiveFeeKnowledgeResearchQuestion({
+      parentQuestion,
+      parentQuestionRef,
+      parentAttemptId: "research_parent",
+      candidate: null,
+      claimSupport: {
+        candidateId: "candidate_inapplicable",
+        evidenceDecision: "source_inapplicable",
+        applicability: { processorOrNetwork: true, statementPeriod: false, jurisdiction: false, transactionContext: null },
+        rateOrAmountComparison: "not_calculable",
+        structuredClaim: { claimKind: "published_rule" },
+        semanticSupport: { decision: "does_not_support", reasonCodes: ["missing rate rule evidence"] },
+        exclusions: [],
+      } as any,
+    });
+
+    expect(rejectedFollowUp).not.toBeNull();
+    expect(rejectedFollowUp!.triggerReason).toBe("adaptive_missing_rate_rule_evidence");
+    expect(rejectedFollowUp!.adaptiveFollowUp?.missingDimensions).toEqual(expect.arrayContaining([
+      "rate_rule_missing",
+      "period_mismatch",
+      "applicability_missing",
+      "fee_or_alias_missing",
+    ]));
+    expect(planFeeKnowledgeResearchQuestions([parentQuestion, rejectedFollowUp!], FEE_KNOWLEDGE_RESEARCH_LIMITS).selected[0]!.question)
+      .toBe(rejectedFollowUp);
+  }, 30_000);
+
+  it("replays statements #2, #3, #4, and #5 with broader evidence-acquisition planning", async () => {
+    for (const fixturePath of [STATEMENT_2, STATEMENT_3, STATEMENT_4, STATEMENT_5]) {
       const analysis = await analysisFromPdf(fixturePath, `evidence_acquisition_replay_${fixturePath}`);
       const questions = defaultFeeKnowledgeResearchQuestions(analysis, null);
       const plan = planFeeKnowledgeResearchQuestions(questions, FEE_KNOWLEDGE_RESEARCH_LIMITS);

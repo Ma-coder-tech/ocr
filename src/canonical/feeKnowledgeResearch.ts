@@ -36,7 +36,9 @@ import { safeProviderFailureError, safeProviderPostResponseFailureError } from "
 export type FeeKnowledgeResearchLimits = {
   policyVersion: typeof FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION;
   maxSearchCalls: number;
+  maxAdaptiveFollowUpCalls: number;
   maxRetrievalCandidates: number;
+  maxAdaptiveFollowUpCandidates: number;
   totalDeadlineMs: number;
   maxResultCandidatesPerSearch: number;
 };
@@ -44,7 +46,9 @@ export type FeeKnowledgeResearchLimits = {
 export const FEE_KNOWLEDGE_RESEARCH_LIMITS = {
   policyVersion: FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
   maxSearchCalls: 4,
-  maxRetrievalCandidates: 8,
+  maxAdaptiveFollowUpCalls: 1,
+  maxRetrievalCandidates: 10,
+  maxAdaptiveFollowUpCandidates: 2,
   totalDeadlineMs: LIVE_EVALUATION_TIMEOUT_POLICY.researchGraphTotalMs,
   maxResultCandidatesPerSearch: 4,
 } as const satisfies FeeKnowledgeResearchLimits;
@@ -71,6 +75,23 @@ export type FeeKnowledgeResearchQuestion = {
   deterministicActionabilityCeiling: FeeKnowledgeStructuredClaim["actionabilityCeiling"];
   deterministicConfidence: FeeKnowledgeStructuredClaim["maximumConfidence"];
   semanticQuestion: string;
+  adaptiveFollowUp?: FeeKnowledgeAdaptiveFollowUpContext | null;
+};
+
+export type FeeKnowledgeAdaptiveMissingDimension =
+  | "fee_or_alias_missing"
+  | "rate_rule_missing"
+  | "processor_network_mismatch"
+  | "period_mismatch"
+  | "applicability_missing"
+  | "authoritative_source_inaccessible";
+
+export type FeeKnowledgeAdaptiveFollowUpContext = {
+  parentQuestionRef: string;
+  parentAttemptId: string;
+  parentCandidateId: string | null;
+  missingDimensions: FeeKnowledgeAdaptiveMissingDimension[];
+  sourceReasonCodes: string[];
 };
 
 export function feeKnowledgeQuestionRef(question: FeeKnowledgeResearchQuestion, questionOrdinal: number): string {
@@ -375,6 +396,7 @@ export function defaultFeeKnowledgeResearchQuestions(
           deterministicCategory,
           selected,
         }),
+        adaptiveFollowUp: null,
       };
       return {
         question,
@@ -423,6 +445,104 @@ export function planFeeKnowledgeResearchQuestions(
     selected,
     notSelectedQuestions,
   };
+}
+
+export function buildAdaptiveFeeKnowledgeResearchQuestion(input: {
+  parentQuestion: FeeKnowledgeResearchQuestion;
+  parentQuestionRef: string;
+  parentAttemptId: string;
+  candidate: FeeKnowledgeResearchCandidateRecord | null;
+  claimSupport: FeeKnowledgeClaimSupportRecord | null;
+}): FeeKnowledgeResearchQuestion | null {
+  if (input.parentQuestion.adaptiveFollowUp) return null;
+  const missingDimensions = adaptiveMissingDimensions(input.candidate, input.claimSupport);
+  if (missingDimensions.length === 0) return null;
+  const triggerReason = adaptiveTriggerReason(missingDimensions);
+  return {
+    ...input.parentQuestion,
+    triggerReason,
+    semanticQuestion: adaptiveSemanticQuestion(input.parentQuestion, missingDimensions),
+    adaptiveFollowUp: {
+      parentQuestionRef: input.parentQuestionRef,
+      parentAttemptId: input.parentAttemptId,
+      parentCandidateId: input.candidate?.candidateId ?? input.claimSupport?.candidateId ?? null,
+      missingDimensions,
+      sourceReasonCodes: adaptiveSourceReasonCodes(input.candidate, input.claimSupport),
+    },
+  };
+}
+
+export function adaptiveMissingDimensions(
+  candidate: FeeKnowledgeResearchCandidateRecord | null,
+  claimSupport: FeeKnowledgeClaimSupportRecord | null,
+): FeeKnowledgeAdaptiveMissingDimension[] {
+  const reasonCodes = new Set([
+    ...(candidate?.reasonCodes ?? []),
+    ...(claimSupport?.semanticSupport.reasonCodes ?? []),
+    ...(claimSupport?.exclusions ?? []),
+    ...(claimSupport ? [`fee_knowledge_${claimSupport.evidenceDecision}`] : []),
+  ].map(normalizeText));
+  const dimensions = new Set<FeeKnowledgeAdaptiveMissingDimension>();
+  if (candidate?.retrievalStatus && candidate.retrievalStatus !== "retrieved_text") {
+    if (candidate.reasonCodes.some((code) => code === "fee_knowledge_http_403")) dimensions.add("authoritative_source_inaccessible");
+    if (candidate.verificationStatus === "source_unavailable" || candidate.verificationStatus === "rejected") dimensions.add("authoritative_source_inaccessible");
+  }
+  if (candidate?.safeRetrievalDiagnostics?.httpStatus === 403) dimensions.add("authoritative_source_inaccessible");
+  if (candidate?.semanticVerificationStatus === "not_eligible"
+    || candidate?.reasonCodes.includes("fee_knowledge_claim_support_missing")
+    || candidate?.reasonCodes.includes("fee_knowledge_semantic_not_eligible_claim_support_missing")) {
+    dimensions.add("fee_or_alias_missing");
+  }
+  if (claimSupport) {
+    if (!claimSupport.applicability.processorOrNetwork) dimensions.add("processor_network_mismatch");
+    if (!claimSupport.applicability.statementPeriod) dimensions.add("period_mismatch");
+    if (claimSupport.applicability.jurisdiction === false || claimSupport.applicability.transactionContext === false) dimensions.add("applicability_missing");
+    if (claimSupport.evidenceDecision === "source_inapplicable") dimensions.add("applicability_missing");
+    if (claimSupport.evidenceDecision === "unsupported" || claimSupport.semanticSupport.decision === "does_not_support" || claimSupport.semanticSupport.decision === "unsupported") {
+      dimensions.add("fee_or_alias_missing");
+    }
+    if (claimSupport.structuredClaim.claimKind === "published_rule"
+      || claimSupport.rateOrAmountComparison === "not_calculable"
+      || reasonCodes.has("missing rate rule evidence")
+      || reasonCodes.has("fee knowledge source inapplicable")) {
+      dimensions.add("rate_rule_missing");
+    }
+  }
+  return [...dimensions].sort().slice(0, 5);
+}
+
+function adaptiveTriggerReason(
+  missingDimensions: readonly FeeKnowledgeAdaptiveMissingDimension[],
+): FeeKnowledgeResearchQuestion["triggerReason"] {
+  if (missingDimensions.includes("authoritative_source_inaccessible")) return "adaptive_inaccessible_authoritative_source";
+  if (missingDimensions.includes("rate_rule_missing")) return "adaptive_missing_rate_rule_evidence";
+  return "adaptive_missing_applicability";
+}
+
+function adaptiveSemanticQuestion(
+  question: FeeKnowledgeResearchQuestion,
+  missingDimensions: readonly FeeKnowledgeAdaptiveMissingDimension[],
+): string {
+  const label = question.feeLabel || "this fee";
+  const targets: string[] = [];
+  if (missingDimensions.includes("fee_or_alias_missing")) targets.push("exact fee name, likely alias, authorization/discount/assessment terminology");
+  if (missingDimensions.includes("rate_rule_missing")) targets.push("official fee schedule, rate table, published rule, effective date");
+  if (missingDimensions.includes("processor_network_mismatch")) targets.push("correct processor, acquirer, card brand, or network ownership");
+  if (missingDimensions.includes("period_mismatch")) targets.push(`historical ${question.statementPeriodYear ?? "statement-period"} version or effective-date language`);
+  if (missingDimensions.includes("applicability_missing")) targets.push("geography, product, card-present/card-not-present, debit/credit, and transaction-context applicability");
+  if (missingDimensions.includes("authoritative_source_inaccessible")) targets.push("alternate official PDFs, schedules, archived official pages, or processor/network endpoints");
+  return `Follow up on rejected evidence for ${label}: search specifically for ${targets.join("; ")}. Preserve only evidence that is both authoritative and applicable.`;
+}
+
+function adaptiveSourceReasonCodes(
+  candidate: FeeKnowledgeResearchCandidateRecord | null,
+  claimSupport: FeeKnowledgeClaimSupportRecord | null,
+): string[] {
+  return [...new Set([
+    ...(candidate?.reasonCodes ?? []),
+    ...(claimSupport?.semanticSupport.reasonCodes ?? []),
+    ...(claimSupport ? [`fee_knowledge_${claimSupport.evidenceDecision}`] : []),
+  ].filter(safeReasonCode))].sort().slice(0, 10);
 }
 
 export function openAiWebSearchAdapter(options: {
@@ -503,6 +623,13 @@ export function buildFeeKnowledgeWebSearchInput(questions: readonly FeeKnowledge
           statementPeriodYear: question.statementPeriodYear,
           statementSection: question.statementSection,
         },
+        adaptiveFollowUp: question.adaptiveFollowUp
+          ? {
+              missingDimensions: question.adaptiveFollowUp.missingDimensions,
+              sourceReasonCodes: question.adaptiveFollowUp.sourceReasonCodes,
+              instruction: "This is a bounded follow-up. Search for the missing applicability/evidence dimension that caused prior candidates to be rejected.",
+            }
+          : null,
         confidenceAndActionability: {
           deterministicConfidence: question.deterministicConfidence,
           deterministicActionabilityCeiling: question.deterministicActionabilityCeiling,
@@ -1234,6 +1361,9 @@ function priority(reason: FeeKnowledgeResearchQuestion["triggerReason"]): number
   return {
     contradicted_source: 0,
     expired_or_superseded_source: 1,
+    adaptive_inaccessible_authoritative_source: 1,
+    adaptive_missing_rate_rule_evidence: 1,
+    adaptive_missing_applicability: 1,
     missing_applicable_registry_claim: 2,
     material_unfamiliar_label: 3,
     disabled: 4,
@@ -1276,6 +1406,9 @@ function researchQuestionPriorityScore(input: {
   score += {
     contradicted_source: 1000,
     expired_or_superseded_source: 900,
+    adaptive_inaccessible_authoritative_source: 880,
+    adaptive_missing_rate_rule_evidence: 860,
+    adaptive_missing_applicability: 840,
     material_unfamiliar_label: 760,
     missing_applicable_registry_claim: 420,
     disabled: 0,
@@ -1315,6 +1448,7 @@ function researchSearchTerms(question: FeeKnowledgeResearchQuestion): string[] {
     question.deterministicEconomicOwner,
     question.deterministicContractualController,
     question.statementPeriodYear,
+    ...adaptiveSearchTerms(question),
     ...networkAliases(question),
     ...categorySearchTerms(question),
   ];
@@ -1329,6 +1463,15 @@ function sourcePreferenceHints(question: FeeKnowledgeResearchQuestion): string[]
   const hints = ["official documentation", "fee schedule", "rules", "rate table", "PDF"];
   if (question.processorOrNetwork) hints.push(`${question.processorOrNetwork} official`);
   for (const network of networkAliases(question)) hints.push(`${network} official`);
+  if (question.adaptiveFollowUp?.missingDimensions.includes("authoritative_source_inaccessible")) {
+    hints.push("alternate official PDF", "archived official schedule", "official downloadable fee schedule");
+  }
+  if (question.adaptiveFollowUp?.missingDimensions.includes("rate_rule_missing")) {
+    hints.push("published rate table", "fee schedule PDF", "effective date");
+  }
+  if (question.adaptiveFollowUp?.missingDimensions.includes("processor_network_mismatch")) {
+    hints.push("network official documentation", "processor official documentation");
+  }
   if (question.deterministicCategory === "processor_markup") hints.push("processor pricing guide", "merchant services fee schedule");
   if (question.deterministicCategory === "interchange") hints.push("interchange reimbursement fee schedule");
   if (question.deterministicCategory === "card_brand_network_assessment") hints.push("assessment fee schedule", "card brand fee schedule");
@@ -1364,6 +1507,7 @@ function discoveryCandidateScore(candidate: FeeKnowledgeDiscoveryCandidate, ques
   const labelTokens = meaningfulQueryTokens(question.feeLabel);
   const queryTokens = meaningfulQueryTokens([question.semanticQuestion, question.deterministicCategory ?? "", ...categorySearchTerms(question)].join(" "));
   const networks = networkAliases(question).map(normalizeText);
+  const adaptiveTerms = adaptiveSearchTerms(question).map(normalizeText);
   if (url?.protocol === "https:") score += 20;
   score += officialDomainScore(host, question);
   if (host.endsWith(".gov")) score += 120;
@@ -1379,11 +1523,26 @@ function discoveryCandidateScore(candidate: FeeKnowledgeDiscoveryCandidate, ques
   for (const token of queryTokens) {
     if (haystack.includes(token)) score += 18;
   }
+  for (const token of adaptiveTerms) {
+    if (haystack.includes(token)) score += 40;
+  }
   if (question.processorOrNetwork && haystack.includes(normalizeText(question.processorOrNetwork))) score += 90;
   if (/\b(?:blog|news|press|learn|insights|faq|support|contact|login|careers|about|glossary)\b/.test(haystack)) score -= 75;
   if (/\b(?:what is|guide to|explained|education|small business)\b/.test(title)) score -= 60;
   if (!/\b(?:fee|rate|schedule|rule|interchange|assessment|pricing|program)\b/.test(haystack)) score -= 40;
   return score;
+}
+
+function adaptiveSearchTerms(question: FeeKnowledgeResearchQuestion): string[] {
+  const dimensions = question.adaptiveFollowUp?.missingDimensions ?? [];
+  const terms: string[] = [];
+  if (dimensions.includes("fee_or_alias_missing")) terms.push("alias", "authorization fee", "sales discount", "assessment", "fee definition");
+  if (dimensions.includes("rate_rule_missing")) terms.push("rate table", "fee schedule", "published rate", "effective date", "program guide");
+  if (dimensions.includes("processor_network_mismatch")) terms.push("network fee", "processor fee", "acquirer fee", "card brand fee");
+  if (dimensions.includes("period_mismatch")) terms.push("historical", "effective date", question.statementPeriodYear ?? "");
+  if (dimensions.includes("applicability_missing")) terms.push("applicability", "card present", "debit", "credit", "US");
+  if (dimensions.includes("authoritative_source_inaccessible")) terms.push("PDF", "download", "official", "archived");
+  return terms.filter(Boolean);
 }
 
 function officialDomainScore(host: string, question: FeeKnowledgeResearchQuestion): number {

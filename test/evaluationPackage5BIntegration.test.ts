@@ -273,6 +273,70 @@ describe("Package 5B manifest-driven admission", () => {
     expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
   }, 30_000);
 
+  it("runs one rejection-driven adaptive follow-up through retrieval, semantic verification, and admission", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    let webCalls = 0;
+    let retrievalCalls = 0;
+    let semanticCalls = 0;
+    let adaptiveQuestion: FeeKnowledgeResearchQuestion | null = null;
+    let feeLabel = "fee";
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: adaptiveFollowUpOneTimeCalls(),
+      outputArtifactPath: path.join(fixture.directory, "adaptive-follow-up-admission.json"),
+      oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis)],
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async ({ questions: [question] }) => {
+          webCalls += 1;
+          feeLabel = question!.feeLabel;
+          if (question!.adaptiveFollowUp) adaptiveQuestion = question!;
+          if (webCalls === 1) {
+            return external([{ url: "https://www.fiserv.com/blocked/official-fee-schedule.pdf", title: "Official Fiserv fee schedule", publisher: "Fiserv" }], "request_search_initial_blocked");
+          }
+          return external([{ url: "https://docs.fiserv.com/content/dam/public/merchants/alternative-fee-schedule.pdf", title: "Alternative official Fiserv fee schedule", publisher: "Fiserv" }], "request_search_adaptive_alternative");
+        },
+        documentRetrieval: async (url) => {
+          retrievalCalls += 1;
+          if (url.includes("blocked")) return external(terminalRetrievedDocument("unavailable", "fee_knowledge_http_403"), "request_retrieval_blocked");
+          return external(retrievedTextDocument(url, feeLabel), "request_retrieval_adaptive");
+        },
+        semanticVerification: async ({ structuredClaim }) => {
+          semanticCalls += 1;
+          return external(semanticSupport(structuredClaim), "request_semantic_adaptive");
+        },
+        wholeStatementReview: async (packet) => external(validReview(packet), "request_whole_after_adaptive"),
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(webCalls).toBe(2);
+    expect(retrievalCalls).toBe(2);
+    expect(semanticCalls).toBe(1);
+    expect(adaptiveQuestion).toMatchObject({
+      triggerReason: "adaptive_inaccessible_authoritative_source",
+      adaptiveFollowUp: {
+        missingDimensions: ["authoritative_source_inaccessible"],
+        sourceReasonCodes: expect.arrayContaining(["fee_knowledge_http_403"]),
+      },
+    });
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    expect(admission.researchEvidence.attempts.map((attempt) => attempt.triggerReason)).toEqual(expect.arrayContaining([
+      "material_unfamiliar_label",
+      "adaptive_inaccessible_authoritative_source",
+    ]));
+    expect(admission.researchEvidence.candidates).toHaveLength(2);
+    expect(admission.researchEvidence.candidates.some((candidate) => candidate.reasonCodes.includes("fee_knowledge_http_403"))).toBe(true);
+    expect(admission.researchEvidence.candidates.some((candidate) => candidate.semanticVerificationStatus === "completed")).toBe(true);
+    expect(admission.researchEvidence.claimSupports).toHaveLength(1);
+    expect(admission.researchEvidence.claimSupports[0]).toMatchObject({
+      disposition: "accepted",
+      evidenceDecision: "verified_classification",
+    });
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+  }, 30_000);
+
   it("classifies missing OpenAI readiness before web discovery send without blocking deterministic statement success", async () => {
     const fixture = await approvedOneTimePdfFixture();
     const previousOpenAiKey = process.env.OPENAI_API_KEY;
@@ -305,11 +369,11 @@ describe("Package 5B manifest-driven admission", () => {
       expect(admission.researchEvidence.claimSupports).toEqual([]);
       expect(result.providerCallOutcomes.filter((outcome) => outcome.stage === "web_search_discovery"))
         .toHaveLength(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
-      expect(result.providerCallOutcomes
-        .filter((outcome) => outcome.stage === "web_search_discovery")
-        .every((outcome) => outcome.status === "success"
-          && outcome.requestId === null
-          && outcome.reasonCodes.includes("fee_knowledge_web_search_provider_unavailable_before_send"))).toBe(true);
+      const providerUnavailableSearchOutcomes = result.providerCallOutcomes.filter((outcome) =>
+        outcome.stage === "web_search_discovery" &&
+        outcome.reasonCodes.includes("fee_knowledge_web_search_provider_unavailable_before_send"));
+      expect(providerUnavailableSearchOutcomes).toHaveLength(4);
+      expect(providerUnavailableSearchOutcomes.every((outcome) => outcome.status === "success" && outcome.requestId === null)).toBe(true);
       expect(result.providerCallOutcomes.some((outcome) => outcome.reasonCodes.includes("provider_call_failed"))).toBe(false);
       expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
     } finally {
@@ -1563,7 +1627,7 @@ describe("Package 5B manifest-driven admission", () => {
       expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
       if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
       const admission = result.artifact.canonicalAdmissionResults[0]!;
-      expect(admission.researchEvidence.attempts[0]).toMatchObject({
+      expect(admission.researchEvidence.attempts.find((attempt) => attempt.status === "completed")).toMatchObject({
         status: "completed",
         resultCount: 1,
       });
@@ -1846,6 +1910,7 @@ function researchQuestion(analysis: CanonicalStatementAnalysis, index = 0): FeeK
     deterministicActionabilityCeiling: selected?.actionabilityCeiling ?? "unknown",
     deterministicConfidence: selected?.confidence ?? "low",
     semanticQuestion: `Find official documentation for this fee classification case ${index + 1}.`,
+    adaptiveFollowUp: null,
   };
 }
 
@@ -1881,6 +1946,23 @@ function fullOneTimeCalls(sourceDocumentId = "doc_one_time_fiserv") {
       estimatedMaximumCostUsd: stage === "whole_statement_ai_review" ? 1 : 0.5,
     },
   })));
+}
+
+function adaptiveFollowUpOneTimeCalls(sourceDocumentId = "doc_one_time_fiserv") {
+  const pool = fullOneTimeCalls(sourceDocumentId);
+  const take = (stage: ReturnType<typeof fullOneTimeCalls>[number]["stage"]) => {
+    const index = pool.findIndex((call) => call.stage === stage);
+    if (index < 0) throw new Error(`missing adaptive test call for ${stage}`);
+    return pool.splice(index, 1)[0]!;
+  };
+  return [
+    take("web_search_discovery"),
+    take("document_retrieval"),
+    take("web_search_discovery"),
+    take("document_retrieval"),
+    take("semantic_verification"),
+    take("whole_statement_ai_review"),
+  ];
 }
 
 function package5BReadinessCalls(sourceDocumentId = "doc_one_time_fiserv") {
@@ -2095,7 +2177,7 @@ async function approvedOneTimePdfFixture(stages: EvaluationExecutionStage[] = el
       manifestPath,
       approvedManifestHash: manifest.manifestContentHash,
       requestedExecutions: requests,
-	      approvedBudgetUsd: 12,
+      approvedBudgetUsd: 20,
       adapterId: "one_time_statement_evaluation_v1" as const,
       businessType: "restaurant_food_beverage" as const,
       resolveSourceBytes: async () => bytes,
@@ -2139,7 +2221,7 @@ async function approvedShortCloverPdfFixture() {
       manifestPath,
       approvedManifestHash: manifest.manifestContentHash,
       requestedExecutions: [{ sourceDocumentId, stages: eligibleStages }],
-	      approvedBudgetUsd: 12,
+      approvedBudgetUsd: 20,
       adapterId: "one_time_statement_evaluation_v1" as const,
       businessType: "restaurant_food_beverage" as const,
       resolveSourceBytes: async () => bytes,
@@ -2193,7 +2275,7 @@ async function approvedTwoDocumentPdfFixture() {
       manifestPath,
       approvedManifestHash: manifest.manifestContentHash,
       requestedExecutions: sourceDocumentIds.map((sourceDocumentId) => ({ sourceDocumentId, stages: eligibleStages })),
-	      approvedBudgetUsd: 24,
+      approvedBudgetUsd: 40,
       adapterId: "one_time_statement_evaluation_v1" as const,
       businessType: "restaurant_food_beverage" as const,
       resolveSourceBytes: async (row: { sourceDocumentId: string }) => bytesBySource.get(row.sourceDocumentId)!,
