@@ -1699,6 +1699,7 @@ function fixtureResearchQuestion(overrides: Partial<FeeKnowledgeResearchQuestion
     deterministicActionabilityCeiling: "potentially_actionable",
     deterministicConfidence: "high",
     semanticQuestion: "How is this synthetic service charge classified?",
+    adaptiveFollowUp: null,
     ...overrides,
   };
 }
@@ -2289,6 +2290,7 @@ function realResearchQuestion(analysis: CanonicalStatementAnalysis) {
     deterministicActionabilityCeiling: "verify_only" as const,
     deterministicConfidence: "high" as const,
     semanticQuestion: "Find official documentation explaining this fee classification.",
+    adaptiveFollowUp: null,
   };
 }
 

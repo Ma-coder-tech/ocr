@@ -268,6 +268,9 @@ export type FeeKnowledgeResearchAttemptRecord = {
     | "expired_or_superseded_source"
     | "contradicted_source"
     | "material_unfamiliar_label"
+    | "adaptive_missing_applicability"
+    | "adaptive_missing_rate_rule_evidence"
+    | "adaptive_inaccessible_authoritative_source"
     | "not_needed"
     | "disabled";
   status: FeeKnowledgeResearchNonSuccessStatus;

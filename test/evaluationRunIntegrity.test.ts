@@ -50,6 +50,9 @@ const eligibleStages: EvaluationExecutionStage[] = [
   "final_artifact",
 ];
 
+const ONE_TIME_FIXTURE_APPROVED_BUDGET_USD = 20;
+const ONE_TIME_INITIAL_WEB_SEARCH_CALLS = ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch - 1;
+
 describe("evaluation-run integrity", () => {
   it("observes checksum and byte count from local bytes without retaining the local path", async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "evaluation-source-observation-"));
@@ -905,7 +908,7 @@ describe("evaluation-run integrity", () => {
       manifestPath: fixture.manifestPath,
       approvedManifestHash: fixture.manifest.manifestContentHash,
       requestedExecutions: fixture.requests,
-      approvedBudgetUsd: 12,
+      approvedBudgetUsd: ONE_TIME_FIXTURE_APPROVED_BUDGET_USD,
       calls: oneTimePaidCalls(),
       outputArtifactPath: path.join(fixture.directory, "one-time-success-artifact.json"),
       adapterId: "one_time_statement_evaluation_v1",
@@ -961,11 +964,11 @@ describe("evaluation-run integrity", () => {
 
     expect(adapterConstructions).toBe(1);
     expect(invocations.whole).toBeGreaterThan(0);
-    expect(invocations.search).toBe(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
+    expect(invocations.search).toBe(ONE_TIME_INITIAL_WEB_SEARCH_CALLS);
     expect(searchedQuestionCount).toBe(1);
-    expect(invocations.retrieval).toBe(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
+    expect(invocations.retrieval).toBe(1);
     expect(invocations.semantic).toBeGreaterThan(0);
-    expect(invocations.semantic).toBeLessThanOrEqual(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
+    expect(invocations.semantic).toBeLessThanOrEqual(ONE_TIME_INITIAL_WEB_SEARCH_CALLS);
     expect(wholePacket.admittedFeeRows.length).toBeLessThanOrEqual(preparedPacket.wholeStatementReview.admittedFeeRows.length);
     expect(wholePacket.sourceProvenancePacket.researchAttempts.length).toBeGreaterThan(0);
     expect(result.finalStatus).toBe("completed");
@@ -978,8 +981,8 @@ describe("evaluation-run integrity", () => {
     expect(nonWorkUnitOutcomes.map((item) => item.stage)).toEqual(expectedOneTimeCalls.map((call) => call.stage));
     expect(sentWorkUnitOutcomes).toHaveLength(invocations.whole);
     expect(workUnitOutcomes.every((item) => item.stage === "whole_statement_ai_review")).toBe(true);
-    expect(result.costLedger.entries.filter((item) => item.requestId === "request_search")).toHaveLength(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
-    expect(result.costLedger.entries.filter((item) => item.requestId === "request_retrieval")).toHaveLength(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
+    expect(result.costLedger.entries.filter((item) => item.requestId === "request_search")).toHaveLength(ONE_TIME_INITIAL_WEB_SEARCH_CALLS);
+    expect(result.costLedger.entries.filter((item) => item.requestId === "request_retrieval")).toHaveLength(1);
     expect(result.costLedger.entries.filter((item) => item.requestId === "request_semantic")).toHaveLength(invocations.semantic);
     const reservationByCall = new Map(expectedOneTimeCalls.map((call) => [call.reservation.callId, call.reservation]));
     const wholeCallId = expectedOneTimeCalls.find((call) => call.stage === "whole_statement_ai_review")!.reservation.callId;
@@ -1018,7 +1021,7 @@ describe("evaluation-run integrity", () => {
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
     if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
     const candidates = result.artifact.canonicalAdmissionResults[0]!.researchEvidence.candidates;
-    expect(candidates).toHaveLength(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
+    expect(candidates).toHaveLength(1);
     expect(candidates.every((candidate) => candidate.retrievalStatus === "retrieved_text" && candidate.semanticVerificationStatus === "completed")).toBe(true);
     expect(candidates.every((candidate) => candidate.safeRetrievalDiagnostics?.outcomeClass === "successful_usable_retrieval")).toBe(true);
     expect(candidates.every((candidate) => candidate.safeRetrievalDiagnostics?.sourceDomain === "syntheticprocessor.test")).toBe(true);
@@ -1042,7 +1045,7 @@ describe("evaluation-run integrity", () => {
       manifestPath: fixture.manifestPath,
       approvedManifestHash: fixture.manifest.manifestContentHash,
       requestedExecutions: fixture.requests,
-      approvedBudgetUsd: 12,
+      approvedBudgetUsd: ONE_TIME_FIXTURE_APPROVED_BUDGET_USD,
       calls: oneTimePaidCalls(),
       outputArtifactPath: path.join(fixture.directory, "one-time-no-candidates-artifact.json"),
       adapterId: "one_time_statement_evaluation_v1",
@@ -1066,11 +1069,11 @@ describe("evaluation-run integrity", () => {
     });
 
     expect(invocations.whole).toBeGreaterThan(0);
-    expect(invocations).toMatchObject({ search: ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch, retrieval: 0, semantic: 0 });
-    expect(result.costLedger.entries.filter((item) => item.requestId === "request_search_empty")).toHaveLength(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
+    expect(invocations).toMatchObject({ search: ONE_TIME_INITIAL_WEB_SEARCH_CALLS, retrieval: 0, semantic: 0 });
+    expect(result.costLedger.entries.filter((item) => item.requestId === "request_search_empty")).toHaveLength(ONE_TIME_INITIAL_WEB_SEARCH_CALLS);
     expect(result.costLedger.entries.at(-1)).toMatchObject({ status: "success" });
     expect(result.costLedger.entries.filter((item) => item.requestId === null && item.capability !== "ai_sdk").every((item) => item.status === "success" && item.observedOrEstimatedFinalCostUsd === 0 && item.billingDisposition === "provider_confirmed_zero")).toBe(true);
-    const expectedObservedCost = 0.1 * ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch + FAKE_WHOLE_STATEMENT_OBSERVED_COST_USD * invocations.whole;
+    const expectedObservedCost = 0.1 * ONE_TIME_INITIAL_WEB_SEARCH_CALLS + FAKE_WHOLE_STATEMENT_OBSERVED_COST_USD * invocations.whole;
     expect(result.costLedger.cumulativeObservedUsd).toBeCloseTo(expectedObservedCost);
     expect(result.costLedger.cumulativeBudgetCommittedUsd).toBeCloseTo(expectedObservedCost);
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
@@ -1087,7 +1090,7 @@ describe("evaluation-run integrity", () => {
       manifestPath: fixture.manifestPath,
       approvedManifestHash: fixture.manifest.manifestContentHash,
       requestedExecutions: fixture.requests,
-      approvedBudgetUsd: 12,
+      approvedBudgetUsd: ONE_TIME_FIXTURE_APPROVED_BUDGET_USD,
       calls: oneTimePaidCalls(),
       outputArtifactPath: path.join(fixture.directory, "one-time-timeout-artifact.json"),
       adapterId: "one_time_statement_evaluation_v1",
@@ -1114,13 +1117,15 @@ describe("evaluation-run integrity", () => {
     });
 
     expect(invocations.whole).toBeGreaterThan(0);
-    expect(invocations).toMatchObject({ search: ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch, retrieval: 0, semantic: 0 });
+    expect(invocations).toMatchObject({ search: ONE_TIME_INITIAL_WEB_SEARCH_CALLS, retrieval: 0, semantic: 0 });
     expect(result.finalStatus).toBe("completed");
     expect(result.costLedger.entries[0]).toMatchObject({ status: "timeout", billingDisposition: "unknown", requestId: "request_fake_timeout" });
-    expect(result.costLedger.entries.filter((item) => item.capability === "web_search").every((item) => item.status === "timeout")).toBe(true);
+    expect(result.costLedger.entries.filter((item) => item.capability === "web_search" && item.status === "timeout")).toHaveLength(ONE_TIME_INITIAL_WEB_SEARCH_CALLS);
+    expect(result.costLedger.entries.filter((item) => item.capability === "web_search" && item.requestId === null)
+      .every((item) => item.status === "success" && item.observedOrEstimatedFinalCostUsd === 0)).toBe(true);
     expect(result.costLedger.entries.filter((item) => ["retrieval", "semantic_verification"].includes(item.capability)).every((item) => item.status === "success" && item.requestId === null)).toBe(true);
     expect(result.costLedger.entries.at(-1)).toMatchObject({ status: "success" });
-    expect(result.providerCallOutcomes.filter((item) => item.stage === "web_search_discovery").every((item) => item.status === "timeout")).toBe(true);
+    expect(result.providerCallOutcomes.filter((item) => item.stage === "web_search_discovery" && item.status === "timeout")).toHaveLength(ONE_TIME_INITIAL_WEB_SEARCH_CALLS);
     expect(result.providerCallOutcomes.filter((item) => ["document_retrieval", "semantic_verification"].includes(item.stage)).every((item) => item.status === "success")).toBe(true);
     expect(result.providerCallOutcomes.at(-1)).toMatchObject({ stage: "whole_statement_ai_review", status: "success" });
     expect(JSON.stringify(result.artifact)).not.toContain("private fake timeout detail");
@@ -1140,7 +1145,7 @@ describe("evaluation-run integrity", () => {
       manifestPath: fixture.manifestPath,
       approvedManifestHash: fixture.manifest.manifestContentHash,
       requestedExecutions: fixture.requests,
-      approvedBudgetUsd: 12,
+      approvedBudgetUsd: ONE_TIME_FIXTURE_APPROVED_BUDGET_USD,
       calls: oneTimePaidCalls(),
       outputArtifactPath: path.join(fixture.directory, "one-time-safe-provider-failure-artifact.json"),
       adapterId: "one_time_statement_evaluation_v1",
@@ -1216,7 +1221,7 @@ describe("evaluation-run integrity", () => {
       manifestPath: fixture.manifestPath,
       approvedManifestHash: fixture.manifest.manifestContentHash,
       requestedExecutions: fixture.requests,
-      approvedBudgetUsd: 12,
+      approvedBudgetUsd: ONE_TIME_FIXTURE_APPROVED_BUDGET_USD,
       calls: oneTimePaidCalls(),
       outputArtifactPath: path.join(fixture.directory, "one-time-required-tool-failure-artifact.json"),
       adapterId: "one_time_statement_evaluation_v1",
@@ -1254,7 +1259,7 @@ describe("evaluation-run integrity", () => {
       manifestPath: fixture.manifestPath,
       approvedManifestHash: fixture.manifest.manifestContentHash,
       requestedExecutions: fixture.requests,
-      approvedBudgetUsd: 12,
+      approvedBudgetUsd: ONE_TIME_FIXTURE_APPROVED_BUDGET_USD,
       calls: oneTimePaidCalls(),
       outputArtifactPath: path.join(fixture.directory, "one-time-web-action-limit-artifact.json"),
       adapterId: "one_time_statement_evaluation_v1",
@@ -1301,7 +1306,7 @@ describe("evaluation-run integrity", () => {
     });
 
     expect(invocations.whole).toBeGreaterThan(0);
-    expect(invocations).toMatchObject({ search: ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch, retrieval: 0, semantic: 0 });
+    expect(invocations).toMatchObject({ search: ONE_TIME_INITIAL_WEB_SEARCH_CALLS, retrieval: 0, semantic: 0 });
     expect(result.providerCallOutcomes.filter((outcome) => outcome.stage === "web_search_discovery")).toHaveLength(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
     expect(result.providerCallOutcomes[0]).toMatchObject({
       stage: "web_search_discovery",

@@ -63,7 +63,11 @@ const PROJECTION_REASONS = [
 ] as const;
 const ATTEMPT_STATUSES = ["completed", "disabled", "not_needed", "failed", "timed_out", "safety_blocked", "budget_exhausted", "not_selected_planning", "provider_unavailable", "unsupported_model"] as const;
 const QUESTION_CATEGORIES = ["classification", "published_rule", "applicability", "contradiction"] as const;
-const QUESTION_TRIGGER_REASONS = ["missing_applicable_registry_claim", "expired_or_superseded_source", "contradicted_source", "material_unfamiliar_label", "not_needed", "disabled"] as const;
+const QUESTION_TRIGGER_REASONS = [
+  "missing_applicable_registry_claim", "expired_or_superseded_source", "contradicted_source", "material_unfamiliar_label",
+  "adaptive_missing_applicability", "adaptive_missing_rate_rule_evidence", "adaptive_inaccessible_authoritative_source",
+  "not_needed", "disabled",
+] as const;
 const ATTEMPT_REASON_BY_STATUS = {
   completed: ["fee_knowledge_research_completed"], disabled: ["fee_knowledge_research_disabled"], not_needed: ["fee_knowledge_research_not_needed"],
   failed: ["fee_knowledge_research_failed"], timed_out: ["fee_knowledge_research_timed_out"],
@@ -295,7 +299,7 @@ const ROW_EVIDENCE_KEYS = ["feeRowRef", "evidenceRefs", "contributesToUniqueTota
 const PREPARED_RESEARCH_QUESTION_KEYS = [
   "feeRowRef", "sanitizedQuestionCategory", "triggerReason", "processorOrNetwork", "feeLabel", "statementSection",
   "statementPeriodYear", "deterministicCategory", "deterministicEconomicOwner", "deterministicContractualController",
-  "deterministicActionabilityCeiling", "deterministicConfidence", "semanticQuestion",
+  "deterministicActionabilityCeiling", "deterministicConfidence", "semanticQuestion", "adaptiveFollowUp",
 ] as const;
 
 type PreparedResearchQuestion = OneTimeStatementEvaluationPacket["research"]["questions"][number];
@@ -1036,13 +1040,30 @@ function validatePreparedResearchQuestion(value: unknown): value is PreparedRese
     || !nullableEnum(value.deterministicContractualController, FEE_PARTIES)) return false;
   return enumValue(value.deterministicActionabilityCeiling, FEE_ACTIONABILITIES)
     && enumValue(value.deterministicConfidence, ["high", "medium", "low"])
-    && typeof value.semanticQuestion === "string";
+    && typeof value.semanticQuestion === "string"
+    && validateAdaptiveFollowUp(value.adaptiveFollowUp);
+}
+
+function validateAdaptiveFollowUp(value: unknown): boolean {
+  if (value === null) return true;
+  if (!isRecord(value) || !hasExactKeys(value, ["parentQuestionRef", "parentAttemptId", "parentCandidateId", "missingDimensions", "sourceReasonCodes"])) return false;
+  if (!QUESTION_REF.test(stringValue(value.parentQuestionRef)) || !RESEARCH_ATTEMPT_REF.test(stringValue(value.parentAttemptId))) return false;
+  if (value.parentCandidateId !== null && !CANDIDATE_REF.test(stringValue(value.parentCandidateId))) return false;
+  const dimensions = new Set(["fee_or_alias_missing", "rate_rule_missing", "processor_network_mismatch", "period_mismatch", "applicability_missing", "authoritative_source_inaccessible"]);
+  return closedSetArray(value.missingDimensions, dimensions)
+    && (value.missingDimensions as unknown[]).length > 0
+    && (value.missingDimensions as unknown[]).length <= 5
+    && safeCodeArray(value.sourceReasonCodes)
+    && (value.sourceReasonCodes as unknown[]).length <= 10;
 }
 
 function validateResearchLimits(value: unknown): value is EvaluationExpectedResearchQuestionProjection["limits"] {
-  if (!isRecord(value) || !hasExactKeys(value, ["policyVersion", "maxSearchCalls", "maxRetrievalCandidates", "totalDeadlineMs", "maxResultCandidatesPerSearch"])) return false;
+  if (!isRecord(value)) return false;
+  const legacyKeys = ["policyVersion", "maxSearchCalls", "maxRetrievalCandidates", "totalDeadlineMs", "maxResultCandidatesPerSearch"];
+  const adaptiveKeys = ["policyVersion", "maxSearchCalls", "maxAdaptiveFollowUpCalls", "maxRetrievalCandidates", "maxAdaptiveFollowUpCandidates", "totalDeadlineMs", "maxResultCandidatesPerSearch"];
+  if (!hasExactKeys(value, legacyKeys) && !hasExactKeys(value, adaptiveKeys)) return false;
   if (value.policyVersion !== "fee_knowledge_research_policy_v1") return false;
-  return [value.maxSearchCalls, value.maxRetrievalCandidates, value.maxResultCandidatesPerSearch]
+  return [value.maxSearchCalls, value.maxRetrievalCandidates, value.maxResultCandidatesPerSearch, value.maxAdaptiveFollowUpCalls ?? 0, value.maxAdaptiveFollowUpCandidates ?? 0]
     .every((limit) => Number.isInteger(limit) && Number(limit) >= 0)
     && Number.isInteger(value.totalDeadlineMs)
     && Number(value.totalDeadlineMs) > 0;
@@ -1072,6 +1093,7 @@ function validateResearchProof(
   const candidateParents = new Map<string, string>();
   const supportParents = new Map<string, string>();
   let retainedCandidateCount = 0;
+  let completedAdaptiveAttemptCount = 0;
   for (const item of value.attempts) {
     if (!isRecord(item) || !hasExactKeys(item, ATTEMPT_KEYS) || !RESEARCH_ATTEMPT_REF.test(stringValue(item.researchAttemptRef)) || !QUESTION_REF.test(stringValue(item.questionRef)) || !FEE_ROW_REF.test(stringValue(item.feeRowRef)) || !enumValue(item.status, ATTEMPT_STATUSES) || !Number.isInteger(item.resultCount) || item.resultCount < 0 || !safeRefArray(item.candidateRefs, CANDIDATE_REF) || attempts.has(item.researchAttemptRef as string) || questions.has(item.questionRef as string)) return false;
     const expectedQuestion = expectedQuestions.get(item.questionRef as string);
@@ -1084,9 +1106,14 @@ function validateResearchProof(
     if (item.resultCount !== item.candidateRefs.length || !safeCodeArray(item.reasonCodes) || item.reasonCodes.length !== 1 || !allowedReasons.includes(item.reasonCodes[0])) return false;
     const candidateRetentionAllowed = ["completed", "failed", "timed_out", "safety_blocked"].includes(item.status as string);
     if (!candidateRetentionAllowed && item.resultCount !== 0) return false;
-    if (expectedQuestion.questionOrdinal > expectedResearchQuestions.limits.maxSearchCalls) {
-      if (!["budget_exhausted", "not_selected_planning"].includes(item.status as string)) return false;
-    } else if (["budget_exhausted", "not_selected_planning"].includes(item.status as string)) return false;
+    const adaptiveTrigger = String(expectedQuestion.triggerReason).startsWith("adaptive_");
+    if (adaptiveTrigger && !["not_selected_planning", "completed", "failed", "timed_out", "safety_blocked", "provider_unavailable", "unsupported_model"].includes(item.status as string)) return false;
+    if (adaptiveTrigger && item.status === "completed") completedAdaptiveAttemptCount += 1;
+    if (!adaptiveTrigger) {
+      if (expectedQuestion.questionOrdinal > expectedResearchQuestions.limits.maxSearchCalls) {
+        if (!["budget_exhausted", "not_selected_planning"].includes(item.status as string)) return false;
+      } else if (["budget_exhausted", "not_selected_planning"].includes(item.status as string)) return false;
+    }
     if (candidateRetentionAllowed) {
       if (item.resultCount > expectedResearchQuestions.limits.maxResultCandidatesPerSearch) return false;
       retainedCandidateCount += item.resultCount as number;
@@ -1095,6 +1122,7 @@ function validateResearchProof(
     questions.add(item.questionRef as string);
     attempts.set(item.researchAttemptRef as string, item);
   }
+  if (completedAdaptiveAttemptCount > (expectedResearchQuestions.limits.maxAdaptiveFollowUpCalls ?? 0)) return false;
   if (retainedCandidateCount > expectedResearchQuestions.limits.maxRetrievalCandidates) return false;
   if (!setEquals(questions, new Set(expectedQuestions.keys()))) return false;
   for (const item of value.candidates) {
