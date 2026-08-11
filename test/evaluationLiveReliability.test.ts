@@ -116,6 +116,6 @@ describe("live evaluation reliability policy", () => {
       + ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch * 0.53
       + ONE_TIME_RESEARCH_REQUEST_SLOTS.retrieval * 0.001
       + ONE_TIME_RESEARCH_REQUEST_SLOTS.semanticVerification * 0.01512;
-    expect(perStatementReservation * fixture.selectedStatementCount).toBeCloseTo(7.3155, 6);
+    expect(perStatementReservation * fixture.selectedStatementCount).toBeCloseTo(12.8573, 6);
   });
 });

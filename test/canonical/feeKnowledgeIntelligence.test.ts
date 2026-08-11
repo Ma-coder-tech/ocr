@@ -6,7 +6,11 @@ import { buildWholeStatementFeeIntelligencePacket } from "../../src/canonical/wh
 import { buildWholeStatementFeeIntelligenceWorkPlan } from "../../src/canonical/wholeStatementFeeIntelligenceWorkPlan.js";
 import { buildCanonicalRuntimeAnalysis } from "../../src/canonical/runtimeAdapter.js";
 import {
+  FEE_KNOWLEDGE_RESEARCH_LIMITS,
+  buildFeeKnowledgeWebSearchInput,
   defaultFeeKnowledgeResearchQuestions,
+  planFeeKnowledgeResearchQuestions,
+  rankFeeKnowledgeDiscoveryCandidates,
   runFeeKnowledgeResearch,
   type FeeKnowledgeSemanticSupportAdapter,
 } from "../../src/canonical/feeKnowledgeResearch.js";
@@ -23,6 +27,8 @@ import { analyzeStatementDocument } from "../../src/statementParserOrchestrator.
 
 const STATEMENT_1 = "test/fixtures/pdfs/fiserv_PAYSAFE_Febr_2024.pdf";
 const STATEMENT_2 = "test/fixtures/pdfs/fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf";
+const STATEMENT_3 = "test/fixtures/pdfs/fiserv_ABDUL_BASHER_Aug_2025.pdf";
+const STATEMENT_4 = "test/fixtures/pdfs/fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf";
 
 describe("fee knowledge intelligence state model", () => {
   it("replays statement #1 and #2 into statement-grounded provisional intelligence without mutating financial truth", async () => {
@@ -571,6 +577,57 @@ describe("fee knowledge intelligence state model", () => {
 
     expect(candidateEvidenceLocatorHash([deterministic, ai], "candidate_1")).toBe("substantive_hash");
   });
+
+  it("replays statements #2, #3, and #4 with broader evidence-acquisition planning", async () => {
+    for (const fixturePath of [STATEMENT_2, STATEMENT_3, STATEMENT_4]) {
+      const analysis = await analysisFromPdf(fixturePath, `evidence_acquisition_replay_${fixturePath}`);
+      const questions = defaultFeeKnowledgeResearchQuestions(analysis, null);
+      const plan = planFeeKnowledgeResearchQuestions(questions, FEE_KNOWLEDGE_RESEARCH_LIMITS);
+      const prompt = buildFeeKnowledgeWebSearchInput(plan.selectedQuestions.slice(0, 1));
+
+      expect(questions.length).toBeGreaterThan(0);
+      expect(plan.selected).toHaveLength(Math.min(FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls, questions.length));
+      expect(plan.selected.length).toBeGreaterThanOrEqual(Math.min(4, questions.length));
+      expect(plan.selected.every((item) => item.score > 0)).toBe(true);
+      expect(plan.selected.some((item) =>
+        item.reasonCodes.includes("fee_knowledge_research_priority_actionable") ||
+        item.reasonCodes.includes("fee_knowledge_research_priority_markup") ||
+        item.reasonCodes.includes("fee_knowledge_research_priority_network_fee") ||
+        item.reasonCodes.includes("fee_knowledge_research_priority_uncertain")
+      )).toBe(true);
+      expect(prompt).toContain("applicabilityTargets");
+      expect(prompt).toContain("sourcePreferences");
+      expect(prompt).toContain("alternative official");
+    }
+  }, 60_000);
+
+  it("ranks candidates by applicability to the specific question, not by official domain alone", async () => {
+    const analysis = await analysisFromPdf(STATEMENT_4, "statement_4_candidate_ranking_replay");
+    const question = defaultFeeKnowledgeResearchQuestions(analysis, null).find((item) =>
+      item.deterministicCategory === "card_brand_network_assessment" ||
+      /visa|assessment|network/i.test(item.feeLabel)
+    ) ?? defaultFeeKnowledgeResearchQuestions(analysis, null)[0]!;
+    const ranked = rankFeeKnowledgeDiscoveryCandidates([
+      {
+        url: "https://usa.visa.com/pay-with-visa/featured-technologies/small-business.html",
+        title: "Visa small business education",
+        publisher: "Visa",
+      },
+      {
+        url: "https://usa.visa.com/dam/VCOM/download/merchants/visa-usa-interchange-reimbursement-fees.pdf",
+        title: "Visa USA Interchange Reimbursement Fees",
+        publisher: "Visa",
+      },
+      {
+        url: "https://example.com/blog/payment-processing-fees-explained",
+        title: "Payment processing fees explained",
+        publisher: "Example Blog",
+      },
+    ], question);
+
+    expect(ranked[0]!.url).toContain("interchange-reimbursement-fees.pdf");
+    expect(ranked.at(-1)!.url).toContain("example.com");
+  }, 30_000);
 });
 
 async function analysisFromPdf(path: string, ref: string) {

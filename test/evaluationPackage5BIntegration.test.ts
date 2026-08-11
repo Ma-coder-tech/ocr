@@ -294,8 +294,8 @@ describe("Package 5B manifest-driven admission", () => {
         .map((attempt) => [attempt.status, attempt.reasonCodes[0]])).toEqual([
           ["provider_unavailable", "fee_knowledge_web_search_provider_unavailable_before_send"],
           ["provider_unavailable", "fee_knowledge_web_search_provider_unavailable_before_send"],
-          ["not_selected_planning", "fee_knowledge_research_not_selected_planning"],
-          ["not_selected_planning", "fee_knowledge_research_not_selected_planning"],
+          ["provider_unavailable", "fee_knowledge_web_search_provider_unavailable_before_send"],
+          ["provider_unavailable", "fee_knowledge_web_search_provider_unavailable_before_send"],
         ]);
       expect(admission.researchEvidence.candidates).toEqual([]);
       expect(admission.researchEvidence.claimSupports).toEqual([]);
@@ -776,14 +776,14 @@ describe("Package 5B manifest-driven admission", () => {
         ...fixture.runnerInput,
         calls: fullOneTimeCalls(),
         outputArtifactPath: path.join(fixture.directory, `package-5b-${mode}.json`),
-        oneTimeResearchQuestionsForTesting: (analysis) => mode === "budget"
-          ? Array.from({ length: 4 }, (_, index) => researchQuestion(analysis, index))
+	        oneTimeResearchQuestionsForTesting: (analysis) => mode === "budget"
+	          ? Array.from({ length: 6 }, (_, index) => researchQuestion(analysis, index))
           : [researchQuestion(analysis)],
         onCanonicalAdmissionProjectedForTesting: mode === "budget" ? (value) => {
           expect(value.admissionDisposition).toBe("admitted");
           expect(value.admission.validationErrorCodes).toEqual([]);
           expect(value.package5a).toMatchObject({ executionState: "completed", admissionState: "admitted", finalCanonicalStatus: "completed" });
-          expect(value.researchEvidence.attempts.map((attempt) => [attempt.questionOrdinal, attempt.status]).sort((left, right) => Number(left[0]) - Number(right[0]))).toEqual([[1, "completed"], [2, "completed"], [3, "not_selected_planning"], [4, "not_selected_planning"]]);
+	          expect(value.researchEvidence.attempts.map((attempt) => [attempt.questionOrdinal, attempt.status]).sort((left, right) => Number(left[0]) - Number(right[0]))).toEqual([[1, "completed"], [2, "completed"], [3, "completed"], [4, "completed"], [5, "not_selected_planning"], [6, "not_selected_planning"]]);
           expect(value.researchEvidence.candidates.every((candidate) => candidate.retrievalStatus === "retrieved_text" && candidate.semanticVerificationStatus === "completed")).toBe(true);
           expect(value.researchEvidence.claimSupports.every((support) => support.disposition === "accepted")).toBe(true);
         } : undefined,
@@ -981,9 +981,10 @@ describe("Package 5B manifest-driven admission", () => {
         estimatedMaximumCostUsd: 0.5,
       },
     }));
-    const result = await runManifestDrivenLiveEvaluation({
-      ...fixture.runnerInput,
-      calls: [
+	    const result = await runManifestDrivenLiveEvaluation({
+	      ...fixture.runnerInput,
+	      approvedBudgetUsd: 20,
+	      calls: [
         ...baseCalls.slice(0, semanticIndex),
         ...retrievedDocumentInvestigationCalls,
         ...baseCalls.slice(semanticIndex),
@@ -1401,7 +1402,8 @@ describe("Package 5B manifest-driven admission", () => {
       .sort((left, right) => left.questionOrdinal - right.questionOrdinal)
       .map((attempt) => attempt.status)).toEqual(["timed_out", "timed_out", "not_selected_planning"]);
     expect(admission.packageF).toBeNull();
-    expect(result.artifact.providerCallOutcomes.filter((outcome) => outcome.stage === "web_search_discovery")).toHaveLength(2);
+	    expect(result.artifact.providerCallOutcomes.filter((outcome) => outcome.stage === "web_search_discovery")).toHaveLength(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
+	    expect(result.artifact.providerCallOutcomes.filter((outcome) => outcome.stage === "web_search_discovery" && outcome.status === "timeout")).toHaveLength(2);
     expect(result.artifact.providerCallOutcomes.some((outcome) => outcome.stage === "whole_statement_ai_review" && outcome.status === "success")).toBe(true);
   }, 30_000);
 
@@ -2025,7 +2027,7 @@ async function approvedOneTimePdfFixture(stages: EvaluationExecutionStage[] = el
       manifestPath,
       approvedManifestHash: manifest.manifestContentHash,
       requestedExecutions: requests,
-      approvedBudgetUsd: 10,
+	      approvedBudgetUsd: 12,
       adapterId: "one_time_statement_evaluation_v1" as const,
       businessType: "restaurant_food_beverage" as const,
       resolveSourceBytes: async () => bytes,
@@ -2069,7 +2071,7 @@ async function approvedShortCloverPdfFixture() {
       manifestPath,
       approvedManifestHash: manifest.manifestContentHash,
       requestedExecutions: [{ sourceDocumentId, stages: eligibleStages }],
-      approvedBudgetUsd: 10,
+	      approvedBudgetUsd: 12,
       adapterId: "one_time_statement_evaluation_v1" as const,
       businessType: "restaurant_food_beverage" as const,
       resolveSourceBytes: async () => bytes,
@@ -2123,7 +2125,7 @@ async function approvedTwoDocumentPdfFixture() {
       manifestPath,
       approvedManifestHash: manifest.manifestContentHash,
       requestedExecutions: sourceDocumentIds.map((sourceDocumentId) => ({ sourceDocumentId, stages: eligibleStages })),
-      approvedBudgetUsd: 20,
+	      approvedBudgetUsd: 24,
       adapterId: "one_time_statement_evaluation_v1" as const,
       businessType: "restaurant_food_beverage" as const,
       resolveSourceBytes: async (row: { sourceDocumentId: string }) => bytesBySource.get(row.sourceDocumentId)!,

@@ -10,6 +10,7 @@ import {
   feeKnowledgeQuestionRef,
   openAiSemanticSupportAdapter,
   openAiWebSearchAdapter,
+  rankFeeKnowledgeDiscoveryCandidates,
   verifyCandidate,
   type FeeKnowledgeDiscoveryCandidate,
   type FeeKnowledgeResearchQuestion,
@@ -695,7 +696,10 @@ export function createOneTimeStatementEvaluationTransport(input: {
         return providerFailureResult({ started, error, reasonCode, scope: "candidate_local" });
       }
       const remaining = context.packet.research.limits.maxRetrievalCandidates - context.discovered.length;
-      const discovered = dedupeCandidates(response.value
+      const discovered = rankFeeKnowledgeDiscoveryCandidates(
+        [...new Map(response.value.map((candidate) => [candidate.url, candidate])).values()],
+        question,
+      )
         .slice(0, Math.min(remaining, context.packet.research.limits.maxResultCandidatesPerSearch))
         .map((candidate, candidateOrdinal) => ({
           attemptId,
@@ -703,7 +707,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
           question,
           questionOrdinal,
           candidateId: `candidate_${shortHash([attemptId, candidate.url, String(candidateOrdinal)])}`,
-        })));
+        }));
       context.discovered.push(...discovered);
       context.attempts.push(attemptRecord(question, questionOrdinal, "completed", discovered.map((item) => item.candidateId), ["fee_knowledge_research_completed"]));
       context.candidates.push(...discovered.map(discoveredCandidateRecord));

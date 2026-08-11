@@ -345,7 +345,7 @@ describe("canonical research admission integration", () => {
     await new Promise((resolve) => setTimeout(resolve, 120));
 
     expect(JSON.stringify(result)).toBe(immediateJson);
-    expect(result.attempts.map((attempt) => attempt.status)).toEqual(["timed_out", "timed_out", "not_selected_planning"]);
+    expect(result.attempts.map((attempt) => attempt.status)).toEqual(["timed_out", "timed_out", "timed_out"]);
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0]).toMatchObject({ retrievalStatus: "retrieved_text", semanticVerificationStatus: "timed_out" });
     const packet = buildFeeKnowledgeSourcePacket({
