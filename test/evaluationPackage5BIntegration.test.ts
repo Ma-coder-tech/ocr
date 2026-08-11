@@ -417,6 +417,60 @@ describe("Package 5B manifest-driven admission", () => {
     }
   }, 30_000);
 
+  it("classifies unsupported OpenAI web-search model before send with zero exposure", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "synthetic-present-key";
+    try {
+      const result = await runManifestDrivenLiveEvaluation({
+        ...fixture.runnerInput,
+        calls: openAiReadinessCalls().map((call) => call.stage === "web_search_discovery"
+          ? {
+            ...call,
+            reservation: {
+              ...call.reservation,
+              model: "gpt-5.4-mini",
+            },
+          }
+          : call),
+        outputArtifactPath: path.join(fixture.directory, "integrated-web-unsupported-model-pre-send.json"),
+        oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis)],
+        oneTimeServicesForTesting: {
+          wholeStatementReview: async (packet) => external(validReview(packet), "request_whole_after_unsupported_web_model"),
+        },
+      });
+
+      expect(result.finalStatus).toBe("completed");
+      expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+      if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+      const admission = result.artifact.canonicalAdmissionResults[0]!;
+      expect(admission.admission.validationErrorCodes).toEqual(["whole_statement_research_incomplete"]);
+      expect(admission.researchEvidence.attempts[0]).toMatchObject({
+        status: "unsupported_model",
+        reasonCodes: ["fee_knowledge_web_search_model_unsupported"],
+      });
+      expect(admission.researchEvidence.candidates).toEqual([]);
+      expect(admission.researchEvidence.claimSupports).toEqual([]);
+      const searchOutcome = result.providerCallOutcomes.find((outcome) => outcome.stage === "web_search_discovery");
+      expect(searchOutcome).toMatchObject({
+        status: "success",
+        requestId: null,
+      });
+      expect(searchOutcome?.reasonCodes).toContain("fee_knowledge_web_search_model_unsupported");
+      const searchLedger = result.costLedger.entries.find((entry) => entry.callId === searchOutcome?.callId);
+      expect(searchLedger).toMatchObject({
+        observedOrEstimatedFinalCostUsd: 0,
+        billingDisposition: "provider_confirmed_zero",
+        status: "success",
+      });
+      expect(result.providerCallOutcomes.some((outcome) => outcome.reasonCodes.includes("provider_call_failed"))).toBe(false);
+      expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+    } finally {
+      if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousOpenAiKey;
+    }
+  }, 30_000);
+
   it("classifies missing OpenAI readiness before semantic verification send without admitting unavailable evidence", async () => {
     const fixture = await approvedOneTimePdfFixture();
     const previousOpenAiKey = process.env.OPENAI_API_KEY;
