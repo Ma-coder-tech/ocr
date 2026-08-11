@@ -36,7 +36,8 @@ export function projectOneTimeCanonicalAdmissionResult(input: {
     && sha256Canonical(input.finalized.wholeStatementPacketSent) !== sha256Canonical(preparedPacket.wholeStatementReview)) {
     throw new Error("package_5b_sent_whole_statement_packet_mismatch");
   }
-  if (canonical.admission.executionStatus === "completed"
+  if (input.finalized.wholeStatementWorkPlan !== null
+    && canonical.admission.executionStatus === "completed"
     && canonical.admission.admissionDisposition !== "safety_blocked"
     && !input.finalized.wholeStatementPacketSent) {
     throw new Error("package_5b_completed_execution_sent_packet_missing");

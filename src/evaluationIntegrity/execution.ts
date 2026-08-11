@@ -416,6 +416,7 @@ export async function runManifestDrivenLiveEvaluation(input: {
       providerCallOutcomes,
       sourceExecutionFailures,
       adapter.oneTimeResearchTerminalFor(document.sourceDocumentId),
+      document.stages,
     ),
   ] as const));
   if (input.adapterId === "one_time_statement_evaluation_v1" && [...sourceExecutionStatuses.values()].includes("timed_out")) {
@@ -833,6 +834,7 @@ function deriveSourceExecutionStatus(
   outcomes: EvaluationRunIntegrityArtifact["providerCallOutcomes"],
   explicitFailures: ReadonlyMap<string, "failed" | "timed_out" | "safety_blocked">,
   graphTerminal: "failed" | "timed_out" | "safety_blocked" | null,
+  requestedStages: readonly EvaluationExecutionStage[],
 ): "completed" | "failed" | "timed_out" | "safety_blocked" {
   const explicit = explicitFailures.get(sourceDocumentId);
   if (explicit) return explicit;
@@ -845,6 +847,7 @@ function deriveSourceExecutionStatus(
   if (graphTerminal) return graphTerminal;
   if (sourceOutcomes.some((outcome) => outcome.status === "timeout")) return "timed_out";
   if (sourceOutcomes.some((outcome) => outcome.status === "failure")) return "failed";
+  if (!requestedStages.includes("whole_statement_ai_review")) return "completed";
   return "failed";
 }
 

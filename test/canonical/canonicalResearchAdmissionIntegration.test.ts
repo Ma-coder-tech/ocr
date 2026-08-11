@@ -138,7 +138,8 @@ describe("canonical research admission integration", () => {
 
     expect(result.candidate.semanticVerificationStatus).toBe("parse_failed");
     expect(result.candidate.reasonCodes).toContain("fee_knowledge_semantic_parse_failed");
-    expect(result.claimSupport?.evidenceDecision).toBe("unsupported");
+    expect(result.candidate.claimSupportDecisionRef).toBeNull();
+    expect(result.claimSupport).toBeNull();
   });
 
   it("requests strict structured output for semantic verification", async () => {
@@ -250,7 +251,7 @@ describe("canonical research admission integration", () => {
       candidateId: "candidate_provider_unavailable",
       semanticSupportAdapter: openAiSemanticSupportAdapter({ apiKey: "" }),
     });
-    const httpFailure = verifyCandidate({
+    const httpFailure = () => verifyCandidate({
       ...base,
       candidateId: "candidate_provider_http_failure",
       semanticSupportAdapter: openAiSemanticSupportAdapter({
@@ -263,10 +264,9 @@ describe("canonical research admission integration", () => {
     expect(successfulUnsupported.claimSupport).toMatchObject({ evidenceDecision: "unsupported" });
     expect(unavailable.candidate.semanticVerificationStatus).toBe("failed");
     expect(unavailable.candidate.reasonCodes).toContain("fee_knowledge_semantic_failed");
-    expect(unavailable.claimSupport?.semanticSupport.reasonCodes).toContain("fee_knowledge_semantic_support_provider_unavailable");
-    expect(buildRuntimeClaimSupportDecisionPayload({ support: unavailable.claimSupport!, candidate: unavailable.candidate }).reasonCodes)
-      .toEqual([`fee_knowledge_${unavailable.claimSupport!.evidenceDecision}`]);
-    await expect(httpFailure).rejects.toMatchObject({
+    expect(unavailable.candidate.claimSupportDecisionRef).toBeNull();
+    expect(unavailable.claimSupport).toBeNull();
+    await expect(httpFailure()).rejects.toMatchObject({
       reasonCode: "provider_server_error",
       reasonCodes: ["provider_http_status_503", "provider_http_status_class_5xx", "provider_server_error"],
     });

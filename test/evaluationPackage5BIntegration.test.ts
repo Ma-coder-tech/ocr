@@ -337,6 +337,130 @@ describe("Package 5B manifest-driven admission", () => {
     expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
   }, 30_000);
 
+  it("keeps adaptive semantic parse failure terminally coherent without Package 5B", async () => {
+    const canaryStages: EvaluationExecutionStage[] = [
+      "parser",
+      "web_search_discovery",
+      "document_retrieval",
+      "retrieved_document_investigative_intelligence",
+      "semantic_verification",
+      "canonical_admission",
+      "customer_publication",
+      "final_artifact",
+    ];
+    const fixture = await approvedOneTimePdfFixture(canaryStages);
+    const baseCalls = adaptiveFollowUpOneTimeCalls().filter((call) => call.stage !== "whole_statement_ai_review");
+    const semanticIndex = baseCalls.findIndex((call) => call.stage === "semantic_verification");
+    const retrievedDocumentInvestigationCall = {
+      sourceDocumentId: "doc_one_time_fiserv",
+      stage: "retrieved_document_investigative_intelligence" as const,
+      reservation: {
+        callId: "package_5b_doc_one_time_fiserv_retrieved_document_investigative_intelligence_1",
+        attempt: 1,
+        retryOfCallId: null,
+        capability: "investigative_intelligence" as const,
+        pricingPolicyRef: "sanitized_pricing_policy_v1",
+        providerRoute: "sanitized_route",
+        provider: "sanitized_provider",
+        model: "sanitized_model",
+        toolClass: "investigative_intelligence",
+        maximumInputTokens: 1000000,
+        maximumOutputTokens: 50000,
+        maximumToolUses: 0,
+        pricing: {
+          uncachedInputUsdPerMillionTokens: 0,
+          cachedInputUsdPerMillionTokens: 0,
+          outputUsdPerMillionTokens: 2,
+          toolUseUsd: 0,
+        },
+        estimatedMaximumCostUsd: 0.5,
+      },
+    };
+    let webCalls = 0;
+    let retrievalCalls = 0;
+    let retrievedDocumentInvestigations = 0;
+    let semanticCalls = 0;
+    let feeLabel = "fee";
+
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: [
+        ...baseCalls.slice(0, semanticIndex),
+        retrievedDocumentInvestigationCall,
+        ...baseCalls.slice(semanticIndex),
+      ],
+      outputArtifactPath: path.join(fixture.directory, "adaptive-canary-semantic-parse-failed.json"),
+      oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis)],
+      oneTimeResearchLimitsForTesting: {
+        policyVersion: "fee_knowledge_research_policy_v1",
+        maxSearchCalls: 1,
+        maxAdaptiveFollowUpCalls: 1,
+        maxRetrievalCandidates: 3,
+        maxAdaptiveFollowUpCandidates: 2,
+        totalDeadlineMs: 25_000,
+        maxResultCandidatesPerSearch: 2,
+      },
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async ({ questions: [question] }) => {
+          webCalls += 1;
+          feeLabel = question!.feeLabel;
+          if (webCalls === 1) {
+            return external([{ url: "https://www.mastercard.com/blocked-rules", title: "Mastercard rules", publisher: "Mastercard" }], "request_search_canary_initial");
+          }
+          return external([{ url: "https://docs.withreach.com/mastercard-alt", title: "Alternative Mastercard fee docs", publisher: "Reach" }], "request_search_canary_adaptive");
+        },
+        documentRetrieval: async (url) => {
+          retrievalCalls += 1;
+          if (retrievalCalls === 1) return external(terminalRetrievedDocument("unavailable", "fee_knowledge_http_403"), "request_retrieval_canary_403");
+          return external(retrievedTextDocument(url, feeLabel), "request_retrieval_canary_text");
+        },
+        retrievedDocumentInvestigativeIntelligence: async () => {
+          retrievedDocumentInvestigations += 1;
+          return external({ findings: [] }, "request_retrieved_doc_ai_canary");
+        },
+        semanticVerification: async ({ structuredClaim }) => {
+          semanticCalls += 1;
+          return external({
+            ...semanticSupport(structuredClaim),
+            decision: "unsupported" as const,
+            reasonCodes: ["fee_knowledge_semantic_json_invalid"],
+          }, "request_semantic_canary_parse_failed");
+        },
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(webCalls).toBe(2);
+    expect(retrievalCalls).toBe(2);
+    expect(retrievedDocumentInvestigations).toBe(1);
+    expect(semanticCalls).toBe(1);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    expect(admission.packageF).toBeNull();
+    expect(admission.admissionDisposition).toBe("rejected");
+    expect(admission.researchEvidence.attempts.map((attempt) => attempt.triggerReason)).toEqual(expect.arrayContaining([
+      "material_unfamiliar_label",
+      "adaptive_inaccessible_authoritative_source",
+    ]));
+    expect(admission.researchEvidence.candidates).toHaveLength(2);
+    expect(admission.researchEvidence.candidates.find((candidate) => candidate.retrievalStatus === "unavailable")).toMatchObject({
+      retrievalStatus: "unavailable",
+      semanticVerificationStatus: "not_started",
+      reasonCodes: expect.arrayContaining(["fee_knowledge_http_403"]),
+    });
+    expect(admission.researchEvidence.candidates.find((candidate) => candidate.semanticVerificationStatus === "parse_failed")).toMatchObject({
+      retrievalStatus: "retrieved_text",
+      semanticVerificationStatus: "parse_failed",
+      verificationStatus: "rejected",
+      claimSupportRefs: [],
+    });
+    expect(admission.researchEvidence.claimSupports).toEqual([]);
+    expect(result.providerCallOutcomes.find((outcome) => outcome.requestId === "request_semantic_canary_parse_failed"))
+      .toMatchObject({ status: "success", stage: "semantic_verification" });
+  }, 30_000);
+
   it("rejects invalid prepared research-question vocabulary before external work begins", async () => {
     const fixture = await approvedOneTimePdfFixture();
     let externalCalls = 0;
@@ -1353,12 +1477,17 @@ describe("Package 5B manifest-driven admission", () => {
       .toMatchObject({ status: "timeout", stage: "document_retrieval" });
     if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
     const candidates = result.artifact.canonicalAdmissionResults[0]!.researchEvidence.candidates;
+    const claimSupports = result.artifact.canonicalAdmissionResults[0]!.researchEvidence.claimSupports;
     expect(candidates.filter((candidate) => candidate.retrievalStatus === "retrieved_text")).toHaveLength(2);
     expect(candidates.filter((candidate) => candidate.retrievalStatus === "timed_out")).toHaveLength(1);
     expect(candidates.filter((candidate) => candidate.semanticVerificationStatus === "parse_failed")).toHaveLength(1);
     expect(candidates.filter((candidate) => candidate.semanticVerificationStatus === "completed")).toHaveLength(1);
-    expect(candidates.find((candidate) => candidate.semanticVerificationStatus === "parse_failed")?.verificationStatus)
-      .not.toBe("runtime_verified_documentation");
+    const parseFailed = candidates.find((candidate) => candidate.semanticVerificationStatus === "parse_failed")!;
+    expect(parseFailed).toMatchObject({
+      verificationStatus: "rejected",
+      claimSupportRefs: [],
+    });
+    expect(claimSupports.every((support) => support.candidateRef !== parseFailed.candidateRef)).toBe(true);
   }, 30_000);
 
   it("keeps an unsafe URL candidate local and admits evidence only from a later safe candidate", async () => {
@@ -1789,6 +1918,13 @@ describe("Package 5B manifest-driven admission", () => {
         if (semanticStatus === "safety_blocked") expect(wholeStatementCalls).toBe(0);
         else expect(wholeStatementCalls).toBeGreaterThan(0);
         expect(admission.packageF).toBeNull();
+        if (semanticStatus === "parse_failed") {
+          expect(admission.researchEvidence.candidates[0]).toMatchObject({
+            verificationStatus: "rejected",
+            claimSupportRefs: [],
+          });
+          expect(admission.researchEvidence.claimSupports).toEqual([]);
+        }
       }
       if (semanticStatus === "safety_blocked") {
         const attempt = admission.researchEvidence.attempts[0]!;
