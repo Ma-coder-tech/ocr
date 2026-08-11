@@ -593,30 +593,40 @@ export function createOneTimeStatementEvaluationTransport(input: {
       });
       const existingIntelligence = structuredClone(context.intelligence);
       let investigativeAccounting: RepositoryProviderTransportResult["accounting"] | null = null;
-      const records = await runWithinPreparedResearchDeadline(context, "statement_investigative_intelligence", async (abortSignal) =>
-        runFeeKnowledgeInvestigativeIntelligence({
-          scope: "statement",
-          analysis: context.analysis,
-          questions: context.packet.research.questions,
-          existingIntelligence,
-          options: {
-            enabled: true,
-            adapter: async (investigativeRequest, investigativeContext) => {
-              if (readiness.status === "unavailable_before_send") throw new Error(readiness.reasonCodes[0] ?? "fee_knowledge_ai_investigative_unavailable_before_send");
-              const response = unwrapExternalRequestResult(
-                await services.statementInvestigativeIntelligence(investigativeRequest, {
-                  abortSignal: investigativeContext.abortSignal,
-                  approvedCallMetadata: structuredClone(request.approvedCallMetadata),
-                }),
-                started,
-                "investigative_intelligence",
-              );
-              investigativeAccounting = response.accounting;
-              return response.value;
+      let records: FeeKnowledgeIntelligenceRecord[];
+      try {
+        records = await runWithinPreparedResearchDeadline(context, "statement_investigative_intelligence", async (abortSignal) =>
+          runFeeKnowledgeInvestigativeIntelligence({
+            scope: "statement",
+            analysis: context.analysis,
+            questions: context.packet.research.questions,
+            existingIntelligence,
+            options: {
+              enabled: true,
+              adapter: async (investigativeRequest, investigativeContext) => {
+                if (readiness.status === "unavailable_before_send") throw new Error(readiness.reasonCodes[0] ?? "fee_knowledge_ai_investigative_unavailable_before_send");
+                const response = unwrapExternalRequestResult(
+                  await services.statementInvestigativeIntelligence(investigativeRequest, {
+                    abortSignal: investigativeContext.abortSignal,
+                    approvedCallMetadata: structuredClone(request.approvedCallMetadata),
+                  }),
+                  started,
+                  "investigative_intelligence",
+                );
+                investigativeAccounting = response.accounting;
+                return response.value;
+              },
             },
-          },
-          abortSignal,
-        }));
+            abortSignal,
+          }));
+      } catch (error) {
+        const status = providerFailureStatus(error);
+        const reasonCode = timeoutReasonCode(error) ?? (status === "timed_out"
+          ? "fee_knowledge_statement_investigative_timed_out"
+          : "fee_knowledge_ai_investigative_provider_failed");
+        context.statementInvestigativeCompleted = true;
+        return providerFailureResult({ started, error, reasonCode, scope: "candidate_local" });
+      }
       context.intelligence.push(...records);
       context.statementInvestigativeCompleted = true;
       const generated = investigativeAccounting !== null;
