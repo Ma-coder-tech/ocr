@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { retrieveFeeKnowledgeDocument } from "../src/canonical/feeKnowledgeRetrieval.js";
 import { buildCanonicalClaimSupportDecision } from "../src/canonical/feeKnowledgeClaimSupportDecision.js";
 import { FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION } from "../src/canonical/feeKnowledgeTypes.js";
@@ -16,7 +16,9 @@ import {
   ONE_TIME_RESEARCH_REQUEST_SLOTS,
   buildEvaluationSourceManifest,
   createDeterministicPreflightArtifact,
+  createOneTimeStatementEvaluationTransport,
   livePackage5BProviderSettings,
+  prepareOneTimeStatementEvaluationSource,
   preserveParserDecision,
   projectOneTimeCanonicalAdmissionResult,
   runManifestDrivenLiveEvaluation,
@@ -33,6 +35,8 @@ const eligibleStages: EvaluationExecutionStage[] = [
 ];
 
 describe("Package 5B manifest-driven admission", () => {
+  afterEach(() => vi.useRealTimers());
+
   it("admits a fully validated statement-only review into Package F and persists a verifiable V2 artifact", async () => {
     const fixture = await approvedOneTimePdfFixture();
     const expectedCalls = fullOneTimeCalls();
@@ -1036,6 +1040,70 @@ describe("Package 5B manifest-driven admission", () => {
     });
     expect(admission.researchEvidence.claimSupports).toHaveLength(1);
     expect(admission.package5bWorkPlan?.units.some((unit) => unit.status === "completed")).toBe(true);
+  }, 30_000);
+
+  it("keeps statement investigative timeout capability-local so later statement stages can continue", async () => {
+    const stages: EvaluationExecutionStage[] = [
+      "parser",
+      "statement_investigative_intelligence",
+      ...eligibleStages.filter((stage) => stage !== "parser"),
+    ];
+    const fixture = await approvedOneTimePdfFixture(stages);
+    const manifest = JSON.parse(await readFile(fixture.runnerInput.manifestPath, "utf8"));
+    const prepared = await prepareOneTimeStatementEvaluationSource({
+      manifestRow: manifest.documents[0],
+      verifiedSourceBytes: fixture.bytes,
+      businessType: "restaurant_food_beverage",
+    });
+    const transport = createOneTimeStatementEvaluationTransport({
+      preparedBySource: new Map([["doc_one_time_fiserv", prepared]]),
+      services: {
+        statementInvestigativeIntelligence: async (_request, context) =>
+          new Promise((_, reject) => {
+            context.abortSignal.addEventListener("abort", () => reject(context.abortSignal.reason));
+          }),
+      },
+    });
+
+    vi.useFakeTimers();
+    const invocation = transport({
+      sanitizedPacket: prepared.sanitizedPacket,
+      sourceDocumentId: "doc_one_time_fiserv",
+      stage: "statement_investigative_intelligence",
+      reservedCallId: "package_5b_doc_one_time_fiserv_statement_investigative_intelligence_1",
+      approvedCallMetadata: {
+        callId: "package_5b_doc_one_time_fiserv_statement_investigative_intelligence_1",
+        attempt: 1,
+        retryOfCallId: null,
+        capability: "investigative_intelligence",
+        pricingPolicyRef: "sanitized_pricing_policy_v1",
+        providerRoute: "sanitized_route",
+        provider: "sanitized_provider",
+        model: "sanitized_model",
+        toolClass: "investigative_intelligence",
+        maximumInputTokens: 1000000,
+        maximumOutputTokens: 50000,
+        maximumToolUses: 0,
+        pricing: {
+          uncachedInputUsdPerMillionTokens: 0,
+          cachedInputUsdPerMillionTokens: 0,
+          outputUsdPerMillionTokens: 2,
+          toolUseUsd: 0,
+        },
+        estimatedMaximumCostUsd: 0.5,
+      },
+    });
+    await vi.advanceTimersByTimeAsync(120_000);
+    const result = await invocation;
+
+    expect(result.providerFailure).toMatchObject({
+      status: "timeout",
+      scope: "candidate_local",
+      reasonCode: "fee_knowledge_statement_investigative_timed_out",
+    });
+    expect(result.researchTerminal).toBeUndefined();
+    expect(result.lifecycle?.reasonCodes).toContain("fee_knowledge_statement_investigative_timed_out");
+    expect(result.accounting.billingDisposition).toBe("unknown");
   }, 30_000);
 
   it("withholds admission when an unused second selected candidate fails retrieval", async () => {
