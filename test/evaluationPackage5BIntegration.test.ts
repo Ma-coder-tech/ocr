@@ -337,6 +337,41 @@ describe("Package 5B manifest-driven admission", () => {
     expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
   }, 30_000);
 
+  it("rejects invalid prepared research-question vocabulary before external work begins", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    let externalCalls = 0;
+
+    await expect(runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: adaptiveFollowUpOneTimeCalls(),
+      outputArtifactPath: path.join(fixture.directory, "invalid-question-vocabulary-pre-send.json"),
+      oneTimeResearchQuestionsForTesting: (analysis) => [{
+        ...researchQuestion(analysis),
+        sanitizedQuestionCategory: "published_rate_rule" as any,
+      }],
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async () => {
+          externalCalls += 1;
+          return external([], "request_should_not_run");
+        },
+        documentRetrieval: async () => {
+          externalCalls += 1;
+          throw new Error("retrieval_should_not_run");
+        },
+        semanticVerification: async ({ structuredClaim }) => {
+          externalCalls += 1;
+          return external(semanticSupport(structuredClaim), "request_semantic_should_not_run");
+        },
+        wholeStatementReview: async (packet) => {
+          externalCalls += 1;
+          return external(validReview(packet), "request_whole_should_not_run");
+        },
+      },
+    })).rejects.toThrow("prepared research question failed closed");
+
+    expect(externalCalls).toBe(0);
+  }, 30_000);
+
   it("classifies missing OpenAI readiness before web discovery send without blocking deterministic statement success", async () => {
     const fixture = await approvedOneTimePdfFixture();
     const previousOpenAiKey = process.env.OPENAI_API_KEY;

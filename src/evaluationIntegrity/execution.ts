@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildEvaluationRunIntegrityArtifact, verifyEvaluationRunIntegrityArtifact } from "./artifact.js";
 import {
+  buildEvaluationExpectedResearchQuestionProjection,
   buildEvaluationRunIntegrityArtifactV2,
   verifyEvaluationRunIntegrityArtifactV2,
   writeAndVerifyEvaluationRunIntegrityArtifactV2,
@@ -151,6 +152,9 @@ export async function runManifestDrivenLiveEvaluation(input: {
       });
       assertSnapshotStillMatches(row, snapshot);
       assertSanitizedPacketSourceIdentityExcluded(prepared.sanitizedPacket);
+      if (input.adapterId === "one_time_statement_evaluation_v1" && prepared.oneTime?.privateContext) {
+        buildEvaluationExpectedResearchQuestionProjection(prepared.sanitizedPacket as import("./oneTimeStatementEvaluationAdapter.js").OneTimeStatementEvaluationPacket);
+      }
       await input.afterPacketPreparedForTesting?.(document.sourceDocumentId, structuredClone(prepared.sanitizedPacket));
       preparedSources.push(prepared);
       packets.set(document.sourceDocumentId, prepared.sanitizedPacket);
