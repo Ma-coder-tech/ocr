@@ -381,7 +381,7 @@ describe("fee knowledge intelligence state model", () => {
                 state: "fully_verified",
                 subject: "published_rate",
                 summary: "Unsafe attempt to self-verify.",
-                reasonCodes: ["fee_knowledge_ai_candidate_rate_or_rule", "unsafe-url"],
+                reasonCodes: ["fee_knowledge_ai_candidate_rate_or_rule", "model_invented_but_safe", "unsafe-url"],
                 confidence: "high",
                 actionabilityCeiling: "potentially_actionable",
                 merchantActionability: "merchant_display_verified",
@@ -450,6 +450,12 @@ describe("fee knowledge intelligence state model", () => {
     const required = (bodies[0] as { text: { format: { schema: { properties: { findings: { items: { required: string[] } } } } } } })
       .text.format.schema.properties.findings.items.required;
     expect(required).toContain("locatorTextHash");
+    const reasonCodeSchema = (bodies[0] as {
+      text: { format: { schema: { properties: { findings: { items: { properties: { reasonCodes: { items: { enum: string[]; pattern?: string } } } } } } } } };
+    }).text.format.schema.properties.findings.items.properties.reasonCodes.items;
+    expect(reasonCodeSchema.enum).toContain("fee_knowledge_ai_candidate_rate_or_rule");
+    expect(reasonCodeSchema.enum).not.toContain("model_invented_but_safe");
+    expect(reasonCodeSchema.pattern).toBeUndefined();
   }, 30_000);
 
   it("prioritizes substantive retrieved-document locators over navigation snippets for AI investigation", async () => {
