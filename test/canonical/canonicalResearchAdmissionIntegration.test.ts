@@ -89,6 +89,53 @@ describe("canonical research admission integration", () => {
     expect(validateResearchLinkage(packet)).toEqual([]);
   });
 
+  it("fails closed without orphaning candidate decisions when runtime support linkage is incomplete", async () => {
+    const currentAnalysis = await analysisWithCanonicalFeeRows();
+    const [firstRow] = currentAnalysis.feeLedger.rows;
+    if (!firstRow) throw new Error("expected canonical fee row");
+    const current = question(firstRow.id, firstRow.selectedLabel);
+    const result = await runFeeKnowledgeResearch({
+      analysis: currentAnalysis,
+      questions: [current],
+      options: {
+        enabled: true,
+        timeoutMs: 1000,
+        domainIdentityPolicy: domainPolicy(),
+        resolveHost: async () => ["93.184.216.34"],
+        adapter: async () => [{ url: "https://evidence.test/orphan-linkage", title: "Official guide", publisher: "Fiserv" }],
+        fetchImpl: async () => htmlResponse(`Fiserv official guide explains ${firstRow.selectedLabel} for 2026.`),
+        semanticSupportAdapter: async ({ structuredClaim }) => ({
+          type: "fee_knowledge_semantic_support_decision",
+          policyVersion: FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION,
+          decision: "supports",
+          structuredClaim,
+          reasonCodes: ["synthetic_semantic_support"],
+          providerDetailsStripped: true,
+        }),
+      },
+    });
+    expect(result.candidates[0]?.claimSupportDecisionRef).toMatch(/^claim_support_decision_/);
+    expect(result.claimSupports).toHaveLength(1);
+
+    const packet = buildFeeKnowledgeSourcePacket({
+      analysis: currentAnalysis,
+      registry: null,
+      runtimeClaimSupports: [],
+      researchAttempts: result.attempts,
+      researchCandidates: result.candidates,
+    });
+
+    expect(packet.registryValidation).toMatchObject({
+      status: "invalid",
+      reasonCodes: ["fee_knowledge_runtime_linkage_invalid"],
+    });
+    expect(packet.claimSupports).toEqual([]);
+    expect(packet.researchCandidates).toHaveLength(1);
+    expect(packet.researchCandidates[0]!.claimSupportDecisionRef).toBeNull();
+    expect(packet.researchCandidates[0]!.reasonCodes).toContain("fee_knowledge_runtime_linkage_invalid");
+    expect(validateResearchLinkage(packet)).toEqual([]);
+  });
+
   it("preserves completed records when a later question times out", async () => {
     const questions = [question("feerow_aaaaaaaaaaaaaaaaaaaaaaaa", "Alpha Fee"), question("feerow_bbbbbbbbbbbbbbbbbbbbbbbb", "Beta Fee")];
     let searches = 0;
