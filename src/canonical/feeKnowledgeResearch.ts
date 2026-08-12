@@ -11,6 +11,7 @@ import {
   type FeeKnowledgeDomainIdentityPolicy,
   type FeeKnowledgeEvidenceDecision,
   type FeeKnowledgeIntelligenceRecord,
+  type FeeKnowledgeResolutionRequirement,
   type FeeKnowledgeResearchAttemptRecord,
   type FeeKnowledgeResearchCandidateRecord,
   type FeeKnowledgeSemanticSupportDecision,
@@ -453,8 +454,12 @@ export function buildAdaptiveFeeKnowledgeResearchQuestion(input: {
   parentAttemptId: string;
   candidate: FeeKnowledgeResearchCandidateRecord | null;
   claimSupport: FeeKnowledgeClaimSupportRecord | null;
+  resolutionRequirement?: FeeKnowledgeResolutionRequirement;
 }): FeeKnowledgeResearchQuestion | null {
   if (input.parentQuestion.adaptiveFollowUp) return null;
+  const resolutionRequirement = input.resolutionRequirement ??
+    adaptiveEvidenceResolutionRequirement(input.candidate, input.claimSupport);
+  if (!feeKnowledgeResolutionAllowsAdaptivePublicResearch(resolutionRequirement)) return null;
   const missingDimensions = adaptiveMissingDimensions(input.candidate, input.claimSupport);
   if (missingDimensions.length === 0) return null;
   const triggerReason = adaptiveTriggerReason(missingDimensions);
@@ -470,6 +475,31 @@ export function buildAdaptiveFeeKnowledgeResearchQuestion(input: {
       sourceReasonCodes: adaptiveSourceReasonCodes(input.candidate, input.claimSupport),
     },
   };
+}
+
+export function feeKnowledgeResolutionAllowsAdaptivePublicResearch(
+  requirement: FeeKnowledgeResolutionRequirement,
+): boolean {
+  return requirement === "public_evidence_required" || requirement === "public_evidence_unavailable";
+}
+
+export function adaptiveEvidenceResolutionRequirement(
+  candidate: FeeKnowledgeResearchCandidateRecord | null,
+  claimSupport: FeeKnowledgeClaimSupportRecord | null,
+): FeeKnowledgeResolutionRequirement {
+  if (claimSupport?.structuredClaim.claimKind === "merchant_application") return "merchant_pricing_document_required";
+  if (claimSupport?.rateOrAmountComparison === "matches_published_rule" || claimSupport?.rateOrAmountComparison === "does_not_match_published_rule") {
+    return "current_statement_sufficient";
+  }
+  if (claimSupport && claimSupport.evidenceDecision === "verified_rule" && claimSupport.rateOrAmountComparison === "not_evaluated") {
+    return "deterministic_math_required";
+  }
+  if (candidate?.retrievalStatus && candidate.retrievalStatus !== "retrieved_text") return "public_evidence_unavailable";
+  if (candidate?.safeRetrievalDiagnostics?.httpStatus === 403 || candidate?.reasonCodes.includes("fee_knowledge_http_403")) {
+    return "public_evidence_unavailable";
+  }
+  if (claimSupport) return "public_evidence_required";
+  return "public_evidence_required";
 }
 
 export function adaptiveMissingDimensions(

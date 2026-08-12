@@ -76,6 +76,14 @@ export type FeeKnowledgeIntelligenceProofRequirement =
   | "deterministic_math_required"
   | "external_and_math_required"
   | "human_review_required";
+export type FeeKnowledgeResolutionRequirement =
+  | "current_statement_sufficient"
+  | "public_evidence_required"
+  | "merchant_pricing_document_required"
+  | "additional_statement_history_required"
+  | "deterministic_math_required"
+  | "public_evidence_unavailable"
+  | "unresolved_review_required";
 export type FeeKnowledgeMerchantActionability =
   | "merchant_display_provisional"
   | "merchant_display_supported"
@@ -321,6 +329,7 @@ export type FeeKnowledgeIntelligenceRecord = {
   actionabilityCeiling: CanonicalFeeActionability;
   merchantActionability: FeeKnowledgeMerchantActionability;
   proofRequirement: FeeKnowledgeIntelligenceProofRequirement;
+  resolutionRequirement: FeeKnowledgeResolutionRequirement;
   basis: {
     statementEvidenceRefs: string[];
     researchAttemptRefs: string[];
