@@ -337,6 +337,114 @@ describe("Package 5B manifest-driven admission", () => {
     expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
   }, 30_000);
 
+  it("publishes a verifiable full integrated artifact when semantic evidence is rejected but Package 5B completes", async () => {
+    const stages: EvaluationExecutionStage[] = [
+      ...eligibleStages,
+      "statement_investigative_intelligence",
+      "retrieved_document_investigative_intelligence",
+    ];
+    const fixture = await approvedOneTimePdfFixture(stages);
+    const baseCalls = fullOneTimeCalls();
+    const firstSearch = baseCalls.findIndex((call) => call.stage === "web_search_discovery");
+    const firstRetrieval = baseCalls.findIndex((call) => call.stage === "document_retrieval");
+    const firstSemantic = baseCalls.findIndex((call) => call.stage === "semantic_verification");
+    const firstWhole = baseCalls.findIndex((call) => call.stage === "whole_statement_ai_review");
+    const statementInvestigationCall = {
+      sourceDocumentId: "doc_one_time_fiserv",
+      stage: "statement_investigative_intelligence" as const,
+      reservation: {
+        ...baseCalls[firstWhole]!.reservation,
+        callId: "package_5b_doc_one_time_fiserv_statement_investigative_intelligence_1",
+        capability: "investigative_intelligence" as const,
+        toolClass: "investigative_intelligence",
+      },
+    };
+    const retrievedDocumentInvestigationCall = {
+      sourceDocumentId: "doc_one_time_fiserv",
+      stage: "retrieved_document_investigative_intelligence" as const,
+      reservation: {
+        ...baseCalls[firstWhole]!.reservation,
+        callId: "package_5b_doc_one_time_fiserv_retrieved_document_investigative_intelligence_1",
+        capability: "investigative_intelligence" as const,
+        toolClass: "investigative_intelligence",
+      },
+    };
+    let feeLabel = "fee";
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: [
+        statementInvestigationCall,
+        baseCalls[firstSearch]!,
+        baseCalls[firstRetrieval]!,
+        retrievedDocumentInvestigationCall,
+        baseCalls[firstSemantic]!,
+        baseCalls[firstWhole]!,
+      ],
+      outputArtifactPath: path.join(fixture.directory, "full-integrated-rejected-evidence-package-5b.json"),
+      oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis)],
+      oneTimeServicesForTesting: {
+        statementInvestigativeIntelligence: async ({ questions: [question] }) => external({
+          findings: [{
+            feeRowRef: question!.feeRowRef,
+            state: "investigation_lead",
+            subject: "fee_alias",
+            summary: "Statement terminology may have an industry alias that requires public evidence.",
+            reasonCodes: ["fee_knowledge_ai_alias_hypothesis"],
+            confidence: "low",
+            actionabilityCeiling: "verify_only",
+            merchantActionability: "merchant_display_provisional",
+            proofRequirement: "external_verification_required",
+          }],
+        }, "request_statement_ai_full_integrated"),
+        webSearchDiscovery: async ({ questions: [question] }) => {
+          feeLabel = question!.feeLabel;
+          return external([{ url: "https://www.fiserv.com/official-fee-guide/full-integrated", title: "Official fee guide", publisher: "Fiserv" }], "request_search_full_integrated");
+        },
+        documentRetrieval: async (url) => external(retrievedTextDocument(url, feeLabel), "request_retrieval_full_integrated"),
+        retrievedDocumentInvestigativeIntelligence: async ({ candidate, questions: [question] }) => external({
+          findings: [{
+            feeRowRef: question!.feeRowRef,
+            state: "source_derived_candidate_evidence",
+            subject: "source_relevance",
+            summary: "The retrieved document appears relevant but still requires strict semantic verification.",
+            reasonCodes: ["fee_knowledge_ai_candidate_evidence_locator"],
+            confidence: "low",
+            actionabilityCeiling: "verify_only",
+            merchantActionability: "internal_only",
+            proofRequirement: "external_verification_required",
+            candidateRef: candidate!.candidateId,
+            locatorTextHash: candidate!.retrieved.locators[0]!.textHash,
+            supportStatus: "candidate_only",
+          }],
+        }, "request_retrieved_doc_ai_full_integrated"),
+        semanticVerification: async ({ structuredClaim }) => external({
+          ...semanticSupport(structuredClaim),
+          decision: "unsupported" as const,
+          reasonCodes: ["synthetic_semantic_unsupported"],
+        }, "request_semantic_full_integrated"),
+        wholeStatementReview: async (packet) => external(validReview(packet), "request_whole_full_integrated"),
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    expect(admission.admissionDisposition).toBe("admitted");
+    expect(admission.packageF?.output.reviewStatus).toBe("completed");
+    expect(admission.researchEvidence.intelligence.length).toBeGreaterThan(0);
+    expect(admission.researchEvidence.candidates[0]).toMatchObject({
+      retrievalStatus: "retrieved_text",
+      semanticVerificationStatus: "completed",
+      verificationStatus: "verified_candidate_limited",
+    });
+    expect(admission.researchEvidence.claimSupports[0]).toMatchObject({
+      disposition: "rejected",
+      evidenceDecision: "unsupported",
+    });
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+  }, 30_000);
+
   it("keeps adaptive semantic parse failure terminally coherent without Package 5B", async () => {
     const canaryStages: EvaluationExecutionStage[] = [
       "parser",
