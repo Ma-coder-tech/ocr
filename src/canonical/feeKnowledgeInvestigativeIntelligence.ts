@@ -323,6 +323,7 @@ function safeInvestigativePacket(request: FeeKnowledgeInvestigativeIntelligenceR
       subject: item.subject,
       summary: safeText(item.summary, 180),
       proofRequirement: item.proofRequirement,
+      resolutionRequirement: item.resolutionRequirement,
       claimSupportRefs: item.basis.claimSupportRefs,
     })),
     candidate: request.candidate ? {

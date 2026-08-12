@@ -86,6 +86,15 @@ const INTELLIGENCE_STATES = ["ai_interpretation", "ai_hypothesis", "anomaly_flag
 const INTELLIGENCE_SUBJECTS = ["fee_meaning", "fee_alias", "fee_ownership", "processor_vs_network", "published_rate", "applicability_condition", "markup_hypothesis", "anomaly", "negotiability", "investigation_question", "source_relevance", "conflict"] as const;
 const MERCHANT_ACTIONABILITIES = ["merchant_display_provisional", "merchant_display_supported", "merchant_display_verified", "internal_only", "human_review_only"] as const;
 const PROOF_REQUIREMENTS = ["statement_grounded_labeling_only", "external_verification_required", "deterministic_math_required", "external_and_math_required", "human_review_required"] as const;
+const RESOLUTION_REQUIREMENTS = [
+  "current_statement_sufficient",
+  "public_evidence_required",
+  "merchant_pricing_document_required",
+  "additional_statement_history_required",
+  "deterministic_math_required",
+  "public_evidence_unavailable",
+  "unresolved_review_required",
+] as const;
 const CANDIDATE_EVIDENCE_SUPPORT_STATUSES = ["candidate_only", "semantic_supported", "semantic_rejected", "semantic_not_run", "inapplicable"] as const;
 const MATH_VERIFICATION_STATUSES = ["not_required", "required_not_run", "passed", "failed"] as const;
 const VERIFIED_EVIDENCE_DECISIONS = new Set(["verified_classification", "verified_rule", "verified_application"]);
@@ -280,6 +289,10 @@ const SAFE_RETRIEVAL_OUTCOME_CLASSES = [
 const INTELLIGENCE_KEYS = [
   "intelligenceRef", "feeRowRef", "origin", "state", "subject", "confidence", "actionabilityCeiling", "merchantActionability",
   "proofRequirement", "candidateRefs", "claimSupportRefs", "reasonCodes", "candidateEvidence", "mathVerificationStatus",
+] as const;
+const INTELLIGENCE_KEYS_WITH_RESOLUTION_REQUIREMENT = [
+  "intelligenceRef", "feeRowRef", "origin", "state", "subject", "confidence", "actionabilityCeiling", "merchantActionability",
+  "proofRequirement", "resolutionRequirement", "candidateRefs", "claimSupportRefs", "reasonCodes", "candidateEvidence", "mathVerificationStatus",
 ] as const;
 const CANDIDATE_EVIDENCE_KEYS = ["candidateRef", "documentFingerprint", "locatorHash", "sourceDomain", "supportStatus"] as const;
 const SUPPORT_KEYS = [
@@ -1239,7 +1252,7 @@ function validateClaimSupport(value: unknown): value is Record<string, unknown> 
 }
 
 function validateResearchIntelligence(value: unknown): value is Record<string, unknown> {
-  if (!isRecord(value) || !hasExactKeys(value, INTELLIGENCE_KEYS)) return false;
+  if (!isRecord(value) || (!hasExactKeys(value, INTELLIGENCE_KEYS) && !hasExactKeys(value, INTELLIGENCE_KEYS_WITH_RESOLUTION_REQUIREMENT))) return false;
   if (!INTELLIGENCE_REF.test(stringValue(value.intelligenceRef)) || !FEE_ROW_REF.test(stringValue(value.feeRowRef))) return false;
   if (!enumValue(value.origin, INTELLIGENCE_ORIGINS)
     || !enumValue(value.state, INTELLIGENCE_STATES)
@@ -1249,6 +1262,7 @@ function validateResearchIntelligence(value: unknown): value is Record<string, u
     || !enumValue(value.merchantActionability, MERCHANT_ACTIONABILITIES)
     || !enumValue(value.proofRequirement, PROOF_REQUIREMENTS)
     || !enumValue(value.mathVerificationStatus, MATH_VERIFICATION_STATUSES)) return false;
+  if ("resolutionRequirement" in value && !enumValue(value.resolutionRequirement, RESOLUTION_REQUIREMENTS)) return false;
   if (!safeRefArray(value.candidateRefs, CANDIDATE_REF) || !safeRefArray(value.claimSupportRefs, CLAIM_SUPPORT_REF)) return false;
   if (!closedSetArray(value.reasonCodes, INTELLIGENCE_REASON_CODES) || (value.reasonCodes as string[]).length === 0) return false;
   if (["externally_verified", "math_verified", "fully_verified"].includes(value.state as string)

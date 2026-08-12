@@ -103,6 +103,7 @@ export function projectOneTimeCanonicalAdmissionResult(input: {
     actionabilityCeiling: item.actionabilityCeiling,
     merchantActionability: item.merchantActionability,
     proofRequirement: item.proofRequirement,
+    resolutionRequirement: item.resolutionRequirement,
     candidateRefs: [...item.basis.candidateRefs].sort(),
     claimSupportRefs: [...item.basis.claimSupportRefs].sort(),
     reasonCodes: [...item.reasonCodes].sort(),

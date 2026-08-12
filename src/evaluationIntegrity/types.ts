@@ -17,6 +17,7 @@ import type {
   FeeKnowledgeMerchantActionability,
   FeeKnowledgeResearchAttemptRecord,
   FeeKnowledgeResearchNonSuccessStatus,
+  FeeKnowledgeResolutionRequirement,
   FeeKnowledgeRetrievalSafeDiagnostics,
   FeeKnowledgeRetrievalStatus,
   FeeKnowledgeSemanticSupportDecision,
@@ -681,6 +682,7 @@ export type EvaluationResearchIntelligenceProof = {
   actionabilityCeiling: CanonicalFeeActionability;
   merchantActionability: FeeKnowledgeMerchantActionability;
   proofRequirement: FeeKnowledgeIntelligenceProofRequirement;
+  resolutionRequirement: FeeKnowledgeResolutionRequirement;
   candidateRefs: string[];
   claimSupportRefs: string[];
   reasonCodes: string[];

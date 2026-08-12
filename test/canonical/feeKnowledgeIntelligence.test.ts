@@ -1,15 +1,17 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { buildFeeKnowledgeSourcePacket } from "../../src/canonical/feeKnowledgeRegistry.js";
-import { buildFeeKnowledgeIntelligenceRecord, buildStatementGroundedIntelligence } from "../../src/canonical/feeKnowledgeIntelligence.js";
+import { buildFeeKnowledgeIntelligenceRecord, buildStatementGroundedIntelligence, deriveFeeKnowledgeResolutionRequirement } from "../../src/canonical/feeKnowledgeIntelligence.js";
 import { buildWholeStatementFeeIntelligencePacket } from "../../src/canonical/wholeStatementFeeIntelligenceReview.js";
 import { buildWholeStatementFeeIntelligenceWorkPlan } from "../../src/canonical/wholeStatementFeeIntelligenceWorkPlan.js";
 import { buildCanonicalRuntimeAnalysis } from "../../src/canonical/runtimeAdapter.js";
 import {
   FEE_KNOWLEDGE_RESEARCH_LIMITS,
+  adaptiveEvidenceResolutionRequirement,
   buildAdaptiveFeeKnowledgeResearchQuestion,
   buildFeeKnowledgeWebSearchInput,
   defaultFeeKnowledgeResearchQuestions,
+  feeKnowledgeResolutionAllowsAdaptivePublicResearch,
   planFeeKnowledgeResearchQuestions,
   rankFeeKnowledgeDiscoveryCandidates,
   runFeeKnowledgeResearch,
@@ -44,6 +46,8 @@ describe("fee knowledge intelligence state model", () => {
       expect(questions.length).toBeGreaterThan(0);
       expect(intelligence.length).toBeGreaterThan(0);
       expect(sourcePacket.intelligence.some((item) => item.origin === "statement_grounded")).toBe(true);
+      expect(sourcePacket.intelligence.every((item) => item.resolutionRequirement)).toBe(true);
+      expect(sourcePacket.intelligence.some((item) => item.resolutionRequirement === "public_evidence_required")).toBe(true);
       expect(sourcePacket.claimSupports).toEqual([]);
       expect(analysis.feeLedger.rows.map((row) => ({ id: row.id, amount: row.amount, label: row.selectedLabel })))
         .toEqual(beforeRows);
@@ -108,7 +112,8 @@ describe("fee knowledge intelligence state model", () => {
     expect(research.intelligence.some((item) =>
       item.origin === "retrieved_document" &&
       item.state === "source_derived_candidate_evidence" &&
-      item.candidateEvidence?.supportStatus === "candidate_only"
+      item.candidateEvidence?.supportStatus === "candidate_only" &&
+      item.resolutionRequirement === "public_evidence_required"
     )).toBe(true);
   }, 30_000);
 
@@ -146,7 +151,10 @@ describe("fee knowledge intelligence state model", () => {
 
     expect(sourcePacket.claimSupports).toEqual([]);
     expect(sourcePacket.intelligence.some((item) => item.state === "unresolved_review_needed")).toBe(true);
+    expect(sourcePacket.intelligence.some((item) => item.resolutionRequirement === "unresolved_review_required")).toBe(true);
     expect(plan.units.some((unit) => unit.packet.sourceProvenancePacket.intelligence.length > 0)).toBe(true);
+    expect(plan.units.flatMap((unit) => unit.packet.sourceProvenancePacket.intelligence)
+      .every((item) => item.resolutionRequirement)).toBe(true);
     expect(plan.units.every((unit) => unit.packet.sourceProvenancePacket.claimSupports.length === 0)).toBe(true);
   }, 30_000);
 
@@ -171,10 +179,12 @@ describe("fee knowledge intelligence state model", () => {
       confidence: "medium",
       merchantActionability: "merchant_display_verified",
       proofRequirement: "external_verification_required",
+      resolutionRequirement: "current_statement_sufficient",
     });
     expect(contradiction).toMatchObject({
       merchantActionability: "merchant_display_supported",
       proofRequirement: "external_verification_required",
+      resolutionRequirement: "public_evidence_required",
     });
   }, 30_000);
 
@@ -235,7 +245,8 @@ describe("fee knowledge intelligence state model", () => {
       )).toBe(true);
       expect(research.intelligence.some((item) =>
         item.reasonCodes.includes("fee_knowledge_ai_markup_hypothesis") &&
-        item.proofRequirement === "external_and_math_required"
+        item.proofRequirement === "external_and_math_required" &&
+        item.resolutionRequirement === "merchant_pricing_document_required"
       )).toBe(true);
       expect(analysis.feeLedger.rows.map((row) => ({ id: row.id, amount: row.amount, label: row.selectedLabel })))
         .toEqual(beforeRows);
@@ -394,6 +405,7 @@ describe("fee knowledge intelligence state model", () => {
                 actionabilityCeiling: "potentially_actionable",
                 merchantActionability: "merchant_display_verified",
                 proofRequirement: "external_verification_required",
+                resolutionRequirement: "merchant_document_upload_required",
                 candidateRef: "candidate_aaaaaaaaaaaaaaaa",
                 locatorTextHash: "bad/url",
               },
@@ -411,6 +423,7 @@ describe("fee knowledge intelligence state model", () => {
       reasonCodes: ["fee_knowledge_ai_candidate_rate_or_rule"],
       locatorTextHash: null,
     });
+    expect(parsed.findings[0]).not.toHaveProperty("resolutionRequirement");
   });
 
   it("requests strict structured output for provider-backed investigative intelligence", async () => {
@@ -580,6 +593,47 @@ describe("fee knowledge intelligence state model", () => {
     expect(candidateEvidenceLocatorHash([deterministic, ai], "candidate_1")).toBe("substantive_hash");
   });
 
+  it("derives bounded evidence-resolution requirements and gates adaptive public research", () => {
+    expect(deriveFeeKnowledgeResolutionRequirement({
+      state: "investigation_lead",
+      subject: "markup_hypothesis",
+      proofRequirement: "external_and_math_required",
+    })).toBe("merchant_pricing_document_required");
+    expect(deriveFeeKnowledgeResolutionRequirement({
+      state: "anomaly_flag",
+      subject: "anomaly",
+      proofRequirement: "human_review_required",
+    })).toBe("unresolved_review_required");
+    expect(deriveFeeKnowledgeResolutionRequirement({
+      state: "externally_verified",
+      subject: "published_rate",
+      proofRequirement: "external_verification_required",
+      mathVerification: { status: "required_not_run", deterministicCalculationRef: null },
+    })).toBe("deterministic_math_required");
+    expect(deriveFeeKnowledgeResolutionRequirement({
+      state: "source_derived_candidate_evidence",
+      subject: "published_rate",
+      proofRequirement: "external_verification_required",
+      reasonCodes: ["fee_knowledge_http_403"],
+    })).toBe("public_evidence_unavailable");
+
+    expect(feeKnowledgeResolutionAllowsAdaptivePublicResearch("public_evidence_required")).toBe(true);
+    expect(feeKnowledgeResolutionAllowsAdaptivePublicResearch("public_evidence_unavailable")).toBe(true);
+    expect(feeKnowledgeResolutionAllowsAdaptivePublicResearch("merchant_pricing_document_required")).toBe(false);
+    expect(feeKnowledgeResolutionAllowsAdaptivePublicResearch("additional_statement_history_required")).toBe(false);
+    expect(feeKnowledgeResolutionAllowsAdaptivePublicResearch("deterministic_math_required")).toBe(false);
+
+    expect(adaptiveEvidenceResolutionRequirement(null, {
+      structuredClaim: { claimKind: "merchant_application" },
+      rateOrAmountComparison: "not_evaluated",
+    } as any)).toBe("merchant_pricing_document_required");
+    expect(adaptiveEvidenceResolutionRequirement(null, {
+      structuredClaim: { claimKind: "published_rule" },
+      evidenceDecision: "verified_rule",
+      rateOrAmountComparison: "not_evaluated",
+    } as any)).toBe("deterministic_math_required");
+  });
+
   it("builds bounded adaptive follow-up questions from rejected or inaccessible evidence", async () => {
     const analysis = await analysisFromPdf(STATEMENT_2, "statement_2_adaptive_followup_replay");
     const parentQuestion = defaultFeeKnowledgeResearchQuestions(analysis, null)[0]!;
@@ -638,6 +692,28 @@ describe("fee knowledge intelligence state model", () => {
     ]));
     expect(planFeeKnowledgeResearchQuestions([parentQuestion, rejectedFollowUp!], FEE_KNOWLEDGE_RESEARCH_LIMITS).selected[0]!.question)
       .toBe(rejectedFollowUp);
+
+    expect(buildAdaptiveFeeKnowledgeResearchQuestion({
+      parentQuestion,
+      parentQuestionRef,
+      parentAttemptId: "research_parent",
+      candidate: null,
+      claimSupport: {
+        structuredClaim: { claimKind: "merchant_application" },
+        rateOrAmountComparison: "not_evaluated",
+      } as any,
+    })).toBeNull();
+    expect(buildAdaptiveFeeKnowledgeResearchQuestion({
+      parentQuestion,
+      parentQuestionRef,
+      parentAttemptId: "research_parent",
+      candidate: null,
+      claimSupport: {
+        structuredClaim: { claimKind: "published_rule" },
+        evidenceDecision: "verified_rule",
+        rateOrAmountComparison: "not_evaluated",
+      } as any,
+    })).toBeNull();
   }, 30_000);
 
   it("replays statements #2, #3, #4, and #5 with broader evidence-acquisition planning", async () => {

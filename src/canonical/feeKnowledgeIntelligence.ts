@@ -4,6 +4,7 @@ import {
   FEE_KNOWLEDGE_INTELLIGENCE_POLICY_VERSION,
   type FeeKnowledgeClaimSupportRecord,
   type FeeKnowledgeIntelligenceRecord,
+  type FeeKnowledgeResolutionRequirement,
   type FeeKnowledgeResearchCandidateRecord,
 } from "./feeKnowledgeTypes.js";
 import type { FeeKnowledgeResearchQuestion } from "./feeKnowledgeResearch.js";
@@ -41,6 +42,7 @@ export function buildStatementGroundedIntelligence(input: {
         actionabilityCeiling: "verify_only",
         merchantActionability: "merchant_display_provisional",
         proofRequirement: "statement_grounded_labeling_only",
+        resolutionRequirement: "public_evidence_required",
         statementEvidenceRefs: row.sourceOccurrenceIds ?? [],
       }));
     }
@@ -56,6 +58,7 @@ export function buildStatementGroundedIntelligence(input: {
         actionabilityCeiling: "verify_only",
         merchantActionability: "merchant_display_provisional",
         proofRequirement: "external_and_math_required",
+        resolutionRequirement: "merchant_pricing_document_required",
         statementEvidenceRefs: row.sourceOccurrenceIds ?? [],
       }));
     }
@@ -71,6 +74,7 @@ export function buildStatementGroundedIntelligence(input: {
         actionabilityCeiling: "unknown",
         merchantActionability: "human_review_only",
         proofRequirement: "human_review_required",
+        resolutionRequirement: "additional_statement_history_required",
         statementEvidenceRefs: row.sourceOccurrenceIds ?? [],
       }));
     }
@@ -107,6 +111,7 @@ export function buildRetrievedDocumentIntelligence(input: FeeKnowledgeDocumentIn
       actionabilityCeiling: "verify_only",
       merchantActionability: "internal_only",
       proofRequirement: hasRateLikeTerm ? "external_verification_required" : "human_review_required",
+      resolutionRequirement: hasRateLikeTerm ? "public_evidence_required" : "unresolved_review_required",
       candidateRef: input.candidateId,
       researchAttemptRefs: [input.attemptId],
       candidateEvidence: {
@@ -129,6 +134,7 @@ export function buildRetrievedDocumentIntelligence(input: FeeKnowledgeDocumentIn
       actionabilityCeiling: "unknown",
       merchantActionability: "internal_only",
       proofRequirement: "human_review_required",
+      resolutionRequirement: "unresolved_review_required",
       candidateRef: input.candidateId,
       researchAttemptRefs: [input.attemptId],
       candidateEvidence: {
@@ -152,6 +158,8 @@ export function buildIntelligenceFromClaimSupport(input: {
     input.support.evidenceDecision === "verified_application";
   const rateCompared = input.support.rateOrAmountComparison === "matches_published_rule" ||
     input.support.rateOrAmountComparison === "does_not_match_published_rule";
+  const remainingMathRequired = input.support.structuredClaim.claimKind === "published_rule" &&
+    input.support.rateOrAmountComparison === "not_evaluated";
   return buildFeeKnowledgeIntelligenceRecord({
     feeRowRef: input.support.feeRowRef,
     origin: rateCompared ? "deterministic_math" : "semantic_verification",
@@ -165,6 +173,13 @@ export function buildIntelligenceFromClaimSupport(input: {
     actionabilityCeiling: input.support.actionabilityCeiling,
     merchantActionability: verified ? "merchant_display_verified" : "merchant_display_supported",
     proofRequirement: rateCompared ? "external_and_math_required" : "external_verification_required",
+    resolutionRequirement: verified && rateCompared
+      ? "current_statement_sufficient"
+      : verified && remainingMathRequired
+        ? "deterministic_math_required"
+        : verified
+          ? "current_statement_sufficient"
+        : "public_evidence_required",
     candidateRef: input.support.candidateId ?? undefined,
     claimSupportRefs: [input.support.claimSupportId],
     candidateEvidence: input.support.candidateId ? {
@@ -199,6 +214,7 @@ export function buildFeeKnowledgeIntelligenceRecord(input: {
   deterministicFactRefs?: readonly string[];
   candidateEvidence?: FeeKnowledgeIntelligenceRecord["candidateEvidence"];
   mathVerification?: FeeKnowledgeIntelligenceRecord["mathVerification"];
+  resolutionRequirement?: FeeKnowledgeResolutionRequirement;
 }): FeeKnowledgeIntelligenceRecord {
   const payload = {
     feeRowRef: input.feeRowRef,
@@ -216,6 +232,7 @@ export function buildFeeKnowledgeIntelligenceRecord(input: {
     },
     candidateEvidence: input.candidateEvidence ?? null,
     mathVerification: input.mathVerification ?? { status: "not_required" as const, deterministicCalculationRef: null },
+    resolutionRequirement: input.resolutionRequirement ?? deriveFeeKnowledgeResolutionRequirement(input),
   };
   return {
     type: "fee_knowledge_intelligence",
@@ -226,9 +243,38 @@ export function buildFeeKnowledgeIntelligenceRecord(input: {
     actionabilityCeiling: input.actionabilityCeiling,
     merchantActionability: input.merchantActionability,
     proofRequirement: input.proofRequirement,
+    resolutionRequirement: payload.resolutionRequirement,
     supersededByIntelligenceRef: null,
     displayPermission: input.merchantActionability.startsWith("merchant_display") ? "human_review_required" : "internal_only",
   };
+}
+
+export function deriveFeeKnowledgeResolutionRequirement(input: {
+  state: FeeKnowledgeIntelligenceRecord["state"];
+  subject: FeeKnowledgeIntelligenceRecord["subject"];
+  proofRequirement: FeeKnowledgeIntelligenceRecord["proofRequirement"];
+  reasonCodes?: readonly string[];
+  candidateEvidence?: FeeKnowledgeIntelligenceRecord["candidateEvidence"];
+  mathVerification?: FeeKnowledgeIntelligenceRecord["mathVerification"];
+}): FeeKnowledgeResolutionRequirement {
+  const reasonCodes = new Set(input.reasonCodes ?? []);
+  if ([...reasonCodes].some((code) => /(?:http_403|source_unavailable|inaccessible|retrieval.*unavailable)/i.test(code))) {
+    return "public_evidence_unavailable";
+  }
+  if (input.state === "fully_verified" || input.state === "math_verified") return "current_statement_sufficient";
+  if (input.proofRequirement === "deterministic_math_required") return "deterministic_math_required";
+  if (input.mathVerification?.status === "required_not_run" || input.mathVerification?.status === "failed") {
+    return "deterministic_math_required";
+  }
+  if (input.subject === "markup_hypothesis" || input.subject === "negotiability") {
+    return "merchant_pricing_document_required";
+  }
+  if (input.proofRequirement === "external_and_math_required") {
+    return input.candidateEvidence?.supportStatus === "semantic_supported" ? "deterministic_math_required" : "merchant_pricing_document_required";
+  }
+  if (input.proofRequirement === "external_verification_required") return "public_evidence_required";
+  if (input.proofRequirement === "human_review_required") return "unresolved_review_required";
+  return "current_statement_sufficient";
 }
 
 function dedupe(records: FeeKnowledgeIntelligenceRecord[]): FeeKnowledgeIntelligenceRecord[] {
