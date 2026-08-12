@@ -87,7 +87,7 @@ export function projectOneTimeCanonicalAdmissionResult(input: {
     questionRef: candidate.questionRef,
     feeRowRef: candidate.feeRowRef,
     verificationStatus: candidate.verificationStatus,
-    retrievalStatus: candidate.retrievalStatus === "not_started" ? "failed" as const : candidate.retrievalStatus,
+    retrievalStatus: candidate.retrievalStatus,
     semanticVerificationStatus: candidate.semanticVerificationStatus,
     claimSupportRefs: [...(supportsByCandidate.get(candidate.candidateId) ?? [])].sort(),
     reasonCodes: [...candidate.reasonCodes].sort(),

@@ -1031,6 +1031,7 @@ describe("Evaluation Run Integrity Artifact V2", () => {
 
   it("requires exact retrieval reason families for every candidate retrieval state", () => {
     const cases = [
+      { retrievalStatus: "not_started", semanticVerificationStatus: "not_started", verificationStatus: "provisional", reasonCodes: ["fee_knowledge_retrieval_not_started", "fee_knowledge_semantic_support_not_run"] },
       { retrievalStatus: "retrieved_text", semanticVerificationStatus: "completed", verificationStatus: "verified_candidate_limited", reasonCodes: ["fee_knowledge_text_retrieved", "fee_knowledge_unsupported"] },
       { retrievalStatus: "retrieval_succeeded_text_unavailable", semanticVerificationStatus: "not_started", verificationStatus: "source_unavailable", reasonCodes: ["fee_knowledge_semantic_support_not_run", "fee_knowledge_text_unavailable"] },
       { retrievalStatus: "unavailable", semanticVerificationStatus: "not_started", verificationStatus: "rejected", reasonCodes: ["fee_knowledge_http_404", "fee_knowledge_semantic_support_not_run"] },

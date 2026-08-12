@@ -390,6 +390,7 @@ async function executeEvaluationCall(input: {
         ...(childBudgetController ? { childBudgetController } : {}),
       });
     } catch (error) {
+      if (!isReserved(input.ledger, call.reservation.callId)) return { action: "continue" };
       const failure = providerFailure(error, Math.max(0, Date.now() - started));
       const costExceeded = finalizeCallOrDetectCostOverrun(input.ledger, call.reservation.callId, {
         ...failure.accounting,
@@ -421,6 +422,8 @@ async function executeEvaluationCall(input: {
       if (input.adapterId === "one_time_statement_evaluation_v1") return { action: "continue", finalStatus: sourceStatus, reasonCodes: [reasonCode] };
       return { action: "break", finalStatus: sourceStatus, reasonCodes: [reasonCode] };
     }
+
+    if (!isReserved(input.ledger, call.reservation.callId)) return { action: "continue" };
 
     if (result.providerFailure) {
       const costExceeded = finalizeCallOrDetectCostOverrun(input.ledger, call.reservation.callId, {
@@ -919,6 +922,10 @@ function recordFailedLifecycle(
       providerRequestRef: providerRef,
     }));
   }
+}
+
+function isReserved(ledger: EvaluationCostBudgetLedger, callId: string): boolean {
+  return ledger.snapshot().entries.some((entry) => entry.callId === callId && entry.status === "reserved");
 }
 
 function cancelReservedCalls(

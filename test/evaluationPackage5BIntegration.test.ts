@@ -2091,6 +2091,94 @@ describe("Package 5B manifest-driven admission", () => {
     expect(result.artifact.providerCallOutcomes.some((outcome) => outcome.stage === "whole_statement_ai_review" && outcome.status === "success")).toBe(true);
   }, 30_000);
 
+  it("aborts hung concurrent web searches at the per-call liveness boundary and releases slots", async () => {
+    const fixture = await approvedShortCloverPdfFixture();
+    const previousTimeoutMs = LIVE_EVALUATION_TIMEOUT_POLICY.perCallMs.web_search_discovery;
+    (LIVE_EVALUATION_TIMEOUT_POLICY.perCallMs as any).web_search_discovery = 25;
+    const active = new Set<number>();
+    let maxActive = 0;
+    let aborted = 0;
+    let searchCalls = 0;
+    let wholeStatementCalls = 0;
+
+    try {
+      const result = await runManifestDrivenLiveEvaluation({
+        ...fixture.runnerInput,
+        calls: fullOneTimeCalls("doc_one_time_clover_short"),
+        outputArtifactPath: path.join(fixture.directory, "package-5b-hung-web-search.json"),
+        oneTimeResearchLimitsForTesting: {
+          policyVersion: "fee_knowledge_research_policy_v1",
+          maxSearchCalls: 3,
+          maxAdaptiveFollowUpCalls: 0,
+          maxRetrievalCandidates: 3,
+          maxAdaptiveFollowUpCandidates: 0,
+          totalDeadlineMs: 5000,
+          maxResultCandidatesPerSearch: 1,
+        },
+        oneTimeResearchQuestionsForTesting: (analysis) => [
+          researchQuestion(analysis, 0),
+          researchQuestion(analysis, 1),
+          researchQuestion(analysis, 2),
+        ],
+        oneTimeServicesForTesting: {
+          webSearchDiscovery: async (_request, context) => {
+            const ordinal = searchCalls++;
+            active.add(ordinal);
+            maxActive = Math.max(maxActive, active.size);
+            if (ordinal === 1) {
+              await delay(10);
+              active.delete(ordinal);
+              return external([
+                { url: "https://www.fiserv.com/hung-search/fast", title: "Official fee guide", publisher: "Fiserv" },
+              ], "request_search_hung_fast");
+            }
+            return new Promise((_resolve, reject) => {
+              context.abortSignal.addEventListener("abort", () => {
+                aborted += 1;
+                active.delete(ordinal);
+                reject(context.abortSignal.reason);
+              }, { once: true });
+            });
+          },
+          documentRetrieval: async (url) => external(retrievedTextDocument(url, "official fee"), "request_retrieval_after_hung_search"),
+          semanticVerification: async ({ structuredClaim }) => external(semanticSupport(structuredClaim), "request_semantic_after_hung_search"),
+          wholeStatementReview: async (packet, context) => {
+            wholeStatementCalls += 1;
+            return wholeStatementExternal(validReview(packet), "request_whole_after_hung_search", context);
+          },
+        },
+      });
+
+      expect(searchCalls).toBe(3);
+      expect(maxActive).toBe(3);
+      expect(aborted).toBe(2);
+      expect(active.size).toBe(0);
+      expect(wholeStatementCalls).toBeGreaterThan(0);
+      expect(result.finalStatus).toBe("completed");
+      expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+      if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+      const admission = result.artifact.canonicalAdmissionResults[0]!;
+      expect(admission.researchEvidence.attempts
+        .sort((left, right) => left.questionOrdinal - right.questionOrdinal)
+        .map((attempt) => attempt.status)).toEqual(["timed_out", "completed", "timed_out"]);
+      expect(result.providerCallOutcomes.filter((outcome) =>
+        outcome.stage === "web_search_discovery" && outcome.status === "timeout",
+      )).toHaveLength(2);
+      expect(result.providerCallOutcomes.some((outcome) =>
+        outcome.stage === "web_search_discovery" && outcome.status === "success",
+      )).toBe(true);
+      expect(result.costLedger.entries.filter((entry) =>
+        entry.capability === "web_search" && entry.status === "timeout" && entry.billingDisposition === "unknown",
+      )).toHaveLength(2);
+      expect(result.costLedger.entries.some((entry) =>
+        entry.capability === "web_search" && entry.requestId === "request_search_hung_fast" && entry.billingDisposition === "observed",
+      )).toBe(true);
+      expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+    } finally {
+      (LIVE_EVALUATION_TIMEOUT_POLICY.perCallMs as any).web_search_discovery = previousTimeoutMs;
+    }
+  }, 30_000);
+
   it("overlaps independent initial web searches and globally caps retained candidates deterministically", async () => {
     const fixture = await approvedShortCloverPdfFixture();
     const active = new Set<number>();
@@ -2150,6 +2238,83 @@ describe("Package 5B manifest-driven admission", () => {
       [...admission.researchEvidence.candidates.map((candidate) => candidate.candidateRef)].sort(),
     );
     expect(started.length).toBe(3);
+  }, 30_000);
+
+  it("processes adaptive candidates after unused initial retrieval slots without invalid not-started projection", async () => {
+    const fixture = await approvedShortCloverPdfFixture();
+    const retrievedUrls: string[] = [];
+    const semanticUrls: string[] = [];
+    const allCalls = fullOneTimeCalls("doc_one_time_clover_short");
+    const webSearchCalls = allCalls.filter((call) => call.stage === "web_search_discovery");
+    const retrievalCalls = allCalls.filter((call) => call.stage === "document_retrieval");
+    const semanticCalls = allCalls.filter((call) => call.stage === "semantic_verification");
+    const wholeStatementCalls = allCalls.filter((call) => call.stage === "whole_statement_ai_review");
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: [
+        webSearchCalls[0]!,
+        ...retrievalCalls.slice(0, 8),
+        ...semanticCalls.slice(0, 8),
+        webSearchCalls[1]!,
+        ...retrievalCalls.slice(8),
+        ...semanticCalls.slice(8),
+        ...wholeStatementCalls,
+      ],
+      outputArtifactPath: path.join(fixture.directory, "package-5b-adaptive-after-unused-slots.json"),
+      oneTimeResearchLimitsForTesting: {
+        policyVersion: "fee_knowledge_research_policy_v1",
+        maxSearchCalls: 1,
+        maxAdaptiveFollowUpCalls: 1,
+        maxRetrievalCandidates: 3,
+        maxAdaptiveFollowUpCandidates: 2,
+        totalDeadlineMs: 5000,
+        maxResultCandidatesPerSearch: 2,
+      },
+      oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis, 0)],
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async ({ questions: [question] }) => {
+          if (question!.adaptiveFollowUp) {
+            return external([
+              { url: "https://www.fiserv.com/adaptive/follow-up-a", title: "Official adaptive fee guide A", publisher: "Fiserv" },
+              { url: "https://www.fiserv.com/adaptive/follow-up-b", title: "Official adaptive fee guide B", publisher: "Fiserv" },
+            ], "request_search_adaptive_follow_up");
+          }
+          return external([
+            { url: "https://www.fiserv.com/adaptive/primary-403", title: "Official primary fee guide", publisher: "Fiserv" },
+          ], "request_search_adaptive_primary");
+        },
+        documentRetrieval: async (url) => {
+          retrievedUrls.push(url);
+          if (url.endsWith("primary-403")) {
+            return external({
+              ...textUnavailableDocument(url),
+              status: "unavailable" as const,
+              reasonCodes: ["fee_knowledge_http_403"],
+            }, "request_retrieval_adaptive_primary_403");
+          }
+          return external(retrievedTextDocument(url, "official fee"), `request_retrieval_adaptive_${url.split("/").pop()}`);
+        },
+        semanticVerification: async (request) => {
+          semanticUrls.push(request.documentFingerprint);
+          return external(semanticSupport(request.structuredClaim), `request_semantic_adaptive_${semanticUrls.length}`);
+        },
+        wholeStatementReview: async (packet, context) => wholeStatementExternal(validReview(packet), "request_whole_after_adaptive_slots", context),
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    expect(admission.researchEvidence.attempts.map((attempt) => attempt.status)).toEqual(["completed", "completed"]);
+    expect([...retrievedUrls].sort()).toEqual([
+      "https://www.fiserv.com/adaptive/follow-up-a",
+      "https://www.fiserv.com/adaptive/follow-up-b",
+      "https://www.fiserv.com/adaptive/primary-403",
+    ].sort());
+    expect(admission.researchEvidence.candidates.filter((candidate) => candidate.retrievalStatus === "not_started")).toHaveLength(0);
+    expect(admission.researchEvidence.candidates.filter((candidate) => candidate.retrievalStatus === "retrieved_text")).toHaveLength(2);
+    expect(admission.researchEvidence.candidates.filter((candidate) => candidate.semanticVerificationStatus === "completed")).toHaveLength(2);
   }, 30_000);
 
   it("preserves completed research and ignores a late abort-insensitive semantic result", async () => {
