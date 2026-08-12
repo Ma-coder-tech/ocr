@@ -1,4 +1,6 @@
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { validateTypedAiCapabilityOutput } from "../canonical/aiCapabilityOutputs.js";
 import { CANONICAL_AI_ADMISSION_REASON_CODES } from "../canonical/aiAdmissionDiagnostics.js";
@@ -396,7 +398,10 @@ export function buildEvaluationRunIntegrityArtifactV2(
     canonicalAdmissionResults: results,
   } as const;
   const artifact: EvaluationRunIntegrityArtifactV2 = { ...content, artifactContentHash: sha256Canonical(content) };
-  if (!verifyEvaluationRunIntegrityArtifactV2(artifact)) throw new Error("Evaluation Artifact V2 validation failed closed.");
+  if (!verifyEvaluationRunIntegrityArtifactV2(artifact)) {
+    writeInvalidArtifactDebugSnapshot(artifact);
+    throw new Error("Evaluation Artifact V2 validation failed closed.");
+  }
   return artifact;
 }
 
@@ -437,6 +442,32 @@ function debugReject(stage: string): false {
     console.error(`[evaluation-artifact-v2] rejected at ${stage}`);
   }
   return false;
+}
+
+function debugInvalid(stage: string): boolean {
+  debugReject(stage);
+  return false;
+}
+
+function writeInvalidArtifactDebugSnapshot(artifact: EvaluationRunIntegrityArtifactV2): void {
+  const outputDir = process.env.EVALUATION_ARTIFACT_INVALID_DEBUG_DIR?.trim();
+  if (!outputDir) return;
+  try {
+    if (!path.isAbsolute(outputDir)) return;
+    const repositoryRoot = realpathSync(process.cwd());
+    const resolvedOutputDir = path.resolve(outputDir);
+    const relative = path.relative(repositoryRoot, resolvedOutputDir);
+    if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) return;
+    mkdirSync(outputDir, { recursive: true });
+    const digest = createHash("sha256").update(JSON.stringify(artifact)).digest("hex").slice(0, 16);
+    writeFileSync(
+      path.join(outputDir, `invalid-evaluation-artifact-v2-${digest}.json`),
+      `${JSON.stringify(artifact, null, 2)}\n`,
+      { mode: 0o600 },
+    );
+  } catch {
+    // Debug snapshots must never mask the fail-closed validation result.
+  }
 }
 
 export function verifyEvaluationRunIntegrityArtifactByType(value: unknown): value is EvaluationRunIntegrityArtifact | EvaluationRunIntegrityArtifactV2 {
@@ -1108,7 +1139,7 @@ function validateResearchProof(
   let retainedCandidateCount = 0;
   let completedAdaptiveAttemptCount = 0;
   for (const item of value.attempts) {
-    if (!isRecord(item) || !hasExactKeys(item, ATTEMPT_KEYS) || !RESEARCH_ATTEMPT_REF.test(stringValue(item.researchAttemptRef)) || !QUESTION_REF.test(stringValue(item.questionRef)) || !FEE_ROW_REF.test(stringValue(item.feeRowRef)) || !enumValue(item.status, ATTEMPT_STATUSES) || !Number.isInteger(item.resultCount) || item.resultCount < 0 || !safeRefArray(item.candidateRefs, CANDIDATE_REF) || attempts.has(item.researchAttemptRef as string) || questions.has(item.questionRef as string)) return false;
+    if (!isRecord(item) || !hasExactKeys(item, ATTEMPT_KEYS) || !RESEARCH_ATTEMPT_REF.test(stringValue(item.researchAttemptRef)) || !QUESTION_REF.test(stringValue(item.questionRef)) || !FEE_ROW_REF.test(stringValue(item.feeRowRef)) || !enumValue(item.status, ATTEMPT_STATUSES) || !Number.isInteger(item.resultCount) || item.resultCount < 0 || !safeRefArray(item.candidateRefs, CANDIDATE_REF) || attempts.has(item.researchAttemptRef as string) || questions.has(item.questionRef as string)) return debugInvalid("research_attempt_shape");
     const expectedQuestion = expectedQuestions.get(item.questionRef as string);
     if (!expectedQuestion
       || item.feeRowRef !== expectedQuestion.feeRowRef
@@ -1116,7 +1147,7 @@ function validateResearchProof(
       || item.sanitizedQuestionCategory !== expectedQuestion.sanitizedQuestionCategory
       || item.triggerReason !== expectedQuestion.triggerReason) return false;
     const allowedReasons = ATTEMPT_REASON_BY_STATUS[item.status as keyof typeof ATTEMPT_REASON_BY_STATUS] as readonly string[];
-    if (item.resultCount !== item.candidateRefs.length || !safeCodeArray(item.reasonCodes) || item.reasonCodes.length !== 1 || !allowedReasons.includes(item.reasonCodes[0])) return false;
+    if (item.resultCount !== item.candidateRefs.length || !safeCodeArray(item.reasonCodes) || item.reasonCodes.length !== 1 || !allowedReasons.includes(item.reasonCodes[0])) return debugInvalid("research_attempt_reason");
     const candidateRetentionAllowed = ["completed", "failed", "timed_out", "safety_blocked"].includes(item.status as string);
     if (!candidateRetentionAllowed && item.resultCount !== 0) return false;
     const adaptiveTrigger = String(expectedQuestion.triggerReason).startsWith("adaptive_");
@@ -1128,43 +1159,43 @@ function validateResearchProof(
       } else if (["budget_exhausted", "not_selected_planning"].includes(item.status as string)) return false;
     }
     if (candidateRetentionAllowed) {
-      if (item.resultCount > expectedResearchQuestions.limits.maxResultCandidatesPerSearch) return false;
+      if (item.resultCount > expectedResearchQuestions.limits.maxResultCandidatesPerSearch) return debugInvalid("research_attempt_candidate_limit");
       retainedCandidateCount += item.resultCount as number;
     }
     for (const ref of item.candidateRefs as string[]) if (candidateParents.has(ref)) return false; else candidateParents.set(ref, item.researchAttemptRef as string);
     questions.add(item.questionRef as string);
     attempts.set(item.researchAttemptRef as string, item);
   }
-  if (completedAdaptiveAttemptCount > (expectedResearchQuestions.limits.maxAdaptiveFollowUpCalls ?? 0)) return false;
-  if (retainedCandidateCount > expectedResearchQuestions.limits.maxRetrievalCandidates) return false;
-  if (!setEquals(questions, new Set(expectedQuestions.keys()))) return false;
+  if (completedAdaptiveAttemptCount > (expectedResearchQuestions.limits.maxAdaptiveFollowUpCalls ?? 0)) return debugInvalid("research_adaptive_attempt_limit");
+  if (retainedCandidateCount > expectedResearchQuestions.limits.maxRetrievalCandidates) return debugInvalid("research_candidate_limit");
+  if (!setEquals(questions, new Set(expectedQuestions.keys()))) return debugInvalid("research_question_population");
   for (const item of value.candidates) {
     const candidateKeysValid = isRecord(item) && (hasExactKeys(item, CANDIDATE_KEYS) || hasExactKeys(item, CANDIDATE_KEYS_WITH_SAFE_RETRIEVAL_DIAGNOSTICS));
-    if (!candidateKeysValid || !CANDIDATE_REF.test(stringValue(item.candidateRef)) || !RESEARCH_ATTEMPT_REF.test(stringValue(item.researchAttemptRef)) || !QUESTION_REF.test(stringValue(item.questionRef)) || !FEE_ROW_REF.test(stringValue(item.feeRowRef)) || !enumValue(item.verificationStatus, CANDIDATE_STATUSES) || !enumValue(item.retrievalStatus, RETRIEVAL_STATUSES) || !enumValue(item.semanticVerificationStatus, SEMANTIC_STATUSES) || !safeRefArray(item.claimSupportRefs, CLAIM_SUPPORT_REF) || !closedSetArray(item.reasonCodes, CANDIDATE_REASON_CODES) || (item.reasonCodes as string[]).length === 0 || !validateSafeRetrievalDiagnostics(item) || candidates.has(item.candidateRef as string)) return false;
-    if (!validateCandidateState(item)) return false;
+    if (!candidateKeysValid || !CANDIDATE_REF.test(stringValue(item.candidateRef)) || !RESEARCH_ATTEMPT_REF.test(stringValue(item.researchAttemptRef)) || !QUESTION_REF.test(stringValue(item.questionRef)) || !FEE_ROW_REF.test(stringValue(item.feeRowRef)) || !enumValue(item.verificationStatus, CANDIDATE_STATUSES) || !enumValue(item.retrievalStatus, RETRIEVAL_STATUSES) || !enumValue(item.semanticVerificationStatus, SEMANTIC_STATUSES) || !safeRefArray(item.claimSupportRefs, CLAIM_SUPPORT_REF) || !closedSetArray(item.reasonCodes, CANDIDATE_REASON_CODES) || (item.reasonCodes as string[]).length === 0 || !validateSafeRetrievalDiagnostics(item) || candidates.has(item.candidateRef as string)) return debugInvalid("research_candidate_shape");
+    if (!validateCandidateState(item)) return debugInvalid("research_candidate_state");
     const parent = attempts.get(item.researchAttemptRef as string);
-    if (!parent || candidateParents.get(item.candidateRef as string) !== item.researchAttemptRef || parent.questionRef !== item.questionRef || parent.feeRowRef !== item.feeRowRef) return false;
+    if (!parent || candidateParents.get(item.candidateRef as string) !== item.researchAttemptRef || parent.questionRef !== item.questionRef || parent.feeRowRef !== item.feeRowRef) return debugInvalid("research_candidate_parentage");
     for (const ref of item.claimSupportRefs as string[]) if (supportParents.has(ref)) return false; else supportParents.set(ref, item.candidateRef as string);
     candidates.set(item.candidateRef as string, item);
   }
   for (const item of value.claimSupports) {
-    if (!validateClaimSupport(item) || supports.has(item.claimSupportRef as string)) return false;
+    if (!validateClaimSupport(item) || supports.has(item.claimSupportRef as string)) return debugInvalid("research_claim_support_shape");
     if (item.origin === "runtime_research") {
       const parent = candidates.get(item.candidateRef as string);
-      if (!parent || supportParents.get(item.claimSupportRef as string) !== item.candidateRef || parent.researchAttemptRef !== item.researchAttemptRef || parent.questionRef !== item.questionRef || parent.feeRowRef !== item.feeRowRef) return false;
-    } else if (supportParents.has(item.claimSupportRef as string)) return false;
+      if (!parent || supportParents.get(item.claimSupportRef as string) !== item.candidateRef || parent.researchAttemptRef !== item.researchAttemptRef || parent.questionRef !== item.questionRef || parent.feeRowRef !== item.feeRowRef) return debugInvalid("research_claim_support_parentage");
+    } else if (supportParents.has(item.claimSupportRef as string)) return debugInvalid("research_claim_support_parented_approved");
     supports.set(item.claimSupportRef as string, item);
   }
   for (const item of intelligenceItems) {
-    if (!validateResearchIntelligence(item) || intelligenceRefs.has(item.intelligenceRef as string)) return false;
-    if ((item.candidateRefs as string[]).some((ref) => !candidates.has(ref))) return false;
-    if ((item.claimSupportRefs as string[]).some((ref) => !supports.has(ref))) return false;
+    if (!validateResearchIntelligence(item) || intelligenceRefs.has(item.intelligenceRef as string)) return debugInvalid("research_intelligence_shape");
+    if ((item.candidateRefs as string[]).some((ref) => !candidates.has(ref))) return debugInvalid("research_intelligence_candidate_ref");
+    if ((item.claimSupportRefs as string[]).some((ref) => !supports.has(ref))) return debugInvalid("research_intelligence_support_ref");
     if (item.candidateEvidence !== null) {
       const evidence = item.candidateEvidence as Record<string, unknown>;
-      if (!candidates.has(evidence.candidateRef as string)) return false;
+      if (!candidates.has(evidence.candidateRef as string)) return debugInvalid("research_intelligence_candidate_evidence_ref");
     }
     if (["externally_verified", "math_verified", "fully_verified"].includes(item.state as string)
-      && (item.claimSupportRefs as string[]).length === 0) return false;
+      && (item.claimSupportRefs as string[]).length === 0) return debugInvalid("research_intelligence_verified_without_support");
     intelligenceRefs.add(item.intelligenceRef as string);
   }
   for (const attempt of attempts.values()) if ((attempt.candidateRefs as string[]).some((ref) => !candidates.has(ref))) return false;
@@ -1523,16 +1554,16 @@ function validateFinancialInvarianceResult(value: unknown): boolean {
 }
 
 function validateTrustedV1Fields(value: Record<string, unknown>): boolean {
-  if (value.manifestVersion !== "evaluation_source_manifest_v1" || value.manifestHash !== value.approvedManifestHash || !SHA256.test(stringValue(value.manifestHash))) return false;
-  if (!Array.isArray(value.sourceIdentity) || !Array.isArray(value.deduplicationDecisions) || !Array.isArray(value.parserDecisions) || !Array.isArray(value.packageFinancialInvariance) || !Array.isArray(value.providerCallOutcomes)) return false;
-  if (!isRecord(value.parentPreflightProof) || !hasExactKeys(value.parentPreflightProof, ["artifactId", "recordedHash", "reconstructedHash", "verified"]) || value.parentPreflightProof.verified !== true || value.parentPreflightProof.recordedHash !== value.parentPreflightProof.reconstructedHash) return false;
+  if (value.manifestVersion !== "evaluation_source_manifest_v1" || value.manifestHash !== value.approvedManifestHash || !SHA256.test(stringValue(value.manifestHash))) return debugInvalid("v1_manifest_identity");
+  if (!Array.isArray(value.sourceIdentity) || !Array.isArray(value.deduplicationDecisions) || !Array.isArray(value.parserDecisions) || !Array.isArray(value.packageFinancialInvariance) || !Array.isArray(value.providerCallOutcomes)) return debugInvalid("v1_arrays");
+  if (!isRecord(value.parentPreflightProof) || !hasExactKeys(value.parentPreflightProof, ["artifactId", "recordedHash", "reconstructedHash", "verified"]) || value.parentPreflightProof.verified !== true || value.parentPreflightProof.recordedHash !== value.parentPreflightProof.reconstructedHash) return debugInvalid("v1_parent_preflight");
   const sourceIds = value.sourceIdentity.map((row) => isRecord(row) ? stringValue(row.sourceDocumentId) : "");
-  if (!sourceIds.every(Boolean) || new Set(sourceIds).size !== sourceIds.length) return false;
-  if (!isRecord(value.lifecycleLedger) || value.lifecycleLedger.type !== "evaluation_lifecycle_ledger_v1" || !Array.isArray(value.lifecycleLedger.documents)) return false;
-  if (!isRecord(value.executionPermit) || value.executionPermit.type !== "approved_evaluation_execution_permit_v1" || value.executionPermit.manifestPath !== "internal:approved_manifest") return false;
-  if (value.executionPermit.approvedManifestHash !== value.manifestHash || value.executionPermit.recalculatedManifestHash !== value.manifestHash) return false;
-  if (!isRecord(value.costBudgetLedger) || value.costBudgetLedger.type !== "evaluation_cost_budget_ledger_v2") return false;
-  if (!enumValue(value.finalStatus, ["completed", "blocked", "failed", "timed_out"]) || !safeCodeArray(value.reasonCodes)) return false;
+  if (!sourceIds.every(Boolean) || new Set(sourceIds).size !== sourceIds.length) return debugInvalid("v1_source_ids");
+  if (!isRecord(value.lifecycleLedger) || value.lifecycleLedger.type !== "evaluation_lifecycle_ledger_v1" || !Array.isArray(value.lifecycleLedger.documents)) return debugInvalid("v1_lifecycle_shape");
+  if (!isRecord(value.executionPermit) || value.executionPermit.type !== "approved_evaluation_execution_permit_v1" || value.executionPermit.manifestPath !== "internal:approved_manifest") return debugInvalid("v1_execution_permit_shape");
+  if (value.executionPermit.approvedManifestHash !== value.manifestHash || value.executionPermit.recalculatedManifestHash !== value.manifestHash) return debugInvalid("v1_execution_permit_hash");
+  if (!isRecord(value.costBudgetLedger) || value.costBudgetLedger.type !== "evaluation_cost_budget_ledger_v2") return debugInvalid("v1_cost_shape");
+  if (!enumValue(value.finalStatus, ["completed", "blocked", "failed", "timed_out"]) || !safeCodeArray(value.reasonCodes)) return debugInvalid("v1_final_status");
   return validateClosedTrustedV1(value);
 }
 
@@ -1541,59 +1572,59 @@ function validateClosedTrustedV1(value: Record<string, any>): boolean {
   const parserDecisionKeys = ["status", "reportable", "confidence", "reason", "reasonCode", "failedControls", "warningControls", "reportabilityImpact"] as const;
   const parserControlKeys = ["controlId", "status", "basisId", "populationId", "expected", "actual", "delta", "tolerance", "reportabilityImpact"] as const;
   for (const source of value.sourceIdentity) {
-    if (!isRecord(source) || !hasExactKeys(source, sourceKeys) || !SHA256.test(stringValue(source.sha256))) return false;
-    if (source.displayFileNameHash !== null && !SHA256.test(stringValue(source.displayFileNameHash))) return false;
-    if (source.parsedStatementPeriod !== null && (!isRecord(source.parsedStatementPeriod) || !hasExactKeys(source.parsedStatementPeriod, ["start", "end"]))) return false;
-    if (!enumValue(source.parserEligibility, ["eligible", "unsupported", "failed"]) || !enumValue(source.processorLayoutFamily, ["fiserv_family", "nxgen_vortax", "unknown"])) return false;
-    if (!enumValue(source.productScopeEligibility, ["eligible", "ineligible"]) || !enumValue(source.productScopeReasonCode, ["fiserv_family_supported", "processor_layout_out_of_product_scope", "processor_layout_unknown"])) return false;
-    if (!enumValue(source.paidStageEligibility, ["eligible", "ineligible"]) || !nullableEnum(source.paidStageExclusionReason, ["parser_ineligible", "product_scope_ineligible"])) return false;
-    if (!Array.isArray(source.allowedExecutionStages) || source.allowedExecutionStages.some((stage: unknown) => !enumValue(stage, EXECUTION_STAGES))) return false;
-    if (!validateParserDecision(source.parserDecision, parserDecisionKeys, parserControlKeys)) return false;
+    if (!isRecord(source) || !hasExactKeys(source, sourceKeys) || !SHA256.test(stringValue(source.sha256))) return debugInvalid("v1_source_shape");
+    if (source.displayFileNameHash !== null && !SHA256.test(stringValue(source.displayFileNameHash))) return debugInvalid("v1_source_display_hash");
+    if (source.parsedStatementPeriod !== null && (!isRecord(source.parsedStatementPeriod) || !hasExactKeys(source.parsedStatementPeriod, ["start", "end"]))) return debugInvalid("v1_source_period");
+    if (!enumValue(source.parserEligibility, ["eligible", "unsupported", "failed"]) || !enumValue(source.processorLayoutFamily, ["fiserv_family", "nxgen_vortax", "unknown"])) return debugInvalid("v1_source_parser_family");
+    if (!enumValue(source.productScopeEligibility, ["eligible", "ineligible"]) || !enumValue(source.productScopeReasonCode, ["fiserv_family_supported", "processor_layout_out_of_product_scope", "processor_layout_unknown"])) return debugInvalid("v1_source_product_scope");
+    if (!enumValue(source.paidStageEligibility, ["eligible", "ineligible"]) || !nullableEnum(source.paidStageExclusionReason, ["parser_ineligible", "product_scope_ineligible"])) return debugInvalid("v1_source_paid_scope");
+    if (!Array.isArray(source.allowedExecutionStages) || source.allowedExecutionStages.some((stage: unknown) => !enumValue(stage, EXECUTION_STAGES))) return debugInvalid("v1_source_stages");
+    if (!validateParserDecision(source.parserDecision, parserDecisionKeys, parserControlKeys)) return debugInvalid("v1_source_parser_decision");
   }
   for (const decision of value.deduplicationDecisions) {
-    if (!isRecord(decision) || !hasExactKeys(decision, ["duplicateGroupId", "checksum", "groupMembers", "selectedRepresentative", "exclusions"]) || !Array.isArray(decision.groupMembers) || !Array.isArray(decision.exclusions)) return false;
-    if (decision.exclusions.some((item: unknown) => !isRecord(item) || !hasExactKeys(item, ["sourceDocumentId", "reason"]) || item.reason !== "duplicate_checksum_non_representative")) return false;
+    if (!isRecord(decision) || !hasExactKeys(decision, ["duplicateGroupId", "checksum", "groupMembers", "selectedRepresentative", "exclusions"]) || !Array.isArray(decision.groupMembers) || !Array.isArray(decision.exclusions)) return debugInvalid("v1_dedup_shape");
+    if (decision.exclusions.some((item: unknown) => !isRecord(item) || !hasExactKeys(item, ["sourceDocumentId", "reason"]) || item.reason !== "duplicate_checksum_non_representative")) return debugInvalid("v1_dedup_exclusion");
   }
   const ledger = value.lifecycleLedger;
-  if (!hasExactKeys(ledger, ["type", "documents"]) || !Array.isArray(ledger.documents)) return false;
+  if (!hasExactKeys(ledger, ["type", "documents"]) || !Array.isArray(ledger.documents)) return debugInvalid("v1_lifecycle_keys");
   const aiStateNames = ["executed", "generated", "schema_valid", "evidence_validated", "policy_accepted", "canonical_admitted", "customer_published"] as const;
   const eventKeys = ["eventId", "sourceDocumentId", "stage", "state", "reasonCodes", "manifestRowRef", "preflightRecordRef", "parserRecordRef", "capabilityExecutionRef", "providerRequestRef", "researchRetrievalRefs", "semanticVerificationRef", "canonicalAdmissionRef", "customerPublicationRef", "finalArtifactRef"] as const;
   for (const document of ledger.documents) {
-    if (!isRecord(document) || !hasExactKeys(document, ["sourceDocumentId", "aiStates", "events"]) || !isRecord(document.aiStates) || !hasExactKeys(document.aiStates, aiStateNames) || !Array.isArray(document.events)) return false;
-    for (const state of Object.values(document.aiStates)) if (!isRecord(state) || !hasExactKeys(state, ["state", "reasonCodes"]) || !enumValue(state.state, LIFECYCLE_STATES) || !safeCodeArray(state.reasonCodes)) return false;
+    if (!isRecord(document) || !hasExactKeys(document, ["sourceDocumentId", "aiStates", "events"]) || !isRecord(document.aiStates) || !hasExactKeys(document.aiStates, aiStateNames) || !Array.isArray(document.events)) return debugInvalid("v1_lifecycle_document_shape");
+    for (const state of Object.values(document.aiStates)) if (!isRecord(state) || !hasExactKeys(state, ["state", "reasonCodes"]) || !enumValue(state.state, LIFECYCLE_STATES) || !safeCodeArray(state.reasonCodes)) return debugInvalid("v1_lifecycle_ai_state");
     for (const event of document.events) {
-      if (!isRecord(event) || !hasExactKeys(event, eventKeys) || !enumValue(event.stage, LIFECYCLE_STAGES) || !enumValue(event.state, LIFECYCLE_STATES) || !safeCodeArray(event.reasonCodes) || !Array.isArray(event.researchRetrievalRefs)) return false;
+      if (!isRecord(event) || !hasExactKeys(event, eventKeys) || !enumValue(event.stage, LIFECYCLE_STAGES) || !enumValue(event.state, LIFECYCLE_STATES) || !safeCodeArray(event.reasonCodes) || !Array.isArray(event.researchRetrievalRefs)) return debugInvalid("v1_lifecycle_event");
     }
   }
   for (const record of value.parserDecisions) {
-    if (!isRecord(record) || !hasExactKeys(record, ["sourceDocumentId", "parserRecordId", "decision"]) || !validateParserDecision(record.decision, parserDecisionKeys, parserControlKeys)) return false;
+    if (!isRecord(record) || !hasExactKeys(record, ["sourceDocumentId", "parserRecordId", "decision"]) || !validateParserDecision(record.decision, parserDecisionKeys, parserControlKeys)) return debugInvalid("v1_parser_record");
   }
   for (const entry of value.packageFinancialInvariance) {
-    if (!isRecord(entry) || !hasExactKeys(entry, ["sourceDocumentId", "result"]) || !isRecord(entry.result)) return false;
+    if (!isRecord(entry) || !hasExactKeys(entry, ["sourceDocumentId", "result"]) || !isRecord(entry.result)) return debugInvalid("v1_invariance_entry");
     const result = entry.result;
-    if (!hasExactKeys(result, ["type", "projectionVersion", "packages", "beforeCombinedHash", "afterCombinedHash", "invariant", "mismatchPaths", "liveRunBlocked"]) || !Array.isArray(result.packages) || !Array.isArray(result.mismatchPaths)) return false;
-    for (const item of result.packages) if (!isRecord(item) || !hasExactKeys(item, ["package", "projectionVersion", "beforeHash", "afterHash", "invariant", "mismatchPaths"]) || !Array.isArray(item.mismatchPaths)) return false;
-    if (!validateFinancialInvarianceResult(result)) return false;
+    if (!hasExactKeys(result, ["type", "projectionVersion", "packages", "beforeCombinedHash", "afterCombinedHash", "invariant", "mismatchPaths", "liveRunBlocked"]) || !Array.isArray(result.packages) || !Array.isArray(result.mismatchPaths)) return debugInvalid("v1_invariance_shape");
+    for (const item of result.packages) if (!isRecord(item) || !hasExactKeys(item, ["package", "projectionVersion", "beforeHash", "afterHash", "invariant", "mismatchPaths"]) || !Array.isArray(item.mismatchPaths)) return debugInvalid("v1_invariance_package");
+    if (!validateFinancialInvarianceResult(result)) return debugInvalid("v1_invariance_result");
   }
   const cost = value.costBudgetLedger;
-  if (!hasExactKeys(cost, ["type", "currency", "fixedPointScale", "approvedBudgetUsd", "cumulativeReservedUsd", "cumulativeObservedUsd", "cumulativeBudgetCommittedUsd", "cumulativeReleasedUsd", "remainingBudgetUsd", "blocked", "entries"]) || !Array.isArray(cost.entries)) return false;
+  if (!hasExactKeys(cost, ["type", "currency", "fixedPointScale", "approvedBudgetUsd", "cumulativeReservedUsd", "cumulativeObservedUsd", "cumulativeBudgetCommittedUsd", "cumulativeReleasedUsd", "remainingBudgetUsd", "blocked", "entries"]) || !Array.isArray(cost.entries)) return debugInvalid("v1_cost_keys");
   const legacyCostEntryKeys = ["callId", "attempt", "attemptKind", "retryOfCallId", "capability", "currency", "fixedPointScale", "pricingPolicyRef", "providerRoute", "provider", "model", "toolClass", "maximumInputTokens", "maximumOutputTokens", "maximumToolUses", "requestId", "startedAt", "endedAt", "durationMs", "status", "inputTokens", "cachedInputTokens", "outputTokens", "toolEvents", "estimatedMaximumCostUsd", "worstCaseReservedCostUsd", "observedOrEstimatedFinalCostUsd", "billingDisposition", "cumulativeReservedUsd", "cumulativeObservedUsd", "cumulativeBudgetCommittedUsd", "cumulativeReleasedUsd", "remainingBudgetUsd"] as const;
   const costEntryKeys = ["callId", "parentCallId", "operationKind", "operationRef", "reservationScope", "attempt", "attemptKind", "retryOfCallId", "capability", "currency", "fixedPointScale", "pricingPolicyRef", "providerRoute", "provider", "model", "toolClass", "maximumInputTokens", "maximumOutputTokens", "maximumToolUses", "requestId", "startedAt", "endedAt", "durationMs", "status", "inputTokens", "cachedInputTokens", "outputTokens", "toolEvents", "estimatedMaximumCostUsd", "worstCaseReservedCostUsd", "observedOrEstimatedFinalCostUsd", "billingDisposition", "cumulativeReservedUsd", "cumulativeObservedUsd", "cumulativeBudgetCommittedUsd", "cumulativeReleasedUsd", "remainingBudgetUsd"] as const;
   for (const entry of cost.entries) {
-    if (!isRecord(entry) || !(hasExactKeys(entry, costEntryKeys) || hasExactKeys(entry, legacyCostEntryKeys)) || !Array.isArray(entry.toolEvents)) return false;
-    if (Object.hasOwn(entry, "operationKind") && !enumValue(entry.operationKind, ["manifest_call", "package_5b_budget_envelope", "package_5b_work_unit"])) return false;
-    if (Object.hasOwn(entry, "reservationScope") && !enumValue(entry.reservationScope, ["provider_send", "budget_envelope"])) return false;
-    if (!enumValue(entry.attemptKind, ["initial", "retry"]) || !enumValue(entry.capability, ["direct_responses", "ai_sdk", "investigative_intelligence", "web_search", "retrieval", "semantic_verification"]) || entry.currency !== "USD") return false;
-    if (!enumValue(entry.status, ["reserved", "success", "failure", "timeout", "cancelled_before_send"]) || !enumValue(entry.billingDisposition, ["pending", "observed", "provider_confirmed_zero", "unknown"])) return false;
-    if (entry.toolEvents.some((item: unknown) => !isRecord(item) || !hasExactKeys(item, ["type", "count"]))) return false;
+    if (!isRecord(entry) || !(hasExactKeys(entry, costEntryKeys) || hasExactKeys(entry, legacyCostEntryKeys)) || !Array.isArray(entry.toolEvents)) return debugInvalid("v1_cost_entry_shape");
+    if (Object.hasOwn(entry, "operationKind") && !enumValue(entry.operationKind, ["manifest_call", "package_5b_budget_envelope", "package_5b_work_unit"])) return debugInvalid("v1_cost_operation_kind");
+    if (Object.hasOwn(entry, "reservationScope") && !enumValue(entry.reservationScope, ["provider_send", "budget_envelope"])) return debugInvalid("v1_cost_reservation_scope");
+    if (!enumValue(entry.attemptKind, ["initial", "retry"]) || !enumValue(entry.capability, ["direct_responses", "ai_sdk", "investigative_intelligence", "web_search", "retrieval", "semantic_verification"]) || entry.currency !== "USD") return debugInvalid("v1_cost_capability");
+    if (!enumValue(entry.status, ["reserved", "success", "failure", "timeout", "cancelled_before_send"]) || !enumValue(entry.billingDisposition, ["pending", "observed", "provider_confirmed_zero", "unknown"])) return debugInvalid("v1_cost_status");
+    if (entry.toolEvents.some((item: unknown) => !isRecord(item) || !hasExactKeys(item, ["type", "count"]))) return debugInvalid("v1_cost_tool_event");
   }
   const permit = value.executionPermit;
-  if (!hasExactKeys(permit, ["type", "manifestPath", "approvedManifestHash", "recalculatedManifestHash", "selectedCount", "documents", "diagnostics"]) || !Array.isArray(permit.documents) || !Array.isArray(permit.diagnostics)) return false;
-  for (const document of permit.documents) if (!isRecord(document) || !hasExactKeys(document, ["sourceDocumentId", "internalSourceRef", "sha256", "byteCount", "selectedDriver", "processorLayoutFamily", "productScopeEligibility", "paidStageEligibility", "stages"]) || !enumValue(document.processorLayoutFamily, ["fiserv_family", "nxgen_vortax", "unknown"]) || !enumValue(document.productScopeEligibility, ["eligible", "ineligible"]) || !enumValue(document.paidStageEligibility, ["eligible", "ineligible"]) || !Array.isArray(document.stages) || document.stages.some((stage: unknown) => !enumValue(stage, EXECUTION_STAGES))) return false;
-  for (const diagnostic of permit.diagnostics) if (!isRecord(diagnostic) || !hasExactKeys(diagnostic, ["code", "sourceDocumentId", "detail"])) return false;
+  if (!hasExactKeys(permit, ["type", "manifestPath", "approvedManifestHash", "recalculatedManifestHash", "selectedCount", "documents", "diagnostics"]) || !Array.isArray(permit.documents) || !Array.isArray(permit.diagnostics)) return debugInvalid("v1_permit_shape");
+  for (const document of permit.documents) if (!isRecord(document) || !hasExactKeys(document, ["sourceDocumentId", "internalSourceRef", "sha256", "byteCount", "selectedDriver", "processorLayoutFamily", "productScopeEligibility", "paidStageEligibility", "stages"]) || !enumValue(document.processorLayoutFamily, ["fiserv_family", "nxgen_vortax", "unknown"]) || !enumValue(document.productScopeEligibility, ["eligible", "ineligible"]) || !enumValue(document.paidStageEligibility, ["eligible", "ineligible"]) || !Array.isArray(document.stages) || document.stages.some((stage: unknown) => !enumValue(stage, EXECUTION_STAGES))) return debugInvalid("v1_permit_document");
+  for (const diagnostic of permit.diagnostics) if (!isRecord(diagnostic) || !hasExactKeys(diagnostic, ["code", "sourceDocumentId", "detail"])) return debugInvalid("v1_permit_diagnostic");
   for (const outcome of value.providerCallOutcomes) {
-    if (!isRecord(outcome) || !(hasExactKeys(outcome, ["callId", "parentCallId", "operationKind", "operationRef", "sourceDocumentId", "stage", "status", "requestId", "reasonCodes"]) || hasExactKeys(outcome, ["callId", "sourceDocumentId", "stage", "status", "requestId", "reasonCodes"])) || !enumValue(outcome.stage, EXECUTION_STAGES) || !enumValue(outcome.status, ["success", "failure", "timeout", "cancelled_before_send"]) || !safeCodeArray(outcome.reasonCodes)) return false;
-    if (Object.hasOwn(outcome, "operationKind") && !enumValue(outcome.operationKind, ["manifest_call", "package_5b_budget_envelope", "package_5b_work_unit"])) return false;
+    if (!isRecord(outcome) || !(hasExactKeys(outcome, ["callId", "parentCallId", "operationKind", "operationRef", "sourceDocumentId", "stage", "status", "requestId", "reasonCodes"]) || hasExactKeys(outcome, ["callId", "sourceDocumentId", "stage", "status", "requestId", "reasonCodes"])) || !enumValue(outcome.stage, EXECUTION_STAGES) || !enumValue(outcome.status, ["success", "failure", "timeout", "cancelled_before_send"]) || !safeCodeArray(outcome.reasonCodes)) return debugInvalid("v1_provider_outcome_shape");
+    if (Object.hasOwn(outcome, "operationKind") && !enumValue(outcome.operationKind, ["manifest_call", "package_5b_budget_envelope", "package_5b_work_unit"])) return debugInvalid("v1_provider_outcome_operation_kind");
   }
   return true;
 }
