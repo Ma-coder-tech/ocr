@@ -323,8 +323,20 @@ export function buildFeeKnowledgeSourcePacket(input: {
       ? candidate
       : {
           ...candidate,
+          semanticVerificationStatus: "failed" as const,
+          verificationStatus: "rejected" as const,
           claimSupportDecisionRef: null,
-          reasonCodes: [...new Set([...candidate.reasonCodes, "fee_knowledge_runtime_linkage_invalid"])].sort(),
+          reasonCodes: [...new Set([
+            ...candidate.reasonCodes.filter((reason) => !reason.startsWith("fee_knowledge_verified_")
+              && reason !== "fee_knowledge_possible_interpretation"
+              && reason !== "fee_knowledge_needs_verification"
+              && reason !== "fee_knowledge_conflicting_evidence"
+              && reason !== "fee_knowledge_unsupported"
+              && reason !== "fee_knowledge_source_unavailable"
+              && reason !== "fee_knowledge_source_inapplicable"),
+            "fee_knowledge_semantic_failed",
+            "fee_knowledge_runtime_linkage_invalid",
+          ])].sort(),
         })
     : [...(input.researchCandidates ?? [])];
 

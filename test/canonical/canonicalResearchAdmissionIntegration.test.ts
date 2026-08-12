@@ -132,6 +132,9 @@ describe("canonical research admission integration", () => {
     expect(packet.claimSupports).toEqual([]);
     expect(packet.researchCandidates).toHaveLength(1);
     expect(packet.researchCandidates[0]!.claimSupportDecisionRef).toBeNull();
+    expect(packet.researchCandidates[0]!.semanticVerificationStatus).toBe("failed");
+    expect(packet.researchCandidates[0]!.verificationStatus).toBe("rejected");
+    expect(packet.researchCandidates[0]!.reasonCodes).toContain("fee_knowledge_semantic_failed");
     expect(packet.researchCandidates[0]!.reasonCodes).toContain("fee_knowledge_runtime_linkage_invalid");
     expect(validateResearchLinkage(packet)).toEqual([]);
   });

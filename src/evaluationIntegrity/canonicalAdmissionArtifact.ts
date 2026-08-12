@@ -140,6 +140,7 @@ const CANDIDATE_REASON_CODES = new Set([
   "fee_knowledge_retrieval_timed_out", "fee_knowledge_semantic_parse_failed", "fee_knowledge_semantic_timed_out",
   "fee_knowledge_semantic_safety_blocked", "fee_knowledge_semantic_unsupported", "fee_knowledge_semantic_failed",
   "fee_knowledge_semantic_provider_unavailable_before_send", "fee_knowledge_semantic_provider_configuration_invalid_before_send",
+  "fee_knowledge_runtime_linkage_invalid",
   ...[400, 401, 403, 404, 408, 409, 410, 413, 415, 422, 425, 429, 500, 501, 502, 503, 504].map((status) => `fee_knowledge_http_${status}`),
 ]);
 const HTTP_UNAVAILABLE_REASONS = [400, 401, 403, 404, 408, 409, 410, 413, 415, 422, 425, 429, 500, 501, 502, 503, 504]
