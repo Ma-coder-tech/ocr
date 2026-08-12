@@ -7,7 +7,7 @@ import { retrieveFeeKnowledgeDocument } from "../src/canonical/feeKnowledgeRetri
 import { buildCanonicalClaimSupportDecision } from "../src/canonical/feeKnowledgeClaimSupportDecision.js";
 import { FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION } from "../src/canonical/feeKnowledgeTypes.js";
 import type { ApprovedFeeKnowledgeSourceRegistry } from "../src/canonical/feeKnowledgeTypes.js";
-import { type FeeKnowledgeResearchQuestion } from "../src/canonical/feeKnowledgeResearch.js";
+import { FeeKnowledgeSearchProviderError, type FeeKnowledgeResearchQuestion } from "../src/canonical/feeKnowledgeResearch.js";
 import type { CanonicalStatementAnalysis } from "../src/canonical/types.js";
 import { parsePdfBytes } from "../src/parser.js";
 import { analyzeStatementDocument } from "../src/statementParserOrchestrator.js";
@@ -344,6 +344,151 @@ describe("Package 5B manifest-driven admission", () => {
       disposition: "accepted",
       evidenceDecision: "verified_classification",
     });
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+  }, 30_000);
+
+  it("keeps Package 5B running when an adaptive follow-up search fails provider-side", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    let webCalls = 0;
+    let wholeStatementCalls = 0;
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: adaptiveFollowUpOneTimeCalls(),
+      outputArtifactPath: path.join(fixture.directory, "adaptive-search-provider-failure-package-5b-continues.json"),
+      oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis)],
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async ({ questions: [question] }) => {
+          webCalls += 1;
+          if (question!.adaptiveFollowUp) {
+            throw new FeeKnowledgeSearchProviderError("failed", "Synthetic adaptive web-search provider failure.");
+          }
+          return external([{ url: "https://www.fiserv.com/blocked/official-fee-schedule.pdf", title: "Official Fiserv fee schedule", publisher: "Fiserv" }], "request_search_initial_blocked");
+        },
+        documentRetrieval: async (url) => external(terminalRetrievedDocument("unavailable", "fee_knowledge_http_403", url), "request_retrieval_blocked"),
+        semanticVerification: async ({ structuredClaim }) => external(semanticSupport(structuredClaim), "request_semantic_should_not_run"),
+        wholeStatementReview: async (packet, context) => {
+          wholeStatementCalls += 1;
+          return wholeStatementExternal(validReview(packet), "request_whole_after_adaptive_provider_failure", context);
+        },
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(webCalls).toBe(2);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    expect(wholeStatementCalls).toBe(admission.package5bWorkPlan?.selectedWorkUnitCount);
+    expect(admission.package5bWorkPlan?.reviewedFeeRowCount).toBe(admission.package5bWorkPlan?.expectedFeeRowCount);
+    expect(admission.package5bWorkPlan?.missingFeeRowCount).toBe(0);
+    expect(admission.researchEvidence.attempts.map((attempt) => [attempt.triggerReason, attempt.status, attempt.reasonCodes[0]])).toEqual(expect.arrayContaining([
+      ["adaptive_inaccessible_authoritative_source", "failed", "fee_knowledge_research_failed"],
+    ]));
+    expect(admission.researchEvidence.claimSupports).toEqual([]);
+    const adaptiveSearchOutcome = result.providerCallOutcomes.find((outcome) =>
+      outcome.stage === "web_search_discovery" &&
+      outcome.status === "failure");
+    expect(adaptiveSearchOutcome?.reasonCodes).toContain("fee_knowledge_research_failed");
+    expect(result.providerCallOutcomes.some((outcome) => outcome.reasonCodes.includes("cancelled_after_provider_failure"))).toBe(false);
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+  }, 30_000);
+
+  it("keeps adaptive web-search pre-send unavailability zero-cost and continues Package 5B", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    let readinessChecks = 0;
+    let webCalls = 0;
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: adaptiveFollowUpOneTimeCalls(),
+      outputArtifactPath: path.join(fixture.directory, "adaptive-search-pre-send-unavailable-package-5b-continues.json"),
+      oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis)],
+      oneTimeServicesForTesting: {
+        webSearchDiscoveryReadiness: () => {
+          readinessChecks += 1;
+          return readinessChecks === 1
+            ? { status: "ready_to_send", reasonCodes: ["fee_knowledge_web_search_provider_ready_to_send"] }
+            : { status: "unavailable_before_send", diagnosticClass: "provider_route_unavailable", reasonCodes: ["fee_knowledge_web_search_model_unsupported"] };
+        },
+        webSearchDiscovery: async () => {
+          webCalls += 1;
+          return external([{ url: "https://www.fiserv.com/blocked/official-fee-schedule.pdf", title: "Official Fiserv fee schedule", publisher: "Fiserv" }], "request_search_initial_blocked");
+        },
+        documentRetrieval: async (url) => external(terminalRetrievedDocument("unavailable", "fee_knowledge_http_403", url), "request_retrieval_blocked"),
+        semanticVerification: async ({ structuredClaim }) => external(semanticSupport(structuredClaim), "request_semantic_should_not_run"),
+        wholeStatementReview: async (packet, context) => wholeStatementExternal(validReview(packet), "request_whole_after_adaptive_pre_send_unavailable", context),
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(webCalls).toBe(1);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    expect(admission.package5bWorkPlan?.reviewedFeeRowCount).toBe(admission.package5bWorkPlan?.expectedFeeRowCount);
+    expect(admission.package5bWorkPlan?.missingFeeRowCount).toBe(0);
+    expect(admission.researchEvidence.attempts.map((attempt) => [attempt.triggerReason, attempt.status, attempt.reasonCodes[0]])).toEqual(expect.arrayContaining([
+      ["adaptive_inaccessible_authoritative_source", "unsupported_model", "fee_knowledge_web_search_model_unsupported"],
+    ]));
+    const unsupportedOutcome = result.providerCallOutcomes.find((outcome) =>
+      outcome.stage === "web_search_discovery" &&
+      outcome.reasonCodes.includes("fee_knowledge_web_search_model_unsupported"));
+    expect(unsupportedOutcome).toMatchObject({ status: "success", requestId: null });
+    const unsupportedLedger = result.costLedger.entries.find((entry) => entry.callId === unsupportedOutcome?.callId);
+    expect(unsupportedLedger).toMatchObject({
+      status: "success",
+      observedOrEstimatedFinalCostUsd: 0,
+      billingDisposition: "provider_confirmed_zero",
+    });
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+  }, 30_000);
+
+  it("lets unused adaptive reserve slots finalize as no-op after research capacity is full", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    let wholeStatementCalls = 0;
+    const calls = adaptiveFollowUpOneTimeCalls();
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls,
+      outputArtifactPath: path.join(fixture.directory, "adaptive-reserve-slot-noop-package-5b-continues.json"),
+      oneTimeResearchLimitsForTesting: {
+        policyVersion: "fee_knowledge_research_policy_v1",
+        maxSearchCalls: 1,
+        maxAdaptiveFollowUpCalls: 1,
+        maxRetrievalCandidates: 1,
+        maxAdaptiveFollowUpCandidates: 1,
+        totalDeadlineMs: 5000,
+        maxResultCandidatesPerSearch: 1,
+      },
+      oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis)],
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async () => external([{ url: "https://www.fiserv.com/blocked/official-fee-schedule.pdf", title: "Official Fiserv fee schedule", publisher: "Fiserv" }], "request_search_initial_capacity_full"),
+        documentRetrieval: async (url) => external(terminalRetrievedDocument("unavailable", "fee_knowledge_http_403", url), "request_retrieval_capacity_full"),
+        semanticVerification: async ({ structuredClaim }) => external(semanticSupport(structuredClaim), "request_semantic_should_not_run"),
+        wholeStatementReview: async (packet, context) => {
+          wholeStatementCalls += 1;
+          return wholeStatementExternal(validReview(packet), "request_whole_after_unused_adaptive_slots", context);
+        },
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    expect(wholeStatementCalls).toBe(admission.package5bWorkPlan?.selectedWorkUnitCount);
+    expect(admission.package5bWorkPlan?.reviewedFeeRowCount).toBe(admission.package5bWorkPlan?.expectedFeeRowCount);
+    expect(admission.package5bWorkPlan?.missingFeeRowCount).toBe(0);
+    expect(admission.researchEvidence.attempts).toHaveLength(1);
+    expect(admission.researchEvidence.attempts[0]).toMatchObject({
+      status: "completed",
+      reasonCodes: ["fee_knowledge_research_completed"],
+    });
+    expect(admission.researchEvidence.claimSupports).toEqual([]);
+    const lateNoopSearch = result.providerCallOutcomes.find((outcome) =>
+      outcome.stage === "web_search_discovery" &&
+      outcome.reasonCodes.includes("fee_knowledge_discovery_not_needed"));
+    expect(lateNoopSearch).toMatchObject({ status: "success", requestId: null });
+    expect(result.providerCallOutcomes.some((outcome) => outcome.reasonCodes.includes("provider_call_failed"))).toBe(false);
     expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
   }, 30_000);
 

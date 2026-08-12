@@ -1928,7 +1928,7 @@ function assertOneTimeStageTransition(
   if (!(stage in ranks)) throw new Error("one_time_evaluation_stage_not_supported");
   const rank = ranks[stage as keyof typeof ranks];
   const adaptiveResearchCycle =
-    context.adaptiveFollowUpCount > 0
+    (context.adaptiveFollowUpCount > 0 || isLateResearchReserveSlotWithoutPendingWork(context, stage))
     && stage !== "statement_investigative_intelligence"
     && stage !== "whole_statement_ai_review";
   if (rank < context.lastStageRank && !adaptiveResearchCycle) {
@@ -1951,6 +1951,20 @@ function assertOneTimeStageTransition(
     context.wholeStatementReviewCount += 1;
   }
   context.lastStageRank = Math.max(context.lastStageRank, rank);
+}
+
+function isLateResearchReserveSlotWithoutPendingWork(
+  context: OneTimePrivateContext,
+  stage: RepositoryProviderTransportInput["stage"],
+): boolean {
+  if (stage === "web_search_discovery") {
+    return context.searchCursor >= context.packet.research.limits.maxSearchCalls
+      && context.adaptiveSearchQueue.length === 0;
+  }
+  if (stage === "document_retrieval") return context.retrievalCursor >= context.discovered.length;
+  if (stage === "retrieved_document_investigative_intelligence") return context.retrievedDocumentInvestigativeCursor >= context.retrieved.length;
+  if (stage === "semantic_verification") return context.semanticCursor >= context.retrieved.length;
+  return false;
 }
 
 function completeUnattemptedAdaptiveFollowUps(context: OneTimePrivateContext): void {
