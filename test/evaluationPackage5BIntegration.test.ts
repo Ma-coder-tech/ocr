@@ -2385,6 +2385,86 @@ describe("Package 5B manifest-driven admission", () => {
     expect(started.length).toBe(3);
   }, 30_000);
 
+  it("preserves adaptive candidate reserve across concurrent initial web searches", async () => {
+    const fixture = await approvedShortCloverPdfFixture();
+    const active = new Set<number>();
+    let maxActive = 0;
+    let retrievalCalls = 0;
+    let wholeStatementCalls = 0;
+    const delays = new Map([[0, 40], [1, 5], [2, 10]]);
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: fullOneTimeCalls("doc_one_time_clover_short"),
+      outputArtifactPath: path.join(fixture.directory, "package-5b-web-search-concurrency-adaptive-reserve.json"),
+      oneTimeResearchLimitsForTesting: {
+        policyVersion: "fee_knowledge_research_policy_v1",
+        maxSearchCalls: 3,
+        maxAdaptiveFollowUpCalls: 1,
+        maxRetrievalCandidates: 5,
+        maxAdaptiveFollowUpCandidates: 2,
+        totalDeadlineMs: 5000,
+        maxResultCandidatesPerSearch: 2,
+      },
+      oneTimeResearchQuestionsForTesting: (analysis) => [
+        researchQuestion(analysis, 0),
+        researchQuestion(analysis, 1),
+        researchQuestion(analysis, 2),
+      ],
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async ({ questions: [question] }) => {
+          if (question!.adaptiveFollowUp) throw new Error("adaptive search should not run when no follow-up was queued");
+          const ordinal = Number(/case (\d+)\./.exec(question!.semanticQuestion)?.[1] ?? "1") - 1;
+          active.add(ordinal);
+          maxActive = Math.max(maxActive, active.size);
+          await delay(delays.get(ordinal) ?? 1);
+          active.delete(ordinal);
+          return external([
+            { url: `https://www.fiserv.com/concurrent-reserve/${ordinal}/a`, title: `Official fee guide ${ordinal} A`, publisher: "Fiserv" },
+            { url: `https://www.fiserv.com/concurrent-reserve/${ordinal}/b`, title: `Official fee guide ${ordinal} B`, publisher: "Fiserv" },
+          ], `request_search_concurrent_reserve_${ordinal}`);
+        },
+        documentRetrieval: async (url) => {
+          retrievalCalls += 1;
+          return external(textUnavailableDocument(url), `request_retrieval_${url.split("/").pop()}`);
+        },
+        wholeStatementReview: async (packet, context) => {
+          wholeStatementCalls += 1;
+          return wholeStatementExternal(validReview(packet), "request_whole_after_concurrent_search_reserve", context);
+        },
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(maxActive).toBeGreaterThan(1);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    const initialAttempts = admission.researchEvidence.attempts
+      .filter((attempt) => attempt.triggerReason !== "adaptive_inaccessible_authoritative_source")
+      .sort((left, right) => left.questionOrdinal - right.questionOrdinal);
+    expect(initialAttempts.map((attempt) => attempt.resultCount)).toEqual([2, 1, 0]);
+    expect(admission.researchEvidence.attempts.some((attempt) =>
+      attempt.triggerReason === "adaptive_inaccessible_authoritative_source" &&
+      attempt.status === "not_selected_planning"
+    )).toBe(true);
+    expect(admission.researchEvidence.candidates).toHaveLength(3);
+    expect(retrievalCalls).toBe(3);
+    expect(result.providerCallOutcomes.filter((outcome) =>
+      outcome.stage === "document_retrieval" &&
+      outcome.reasonCodes.includes("fee_knowledge_retrieval_not_needed")
+    )).toHaveLength(7);
+    expect(result.providerCallOutcomes.filter((outcome) =>
+      outcome.stage === "web_search_discovery" &&
+      outcome.reasonCodes.includes("fee_knowledge_discovery_not_needed")
+    )).toHaveLength(2);
+    expect(wholeStatementCalls).toBe(admission.package5bWorkPlan?.selectedWorkUnitCount);
+    expect(admission.package5bWorkPlan?.reviewedFeeRowCount).toBe(admission.package5bWorkPlan?.expectedFeeRowCount);
+    expect(admission.package5bWorkPlan?.missingFeeRowCount).toBe(0);
+    expect(result.providerCallOutcomes.some((outcome) => outcome.reasonCodes.includes("provider_call_failed"))).toBe(false);
+    expect(result.providerCallOutcomes.some((outcome) => outcome.reasonCodes.includes("cancelled_after_provider_failure"))).toBe(false);
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+  }, 30_000);
+
   it("processes adaptive candidates after unused initial retrieval slots without invalid not-started projection", async () => {
     const fixture = await approvedShortCloverPdfFixture();
     const retrievedUrls: string[] = [];
