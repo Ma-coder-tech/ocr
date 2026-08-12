@@ -66,6 +66,28 @@ describe("live evaluation reliability policy", () => {
     expect(aborts).toBe(1);
   });
 
+  it("terminates a handle-less hung provider operation at the liveness boundary", async () => {
+    vi.useRealTimers();
+    const started = Date.now();
+    let aborted = false;
+
+    await expect(runWithLiveEvaluationTimeout({
+      stage: "retrieved_document_investigative_intelligence",
+      scope: "per_call",
+      timeoutMs: 25,
+      operation: async (signal) => new Promise<never>(() => {
+        signal.addEventListener("abort", () => { aborted = true; }, { once: true });
+      }),
+    })).rejects.toMatchObject({
+      code: "provider_timeout",
+      evaluationTimeoutScope: "per_call",
+      reasonCode: "fee_knowledge_retrieved_document_investigative_timed_out",
+    });
+
+    expect(aborted).toBe(true);
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
   it("allows a controlled 16-second discovery operation and still enforces the graph deadline", async () => {
     vi.useFakeTimers();
     const discovery = runWithLiveEvaluationTimeout({
