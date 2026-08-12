@@ -318,6 +318,16 @@ export function buildFeeKnowledgeSourcePacket(input: {
     return supports.length === 0 ? candidate.claimSupportDecisionRef !== null : supports.length !== 1;
   });
 
+  const researchCandidates = invalidRuntimeSupport
+    ? (input.researchCandidates ?? []).map((candidate) => candidate.claimSupportDecisionRef === null
+      ? candidate
+      : {
+          ...candidate,
+          claimSupportDecisionRef: null,
+          reasonCodes: [...new Set([...candidate.reasonCodes, "fee_knowledge_runtime_linkage_invalid"])].sort(),
+        })
+    : [...(input.researchCandidates ?? [])];
+
   for (const support of invalidRuntimeSupport ? [] : input.runtimeClaimSupports ?? []) {
     claimSupports.push(support);
     intelligence.push(buildIntelligenceFromClaimSupport({ support, candidate: support.candidateId ? candidatesById.get(support.candidateId) ?? null : null }));
@@ -344,7 +354,7 @@ export function buildFeeKnowledgeSourcePacket(input: {
     });
   }
 
-  for (const candidate of input.researchCandidates ?? []) {
+  for (const candidate of researchCandidates) {
     if (provenanceDecisions.some((decision) => decision.candidateId === candidate.candidateId)) continue;
     provenanceDecisions.push(provenanceDecisionFromCandidate(candidate));
   }
@@ -413,7 +423,7 @@ export function buildFeeKnowledgeSourcePacket(input: {
     rowPackets,
     sourceMatches: sourceMatches.sort(byRowThenId),
     researchAttempts: [...(input.researchAttempts ?? [])].sort((left, right) => left.attemptId.localeCompare(right.attemptId)),
-    researchCandidates: [...(input.researchCandidates ?? [])].sort((left, right) => left.candidateId.localeCompare(right.candidateId)),
+    researchCandidates: researchCandidates.sort((left, right) => left.candidateId.localeCompare(right.candidateId)),
     intelligence: intelligence.sort((left, right) => left.intelligenceId.localeCompare(right.intelligenceId)),
     claimSupports: claimSupports.sort((left, right) => left.claimSupportId.localeCompare(right.claimSupportId)),
     provenanceDecisions: provenanceDecisions.sort((left, right) => left.decisionId.localeCompare(right.decisionId)),
