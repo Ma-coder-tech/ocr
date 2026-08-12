@@ -79,7 +79,7 @@ const ATTEMPT_REASON_BY_STATUS = {
   unsupported_model: ["fee_knowledge_web_search_model_unsupported"],
 } as const;
 const CANDIDATE_STATUSES = ["runtime_verified_documentation", "verified_candidate_limited", "provisional", "rejected", "safety_blocked", "source_unavailable", "source_inapplicable", "conflicting_evidence"] as const;
-const RETRIEVAL_STATUSES = ["retrieved_text", "retrieval_succeeded_text_unavailable", "unavailable", "failed", "timed_out", "safety_blocked", "unsupported_content_type", "oversized", "malformed", "encrypted"] as const;
+const RETRIEVAL_STATUSES = ["not_started", "retrieved_text", "retrieval_succeeded_text_unavailable", "unavailable", "failed", "timed_out", "safety_blocked", "unsupported_content_type", "oversized", "malformed", "encrypted"] as const;
 const SEMANTIC_STATUSES = ["not_started", "not_eligible", "completed", "failed", "timed_out", "parse_failed", "safety_blocked", "provider_unavailable", "unsupported"] as const;
 const EVIDENCE_DECISIONS = ["verified_classification", "verified_rule", "verified_application", "possible_interpretation", "needs_verification", "conflicting_evidence", "unsupported", "source_unavailable", "source_inapplicable"] as const;
 const SEMANTIC_DECISIONS = ["supports", "partially_supports", "does_not_support", "contradicts", "unsupported"] as const;
@@ -134,7 +134,7 @@ const CANDIDATE_REASON_CODES = new Set([
   "fee_knowledge_text_retrieved", "fee_knowledge_text_unavailable", "fee_knowledge_url_credentials_unsafe",
   "fee_knowledge_url_host_missing", "fee_knowledge_url_invalid", "fee_knowledge_url_port_unsafe", "fee_knowledge_url_private_host",
   "fee_knowledge_url_private_ip", "fee_knowledge_url_scheme_unsafe", "fee_knowledge_dns_empty", "fee_knowledge_validated_address_invalid",
-  "fee_knowledge_validated_address_missing", "fee_knowledge_pdf_encrypted", "fee_knowledge_semantic_support_not_run",
+  "fee_knowledge_validated_address_missing", "fee_knowledge_pdf_encrypted", "fee_knowledge_retrieval_not_started", "fee_knowledge_semantic_support_not_run",
   "fee_knowledge_semantic_not_eligible_claim_support_missing",
   ...EVIDENCE_DECISIONS.map((decision) => `fee_knowledge_${decision}`),
   "fee_knowledge_retrieval_timed_out", "fee_knowledge_semantic_parse_failed", "fee_knowledge_semantic_timed_out",
@@ -146,6 +146,7 @@ const CANDIDATE_REASON_CODES = new Set([
 const HTTP_UNAVAILABLE_REASONS = [400, 401, 403, 404, 408, 409, 410, 413, 415, 422, 425, 429, 500, 501, 502, 503, 504]
   .map((status) => `fee_knowledge_http_${status}`);
 const RETRIEVAL_REASON_BY_STATUS: Record<(typeof RETRIEVAL_STATUSES)[number], readonly string[]> = {
+  not_started: ["fee_knowledge_retrieval_not_started"],
   retrieved_text: ["fee_knowledge_text_retrieved", "fee_knowledge_pdf_text_retrieved"],
   retrieval_succeeded_text_unavailable: ["fee_knowledge_text_unavailable", "fee_knowledge_pdf_text_unavailable"],
   unavailable: HTTP_UNAVAILABLE_REASONS,
@@ -1926,6 +1927,7 @@ function validateCandidateState(value: Record<string, unknown>): boolean {
   if (retrieval !== "retrieved_text" && claimSupportRefs.length !== 0) return false;
   if (semantic === "not_eligible" && claimSupportRefs.length !== 0) return false;
   if (semantic === "completed" && claimSupportRefs.length === 0) return false;
+  if (retrieval === "not_started") return semantic === "not_started" && value.verificationStatus === "provisional";
   if (retrieval === "retrieval_succeeded_text_unavailable" && value.verificationStatus !== "source_unavailable") return false;
   if (retrieval === "safety_blocked" && value.verificationStatus !== "safety_blocked") return false;
   if (retrieval !== "retrieved_text" && retrieval !== "retrieval_succeeded_text_unavailable" && retrieval !== "safety_blocked" && value.verificationStatus !== "rejected") return false;

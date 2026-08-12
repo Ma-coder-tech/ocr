@@ -366,6 +366,45 @@ describe("canonical fee knowledge and provenance", () => {
 	    expect(JSON.stringify(candidates)).not.toMatch(/test-key|gpt-5|openai/i);
   });
 
+  it("propagates web-search abort signals into the OpenAI Responses fetch", async () => {
+    const controller = new AbortController();
+    let fetchSignal: AbortSignal | null = null;
+    const adapter = openAiWebSearchAdapter({
+      apiKey: "test-key",
+      modelName: "gpt-5",
+      fetchImpl: async (_url, init) => {
+        fetchSignal = init?.signal as AbortSignal;
+        return new Promise<Response>((_resolve, reject) => {
+          fetchSignal!.addEventListener("abort", () => {
+            reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+          }, { once: true });
+        });
+      },
+    });
+    const pending = adapter(
+      {
+        attemptId: "research_abort_test",
+        limits: {
+          policyVersion: "fee_knowledge_research_policy_v1",
+          maxSearchCalls: 1,
+          maxRetrievalCandidates: 1,
+          totalDeadlineMs: 15000,
+          maxResultCandidatesPerSearch: 1,
+        },
+        questions: [questionFor(syntheticAnalysis())],
+      },
+      { abortSignal: controller.signal },
+    );
+
+    await Promise.resolve();
+    expect(fetchSignal).toBe(controller.signal);
+    controller.abort(Object.assign(new Error("timeout"), { name: "AbortError" }));
+    await expect(pending).rejects.toMatchObject({
+      reasonCode: "provider_call_timed_out",
+      reasonCodes: expect.arrayContaining(["provider_sdk_error_class_aborterror"]),
+    });
+  });
+
 	  it("records disabled research, failed retrieval, unsafe URL, text-unavailable PDF, and no-source outcomes without canonical proof", async () => {
     const analysis = syntheticAnalysis();
     const disabled = await runFeeKnowledgeResearch({

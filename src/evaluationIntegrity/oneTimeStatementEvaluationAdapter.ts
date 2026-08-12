@@ -772,7 +772,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
     }
 
     if (request.stage === "document_retrieval") {
-      const candidate = context.discovered[context.retrievalCursor++];
+      const candidate = context.discovered[context.retrievalCursor];
       if (!candidate) {
         return result({
           value: { retrievedCount: 0 },
@@ -780,6 +780,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
           accounting: noRequestAccounting(started),
         });
       }
+      context.retrievalCursor += 1;
       let response: ReturnType<typeof unwrapExternalRequestResult<RetrievedDocument>>;
       try {
         response = await runWithinPreparedResearchDeadline(context, "document_retrieval", async (abortSignal) => unwrapExternalRequestResult(
@@ -846,7 +847,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
     }
 
     if (request.stage === "retrieved_document_investigative_intelligence") {
-      const item = context.retrieved[context.retrievedDocumentInvestigativeCursor++];
+      const item = context.retrieved[context.retrievedDocumentInvestigativeCursor];
       if (!item) {
         return result({
           value: { intelligenceCount: 0, scope: "retrieved_document", status: "not_needed" },
@@ -857,6 +858,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
           accounting: noRequestAccounting(started),
         });
       }
+      context.retrievedDocumentInvestigativeCursor += 1;
       const readiness = services.retrievedDocumentInvestigativeIntelligenceReadiness({
         approvedCallMetadata: structuredClone(request.approvedCallMetadata),
       });
@@ -921,7 +923,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
     }
 
     if (request.stage === "semantic_verification") {
-      const item = context.retrieved[context.semanticCursor++];
+      const item = context.retrieved[context.semanticCursor];
       if (!item) {
         return result({
           value: { verifiedCount: 0, supportedCount: 0 },
@@ -931,6 +933,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
           accounting: noRequestAccounting(started),
         });
       }
+      context.semanticCursor += 1;
       const readiness = services.semanticVerificationReadiness({
         approvedCallMetadata: structuredClone(request.approvedCallMetadata),
       });
@@ -1754,7 +1757,7 @@ function discoveredCandidateRecord(item: CandidateContext): FeeKnowledgeResearch
     title: safeCandidateText(item.candidate.title, 160),
     publisher: safeCandidateText(item.candidate.publisher, 120),
     verificationStatus: "provisional",
-    reasonCodes: ["fee_knowledge_semantic_support_not_run"],
+    reasonCodes: ["fee_knowledge_retrieval_not_started", "fee_knowledge_semantic_support_not_run"],
     safeApplicability: {
       processorOrNetworkMatched: false,
       periodApplicable: Boolean(item.question.statementPeriodYear),
