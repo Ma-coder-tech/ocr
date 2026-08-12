@@ -15,6 +15,10 @@ import {
   calculateWorstCaseCostUsd,
 } from "../src/evaluationIntegrity/providerAccounting.js";
 import {
+  oneTimeLiveCostPolicyTemplate,
+  oneTimeSlotExpandedCostEnvelope,
+} from "../src/evaluationIntegrity/oneTimeLiveCostPolicy.js";
+import {
   fiservFirstDataFullStatementDriver,
   fiservFirstDataProcessorStatementDriver,
   fiservFirstDataShortStatementDriver,
@@ -37,42 +41,6 @@ const FULL_INTEGRATED_STAGES: EvaluationExecutionStage[] = [
   "customer_publication",
   "final_artifact",
 ];
-
-const LIVE_COST_POLICY_TEMPLATE = {
-  statement_investigative_intelligence: openAiResponsesPolicy("investigative_intelligence", 24_000, 3_200, 0, 0.062),
-  web_search_discovery: openAiResponsesPolicy("web_search", 400_000, 2_000, 2, 0.54, "openai_responses_web_search"),
-  document_retrieval: {
-    pricingPolicyRef: "direct_https_retrieval_policy_v1",
-    providerRoute: "pinned_https_retrieval",
-    provider: "ratereveal",
-    model: null,
-    toolClass: "retrieval",
-    maximumInputTokens: 0,
-    maximumOutputTokens: 0,
-    maximumToolUses: 1,
-    pricing: {
-      uncachedInputUsdPerMillionTokens: 0,
-      cachedInputUsdPerMillionTokens: 0,
-      outputUsdPerMillionTokens: 0,
-      toolUseUsd: 0.001,
-    },
-    estimatedMaximumCostUsd: 0.001,
-  },
-  retrieved_document_investigative_intelligence: openAiResponsesPolicy("investigative_intelligence", 24_000, 3_200, 0, 0.062),
-  semantic_verification: openAiResponsesPolicy("semantic_verification", 4_096, 1_000, 0, 0.01512),
-  whole_statement_ai_review: {
-    pricingPolicyRef: "openai_official_pricing_2026-08-08_v1",
-    providerRoute: "openai_ai_sdk_generate_text_structured_output",
-    provider: "openai",
-    model: "gpt-5.4-mini",
-    toolClass: "ai_sdk_structured_output",
-    maximumInputTokens: 400_000,
-    maximumOutputTokens: 5_000,
-    maximumToolUses: 0,
-    pricing: null,
-    estimatedMaximumCostUsd: 0.1,
-  },
-};
 
 const parserDrivers: ParserDriver<unknown>[] = [
   fiservFirstDataProcessorStatementDriver,
@@ -178,9 +146,9 @@ const package5BUnits = workPlan.units.filter((unit) => unit.status === "selected
 const package5BParentEnvelope = roundUsd(
   package5BUnits.reduce((sum, unit) => sum + unit.estimatedMaximumCostUsd, 0) + 0.000001,
 );
-const costPolicy = structuredClone(LIVE_COST_POLICY_TEMPLATE);
-costPolicy.whole_statement_ai_review.estimatedMaximumCostUsd = package5BParentEnvelope;
+const costPolicy = oneTimeLiveCostPolicyTemplate(package5BParentEnvelope);
 await writeJson(costPolicyPath, costPolicy);
+const slotExpandedEnvelope = oneTimeSlotExpandedCostEnvelope(costPolicy, FULL_INTEGRATED_STAGES);
 
 console.log(JSON.stringify({
   outputDir,
@@ -207,35 +175,12 @@ console.log(JSON.stringify({
     parentEnvelopeUsd: package5BParentEnvelope,
     units: package5BUnits,
   },
-  totalEstimatedEnvelopeUsd: roundUsd(Object.values(costPolicy).reduce((sum, policy) => sum + policy.estimatedMaximumCostUsd, 0)),
+  costEnvelope: {
+    slotExpanded: true,
+    stages: slotExpandedEnvelope.stages,
+    totalEstimatedEnvelopeUsd: slotExpandedEnvelope.totalEstimatedEnvelopeUsd,
+  },
 }, null, 2));
-
-function openAiResponsesPolicy(
-  toolClass: string,
-  maximumInputTokens: number,
-  maximumOutputTokens: number,
-  maximumToolUses: number,
-  estimatedMaximumCostUsd: number,
-  providerRoute = "openai_responses",
-) {
-  return {
-    pricingPolicyRef: "openai_official_pricing_2026-08-08_v1",
-    providerRoute,
-    provider: "openai",
-    model: "gpt-5",
-    toolClass,
-    maximumInputTokens,
-    maximumOutputTokens,
-    maximumToolUses,
-    pricing: {
-      uncachedInputUsdPerMillionTokens: 1.25,
-      cachedInputUsdPerMillionTokens: 0.125,
-      outputUsdPerMillionTokens: 10,
-      toolUseUsd: 0.01,
-    },
-    estimatedMaximumCostUsd,
-  };
-}
 
 function argumentMap(values: string[]): Map<string, string> {
   const parsed = new Map<string, string>();

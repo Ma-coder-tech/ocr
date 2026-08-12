@@ -28,6 +28,9 @@ import {
   runManifestDrivenLiveEvaluation,
   recordAiLifecycleState,
   ONE_TIME_RESEARCH_REQUEST_SLOTS,
+  ONE_TIME_PAID_STAGE_ORDER,
+  oneTimeLiveCostPolicyTemplate,
+  oneTimeSlotExpandedCostEnvelope,
   sha256Canonical,
   verifyEvaluationRunIntegrityArtifact,
   verifyEvaluationRunIntegrityArtifactV2,
@@ -402,6 +405,59 @@ describe("evaluation-run integrity", () => {
       cumulativeReleasedUsd: 0,
       remainingBudgetUsd: 1.2,
       entries: [{ status: "timeout", worstCaseReservedCostUsd: 0.8, billingDisposition: "unknown" }],
+    });
+  });
+
+  it("reports the same one-time slot-expanded envelope that the production runner reserves", () => {
+    const package5BEnvelopeUsd = 0.06107425;
+    const costPolicy = oneTimeLiveCostPolicyTemplate(package5BEnvelopeUsd);
+    const allowedStages = [
+      "parser",
+      "statement_investigative_intelligence",
+      "whole_statement_ai_review",
+      "web_search_discovery",
+      "document_retrieval",
+      "retrieved_document_investigative_intelligence",
+      "semantic_verification",
+      "canonical_admission",
+      "customer_publication",
+      "final_artifact",
+    ] as const;
+    const envelope = oneTimeSlotExpandedCostEnvelope(costPolicy, allowedStages);
+    const singleCopyStageSum = ONE_TIME_PAID_STAGE_ORDER.reduce((sum, stage) => sum + costPolicy[stage].estimatedMaximumCostUsd, 0);
+    const ledger = new EvaluationCostBudgetLedger(envelope.totalEstimatedEnvelopeUsd);
+
+    for (const stage of envelope.stages) {
+      for (let ordinal = 0; ordinal < stage.slotCount; ordinal += 1) {
+        ledger.reserve({
+          ...costPolicy[stage.stage],
+          callId: `slot_${stage.stage}_${ordinal + 1}`,
+          attempt: 1,
+          retryOfCallId: null,
+          capability: stageCapability(stage.stage),
+          ...(stage.stage === "whole_statement_ai_review"
+            ? {
+                operationKind: "package_5b_budget_envelope" as const,
+                operationRef: "package_5b_budget_envelope",
+                reservationScope: "budget_envelope" as const,
+              }
+            : {}),
+        });
+      }
+    }
+
+    expect(singleCopyStageSum).toBeLessThan(envelope.totalEstimatedEnvelopeUsd);
+    expect(envelope.stages.find((item) => item.stage === "web_search_discovery")).toMatchObject({
+      slotCount: ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch,
+      estimatedMaximumCostUsdPerSlot: 0.06,
+      estimatedMaximumCostUsd: 0.3,
+    });
+    expect(envelope.totalEstimatedEnvelopeUsd).toBeCloseTo(1.20427425, 9);
+    expect(ledger.snapshot()).toMatchObject({
+      approvedBudgetUsd: envelope.totalEstimatedEnvelopeUsd,
+      cumulativeBudgetCommittedUsd: envelope.totalEstimatedEnvelopeUsd,
+      remainingBudgetUsd: 0,
+      blocked: true,
     });
   });
 
@@ -2318,6 +2374,18 @@ function costReservation(input: {
     },
     estimatedMaximumCostUsd: input.estimatedMaximumCostUsd,
   };
+}
+
+function stageCapability(stage: (typeof ONE_TIME_PAID_STAGE_ORDER)[number]) {
+  const mapping = {
+    statement_investigative_intelligence: "investigative_intelligence",
+    web_search_discovery: "web_search",
+    document_retrieval: "retrieval",
+    retrieved_document_investigative_intelligence: "investigative_intelligence",
+    semantic_verification: "semantic_verification",
+    whole_statement_ai_review: "ai_sdk",
+  } as const;
+  return mapping[stage];
 }
 
 function package5BChildReservation(parentCallId: string, operationRef: string, estimatedMaximumCostUsd: number) {
