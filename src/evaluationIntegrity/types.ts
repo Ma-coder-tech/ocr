@@ -374,6 +374,7 @@ export type CostLedgerEntry = {
   maximumInputTokens: number | null;
   maximumOutputTokens: number | null;
   maximumToolUses: number | null;
+  reservedAt: string;
   requestId: string | null;
   startedAt: string;
   endedAt: string | null;

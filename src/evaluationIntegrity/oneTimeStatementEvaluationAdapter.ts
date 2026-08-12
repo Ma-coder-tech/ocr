@@ -817,6 +817,8 @@ export function createOneTimeStatementEvaluationTransport(input: {
         });
       }
       context.retrieved.push({ ...candidate, retrieved: response.value });
+      sortRetrievedContext(context);
+      sortIntelligenceRecords(context);
       return result({
         value: { retrievedCount: context.retrieved.length },
         reasonCodes: ["fee_knowledge_retrieval_completed"],
@@ -884,6 +886,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
         return providerFailureResult({ started, error, reasonCode, scope: "candidate_local" });
       }
       context.intelligence.push(...records);
+      sortIntelligenceRecords(context);
       return result({
         value: { intelligenceCount: records.length, totalIntelligenceCount: context.intelligence.length, scope: "retrieved_document", candidateId: item.candidateId },
         generated: investigativeAccounting !== null,
@@ -1766,6 +1769,14 @@ function currentSourcePacket(context: OneTimePrivateContext): FeeKnowledgeSource
     researchAttempts: context.attempts,
     researchCandidates: context.candidates,
   });
+}
+
+function sortRetrievedContext(context: OneTimePrivateContext): void {
+  context.retrieved.sort((left, right) => left.candidateId.localeCompare(right.candidateId));
+}
+
+function sortIntelligenceRecords(context: OneTimePrivateContext): void {
+  context.intelligence.sort((left, right) => left.intelligenceId.localeCompare(right.intelligenceId));
 }
 
 function completeResearchAfterTerminal(context: OneTimePrivateContext): void {
