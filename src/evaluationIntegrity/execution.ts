@@ -6,7 +6,9 @@ import { buildEvaluationRunIntegrityArtifact, verifyEvaluationRunIntegrityArtifa
 import {
   buildEvaluationExpectedResearchQuestionProjection,
   buildEvaluationRunIntegrityArtifactV2,
+  EvaluationArtifactV2ValidationError,
   verifyEvaluationRunIntegrityArtifactV2,
+  writeEvaluationInvalidArtifactV2DiagnosticSnapshot,
   writeAndVerifyEvaluationRunIntegrityArtifactV2,
 } from "./canonicalAdmissionArtifact.js";
 import { EvaluationCostBudgetLedger, type CostReservationInput } from "./costLedger.js";
@@ -723,19 +725,30 @@ async function writeVerifiedFinalArtifactV2(input: {
       finalArtifactRef: "self:artifactContentHash",
     }));
   }
-  const artifact = buildEvaluationRunIntegrityArtifactV2({
-    manifest: input.manifest,
-    approvedManifestHash: input.approvedManifestHash,
-    executionPermit: input.executionPermit,
-    lifecycleLedger: input.lifecycleLedger,
-    packageFinancialInvariance: input.packageFinancialInvariance,
-    costBudgetLedger: input.costBudgetLedger,
-    providerCallOutcomes: input.providerCallOutcomes,
-    finalStatus: input.finalStatus,
-    reasonCodes: input.reasonCodes,
-    canonicalAdmissionResults: input.canonicalAdmissionResults,
-    preparedSanitizedPackets: input.preparedSanitizedPackets,
-  });
+  let artifact: EvaluationRunIntegrityArtifactV2;
+  try {
+    artifact = buildEvaluationRunIntegrityArtifactV2({
+      manifest: input.manifest,
+      approvedManifestHash: input.approvedManifestHash,
+      executionPermit: input.executionPermit,
+      lifecycleLedger: input.lifecycleLedger,
+      packageFinancialInvariance: input.packageFinancialInvariance,
+      costBudgetLedger: input.costBudgetLedger,
+      providerCallOutcomes: input.providerCallOutcomes,
+      finalStatus: input.finalStatus,
+      reasonCodes: input.reasonCodes,
+      canonicalAdmissionResults: input.canonicalAdmissionResults,
+      preparedSanitizedPackets: input.preparedSanitizedPackets,
+    });
+  } catch (error) {
+    if (error instanceof EvaluationArtifactV2ValidationError) {
+      await writeEvaluationInvalidArtifactV2DiagnosticSnapshot({
+        snapshot: error.diagnosticSnapshot,
+        outputPath: `${path.resolve(input.outputArtifactPath)}.invalid-artifact-v2-diagnostic.json`,
+      }).catch(() => undefined);
+    }
+    throw error;
+  }
   if (!verifyEvaluationRunIntegrityArtifactV2(artifact)) throw new Error("final_integrity_artifact_v2_verification_failed");
   await writeAndVerifyEvaluationRunIntegrityArtifactV2({ artifact, outputPath: path.resolve(input.outputArtifactPath) });
   const independentlyRead = JSON.parse(await readFile(path.resolve(input.outputArtifactPath), "utf8")) as EvaluationRunIntegrityArtifactV2;

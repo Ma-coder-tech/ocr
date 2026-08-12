@@ -28,6 +28,8 @@ import {
   buildEvaluationRunIntegrityArtifact,
   buildEvaluationRunIntegrityArtifactV1,
   buildEvaluationRunIntegrityArtifactV2,
+  buildEvaluationInvalidArtifactV2DiagnosticSnapshot,
+  EvaluationArtifactV2ValidationError,
   buildEvaluationExpectedResearchQuestionProjection,
   calculateEvaluationCanonicalReferenceProjectionHash,
   calculateEvaluationClaimSupportDecisionRef,
@@ -47,6 +49,9 @@ import {
   verifyEvaluationRunIntegrityArtifactByType,
   verifyEvaluationRunIntegrityArtifactV1,
   verifyEvaluationRunIntegrityArtifactV2,
+  verifyEvaluationInvalidArtifactV2DiagnosticSnapshot,
+  validateEvaluationRunIntegrityArtifactV2WithDiagnostics,
+  writeEvaluationInvalidArtifactV2DiagnosticSnapshot,
   writeAndVerifyEvaluationRunIntegrityArtifactV2,
   writeAndVerifyEvaluationRunIntegrityArtifactV2ForTesting,
   type EvaluationCanonicalAdmissionResultInput,
@@ -114,6 +119,60 @@ describe("Evaluation Run Integrity Artifact V2", () => {
     const outputPath = path.join(directory, "artifact.json");
     expect(await writeAndVerifyEvaluationRunIntegrityArtifactV2({ artifact, outputPath })).toBe(outputPath);
     expect(verifyEvaluationRunIntegrityArtifactV2(JSON.parse(await readFile(outputPath, "utf8")))).toBe(true);
+    const diagnosticPath = `${outputPath}.invalid-artifact-v2-diagnostic.json`;
+    await expect(lstat(diagnosticPath)).rejects.toThrow();
+    expect(validateEvaluationRunIntegrityArtifactV2WithDiagnostics(artifact)).toEqual({ valid: true, issues: [] });
+  });
+
+  it("builds and writes a safe diagnostic snapshot for invalid V2 artifacts", async () => {
+    const artifact = validArtifact() as unknown as Record<string, any>;
+    const candidate = artifact.canonicalAdmissionResults[0].researchEvidence.candidates[0];
+    candidate.semanticVerificationStatus = "completed";
+    candidate.claimSupportRefs = [];
+    resign(artifact);
+
+    const validation = validateEvaluationRunIntegrityArtifactV2WithDiagnostics(artifact);
+    expect(validation.valid).toBe(false);
+    expect(validation.issues).toContainEqual({
+      rule: "research_candidate_state",
+      path: "canonical_admission_results_research_evidence_candidates",
+      category: "research_evidence",
+    });
+
+    const snapshot = buildEvaluationInvalidArtifactV2DiagnosticSnapshot({
+      artifact: artifact as unknown as EvaluationRunIntegrityArtifactV2,
+      validation,
+    });
+    expect(verifyEvaluationInvalidArtifactV2DiagnosticSnapshot(snapshot)).toBe(true);
+    const serialized = JSON.stringify(snapshot);
+    expect(serialized).toContain("research_candidate_state");
+    expect(serialized).toContain(candidate.candidateRef);
+
+    const sensitiveArtifact = validArtifact() as unknown as Record<string, any>;
+    sensitiveArtifact.rawProviderResponse = "do not persist this response";
+    sensitiveArtifact.canonicalAdmissionResults[0].researchEvidence.candidates[0].rawPrompt =
+      "do not persist this prompt with sk-test-secret or https://private.example/search?q=merchant";
+    resign(sensitiveArtifact);
+    const sensitiveValidation = validateEvaluationRunIntegrityArtifactV2WithDiagnostics(sensitiveArtifact);
+    const sensitiveSnapshot = buildEvaluationInvalidArtifactV2DiagnosticSnapshot({
+      artifact: sensitiveArtifact as unknown as EvaluationRunIntegrityArtifactV2,
+      validation: sensitiveValidation,
+    });
+    const sensitiveSerialized = JSON.stringify(sensitiveSnapshot);
+    expect(sensitiveValidation.issues[0].rule).toBe("top_shape");
+    expect(verifyEvaluationInvalidArtifactV2DiagnosticSnapshot(sensitiveSnapshot)).toBe(true);
+    expect(serialized).not.toContain("sk-test-secret");
+    expect(sensitiveSerialized).not.toContain("sk-test-secret");
+    expect(sensitiveSerialized).not.toContain("https://private.example");
+    expect(sensitiveSerialized).not.toContain("do not persist this prompt");
+    expect(sensitiveSerialized).not.toContain("do not persist this response");
+
+    const directory = await mkdtemp(path.join(tmpdir(), "artifact-v2-invalid-diagnostic-"));
+    const outputPath = path.join(directory, "artifact.json.invalid-artifact-v2-diagnostic.json");
+    expect(await writeEvaluationInvalidArtifactV2DiagnosticSnapshot({ snapshot, outputPath })).toBe(outputPath);
+    const persisted = JSON.parse(await readFile(outputPath, "utf8"));
+    expect(verifyEvaluationInvalidArtifactV2DiagnosticSnapshot(persisted)).toBe(true);
+    expect(persisted.validation.issues[0].rule).toBe("research_candidate_state");
   });
 
   it("invalidates the artifact when any nested admission field changes without matching hashes", () => {
@@ -566,11 +625,20 @@ describe("Evaluation Run Integrity Artifact V2", () => {
       status: "budget_exhausted",
       reasonCodes: ["fee_knowledge_research_budget_exhausted"],
     }));
-    expect(() => buildEvaluationRunIntegrityArtifactV2({
-      ...prepared.fixture.v1Input,
-      canonicalAdmissionResults: [prepared.result],
-      preparedSanitizedPackets: [{ resultId: prepared.result.resultId, packet: prepared.packet }],
-    })).toThrow("Evaluation Artifact V2 validation failed closed");
+    let caught: unknown;
+    try {
+      buildEvaluationRunIntegrityArtifactV2({
+        ...prepared.fixture.v1Input,
+        canonicalAdmissionResults: [prepared.result],
+        preparedSanitizedPackets: [{ resultId: prepared.result.resultId, packet: prepared.packet }],
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(EvaluationArtifactV2ValidationError);
+    expect((caught as EvaluationArtifactV2ValidationError).message).toContain("Evaluation Artifact V2 validation failed closed");
+    expect(verifyEvaluationInvalidArtifactV2DiagnosticSnapshot((caught as EvaluationArtifactV2ValidationError).diagnosticSnapshot)).toBe(true);
+    expect((caught as EvaluationArtifactV2ValidationError).diagnosticSnapshot.validation.issues.length).toBeGreaterThan(0);
   });
 
   it("keeps two prepared questions for the same fee row separately represented", () => {

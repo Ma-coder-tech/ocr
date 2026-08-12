@@ -320,6 +320,48 @@ const PREPARED_RESEARCH_QUESTION_KEYS = [
   "statementPeriodYear", "deterministicCategory", "deterministicEconomicOwner", "deterministicContractualController",
   "deterministicActionabilityCeiling", "deterministicConfidence", "semanticQuestion", "adaptiveFollowUp",
 ] as const;
+const INVALID_ARTIFACT_DIAGNOSTIC_VERSION = "evaluation_invalid_artifact_v2_diagnostic_v1" as const;
+const INVALID_DIAGNOSTIC_TOP_LEVEL_KEYS = [
+  "type", "artifactType", "artifactContentHash", "validation", "topLevel", "costBudgetLedger",
+  "providerCallOutcomes", "packageFinancialInvariance", "canonicalAdmissionResults",
+] as const;
+const INVALID_DIAGNOSTIC_VALIDATION_KEYS = ["valid", "issues"] as const;
+const INVALID_DIAGNOSTIC_ISSUE_KEYS = ["rule", "path", "category"] as const;
+
+export type EvaluationArtifactV2ValidationDiagnosticIssue = {
+  rule: string;
+  path: string;
+  category: string;
+};
+
+export type EvaluationArtifactV2ValidationDiagnostics = {
+  valid: boolean;
+  issues: EvaluationArtifactV2ValidationDiagnosticIssue[];
+};
+
+export class EvaluationArtifactV2ValidationError extends Error {
+  readonly diagnosticSnapshot: EvaluationInvalidArtifactV2DiagnosticSnapshot;
+
+  constructor(diagnosticSnapshot: EvaluationInvalidArtifactV2DiagnosticSnapshot) {
+    super("Evaluation Artifact V2 validation failed closed.");
+    this.name = "EvaluationArtifactV2ValidationError";
+    this.diagnosticSnapshot = diagnosticSnapshot;
+  }
+}
+
+export type EvaluationInvalidArtifactV2DiagnosticSnapshot = {
+  type: typeof INVALID_ARTIFACT_DIAGNOSTIC_VERSION;
+  artifactType: typeof EVALUATION_INTEGRITY_ARTIFACT_V2_VERSION;
+  artifactContentHash: string;
+  validation: EvaluationArtifactV2ValidationDiagnostics;
+  topLevel: Record<string, unknown>;
+  costBudgetLedger: Record<string, unknown>;
+  providerCallOutcomes: unknown[];
+  packageFinancialInvariance: unknown[];
+  canonicalAdmissionResults: unknown[];
+};
+
+let activeValidationIssues: EvaluationArtifactV2ValidationDiagnosticIssue[] | null = null;
 
 type PreparedResearchQuestion = OneTimeStatementEvaluationPacket["research"]["questions"][number];
 
@@ -402,9 +444,11 @@ export function buildEvaluationRunIntegrityArtifactV2(
     canonicalAdmissionResults: results,
   } as const;
   const artifact: EvaluationRunIntegrityArtifactV2 = { ...content, artifactContentHash: sha256Canonical(content) };
-  if (!verifyEvaluationRunIntegrityArtifactV2(artifact)) {
-    writeInvalidArtifactDebugSnapshot(artifact);
-    throw new Error("Evaluation Artifact V2 validation failed closed.");
+  const validation = validateEvaluationRunIntegrityArtifactV2WithDiagnostics(artifact);
+  if (!validation.valid) {
+    const diagnosticSnapshot = buildEvaluationInvalidArtifactV2DiagnosticSnapshot({ artifact, validation });
+    writeInvalidArtifactDebugSnapshot(diagnosticSnapshot);
+    throw new EvaluationArtifactV2ValidationError(diagnosticSnapshot);
   }
   return artifact;
 }
@@ -441,7 +485,24 @@ export function verifyEvaluationRunIntegrityArtifactV2(value: unknown): value is
   return true;
 }
 
+export function validateEvaluationRunIntegrityArtifactV2WithDiagnostics(value: unknown): EvaluationArtifactV2ValidationDiagnostics {
+  const previousIssues = activeValidationIssues;
+  const issues: EvaluationArtifactV2ValidationDiagnosticIssue[] = [];
+  activeValidationIssues = issues;
+  try {
+    const valid = verifyEvaluationRunIntegrityArtifactV2(value);
+    return { valid, issues: dedupeValidationIssues(issues) };
+  } finally {
+    activeValidationIssues = previousIssues;
+  }
+}
+
 function debugReject(stage: string): false {
+  activeValidationIssues?.push({
+    rule: stage,
+    path: validationIssuePath(stage),
+    category: validationIssueCategory(stage),
+  });
   if (process.env.EVALUATION_ARTIFACT_DEBUG?.trim()) {
     console.error(`[evaluation-artifact-v2] rejected at ${stage}`);
   }
@@ -453,7 +514,7 @@ function debugInvalid(stage: string): boolean {
   return false;
 }
 
-function writeInvalidArtifactDebugSnapshot(artifact: EvaluationRunIntegrityArtifactV2): void {
+function writeInvalidArtifactDebugSnapshot(snapshot: EvaluationInvalidArtifactV2DiagnosticSnapshot): void {
   const outputDir = process.env.EVALUATION_ARTIFACT_INVALID_DEBUG_DIR?.trim();
   if (!outputDir) return;
   try {
@@ -463,15 +524,445 @@ function writeInvalidArtifactDebugSnapshot(artifact: EvaluationRunIntegrityArtif
     const relative = path.relative(repositoryRoot, resolvedOutputDir);
     if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) return;
     mkdirSync(outputDir, { recursive: true });
-    const digest = createHash("sha256").update(JSON.stringify(artifact)).digest("hex").slice(0, 16);
+    if (!verifyEvaluationInvalidArtifactV2DiagnosticSnapshot(snapshot)) return;
+    const digest = createHash("sha256").update(JSON.stringify(snapshot)).digest("hex").slice(0, 16);
     writeFileSync(
       path.join(outputDir, `invalid-evaluation-artifact-v2-${digest}.json`),
-      `${JSON.stringify(artifact, null, 2)}\n`,
+      `${JSON.stringify(snapshot, null, 2)}\n`,
       { mode: 0o600 },
     );
   } catch {
     // Debug snapshots must never mask the fail-closed validation result.
   }
+}
+
+export async function writeEvaluationInvalidArtifactV2DiagnosticSnapshot(input: {
+  snapshot: EvaluationInvalidArtifactV2DiagnosticSnapshot;
+  outputPath: string;
+}): Promise<string> {
+  if (!verifyEvaluationInvalidArtifactV2DiagnosticSnapshot(input.snapshot)) {
+    throw new Error("Refusing to write an invalid Evaluation Artifact V2 diagnostic snapshot.");
+  }
+  await assertOutsideRepositoryArtifactPath(input.outputPath);
+  await mkdir(path.dirname(input.outputPath), { recursive: true });
+  await writeFile(input.outputPath, `${JSON.stringify(input.snapshot, null, 2)}\n`, { mode: 0o600 });
+  return input.outputPath;
+}
+
+export function buildEvaluationInvalidArtifactV2DiagnosticSnapshot(input: {
+  artifact: EvaluationRunIntegrityArtifactV2;
+  validation: EvaluationArtifactV2ValidationDiagnostics;
+}): EvaluationInvalidArtifactV2DiagnosticSnapshot {
+  const snapshot: EvaluationInvalidArtifactV2DiagnosticSnapshot = {
+    type: INVALID_ARTIFACT_DIAGNOSTIC_VERSION,
+    artifactType: EVALUATION_INTEGRITY_ARTIFACT_V2_VERSION,
+    artifactContentHash: input.artifact.artifactContentHash,
+    validation: {
+      valid: false,
+      issues: dedupeValidationIssues(input.validation.issues),
+    },
+    topLevel: {
+      manifestVersion: input.artifact.manifestVersion,
+      manifestHash: input.artifact.manifestHash,
+      approvedManifestHash: input.artifact.approvedManifestHash,
+      finalStatus: input.artifact.finalStatus,
+      reasonCodes: safeStringArray(input.artifact.reasonCodes),
+      sourceDocumentIds: input.artifact.sourceIdentity.map((source) => source.sourceDocumentId).sort(),
+      lifecycleStageCounts: countBy(input.artifact.lifecycleLedger.documents.flatMap((document) => document.events), (event) => `${event.stage}:${event.state}`),
+    },
+    costBudgetLedger: summarizeCostBudgetLedger(input.artifact.costBudgetLedger),
+    providerCallOutcomes: input.artifact.providerCallOutcomes.map((outcome) => ({
+      callId: outcome.callId,
+      parentCallId: outcome.parentCallId,
+      operationKind: outcome.operationKind,
+      operationRef: outcome.operationRef,
+      sourceDocumentId: outcome.sourceDocumentId,
+      stage: outcome.stage,
+      status: outcome.status,
+      requestId: outcome.requestId,
+      reasonCodes: safeStringArray(outcome.reasonCodes),
+    })).sort((left, right) => String(left.callId).localeCompare(String(right.callId))),
+    packageFinancialInvariance: input.artifact.packageFinancialInvariance.map((item) => ({
+      sourceDocumentId: item.sourceDocumentId,
+      invariant: item.result.invariant,
+      mismatchPaths: safeStringArray(item.result.mismatchPaths),
+      packageStatuses: item.result.packages.map((pkg) => ({
+        package: pkg.package,
+        invariant: pkg.invariant,
+        mismatchPaths: safeStringArray(pkg.mismatchPaths),
+      })),
+    })).sort((left, right) => String(left.sourceDocumentId).localeCompare(String(right.sourceDocumentId))),
+    canonicalAdmissionResults: input.artifact.canonicalAdmissionResults.map(summarizeCanonicalAdmissionResult),
+  };
+  if (!verifyEvaluationInvalidArtifactV2DiagnosticSnapshot(snapshot)) {
+    throw new Error("Evaluation Artifact V2 diagnostic snapshot failed safe-schema verification.");
+  }
+  return snapshot;
+}
+
+export function verifyEvaluationInvalidArtifactV2DiagnosticSnapshot(value: unknown): value is EvaluationInvalidArtifactV2DiagnosticSnapshot {
+  if (!isRecord(value) || !hasExactKeys(value, INVALID_DIAGNOSTIC_TOP_LEVEL_KEYS)) return false;
+  if (value.type !== INVALID_ARTIFACT_DIAGNOSTIC_VERSION || value.artifactType !== EVALUATION_INTEGRITY_ARTIFACT_V2_VERSION) return false;
+  if (!SHA256.test(stringValue(value.artifactContentHash))) return false;
+  if (!isRecord(value.validation) || !hasExactKeys(value.validation, INVALID_DIAGNOSTIC_VALIDATION_KEYS)) return false;
+  if (value.validation.valid !== false || !Array.isArray(value.validation.issues) || value.validation.issues.length === 0) return false;
+  for (const issue of value.validation.issues) {
+    if (!isRecord(issue) || !hasExactKeys(issue, INVALID_DIAGNOSTIC_ISSUE_KEYS)) return false;
+    if (!SAFE_CODE.test(stringValue(issue.rule)) || !SAFE_REFERENCE.test(stringValue(issue.path)) || !SAFE_CODE.test(stringValue(issue.category))) return false;
+  }
+  for (const key of ["topLevel", "costBudgetLedger"] as const) if (!isRecord(value[key])) return false;
+  for (const key of ["providerCallOutcomes", "packageFinancialInvariance", "canonicalAdmissionResults"] as const) if (!Array.isArray(value[key])) return false;
+  return !containsSensitiveDiagnosticValue(value);
+}
+
+function summarizeCostBudgetLedger(value: EvaluationRunIntegrityArtifactV2["costBudgetLedger"]): Record<string, unknown> {
+  return {
+    type: value.type,
+    currency: value.currency,
+    approvedBudgetUsd: value.approvedBudgetUsd,
+    cumulativeReservedUsd: value.cumulativeReservedUsd,
+    cumulativeObservedUsd: value.cumulativeObservedUsd,
+    cumulativeBudgetCommittedUsd: value.cumulativeBudgetCommittedUsd,
+    cumulativeReleasedUsd: value.cumulativeReleasedUsd,
+    remainingBudgetUsd: value.remainingBudgetUsd,
+    blocked: value.blocked,
+    entries: value.entries.map((entry) => ({
+      callId: entry.callId,
+      parentCallId: entry.parentCallId,
+      operationKind: entry.operationKind,
+      operationRef: entry.operationRef,
+      reservationScope: entry.reservationScope,
+      attempt: entry.attempt,
+      attemptKind: entry.attemptKind,
+      retryOfCallId: entry.retryOfCallId,
+      capability: entry.capability,
+      maximumInputTokens: entry.maximumInputTokens,
+      maximumOutputTokens: entry.maximumOutputTokens,
+      maximumToolUses: entry.maximumToolUses,
+      requestId: entry.requestId,
+      startedAt: entry.startedAt,
+      endedAt: entry.endedAt,
+      durationMs: entry.durationMs,
+      status: entry.status,
+      inputTokens: entry.inputTokens,
+      cachedInputTokens: entry.cachedInputTokens,
+      outputTokens: entry.outputTokens,
+      toolEventCount: entry.toolEvents.length,
+      estimatedMaximumCostUsd: entry.estimatedMaximumCostUsd,
+      worstCaseReservedCostUsd: entry.worstCaseReservedCostUsd,
+      observedOrEstimatedFinalCostUsd: entry.observedOrEstimatedFinalCostUsd,
+      billingDisposition: entry.billingDisposition,
+      cumulativeReservedUsd: entry.cumulativeReservedUsd,
+      cumulativeObservedUsd: entry.cumulativeObservedUsd,
+      cumulativeBudgetCommittedUsd: entry.cumulativeBudgetCommittedUsd,
+      cumulativeReleasedUsd: entry.cumulativeReleasedUsd,
+      remainingBudgetUsd: entry.remainingBudgetUsd,
+    })).sort((left, right) => String(left.callId).localeCompare(String(right.callId))),
+  };
+}
+
+function summarizeCanonicalAdmissionResult(result: EvaluationRunIntegrityArtifactV2["canonicalAdmissionResults"][number]): Record<string, unknown> {
+  return {
+    resultId: result.resultId,
+    sourceDocumentId: result.sourceDocumentId,
+    capabilityId: result.capabilityId,
+    executionRef: result.executionRef,
+    lifecycleAdmissionRef: result.lifecycleAdmissionRef,
+    admissionDisposition: result.admissionDisposition,
+    reasonCodes: safeStringArray(result.reasonCodes),
+    authoritative: result.authoritative,
+    financialMutationAllowed: result.financialMutationAllowed,
+    customerPublished: result.customerPublished,
+    resultContentHash: result.resultContentHash,
+    admission: {
+      executionStatus: result.admission.executionStatus,
+      validationStatus: result.admission.validationStatus,
+      groundingStatus: result.admission.groundingStatus,
+      admissionDisposition: result.admission.admissionDisposition,
+      acceptedClaimSupportRefs: safeStringArray(result.admission.acceptedClaimSupportRefs),
+      rejectedClaimSupportRefs: safeStringArray(result.admission.rejectedClaimSupportRefs),
+      researchAttemptRefs: safeStringArray(result.admission.researchAttemptRefs),
+      validationErrorCodes: safeStringArray(result.admission.validationErrorCodes),
+      reasonCodes: safeStringArray(result.admission.reasonCodes),
+      safeCounts: structuredClone(result.admission.safeCounts),
+      package5aDiagnosticRef: result.admission.package5aDiagnosticRef,
+    },
+    package5a: {
+      diagnosticRef: result.package5a.diagnosticRef,
+      executionState: result.package5a.executionState,
+      admissionState: result.package5a.admissionState,
+      finalCanonicalStatus: result.package5a.finalCanonicalStatus,
+      stageStates: structuredClone(result.package5a.stageStates),
+      reasonCodes: safeStringArray(result.package5a.reasonCodes),
+      projectionReasonCodes: safeStringArray(result.package5a.projectionReasonCodes),
+      diagnosticRefs: safeStringArray(result.package5a.diagnosticRefs),
+      rawPromptPersisted: result.package5a.rawPromptPersisted,
+      rawResponsePersisted: result.package5a.rawResponsePersisted,
+      rawStatementTextPersisted: result.package5a.rawStatementTextPersisted,
+      providerDetailsPersisted: result.package5a.providerDetailsPersisted,
+    },
+    package5bWorkPlan: summarizePackage5bWorkPlan(result.package5bWorkPlan),
+    packageF: summarizePackageF(result.packageF),
+    researchEvidence: summarizeResearchEvidence(result.researchEvidence),
+    canonicalReferenceProof: {
+      canonicalFeeRowRefs: safeStringArray(result.canonicalReferenceProof.canonicalFeeRowRefs),
+      canonicalEvidenceRefs: safeStringArray(result.canonicalReferenceProof.canonicalEvidenceRefs),
+      candidateRefs: safeStringArray(result.canonicalReferenceProof.candidateRefs),
+      claimSupportRefs: safeStringArray(result.canonicalReferenceProof.claimSupportRefs),
+      claimSupportDecisionRefs: safeStringArray(result.canonicalReferenceProof.claimSupportDecisionRefs),
+      approvedFactRefs: safeStringArray(result.canonicalReferenceProof.approvedFactRefs),
+      canonicalReferenceProjectionHash: result.canonicalReferenceProof.canonicalReferenceProjectionHash,
+      preparedSanitizedPacketContentHash: result.canonicalReferenceProof.preparedSanitizedPacketContentHash,
+      wholeStatementPacketContentHash: result.canonicalReferenceProof.wholeStatementPacketContentHash,
+      expectedResearchQuestions: {
+        limits: structuredClone(result.canonicalReferenceProof.expectedResearchQuestions.limits),
+        questions: result.canonicalReferenceProof.expectedResearchQuestions.questions.map((question) => {
+          const adaptiveFollowUp = (question as Record<string, unknown>).adaptiveFollowUp;
+          return {
+            questionRef: question.questionRef,
+            feeRowRef: question.feeRowRef,
+            questionOrdinal: question.questionOrdinal,
+            sanitizedQuestionCategory: question.sanitizedQuestionCategory,
+            triggerReason: question.triggerReason,
+            adaptiveFollowUp: isRecord(adaptiveFollowUp) ? {
+              parentQuestionRef: adaptiveFollowUp.parentQuestionRef,
+              triggerReason: adaptiveFollowUp.triggerReason,
+            } : null,
+          };
+        }),
+      },
+    },
+  };
+}
+
+function summarizePackage5bWorkPlan(value: EvaluationRunIntegrityArtifactV2["canonicalAdmissionResults"][number]["package5bWorkPlan"]): Record<string, unknown> | null {
+  if (value === null) return null;
+  return {
+    type: value.type,
+    policyVersion: value.policyVersion,
+    mode: value.mode,
+    statementPacketContentHash: value.statementPacketContentHash,
+    expectedFeeRowCount: value.expectedFeeRowCount,
+    plannedFeeRowCount: value.plannedFeeRowCount,
+    selectedFeeRowCount: value.selectedFeeRowCount,
+    reviewedFeeRowCount: value.reviewedFeeRowCount,
+    missingFeeRowCount: value.missingFeeRowCount,
+    plannedWorkUnitCount: value.plannedWorkUnitCount,
+    selectedWorkUnitCount: value.selectedWorkUnitCount,
+    completedWorkUnitCount: value.completedWorkUnitCount,
+    unavailableWorkUnitCount: value.unavailableWorkUnitCount,
+    notSelectedWorkUnitCount: value.notSelectedWorkUnitCount,
+    units: value.units.map((unit) => ({
+      workUnitRef: unit.workUnitRef,
+      ordinal: unit.ordinal,
+      status: unit.status,
+      outcomeClass: unit.outcomeClass,
+      expectedFeeRowRefs: safeStringArray(unit.expectedFeeRowRefs),
+      expectedRowCount: unit.expectedRowCount,
+      reviewedRowCount: unit.reviewedRowCount,
+      missingRowCount: unit.missingRowCount,
+      duplicatedRowCount: unit.duplicatedRowCount,
+      unknownRowCount: unit.unknownRowCount,
+      estimatedInputBytes: unit.estimatedInputBytes,
+      estimatedOutputTokens: unit.estimatedOutputTokens,
+      outputTokenCeiling: unit.outputTokenCeiling,
+      requestId: unit.requestId,
+      inputTokens: unit.inputTokens,
+      cachedInputTokens: unit.cachedInputTokens,
+      outputTokens: unit.outputTokens,
+      durationMs: unit.durationMs,
+      billingDisposition: unit.billingDisposition,
+      reasonCodes: safeStringArray(unit.reasonCodes),
+    })),
+    rawPromptPersisted: value.rawPromptPersisted,
+    rawResponsePersisted: value.rawResponsePersisted,
+    providerDetailsPersisted: value.providerDetailsPersisted,
+    reasonCodes: safeStringArray(value.reasonCodes),
+  };
+}
+
+function summarizePackageF(value: EvaluationRunIntegrityArtifactV2["canonicalAdmissionResults"][number]["packageF"]): Record<string, unknown> | null {
+  if (value === null) return null;
+  const output = value.output as Record<string, any>;
+  return {
+    type: value.type,
+    capabilityId: value.capabilityId,
+    executionRef: value.executionRef,
+    sourceReferencesValidatedAgainstProof: value.sourceReferencesValidatedAgainstProof,
+    authoritative: value.authoritative,
+    financialMutationAllowed: value.financialMutationAllowed,
+    coverageProof: isRecord(output.coverageProof) ? {
+      reviewedFeeRowRefs: safeStringArray(output.coverageProof.reviewedFeeRowRefs),
+      missingFeeRowRefs: safeStringArray(output.coverageProof.missingFeeRowRefs),
+      duplicatedFeeRowRefs: safeStringArray(output.coverageProof.duplicatedFeeRowRefs),
+      unknownFeeRowRefs: safeStringArray(output.coverageProof.unknownFeeRowRefs),
+    } : null,
+    rowInterpretations: Array.isArray(output.rowInterpretations) ? output.rowInterpretations.map((row: Record<string, unknown>) => ({
+      feeRowRef: row.feeRowRef,
+      category: row.category,
+      likelyEconomicOwner: row.likelyEconomicOwner,
+      likelyContractualController: row.likelyContractualController,
+      confidence: row.confidence,
+      actionability: row.actionability,
+      evidenceProvenance: row.evidenceProvenance,
+      externalClaimSupportRef: row.externalClaimSupportRef,
+      reasonCodes: safeStringArray(row.reasonCodes),
+    })) : [],
+    acceptanceRecords: Array.isArray(output.acceptanceRecords) ? output.acceptanceRecords.map((record: Record<string, unknown>) => ({
+      feeRowRef: record.feeRowRef,
+      status: record.status,
+      externalClaimSupportRef: record.externalClaimSupportRef,
+      reasonCodes: safeStringArray(record.reasonCodes),
+    })) : [],
+  };
+}
+
+function summarizeResearchEvidence(value: EvaluationRunIntegrityArtifactV2["canonicalAdmissionResults"][number]["researchEvidence"]): Record<string, unknown> {
+  return {
+    type: value.type,
+    attempts: value.attempts.map((attempt) => ({
+      researchAttemptRef: attempt.researchAttemptRef,
+      questionRef: attempt.questionRef,
+      feeRowRef: attempt.feeRowRef,
+      questionOrdinal: attempt.questionOrdinal,
+      sanitizedQuestionCategory: attempt.sanitizedQuestionCategory,
+      triggerReason: attempt.triggerReason,
+      status: attempt.status,
+      resultCount: attempt.resultCount,
+      candidateRefs: safeStringArray(attempt.candidateRefs),
+      reasonCodes: safeStringArray(attempt.reasonCodes),
+    })),
+    candidates: value.candidates.map((candidate) => ({
+      candidateRef: candidate.candidateRef,
+      researchAttemptRef: candidate.researchAttemptRef,
+      questionRef: candidate.questionRef,
+      feeRowRef: candidate.feeRowRef,
+      verificationStatus: candidate.verificationStatus,
+      retrievalStatus: candidate.retrievalStatus,
+      semanticVerificationStatus: candidate.semanticVerificationStatus,
+      claimSupportRefs: safeStringArray(candidate.claimSupportRefs),
+      reasonCodes: safeStringArray(candidate.reasonCodes),
+      safeRetrievalDiagnostics: "safeRetrievalDiagnostics" in candidate ? structuredClone(candidate.safeRetrievalDiagnostics) : null,
+    })),
+    intelligence: "intelligence" in value && Array.isArray(value.intelligence) ? value.intelligence.map((item) => ({
+      intelligenceRef: item.intelligenceRef,
+      feeRowRef: item.feeRowRef,
+      origin: item.origin,
+      state: item.state,
+      subject: item.subject,
+      confidence: item.confidence,
+      actionabilityCeiling: item.actionabilityCeiling,
+      merchantActionability: item.merchantActionability,
+      proofRequirement: item.proofRequirement,
+      resolutionRequirement: "resolutionRequirement" in item ? item.resolutionRequirement : null,
+      candidateRefs: safeStringArray(item.candidateRefs),
+      claimSupportRefs: safeStringArray(item.claimSupportRefs),
+      reasonCodes: safeStringArray(item.reasonCodes),
+      candidateEvidence: item.candidateEvidence === null ? null : structuredClone(item.candidateEvidence),
+      mathVerificationStatus: item.mathVerificationStatus,
+    })) : [],
+    claimSupports: value.claimSupports.map((support) => ({
+      claimSupportRef: support.claimSupportRef,
+      origin: support.origin,
+      runtimeSourceRef: support.runtimeSourceRef,
+      runtimeClaimRef: support.runtimeClaimRef,
+      candidateRef: support.candidateRef,
+      researchAttemptRef: support.researchAttemptRef,
+      questionRef: support.questionRef,
+      approvedSourceRef: support.approvedSourceRef,
+      approvedClaimRef: support.approvedClaimRef,
+      approvedRegistryVersionRef: support.approvedRegistryVersionRef,
+      approvedSourceLifecycle: support.approvedSourceLifecycle,
+      approvedSourceApplicable: support.approvedSourceApplicable,
+      approvedRegistryVerificationRef: support.approvedRegistryVerificationRef,
+      approvedContentFingerprint: support.approvedContentFingerprint,
+      approvedRegistryProofLevel: support.approvedRegistryProofLevel,
+      approvedRegistryScopeBasis: support.approvedRegistryScopeBasis,
+      feeRowRef: support.feeRowRef,
+      runtimeDocumentFingerprint: support.runtimeDocumentFingerprint,
+      locatorTextHash: support.locatorTextHash,
+      claimKind: support.structuredClaim.claimKind,
+      proposedCategory: support.structuredClaim.proposedCategory,
+      likelyEconomicOwner: support.structuredClaim.likelyEconomicOwner,
+      likelyContractualController: support.structuredClaim.likelyContractualController,
+      maximumConfidence: support.structuredClaim.maximumConfidence,
+      actionabilityCeiling: support.structuredClaim.actionabilityCeiling,
+      semanticDecision: support.semanticDecision,
+      applicability: structuredClone(support.applicability),
+      rateOrAmountComparison: support.rateOrAmountComparison,
+      hasDeterministicCalculationProof: support.hasDeterministicCalculationProof,
+      hasConditions: support.hasConditions,
+      hasStructuredClaimExclusions: support.hasStructuredClaimExclusions,
+      hasSupportExclusions: support.hasSupportExclusions,
+      finalConfidence: support.finalConfidence,
+      finalActionabilityCeiling: support.finalActionabilityCeiling,
+      evidenceDecision: support.evidenceDecision,
+      contradictionCodes: safeStringArray(support.contradictionCodes),
+      reasonCodes: safeStringArray(support.reasonCodes),
+      disposition: support.disposition,
+      claimSupportDecisionRef: support.claimSupportDecisionRef,
+    })),
+  };
+}
+
+function dedupeValidationIssues(issues: EvaluationArtifactV2ValidationDiagnosticIssue[]): EvaluationArtifactV2ValidationDiagnosticIssue[] {
+  const seen = new Set<string>();
+  const deduped: EvaluationArtifactV2ValidationDiagnosticIssue[] = [];
+  for (const issue of issues) {
+    const key = `${issue.rule}:${issue.path}:${issue.category}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(issue);
+  }
+  return deduped;
+}
+
+function validationIssueCategory(rule: string): string {
+  if (rule.startsWith("research_")) return "research_evidence";
+  if (rule.startsWith("package5b_")) return "package_5b";
+  if (rule.startsWith("packagef_")) return "package_f";
+  if (rule.startsWith("admission_") || rule.startsWith("result")) return "canonical_admission";
+  if (rule.startsWith("v1_") || rule.startsWith("top_")) return "artifact_shape";
+  if (rule.startsWith("reference_")) return "canonical_reference";
+  if (rule.startsWith("lifecycle")) return "lifecycle";
+  if (rule.startsWith("invariance")) return "package_b_e_invariance";
+  return "artifact_validation";
+}
+
+function validationIssuePath(rule: string): string {
+  if (rule.startsWith("research_attempt")) return "canonical_admission_results_research_evidence_attempts";
+  if (rule.startsWith("research_candidate")) return "canonical_admission_results_research_evidence_candidates";
+  if (rule.startsWith("research_claim_support")) return "canonical_admission_results_research_evidence_claim_supports";
+  if (rule.startsWith("research_intelligence")) return "canonical_admission_results_research_evidence_intelligence";
+  if (rule.startsWith("package5b_work_plan_unit")) return "canonical_admission_results_package_5b_work_plan_units";
+  if (rule.startsWith("package5b_work_plan")) return "canonical_admission_results_package_5b_work_plan";
+  if (rule.startsWith("packagef")) return "canonical_admission_results_package_f";
+  if (rule.startsWith("admission")) return "canonical_admission_results_admission";
+  if (rule.startsWith("reference")) return "canonical_admission_results_canonical_reference_proof";
+  if (rule.startsWith("lifecycle")) return "lifecycle_ledger";
+  if (rule.startsWith("invariance")) return "package_financial_invariance";
+  if (rule.startsWith("v1_")) return "trusted_v1_fields";
+  if (rule.startsWith("top_")) return "artifact";
+  if (rule.startsWith("result")) return "canonical_admission_results";
+  return "artifact";
+}
+
+function countBy<T>(values: T[], classify: (value: T) => string): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const value of values) counts[classify(value)] = (counts[classify(value)] ?? 0) + 1;
+  return Object.fromEntries(Object.entries(counts).sort(([left], [right]) => left.localeCompare(right)));
+}
+
+function safeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item)).sort();
+}
+
+function containsSensitiveDiagnosticValue(value: unknown): boolean {
+  if (typeof value === "string") return SENSITIVE_VALUE.test(value);
+  if (Array.isArray(value)) return value.some(containsSensitiveDiagnosticValue);
+  if (isRecord(value)) return Object.values(value).some(containsSensitiveDiagnosticValue);
+  return false;
 }
 
 export function verifyEvaluationRunIntegrityArtifactByType(value: unknown): value is EvaluationRunIntegrityArtifact | EvaluationRunIntegrityArtifactV2 {
