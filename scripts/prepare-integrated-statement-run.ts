@@ -27,7 +27,12 @@ import { genericFiservStatementDriver } from "../src/genericFiservStatementParse
 import { parsePdf } from "../src/parser.js";
 import type { ParserDriver } from "../src/parserFoundation.js";
 import { analyzeStatementDocument } from "../src/statementParserOrchestrator.js";
-import { buildWholeStatementFeeIntelligenceWorkPlan } from "../src/canonical/wholeStatementFeeIntelligenceWorkPlan.js";
+import {
+  buildWholeStatementFeeIntelligenceWorkPlan,
+  wholeStatementFeeIntelligenceAggregateOutputCeiling,
+  wholeStatementFeeIntelligenceEvidenceAwareInputReserveBytes,
+  wholeStatementFeeIntelligenceWorkUnitOutputReserveTokens,
+} from "../src/canonical/wholeStatementFeeIntelligenceWorkPlan.js";
 
 const FULL_INTEGRATED_STAGES: EvaluationExecutionStage[] = [
   "parser",
@@ -128,10 +133,20 @@ const workPlan = buildWholeStatementFeeIntelligenceWorkPlan({
   mode: "comprehensive",
   limits: { maxAggregateInputBytes: null, maxAggregateOutputTokens: null },
 });
-const package5BUnits = workPlan.units.filter((unit) => unit.status === "selected").map((unit) => {
+const selectedPackage5BUnits = workPlan.units.filter((unit) => unit.status === "selected");
+const package5BUnitsAtDeterministicCeilings = selectedPackage5BUnits.map((unit) => {
+  const maximumInputTokens = wholeStatementFeeIntelligenceEvidenceAwareInputReserveBytes({
+    unit,
+    researchLimits: (prepared.sanitizedPacket as any).research.limits,
+  });
+  const maximumOutputTokens = wholeStatementFeeIntelligenceWorkUnitOutputReserveTokens({
+    unit,
+    parentMaximumOutputTokens: 5_000,
+    aggregateOutputCeiling: null,
+  });
   const estimatedMaximumCostUsd = calculateWorstCaseCostUsd({
-    maximumInputTokens: unit.estimatedInputBytes,
-    maximumOutputTokens: unit.estimatedOutputTokens,
+    maximumInputTokens,
+    maximumOutputTokens,
     maximumToolUses: 0,
     pricing: OPENAI_PACKAGE_5B_STRUCTURED_OUTPUT_PRICING,
   });
@@ -139,14 +154,50 @@ const package5BUnits = workPlan.units.filter((unit) => unit.status === "selected
     workUnitRef: unit.workUnitRef,
     rowCount: unit.expectedFeeRowRefs.length,
     estimatedInputBytes: unit.estimatedInputBytes,
+    maximumInputTokens,
+    maximumOutputTokens,
     estimatedOutputTokens: unit.estimatedOutputTokens,
     estimatedMaximumCostUsd,
   };
 });
 const package5BParentEnvelope = roundUsd(
-  package5BUnits.reduce((sum, unit) => sum + unit.estimatedMaximumCostUsd, 0) + 0.000001,
+  package5BUnitsAtDeterministicCeilings.reduce((sum, unit) => sum + unit.estimatedMaximumCostUsd, 0) + 0.000001,
 );
 const costPolicy = oneTimeLiveCostPolicyTemplate(package5BParentEnvelope);
+const aggregateOutputCeiling = wholeStatementFeeIntelligenceAggregateOutputCeiling({
+  parentMaximumOutputTokens: costPolicy.whole_statement_ai_review.maximumOutputTokens,
+  parentEstimatedMaximumCostUsd: costPolicy.whole_statement_ai_review.estimatedMaximumCostUsd,
+  parentMaximumToolUses: costPolicy.whole_statement_ai_review.maximumToolUses,
+  pricing: OPENAI_PACKAGE_5B_STRUCTURED_OUTPUT_PRICING,
+  units: selectedPackage5BUnits,
+  researchLimits: (prepared.sanitizedPacket as any).research.limits,
+  calculateWorstCaseCostUsd,
+});
+const package5BUnits = selectedPackage5BUnits.map((unit) => {
+  const maximumInputTokens = wholeStatementFeeIntelligenceEvidenceAwareInputReserveBytes({
+    unit,
+    researchLimits: (prepared.sanitizedPacket as any).research.limits,
+  });
+  const maximumOutputTokens = wholeStatementFeeIntelligenceWorkUnitOutputReserveTokens({
+    unit,
+    parentMaximumOutputTokens: costPolicy.whole_statement_ai_review.maximumOutputTokens,
+    aggregateOutputCeiling,
+  });
+  return {
+    workUnitRef: unit.workUnitRef,
+    rowCount: unit.expectedFeeRowRefs.length,
+    estimatedInputBytes: unit.estimatedInputBytes,
+    maximumInputTokens,
+    maximumOutputTokens,
+    estimatedOutputTokens: unit.estimatedOutputTokens,
+    estimatedMaximumCostUsd: calculateWorstCaseCostUsd({
+      maximumInputTokens,
+      maximumOutputTokens,
+      maximumToolUses: 0,
+      pricing: OPENAI_PACKAGE_5B_STRUCTURED_OUTPUT_PRICING,
+    }),
+  };
+});
 await writeJson(costPolicyPath, costPolicy);
 const slotExpandedEnvelope = oneTimeSlotExpandedCostEnvelope(costPolicy, FULL_INTEGRATED_STAGES);
 

@@ -12,6 +12,8 @@ import type { CanonicalStatementAnalysis } from "../src/canonical/types.js";
 import { parsePdfBytes } from "../src/parser.js";
 import { analyzeStatementDocument } from "../src/statementParserOrchestrator.js";
 import { buildCanonicalRuntimeAnalysis } from "../src/canonical/runtimeAdapter.js";
+import { accountingFromProviderUsage } from "../src/evaluationIntegrity/providerAccounting.js";
+import { ONE_TIME_EVALUATION_CONCURRENCY_POLICY } from "../src/evaluationIntegrity/oneTimeConcurrencyPolicy.js";
 import {
   ONE_TIME_RESEARCH_REQUEST_SLOTS,
   buildEvaluationSourceManifest,
@@ -47,9 +49,9 @@ describe("Package 5B manifest-driven admission", () => {
       outputArtifactPath: path.join(fixture.directory, "package-5b-statement-only.json"),
       oneTimeResearchQuestionsForTesting: () => [],
       oneTimeServicesForTesting: {
-        wholeStatementReview: async (packet) => {
+        wholeStatementReview: async (packet, context) => {
           wholeStatementInvocations += 1;
-          return external(validReview(packet), "request_whole_statement");
+          return wholeStatementExternal(validReview(packet), "request_whole_statement", context);
         },
       },
     });
@@ -80,7 +82,13 @@ describe("Package 5B manifest-driven admission", () => {
     const wholeStatementCallId = expectedCalls.find((call) => call.stage === "whole_statement_ai_review")!.reservation.callId;
     expect(result.costLedger.entries.find((entry) => entry.callId === wholeStatementCallId)?.observedOrEstimatedFinalCostUsd)
       .toBe(0);
-    expect(result.costLedger.entries.filter((entry) => entry.operationKind === "package_5b_work_unit").every((entry) => entry.observedOrEstimatedFinalCostUsd === 0.01))
+    expect(result.costLedger.entries.filter((entry) => entry.operationKind === "package_5b_work_unit").every((entry) =>
+      entry.status === "success" &&
+      entry.billingDisposition === "observed" &&
+      entry.observedOrEstimatedFinalCostUsd !== null &&
+      entry.observedOrEstimatedFinalCostUsd > 0 &&
+      entry.observedOrEstimatedFinalCostUsd <= entry.worstCaseReservedCostUsd
+    ))
       .toBe(true);
     expect(result.costLedger.entries.filter((entry) => /fee_classification|package_5c/i.test(entry.callId))).toEqual([]);
     expect(result.packageFinancialInvariance[0]!.result.packages.every((item) => item.beforeHash === item.afterHash)).toBe(true);
@@ -96,6 +104,7 @@ describe("Package 5B manifest-driven admission", () => {
           reservation: {
             ...call.reservation,
             pricing: null,
+            maximumInputTokens: 100_000,
             estimatedMaximumCostUsd: 1,
           },
         });
@@ -105,7 +114,7 @@ describe("Package 5B manifest-driven admission", () => {
       outputArtifactPath: path.join(fixture.directory, "package-5b-derived-work-unit-pricing.json"),
       oneTimeResearchQuestionsForTesting: () => [],
       oneTimeServicesForTesting: {
-        wholeStatementReview: async (packet) => external(validReview(packet), "request_whole_derived_pricing"),
+        wholeStatementReview: async (packet, context) => wholeStatementExternal(validReview(packet), "request_whole_derived_pricing", context),
       },
     });
 
@@ -238,7 +247,7 @@ describe("Package 5B manifest-driven admission", () => {
           semanticCalls += 1;
           return external(semanticSupport(structuredClaim), "request_semantic_should_not_run");
         },
-        wholeStatementReview: async (packet) => external(validReview(packet), "request_whole_not_eligible"),
+        wholeStatementReview: async (packet, context) => wholeStatementExternal(validReview(packet), "request_whole_not_eligible", context),
       },
     });
 
@@ -304,7 +313,7 @@ describe("Package 5B manifest-driven admission", () => {
           semanticCalls += 1;
           return external(semanticSupport(structuredClaim), "request_semantic_adaptive");
         },
-        wholeStatementReview: async (packet) => external(validReview(packet), "request_whole_after_adaptive"),
+        wholeStatementReview: async (packet, context) => wholeStatementExternal(validReview(packet), "request_whole_after_adaptive", context),
       },
     });
 
@@ -422,7 +431,7 @@ describe("Package 5B manifest-driven admission", () => {
           decision: "unsupported" as const,
           reasonCodes: ["synthetic_semantic_unsupported"],
         }, "request_semantic_full_integrated"),
-        wholeStatementReview: async (packet) => external(validReview(packet), "request_whole_full_integrated"),
+        wholeStatementReview: async (packet, context) => wholeStatementExternal(validReview(packet), "request_whole_full_integrated", context),
       },
     });
 
@@ -472,8 +481,8 @@ describe("Package 5B manifest-driven admission", () => {
         provider: "sanitized_provider",
         model: "sanitized_model",
         toolClass: "investigative_intelligence",
-        maximumInputTokens: 1000000,
-        maximumOutputTokens: 50000,
+        maximumInputTokens: 100_000,
+        maximumOutputTokens: 5_000,
         maximumToolUses: 0,
         pricing: {
           uncachedInputUsdPerMillionTokens: 0,
@@ -481,7 +490,7 @@ describe("Package 5B manifest-driven admission", () => {
           outputUsdPerMillionTokens: 2,
           toolUseUsd: 0,
         },
-        estimatedMaximumCostUsd: 0.5,
+        estimatedMaximumCostUsd: 0.05,
       },
     };
     let webCalls = 0;
@@ -668,7 +677,7 @@ describe("Package 5B manifest-driven admission", () => {
         outputArtifactPath: path.join(fixture.directory, "integrated-web-unsupported-model-pre-send.json"),
         oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis)],
         oneTimeServicesForTesting: {
-          wholeStatementReview: async (packet) => external(validReview(packet), "request_whole_after_unsupported_web_model"),
+          wholeStatementReview: async (packet, context) => wholeStatementExternal(validReview(packet), "request_whole_after_unsupported_web_model", context),
         },
       });
 
@@ -720,7 +729,7 @@ describe("Package 5B manifest-driven admission", () => {
             return external([{ url: "https://www.fiserv.com/semantic-provider-unavailable", title: "Official fee guide", publisher: "Fiserv" }], "request_search_semantic_readiness");
           },
           documentRetrieval: async (url) => external(retrievedTextDocument(url, feeLabel), "request_retrieval_semantic_readiness"),
-          wholeStatementReview: async (packet) => external(validReview(packet), "request_whole_semantic_readiness"),
+          wholeStatementReview: async (packet, context) => wholeStatementExternal(validReview(packet), "request_whole_semantic_readiness", context),
         },
       });
 
@@ -732,7 +741,7 @@ describe("Package 5B manifest-driven admission", () => {
       expect(admission.researchEvidence.claimSupports).toEqual([]);
       expect(admission.researchEvidence.candidates[0]).toMatchObject({
         retrievalStatus: "retrieved_text",
-        semanticVerificationStatus: "provider_unavailable",
+        semanticVerificationStatus: "not_started",
         verificationStatus: "verified_candidate_limited",
       });
       expect(admission.researchEvidence.candidates[0]?.reasonCodes).toContain("fee_knowledge_semantic_provider_unavailable_before_send");
@@ -841,10 +850,10 @@ describe("Package 5B manifest-driven admission", () => {
           searchedQuestions.push(...questions);
           return external([], `request_search_privacy_${searchedQuestions.length}`);
         },
-        wholeStatementReview: async (packet) => {
+        wholeStatementReview: async (packet, context) => {
           wholeStatementInvocations += 1;
           packetObservedByWholeStatementService = structuredClone(packet);
-          return external(validReview(packet), "request_whole_privacy");
+          return wholeStatementExternal(validReview(packet), "request_whole_privacy", context);
         },
       },
     });
@@ -949,9 +958,9 @@ describe("Package 5B manifest-driven admission", () => {
           reasonCodes: ["synthetic_semantic_support"],
           providerDetailsStripped: true,
         }, "request_semantic"),
-        wholeStatementReview: async (packet) => {
+        wholeStatementReview: async (packet, context) => {
           packetsObservedByWholeStatementService.push(structuredClone(packet));
-          return external(validReview(packet, true), "request_whole_research");
+          return wholeStatementExternal(validReview(packet, true), "request_whole_research", context);
         },
       },
     });
@@ -1032,7 +1041,7 @@ describe("Package 5B manifest-driven admission", () => {
           },
           reasonCodes: ["deterministic_calculation_matches"],
         }, "request_semantic_application"),
-        wholeStatementReview: async (packet) => external(validReview(packet, true), "request_whole_application"),
+        wholeStatementReview: async (packet, context) => wholeStatementExternal(validReview(packet, true), "request_whole_application", context),
       },
     });
 
@@ -1067,11 +1076,11 @@ describe("Package 5B manifest-driven admission", () => {
         },
         documentRetrieval: async (url) => external(retrievedTextDocument(url, runtimeLabel), "request_retrieval_runtime_source_only"),
         semanticVerification: async ({ structuredClaim }) => external(semanticSupport(structuredClaim), "request_semantic_runtime_source_only"),
-        wholeStatementReview: async (packet) => {
+        wholeStatementReview: async (packet, context) => {
           const review = validReview(packet, true);
           const externalRow = review.rowInterpretations.find((row: any) => row.evidenceProvenance === "runtime_verified_documentation");
           if (externalRow) externalRow.externalClaimSupportRef = null;
-          return external(review, "request_whole_runtime_source_only");
+          return wholeStatementExternal(review, "request_whole_runtime_source_only", context);
         },
       },
     });
@@ -1094,11 +1103,11 @@ describe("Package 5B manifest-driven admission", () => {
       oneTimeRegistryForTesting: registry,
       oneTimeResearchQuestionsForTesting: () => [],
       oneTimeServicesForTesting: {
-        wholeStatementReview: async (packet) => {
+        wholeStatementReview: async (packet, context) => {
           const review = validReviewWithApprovedSupport(packet);
           const externalRow = review.rowInterpretations.find((row: any) => row.evidenceProvenance === "approved_external_documentation");
           if (externalRow) externalRow.externalClaimSupportRef = null;
-          return external(review, "request_whole_approved_source_only");
+          return wholeStatementExternal(review, "request_whole_approved_source_only", context);
         },
       },
     });
@@ -1130,7 +1139,7 @@ describe("Package 5B manifest-driven admission", () => {
         oneTimeResearchQuestionsForTesting: () => [],
         onOneTimeFinalizedForTesting: (_sourceDocumentId, value) => { finalized = structuredClone(value); },
         oneTimeServicesForTesting: {
-          wholeStatementReview: async (packet) => {
+          wholeStatementReview: async (packet, context) => {
             const review = validReviewWithApprovedSupport(packet);
             const row = review.rowInterpretations.find((item: any) => item.evidenceProvenance === "approved_external_documentation")!;
             if (mode === "ambiguous") row.externalClaimSupportRef = null;
@@ -1139,7 +1148,7 @@ describe("Package 5B manifest-driven admission", () => {
               row.externalSourceRef = "approved_source_foreign";
             }
             if (mode === "mismatched_pair") row.externalSourceRef = registry.sources[0]!.claims[1]!.claimId;
-            return external(review, `request_whole_reference_${mode}`);
+            return wholeStatementExternal(review, `request_whole_reference_${mode}`, context);
           },
         },
       });
@@ -1188,7 +1197,7 @@ describe("Package 5B manifest-driven admission", () => {
             ? external({ type: "fee_knowledge_retrieved_document", policyVersion: "fee_knowledge_retrieval_v1", status: "safety_blocked", canonicalUrl: null, redirectChain: [], contentType: null, byteLength: 0, documentFingerprint: null, title: null, text: "", locators: [], reasonCodes: ["fee_knowledge_url_private_host"] }, "request_retrieval_safety")
             : external(await retrieveFeeKnowledgeDocument(url, { abortSignal: options.abortSignal, resolveHost: async () => ["93.184.216.34"], fetchImpl: async () => new Response(`<p>Fiserv ${labelByUrl.get(url) ?? modeFeeLabel} official fee guide for 2024.</p>`, { status: 200, headers: { "content-type": "text/html" } }) }), `request_retrieval_${mode}`),
           semanticVerification: async ({ structuredClaim }) => external({ type: "fee_knowledge_semantic_support_decision", policyVersion: FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION, decision: mode === "unsupported" ? "unsupported" : mode === "contradiction" ? "contradicts" : "supports", structuredClaim, reasonCodes: ["synthetic_semantic_result"], providerDetailsStripped: true }, `request_semantic_${mode}`),
-          wholeStatementReview: async (packet) => external(validReview(packet), `request_whole_${mode}`),
+          wholeStatementReview: async (packet, context) => wholeStatementExternal(validReview(packet), `request_whole_${mode}`, context),
         },
       });
 
@@ -1232,7 +1241,7 @@ describe("Package 5B manifest-driven admission", () => {
         outputArtifactPath: path.join(fixture.directory, `package-5b-${variant}.json`),
         oneTimeResearchQuestionsForTesting: () => [],
         oneTimeServicesForTesting: {
-          wholeStatementReview: async (packet) => external(reviewWithDisposition(packet, variant), `request_whole_${variant}`),
+          wholeStatementReview: async (packet, context) => wholeStatementExternal(reviewWithDisposition(packet, variant), `request_whole_${variant}`, context),
         },
       });
       expect(result.finalStatus).toBe("completed");
@@ -1255,7 +1264,7 @@ describe("Package 5B manifest-driven admission", () => {
         oneTimeRegistryForTesting: registry,
         oneTimeResearchQuestionsForTesting: () => [],
         oneTimeServicesForTesting: {
-          wholeStatementReview: async (packet) => external(validReviewWithApprovedSupport(packet), `request_whole_registry_${mode}`),
+          wholeStatementReview: async (packet, context) => wholeStatementExternal(validReviewWithApprovedSupport(packet), `request_whole_registry_${mode}`, context),
         },
       });
       expect(result.finalStatus).toBe("completed");
@@ -1313,9 +1322,9 @@ describe("Package 5B manifest-driven admission", () => {
           if (semanticCalls === 2) throw timeout;
           return external({ type: "fee_knowledge_semantic_support_decision", policyVersion: FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION, decision: "supports", structuredClaim, reasonCodes: ["synthetic_semantic_support"], providerDetailsStripped: true }, "request_semantic_first");
         },
-        wholeStatementReview: async (packet) => {
+        wholeStatementReview: async (packet, context) => {
           wholeStatementCalls += 1;
-          return external(validReview(packet, true), "request_whole_after_partial_semantic_timeout");
+          return wholeStatementExternal(validReview(packet, true), "request_whole_after_partial_semantic_timeout", context);
         },
       },
     });
@@ -1358,8 +1367,8 @@ describe("Package 5B manifest-driven admission", () => {
         provider: "sanitized_provider",
         model: "sanitized_model",
         toolClass: "investigative_intelligence",
-        maximumInputTokens: 1000000,
-        maximumOutputTokens: 50000,
+        maximumInputTokens: 100_000,
+        maximumOutputTokens: 5_000,
         maximumToolUses: 0,
         pricing: {
           uncachedInputUsdPerMillionTokens: 0,
@@ -1367,7 +1376,7 @@ describe("Package 5B manifest-driven admission", () => {
           outputUsdPerMillionTokens: 2,
           toolUseUsd: 0,
         },
-        estimatedMaximumCostUsd: 0.5,
+        estimatedMaximumCostUsd: 0.05,
       },
     }));
 	    const result = await runManifestDrivenLiveEvaluation({
@@ -1396,9 +1405,9 @@ describe("Package 5B manifest-driven admission", () => {
           semanticCalls += 1;
           return external(semanticSupport(structuredClaim), "request_semantic_after_retrieved_doc_timeout");
         },
-        wholeStatementReview: async (packet) => {
+        wholeStatementReview: async (packet, context) => {
           wholeStatementCalls += 1;
-          return external(validReview(packet, true), "request_whole_after_retrieved_doc_timeout");
+          return wholeStatementExternal(validReview(packet, true), "request_whole_after_retrieved_doc_timeout", context);
         },
       },
     });
@@ -1507,8 +1516,8 @@ describe("Package 5B manifest-driven admission", () => {
         },
         semanticVerification: async ({ structuredClaim }) =>
           external(semanticSupport(structuredClaim), `request_semantic_concurrent_${structuredClaim.claimId}`),
-        wholeStatementReview: async (packet) =>
-          external(validReview(packet, true), "request_whole_concurrent_candidate_work"),
+        wholeStatementReview: async (packet, context) =>
+          wholeStatementExternal(validReview(packet, true), "request_whole_concurrent_candidate_work", context),
       },
     });
 
@@ -1625,7 +1634,7 @@ describe("Package 5B manifest-driven admission", () => {
           return external(await retrieveFeeKnowledgeDocument(url, { abortSignal: options.abortSignal, resolveHost: async () => ["93.184.216.34"], fetchImpl: async () => new Response(`<p>Fiserv ${label} official classification guide for 2024.</p>`, { status: 200, headers: { "content-type": "text/html" } }) }), "request_retrieval_primary");
         },
         semanticVerification: async ({ structuredClaim }) => external({ type: "fee_knowledge_semantic_support_decision", policyVersion: FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION, decision: "supports", structuredClaim, reasonCodes: ["synthetic_semantic_support"], providerDetailsStripped: true }, "request_semantic_primary"),
-        wholeStatementReview: async (packet) => external(validReview(packet, true), "request_whole_unused_candidate"),
+        wholeStatementReview: async (packet, context) => wholeStatementExternal(validReview(packet, true), "request_whole_unused_candidate", context),
       },
     });
 
@@ -1680,9 +1689,9 @@ describe("Package 5B manifest-driven admission", () => {
           }
           return external(semanticSupport(structuredClaim), `request_semantic_candidate_${semanticCalls}`);
         },
-        wholeStatementReview: async (packet) => {
+        wholeStatementReview: async (packet, context) => {
           wholeStatementCalls += 1;
-          return external(validReview(packet, true), "request_whole_candidate_local");
+          return wholeStatementExternal(validReview(packet, true), "request_whole_candidate_local", context);
         },
       },
     });
@@ -1739,10 +1748,10 @@ describe("Package 5B manifest-driven admission", () => {
           semanticCalls += 1;
           return external(semanticSupport(structuredClaim), "request_semantic_safe");
         },
-        wholeStatementReview: async (packet) => {
+        wholeStatementReview: async (packet, context) => {
           wholeStatementCalls += 1;
           wholeStatementPackets.push(structuredClone(packet));
-          return external(validReview(packet, true), "request_whole_unsafe_then_safe");
+          return wholeStatementExternal(validReview(packet, true), "request_whole_unsafe_then_safe", context);
         },
       },
     });
@@ -1897,7 +1906,7 @@ describe("Package 5B manifest-driven admission", () => {
             const value = current.mode === "first_rejected" && sourceDocumentId === "doc_multi_a"
               ? { ...review, rowInterpretations: review.rowInterpretations.slice(1) }
               : review;
-            return external(value, `request_whole_${sourceDocumentId}`);
+            return wholeStatementExternal(value, `request_whole_${sourceDocumentId}`, context);
           },
         },
       });
@@ -1954,9 +1963,9 @@ describe("Package 5B manifest-driven admission", () => {
       ],
       oneTimeServicesForTesting: {
         webSearchDiscovery: async () => { throw timeout; },
-        wholeStatementReview: async (packet) => {
+        wholeStatementReview: async (packet, context) => {
           wholeStatementCalls += 1;
-          return external(validReview(packet), "request_whole_after_graph_timeout");
+          return wholeStatementExternal(validReview(packet), "request_whole_after_graph_timeout", context);
         },
       },
     });
@@ -1974,6 +1983,62 @@ describe("Package 5B manifest-driven admission", () => {
 	    expect(result.artifact.providerCallOutcomes.filter((outcome) => outcome.stage === "web_search_discovery")).toHaveLength(ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch);
 	    expect(result.artifact.providerCallOutcomes.filter((outcome) => outcome.stage === "web_search_discovery" && outcome.status === "timeout")).toHaveLength(2);
     expect(result.artifact.providerCallOutcomes.some((outcome) => outcome.stage === "whole_statement_ai_review" && outcome.status === "success")).toBe(true);
+  }, 30_000);
+
+  it("overlaps independent initial web searches without letting completion order change candidate order", async () => {
+    const fixture = await approvedShortCloverPdfFixture();
+    const active = new Set<number>();
+    const started: number[] = [];
+    const completed: number[] = [];
+    let maxActive = 0;
+    const delays = new Map([[0, 40], [1, 5], [2, 10]]);
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: fullOneTimeCalls("doc_one_time_clover_short"),
+      outputArtifactPath: path.join(fixture.directory, "package-5b-web-search-concurrency.json"),
+      oneTimeResearchLimitsForTesting: {
+        policyVersion: "fee_knowledge_research_policy_v1",
+        maxSearchCalls: 3,
+        maxAdaptiveFollowUpCalls: 0,
+        maxRetrievalCandidates: 3,
+        maxAdaptiveFollowUpCandidates: 0,
+        totalDeadlineMs: 5000,
+        maxResultCandidatesPerSearch: 1,
+      },
+      oneTimeResearchQuestionsForTesting: (analysis) => [
+        researchQuestion(analysis, 0),
+        researchQuestion(analysis, 1),
+        researchQuestion(analysis, 2),
+      ],
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async ({ questions: [question] }) => {
+          const ordinal = Number(/case (\d+)\./.exec(question!.semanticQuestion)?.[1] ?? "1") - 1;
+          started.push(ordinal);
+          active.add(ordinal);
+          maxActive = Math.max(maxActive, active.size);
+          await delay(delays.get(ordinal) ?? 1);
+          active.delete(ordinal);
+          completed.push(ordinal);
+          return external([{ url: `https://www.fiserv.com/concurrent/${ordinal}`, title: `Official fee guide ${ordinal}`, publisher: "Fiserv" }], `request_search_concurrent_${ordinal}`);
+        },
+        documentRetrieval: async (url) => external(textUnavailableDocument(url), `request_retrieval_${url.split("/").pop()}`),
+        wholeStatementReview: async (packet, context) => wholeStatementExternal(validReview(packet), "request_whole_after_concurrent_search", context),
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(maxActive).toBeGreaterThan(1);
+    expect(maxActive).toBeLessThanOrEqual(ONE_TIME_EVALUATION_CONCURRENCY_POLICY.stageLimits.web_search_discovery);
+    expect(completed[0]).not.toBe(0);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    expect(admission.researchEvidence.attempts.map((attempt) => attempt.questionOrdinal)).toEqual([1, 2, 3]);
+    expect(admission.researchEvidence.candidates).toHaveLength(3);
+    expect(admission.researchEvidence.candidates.map((candidate) => candidate.candidateRef)).toEqual(
+      [...admission.researchEvidence.candidates.map((candidate) => candidate.candidateRef)].sort(),
+    );
+    expect(started.length).toBe(3);
   }, 30_000);
 
   it("preserves completed research and ignores a late abort-insensitive semantic result", async () => {
@@ -2009,9 +2074,9 @@ describe("Package 5B manifest-driven admission", () => {
           if (semanticCalls === 1) return external(semanticSupport(structuredClaim), "request_semantic_deadline_one");
           return new Promise((resolve) => setTimeout(() => resolve(external(semanticSupport(structuredClaim), "request_semantic_deadline_late")), 1300));
         },
-        wholeStatementReview: async (packet) => {
+        wholeStatementReview: async (packet, context) => {
           wholeStatementCalls += 1;
-          return external(validReview(packet, true), "request_whole_after_late_semantic");
+          return wholeStatementExternal(validReview(packet, true), "request_whole_after_late_semantic", context);
         },
       },
     });
@@ -2028,6 +2093,69 @@ describe("Package 5B manifest-driven admission", () => {
     expect(admission.researchEvidence.candidates.map((candidate) => candidate.semanticVerificationStatus).sort()).toEqual(["completed", "completed"]);
     expect(admission.researchEvidence.claimSupports).toHaveLength(2);
     expect(admission.packageF).not.toBeNull();
+  }, 30_000);
+
+  it("overlaps independent semantic verification without changing deterministic admission order", async () => {
+    const fixture = await approvedOneTimePdfFixture(eligibleStages.filter((stage) => stage !== "whole_statement_ai_review"));
+    const active = new Set<number>();
+    let maxActive = 0;
+    let semanticSequence = 0;
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: fullOneTimeCalls().filter((call) => call.stage !== "whole_statement_ai_review"),
+      outputArtifactPath: path.join(fixture.directory, "package-5b-semantic-concurrency.json"),
+      oneTimeResearchLimitsForTesting: {
+        policyVersion: "fee_knowledge_research_policy_v1",
+        maxSearchCalls: 2,
+        maxRetrievalCandidates: 2,
+        totalDeadlineMs: 5000,
+        maxResultCandidatesPerSearch: 1,
+      },
+      oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis, 0), researchQuestion(analysis, 1)],
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async ({ questions: [question] }) => {
+          const ordinal = Number(/case (\d+)\./.exec(question!.semanticQuestion)?.[1] ?? "1") - 1;
+          return external([{ url: `https://www.fiserv.com/semantic-concurrent/${ordinal}`, title: "Official fee guide", publisher: "Fiserv" }], `request_search_semantic_concurrent_${ordinal}`);
+        },
+        documentRetrieval: async (url) => external(retrievedTextDocument(url, "fee"), `request_retrieval_semantic_concurrent_${url.split("/").pop()}`),
+        retrievedDocumentInvestigativeIntelligence: async ({ candidate, questions: [question] }) => external({
+          findings: [{
+            feeRowRef: question!.feeRowRef,
+            state: "source_derived_candidate_evidence",
+            subject: "source_relevance",
+            summary: "The retrieved document appears relevant but still requires strict semantic verification.",
+            reasonCodes: ["fee_knowledge_ai_candidate_evidence_locator"],
+            confidence: "low",
+            actionabilityCeiling: "verify_only",
+            merchantActionability: "internal_only",
+            proofRequirement: "external_verification_required",
+            candidateRef: candidate!.candidateId,
+            locatorTextHash: candidate!.retrieved.locators[0]!.textHash,
+            supportStatus: "candidate_only",
+          }],
+        }, `request_retrieved_doc_ai_semantic_concurrent_${candidate!.candidateId}`),
+        semanticVerification: async ({ structuredClaim }) => {
+          const ref = semanticSequence++;
+          active.add(ref);
+          maxActive = Math.max(maxActive, active.size);
+          await delay(ref === 0 ? 25 : 5);
+          active.delete(ref);
+          return external(semanticSupport(structuredClaim), `request_semantic_concurrent_${ref}`);
+        },
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(maxActive).toBeGreaterThan(1);
+    expect(maxActive).toBeLessThanOrEqual(ONE_TIME_EVALUATION_CONCURRENCY_POLICY.stageLimits.semantic_verification);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    expect(admission.researchEvidence.claimSupports).toHaveLength(2);
+    expect(admission.researchEvidence.claimSupports.map((support) => support.claimSupportRef)).toEqual(
+      [...admission.researchEvidence.claimSupports.map((support) => support.claimSupportRef)].sort(),
+    );
+    expect(admission.package5bWorkPlan?.reviewedRowCount ?? 0).toBe(0);
   }, 30_000);
 
   it("maps structured retrieval terminal values to exact research, lifecycle, admission, and run states", async () => {
@@ -2052,9 +2180,9 @@ describe("Package 5B manifest-driven admission", () => {
         oneTimeServicesForTesting: {
           webSearchDiscovery: async () => external([{ url: "https://www.fiserv.com/terminal", title: "Official fee guide", publisher: "Fiserv" }], `request_search_${retrievalStatus}`),
           documentRetrieval: async () => external(terminalRetrievedDocument(retrievalStatus, terminalReason), `request_retrieval_${retrievalStatus}`),
-          wholeStatementReview: async (packet) => {
+          wholeStatementReview: async (packet, context) => {
             wholeStatementCalls += 1;
-            return external(validReview(packet), `request_whole_retrieval_${retrievalStatus}`);
+            return wholeStatementExternal(validReview(packet), `request_whole_retrieval_${retrievalStatus}`, context);
           },
         },
       });
@@ -2115,9 +2243,9 @@ describe("Package 5B manifest-driven admission", () => {
             decision: "unsupported" as const,
             reasonCodes: [semanticReason],
           }, `request_semantic_${semanticStatus}`),
-          wholeStatementReview: async (packet) => {
+          wholeStatementReview: async (packet, context) => {
             wholeStatementCalls += 1;
-            return external(validReview(packet), `request_whole_semantic_${semanticStatus}`);
+            return wholeStatementExternal(validReview(packet), `request_whole_semantic_${semanticStatus}`, context);
           },
         },
       });
@@ -2187,7 +2315,7 @@ describe("Package 5B manifest-driven admission", () => {
       oneTimeResearchQuestionsForTesting: () => [],
       onOneTimeFinalizedForTesting: (_sourceDocumentId, finalized) => { finalizedEvaluation = structuredClone(finalized); },
       oneTimeServicesForTesting: {
-        wholeStatementReview: async (packet) => external(validReviewWithApprovedSupport(packet), "request_whole_partition"),
+        wholeStatementReview: async (packet, context) => wholeStatementExternal(validReviewWithApprovedSupport(packet), "request_whole_partition", context),
       },
     });
     expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
@@ -2208,7 +2336,6 @@ describe("Package 5B manifest-driven admission", () => {
 });
 
 function validReview(packet: any, useRuntimeSupport = false) {
-  const support = useRuntimeSupport ? packet.sourceProvenancePacket.claimSupports.find((item: any) => item.candidateId) : null;
   return {
     type: "whole_statement_fee_intelligence_review",
     reviewPolicyVersion: "whole_statement_fee_intelligence_review_v1",
@@ -2217,19 +2344,22 @@ function validReview(packet: any, useRuntimeSupport = false) {
     factRefs: [],
     limitationCodes: [],
     rowInterpretations: packet.admittedFeeRows.map((row: any) => {
+      const support = useRuntimeSupport
+        ? packet.sourceProvenancePacket.claimSupports.find((item: any) => item.candidateId && item.feeRowRef === row.feeRowRef)
+        : null;
       const external = support?.feeRowRef === row.feeRowRef;
       return {
         feeRowRef: row.feeRowRef,
         proposedCategory: external ? support.structuredClaim.proposedCategory : row.currentDeterministicCandidates[0]?.category ?? "unknown_needs_review",
         likelyEconomicOwner: external ? support.structuredClaim.likelyEconomicOwner : row.currentDeterministicCandidates[0]?.likelyEconomicOwner ?? "unknown",
         likelyContractualController: external ? support.structuredClaim.likelyContractualController : row.currentDeterministicCandidates[0]?.likelyContractualController ?? "unknown",
-        proposedActionabilityCeiling: external ? support.actionabilityCeiling : row.currentDeterministicCandidates[0]?.actionabilityCeiling ?? "unknown",
-        confidence: external ? support.confidence : row.currentDeterministicCandidates[0]?.confidence ?? "low",
+        proposedActionabilityCeiling: external ? support.structuredClaim.actionabilityCeiling : row.currentDeterministicCandidates[0]?.actionabilityCeiling ?? "unknown",
+        confidence: external ? support.structuredClaim.maximumConfidence : row.currentDeterministicCandidates[0]?.confidence ?? "low",
         conciseRationale: external ? "Verified official documentation supports this limited interpretation." : "Statement evidence and deterministic context support this interpretation.",
         evidenceProvenance: external ? "runtime_verified_documentation" : "statement_evidence",
         evidenceRefs: row.evidenceRefs,
-        externalSourceRef: external ? support.sourceId : null,
-        externalClaimSupportRef: external ? support.claimSupportId : null,
+        externalSourceRef: external ? support.sourceRef ?? support.sourceId : null,
+        externalClaimSupportRef: external ? support.claimSupportRef ?? support.claimSupportId : null,
         conflicts: [],
         missingEvidence: [],
         recommendedDisposition: "supported",
@@ -2374,12 +2504,12 @@ function fullOneTimeCalls(sourceDocumentId = "doc_one_time_fiserv") {
       retryOfCallId: null,
       capability,
       pricingPolicyRef: "sanitized_pricing_policy_v1",
-      providerRoute: "sanitized_route",
-      provider: "sanitized_provider",
-      model: "sanitized_model",
-      toolClass: capability,
+      providerRoute: stage === "whole_statement_ai_review" ? "openai_ai_sdk_generate_text_structured_output" : "sanitized_route",
+      provider: stage === "whole_statement_ai_review" ? "openai" : "sanitized_provider",
+      model: stage === "whole_statement_ai_review" ? "gpt-5.4-mini" : "sanitized_model",
+      toolClass: stage === "whole_statement_ai_review" ? "ai_sdk_structured_output" : capability,
       maximumInputTokens: 1000000,
-      maximumOutputTokens: 50000,
+      maximumOutputTokens: stage === "whole_statement_ai_review" ? 5_000 : 50_000,
       maximumToolUses: capability === "web_search" ? 2 : capability === "retrieval" ? 1 : 0,
       pricing: {
         uncachedInputUsdPerMillionTokens: 0,
@@ -2387,7 +2517,7 @@ function fullOneTimeCalls(sourceDocumentId = "doc_one_time_fiserv") {
         outputUsdPerMillionTokens: 2,
         toolUseUsd: 0,
       },
-      estimatedMaximumCostUsd: stage === "whole_statement_ai_review" ? 1 : 0.5,
+      estimatedMaximumCostUsd: stage === "whole_statement_ai_review" ? 5 : 0.5,
     },
   })));
 }
@@ -2495,8 +2625,34 @@ function sourceDocumentIdFromCall(callId: string): string {
   return match[1]!;
 }
 
-function external<T>(value: T, requestId: string) {
-  return { type: "one_time_external_request_result_v1" as const, value, accounting: { requestId, durationMs: 1, inputTokens: 1, outputTokens: 1, toolEvents: [], observedOrEstimatedFinalCostUsd: 0.01, billingDisposition: "observed" as const } };
+function external<T>(value: T, requestId: string, observedOrEstimatedFinalCostUsd = 0.01) {
+  return { type: "one_time_external_request_result_v1" as const, value, accounting: { requestId, durationMs: 1, inputTokens: 1, outputTokens: 1, toolEvents: [], observedOrEstimatedFinalCostUsd, billingDisposition: "observed" as const } };
+}
+
+function wholeStatementExternal<T>(
+  value: T,
+  requestId: string,
+  context: { approvedCallMetadata: Parameters<typeof accountingFromProviderUsage>[0]["approvedCallMetadata"] },
+) {
+  return {
+    type: "one_time_external_request_result_v1" as const,
+    value,
+    accounting: accountingFromProviderUsage({
+      usage: {
+        requestId,
+        inputTokens: 1,
+        cachedInputTokens: 0,
+        outputTokens: 1,
+        toolEvents: [],
+      },
+      approvedCallMetadata: context.approvedCallMetadata,
+      durationMs: 1,
+    }),
+  };
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function outboundFeeLabelPrivacyMatches(labels: string[]) {
@@ -2530,6 +2686,17 @@ function semanticSupport(structuredClaim: any) {
     decision: "supports" as const,
     structuredClaim,
     reasonCodes: ["synthetic_semantic_support"],
+    providerDetailsStripped: true as const,
+  };
+}
+
+function semanticUnsupported(structuredClaim: any) {
+  return {
+    type: "fee_knowledge_semantic_support_decision" as const,
+    policyVersion: FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION,
+    decision: "unsupported" as const,
+    structuredClaim,
+    reasonCodes: ["synthetic_semantic_unsupported"],
     providerDetailsStripped: true as const,
   };
 }
@@ -2581,6 +2748,23 @@ function retrievedTextDocument(url: string, feeLabel: string) {
       textHash,
     }],
     reasonCodes: ["fee_knowledge_text_retrieved"],
+  };
+}
+
+function textUnavailableDocument(url: string) {
+  return {
+    type: "fee_knowledge_retrieved_document" as const,
+    policyVersion: "fee_knowledge_retrieval_v1" as const,
+    status: "retrieval_succeeded_text_unavailable" as const,
+    canonicalUrl: url,
+    redirectChain: [],
+    contentType: "application/pdf",
+    byteLength: 128,
+    documentFingerprint: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    title: "Official fee guide",
+    text: "",
+    locators: [],
+    reasonCodes: ["fee_knowledge_pdf_text_unavailable"],
   };
 }
 

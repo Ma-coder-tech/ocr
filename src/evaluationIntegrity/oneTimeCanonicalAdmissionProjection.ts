@@ -65,7 +65,7 @@ export function projectOneTimeCanonicalAdmissionResult(input: {
       candidateRefs: [...attempt.candidateIds].sort(),
       reasonCodes: [...attempt.reasonCodes].sort(),
     };
-  }).sort((left, right) => left.researchAttemptRef.localeCompare(right.researchAttemptRef));
+  }).sort((left, right) => left.questionOrdinal - right.questionOrdinal || left.researchAttemptRef.localeCompare(right.researchAttemptRef));
 
   const supports = sourcePacket.claimSupports.map((support) => projectSupport(support, sourcePacket, registry))
     .sort((left, right) => left.claimSupportRef.localeCompare(right.claimSupportRef));
