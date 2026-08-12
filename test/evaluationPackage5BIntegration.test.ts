@@ -16,6 +16,7 @@ import { accountingFromProviderUsage } from "../src/evaluationIntegrity/provider
 import { ONE_TIME_EVALUATION_CONCURRENCY_POLICY } from "../src/evaluationIntegrity/oneTimeConcurrencyPolicy.js";
 import {
   ONE_TIME_RESEARCH_REQUEST_SLOTS,
+  LIVE_EVALUATION_TIMEOUT_POLICY,
   buildEvaluationSourceManifest,
   createDeterministicPreflightArtifact,
   createOneTimeStatementEvaluationTransport,
@@ -1436,6 +1437,111 @@ describe("Package 5B manifest-driven admission", () => {
     expect(admission.package5bWorkPlan?.units.some((unit) => unit.status === "completed")).toBe(true);
   }, 30_000);
 
+  it("aborts hung retrieved-document investigative calls and releases concurrency slots", async () => {
+    const fixture = await approvedOneTimePdfFixture([
+      ...eligibleStages,
+      "retrieved_document_investigative_intelligence",
+    ]);
+    const previousTimeoutMs = LIVE_EVALUATION_TIMEOUT_POLICY.perCallMs.retrieved_document_investigative_intelligence;
+    (LIVE_EVALUATION_TIMEOUT_POLICY.perCallMs as any).retrieved_document_investigative_intelligence = 25;
+    const baseCalls = fullOneTimeCalls();
+    const semanticIndex = baseCalls.findIndex((call) => call.stage === "semantic_verification");
+    const retrievedDocumentInvestigationCalls = Array.from({ length: ONE_TIME_RESEARCH_REQUEST_SLOTS.retrievedDocumentInvestigation }, (_, ordinal) => ({
+      sourceDocumentId: "doc_one_time_fiserv",
+      stage: "retrieved_document_investigative_intelligence" as const,
+      reservation: {
+        ...baseCalls[semanticIndex]!.reservation,
+        callId: `package_5b_doc_one_time_fiserv_retrieved_document_investigative_intelligence_hung_${ordinal + 1}`,
+        capability: "investigative_intelligence" as const,
+        toolClass: "investigative_intelligence",
+      },
+    }));
+    const active = new Set<number>();
+    let maxActive = 0;
+    let aborted = 0;
+    let docAiCalls = 0;
+    let semanticCalls = 0;
+    let wholeStatementCalls = 0;
+
+    try {
+      const result = await runManifestDrivenLiveEvaluation({
+        ...fixture.runnerInput,
+        approvedBudgetUsd: 100,
+        calls: [
+          ...baseCalls.slice(0, semanticIndex),
+          ...retrievedDocumentInvestigationCalls,
+          ...baseCalls.slice(semanticIndex),
+        ],
+        outputArtifactPath: path.join(fixture.directory, "package-5b-hung-retrieved-document-investigation.json"),
+        oneTimeResearchLimitsForTesting: {
+          policyVersion: "fee_knowledge_research_policy_v1",
+          maxSearchCalls: 3,
+          maxAdaptiveFollowUpCalls: 0,
+          maxRetrievalCandidates: 3,
+          maxAdaptiveFollowUpCandidates: 0,
+          totalDeadlineMs: 5000,
+          maxResultCandidatesPerSearch: 1,
+        },
+        oneTimeResearchQuestionsForTesting: (analysis) => [
+          researchQuestion(analysis, 0),
+          researchQuestion(analysis, 1),
+          researchQuestion(analysis, 2),
+        ],
+        oneTimeServicesForTesting: {
+          webSearchDiscovery: async ({ questions: [question] }) => {
+            const ordinal = Number(/case (\d+)\./.exec(question!.semanticQuestion)?.[1] ?? "1") - 1;
+            return external([{ url: `https://www.fiserv.com/hung-doc-ai/${ordinal}`, title: `Official fee guide ${ordinal}`, publisher: "Fiserv" }], `request_search_hung_doc_ai_${ordinal}`);
+          },
+          documentRetrieval: async (url) => external(retrievedTextDocument(url, "fee"), `request_retrieval_hung_doc_ai_${url.split("/").pop()}`),
+          retrievedDocumentInvestigativeIntelligence: async (_request, context) => {
+            const ordinal = docAiCalls++;
+            active.add(ordinal);
+            maxActive = Math.max(maxActive, active.size);
+            if (ordinal === 2) {
+              active.delete(ordinal);
+              return external({ findings: [] }, "request_retrieved_doc_ai_hung_fast");
+            }
+            return new Promise((_resolve, reject) => {
+              context.abortSignal.addEventListener("abort", () => {
+                aborted += 1;
+                active.delete(ordinal);
+                reject(context.abortSignal.reason);
+              }, { once: true });
+            });
+          },
+          semanticVerification: async ({ structuredClaim }) => {
+            semanticCalls += 1;
+            return external(semanticSupport(structuredClaim), `request_semantic_after_hung_doc_ai_${semanticCalls}`);
+          },
+          wholeStatementReview: async (packet, context) => {
+            wholeStatementCalls += 1;
+            return wholeStatementExternal(validReview(packet, true), "request_whole_after_hung_doc_ai", context);
+          },
+        },
+      });
+
+      expect(docAiCalls).toBe(3);
+      expect(maxActive).toBe(3);
+      expect(aborted).toBe(2);
+      expect(active.size).toBe(0);
+      expect(semanticCalls).toBeGreaterThan(0);
+      expect(wholeStatementCalls).toBeGreaterThan(0);
+      expect(result.finalStatus).toBe("completed");
+      expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+      expect(result.providerCallOutcomes.filter((outcome) =>
+        outcome.stage === "retrieved_document_investigative_intelligence" && outcome.status === "timeout",
+      )).toHaveLength(2);
+      expect(result.providerCallOutcomes.some((outcome) => outcome.stage === "semantic_verification" && outcome.status === "success"))
+        .toBe(true);
+      expect(result.providerCallOutcomes.some((outcome) =>
+        outcome.stage === "whole_statement_ai_review" && outcome.operationKind === "package_5b_work_unit" && outcome.status === "success",
+      )).toBe(true);
+      expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    } finally {
+      (LIVE_EVALUATION_TIMEOUT_POLICY.perCallMs as any).retrieved_document_investigative_intelligence = previousTimeoutMs;
+    }
+  }, 30_000);
+
   it("overlaps independent retrieval and retrieved-document investigative work without changing deterministic projection order", async () => {
     const fixture = await approvedOneTimePdfFixture([
       ...eligibleStages,
@@ -1985,7 +2091,7 @@ describe("Package 5B manifest-driven admission", () => {
     expect(result.artifact.providerCallOutcomes.some((outcome) => outcome.stage === "whole_statement_ai_review" && outcome.status === "success")).toBe(true);
   }, 30_000);
 
-  it("overlaps independent initial web searches without letting completion order change candidate order", async () => {
+  it("overlaps independent initial web searches and globally caps retained candidates deterministically", async () => {
     const fixture = await approvedShortCloverPdfFixture();
     const active = new Set<number>();
     const started: number[] = [];
@@ -2003,7 +2109,7 @@ describe("Package 5B manifest-driven admission", () => {
         maxRetrievalCandidates: 3,
         maxAdaptiveFollowUpCandidates: 0,
         totalDeadlineMs: 5000,
-        maxResultCandidatesPerSearch: 1,
+        maxResultCandidatesPerSearch: 2,
       },
       oneTimeResearchQuestionsForTesting: (analysis) => [
         researchQuestion(analysis, 0),
@@ -2019,7 +2125,10 @@ describe("Package 5B manifest-driven admission", () => {
           await delay(delays.get(ordinal) ?? 1);
           active.delete(ordinal);
           completed.push(ordinal);
-          return external([{ url: `https://www.fiserv.com/concurrent/${ordinal}`, title: `Official fee guide ${ordinal}`, publisher: "Fiserv" }], `request_search_concurrent_${ordinal}`);
+          return external([
+            { url: `https://www.fiserv.com/concurrent/${ordinal}/a`, title: `Official fee guide ${ordinal} A`, publisher: "Fiserv" },
+            { url: `https://www.fiserv.com/concurrent/${ordinal}/b`, title: `Official fee guide ${ordinal} B`, publisher: "Fiserv" },
+          ], `request_search_concurrent_${ordinal}`);
         },
         documentRetrieval: async (url) => external(textUnavailableDocument(url), `request_retrieval_${url.split("/").pop()}`),
         wholeStatementReview: async (packet, context) => wholeStatementExternal(validReview(packet), "request_whole_after_concurrent_search", context),
@@ -2034,7 +2143,9 @@ describe("Package 5B manifest-driven admission", () => {
     if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
     const admission = result.artifact.canonicalAdmissionResults[0]!;
     expect(admission.researchEvidence.attempts.map((attempt) => attempt.questionOrdinal)).toEqual([1, 2, 3]);
+    expect(admission.researchEvidence.attempts.map((attempt) => attempt.resultCount)).toEqual([2, 1, 0]);
     expect(admission.researchEvidence.candidates).toHaveLength(3);
+    expect(admission.researchEvidence.attempts.flatMap((attempt) => attempt.candidateRefs)).toHaveLength(3);
     expect(admission.researchEvidence.candidates.map((candidate) => candidate.candidateRef)).toEqual(
       [...admission.researchEvidence.candidates.map((candidate) => candidate.candidateRef)].sort(),
     );

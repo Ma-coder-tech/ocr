@@ -1613,10 +1613,32 @@ function committedAndPendingDiscoveredCount(context: OneTimePrivateContext): num
 }
 
 function commitDiscoveryAttempt(context: OneTimePrivateContext, pending: PendingDiscoveryAttempt): void {
-  context.discovered.push(...pending.discovered);
-  context.attempts.push(pending.attempt);
-  context.candidates.push(...pending.discovered.map(discoveredCandidateRecord));
+  const discovered = discoveryCandidatesAllowedForCommit(context, pending.discovered);
+  context.discovered.push(...discovered);
+  context.attempts.push({
+    ...pending.attempt,
+    resultCount: discovered.length,
+    candidateIds: discovered.map((item) => item.candidateId).sort(),
+  });
+  context.candidates.push(...discovered.map(discoveredCandidateRecord));
   sortResearchContext(context);
+}
+
+function discoveryCandidatesAllowedForCommit(
+  context: OneTimePrivateContext,
+  candidates: readonly CandidateContext[],
+): CandidateContext[] {
+  const remaining = Math.max(0, context.packet.research.limits.maxRetrievalCandidates - context.discovered.length);
+  if (remaining === 0) return [];
+  const retainedUrls = new Set(context.discovered.map((item) => item.candidate.url));
+  const retained: CandidateContext[] = [];
+  for (const candidate of candidates) {
+    if (retainedUrls.has(candidate.candidate.url)) continue;
+    retained.push(candidate);
+    retainedUrls.add(candidate.candidate.url);
+    if (retained.length >= remaining) break;
+  }
+  return retained;
 }
 
 function flushInitialDiscoveryAttempts(context: OneTimePrivateContext): void {

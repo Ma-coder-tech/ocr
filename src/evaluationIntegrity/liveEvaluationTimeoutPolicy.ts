@@ -91,7 +91,6 @@ export async function runWithLiveEvaluationTimeout<T>(input: {
         controller.abort(error);
         reject(error);
       }, input.timeoutMs);
-      timer.unref?.();
       input.operation(controller.signal).then(
         (value) => {
           if (settled) return;
