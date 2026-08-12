@@ -44,6 +44,11 @@ if (!isBusinessTypeId(businessType)) throw new Error("--business-type must be a 
 const approvedBudgetUsd = Number(requiredArg(args, "budget-usd"));
 if (!Number.isFinite(approvedBudgetUsd) || approvedBudgetUsd <= 0) throw new Error("--budget-usd must be a positive number.");
 
+const FEE_INITIAL_SEARCH_CALLS = ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch - 1;
+const FEE_ADAPTIVE_SEARCH_CALLS = 1;
+const FEE_ADAPTIVE_RETRIEVAL_CANDIDATES = 2;
+const FEE_INITIAL_RETRIEVAL_CANDIDATES = Math.max(0, ONE_TIME_RESEARCH_REQUEST_SLOTS.retrieval - FEE_ADAPTIVE_RETRIEVAL_CANDIDATES);
+
 const manifest = await loadExactApprovedManifest({ manifestPath, approvedManifestHash });
 const sourceBindings = await readJson<SourceBinding[]>(sourceBindingsPath);
 const costPolicy = await readJson<Record<string, StageCostPolicy>>(costPolicyPath);
@@ -152,11 +157,6 @@ function oneTimeStatementCalls(sourceDocumentId: string, allowedStages: readonly
   if (allowed.has("whole_statement_ai_review")) calls.push(...callBatch(sourceDocumentId, "whole_statement_ai_review", 1, 0));
   return calls;
 }
-
-const FEE_INITIAL_SEARCH_CALLS = ONE_TIME_RESEARCH_REQUEST_SLOTS.webSearch - 1;
-const FEE_ADAPTIVE_SEARCH_CALLS = 1;
-const FEE_ADAPTIVE_RETRIEVAL_CANDIDATES = 2;
-const FEE_INITIAL_RETRIEVAL_CANDIDATES = Math.max(0, ONE_TIME_RESEARCH_REQUEST_SLOTS.retrieval - FEE_ADAPTIVE_RETRIEVAL_CANDIDATES);
 
 function callBatch(
   sourceDocumentId: string,
