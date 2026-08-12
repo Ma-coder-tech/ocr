@@ -139,7 +139,7 @@ const CANDIDATE_REASON_CODES = new Set([
   ...EVIDENCE_DECISIONS.map((decision) => `fee_knowledge_${decision}`),
   "fee_knowledge_retrieval_timed_out", "fee_knowledge_semantic_parse_failed", "fee_knowledge_semantic_timed_out",
   "fee_knowledge_semantic_safety_blocked", "fee_knowledge_semantic_unsupported", "fee_knowledge_semantic_failed",
-  "fee_knowledge_semantic_provider_unavailable_before_send",
+  "fee_knowledge_semantic_provider_unavailable_before_send", "fee_knowledge_semantic_provider_configuration_invalid_before_send",
   ...[400, 401, 403, 404, 408, 409, 410, 413, 415, 422, 425, 429, 500, 501, 502, 503, 504].map((status) => `fee_knowledge_http_${status}`),
 ]);
 const HTTP_UNAVAILABLE_REASONS = [400, 401, 403, 404, 408, 409, 410, 413, 415, 422, 425, 429, 500, 501, 502, 503, 504]
@@ -169,7 +169,10 @@ const SEMANTIC_REASON_BY_STATUS: Record<(typeof SEMANTIC_STATUSES)[number], read
   timed_out: ["fee_knowledge_semantic_timed_out"],
   parse_failed: ["fee_knowledge_semantic_parse_failed"],
   safety_blocked: ["fee_knowledge_semantic_safety_blocked"],
-  provider_unavailable: ["fee_knowledge_semantic_provider_unavailable_before_send"],
+  provider_unavailable: [
+    "fee_knowledge_semantic_provider_unavailable_before_send",
+    "fee_knowledge_semantic_provider_configuration_invalid_before_send",
+  ],
   unsupported: ["fee_knowledge_semantic_unsupported"],
 };
 const INVARIANCE_PACKAGE_PROJECTIONS = [
@@ -1124,7 +1127,7 @@ function validateResearchProof(
   if (!validateExpectedResearchQuestionProjection(expectedResearchQuestions)) return false;
   if (!Array.isArray(value.attempts) || !Array.isArray(value.candidates) || !Array.isArray(value.claimSupports)) return false;
   const intelligenceItems = Array.isArray(value.intelligence) ? value.intelligence : [];
-  if (!isSorted(value.attempts.map((item) => isRecord(item) ? stringValue(item.researchAttemptRef) : ""))) return false;
+  if (!isResearchAttemptOrderValid(value.attempts)) return false;
   if (!isSorted(value.candidates.map((item) => isRecord(item) ? stringValue(item.candidateRef) : ""))) return false;
   if (Array.isArray(value.intelligence) && !isSorted(value.intelligence.map((item) => isRecord(item) ? stringValue(item.intelligenceRef) : ""))) return false;
   if (!isSorted(value.claimSupports.map((item) => isRecord(item) ? stringValue(item.claimSupportRef) : ""))) return false;
@@ -1421,7 +1424,11 @@ function validateCandidateState(value: Record<string, unknown>): boolean {
     if (status !== retrieval && family.some((reason) => reasons.includes(reason))) return false;
   }
   for (const [status, family] of Object.entries(SEMANTIC_REASON_BY_STATUS)) {
-    if (status !== semantic && family.some((reason) => reasons.includes(reason))) return false;
+    if (status !== semantic && family.some((reason) => reasons.includes(reason))) {
+      const allowedPreSendUnavailableOnNotStarted = semantic === "not_started"
+        && status === "provider_unavailable";
+      if (!allowedPreSendUnavailableOnNotStarted) return false;
+    }
   }
   if (retrieval !== "retrieved_text" && semantic !== "not_started") return false;
   if (retrieval !== "retrieved_text" && claimSupportRefs.length !== 0) return false;
@@ -1707,6 +1714,22 @@ function isSortedUnique(values: string[]): boolean {
 
 function isSorted(values: string[]): boolean {
   return values.every((value, index) => index === 0 || values[index - 1]!.localeCompare(value) <= 0);
+}
+
+function isResearchAttemptOrderValid(values: unknown[]): boolean {
+  const refOrder = values.map((item) => isRecord(item) ? stringValue(item.researchAttemptRef) : "");
+  if (isSorted(refOrder)) return true;
+  return values.every((item, index) => {
+    if (!isRecord(item) || !Number.isInteger(item.questionOrdinal)) return false;
+    if (index === 0) return true;
+    const previous = values[index - 1];
+    if (!isRecord(previous) || !Number.isInteger(previous.questionOrdinal)) return false;
+    const ordinal = Number(item.questionOrdinal);
+    const previousOrdinal = Number(previous.questionOrdinal);
+    if (previousOrdinal < ordinal) return true;
+    if (previousOrdinal > ordinal) return false;
+    return stringValue(previous.researchAttemptRef).localeCompare(stringValue(item.researchAttemptRef)) <= 0;
+  });
 }
 
 function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {

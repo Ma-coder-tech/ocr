@@ -13,20 +13,44 @@ import {
   buildWholeStatementFeeIntelligenceWorkPlan,
   classifyWholeStatementFeeIntelligenceWorkUnitFailure,
   mergeWholeStatementFeeIntelligenceWorkUnitResults,
+  wholeStatementFeeIntelligenceAggregateOutputCeiling,
+  wholeStatementFeeIntelligenceEvidenceAwareInputReserveBytes,
+  wholeStatementFeeIntelligenceWorkUnitOutputReserveTokens,
   wholeStatementFeeIntelligenceWorkUnitResultFromValidation,
   type WholeStatementFeeIntelligenceWorkUnitResult,
 } from "../../src/canonical/wholeStatementFeeIntelligenceWorkPlan.js";
 import { wholeStatementFeeIntelligenceProviderInputBytes } from "../../src/canonical/wholeStatementFeeIntelligenceProviderInput.js";
 import type { CanonicalStatementAnalysis } from "../../src/canonical/types.js";
 import { parsePdfBytes, type ParsedDocument } from "../../src/parser.js";
-import { calculateWorstCaseCostUsd } from "../../src/evaluationIntegrity/providerAccounting.js";
-import { verifyEvaluationRunIntegrityArtifactV2 } from "../../src/evaluationIntegrity/index.js";
+import {
+  OPENAI_PACKAGE_5B_STRUCTURED_OUTPUT_PRICING,
+  calculateWorstCaseCostUsd,
+} from "../../src/evaluationIntegrity/providerAccounting.js";
+import {
+  ONE_TIME_PAID_STAGE_ORDER,
+  oneTimeLiveCostPolicyTemplate,
+  oneTimeSlotExpandedCostEnvelope,
+  verifyEvaluationRunIntegrityArtifactV2,
+} from "../../src/evaluationIntegrity/index.js";
 import { analyzeStatementDocument } from "../../src/statementParserOrchestrator.js";
 import { buildCanonicalRuntimeAnalysis } from "../../src/canonical/runtimeAdapter.js";
 
 const LIVE_ARTIFACT_PATH = "/private/tmp/ratereveal-five-statement-live-final-20260808T220413Z/evaluation-run-integrity-artifact.json";
 const LIVE_ARTIFACT_SHA256 = "c3e286e20f3d2a8235d6d721873f2f0be8703288ac224b1002674db152ce494a";
 const REAL_134_ROW_STATEMENT_PATH = "test/fixtures/pdfs/SAMPLE_MERCHANT4_CLOVER.pdf";
+const REAL_STATEMENT_1_PATH = "test/fixtures/pdfs/fiserv_PAYSAFE_Febr_2024.pdf";
+const FULL_INTEGRATED_STAGES = [
+  "parser",
+  "statement_investigative_intelligence",
+  "whole_statement_ai_review",
+  "web_search_discovery",
+  "document_retrieval",
+  "retrieved_document_investigative_intelligence",
+  "semantic_verification",
+  "canonical_admission",
+  "customer_publication",
+  "final_artifact",
+] as const;
 
 describe("whole-statement fee intelligence work plan", () => {
   it("classifies local Package 5B provider-send metadata failures as pre-send unavailability", () => {
@@ -95,6 +119,90 @@ describe("whole-statement fee intelligence work plan", () => {
     expect(planFor(18).units[0]!.estimatedOutputTokens).toBe(4_120);
     expect(planFor(30).units[0]!.estimatedOutputTokens).toBe(5_000);
   });
+
+  it("reserves Package 5B input for bounded live evidence context instead of statement-only packet bytes", () => {
+    const analysis = expandedAnalysis(28);
+    const sourcePacket = buildFeeKnowledgeSourcePacket({ analysis, registry: null });
+    const packet = buildWholeStatementFeeIntelligencePacket(analysis, { approvedExternalSourceRefs: [] }, sourcePacket);
+    const plan = buildWholeStatementFeeIntelligenceWorkPlan({ packet, mode: "comprehensive" });
+    const limits = {
+      maxSearchCalls: 4,
+      maxRetrievalCandidates: 10,
+      maxAdaptiveFollowUpCalls: 1,
+    };
+
+    for (const unit of plan.units) {
+      const reserved = wholeStatementFeeIntelligenceEvidenceAwareInputReserveBytes({ unit, researchLimits: limits });
+      expect(reserved).toBeGreaterThan(unit.estimatedInputBytes);
+      expect(reserved).toBe(unit.estimatedInputBytes + 9_000 + 52_000 + unit.expectedFeeRowRefs.length * 2_200);
+    }
+  });
+
+  it("matches statement #1 prep reporting to slot-expanded production reservations", async () => {
+    const bytes = await readFile(REAL_STATEMENT_1_PATH);
+    const document = await parsePdfBytes(bytes);
+    const summary = analyzeStatementDocument(document, "restaurant_food_beverage", { sourceFileName: "fiserv_PAYSAFE_Febr_2024.pdf" });
+    const analysis = buildCanonicalRuntimeAnalysis({
+      document,
+      businessType: "restaurant_food_beverage",
+      runtimeDocumentRef: "statement_1_prep_envelope_regression",
+      legacySummary: summary,
+    }).analysis;
+    const sourcePacket = buildFeeKnowledgeSourcePacket({ analysis, registry: null });
+    const packet = buildWholeStatementFeeIntelligencePacket(analysis, { approvedExternalSourceRefs: [] }, sourcePacket);
+    const plan = buildWholeStatementFeeIntelligenceWorkPlan({
+      packet,
+      mode: "comprehensive",
+      limits: { maxAggregateInputBytes: null, maxAggregateOutputTokens: null },
+    });
+    const researchLimits = {
+      maxSearchCalls: 4,
+      maxRetrievalCandidates: 10,
+      maxAdaptiveFollowUpCalls: 1,
+    };
+    const selectedUnits = plan.units.filter((unit) => unit.status === "selected");
+    const package5BParentEnvelope = roundUsd(selectedUnits.reduce((sum, unit) => sum + calculateWorstCaseCostUsd({
+      maximumInputTokens: wholeStatementFeeIntelligenceEvidenceAwareInputReserveBytes({ unit, researchLimits }),
+      maximumOutputTokens: wholeStatementFeeIntelligenceWorkUnitOutputReserveTokens({
+        unit,
+        parentMaximumOutputTokens: 5_000,
+        aggregateOutputCeiling: null,
+      }),
+      maximumToolUses: 0,
+      pricing: OPENAI_PACKAGE_5B_STRUCTURED_OUTPUT_PRICING,
+    }), 0) + 0.000001);
+    const costPolicy = oneTimeLiveCostPolicyTemplate(package5BParentEnvelope);
+    const aggregateOutputCeiling = wholeStatementFeeIntelligenceAggregateOutputCeiling({
+      parentMaximumOutputTokens: costPolicy.whole_statement_ai_review.maximumOutputTokens,
+      parentEstimatedMaximumCostUsd: costPolicy.whole_statement_ai_review.estimatedMaximumCostUsd,
+      parentMaximumToolUses: costPolicy.whole_statement_ai_review.maximumToolUses,
+      pricing: OPENAI_PACKAGE_5B_STRUCTURED_OUTPUT_PRICING,
+      units: selectedUnits,
+      researchLimits,
+      calculateWorstCaseCostUsd,
+    });
+    const workUnitReservations = selectedUnits.map((unit) => ({
+      rowCount: unit.expectedFeeRowRefs.length,
+      maximumInputTokens: wholeStatementFeeIntelligenceEvidenceAwareInputReserveBytes({ unit, researchLimits }),
+      maximumOutputTokens: wholeStatementFeeIntelligenceWorkUnitOutputReserveTokens({
+        unit,
+        parentMaximumOutputTokens: costPolicy.whole_statement_ai_review.maximumOutputTokens,
+        aggregateOutputCeiling,
+      }),
+    }));
+    const slotExpandedEnvelope = oneTimeSlotExpandedCostEnvelope(costPolicy, FULL_INTEGRATED_STAGES);
+    const singleCopyStageSum = ONE_TIME_PAID_STAGE_ORDER.reduce((sum, stage) => sum + costPolicy[stage].estimatedMaximumCostUsd, 0);
+
+    expect(analysis.feeLedger.rows).toHaveLength(28);
+    expect(workUnitReservations).toEqual([
+      { rowCount: 18, maximumInputTokens: 126_385, maximumOutputTokens: 4_120 },
+      { rowCount: 10, maximumInputTokens: 98_326, maximumOutputTokens: 2_600 },
+    ]);
+    expect(package5BParentEnvelope).toBe(0.19877425);
+    expect(singleCopyStageSum).toBe(0.39889425);
+    expect(slotExpandedEnvelope.totalEstimatedEnvelopeUsd).toBe(1.34197425);
+    expect(singleCopyStageSum).toBeLessThan(slotExpandedEnvelope.totalEstimatedEnvelopeUsd);
+  }, 30_000);
 
   it("uses the exact latest five-statement live artifact row counts as offline sizing fixtures", async () => {
     const artifact = await latestLiveArtifact();
@@ -549,4 +657,8 @@ function packagesBE(analysis: CanonicalStatementAnalysis) {
     opportunityEngine: analysis.opportunityEngine,
     calculations: analysis.calculations,
   });
+}
+
+function roundUsd(value: number): number {
+  return Math.ceil(value * 1_000_000_000) / 1_000_000_000;
 }

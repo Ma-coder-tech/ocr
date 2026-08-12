@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { FeeKnowledgeSourcePacket } from "./feeKnowledgeTypes.js";
+import { FEE_KNOWLEDGE_RESEARCH_LIMITS } from "./feeKnowledgeResearch.js";
 import type {
   CanonicalAiWholeStatementFeeIntelligenceOutput,
   CanonicalStatementAnalysis,
@@ -56,6 +57,12 @@ export type WholeStatementFeeIntelligenceWorkPlanLimits = {
   outputTokenOverheadPerUnit: number;
   minimumOutputTokensPerUnit: number;
   maximumOutputTokensPerUnit: number;
+};
+
+export type WholeStatementFeeIntelligenceEvidenceContextReserveLimits = {
+  maxSearchCalls: number;
+  maxRetrievalCandidates: number;
+  maxAdaptiveFollowUpCalls: number;
 };
 
 export type WholeStatementFeeIntelligenceWorkUnit = {
@@ -196,6 +203,81 @@ export function buildWholeStatementFeeIntelligenceWorkPlan(input: {
       units.some((unit) => unit.status === "not_selected_policy") ? "whole_statement_fee_intelligence_policy_limited" : "",
     ].filter(Boolean))].sort(),
   };
+}
+
+export function wholeStatementFeeIntelligenceEvidenceAwareInputReserveBytes(input: {
+  unit: Pick<WholeStatementFeeIntelligenceWorkUnit, "estimatedInputBytes" | "expectedFeeRowRefs">;
+  researchLimits: Partial<WholeStatementFeeIntelligenceEvidenceContextReserveLimits>;
+}): number {
+  const rowCount = input.unit.expectedFeeRowRefs.length;
+  const limits = input.researchLimits;
+  const initialSearches = conservativeResearchLimit(limits.maxSearchCalls, FEE_KNOWLEDGE_RESEARCH_LIMITS.maxSearchCalls);
+  const adaptiveSearches = conservativeResearchLimit(limits.maxAdaptiveFollowUpCalls, FEE_KNOWLEDGE_RESEARCH_LIMITS.maxAdaptiveFollowUpCalls);
+  const candidates = conservativeResearchLimit(limits.maxRetrievalCandidates, FEE_KNOWLEDGE_RESEARCH_LIMITS.maxRetrievalCandidates);
+  const searchContextBytes = (initialSearches + adaptiveSearches) * 1_800;
+  const candidateContextBytes = candidates * 5_200;
+  const rowScopedIntelligenceBytes = rowCount * 2_200;
+  return input.unit.estimatedInputBytes + searchContextBytes + candidateContextBytes + rowScopedIntelligenceBytes;
+}
+
+function conservativeResearchLimit(value: number | null | undefined, fallback: number): number {
+  if (!Number.isFinite(value) || value! < 0) return fallback;
+  return Math.trunc(value!);
+}
+
+export function wholeStatementFeeIntelligenceWorkUnitOutputReserveTokens(input: {
+  unit: Pick<WholeStatementFeeIntelligenceWorkUnit, "estimatedOutputTokens" | "outputTokenCeiling">;
+  parentMaximumOutputTokens: number | null;
+  aggregateOutputCeiling: number | null;
+}): number {
+  return Math.min(
+    input.parentMaximumOutputTokens ?? input.unit.estimatedOutputTokens,
+    input.unit.outputTokenCeiling ?? input.unit.estimatedOutputTokens,
+    input.aggregateOutputCeiling ?? input.unit.outputTokenCeiling ?? input.unit.estimatedOutputTokens,
+  );
+}
+
+export function wholeStatementFeeIntelligenceAggregateOutputCeiling(input: {
+  parentMaximumOutputTokens: number | null | undefined;
+  parentEstimatedMaximumCostUsd: number;
+  parentMaximumToolUses?: number | null;
+  pricing: {
+    uncachedInputUsdPerMillionTokens: number;
+    cachedInputUsdPerMillionTokens: number;
+    outputUsdPerMillionTokens: number;
+    toolUseUsd: number;
+  } | null | undefined;
+  units: readonly Pick<WholeStatementFeeIntelligenceWorkUnit, "estimatedInputBytes" | "expectedFeeRowRefs">[];
+  researchLimits?: WholeStatementFeeIntelligenceEvidenceContextReserveLimits;
+  calculateWorstCaseCostUsd: (input: {
+    maximumInputTokens: number | null;
+    maximumOutputTokens: number | null;
+    maximumToolUses: number | null;
+    pricing: {
+      uncachedInputUsdPerMillionTokens: number;
+      cachedInputUsdPerMillionTokens: number;
+      outputUsdPerMillionTokens: number;
+      toolUseUsd: number;
+    };
+  }) => number;
+}): number | null {
+  if (!input.pricing || input.parentMaximumOutputTokens == null) return null;
+  const maximumToolUses = input.parentMaximumToolUses ?? 0;
+  let aggregateFullOutputCost = 0;
+  for (const unit of input.units) {
+    if (!Number.isInteger(unit.estimatedInputBytes) || unit.estimatedInputBytes < 0) return null;
+    const estimatedInputBytes = input.researchLimits
+      ? wholeStatementFeeIntelligenceEvidenceAwareInputReserveBytes({ unit, researchLimits: input.researchLimits })
+      : unit.estimatedInputBytes;
+    if (!Number.isInteger(estimatedInputBytes) || estimatedInputBytes < 0) return null;
+    aggregateFullOutputCost += input.calculateWorstCaseCostUsd({
+      maximumInputTokens: estimatedInputBytes,
+      maximumOutputTokens: input.parentMaximumOutputTokens,
+      maximumToolUses,
+      pricing: input.pricing!,
+    });
+  }
+  return aggregateFullOutputCost <= input.parentEstimatedMaximumCostUsd + 1e-9 ? input.parentMaximumOutputTokens : null;
 }
 
 export function notSelectedWholeStatementFeeIntelligenceWorkUnitResult(

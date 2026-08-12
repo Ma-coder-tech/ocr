@@ -55,8 +55,12 @@ import {
   mergeWholeStatementFeeIntelligenceWorkUnitResults,
   notSelectedWholeStatementFeeIntelligenceWorkUnitResult,
   providerUnavailableWholeStatementFeeIntelligenceWorkUnitResult,
+  wholeStatementFeeIntelligenceAggregateOutputCeiling,
+  wholeStatementFeeIntelligenceEvidenceAwareInputReserveBytes,
+  wholeStatementFeeIntelligenceWorkUnitOutputReserveTokens,
   wholeStatementFeeIntelligenceWorkUnitResultFromValidation,
   type WholeStatementFeeIntelligenceMergedWorkPlan,
+  type WholeStatementFeeIntelligenceEvidenceContextReserveLimits,
   type WholeStatementFeeIntelligenceWorkUnit,
 } from "../canonical/wholeStatementFeeIntelligenceWorkPlan.js";
 import {
@@ -158,6 +162,11 @@ type CandidateContext = {
 
 type RetrievedContext = CandidateContext & { retrieved: RetrievedDocument };
 type OneTimeResearchTerminalStatus = "failed" | "timed_out" | "safety_blocked";
+type PendingDiscoveryAttempt = {
+  questionOrdinal: number;
+  attempt: FeeKnowledgeResearchAttemptRecord;
+  discovered: CandidateContext[];
+};
 
 type OneTimePrivateContext = {
   analysis: CanonicalStatementAnalysis;
@@ -168,6 +177,7 @@ type OneTimePrivateContext = {
   sentSourcePacket: FeeKnowledgeSourcePacket | null;
   registry: ApprovedFeeKnowledgeSourceRegistry | null;
   discovered: CandidateContext[];
+  pendingInitialDiscoveries: PendingDiscoveryAttempt[];
   retrieved: RetrievedContext[];
   attempts: FeeKnowledgeResearchAttemptRecord[];
   candidates: FeeKnowledgeResearchCandidateRecord[];
@@ -256,6 +266,7 @@ export async function prepareOneTimeStatementEvaluationSource(input: {
       sentSourcePacket: null,
       registry,
       discovered: [],
+      pendingInitialDiscoveries: [],
       retrieved: [],
       attempts: questions.slice(limits.maxSearchCalls).map((question, offset) => attemptRecord(
         question,
@@ -423,16 +434,17 @@ export function createOneTimeStatementEvaluationTransport(input: {
           childProviderCallOutcomes,
         });
       }
-      const workUnitOutputCeiling = package5BWorkUnitOutputCeiling(request.approvedCallMetadata, selectedUnits);
+      const workUnitOutputCeiling = package5BWorkUnitOutputCeiling(request.approvedCallMetadata, selectedUnits, context.packet.research.limits);
       for (const unit of selectedUnits) {
-        if (request.approvedCallMetadata.maximumInputTokens !== null && unit.estimatedInputBytes > request.approvedCallMetadata.maximumInputTokens) {
+        const estimatedInputBytes = wholeStatementFeeIntelligenceEvidenceAwareInputReserveBytes({ unit, researchLimits: context.packet.research.limits });
+        if (request.approvedCallMetadata.maximumInputTokens !== null && estimatedInputBytes > request.approvedCallMetadata.maximumInputTokens) {
           const reasonCodes = [
             "whole_statement_fee_intelligence_work_unit_not_selected_budget",
             "whole_statement_fee_intelligence_work_unit_input_bound_exceeded_before_send",
           ];
           workUnitResults.push(package5BWorkUnitNotSelectedByResourceBudget(unit.workUnitRef, reasonCodes));
           childProviderCallOutcomes.push(package5BWorkUnitOutcome({
-            reservation: package5BWorkUnitReservation(request.approvedCallMetadata, unit, workUnitOutputCeiling),
+            reservation: package5BWorkUnitReservation(request.approvedCallMetadata, unit, workUnitOutputCeiling, context.packet.research.limits),
             sourceDocumentId: request.sourceDocumentId,
             status: "cancelled_before_send",
             requestId: null,
@@ -440,7 +452,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
           }));
           continue;
         }
-        const unitReservation = package5BWorkUnitReservation(request.approvedCallMetadata, unit, workUnitOutputCeiling);
+        const unitReservation = package5BWorkUnitReservation(request.approvedCallMetadata, unit, workUnitOutputCeiling, context.packet.research.limits);
         try {
           request.childBudgetController!.reserve(unitReservation);
         } catch (error) {
@@ -701,6 +713,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
         const reasonCode = timeoutReasonCode(error) ?? researchProviderFailureReason(status);
         const terminalStatus = status === "safety_blocked" ? "safety_blocked" : status === "timed_out" ? "timed_out" : "failed";
         upsertContextAttempt(context, attemptRecord(question, questionOrdinal, status, [], [researchProviderFailureReason(status)]));
+        if (!question.adaptiveFollowUp) flushInitialDiscoveryAttempts(context);
         if (status === "unsupported_model") {
           return result({
             value: { attemptId, questionRef: feeKnowledgeQuestionRef(question, questionOrdinal), candidateCount: 0, providerReadiness: "unavailable_before_send" },
@@ -723,7 +736,8 @@ export function createOneTimeStatementEvaluationTransport(input: {
         }
         return providerFailureResult({ started, error, reasonCode, scope: "candidate_local" });
       }
-      const remaining = context.packet.research.limits.maxRetrievalCandidates - context.discovered.length;
+      const isAdaptiveSearch = Boolean(question.adaptiveFollowUp);
+      const remaining = context.packet.research.limits.maxRetrievalCandidates - committedAndPendingDiscoveredCount(context);
       const candidateLimit = question.adaptiveFollowUp
         ? Math.min(context.packet.research.limits.maxAdaptiveFollowUpCandidates, remaining)
         : initialDiscoveryCandidateLimit(context);
@@ -740,9 +754,13 @@ export function createOneTimeStatementEvaluationTransport(input: {
           questionOrdinal,
           candidateId: `candidate_${shortHash([attemptId, candidate.url, String(candidateOrdinal)])}`,
         }));
-      context.discovered.push(...discovered);
-      context.attempts.push(attemptRecord(question, questionOrdinal, "completed", discovered.map((item) => item.candidateId), ["fee_knowledge_research_completed"]));
-      context.candidates.push(...discovered.map(discoveredCandidateRecord));
+      const attempt = attemptRecord(question, questionOrdinal, "completed", discovered.map((item) => item.candidateId), ["fee_knowledge_research_completed"]);
+      if (isAdaptiveSearch) {
+        commitDiscoveryAttempt(context, { questionOrdinal, attempt, discovered });
+      } else {
+        context.pendingInitialDiscoveries.push({ questionOrdinal, attempt, discovered });
+        flushInitialDiscoveryAttempts(context);
+      }
       return result({
         value: { attemptId, questionRef: feeKnowledgeQuestionRef(question, questionOrdinal), candidateCount: discovered.length },
         generated: true,
@@ -1359,14 +1377,19 @@ function package5BWorkUnitReservation(
   parent: CostReservationInput,
   unit: WholeStatementFeeIntelligenceWorkUnit,
   aggregateOutputCeiling: number | null,
+  researchLimits?: WholeStatementFeeIntelligenceEvidenceContextReserveLimits,
 ): CostReservationInput {
   const pricing = approvedPackage5BPricingPolicy(parent);
   if (!pricing) throw new Error("package_5b_pricing_policy_required_for_work_unit_reservations");
-  const maximumInputTokens = Math.min(parent.maximumInputTokens ?? unit.estimatedInputBytes, unit.estimatedInputBytes);
-  const maximumOutputTokens = Math.min(
-    parent.maximumOutputTokens ?? unit.estimatedOutputTokens,
-    aggregateOutputCeiling ?? unit.outputTokenCeiling ?? unit.estimatedOutputTokens,
-  );
+  const estimatedInputBytes = researchLimits
+    ? wholeStatementFeeIntelligenceEvidenceAwareInputReserveBytes({ unit, researchLimits })
+    : unit.estimatedInputBytes;
+  const maximumInputTokens = Math.min(parent.maximumInputTokens ?? estimatedInputBytes, estimatedInputBytes);
+  const maximumOutputTokens = wholeStatementFeeIntelligenceWorkUnitOutputReserveTokens({
+    unit,
+    parentMaximumOutputTokens: parent.maximumOutputTokens,
+    aggregateOutputCeiling,
+  });
   const maximumToolUses = parent.maximumToolUses ?? 0;
   const reservation: CostReservationInput = {
     ...structuredClone(parent),
@@ -1394,20 +1417,19 @@ function package5BWorkUnitReservation(
 function package5BWorkUnitOutputCeiling(
   parent: CostReservationInput,
   units: readonly WholeStatementFeeIntelligenceWorkUnit[],
+  researchLimits?: WholeStatementFeeIntelligenceEvidenceContextReserveLimits,
 ): number | null {
   const pricing = approvedPackage5BPricingPolicy(parent);
-  if (!pricing || parent.maximumOutputTokens === null) return null;
-  const maximumToolUses = parent.maximumToolUses ?? 0;
-  const aggregateFullOutputCost = units.reduce((sum, unit) => {
-    const maximumInputTokens = Math.min(parent.maximumInputTokens ?? unit.estimatedInputBytes, unit.estimatedInputBytes);
-    return sum + calculateWorstCaseCostUsd({
-      maximumInputTokens,
-      maximumOutputTokens: parent.maximumOutputTokens,
-      maximumToolUses,
-      pricing,
-    });
-  }, 0);
-  return aggregateFullOutputCost <= parent.estimatedMaximumCostUsd + 1e-9 ? parent.maximumOutputTokens : null;
+  if (!pricing || parent.maximumOutputTokens == null) return null;
+  return wholeStatementFeeIntelligenceAggregateOutputCeiling({
+    parentMaximumOutputTokens: parent.maximumOutputTokens,
+    parentEstimatedMaximumCostUsd: parent.estimatedMaximumCostUsd,
+    parentMaximumToolUses: parent.maximumToolUses ?? 0,
+    pricing,
+    units,
+    researchLimits,
+    calculateWorstCaseCostUsd,
+  });
 }
 
 function package5BWorkUnitOutcome(input: {
@@ -1586,6 +1608,40 @@ function dedupeCandidates(items: CandidateContext[]): CandidateContext[] {
   return [...new Map(items.map((item) => [item.candidate.url, item])).values()];
 }
 
+function committedAndPendingDiscoveredCount(context: OneTimePrivateContext): number {
+  return context.discovered.length + context.pendingInitialDiscoveries.reduce((sum, item) => sum + item.discovered.length, 0);
+}
+
+function commitDiscoveryAttempt(context: OneTimePrivateContext, pending: PendingDiscoveryAttempt): void {
+  context.discovered.push(...pending.discovered);
+  context.attempts.push(pending.attempt);
+  context.candidates.push(...pending.discovered.map(discoveredCandidateRecord));
+  sortResearchContext(context);
+}
+
+function flushInitialDiscoveryAttempts(context: OneTimePrivateContext): void {
+  context.pendingInitialDiscoveries.sort((left, right) => left.questionOrdinal - right.questionOrdinal);
+  let expectedOrdinal = 0;
+  while (expectedOrdinal < context.packet.research.limits.maxSearchCalls) {
+    const pendingIndex = context.pendingInitialDiscoveries.findIndex((item) => item.questionOrdinal === expectedOrdinal);
+    if (pendingIndex >= 0) {
+      commitDiscoveryAttempt(context, context.pendingInitialDiscoveries.splice(pendingIndex, 1)[0]!);
+      expectedOrdinal += 1;
+      continue;
+    }
+    if (hasRecordedSearchAttempt(context, expectedOrdinal)) {
+      expectedOrdinal += 1;
+      continue;
+    }
+    break;
+  }
+}
+
+function hasRecordedSearchAttempt(context: OneTimePrivateContext, questionOrdinal: number): boolean {
+  const question = context.packet.research.questions[questionOrdinal];
+  return Boolean(question) && context.attempts.some((attempt) => attempt.questionRef === feeKnowledgeQuestionRef(question, questionOrdinal));
+}
+
 function nextSearchQuestion(
   context: OneTimePrivateContext,
 ): { question: FeeKnowledgeResearchQuestion; questionOrdinal: number } | null {
@@ -1751,10 +1807,10 @@ function updateSemanticProviderUnavailable(
   if (!current) return;
   context.candidates[index] = {
     ...current,
-    semanticVerificationStatus: "provider_unavailable",
+    semanticVerificationStatus: "not_started",
     verificationStatus: "verified_candidate_limited",
     reasonCodes: [...new Set([
-      ...current.reasonCodes.filter((reason) => reason !== "fee_knowledge_semantic_support_not_run"),
+      ...current.reasonCodes,
       reasonCode,
     ])].sort(),
   };
@@ -1777,6 +1833,12 @@ function sortRetrievedContext(context: OneTimePrivateContext): void {
 
 function sortIntelligenceRecords(context: OneTimePrivateContext): void {
   context.intelligence.sort((left, right) => left.intelligenceId.localeCompare(right.intelligenceId));
+}
+
+function sortResearchContext(context: OneTimePrivateContext): void {
+  context.discovered.sort((left, right) => left.questionOrdinal - right.questionOrdinal || left.candidateId.localeCompare(right.candidateId));
+  context.attempts.sort((left, right) => left.questionRef.localeCompare(right.questionRef));
+  context.candidates.sort((left, right) => left.candidateId.localeCompare(right.candidateId));
 }
 
 function completeResearchAfterTerminal(context: OneTimePrivateContext): void {
@@ -1806,6 +1868,23 @@ function completeResearchAfterTerminal(context: OneTimePrivateContext): void {
   context.semanticCursor = context.retrieved.length;
 }
 
+function completeUnselectedInitialResearchQuestions(context: OneTimePrivateContext): void {
+  const existingQuestionRefs = new Set(context.attempts.map((attempt) => attempt.questionRef));
+  for (const [questionOrdinal, question] of context.packet.research.questions.entries()) {
+    if (question.adaptiveFollowUp) continue;
+    if (questionOrdinal < context.packet.research.limits.maxSearchCalls) continue;
+    const questionRef = feeKnowledgeQuestionRef(question, questionOrdinal);
+    if (existingQuestionRefs.has(questionRef)) continue;
+    context.attempts.push(attemptRecord(
+      question,
+      questionOrdinal,
+      "not_selected_planning",
+      [],
+      ["fee_knowledge_research_not_selected_planning"],
+    ));
+  }
+}
+
 function assertOneTimeStageTransition(
   context: OneTimePrivateContext,
   stage: RepositoryProviderTransportInput["stage"],
@@ -1832,6 +1911,8 @@ function assertOneTimeStageTransition(
   }
   if (stage === "whole_statement_ai_review") {
     if (context.wholeStatementReviewCount !== 0) throw new Error("one_time_whole_statement_review_duplicate");
+    flushInitialDiscoveryAttempts(context);
+    completeUnselectedInitialResearchQuestions(context);
     completeResearchAfterTerminal(context);
     completeUnattemptedAdaptiveFollowUps(context);
     const expectedQuestionRefs = new Set(context.packet.research.questions.map(feeKnowledgeQuestionRef));

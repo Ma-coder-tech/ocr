@@ -8,8 +8,10 @@ export type OneTimeEvaluationConcurrencyPolicy = {
 };
 
 const stageLimits: Partial<Record<EvaluationExecutionStage, number>> = {
+  web_search_discovery: 3,
   document_retrieval: 4,
   retrieved_document_investigative_intelligence: 3,
+  semantic_verification: 3,
 };
 
 export const ONE_TIME_EVALUATION_CONCURRENCY_POLICY = {
