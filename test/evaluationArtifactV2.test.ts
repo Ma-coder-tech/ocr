@@ -807,6 +807,31 @@ describe("Evaluation Run Integrity Artifact V2", () => {
     expectResignedInvalid(artifact);
   });
 
+  it("accepts a fail-closed runtime linkage invalid candidate without orphaned claim support", () => {
+    const artifact = validArtifact() as unknown as Record<string, any>;
+    const result = artifact.canonicalAdmissionResults[0];
+    const candidate = result.researchEvidence.candidates[1];
+    Object.assign(candidate, {
+      verificationStatus: "rejected",
+      semanticVerificationStatus: "failed",
+      claimSupportRefs: [],
+      reasonCodes: ["fee_knowledge_runtime_linkage_invalid", "fee_knowledge_semantic_failed", "fee_knowledge_text_retrieved"],
+    });
+    result.researchEvidence.claimSupports = result.researchEvidence.claimSupports
+      .filter((support: Record<string, unknown>) => support.candidateRef !== candidate.candidateRef);
+    result.admission.acceptedClaimSupportRefs = result.admission.acceptedClaimSupportRefs
+      .filter((ref: string) => result.researchEvidence.claimSupports.some((support: Record<string, unknown>) => support.claimSupportRef === ref));
+    result.admission.rejectedClaimSupportRefs = result.admission.rejectedClaimSupportRefs
+      .filter((ref: string) => result.researchEvidence.claimSupports.some((support: Record<string, unknown>) => support.claimSupportRef === ref));
+    result.admission.safeCounts.claimSupportCount = result.researchEvidence.claimSupports.length;
+    result.canonicalReferenceProof.claimSupportRefs = result.researchEvidence.claimSupports
+      .map((support: Record<string, unknown>) => support.claimSupportRef)
+      .sort();
+    refreshSupportDecisionProof(result);
+    resign(artifact);
+    expect(verifyEvaluationRunIntegrityArtifactV2(artifact)).toBe(true);
+  });
+
   it("rejects accepted claim support carried by a retained safety-blocked candidate", () => {
     const artifact = safetyBlockedResearchArtifact("retrieval") as unknown as Record<string, any>;
     const result = artifact.canonicalAdmissionResults[0];
