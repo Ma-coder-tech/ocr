@@ -25,6 +25,7 @@ import {
 import { safeProviderReasonCode, safeProviderReasonCodes } from "../canonical/providerFailureDiagnostics.js";
 import type { OneTimeResearchLimits, OneTimeStatementEvaluationServices } from "./oneTimeStatementEvaluationAdapter.js";
 import type { FinalizedOneTimeStatementEvaluation } from "./oneTimeStatementEvaluationAdapter.js";
+import { oneTimeEvaluationConcurrencyLimit } from "./oneTimeConcurrencyPolicy.js";
 import { projectOneTimeCanonicalAdmissionResult } from "./oneTimeCanonicalAdmissionProjection.js";
 import type { ApprovedFeeKnowledgeSourceRegistry } from "../canonical/feeKnowledgeTypes.js";
 import type { FeeKnowledgeResearchQuestion } from "../canonical/feeKnowledgeResearch.js";
@@ -34,6 +35,7 @@ import {
   paidEvaluationStages,
   type ApprovedExecutionPermit,
   type CostBudgetLedgerSnapshot,
+  type CostOperationKind,
   type EvaluationExecutionStage,
   type EvaluationLifecycleLedger,
   type EvaluationManifestDocument,
@@ -180,221 +182,37 @@ export async function runManifestDrivenLiveEvaluation(input: {
   let reasonCodes = ["evaluation_completed"];
 
   for (let index = 0; index < input.calls.length; index += 1) {
-    const call = input.calls[index]!;
-    const currentReservation = ledger.snapshot().entries.find((entry) => entry.callId === call.reservation.callId);
-    if (currentReservation?.status === "cancelled_before_send") continue;
-    const sourceDocument = manifest.documents.find((item) => item.sourceDocumentId === call.sourceDocumentId)!;
-    const capabilityRef = `capability:${call.reservation.callId}`;
-    const providerRef = `provider:${call.reservation.callId}`;
-    recordAiLifecycleState({
-      ledger: lifecycleLedger,
-      sourceDocumentId: call.sourceDocumentId,
-      stateName: "executed",
-      state: "completed",
-      reasonCodes: ["provider_call_started"],
-    });
-    recordLifecycleStage(lifecycleLedger, lifecycleRefs({
-      sourceDocumentId: call.sourceDocumentId,
-      stage: "capability_execution",
-      state: "completed",
-      reasonCodes: ["capability_execution_started"],
-      manifestRowRef: sourceDocument.sourceDocumentId,
-      preflightRecordRef: sourceDocument.parentPreflightArtifactId,
-      parserRecordRef: sourceDocument.parserRecordId,
-      capabilityExecutionRef: capabilityRef,
-      providerRequestRef: providerRef,
-    }));
-
-    const started = Date.now();
-    let result: RepositoryProviderTransportResult;
-    try {
-      ledger.assertReadyToSend(call.reservation.callId);
-      const childBudgetController = input.adapterId === "one_time_statement_evaluation_v1" && call.stage === "whole_statement_ai_review"
-        ? {
-            reserve: (reservation: CostReservationInput) => { ledger.reserve(reservation); },
-            assertReadyToSend: (callId: string) => { ledger.assertReadyToSend(callId); },
-            finalize: (callId: string, finalizeInput: Parameters<EvaluationCostBudgetLedger["finalize"]>[1]) => finalizeCallOrDetectCostOverrun(ledger, callId, finalizeInput),
-          }
-        : null;
-      result = await adapter.invoke({
-        sanitizedPacket: packets.get(call.sourceDocumentId),
-        sourceDocumentId: call.sourceDocumentId,
-        stage: call.stage,
-        reservedCallId: call.reservation.callId,
-        approvedCallMetadata: structuredClone(reservationForExecution(call, input.adapterId)),
-        ...(childBudgetController ? { childBudgetController } : {}),
-      });
-    } catch (error) {
-      const failure = providerFailure(error, Math.max(0, Date.now() - started));
-      const costExceeded = finalizeCallOrDetectCostOverrun(ledger, call.reservation.callId, {
-        ...failure.accounting,
-        status: failure.status,
-        billingDisposition: "unknown",
-      });
-      const reasonCode = costExceeded ? "cost_exceeded_reservation" : failure.reasonCode;
-      const failureReasonCodes = costExceeded ? [reasonCode] : failure.reasonCodes;
-      providerCallOutcomes.push({
-        callId: call.reservation.callId,
-        ...outcomeOperationFields(reservationForExecution(call, input.adapterId)),
-        sourceDocumentId: call.sourceDocumentId,
-        stage: call.stage,
-        status: costExceeded ? "failure" : failure.status,
-        requestId: failure.accounting.requestId ?? null,
-        reasonCodes: failureReasonCodes,
-      });
-      recordFailedLifecycle(lifecycleLedger, sourceDocument, call, costExceeded ? "failure" : failure.status, reasonCode, capabilityRef, providerRef);
-      cancelReservedCalls(
+    const batch = callableBatch(input.calls, index, ledger, input.adapterId);
+    const batchResults = await runBounded(batch, oneTimeBatchConcurrencyLimit(input.adapterId, batch), async (item) => {
+      const call = item.call;
+      const currentReservation = ledger.snapshot().entries.find((entry) => entry.callId === call.reservation.callId);
+      if (currentReservation?.status === "cancelled_before_send") return { action: "continue" as const };
+      const sourceDocument = manifest.documents.find((manifestItem) => manifestItem.sourceDocumentId === call.sourceDocumentId)!;
+      return executeEvaluationCall({
+        call,
+        index: item.index,
+        inputCalls: input.calls,
+        adapterId: input.adapterId,
+        adapter,
+        packets,
+        beforeStates,
+        manifest,
         ledger,
-        input.adapterId === "one_time_statement_evaluation_v1"
-          ? input.calls.slice(index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId)
-          : input.calls.slice(index + 1),
+        lifecycleLedger,
         providerCallOutcomes,
-        "cancelled_after_provider_failure",
-      );
-      const sourceStatus = !costExceeded && failure.status === "timeout" ? "timed_out" : "failed";
-      sourceExecutionFailures.set(call.sourceDocumentId, sourceStatus);
-      finalStatus = sourceStatus;
-      reasonCodes = [reasonCode];
-      if (input.adapterId === "one_time_statement_evaluation_v1") continue;
-      break;
-    }
-
-    if (result.providerFailure) {
-      const costExceeded = finalizeCallOrDetectCostOverrun(ledger, call.reservation.callId, {
-        ...result.accounting,
-        status: result.providerFailure.status,
-        billingDisposition: "unknown",
+        results,
+        sourceExecutionFailures,
+        sourceDocument,
       });
-      const reasonCode = costExceeded ? "cost_exceeded_reservation" : result.providerFailure.reasonCode;
-      const failureReasonCodes = costExceeded ? [reasonCode] : result.providerFailure.reasonCodes ?? [reasonCode];
-      const status = costExceeded ? "failure" : result.providerFailure.status;
-      providerCallOutcomes.push({
-        callId: call.reservation.callId,
-        ...outcomeOperationFields(reservationForExecution(call, input.adapterId)),
-        sourceDocumentId: call.sourceDocumentId,
-        stage: call.stage,
-        status,
-        requestId: result.accounting.requestId ?? null,
-        reasonCodes: [...new Set(failureReasonCodes)].sort(),
-      });
-      recordFailedLifecycle(lifecycleLedger, sourceDocument, call, status, reasonCode, capabilityRef, providerRef);
-      if (costExceeded) {
-        cancelReservedCalls(
-          ledger,
-          input.calls.slice(index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId),
-          providerCallOutcomes,
-          "cancelled_after_cost_exceeded_reservation",
-        );
-        sourceExecutionFailures.set(call.sourceDocumentId, "failed");
-        finalStatus = "failed";
-        reasonCodes = [reasonCode];
-      } else if (result.providerFailure.scope === "research_graph") {
-        const safetyBlocked = result.researchTerminal?.status === "safety_blocked";
-        cancelReservedCalls(
-          ledger,
-          input.calls.slice(index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId
-            && (safetyBlocked || pending.stage !== "whole_statement_ai_review")),
-          providerCallOutcomes,
-          `cancelled_after_research_${result.researchTerminal?.status ?? "failed"}`,
-        );
-        if (safetyBlocked) {
-          sourceExecutionFailures.set(call.sourceDocumentId, "safety_blocked");
-          finalStatus = "blocked";
-          reasonCodes = [reasonCode];
-        }
-      }
-      continue;
-    }
-
-    const costExceeded = finalizeCallOrDetectCostOverrun(ledger, call.reservation.callId, {
-      ...result.accounting,
-      status: "success",
-      billingDisposition: result.accounting.billingDisposition ?? "unknown",
     });
-    if (costExceeded) {
-      providerCallOutcomes.push({
-        callId: call.reservation.callId,
-        ...outcomeOperationFields(reservationForExecution(call, input.adapterId)),
-        sourceDocumentId: call.sourceDocumentId,
-        stage: call.stage,
-        status: "failure",
-        requestId: result.accounting.requestId ?? null,
-        reasonCodes: ["cost_exceeded_reservation"],
-      });
-      recordFailedLifecycle(lifecycleLedger, sourceDocument, call, "failure", "cost_exceeded_reservation", capabilityRef, providerRef);
-      cancelReservedCalls(
-        ledger,
-        input.adapterId === "one_time_statement_evaluation_v1"
-          ? input.calls.slice(index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId)
-          : input.calls.slice(index + 1),
-        providerCallOutcomes,
-        "cancelled_after_cost_exceeded_reservation",
-      );
-      sourceExecutionFailures.set(call.sourceDocumentId, "failed");
-      finalStatus = "failed";
-      reasonCodes = ["cost_exceeded_reservation"];
-      if (input.adapterId === "one_time_statement_evaluation_v1") continue;
-      break;
+    let shouldBreak = false;
+    for (const item of batchResults) {
+      if (item.finalStatus) finalStatus = item.finalStatus;
+      if (item.reasonCodes) reasonCodes = item.reasonCodes;
+      if (item.action === "break") shouldBreak = true;
     }
-    providerCallOutcomes.push(...(result.childProviderCallOutcomes ?? []));
-    providerCallOutcomes.push({
-      callId: call.reservation.callId,
-      ...outcomeOperationFields(reservationForExecution(call, input.adapterId)),
-      sourceDocumentId: call.sourceDocumentId,
-      stage: call.stage,
-      status: "success",
-      requestId: result.accounting.requestId ?? null,
-      reasonCodes: [...new Set(result.lifecycle?.reasonCodes ?? ["provider_call_completed"])].sort(),
-    });
-    results.push({ callId: call.reservation.callId, value: result.value });
-    recordSuccessfulLifecycle(lifecycleLedger, sourceDocument, call, result, capabilityRef, providerRef);
-
-    const current = adapter.canonicalStateFor(call.sourceDocumentId);
-    const invariance = provePackagesBEFinancialInvariance(beforeStates.get(call.sourceDocumentId)!, current);
-    if (!invariance.invariant) {
-      cancelReservedCalls(ledger, input.calls.slice(index + 1), providerCallOutcomes, "cancelled_after_financial_invariance_failure");
-      finalStatus = "blocked";
-      reasonCodes = ["packages_b_e_financial_invariance_failed"];
-      recordLifecycleStage(lifecycleLedger, lifecycleRefs({
-        sourceDocumentId: call.sourceDocumentId,
-        stage: "canonical_admission",
-        state: "blocked",
-        reasonCodes,
-        manifestRowRef: sourceDocument.sourceDocumentId,
-        preflightRecordRef: sourceDocument.parentPreflightArtifactId,
-        parserRecordRef: sourceDocument.parserRecordId,
-        capabilityExecutionRef: capabilityRef,
-        providerRequestRef: providerRef,
-      }));
-      recordLifecycleStage(lifecycleLedger, lifecycleRefs({
-        sourceDocumentId: call.sourceDocumentId,
-        stage: "customer_publication",
-        state: "withheld",
-        reasonCodes: ["packages_b_e_financial_invariance_failed"],
-        manifestRowRef: sourceDocument.sourceDocumentId,
-        preflightRecordRef: sourceDocument.parentPreflightArtifactId,
-        parserRecordRef: sourceDocument.parserRecordId,
-        capabilityExecutionRef: capabilityRef,
-        providerRequestRef: providerRef,
-      }));
-      break;
-    }
-    recordAdmissionLifecycle(lifecycleLedger, sourceDocument, result, capabilityRef, providerRef);
-    if (result.researchTerminal) {
-      const safetyBlocked = result.researchTerminal.status === "safety_blocked";
-      cancelReservedCalls(
-        ledger,
-        input.calls.slice(index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId
-          && (safetyBlocked || pending.stage !== "whole_statement_ai_review")),
-        providerCallOutcomes,
-        `cancelled_after_research_${result.researchTerminal.status}`,
-      );
-      if (safetyBlocked) {
-        sourceExecutionFailures.set(call.sourceDocumentId, "safety_blocked");
-        finalStatus = "blocked";
-        reasonCodes = ["canonical_admission_safety_blocked"];
-      }
-    }
+    index += batch.length - 1;
+    if (shouldBreak) break;
   }
 
   const packageFinancialInvariance = executionPermit.documents.map((document) => ({
@@ -451,6 +269,9 @@ export async function runManifestDrivenLiveEvaluation(input: {
     preparedSanitizedPackets.sort((left, right) => left.resultId.localeCompare(right.resultId));
   }
 
+  sortProviderCallOutcomes(providerCallOutcomes, input.calls);
+  sortCallResults(results, input.calls);
+
   const finalInvariance = executionPermit.documents.map((document) => ({
     sourceDocumentId: document.sourceDocumentId,
     result: provePackagesBEFinancialInvariance(
@@ -505,6 +326,333 @@ export async function runManifestDrivenLiveEvaluation(input: {
     artifact,
     artifactPath: path.resolve(input.outputArtifactPath),
   };
+}
+
+async function executeEvaluationCall(input: {
+  call: ManifestDrivenEvaluationCall;
+  index: number;
+  inputCalls: ManifestDrivenEvaluationCall[];
+  adapterId: RepositoryEvaluationAdapterId;
+  adapter: ReturnType<typeof createRepositoryEvaluationAdapter>;
+  packets: Map<string, unknown>;
+  beforeStates: Map<string, PackagesBEProjectionInput>;
+  manifest: EvaluationSourceManifest;
+  ledger: EvaluationCostBudgetLedger;
+  lifecycleLedger: EvaluationLifecycleLedger;
+  providerCallOutcomes: EvaluationRunIntegrityArtifact["providerCallOutcomes"];
+  results: Array<{ callId: string; value: unknown }>;
+  sourceExecutionFailures: Map<string, "failed" | "timed_out" | "safety_blocked">;
+  sourceDocument: EvaluationManifestDocument;
+}): Promise<{ action: "continue" | "break"; finalStatus?: EvaluationRunIntegrityArtifact["finalStatus"]; reasonCodes?: string[] }> {
+    const { call, sourceDocument } = input;
+    const currentReservation = input.ledger.snapshot().entries.find((entry) => entry.callId === call.reservation.callId);
+    if (currentReservation?.status === "cancelled_before_send") return { action: "continue" };
+    const capabilityRef = `capability:${call.reservation.callId}`;
+    const providerRef = `provider:${call.reservation.callId}`;
+    recordAiLifecycleState({
+      ledger: input.lifecycleLedger,
+      sourceDocumentId: call.sourceDocumentId,
+      stateName: "executed",
+      state: "completed",
+      reasonCodes: ["provider_call_started"],
+    });
+    recordLifecycleStage(input.lifecycleLedger, lifecycleRefs({
+      sourceDocumentId: call.sourceDocumentId,
+      stage: "capability_execution",
+      state: "completed",
+      reasonCodes: ["capability_execution_started"],
+      manifestRowRef: sourceDocument.sourceDocumentId,
+      preflightRecordRef: sourceDocument.parentPreflightArtifactId,
+      parserRecordRef: sourceDocument.parserRecordId,
+      capabilityExecutionRef: capabilityRef,
+      providerRequestRef: providerRef,
+    }));
+
+    const started = Date.now();
+    let result: RepositoryProviderTransportResult;
+    try {
+      input.ledger.assertReadyToSend(call.reservation.callId);
+      const childBudgetController = input.adapterId === "one_time_statement_evaluation_v1" && call.stage === "whole_statement_ai_review"
+        ? {
+            reserve: (reservation: CostReservationInput) => { input.ledger.reserve(reservation); },
+            assertReadyToSend: (callId: string) => { input.ledger.assertReadyToSend(callId); },
+            finalize: (callId: string, finalizeInput: Parameters<EvaluationCostBudgetLedger["finalize"]>[1]) => finalizeCallOrDetectCostOverrun(input.ledger, callId, finalizeInput),
+          }
+        : null;
+      result = await input.adapter.invoke({
+        sanitizedPacket: input.packets.get(call.sourceDocumentId),
+        sourceDocumentId: call.sourceDocumentId,
+        stage: call.stage,
+        reservedCallId: call.reservation.callId,
+        approvedCallMetadata: structuredClone(reservationForExecution(call, input.adapterId)),
+        ...(childBudgetController ? { childBudgetController } : {}),
+      });
+    } catch (error) {
+      const failure = providerFailure(error, Math.max(0, Date.now() - started));
+      const costExceeded = finalizeCallOrDetectCostOverrun(input.ledger, call.reservation.callId, {
+        ...failure.accounting,
+        status: failure.status,
+        billingDisposition: "unknown",
+      });
+      const reasonCode = costExceeded ? "cost_exceeded_reservation" : failure.reasonCode;
+      const failureReasonCodes = costExceeded ? [reasonCode] : failure.reasonCodes;
+      input.providerCallOutcomes.push({
+        callId: call.reservation.callId,
+        ...outcomeOperationFields(reservationForExecution(call, input.adapterId)),
+        sourceDocumentId: call.sourceDocumentId,
+        stage: call.stage,
+        status: costExceeded ? "failure" : failure.status,
+        requestId: failure.accounting.requestId ?? null,
+        reasonCodes: failureReasonCodes,
+      });
+      recordFailedLifecycle(input.lifecycleLedger, sourceDocument, call, costExceeded ? "failure" : failure.status, reasonCode, capabilityRef, providerRef);
+      cancelReservedCalls(
+        input.ledger,
+        input.adapterId === "one_time_statement_evaluation_v1"
+          ? input.inputCalls.slice(input.index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId)
+          : input.inputCalls.slice(input.index + 1),
+        input.providerCallOutcomes,
+        "cancelled_after_provider_failure",
+      );
+      const sourceStatus = !costExceeded && failure.status === "timeout" ? "timed_out" : "failed";
+      input.sourceExecutionFailures.set(call.sourceDocumentId, sourceStatus);
+      if (input.adapterId === "one_time_statement_evaluation_v1") return { action: "continue", finalStatus: sourceStatus, reasonCodes: [reasonCode] };
+      return { action: "break", finalStatus: sourceStatus, reasonCodes: [reasonCode] };
+    }
+
+    if (result.providerFailure) {
+      const costExceeded = finalizeCallOrDetectCostOverrun(input.ledger, call.reservation.callId, {
+        ...result.accounting,
+        status: result.providerFailure.status,
+        billingDisposition: "unknown",
+      });
+      const reasonCode = costExceeded ? "cost_exceeded_reservation" : result.providerFailure.reasonCode;
+      const failureReasonCodes = costExceeded ? [reasonCode] : result.providerFailure.reasonCodes ?? [reasonCode];
+      const status = costExceeded ? "failure" : result.providerFailure.status;
+      input.providerCallOutcomes.push({
+        callId: call.reservation.callId,
+        ...outcomeOperationFields(reservationForExecution(call, input.adapterId)),
+        sourceDocumentId: call.sourceDocumentId,
+        stage: call.stage,
+        status,
+        requestId: result.accounting.requestId ?? null,
+        reasonCodes: [...new Set(failureReasonCodes)].sort(),
+      });
+      recordFailedLifecycle(input.lifecycleLedger, sourceDocument, call, status, reasonCode, capabilityRef, providerRef);
+      if (costExceeded) {
+        cancelReservedCalls(
+          input.ledger,
+          input.inputCalls.slice(input.index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId),
+          input.providerCallOutcomes,
+          "cancelled_after_cost_exceeded_reservation",
+        );
+        input.sourceExecutionFailures.set(call.sourceDocumentId, "failed");
+        return { action: "continue", finalStatus: "failed", reasonCodes: [reasonCode] };
+      } else if (result.providerFailure.scope === "research_graph") {
+        const safetyBlocked = result.researchTerminal?.status === "safety_blocked";
+        cancelReservedCalls(
+          input.ledger,
+          input.inputCalls.slice(input.index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId
+            && (safetyBlocked || pending.stage !== "whole_statement_ai_review")),
+          input.providerCallOutcomes,
+          `cancelled_after_research_${result.researchTerminal?.status ?? "failed"}`,
+        );
+        if (safetyBlocked) {
+          input.sourceExecutionFailures.set(call.sourceDocumentId, "safety_blocked");
+          return { action: "continue", finalStatus: "blocked", reasonCodes: [reasonCode] };
+        }
+      }
+      return { action: "continue" };
+    }
+
+    const costExceeded = finalizeCallOrDetectCostOverrun(input.ledger, call.reservation.callId, {
+      ...result.accounting,
+      status: "success",
+      billingDisposition: result.accounting.billingDisposition ?? "unknown",
+    });
+    if (costExceeded) {
+      input.providerCallOutcomes.push({
+        callId: call.reservation.callId,
+        ...outcomeOperationFields(reservationForExecution(call, input.adapterId)),
+        sourceDocumentId: call.sourceDocumentId,
+        stage: call.stage,
+        status: "failure",
+        requestId: result.accounting.requestId ?? null,
+        reasonCodes: ["cost_exceeded_reservation"],
+      });
+      recordFailedLifecycle(input.lifecycleLedger, sourceDocument, call, "failure", "cost_exceeded_reservation", capabilityRef, providerRef);
+      cancelReservedCalls(
+        input.ledger,
+        input.adapterId === "one_time_statement_evaluation_v1"
+          ? input.inputCalls.slice(input.index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId)
+          : input.inputCalls.slice(input.index + 1),
+        input.providerCallOutcomes,
+        "cancelled_after_cost_exceeded_reservation",
+      );
+      input.sourceExecutionFailures.set(call.sourceDocumentId, "failed");
+      if (input.adapterId === "one_time_statement_evaluation_v1") return { action: "continue", finalStatus: "failed", reasonCodes: ["cost_exceeded_reservation"] };
+      return { action: "break", finalStatus: "failed", reasonCodes: ["cost_exceeded_reservation"] };
+    }
+    input.providerCallOutcomes.push(...(result.childProviderCallOutcomes ?? []));
+    input.providerCallOutcomes.push({
+      callId: call.reservation.callId,
+      ...outcomeOperationFields(reservationForExecution(call, input.adapterId)),
+      sourceDocumentId: call.sourceDocumentId,
+      stage: call.stage,
+      status: "success",
+      requestId: result.accounting.requestId ?? null,
+      reasonCodes: [...new Set(result.lifecycle?.reasonCodes ?? ["provider_call_completed"])].sort(),
+    });
+    input.results.push({ callId: call.reservation.callId, value: result.value });
+    recordSuccessfulLifecycle(input.lifecycleLedger, sourceDocument, call, result, capabilityRef, providerRef);
+
+    const current = input.adapter.canonicalStateFor(call.sourceDocumentId);
+    const invariance = provePackagesBEFinancialInvariance(input.beforeStates.get(call.sourceDocumentId)!, current);
+    if (!invariance.invariant) {
+      cancelReservedCalls(input.ledger, input.inputCalls.slice(input.index + 1), input.providerCallOutcomes, "cancelled_after_financial_invariance_failure");
+      recordLifecycleStage(input.lifecycleLedger, lifecycleRefs({
+        sourceDocumentId: call.sourceDocumentId,
+        stage: "canonical_admission",
+        state: "blocked",
+        reasonCodes: ["packages_b_e_financial_invariance_failed"],
+        manifestRowRef: sourceDocument.sourceDocumentId,
+        preflightRecordRef: sourceDocument.parentPreflightArtifactId,
+        parserRecordRef: sourceDocument.parserRecordId,
+        capabilityExecutionRef: capabilityRef,
+        providerRequestRef: providerRef,
+      }));
+      recordLifecycleStage(input.lifecycleLedger, lifecycleRefs({
+        sourceDocumentId: call.sourceDocumentId,
+        stage: "customer_publication",
+        state: "withheld",
+        reasonCodes: ["packages_b_e_financial_invariance_failed"],
+        manifestRowRef: sourceDocument.sourceDocumentId,
+        preflightRecordRef: sourceDocument.parentPreflightArtifactId,
+        parserRecordRef: sourceDocument.parserRecordId,
+        capabilityExecutionRef: capabilityRef,
+        providerRequestRef: providerRef,
+      }));
+      return { action: "break", finalStatus: "blocked", reasonCodes: ["packages_b_e_financial_invariance_failed"] };
+    }
+    recordAdmissionLifecycle(input.lifecycleLedger, sourceDocument, result, capabilityRef, providerRef);
+    if (result.researchTerminal) {
+      const safetyBlocked = result.researchTerminal.status === "safety_blocked";
+      cancelReservedCalls(
+        input.ledger,
+        input.inputCalls.slice(input.index + 1).filter((pending) => pending.sourceDocumentId === call.sourceDocumentId
+          && (safetyBlocked || pending.stage !== "whole_statement_ai_review")),
+        input.providerCallOutcomes,
+        `cancelled_after_research_${result.researchTerminal.status}`,
+      );
+      if (safetyBlocked) {
+        input.sourceExecutionFailures.set(call.sourceDocumentId, "safety_blocked");
+        return { action: "continue", finalStatus: "blocked", reasonCodes: ["canonical_admission_safety_blocked"] };
+      }
+    }
+    return { action: "continue" };
+}
+
+type IndexedEvaluationCall = {
+  call: ManifestDrivenEvaluationCall;
+  index: number;
+};
+
+function callableBatch(
+  calls: readonly ManifestDrivenEvaluationCall[],
+  startIndex: number,
+  ledger: EvaluationCostBudgetLedger,
+  adapterId: RepositoryEvaluationAdapterId,
+): IndexedEvaluationCall[] {
+  const first = calls[startIndex];
+  if (!first) return [];
+  const firstItem = { call: first, index: startIndex };
+  const limit = oneTimeBatchConcurrencyLimit(adapterId, [firstItem]);
+  if (limit <= 1) return [firstItem];
+  const batch: IndexedEvaluationCall[] = [firstItem];
+  const snapshot = ledger.snapshot();
+  for (let index = startIndex + 1; index < calls.length && batch.length < limit; index += 1) {
+    const call = calls[index]!;
+    if (call.sourceDocumentId !== first.sourceDocumentId || call.stage !== first.stage) break;
+    const entry = snapshot.entries.find((item) => item.callId === call.reservation.callId);
+    if (entry?.status === "cancelled_before_send") {
+      batch.push({ call, index });
+      continue;
+    }
+    batch.push({ call, index });
+  }
+  return batch;
+}
+
+function oneTimeBatchConcurrencyLimit(
+  adapterId: RepositoryEvaluationAdapterId,
+  batch: readonly IndexedEvaluationCall[],
+): number {
+  const stage = batch[0]?.call.stage;
+  if (adapterId !== "one_time_statement_evaluation_v1" || !stage) return 1;
+  return oneTimeEvaluationConcurrencyLimit(stage);
+}
+
+async function runBounded<T, R>(
+  items: readonly T[],
+  limit: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const effectiveLimit = Math.max(1, Math.min(limit, items.length));
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  async function consume(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await worker(items[index]!);
+    }
+  }
+  await Promise.all(Array.from({ length: effectiveLimit }, consume));
+  return results;
+}
+
+function sortProviderCallOutcomes(
+  outcomes: EvaluationRunIntegrityArtifact["providerCallOutcomes"],
+  calls: readonly ManifestDrivenEvaluationCall[],
+): void {
+  const order = callOrder(calls);
+  outcomes.sort((left, right) =>
+    providerOutcomeOrder(left, order) - providerOutcomeOrder(right, order)
+    || operationKindOrder(left.operationKind) - operationKindOrder(right.operationKind)
+    || (left.operationRef ?? "").localeCompare(right.operationRef ?? "")
+    || left.callId.localeCompare(right.callId),
+  );
+}
+
+function sortCallResults(
+  results: Array<{ callId: string; value: unknown }>,
+  calls: readonly ManifestDrivenEvaluationCall[],
+): void {
+  const order = callOrder(calls);
+  results.sort((left, right) =>
+    (order.get(left.callId) ?? Number.MAX_SAFE_INTEGER) - (order.get(right.callId) ?? Number.MAX_SAFE_INTEGER)
+    || left.callId.localeCompare(right.callId),
+  );
+}
+
+function callOrder(calls: readonly ManifestDrivenEvaluationCall[]): Map<string, number> {
+  return new Map(calls.map((call, index) => [call.reservation.callId, index]));
+}
+
+function providerOutcomeOrder(
+  outcome: EvaluationRunIntegrityArtifact["providerCallOutcomes"][number],
+  order: ReadonlyMap<string, number>,
+): number {
+  return order.get(outcome.parentCallId ?? outcome.callId)
+    ?? order.get(outcome.callId)
+    ?? Number.MAX_SAFE_INTEGER;
+}
+
+function operationKindOrder(kind: CostOperationKind): number {
+  if (kind === "package_5b_budget_envelope") return 0;
+  if (kind === "manifest_call") return 1;
+  return 2;
 }
 
 async function writeVerifiedFinalArtifact(input: {

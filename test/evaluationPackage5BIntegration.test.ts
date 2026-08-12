@@ -1427,6 +1427,117 @@ describe("Package 5B manifest-driven admission", () => {
     expect(admission.package5bWorkPlan?.units.some((unit) => unit.status === "completed")).toBe(true);
   }, 30_000);
 
+  it("overlaps independent retrieval and retrieved-document investigative work without changing deterministic projection order", async () => {
+    const fixture = await approvedOneTimePdfFixture([
+      ...eligibleStages,
+      "retrieved_document_investigative_intelligence",
+    ]);
+    const baseCalls = fullOneTimeCalls();
+    const firstSemanticIndex = baseCalls.findIndex((call) => call.stage === "semantic_verification");
+    const retrievedDocumentInvestigationCalls = Array.from({ length: 3 }, (_, ordinal) => ({
+      sourceDocumentId: "doc_one_time_fiserv",
+      stage: "retrieved_document_investigative_intelligence" as const,
+      reservation: {
+        ...baseCalls[firstSemanticIndex]!.reservation,
+        callId: `package_5b_doc_one_time_fiserv_retrieved_document_investigative_intelligence_concurrent_${ordinal + 1}`,
+        capability: "investigative_intelligence" as const,
+        toolClass: "investigative_intelligence",
+      },
+    }));
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    const labels = new Map<string, string>();
+    const active = { retrieval: 0, maxRetrieval: 0, docAi: 0, maxDocAi: 0 };
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: [
+        ...baseCalls.slice(0, firstSemanticIndex),
+        ...retrievedDocumentInvestigationCalls,
+        ...baseCalls.slice(firstSemanticIndex),
+      ],
+      outputArtifactPath: path.join(fixture.directory, "package-5b-concurrent-candidate-work.json"),
+      oneTimeResearchQuestionsForTesting: (analysis) => [
+        researchQuestion(analysis, 0),
+        researchQuestion(analysis, 1),
+        researchQuestion(analysis, 2),
+      ],
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async ({ questions: [question] }) => {
+          const ordinal = Number(question!.semanticQuestion.match(/case (\d+)/)?.[1] ?? "1");
+          const url = `https://www.fiserv.com/guide/concurrent-${ordinal}`;
+          labels.set(url, question!.feeLabel);
+          return external([{ url, title: `Official fee guide ${ordinal}`, publisher: "Fiserv" }], `request_search_concurrent_${ordinal}`);
+        },
+        documentRetrieval: async (url, options) => {
+          active.retrieval += 1;
+          active.maxRetrieval = Math.max(active.maxRetrieval, active.retrieval);
+          const ordinal = Number(url.match(/concurrent-(\d+)/)?.[1] ?? "1");
+          await delay(35 - ordinal * 5);
+          active.retrieval -= 1;
+          return external(await retrieveFeeKnowledgeDocument(url, {
+            abortSignal: options.abortSignal,
+            resolveHost: async () => ["93.184.216.34"],
+            fetchImpl: async () => new Response(`<p>Fiserv ${labels.get(url) ?? "fee"} official classification guide for 2024.</p>`, {
+              status: 200,
+              headers: { "content-type": "text/html" },
+            }),
+          }), `request_retrieval_concurrent_${ordinal}`);
+        },
+        retrievedDocumentInvestigativeIntelligence: async ({ candidate, questions: [question] }) => {
+          active.docAi += 1;
+          active.maxDocAi = Math.max(active.maxDocAi, active.docAi);
+          const ordinal = Number(candidate!.candidateRecord?.title.match(/(\d+)/)?.[1] ?? "1");
+          await delay(35 - ordinal * 5);
+          active.docAi -= 1;
+          return external({
+            findings: [{
+              feeRowRef: question!.feeRowRef,
+              state: "source_derived_candidate_evidence",
+              subject: "source_relevance",
+              summary: "The retrieved document appears relevant but still requires strict semantic verification.",
+              reasonCodes: ["fee_knowledge_ai_candidate_evidence_locator"],
+              confidence: "low",
+              actionabilityCeiling: "verify_only",
+              merchantActionability: "internal_only",
+              proofRequirement: "external_verification_required",
+              candidateRef: candidate!.candidateId,
+              locatorTextHash: candidate!.retrieved.locators[0]!.textHash,
+              supportStatus: "candidate_only",
+            }],
+          }, `request_retrieved_doc_ai_concurrent_${ordinal}`);
+        },
+        semanticVerification: async ({ structuredClaim }) =>
+          external(semanticSupport(structuredClaim), `request_semantic_concurrent_${structuredClaim.claimId}`),
+        wholeStatementReview: async (packet) =>
+          external(validReview(packet, true), "request_whole_concurrent_candidate_work"),
+      },
+    });
+
+    expect(active.maxRetrieval).toBeGreaterThan(1);
+    expect(active.maxRetrieval).toBeLessThanOrEqual(4);
+    expect(active.maxDocAi).toBeGreaterThan(1);
+    expect(active.maxDocAi).toBeLessThanOrEqual(3);
+    expect(result.finalStatus).toBe("completed");
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const evidence = result.artifact.canonicalAdmissionResults[0]!.researchEvidence;
+    expect(evidence.candidates.map((candidate) => candidate.safeRetrievalDiagnostics?.sourceDomain)).toEqual([
+      "www.fiserv.com",
+      "www.fiserv.com",
+      "www.fiserv.com",
+    ]);
+    expect(evidence.candidates.map((candidate) => candidate.retrievalStatus)).toEqual([
+      "retrieved_text",
+      "retrieved_text",
+      "retrieved_text",
+    ]);
+    expect(evidence.claimSupports).toHaveLength(3);
+    expect(evidence.claimSupports.map((support) => support.disposition)).toEqual(["accepted", "accepted", "accepted"]);
+    const retrievalEntries = result.costLedger.entries.filter((entry) => entry.capability === "retrieval" && entry.status === "success");
+    expect(retrievalEntries.every((entry) => entry.reservedAt <= entry.startedAt && entry.startedAt <= entry.endedAt)).toBe(true);
+    expect(retrievalEntries.some((entry) => entry.reservedAt < entry.startedAt)).toBe(true);
+  }, 30_000);
+
   it("keeps statement investigative timeout capability-local so later statement stages can continue", async () => {
     const stages: EvaluationExecutionStage[] = [
       "parser",

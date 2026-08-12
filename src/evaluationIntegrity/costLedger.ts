@@ -126,6 +126,7 @@ export class EvaluationCostBudgetLedger {
       maximumInputTokens: input.maximumInputTokens,
       maximumOutputTokens: input.maximumOutputTokens,
       maximumToolUses: input.maximumToolUses,
+      reservedAt: input.startedAt ?? new Date().toISOString(),
       requestId: null,
       startedAt: input.startedAt ?? new Date().toISOString(),
       endedAt: null,
@@ -163,6 +164,7 @@ export class EvaluationCostBudgetLedger {
     entry.requestId = input.requestId ?? null;
     entry.endedAt = input.endedAt ?? new Date().toISOString();
     entry.durationMs = input.durationMs;
+    entry.startedAt = new Date(Date.parse(entry.endedAt) - input.durationMs).toISOString();
     entry.inputTokens = input.inputTokens ?? null;
     entry.cachedInputTokens = input.cachedInputTokens ?? null;
     entry.outputTokens = input.outputTokens ?? null;
