@@ -1616,7 +1616,10 @@ function committedAndPendingDiscoveredCount(context: OneTimePrivateContext): num
 }
 
 function commitDiscoveryAttempt(context: OneTimePrivateContext, pending: PendingDiscoveryAttempt): void {
-  const discovered = discoveryCandidatesAllowedForCommit(context, pending.discovered);
+  const question = context.packet.research.questions[pending.questionOrdinal];
+  const discovered = discoveryCandidatesAllowedForCommit(context, pending.discovered, {
+    preserveAdaptiveReserve: !question?.adaptiveFollowUp,
+  });
   context.discovered.push(...discovered);
   context.attempts.push({
     ...pending.attempt,
@@ -1630,8 +1633,14 @@ function commitDiscoveryAttempt(context: OneTimePrivateContext, pending: Pending
 function discoveryCandidatesAllowedForCommit(
   context: OneTimePrivateContext,
   candidates: readonly CandidateContext[],
+  options: { preserveAdaptiveReserve: boolean } = { preserveAdaptiveReserve: false },
 ): CandidateContext[] {
-  const remaining = Math.max(0, context.packet.research.limits.maxRetrievalCandidates - context.discovered.length);
+  const limits = context.packet.research.limits;
+  const adaptiveReserve = options.preserveAdaptiveReserve
+    && limits.maxRetrievalCandidates > limits.maxAdaptiveFollowUpCandidates + limits.maxResultCandidatesPerSearch
+    ? limits.maxAdaptiveFollowUpCandidates
+    : 0;
+  const remaining = Math.max(0, limits.maxRetrievalCandidates - adaptiveReserve - context.discovered.length);
   if (remaining === 0) return [];
   const retainedUrls = new Set(context.discovered.map((item) => item.candidate.url));
   const retained: CandidateContext[] = [];
@@ -1682,10 +1691,7 @@ function initialDiscoveryCandidateLimit(context: OneTimePrivateContext): number 
   const limits = context.packet.research.limits;
   const remaining = limits.maxRetrievalCandidates - context.discovered.length;
   if (remaining <= 0) return 0;
-  const adaptiveReserve = limits.maxRetrievalCandidates > limits.maxAdaptiveFollowUpCandidates + limits.maxResultCandidatesPerSearch
-    ? limits.maxAdaptiveFollowUpCandidates
-    : 0;
-  return Math.min(Math.max(0, remaining - adaptiveReserve), limits.maxResultCandidatesPerSearch);
+  return Math.min(remaining, limits.maxResultCandidatesPerSearch);
 }
 
 function queueAdaptiveFollowUpIfNeeded(
