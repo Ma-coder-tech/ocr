@@ -189,8 +189,8 @@ type OneTimePrivateContext = {
   adaptiveSearchQueue: Array<{ question: FeeKnowledgeResearchQuestion; questionOrdinal: number }>;
   adaptiveFollowUpCount: number;
   retrievalCursor: number;
-  retrievedDocumentInvestigativeCursor: number;
-  semanticCursor: number;
+  retrievedDocumentInvestigatedCandidateIds: Set<string>;
+  semanticallyProcessedCandidateIds: Set<string>;
   lastStageRank: number;
   wholeStatementReviewCount: number;
   researchDeadlineStartedAt: number | null;
@@ -284,8 +284,8 @@ export async function prepareOneTimeStatementEvaluationSource(input: {
       adaptiveSearchQueue: [],
       adaptiveFollowUpCount: 0,
       retrievalCursor: 0,
-      retrievedDocumentInvestigativeCursor: 0,
-      semanticCursor: 0,
+      retrievedDocumentInvestigatedCandidateIds: new Set(),
+      semanticallyProcessedCandidateIds: new Set(),
       lastStageRank: -1,
       wholeStatementReviewCount: 0,
       researchDeadlineStartedAt: null,
@@ -847,7 +847,9 @@ export function createOneTimeStatementEvaluationTransport(input: {
     }
 
     if (request.stage === "retrieved_document_investigative_intelligence") {
-      const item = context.retrieved[context.retrievedDocumentInvestigativeCursor];
+      const item = context.retrieved.find((candidate) =>
+        !context.retrievedDocumentInvestigatedCandidateIds.has(candidate.candidateId)
+      );
       if (!item) {
         return result({
           value: { intelligenceCount: 0, scope: "retrieved_document", status: "not_needed" },
@@ -858,7 +860,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
           accounting: noRequestAccounting(started),
         });
       }
-      context.retrievedDocumentInvestigativeCursor += 1;
+      context.retrievedDocumentInvestigatedCandidateIds.add(item.candidateId);
       const readiness = services.retrievedDocumentInvestigativeIntelligenceReadiness({
         approvedCallMetadata: structuredClone(request.approvedCallMetadata),
       });
@@ -923,7 +925,9 @@ export function createOneTimeStatementEvaluationTransport(input: {
     }
 
     if (request.stage === "semantic_verification") {
-      const item = context.retrieved[context.semanticCursor];
+      const item = context.retrieved.find((candidate) =>
+        !context.semanticallyProcessedCandidateIds.has(candidate.candidateId)
+      );
       if (!item) {
         return result({
           value: { verifiedCount: 0, supportedCount: 0 },
@@ -933,7 +937,7 @@ export function createOneTimeStatementEvaluationTransport(input: {
           accounting: noRequestAccounting(started),
         });
       }
-      context.semanticCursor += 1;
+      context.semanticallyProcessedCandidateIds.add(item.candidateId);
       const readiness = services.semanticVerificationReadiness({
         approvedCallMetadata: structuredClone(request.approvedCallMetadata),
       });
@@ -1891,12 +1895,16 @@ function completeResearchAfterTerminal(context: OneTimePrivateContext): void {
   for (const candidate of context.discovered.slice(context.retrievalCursor)) {
     updateFailedCandidate(context, candidate, "retrieval", status);
   }
-  for (const candidate of context.retrieved.slice(context.semanticCursor)) {
+  for (const candidate of context.retrieved.filter((item) =>
+    !context.semanticallyProcessedCandidateIds.has(item.candidateId)
+  )) {
     updateFailedCandidate(context, candidate, "semantic", status);
   }
   context.retrievalCursor = context.discovered.length;
-  context.retrievedDocumentInvestigativeCursor = context.retrieved.length;
-  context.semanticCursor = context.retrieved.length;
+  for (const candidate of context.retrieved) {
+    context.retrievedDocumentInvestigatedCandidateIds.add(candidate.candidateId);
+    context.semanticallyProcessedCandidateIds.add(candidate.candidateId);
+  }
 }
 
 function completeUnselectedInitialResearchQuestions(context: OneTimePrivateContext): void {
@@ -1951,7 +1959,7 @@ function assertOneTimeStageTransition(
     if (expectedQuestionRefs.size !== attemptedQuestionRefs.size
       || [...expectedQuestionRefs].some((questionRef) => !attemptedQuestionRefs.has(questionRef))
       || context.retrievalCursor < context.discovered.length
-      || context.semanticCursor < context.retrieved.length) {
+      || context.semanticallyProcessedCandidateIds.size < context.retrieved.length) {
       throw new Error("one_time_whole_statement_review_before_research_complete");
     }
     context.wholeStatementReviewCount += 1;
@@ -1968,8 +1976,8 @@ function isLateResearchReserveSlotWithoutPendingWork(
       && context.adaptiveSearchQueue.length === 0;
   }
   if (stage === "document_retrieval") return context.retrievalCursor >= context.discovered.length;
-  if (stage === "retrieved_document_investigative_intelligence") return context.retrievedDocumentInvestigativeCursor >= context.retrieved.length;
-  if (stage === "semantic_verification") return context.semanticCursor >= context.retrieved.length;
+  if (stage === "retrieved_document_investigative_intelligence") return context.retrievedDocumentInvestigatedCandidateIds.size >= context.retrieved.length;
+  if (stage === "semantic_verification") return context.semanticallyProcessedCandidateIds.size >= context.retrieved.length;
   return false;
 }
 

@@ -7,7 +7,7 @@ import { retrieveFeeKnowledgeDocument } from "../src/canonical/feeKnowledgeRetri
 import { buildCanonicalClaimSupportDecision } from "../src/canonical/feeKnowledgeClaimSupportDecision.js";
 import { FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION } from "../src/canonical/feeKnowledgeTypes.js";
 import type { ApprovedFeeKnowledgeSourceRegistry } from "../src/canonical/feeKnowledgeTypes.js";
-import { FeeKnowledgeSearchProviderError, type FeeKnowledgeResearchQuestion } from "../src/canonical/feeKnowledgeResearch.js";
+import { FeeKnowledgeSearchProviderError, feeKnowledgeQuestionRef, type FeeKnowledgeResearchQuestion } from "../src/canonical/feeKnowledgeResearch.js";
 import type { CanonicalStatementAnalysis } from "../src/canonical/types.js";
 import { parsePdfBytes } from "../src/parser.js";
 import { analyzeStatementDocument } from "../src/statementParserOrchestrator.js";
@@ -378,6 +378,74 @@ describe("Package 5B manifest-driven admission", () => {
       disposition: "accepted",
       evidenceDecision: "verified_classification",
     });
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+  }, 30_000);
+
+  it("processes adaptive retrieved candidates exactly once after deterministic reordering", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    const pool = fullOneTimeCalls();
+    const take = (stage: ReturnType<typeof fullOneTimeCalls>[number]["stage"]) => {
+      const index = pool.findIndex((call) => call.stage === stage);
+      if (index < 0) throw new Error(`missing adaptive identity test call for ${stage}`);
+      return pool.splice(index, 1)[0]!;
+    };
+    let webCalls = 0;
+    let semanticCalls = 0;
+    let feeLabel = "fee";
+    let initialCandidateId = "";
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      calls: [
+        take("web_search_discovery"),
+        take("document_retrieval"),
+        take("semantic_verification"),
+        take("web_search_discovery"),
+        take("document_retrieval"),
+        take("semantic_verification"),
+        take("whole_statement_ai_review"),
+      ],
+      outputArtifactPath: path.join(fixture.directory, "adaptive-candidate-stage-identity.json"),
+      oneTimeResearchQuestionsForTesting: (analysis) => [researchQuestion(analysis)],
+      oneTimeServicesForTesting: {
+        webSearchDiscovery: async ({ questions: [question] }) => {
+          webCalls += 1;
+          feeLabel = question!.feeLabel;
+          const questionOrdinal = question!.adaptiveFollowUp ? 1 : 0;
+          const attemptId = `research_${shortTestHash([feeKnowledgeQuestionRef(question!, questionOrdinal), String(questionOrdinal)])}`;
+          if (webCalls === 1) {
+            const url = "https://www.fiserv.com/initial-fee-guide";
+            initialCandidateId = `candidate_${shortTestHash([attemptId, url, "0"])}`;
+            return external([{ url, title: "Initial fee guide", publisher: "Fiserv" }], `request_search_${webCalls}`);
+          }
+          let suffix = 0;
+          let url = "";
+          let adaptiveCandidateId = "";
+          do {
+            url = `https://docs.fiserv.com/adaptive-fee-guide-${suffix++}`;
+            adaptiveCandidateId = `candidate_${shortTestHash([attemptId, url, "0"])}`;
+          } while (adaptiveCandidateId >= initialCandidateId);
+          return external([{ url, title: "Adaptive fee guide", publisher: "Fiserv" }], `request_search_${webCalls}`);
+        },
+        documentRetrieval: async (url) => external(retrievedTextDocument(url, feeLabel), `request_retrieval_${webCalls}`),
+        semanticVerification: async ({ structuredClaim }) => {
+          semanticCalls += 1;
+          return external(semanticCalls === 1 ? semanticUnsupported(structuredClaim) : semanticSupport(structuredClaim), `request_semantic_${semanticCalls}`);
+        },
+        wholeStatementReview: async (packet, context) => wholeStatementExternal(validReview(packet), "request_whole_after_adaptive_reordering", context),
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(webCalls).toBe(2);
+    expect(semanticCalls).toBe(2);
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const admission = result.artifact.canonicalAdmissionResults[0]!;
+    expect(admission.researchEvidence.candidates).toHaveLength(2);
+    expect(admission.researchEvidence.claimSupports).toHaveLength(2);
+    expect(admission.researchEvidence.candidates.every((candidate) =>
+      !candidate.reasonCodes.includes("fee_knowledge_runtime_linkage_invalid")
+    )).toBe(true);
     expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
   }, 30_000);
 
@@ -3188,6 +3256,10 @@ function wholeStatementExternal<T>(
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function shortTestHash(parts: string[]): string {
+  return createHash("sha256").update(parts.join("\u001f")).digest("hex").slice(0, 20);
 }
 
 function outboundFeeLabelPrivacyMatches(labels: string[]) {
