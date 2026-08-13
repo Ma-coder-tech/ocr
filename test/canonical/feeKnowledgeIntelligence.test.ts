@@ -647,8 +647,10 @@ describe("fee knowledge intelligence state model", () => {
         retrievalStatus: "unavailable",
         verificationStatus: "source_unavailable",
         semanticVerificationStatus: "not_started",
+        title: `${parentQuestion.processorOrNetwork} ${parentQuestion.feeLabel} official fee schedule ${parentQuestion.statementPeriodYear}`,
+        publisher: parentQuestion.processorOrNetwork,
         reasonCodes: ["fee_knowledge_http_403"],
-        safeRetrievalDiagnostics: { httpStatus: 403 },
+        safeRetrievalDiagnostics: { httpStatus: 403, sourceDomain: "paysafe.com", finalSourceDomain: "paysafe.com" },
       } as any,
       claimSupport: null,
     });
@@ -665,6 +667,24 @@ describe("fee knowledge intelligence state model", () => {
     const inaccessiblePrompt = buildFeeKnowledgeWebSearchInput([inaccessibleFollowUp!]);
     expect(inaccessiblePrompt).toContain("alternate official PDFs");
     expect(inaccessiblePrompt).toContain("adaptiveFollowUp");
+
+    const communityFollowUp = buildAdaptiveFeeKnowledgeResearchQuestion({
+      parentQuestion,
+      parentQuestionRef,
+      parentAttemptId: "research_community_parent",
+      candidate: {
+        candidateId: "candidate_reddit_blocked",
+        retrievalStatus: "unavailable",
+        verificationStatus: "rejected",
+        semanticVerificationStatus: "not_started",
+        title: `${parentQuestion.feeLabel} discussion`,
+        publisher: "Reddit",
+        reasonCodes: ["fee_knowledge_http_403"],
+        safeRetrievalDiagnostics: { httpStatus: 403, sourceDomain: "www.reddit.com", finalSourceDomain: "www.reddit.com" },
+      } as any,
+      claimSupport: null,
+    });
+    expect(communityFollowUp).toBeNull();
 
     const rejectedFollowUp = buildAdaptiveFeeKnowledgeResearchQuestion({
       parentQuestion,
@@ -765,6 +785,49 @@ describe("fee knowledge intelligence state model", () => {
 
     expect(ranked[0]!.url).toContain("interchange-reimbursement-fees.pdf");
     expect(ranked.at(-1)!.url).toContain("example.com");
+  }, 30_000);
+
+  it("keeps relevant processor evidence ahead of generic official, academic, and community material", async () => {
+    const analysis = await analysisFromPdf(STATEMENT_4, "statement_4_source_quality_ranking_replay");
+    const baseQuestion = defaultFeeKnowledgeResearchQuestions(analysis, null)[0]!;
+    const question = {
+      ...baseQuestion,
+      processorOrNetwork: "Basys",
+      feeLabel: "Visa Sales Discount",
+      statementPeriodYear: "2020",
+    };
+    const ranked = rankFeeKnowledgeDiscoveryCandidates([
+      {
+        url: "https://arxiv.org/abs/2401.00001",
+        title: "General payment processing research",
+        publisher: "arXiv",
+      },
+      {
+        url: "https://www.legislation.gov.au/example/payment-regulation.pdf",
+        title: "Generic payments legislation",
+        publisher: "Australian Government",
+      },
+      {
+        url: "https://www.reddit.com/r/smallbusiness/comments/example/visa_sales_discount/",
+        title: "Visa sales discount discussion",
+        publisher: "Reddit",
+      },
+      {
+        url: "https://www.basyspro.com/resources/visa-sales-discount-fee-schedule.pdf",
+        title: "Basys Visa Sales Discount Fee Schedule 2020",
+        publisher: "Basys",
+      },
+    ], question);
+
+    expect(ranked[0]!.url).toContain("basyspro.com");
+    expect(ranked.findIndex((candidate) => candidate.url.includes("reddit.com")))
+      .toBeGreaterThan(ranked.findIndex((candidate) => candidate.url.includes("basyspro.com")));
+    expect(ranked.findIndex((candidate) => candidate.url.includes("arxiv.org")))
+      .toBeGreaterThan(ranked.findIndex((candidate) => candidate.url.includes("basyspro.com")));
+    expect(ranked.findIndex((candidate) => candidate.url.includes("legislation.gov.au")))
+      .toBeGreaterThan(ranked.findIndex((candidate) => candidate.url.includes("basyspro.com")));
+    expect(ranked.findIndex((candidate) => candidate.url.includes("reddit.com")))
+      .toBeLessThan(ranked.findIndex((candidate) => candidate.url.includes("legislation.gov.au")));
   }, 30_000);
 });
 

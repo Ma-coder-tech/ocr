@@ -460,7 +460,7 @@ export function buildAdaptiveFeeKnowledgeResearchQuestion(input: {
   const resolutionRequirement = input.resolutionRequirement ??
     adaptiveEvidenceResolutionRequirement(input.candidate, input.claimSupport);
   if (!feeKnowledgeResolutionAllowsAdaptivePublicResearch(resolutionRequirement)) return null;
-  const missingDimensions = adaptiveMissingDimensions(input.candidate, input.claimSupport);
+  const missingDimensions = adaptiveMissingDimensions(input.candidate, input.claimSupport, input.parentQuestion);
   if (missingDimensions.length === 0) return null;
   const triggerReason = adaptiveTriggerReason(missingDimensions);
   return {
@@ -505,6 +505,7 @@ export function adaptiveEvidenceResolutionRequirement(
 export function adaptiveMissingDimensions(
   candidate: FeeKnowledgeResearchCandidateRecord | null,
   claimSupport: FeeKnowledgeClaimSupportRecord | null,
+  question?: FeeKnowledgeResearchQuestion,
 ): FeeKnowledgeAdaptiveMissingDimension[] {
   const reasonCodes = new Set([
     ...(candidate?.reasonCodes ?? []),
@@ -514,10 +515,10 @@ export function adaptiveMissingDimensions(
   ].map(normalizeText));
   const dimensions = new Set<FeeKnowledgeAdaptiveMissingDimension>();
   if (candidate?.retrievalStatus && candidate.retrievalStatus !== "retrieved_text") {
-    if (candidate.reasonCodes.some((code) => code === "fee_knowledge_http_403")) dimensions.add("authoritative_source_inaccessible");
-    if (candidate.verificationStatus === "source_unavailable" || candidate.verificationStatus === "rejected") dimensions.add("authoritative_source_inaccessible");
+    if (question && inaccessibleCandidateIsAuthoritativeForQuestion(candidate, question)) {
+      dimensions.add("authoritative_source_inaccessible");
+    }
   }
-  if (candidate?.safeRetrievalDiagnostics?.httpStatus === 403) dimensions.add("authoritative_source_inaccessible");
   if (candidate?.semanticVerificationStatus === "not_eligible"
     || candidate?.reasonCodes.includes("fee_knowledge_claim_support_missing")
     || candidate?.reasonCodes.includes("fee_knowledge_semantic_not_eligible_claim_support_missing")) {
@@ -678,9 +679,12 @@ export function rankFeeKnowledgeDiscoveryCandidates(
     .map((candidate, index) => ({
       candidate,
       index,
-      score: discoveryCandidateScore(candidate, question),
+      assessment: assessFeeKnowledgeDiscoveryCandidate(candidate, question),
     }))
-    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .sort((left, right) =>
+      right.assessment.rankTier - left.assessment.rankTier ||
+      right.assessment.score - left.assessment.score ||
+      left.index - right.index)
     .map((item) => item.candidate);
 }
 
@@ -1588,6 +1592,113 @@ function discoveryCandidateScore(candidate: FeeKnowledgeDiscoveryCandidate, ques
   if (/\b(?:what is|guide to|explained|education|small business)\b/.test(title)) score -= 60;
   if (!/\b(?:fee|rate|schedule|rule|interchange|assessment|pricing|program)\b/.test(haystack)) score -= 40;
   return score;
+}
+
+type FeeKnowledgeDiscoveryCandidateAssessment = {
+  authority: "question_specific_official" | "general_authoritative" | "non_authoritative";
+  applicabilityScore: number;
+  rankTier: number;
+  score: number;
+};
+
+function assessFeeKnowledgeDiscoveryCandidate(
+  candidate: FeeKnowledgeDiscoveryCandidate,
+  question: FeeKnowledgeResearchQuestion,
+): FeeKnowledgeDiscoveryCandidateAssessment {
+  const url = safeUrl(candidate.url);
+  const host = url?.hostname.toLowerCase() ?? "";
+  const haystack = normalizeText([
+    host,
+    url?.pathname ?? "",
+    candidate.title ?? "",
+    candidate.publisher ?? "",
+  ].join(" "));
+  const authority = questionSpecificOfficialDomain(host, question)
+    ? "question_specific_official"
+    : generalAuthoritativeDomain(host)
+      ? "general_authoritative"
+      : "non_authoritative";
+  const applicabilityScore = discoveryApplicabilityScore(haystack, question);
+  const weakSourcePenalty = weakDiscoverySourcePenalty(host);
+  const rankTier = authority === "question_specific_official" && applicabilityScore >= 2 ? 4
+    : authority === "general_authoritative" && applicabilityScore >= 2 ? 3
+      : applicabilityScore >= 2 ? 2
+        : applicabilityScore >= 1 ? 1 : 0;
+  return {
+    authority,
+    applicabilityScore,
+    rankTier,
+    score: discoveryCandidateScore(candidate, question) + applicabilityScore * 100 + weakSourcePenalty,
+  };
+}
+
+function inaccessibleCandidateIsAuthoritativeForQuestion(
+  candidate: FeeKnowledgeResearchCandidateRecord,
+  question: FeeKnowledgeResearchQuestion,
+): boolean {
+  if (candidate.retrievalStatus === "retrieved_text") return false;
+  const host = candidate.safeRetrievalDiagnostics?.finalSourceDomain
+    ?? candidate.safeRetrievalDiagnostics?.sourceDomain
+    ?? safeUrl(candidate.canonicalUrl ?? "")?.hostname
+    ?? "";
+  const assessment = assessFeeKnowledgeDiscoveryCandidate({
+    url: host ? `https://${host}/` : "",
+    title: candidate.title,
+    publisher: candidate.publisher,
+  }, question);
+  return assessment.authority === "question_specific_official" && assessment.applicabilityScore >= 2;
+}
+
+function discoveryApplicabilityScore(haystack: string, question: FeeKnowledgeResearchQuestion): number {
+  let score = 0;
+  const labelMatches = meaningfulQueryTokens(question.feeLabel).filter((token) => haystack.includes(token)).length;
+  if (labelMatches >= 2) score += 2;
+  else if (labelMatches === 1) score += 1;
+  const processor = normalizeText(question.processorOrNetwork ?? "");
+  if (processor && haystack.includes(processor)) score += 1;
+  if (networkAliases(question).map(normalizeText).some((network) => haystack.includes(network))) score += 1;
+  if (/\b(?:fee|rate|schedule|rule|interchange|assessment|pricing|program|authorization|discount)\b/.test(haystack)) score += 1;
+  if (question.statementPeriodYear && haystack.includes(question.statementPeriodYear)) score += 1;
+  return score;
+}
+
+function questionSpecificOfficialDomain(host: string, question: FeeKnowledgeResearchQuestion): boolean {
+  if (!host) return false;
+  const officialNetworkDomains = new Map<string, readonly string[]>([
+    ["visa", ["visa.com"]],
+    ["mastercard", ["mastercard.com"]],
+    ["discover", ["discover.com", "discovernetwork.com", "discoverglobalnetwork.com"]],
+    ["american express", ["americanexpress.com", "aexp-static.com"]],
+  ]);
+  for (const network of networkAliases(question).map(normalizeText)) {
+    if ((officialNetworkDomains.get(network) ?? []).some((domain) => domainMatches(host, domain))) return true;
+  }
+  const processor = normalizeText(question.processorOrNetwork ?? "");
+  const processorDomains: Array<[string, readonly string[]]> = [
+    ["fiserv", ["fiserv.com", "firstdata.com"]],
+    ["paysafe", ["paysafe.com"]],
+    ["basys", ["basys.com", "basyspro.com", "basyspro.net", "basysuniversity.com"]],
+    ["merchant one", ["merchantone.com"]],
+    ["clover", ["clover.com"]],
+  ];
+  if (processor && processorDomains.some(([alias, domains]) => processor.includes(alias) && domains.some((domain) => domainMatches(host, domain)))) {
+    return true;
+  }
+  return Boolean(question.processorOrNetwork && verifiedPublisherDomain(host, question.processorOrNetwork));
+}
+
+function generalAuthoritativeDomain(host: string): boolean {
+  return /(?:^|\.)gov(?:\.[a-z]{2})?$/.test(host);
+}
+
+function weakDiscoverySourcePenalty(host: string): number {
+  if (domainMatches(host, "reddit.com")) return -300;
+  if (domainMatches(host, "arxiv.org")) return -180;
+  return 0;
+}
+
+function domainMatches(host: string, domain: string): boolean {
+  return host === domain || host.endsWith(`.${domain}`);
 }
 
 function adaptiveSearchTerms(question: FeeKnowledgeResearchQuestion): string[] {
