@@ -7,7 +7,7 @@ export const LIVE_TRIAL_OUTPUT_LIMITS = {
   statement_investigative_intelligence: 3_200,
   retrieved_document_investigative_intelligence: 3_200,
   web_search_discovery: 2_000,
-  semantic_verification: 1_000,
+  semantic_verification: 2_000,
 } as const;
 
 export const WEB_SEARCH_ACCOUNTING_MAX_ACTIONS = 2;

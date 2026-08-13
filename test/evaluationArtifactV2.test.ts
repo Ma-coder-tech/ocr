@@ -1067,7 +1067,7 @@ describe("Evaluation Run Integrity Artifact V2", () => {
       { semanticVerificationStatus: "completed", verificationStatus: "verified_candidate_limited", reasonCodes: ["fee_knowledge_text_retrieved", "fee_knowledge_unsupported"] },
       { semanticVerificationStatus: "failed", verificationStatus: "rejected", reasonCodes: ["fee_knowledge_semantic_failed", "fee_knowledge_text_retrieved"] },
       { semanticVerificationStatus: "timed_out", verificationStatus: "rejected", reasonCodes: ["fee_knowledge_semantic_timed_out", "fee_knowledge_text_retrieved"] },
-      { semanticVerificationStatus: "parse_failed", verificationStatus: "rejected", reasonCodes: ["fee_knowledge_semantic_parse_failed", "fee_knowledge_text_retrieved"] },
+      { semanticVerificationStatus: "parse_failed", verificationStatus: "rejected", reasonCodes: ["fee_knowledge_semantic_output_exhausted", "fee_knowledge_semantic_parse_failed", "fee_knowledge_text_retrieved"] },
       { semanticVerificationStatus: "safety_blocked", verificationStatus: "safety_blocked", reasonCodes: ["fee_knowledge_semantic_safety_blocked", "fee_knowledge_text_retrieved"] },
       { semanticVerificationStatus: "unsupported", verificationStatus: "verified_candidate_limited", reasonCodes: ["fee_knowledge_semantic_unsupported", "fee_knowledge_text_retrieved"] },
     ];

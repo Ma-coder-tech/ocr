@@ -199,8 +199,8 @@ describe("whole-statement fee intelligence work plan", () => {
       { rowCount: 10, maximumInputTokens: 98_326, maximumOutputTokens: 2_600 },
     ]);
     expect(package5BParentEnvelope).toBe(0.19877425);
-    expect(singleCopyStageSum).toBe(0.39889425);
-    expect(slotExpandedEnvelope.totalEstimatedEnvelopeUsd).toBe(1.34197425);
+    expect(singleCopyStageSum).toBe(0.40889425);
+    expect(slotExpandedEnvelope.totalEstimatedEnvelopeUsd).toBe(1.44197425);
     expect(singleCopyStageSum).toBeLessThan(slotExpandedEnvelope.totalEstimatedEnvelopeUsd);
   }, 30_000);
 

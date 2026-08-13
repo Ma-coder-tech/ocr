@@ -270,6 +270,7 @@ function projectPackage5bWorkPlan(
         outputTokens: result?.outputTokens ?? null,
         durationMs: result?.durationMs ?? null,
         billingDisposition: result?.billingDisposition ?? "unknown",
+        validationErrorCodes: package5bValidationErrorCodes(result?.validation?.ok === false ? result.validation.errors : []),
         reasonCodes: [...new Set(result?.reasonCodes ?? unit.selectionReasonCodes)].sort(),
       };
     }).sort((left, right) => left.ordinal - right.ordinal),
@@ -278,6 +279,19 @@ function projectPackage5bWorkPlan(
     providerDetailsPersisted: false,
     reasonCodes: merged.reasonCodes,
   };
+}
+
+function package5bValidationErrorCodes(errors: readonly string[]): string[] {
+  return [...new Set(errors.map((error) => {
+    const controlled = error.split(":", 1)[0] ?? "";
+    const rowError = /^whole_statement_fee_intelligence_rowInterpretations\[(\d+)\]_(.+)$/.exec(controlled);
+    const normalized = rowError
+      ? `whole_statement_fee_intelligence_row_${rowError[1]}_${rowError[2]}`
+      : controlled;
+    return /^[a-z][a-zA-Z0-9_]{2,180}$/.test(normalized)
+      ? normalized.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`).slice(0, 120)
+      : "whole_statement_fee_intelligence_validation_error";
+  }))].sort();
 }
 
 function projectPackage5a(

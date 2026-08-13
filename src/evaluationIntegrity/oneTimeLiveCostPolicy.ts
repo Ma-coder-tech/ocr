@@ -73,7 +73,7 @@ export function oneTimeLiveCostPolicyTemplate(package5BParentEnvelopeUsd = 0.1):
       estimatedMaximumCostUsd: 0.001,
     },
     retrieved_document_investigative_intelligence: openAiResponsesPolicy("investigative_intelligence", 24_000, 3_200, 0),
-    semantic_verification: openAiResponsesPolicy("semantic_verification", 4_096, 1_000, 0),
+    semantic_verification: openAiResponsesPolicy("semantic_verification", 4_096, 2_000, 0),
     whole_statement_ai_review: {
       pricingPolicyRef: "openai_official_pricing_2026-08-08_v1",
       providerRoute: "openai_ai_sdk_generate_text_structured_output",

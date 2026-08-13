@@ -546,6 +546,7 @@ export type EvaluationPackage5BWorkPlanProjection = {
     outputTokens: number | null;
     durationMs: number | null;
     billingDisposition: "observed" | "provider_confirmed_zero" | "unknown" | "pending";
+    validationErrorCodes?: string[];
     reasonCodes: string[];
   }>;
   rawPromptPersisted: false;
