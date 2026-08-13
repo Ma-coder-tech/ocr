@@ -139,6 +139,7 @@ const CANDIDATE_REASON_CODES = new Set([
   ...EVIDENCE_DECISIONS.map((decision) => `fee_knowledge_${decision}`),
   "fee_knowledge_retrieval_timed_out", "fee_knowledge_semantic_parse_failed", "fee_knowledge_semantic_timed_out",
   "fee_knowledge_semantic_safety_blocked", "fee_knowledge_semantic_unsupported", "fee_knowledge_semantic_failed",
+  "fee_knowledge_semantic_json_invalid", "fee_knowledge_semantic_output_exhausted", "fee_knowledge_semantic_response_incomplete",
   "fee_knowledge_semantic_provider_unavailable_before_send", "fee_knowledge_semantic_provider_configuration_invalid_before_send",
   "fee_knowledge_runtime_linkage_invalid",
   ...[400, 401, 403, 404, 408, 409, 410, 413, 415, 422, 425, 429, 500, 501, 502, 503, 504].map((status) => `fee_knowledge_http_${status}`),
@@ -269,6 +270,10 @@ const PACKAGE_5B_WORK_UNIT_KEYS = [
   "missingRowCount", "duplicatedRowCount", "unknownRowCount", "estimatedInputBytes", "estimatedOutputTokens",
   "outputTokenCeiling", "requestId", "inputTokens", "cachedInputTokens", "outputTokens", "durationMs", "billingDisposition",
   "reasonCodes",
+] as const;
+const PACKAGE_5B_WORK_UNIT_KEYS_WITH_VALIDATION_ERRORS = [
+  ...PACKAGE_5B_WORK_UNIT_KEYS,
+  "validationErrorCodes",
 ] as const;
 const PACKAGE_5A_KEYS = [
   "type", "diagnosticRef", "capabilityId", "executionRef", "executionState", "admissionState", "finalCanonicalStatus",
@@ -773,6 +778,7 @@ function summarizePackage5bWorkPlan(value: EvaluationRunIntegrityArtifactV2["can
       outputTokens: unit.outputTokens,
       durationMs: unit.durationMs,
       billingDisposition: unit.billingDisposition,
+      ...(unit.validationErrorCodes ? { validationErrorCodes: safeStringArray(unit.validationErrorCodes) } : {}),
       reasonCodes: safeStringArray(unit.reasonCodes),
     })),
     rawPromptPersisted: value.rawPromptPersisted,
@@ -1163,7 +1169,9 @@ function validatePackage5bWorkPlan(value: unknown, result: Record<string, unknow
 }
 
 function validatePackage5bWorkUnit(value: unknown): boolean {
-  if (!isRecord(value) || !hasExactKeys(value, PACKAGE_5B_WORK_UNIT_KEYS)) return false;
+  if (!isRecord(value)
+    || (!hasExactKeys(value, PACKAGE_5B_WORK_UNIT_KEYS)
+      && !hasExactKeys(value, PACKAGE_5B_WORK_UNIT_KEYS_WITH_VALIDATION_ERRORS))) return false;
   if (!/^whole_stmt_work_[a-f0-9]{32}$/.test(stringValue(value.workUnitRef))) return false;
   if (!nonnegativeInteger(value.ordinal) || !enumValue(value.status, ["planned", "selected", "not_selected_policy", "not_selected_budget", "not_attempted_provider_unavailable", "completed", "failed", "timed_out", "rejected", "safety_blocked"])) return false;
   if (!enumValue(value.outcomeClass, ["not_attempted", "completed_exact_unit_coverage", "provider_transport_failed", "provider_refused", "provider_schema_failed", "output_length_exhausted", "incomplete_response", "timeout_watchdog", "budget_not_selected", "policy_not_selected", "provider_unavailable_before_send", "validation_rejected", "safety_blocked"])) return false;
@@ -1177,6 +1185,7 @@ function validatePackage5bWorkUnit(value: unknown): boolean {
   }
   if (value.requestId !== null && !/^[A-Za-z0-9_.:-]{1,160}$/.test(stringValue(value.requestId))) return false;
   if (!enumValue(value.billingDisposition, ["observed", "provider_confirmed_zero", "unknown", "pending"])) return false;
+  if (Object.hasOwn(value, "validationErrorCodes") && !safeCodeArray(value.validationErrorCodes)) return false;
   return safeCodeArray(value.reasonCodes) && value.expectedRowCount === (value.expectedFeeRowRefs as unknown[]).length;
 }
 

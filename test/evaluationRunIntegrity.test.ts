@@ -452,7 +452,7 @@ describe("evaluation-run integrity", () => {
       estimatedMaximumCostUsdPerSlot: 0.06,
       estimatedMaximumCostUsd: 0.3,
     });
-    expect(envelope.totalEstimatedEnvelopeUsd).toBeCloseTo(1.20427425, 9);
+    expect(envelope.totalEstimatedEnvelopeUsd).toBeCloseTo(1.30427425, 9);
     expect(ledger.snapshot()).toMatchObject({
       approvedBudgetUsd: envelope.totalEstimatedEnvelopeUsd,
       cumulativeBudgetCommittedUsd: envelope.totalEstimatedEnvelopeUsd,

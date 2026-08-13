@@ -188,6 +188,7 @@ describe("canonical research admission integration", () => {
 
     expect(result.candidate.semanticVerificationStatus).toBe("parse_failed");
     expect(result.candidate.reasonCodes).toContain("fee_knowledge_semantic_parse_failed");
+    expect(result.candidate.reasonCodes).toContain("fee_knowledge_semantic_json_invalid");
     expect(result.candidate.claimSupportDecisionRef).toBeNull();
     expect(result.claimSupport).toBeNull();
   });
@@ -237,6 +238,7 @@ describe("canonical research admission integration", () => {
 
     expect(bodies).toHaveLength(1);
     expect(bodies[0]).toMatchObject({
+      reasoning: { effort: "low" },
       text: {
         format: {
           type: "json_schema",
@@ -320,6 +322,46 @@ describe("canonical research admission integration", () => {
       reasonCode: "provider_server_error",
       reasonCodes: ["provider_http_status_503", "provider_http_status_class_5xx", "provider_server_error"],
     });
+  });
+
+  it("fails closed with a precise state when semantic output exhausts its provider ceiling", async () => {
+    const current = question("feerow_aaaaaaaaaaaaaaaaaaaaaaaa", "Alpha Fee");
+    const retrieved = await retrieveFeeKnowledgeDocument("https://evidence.test/alpha", {
+      abortSignal: new AbortController().signal,
+      resolveHost: async () => ["93.184.216.34"],
+      fetchImpl: async () => htmlResponse("Fiserv official guide explains Alpha Fee for 2026."),
+    });
+    const semantic = openAiSemanticSupportAdapter({
+      apiKey: "synthetic_test_key",
+      fetchImpl: async () => new Response(JSON.stringify({
+        id: "resp_semantic_exhausted",
+        status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" },
+        usage: { input_tokens: 475, output_tokens: 1_960 },
+        output: [],
+      }), { status: 200, headers: { "content-type": "application/json" } }),
+    });
+
+    const result = await verifyCandidate({
+      candidateId: "candidate_aaaaaaaaaaaaaaaa",
+      attemptId: "research_aaaaaaaaaaaaaaaa",
+      candidate: { url: "https://evidence.test/alpha", title: "Official guide", publisher: "Fiserv" },
+      retrieved,
+      question: current,
+      questionOrdinal: 0,
+      domainIdentityPolicy: domainPolicy(),
+      semanticSupportAdapter: semantic,
+    });
+
+    expect(result.candidate).toMatchObject({
+      semanticVerificationStatus: "parse_failed",
+      verificationStatus: "rejected",
+    });
+    expect(result.candidate.reasonCodes).toEqual(expect.arrayContaining([
+      "fee_knowledge_semantic_output_exhausted",
+      "fee_knowledge_semantic_parse_failed",
+    ]));
+    expect(result.claimSupport).toBeNull();
   });
 
   it("preserves unsupported-model and discovery safety-block statuses exactly", async () => {

@@ -57,7 +57,7 @@ export const FEE_KNOWLEDGE_RESEARCH_LIMITS = {
 const DEFAULT_OPENAI_WEB_SEARCH_MODEL = "gpt-5";
 export const OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS = 2_000;
 export const WEB_SEARCH_PROVIDER_MAX_TOOL_CALLS = 1;
-export const OPENAI_SEMANTIC_VERIFICATION_MAX_OUTPUT_TOKENS = 1_000;
+export const OPENAI_SEMANTIC_VERIFICATION_MAX_OUTPUT_TOKENS = 2_000;
 const WEB_SEARCH_MODEL_PATTERN = /^(gpt-5(?:$|-)|gpt-4\.1(?:$|-)|gpt-4o(?:-search-preview)?(?:$|-)|o3(?:$|-)|o4-mini(?:$|-))/i;
 
 export type OpenAiWebSearchActionType = "search" | "open_page" | "find_in_page" | "other";
@@ -719,6 +719,7 @@ export function openAiSemanticSupportAdapter(options: {
           model: options.modelName ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_WEB_SEARCH_MODEL,
           input,
           max_output_tokens: maximumOutputTokens,
+          reasoning: { effort: "low" },
           text: { format: semanticSupportOutputJsonSchema() },
         }),
       });
@@ -883,7 +884,11 @@ export async function verifyCandidate(input: {
   });
   const verified = isVerifiedDocumentationDecision(evidenceDecision);
   const semanticVerificationStatus: FeeKnowledgeResearchCandidateRecord["semanticVerificationStatus"] =
-    semanticSupport.reasonCodes.includes("fee_knowledge_semantic_json_invalid") ? "parse_failed"
+    semanticSupport.reasonCodes.some((reason) => [
+      "fee_knowledge_semantic_json_invalid",
+      "fee_knowledge_semantic_output_exhausted",
+      "fee_knowledge_semantic_response_incomplete",
+    ].includes(reason)) ? "parse_failed"
       : semanticSupport.reasonCodes.includes("fee_knowledge_semantic_timed_out") ? "timed_out"
         : semanticSupport.reasonCodes.includes("fee_knowledge_semantic_safety_blocked") ? "safety_blocked"
           : semanticSupport.reasonCodes.some((reason) => [
@@ -911,6 +916,7 @@ export async function verifyCandidate(input: {
     reasonCodes: [
       ...input.retrieved.reasonCodes,
       ...(semanticVerificationStatus === "completed" ? [`fee_knowledge_${evidenceDecision}`] : []),
+      ...(semanticVerificationStatus === "parse_failed" ? semanticSupport.reasonCodes : []),
       semanticStateReason,
     ],
     safeApplicability: { processorOrNetworkMatched: processorMatched, periodApplicable, jurisdictionApplicable: null, contextApplicable: null },
@@ -1248,6 +1254,17 @@ export function isOpenAiWebSearchModelSupported(model: string): boolean {
 }
 
 function semanticDecisionFromRaw(raw: unknown, structuredClaim: FeeKnowledgeStructuredClaim): FeeKnowledgeSemanticSupportDecision {
+  const root = asRecord(raw);
+  if (root?.status === "incomplete") {
+    const incompleteDetails = asRecord(root.incomplete_details);
+    const reason = incompleteDetails ? stringField(incompleteDetails, "reason") : null;
+    return unsupportedSemanticDecision(
+      structuredClaim,
+      reason === "max_output_tokens"
+        ? "fee_knowledge_semantic_output_exhausted"
+        : "fee_knowledge_semantic_response_incomplete",
+    );
+  }
   const text = outputText(raw);
   const parsed = parseJsonObject(text);
   if (!parsed) return unsupportedSemanticDecision(structuredClaim, "fee_knowledge_semantic_json_invalid");

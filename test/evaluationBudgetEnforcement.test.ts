@@ -435,7 +435,10 @@ describe("live-evaluation budget enforcement", () => {
 
     await adapter(request as any, { abortSignal: new AbortController().signal });
 
-    expect(body).toMatchObject({ max_output_tokens: 1_000 });
+    expect(body).toMatchObject({
+      max_output_tokens: 2_000,
+      reasoning: { effort: "low" },
+    });
     expect(body).not.toHaveProperty("tools");
     expect(usage).toEqual({
       requestId: "resp_semantic",
@@ -469,6 +472,28 @@ describe("live-evaluation budget enforcement", () => {
     expect(malformed).toMatchObject({ decision: "unsupported", reasonCodes: ["fee_knowledge_semantic_json_invalid"] });
     expect(refused).toMatchObject({ decision: "unsupported", reasonCodes: ["fee_knowledge_semantic_support_provider_failed"] });
     expect(bodies.every((body) => !("tools" in body) && !("tool_choice" in body))).toBe(true);
+  });
+
+  it("classifies provider-declared semantic output exhaustion before JSON parsing", async () => {
+    const adapter = openAiSemanticSupportAdapter({
+      apiKey: "synthetic-key",
+      modelName: "gpt-5",
+      maximumToolUses: 0,
+      fetchImpl: async () => jsonResponse({
+        id: "resp_semantic_incomplete",
+        status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" },
+        usage: { input_tokens: 475, output_tokens: 1_960 },
+        output: [],
+      }),
+    });
+
+    const result = await adapter(semanticRequest() as any, { abortSignal: new AbortController().signal });
+
+    expect(result).toMatchObject({
+      decision: "unsupported",
+      reasonCodes: ["fee_knowledge_semantic_output_exhausted"],
+    });
   });
 
   it("blocks missing, invalid, or inconsistent output ceilings before a provider send", async () => {

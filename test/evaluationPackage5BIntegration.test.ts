@@ -138,6 +138,40 @@ describe("Package 5B manifest-driven admission", () => {
     expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
   }, 30_000);
 
+  it("projects privacy-safe row-level validator diagnostics for a rejected Package 5B work unit", async () => {
+    const fixture = await approvedOneTimePdfFixture();
+    let invocation = 0;
+    const result = await runManifestDrivenLiveEvaluation({
+      ...fixture.runnerInput,
+      approvedBudgetUsd: 20,
+      calls: fullOneTimeCalls(),
+      outputArtifactPath: path.join(fixture.directory, "package-5b-validation-diagnostics.json"),
+      oneTimeResearchQuestionsForTesting: () => [],
+      oneTimeServicesForTesting: {
+        wholeStatementReview: async (packet, context) => {
+          invocation += 1;
+          const review = validReview(packet);
+          if (invocation === 2) {
+            review.rowInterpretations[0]!.evidenceProvenance = "industry_inference";
+            review.rowInterpretations[0]!.proposedActionabilityCeiling = "potentially_actionable";
+          }
+          return wholeStatementExternal(review, `request_whole_diagnostic_${invocation}`, context);
+        },
+      },
+    });
+
+    expect(result.finalStatus).toBe("completed");
+    expect(verifyEvaluationRunIntegrityArtifactV2(result.artifact)).toBe(true);
+    expect(result.packageFinancialInvariance[0]!.result.invariant).toBe(true);
+    if (result.artifact.type !== "evaluation_run_integrity_artifact_v2") throw new Error("expected V2 artifact");
+    const rejected = result.artifact.canonicalAdmissionResults[0]!.package5bWorkPlan?.units.find((unit) => unit.status === "rejected");
+    expect(rejected).toMatchObject({
+      outcomeClass: "validation_rejected",
+      validationErrorCodes: ["whole_statement_fee_intelligence_row_0_inference_actionability_too_strong"],
+    });
+    expect(JSON.stringify(rejected)).not.toContain("Statement evidence and deterministic context");
+  }, 30_000);
+
   it("accepts integrated Package 5B work-unit provider settings with deterministic output ceilings below the parent envelope", () => {
     const integratedPaysafeUnitReservation = {
       callId: "evaluation_doc_fiserv_paysafe_febr_2024_pdf_whole_statement_ai_review_1__whole_stmt_work_604fd6e53c82fcb7dd377c3416a02aee",
@@ -3091,7 +3125,7 @@ function openAiReadinessCalls(sourceDocumentId = "doc_one_time_fiserv") {
       };
     }
     const expectedOutput = call.stage === "web_search_discovery" ? 2_000
-      : call.stage === "semantic_verification" ? 1_000 : 5_000;
+      : call.stage === "semantic_verification" ? 2_000 : 5_000;
     const expectedToolUses = call.stage === "web_search_discovery" ? 2 : 0;
     return {
       ...call,
