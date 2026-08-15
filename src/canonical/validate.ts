@@ -16,7 +16,6 @@ import {
 import { aggregateCanonicalOpportunityComponents } from "./opportunityEngine.js";
 import { targetSupportsApprovedEstimate, targetSupportsDeterministic } from "./opportunityPolicy.js";
 import type {
-  CanonicalCustomerBenchmarkReference,
   CanonicalCustomerPermissionKey,
   CanonicalFeeLedgerControl,
   CanonicalFeeRow,
@@ -24,11 +23,6 @@ import type {
   CanonicalStatementAnalysis,
   MoneyAmount,
 } from "./types.js";
-
-type MerchantBenchmarkDerivation = NonNullable<CanonicalCustomerBenchmarkReference["derivation"]>;
-type MerchantBenchmarkBoundary = MerchantBenchmarkDerivation["lowerBound"];
-type MerchantBenchmarkInput = MerchantBenchmarkDerivation["inputs"][number];
-type MerchantBenchmarkSource = NonNullable<CanonicalCustomerBenchmarkReference["sourceRecords"]>[number];
 
 export class CanonicalStatementValidationError extends Error {
   readonly errors: string[];
@@ -656,8 +650,9 @@ function validateCanonicalCustomerState(
     }
     if (
       !state.rateComparison.benchmarkRef?.referenceId ||
+      state.rateComparison.benchmarkRef.referenceKind !== "ratereveal_reference_range" ||
+      !/^RateReveal .+ reference range$/.test(state.rateComparison.benchmarkRef.displayLabel ?? "") ||
       !state.rateComparison.benchmarkRef.version ||
-      !state.rateComparison.benchmarkRef.methodology ||
       !benchmarkAppliesToStatement(state.rateComparison.benchmarkRef, analysis)
     ) {
       errors.push("Package G qualified benchmark requires versioned, applicable benchmark reference metadata.");
@@ -670,10 +665,11 @@ function validateCanonicalCustomerState(
       !state.rateComparison.benchmarkRef.annualVolumeTier ||
       state.rateComparison.benchmarkRef.market !== "US" ||
       !state.rateComparison.benchmarkRef.sourceRecords ||
-      state.rateComparison.benchmarkRef.sourceRecords.length < 2 ||
-      !state.rateComparison.benchmarkRef.derivation
+      state.rateComparison.benchmarkRef.sourceRecords.length < 1 ||
+      !state.rateComparison.benchmarkRef.synthesis ||
+      state.rateComparison.benchmarkRef.productApproval?.status !== "approved_for_merchant_display"
     ) {
-      errors.push("Package 1 qualified benchmark requires range, factor, market, direct source provenance, and an exact derivation.");
+      errors.push("Package 1 qualified benchmark requires an approved RateReveal reference, range, applicability, research provenance, and synthesis rationale.");
     }
     if (state.rateComparison.benchmarkRef?.opportunityApproved !== false) {
       errors.push("Package 1 benchmark references cannot approve savings or opportunity amounts.");
@@ -694,19 +690,18 @@ function validateCanonicalCustomerState(
           !source.independenceGroup ||
           !source.locator ||
           !source.locationWithinSource ||
-          !source.publishedAt ||
           !source.accessedAt ||
-          !/^[a-f0-9]{64}$/.test(source.contentDigestSha256) ||
-          !source.supportedClaim ||
-          source.quantitativeValues.length === 0 ||
-          source.limitations.length < 2 ||
-          !["public_schedule", "industry_analysis", "internal_anonymized_validation"].includes(source.sourceType),
+          !source.reviewedAt ||
+          !source.metricType ||
+          !source.supportedObservation ||
+          source.limitations.length < 1 ||
+          !["network_schedule", "government_data", "industry_analysis", "processor_pricing", "legal_analysis"].includes(source.sourceType),
       )
     ) {
       errors.push("Package 1 qualified benchmark source provenance is incomplete or duplicated.");
     }
-    if (state.rateComparison.benchmarkRef && !validMerchantBenchmarkDerivation(state.rateComparison.benchmarkRef)) {
-      errors.push("Package 1 qualified benchmark derivation does not reconstruct from concrete source metrics.");
+    if (state.rateComparison.benchmarkRef && !validMerchantBenchmarkSynthesis(state.rateComparison.benchmarkRef)) {
+      errors.push("Package 1 qualified benchmark lacks an approved, traceable RateReveal synthesis.");
     }
     for (const source of sourceRecords) {
       const evidence = analysis.evidence.find((record) => record.id === source.evidenceRef);
@@ -859,35 +854,46 @@ function validBenchmarkPositionCalculation(
   return comparison.position === expectedPosition;
 }
 
-function validMerchantBenchmarkDerivation(
+function validMerchantBenchmarkSynthesis(
   reference: NonNullable<CanonicalStatementAnalysis["customerState"]["rateComparison"]["benchmarkRef"]>,
 ): boolean {
   const sources = reference.sourceRecords ?? [];
-  const derivation = reference.derivation;
-  if (!reference.range || !derivation || derivation.methodVersion !== "qualified_benchmark_linear_derivation_v1") return false;
-  if (derivation.summary.length < 80 || derivation.assumptions.length < 2 || !validIsoDate(derivation.reviewedAt)) return false;
-  const externalGroups = new Set<string>();
+  const synthesis = reference.synthesis;
+  const approval = reference.productApproval;
+  if (
+    !reference.range ||
+    !synthesis ||
+    synthesis.methodVersion !== "ratereveal_market_informed_synthesis_v1" ||
+    !approval ||
+    approval.status !== "approved_for_merchant_display" ||
+    !validIsoDate(approval.approvedAt) ||
+    !approval.decisionRef
+  ) return false;
+  if (
+    synthesis.evidenceSummary.length < 80 ||
+    synthesis.rateRevealRationale.length < 80 ||
+    synthesis.assumptions.length < 2 ||
+    synthesis.limitations.length < 2 ||
+    !validIsoDate(synthesis.reviewedAt) ||
+    !validIsoDate(synthesis.reviewBy) ||
+    synthesis.reviewBy < synthesis.reviewedAt
+  ) return false;
+  if (sources.length < 1 || new Set(sources.map((source) => source.sourceId)).size !== sources.length) return false;
   for (const source of sources) {
     if (
       !source.documentId ||
       !source.independenceGroup ||
       !singlePublisherName(source.publisher) ||
       !source.locationWithinSource ||
-      !validIsoDate(source.publishedAt) ||
+      !directHttpsUrl(source.locator) ||
+      (source.publishedAt !== null && !validIsoDate(source.publishedAt)) ||
       !validIsoDate(source.accessedAt) ||
       !validIsoDate(source.reviewedAt) ||
-      !/^[a-f0-9]{64}$/.test(source.contentDigestSha256) ||
-      source.quantitativeValues.length === 0
+      !source.metricType ||
+      !source.supportedObservation ||
+      !["high", "medium", "low"].includes(source.sourceQuality) ||
+      source.limitations.length < 1
     ) {
-      return false;
-    }
-    if (source.sourceType === "internal_anonymized_validation") {
-      if (!source.locator.startsWith("repository:data/qualified-benchmark/evidence/")) return false;
-    } else {
-      if (!directHttpsUrl(source.locator)) return false;
-      externalGroups.add(source.independenceGroup);
-    }
-    if (source.sourceType === "public_schedule" && (!source.effectiveFrom || !source.effectiveTo || !validIsoDate(source.effectiveFrom) || !validIsoDate(source.effectiveTo))) {
       return false;
     }
     if (
@@ -903,42 +909,7 @@ function validMerchantBenchmarkDerivation(
       return false;
     }
   }
-  if (externalGroups.size < 2) return false;
-
-  const sourceById = new Map(sources.map((source) => [source.sourceId, source]));
-  const inputById = new Map(derivation.inputs.map((input) => [input.inputId, input]));
-  if (derivation.inputs.length < 2 || inputById.size !== derivation.inputs.length) return false;
-  const usedSourceIds = new Set<string>();
-  for (const input of derivation.inputs) {
-    const source = sourceById.get(input.sourceId);
-    const metric = source?.quantitativeValues.find((candidate) => candidate.metricId === input.metricId);
-    if (!input.inputId || !source || !metric || input.unit !== "decimal_rate" || input.value !== metric.value || !validDecimal6(input.value)) return false;
-    usedSourceIds.add(input.sourceId);
-  }
-  if (sources.some((source) => !usedSourceIds.has(source.sourceId))) return false;
-  return (
-    reconstructBenchmarkBoundary(derivation.lowerBound, inputById, sourceById, reference.range.low) &&
-    reconstructBenchmarkBoundary(derivation.upperBound, inputById, sourceById, reference.range.high)
-  );
-}
-
-function reconstructBenchmarkBoundary(
-  boundary: MerchantBenchmarkBoundary,
-  inputById: Map<string, MerchantBenchmarkInput>,
-  sourceById: Map<string, MerchantBenchmarkSource>,
-  expected: string,
-): boolean {
-  if (!validDecimal6(boundary.offset) || boundary.terms.length < 2 || new Set(boundary.terms.map((term) => term.inputId)).size !== boundary.terms.length) return false;
-  let result = Number(boundary.offset);
-  const externalGroups = new Set<string>();
-  for (const term of boundary.terms) {
-    const input = inputById.get(term.inputId);
-    if (!input || !validDecimal6(term.weight)) return false;
-    result += Number(input.value) * Number(term.weight);
-    const source = sourceById.get(input.sourceId);
-    if (source?.sourceType !== "internal_anonymized_validation") externalGroups.add(source?.independenceGroup ?? "");
-  }
-  return externalGroups.size >= 2 && boundary.result === expected && result.toFixed(6) === expected;
+  return true;
 }
 
 function validIsoDate(value: string): boolean {

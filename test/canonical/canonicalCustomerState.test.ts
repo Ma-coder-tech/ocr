@@ -55,6 +55,7 @@ describe("canonical customer state resolver", () => {
     clearOpportunities(benchmarkUnavailable);
     refreshCustomerState(benchmarkUnavailable);
     expect(benchmarkUnavailable.customerState.primaryState).toBe("verified_benchmark_unavailable");
+    expect(benchmarkUnavailable.customerState.axes.analysisReadiness).toBe("verified");
     expect(benchmarkUnavailable.customerState.axes.ratePosition).toBe("unavailable");
 
     const competitiveNoOpportunity = readyAnalysis();

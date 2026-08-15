@@ -1245,6 +1245,8 @@ export type CanonicalCustomerAxisProjection = {
 
 export type CanonicalCustomerBenchmarkReference = {
   referenceId: string;
+  displayLabel?: string;
+  referenceKind?: "ratereveal_reference_range";
   version: string;
   effectiveFrom: string | null;
   effectiveTo: string | null;
@@ -1258,23 +1260,29 @@ export type CanonicalCustomerBenchmarkReference = {
   channel?: Exclude<CanonicalProcessingChannel, "unknown">;
   annualVolumeTier?: Exclude<CanonicalAnnualVolumeTier, "unknown">;
   range?: { low: DecimalString; high: DecimalString };
-  confidence?: Exclude<CanonicalBusinessQualificationConfidence, "low">;
+  confidence?: CanonicalBusinessQualificationConfidence;
+  productApproval?: {
+    status: "approved_for_merchant_display";
+    approvedAt: string;
+    decisionRef: string;
+  };
   sourceRecords?: Array<{
     sourceId: string;
     documentId: string;
     title: string;
     publisher: string;
     independenceGroup: string;
-    sourceType: "public_schedule" | "industry_analysis" | "internal_anonymized_validation";
+    sourceType: "network_schedule" | "government_data" | "industry_analysis" | "processor_pricing" | "legal_analysis";
     locator: string;
     locationWithinSource: string;
-    publishedAt: string;
+    publishedAt: string | null;
     effectiveFrom: string | null;
     effectiveTo: string | null;
     accessedAt: string;
-    contentDigestSha256: string;
     reviewedAt: string;
-    supportedClaim: string;
+    metricType: string;
+    sourceQuality: "high" | "medium" | "low";
+    supportedObservation: string;
     quantitativeValues: Array<{
       metricId: string;
       label: string;
@@ -1285,30 +1293,15 @@ export type CanonicalCustomerBenchmarkReference = {
     limitations: string[];
     evidenceRef: string;
   }>;
-  derivation?: {
-    methodVersion: "qualified_benchmark_linear_derivation_v1";
-    summary: string;
-    inputs: Array<{
-      inputId: string;
-      sourceId: string;
-      metricId: string;
-      value: DecimalString;
-      unit: "decimal_rate";
-    }>;
-    lowerBound: {
-      offset: DecimalString;
-      terms: Array<{ inputId: string; weight: DecimalString }>;
-      result: DecimalString;
-    };
-    upperBound: {
-      offset: DecimalString;
-      terms: Array<{ inputId: string; weight: DecimalString }>;
-      result: DecimalString;
-    };
+  synthesis?: {
+    methodVersion: "ratereveal_market_informed_synthesis_v1";
+    evidenceSummary: string;
+    rateRevealRationale: string;
     assumptions: string[];
+    limitations: string[];
     reviewedAt: string;
+    reviewBy: string;
   };
-  methodology: string;
   limitations: string[];
   evidenceRefs: string[];
   qualified: boolean;

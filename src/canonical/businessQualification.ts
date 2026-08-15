@@ -231,9 +231,13 @@ export function buildBusinessQualification(input: BuildBusinessQualificationInpu
 
   const materialConflicts = conflicts.filter((conflict) => conflict.material);
   const missingDeclaration = !confirmedSegment && !selectedSegment && !freeTextSegment;
+  const highRiskConfirmationRequired =
+    resolvedSegmentId === "high_risk_retail" &&
+    (confirmedSegment !== "high_risk_retail" || confirmedRiskClass !== "high_risk");
   const confirmationReason =
     materialConflicts[0]?.id ??
     (missingDeclaration ? "business_declaration_required" : null) ??
+    (highRiskConfirmationRequired ? "high_risk_activity_confirmation_required" : null) ??
     (channel.status !== "qualified" ? "processing_channel_confirmation_required" : null) ??
     (annualVolume.status === "confirmation_required" ? "annual_volume_confirmation_required" : null) ??
     (risk.status !== "qualified" ? "risk_class_confirmation_required" : null);
@@ -329,7 +333,7 @@ export function buildQualifiedRateComparison(
       pageNumber: null,
       rowIndex: index,
       section: entry.referenceId,
-      extractedText: `${source.title}. ${source.supportedClaim}`,
+      extractedText: `${source.title}. ${source.supportedObservation}`,
       sourceRole: "benchmark_reference",
       confidence: entry.confidence,
       extractionMethod: "reference_registry",
@@ -365,6 +369,8 @@ export function buildQualifiedRateComparison(
     position,
     benchmarkRef: {
       referenceId: entry.referenceId,
+      displayLabel: entry.displayLabel,
+      referenceKind: entry.referenceKind,
       version: registry.version,
       effectiveFrom: entry.effectiveFrom,
       effectiveTo: entry.effectiveTo,
@@ -379,9 +385,9 @@ export function buildQualifiedRateComparison(
       annualVolumeTier: entry.annualVolumeTier,
       range: entry.range,
       confidence: entry.confidence,
+      productApproval: entry.productApproval,
       sourceRecords,
-      derivation: entry.derivation,
-      methodology: entry.methodology,
+      synthesis: entry.synthesis,
       limitations: entry.limitations,
       evidenceRefs: sourceRecords.map((source) => source.evidenceRef),
       qualified: true,
@@ -664,7 +670,7 @@ function segmentForCategory(categoryId: string): string | null {
     gas_petroleum: "gas_petroleum",
     hospitality: "lodging",
     lodging: "lodging",
-    ecommerce: "general_retail",
+    ecommerce: "ecommerce",
     mobile_phone_repair: "mobile_phone_repair",
     smoke: "high_risk_retail",
     smoke_vape_cbd: "high_risk_retail",
@@ -686,7 +692,7 @@ function segmentForText(value: string): string | null {
   if (/\brestaurant|\bresturant|\btaqueria|\bmexican|\bpizzeria|\bcafe|\bdiner|\bbar\s+and\s+grill/.test(text)) return "restaurant_food_service";
   if (/\bgas\s+station|\bpetroleum|\bfuel\s+station/.test(text)) return "gas_petroleum";
   if (/\bhotel|\bmotel|\binn\b|\bresort|\blodging/.test(text)) return "lodging";
-  if (/\becommerce|\be-commerce|\bonline\s+(?:shop|store)/.test(text)) return "general_retail";
+  if (/\becommerce|\be-commerce|\bonline\s+(?:shop|store)/.test(text)) return "ecommerce";
   if (/\bretail|\bstore|\bshop\b/.test(text)) return "general_retail";
   return null;
 }
@@ -713,7 +719,7 @@ function highRiskText(value: string): boolean {
 
 function broadSegmentCanBeRefined(selected: string, described: string): boolean {
   if (selected === described) return true;
-  if (selected === "general_retail" && ["grocery_specialty_food", "mobile_phone_repair", "gas_petroleum", "auto_repair"].includes(described)) return true;
+  if (selected === "general_retail" && ["grocery_specialty_food", "ecommerce", "mobile_phone_repair", "gas_petroleum", "auto_repair"].includes(described)) return true;
   if (selected === "professional_services" && described === "professional_services") return true;
   return false;
 }
@@ -766,6 +772,7 @@ function dedupeAlternatives(alternatives: CanonicalBusinessAlternative[]): Canon
 function confirmationPrompt(reasonCode: string): string {
   if (reasonCode.includes("channel")) return "Confirm whether transactions are primarily card-present, card-not-present, or mixed.";
   if (reasonCode.includes("annual_volume")) return "Confirm the merchant's approximate annual card-processing volume.";
+  if (reasonCode === "high_risk_activity_confirmation_required") return "Confirm the merchant's supported business activity and high-risk eligibility before RateReveal applies a high-risk reference.";
   if (reasonCode.includes("risk")) return "Confirm the business activity and risk context before RateReveal selects a comparison segment.";
   return "Confirm which business description best represents what the merchant actually sells or does.";
 }
@@ -775,6 +782,7 @@ function isKnownSegment(value: string): boolean {
     "restaurant_food_service",
     "grocery_specialty_food",
     "general_retail",
+    "ecommerce",
     "professional_services",
     "gas_petroleum",
     "lodging",
