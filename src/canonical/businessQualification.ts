@@ -380,6 +380,7 @@ export function buildQualifiedRateComparison(
       range: entry.range,
       confidence: entry.confidence,
       sourceRecords,
+      derivation: entry.derivation,
       methodology: entry.methodology,
       limitations: entry.limitations,
       evidenceRefs: sourceRecords.map((source) => source.evidenceRef),

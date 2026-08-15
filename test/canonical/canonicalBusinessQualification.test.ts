@@ -25,34 +25,62 @@ import type {
 const EL_NUEVO_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf");
 
 describe("Package 1 canonical business qualification", () => {
-  it("admits only the two narrow merchant-facing reference entries", () => {
+  it("fails closed with no merchant-facing entries after the provenance review", () => {
     const registry = loadQualifiedBenchmarkRegistry();
     expect(registry.normalRuntimeNetworkRequired).toBe(false);
-    expect(registry.entries.map((entry) => [entry.segmentId, entry.channel, entry.annualVolumeTier])).toEqual([
-      ["restaurant_food_service", "card_present", "100k_500k"],
-      ["grocery_specialty_food", "card_present", "100k_500k"],
+    expect(registry.entries).toEqual([]);
+    expect(registry.sourceRecords).toEqual([]);
+    expect(registry.provenanceReview.candidateRangeAssessments).toEqual([
+      expect.objectContaining({ segmentId: "restaurant_food_service", previousRange: { low: "0.021000", high: "0.026000" }, decision: "unavailable" }),
+      expect.objectContaining({ segmentId: "grocery_specialty_food", previousRange: { low: "0.018000", high: "0.023000" }, decision: "unavailable" }),
     ]);
-    expect(registry.entries.every((entry) => entry.riskClass === "standard" && entry.effectiveFrom === "2026-06-01" && entry.effectiveTo === "2026-10-31")).toBe(true);
-    expect(registry.entries.every((entry) => entry.sourceIds.length >= 2 && entry.materiallyAboveDelta === null)).toBe(true);
   });
 
-  it("rejects a registry entry without sufficient provenance", () => {
-    const registry = structuredClone(loadQualifiedBenchmarkRegistry());
+  it("rejects a merchant-facing entry without sufficient provenance", () => {
+    const registry = eligibleTestRegistry();
     registry.entries[0]!.sourceIds = [];
     expect(() => validateQualifiedBenchmarkRegistry(registry)).toThrow(/source provenance/);
   });
 
+  it("rejects legacy locators, bundled publishers, missing dates, and unpinned content", () => {
+    const legacyLocator = eligibleTestRegistry();
+    legacyLocator.sourceRecords[0]!.locator = "repository:data/fiserv-fee-analysis/mcc_benchmark_reference.json#sources";
+    expect(() => validateQualifiedBenchmarkRegistry(legacyLocator)).toThrow(/direct HTTPS locator/);
+
+    const bundledPublisher = eligibleTestRegistry();
+    bundledPublisher.sourceRecords[0]!.publisher = "Publisher One and Publisher Two";
+    expect(() => validateQualifiedBenchmarkRegistry(bundledPublisher)).toThrow(/one publisher/);
+
+    const missingPublicationDate = eligibleTestRegistry();
+    missingPublicationDate.sourceRecords[0]!.publishedAt = "";
+    expect(() => validateQualifiedBenchmarkRegistry(missingPublicationDate)).toThrow(/publication/);
+
+    const unpinnedContent = eligibleTestRegistry();
+    unpinnedContent.sourceRecords[0]!.contentDigestSha256 = "not-a-digest";
+    expect(() => validateQualifiedBenchmarkRegistry(unpinnedContent)).toThrow(/SHA-256/);
+  });
+
+  it("rejects prose-and-source-count provenance when exact boundaries do not reconstruct", () => {
+    const registry = eligibleTestRegistry();
+    registry.entries[0]!.derivation.lowerBound.result = "0.020000";
+    expect(() => validateQualifiedBenchmarkRegistry(registry)).toThrow(/does not reconstruct to the displayed range/);
+
+    const unlinkedMetric = eligibleTestRegistry();
+    unlinkedMetric.entries[0]!.derivation.inputs[0]!.metricId = "unsupported_metric";
+    expect(() => validateQualifiedBenchmarkRegistry(unlinkedMetric)).toThrow(/does not reconstruct from a linked source metric/);
+  });
+
   it("rejects unsupported factors and overlapping entries instead of choosing a default", () => {
-    const invalidFactorRegistry = structuredClone(loadQualifiedBenchmarkRegistry());
+    const invalidFactorRegistry = eligibleTestRegistry();
     invalidFactorRegistry.entries[0]!.channel = "unknown" as never;
     expect(() => validateQualifiedBenchmarkRegistry(invalidFactorRegistry)).toThrow(/unsupported channel/);
 
-    const overlappingRegistry = structuredClone(loadQualifiedBenchmarkRegistry());
+    const overlappingRegistry = eligibleTestRegistry();
     overlappingRegistry.entries.push({ ...overlappingRegistry.entries[0]!, referenceId: "duplicate_applicability" });
     expect(() => validateQualifiedBenchmarkRegistry(overlappingRegistry)).toThrow(/overlap for the same qualification factors/);
   });
 
-  it("qualifies a declared restaurant and deterministically positions the verified effective rate", () => {
+  it("keeps restaurant business qualification but returns unavailable with the reviewed registry", () => {
     const result = qualify({
       merchantName: "Neighborhood dining company",
       selectedCategoryId: "restaurant_food_beverage",
@@ -66,12 +94,23 @@ describe("Package 1 canonical business qualification", () => {
       channel: { value: "card_present", status: "qualified" },
       annualVolume: { tier: "100k_500k", status: "qualified", source: "statement_month_x12" },
     });
+    expect(result.rateComparison).toMatchObject({ status: "unavailable", position: "unavailable", benchmarkRef: null, calculationRef: null });
+  });
+
+  it("qualifies only a reproducibly derived injected reference and never creates savings", () => {
+    const result = qualify({
+      selectedCategoryId: "restaurant_food_beverage",
+      freeTextDescription: "Restaurant",
+      effectiveRate: "0.025000",
+      registry: eligibleTestRegistry(),
+    });
     expect(result.rateComparison).toMatchObject({
       status: "qualified",
       position: "within_reference",
       benchmarkRef: {
         segmentId: "restaurant_food_service",
         range: { low: "0.021000", high: "0.026000" },
+        derivation: { methodVersion: "qualified_benchmark_linear_derivation_v1" },
         opportunityApproved: false,
         aiSourced: false,
       },
@@ -79,10 +118,10 @@ describe("Package 1 canonical business qualification", () => {
     expect(JSON.stringify(result.rateComparison)).not.toMatch(/savings|overpayment|recoverable|annualImpact|monthlyImpact/i);
   });
 
-  it("qualifies specialty grocery without collapsing it into general retail", () => {
+  it("resolves specialty grocery without collapsing it into general retail but withholds the unsupported range", () => {
     const result = qualify({ selectedCategoryId: "retail", freeTextDescription: "Specialty grocery market", effectiveRate: "0.024000" });
     expect(result.businessQualification.resolvedSegmentId).toBe("grocery_specialty_food");
-    expect(result.rateComparison).toMatchObject({ status: "qualified", position: "above_reference" });
+    expect(result.rateComparison).toMatchObject({ status: "unavailable", position: "unavailable", benchmarkRef: null });
   });
 
   it("uses merchant declaration over a weak merchant-name alternative", () => {
@@ -232,6 +271,15 @@ describe("Package 1 canonical business qualification", () => {
     calculation.inputs.find((item) => item.label === "Reference range upper boundary")!.value = "0.099000";
     expect(() => validateCanonicalStatementAnalysis(tampered)).toThrow(/benchmark position does not reconstruct/);
 
+    const unsupportedProvenance = structuredClone(qualified);
+    unsupportedProvenance.customerState.rateComparison.benchmarkRef!.sourceRecords![0]!.locator =
+      "repository:data/fiserv-fee-analysis/mcc_benchmark_reference.json#sources";
+    expect(() => validateCanonicalStatementAnalysis(unsupportedProvenance)).toThrow(/derivation does not reconstruct from concrete source metrics/);
+
+    const unsupportedDerivation = structuredClone(qualified);
+    unsupportedDerivation.customerState.rateComparison.benchmarkRef!.derivation!.upperBound.result = "0.025000";
+    expect(() => validateCanonicalStatementAnalysis(unsupportedDerivation)).toThrow(/derivation does not reconstruct from concrete source metrics/);
+
     const fabricatedMcc = structuredClone(qualified);
     const looseMccEvidence = makeEvidenceRecord({
       documentId: fabricatedMcc.identity.sourceDocumentRef,
@@ -262,6 +310,7 @@ function qualify(options: {
   period?: { start: string; end: string };
   statementLines?: string[];
   aiSuggestion?: CanonicalBusinessProfileInput["aiSuggestion"];
+  registry?: QualifiedBenchmarkRegistry;
 }) {
   const evidence = new Map<string, CanonicalEvidenceRecord>();
   const context = makeEvidenceRecord({
@@ -321,6 +370,7 @@ function qualify(options: {
       market: "US",
       aiSuggestion: options.aiSuggestion,
     },
+    registry: options.registry,
     evidence,
     calculations,
   });
@@ -360,8 +410,111 @@ function financialFactsFixture(processedSalesUsd: number, effectiveRate: string,
 }
 
 function registryForPeriod(effectiveFrom: string, effectiveTo: string): QualifiedBenchmarkRegistry {
-  const registry = structuredClone(loadQualifiedBenchmarkRegistry());
+  const registry = eligibleTestRegistry();
   registry.version = `test-${effectiveFrom}-${effectiveTo}`;
   registry.entries = registry.entries.map((entry) => ({ ...entry, effectiveFrom, effectiveTo }));
   return registry;
+}
+
+function eligibleTestRegistry(): QualifiedBenchmarkRegistry {
+  const registry = structuredClone(loadQualifiedBenchmarkRegistry());
+  registry.version = "test-reproducible-reference-v1";
+  registry.sourceRecords = [
+    {
+      sourceId: "test_source_alpha",
+      documentId: "test_document_alpha_v1",
+      title: "Test quantitative cost study alpha",
+      publisher: "PublisherAlpha",
+      independenceGroup: "publisher_alpha",
+      sourceType: "industry_analysis",
+      locator: "https://evidence.example.test/alpha-v1.pdf",
+      locationWithinSource: "Table 2, restaurant card-present observations",
+      publishedAt: "2026-07-01",
+      effectiveFrom: null,
+      effectiveTo: null,
+      accessedAt: "2026-08-15",
+      contentDigestSha256: "a".repeat(64),
+      reviewedAt: "2026-08-15",
+      supportedClaim: "Provides independently measured lower and upper restaurant effective-rate inputs for the test derivation.",
+      quantitativeValues: [
+        { metricId: "alpha_lower", label: "Alpha lower observation", value: "0.020000", unit: "decimal_rate", locationWithinSource: "Table 2, row lower" },
+        { metricId: "alpha_upper", label: "Alpha upper observation", value: "0.025000", unit: "decimal_rate", locationWithinSource: "Table 2, row upper" },
+      ],
+      limitations: ["Synthetic source used only to verify the admission architecture.", "Does not authorize a production merchant-facing reference."],
+    },
+    {
+      sourceId: "test_source_beta",
+      documentId: "test_document_beta_v1",
+      title: "Test quantitative cost study beta",
+      publisher: "PublisherBeta",
+      independenceGroup: "publisher_beta",
+      sourceType: "industry_analysis",
+      locator: "https://evidence.example.test/beta-v1.pdf",
+      locationWithinSource: "Dataset summary, restaurant card-present observations",
+      publishedAt: "2026-07-15",
+      effectiveFrom: null,
+      effectiveTo: null,
+      accessedAt: "2026-08-15",
+      contentDigestSha256: "b".repeat(64),
+      reviewedAt: "2026-08-15",
+      supportedClaim: "Provides a second independent lower and upper restaurant effective-rate input for the test derivation.",
+      quantitativeValues: [
+        { metricId: "beta_lower", label: "Beta lower observation", value: "0.022000", unit: "decimal_rate", locationWithinSource: "Dataset summary, lower observation" },
+        { metricId: "beta_upper", label: "Beta upper observation", value: "0.027000", unit: "decimal_rate", locationWithinSource: "Dataset summary, upper observation" },
+      ],
+      limitations: ["Synthetic source used only to verify the admission architecture.", "Does not authorize a production merchant-facing reference."],
+    },
+  ];
+  registry.entries = [
+    {
+      referenceId: "test_restaurant_reproducible_reference",
+      displayLabel: "Restaurant / Food Service",
+      segmentId: "restaurant_food_service",
+      riskClass: "standard",
+      channel: "card_present",
+      annualVolumeTier: "100k_500k",
+      applicableProcessor: "fiserv",
+      effectiveFrom: "2026-06-01",
+      effectiveTo: "2026-10-31",
+      range: { low: "0.021000", high: "0.026000" },
+      confidence: "medium",
+      merchantDisplayEligible: true,
+      materiallyAboveDelta: null,
+      sourceIds: ["test_source_alpha", "test_source_beta"],
+      derivation: {
+        methodVersion: "qualified_benchmark_linear_derivation_v1",
+        summary: "The test range is the equal-weight arithmetic mean of two independent lower observations and two independent upper observations, with no offset.",
+        inputs: [
+          { inputId: "alpha_lower_input", sourceId: "test_source_alpha", metricId: "alpha_lower", value: "0.020000", unit: "decimal_rate" },
+          { inputId: "beta_lower_input", sourceId: "test_source_beta", metricId: "beta_lower", value: "0.022000", unit: "decimal_rate" },
+          { inputId: "alpha_upper_input", sourceId: "test_source_alpha", metricId: "alpha_upper", value: "0.025000", unit: "decimal_rate" },
+          { inputId: "beta_upper_input", sourceId: "test_source_beta", metricId: "beta_upper", value: "0.027000", unit: "decimal_rate" },
+        ],
+        lowerBound: {
+          offset: "0.000000",
+          terms: [
+            { inputId: "alpha_lower_input", weight: "0.500000" },
+            { inputId: "beta_lower_input", weight: "0.500000" },
+          ],
+          result: "0.021000",
+        },
+        upperBound: {
+          offset: "0.000000",
+          terms: [
+            { inputId: "alpha_upper_input", weight: "0.500000" },
+            { inputId: "beta_upper_input", weight: "0.500000" },
+          ],
+          result: "0.026000",
+        },
+        assumptions: [
+          "Equal weighting is explicit and used only for the synthetic test fixture.",
+          "All inputs are already normalized to the same all-in decimal-rate basis.",
+        ],
+        reviewedAt: "2026-08-15",
+      },
+      methodology: "Synthetic reproducible reference used only to verify that concrete sources and both exact boundaries are required before qualification.",
+      limitations: ["This fixture is not production benchmark evidence.", "It exists only to exercise Package 1 admission and canonical invariance."],
+    },
+  ];
+  return validateQualifiedBenchmarkRegistry(registry);
 }

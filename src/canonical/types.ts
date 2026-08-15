@@ -1261,16 +1261,53 @@ export type CanonicalCustomerBenchmarkReference = {
   confidence?: Exclude<CanonicalBusinessQualificationConfidence, "low">;
   sourceRecords?: Array<{
     sourceId: string;
+    documentId: string;
     title: string;
     publisher: string;
+    independenceGroup: string;
     sourceType: "public_schedule" | "industry_analysis" | "internal_anonymized_validation";
     locator: string;
-    publishedAt: string | null;
+    locationWithinSource: string;
+    publishedAt: string;
+    effectiveFrom: string | null;
+    effectiveTo: string | null;
+    accessedAt: string;
+    contentDigestSha256: string;
     reviewedAt: string;
     supportedClaim: string;
+    quantitativeValues: Array<{
+      metricId: string;
+      label: string;
+      value: DecimalString;
+      unit: "decimal_rate";
+      locationWithinSource: string;
+    }>;
     limitations: string[];
     evidenceRef: string;
   }>;
+  derivation?: {
+    methodVersion: "qualified_benchmark_linear_derivation_v1";
+    summary: string;
+    inputs: Array<{
+      inputId: string;
+      sourceId: string;
+      metricId: string;
+      value: DecimalString;
+      unit: "decimal_rate";
+    }>;
+    lowerBound: {
+      offset: DecimalString;
+      terms: Array<{ inputId: string; weight: DecimalString }>;
+      result: DecimalString;
+    };
+    upperBound: {
+      offset: DecimalString;
+      terms: Array<{ inputId: string; weight: DecimalString }>;
+      result: DecimalString;
+    };
+    assumptions: string[];
+    reviewedAt: string;
+  };
   methodology: string;
   limitations: string[];
   evidenceRefs: string[];

@@ -16,6 +16,7 @@ import {
 import { aggregateCanonicalOpportunityComponents } from "./opportunityEngine.js";
 import { targetSupportsApprovedEstimate, targetSupportsDeterministic } from "./opportunityPolicy.js";
 import type {
+  CanonicalCustomerBenchmarkReference,
   CanonicalCustomerPermissionKey,
   CanonicalFeeLedgerControl,
   CanonicalFeeRow,
@@ -23,6 +24,11 @@ import type {
   CanonicalStatementAnalysis,
   MoneyAmount,
 } from "./types.js";
+
+type MerchantBenchmarkDerivation = NonNullable<CanonicalCustomerBenchmarkReference["derivation"]>;
+type MerchantBenchmarkBoundary = MerchantBenchmarkDerivation["lowerBound"];
+type MerchantBenchmarkInput = MerchantBenchmarkDerivation["inputs"][number];
+type MerchantBenchmarkSource = NonNullable<CanonicalCustomerBenchmarkReference["sourceRecords"]>[number];
 
 export class CanonicalStatementValidationError extends Error {
   readonly errors: string[];
@@ -664,9 +670,10 @@ function validateCanonicalCustomerState(
       !state.rateComparison.benchmarkRef.annualVolumeTier ||
       state.rateComparison.benchmarkRef.market !== "US" ||
       !state.rateComparison.benchmarkRef.sourceRecords ||
-      state.rateComparison.benchmarkRef.sourceRecords.length < 2
+      state.rateComparison.benchmarkRef.sourceRecords.length < 2 ||
+      !state.rateComparison.benchmarkRef.derivation
     ) {
-      errors.push("Package 1 qualified benchmark requires range, factor, market, and per-entry source provenance.");
+      errors.push("Package 1 qualified benchmark requires range, factor, market, direct source provenance, and an exact derivation.");
     }
     if (state.rateComparison.benchmarkRef?.opportunityApproved !== false) {
       errors.push("Package 1 benchmark references cannot approve savings or opportunity amounts.");
@@ -683,13 +690,23 @@ function validateCanonicalCustomerState(
           !source.sourceId ||
           !source.title ||
           !source.publisher ||
+          !source.documentId ||
+          !source.independenceGroup ||
           !source.locator ||
+          !source.locationWithinSource ||
+          !source.publishedAt ||
+          !source.accessedAt ||
+          !/^[a-f0-9]{64}$/.test(source.contentDigestSha256) ||
           !source.supportedClaim ||
+          source.quantitativeValues.length === 0 ||
           source.limitations.length < 2 ||
           !["public_schedule", "industry_analysis", "internal_anonymized_validation"].includes(source.sourceType),
       )
     ) {
       errors.push("Package 1 qualified benchmark source provenance is incomplete or duplicated.");
+    }
+    if (state.rateComparison.benchmarkRef && !validMerchantBenchmarkDerivation(state.rateComparison.benchmarkRef)) {
+      errors.push("Package 1 qualified benchmark derivation does not reconstruct from concrete source metrics.");
     }
     for (const source of sourceRecords) {
       const evidence = analysis.evidence.find((record) => record.id === source.evidenceRef);
@@ -840,6 +857,109 @@ function validBenchmarkPositionCalculation(
   if (![numericRate, low, high].every(Number.isFinite) || low <= 0 || high <= low) return false;
   const expectedPosition = numericRate < low ? "below_reference" : numericRate <= high ? "within_reference" : "above_reference";
   return comparison.position === expectedPosition;
+}
+
+function validMerchantBenchmarkDerivation(
+  reference: NonNullable<CanonicalStatementAnalysis["customerState"]["rateComparison"]["benchmarkRef"]>,
+): boolean {
+  const sources = reference.sourceRecords ?? [];
+  const derivation = reference.derivation;
+  if (!reference.range || !derivation || derivation.methodVersion !== "qualified_benchmark_linear_derivation_v1") return false;
+  if (derivation.summary.length < 80 || derivation.assumptions.length < 2 || !validIsoDate(derivation.reviewedAt)) return false;
+  const externalGroups = new Set<string>();
+  for (const source of sources) {
+    if (
+      !source.documentId ||
+      !source.independenceGroup ||
+      !singlePublisherName(source.publisher) ||
+      !source.locationWithinSource ||
+      !validIsoDate(source.publishedAt) ||
+      !validIsoDate(source.accessedAt) ||
+      !validIsoDate(source.reviewedAt) ||
+      !/^[a-f0-9]{64}$/.test(source.contentDigestSha256) ||
+      source.quantitativeValues.length === 0
+    ) {
+      return false;
+    }
+    if (source.sourceType === "internal_anonymized_validation") {
+      if (!source.locator.startsWith("repository:data/qualified-benchmark/evidence/")) return false;
+    } else {
+      if (!directHttpsUrl(source.locator)) return false;
+      externalGroups.add(source.independenceGroup);
+    }
+    if (source.sourceType === "public_schedule" && (!source.effectiveFrom || !source.effectiveTo || !validIsoDate(source.effectiveFrom) || !validIsoDate(source.effectiveTo))) {
+      return false;
+    }
+    if (
+      source.quantitativeValues.some(
+        (metric) =>
+          !metric.metricId ||
+          !metric.label ||
+          !validDecimal6(metric.value) ||
+          metric.unit !== "decimal_rate" ||
+          !metric.locationWithinSource,
+      )
+    ) {
+      return false;
+    }
+  }
+  if (externalGroups.size < 2) return false;
+
+  const sourceById = new Map(sources.map((source) => [source.sourceId, source]));
+  const inputById = new Map(derivation.inputs.map((input) => [input.inputId, input]));
+  if (derivation.inputs.length < 2 || inputById.size !== derivation.inputs.length) return false;
+  const usedSourceIds = new Set<string>();
+  for (const input of derivation.inputs) {
+    const source = sourceById.get(input.sourceId);
+    const metric = source?.quantitativeValues.find((candidate) => candidate.metricId === input.metricId);
+    if (!input.inputId || !source || !metric || input.unit !== "decimal_rate" || input.value !== metric.value || !validDecimal6(input.value)) return false;
+    usedSourceIds.add(input.sourceId);
+  }
+  if (sources.some((source) => !usedSourceIds.has(source.sourceId))) return false;
+  return (
+    reconstructBenchmarkBoundary(derivation.lowerBound, inputById, sourceById, reference.range.low) &&
+    reconstructBenchmarkBoundary(derivation.upperBound, inputById, sourceById, reference.range.high)
+  );
+}
+
+function reconstructBenchmarkBoundary(
+  boundary: MerchantBenchmarkBoundary,
+  inputById: Map<string, MerchantBenchmarkInput>,
+  sourceById: Map<string, MerchantBenchmarkSource>,
+  expected: string,
+): boolean {
+  if (!validDecimal6(boundary.offset) || boundary.terms.length < 2 || new Set(boundary.terms.map((term) => term.inputId)).size !== boundary.terms.length) return false;
+  let result = Number(boundary.offset);
+  const externalGroups = new Set<string>();
+  for (const term of boundary.terms) {
+    const input = inputById.get(term.inputId);
+    if (!input || !validDecimal6(term.weight)) return false;
+    result += Number(input.value) * Number(term.weight);
+    const source = sourceById.get(input.sourceId);
+    if (source?.sourceType !== "internal_anonymized_validation") externalGroups.add(source?.independenceGroup ?? "");
+  }
+  return externalGroups.size >= 2 && boundary.result === expected && result.toFixed(6) === expected;
+}
+
+function validIsoDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`));
+}
+
+function validDecimal6(value: string): boolean {
+  return /^\d+\.\d{6}$/.test(value) && Number.isFinite(Number(value));
+}
+
+function directHttpsUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" && parsed.hostname.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function singlePublisherName(value: string): boolean {
+  return value.trim().length > 0 && !/[,&;]|\band\b|\//i.test(value);
 }
 
 function benchmarkAppliesToStatement(
