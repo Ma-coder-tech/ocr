@@ -20,6 +20,7 @@ import type {
 } from "./types.js";
 
 export const MERCHANT_ATTENTION_POLICY_VERSION = "canonical_merchant_attention_v1" as const;
+export const MERCHANT_ATTENTION_LANGUAGE_ELIGIBILITY_POLICY_VERSION = "merchant_attention_language_eligibility_v1" as const;
 
 type MerchantAttentionInput = Pick<
   CanonicalStatementAnalysis,
@@ -82,6 +83,7 @@ export function buildCanonicalMerchantAttentionModel(
   const pricingItem = buildStatementPricingAttentionItem(input, evidenceIds);
   const items = [...feeItems, ...(pricingItem ? [pricingItem] : [])].sort(compareAttentionItems);
   const unresolved = items.some((item) => item.conflict.status === "unresolved" || item.evidenceStatus === "unresolved");
+  const languageEligibleCount = items.filter((item) => item.merchantLanguageEligibility.eligibleForAiInterpretation).length;
   const status: CanonicalMerchantAttentionModel["status"] = items.length === 0
     ? "empty"
     : input.feeLedger.status === "available" && !unresolved
@@ -121,6 +123,13 @@ export function buildCanonicalMerchantAttentionModel(
         actionabilityCeilingValidated: false,
         privacyValidated: false,
         reasonCodes: ["merchant_attention_ai_interpretation_unavailable"],
+      },
+      coverage: {
+        policyVersion: MERCHANT_ATTENTION_LANGUAGE_ELIGIBILITY_POLICY_VERSION,
+        eligibleItemCount: languageEligibleCount,
+        admittedItemCount: 0,
+        deterministicRoutineItemCount: items.length - languageEligibleCount,
+        exactEligibleCoverage: false,
       },
       fallbackReasonCodes: ["merchant_attention_ai_interpretation_unavailable"],
     },
@@ -166,7 +175,9 @@ function buildFeeAttentionItem(input: {
   const evidenceRefs = unique([
     ...input.row.contributionDecision.evidenceRefs,
     ...(input.classification?.candidates.find((candidate) => candidate.id === selected?.candidateId)?.evidenceRefs ?? []),
-    ...(input.rowIntelligence?.acceptance?.evidenceRefs ?? []),
+    ...(meaning.conclusionBasis === "admitted_intelligence"
+      ? input.rowIntelligence?.acceptance?.evidenceRefs ?? []
+      : []),
     ...input.feeKnowledge.flatMap((record) => record.basis.statementEvidenceRefs),
   ]).filter((ref) => input.evidenceIds.has(ref)).sort();
   const opportunityLink = supportedOpportunityLink(input.input, input.row.id);
@@ -221,6 +232,19 @@ function buildFeeAttentionItem(input: {
         documentationNeeded,
       });
   const priorityFinding = priority === "high_priority" || (priority === "review" && attentionType !== "informational" && evidenceRefs.length > 0);
+  const merchantLanguageEligibility = languageEligibilityFor({
+    scope: "fee_row",
+    priorityFinding,
+    questionToResolve: questionToResolve !== null,
+    actionToolkit: toolkit !== null,
+    inventoryDisposition: conflict.status === "unresolved"
+      ? "unresolved_review"
+      : priority === "routine"
+        ? "routine_context"
+        : "attention_review",
+    priority,
+    attentionType,
+  });
 
   return {
     id,
@@ -290,6 +314,7 @@ function buildFeeAttentionItem(input: {
       ...meaning.intelligenceRefs,
       ...input.feeKnowledge.map((record) => record.intelligenceId),
     ]).sort(),
+    merchantLanguageEligibility,
     merchantLanguageSource: "deterministic_fallback",
   };
 }
@@ -378,6 +403,15 @@ function buildStatementPricingAttentionItem(
     reasonCodes: ["attention_pricing_review", "benchmark_context_only", "resolution_merchant_pricing_agreement_required"],
     evidenceRefs,
     sourceIntelligenceRefs: [],
+    merchantLanguageEligibility: languageEligibilityFor({
+      scope: "statement_pricing",
+      priorityFinding: true,
+      questionToResolve: true,
+      actionToolkit: true,
+      inventoryDisposition: "statement_level_only",
+      priority: "review",
+      attentionType: "pricing_review",
+    }),
     merchantLanguageSource: "deterministic_fallback",
   };
 }
@@ -410,7 +444,7 @@ function resolveRowMeaning(
   const accepted = intelligence?.acceptance && ["accepted", "accepted_with_conditions"].includes(intelligence.acceptance.status)
     ? intelligence.acceptance
     : null;
-  const interpretation = intelligence?.interpretation ?? null;
+  const interpretation = accepted ? intelligence?.interpretation ?? null : null;
   const category = accepted?.acceptedSemanticFields.category ?? selected?.category ?? "unknown_needs_review";
   const economicBeneficiary = accepted?.acceptedSemanticFields.likelyEconomicOwner ?? selected?.ownership.economicBeneficiary ?? "unknown";
   const contractualController = accepted?.acceptedSemanticFields.likelyContractualController ?? selected?.ownership.contractualController ?? "unknown";
@@ -440,11 +474,39 @@ function resolveRowMeaning(
       ...(["unresolved", "requires_human_review"].includes(classification?.conflictStatus ?? "none") && classification?.conflictReason
         ? [classification.conflictReason]
         : []),
-      ...(interpretation?.conflicts ?? []),
       ...(accepted?.conflicts ?? []),
     ]),
-    missingEvidence: unique(interpretation?.missingEvidence ?? []),
+    // Whole-statement missing-evidence prose is not an admitted semantic field.
+    // Until that dimension has an explicit accepted representation, it has zero
+    // authority over Merchant Attention resolution or merchant language.
+    missingEvidence: [],
     publicDocumentationSupported,
+  };
+}
+
+function languageEligibilityFor(input: {
+  scope: CanonicalMerchantAttentionItem["scope"];
+  priorityFinding: boolean;
+  questionToResolve: boolean;
+  actionToolkit: boolean;
+  inventoryDisposition: CanonicalMerchantAttentionItem["inventoryDisposition"];
+  priority: CanonicalMerchantAttentionPriority;
+  attentionType: CanonicalMerchantAttentionType;
+}): CanonicalMerchantAttentionItem["merchantLanguageEligibility"] {
+  const reasonCodes = unique([
+    ...(input.priorityFinding ? ["merchant_language_priority_finding"] : []),
+    ...(input.questionToResolve ? ["merchant_language_question_to_resolve"] : []),
+    ...(input.actionToolkit ? ["merchant_language_action_toolkit"] : []),
+    ...(input.inventoryDisposition === "unresolved_review" ? ["merchant_language_unresolved_inventory"] : []),
+    ...(input.scope === "statement_pricing" ? ["merchant_language_statement_pricing_review"] : []),
+    ...(input.priority !== "routine" && input.attentionType !== "informational"
+      ? ["merchant_language_nonroutine_attention"]
+      : []),
+  ]).sort();
+  return {
+    policyVersion: MERCHANT_ATTENTION_LANGUAGE_ELIGIBILITY_POLICY_VERSION,
+    eligibleForAiInterpretation: reasonCodes.length > 0,
+    reasonCodes: reasonCodes.length > 0 ? reasonCodes : ["merchant_language_routine_inventory_fallback"],
   };
 }
 
@@ -921,6 +983,18 @@ export function validateCanonicalMerchantAttentionModel(
     if (item.actionToolkit?.attentionItemId !== item.id && item.actionToolkit !== null) errors.push(`Package 2 toolkit module for ${item.id} is detached.`);
     if (item.surfaceEligibility.questionsToResolve !== Boolean(item.questionToResolve)) errors.push(`Package 2 item ${item.id} has contradictory question projection eligibility.`);
     if (item.surfaceEligibility.actionToolkit !== Boolean(item.actionToolkit)) errors.push(`Package 2 item ${item.id} has contradictory toolkit projection eligibility.`);
+    const expectedLanguageEligibility = languageEligibilityFor({
+      scope: item.scope,
+      priorityFinding: item.surfaceEligibility.priorityFinding,
+      questionToResolve: item.questionToResolve !== null,
+      actionToolkit: item.actionToolkit !== null,
+      inventoryDisposition: item.inventoryDisposition,
+      priority: item.priority,
+      attentionType: item.attentionType,
+    });
+    if (JSON.stringify(item.merchantLanguageEligibility) !== JSON.stringify(expectedLanguageEligibility)) {
+      errors.push(`Package 2 item ${item.id} has invalid merchant-language AI eligibility.`);
+    }
     if (containsInternalMerchantLanguage(item)) errors.push(`Package 2 item ${item.id} exposes internal engineering language in merchant-safe fields.`);
   }
   const expectedOrder = model.items.slice().sort(compareAttentionItems).map((item) => item.id);
@@ -942,14 +1016,31 @@ export function validateCanonicalMerchantAttentionModel(
   ) {
     errors.push("Package 2 merchant-language interpretation boundary is missing or unsafe.");
   } else {
-    const expectedLanguageSource = model.interpretation.source;
-    if (model.items.some((item) => item.merchantLanguageSource !== expectedLanguageSource)) {
-      errors.push("Package 2 attention items have inconsistent merchant-language sources.");
+    const eligibleItems = model.items.filter((item) => item.merchantLanguageEligibility.eligibleForAiInterpretation);
+    const admittedItems = eligibleItems.filter((item) => item.merchantLanguageSource === "admitted_ai_interpretation");
+    const routineFallbackItems = model.items.filter((item) => !item.merchantLanguageEligibility.eligibleForAiInterpretation);
+    const expectedCoverage = {
+      policyVersion: MERCHANT_ATTENTION_LANGUAGE_ELIGIBILITY_POLICY_VERSION,
+      eligibleItemCount: eligibleItems.length,
+      admittedItemCount: admittedItems.length,
+      deterministicRoutineItemCount: routineFallbackItems.length,
+      exactEligibleCoverage: model.interpretation.source === "admitted_ai_interpretation"
+        && admittedItems.length === eligibleItems.length,
+    };
+    if (JSON.stringify(model.interpretation.coverage) !== JSON.stringify(expectedCoverage)) {
+      errors.push("Package 2 merchant-language eligibility coverage does not reconstruct from items.");
+    }
+    if (routineFallbackItems.some((item) => item.merchantLanguageSource !== "deterministic_fallback")) {
+      errors.push("Package 2 routine inventory language must remain deterministic fallback.");
+    }
+    if (model.interpretation.source === "deterministic_fallback" && admittedItems.length > 0) {
+      errors.push("Package 2 degraded merchant language cannot contain admitted AI items.");
     }
     if (
-      expectedLanguageSource === "admitted_ai_interpretation" &&
+      model.interpretation.source === "admitted_ai_interpretation" &&
       (model.interpretation.readiness !== "ready" ||
         !model.interpretation.outputRef ||
+        !model.interpretation.coverage.exactEligibleCoverage ||
         !model.interpretation.admission.schemaValidated ||
         !model.interpretation.admission.canonicalLinkageValidated ||
         !model.interpretation.admission.actionabilityCeilingValidated ||
@@ -957,7 +1048,7 @@ export function validateCanonicalMerchantAttentionModel(
     ) {
       errors.push("Package 2 AI merchant interpretation is marked admitted without complete deterministic admission proof.");
     }
-    if (expectedLanguageSource === "deterministic_fallback" && model.interpretation.readiness !== "degraded_fallback") {
+    if (model.interpretation.source === "deterministic_fallback" && model.interpretation.readiness !== "degraded_fallback") {
       errors.push("Package 2 deterministic merchant language is not marked as a degraded fallback.");
     }
   }

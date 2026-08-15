@@ -15,7 +15,7 @@ import {
   buildCanonicalClaimSupportDecision,
   calculateRuntimeClaimSupportDecisionRef,
 } from "./feeKnowledgeClaimSupportDecision.js";
-import type { ApprovedFeeKnowledgeSourceRegistry, FeeKnowledgeSourcePacket } from "./feeKnowledgeTypes.js";
+import type { ApprovedFeeKnowledgeSourceRegistry, FeeKnowledgeIntelligenceRecord, FeeKnowledgeSourcePacket } from "./feeKnowledgeTypes.js";
 import {
   deterministicReuseFeeClassificationCapabilityInput,
   type RuntimeAiCapabilitySnapshot,
@@ -115,7 +115,7 @@ export function admitWholeStatementFeeIntelligence(input: {
     .sort();
 
   const provisional = eligible
-    ? rebuildWholeStatementCapability(input.analysis, input.validation.output, `ai_exec_${"0".repeat(32)}`, "completed")
+    ? rebuildWholeStatementCapability(input.analysis, input.validation.output, `ai_exec_${"0".repeat(32)}`, "completed", input.sourcePacket.intelligence)
     : safetyBlocked
       ? rebuildWholeStatementCapability(input.analysis, null, `ai_exec_${"0".repeat(32)}`, "safety_blocked")
       : structuredClone(input.analysis);
@@ -142,7 +142,7 @@ export function admitWholeStatementFeeIntelligence(input: {
   const auditErrors = validateCanonicalAiAdmissionAudit(aiAdmissionAudit);
   const admitted = eligible && auditErrors.length === 0;
   const analysis = admitted
-    ? rebuildWholeStatementCapability(input.analysis, input.validation.output, diagnostic.executionRef, "completed")
+    ? rebuildWholeStatementCapability(input.analysis, input.validation.output, diagnostic.executionRef, "completed", input.sourcePacket.intelligence)
     : safetyBlocked
       ? rebuildWholeStatementCapability(input.analysis, null, diagnostic.executionRef, "safety_blocked")
       : structuredClone(input.analysis);
@@ -165,6 +165,7 @@ export function admitWholeStatementFeeIntelligence(input: {
     admissionDisposition: admitted ? "admitted" : safetyBlocked ? "safety_blocked" : "rejected",
     beforeProtectedFinancialHash: before,
     safetyBlocked,
+    feeKnowledgeIntelligence: admitted ? input.sourcePacket.intelligence : [],
   });
   const finalAnalysis = feeClassificationComposition?.analysis ?? analysis;
   const finalAiAdmissionAudit = feeClassificationComposition?.aiAdmissionAudit ?? aiAdmissionAudit;
@@ -234,6 +235,7 @@ function composeFeeClassificationReuse(input: {
   admissionDisposition: "admitted" | "rejected" | "safety_blocked";
   beforeProtectedFinancialHash: string;
   safetyBlocked: boolean;
+  feeKnowledgeIntelligence: readonly FeeKnowledgeIntelligenceRecord[];
 }): {
   analysis: CanonicalStatementAnalysis;
   aiAdmissionAudit: CanonicalAiAdmissionAudit;
@@ -253,7 +255,7 @@ function composeFeeClassificationReuse(input: {
       review: feeClassificationReuse.review,
       packetRef: feeClassificationReuse.packetRef,
     });
-    const provisionalFinalAnalysis = rebuildWithExtraCapability(input.analysis, feeClassificationCapability.harnessInput);
+    const provisionalFinalAnalysis = rebuildWithExtraCapability(input.analysis, feeClassificationCapability.harnessInput, input.feeKnowledgeIntelligence);
     const finalAiAdmissionAudit = extendTrustedCanonicalAiAdmissionAuditWithDeterministicFeeClassificationAttempt({
       audit: input.aiAdmissionAudit,
       capabilities: provisionalFinalAnalysis.aiCapabilities.capabilities,
@@ -263,11 +265,11 @@ function composeFeeClassificationReuse(input: {
     const finalDiagnostic = finalAiAdmissionAudit.attempts.find((attempt) => attempt.capability === "whole_statement_fee_intelligence_review");
     if (!finalDiagnostic?.executionRef) return null;
     const finalBaseAnalysis = input.admissionDisposition === "admitted"
-      ? rebuildWholeStatementCapability(input.originalAnalysis, input.output, finalDiagnostic.executionRef, "completed")
+      ? rebuildWholeStatementCapability(input.originalAnalysis, input.output, finalDiagnostic.executionRef, "completed", input.feeKnowledgeIntelligence)
       : input.safetyBlocked
         ? rebuildWholeStatementCapability(input.originalAnalysis, null, finalDiagnostic.executionRef, "safety_blocked")
         : structuredClone(input.originalAnalysis);
-    const finalAnalysis = rebuildWithExtraCapability(finalBaseAnalysis, feeClassificationCapability.harnessInput);
+    const finalAnalysis = rebuildWithExtraCapability(finalBaseAnalysis, feeClassificationCapability.harnessInput, input.feeKnowledgeIntelligence);
     if (protectedFinancialHash(finalAnalysis) !== input.beforeProtectedFinancialHash) return null;
     return { analysis: finalAnalysis, aiAdmissionAudit: finalAiAdmissionAudit, feeClassificationReuse };
   } catch {
@@ -380,6 +382,7 @@ function rebuildWholeStatementCapability(
   output: CanonicalAiWholeStatementFeeIntelligenceOutput | null,
   executionRef: string,
   status: "completed" | "safety_blocked",
+  feeKnowledgeIntelligence: readonly FeeKnowledgeIntelligenceRecord[] = [],
 ): CanonicalStatementAnalysis {
   const harnessInputs: CanonicalAiCapabilityHarnessInput[] = analysis.aiCapabilities.capabilities.map((record) => ({
     capability: record.capability,
@@ -402,12 +405,13 @@ function rebuildWholeStatementCapability(
     harnessInputs,
     deterministicRuntimeSafetyReview: analysis.aiCapabilities.deterministicRuntimeSafetyReview,
   });
-  return rebuildAttentionProjection(analysis, aiCapabilities);
+  return rebuildAttentionProjection(analysis, aiCapabilities, feeKnowledgeIntelligence);
 }
 
 function rebuildWithExtraCapability(
   analysis: CanonicalStatementAnalysis,
   harnessInput: CanonicalAiCapabilityHarnessInput,
+  feeKnowledgeIntelligence: readonly FeeKnowledgeIntelligenceRecord[] = [],
 ): CanonicalStatementAnalysis {
   const harnessInputs: CanonicalAiCapabilityHarnessInput[] = analysis.aiCapabilities.capabilities.map((record) => ({
     capability: record.capability,
@@ -428,12 +432,13 @@ function rebuildWithExtraCapability(
     harnessInputs,
     deterministicRuntimeSafetyReview: analysis.aiCapabilities.deterministicRuntimeSafetyReview,
   });
-  return rebuildAttentionProjection(analysis, aiCapabilities);
+  return rebuildAttentionProjection(analysis, aiCapabilities, feeKnowledgeIntelligence);
 }
 
 function rebuildAttentionProjection(
   analysis: CanonicalStatementAnalysis,
   aiCapabilities: CanonicalStatementAnalysis["aiCapabilities"],
+  feeKnowledgeIntelligence: readonly FeeKnowledgeIntelligenceRecord[] = [],
 ): CanonicalStatementAnalysis {
   const customerState = buildCanonicalCustomerState({
     identity: analysis.identity,
@@ -447,7 +452,7 @@ function rebuildAttentionProjection(
   const candidate = { ...structuredClone(analysis), aiCapabilities, customerState };
   return validateCanonicalStatementAnalysis({
     ...candidate,
-    merchantAttention: buildCanonicalMerchantAttentionModel(candidate),
+    merchantAttention: buildCanonicalMerchantAttentionModel(candidate, { feeKnowledgeIntelligence }),
   });
 }
 

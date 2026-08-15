@@ -18,6 +18,7 @@ import type {
   CanonicalAiWholeStatementFeeIntelligenceOutput,
   CanonicalStatementAnalysis,
 } from "./types.js";
+import type { FeeKnowledgeIntelligenceRecord } from "./feeKnowledgeTypes.js";
 import { safeProviderFailureError, type SafeProviderFailureOperationPhase } from "./providerFailureDiagnostics.js";
 import { serializeWholeStatementFeeIntelligenceProviderInput } from "./wholeStatementFeeIntelligenceProviderInput.js";
 
@@ -85,6 +86,11 @@ export type WholeStatementFeeIntelligenceProviderUsage = {
   providerResponseReceived?: boolean;
 };
 
+export type WholeStatementFeeIntelligenceRuntimeResult = {
+  output: CanonicalAiWholeStatementFeeIntelligenceOutput;
+  feeKnowledgeIntelligence: FeeKnowledgeIntelligenceRecord[];
+};
+
 type ProviderTransportTrace = {
   localTraceId: string;
   provider: RuntimeProvider;
@@ -105,14 +111,24 @@ export async function runWholeStatementFeeIntelligenceRuntime(input: {
   analysis: CanonicalStatementAnalysis;
   options?: WholeStatementFeeIntelligenceRuntimeOptions;
 }): Promise<CanonicalAiWholeStatementFeeIntelligenceOutput> {
+  return (await runWholeStatementFeeIntelligenceRuntimeWithContext(input)).output;
+}
+
+export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: {
+  analysis: CanonicalStatementAnalysis;
+  options?: WholeStatementFeeIntelligenceRuntimeOptions;
+}): Promise<WholeStatementFeeIntelligenceRuntimeResult> {
   const options = input.options ?? {};
   const registry = options.sourceRegistry ?? { approvedExternalSourceRefs: [] };
   if (!runtimeEnabled(options)) {
-    return failedWholeStatementFeeIntelligenceOutput(
-      input.analysis,
-      "disabled",
-      "whole_statement_fee_intelligence_disabled",
-    );
+    return {
+      output: failedWholeStatementFeeIntelligenceOutput(
+        input.analysis,
+        "disabled",
+        "whole_statement_fee_intelligence_disabled",
+      ),
+      feeKnowledgeIntelligence: [],
+    };
   }
   const research = await runFeeKnowledgeResearch({
     analysis: input.analysis,
@@ -131,11 +147,14 @@ export async function runWholeStatementFeeIntelligenceRuntime(input: {
   const packet = buildWholeStatementFeeIntelligencePacket(input.analysis, registry, sourceProvenancePacket);
 
   if (packet.admittedFeeRows.length === 0) {
-    return failedWholeStatementFeeIntelligenceOutput(
-      input.analysis,
-      "failed",
-      "whole_statement_fee_intelligence_no_admitted_fee_rows",
-    );
+    return {
+      output: failedWholeStatementFeeIntelligenceOutput(
+        input.analysis,
+        "failed",
+        "whole_statement_fee_intelligence_no_admitted_fee_rows",
+      ),
+      feeKnowledgeIntelligence: [],
+    };
   }
 
   try {
@@ -145,15 +164,23 @@ export async function runWholeStatementFeeIntelligenceRuntime(input: {
       timeoutMs,
     );
     const validation = validateWholeStatementFeeIntelligenceReview(raw, input.analysis, registry, sourceProvenancePacket);
-    return validation.output;
+    return {
+      output: validation.output,
+      feeKnowledgeIntelligence: validation.ok && ["completed", "partial"].includes(validation.output.reviewStatus)
+        ? sourceProvenancePacket.intelligence
+        : [],
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     const timedOut = /timed out|timeout/i.test(message);
-    return failedWholeStatementFeeIntelligenceOutput(
-      input.analysis,
-      timedOut ? "timed_out" : "failed",
-      timedOut ? "whole_statement_fee_intelligence_timed_out" : "whole_statement_fee_intelligence_failed",
-    );
+    return {
+      output: failedWholeStatementFeeIntelligenceOutput(
+        input.analysis,
+        timedOut ? "timed_out" : "failed",
+        timedOut ? "whole_statement_fee_intelligence_timed_out" : "whole_statement_fee_intelligence_failed",
+      ),
+      feeKnowledgeIntelligence: [],
+    };
   }
 }
 

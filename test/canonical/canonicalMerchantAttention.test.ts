@@ -154,6 +154,37 @@ describe("Package 2 canonical merchant attention", () => {
     expect(item.sourceIntelligenceRefs.join(" ")).not.toMatch(/provider|model/i);
   });
 
+  it("gives rejected row intelligence zero authority over merchant meaning", () => {
+    const analysis = analysisWithRows([{ label: "VISA INTERCHANGE", amount: 20, section: "Interchange Charges" }]);
+    const deterministic = structuredClone(analysis.merchantAttention.items[0]!);
+    const output: any = wholeStatementOutput(analysis, "statement_evidence");
+    output.rowInterpretations[0].conflicts = ["Adversarial claim: pricing agreement conflicts with this fee."];
+    output.rowInterpretations[0].missingEvidence = ["Adversarial claim: additional history and public documentation are required."];
+    output.rowInterpretations[0].recommendedDisposition = "conflicting_evidence";
+    output.acceptanceRecords[0] = {
+      ...output.acceptanceRecords[0],
+      status: "rejected",
+      acceptedSemanticFields: {
+        category: null,
+        likelyEconomicOwner: null,
+        likelyContractualController: null,
+        actionabilityCeiling: null,
+        evidenceProvenance: null,
+      },
+      conflicts: ["Adversarial claim: ask the processor for a contract explanation."],
+      reasonCodes: ["whole_statement_fee_intelligence_rejected"],
+    };
+
+    refresh(analysis, [{ capability: "whole_statement_fee_intelligence_review", status: "completed", output }]);
+    const after = analysis.merchantAttention.items[0]!;
+
+    expect(after).toEqual(deterministic);
+    expect(after.resolution.requirement).toBe("no_additional_evidence_required");
+    expect(after.questionToResolve).toBeNull();
+    expect(after.safestNextAction.actionType).toBe("no_action");
+    expect(after.sourceIntelligenceRefs).toEqual([]);
+  });
+
   it("maps accepted resolution requirements into merchant-safe questions", () => {
     const requirements = [
       ["public_evidence_required", "public_documentation_required"],
@@ -274,6 +305,11 @@ describe("Package 2 canonical merchant attention", () => {
         evidenceMutationAllowed: false,
         actionabilityExpansionAllowed: false,
       },
+      runtimeBoundary: {
+        providerTransportStatus: "not_implemented_in_package_2",
+        productionReadyWithoutAdmittedProviderOutput: false,
+        deterministicFallbackIsDegradedPath: true,
+      },
     });
     expect(packet.items[0]).toMatchObject({
       observedFact: { statementLabel: "ADDITIONAL FEES", amount: money(9.48) },
@@ -312,7 +348,7 @@ describe("Package 2 canonical merchant attention", () => {
       },
     });
     expect(result.model.items[0]).toMatchObject({
-      merchantTitle: "Ask for a clearer breakdown",
+      merchantTitle: "Unclear fee needs itemization",
       merchantLanguageSource: "admitted_ai_interpretation",
       originalObservedStatementLabel: "ADDITIONAL FEES",
       observedAmount: money(9.48),
@@ -321,6 +357,70 @@ describe("Package 2 canonical merchant attention", () => {
     expect(authoritativeAttentionProjection(result.model)).toEqual(authoritativeBefore);
     analysis.merchantAttention = result.model;
     expect(validateCanonicalMerchantAttentionModel(analysis)).toEqual([]);
+  });
+
+  it.each([
+    ["invented fee owner", "This charge belongs to the processor."],
+    ["invented service or fee purpose", "This charge pays for account maintenance."],
+    ["invented cause", "Card-not-present transactions caused this charge."],
+    ["invented network attribution", "Visa assessed this charge."],
+    ["invented certainty outside the legacy prohibited phrases", "This charge is unquestionably valid."],
+  ])("rejects %s through field-scoped semantic support", (_label, inventedConclusion) => {
+    const model = analysisWithRows([{ label: "ADDITIONAL FEES", amount: 9.48 }]).merchantAttention;
+    const output: any = validMerchantInterpretation(model);
+    output.items[0].reasonableConclusion = inventedConclusion;
+    const result = admitMerchantAttentionAiInterpretation({ model, output });
+
+    expect(result.admitted).toBe(false);
+    expect(result.errors.join(" ")).toMatch(/semantic fidelity/i);
+    expect(result.model.items).toEqual(model.items);
+  });
+
+  it("admits a plain-English paraphrase only when every semantic field remains linked and entailed", () => {
+    const model = analysisWithRows([{ label: "ADDITIONAL FEES", amount: 9.48 }]).merchantAttention;
+    const output: any = validMerchantInterpretation(model);
+    expect(output.items[0].merchantTitle).toBe("Unclear fee needs itemization");
+    expect(output.items[0].safeNextAction).toMatch(/^Request\b/);
+
+    const result = admitMerchantAttentionAiInterpretation({ model, output });
+    expect(result.admitted).toBe(true);
+    expect(result.model.items[0]!.merchantLanguageSource).toBe("admitted_ai_interpretation");
+  });
+
+  it("requires exact AI coverage only for the deterministic merchant-language-eligible population", () => {
+    const model = analysisWithRows([
+      { label: "PROCESSOR MARKUP", amount: 75 },
+      { label: "ADDITIONAL FEES", amount: 9.48 },
+      { label: "VISA INTERCHANGE", amount: 20, section: "Interchange Charges" },
+      { label: "MASTERCARD INTERCHANGE", amount: 18, section: "Interchange Charges" },
+    ]).merchantAttention;
+    const routine = model.items.filter((item) => item.inventoryDisposition === "routine_context");
+    const eligible = model.items.filter((item) => item.merchantLanguageEligibility.eligibleForAiInterpretation);
+    const packet = buildMerchantAttentionAiInterpretationPacket(model);
+
+    expect(eligible.length).toBeGreaterThanOrEqual(2);
+    expect(routine.length).toBe(2);
+    expect(routine.every((item) => !item.merchantLanguageEligibility.eligibleForAiInterpretation)).toBe(true);
+    expect(packet.items.map((item) => item.attentionItemId)).toEqual(eligible.map((item) => item.id));
+    expect(packet.items.some((item) => routine.some((candidate) => candidate.id === item.attentionItemId))).toBe(false);
+
+    const output: any = validMerchantInterpretation(model);
+    const missingRequired: any = structuredClone(output);
+    missingRequired.items.shift();
+    expect(admitMerchantAttentionAiInterpretation({ model, output: missingRequired }).admitted).toBe(false);
+
+    const beforeIdentity = model.items.map((item) => ({ id: item.id, feeRowIds: item.feeRowIds }));
+    const admitted = admitMerchantAttentionAiInterpretation({ model, output });
+    expect(admitted.admitted).toBe(true);
+    expect(admitted.model.interpretation.coverage).toMatchObject({
+      eligibleItemCount: eligible.length,
+      admittedItemCount: eligible.length,
+      deterministicRoutineItemCount: routine.length,
+      exactEligibleCoverage: true,
+    });
+    expect(admitted.model.items.map((item) => ({ id: item.id, feeRowIds: item.feeRowIds }))).toEqual(beforeIdentity);
+    expect(admitted.model.items.filter((item) => routine.some((candidate) => candidate.id === item.id))
+      .every((item) => item.merchantLanguageSource === "deterministic_fallback")).toBe(true);
   });
 
   it("does not let a later output overwrite an already admitted interpretation", () => {
@@ -332,7 +432,7 @@ describe("Package 2 canonical merchant attention", () => {
     const second = admitMerchantAttentionAiInterpretation({ model: first.model, output: secondOutput });
     expect(second.admitted).toBe(false);
     expect(second.model).toEqual(first.model);
-    expect(second.model.items[0]!.merchantTitle).toBe("Ask for a clearer breakdown");
+    expect(second.model.items[0]!.merchantTitle).toBe("Unclear fee needs itemization");
   });
 
   it.each([
@@ -776,32 +876,42 @@ function authoritativeAttentionProjection(model: CanonicalStatementAnalysis["mer
 }
 
 function validMerchantInterpretation(model: CanonicalStatementAnalysis["merchantAttention"]): unknown {
+  const packet = buildMerchantAttentionAiInterpretationPacket(model);
+  const supportRefs = new Map(packet.items.map((item) => [
+    item.attentionItemId,
+    item.semanticSupportUnits.map((unit) => unit.supportRef).sort(),
+  ]));
   return {
     type: "merchant_attention_ai_interpretation",
     policyVersion: "merchant_attention_ai_interpretation_v1",
     outputId: "attention_language_output",
-    items: model.items.map((item) => ({
+    items: model.items
+      .filter((item) => item.merchantLanguageEligibility.eligibleForAiInterpretation)
+      .map((item) => ({
       attentionItemId: item.id,
-      merchantTitle: "Ask for a clearer breakdown",
-      whyThisDeservesAttention: "The label does not explain the service or pricing basis behind this charge.",
-      reasonableConclusion: "The statement supports treating this as a charge that deserves explanation.",
-      remainingUncertainty: ["The statement does not show the complete reason for the charge."],
-      safeNextAction: "Ask the processor to identify the service and pricing basis for this line.",
-      resolutionMeaning: "A processor explanation and itemized support are still needed.",
+      merchantTitle: item.merchantTitle.replace(/\bcharge\b/i, "fee"),
+      whyThisDeservesAttention: item.whyThisDeservesAttention,
+      reasonableConclusion: item.evidenceBoundary.reasonableConclusion.summary,
+      remainingUncertainty: [...item.evidenceBoundary.remainingUncertainty],
+      safeNextAction: item.safestNextAction.instruction.replace(/^Ask\b/i, "Request"),
+      resolutionMeaning: item.resolution.merchantMeaning,
       question: item.questionToResolve ? {
-        question: "What service and pricing basis created this charge?",
-        whatRateRevealKnows: "The statement includes this charge as a separate line.",
-        whatRemainsUncertain: "The statement does not provide a complete itemization.",
-        safeNextStep: "Ask for an itemized written explanation.",
+        question: item.questionToResolve.question.replace(/ labeled “[^”]+”/i, "").replace(/Which pricing terms and fee components/i, "Which pricing terms and charge components"),
+        whatRateRevealKnows: item.scope === "fee_row"
+          ? "The statement contains an observed charge."
+          : item.questionToResolve.whatRateRevealKnows,
+        whatRemainsUncertain: item.questionToResolve.whatRemainsUncertain,
+        safeNextStep: item.questionToResolve.safeNextStep.replace(/^Ask\b/i, "Request"),
       } : null,
       actionToolkit: item.actionToolkit ? {
-        whatToDo: "Request a written itemization from the processor.",
-        why: "A written response can clarify the service and pricing basis.",
-        exactAsk: "Please identify the service, pricing basis, and agreement provision for this charge.",
-        unclearAnswerFollowUp: "Please provide the detailed calculation or supporting document.",
-        avoidClaiming: ["Do not call the charge removable without supporting evidence."],
-        successCriteria: ["The processor identifies the service and pricing basis in writing."],
+        whatToDo: item.actionToolkit.whatToDo.replace(/^Ask\b/i, "Request"),
+        why: item.actionToolkit.why,
+        exactAsk: item.actionToolkit.exactAsk,
+        unclearAnswerFollowUp: item.actionToolkit.unclearAnswerFollowUp,
+        avoidClaiming: [...item.actionToolkit.avoidClaiming],
+        successCriteria: [...item.actionToolkit.successCriteria],
       } : null,
+      semanticSupportRefs: supportRefs.get(item.id) ?? [],
     })),
     authoritative: false,
     financialMutationAllowed: false,

@@ -12,7 +12,7 @@ import {
   type RuntimeAiCapabilitySnapshot,
 } from "./runtimeAiCapabilityAdapter.js";
 import {
-  runWholeStatementFeeIntelligenceRuntime,
+  runWholeStatementFeeIntelligenceRuntimeWithContext,
   type WholeStatementFeeIntelligenceRuntimeOptions,
 } from "./wholeStatementFeeIntelligenceRuntime.js";
 import {
@@ -33,6 +33,7 @@ import type {
   CanonicalAiWholeStatementFeeIntelligenceOutput,
   CanonicalStatementAnalysis,
 } from "./types.js";
+import type { FeeKnowledgeIntelligenceRecord } from "./feeKnowledgeTypes.js";
 
 export type CanonicalRuntimeInputAdmissionStatus =
   | "canonical_evidence"
@@ -233,10 +234,11 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     summary: legacySummary,
     analysis,
   });
-  const wholeStatementOutput = await runWholeStatementFeeIntelligenceRuntime({
+  const wholeStatementRuntime = await runWholeStatementFeeIntelligenceRuntimeWithContext({
     analysis,
     options: input.wholeStatementFeeIntelligence,
   });
+  const wholeStatementOutput = wholeStatementRuntime.output;
   const wholeStatementHarnessInput: CanonicalAiCapabilityHarnessInput = {
     capability: "whole_statement_fee_intelligence_review",
     status: wholeStatementOutput.reviewStatus === "partial" ? "completed" : wholeStatementOutput.reviewStatus,
@@ -268,7 +270,13 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     harnessInputs,
     deterministicRuntimeSafetyReview,
   });
-  const finalAnalysis = rebuildCustomerProjectionLayers(analysis, aiCapabilities);
+  const finalAnalysis = rebuildCustomerProjectionLayers(
+    analysis,
+    aiCapabilities,
+    ["completed", "partial"].includes(wholeStatementOutput.reviewStatus)
+      ? wholeStatementRuntime.feeKnowledgeIntelligence
+      : [],
+  );
 
   return {
     analysis: finalAnalysis,
@@ -298,6 +306,7 @@ function runtimeBusinessProfile(
 function rebuildCustomerProjectionLayers(
   analysis: CanonicalStatementAnalysis,
   aiCapabilities: CanonicalStatementAnalysis["aiCapabilities"],
+  feeKnowledgeIntelligence: readonly FeeKnowledgeIntelligenceRecord[] = [],
 ): CanonicalStatementAnalysis {
   const customerState = buildCanonicalCustomerState({
     identity: analysis.identity,
@@ -311,7 +320,7 @@ function rebuildCustomerProjectionLayers(
   const candidate = { ...analysis, aiCapabilities, customerState };
   return validateCanonicalStatementAnalysis({
     ...candidate,
-    merchantAttention: buildCanonicalMerchantAttentionModel(candidate),
+    merchantAttention: buildCanonicalMerchantAttentionModel(candidate, { feeKnowledgeIntelligence }),
   });
 }
 

@@ -738,6 +738,9 @@ describe("canonical whole-statement fee intelligence review", () => {
     expect(completedRuntimeReview.reviewStatus).toBe("completed");
     expect(completedRuntimeReview.coverageProof.exactCoverage).toBe(true);
     expect(completedRuntimeReview.acceptanceRecordCount).toBeGreaterThan(0);
+    expect(completed.analysis.merchantAttention.items.some((item) =>
+      item.sourceIntelligenceRefs.some((ref) => ref.startsWith("intel_"))
+    )).toBe(true);
     expect(financialProjection(completed.analysis)).toEqual(financialProjection(baseline));
 
     const reportAfter = buildSingleStatementReportV1({

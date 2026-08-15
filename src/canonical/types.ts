@@ -1578,6 +1578,11 @@ export type CanonicalMerchantAttentionItem = {
   reasonCodes: string[];
   evidenceRefs: string[];
   sourceIntelligenceRefs: string[];
+  merchantLanguageEligibility: {
+    policyVersion: "merchant_attention_language_eligibility_v1";
+    eligibleForAiInterpretation: boolean;
+    reasonCodes: string[];
+  };
   merchantLanguageSource: "admitted_ai_interpretation" | "deterministic_fallback";
 };
 
@@ -1607,6 +1612,7 @@ export type CanonicalMerchantAttentionAiInterpretationOutput = {
       avoidClaiming: string[];
       successCriteria: string[];
     };
+    semanticSupportRefs: string[];
   }>;
   authoritative: false;
   financialMutationAllowed: false;
@@ -1646,6 +1652,13 @@ export type CanonicalMerchantAttentionModel = {
       actionabilityCeilingValidated: boolean;
       privacyValidated: boolean;
       reasonCodes: string[];
+    };
+    coverage: {
+      policyVersion: "merchant_attention_language_eligibility_v1";
+      eligibleItemCount: number;
+      admittedItemCount: number;
+      deterministicRoutineItemCount: number;
+      exactEligibleCoverage: boolean;
     };
     fallbackReasonCodes: string[];
   };
