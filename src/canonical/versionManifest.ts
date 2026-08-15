@@ -25,6 +25,7 @@ export const OPPORTUNITY_TARGET_POLICY_VERSION = "opportunity_target_policy_v1" 
 export const OPPORTUNITY_CADENCE_POLICY_VERSION = "opportunity_cadence_policy_v1" as const;
 export const OPPORTUNITY_BENCHMARK_POLICY_VERSION = "opportunity_benchmark_policy_v1" as const;
 export const OPPORTUNITY_AI_BOUNDARY_POLICY_VERSION = "opportunity_ai_boundary_policy_v1" as const;
+export const BUSINESS_QUALIFICATION_POLICY_VERSION = "canonical_business_qualification_v1" as const;
 
 export function buildVersionManifest(input: {
   parserId: string | null;
@@ -52,6 +53,7 @@ export function buildVersionManifest(input: {
     aiReadinessDegradationPolicyVersion: AI_READINESS_DEGRADATION_POLICY_VERSION,
     aiPrivacyRetentionPolicyVersion: AI_PRIVACY_RETENTION_POLICY_VERSION,
     deterministicExplanationPolicyVersion: DETERMINISTIC_EXPLANATION_POLICY_VERSION,
+    businessQualificationPolicyVersion: BUSINESS_QUALIFICATION_POLICY_VERSION,
     customerStatePolicyVersion: CUSTOMER_STATE_POLICY_VERSION,
     customerStateMaterialityPolicyVersion: CUSTOMER_STATE_MATERIALITY_POLICY_VERSION,
     customerBenchmarkPolicyVersion: CUSTOMER_BENCHMARK_POLICY_VERSION,

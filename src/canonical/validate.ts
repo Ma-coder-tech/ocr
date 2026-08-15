@@ -144,6 +144,9 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   if (analysis.versionManifest?.deterministicExplanationPolicyVersion !== "deterministic_explanation_policy_v1") {
     errors.push("Canonical version manifest must include deterministic_explanation_policy_v1.");
   }
+  if (analysis.versionManifest?.businessQualificationPolicyVersion !== "canonical_business_qualification_v1") {
+    errors.push("Canonical version manifest must include canonical_business_qualification_v1.");
+  }
   if (analysis.versionManifest?.customerStatePolicyVersion !== CUSTOMER_STATE_POLICY_VERSION) {
     errors.push("Canonical version manifest must include canonical_customer_state_policy_v1.");
   }
@@ -443,8 +446,9 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
     errors.push("Selected effective rate requires explicit supported numerator and denominator basis plus calculationRef.");
   }
   validateOpportunityEngine(analysis, evidenceIds, calculationIds, calculationsById, errors);
+  validateBusinessQualification(analysis, evidenceIds, errors);
   validateCanonicalAiCapabilityLayer(analysis, errors);
-  validateCanonicalCustomerState(analysis, evidenceIds, calculationIds, errors);
+  validateCanonicalCustomerState(analysis, evidenceIds, calculationIds, calculationsById, errors);
 
   const validated: CanonicalStatementAnalysis = {
     ...analysis,
@@ -458,6 +462,120 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
     throw new CanonicalStatementValidationError(errors, warnings, validated);
   }
   return validated;
+}
+
+function validateBusinessQualification(
+  analysis: CanonicalStatementAnalysis,
+  evidenceIds: Set<string>,
+  errors: string[],
+): void {
+  const qualification = analysis.businessQualification;
+  if (!qualification || qualification.policyVersion !== "canonical_business_qualification_v1") {
+    errors.push("Package 1 canonical business qualification is missing or unsupported.");
+    return;
+  }
+  for (const evidenceRef of qualification.evidenceRefs) {
+    if (!evidenceIds.has(evidenceRef)) errors.push(`Package 1 business qualification evidence ref ${evidenceRef} is broken.`);
+  }
+  for (const factor of [qualification.risk, qualification.channel, qualification.market, qualification.processorFamily]) {
+    for (const evidenceRef of factor.evidenceRefs) {
+      if (!evidenceIds.has(evidenceRef)) errors.push(`Package 1 qualification factor evidence ref ${evidenceRef} is broken.`);
+    }
+  }
+  for (const evidenceRef of qualification.annualVolume.evidenceRefs) {
+    if (!evidenceIds.has(evidenceRef)) errors.push(`Package 1 annual-volume evidence ref ${evidenceRef} is broken.`);
+  }
+  for (const conflict of qualification.conflicts) {
+    for (const evidenceRef of conflict.evidenceRefs) {
+      if (!evidenceIds.has(evidenceRef)) errors.push(`Package 1 conflict ${conflict.id} evidence ref ${evidenceRef} is broken.`);
+    }
+  }
+  for (const alternative of qualification.alternatives) {
+    if (alternative.source === "ai_suggestion" && alternative.authoritative) {
+      errors.push("Package 1 AI business alternative cannot be authoritative.");
+    }
+    for (const evidenceRef of alternative.evidenceRefs) {
+      if (!evidenceIds.has(evidenceRef)) errors.push(`Package 1 alternative evidence ref ${evidenceRef} is broken.`);
+    }
+  }
+  if (qualification.aiAuthoritative !== false) errors.push("Package 1 business qualification must explicitly deny AI authority.");
+  if (qualification.status === "qualified") {
+    if (!qualification.resolvedSegmentId || qualification.resolvedSegmentId === "default" || qualification.resolvedSegmentId === "other") {
+      errors.push("Package 1 qualified business context requires a non-default resolved segment.");
+    }
+    if (
+      qualification.risk.status !== "qualified" ||
+      qualification.channel.status !== "qualified" ||
+      qualification.annualVolume.status !== "qualified" ||
+      qualification.market.status !== "qualified" ||
+      qualification.processorFamily.status !== "qualified"
+    ) {
+      errors.push("Package 1 qualified business context requires every benchmark factor to qualify.");
+    }
+    if (qualification.conflicts.some((conflict) => conflict.material)) errors.push("Package 1 qualified business context contains an unresolved material conflict.");
+    if (qualification.confirmationRequirement !== null) errors.push("Package 1 qualified business context cannot retain a confirmation requirement.");
+  }
+  if (qualification.status === "confirmation_required" && qualification.confirmationRequirement === null) {
+    errors.push("Package 1 confirmation-required business context lacks a confirmation requirement.");
+  }
+  const actualMcc = qualification.accountCoding.actualMcc;
+  if (actualMcc.status === "selected") {
+    if (!actualMcc.value || !/^\d{4}$/.test(actualMcc.value) || actualMcc.value === "0000") errors.push("Package 1 actual MCC must be an explicit valid four-digit statement value.");
+    if (qualification.accountCoding.source !== "explicit_statement") errors.push("Package 1 selected actual MCC must use explicit_statement source.");
+    for (const evidenceRef of actualMcc.evidenceRefs) {
+      const evidence = analysis.evidence.find((record) => record.id === evidenceRef);
+      if (
+        !evidence ||
+        evidence.sourceRole !== "account_coding" ||
+        evidence.pageNumber === null ||
+        evidence.extractionObservations.length === 0 ||
+        evidence.extractionObservations.some((observation) => observation.extractionMethod !== "pdf_text")
+      ) {
+        errors.push("Package 1 actual MCC requires direct PDF statement evidence.");
+      } else if (explicitLabeledMcc(evidence.extractedText ?? "") !== actualMcc.value) {
+        errors.push("Package 1 actual MCC evidence is not an explicitly labeled MCC statement field.");
+      }
+    }
+  } else if (actualMcc.status === "ambiguous") {
+    if (qualification.accountCoding.source !== "conflicting_statement_values") {
+      errors.push("Package 1 ambiguous actual MCC must preserve conflicting_statement_values source.");
+    }
+    if (!qualification.conflicts.some((conflict) => conflict.kind === "mcc_conflict" && conflict.material)) {
+      errors.push("Package 1 ambiguous actual MCC requires an explicit material MCC conflict.");
+    }
+  } else if (qualification.accountCoding.source !== "not_available") {
+    errors.push("Package 1 unavailable actual MCC must preserve not_available source.");
+  }
+  const forbiddenField = findForbiddenBenchmarkFinancialField(qualification);
+  if (forbiddenField) errors.push(`Package 1 business qualification contains forbidden savings/opportunity field ${forbiddenField}.`);
+  const comparisonForbiddenField = findForbiddenBenchmarkFinancialField(analysis.customerState.rateComparison);
+  if (comparisonForbiddenField) errors.push(`Package 1 rate comparison contains forbidden savings/opportunity field ${comparisonForbiddenField}.`);
+}
+
+function explicitLabeledMcc(text: string): string | null {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  const direct = normalized.match(/^\s*(?:MERCHANT\s+CATEGORY(?:\s+CODE)?|MCC(?:\s+CODE)?)\s*(?::|#|-|IS)?\s*(\d{4})\s*$/i);
+  if (direct?.[1] && direct[1] !== "0000") return direct[1];
+  const cells = normalized.split("|").map((cell) => cell.trim()).filter(Boolean);
+  for (let index = 0; index < cells.length - 1; index += 1) {
+    if (/^(?:MERCHANT\s+CATEGORY(?:\s+CODE)?|MCC(?:\s+CODE)?)$/i.test(cells[index]!) && /^\d{4}$/.test(cells[index + 1]!) && cells[index + 1] !== "0000") {
+      return cells[index + 1]!;
+    }
+  }
+  return null;
+}
+
+function findForbiddenBenchmarkFinancialField(value: unknown, path = "benchmark"): string | null {
+  if (!value || typeof value !== "object") return null;
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    const nestedPath = `${path}.${key}`;
+    if (/savings|overpayment|recoverable|repricing|targetAmount|opportunityAmount|annualImpact|monthlyImpact/i.test(key)) return nestedPath;
+    if (nested && typeof nested === "object") {
+      const found = findForbiddenBenchmarkFinancialField(nested, nestedPath);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 function reconstructControlActualAmount(control: CanonicalFeeLedgerControl, rows: CanonicalFeeRow[]): MoneyAmount | null {
@@ -484,6 +602,7 @@ function validateCanonicalCustomerState(
   analysis: CanonicalStatementAnalysis,
   evidenceIds: Set<string>,
   calculationIds: Set<string>,
+  calculationsById: Map<string, CanonicalStatementAnalysis["calculations"][number]>,
   errors: string[],
 ): void {
   const state = analysis.customerState;
@@ -525,25 +644,98 @@ function validateCanonicalCustomerState(
   if (state.rateComparison.policyVersion !== CUSTOMER_BENCHMARK_POLICY_VERSION) errors.push("Package G rate comparison policy version is missing or unsupported.");
   if (state.rateComparison.status === "qualified") {
     if (state.rateComparison.position === "unavailable") errors.push("Package G qualified benchmark has unavailable rate position.");
+    if (analysis.businessQualification.status !== "qualified") errors.push("Package 1 qualified benchmark requires qualified business context.");
     if (!state.rateComparison.benchmarkRef?.qualified || state.rateComparison.evidenceRefs.length === 0 || !state.rateComparison.calculationRef) {
       errors.push("Package G qualified benchmark requires reference, evidence, and calculation.");
     }
     if (
       !state.rateComparison.benchmarkRef?.referenceId ||
+      state.rateComparison.benchmarkRef.referenceKind !== "ratereveal_reference_range" ||
+      !/^RateReveal .+ reference range$/.test(state.rateComparison.benchmarkRef.displayLabel ?? "") ||
       !state.rateComparison.benchmarkRef.version ||
-      !state.rateComparison.benchmarkRef.methodology ||
       !benchmarkAppliesToStatement(state.rateComparison.benchmarkRef, analysis)
     ) {
       errors.push("Package G qualified benchmark requires versioned, applicable benchmark reference metadata.");
     }
+    if (
+      !state.rateComparison.benchmarkRef?.range ||
+      !state.rateComparison.benchmarkRef.segmentId ||
+      !state.rateComparison.benchmarkRef.riskClass ||
+      !state.rateComparison.benchmarkRef.channel ||
+      !state.rateComparison.benchmarkRef.annualVolumeTier ||
+      state.rateComparison.benchmarkRef.market !== "US" ||
+      !state.rateComparison.benchmarkRef.sourceRecords ||
+      state.rateComparison.benchmarkRef.sourceRecords.length < 1 ||
+      !state.rateComparison.benchmarkRef.synthesis ||
+      state.rateComparison.benchmarkRef.productApproval?.status !== "approved_for_merchant_display"
+    ) {
+      errors.push("Package 1 qualified benchmark requires an approved RateReveal reference, range, applicability, research provenance, and synthesis rationale.");
+    }
+    if (state.rateComparison.benchmarkRef?.opportunityApproved !== false) {
+      errors.push("Package 1 benchmark references cannot approve savings or opportunity amounts.");
+    }
     if (state.rateComparison.benchmarkRef?.aiSourced !== false || state.rateComparison.aiSourced !== false) {
       errors.push("Package G benchmark comparison must not be AI-sourced.");
+    }
+    const sourceRecords = state.rateComparison.benchmarkRef?.sourceRecords ?? [];
+    if (
+      new Set(sourceRecords.map((source) => source.sourceId)).size !== sourceRecords.length ||
+      new Set(sourceRecords.map((source) => source.evidenceRef)).size !== sourceRecords.length ||
+      sourceRecords.some(
+        (source) =>
+          !source.sourceId ||
+          !source.title ||
+          !source.publisher ||
+          !source.documentId ||
+          !source.independenceGroup ||
+          !source.locator ||
+          !source.locationWithinSource ||
+          !source.accessedAt ||
+          !source.reviewedAt ||
+          !source.metricType ||
+          !source.supportedObservation ||
+          source.limitations.length < 1 ||
+          !["network_schedule", "government_data", "industry_analysis", "processor_pricing", "legal_analysis"].includes(source.sourceType),
+      )
+    ) {
+      errors.push("Package 1 qualified benchmark source provenance is incomplete or duplicated.");
+    }
+    if (state.rateComparison.benchmarkRef && !validMerchantBenchmarkSynthesis(state.rateComparison.benchmarkRef)) {
+      errors.push("Package 1 qualified benchmark lacks an approved, traceable RateReveal synthesis.");
+    }
+    for (const source of sourceRecords) {
+      const evidence = analysis.evidence.find((record) => record.id === source.evidenceRef);
+      if (
+        !evidence ||
+        evidence.sourceRole !== "benchmark_reference" ||
+        evidence.extractionObservations.length === 0 ||
+        evidence.extractionObservations.some((observation) => observation.extractionMethod !== "reference_registry")
+      ) {
+        errors.push(`Package 1 benchmark source ${source.sourceId} lacks registry evidence.`);
+      }
+    }
+    if (
+      state.rateComparison.benchmarkRef &&
+      JSON.stringify([...state.rateComparison.benchmarkRef.evidenceRefs].sort()) !== JSON.stringify(sourceRecords.map((source) => source.evidenceRef).sort())
+    ) {
+      errors.push("Package 1 benchmark reference evidence does not match its source records.");
     }
     for (const evidenceRef of [...state.rateComparison.evidenceRefs, ...(state.rateComparison.benchmarkRef?.evidenceRefs ?? [])]) {
       if (!evidenceIds.has(evidenceRef)) errors.push(`Package G benchmark evidence ref ${evidenceRef} is broken.`);
     }
     if (state.rateComparison.calculationRef && !calculationIds.has(state.rateComparison.calculationRef)) {
       errors.push(`Package G benchmark calculation ref ${state.rateComparison.calculationRef} is broken.`);
+    }
+    const benchmarkCalculation = state.rateComparison.calculationRef ? calculationsById.get(state.rateComparison.calculationRef) : null;
+    if (!benchmarkCalculation || !validBenchmarkPositionCalculation(analysis, benchmarkCalculation)) {
+      errors.push("Package 1 qualified benchmark position does not reconstruct from the verified rate and admitted range.");
+    }
+  } else {
+    if (state.rateComparison.position !== "unavailable" || state.rateComparison.benchmarkRef !== null || state.rateComparison.calculationRef !== null) {
+      errors.push("Package 1 non-qualified benchmark outcome must not expose a range, position, reference, or calculation.");
+    }
+    if (state.rateComparison.status === "confirmation_required" && analysis.businessQualification.confirmationRequirement === null) {
+      errors.push("Package 1 confirmation-required comparison lacks a business confirmation requirement.");
     }
   }
   if ((state.primaryState === "competitive_no_opportunity" || state.primaryState === "competitive_with_opportunity") && (state.rateComparison.status !== "qualified" || (state.axes.ratePosition !== "within_reference" && state.axes.ratePosition !== "below_reference"))) {
@@ -628,19 +820,137 @@ function validateCanonicalCustomerState(
   if (containsAiSourcedCustomerAuthority(state)) errors.push("Package G contains AI-sourced observed amounts, targets, cadence, ownership, calculations, state, permissions, visibility, or actions.");
 }
 
+function validBenchmarkPositionCalculation(
+  analysis: CanonicalStatementAnalysis,
+  calculation: CanonicalStatementAnalysis["calculations"][number],
+): boolean {
+  const comparison = analysis.customerState.rateComparison;
+  const reference = comparison.benchmarkRef;
+  const rate = analysis.financialFacts.rateRevealCalculatedAllInRate.value;
+  if (!reference?.range || rate === null) return false;
+  if (
+    calculation.formulaCode !== "benchmark_rate_position" ||
+    calculation.formulaVersion !== CUSTOMER_BENCHMARK_POLICY_VERSION ||
+    calculation.unit !== "decimal_rate" ||
+    calculation.roundingPolicy !== "decimal_rate_6_places_v1" ||
+    calculation.result !== rate
+  ) {
+    return false;
+  }
+  const inputs = new Map(calculation.inputs.map((input) => [input.label, input]));
+  if (
+    inputs.get("Verified effective rate")?.value !== rate ||
+    inputs.get("Reference range lower boundary")?.value !== reference.range.low ||
+    inputs.get("Reference range upper boundary")?.value !== reference.range.high ||
+    [...inputs.values()].some((input) => input.unit !== "decimal_rate")
+  ) {
+    return false;
+  }
+  const numericRate = Number(rate);
+  const low = Number(reference.range.low);
+  const high = Number(reference.range.high);
+  if (![numericRate, low, high].every(Number.isFinite) || low <= 0 || high <= low) return false;
+  const expectedPosition = numericRate < low ? "below_reference" : numericRate <= high ? "within_reference" : "above_reference";
+  return comparison.position === expectedPosition;
+}
+
+function validMerchantBenchmarkSynthesis(
+  reference: NonNullable<CanonicalStatementAnalysis["customerState"]["rateComparison"]["benchmarkRef"]>,
+): boolean {
+  const sources = reference.sourceRecords ?? [];
+  const synthesis = reference.synthesis;
+  const approval = reference.productApproval;
+  if (
+    !reference.range ||
+    !synthesis ||
+    synthesis.methodVersion !== "ratereveal_market_informed_synthesis_v1" ||
+    !approval ||
+    approval.status !== "approved_for_merchant_display" ||
+    !validIsoDate(approval.approvedAt) ||
+    !approval.decisionRef
+  ) return false;
+  if (
+    synthesis.evidenceSummary.length < 80 ||
+    synthesis.rateRevealRationale.length < 80 ||
+    synthesis.assumptions.length < 2 ||
+    synthesis.limitations.length < 2 ||
+    !validIsoDate(synthesis.reviewedAt) ||
+    !validIsoDate(synthesis.reviewBy) ||
+    synthesis.reviewBy < synthesis.reviewedAt
+  ) return false;
+  if (sources.length < 1 || new Set(sources.map((source) => source.sourceId)).size !== sources.length) return false;
+  for (const source of sources) {
+    if (
+      !source.documentId ||
+      !source.independenceGroup ||
+      !singlePublisherName(source.publisher) ||
+      !source.locationWithinSource ||
+      !directHttpsUrl(source.locator) ||
+      (source.publishedAt !== null && !validIsoDate(source.publishedAt)) ||
+      !validIsoDate(source.accessedAt) ||
+      !validIsoDate(source.reviewedAt) ||
+      !source.metricType ||
+      !source.supportedObservation ||
+      !["high", "medium", "low"].includes(source.sourceQuality) ||
+      source.limitations.length < 1
+    ) {
+      return false;
+    }
+    if (
+      source.quantitativeValues.some(
+        (metric) =>
+          !metric.metricId ||
+          !metric.label ||
+          !validDecimal6(metric.value) ||
+          metric.unit !== "decimal_rate" ||
+          !metric.locationWithinSource,
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function validIsoDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`));
+}
+
+function validDecimal6(value: string): boolean {
+  return /^\d+\.\d{6}$/.test(value) && Number.isFinite(Number(value));
+}
+
+function directHttpsUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" && parsed.hostname.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function singlePublisherName(value: string): boolean {
+  return value.trim().length > 0 && !/[,&;]|\band\b|\//i.test(value);
+}
+
 function benchmarkAppliesToStatement(
   benchmarkRef: NonNullable<CanonicalStatementAnalysis["customerState"]["rateComparison"]["benchmarkRef"]>,
   analysis: CanonicalStatementAnalysis,
 ): boolean {
-  const periodStart = analysis.identity.statementPeriod.value?.start ?? null;
-  if (!periodStart) return false;
-  if (benchmarkRef.effectiveFrom && periodStart < benchmarkRef.effectiveFrom) return false;
-  if (benchmarkRef.effectiveTo && periodStart > benchmarkRef.effectiveTo) return false;
-  const processor = String(analysis.identity.processorFamily.value ?? analysis.identity.processorName.value ?? "unknown").toLowerCase();
-  const businessType = String(analysis.identity.businessType.value ?? "unknown").toLowerCase();
-  if (benchmarkRef.applicableProcessor && benchmarkRef.applicableProcessor !== "unknown" && benchmarkRef.applicableProcessor.toLowerCase() !== processor) return false;
-  if (benchmarkRef.applicableBusinessType && benchmarkRef.applicableBusinessType !== "unknown" && benchmarkRef.applicableBusinessType.toLowerCase() !== businessType) return false;
-  if (benchmarkRef.applicableChannel && benchmarkRef.applicableChannel !== "unknown") return false;
+  const period = analysis.identity.statementPeriod.value;
+  if (!period) return false;
+  if (benchmarkRef.effectiveFrom && period.start < benchmarkRef.effectiveFrom) return false;
+  if (benchmarkRef.effectiveTo && period.end > benchmarkRef.effectiveTo) return false;
+  const qualification = analysis.businessQualification;
+  if (qualification.status !== "qualified") return false;
+  if (benchmarkRef.applicableProcessor && benchmarkRef.applicableProcessor !== "unknown" && benchmarkRef.applicableProcessor.toLowerCase() !== qualification.processorFamily.value) return false;
+  if (benchmarkRef.applicableBusinessType && benchmarkRef.applicableBusinessType !== "unknown" && benchmarkRef.applicableBusinessType !== qualification.resolvedSegmentId) return false;
+  if (benchmarkRef.applicableChannel && benchmarkRef.applicableChannel !== "unknown" && benchmarkRef.applicableChannel !== qualification.channel.value) return false;
+  if (benchmarkRef.segmentId && benchmarkRef.segmentId !== qualification.resolvedSegmentId) return false;
+  if (benchmarkRef.riskClass && benchmarkRef.riskClass !== qualification.risk.value) return false;
+  if (benchmarkRef.channel && benchmarkRef.channel !== qualification.channel.value) return false;
+  if (benchmarkRef.annualVolumeTier && benchmarkRef.annualVolumeTier !== qualification.annualVolume.tier) return false;
+  if (benchmarkRef.market && benchmarkRef.market !== qualification.market.value) return false;
   if (benchmarkRef.applicableCardEnvironment && benchmarkRef.applicableCardEnvironment !== "unknown") return false;
   return true;
 }

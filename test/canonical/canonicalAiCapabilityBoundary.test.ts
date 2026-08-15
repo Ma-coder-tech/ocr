@@ -96,16 +96,16 @@ describe("canonical AI capability boundary", () => {
     expect(() => validateCanonicalStatementAnalysis(analysis)).toThrow(/forbidden financial-impact|provider-specific/i);
   });
 
-  it("keeps the directional benchmark category diagnostic-only unless deterministic category evidence exists", () => {
+  it("keeps benchmark-category AI optional and non-authoritative when deterministic qualification is incomplete", () => {
     const analysis = buildCanonicalStatementFactsFromParsedDocument(syntheticStatement(), { sourceFileName: "package-f-unknown-business.pdf" });
 
     expect(analysis.aiCapabilities.capabilities.find((record) => record.capability === "benchmark_category_review")).toMatchObject({
-      required: true,
+      required: false,
       status: "disabled",
-      financialReadinessOnFailure: "limited",
+      financialReadinessOnFailure: "ready",
     });
     expect(analysis.aiCapabilities.summary.financialReadiness).toBe("withheld");
-    expect(analysis.aiCapabilities.summary.limitationCodes).toContain("benchmark_category_not_verified");
+    expect(analysis.aiCapabilities.summary.limitationCodes).not.toContain("benchmark_category_not_verified");
     expect(validateCanonicalStatementAnalysis(analysis).validation.status).toBe("valid");
   });
 
@@ -148,7 +148,7 @@ describe("canonical AI capability boundary", () => {
       evidence: unknownBenchmark.evidence,
       harnessInputs: readyHarnessInputs(unknownBenchmark),
     });
-    expect(unknownBenchmark.aiCapabilities.summary.financialReadiness).toBe("limited");
+    expect(unknownBenchmark.aiCapabilities.summary.financialReadiness).toBe("ready");
 
     const notice = buildCanonicalStatementFactsFromParsedDocument(syntheticNoticeStatement(), {
       sourceFileName: "package-f-notice-limited.pdf",

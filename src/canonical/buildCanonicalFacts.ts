@@ -14,6 +14,11 @@ import { buildCanonicalFeeOwnershipActionability } from "./feeOwnershipActionabi
 import { buildCanonicalOpportunityEngine } from "./opportunityEngine.js";
 import { buildCanonicalAiCapabilities } from "./buildCanonicalAiCapabilities.js";
 import { buildCanonicalCustomerState } from "./customerStateResolver.js";
+import {
+  buildBusinessQualificationAndRateComparison,
+  type CanonicalBusinessProfileInput,
+} from "./businessQualification.js";
+import type { QualifiedBenchmarkRegistry } from "./qualifiedBenchmarkRegistry.js";
 import { moneyFromNumber } from "./money.js";
 import { buildAverageTicket, emptyTransactionCounts, transactionCountsFromParserSupport } from "./transactionCounts.js";
 import { buildVersionManifest, CANONICAL_SCHEMA_VERSION } from "./versionManifest.js";
@@ -37,6 +42,8 @@ type BuildOptions = {
   businessType?: string | null;
   sourceAnalysisId?: string | null;
   preferExtractedRows?: boolean;
+  businessProfile?: CanonicalBusinessProfileInput | null;
+  benchmarkRegistry?: QualifiedBenchmarkRegistry;
 };
 
 type MatchedOutput = {
@@ -102,6 +109,15 @@ export function canonicalActualValues(analysis: CanonicalStatementAnalysis): Rec
     "financialFacts.averageTicketBasis.allowed": analysis.financialFacts.averageTicketBasis.allowed,
     "financialFacts.averageTicketBasis.selectedCountType": analysis.financialFacts.averageTicketBasis.selectedCountType,
     "financialFacts.averageTicketBasis.selectedVolumePopulation": analysis.financialFacts.averageTicketBasis.selectedVolumePopulation,
+    "businessQualification.status": analysis.businessQualification.status,
+    "businessQualification.resolvedSegmentId": analysis.businessQualification.resolvedSegmentId,
+    "businessQualification.actualMcc": analysis.businessQualification.accountCoding.actualMcc.value,
+    "businessQualification.riskClass": analysis.businessQualification.risk.value,
+    "businessQualification.processingChannel": analysis.businessQualification.channel.value,
+    "businessQualification.annualVolumeTier": analysis.businessQualification.annualVolume.tier,
+    "rateComparison.status": analysis.customerState.rateComparison.status,
+    "rateComparison.position": analysis.customerState.rateComparison.position,
+    "rateComparison.referenceId": analysis.customerState.rateComparison.benchmarkRef?.referenceId ?? null,
     "feeLedger.status": analysis.feeLedger.status,
     "feeLedger.uniqueChargeTotal": analysis.feeLedger.uniqueChargeTotal,
     "feeLedger.uniqueChargeRowCount": analysis.feeLedger.rows.filter((row) => row.contributesToUniqueTotal).length,
@@ -479,9 +495,21 @@ function buildAnalysisEnvelope(input: {
     evidence: [...input.evidence.values()],
     statementPeriodVerified: input.identity.statementPeriod.status === "selected" && input.identity.statementPeriod.value !== null,
   });
+  const { businessQualification, rateComparison } = buildBusinessQualificationAndRateComparison({
+    doc: input.doc,
+    matchedParserId: input.matched.driverId,
+    parserOutput: input.parserOutput,
+    identity: input.identity,
+    financialFacts,
+    profile: input.options.businessProfile ?? null,
+    evidence: input.evidence,
+    calculations: input.calculations,
+    registry: input.options.benchmarkRegistry,
+  });
   const evidence = [...input.evidence.values()];
   const aiCapabilities = buildCanonicalAiCapabilities({
     identity: input.identity,
+    businessQualification,
     financialFacts,
     feeLedger,
     feeOwnershipActionability,
@@ -495,6 +523,7 @@ function buildAnalysisEnvelope(input: {
     feeOwnershipActionability,
     opportunityEngine,
     aiCapabilities,
+    rateComparison,
   });
 
   return {
@@ -504,6 +533,7 @@ function buildAnalysisEnvelope(input: {
     createdAt: new Date(0).toISOString(),
     identity: input.identity,
     financialFacts,
+    businessQualification,
     feeLedger,
     feeOwnershipActionability,
     opportunityEngine,

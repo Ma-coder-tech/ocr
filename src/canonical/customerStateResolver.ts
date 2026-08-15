@@ -95,7 +95,7 @@ export function buildCanonicalCustomerState(input: {
     primaryState,
     visibility,
     aiCapabilities: input.aiCapabilities,
-    benchmarkUnavailable: rateComparison.status === "unavailable",
+    benchmarkUnavailable: rateComparison.status !== "qualified",
   });
 
   return {
@@ -114,7 +114,7 @@ export function buildCanonicalCustomerState(input: {
     visibility,
     actionGuidance,
     explanation,
-    reasonCodes: reasonCodes({ coreUnsafe, dataIntegrity, primaryState, benchmarkUnavailable: rateComparison.status === "unavailable" }),
+    reasonCodes: reasonCodes({ coreUnsafe, dataIntegrity, primaryState, benchmarkUnavailable: rateComparison.status !== "qualified" }),
     limitations: [
       "Package G is canonical/harness-only and does not feed Report V1, legacy reports, frontend, APIs, workers, persistence, production, or feature flags.",
       "Benchmark-unavailable analysis keeps rate position unavailable instead of inferring competitiveness.",
@@ -125,7 +125,18 @@ export function buildCanonicalCustomerState(input: {
 
 function normalizeRateComparison(rateComparison: CanonicalCustomerRateComparison | null | undefined): CanonicalCustomerRateComparison {
   if (!rateComparison) return unavailableRateComparison();
-  if (rateComparison.status !== "qualified") return unavailableRateComparison(rateComparison.reasonCodes[0] ?? "qualified_benchmark_unavailable");
+  if (rateComparison.status !== "qualified") {
+    return {
+      policyVersion: CUSTOMER_BENCHMARK_POLICY_VERSION,
+      status: rateComparison.status,
+      position: "unavailable",
+      benchmarkRef: null,
+      calculationRef: null,
+      evidenceRefs: [...new Set(rateComparison.evidenceRefs)].sort(),
+      reasonCodes: [...new Set(rateComparison.reasonCodes.length > 0 ? rateComparison.reasonCodes : ["qualified_benchmark_unavailable"])].sort(),
+      aiSourced: false,
+    };
+  }
   return {
     ...rateComparison,
     policyVersion: CUSTOMER_BENCHMARK_POLICY_VERSION,

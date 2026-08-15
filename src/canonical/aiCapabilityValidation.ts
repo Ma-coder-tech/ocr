@@ -52,6 +52,7 @@ export function validateCanonicalAiCapabilityLayer(analysis: CanonicalStatementA
   const expectedNeeds = new Map(
     determineAiCapabilityNeeds({
       identity: analysis.identity,
+      businessQualification: analysis.businessQualification,
       feeLedger: analysis.feeLedger,
       feeOwnershipActionability: analysis.feeOwnershipActionability,
       opportunityEngine: analysis.opportunityEngine,

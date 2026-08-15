@@ -11,7 +11,7 @@ const PAYSAFE_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs",
 const EL_NUEVO_PDF_PATH = path.resolve(process.cwd(), "test", "fixtures", "pdfs", "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf");
 
 describe("AI benchmark category inference", () => {
-  it("applies AI category inference when deterministic resolution falls back to default", async () => {
+  it("records a privacy-minimized non-authoritative AI suggestion when deterministic resolution falls back to default", async () => {
     const doc = await parsePdf(PAYSAFE_PDF_PATH);
     const parsed = fiservFirstDataProcessorStatementDriver.parse(doc, {
       sourceFileName: "fiserv_PAYSAFE_Febr_2024.pdf",
@@ -46,24 +46,34 @@ describe("AI benchmark category inference", () => {
     });
 
     expect(prompt).toContain("Available categories");
-    expect(prompt).toContain("fiserv_PAYSAFE_Febr_2024.pdf");
+    expect(prompt).not.toContain("fiserv_PAYSAFE_Febr_2024.pdf");
+    expect(prompt).not.toContain(parsed.statementIdentity.merchantNumber ?? "never-present");
+    expect(prompt).not.toContain(parsed.statementIdentity.merchantName);
+    expect(prompt).not.toContain(parsed.statementIdentity.processorFamily);
+    expect(prompt).not.toContain(parsed.statementIdentity.visibleBrand);
+    expect(prompt).not.toContain(parsed.statementIdentity.statementPeriodStart);
+    expect(prompt).not.toContain(parsed.statementIdentity.statementPeriodEnd);
+    expect(prompt).not.toContain(String(parsed.selectedFinancials.totalVolume));
+    expect(prompt).not.toContain(String(parsed.selectedFinancials.totalFees));
+    expect(prompt).not.toContain(String(parsed.selectedFinancials.effectiveRate));
+    expect(prompt).not.toContain(parsed.fiservFeeAnalysisV2.rows[0]?.description ?? "never-present");
     expect(result.benchmarkCategoryAi).toMatchObject({
-      status: "applied",
+      status: "suggestion_recorded",
       provider: "anthropic",
       model: "category-test-model",
       categoryId: "retail",
       confidence: "medium",
-      applied: true,
+      applied: false,
     });
     expect(result.output.fiservFeeAnalysisV2.benchmarkCategoryResolution).toMatchObject({
-      categoryId: "retail",
-      source: "ai_inferred",
+      categoryId: "default",
+      source: "default",
       deterministicCategoryId: "default",
-      aiSuggestedCategoryId: "retail",
+      aiSuggestedCategoryId: null,
     });
     expect(result.output.fiservFeeAnalysisV2.effectiveRateBenchmarkAnalysis).toMatchObject({
-      categoryId: "retail",
-      categorySource: "ai_inferred",
+      categoryId: "default",
+      categorySource: "default",
     });
   });
 
@@ -119,7 +129,7 @@ describe("AI benchmark category inference", () => {
         attempted: false,
         applied: false,
       });
-      expect(result.benchmarkCategoryAi.notes).toContain("AI benchmark category inference requires ANTHROPIC_API_KEY or OPENAI_API_KEY.");
+      expect(result.benchmarkCategoryAi.notes).toContain("AI benchmark category inference was explicitly disabled.");
       expect(result.output.fiservFeeAnalysisV2.benchmarkCategoryResolution.categoryId).toBe("default");
     } finally {
       if (originalAnthropicKey === undefined) {

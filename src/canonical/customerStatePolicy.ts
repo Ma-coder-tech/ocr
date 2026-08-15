@@ -87,10 +87,14 @@ export function resolveAxes(input: {
     return "none" as const;
   })();
 
+  const qualifiedPosition = input.rateComparison.position;
   return {
     analysisReadiness,
     dataIntegrity: input.dataIntegrity,
-    ratePosition: analysisReadiness === "verified" && input.rateComparison.status === "qualified" ? input.rateComparison.position : "unavailable",
+    ratePosition:
+      analysisReadiness === "verified" && input.rateComparison.status === "qualified" && qualifiedPosition !== "unavailable"
+        ? qualifiedPosition
+        : "unavailable",
     opportunityPosture,
     explanationReadiness: input.aiCapabilities.summary.explanationReadiness,
   };

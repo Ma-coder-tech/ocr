@@ -3,6 +3,7 @@ import type {
   CanonicalAiCapabilityTrigger,
   CanonicalAiFinancialReadiness,
   CanonicalAiLimitationCode,
+  CanonicalBusinessQualification,
   CanonicalFeeLedger,
   CanonicalFeeOwnershipActionability,
   CanonicalOpportunityEngine,
@@ -28,6 +29,7 @@ export type AiCapabilityNeed = {
 
 export function determineAiCapabilityNeeds(input: {
   identity: CanonicalStatementIdentity;
+  businessQualification?: CanonicalBusinessQualification;
   feeLedger: CanonicalFeeLedger;
   feeOwnershipActionability: CanonicalFeeOwnershipActionability;
   opportunityEngine: CanonicalOpportunityEngine;
@@ -35,7 +37,7 @@ export function determineAiCapabilityNeeds(input: {
 }): AiCapabilityNeed[] {
   const materialFeeRows = materialUnresolvedFeeRows(input.feeLedger, input.feeOwnershipActionability, input.opportunityEngine);
   const noticeEvidenceRefs = noticeEvidenceRefsFromText(input.evidenceText);
-  const benchmarkVerified = input.identity.businessType.status === "selected" && (input.identity.businessType.value ?? "").trim().length > 0;
+  const benchmarkVerified = input.businessQualification?.status === "qualified";
 
   return [
     {
@@ -122,13 +124,13 @@ export function determineAiCapabilityNeeds(input: {
     },
     {
       capability: "benchmark_category_review",
-      required: !benchmarkVerified,
+      required: false,
       trigger: !benchmarkVerified
         ? {
             present: true,
             reasonCode: "benchmark_applicability_unverified",
-            reason: "Benchmark applicability lacks explicit verified merchant selection, deterministic category evidence, or approved non-AI category policy.",
-            evidenceRefs: [],
+            reason: "Business or benchmark qualification is incomplete. Optional AI may suggest an alternative but cannot create benchmark authority.",
+            evidenceRefs: input.businessQualification?.evidenceRefs ?? [],
             feeRowRefs: [],
             opportunityComponentRefs: [],
             absenceProof: null,
@@ -136,14 +138,14 @@ export function determineAiCapabilityNeeds(input: {
         : {
             present: false,
             reasonCode: "deterministic_absence_proven",
-            reason: "Benchmark category AI is not needed because business type is explicitly selected in canonical identity.",
-            evidenceRefs: input.identity.businessType.evidenceRefs,
+            reason: "Benchmark category AI is not needed because the canonical business qualification passed deterministic policy.",
+            evidenceRefs: input.businessQualification?.evidenceRefs ?? [],
             feeRowRefs: [],
             opportunityComponentRefs: [],
             absenceProof: "Benchmark presentation may proceed only from verified merchant selection, deterministic category evidence, or approved non-AI category policy.",
           },
-      failureFinancialReadiness: !benchmarkVerified ? "limited" : "ready",
-      failureLimitationCodes: !benchmarkVerified ? ["benchmark_category_review_required", "benchmark_category_not_verified", "provider_unavailable"] : [],
+      failureFinancialReadiness: "ready",
+      failureLimitationCodes: [],
     },
     {
       capability: "merchant_narrative",
