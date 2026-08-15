@@ -392,6 +392,7 @@ function rebuildWholeStatementCapability(
   }
   const aiCapabilities = buildCanonicalAiCapabilities({
     identity: analysis.identity,
+    businessQualification: analysis.businessQualification,
     financialFacts: analysis.financialFacts,
     feeLedger: analysis.feeLedger,
     feeOwnershipActionability: analysis.feeOwnershipActionability,
@@ -410,6 +411,7 @@ function rebuildWholeStatementCapability(
       feeOwnershipActionability: analysis.feeOwnershipActionability,
       opportunityEngine: analysis.opportunityEngine,
       aiCapabilities,
+      rateComparison: analysis.customerState.rateComparison,
     }),
   });
 }
@@ -428,6 +430,7 @@ function rebuildWithExtraCapability(
   if (!harnessInputs.some((item) => item.capability === harnessInput.capability)) harnessInputs.push(harnessInput);
   const aiCapabilities = buildCanonicalAiCapabilities({
     identity: analysis.identity,
+    businessQualification: analysis.businessQualification,
     financialFacts: analysis.financialFacts,
     feeLedger: analysis.feeLedger,
     feeOwnershipActionability: analysis.feeOwnershipActionability,
@@ -446,6 +449,7 @@ function rebuildWithExtraCapability(
       feeOwnershipActionability: analysis.feeOwnershipActionability,
       opportunityEngine: analysis.opportunityEngine,
       aiCapabilities,
+      rateComparison: analysis.customerState.rateComparison,
     }),
   });
 }

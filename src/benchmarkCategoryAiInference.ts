@@ -1,8 +1,5 @@
 import { createRequire } from "node:module";
-import {
-  applyBenchmarkCategoryAiSuggestionToFiservFeeAnalysisV2,
-  type FiservFeeAnalysisV2,
-} from "./fiservFeeAnalysis.js";
+import type { FiservFeeAnalysisV2 } from "./fiservFeeAnalysis.js";
 import {
   loadMccBenchmarkReference,
   type MccBenchmarkReference,
@@ -34,7 +31,7 @@ type AiSdk = {
   createOpenAI?: AiProviderFactoryCreator;
 };
 
-export type BenchmarkCategoryAiStatus = "disabled" | "not_needed" | "applied" | "no_usable_suggestion" | "failed";
+export type BenchmarkCategoryAiStatus = "disabled" | "not_needed" | "suggestion_recorded" | "no_usable_suggestion" | "failed";
 
 export type BenchmarkCategoryAiInference = {
   status: BenchmarkCategoryAiStatus;
@@ -122,7 +119,9 @@ function envFlagOrDefault(name: string, defaultValue: boolean): boolean {
 }
 
 function aiEnabled(options: BenchmarkCategoryAiOptions): boolean {
-  return options.enabled ?? envFlagOrDefault("AI_BENCHMARK_CATEGORY_ENABLED", true);
+  if (options.enabled !== undefined) return options.enabled;
+  if (options.apiKey || options.anthropicApiKey || options.openAiApiKey) return true;
+  return envFlagOrDefault("AI_BENCHMARK_CATEGORY_ENABLED", false);
 }
 
 function providerPreference(options: BenchmarkCategoryAiOptions): BenchmarkCategoryAiProviderPreference {
@@ -229,48 +228,28 @@ function availableCategories(reference: MccBenchmarkReference): Array<{ id: stri
     }));
 }
 
-function topFeeDescriptions(output: ParserOutputWithBenchmarkCategory): string[] {
-  const rows = output.fiservFeeAnalysisV2?.rows ?? output.feeLedger?.rows ?? [];
-  return rows
-    .map((row) => ({
-      description: String(row.description ?? "").replace(/\s+/g, " ").trim(),
-      amount: typeof row.amount === "number" && Number.isFinite(row.amount) ? row.amount : 0,
-    }))
-    .filter((row) => row.description)
-    .sort((left, right) => right.amount - left.amount)
-    .slice(0, 20)
-    .map((row) => row.description);
-}
-
-function categoryPrompt(output: ParserOutputWithBenchmarkCategory, reference: MccBenchmarkReference): string {
+export function benchmarkCategoryAiPrompt(output: ParserOutputWithBenchmarkCategory, reference: MccBenchmarkReference): string {
   const analysis = output.fiservFeeAnalysisV2;
+  const resolution = analysis?.benchmarkCategoryResolution;
+  const channel = analysis?.merchantChannelAnalysis;
   return [
-    "You infer the merchant business category for payment-processing benchmark selection.",
+    "You suggest a merchant business category for human or deterministic review.",
     "Return conservative JSON only. Do not include prose outside JSON.",
     "Use only the provided category ids. If evidence is weak or ambiguous, return categoryId \"default\" with low confidence.",
-    "Do not override a user-selected business type. This task is only called when no specific user-selected or deterministic category exists.",
-    "Prefer concrete business evidence from merchant name, DBA, statement identity, card-present/card-not-present signals, and fee patterns.",
-    "Do not classify based only on processor name or bank brand.",
+    "Your output is non-authoritative. It cannot qualify a benchmark, override merchant declaration, create an MCC, or change financial facts.",
+    "Do not infer merchant identity or search for the merchant. Use only the minimized signal codes below.",
     "",
     `Available categories: ${JSON.stringify(availableCategories(reference))}`,
     "",
-    "Statement context:",
+    "Minimized qualification signals:",
     JSON.stringify({
-      merchantName: output.statementIdentity.merchantName ?? null,
-      merchantNumber: output.statementIdentity.merchantNumber ?? null,
-      processorFamily: output.statementIdentity.processorFamily,
-      visibleBrand: output.statementIdentity.visibleBrand,
-      statementFamily: output.statementIdentity.statementFamily,
-      statementPeriodStart: output.statementIdentity.statementPeriodStart,
-      statementPeriodEnd: output.statementIdentity.statementPeriodEnd,
-      sourceFileName: output.statementIdentity.sourceFileName ?? null,
-      pricingModel: output.pricingModel?.pricingModel ?? analysis?.pricingModel.pricingModel ?? null,
-      totalVolume: output.selectedFinancials.totalVolume,
-      totalFees: output.selectedFinancials.totalFees,
-      effectiveRate: output.selectedFinancials.effectiveRate,
-      currentCategoryResolution: analysis?.benchmarkCategoryResolution ?? null,
-      merchantChannel: analysis?.merchantChannelAnalysis ?? null,
-      topFeeDescriptions: topFeeDescriptions(output),
+      selectedBusinessType: resolution?.userSelectedBusinessType ?? null,
+      deterministicCategoryId: resolution?.deterministicCategoryId ?? null,
+      deterministicSource: resolution?.deterministicSource ?? null,
+      channel: channel?.merchantChannel ?? null,
+      channelStatus: channel?.status ?? null,
+      channelConfidence: channel?.confidence ?? null,
+      highRiskDeterministicSignal: resolution?.deterministicSource === "high_risk_keyword",
     }),
   ].join("\n");
 }
@@ -365,7 +344,7 @@ async function generateCategoryInferenceWithProvider(
   if (!factory) throw new Error(`${providerLabel(provider)} AI SDK provider is not available.`);
 
   const schema = categoryResponseSchema();
-  const prompt = categoryPrompt(output, reference);
+  const prompt = benchmarkCategoryAiPrompt(output, reference);
   if (provider === "openai") {
     if (!sdk.generateText || !sdk.Output) throw new Error("OpenAI structured output requires AI SDK generateText and Output.object.");
     const result = await withTimeout(
@@ -539,21 +518,13 @@ export async function maybeRunBenchmarkCategoryAiInferenceForParserOutput<O exte
         });
         return { output: attachInference(output, result), benchmarkCategoryAi: result };
       }
-      const updatedAnalysis = applyBenchmarkCategoryAiSuggestionToFiservFeeAnalysisV2({
-        analysis,
-        merchantName: output.statementIdentity.merchantName,
-        totalVolume: output.selectedFinancials.totalVolume,
-        totalFees: output.selectedFinancials.totalFees,
-        statementPeriodStart: output.statementIdentity.statementPeriodStart,
-        aiSuggestion: generated.suggestion,
-      });
       const result = inferenceResult({
-        status: "applied",
+        status: "suggestion_recorded",
         provider: attempt.provider,
         model: attempt.modelName,
         attempted: true,
         suggestion: generated.suggestion,
-        applied: true,
+        applied: false,
         highRiskSignal: generated.highRiskSignal,
         notes: [...failureNotes, ...generated.notes],
       });
@@ -561,7 +532,7 @@ export async function maybeRunBenchmarkCategoryAiInferenceForParserOutput<O exte
         output: {
           ...output,
           fiservFeeAnalysisV2: {
-            ...updatedAnalysis,
+            ...analysis,
             benchmarkCategoryAi: result,
           },
         },

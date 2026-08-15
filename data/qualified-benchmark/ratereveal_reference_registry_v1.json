@@ -1,0 +1,126 @@
+{
+  "schemaVersion": "ratereveal_qualified_benchmark_registry_v1",
+  "registryId": "ratereveal_us_fiserv_reference_ranges",
+  "version": "2026-08-15.1",
+  "createdAt": "2026-08-15",
+  "reviewedAt": "2026-08-15",
+  "market": "US",
+  "normalRuntimeNetworkRequired": false,
+  "methodologySummary": "RateReveal reference ranges are conservative review signals, not market percentiles or promised processor pricing. The initial entries reuse category-specific ranges only where the repository documents a category-specific MCC basis, current network-cost inputs, broad independent all-in cross-checks, and anonymized Fiserv statement sanity checks. Qualification is restricted to the calibration volume tier, standard-risk card-present merchants, supported Fiserv-family statements, and the registry review period.",
+  "sourceRecords": [
+    {
+      "sourceId": "network_schedules_2025_2026",
+      "title": "Published U.S. Visa and Mastercard interchange schedules, 2025–2026 review set",
+      "publisher": "Visa and Mastercard",
+      "sourceType": "public_schedule",
+      "locator": "repository:data/fiserv-fee-analysis/mcc_benchmark_reference.json#sources",
+      "publishedAt": null,
+      "reviewedAt": "2026-08-15",
+      "supportedClaim": "Category and card-program interchange costs are material inputs to an all-in effective-rate reference.",
+      "limitations": [
+        "Interchange schedules do not establish processor markup or a guaranteed all-in merchant price.",
+        "Actual card mix and qualification outcomes vary by merchant."
+      ]
+    },
+    {
+      "sourceId": "industry_all_in_triangulation_2025_2026",
+      "title": "Independent U.S. processing-cost analyses used for broad all-in triangulation",
+      "publisher": "MerchantCostConsulting, Swipesum, Corepay, and CardFellow",
+      "sourceType": "industry_analysis",
+      "locator": "repository:data/fiserv-fee-analysis/mcc_benchmark_reference.json#sources",
+      "publishedAt": null,
+      "reviewedAt": "2026-08-15",
+      "supportedClaim": "The admitted ranges fall inside the broad U.S. all-in cost context documented by multiple independent industry analyses.",
+      "limitations": [
+        "The referenced analyses are directional and do not provide a statistical distribution for every MCC.",
+        "The ranges must not be described as an industry standard or guaranteed target."
+      ]
+    },
+    {
+      "sourceId": "anonymized_fiserv_sanity_check_2026_06",
+      "title": "Anonymized supported-Fiserv statement sanity-check cohort",
+      "publisher": "RateReveal",
+      "sourceType": "internal_anonymized_validation",
+      "locator": "repository:data/fiserv-fee-analysis/mcc_benchmark_reference.json#confidence",
+      "publishedAt": "2026-06-29",
+      "reviewedAt": "2026-08-15",
+      "supportedClaim": "The initial restaurant and grocery ranges were checked against supported Fiserv statement behavior for directional plausibility.",
+      "limitations": [
+        "The cohort is small and is not a representative market sample.",
+        "No private merchant identity is part of the merchant-facing source description."
+      ]
+    }
+  ],
+  "entries": [
+    {
+      "referenceId": "rr_restaurant_cp_standard_100k_500k_2026_06",
+      "displayLabel": "Restaurant / Food Service",
+      "segmentId": "restaurant_food_service",
+      "riskClass": "standard",
+      "channel": "card_present",
+      "annualVolumeTier": "100k_500k",
+      "applicableProcessor": "fiserv",
+      "effectiveFrom": "2026-06-01",
+      "effectiveTo": "2026-10-31",
+      "range": { "low": "0.021000", "high": "0.026000" },
+      "confidence": "medium",
+      "merchantDisplayEligible": true,
+      "materiallyAboveDelta": null,
+      "sourceIds": [
+        "network_schedules_2025_2026",
+        "industry_all_in_triangulation_2025_2026",
+        "anonymized_fiserv_sanity_check_2026_06"
+      ],
+      "methodology": "Category-specific restaurant interchange and network-cost context was combined with broad independent U.S. all-in processing ranges and an anonymized supported-Fiserv sanity check. The base range is admitted only for standard-risk card-present merchants in the $100,000–$500,000 annualized calibration tier.",
+      "limitations": [
+        "This is a RateReveal pricing-review reference, not a market percentile, contract term, or guaranteed target.",
+        "Commercial-card mix, debit regulation, ticket size, rewards mix, and transaction qualification can move actual costs.",
+        "Card-not-present, mixed-channel, high-risk, and other annual-volume tiers are not covered by this entry."
+      ]
+    },
+    {
+      "referenceId": "rr_grocery_cp_standard_100k_500k_2026_06",
+      "displayLabel": "Grocery / Supermarket / Specialty Food",
+      "segmentId": "grocery_specialty_food",
+      "riskClass": "standard",
+      "channel": "card_present",
+      "annualVolumeTier": "100k_500k",
+      "applicableProcessor": "fiserv",
+      "effectiveFrom": "2026-06-01",
+      "effectiveTo": "2026-10-31",
+      "range": { "low": "0.018000", "high": "0.023000" },
+      "confidence": "medium",
+      "merchantDisplayEligible": true,
+      "materiallyAboveDelta": null,
+      "sourceIds": [
+        "network_schedules_2025_2026",
+        "industry_all_in_triangulation_2025_2026",
+        "anonymized_fiserv_sanity_check_2026_06"
+      ],
+      "methodology": "Category-specific grocery interchange and network-cost context was combined with broad independent U.S. all-in processing ranges and an anonymized supported-Fiserv sanity check. The base range is admitted only for standard-risk card-present merchants in the $100,000–$500,000 annualized calibration tier.",
+      "limitations": [
+        "This is a RateReveal pricing-review reference, not a market percentile, contract term, or guaranteed target.",
+        "Regulated-debit share, specialty-food mix, rewards mix, ticket size, and transaction qualification can move actual costs.",
+        "Card-not-present, mixed-channel, high-risk, and other annual-volume tiers are not covered by this entry."
+      ]
+    }
+  ],
+  "unavailableCoverage": [
+    {
+      "scope": "general_retail, professional_services, gas_petroleum, lodging, auto_repair, mobile_phone_repair, ecommerce, and high_risk_retail",
+      "reason": "Existing repository ranges do not yet have sufficiently specific per-entry methodology and validation for merchant-facing admission."
+    },
+    {
+      "scope": "card_not_present and mixed channels",
+      "reason": "The existing channel adjustments are directional and are not admitted as a qualified effective-rate range."
+    },
+    {
+      "scope": "annual volume below $100,000 or at/above $500,000",
+      "reason": "Existing volume adjustments are directional assumptions and are not admitted for merchant display."
+    },
+    {
+      "scope": "statements outside 2026-06-01 through 2026-10-31",
+      "reason": "The initial registry does not claim historical applicability outside its reviewed period."
+    }
+  ]
+}

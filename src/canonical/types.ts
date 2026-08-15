@@ -20,10 +20,12 @@ export type CanonicalFactCandidateRole =
   | "funding_formula_result"
   | "card_type_total"
   | "user_supplied"
+  | "merchant_declaration"
+  | "account_coding"
   | "legacy_summary"
   | "unknown";
 
-export type CanonicalExtractionMethod = "pdf_text" | "document_ir" | "ocr" | "csv" | "manual_input" | "legacy";
+export type CanonicalExtractionMethod = "pdf_text" | "document_ir" | "ocr" | "csv" | "manual_input" | "reference_registry" | "legacy";
 
 export type CanonicalFactCandidate<T> = {
   id: string;
@@ -58,6 +60,9 @@ export type CanonicalEvidenceSourceRole =
   | "control_total"
   | "calculation_input"
   | "parser_interpretation"
+  | "merchant_declaration"
+  | "account_coding"
+  | "benchmark_reference"
   | "advanced_review_diagnostic";
 
 export type CanonicalEvidenceRecord = {
@@ -172,7 +177,8 @@ export type CanonicalCalculationRecord = {
     | "opportunity_observed_minus_target"
     | "opportunity_monthly_delta_times_12"
     | "opportunity_annual_delta"
-    | "opportunity_component_sum";
+    | "opportunity_component_sum"
+    | "benchmark_rate_position";
   formulaVersion: string;
   inputs: Array<{
     label: string;
@@ -1125,6 +1131,91 @@ export type CanonicalAiCapabilityLayer = {
 export type CanonicalCustomerAnalysisReadiness = "verified" | "limited" | "withheld" | "unavailable";
 export type CanonicalCustomerDataIntegrity = "reconciled" | "partially_reconciled" | "failed" | "unavailable";
 export type CanonicalCustomerRatePosition = "below_reference" | "within_reference" | "above_reference" | "unavailable";
+export type CanonicalQualifiedRatePosition = "below_reference" | "within_reference" | "above_reference";
+export type CanonicalBusinessQualificationStatus = "qualified" | "confirmation_required" | "unavailable";
+export type CanonicalBusinessQualificationConfidence = "high" | "medium" | "low";
+export type CanonicalBusinessRiskClass = "standard" | "high_risk" | "unknown";
+export type CanonicalProcessingChannel = "card_present" | "card_not_present" | "mixed" | "unknown";
+export type CanonicalAnnualVolumeTier = "under_100k" | "100k_500k" | "500k_2m" | "2m_10m" | "over_10m" | "unknown";
+
+export type CanonicalMerchantDeclaration = {
+  selectedCategoryId: string | null;
+  freeTextDescription: string | null;
+  confirmedSegmentId: string | null;
+  evidenceRefs: string[];
+};
+
+export type CanonicalAccountCoding = {
+  actualMcc: CanonicalFactValue<string | null>;
+  source: "explicit_statement" | "not_available" | "conflicting_statement_values";
+};
+
+export type CanonicalBusinessQualificationFactor<T extends string> = {
+  value: T;
+  status: "qualified" | "confirmation_required" | "unavailable";
+  confidence: CanonicalBusinessQualificationConfidence;
+  source: string;
+  evidenceRefs: string[];
+  limitations: string[];
+};
+
+export type CanonicalAnnualVolumeQualification = {
+  value: MoneyAmount | null;
+  tier: CanonicalAnnualVolumeTier;
+  status: "qualified" | "confirmation_required" | "unavailable";
+  confidence: CanonicalBusinessQualificationConfidence;
+  source: "confirmed_annual_volume" | "statement_month_x12" | "not_available";
+  statementMonthsUsed: number | null;
+  evidenceRefs: string[];
+  limitations: string[];
+};
+
+export type CanonicalBusinessConflict = {
+  id: string;
+  kind: "declaration_conflict" | "mcc_conflict" | "high_risk_conflict" | "channel_conflict";
+  material: boolean;
+  reason: string;
+  evidenceRefs: string[];
+  alternatives: string[];
+};
+
+export type CanonicalBusinessAlternative = {
+  segmentId: string;
+  source: "merchant_declaration" | "account_mcc" | "merchant_name_signal" | "ai_suggestion";
+  confidence: CanonicalBusinessQualificationConfidence;
+  authoritative: boolean;
+  reason: string;
+  evidenceRefs: string[];
+};
+
+export type CanonicalBusinessConfirmationRequirement = {
+  reasonCode: string;
+  prompt: string;
+  allowedSegmentIds: string[];
+  allowedRiskClasses: Exclude<CanonicalBusinessRiskClass, "unknown">[];
+  allowedChannels: Exclude<CanonicalProcessingChannel, "unknown">[];
+};
+
+export type CanonicalBusinessQualification = {
+  policyVersion: "canonical_business_qualification_v1";
+  status: CanonicalBusinessQualificationStatus;
+  confidence: CanonicalBusinessQualificationConfidence;
+  merchantDeclaration: CanonicalMerchantDeclaration;
+  accountCoding: CanonicalAccountCoding;
+  resolvedSegmentId: string | null;
+  risk: CanonicalBusinessQualificationFactor<CanonicalBusinessRiskClass>;
+  channel: CanonicalBusinessQualificationFactor<CanonicalProcessingChannel>;
+  annualVolume: CanonicalAnnualVolumeQualification;
+  market: CanonicalBusinessQualificationFactor<"US" | "unknown">;
+  processorFamily: CanonicalBusinessQualificationFactor<"fiserv" | "unknown">;
+  deterministicSignals: string[];
+  alternatives: CanonicalBusinessAlternative[];
+  conflicts: CanonicalBusinessConflict[];
+  confirmationRequirement: CanonicalBusinessConfirmationRequirement | null;
+  evidenceRefs: string[];
+  limitations: string[];
+  aiAuthoritative: false;
+};
 export type CanonicalCustomerOpportunityPosture =
   | "none"
   | "verification_only"
@@ -1161,6 +1252,25 @@ export type CanonicalCustomerBenchmarkReference = {
   applicableBusinessType: string | null;
   applicableChannel: string | null;
   applicableCardEnvironment: string | null;
+  market?: "US";
+  segmentId?: string;
+  riskClass?: Exclude<CanonicalBusinessRiskClass, "unknown">;
+  channel?: Exclude<CanonicalProcessingChannel, "unknown">;
+  annualVolumeTier?: Exclude<CanonicalAnnualVolumeTier, "unknown">;
+  range?: { low: DecimalString; high: DecimalString };
+  confidence?: Exclude<CanonicalBusinessQualificationConfidence, "low">;
+  sourceRecords?: Array<{
+    sourceId: string;
+    title: string;
+    publisher: string;
+    sourceType: "public_schedule" | "industry_analysis" | "internal_anonymized_validation";
+    locator: string;
+    publishedAt: string | null;
+    reviewedAt: string;
+    supportedClaim: string;
+    limitations: string[];
+    evidenceRef: string;
+  }>;
   methodology: string;
   limitations: string[];
   evidenceRefs: string[];
@@ -1171,8 +1281,8 @@ export type CanonicalCustomerBenchmarkReference = {
 
 export type CanonicalCustomerRateComparison = {
   policyVersion: "canonical_customer_benchmark_policy_v1";
-  status: "qualified" | "unavailable";
-  position: CanonicalCustomerRatePosition;
+  status: "qualified" | "confirmation_required" | "unavailable";
+  position: CanonicalQualifiedRatePosition | "unavailable";
   benchmarkRef: CanonicalCustomerBenchmarkReference | null;
   calculationRef: string | null;
   evidenceRefs: string[];
@@ -1387,6 +1497,7 @@ export type CanonicalAnalysisVersionManifest = {
   aiReadinessDegradationPolicyVersion: "ai_readiness_degradation_policy_v1";
   aiPrivacyRetentionPolicyVersion: "ai_privacy_retention_policy_v1";
   deterministicExplanationPolicyVersion: "deterministic_explanation_policy_v1";
+  businessQualificationPolicyVersion: "canonical_business_qualification_v1";
   customerStatePolicyVersion: "canonical_customer_state_policy_v1";
   customerStateMaterialityPolicyVersion: "canonical_customer_state_materiality_v1";
   customerBenchmarkPolicyVersion: "canonical_customer_benchmark_policy_v1";
@@ -1412,6 +1523,7 @@ export type CanonicalStatementAnalysis = {
   createdAt: string;
   identity: CanonicalStatementIdentity;
   financialFacts: CanonicalFinancialFacts;
+  businessQualification: CanonicalBusinessQualification;
   feeLedger: CanonicalFeeLedger;
   feeOwnershipActionability: CanonicalFeeOwnershipActionability;
   opportunityEngine: CanonicalOpportunityEngine;

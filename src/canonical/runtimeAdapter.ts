@@ -21,6 +21,7 @@ import {
 } from "./deterministicRuntimeSafetyReview.js";
 import { validateCanonicalStatementAnalysis } from "./validate.js";
 import type { BusinessTypeId } from "../businessTypes.js";
+import type { CanonicalBusinessProfileInput } from "./businessQualification.js";
 import type { ParsedDocument } from "../parser.js";
 import type { AnalysisSummary } from "../types.js";
 import type {
@@ -56,8 +57,14 @@ export const CANONICAL_RUNTIME_INPUT_ADMISSION_TABLE: readonly CanonicalRuntimeI
   {
     input: "runtime_business_type",
     status: "provisional_with_limitation",
-    canonicalUse: "Business-type context only; not authority for financial conclusions or benchmark opportunity.",
+    canonicalUse: "Merchant-selected declaration input only; it remains distinct from account MCC and cannot create savings authority.",
     reasonCode: "business_context_limited",
+  },
+  {
+    input: "canonical_business_profile",
+    status: "canonical_evidence",
+    canonicalUse: "Merchant declaration, optional confirmation, and U.S. product-scope context for Package 1 business qualification.",
+    reasonCode: "business_qualification_input_v1",
   },
   {
     input: "opaque_runtime_document_ref",
@@ -144,6 +151,7 @@ export type CanonicalRuntimeAdapterInput = {
   businessType: BusinessTypeId;
   runtimeDocumentRef: string;
   legacySummary?: AnalysisSummary | null;
+  businessProfile?: CanonicalBusinessProfileInput | null;
   wholeStatementFeeIntelligence?: WholeStatementFeeIntelligenceRuntimeOptions;
 };
 
@@ -162,6 +170,7 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
 
   const analysis = buildCanonicalStatementFactsFromParsedDocument(document, {
     businessType,
+    businessProfile: runtimeBusinessProfile(input.businessProfile, businessType),
     sourceAnalysisId: runtimeDocumentRef,
     sourceFileName: null,
   });
@@ -183,6 +192,7 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
       ? analysis.aiCapabilities
       : buildCanonicalAiCapabilities({
           identity: analysis.identity,
+          businessQualification: analysis.businessQualification,
           financialFacts: analysis.financialFacts,
           feeLedger: analysis.feeLedger,
           feeOwnershipActionability: analysis.feeOwnershipActionability,
@@ -204,6 +214,7 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
             feeOwnershipActionability: analysis.feeOwnershipActionability,
             opportunityEngine: analysis.opportunityEngine,
             aiCapabilities,
+            rateComparison: analysis.customerState.rateComparison,
           }),
         });
 
@@ -226,6 +237,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
 
   const analysis = buildCanonicalStatementFactsFromParsedDocument(document, {
     businessType,
+    businessProfile: runtimeBusinessProfile(input.businessProfile, businessType),
     sourceAnalysisId: runtimeDocumentRef,
     sourceFileName: null,
   });
@@ -259,6 +271,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
   });
   const aiCapabilities = buildCanonicalAiCapabilities({
     identity: analysis.identity,
+    businessQualification: analysis.businessQualification,
     financialFacts: analysis.financialFacts,
     feeLedger: analysis.feeLedger,
     feeOwnershipActionability: analysis.feeOwnershipActionability,
@@ -277,6 +290,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
       feeOwnershipActionability: analysis.feeOwnershipActionability,
       opportunityEngine: analysis.opportunityEngine,
       aiCapabilities,
+      rateComparison: analysis.customerState.rateComparison,
     }),
   });
 
@@ -288,6 +302,20 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     }),
     inputAdmission: canonicalRuntimeInputAdmissionTable(),
     runtimeAiCapabilitySnapshots: snapshots,
+  };
+}
+
+function runtimeBusinessProfile(
+  profile: CanonicalBusinessProfileInput | null | undefined,
+  businessType: BusinessTypeId,
+): CanonicalBusinessProfileInput {
+  return {
+    ...profile,
+    merchantDeclaration: {
+      selectedCategoryId: profile?.merchantDeclaration?.selectedCategoryId ?? businessType,
+      freeTextDescription: profile?.merchantDeclaration?.freeTextDescription ?? null,
+    },
+    market: profile?.market ?? "US",
   };
 }
 

@@ -21,6 +21,7 @@ import type {
   CanonicalAiCapabilityTrigger,
   CanonicalAiExplanationReadiness,
   CanonicalAiLimitationCode,
+  CanonicalBusinessQualification,
   CanonicalEvidenceRecord,
   CanonicalFeeLedger,
   CanonicalFeeOwnershipActionability,
@@ -40,6 +41,7 @@ export type CanonicalAiCapabilityHarnessInput = {
 
 export function buildCanonicalAiCapabilities(input: {
   identity: CanonicalStatementIdentity;
+  businessQualification?: CanonicalBusinessQualification;
   financialFacts: CanonicalFinancialFacts;
   feeLedger: CanonicalFeeLedger;
   feeOwnershipActionability: CanonicalFeeOwnershipActionability;
@@ -62,7 +64,9 @@ export function buildCanonicalAiCapabilities(input: {
     if (!need) continue;
     const harness = harnessByCapability.get(capability);
     const duplicateHarness = duplicateHarnessCapabilities.has(capability);
-    const status = duplicateHarness ? "rejected" : harness?.status ?? (need.required || capability === "merchant_narrative" ? "disabled" : "not_needed");
+    const status = duplicateHarness
+      ? "rejected"
+      : harness?.status ?? (need.required || capability === "merchant_narrative" || need.trigger.present ? "disabled" : "not_needed");
     const output = duplicateHarness ? null : harness?.output ?? null;
     const grounding = output ? evaluateAiCapabilityGrounding(output, { evidence: [...input.evidence], feeLedger: input.feeLedger, opportunityEngine: input.opportunityEngine }) : null;
     const rejected = grounding?.status === "rejected";
