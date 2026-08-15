@@ -305,6 +305,12 @@ describe("Package 2 canonical merchant attention", () => {
         evidenceMutationAllowed: false,
         actionabilityExpansionAllowed: false,
       },
+      semanticFidelity: {
+        fieldScopedSupportRequired: true,
+        lexicalEntailmentRequired: true,
+        logicalQualificationPreservationRequired: true,
+        newSemanticClaimsAllowed: false,
+      },
       runtimeBoundary: {
         providerTransportStatus: "not_implemented_in_package_2",
         productionReadyWithoutAdmittedProviderOutput: false,
@@ -385,6 +391,77 @@ describe("Package 2 canonical merchant attention", () => {
     const result = admitMerchantAttentionAiInterpretation({ model, output });
     expect(result.admitted).toBe(true);
     expect(result.model.items[0]!.merchantLanguageSource).toBe("admitted_ai_interpretation");
+  });
+
+  it.each([
+    [
+      "negation scope",
+      "The observed amount is not automatically an overcharge.",
+      "The observed amount is not an overcharge.",
+    ],
+    [
+      "evidentiary negation",
+      "The statement does not establish that this charge is negotiable.",
+      "This charge is not negotiable.",
+    ],
+    [
+      "possibility modality",
+      "This charge may relate to the listed service.",
+      "This charge relates to the listed service.",
+    ],
+    [
+      "evidentiary strength",
+      "The statement supports review of the issue.",
+      "The statement proves the issue.",
+    ],
+    [
+      "exception condition",
+      "Review is appropriate unless the processor documents the charge.",
+      "Review is appropriate; the processor documents the charge.",
+    ],
+    [
+      "temporal precondition",
+      "Review is appropriate before the processor confirms the charge.",
+      "Review is appropriate; the processor confirms the charge.",
+    ],
+    [
+      "temporal limit",
+      "Review remains appropriate until the processor confirms the charge.",
+      "Review remains appropriate; the processor confirms the charge.",
+    ],
+    [
+      "could modality",
+      "This charge could relate to the listed service.",
+      "This charge relates to the listed service.",
+    ],
+    [
+      "appearance qualification",
+      "This charge appears related to the listed service.",
+      "This charge is related to the listed service.",
+    ],
+  ])("rejects a paraphrase that alters %s", (_label, canonicalMeaning, strengthenedMeaning) => {
+    const model = analysisWithRows([{ label: "ADDITIONAL FEES", amount: 9.48 }]).merchantAttention;
+    model.items[0]!.evidenceBoundary.reasonableConclusion.summary = canonicalMeaning;
+    const output: any = validMerchantInterpretation(model);
+    output.items[0].reasonableConclusion = strengthenedMeaning;
+
+    const result = admitMerchantAttentionAiInterpretation({ model, output });
+
+    expect(result.admitted).toBe(false);
+    expect(result.errors.join(" ")).toMatch(/alters canonical qualification/i);
+    expect(result.model.items).toEqual(model.items);
+  });
+
+  it("admits an equivalent paraphrase that preserves logical modality", () => {
+    const model = analysisWithRows([{ label: "ADDITIONAL FEES", amount: 9.48 }]).merchantAttention;
+    model.items[0]!.evidenceBoundary.reasonableConclusion.summary = "This charge may relate to the listed service.";
+    const output: any = validMerchantInterpretation(model);
+    output.items[0].reasonableConclusion = "This fee could relate to the listed service.";
+
+    const result = admitMerchantAttentionAiInterpretation({ model, output });
+
+    expect(result.admitted).toBe(true);
+    expect(result.errors).toEqual([]);
   });
 
   it("requires exact AI coverage only for the deterministic merchant-language-eligible population", () => {

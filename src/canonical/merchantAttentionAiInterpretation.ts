@@ -52,6 +52,7 @@ export type MerchantAttentionAiInterpretationPacket = {
     policyVersion: "merchant_attention_semantic_fidelity_v1";
     fieldScopedSupportRequired: true;
     lexicalEntailmentRequired: true;
+    logicalQualificationPreservationRequired: true;
     newSemanticClaimsAllowed: false;
   };
   runtimeBoundary: {
@@ -165,6 +166,7 @@ export function buildMerchantAttentionAiInterpretationPacket(
       policyVersion: MERCHANT_ATTENTION_SEMANTIC_FIDELITY_POLICY_VERSION,
       fieldScopedSupportRequired: true,
       lexicalEntailmentRequired: true,
+      logicalQualificationPreservationRequired: true,
       newSemanticClaimsAllowed: false,
     },
     runtimeBoundary: {
@@ -452,7 +454,18 @@ function semanticFidelityErrors(canonical: CanonicalMerchantAttentionItem, value
     }
     const unsupported = unsupportedSemanticTokens(entry.generatedText, support);
     if (unsupported.length > 0) errors.push(`${entry.field} adds unsupported semantic tokens: ${unsupported.join(", ")}`);
-    if (erasesSemanticCaution(entry.generatedText, support)) errors.push(`${entry.field} erases a canonical uncertainty or limitation`);
+  }
+  const generatedByField = new Map<MerchantLanguageField, string[]>();
+  for (const entry of generated) {
+    const values = generatedByField.get(entry.field) ?? [];
+    values.push(entry.generatedText);
+    generatedByField.set(entry.field, values);
+  }
+  for (const [field, generatedValues] of generatedByField) {
+    const support = canonicalByField.get(field);
+    if (support && altersLogicalQualification(generatedValues.join(" "), support)) {
+      errors.push(`${field} alters canonical qualification, modality, negation, conditionality, or evidentiary scope`);
+    }
   }
   return [...new Set(errors)];
 }
@@ -557,6 +570,28 @@ const SEMANTIC_SYNONYMS: Record<string, string> = {
   needed: "need",
   requires: "require",
   required: "require",
+  demonstrate: "establish",
+  demonstrated: "establish",
+  demonstrates: "establish",
+  demonstrating: "establish",
+  relates: "relate",
+  related: "relate",
+  may: "possibility",
+  might: "possibility",
+  could: "possibility",
+  possible: "possibility",
+  possibly: "possibility",
+  perhaps: "possibility",
+  appear: "appearance",
+  appeared: "appearance",
+  appears: "appearance",
+  apparently: "appearance",
+  seem: "appearance",
+  seemed: "appearance",
+  seems: "appearance",
+  seemingly: "appearance",
+  prior: "before",
+  till: "until",
 };
 
 function unsupportedSemanticTokens(generated: string, support: string): string[] {
@@ -571,9 +606,130 @@ function semanticTokens(value: string): string[] {
     .map((token) => SEMANTIC_SYNONYMS[token] ?? token);
 }
 
-function erasesSemanticCaution(generated: string, support: string): boolean {
-  const caution = /\b(?:not|no|without|uncertain|unclear|unknown|appears?|may|might|could|likely|possible|limited|before|until)\b/i;
-  return caution.test(support) && !caution.test(generated);
+const LOGICAL_QUALIFICATION_TOKENS: Record<string, string> = {
+  may: "modality:possibility",
+  might: "modality:possibility",
+  could: "modality:possibility",
+  possible: "modality:possibility",
+  possibly: "modality:possibility",
+  perhaps: "modality:possibility",
+  appear: "epistemic:appearance",
+  appeared: "epistemic:appearance",
+  appears: "epistemic:appearance",
+  apparently: "epistemic:appearance",
+  seem: "epistemic:appearance",
+  seemed: "epistemic:appearance",
+  seems: "epistemic:appearance",
+  seemingly: "epistemic:appearance",
+  likely: "epistemic:likelihood",
+  probably: "epistemic:likelihood",
+  uncertain: "epistemic:uncertainty",
+  uncertainty: "epistemic:uncertainty",
+  unclear: "epistemic:uncertainty",
+  unknown: "epistemic:uncertainty",
+  unless: "condition:exception",
+  before: "temporal:before",
+  prior: "temporal:before",
+  until: "temporal:until",
+  till: "temporal:until",
+  if: "condition:if",
+  when: "condition:when",
+  while: "condition:while",
+  after: "temporal:after",
+  once: "condition:once",
+  except: "condition:exception",
+  provided: "condition:provided",
+  providing: "condition:provided",
+  must: "modality:requirement",
+  should: "modality:recommendation",
+  would: "modality:conditional",
+  can: "modality:capability",
+  will: "modality:prediction",
+  automatically: "scope:automatic",
+  necessarily: "scope:necessary",
+  only: "scope:only",
+  alone: "scope:alone",
+  itself: "scope:alone",
+  limited: "scope:limited",
+  current: "scope:current",
+  currently: "scope:current",
+  available: "scope:available",
+  observed: "scope:observed",
+  specific: "scope:specific",
+  separate: "scope:separate",
+  individual: "scope:individual",
+  exact: "scope:exact",
+  fully: "scope:fully",
+  sufficiently: "scope:sufficiently",
+  enough: "scope:enough",
+  support: "evidence:support",
+  supported: "evidence:support",
+  supporting: "evidence:support",
+  supports: "evidence:support",
+  suggest: "evidence:suggest",
+  suggested: "evidence:suggest",
+  suggesting: "evidence:suggest",
+  suggests: "evidence:suggest",
+  indicate: "evidence:indicate",
+  indicated: "evidence:indicate",
+  indicates: "evidence:indicate",
+  indicating: "evidence:indicate",
+  establish: "evidence:establish",
+  established: "evidence:establish",
+  establishes: "evidence:establish",
+  establishing: "evidence:establish",
+  demonstrate: "evidence:establish",
+  demonstrated: "evidence:establish",
+  demonstrates: "evidence:establish",
+  demonstrating: "evidence:establish",
+  prove: "evidence:prove",
+  proved: "evidence:prove",
+  proven: "evidence:prove",
+  proves: "evidence:prove",
+  proving: "evidence:prove",
+  confirm: "evidence:confirm",
+  confirmed: "evidence:confirm",
+  confirming: "evidence:confirm",
+  confirms: "evidence:confirm",
+};
+
+const LOGICAL_NEGATIONS = new Set(["not", "no", "never", "neither", "nor", "without"]);
+const NEGATION_TARGET_FILLERS = new Set([
+  "a", "an", "and", "are", "as", "at", "be", "been", "being", "by", "do", "does", "did", "for", "from", "has", "have", "had", "in", "is", "it", "of", "on", "or", "that", "the", "their", "this", "to", "was", "were", "with", "you", "your",
+]);
+
+function altersLogicalQualification(generated: string, support: string): boolean {
+  return JSON.stringify(logicalQualificationSignature(generated)) !== JSON.stringify(logicalQualificationSignature(support));
+}
+
+function logicalQualificationSignature(value: string): string[] {
+  const tokens = logicalTokens(value);
+  const signature: string[] = [];
+  for (const [index, token] of tokens.entries()) {
+    const qualification = LOGICAL_QUALIFICATION_TOKENS[token];
+    if (qualification) signature.push(qualification);
+    if (LOGICAL_NEGATIONS.has(token)) signature.push(`negation:${logicalNegationTarget(tokens, index + 1)}`);
+    if (token === "without") signature.push("condition:without");
+  }
+  return signature.sort();
+}
+
+function logicalTokens(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/\bwon['’]t\b/g, "will not")
+    .replace(/\bcan['’]t\b|\bcannot\b/g, "can not")
+    .replace(/n['’]t\b/g, " not")
+    .match(/[a-z]+/g) ?? [];
+}
+
+function logicalNegationTarget(tokens: string[], start: number): string {
+  for (let index = start; index < tokens.length; index += 1) {
+    const token = tokens[index]!;
+    if (NEGATION_TARGET_FILLERS.has(token) || LOGICAL_NEGATIONS.has(token)) continue;
+    return LOGICAL_QUALIFICATION_TOKENS[token] ?? `semantic:${SEMANTIC_SYNONYMS[token] ?? token}`;
+  }
+  return "end_of_clause";
 }
 
 function merchantLanguageOnly(value: Record<string, unknown>): unknown {
