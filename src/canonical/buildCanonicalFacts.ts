@@ -14,6 +14,7 @@ import { buildCanonicalFeeOwnershipActionability } from "./feeOwnershipActionabi
 import { buildCanonicalOpportunityEngine } from "./opportunityEngine.js";
 import { buildCanonicalAiCapabilities } from "./buildCanonicalAiCapabilities.js";
 import { buildCanonicalCustomerState } from "./customerStateResolver.js";
+import { buildCanonicalMerchantAttentionModel } from "./merchantAttention.js";
 import {
   buildBusinessQualificationAndRateComparison,
   type CanonicalBusinessProfileInput,
@@ -184,6 +185,11 @@ export function canonicalActualValues(analysis: CanonicalStatementAnalysis): Rec
     "customerState.reasonCodes": [...analysis.customerState.reasonCodes].sort(),
     "customerState.explanation.source": analysis.customerState.explanation.source,
     "customerState.actionGuidance.actionTypes": analysis.customerState.actionGuidance.map((action) => action.actionType).sort(),
+    "merchantAttention.status": analysis.merchantAttention.status,
+    "merchantAttention.itemCount": analysis.merchantAttention.summary.itemCount,
+    "merchantAttention.highPriorityCount": analysis.merchantAttention.summary.highPriorityCount,
+    "merchantAttention.questionCount": analysis.merchantAttention.summary.questionCount,
+    "merchantAttention.actionToolkitCount": analysis.merchantAttention.summary.actionToolkitCount,
     "validation.status": analysis.validation.status,
   };
 }
@@ -525,6 +531,15 @@ function buildAnalysisEnvelope(input: {
     aiCapabilities,
     rateComparison,
   });
+  const merchantAttention = buildCanonicalMerchantAttentionModel({
+    financialFacts,
+    feeLedger,
+    feeOwnershipActionability,
+    opportunityEngine,
+    aiCapabilities,
+    customerState,
+    evidence,
+  });
 
   return {
     canonicalSchemaVersion: CANONICAL_SCHEMA_VERSION,
@@ -539,6 +554,7 @@ function buildAnalysisEnvelope(input: {
     opportunityEngine,
     aiCapabilities,
     customerState,
+    merchantAttention,
     evidence,
     calculations: input.calculations,
     validation: { status: "valid", errors: [], warnings: [] },

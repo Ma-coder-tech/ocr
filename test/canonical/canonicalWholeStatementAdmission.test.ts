@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
+import { buildCanonicalAiCapabilities } from "../../src/canonical/buildCanonicalAiCapabilities.js";
+import { buildCanonicalCustomerState } from "../../src/canonical/customerStateResolver.js";
 import { buildFeeKnowledgeSourcePacket } from "../../src/canonical/feeKnowledgeRegistry.js";
+import { buildFeeKnowledgeIntelligenceRecord } from "../../src/canonical/feeKnowledgeIntelligence.js";
+import { buildCanonicalFeeLedger } from "../../src/canonical/feeLedger.js";
+import { buildCanonicalFeeOwnershipActionability } from "../../src/canonical/feeOwnershipActionability.js";
+import { buildCanonicalMerchantAttentionModel } from "../../src/canonical/merchantAttention.js";
+import { buildCanonicalOpportunityEngine } from "../../src/canonical/opportunityEngine.js";
 import { admitWholeStatementFeeIntelligence, validateResearchLinkage } from "../../src/canonical/wholeStatementFeeIntelligenceAdmission.js";
 import {
   WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION,
@@ -8,12 +15,12 @@ import {
   validateWholeStatementFeeIntelligenceReview,
 } from "../../src/canonical/wholeStatementFeeIntelligenceReview.js";
 import { validateCanonicalAiAdmissionAudit } from "../../src/canonical/aiAdmissionDiagnostics.js";
-import type { CanonicalStatementAnalysis } from "../../src/canonical/types.js";
+import type { CanonicalEvidenceRecord, CanonicalStatementAnalysis } from "../../src/canonical/types.js";
 import type { ParsedDocument } from "../../src/parser.js";
 
 describe("canonical whole-statement admission", () => {
   it("admits a validated statement-grounded review without changing Packages B-E", () => {
-    const analysis = syntheticAnalysis();
+    const analysis = syntheticAnalysisWithFeeRow();
     const before = financialProjection(analysis);
     const sourcePacket = buildFeeKnowledgeSourcePacket({ analysis, registry: null });
     const packet = buildWholeStatementFeeIntelligencePacket(analysis, { approvedExternalSourceRefs: [] }, sourcePacket);
@@ -26,6 +33,36 @@ describe("canonical whole-statement admission", () => {
     expect(capability).toMatchObject({ status: "completed", groundingStatus: "grounded", executionRef: result.admission.executionRef });
     expect(financialProjection(result.analysis)).toEqual(before);
     expect(validateCanonicalAiAdmissionAudit(result.aiAdmissionAudit)).toEqual([]);
+  });
+
+  it("carries admitted fee-knowledge resolution intelligence through the normal admission rebuild", () => {
+    const analysis = syntheticAnalysisWithFeeRow();
+    const row = analysis.feeLedger.rows[0]!;
+    const intelligence = buildFeeKnowledgeIntelligenceRecord({
+      feeRowRef: row.id,
+      origin: "statement_grounded",
+      state: "investigation_lead",
+      subject: "investigation_question",
+      summary: "A processor explanation is required before a stronger conclusion.",
+      reasonCodes: ["processor_explanation_required"],
+      confidence: "low",
+      actionabilityCeiling: "verify_only",
+      merchantActionability: "merchant_display_provisional",
+      proofRequirement: "human_review_required",
+      statementEvidenceRefs: row.contributionDecision.evidenceRefs,
+      resolutionRequirement: "public_evidence_unavailable",
+    });
+    const sourcePacket = buildFeeKnowledgeSourcePacket({ analysis, registry: null, runtimeIntelligence: [intelligence] });
+    const packet = buildWholeStatementFeeIntelligencePacket(analysis, { approvedExternalSourceRefs: [] }, sourcePacket);
+    const validation = validateWholeStatementFeeIntelligenceReview(validReview(packet), analysis, { approvedExternalSourceRefs: [] }, sourcePacket);
+    const result = admitWholeStatementFeeIntelligence({ analysis, validation, sourcePacket });
+    const item = result.analysis.merchantAttention.items.find((candidate) => candidate.feeRowIds.includes(row.id))!;
+
+    expect(result.admission.admissionDisposition).toBe("admitted");
+    expect(item.sourceIntelligenceRefs).toContain(intelligence.intelligenceId);
+    expect(item.resolution.requirement).toBe("processor_explanation_required");
+    expect(item.questionToResolve?.requirement).toBe("processor_explanation_required");
+    expect(item.sourceIntelligenceRefs).toContain("ai_output_whole_statement_fee_intelligence_review");
   });
 
   it("fails closed on unsafe review output and retains only a fresh internal execution reference", () => {
@@ -141,6 +178,68 @@ function syntheticAnalysis(): CanonicalStatementAnalysis {
     sourceAnalysisId: "package_5b_synthetic",
     sourceFileName: null,
   });
+}
+
+function syntheticAnalysisWithFeeRow(): CanonicalStatementAnalysis {
+  const doc = syntheticDocument();
+  const analysis = syntheticAnalysis();
+  const evidence = new Map<string, CanonicalEvidenceRecord>();
+  const calculations: CanonicalStatementAnalysis["calculations"] = [];
+  analysis.feeLedger = buildCanonicalFeeLedger({
+    doc,
+    documentId: "doc_package_2_fee_knowledge_bridge",
+    matched: { driverId: "synthetic_parser", driverName: "Synthetic parser" },
+    evidence,
+    calculations,
+    parserOutput: {
+      feeLedger: {
+        rows: [{
+          description: "VISA INTERCHANGE",
+          amount: 10,
+          sourceSection: "Interchange Charges",
+          evidenceLine: "VISA INTERCHANGE | -$10.00",
+          pageNumber: 1,
+          rowIndex: 0,
+          confidence: "high",
+        }],
+        controls: [{ label: "Total Fees", rowSum: 10, printedTotal: 10, delta: 0, evidenceLine: "Total Fees | -$10.00" }],
+        printedTotal: 10,
+        delta: 0,
+      },
+    },
+  });
+  analysis.evidence = [...analysis.evidence, ...evidence.values()];
+  analysis.calculations = [...analysis.calculations, ...calculations];
+  analysis.feeOwnershipActionability = buildCanonicalFeeOwnershipActionability(analysis.feeLedger, {
+    processorFamily: "fiserv",
+    statementPeriodStart: "2026-01-01",
+  });
+  analysis.opportunityEngine = buildCanonicalOpportunityEngine({
+    feeLedger: analysis.feeLedger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    evidence: analysis.evidence,
+    statementPeriodVerified: true,
+  });
+  analysis.aiCapabilities = buildCanonicalAiCapabilities({
+    identity: analysis.identity,
+    businessQualification: analysis.businessQualification,
+    financialFacts: analysis.financialFacts,
+    feeLedger: analysis.feeLedger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    opportunityEngine: analysis.opportunityEngine,
+    evidence: analysis.evidence,
+  });
+  analysis.customerState = buildCanonicalCustomerState({
+    identity: analysis.identity,
+    financialFacts: analysis.financialFacts,
+    feeLedger: analysis.feeLedger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    opportunityEngine: analysis.opportunityEngine,
+    aiCapabilities: analysis.aiCapabilities,
+    rateComparison: analysis.customerState.rateComparison,
+  });
+  analysis.merchantAttention = buildCanonicalMerchantAttentionModel(analysis);
+  return analysis;
 }
 
 function syntheticDocument(): ParsedDocument {

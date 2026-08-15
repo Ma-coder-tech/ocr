@@ -1438,6 +1438,233 @@ export type CanonicalCustomerStateProjection = {
   limitations: string[];
 };
 
+export type CanonicalMerchantAttentionType =
+  | "pricing_review"
+  | "potential_negotiation"
+  | "explanation_or_itemization"
+  | "compliance_or_remediation"
+  | "configuration_or_payment_practice_review"
+  | "service_use_review"
+  | "monitor"
+  | "informational";
+
+export type CanonicalMerchantAttentionPriority = "routine" | "review" | "high_priority";
+
+export type CanonicalMerchantAttentionEvidenceStatus =
+  | "statement_confirmed"
+  | "supported_interpretation"
+  | "public_documentation_supported"
+  | "needs_merchant_pricing_agreement"
+  | "needs_additional_statement_history"
+  | "needs_processor_explanation"
+  | "unresolved";
+
+export type CanonicalMerchantAttentionResolutionRequirement =
+  | "no_additional_evidence_required"
+  | "public_documentation_required"
+  | "merchant_pricing_agreement_required"
+  | "additional_statement_history_required"
+  | "deterministic_math_required"
+  | "processor_explanation_required"
+  | "unresolved_review_required";
+
+export type CanonicalMerchantAttentionSafeActionType =
+  | "review_documentation"
+  | "verify_charge"
+  | "request_explanation"
+  | "request_itemization"
+  | "check_service_use"
+  | "review_configuration"
+  | "request_pricing_review"
+  | "monitor"
+  | "request_removal"
+  | "request_repricing"
+  | "no_action";
+
+export type CanonicalMerchantAttentionEvidenceBoundary = {
+  statementProof: {
+    kind: "observed_charge" | "qualified_rate_position";
+    feeRowId: string | null;
+    observedLabel: string | null;
+    observedAmount: MoneyAmount | null;
+    ratePosition: CanonicalQualifiedRatePosition | null;
+    evidenceRefs: string[];
+  };
+  reasonableConclusion: {
+    summary: string;
+    basis: "deterministic_policy" | "admitted_intelligence" | "qualified_reference";
+    confidence: CanonicalFeeClassificationConfidence;
+    reasonRefs: string[];
+  };
+  remainingUncertainty: string[];
+};
+
+export type CanonicalMerchantAttentionQuestion = {
+  questionId: string;
+  attentionItemId: string;
+  question: string;
+  amountUnderReview: MoneyAmount | null;
+  whatRateRevealKnows: string;
+  whatRemainsUncertain: string;
+  safeNextStep: string;
+  requirement: CanonicalMerchantAttentionResolutionRequirement;
+  requiredEvidenceOrConfirmation: string[];
+  evidenceRefs: string[];
+  reasonRefs: string[];
+  amountIsSavings: false;
+};
+
+export type CanonicalMerchantAttentionActionToolkit = {
+  moduleId: string;
+  attentionItemId: string;
+  actionType: CanonicalMerchantAttentionSafeActionType;
+  whatToDo: string;
+  why: string;
+  statementEvidenceRefs: string[];
+  exactAsk: string | null;
+  requestDocumentation: string[];
+  unclearAnswerFollowUp: string | null;
+  avoidClaiming: string[];
+  successCriteria: string[];
+};
+
+export type CanonicalMerchantAttentionItem = {
+  id: string;
+  policyVersion: "canonical_merchant_attention_v1";
+  scope: "fee_row" | "statement_pricing";
+  feeRowIds: string[];
+  merchantTitle: string;
+  whyThisDeservesAttention: string;
+  originalObservedStatementLabel: string | null;
+  observedAmount: MoneyAmount | null;
+  category: CanonicalFeeCategory | "statement_pricing";
+  likelyOwner: {
+    economicBeneficiary: CanonicalFeeParty;
+    contractualController: CanonicalFeeParty;
+  } | null;
+  attentionType: CanonicalMerchantAttentionType;
+  priority: CanonicalMerchantAttentionPriority;
+  evidenceStatus: CanonicalMerchantAttentionEvidenceStatus;
+  confidence: CanonicalFeeClassificationConfidence;
+  evidenceBoundary: CanonicalMerchantAttentionEvidenceBoundary;
+  conflict: {
+    status: "none" | "resolved" | "unresolved";
+    summary: string | null;
+  };
+  resolution: {
+    requirement: CanonicalMerchantAttentionResolutionRequirement;
+    merchantMeaning: string;
+    documentationNeeded: string[];
+  };
+  safestNextAction: {
+    actionType: CanonicalMerchantAttentionSafeActionType;
+    instruction: string;
+  };
+  actionabilityCeiling: CanonicalFeeActionability;
+  opportunityLink: {
+    componentRefs: string[];
+    linkageOnly: true;
+    moneyRecomputed: false;
+  } | null;
+  questionToResolve: CanonicalMerchantAttentionQuestion | null;
+  actionToolkit: CanonicalMerchantAttentionActionToolkit | null;
+  surfaceEligibility: {
+    priorityFinding: boolean;
+    questionsToResolve: boolean;
+    actionToolkit: boolean;
+    feeInventory: boolean;
+  };
+  inventoryDisposition: "attention_review" | "unresolved_review" | "routine_context" | "statement_level_only";
+  reasonCodes: string[];
+  evidenceRefs: string[];
+  sourceIntelligenceRefs: string[];
+  merchantLanguageEligibility: {
+    policyVersion: "merchant_attention_language_eligibility_v1";
+    eligibleForAiInterpretation: boolean;
+    reasonCodes: string[];
+  };
+  merchantLanguageSource: "admitted_ai_interpretation" | "deterministic_fallback";
+};
+
+export type CanonicalMerchantAttentionAiInterpretationOutput = {
+  type: "merchant_attention_ai_interpretation";
+  policyVersion: "merchant_attention_ai_interpretation_v1";
+  outputId: string;
+  items: Array<{
+    attentionItemId: string;
+    merchantTitle: string;
+    whyThisDeservesAttention: string;
+    reasonableConclusion: string;
+    remainingUncertainty: string[];
+    safeNextAction: string;
+    resolutionMeaning: string;
+    question: null | {
+      question: string;
+      whatRateRevealKnows: string;
+      whatRemainsUncertain: string;
+      safeNextStep: string;
+    };
+    actionToolkit: null | {
+      whatToDo: string;
+      why: string;
+      exactAsk: string | null;
+      unclearAnswerFollowUp: string | null;
+      avoidClaiming: string[];
+      successCriteria: string[];
+    };
+    semanticSupportRefs: string[];
+  }>;
+  authoritative: false;
+  financialMutationAllowed: false;
+  providerDetailsStripped: true;
+};
+
+export type CanonicalMerchantAttentionModel = {
+  policyVersion: "canonical_merchant_attention_v1";
+  status: "available" | "empty" | "partial";
+  items: CanonicalMerchantAttentionItem[];
+  summary: {
+    itemCount: number;
+    highPriorityCount: number;
+    reviewCount: number;
+    routineCount: number;
+    questionCount: number;
+    actionToolkitCount: number;
+  };
+  sourcePolicyVersions: {
+    feeLedger: "canonical_fee_ledger_v1";
+    ownershipActionability: "fee_ownership_actionability_v1";
+    opportunityEngine: "canonical_opportunity_engine_v1";
+    aiCapabilityBoundary: "canonical_ai_capability_boundary_v1";
+    customerBenchmark: "canonical_customer_benchmark_policy_v1";
+  };
+  interpretation: {
+    policyVersion: "merchant_attention_ai_interpretation_v1";
+    normalPathRequirement: "ai_interpretation_required";
+    source: "admitted_ai_interpretation" | "deterministic_fallback";
+    readiness: "ready" | "degraded_fallback";
+    authoritative: false;
+    financialMutationAllowed: false;
+    outputRef: string | null;
+    admission: {
+      schemaValidated: boolean;
+      canonicalLinkageValidated: boolean;
+      actionabilityCeilingValidated: boolean;
+      privacyValidated: boolean;
+      reasonCodes: string[];
+    };
+    coverage: {
+      policyVersion: "merchant_attention_language_eligibility_v1";
+      eligibleItemCount: number;
+      admittedItemCount: number;
+      deterministicRoutineItemCount: number;
+      exactEligibleCoverage: boolean;
+    };
+    fallbackReasonCodes: string[];
+  };
+  limitations: string[];
+};
+
 export type CanonicalFeeLedgerControlType =
   | "printed_charge_sum"
   | "rate_times_volume"
@@ -1535,6 +1762,7 @@ export type CanonicalAnalysisVersionManifest = {
   customerVisibilityPolicyVersion: "canonical_customer_visibility_v1";
   customerActionGuidancePolicyVersion: "canonical_customer_action_guidance_v1";
   customerWordingPolicyVersion: "canonical_customer_wording_v1";
+  merchantAttentionPolicyVersion: "canonical_merchant_attention_v1";
   parserId: string | null;
   parserVersion: string | null;
   extractionVersion: string;
@@ -1559,6 +1787,7 @@ export type CanonicalStatementAnalysis = {
   opportunityEngine: CanonicalOpportunityEngine;
   aiCapabilities: CanonicalAiCapabilityLayer;
   customerState: CanonicalCustomerStateProjection;
+  merchantAttention: CanonicalMerchantAttentionModel;
   evidence: CanonicalEvidenceRecord[];
   calculations: CanonicalCalculationRecord[];
   validation: CanonicalValidationState;

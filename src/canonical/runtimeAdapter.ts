@@ -12,7 +12,7 @@ import {
   type RuntimeAiCapabilitySnapshot,
 } from "./runtimeAiCapabilityAdapter.js";
 import {
-  runWholeStatementFeeIntelligenceRuntime,
+  runWholeStatementFeeIntelligenceRuntimeWithContext,
   type WholeStatementFeeIntelligenceRuntimeOptions,
 } from "./wholeStatementFeeIntelligenceRuntime.js";
 import {
@@ -20,6 +20,7 @@ import {
   buildDeterministicRuntimeSafetyReview,
 } from "./deterministicRuntimeSafetyReview.js";
 import { validateCanonicalStatementAnalysis } from "./validate.js";
+import { buildCanonicalMerchantAttentionModel } from "./merchantAttention.js";
 import type { BusinessTypeId } from "../businessTypes.js";
 import type { CanonicalBusinessProfileInput } from "./businessQualification.js";
 import type { ParsedDocument } from "../parser.js";
@@ -32,6 +33,7 @@ import type {
   CanonicalAiWholeStatementFeeIntelligenceOutput,
   CanonicalStatementAnalysis,
 } from "./types.js";
+import type { FeeKnowledgeIntelligenceRecord } from "./feeKnowledgeTypes.js";
 
 export type CanonicalRuntimeInputAdmissionStatus =
   | "canonical_evidence"
@@ -201,22 +203,9 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
           harnessInputs,
           deterministicRuntimeSafetyReview,
         });
-  const finalAnalysis =
-    harnessInputs.length === 0 && !deterministicRuntimeSafetyReview
-      ? analysis
-      : validateCanonicalStatementAnalysis({
-          ...analysis,
-          aiCapabilities,
-          customerState: buildCanonicalCustomerState({
-            identity: analysis.identity,
-            financialFacts: analysis.financialFacts,
-            feeLedger: analysis.feeLedger,
-            feeOwnershipActionability: analysis.feeOwnershipActionability,
-            opportunityEngine: analysis.opportunityEngine,
-            aiCapabilities,
-            rateComparison: analysis.customerState.rateComparison,
-          }),
-        });
+  const finalAnalysis = harnessInputs.length === 0 && !deterministicRuntimeSafetyReview
+    ? analysis
+    : rebuildCustomerProjectionLayers(analysis, aiCapabilities);
 
   return {
     analysis: finalAnalysis,
@@ -245,10 +234,11 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     summary: legacySummary,
     analysis,
   });
-  const wholeStatementOutput = await runWholeStatementFeeIntelligenceRuntime({
+  const wholeStatementRuntime = await runWholeStatementFeeIntelligenceRuntimeWithContext({
     analysis,
     options: input.wholeStatementFeeIntelligence,
   });
+  const wholeStatementOutput = wholeStatementRuntime.output;
   const wholeStatementHarnessInput: CanonicalAiCapabilityHarnessInput = {
     capability: "whole_statement_fee_intelligence_review",
     status: wholeStatementOutput.reviewStatus === "partial" ? "completed" : wholeStatementOutput.reviewStatus,
@@ -280,19 +270,13 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     harnessInputs,
     deterministicRuntimeSafetyReview,
   });
-  const finalAnalysis = validateCanonicalStatementAnalysis({
-    ...analysis,
+  const finalAnalysis = rebuildCustomerProjectionLayers(
+    analysis,
     aiCapabilities,
-    customerState: buildCanonicalCustomerState({
-      identity: analysis.identity,
-      financialFacts: analysis.financialFacts,
-      feeLedger: analysis.feeLedger,
-      feeOwnershipActionability: analysis.feeOwnershipActionability,
-      opportunityEngine: analysis.opportunityEngine,
-      aiCapabilities,
-      rateComparison: analysis.customerState.rateComparison,
-    }),
-  });
+    ["completed", "partial"].includes(wholeStatementOutput.reviewStatus)
+      ? wholeStatementRuntime.feeKnowledgeIntelligence
+      : [],
+  );
 
   return {
     analysis: finalAnalysis,
@@ -317,6 +301,27 @@ function runtimeBusinessProfile(
     },
     market: profile?.market ?? "US",
   };
+}
+
+function rebuildCustomerProjectionLayers(
+  analysis: CanonicalStatementAnalysis,
+  aiCapabilities: CanonicalStatementAnalysis["aiCapabilities"],
+  feeKnowledgeIntelligence: readonly FeeKnowledgeIntelligenceRecord[] = [],
+): CanonicalStatementAnalysis {
+  const customerState = buildCanonicalCustomerState({
+    identity: analysis.identity,
+    financialFacts: analysis.financialFacts,
+    feeLedger: analysis.feeLedger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    opportunityEngine: analysis.opportunityEngine,
+    aiCapabilities,
+    rateComparison: analysis.customerState.rateComparison,
+  });
+  const candidate = { ...analysis, aiCapabilities, customerState };
+  return validateCanonicalStatementAnalysis({
+    ...candidate,
+    merchantAttention: buildCanonicalMerchantAttentionModel(candidate, { feeKnowledgeIntelligence }),
+  });
 }
 
 export function canonicalRuntimeInputAdmissionTable(): CanonicalRuntimeInputAdmission[] {
