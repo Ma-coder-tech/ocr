@@ -10,6 +10,7 @@ import {
 } from "./aiAdmissionDiagnostics.js";
 import { buildCanonicalAiCapabilities, type CanonicalAiCapabilityHarnessInput } from "./buildCanonicalAiCapabilities.js";
 import { buildCanonicalCustomerState } from "./customerStateResolver.js";
+import { buildCanonicalMerchantAttentionModel } from "./merchantAttention.js";
 import {
   buildCanonicalClaimSupportDecision,
   calculateRuntimeClaimSupportDecisionRef,
@@ -401,19 +402,7 @@ function rebuildWholeStatementCapability(
     harnessInputs,
     deterministicRuntimeSafetyReview: analysis.aiCapabilities.deterministicRuntimeSafetyReview,
   });
-  return validateCanonicalStatementAnalysis({
-    ...structuredClone(analysis),
-    aiCapabilities,
-    customerState: buildCanonicalCustomerState({
-      identity: analysis.identity,
-      financialFacts: analysis.financialFacts,
-      feeLedger: analysis.feeLedger,
-      feeOwnershipActionability: analysis.feeOwnershipActionability,
-      opportunityEngine: analysis.opportunityEngine,
-      aiCapabilities,
-      rateComparison: analysis.customerState.rateComparison,
-    }),
-  });
+  return rebuildAttentionProjection(analysis, aiCapabilities);
 }
 
 function rebuildWithExtraCapability(
@@ -439,18 +428,26 @@ function rebuildWithExtraCapability(
     harnessInputs,
     deterministicRuntimeSafetyReview: analysis.aiCapabilities.deterministicRuntimeSafetyReview,
   });
-  return validateCanonicalStatementAnalysis({
-    ...structuredClone(analysis),
+  return rebuildAttentionProjection(analysis, aiCapabilities);
+}
+
+function rebuildAttentionProjection(
+  analysis: CanonicalStatementAnalysis,
+  aiCapabilities: CanonicalStatementAnalysis["aiCapabilities"],
+): CanonicalStatementAnalysis {
+  const customerState = buildCanonicalCustomerState({
+    identity: analysis.identity,
+    financialFacts: analysis.financialFacts,
+    feeLedger: analysis.feeLedger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    opportunityEngine: analysis.opportunityEngine,
     aiCapabilities,
-    customerState: buildCanonicalCustomerState({
-      identity: analysis.identity,
-      financialFacts: analysis.financialFacts,
-      feeLedger: analysis.feeLedger,
-      feeOwnershipActionability: analysis.feeOwnershipActionability,
-      opportunityEngine: analysis.opportunityEngine,
-      aiCapabilities,
-      rateComparison: analysis.customerState.rateComparison,
-    }),
+    rateComparison: analysis.customerState.rateComparison,
+  });
+  const candidate = { ...structuredClone(analysis), aiCapabilities, customerState };
+  return validateCanonicalStatementAnalysis({
+    ...candidate,
+    merchantAttention: buildCanonicalMerchantAttentionModel(candidate),
   });
 }
 

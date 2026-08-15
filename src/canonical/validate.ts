@@ -15,6 +15,7 @@ import {
 } from "./customerStateTypes.js";
 import { aggregateCanonicalOpportunityComponents } from "./opportunityEngine.js";
 import { targetSupportsApprovedEstimate, targetSupportsDeterministic } from "./opportunityPolicy.js";
+import { validateCanonicalMerchantAttentionModel } from "./merchantAttention.js";
 import type {
   CanonicalCustomerPermissionKey,
   CanonicalFeeLedgerControl,
@@ -116,6 +117,9 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   }
   if (analysis.versionManifest?.opportunityEnginePolicyVersion !== "canonical_opportunity_engine_v1") {
     errors.push("Canonical version manifest must include canonical_opportunity_engine_v1.");
+  }
+  if (analysis.versionManifest?.merchantAttentionPolicyVersion !== "canonical_merchant_attention_v1") {
+    errors.push("Canonical version manifest must include canonical_merchant_attention_v1.");
   }
   if (analysis.versionManifest?.opportunityTargetPolicyVersion !== "opportunity_target_policy_v1") {
     errors.push("Canonical version manifest must include opportunity_target_policy_v1.");
@@ -449,6 +453,7 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   validateBusinessQualification(analysis, evidenceIds, errors);
   validateCanonicalAiCapabilityLayer(analysis, errors);
   validateCanonicalCustomerState(analysis, evidenceIds, calculationIds, calculationsById, errors);
+  errors.push(...validateCanonicalMerchantAttentionModel(analysis));
 
   const validated: CanonicalStatementAnalysis = {
     ...analysis,

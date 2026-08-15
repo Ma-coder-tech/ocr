@@ -20,6 +20,7 @@ import {
   buildDeterministicRuntimeSafetyReview,
 } from "./deterministicRuntimeSafetyReview.js";
 import { validateCanonicalStatementAnalysis } from "./validate.js";
+import { buildCanonicalMerchantAttentionModel } from "./merchantAttention.js";
 import type { BusinessTypeId } from "../businessTypes.js";
 import type { CanonicalBusinessProfileInput } from "./businessQualification.js";
 import type { ParsedDocument } from "../parser.js";
@@ -201,22 +202,9 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
           harnessInputs,
           deterministicRuntimeSafetyReview,
         });
-  const finalAnalysis =
-    harnessInputs.length === 0 && !deterministicRuntimeSafetyReview
-      ? analysis
-      : validateCanonicalStatementAnalysis({
-          ...analysis,
-          aiCapabilities,
-          customerState: buildCanonicalCustomerState({
-            identity: analysis.identity,
-            financialFacts: analysis.financialFacts,
-            feeLedger: analysis.feeLedger,
-            feeOwnershipActionability: analysis.feeOwnershipActionability,
-            opportunityEngine: analysis.opportunityEngine,
-            aiCapabilities,
-            rateComparison: analysis.customerState.rateComparison,
-          }),
-        });
+  const finalAnalysis = harnessInputs.length === 0 && !deterministicRuntimeSafetyReview
+    ? analysis
+    : rebuildCustomerProjectionLayers(analysis, aiCapabilities);
 
   return {
     analysis: finalAnalysis,
@@ -280,19 +268,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     harnessInputs,
     deterministicRuntimeSafetyReview,
   });
-  const finalAnalysis = validateCanonicalStatementAnalysis({
-    ...analysis,
-    aiCapabilities,
-    customerState: buildCanonicalCustomerState({
-      identity: analysis.identity,
-      financialFacts: analysis.financialFacts,
-      feeLedger: analysis.feeLedger,
-      feeOwnershipActionability: analysis.feeOwnershipActionability,
-      opportunityEngine: analysis.opportunityEngine,
-      aiCapabilities,
-      rateComparison: analysis.customerState.rateComparison,
-    }),
-  });
+  const finalAnalysis = rebuildCustomerProjectionLayers(analysis, aiCapabilities);
 
   return {
     analysis: finalAnalysis,
@@ -317,6 +293,26 @@ function runtimeBusinessProfile(
     },
     market: profile?.market ?? "US",
   };
+}
+
+function rebuildCustomerProjectionLayers(
+  analysis: CanonicalStatementAnalysis,
+  aiCapabilities: CanonicalStatementAnalysis["aiCapabilities"],
+): CanonicalStatementAnalysis {
+  const customerState = buildCanonicalCustomerState({
+    identity: analysis.identity,
+    financialFacts: analysis.financialFacts,
+    feeLedger: analysis.feeLedger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    opportunityEngine: analysis.opportunityEngine,
+    aiCapabilities,
+    rateComparison: analysis.customerState.rateComparison,
+  });
+  const candidate = { ...analysis, aiCapabilities, customerState };
+  return validateCanonicalStatementAnalysis({
+    ...candidate,
+    merchantAttention: buildCanonicalMerchantAttentionModel(candidate),
+  });
 }
 
 export function canonicalRuntimeInputAdmissionTable(): CanonicalRuntimeInputAdmission[] {
