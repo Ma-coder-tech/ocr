@@ -30,6 +30,6 @@
       "visibility": "private"
     }
   },
-  "postCreateCommand": "npm install && npm run build:all",
+  "postCreateCommand": "npm install --include=dev && npm run build:all",
   "postStartCommand": "npm run staging:daemon"
 }

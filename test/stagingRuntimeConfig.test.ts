@@ -25,6 +25,7 @@ describe("Package 4A staging configuration", () => {
       VITE_RATEREVEAL_REPORT_V2_ENABLED: "true",
     });
     expect(config.remoteEnv).not.toHaveProperty("OPENAI_API_KEY");
+    expect(config.postCreateCommand).toBe("npm install --include=dev && npm run build:all");
   });
 
   it("refuses to start without the securely injected OpenAI credential", () => {
