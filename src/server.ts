@@ -479,6 +479,7 @@ async function cleanupOldFiles(dir: string, retentionHours: number): Promise<voi
 }
 
 async function writeUploadedFile(file: File, finalPath: string): Promise<void> {
+  await fs.mkdir(path.dirname(finalPath), { recursive: true });
   const source = Readable.fromWeb(file.stream() as unknown as NodeReadableStream<Uint8Array>);
   await pipeline(source, createWriteStream(finalPath));
 }
