@@ -1,4 +1,7 @@
-import { validateProductionReportProjection } from "./productionReportProjectionValidation.js";
+import {
+  validateProductionReportProjection,
+  validateProductionReportProjectionAgainstCanonical,
+} from "./productionReportProjectionValidation.js";
 import {
   PRODUCTION_REPORT_PROJECTION_SCHEMA_VERSION,
   type ProductionMerchantLanguageSource,
@@ -6,6 +9,7 @@ import {
   type ProductionReportablePayload,
 } from "./productionReportProjectionTypes.js";
 import type {
+  CanonicalCustomerPermissionKey,
   CanonicalFeeCategory,
   CanonicalFeeRow,
   CanonicalMerchantAttentionItem,
@@ -16,56 +20,54 @@ import type {
 const USD = "USD" as const;
 
 export function buildProductionReportProjection(analysis: CanonicalStatementAnalysis): ProductionReportProjection {
+  const visibility = visibilityCeiling(analysis);
   const header = {
     title: "Your RateReveal statement review" as const,
+    merchantName: selectedCustomerIdentity(analysis.identity.merchantName),
     processor: selectedString(analysis.identity.processorName),
     statementPeriod: analysis.identity.statementPeriod.status === "selected" ? analysis.identity.statementPeriod.value : null,
+    statementScope: "One statement analyzed." as const,
   };
-  if (!reportable(analysis)) {
-    return assertValid({
+  if (!reportable(analysis, visibility)) {
+    return assertValid(analysis, {
       schemaVersion: PRODUCTION_REPORT_PROJECTION_SCHEMA_VERSION,
       experience: "unable_to_complete",
       header,
-      recovery: {
-        title: "We couldn't complete this statement review",
-        explanation: "The statement did not provide enough safe, consistent information to calculate the core results.",
-        nextSteps: ["Upload a complete processor statement.", "Make sure the statement includes sales and total fees."],
-      },
+      recovery: recoveryFor(analysis),
       report: null,
     });
   }
 
-  const questions = projectQuestions(analysis);
-  const experience = questions.length > 0 ? "analysis_available_with_open_questions" : "analysis_completed";
+  const questions = projectQuestions(analysis, visibility);
+  const questionContext = openQuestionContext(analysis, visibility);
+  const experience = questionContext.length > 0 || questions.length > 0
+    ? "analysis_available_with_open_questions"
+    : "analysis_completed";
   const languageSource: ProductionMerchantLanguageSource = analysis.merchantAttention.interpretation.source === "admitted_ai_interpretation"
     ? "ai_assisted"
     : "deterministic_fallback";
   const report: ProductionReportablePayload = {
     merchantLanguage: { source: languageSource, degraded: languageSource === "deterministic_fallback" },
-    hero: hero(analysis),
-    snapshot: {
-      heading: "Statement snapshot",
-      processedSales: analysis.financialFacts.processedSales.value!,
-      totalFees: analysis.financialFacts.totalFees.value!,
-      ...(transactionCount(analysis) ? { transactionCount: transactionCount(analysis)! } : {}),
-    },
-    trustStrip: trustStrip(analysis),
-    composition: composition(analysis),
-    priorityFindings: findings(analysis, languageSource),
+    hero: hero(analysis, visibility),
+    snapshot: snapshot(analysis, visibility),
+    trustStrip: trustStrip(analysis, visibility),
+    composition: composition(analysis, visibility),
+    priorityFindings: findings(analysis, languageSource, visibility),
     openQuestions: {
       heading: "What still needs checking",
-      status: questions.length ? "shown" : "omitted",
+      status: questions.length || questionContext.length ? "shown" : "omitted",
+      context: questionContext,
       items: questions,
     },
-    allCharges: allCharges(analysis),
-    nextActions: nextActions(analysis),
+    allCharges: allCharges(analysis, visibility),
+    nextActions: nextActions(analysis, visibility),
     methodology: {
       heading: "How RateReveal reviewed this statement",
-      disclosures: [
-        "RateReveal calculates the effective rate from the processed sales and total fees supported by this statement.",
+      disclosures: visibility.customerExplanation ? [
+        ...(visibility.effectiveRate ? ["RateReveal calculates the effective rate from the processed sales and total fees supported by this statement."] : []),
         "Charge explanations are limited to what the statement and accepted reference material support. Uncertain items stay marked for checking.",
         "Reference ranges provide context only. They do not create a savings or overpayment amount.",
-      ],
+      ] : [],
     },
     saveReport: {
       status: "planned_unavailable",
@@ -83,22 +85,80 @@ export function buildProductionReportProjection(analysis: CanonicalStatementAnal
       callToAction: { label: "Compare 3–6 more months", implemented: false },
     },
   };
-  return assertValid({ schemaVersion: PRODUCTION_REPORT_PROJECTION_SCHEMA_VERSION, experience, header, recovery: null, report });
+  return assertValid(analysis, { schemaVersion: PRODUCTION_REPORT_PROJECTION_SCHEMA_VERSION, experience, header, recovery: null, report });
 }
 
-function reportable(analysis: CanonicalStatementAnalysis): boolean {
-  return analysis.validation.status !== "invalid"
-    && analysis.financialFacts.processedSales.status === "selected"
+type VisibilityCeiling = {
+  coreMetrics: boolean;
+  effectiveRate: boolean;
+  benchmark: boolean;
+  feeInventory: boolean;
+  ownershipActionability: boolean;
+  evidenceCalculations: boolean;
+  verificationAmounts: boolean;
+  actions: boolean;
+  customerExplanation: boolean;
+};
+
+function visibilityCeiling(analysis: CanonicalStatementAnalysis): VisibilityCeiling {
+  const visible = analysis.customerState.visibility;
+  return {
+    coreMetrics: visible.showCoreMetrics && permissionPermitted(analysis, "core_metrics"),
+    effectiveRate: visible.showEffectiveRate && permissionPermitted(analysis, "effective_rate"),
+    benchmark: visible.showBenchmark && permissionPermitted(analysis, "benchmark"),
+    feeInventory: visible.showFeeInventory && permissionPermitted(analysis, "fee_inventory"),
+    ownershipActionability: visible.showOwnershipActionability && permissionPermitted(analysis, "ownership_actionability"),
+    evidenceCalculations: visible.showEvidenceCalculations && permissionPermitted(analysis, "evidence_calculations"),
+    verificationAmounts: visible.showVerificationAmounts && permissionPermitted(analysis, "verification_amounts"),
+    actions: visible.showActions
+      && permissionPermitted(analysis, "actions")
+      && visible.showFeeInventory
+      && permissionPermitted(analysis, "fee_inventory")
+      && visible.showOwnershipActionability
+      && permissionPermitted(analysis, "ownership_actionability"),
+    customerExplanation: visible.showCustomerExplanation && permissionPermitted(analysis, "customer_explanation"),
+  };
+}
+
+function reportable(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeiling): boolean {
+  const { analysisReadiness, dataIntegrity } = analysis.customerState.axes;
+  const withheld = analysis.customerState.primaryState === "unable_to_analyze"
+    || analysis.customerState.primaryState === "analysis_withheld"
+    || analysisReadiness === "unavailable"
+    || analysisReadiness === "withheld";
+  const coreSafe = !visibility.coreMetrics || (
+    analysis.financialFacts.processedSales.status === "selected"
     && (analysis.financialFacts.processedSales.value?.amountMinor ?? 0) > 0
     && analysis.financialFacts.totalFees.status === "selected"
     && analysis.financialFacts.totalFees.value !== null
-    && analysis.financialFacts.rateRevealCalculatedAllInRate.status === "selected"
-    && analysis.financialFacts.rateRevealCalculatedAllInRate.value !== null;
+  );
+  const rateSafe = !visibility.effectiveRate || (
+    analysis.financialFacts.rateRevealCalculatedAllInRate.status === "selected"
+    && analysis.financialFacts.rateRevealCalculatedAllInRate.value !== null
+  );
+  return analysis.validation.status !== "invalid"
+    && !withheld
+    && dataIntegrity !== "failed"
+    && dataIntegrity !== "unavailable"
+    && (visibility.coreMetrics || visibility.effectiveRate)
+    && coreSafe
+    && rateSafe
+    && analysis.identity.statementPeriod.status === "selected"
+    && analysis.identity.statementPeriod.value !== null;
 }
 
-function hero(analysis: CanonicalStatementAnalysis): ProductionReportablePayload["hero"] {
+function hero(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeiling): ProductionReportablePayload["hero"] {
+  if (!visibility.effectiveRate) return {
+    status: "omitted",
+    heading: "Your effective rate",
+    effectiveRate: null,
+    benchmark: null,
+    benchmarkUnavailableMessage: null,
+    interpretation: null,
+    primaryNextAction: null,
+  };
   const comparison = analysis.customerState.rateComparison;
-  const benchmark = comparison.status === "qualified" && comparison.benchmarkRef?.range && qualifiedRange(comparison.benchmarkRef.range)
+  const benchmark = visibility.benchmark && comparison.status === "qualified" && comparison.benchmarkRef?.range && qualifiedRange(comparison.benchmarkRef.range)
     ? {
         label: comparison.benchmarkRef.displayLabel ?? "RateReveal reference range",
         range: { ...comparison.benchmarkRef.range },
@@ -108,20 +168,33 @@ function hero(analysis: CanonicalStatementAnalysis): ProductionReportablePayload
     : null;
   const position = benchmark ? comparison.position : "unavailable";
   return {
+    status: "shown",
     heading: "Your effective rate",
     effectiveRate: analysis.financialFacts.rateRevealCalculatedAllInRate.value!,
     benchmark,
     benchmarkUnavailableMessage: benchmark ? null : "A qualified reference range is not available for this statement. Your statement results are still available.",
-    interpretation: position === "above_reference"
+    interpretation: !visibility.customerExplanation ? null : position === "above_reference"
       ? "Your effective rate is above the qualified reference range. Review the specific charges below before drawing a conclusion."
       : position === "within_reference"
         ? "Your effective rate is within the qualified reference range. Individual charges may still deserve attention."
         : position === "below_reference"
           ? "Your effective rate is below the qualified reference range. Continue to review changes over time."
           : "This statement shows your effective rate, but there is not enough qualified context for a rate comparison.",
-    primaryNextAction: analysis.merchantAttention.items.some((item) => item.surfaceEligibility.actionToolkit)
+    primaryNextAction: !visibility.actions ? null : analysis.merchantAttention.items.some((item) => item.surfaceEligibility.actionToolkit)
       ? "Start with the highest-priority charge and ask the specific question shown below."
       : "Keep this report and compare future statements for changes.",
+  };
+}
+
+function snapshot(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeiling): ProductionReportablePayload["snapshot"] {
+  if (!visibility.coreMetrics) return { status: "omitted", heading: "Statement snapshot", processedSales: null, totalFees: null };
+  const count = transactionCount(analysis);
+  return {
+    status: "shown",
+    heading: "Statement snapshot",
+    processedSales: analysis.financialFacts.processedSales.value!,
+    totalFees: analysis.financialFacts.totalFees.value!,
+    ...(count ? { transactionCount: count } : {}),
   };
 }
 
@@ -142,19 +215,39 @@ function transactionCount(analysis: CanonicalStatementAnalysis): NonNullable<Pro
   return null;
 }
 
-function trustStrip(analysis: CanonicalStatementAnalysis): ProductionReportablePayload["trustStrip"] {
-  const comparison = analysis.customerState.rateComparison;
-  const qualifiedBenchmark = comparison.status === "qualified" && Boolean(comparison.benchmarkRef?.range && qualifiedRange(comparison.benchmarkRef.range));
+function trustStrip(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeiling): ProductionReportablePayload["trustStrip"] {
+  const items: ProductionReportablePayload["trustStrip"]["items"] = [];
+  if (visibility.coreMetrics) {
+    items.push(
+      { label: "Processed sales verified", status: analysis.financialFacts.processedSales.status === "selected" ? "confirmed" : "needs_checking" },
+      { label: "Processing fees verified", status: analysis.financialFacts.totalFees.status === "selected" ? "confirmed" : "needs_checking" },
+    );
+  }
+  if (visibility.evidenceCalculations) {
+    items.push({
+      label: "Charge and fee reconciliation",
+      status: analysis.customerState.axes.dataIntegrity === "reconciled" ? "confirmed" : "limited",
+    });
+  }
+  items.push({ label: "One-statement scope", status: "confirmed" });
   return {
-    items: [
-      { label: "Core statement totals", status: analysis.customerState.axes.dataIntegrity === "reconciled" ? "confirmed" : "limited" },
-      { label: "Charge coverage", status: analysis.feeLedger.status === "available" ? "confirmed" : "limited" },
-      { label: "Reference context", status: qualifiedBenchmark ? "confirmed" : "needs_checking" },
-    ],
+    status: items.length ? "shown" : "omitted",
+    items,
   };
 }
 
-function composition(analysis: CanonicalStatementAnalysis): ProductionReportablePayload["composition"] {
+function composition(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeiling): ProductionReportablePayload["composition"] {
+  if (!visibility.coreMetrics || !visibility.feeInventory || !visibility.ownershipActionability || !visibility.evidenceCalculations) return {
+    heading: "Where your fees went",
+    status: "omitted",
+    categories: [],
+    representedTotal: null,
+    statementFeeTotal: null,
+    difference: null,
+    reconciled: null,
+    disclosure: null,
+    accessibleSummary: "A fee breakdown is not available in this report.",
+  };
   const classification = new Map(analysis.feeOwnershipActionability.rowClassifications.map((row) => [row.feeRowId, row.selected.category]));
   const buckets = new Map<string, { label: string; amountMinor: number; rowCount: number }>();
   for (const row of safeChargeRows(analysis)) {
@@ -173,22 +266,38 @@ function composition(analysis: CanonicalStatementAnalysis): ProductionReportable
   const differenceMinor = feeMinor - representedMinor;
   const reconciled = differenceMinor === 0;
   const partial = analysis.feeLedger.status !== "available" || !reconciled || analysis.feeLedger.controls.some((control) => !["pass", "pass_with_rounding"].includes(control.status));
+  if (categories.length === 0) return {
+    heading: "Where your fees went",
+    status: "omitted",
+    categories: [],
+    representedTotal: null,
+    statementFeeTotal: null,
+    difference: null,
+    reconciled: null,
+    disclosure: null,
+    accessibleSummary: "No safe charge breakdown is available.",
+  };
   return {
     heading: "Where your fees went",
-    status: categories.length === 0 ? "omitted" : partial ? "partial" : "shown",
+    status: partial ? "partial" : "shown",
     categories,
     representedTotal: money(representedMinor),
     statementFeeTotal: money(feeMinor),
     difference: money(differenceMinor),
     reconciled,
     disclosure: partial ? "The visible charge rows do not fully account for the statement fee total, so this breakdown is partial." : null,
-    accessibleSummary: categories.length
-      ? categories.map((category) => `${category.label}: ${category.amount.amountMinor} cents`).join("; ")
-      : "No safe charge breakdown is available.",
+    accessibleSummary: categories.map((category) => `${category.label}: ${formatMoney(category.amount)}`).join("; "),
   };
 }
 
-function findings(analysis: CanonicalStatementAnalysis, languageSource: ProductionMerchantLanguageSource): ProductionReportablePayload["priorityFindings"] {
+function findings(
+  analysis: CanonicalStatementAnalysis,
+  languageSource: ProductionMerchantLanguageSource,
+  visibility: VisibilityCeiling,
+): ProductionReportablePayload["priorityFindings"] {
+  if (!visibility.feeInventory || !visibility.ownershipActionability || !visibility.customerExplanation) {
+    return { heading: "What deserves attention", status: "omitted", items: [] };
+  }
   const items = analysis.merchantAttention.items.filter((item) => item.surfaceEligibility.priorityFinding).map((item) => ({
     id: item.id,
     title: customerCopy(item.merchantTitle),
@@ -201,18 +310,20 @@ function findings(analysis: CanonicalStatementAnalysis, languageSource: Producti
   return { heading: "What deserves attention", status: items.length ? "shown" : "omitted", items };
 }
 
-function projectQuestions(analysis: CanonicalStatementAnalysis): ProductionReportablePayload["openQuestions"]["items"] {
-  const questions = analysis.merchantAttention.items.flatMap((item) => item.questionToResolve ? [{
+function projectQuestions(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeiling): ProductionReportablePayload["openQuestions"]["items"] {
+  const questions = visibility.feeInventory && visibility.ownershipActionability && visibility.customerExplanation
+    ? analysis.merchantAttention.items.flatMap((item) => item.questionToResolve ? [{
     id: item.questionToResolve.questionId,
     question: customerCopy(item.questionToResolve.question),
     whatRateRevealKnows: customerCopy(item.questionToResolve.whatRateRevealKnows),
     whatRemainsUncertain: customerCopy(item.questionToResolve.whatRemainsUncertain),
     safeNextStep: customerCopy(item.questionToResolve.safeNextStep),
-    amountUnderReview: item.questionToResolve.amountUnderReview,
+    amountUnderReview: visibility.verificationAmounts ? item.questionToResolve.amountUnderReview : null,
     amountIsSavings: false as const,
-  }] : []);
+  }] : [])
+    : [];
   const confirmation = analysis.businessQualification.confirmationRequirement;
-  if (confirmation) questions.push({
+  if (confirmation && visibility.customerExplanation) questions.push({
     id: "business_qualification_confirmation",
     question: customerCopy(confirmation.prompt),
     whatRateRevealKnows: "RateReveal kept your business declaration separate from the account coding shown by the processor.",
@@ -224,30 +335,48 @@ function projectQuestions(analysis: CanonicalStatementAnalysis): ProductionRepor
   return questions;
 }
 
-function allCharges(analysis: CanonicalStatementAnalysis): ProductionReportablePayload["allCharges"] {
+function allCharges(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeiling): ProductionReportablePayload["allCharges"] {
+  if (!visibility.feeInventory) return {
+    heading: "All charges on this statement",
+    status: "omitted",
+    defaultView: null,
+    completeness: "partial",
+    disclosure: null,
+    rows: [],
+  };
   const attentionByRow = new Map<string, CanonicalMerchantAttentionItem>();
   for (const item of analysis.merchantAttention.items) for (const rowId of item.feeRowIds) attentionByRow.set(rowId, item);
   const classification = new Map(analysis.feeOwnershipActionability.rowClassifications.map((row) => [row.feeRowId, row.selected.category]));
   const rows = inventoryRows(analysis).map((row) => {
     const attention = attentionByRow.get(row.id);
-    const disposition = attention?.inventoryDisposition === "unresolved_review" ? "unresolved" as const
+    const disposition = !visibility.ownershipActionability ? "informational" as const
+      : attention?.inventoryDisposition === "unresolved_review" ? "unresolved" as const
       : attention?.surfaceEligibility.priorityFinding ? "attention" as const
       : attention?.inventoryDisposition === "routine_context" ? "routine" as const
       : "informational" as const;
-    return { id: row.id, label: customerCopy(row.selectedLabel), amount: contributionAmount(row), category: classification.get(row.id) ?? "unknown", disposition };
+    return {
+      id: row.id,
+      label: customerCopy(row.selectedLabel),
+      amount: contributionAmount(row),
+      category: visibility.ownershipActionability ? classification.get(row.id) ?? "unknown" : "unclassified",
+      disposition,
+    };
   });
   const partial = analysis.feeLedger.status !== "available" || (rows.length === 0 && analysis.financialFacts.totalFees.value!.amountMinor > 0);
   return {
     heading: "All charges on this statement",
     status: partial ? "partial" : "shown",
-    defaultView: "attention",
+    defaultView: rows.some((row) => row.disposition === "attention" || row.disposition === "unresolved") ? "attention" : "all",
     completeness: partial ? "partial" : "complete",
     disclosure: partial ? "Some statement charges could not be safely represented as individual rows." : null,
     rows,
   };
 }
 
-function nextActions(analysis: CanonicalStatementAnalysis): ProductionReportablePayload["nextActions"] {
+function nextActions(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeiling): ProductionReportablePayload["nextActions"] {
+  if (!visibility.actions || !visibility.ownershipActionability) {
+    return { heading: "What to do next", status: "omitted", modules: [], guidance: null };
+  }
   const modules = analysis.merchantAttention.items.filter((item) => item.surfaceEligibility.actionToolkit && item.actionToolkit).map((item) => ({
     id: item.actionToolkit!.moduleId,
     title: item.actionToolkit!.actionType === "request_itemization" ? "Ask for a breakdown" : customerCopy(item.actionToolkit!.whatToDo),
@@ -262,6 +391,111 @@ function nextActions(analysis: CanonicalStatementAnalysis): ProductionReportable
     status: "guidance",
     modules: [],
     guidance: "No specific charge needs action from this statement alone. Keep the report and monitor future statements for new or changing charges.",
+  };
+}
+
+function openQuestionContext(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeiling): string[] {
+  if (!visibility.customerExplanation) return [];
+  const context: string[] = [];
+  const { analysisReadiness, dataIntegrity } = analysis.customerState.axes;
+  if (analysisReadiness === "limited" || analysis.customerState.primaryState === "analysis_limited") {
+    context.push("Some parts of this statement review remain limited and need follow-up before the review can be considered complete.");
+  }
+  if (dataIntegrity === "partially_reconciled") {
+    context.push("The available charge rows do not fully reconcile to the statement totals.");
+  }
+  if (analysis.customerState.primaryState === "verification_needed") {
+    context.push("At least one statement-supported item still requires verification.");
+  }
+  if (analysis.businessQualification.status === "confirmation_required" || analysis.businessQualification.confirmationRequirement) {
+    context.push("Business or processing details still need confirmation before all available context can be used.");
+  }
+  if (visibility.feeInventory && visibility.ownershipActionability && materialCoverageUnresolved(analysis)) {
+    context.push("At least one material charge or coverage item remains unresolved.");
+  }
+  if (!visibility.coreMetrics || !visibility.effectiveRate) {
+    context.push("Some financial fields are not available for customer display in this review.");
+  }
+  const materialCanonicalLimitation = [...analysis.customerState.reasonCodes, ...analysis.customerState.limitations]
+    .some((code) => /(?:verification|confirmation|reconciliation|coverage)_(?:required|incomplete)|analysis_limited/.test(code)
+      && !/(?:benchmark|provider|narrative|explanation)/.test(code));
+  if (materialCanonicalLimitation) {
+    context.push("The statement review includes a material limitation that requires follow-up.");
+  }
+  return [...new Set(context)];
+}
+
+function materialCoverageUnresolved(analysis: CanonicalStatementAnalysis): boolean {
+  return analysis.feeLedger.status !== "available"
+    || analysis.feeLedger.controls.some((control) => !["pass", "pass_with_rounding"].includes(control.status))
+    || analysis.feeLedger.rows.some((row) => row.role === "unknown_unresolved")
+    || analysis.feeOwnershipActionability.rowClassifications.some((row) => row.selected.category === "unknown_needs_review");
+}
+
+function recoveryFor(analysis: CanonicalStatementAnalysis): NonNullable<ProductionReportProjection["recovery"]> {
+  const signals = [
+    ...analysis.validation.errors,
+    ...analysis.validation.warnings,
+    ...analysis.customerState.reasonCodes,
+    ...analysis.customerState.limitations,
+    ...analysis.customerState.visibility.hiddenReasonCodes,
+  ].join(" ").toLowerCase();
+  if (analysis.customerState.primaryState === "analysis_withheld" || analysis.customerState.axes.analysisReadiness === "withheld") {
+    return {
+      title: "We couldn't complete this statement review",
+      reasonCode: "analysis_withheld",
+      explanation: "RateReveal could not safely present financial conclusions from this review.",
+      nextSteps: ["Review the statement details and resolve any verification request before trying again."],
+    };
+  }
+  if (
+    analysis.customerState.axes.dataIntegrity === "failed"
+    || [analysis.financialFacts.processedSales, analysis.financialFacts.totalFees].some((fact) => fact.status === "ambiguous")
+    || /conflict|inconsistent|unsafe total|reconciliation failed/.test(signals)
+  ) {
+    return {
+      title: "We couldn't complete this statement review",
+      reasonCode: "unsafe_or_conflicting_totals",
+      explanation: "The statement totals could not be reconciled safely enough to present financial results.",
+      nextSteps: ["Check that sales and fee totals are readable and internally consistent.", "If available, upload a clearer copy of the same statement."],
+    };
+  }
+  if (
+    [analysis.identity.statementPeriod, analysis.financialFacts.processedSales, analysis.financialFacts.totalFees].some((fact) => fact.status === "unsupported")
+    || /unsupported|unreadable|cannot read|ocr|extraction failed|parse failed/.test(signals)
+  ) {
+    return {
+      title: "We couldn't complete this statement review",
+      reasonCode: "unreadable_or_unsupported_input",
+      explanation: "RateReveal could not safely read this input as a supported processor statement.",
+      nextSteps: ["Upload a clear, text-readable statement from a supported processor.", "Avoid screenshots or cropped pages when a full statement file is available."],
+    };
+  }
+  if (analysis.identity.statementPeriod.status !== "selected" || /incomplete statement|missing page|cropped/.test(signals)) {
+    return {
+      title: "We couldn't complete this statement review",
+      reasonCode: "missing_or_incomplete_statement",
+      explanation: "The statement period or required statement coverage could not be verified.",
+      nextSteps: ["Upload the full statement, including every page and the statement-period summary."],
+    };
+  }
+  if (
+    analysis.financialFacts.processedSales.status !== "selected"
+    || analysis.financialFacts.totalFees.status !== "selected"
+    || analysis.financialFacts.rateRevealCalculatedAllInRate.status !== "selected"
+  ) {
+    return {
+      title: "We couldn't complete this statement review",
+      reasonCode: "missing_required_financial_facts",
+      explanation: "Required sales, fee, or effective-rate inputs could not be verified from this statement.",
+      nextSteps: ["Confirm that the statement includes its processed-sales and total-fees summaries.", "Upload a clearer copy if those totals are present but unreadable."],
+    };
+  }
+  return {
+    title: "We couldn't complete this statement review",
+    reasonCode: "review_could_not_be_completed",
+    explanation: "RateReveal could not safely complete this statement review.",
+    nextSteps: ["Review the uploaded file and try again with a clear supported processor statement."],
   };
 }
 
@@ -295,6 +529,21 @@ function selectedString(fact: CanonicalStatementAnalysis["identity"]["processorN
   return fact.status === "selected" && typeof fact.value === "string" ? customerCopy(fact.value) : null;
 }
 
+function selectedCustomerIdentity(fact: CanonicalStatementAnalysis["identity"]["merchantName"]): string | null {
+  if (fact.status !== "selected" || typeof fact.value !== "string" || fact.evidenceRefs.length === 0) return null;
+  const value = fact.value.trim();
+  if (!value || value.length > 160 || containsUnsafeCustomerIdentity(value)) return null;
+  return value;
+}
+
+function containsUnsafeCustomerIdentity(value: string): boolean {
+  return /(?:^|\s)(?:\/Users\/|\/private\/|\/tmp\/|[A-Za-z]:\\)|\bPackage\s+[A-Z0-9]\b|\b[A-Fa-f0-9]{32,}\b/i.test(value);
+}
+
+function permissionPermitted(analysis: CanonicalStatementAnalysis, key: CanonicalCustomerPermissionKey): boolean {
+  return analysis.customerState.permissions.find((permission) => permission.key === key)?.permitted === true;
+}
+
 function customerCopy(text: string): string {
   return text
     .replace(/needs itemization/gi, "Needs an explanation")
@@ -310,8 +559,14 @@ function customerCopy(text: string): string {
 
 function money(amountMinor: number): MoneyAmount { return { amountMinor, currency: USD }; }
 
-function assertValid(projection: ProductionReportProjection): ProductionReportProjection {
+function formatMoney(value: MoneyAmount): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: value.currency }).format(value.amountMinor / 100);
+}
+
+function assertValid(analysis: CanonicalStatementAnalysis, projection: ProductionReportProjection): ProductionReportProjection {
   const validation = validateProductionReportProjection(projection);
-  if (!validation.valid) throw new Error(`Production report projection rejected: ${validation.errors.join(" ")}`);
+  const ceiling = validateProductionReportProjectionAgainstCanonical(analysis, projection);
+  const errors = [...validation.errors, ...ceiling.errors];
+  if (errors.length) throw new Error(`Production report projection rejected: ${errors.join(" ")}`);
   return projection;
 }

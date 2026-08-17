@@ -1,26 +1,29 @@
 import { describe, expect, it } from "vitest";
 import { admitMerchantAttentionAiInterpretation } from "../../src/canonical/merchantAttentionAiInterpretation.js";
 import { buildProductionReportProjection } from "../../src/canonical/productionReportProjection.js";
-import { validateProductionReportProjection } from "../../src/canonical/productionReportProjectionValidation.js";
+import {
+  validateProductionReportProjection,
+  validateProductionReportProjectionAgainstCanonical,
+} from "../../src/canonical/productionReportProjectionValidation.js";
 import type { CanonicalStatementAnalysis } from "../../src/canonical/types.js";
 import { package3Analysis, validPackage3Interpretation } from "./package3TestFixture.js";
 
 describe("Package 3 production report projection", () => {
   it("projects one completed report layout for a clean statement without fake findings", () => {
-    const report = buildProductionReportProjection(package3Analysis([
-      { label: "VISA INTERCHANGE", amount: 80, section: "Interchange Charges" },
-    ]));
+    const report = buildProductionReportProjection(completedAnalysis());
     expect(report.experience).toBe("analysis_completed");
     expect(report.recovery).toBeNull();
     expect(report.report).toMatchObject({
       priorityFindings: { status: "omitted", items: [] },
       openQuestions: { status: "omitted", items: [] },
-      nextActions: { status: "guidance", modules: [] },
+      nextActions: { status: "omitted", modules: [] },
       continuation: { status: "planned_unavailable", callToAction: { implemented: false } },
       saveReport: { status: "planned_unavailable" },
     });
     expect(report.report!.snapshot).not.toHaveProperty("effectiveRate");
     expect(report.report!.snapshot).not.toHaveProperty("transactionCount");
+    expect(report.report!.allCharges.defaultView).toBe("all");
+    expect(report.header).toMatchObject({ merchantName: "Fixture Merchant", statementScope: "One statement analyzed." });
   });
 
   it("projects findings, questions, all charges, and action modules only from accepted Merchant Attention state", () => {
@@ -80,7 +83,7 @@ describe("Package 3 production report projection", () => {
   });
 
   it("degrades an invalid benchmark subsection without erasing safe statement results", () => {
-    const analysis = package3Analysis([{ label: "VISA INTERCHANGE", amount: 80, section: "Interchange Charges" }]);
+    const analysis = completedAnalysis();
     analysis.customerState.rateComparison = qualifiedComparison(analysis, "above_reference");
     analysis.customerState.rateComparison.benchmarkRef!.range = { low: "0.030000", high: "0.020000" };
     const report = buildProductionReportProjection(analysis);
@@ -137,12 +140,202 @@ describe("Package 3 production report projection", () => {
     expect(serialized).toContain("Ask for a breakdown");
     expect(serialized).not.toMatch(/itemization|evidence boundary|service-use review|fee inventory|Questions to Resolve|Package [A-Z0-9]/i);
   });
+
+  it("never expands canonical customer visibility or permission denials", () => {
+    const core = completedAnalysis();
+    deny(core, "core_metrics", "showCoreMetrics");
+    const coreReport = buildProductionReportProjection(core).report!;
+    expect(coreReport.snapshot).toMatchObject({ status: "omitted", processedSales: null, totalFees: null });
+    expect(coreReport.composition.status).toBe("omitted");
+
+    const rate = completedAnalysis();
+    deny(rate, "effective_rate", "showEffectiveRate");
+    expect(buildProductionReportProjection(rate).report!.hero).toMatchObject({ status: "omitted", effectiveRate: null, benchmark: null });
+
+    const benchmark = completedAnalysis();
+    benchmark.customerState.rateComparison = qualifiedComparison(benchmark, "above_reference");
+    deny(benchmark, "benchmark", "showBenchmark");
+    expect(buildProductionReportProjection(benchmark).report!.hero.benchmark).toBeNull();
+
+    const inventory = package3Analysis([{ label: "PROCESSOR MARKUP", amount: 100 }]);
+    deny(inventory, "fee_inventory", "showFeeInventory");
+    const inventoryReport = buildProductionReportProjection(inventory).report!;
+    expect(inventoryReport.allCharges).toMatchObject({ status: "omitted", rows: [] });
+    expect(inventoryReport.composition.status).toBe("omitted");
+    expect(inventoryReport.priorityFindings.status).toBe("omitted");
+
+    const ownership = package3Analysis([{ label: "PROCESSOR MARKUP", amount: 100 }]);
+    deny(ownership, "ownership_actionability", "showOwnershipActionability");
+    const ownershipReport = buildProductionReportProjection(ownership).report!;
+    expect(ownershipReport.composition.status).toBe("omitted");
+    expect(ownershipReport.priorityFindings.status).toBe("omitted");
+    expect(ownershipReport.allCharges.rows.every((row) => row.category === "unclassified" && row.disposition === "informational")).toBe(true);
+
+    const calculations = package3Analysis([{ label: "PROCESSOR MARKUP", amount: 100 }]);
+    deny(calculations, "evidence_calculations", "showEvidenceCalculations");
+    const calculationReport = buildProductionReportProjection(calculations).report!;
+    expect(calculationReport.composition.status).toBe("omitted");
+    expect(calculationReport.trustStrip.items.map((item) => item.label)).not.toContain("Charge and fee reconciliation");
+
+    const actions = package3Analysis([{ label: "PROCESSOR MARKUP", amount: 100 }]);
+    deny(actions, "actions", "showActions");
+    expect(buildProductionReportProjection(actions).report).toMatchObject({
+      hero: { primaryNextAction: null },
+      nextActions: { status: "omitted", modules: [], guidance: null },
+    });
+
+    const verification = package3Analysis([{ label: "PROCESSOR MARKUP", amount: 100 }]);
+    deny(verification, "verification_amounts", "showVerificationAmounts");
+    expect(buildProductionReportProjection(verification).report!.openQuestions.items.every((item) => item.amountUnderReview === null)).toBe(true);
+
+    const explanation = package3Analysis([{ label: "PROCESSOR MARKUP", amount: 100 }]);
+    explanation.customerState.visibility.showCustomerExplanation = false;
+    const explanationPermission = explanation.customerState.permissions.find((candidate) => candidate.key === "customer_explanation")!;
+    explanationPermission.permitted = false;
+    const explanationReport = buildProductionReportProjection(explanation).report!;
+    expect(explanationReport.hero.interpretation).toBeNull();
+    expect(explanationReport.priorityFindings.items).toEqual([]);
+    expect(explanationReport.openQuestions).toMatchObject({ status: "omitted", context: [], items: [] });
+    expect(explanationReport.methodology.disclosures).toEqual([]);
+
+    const withheldReport = completedAnalysis();
+    deny(withheldReport, "core_metrics", "showCoreMetrics");
+    deny(withheldReport, "effective_rate", "showEffectiveRate");
+    expect(buildProductionReportProjection(withheldReport).experience).toBe("unable_to_complete");
+  });
+
+  it("uses canonical readiness and integrity for all three public experiences", () => {
+    const partial = package3Analysis([{ label: "VISA INTERCHANGE", amount: 80, section: "Interchange Charges" }]);
+    const partialReport = buildProductionReportProjection(partial);
+    expect(partialReport.experience).toBe("analysis_available_with_open_questions");
+    expect(partialReport.report!.openQuestions.items).toEqual([]);
+    expect(partialReport.report!.openQuestions.context.join(" ")).toMatch(/reconcile|limited/i);
+
+    const limited = completedAnalysis();
+    limited.customerState.axes.analysisReadiness = "limited";
+    limited.customerState.primaryState = "analysis_limited";
+    expect(buildProductionReportProjection(limited).experience).toBe("analysis_available_with_open_questions");
+
+    const withheld = completedAnalysis();
+    withheld.customerState.axes.analysisReadiness = "withheld";
+    withheld.customerState.primaryState = "analysis_withheld";
+    expect(buildProductionReportProjection(withheld)).toMatchObject({ experience: "unable_to_complete", report: null });
+
+    const verification = completedAnalysis();
+    verification.customerState.primaryState = "verification_needed";
+    expect(buildProductionReportProjection(verification).experience).toBe("analysis_available_with_open_questions");
+
+    const benchmarkUnavailable = completedAnalysis();
+    expect(benchmarkUnavailable.customerState.rateComparison.status).toBe("unavailable");
+    expect(buildProductionReportProjection(benchmarkUnavailable).experience).toBe("analysis_completed");
+    expect(buildProductionReportProjection(completedAnalysis()).experience).toBe("analysis_completed");
+  });
+
+  it("keeps benchmark availability out of the trust strip", () => {
+    const projection = buildProductionReportProjection(completedAnalysis());
+    const labels = projection.report!.trustStrip.items.map((item) => item.label);
+    expect(labels).toEqual(expect.arrayContaining(["Processed sales verified", "Processing fees verified", "Charge and fee reconciliation", "One-statement scope"]));
+    expect(labels.join(" ")).not.toMatch(/benchmark|reference/i);
+    expect(projection.report!.trustStrip.items).not.toContainEqual(expect.objectContaining({ status: "needs_checking" }));
+  });
+
+  it("omits an unverified merchant identity instead of inventing one", () => {
+    const analysis = completedAnalysis();
+    analysis.identity.merchantName.status = "unavailable";
+    analysis.identity.merchantName.value = null;
+    expect(buildProductionReportProjection(analysis).header.merchantName).toBeNull();
+  });
+
+  it("maps safe recovery reasons without exposing internal diagnostics", () => {
+    const missing = completedAnalysis();
+    missing.financialFacts.processedSales.status = "unavailable";
+    missing.financialFacts.processedSales.value = null;
+    expect(buildProductionReportProjection(missing).recovery?.reasonCode).toBe("missing_required_financial_facts");
+
+    const incomplete = completedAnalysis();
+    incomplete.identity.statementPeriod.status = "unavailable";
+    incomplete.identity.statementPeriod.value = null;
+    expect(buildProductionReportProjection(incomplete).recovery?.reasonCode).toBe("missing_or_incomplete_statement");
+
+    const conflict = completedAnalysis();
+    conflict.customerState.axes.dataIntegrity = "failed";
+    expect(buildProductionReportProjection(conflict).recovery?.reasonCode).toBe("unsafe_or_conflicting_totals");
+
+    const unsupported = completedAnalysis();
+    unsupported.financialFacts.totalFees.status = "unsupported";
+    expect(buildProductionReportProjection(unsupported).recovery?.reasonCode).toBe("unreadable_or_unsupported_input");
+
+    const serialized = JSON.stringify(buildProductionReportProjection(unsupported));
+    expect(serialized).not.toMatch(/parser|provider|\.pdf|\/private\/|Package [A-Z0-9]/i);
+  });
+
+  it("keeps authoritative money while providing human-readable composition text", () => {
+    const projection = buildProductionReportProjection(package3Analysis([{ label: "PROCESSOR MARKUP", amount: 830.65 }]));
+    expect(projection.report!.composition.categories[0]!.amount).toEqual({ amountMinor: 83065, currency: "USD" });
+    expect(projection.report!.composition.accessibleSummary).toContain("$830.65");
+    expect(projection.report!.composition.accessibleSummary).not.toMatch(/83065 cents/i);
+  });
+
+  it("detects a post-projection attempt to expand a canonical denial", () => {
+    const analysis = completedAnalysis();
+    deny(analysis, "actions", "showActions");
+    const projection = buildProductionReportProjection(analysis);
+    projection.report!.nextActions.status = "guidance";
+    projection.report!.nextActions.guidance = "Call your processor.";
+    const validation = validateProductionReportProjectionAgainstCanonical(analysis, projection);
+    expect(validation.valid).toBe(false);
+    expect(validation.errors.join(" ")).toMatch(/action visibility/i);
+  });
 });
+
+function completedAnalysis(): CanonicalStatementAnalysis {
+  const analysis = package3Analysis([{ label: "PROCESSOR MARKUP", amount: 80 }]);
+  for (const item of analysis.merchantAttention.items) {
+    item.surfaceEligibility.priorityFinding = false;
+    item.surfaceEligibility.actionToolkit = false;
+    item.questionToResolve = null;
+    item.actionToolkit = null;
+    item.inventoryDisposition = "routine_context";
+  }
+  analysis.customerState.axes.analysisReadiness = "verified";
+  analysis.customerState.axes.dataIntegrity = "reconciled";
+  analysis.customerState.axes.opportunityPosture = "none";
+  analysis.customerState.primaryState = "verified_benchmark_unavailable";
+  deny(analysis, "actions", "showActions");
+  deny(analysis, "verification_amounts", "showVerificationAmounts");
+  return analysis;
+}
+
+function deny(
+  analysis: CanonicalStatementAnalysis,
+  permissionKey: CanonicalStatementAnalysis["customerState"]["permissions"][number]["key"],
+  visibilityKey: keyof Pick<CanonicalStatementAnalysis["customerState"]["visibility"],
+    | "showCoreMetrics"
+    | "showEffectiveRate"
+    | "showBenchmark"
+    | "showFeeInventory"
+    | "showOwnershipActionability"
+    | "showVerificationAmounts"
+    | "showEvidenceCalculations"
+    | "showActions">,
+): void {
+  analysis.customerState.visibility[visibilityKey] = false;
+  const permission = analysis.customerState.permissions.find((candidate) => candidate.key === permissionKey)!;
+  permission.permitted = false;
+  permission.reasonCodes = ["canonical_test_denial"];
+  permission.limitationCodes = ["canonical_test_denial"];
+}
 
 function qualifiedComparison(
   analysis: CanonicalStatementAnalysis,
   position: "below_reference" | "within_reference" | "above_reference",
 ): CanonicalStatementAnalysis["customerState"]["rateComparison"] {
+  analysis.customerState.visibility.showBenchmark = true;
+  analysis.customerState.axes.ratePosition = position;
+  const permission = analysis.customerState.permissions.find((candidate) => candidate.key === "benchmark")!;
+  permission.permitted = true;
+  permission.reasonCodes = ["qualified_benchmark_available"];
+  permission.limitationCodes = [];
   const evidenceRefs = analysis.evidence.slice(0, 1).map((record) => record.id);
   return {
     policyVersion: "canonical_customer_benchmark_policy_v1",

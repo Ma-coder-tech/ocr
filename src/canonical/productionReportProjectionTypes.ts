@@ -15,11 +15,20 @@ export type ProductionReportProjection = {
   experience: ProductionReportExperience;
   header: {
     title: "Your RateReveal statement review";
+    merchantName: string | null;
     processor: string | null;
     statementPeriod: { start: string; end: string } | null;
+    statementScope: "One statement analyzed.";
   };
   recovery: null | {
     title: "We couldn't complete this statement review";
+    reasonCode:
+      | "missing_or_incomplete_statement"
+      | "unreadable_or_unsupported_input"
+      | "missing_required_financial_facts"
+      | "unsafe_or_conflicting_totals"
+      | "analysis_withheld"
+      | "review_could_not_be_completed";
     explanation: string;
     nextSteps: string[];
   };
@@ -32,8 +41,9 @@ export type ProductionReportablePayload = {
     degraded: boolean;
   };
   hero: {
+    status: "shown" | "omitted";
     heading: "Your effective rate";
-    effectiveRate: string;
+    effectiveRate: string | null;
     benchmark: null | {
       label: string;
       range: { low: string; high: string };
@@ -41,26 +51,28 @@ export type ProductionReportablePayload = {
       limitations: string[];
     };
     benchmarkUnavailableMessage: string | null;
-    interpretation: string;
-    primaryNextAction: string;
+    interpretation: string | null;
+    primaryNextAction: string | null;
   };
   snapshot: {
+    status: "shown" | "omitted";
     heading: "Statement snapshot";
-    processedSales: MoneyAmount;
-    totalFees: MoneyAmount;
+    processedSales: MoneyAmount | null;
+    totalFees: MoneyAmount | null;
     transactionCount?: { value: number; basis: "submitted_transactions" | "settled_transactions" | "authorizations" };
   };
   trustStrip: {
+    status: "shown" | "omitted";
     items: Array<{ label: string; status: "confirmed" | "limited" | "needs_checking" }>;
   };
   composition: {
     heading: "Where your fees went";
     status: ProductionReportSectionStatus;
     categories: Array<{ id: string; label: string; amount: MoneyAmount; rowCount: number }>;
-    representedTotal: MoneyAmount;
-    statementFeeTotal: MoneyAmount;
-    difference: MoneyAmount;
-    reconciled: boolean;
+    representedTotal: MoneyAmount | null;
+    statementFeeTotal: MoneyAmount | null;
+    difference: MoneyAmount | null;
+    reconciled: boolean | null;
     disclosure: string | null;
     accessibleSummary: string;
   };
@@ -80,6 +92,7 @@ export type ProductionReportablePayload = {
   openQuestions: {
     heading: "What still needs checking";
     status: "shown" | "omitted";
+    context: string[];
     items: Array<{
       id: string;
       question: string;
@@ -92,8 +105,8 @@ export type ProductionReportablePayload = {
   };
   allCharges: {
     heading: "All charges on this statement";
-    status: "shown" | "partial";
-    defaultView: "attention";
+    status: "shown" | "partial" | "omitted";
+    defaultView: "attention" | "all" | null;
     completeness: "complete" | "partial";
     disclosure: string | null;
     rows: Array<{

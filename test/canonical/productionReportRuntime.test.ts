@@ -17,7 +17,12 @@ describe("Package 3 production report runtime", () => {
     expect(result.projection.report).not.toBeNull();
     expect(result.projection.report!.merchantLanguage).toEqual({ source: "deterministic_fallback", degraded: true });
     expect(result.merchantLanguageRuntime).toMatchObject({ status: "provider_unavailable", attempted: false });
-    expect(result.projection.header).not.toHaveProperty("merchantName");
+    expect(result.projection.header).toMatchObject({
+      merchantName: "XPRESS FIX",
+      processor: expect.any(String),
+      statementPeriod: expect.any(Object),
+      statementScope: "One statement analyzed.",
+    });
     expect(JSON.stringify(result.merchantLanguageRuntime)).not.toMatch(/providerName|modelName|prompt|response|apiKey/i);
   });
 });

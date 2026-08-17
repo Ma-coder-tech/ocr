@@ -59,6 +59,10 @@ export function package3Analysis(rows: Package3TestRow[]): CanonicalStatementAna
   });
   analysis.identity.processorName.status = "selected";
   analysis.identity.processorName.value = "Fiserv";
+  analysis.identity.merchantName.status = "selected";
+  analysis.identity.merchantName.value = "Fixture Merchant";
+  analysis.identity.merchantName.confidence = "high";
+  analysis.identity.merchantName.evidenceRefs = [...analysis.financialFacts.processedSales.evidenceRefs];
   analysis.identity.processorFamily.status = "selected";
   analysis.identity.processorFamily.value = "fiserv";
   analysis.identity.statementPeriod.status = "selected";
@@ -91,6 +95,55 @@ export function refreshPackage3Analysis(analysis: CanonicalStatementAnalysis): v
     rateComparison: analysis.customerState.rateComparison,
   });
   analysis.merchantAttention = buildCanonicalMerchantAttentionModel(analysis);
+  authorizePackage3ProjectionFixture(analysis);
+}
+
+function authorizePackage3ProjectionFixture(analysis: CanonicalStatementAnalysis): void {
+  const reconciled = analysis.feeLedger.status === "available"
+    && analysis.feeLedger.controls.every((control) => ["pass", "pass_with_rounding"].includes(control.status));
+  const hasQuestion = analysis.merchantAttention.items.some((item) => item.questionToResolve);
+  const hasAction = analysis.merchantAttention.items.some((item) => item.surfaceEligibility.actionToolkit && item.actionToolkit);
+  const benchmark = analysis.customerState.rateComparison.status === "qualified"
+    && analysis.customerState.rateComparison.position !== "unavailable";
+  analysis.customerState.axes.analysisReadiness = reconciled ? "verified" : "limited";
+  analysis.customerState.axes.dataIntegrity = reconciled ? "reconciled" : "partially_reconciled";
+  analysis.customerState.axes.ratePosition = benchmark ? analysis.customerState.rateComparison.position : "unavailable";
+  analysis.customerState.axes.opportunityPosture = hasQuestion ? "verification_only" : "none";
+  analysis.customerState.primaryState = !reconciled
+    ? "analysis_limited"
+    : hasQuestion
+      ? "verification_needed"
+      : "verified_benchmark_unavailable";
+  const permitted = new Set([
+    "core_metrics",
+    "effective_rate",
+    "fee_inventory",
+    "ownership_actionability",
+    "evidence_calculations",
+    "customer_explanation",
+    ...(benchmark ? ["benchmark"] : []),
+    ...(hasQuestion ? ["verification_amounts"] : []),
+    ...(hasAction ? ["actions"] : []),
+  ]);
+  for (const permission of analysis.customerState.permissions) {
+    permission.permitted = permitted.has(permission.key);
+    permission.reasonCodes = [permission.permitted ? "package_3_projection_fixture_permitted" : "package_3_projection_fixture_hidden"];
+    permission.limitationCodes = permission.permitted ? [] : [...permission.reasonCodes];
+  }
+  const visibility = analysis.customerState.visibility;
+  visibility.showCoreMetrics = permitted.has("core_metrics");
+  visibility.showEffectiveRate = permitted.has("effective_rate");
+  visibility.showBenchmark = permitted.has("benchmark");
+  visibility.showFeeInventory = permitted.has("fee_inventory");
+  visibility.showOwnershipActionability = permitted.has("ownership_actionability");
+  visibility.showVerificationAmounts = permitted.has("verification_amounts");
+  visibility.showEvidenceCalculations = permitted.has("evidence_calculations");
+  visibility.showActions = permitted.has("actions");
+  visibility.showCustomerExplanation = permitted.has("customer_explanation");
+  visibility.hiddenReasonCodes = analysis.customerState.permissions
+    .filter((permission) => !permission.permitted)
+    .flatMap((permission) => permission.reasonCodes)
+    .sort();
 }
 
 export function validPackage3Interpretation(model: CanonicalStatementAnalysis["merchantAttention"]): any {
