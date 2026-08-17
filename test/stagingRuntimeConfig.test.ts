@@ -19,6 +19,7 @@ describe("Package 4A staging configuration", () => {
   it("keeps the Codespace port private and the canonical runtime flags fail-closed", () => {
     const config = JSON.parse(fs.readFileSync(".devcontainer/devcontainer.json", "utf8"));
     expect(config.portsAttributes["3000"]).toMatchObject({ protocol: "https", visibility: "private" });
+    expect(config.features["ghcr.io/devcontainers/features/sshd:1"]).toEqual({ version: "latest" });
     expect(config.remoteEnv).toMatchObject({
       ...REQUIRED_STAGING_ENV,
       VITE_RATEREVEAL_REPORT_V2_ENABLED: "true",

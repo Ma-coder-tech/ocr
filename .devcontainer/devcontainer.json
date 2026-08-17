@@ -1,6 +1,11 @@
 {
   "name": "RateReveal Package 4A Staging",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/sshd:1": {
+      "version": "latest"
+    }
+  },
   "remoteEnv": {
     "NODE_ENV": "production",
     "HOST": "0.0.0.0",
