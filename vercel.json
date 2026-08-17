@@ -1,11 +1,14 @@
 {
   "version": 2,
-  "buildCommand": "npm run build:web",
-  "functions": {
-    "api/index.ts": {
-      "includeFiles": "node_modules/pdfjs-dist/**"
+  "builds": [
+    {
+      "src": "api/index.ts",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": "node_modules/pdfjs-dist/**"
+      }
     }
-  },
+  ],
   "routes": [
     {
       "src": "/(.*)",
