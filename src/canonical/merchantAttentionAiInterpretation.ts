@@ -7,7 +7,7 @@ import type {
 export const MERCHANT_ATTENTION_AI_INTERPRETATION_POLICY_VERSION = "merchant_attention_ai_interpretation_v1" as const;
 export const MERCHANT_ATTENTION_AI_INPUT_POLICY_VERSION = "merchant_attention_ai_input_v1" as const;
 export const MERCHANT_ATTENTION_SEMANTIC_FIDELITY_POLICY_VERSION = "merchant_attention_semantic_fidelity_v1" as const;
-export const MERCHANT_ATTENTION_AI_PROVIDER_TRANSPORT_STATUS = "not_implemented_in_package_2" as const;
+export const MERCHANT_ATTENTION_AI_PROVIDER_TRANSPORT_STATUS = "implemented_in_package_3" as const;
 
 type MerchantLanguageField =
   | "merchantTitle"
@@ -56,7 +56,7 @@ export type MerchantAttentionAiInterpretationPacket = {
     newSemanticClaimsAllowed: false;
   };
   runtimeBoundary: {
-    providerTransportStatus: "not_implemented_in_package_2";
+    providerTransportStatus: "implemented_in_package_3";
     productionReadyWithoutAdmittedProviderOutput: false;
     deterministicFallbackIsDegradedPath: true;
   };

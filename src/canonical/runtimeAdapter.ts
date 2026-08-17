@@ -21,6 +21,11 @@ import {
 } from "./deterministicRuntimeSafetyReview.js";
 import { validateCanonicalStatementAnalysis } from "./validate.js";
 import { buildCanonicalMerchantAttentionModel } from "./merchantAttention.js";
+import {
+  runMerchantAttentionAiRuntime,
+  type MerchantAttentionAiRuntimeOptions,
+  type MerchantAttentionAiRuntimeResult,
+} from "./merchantAttentionAiRuntime.js";
 import type { BusinessTypeId } from "../businessTypes.js";
 import type { CanonicalBusinessProfileInput } from "./businessQualification.js";
 import type { ParsedDocument } from "../parser.js";
@@ -155,6 +160,7 @@ export type CanonicalRuntimeAdapterInput = {
   legacySummary?: AnalysisSummary | null;
   businessProfile?: CanonicalBusinessProfileInput | null;
   wholeStatementFeeIntelligence?: WholeStatementFeeIntelligenceRuntimeOptions;
+  merchantLanguageInterpretation?: MerchantAttentionAiRuntimeOptions;
 };
 
 export type CanonicalRuntimeAdapterResult = {
@@ -162,6 +168,7 @@ export type CanonicalRuntimeAdapterResult = {
   aiAdmissionAudit: CanonicalAiAdmissionAudit;
   inputAdmission: CanonicalRuntimeInputAdmission[];
   runtimeAiCapabilitySnapshots: RuntimeAiCapabilitySnapshot[];
+  merchantLanguageRuntime: Omit<MerchantAttentionAiRuntimeResult, "model"> | null;
 };
 
 export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInput): CanonicalRuntimeAdapterResult {
@@ -215,6 +222,7 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
     }),
     inputAdmission: canonicalRuntimeInputAdmissionTable(),
     runtimeAiCapabilitySnapshots: runtimeAi.snapshots,
+    merchantLanguageRuntime: null,
   };
 }
 
@@ -270,13 +278,21 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     harnessInputs,
     deterministicRuntimeSafetyReview,
   });
-  const finalAnalysis = rebuildCustomerProjectionLayers(
+  const deterministicAnalysis = rebuildCustomerProjectionLayers(
     analysis,
     aiCapabilities,
     ["completed", "partial"].includes(wholeStatementOutput.reviewStatus)
       ? wholeStatementRuntime.feeKnowledgeIntelligence
       : [],
   );
+  const merchantLanguageRuntime = await runMerchantAttentionAiRuntime({
+    model: deterministicAnalysis.merchantAttention,
+    options: input.merchantLanguageInterpretation,
+  });
+  const finalAnalysis = validateCanonicalStatementAnalysis({
+    ...deterministicAnalysis,
+    merchantAttention: merchantLanguageRuntime.model,
+  });
 
   return {
     analysis: finalAnalysis,
@@ -286,6 +302,13 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     }),
     inputAdmission: canonicalRuntimeInputAdmissionTable(),
     runtimeAiCapabilitySnapshots: snapshots,
+    merchantLanguageRuntime: {
+      status: merchantLanguageRuntime.status,
+      attempted: merchantLanguageRuntime.attempted,
+      eligibleItemCount: merchantLanguageRuntime.eligibleItemCount,
+      admittedItemCount: merchantLanguageRuntime.admittedItemCount,
+      reasonCodes: [...merchantLanguageRuntime.reasonCodes],
+    },
   };
 }
 
