@@ -77,6 +77,7 @@ const APP_ORIGIN = process.env.APP_ORIGIN ?? `http://${host}:${port}`;
 const isDevelopment = process.env.NODE_ENV === "development";
 const isVercel = Boolean(process.env.VERCEL) || Boolean(process.env.VERCEL_ENV);
 const reportV1Enabled = process.env.RATEREVEAL_REPORT_V1_ENABLED === "true";
+const reportV2Enabled = process.env.RATEREVEAL_REPORT_V2_ENABLED === "true";
 const dataRoot = isVercel ? path.join("/tmp", "ocr-data") : path.resolve("data");
 const uploadDir = path.join(dataRoot, "uploads");
 const publicDir = path.resolve("public");
@@ -1284,6 +1285,7 @@ async function handleAuthenticatedJob(req: IncomingMessage, res: ServerResponse,
         })
       : null,
     reportV1: reportV1ForJob(job),
+    productionReportV2: reportV2Enabled ? job.productionReportV2 ?? null : null,
     statement: statement ? statementSummaryPayload(statement) : null,
     redirectTo,
   });
@@ -1584,6 +1586,7 @@ async function handleAnonymousJobLookup(req: IncomingMessage, res: ServerRespons
         })
       : null,
     reportV1: reportV1ForJob(job),
+    productionReportV2: reportV2Enabled ? job.productionReportV2 ?? null : null,
   });
 }
 

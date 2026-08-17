@@ -1,4 +1,5 @@
 import type { BusinessTypeId } from "./businessTypes.js";
+import type { ProductionReportProjection } from "./canonical/productionReportProjectionTypes.js";
 import type { ParserDecision } from "./parserFoundation.js";
 import type { ProcessorDetection } from "./processorDetection.js";
 
@@ -873,4 +874,5 @@ export type Job = {
   events: JobEvent[];
   error?: string;
   summary?: AnalysisSummary;
+  productionReportV2?: ProductionReportProjection;
 };

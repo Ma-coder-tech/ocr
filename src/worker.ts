@@ -3,6 +3,7 @@ import { createOrReplaceComparison, getStatementsForMerchant, persistStatementFr
 import type { AnalysisSummary } from "./types.js";
 import type { ParsedDocument } from "./parser.js";
 import { detectPreflightFailure } from "./preflight.js";
+import { buildProductionReportV2ForJob } from "./productionReportV2JobBridge.js";
 import {
   failJob,
   getJob,
@@ -218,12 +219,22 @@ async function processJob(jobId: string): Promise<void> {
       };
     }
 
-    await maybeRunCanonicalRuntimeShadow({
+    const productionReportV2 = await buildProductionReportV2ForJob({
       jobId: job.id,
-      parsed,
-      summary,
+      document: parsed,
+      legacySummary: summary,
       businessType: job.businessType,
     });
+    if (productionReportV2) {
+      updateJob(jobId, { productionReportV2 }, "Production report ready");
+    } else {
+      await maybeRunCanonicalRuntimeShadow({
+        jobId: job.id,
+        parsed,
+        summary,
+        businessType: job.businessType,
+      });
+    }
 
     stageUpdate(jobId, "comparing_to_benchmark", 90, "Comparing to your business benchmark");
     if (stageDelayMs > 0) await delay(stageDelayMs);
