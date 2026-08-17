@@ -147,6 +147,8 @@ export type FeeKnowledgeResearchOptions = {
   semanticSupportAdapter?: FeeKnowledgeSemanticSupportAdapter;
   fetchImpl?: SafeFetch;
   resolveHost?: RetrieveDocumentOptions["resolveHost"];
+  pdfExtractionTimeoutMs?: RetrieveDocumentOptions["pdfExtractionTimeoutMs"];
+  pdfIsolationWorkerFactoryForTesting?: RetrieveDocumentOptions["pdfIsolationWorkerFactoryForTesting"];
   timeoutMs?: number;
   domainIdentityPolicy?: FeeKnowledgeDomainIdentityPolicy;
   investigativeIntelligence?: FeeKnowledgeInvestigativeIntelligenceOptions;
@@ -170,8 +172,17 @@ export type FeeKnowledgeResearchDiagnostics = {
   searchCallCount: number;
   searchAttemptStatusCounts: Record<string, number>;
   candidateCount: number;
+  candidateContentTypeCounts: Record<"html" | "text" | "pdf" | "other_or_unknown", number>;
   retrievalAttemptCount: number;
   retrievalStatusCounts: Record<string, number>;
+  retrievedPdf: {
+    attemptCount: number;
+    successfulCount: number;
+    timedOutCount: number;
+    failedCount: number;
+    statusCounts: Record<string, number>;
+    safeReasonCodes: string[];
+  };
   investigative: {
     statement: {
       attempted: boolean;
@@ -359,6 +370,8 @@ export async function runFeeKnowledgeResearch(input: {
             abortSignal,
             fetchImpl: options.fetchImpl,
             resolveHost: options.resolveHost,
+            pdfExtractionTimeoutMs: options.pdfExtractionTimeoutMs,
+            pdfIsolationWorkerFactoryForTesting: options.pdfIsolationWorkerFactoryForTesting,
           });
           diagnosticState.stageElapsedMs.retrieval += elapsedSince(retrievalStartedAt);
           candidates[pendingIndex] = candidateAfterRetrieval(candidates[pendingIndex]!, retrieved);
@@ -1312,6 +1325,7 @@ function buildResearchDiagnostics(
   }
   state.statementInvestigativeReasonCodes.forEach((code) => safeReasonCodes.add(code));
   state.retrievedInvestigativeReasonCodes.forEach((code) => safeReasonCodes.add(code));
+  const pdfCandidates = result.candidates.filter((candidate) => contentTypeClass(candidate.safeRetrievalDiagnostics?.contentType) === "pdf");
   return {
     policyVersion: "fee_knowledge_research_diagnostics_v1",
     enabled: state.enabled,
@@ -1320,8 +1334,17 @@ function buildResearchDiagnostics(
     searchCallCount: state.searchCallCount,
     searchAttemptStatusCounts: countBy(result.attempts.map((attempt) => attempt.status)),
     candidateCount: result.candidates.length,
+    candidateContentTypeCounts: countContentTypes(result.candidates.map((candidate) => candidate.safeRetrievalDiagnostics?.contentType)),
     retrievalAttemptCount: state.retrievalAttemptCount,
     retrievalStatusCounts: countBy(result.candidates.map((candidate) => candidate.retrievalStatus)),
+    retrievedPdf: {
+      attemptCount: pdfCandidates.length,
+      successfulCount: pdfCandidates.filter((candidate) => candidate.retrievalStatus === "retrieved_text").length,
+      timedOutCount: pdfCandidates.filter((candidate) => candidate.retrievalStatus === "timed_out").length,
+      failedCount: pdfCandidates.filter((candidate) => !["retrieved_text", "timed_out"].includes(candidate.retrievalStatus)).length,
+      statusCounts: countBy(pdfCandidates.map((candidate) => candidate.retrievalStatus)),
+      safeReasonCodes: [...new Set(pdfCandidates.flatMap((candidate) => candidate.reasonCodes).filter(safeReasonCode))].sort(),
+    },
     investigative: {
       statement: {
         attempted: state.statementInvestigativeAttempted,
@@ -1370,6 +1393,20 @@ function countBy(values: readonly string[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const value of values) counts[value] = (counts[value] ?? 0) + 1;
   return Object.fromEntries(Object.entries(counts).sort(([left], [right]) => left.localeCompare(right)));
+}
+
+function contentTypeClass(value: string | null | undefined): "html" | "text" | "pdf" | "other_or_unknown" {
+  if (!value) return "other_or_unknown";
+  if (value.startsWith("application/pdf")) return "pdf";
+  if (value.startsWith("text/html") || value.startsWith("application/xhtml+xml")) return "html";
+  if (value.startsWith("text/plain")) return "text";
+  return "other_or_unknown";
+}
+
+function countContentTypes(values: readonly (string | null | undefined)[]): Record<"html" | "text" | "pdf" | "other_or_unknown", number> {
+  const counts = { html: 0, text: 0, pdf: 0, other_or_unknown: 0 };
+  for (const value of values) counts[contentTypeClass(value)] += 1;
+  return counts;
 }
 
 function elapsedSince(startedAt: number): number {

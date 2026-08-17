@@ -3,6 +3,13 @@ import { lookup } from "node:dns/promises";
 import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
 import {
+  PdfParserAbortError,
+  PdfParserIsolationError,
+  PdfParserTimeoutError,
+  runIsolatedPdfPageTextParser,
+  type PdfPageTextIsolationOptions,
+} from "../pdfParserIsolation.js";
+import {
   FEE_KNOWLEDGE_RETRIEVAL_POLICY_VERSION,
   type FeeKnowledgeEvidenceLocator,
   type FeeKnowledgeRetrievalSafeDiagnostics,
@@ -17,6 +24,8 @@ export const FEE_KNOWLEDGE_RETRIEVAL_LIMITS = {
   allowedPorts: [443],
   allowedContentTypes: ["text/html", "text/plain", "application/xhtml+xml", "application/pdf"],
 } as const;
+
+export const FEE_KNOWLEDGE_RETRIEVED_PDF_EXTRACTION_TIMEOUT_MS = 30_000;
 
 export type SafeFetch = typeof fetch;
 
@@ -42,6 +51,8 @@ export type RetrieveDocumentOptions = {
   resolveHost?: (hostname: string) => Promise<string[]>;
   limits?: Partial<typeof FEE_KNOWLEDGE_RETRIEVAL_LIMITS>;
   pdfParserForTesting?: (bytes: Uint8Array) => Promise<void>;
+  pdfExtractionTimeoutMs?: number;
+  pdfIsolationWorkerFactoryForTesting?: PdfPageTextIsolationOptions["workerFactory"];
 };
 
 export async function retrieveFeeKnowledgeDocument(
@@ -211,7 +222,12 @@ export async function retrieveFeeKnowledgeDocument(
       documentFingerprint: fingerprint,
     };
     if (contentType.startsWith("application/pdf")) {
-      return pdfDocument(current.url.href, redirectChain, contentType, bytes, fingerprint, options.pdfParserForTesting, diagnosticsBase);
+      return pdfDocument(current.url.href, redirectChain, contentType, bytes, fingerprint, {
+        abortSignal: options.abortSignal,
+        parserForTesting: options.pdfParserForTesting,
+        extractionTimeoutMs: options.pdfExtractionTimeoutMs,
+        workerFactory: options.pdfIsolationWorkerFactoryForTesting,
+      }, diagnosticsBase);
     }
     return textDocument(current.url.href, redirectChain, contentType, bytes, fingerprint, diagnosticsBase);
   }
@@ -258,22 +274,27 @@ async function pdfDocument(
   contentType: string,
   bytes: Uint8Array,
   fingerprint: string,
-  parserForTesting?: (bytes: Uint8Array) => Promise<void>,
+  options: {
+    abortSignal: AbortSignal;
+    parserForTesting?: (bytes: Uint8Array) => Promise<void>;
+    extractionTimeoutMs?: number;
+    workerFactory?: PdfPageTextIsolationOptions["workerFactory"];
+  },
   diagnosticsBase?: RetrievalDiagnosticsInput,
 ): Promise<RetrievedDocument> {
   try {
-    await parserForTesting?.(bytes);
-    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    const task = pdfjs.getDocument({ data: bytes });
-    const pdf = await task.promise;
+    await options.parserForTesting?.(bytes);
+    const pages = await runIsolatedPdfPageTextParser(bytes, {
+      abortSignal: options.abortSignal,
+      timeoutMs: options.extractionTimeoutMs ?? FEE_KNOWLEDGE_RETRIEVED_PDF_EXTRACTION_TIMEOUT_MS,
+      workerFactory: options.workerFactory,
+    });
     const pageTexts: string[] = [];
     const locators: FeeKnowledgeEvidenceLocator[] = [];
     let offset = 0;
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-      const page = await pdf.getPage(pageNumber);
-      const content = await page.getTextContent();
-      const text = content.items.map((item: unknown) => (typeof (item as { str?: unknown }).str === "string" ? (item as { str: string }).str : "")).join(" ");
-      const clean = cleanText(text);
+    for (const page of pages) {
+      const pageNumber = page.pageNumber;
+      const clean = cleanText(page.text);
       if (clean) {
         const block = `Page ${pageNumber}\n${clean}`;
         if (pageTexts.length > 0) offset += 2;
@@ -337,19 +358,27 @@ async function pdfDocument(
       }),
     };
   } catch (error) {
-    const encrypted = /password|encrypted/i.test(String(error));
+    const timedOut = error instanceof PdfParserTimeoutError;
+    const aborted = error instanceof PdfParserAbortError;
+    const encrypted = (error instanceof PdfParserIsolationError && error.code === "pdf_encrypted") || /password|encrypted/i.test(String(error));
+    const status = timedOut || aborted ? "timed_out" : encrypted ? "encrypted" : "malformed";
+    const reasonCodes = timedOut
+      ? ["fee_knowledge_pdf_extraction_timed_out"]
+      : aborted
+        ? ["fee_knowledge_pdf_extraction_aborted"]
+        : [encrypted ? "fee_knowledge_pdf_encrypted" : "fee_knowledge_pdf_parse_failed"];
     return unavailable(
       canonicalUrl,
       redirectChain,
-      encrypted ? "encrypted" : "malformed",
-      [encrypted ? "fee_knowledge_pdf_encrypted" : "fee_knowledge_pdf_parse_failed"],
+      status,
+      reasonCodes,
       contentType,
       bytes.byteLength,
       fingerprint,
       retrievalDiagnostics({
         ...diagnosticsBase,
-        outcomeClass: "extraction_failed",
-        reasonCodes: [encrypted ? "fee_knowledge_pdf_encrypted" : "fee_knowledge_pdf_parse_failed"],
+        outcomeClass: timedOut || aborted ? "watchdog_timeout" : "extraction_failed",
+        reasonCodes,
       }),
     );
   }

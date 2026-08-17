@@ -5,8 +5,10 @@ import { parentPort, workerData } from "node:worker_threads";
 const MAX_PAGES = 250;
 const MAX_ITEMS_PER_PAGE = 100_000;
 const MAX_LINES = 100_000;
+const MAX_PAGE_TEXT_LENGTH = 2_000_000;
 const startedAt = Date.now();
 const require = createRequire(import.meta.url);
+const mode = workerData?.mode === "page_text" ? "page_text" : "layout_lines";
 
 function stage(name, detail = {}) {
   parentPort?.postMessage({ type: "stage", diagnostic: { stage: name, elapsedMs: Date.now() - startedAt, ...detail } });
@@ -105,6 +107,7 @@ async function run() {
   });
   let document = null;
   const lines = [];
+  const pages = [];
   try {
     document = await loadingTask.promise;
     if (!Number.isInteger(document.numPages) || document.numPages <= 0 || document.numPages > MAX_PAGES) {
@@ -132,6 +135,15 @@ async function run() {
             height: item.height ?? 0,
           }))
           .filter((item) => item.str.length > 0);
+        if (mode === "page_text") {
+          const text = items.map((item) => item.str).join(" ");
+          if (text.length > MAX_PAGE_TEXT_LENGTH) {
+            throw Object.assign(new Error("page text limit"), { code: "pdf_page_text_limit_exceeded" });
+          }
+          pages.push({ pageNumber, text });
+          stage("page_completed", { pageNumber, lineCount: 0 });
+          continue;
+        }
         const pageLines = groupPdfItemsIntoLines(items, pageNumber);
         lines.push(...pageLines);
         if (lines.length > MAX_LINES) throw Object.assign(new Error("line limit"), { code: "pdf_line_limit_exceeded" });
@@ -146,10 +158,15 @@ async function run() {
     else await loadingTask.destroy();
     stage("document_destroy_completed");
   }
-  parentPort?.postMessage({ type: "result", lines });
+  parentPort?.postMessage(mode === "page_text" ? { type: "page_text_result", pages } : { type: "result", lines });
 }
 
 run().catch((error) => {
-  const code = typeof error?.code === "string" && /^[a-z0-9_]{1,80}$/i.test(error.code) ? error.code : "pdf_parse_failed";
+  const encrypted = /password|encrypted/i.test(String(error?.message ?? error));
+  const code = encrypted
+    ? "pdf_encrypted"
+    : typeof error?.code === "string" && /^[a-z0-9_]{1,80}$/i.test(error.code)
+      ? error.code
+      : "pdf_parse_failed";
   parentPort?.postMessage({ type: "error", code });
 });

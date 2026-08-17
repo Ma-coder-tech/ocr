@@ -36,9 +36,19 @@ export type PdfParserIsolationOptions = {
   workerFactory?: () => Worker;
 };
 
+export type IsolatedPdfPageText = {
+  pageNumber: number;
+  text: string;
+};
+
+export type PdfPageTextIsolationOptions = PdfParserIsolationOptions & {
+  abortSignal?: AbortSignal;
+};
+
 type WorkerMessage =
   | { type: "stage"; diagnostic: PdfParserStageDiagnostic }
   | { type: "result"; lines: unknown }
+  | { type: "page_text_result"; pages: unknown }
   | { type: "error"; code: string };
 
 export class PdfParserTimeoutError extends Error {
@@ -50,12 +60,28 @@ export class PdfParserTimeoutError extends Error {
   }
 }
 
+export class PdfParserAbortError extends Error {
+  readonly code = "pdf_parse_aborted";
+
+  constructor() {
+    super("PDF parsing was aborted.");
+    this.name = "PdfParserAbortError";
+  }
+}
+
+export class PdfParserIsolationError extends Error {
+  constructor(public readonly code: string) {
+    super(`PDF parsing failed in the isolated runtime (${safeCode(code)}).`);
+    this.name = "PdfParserIsolationError";
+  }
+}
+
 export async function runIsolatedPdfParser(
   bytes: Uint8Array,
   options: PdfParserIsolationOptions = {},
 ): Promise<IsolatedPdfLine[]> {
   const timeoutMs = boundedTimeout(options.timeoutMs ?? 60_000);
-  const worker = options.workerFactory?.() ?? createProductionWorker(bytes);
+  const worker = options.workerFactory?.() ?? createProductionWorker(bytes, "layout_lines");
   worker.stdout?.resume();
   worker.stderr?.resume();
 
@@ -105,10 +131,71 @@ export async function runIsolatedPdfParser(
   });
 }
 
-function createProductionWorker(bytes: Uint8Array): Worker {
+export async function runIsolatedPdfPageTextParser(
+  bytes: Uint8Array,
+  options: PdfPageTextIsolationOptions = {},
+): Promise<IsolatedPdfPageText[]> {
+  const timeoutMs = boundedTimeout(options.timeoutMs ?? 30_000);
+  const worker = options.workerFactory?.() ?? createProductionWorker(bytes, "page_text");
+  worker.stdout?.resume();
+  worker.stderr?.resume();
+
+  return await new Promise<IsolatedPdfPageText[]>((resolve, reject) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      options.abortSignal?.removeEventListener("abort", onAbort);
+      worker.removeAllListeners();
+    };
+    const terminateAndFinish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      void worker.terminate().finally(callback);
+    };
+    const onAbort = () => terminateAndFinish(() => reject(new PdfParserAbortError()));
+
+    timer = setTimeout(() => {
+      terminateAndFinish(() => reject(new PdfParserTimeoutError(timeoutMs)));
+    }, timeoutMs);
+
+    if (options.abortSignal?.aborted) {
+      onAbort();
+      return;
+    }
+    options.abortSignal?.addEventListener("abort", onAbort, { once: true });
+
+    worker.on("message", (message: WorkerMessage) => {
+      if (message?.type === "stage") {
+        if (validDiagnostic(message.diagnostic)) options.onStage?.(message.diagnostic);
+        return;
+      }
+      if (message?.type === "page_text_result") {
+        try {
+          const pages = validatePageTexts(message.pages);
+          terminateAndFinish(() => resolve(pages));
+        } catch {
+          terminateAndFinish(() => reject(new PdfParserIsolationError("pdf_result_validation_failed")));
+        }
+        return;
+      }
+      if (message?.type === "error") {
+        terminateAndFinish(() => reject(new PdfParserIsolationError(message.code)));
+      }
+    });
+    worker.once("error", () => terminateAndFinish(() => reject(new PdfParserIsolationError("pdf_worker_failed"))));
+    worker.once("exit", (code) => {
+      if (!settled) terminateAndFinish(() => reject(new PdfParserIsolationError(`pdf_worker_exit_${safeExitCode(code)}`)));
+    });
+  });
+}
+
+function createProductionWorker(bytes: Uint8Array, mode: "layout_lines" | "page_text"): Worker {
   const workerPath = resolveWorkerPath();
   const workerOptions: WorkerOptions = {
-    workerData: { bytes: Buffer.from(bytes) },
+    workerData: { bytes: Buffer.from(bytes), mode },
     stdout: true,
     stderr: true,
   };
@@ -163,6 +250,23 @@ function validateLines(value: unknown): IsolatedPdfLine[] {
   });
 }
 
+function validatePageTexts(value: unknown): IsolatedPdfPageText[] {
+  if (!Array.isArray(value) || value.length > 250) throw new Error("invalid page text collection");
+  return value.map((page) => {
+    if (!page || typeof page !== "object") throw new Error("invalid page text");
+    const candidate = page as Record<string, unknown>;
+    if (
+      !Number.isInteger(candidate.pageNumber) || Number(candidate.pageNumber) <= 0 ||
+      typeof candidate.text !== "string" || candidate.text.length > 2_000_000
+    ) throw new Error("invalid page text shape");
+    return { pageNumber: Number(candidate.pageNumber), text: candidate.text };
+  });
+}
+
 function safeCode(value: unknown): string {
   return typeof value === "string" && /^[a-z0-9_]{1,80}$/i.test(value) ? value : "pdf_parse_failed";
+}
+
+function safeExitCode(value: unknown): string {
+  return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 255 ? String(value) : "unknown";
 }
