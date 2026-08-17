@@ -11,6 +11,7 @@ import type {
 } from "./types.js";
 
 const require = createRequire(import.meta.url);
+const MERCHANT_LANGUAGE_AI_MAX_TIMEOUT_MS = 120_000;
 
 type RuntimeProvider = "anthropic" | "openai";
 type ProviderPreference = RuntimeProvider | "auto";
@@ -111,7 +112,7 @@ export async function runMerchantAttentionAiRuntime(input: {
   try {
     const timeoutMs = boundedPositiveInteger(
       options.timeoutMs ?? Number(process.env.RATEREVEAL_MERCHANT_LANGUAGE_AI_TIMEOUT_MS ?? 8000),
-      30000,
+      MERCHANT_LANGUAGE_AI_MAX_TIMEOUT_MS,
       "Merchant-language AI timeout",
     );
     const parsedOutputs: CanonicalMerchantAttentionAiInterpretationOutput[] = [];

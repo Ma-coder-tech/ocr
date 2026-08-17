@@ -141,6 +141,19 @@ describe("Package 3 merchant-language AI runtime", () => {
     expect(calls).toBe(result.eligibleItemCount);
     expect(result).toMatchObject({ status: "admitted", admittedItemCount: result.eligibleItemCount });
   });
+
+  it("accepts the explicit staging timeout envelope while preserving packet admission", async () => {
+    const analysis = package3Analysis([{ label: "ADDITIONAL FEES", amount: 9.48 }]);
+    const result = await runMerchantAttentionAiRuntime({
+      model: analysis.merchantAttention,
+      options: {
+        timeoutMs: 60_000,
+        adapter: async () => validPackage3Interpretation(analysis.merchantAttention),
+      },
+    });
+
+    expect(result).toMatchObject({ status: "admitted", admittedItemCount: result.eligibleItemCount });
+  });
 });
 
 function protectedProjection(analysis: ReturnType<typeof package3Analysis>) {
