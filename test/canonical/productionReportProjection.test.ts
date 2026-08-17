@@ -17,6 +17,14 @@ describe("Package 3 production report projection", () => {
       priorityFindings: { status: "omitted", items: [] },
       openQuestions: { status: "omitted", items: [] },
       nextActions: { status: "omitted", modules: [] },
+      monitoring: {
+        status: "shown",
+        guidance: [
+          "Keep this statement as a baseline.",
+          "Compare your effective rate and recurring charges on the next statement.",
+          "Watch for new charges or changes to recurring charges.",
+        ],
+      },
       continuation: { status: "planned_unavailable", callToAction: { implemented: false } },
       saveReport: { status: "planned_unavailable" },
     });
@@ -24,6 +32,7 @@ describe("Package 3 production report projection", () => {
     expect(report.report!.snapshot).not.toHaveProperty("transactionCount");
     expect(report.report!.allCharges.defaultView).toBe("all");
     expect(report.header).toMatchObject({ merchantName: "Fixture Merchant", statementScope: "One statement analyzed." });
+    expect(JSON.stringify(report.report!.monitoring)).not.toMatch(/actionable|removable|negotiable|saving|overpay/i);
   });
 
   it("projects findings, questions, all charges, and action modules only from accepted Merchant Attention state", () => {
@@ -37,6 +46,88 @@ describe("Package 3 production report projection", () => {
     expect(report.report!.openQuestions.items.every((item) => item.amountIsSavings === false)).toBe(true);
     expect(new Set(report.report!.allCharges.rows.map((row) => row.disposition))).toEqual(new Set(["attention", "unresolved", "routine"]));
     expect(report.report!.nextActions.status).toBe("shown");
+  });
+
+  it("projects the complete merchant-safe State Lab meaning without requiring canonical reconstruction", () => {
+    const analysis = package3Analysis([
+      { label: "PROCESSOR MARKUP", amount: 100 },
+      { label: "ADDITIONAL FEES", amount: 9.48 },
+    ]);
+    analysis.businessQualification.risk.value = "standard";
+    analysis.businessQualification.channel.value = "card_present";
+    analysis.businessQualification.annualVolume.tier = "100k_500k";
+    analysis.customerState.rateComparison = qualifiedComparison(analysis, "above_reference");
+    const findingSource = analysis.merchantAttention.items[0]!;
+    findingSource.opportunityLink = { componentRefs: ["opp_component_supported"], linkageOnly: true, moneyRecomputed: false };
+    analysis.customerState.visibility.showDeterministicOpportunity = true;
+    const opportunityPermission = analysis.customerState.permissions.find((item) => item.key === "deterministic_opportunity")!;
+    opportunityPermission.permitted = true;
+    opportunityPermission.reasonCodes = ["supported_opportunity_link"];
+    opportunityPermission.limitationCodes = [];
+
+    const report = buildProductionReportProjection(analysis).report!;
+    expect(report.hero.benchmark).toMatchObject({
+      context: {
+        referenceSegment: "Restaurant / Food Service",
+        risk: "Standard risk",
+        processingChannel: "Card present",
+        annualVolume: "$100,000–$500,000 annually",
+        confidence: expect.stringMatching(/high|medium|low/),
+      },
+      limitations: ["Context only."],
+    });
+    expect(report.hero.benchmark).not.toHaveProperty("referenceId");
+
+    const finding = report.priorityFindings.items[0]!;
+    expect(finding).toMatchObject({
+      attentionType: expect.any(String),
+      priority: "high_priority",
+      merchantTitle: expect.any(String),
+      observedLabel: "PROCESSOR MARKUP",
+      observedAmount: { amountMinor: 10000, currency: "USD" },
+      category: "Processor markup",
+      likelyOwner: { economicBeneficiary: "Processor", contractualController: "Processor" },
+      evidenceStatus: expect.any(String),
+      confidence: expect.stringMatching(/high|medium|low/),
+      whyDeservesAttention: expect.any(String),
+      whatStatementShows: expect.any(String),
+      whatThisLikelyMeans: expect.any(String),
+      whatStillNeedsConfirmation: expect.any(Array),
+      safestNextAction: { actionType: expect.any(String), instruction: expect.any(String) },
+      opportunityLinkage: { componentRefs: ["opp_component_supported"], linkageOnly: true, moneyIncluded: false },
+      languageSource: "deterministic_fallback",
+    });
+    expect(finding.references.evidenceRefs.length).toBeGreaterThan(0);
+    expect(finding.references.feeRowRefs.length).toBeGreaterThan(0);
+    expect(finding.opportunityLinkage).not.toHaveProperty("amount");
+
+    expect(report.openQuestions.items[0]).toMatchObject({
+      requirement: "merchant_pricing_agreement_required",
+      requiredEvidenceOrConfirmation: ["Current merchant pricing agreement or pricing schedule"],
+      references: { evidenceRefs: expect.any(Array), feeRowRefs: expect.any(Array) },
+      amountIsSavings: false,
+    });
+    expect(report.allCharges.rows[0]).toMatchObject({
+      label: "PROCESSOR MARKUP",
+      category: "Processor markup",
+      likelyOwner: { economicBeneficiary: "Processor", contractualController: "Processor" },
+      whatRateRevealKnows: expect.any(String),
+      evidenceStatus: expect.any(String),
+      safestAction: { actionType: expect.any(String), instruction: expect.any(String) },
+      references: { evidenceRefs: expect.any(Array), feeRowRef: expect.any(String) },
+    });
+    expect(report.nextActions.modules[0]).toMatchObject({
+      actionType: "request_pricing_review",
+      title: expect.any(String),
+      whatToDo: expect.any(String),
+      why: expect.any(String),
+      statementEvidenceRefs: expect.any(Array),
+      exactAsk: expect.any(String),
+      requestDocumentation: expect.any(Array),
+      followUp: expect.any(String),
+      avoidClaiming: expect.any(Array),
+      successCriteria: expect.any(Array),
+    });
   });
 
   it("keeps unavailable comparison independent from successful analysis and never creates benchmark savings", () => {
@@ -179,10 +270,13 @@ describe("Package 3 production report projection", () => {
 
     const actions = package3Analysis([{ label: "PROCESSOR MARKUP", amount: 100 }]);
     deny(actions, "actions", "showActions");
-    expect(buildProductionReportProjection(actions).report).toMatchObject({
+    const actionDeniedReport = buildProductionReportProjection(actions).report!;
+    expect(actionDeniedReport).toMatchObject({
       hero: { primaryNextAction: null },
       nextActions: { status: "omitted", modules: [], guidance: null },
     });
+    expect(actionDeniedReport.priorityFindings.items.every((item) => item.safestNextAction === null)).toBe(true);
+    expect(actionDeniedReport.allCharges.rows.every((row) => row.safestAction === null)).toBe(true);
 
     const verification = package3Analysis([{ label: "PROCESSOR MARKUP", amount: 100 }]);
     deny(verification, "verification_amounts", "showVerificationAmounts");
@@ -197,6 +291,8 @@ describe("Package 3 production report projection", () => {
     expect(explanationReport.priorityFindings.items).toEqual([]);
     expect(explanationReport.openQuestions).toMatchObject({ status: "omitted", context: [], items: [] });
     expect(explanationReport.methodology.disclosures).toEqual([]);
+    expect(explanationReport.monitoring).toEqual({ heading: "What to watch next", status: "omitted", guidance: [] });
+    expect(explanationReport.allCharges.rows.every((row) => row.whatRateRevealKnows === null)).toBe(true);
 
     const withheldReport = completedAnalysis();
     deny(withheldReport, "core_metrics", "showCoreMetrics");
@@ -229,6 +325,25 @@ describe("Package 3 production report projection", () => {
     expect(benchmarkUnavailable.customerState.rateComparison.status).toBe("unavailable");
     expect(buildProductionReportProjection(benchmarkUnavailable).experience).toBe("analysis_completed");
     expect(buildProductionReportProjection(completedAnalysis()).experience).toBe("analysis_completed");
+  });
+
+  it("keeps a canonically limited public state open when explanatory copy is hidden", () => {
+    const analysis = completedAnalysis();
+    analysis.customerState.axes.analysisReadiness = "limited";
+    analysis.customerState.primaryState = "analysis_limited";
+    analysis.customerState.visibility.showCustomerExplanation = false;
+    const explanationPermission = analysis.customerState.permissions.find((candidate) => candidate.key === "customer_explanation")!;
+    explanationPermission.permitted = false;
+
+    const projection = buildProductionReportProjection(analysis);
+    expect(projection.experience).toBe("analysis_available_with_open_questions");
+    expect(projection.report!.openQuestions).toMatchObject({ status: "omitted", context: [], items: [] });
+    expect(projection.report!.monitoring.status).toBe("omitted");
+
+    projection.experience = "analysis_completed";
+    const validation = validateProductionReportProjectionAgainstCanonical(analysis, projection);
+    expect(validation.valid).toBe(false);
+    expect(validation.errors.join(" ")).toMatch(/collapsed.*limited|unresolved.*completed/i);
   });
 
   it("keeps benchmark availability out of the trust strip", () => {

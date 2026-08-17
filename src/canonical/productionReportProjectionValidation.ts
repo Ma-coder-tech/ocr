@@ -44,6 +44,16 @@ export function validateProductionReportProjection(projection: ProductionReportP
       }
     }
     if (report.openQuestions.items.some((question) => question.amountIsSavings !== false)) errors.push("Amounts under review must never be savings.");
+    if (report.priorityFindings.status === "shown" && report.priorityFindings.items.some((item) =>
+      !item.merchantTitle || !item.attentionType || !item.priority || !item.category || !item.evidenceStatus
+      || !item.whyDeservesAttention || !item.whatStatementShows || !item.whatThisLikelyMeans
+    )) errors.push("Shown priority findings require complete merchant-safe card meaning.");
+    if (report.openQuestions.status === "shown" && report.openQuestions.items.some((item) =>
+      !item.requirement || item.requiredEvidenceOrConfirmation.length === 0
+    )) errors.push("Shown open questions require their resolution requirement.");
+    if (report.nextActions.status === "shown" && report.nextActions.modules.some((module) =>
+      !module.actionType || !module.title || !module.whatToDo || !module.why || module.successCriteria.length === 0
+    )) errors.push("Shown action modules require the complete Action Toolkit meaning.");
     if (report.hero.benchmark && Number(report.hero.benchmark.range.low) > Number(report.hero.benchmark.range.high)) errors.push("Benchmark range is invalid.");
     if (report.allCharges.status === "omitted" && (report.allCharges.rows.length || report.allCharges.defaultView !== null)) {
       errors.push("Omitted charge inventory cannot retain charge data or a default view.");
@@ -55,6 +65,15 @@ export function validateProductionReportProjection(projection: ProductionReportP
     }
     if (report.trustStrip.items.some((item) => /benchmark|reference/i.test(item.label))) {
       errors.push("Benchmark availability cannot be used as a statement-analysis trust signal.");
+    }
+    if (report.monitoring.status === "shown" && projection.experience !== "analysis_completed") {
+      errors.push("Baseline monitoring is only available for a completed clean report.");
+    }
+    if (report.monitoring.status === "omitted" && report.monitoring.guidance.length > 0) {
+      errors.push("Omitted monitoring cannot retain customer guidance.");
+    }
+    if (report.monitoring.guidance.some((item) => /\b(?:actionable|remov(?:e|able)|negotiat(?:e|able)|saving|overpay|guarantee)\b/i.test(item))) {
+      errors.push("Baseline monitoring cannot imply fee actionability or financial opportunity.");
     }
     if (report.continuation.callToAction.implemented || report.saveReport.capabilities.some((capability) => capability.implemented)) {
       errors.push("Planned capabilities cannot be presented as implemented.");
@@ -88,6 +107,8 @@ export function validateProductionReportProjectionAgainstCanonical(
   const feeInventory = visible.showFeeInventory && permitted("fee_inventory");
   const ownership = visible.showOwnershipActionability && permitted("ownership_actionability");
   const evidenceCalculations = visible.showEvidenceCalculations && permitted("evidence_calculations");
+  const opportunityLinkage = (visible.showDeterministicOpportunity && permitted("deterministic_opportunity"))
+    || (visible.showEstimatedOpportunity && permitted("estimated_opportunity"));
   const verificationAmounts = visible.showVerificationAmounts && permitted("verification_amounts");
   const actions = visible.showActions && permitted("actions") && feeInventory && ownership;
   const explanation = visible.showCustomerExplanation && permitted("customer_explanation");
@@ -110,12 +131,29 @@ export function validateProductionReportProjectionAgainstCanonical(
     if (report.allCharges.rows.some((row) => row.category !== "unclassified" || row.disposition !== "informational")) {
       errors.push("Production projection attached hidden ownership/actionability conclusions to charge rows.");
     }
+    if (report.allCharges.rows.some((row) => row.likelyOwner !== null)) {
+      errors.push("Production projection attached hidden ownership details to charge rows.");
+    }
   }
   if (!evidenceCalculations && report.composition.status !== "omitted") errors.push("Production projection expanded canonical evidence/calculation visibility.");
+  if (!evidenceCalculations && (
+    report.priorityFindings.items.some((item) => item.references.evidenceRefs.length || item.references.feeRowRefs.length)
+    || report.openQuestions.items.some((item) => item.references.evidenceRefs.length || item.references.feeRowRefs.length)
+    || report.allCharges.rows.some((row) => row.references.evidenceRefs.length)
+    || report.nextActions.modules.some((module) => module.statementEvidenceRefs.length)
+  )) errors.push("Production projection expanded canonical evidence-reference visibility.");
+  if (!opportunityLinkage && report.priorityFindings.items.some((item) => item.opportunityLinkage !== null)) {
+    errors.push("Production projection expanded canonical opportunity-linkage visibility.");
+  }
   if (!verificationAmounts && report.openQuestions.items.some((item) => item.amountUnderReview !== null)) {
     errors.push("Production projection expanded canonical verification-amount visibility.");
   }
-  if (!actions && (report.nextActions.status !== "omitted" || report.hero.primaryNextAction !== null)) {
+  if (!actions && (
+    report.nextActions.status !== "omitted"
+    || report.hero.primaryNextAction !== null
+    || report.priorityFindings.items.some((item) => item.safestNextAction !== null)
+    || report.allCharges.rows.some((row) => row.safestAction !== null)
+  )) {
     errors.push("Production projection expanded canonical action visibility.");
   }
   if (!explanation && (
@@ -124,8 +162,39 @@ export function validateProductionReportProjectionAgainstCanonical(
     || report.openQuestions.items.length > 0
     || report.openQuestions.context.length > 0
     || report.methodology.disclosures.length > 0
+    || report.monitoring.status !== "omitted"
+    || report.allCharges.rows.some((row) => row.whatRateRevealKnows !== null)
   )) {
     errors.push("Production projection expanded canonical customer-explanation visibility.");
   }
+  if (canonicalRequiresOpenExperience(analysis) && projection.experience !== "analysis_available_with_open_questions") {
+    errors.push("Production projection collapsed a canonically limited or unresolved review into a completed experience.");
+  }
   return { valid: errors.length === 0, errors: [...new Set(errors)] };
+}
+
+function canonicalRequiresOpenExperience(analysis: CanonicalStatementAnalysis): boolean {
+  const { analysisReadiness, dataIntegrity } = analysis.customerState.axes;
+  const permitted = (key: CanonicalCustomerPermissionKey) =>
+    analysis.customerState.permissions.find((decision) => decision.key === key)?.permitted === true;
+  const coreMetrics = analysis.customerState.visibility.showCoreMetrics && permitted("core_metrics");
+  const effectiveRate = analysis.customerState.visibility.showEffectiveRate && permitted("effective_rate");
+  const materialLimitation = [...analysis.customerState.reasonCodes, ...analysis.customerState.limitations]
+    .some((code) => /(?:verification|confirmation|reconciliation|coverage)_(?:required|incomplete)|analysis_limited/.test(code)
+      && !/(?:benchmark|provider|narrative|explanation)/.test(code));
+  const unresolvedCoverage = analysis.feeLedger.status !== "available"
+    || analysis.feeLedger.controls.some((control) => !["pass", "pass_with_rounding"].includes(control.status))
+    || analysis.feeLedger.rows.some((row) => row.role === "unknown_unresolved")
+    || analysis.feeOwnershipActionability.rowClassifications.some((row) => row.selected.category === "unknown_needs_review");
+  return analysisReadiness === "limited"
+    || dataIntegrity === "partially_reconciled"
+    || analysis.customerState.primaryState === "analysis_limited"
+    || analysis.customerState.primaryState === "verification_needed"
+    || analysis.businessQualification.status === "confirmation_required"
+    || analysis.businessQualification.confirmationRequirement !== null
+    || analysis.merchantAttention.items.some((item) => item.questionToResolve !== null)
+    || unresolvedCoverage
+    || !coreMetrics
+    || !effectiveRate
+    || materialLimitation;
 }

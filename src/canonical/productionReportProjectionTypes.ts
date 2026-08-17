@@ -48,6 +48,15 @@ export type ProductionReportablePayload = {
       label: string;
       range: { low: string; high: string };
       position: "below_reference" | "within_reference" | "above_reference";
+      context: {
+        referenceSegment: string | null;
+        risk: string | null;
+        processingChannel: string | null;
+        annualVolume: string | null;
+        market: string | null;
+        processor: string | null;
+        confidence: "high" | "medium" | "low";
+      };
       limitations: string[];
     };
     benchmarkUnavailableMessage: string | null;
@@ -81,11 +90,32 @@ export type ProductionReportablePayload = {
     status: "shown" | "omitted";
     items: Array<{
       id: string;
-      title: string;
+      attentionType: string;
+      priority: "routine" | "review" | "high_priority";
+      merchantTitle: string;
+      observedLabel: string | null;
+      observedAmount: MoneyAmount | null;
+      category: string;
+      likelyOwner: null | {
+        economicBeneficiary: string;
+        contractualController: string;
+      };
+      evidenceStatus: string;
+      confidence: "high" | "medium" | "low";
+      whyDeservesAttention: string;
       whatStatementShows: string;
       whatThisLikelyMeans: string;
       whatStillNeedsConfirmation: string[];
-      amount: MoneyAmount | null;
+      safestNextAction: null | { actionType: string; instruction: string };
+      references: {
+        evidenceRefs: string[];
+        feeRowRefs: string[];
+      };
+      opportunityLinkage: null | {
+        componentRefs: string[];
+        linkageOnly: true;
+        moneyIncluded: false;
+      };
       languageSource: ProductionMerchantLanguageSource;
     }>;
   };
@@ -99,6 +129,12 @@ export type ProductionReportablePayload = {
       whatRateRevealKnows: string;
       whatRemainsUncertain: string;
       safeNextStep: string;
+      requirement: string;
+      requiredEvidenceOrConfirmation: string[];
+      references: {
+        evidenceRefs: string[];
+        feeRowRefs: string[];
+      };
       amountUnderReview: MoneyAmount | null;
       amountIsSavings: false;
     }>;
@@ -114,7 +150,18 @@ export type ProductionReportablePayload = {
       label: string;
       amount: MoneyAmount;
       category: string;
+      likelyOwner: null | {
+        economicBeneficiary: string;
+        contractualController: string;
+      };
+      whatRateRevealKnows: string | null;
+      evidenceStatus: string;
       disposition: "attention" | "routine" | "unresolved" | "informational";
+      safestAction: null | { actionType: string; instruction: string };
+      references: {
+        evidenceRefs: string[];
+        feeRowRef: string;
+      };
     }>;
   };
   nextActions: {
@@ -122,13 +169,23 @@ export type ProductionReportablePayload = {
     status: "shown" | "guidance" | "omitted";
     modules: Array<{
       id: string;
+      actionType: string;
       title: string;
+      whatToDo: string;
       why: string;
+      statementEvidenceRefs: string[];
       exactAsk: string | null;
+      requestDocumentation: string[];
       followUp: string | null;
+      avoidClaiming: string[];
       successCriteria: string[];
     }>;
     guidance: string | null;
+  };
+  monitoring: {
+    heading: "What to watch next";
+    status: "shown" | "omitted";
+    guidance: string[];
   };
   methodology: {
     heading: "How RateReveal reviewed this statement";

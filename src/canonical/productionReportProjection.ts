@@ -40,9 +40,7 @@ export function buildProductionReportProjection(analysis: CanonicalStatementAnal
 
   const questions = projectQuestions(analysis, visibility);
   const questionContext = openQuestionContext(analysis, visibility);
-  const experience = questionContext.length > 0 || questions.length > 0
-    ? "analysis_available_with_open_questions"
-    : "analysis_completed";
+  const experience = resolveReportableExperience(analysis, visibility);
   const languageSource: ProductionMerchantLanguageSource = analysis.merchantAttention.interpretation.source === "admitted_ai_interpretation"
     ? "ai_assisted"
     : "deterministic_fallback";
@@ -61,6 +59,7 @@ export function buildProductionReportProjection(analysis: CanonicalStatementAnal
     },
     allCharges: allCharges(analysis, visibility),
     nextActions: nextActions(analysis, visibility),
+    monitoring: cleanMonitoring(analysis, visibility, experience),
     methodology: {
       heading: "How RateReveal reviewed this statement",
       disclosures: visibility.customerExplanation ? [
@@ -95,6 +94,7 @@ type VisibilityCeiling = {
   feeInventory: boolean;
   ownershipActionability: boolean;
   evidenceCalculations: boolean;
+  opportunityLinkage: boolean;
   verificationAmounts: boolean;
   actions: boolean;
   customerExplanation: boolean;
@@ -109,6 +109,8 @@ function visibilityCeiling(analysis: CanonicalStatementAnalysis): VisibilityCeil
     feeInventory: visible.showFeeInventory && permissionPermitted(analysis, "fee_inventory"),
     ownershipActionability: visible.showOwnershipActionability && permissionPermitted(analysis, "ownership_actionability"),
     evidenceCalculations: visible.showEvidenceCalculations && permissionPermitted(analysis, "evidence_calculations"),
+    opportunityLinkage: (visible.showDeterministicOpportunity && permissionPermitted(analysis, "deterministic_opportunity"))
+      || (visible.showEstimatedOpportunity && permissionPermitted(analysis, "estimated_opportunity")),
     verificationAmounts: visible.showVerificationAmounts && permissionPermitted(analysis, "verification_amounts"),
     actions: visible.showActions
       && permissionPermitted(analysis, "actions")
@@ -163,6 +165,27 @@ function hero(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeilin
         label: comparison.benchmarkRef.displayLabel ?? "RateReveal reference range",
         range: { ...comparison.benchmarkRef.range },
         position: comparison.position as "below_reference" | "within_reference" | "above_reference",
+        context: {
+          referenceSegment: businessSegmentLabel(
+            analysis.businessQualification.resolvedSegmentId
+              ?? comparison.benchmarkRef.segmentId
+              ?? comparison.benchmarkRef.applicableBusinessType,
+          ),
+          risk: riskLabel(analysis.businessQualification.risk.value !== "unknown"
+            ? analysis.businessQualification.risk.value
+            : comparison.benchmarkRef.riskClass ?? null),
+          processingChannel: channelLabel(analysis.businessQualification.channel.value !== "unknown"
+            ? analysis.businessQualification.channel.value
+            : comparison.benchmarkRef.channel ?? comparison.benchmarkRef.applicableChannel),
+          annualVolume: volumeLabel(analysis.businessQualification.annualVolume.tier !== "unknown"
+            ? analysis.businessQualification.annualVolume.tier
+            : comparison.benchmarkRef.annualVolumeTier ?? null),
+          market: analysis.businessQualification.market.value === "US" || comparison.benchmarkRef.market === "US"
+            ? "United States"
+            : null,
+          processor: processorLabel(comparison.benchmarkRef.applicableProcessor),
+          confidence: comparison.benchmarkRef.confidence ?? analysis.businessQualification.confidence,
+        },
         limitations: [...comparison.benchmarkRef.limitations],
       }
     : null;
@@ -300,24 +323,54 @@ function findings(
   }
   const items = analysis.merchantAttention.items.filter((item) => item.surfaceEligibility.priorityFinding).map((item) => ({
     id: item.id,
-    title: customerCopy(item.merchantTitle),
+    attentionType: merchantAttentionType(item.attentionType),
+    priority: item.priority,
+    merchantTitle: customerCopy(item.merchantTitle),
+    observedLabel: item.originalObservedStatementLabel ? customerCopy(item.originalObservedStatementLabel) : null,
+    observedAmount: item.observedAmount,
+    category: categoryLabel(item.category),
+    likelyOwner: item.likelyOwner ? {
+      economicBeneficiary: partyLabel(item.likelyOwner.economicBeneficiary),
+      contractualController: partyLabel(item.likelyOwner.contractualController),
+    } : null,
+    evidenceStatus: evidenceStatusLabel(item.evidenceStatus),
+    confidence: item.confidence,
+    whyDeservesAttention: customerCopy(item.whyThisDeservesAttention),
     whatStatementShows: customerCopy(item.originalObservedStatementLabel ? `${item.originalObservedStatementLabel} appears on this statement.` : item.whyThisDeservesAttention),
     whatThisLikelyMeans: customerCopy(item.evidenceBoundary.reasonableConclusion.summary),
     whatStillNeedsConfirmation: item.evidenceBoundary.remainingUncertainty.map(customerCopy),
-    amount: item.observedAmount,
+    safestNextAction: visibility.actions ? {
+      actionType: merchantActionType(item.safestNextAction.actionType),
+      instruction: customerCopy(item.safestNextAction.instruction),
+    } : null,
+    references: {
+      evidenceRefs: visibility.evidenceCalculations ? [...new Set([...item.evidenceRefs, ...item.evidenceBoundary.statementProof.evidenceRefs])] : [],
+      feeRowRefs: visibility.evidenceCalculations ? [...item.feeRowIds] : [],
+    },
+    opportunityLinkage: visibility.opportunityLinkage && item.opportunityLink ? {
+      componentRefs: [...item.opportunityLink.componentRefs],
+      linkageOnly: true as const,
+      moneyIncluded: false as const,
+    } : null,
     languageSource: item.merchantLanguageSource === "admitted_ai_interpretation" ? "ai_assisted" as const : languageSource === "ai_assisted" ? "deterministic_fallback" as const : languageSource,
   }));
   return { heading: "What deserves attention", status: items.length ? "shown" : "omitted", items };
 }
 
 function projectQuestions(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeiling): ProductionReportablePayload["openQuestions"]["items"] {
-  const questions = visibility.feeInventory && visibility.ownershipActionability && visibility.customerExplanation
+  const questions: ProductionReportablePayload["openQuestions"]["items"] = visibility.feeInventory && visibility.ownershipActionability && visibility.customerExplanation
     ? analysis.merchantAttention.items.flatMap((item) => item.questionToResolve ? [{
     id: item.questionToResolve.questionId,
     question: customerCopy(item.questionToResolve.question),
     whatRateRevealKnows: customerCopy(item.questionToResolve.whatRateRevealKnows),
     whatRemainsUncertain: customerCopy(item.questionToResolve.whatRemainsUncertain),
     safeNextStep: customerCopy(item.questionToResolve.safeNextStep),
+    requirement: item.questionToResolve.requirement,
+    requiredEvidenceOrConfirmation: item.questionToResolve.requiredEvidenceOrConfirmation.map(customerCopy),
+    references: {
+      evidenceRefs: visibility.evidenceCalculations ? [...item.questionToResolve.evidenceRefs] : [],
+      feeRowRefs: visibility.evidenceCalculations ? [...item.feeRowIds] : [],
+    },
     amountUnderReview: visibility.verificationAmounts ? item.questionToResolve.amountUnderReview : null,
     amountIsSavings: false as const,
   }] : [])
@@ -329,6 +382,12 @@ function projectQuestions(analysis: CanonicalStatementAnalysis, visibility: Visi
     whatRateRevealKnows: "RateReveal kept your business declaration separate from the account coding shown by the processor.",
     whatRemainsUncertain: "The business type, processing channel, or risk profile still needs confirmation before a qualified comparison can be used.",
     safeNextStep: "Confirm the requested business details in RateReveal.",
+    requirement: "merchant_confirmation_required",
+    requiredEvidenceOrConfirmation: ["Merchant confirmation of the requested business or processing details."],
+    references: {
+      evidenceRefs: visibility.evidenceCalculations ? [...analysis.businessQualification.evidenceRefs] : [],
+      feeRowRefs: [],
+    },
     amountUnderReview: null,
     amountIsSavings: false,
   });
@@ -346,9 +405,10 @@ function allCharges(analysis: CanonicalStatementAnalysis, visibility: Visibility
   };
   const attentionByRow = new Map<string, CanonicalMerchantAttentionItem>();
   for (const item of analysis.merchantAttention.items) for (const rowId of item.feeRowIds) attentionByRow.set(rowId, item);
-  const classification = new Map(analysis.feeOwnershipActionability.rowClassifications.map((row) => [row.feeRowId, row.selected.category]));
+  const classification = new Map(analysis.feeOwnershipActionability.rowClassifications.map((row) => [row.feeRowId, row.selected]));
   const rows = inventoryRows(analysis).map((row) => {
     const attention = attentionByRow.get(row.id);
+    const selected = classification.get(row.id);
     const disposition = !visibility.ownershipActionability ? "informational" as const
       : attention?.inventoryDisposition === "unresolved_review" ? "unresolved" as const
       : attention?.surfaceEligibility.priorityFinding ? "attention" as const
@@ -358,8 +418,24 @@ function allCharges(analysis: CanonicalStatementAnalysis, visibility: Visibility
       id: row.id,
       label: customerCopy(row.selectedLabel),
       amount: contributionAmount(row),
-      category: visibility.ownershipActionability ? classification.get(row.id) ?? "unknown" : "unclassified",
+      category: visibility.ownershipActionability ? categoryLabel(selected?.category ?? "unknown_needs_review") : "unclassified",
+      likelyOwner: visibility.ownershipActionability && selected ? {
+        economicBeneficiary: partyLabel(selected.ownership.economicBeneficiary),
+        contractualController: partyLabel(selected.ownership.contractualController),
+      } : null,
+      whatRateRevealKnows: !visibility.customerExplanation ? null : attention
+        ? customerCopy(attention.evidenceBoundary.reasonableConclusion.summary)
+        : "This charge is shown on the statement; no stronger conclusion is presented here.",
+      evidenceStatus: evidenceStatusLabel(attention?.evidenceStatus ?? "statement_confirmed"),
       disposition,
+      safestAction: visibility.actions && attention ? {
+        actionType: merchantActionType(attention.safestNextAction.actionType),
+        instruction: customerCopy(attention.safestNextAction.instruction),
+      } : null,
+      references: {
+        evidenceRefs: visibility.evidenceCalculations ? [...row.contributionDecision.evidenceRefs] : [],
+        feeRowRef: row.id,
+      },
     };
   });
   const partial = analysis.feeLedger.status !== "available" || (rows.length === 0 && analysis.financialFacts.totalFees.value!.amountMinor > 0);
@@ -379,18 +455,39 @@ function nextActions(analysis: CanonicalStatementAnalysis, visibility: Visibilit
   }
   const modules = analysis.merchantAttention.items.filter((item) => item.surfaceEligibility.actionToolkit && item.actionToolkit).map((item) => ({
     id: item.actionToolkit!.moduleId,
+    actionType: merchantActionType(item.actionToolkit!.actionType),
     title: item.actionToolkit!.actionType === "request_itemization" ? "Ask for a breakdown" : customerCopy(item.actionToolkit!.whatToDo),
+    whatToDo: customerCopy(item.actionToolkit!.whatToDo),
     why: customerCopy(item.actionToolkit!.why),
+    statementEvidenceRefs: visibility.evidenceCalculations ? [...item.actionToolkit!.statementEvidenceRefs] : [],
     exactAsk: item.actionToolkit!.exactAsk ? customerCopy(item.actionToolkit!.exactAsk) : null,
+    requestDocumentation: item.actionToolkit!.requestDocumentation.map(customerCopy),
     followUp: item.actionToolkit!.unclearAnswerFollowUp ? customerCopy(item.actionToolkit!.unclearAnswerFollowUp) : null,
+    avoidClaiming: item.actionToolkit!.avoidClaiming.map(customerCopy),
     successCriteria: item.actionToolkit!.successCriteria.map(customerCopy),
   }));
   if (modules.length) return { heading: "What to do next", status: "shown", modules, guidance: null };
+  return { heading: "What to do next", status: "omitted", modules: [], guidance: null };
+}
+
+function cleanMonitoring(
+  analysis: CanonicalStatementAnalysis,
+  visibility: VisibilityCeiling,
+  experience: ProductionReportProjection["experience"],
+): ProductionReportablePayload["monitoring"] {
+  const specificActionExists = analysis.merchantAttention.items.some((item) => item.surfaceEligibility.actionToolkit && item.actionToolkit);
+  const priorityFindingExists = analysis.merchantAttention.items.some((item) => item.surfaceEligibility.priorityFinding);
+  if (!visibility.customerExplanation || experience !== "analysis_completed" || specificActionExists || priorityFindingExists) {
+    return { heading: "What to watch next", status: "omitted", guidance: [] };
+  }
   return {
-    heading: "What to do next",
-    status: "guidance",
-    modules: [],
-    guidance: "No specific charge needs action from this statement alone. Keep the report and monitor future statements for new or changing charges.",
+    heading: "What to watch next",
+    status: "shown",
+    guidance: [
+      "Keep this statement as a baseline.",
+      "Compare your effective rate and recurring charges on the next statement.",
+      "Watch for new charges or changes to recurring charges.",
+    ],
   };
 }
 
@@ -416,13 +513,35 @@ function openQuestionContext(analysis: CanonicalStatementAnalysis, visibility: V
   if (!visibility.coreMetrics || !visibility.effectiveRate) {
     context.push("Some financial fields are not available for customer display in this review.");
   }
-  const materialCanonicalLimitation = [...analysis.customerState.reasonCodes, ...analysis.customerState.limitations]
-    .some((code) => /(?:verification|confirmation|reconciliation|coverage)_(?:required|incomplete)|analysis_limited/.test(code)
-      && !/(?:benchmark|provider|narrative|explanation)/.test(code));
-  if (materialCanonicalLimitation) {
+  if (hasMaterialCanonicalLimitation(analysis)) {
     context.push("The statement review includes a material limitation that requires follow-up.");
   }
   return [...new Set(context)];
+}
+
+function resolveReportableExperience(
+  analysis: CanonicalStatementAnalysis,
+  visibility: VisibilityCeiling,
+): Extract<ProductionReportProjection["experience"], "analysis_available_with_open_questions" | "analysis_completed"> {
+  const { analysisReadiness, dataIntegrity } = analysis.customerState.axes;
+  const hasOpenRequirement = analysisReadiness === "limited"
+    || dataIntegrity === "partially_reconciled"
+    || analysis.customerState.primaryState === "analysis_limited"
+    || analysis.customerState.primaryState === "verification_needed"
+    || analysis.businessQualification.status === "confirmation_required"
+    || analysis.businessQualification.confirmationRequirement !== null
+    || analysis.merchantAttention.items.some((item) => item.questionToResolve !== null)
+    || materialCoverageUnresolved(analysis)
+    || !visibility.coreMetrics
+    || !visibility.effectiveRate
+    || hasMaterialCanonicalLimitation(analysis);
+  return hasOpenRequirement ? "analysis_available_with_open_questions" : "analysis_completed";
+}
+
+function hasMaterialCanonicalLimitation(analysis: CanonicalStatementAnalysis): boolean {
+  return [...analysis.customerState.reasonCodes, ...analysis.customerState.limitations]
+    .some((code) => /(?:verification|confirmation|reconciliation|coverage)_(?:required|incomplete)|analysis_limited/.test(code)
+      && !/(?:benchmark|provider|narrative|explanation)/.test(code));
 }
 
 function materialCoverageUnresolved(analysis: CanonicalStatementAnalysis): boolean {
@@ -523,6 +642,108 @@ function compositionGroup(category: CanonicalFeeCategory): { id: string; label: 
   if (["service_fee", "compliance_fee", "equipment_or_lease", "third_party_product"].includes(category)) return { id: "services", label: "Services" };
   if (category === "unknown_needs_review") return { id: "unresolved", label: "Unresolved" };
   return { id: "other", label: "Other" };
+}
+
+function businessSegmentLabel(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const labels: Record<string, string> = {
+    restaurant_food_service: "Restaurant / Food Service",
+    grocery_supermarket_specialty_food: "Grocery / Supermarket / Specialty Food",
+  };
+  return labels[value] ?? displayEnum(value);
+}
+
+function riskLabel(value: string | null | undefined): string | null {
+  if (!value || value === "unknown") return null;
+  return value === "standard" ? "Standard risk" : value === "high_risk" ? "Higher-risk category" : displayEnum(value);
+}
+
+function channelLabel(value: string | null | undefined): string | null {
+  if (!value || value === "unknown") return null;
+  const labels: Record<string, string> = {
+    card_present: "Card present",
+    card_not_present: "Card not present",
+    mixed: "Mixed channels",
+  };
+  return labels[value] ?? displayEnum(value);
+}
+
+function volumeLabel(value: string | null | undefined): string | null {
+  if (!value || value === "unknown") return null;
+  const labels: Record<string, string> = {
+    under_100k: "Under $100,000 annually",
+    "100k_500k": "$100,000–$500,000 annually",
+    "500k_2m": "$500,000–$2 million annually",
+    "2m_10m": "$2–$10 million annually",
+    over_10m: "Over $10 million annually",
+  };
+  return labels[value] ?? displayEnum(value);
+}
+
+function processorLabel(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value.toLowerCase() === "fiserv" ? "Fiserv" : displayEnum(value);
+}
+
+function categoryLabel(value: string): string {
+  const labels: Record<string, string> = {
+    statement_pricing: "Overall statement pricing",
+    interchange: "Interchange",
+    card_brand_network_assessment: "Card-brand network assessment",
+    network_access_or_authorization: "Network access or authorization",
+    processor_markup: "Processor markup",
+    processor_per_item_fee: "Processor per-item fee",
+    administrative_fee: "Administrative fee",
+    service_fee: "Service fee",
+    compliance_fee: "Compliance fee",
+    equipment_or_lease: "Equipment or lease",
+    third_party_product: "Third-party product",
+    chargeback_or_dispute: "Chargeback or dispute",
+    funding_adjustment: "Funding adjustment",
+    tax_or_government: "Tax or government charge",
+    credit: "Credit",
+    unknown_needs_review: "Needs review",
+  };
+  return labels[value] ?? displayEnum(value);
+}
+
+function partyLabel(value: string): string {
+  const labels: Record<string, string> = {
+    network: "Card network",
+    card_brand: "Card brand",
+    issuer_or_interchange: "Card issuer / interchange",
+    processor: "Processor",
+    third_party: "Third party",
+    merchant_contract: "Merchant agreement",
+    tax_or_government: "Tax or government authority",
+    unknown: "Not established",
+  };
+  return labels[value] ?? displayEnum(value);
+}
+
+function evidenceStatusLabel(value: string): string {
+  const labels: Record<string, string> = {
+    statement_confirmed: "Shown on the statement",
+    supported_interpretation: "Supported interpretation",
+    public_documentation_supported: "Supported by public documentation",
+    needs_merchant_pricing_agreement: "Needs the merchant pricing agreement",
+    needs_additional_statement_history: "Needs additional statement history",
+    needs_processor_explanation: "Needs a processor explanation",
+    unresolved: "Unresolved",
+  };
+  return labels[value] ?? displayEnum(value);
+}
+
+function merchantAttentionType(value: string): string {
+  return value === "explanation_or_itemization" ? "explanation_or_breakdown" : value;
+}
+
+function merchantActionType(value: string): string {
+  return value === "request_itemization" ? "request_breakdown" : value;
+}
+
+function displayEnum(value: string): string {
+  return value.replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function selectedString(fact: CanonicalStatementAnalysis["identity"]["processorName"]): string | null {
