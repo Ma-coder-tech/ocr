@@ -27,11 +27,13 @@ describe("production report V2 job bridge", () => {
 
   it("projects once through the complete Package 3 runtime without forcing intelligence off", async () => {
     const build = vi.fn(async () => ({ projection: unableProjection }));
-    const projection = await buildProductionReportV2ForJob({ ...input, env: { RATEREVEAL_REPORT_V2_ENABLED: "true" }, build });
+    const progressReporter = vi.fn();
+    const projection = await buildProductionReportV2ForJob({ ...input, env: { RATEREVEAL_REPORT_V2_ENABLED: "true" }, build, progressReporter });
     expect(projection).toBe(unableProjection);
     expect(build).toHaveBeenCalledTimes(1);
     const runtimeInput = build.mock.calls[0]![0];
     expect(runtimeInput.runtimeDocumentRef).toBe("job_job-transport-test");
+    expect(runtimeInput.progressReporter).toBe(progressReporter);
     expect(runtimeInput).not.toHaveProperty("wholeStatementFeeIntelligence");
     expect(runtimeInput).not.toHaveProperty("merchantLanguageInterpretation");
   });

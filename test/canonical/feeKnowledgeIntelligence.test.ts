@@ -27,6 +27,7 @@ import {
 import type { ApprovedFeeKnowledgeSourceRegistry, FeeKnowledgeDomainIdentityPolicy } from "../../src/canonical/feeKnowledgeTypes.js";
 import { parsePdfBytes } from "../../src/parser.js";
 import { analyzeStatementDocument } from "../../src/statementParserOrchestrator.js";
+import type { RuntimeProgressEvent } from "../../src/runtimeProgress.js";
 
 const STATEMENT_1 = "test/fixtures/pdfs/fiserv_PAYSAFE_Febr_2024.pdf";
 const STATEMENT_2 = "test/fixtures/pdfs/fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf";
@@ -60,6 +61,7 @@ describe("fee knowledge intelligence state model", () => {
     if (!question) throw new Error("expected at least one research question");
     const processor = question.processorOrNetwork ?? "Fiserv";
     let semanticCalls = 0;
+    const progress: RuntimeProgressEvent[] = [];
     const semanticSupportAdapter: FeeKnowledgeSemanticSupportAdapter = async () => {
       semanticCalls += 1;
       return {
@@ -99,6 +101,7 @@ describe("fee knowledge intelligence state model", () => {
           { status: 200, headers: { "content-type": "text/html" } },
         ),
         semanticSupportAdapter,
+        progressReporter: (event) => { progress.push(event); },
       },
     });
 
@@ -124,6 +127,14 @@ describe("fee knowledge intelligence state model", () => {
       },
     });
     expect(research.diagnostics.elapsedMs).toBeGreaterThanOrEqual(0);
+    expect(progress).toEqual(expect.arrayContaining([
+      expect.objectContaining({ stage: "research_planning", status: "running" }),
+      expect.objectContaining({ stage: "research_planning", status: "completed" }),
+      expect.objectContaining({ stage: "discovery", status: "completed" }),
+      expect.objectContaining({ stage: "retrieval", status: "completed" }),
+      expect.objectContaining({ stage: "semantic_verification", status: "completed" }),
+    ]));
+    expect(JSON.stringify(progress)).not.toMatch(/evidence\.test|Official rates|network assessment rates|https?:\/\//i);
     expect(JSON.stringify(research.diagnostics)).not.toMatch(/evidence\.test|Official rates|network assessment rates|https?:\/\//i);
     expect(research.intelligence.some((item) =>
       item.origin === "retrieved_document" &&

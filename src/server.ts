@@ -61,7 +61,7 @@ import { buildSingleStatementCustomerReport } from "./reporting/index.js";
 import { buildSingleStatementReportV1, buildUnableToAnalyzeReportV1 } from "./reporting/v1/index.js";
 import type { SingleStatementReportV1 } from "./reporting/v1/index.js";
 import { renderMultiStatementGlobalReportMarkdown } from "./reporting/buildMultiStatement.js";
-import { createJob, getJob, getJobByUploadId, listEvents, listStatementJobsForMerchant, pruneJobs, updateJob } from "./store.js";
+import { createJob, getJob, getJobByUploadId, listEvents, listJobCheckpoints, listStatementJobsForMerchant, pruneJobs, updateJob } from "./store.js";
 import { enqueueJob, hydrateQueuedJobs, processJobUntilTerminal } from "./worker.js";
 import {
   createPreviewJobAccessKey,
@@ -86,7 +86,8 @@ const isDevelopment = process.env.NODE_ENV === "development";
 const isVercel = Boolean(process.env.VERCEL) || Boolean(process.env.VERCEL_ENV);
 const reportV1Enabled = process.env.RATEREVEAL_REPORT_V1_ENABLED === "true";
 const reportV2Enabled = process.env.RATEREVEAL_REPORT_V2_ENABLED === "true";
-const dataRoot = isVercel ? path.join("/tmp", "ocr-data") : path.resolve("data");
+const configuredDataRoot = process.env.RATEREVEAL_DATA_ROOT?.trim();
+const dataRoot = configuredDataRoot || (isVercel ? path.join("/tmp", "ocr-data") : path.resolve("data"));
 const uploadDir = path.join(dataRoot, "uploads");
 const publicDir = path.resolve("public");
 const fileRetentionHours = Math.max(1, Number(process.env.FILE_RETENTION_HOURS ?? 72));
@@ -999,6 +1000,7 @@ function statementJobPayload(job: Job): Record<string, unknown> {
     analysisStatus: status,
     jobStatus: job.status,
     progress: job.progress,
+    checkpoints: listJobCheckpoints(job.id),
     attemptCount: job.attemptCount,
     maxAttempts: job.maxAttempts,
     nextRunAt: job.nextRunAt,

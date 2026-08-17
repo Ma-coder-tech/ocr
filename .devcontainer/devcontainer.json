@@ -1,0 +1,30 @@
+{
+  "name": "RateReveal Package 4A Staging",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "remoteEnv": {
+    "NODE_ENV": "production",
+    "HOST": "0.0.0.0",
+    "PORT": "3000",
+    "FEECLEAR_DB_PATH": "/workspaces/.ratereveal-staging/feeclear.sqlite",
+    "RATEREVEAL_DATA_ROOT": "/workspaces/.ratereveal-staging",
+    "RATEREVEAL_REPORT_V2_ENABLED": "true",
+    "VITE_RATEREVEAL_REPORT_V2_ENABLED": "true",
+    "RATEREVEAL_FEE_KNOWLEDGE_RESEARCH_ENABLED": "true",
+    "RATEREVEAL_FEE_KNOWLEDGE_INVESTIGATIVE_AI_ENABLED": "true",
+    "RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_ENABLED": "true",
+    "RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_PROVIDER": "openai",
+    "RATEREVEAL_MERCHANT_LANGUAGE_AI_PROVIDER": "openai",
+    "AI_FULL_STATEMENT_ANOMALY_ENABLED": "false"
+  },
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "RateReveal private product-review staging",
+      "onAutoForward": "openPreview",
+      "protocol": "https",
+      "visibility": "private"
+    }
+  },
+  "postCreateCommand": "npm install && npm run build:all",
+  "postStartCommand": "npm run staging:daemon"
+}

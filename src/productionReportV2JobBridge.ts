@@ -3,6 +3,7 @@ import type { ParsedDocument } from "./parser.js";
 import type { AnalysisSummary } from "./types.js";
 import type { ProductionReportProjection } from "./canonical/productionReportProjectionTypes.js";
 import type { CanonicalRuntimeDiagnostics } from "./canonical/runtimeAdapter.js";
+import type { RuntimeProgressReporter } from "./runtimeProgress.js";
 
 export type ProductionReportV2RuntimeBuilder = (
   input: import("./canonical/runtimeAdapter.js").CanonicalRuntimeAdapterInput,
@@ -19,6 +20,7 @@ export async function buildProductionReportV2ForJob(input: {
   legacySummary?: AnalysisSummary | null;
   wholeStatementFeeIntelligence?: import("./canonical/wholeStatementFeeIntelligenceRuntime.js").WholeStatementFeeIntelligenceRuntimeOptions;
   merchantLanguageInterpretation?: import("./canonical/merchantAttentionAiRuntime.js").MerchantAttentionAiRuntimeOptions;
+  progressReporter?: RuntimeProgressReporter;
   env?: NodeJS.ProcessEnv;
   build?: ProductionReportV2RuntimeBuilder;
 }): Promise<ProductionReportProjection | null> {
@@ -36,6 +38,7 @@ export async function buildProductionReportV2ForJob(input: {
       ...(input.merchantLanguageInterpretation
         ? { merchantLanguageInterpretation: input.merchantLanguageInterpretation }
         : {}),
+      ...(input.progressReporter ? { progressReporter: input.progressReporter } : {}),
     });
     if (result.runtimeDiagnostics) {
       console.info(

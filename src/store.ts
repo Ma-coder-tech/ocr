@@ -2,6 +2,12 @@ import { assertOneOf } from "./assertOneOf.js";
 import { randomUUID } from "node:crypto";
 import type { BusinessTypeId } from "./businessTypes.js";
 import { db, nowIso } from "./db.js";
+import {
+  normalizeRuntimeProgressEvent,
+  validateRuntimeExecutionId,
+  type RuntimeCheckpoint,
+  type RuntimeProgressEvent,
+} from "./runtimeProgress.js";
 import { JOB_STATUS_VALUES, isStatementSlot, type Job, type JobEvent, type JobStatus, type StatementSlot } from "./types.js";
 
 const TERMINAL_JOB_RETENTION_HOURS = Math.max(1, Number(process.env.TERMINAL_JOB_RETENTION_HOURS ?? 24));
@@ -129,7 +135,114 @@ export function createJob(input: {
     INSERT INTO analysis_job_events (job_id, at, stage, message) VALUES (?, ?, 'queued', 'Job queued')
   `).run(id, now);
 
+  appendJobCheckpointSafely(id, {
+    attemptCount: 0,
+    executionId: null,
+    event: { stage: "queued", status: "waiting" },
+    at: now,
+  });
+
   return getJob(id)!;
+}
+
+export function appendJobCheckpoint(
+  jobId: string,
+  input: {
+    attemptCount: number;
+    executionId?: string | null;
+    event: RuntimeProgressEvent;
+    at?: string;
+  },
+): RuntimeCheckpoint {
+  const normalized = normalizeRuntimeProgressEvent(input.event);
+  const executionId = validateRuntimeExecutionId(input.executionId);
+  if (!Number.isInteger(input.attemptCount) || input.attemptCount < 0) {
+    throw new Error("runtime_checkpoint_attempt_invalid");
+  }
+  const at = input.at ?? nowIso();
+  const insert = db.transaction(() => {
+    const row = db.prepare(`
+      SELECT COALESCE(MAX(sequence), 0) + 1 AS next_sequence
+      FROM analysis_job_checkpoints
+      WHERE job_id = ?
+    `).get(jobId) as { next_sequence: number };
+    db.prepare(`
+      INSERT INTO analysis_job_checkpoints (
+        job_id, sequence, execution_id, attempt_count, stage, status, at,
+        elapsed_ms, provider, model, counters_json, reason_codes_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      jobId,
+      row.next_sequence,
+      executionId,
+      input.attemptCount,
+      normalized.stage,
+      normalized.status,
+      at,
+      normalized.elapsedMs ?? null,
+      normalized.provider ?? null,
+      normalized.model ?? null,
+      JSON.stringify(normalized.counters ?? {}),
+      JSON.stringify(normalized.reasonCodes ?? []),
+    );
+    return row.next_sequence;
+  });
+  const sequence = insert();
+  return listJobCheckpoints(jobId).find((item) => item.sequence === sequence)!;
+}
+
+function appendJobCheckpointSafely(
+  jobId: string,
+  input: Parameters<typeof appendJobCheckpoint>[1],
+): void {
+  try {
+    appendJobCheckpoint(jobId, input);
+  } catch {
+    console.error("[runtime-checkpoint] runtime_checkpoint_persistence_failed");
+  }
+}
+
+export function listJobCheckpoints(jobId: string): RuntimeCheckpoint[] {
+  const rows = db.prepare(`
+    SELECT sequence, execution_id, attempt_count, stage, status, at, elapsed_ms,
+           provider, model, counters_json, reason_codes_json
+    FROM analysis_job_checkpoints
+    WHERE job_id = ?
+    ORDER BY sequence ASC
+  `).all(jobId) as Array<Record<string, unknown>>;
+  return rows.map((row) => ({
+    sequence: Number(row.sequence),
+    executionId: row.execution_id ? String(row.execution_id) : null,
+    attemptCount: Number(row.attempt_count),
+    stage: String(row.stage) as RuntimeCheckpoint["stage"],
+    status: String(row.status) as RuntimeCheckpoint["status"],
+    at: String(row.at),
+    elapsedMs: row.elapsed_ms === null || row.elapsed_ms === undefined ? null : Number(row.elapsed_ms),
+    provider: row.provider ? String(row.provider) as RuntimeCheckpoint["provider"] : null,
+    model: row.model ? String(row.model) : null,
+    counters: safeJsonObject(row.counters_json),
+    reasonCodes: safeJsonStringArray(row.reason_codes_json),
+  }));
+}
+
+function safeJsonObject(value: unknown): RuntimeCheckpoint["counters"] {
+  try {
+    const parsed = JSON.parse(String(value)) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as RuntimeCheckpoint["counters"]
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function safeJsonStringArray(value: unknown): string[] {
+  try {
+    const parsed = JSON.parse(String(value)) as unknown;
+    return Array.isArray(parsed) && parsed.every((item) => typeof item === "string") ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 export function getJob(id: string): Job | undefined {
@@ -330,12 +443,12 @@ export function getNextQueuedJobDelayMs(): number | null {
 export function requeueInterruptedJobs(): number {
   const rows = db
     .prepare(`
-      SELECT id
+      SELECT id, attempt_count
       FROM analysis_jobs
       WHERE status NOT IN ('queued', 'completed', 'failed')
       ORDER BY created_at ASC
     `)
-    .all() as Array<{ id: string }>;
+    .all() as Array<{ id: string; attempt_count: number }>;
 
   if (!rows.length) {
     return 0;
@@ -354,6 +467,16 @@ export function requeueInterruptedJobs(): number {
   `);
   for (const row of rows) {
     insertEvent.run(row.id, updatedAt);
+    appendJobCheckpointSafely(row.id, {
+      attemptCount: Number(row.attempt_count),
+      executionId: null,
+      event: {
+        stage: "queued",
+        status: "waiting",
+        reasonCodes: ["job_resumed_after_restart"],
+      },
+      at: updatedAt,
+    });
   }
 
   return rows.length;

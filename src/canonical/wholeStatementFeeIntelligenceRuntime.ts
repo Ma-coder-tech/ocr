@@ -22,6 +22,7 @@ import type {
 import type { FeeKnowledgeIntelligenceRecord } from "./feeKnowledgeTypes.js";
 import { safeProviderFailureError, type SafeProviderFailureOperationPhase } from "./providerFailureDiagnostics.js";
 import { serializeWholeStatementFeeIntelligenceProviderInput } from "./wholeStatementFeeIntelligenceProviderInput.js";
+import { emitRuntimeProgress, type RuntimeProgressReporter } from "../runtimeProgress.js";
 
 const require = createRequire(import.meta.url);
 
@@ -74,6 +75,7 @@ export type WholeStatementFeeIntelligenceRuntimeOptions = {
   sourceRegistry?: ApprovedWholeStatementFeeIntelligenceSourceRegistry;
   feeKnowledgeResearch?: FeeKnowledgeResearchOptions;
   onProviderUsage?: (usage: WholeStatementFeeIntelligenceProviderUsage) => void;
+  progressReporter?: RuntimeProgressReporter;
 };
 
 export type WholeStatementFeeIntelligenceProviderUsage = {
@@ -133,6 +135,12 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
   const options = input.options ?? {};
   const registry = options.sourceRegistry ?? { approvedExternalSourceRefs: [] };
   if (!runtimeEnabled(options)) {
+    await emitRuntimeProgress(options.progressReporter, {
+      stage: "whole_statement_intelligence",
+      status: "degraded",
+      provider: "none",
+      reasonCodes: ["whole_statement_fee_intelligence_disabled"],
+    });
     return {
       output: failedWholeStatementFeeIntelligenceOutput(
         input.analysis,
@@ -147,7 +155,10 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
     analysis: input.analysis,
     registry,
     questions: defaultFeeKnowledgeResearchQuestions(input.analysis, registry),
-    options: options.feeKnowledgeResearch,
+    options: {
+      ...options.feeKnowledgeResearch,
+      progressReporter: options.progressReporter,
+    },
   });
   const sourceProvenancePacket = buildFeeKnowledgeSourcePacket({
     analysis: input.analysis,
@@ -160,6 +171,16 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
   const packet = buildWholeStatementFeeIntelligencePacket(input.analysis, registry, sourceProvenancePacket);
 
   if (packet.admittedFeeRows.length === 0) {
+    await emitRuntimeProgress(options.progressReporter, {
+      stage: "whole_statement_intelligence",
+      status: "degraded",
+      provider: "none",
+      counters: {
+        expectedFeeRowCount: packet.admittedFeeRows.length,
+        reviewedFeeRowCount: 0,
+      },
+      reasonCodes: ["whole_statement_fee_intelligence_no_admitted_fee_rows"],
+    });
     return {
       output: failedWholeStatementFeeIntelligenceOutput(
         input.analysis,
@@ -172,6 +193,14 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
   }
 
   const providerReviewStartedAt = Date.now();
+  const providerSelection = wholeStatementFeeIntelligenceRuntimeProviderSelection(options);
+  await emitRuntimeProgress(options.progressReporter, {
+    stage: "whole_statement_intelligence",
+    status: "running",
+    provider: providerSelection.provider,
+    model: providerSelection.model,
+    counters: { expectedFeeRowCount: packet.admittedFeeRows.length },
+  });
   try {
     const timeoutMs = options.timeoutMs ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_TIMEOUT_MS ?? 12000);
     const raw = await withAbortTimeout(
@@ -179,6 +208,26 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
       timeoutMs,
     );
     const validation = validateWholeStatementFeeIntelligenceReview(raw, input.analysis, registry, sourceProvenancePacket);
+    await emitRuntimeProgress(options.progressReporter, {
+      stage: "whole_statement_intelligence",
+      status: validation.ok && ["completed", "partial"].includes(validation.output.reviewStatus)
+        ? "completed"
+        : "degraded",
+      elapsedMs: elapsedSince(providerReviewStartedAt),
+      provider: providerSelection.provider,
+      model: providerSelection.model,
+      counters: {
+        expectedFeeRowCount: validation.output.coverageProof.expectedFeeRowRefs.length,
+        reviewedFeeRowCount: validation.output.coverageProof.reviewedFeeRowRefs.length,
+        acceptedRecordCount: validation.output.acceptanceRecords.filter((record) =>
+          record.status === "accepted" || record.status === "accepted_with_conditions"
+        ).length,
+        needsVerificationCount: validation.output.acceptanceRecords.filter((record) => record.status === "needs_verification").length,
+        humanReviewCount: validation.output.acceptanceRecords.filter((record) => record.status === "human_review").length,
+        rejectedRecordCount: validation.output.acceptanceRecords.filter((record) => record.status === "rejected").length,
+      },
+      reasonCodes: validation.output.reasonCodes,
+    });
     return {
       output: validation.output,
       feeKnowledgeIntelligence: validation.ok && ["completed", "partial"].includes(validation.output.reviewStatus)
@@ -193,6 +242,18 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     const timedOut = /timed out|timeout/i.test(message);
+    await emitRuntimeProgress(options.progressReporter, {
+      stage: "whole_statement_intelligence",
+      status: timedOut ? "timed_out" : "failed",
+      elapsedMs: elapsedSince(providerReviewStartedAt),
+      provider: providerSelection.provider,
+      model: providerSelection.model,
+      counters: {
+        expectedFeeRowCount: packet.admittedFeeRows.length,
+        reviewedFeeRowCount: 0,
+      },
+      reasonCodes: [timedOut ? "whole_statement_fee_intelligence_timed_out" : "whole_statement_fee_intelligence_failed"],
+    });
     return {
       output: failedWholeStatementFeeIntelligenceOutput(
         input.analysis,

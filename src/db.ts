@@ -96,6 +96,23 @@ function migrate(): void {
       message TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS analysis_job_checkpoints (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id TEXT NOT NULL REFERENCES analysis_jobs(id) ON DELETE CASCADE,
+      sequence INTEGER NOT NULL,
+      execution_id TEXT,
+      attempt_count INTEGER NOT NULL,
+      stage TEXT NOT NULL,
+      status TEXT NOT NULL,
+      at TEXT NOT NULL,
+      elapsed_ms INTEGER,
+      provider TEXT,
+      model TEXT,
+      counters_json TEXT NOT NULL DEFAULT '{}',
+      reason_codes_json TEXT NOT NULL DEFAULT '[]',
+      UNIQUE(job_id, sequence)
+    );
+
     CREATE TABLE IF NOT EXISTS statement_uploads (
       id TEXT PRIMARY KEY,
       merchant_id INTEGER NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
@@ -248,6 +265,7 @@ function migrate(): void {
     CREATE INDEX IF NOT EXISTS idx_jobs_status_updated ON analysis_jobs(status, updated_at);
     CREATE INDEX IF NOT EXISTS idx_uploads_merchant ON statement_uploads(merchant_id);
     CREATE INDEX IF NOT EXISTS idx_job_events_job ON analysis_job_events(job_id);
+    CREATE INDEX IF NOT EXISTS idx_job_checkpoints_job_sequence ON analysis_job_checkpoints(job_id, sequence);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_statements_merchant_period ON statements(merchant_id, period_key);
     CREATE INDEX IF NOT EXISTS idx_multi_jobs_merchant ON multi_statement_jobs(merchant_id);
     CREATE INDEX IF NOT EXISTS idx_multi_jobs_status ON multi_statement_jobs(status);

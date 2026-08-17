@@ -5,6 +5,7 @@ import {
 } from "./runtimeAdapter.js";
 import { buildProductionReportProjection } from "./productionReportProjection.js";
 import type { ProductionReportProjection } from "./productionReportProjectionTypes.js";
+import { emitRuntimeProgress, runtimeProgressFailureReason, runtimeProgressFailureStatus } from "../runtimeProgress.js";
 
 export type ProductionReportRuntimeResult = {
   projection: ProductionReportProjection;
@@ -29,8 +30,26 @@ export async function buildProductionReportFromRuntime(
   const runtimeStartedAt = Date.now();
   const result = await buildCanonicalRuntimeAnalysisWithRuntimeAi(input);
   const projectionStartedAt = Date.now();
-  const projection = buildProductionReportProjection(result.analysis);
+  await emitRuntimeProgress(input.progressReporter, { stage: "projection", status: "running" });
+  let projection: ProductionReportProjection;
+  try {
+    projection = buildProductionReportProjection(result.analysis);
+  } catch (error) {
+    await emitRuntimeProgress(input.progressReporter, {
+      stage: "projection",
+      status: runtimeProgressFailureStatus(error),
+      elapsedMs: Math.max(0, Date.now() - projectionStartedAt),
+      reasonCodes: [runtimeProgressFailureReason(error, "projection")],
+    });
+    throw error;
+  }
   const projectionElapsedMs = Math.max(0, Date.now() - projectionStartedAt);
+  await emitRuntimeProgress(input.progressReporter, {
+    stage: "projection",
+    status: "completed",
+    elapsedMs: projectionElapsedMs,
+    counters: { projectionCount: 1 },
+  });
   return {
     projection,
     merchantLanguageRuntime: result.merchantLanguageRuntime,
