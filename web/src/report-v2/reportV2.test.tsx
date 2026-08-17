@@ -92,6 +92,16 @@ describe("ReportV2 public experiences", () => {
     expect(screen.getByText("VISA INTERCHANGE")).toBeInTheDocument();
   });
 
+  it("does not infer a clean report when findings and questions are hidden", () => {
+    const report = clone(reportV2Fixtures.above_reference_findings);
+    report.report!.priorityFindings = { heading: "What deserves attention", status: "omitted", items: [] };
+    report.report!.openQuestions = { heading: "What still needs checking", status: "omitted", context: [], items: [] };
+    report.report!.monitoring = { heading: "What to watch next", status: "omitted", guidance: [] };
+    render(<ReportV2Screen report={report} onStartOver={() => {}} />);
+    expect(screen.queryByRole("heading", { name: /nothing urgent found/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+  });
+
   it("does not duplicate effective rate in the statement snapshot and omits a missing transaction count", () => {
     const report = clone(reportV2Fixtures.above_reference_findings);
     if (report.report) report.report.snapshot.transactionCount = undefined;
@@ -115,12 +125,37 @@ describe("ReportV2 public experiences", () => {
   it("uses the projected inventory default and keeps routine charges available", async () => {
     const user = userEvent.setup();
     render(<ReportV2Screen report={reportV2Fixtures.above_reference_findings} onStartOver={() => {}} />);
-    expect(screen.getByRole("button", { name: /needs attention1/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /needs attention2/i })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("PROCESSOR MARKUP")).toBeInTheDocument();
+    expect(screen.getByText("ADDITIONAL FEES")).toBeInTheDocument();
     expect(screen.queryByText("VISA INTERCHANGE")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /routine2/i }));
     expect(screen.getByText("VISA INTERCHANGE")).toBeInTheDocument();
     expect(screen.getByText("MONTHLY SERVICE FEE")).toBeInTheDocument();
+  });
+
+  it("includes unresolved-only charges in the projected attention default", () => {
+    const report = clone(reportV2Fixtures.material_unresolved_fee);
+    report.report!.allCharges.defaultView = "attention";
+    report.report!.allCharges.rows = report.report!.allCharges.rows.filter((row) => row.disposition !== "attention");
+    render(<ReportV2Screen report={report} onStartOver={() => {}} />);
+    expect(screen.getByRole("button", { name: /needs attention1/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("ADDITIONAL FEES")).toBeInTheDocument();
+    expect(screen.queryByText(/no projected charges match/i)).not.toBeInTheDocument();
+  });
+
+  it("shows a neutral unrepresented remainder for partial composition", () => {
+    render(<ReportV2Screen report={reportV2Fixtures.comparison_unavailable} onStartOver={() => {}} />);
+    expect(screen.getByText("Not represented in this breakdown")).toBeInTheDocument();
+    expect(screen.getByText("Visible remainder only; not a fee category")).toBeInTheDocument();
+    expect(screen.getByText("$500.00")).toBeInTheDocument();
+    expect(document.querySelector(".rr-v2-stack-unrepresented")).toBeInTheDocument();
+  });
+
+  it("uses a short finding CTA without changing the projected action module", () => {
+    render(<ReportV2Screen report={reportV2Fixtures.above_reference_findings} onStartOver={() => {}} />);
+    expect(screen.getByRole("link", { name: /see review steps/i })).toHaveAttribute("href", "#rr-v2-next");
+    expect(screen.getByText("Ask for a pricing review")).toBeInTheDocument();
   });
 
   it("shows planned Save report choices without fake download or email behavior", async () => {

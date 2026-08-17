@@ -15,7 +15,9 @@ export async function buildProductionReportV2ForJob(input: {
   jobId: string;
   document: ParsedDocument;
   businessType: BusinessTypeId;
-  legacySummary: AnalysisSummary;
+  legacySummary?: AnalysisSummary | null;
+  wholeStatementFeeIntelligence?: import("./canonical/wholeStatementFeeIntelligenceRuntime.js").WholeStatementFeeIntelligenceRuntimeOptions;
+  merchantLanguageInterpretation?: import("./canonical/merchantAttentionAiRuntime.js").MerchantAttentionAiRuntimeOptions;
   env?: NodeJS.ProcessEnv;
   build?: ProductionReportV2RuntimeBuilder;
 }): Promise<ProductionReportProjection | null> {
@@ -26,10 +28,13 @@ export async function buildProductionReportV2ForJob(input: {
       document: input.document,
       businessType: input.businessType,
       runtimeDocumentRef: `job_${input.jobId}`,
-      legacySummary: input.legacySummary,
-      // The established job analysis has already completed its optional statement-level AI pass.
-      // Package 4 must not trigger a second whole-statement review for transport projection.
-      wholeStatementFeeIntelligence: { enabled: false },
+      legacySummary: input.legacySummary ?? null,
+      ...(input.wholeStatementFeeIntelligence
+        ? { wholeStatementFeeIntelligence: input.wholeStatementFeeIntelligence }
+        : {}),
+      ...(input.merchantLanguageInterpretation
+        ? { merchantLanguageInterpretation: input.merchantLanguageInterpretation }
+        : {}),
     });
     return result.projection;
   } catch (error) {

@@ -268,6 +268,14 @@ const unavailable = clone();
 unavailable.report!.hero.benchmark = null;
 unavailable.report!.hero.benchmarkUnavailableMessage = "A qualified reference range is not available for this statement. Your statement results are still available.";
 unavailable.report!.hero.interpretation = "This statement shows your effective rate, but there is not enough qualified context for a rate comparison.";
+unavailable.report!.composition = {
+  ...unavailable.report!.composition,
+  status: "partial",
+  statementFeeTotal: money(302294),
+  difference: money(50000),
+  reconciled: false,
+  disclosure: "This breakdown represents the supported categories only. Part of the statement fee total is not represented here.",
+};
 
 const confirmation = clone();
 confirmation.report!.openQuestions.items = [{

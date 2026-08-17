@@ -25,15 +25,15 @@ describe("production report V2 job bridge", () => {
     expect(build).not.toHaveBeenCalled();
   });
 
-  it("projects once from the runtime and explicitly suppresses duplicate whole-statement AI", async () => {
+  it("projects once through the complete Package 3 runtime without forcing intelligence off", async () => {
     const build = vi.fn(async () => ({ projection: unableProjection }));
     const projection = await buildProductionReportV2ForJob({ ...input, env: { RATEREVEAL_REPORT_V2_ENABLED: "true" }, build });
     expect(projection).toBe(unableProjection);
     expect(build).toHaveBeenCalledTimes(1);
-    expect(build).toHaveBeenCalledWith(expect.objectContaining({
-      runtimeDocumentRef: "job_job-transport-test",
-      wholeStatementFeeIntelligence: { enabled: false },
-    }));
+    const runtimeInput = build.mock.calls[0]![0];
+    expect(runtimeInput.runtimeDocumentRef).toBe("job_job-transport-test");
+    expect(runtimeInput).not.toHaveProperty("wholeStatementFeeIntelligence");
+    expect(runtimeInput).not.toHaveProperty("merchantLanguageInterpretation");
   });
 
   it("fails safely without replacing existing report paths when projection fails", async () => {

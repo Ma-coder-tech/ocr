@@ -1570,7 +1570,11 @@ async function handleAnonymousJobLookup(req: IncomingMessage, res: ServerRespons
     }
   }
 
-  json(res, 200, {
+  json(res, 200, buildAnonymousJobPayload(job));
+}
+
+export function buildAnonymousJobPayload(job: Job): Record<string, unknown> {
+  return {
     id: job.id,
     fileName: job.fileName,
     businessType: job.businessType,
@@ -1587,7 +1591,7 @@ async function handleAnonymousJobLookup(req: IncomingMessage, res: ServerRespons
       : null,
     reportV1: reportV1ForJob(job),
     productionReportV2: reportV2Enabled ? job.productionReportV2 ?? null : null,
-  });
+  };
 }
 
 async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {

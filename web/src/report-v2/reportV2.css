@@ -122,6 +122,8 @@
 .rr-v2-stack { height: 20px; margin: 20px 0 25px; display: flex; gap: 3px; overflow: hidden; border-radius: 7px; }
 .rr-v2-stack-segment { min-width: 3px; }
 .rr-v2-palette-0 { background: #286d78; }.rr-v2-palette-1 { background: #6a8f83; }.rr-v2-palette-2 { background: #aa7e45; }.rr-v2-palette-3 { background: #7185a2; }.rr-v2-palette-4 { background: #8f758d; }.rr-v2-palette-5 { background: #7c8563; }
+.rr-v2-stack-unrepresented { background: #d7dce0; }
+.rr-v2-unrepresented strong { color: #52606b; }
 .rr-v2-composition-legend { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px 34px; list-style: none; }
 .rr-v2-composition-legend li { display: grid; grid-template-columns: 11px 1fr auto; gap: 10px; align-items: center; }
 .rr-v2-legend-dot { width: 10px; height: 10px; border-radius: 3px; }

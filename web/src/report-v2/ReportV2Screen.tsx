@@ -125,7 +125,7 @@ function UnableReport({ report, onStartOver }: ReportV2ScreenProps) {
 }
 
 function ReportableReport({ report, payload, onStartOver }: { report: ProductionReportV2; payload: ReportV2Payload; onStartOver: () => void }) {
-  const clean = payload.priorityFindings.status === "omitted" && payload.openQuestions.status === "omitted";
+  const clean = report.experience === "analysis_completed" && payload.monitoring.status === "shown";
   const navItems = navigationFor(payload);
   return (
     <div className="rr-v2">
@@ -275,7 +275,11 @@ function Metric({ label, value }: { label: string; value: string }) {
 function Composition({ payload }: { payload: ReportV2Payload }) {
   const composition = payload.composition;
   if (composition.status === "omitted" || !composition.categories.length) return null;
-  const total = Math.max(1, composition.categories.reduce((sum, category) => sum + Math.max(category.amount.amountMinor, 0), 0));
+  const represented = composition.categories.reduce((sum, category) => sum + Math.max(category.amount.amountMinor, 0), 0);
+  const unrepresented = composition.status === "partial" && (composition.difference?.amountMinor ?? 0) > 0
+    ? composition.difference!.amountMinor
+    : 0;
+  const total = Math.max(1, composition.statementFeeTotal?.amountMinor ?? 0, represented + unrepresented);
   return (
     <section className="rr-v2-section" id="rr-v2-fees" aria-labelledby="rr-v2-composition-title">
       <div className="rr-v2-section-heading">
@@ -288,6 +292,7 @@ function Composition({ payload }: { payload: ReportV2Payload }) {
           {composition.categories.map((category, index) => (
             <span key={category.id} className={`rr-v2-stack-segment rr-v2-palette-${index % 6}`} style={{ width: `${Math.max(2, category.amount.amountMinor / total * 100)}%` }} />
           ))}
+          {unrepresented > 0 ? <span className="rr-v2-stack-segment rr-v2-stack-unrepresented" style={{ width: `${unrepresented / total * 100}%` }} /> : null}
         </div>
         <ul className="rr-v2-composition-legend">
           {composition.categories.map((category, index) => (
@@ -297,6 +302,13 @@ function Composition({ payload }: { payload: ReportV2Payload }) {
               <b>{formatMoney(category.amount)}</b>
             </li>
           ))}
+          {unrepresented > 0 ? (
+            <li className="rr-v2-unrepresented">
+              <span className="rr-v2-legend-dot rr-v2-stack-unrepresented" aria-hidden="true" />
+              <span><strong>Not represented in this breakdown</strong><small>Visible remainder only; not a fee category</small></span>
+              <b>{formatMoney(composition.difference!)}</b>
+            </li>
+          ) : null}
         </ul>
         {composition.disclosure ? <p className="rr-v2-inline-note"><Info size={15} aria-hidden="true" />{composition.disclosure}</p> : null}
       </div>
@@ -337,7 +349,7 @@ function FindingCard({ finding, index }: { finding: ReportV2Finding; index: numb
         <span>{finding.likelyOwner ? `Likely owner: ${finding.likelyOwner.economicBeneficiary}` : "Owner not established"}</span>
         <span>{confidenceLabel(finding.confidence)}</span>
         <FindingDetails finding={finding} />
-        {finding.safestNextAction ? <a className="rr-v2-button rr-v2-button-primary rr-v2-button-small" href="#rr-v2-next">{finding.safestNextAction.instruction}<ArrowRight size={15} aria-hidden="true" /></a> : null}
+        {finding.safestNextAction ? <a className="rr-v2-button rr-v2-button-primary rr-v2-button-small" href="#rr-v2-next">{findingActionLabel(finding.safestNextAction.actionType)}<ArrowRight size={15} aria-hidden="true" /></a> : null}
       </div>
     </article>
   );
@@ -596,9 +608,15 @@ function rangeMarker(rate: number, low: number, high: number): number {
 
 function filterCharge(row: ReportV2Charge, filter: InventoryFilter): boolean {
   if (filter === "all") return true;
-  if (filter === "attention") return row.disposition === "attention";
+  if (filter === "attention") return row.disposition === "attention" || row.disposition === "unresolved";
   if (filter === "routine") return row.disposition === "routine";
   return row.disposition === "unresolved";
+}
+
+function findingActionLabel(actionType: string): string {
+  if (actionType === "request_breakdown") return "See what to ask";
+  if (actionType === "request_pricing_review" || actionType === "request_repricing") return "See review steps";
+  return "See what to do";
 }
 
 function countForFilter(rows: ReportV2Charge[], filter: InventoryFilter): number {

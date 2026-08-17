@@ -106,7 +106,7 @@ async function tick(): Promise<void> {
   }
 }
 
-async function processJob(jobId: string): Promise<void> {
+export async function processJob(jobId: string): Promise<void> {
   const queuedJob = getJob(jobId);
   if (!queuedJob || queuedJob.status === "completed" || queuedJob.status === "failed") return;
   const stageDelayMs = Number(process.env.STAGE_DELAY_MS ?? 0);
@@ -132,16 +132,26 @@ async function processJob(jobId: string): Promise<void> {
     });
 
     if (job.fileType === "pdf" && parsed.extraction.mode === "unusable") {
-      failJob(
+      await failJobWithProductionReportRecovery({
         jobId,
-        "This PDF appears to be a scanned image. Please upload a text-based PDF exported directly from your processor's portal. Most processors provide downloadable PDF statements that are text-based.",
-      );
+        document: parsed,
+        businessType: job.businessType,
+        legacySummary: null,
+        error:
+          "This PDF appears to be a scanned image. Please upload a text-based PDF exported directly from your processor's portal. Most processors provide downloadable PDF statements that are text-based.",
+      });
       return;
     }
 
     const preflightFailure = detectPreflightFailure(parsed);
     if (preflightFailure) {
-      failJob(jobId, preflightFailure);
+      await failJobWithProductionReportRecovery({
+        jobId,
+        document: parsed,
+        businessType: job.businessType,
+        legacySummary: null,
+        error: preflightFailure,
+      });
       return;
     }
 
@@ -162,12 +172,24 @@ async function processJob(jobId: string): Promise<void> {
     });
 
     if (summary.totalVolume <= 0) {
-      failJob(jobId, "We could not find your total processing volume.");
+      await failJobWithProductionReportRecovery({
+        jobId,
+        document: parsed,
+        businessType: job.businessType,
+        legacySummary: summary,
+        error: "We could not find your total processing volume.",
+      });
       return;
     }
 
     if (summary.totalFees <= 0) {
-      failJob(jobId, "We could not find your total fees.");
+      await failJobWithProductionReportRecovery({
+        jobId,
+        document: parsed,
+        businessType: job.businessType,
+        legacySummary: summary,
+        error: "We could not find your total fees.",
+      });
       return;
     }
 
@@ -270,6 +292,25 @@ async function processJob(jobId: string): Promise<void> {
       scheduleTickAfter(retry.delayMs);
     }
   }
+}
+
+async function failJobWithProductionReportRecovery(input: {
+  jobId: string;
+  document: ParsedDocument;
+  businessType: AnalysisSummary["businessType"];
+  legacySummary: AnalysisSummary | null;
+  error: string;
+}): Promise<void> {
+  const projection = await buildProductionReportV2ForJob({
+    jobId: input.jobId,
+    document: input.document,
+    businessType: input.businessType,
+    legacySummary: input.legacySummary,
+  });
+  if (projection?.experience === "unable_to_complete") {
+    updateJob(input.jobId, { productionReportV2: projection }, "Safe recovery report ready");
+  }
+  failJob(input.jobId, input.error);
 }
 
 async function runAiRefinement(summary: AnalysisSummary) {
