@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, type ChangeEvent, type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ResultsScreen } from "./ResultsScreen";
+import { readRateRevealApiJson } from "./apiResponse";
 import type { BusinessTypeId, JobResponse, JobStatus } from "./reportAdapter";
 import { ReportV1Gallery } from "./report-v1/ReportV1Gallery";
 import { ReportV1Gate } from "./report-v1/ReportV1Gate";
@@ -246,7 +247,7 @@ export function App() {
         method: "POST",
         body: form,
       });
-      const payload = (await response.json()) as { jobId?: string; error?: string };
+      const payload = await readRateRevealApiJson<{ jobId?: string; error?: string }>(response);
 
       if (!response.ok || !payload.jobId) {
         throw new Error(payload.error ?? "We couldn't start the analysis. Try again.");
@@ -265,7 +266,7 @@ export function App() {
   async function pollJob(jobId: string) {
     try {
       const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`);
-      const payload = (await response.json()) as JobResponse | { error?: string };
+      const payload = await readRateRevealApiJson<JobResponse | { error?: string }>(response);
 
       if (!response.ok || !("status" in payload)) {
         throw new Error("error" in payload && payload.error ? payload.error : "We couldn't check analysis progress.");

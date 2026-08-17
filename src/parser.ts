@@ -1,11 +1,12 @@
 import fs from "node:fs/promises";
-import path from "node:path";
-import { createRequire } from "node:module";
 import { parse } from "csv-parse/sync";
+import {
+  runIsolatedPdfParser,
+  type PdfParserIsolationOptions,
+  type PdfParserStageDiagnostic,
+} from "./pdfParserIsolation.js";
 
 const PDF_PARSE_TIMEOUT_MS = Number(process.env.PDF_PARSE_TIMEOUT_MS ?? 60_000);
-const require = createRequire(import.meta.url);
-const PDFJS_STANDARD_FONT_DATA_URL = `${path.join(path.dirname(require.resolve("pdfjs-dist/package.json")), "standard_fonts")}/`;
 
 export type ParsedDocument = {
   sourceType: "csv" | "pdf";
@@ -26,14 +27,6 @@ export type ExtractionDiagnostics = {
   hasExtractableText: boolean;
 };
 
-type PdfTextItem = {
-  str: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
 type PdfCell = {
   text: string;
   x0: number;
@@ -45,24 +38,6 @@ type PdfLine = {
   y: number;
   cells: PdfCell[];
   text: string;
-};
-
-type PdfJsPageProxy = {
-  getTextContent: () => Promise<{
-    items: Array<{ str?: string; transform?: number[]; width?: number; height?: number }>;
-  }>;
-  cleanup: () => void;
-};
-
-type PdfJsDocumentProxy = {
-  numPages: number;
-  getPage: (pageNumber: number) => Promise<PdfJsPageProxy>;
-  destroy: () => Promise<void>;
-};
-
-type PdfJsLoadingTask = {
-  promise: Promise<PdfJsDocumentProxy>;
-  destroy: () => Promise<void>;
 };
 
 function isLikelyHeaderCell(value: string): boolean {
@@ -174,71 +149,6 @@ function looksLikeLabelText(input: string): boolean {
   return true;
 }
 
-function splitPdfLineIntoCells(items: PdfTextItem[]): PdfCell[] {
-  const sorted = [...items].sort((left, right) => left.x - right.x);
-  const cells: PdfCell[] = [];
-  let current: PdfCell | null = null;
-
-  for (const item of sorted) {
-    const text = cleanPdfCellText(item.str);
-    if (!text) continue;
-
-    if (!current) {
-      current = { text, x0: item.x, x1: item.x + item.width };
-      continue;
-    }
-
-    const gap = item.x - current.x1;
-    const threshold = Math.max(12, item.height * 1.2);
-    if (gap > threshold) {
-      cells.push({ ...current, text: cleanPdfCellText(current.text) });
-      current = { text, x0: item.x, x1: item.x + item.width };
-      continue;
-    }
-
-    current.text = cleanPdfCellText(`${current.text}${gap > 1 ? " " : ""}${text}`);
-    current.x1 = Math.max(current.x1, item.x + item.width);
-  }
-
-  if (current) {
-    cells.push({ ...current, text: cleanPdfCellText(current.text) });
-  }
-
-  return cells.filter((cell) => cell.text.length > 0);
-}
-
-function groupPdfItemsIntoLines(items: PdfTextItem[], pageNumber: number): PdfLine[] {
-  const buckets = new Map<number, PdfTextItem[]>();
-
-  for (const item of items) {
-    const bucketY = Math.round(item.y * 2) / 2;
-    let existingKey: number | null = null;
-    for (const key of buckets.keys()) {
-      if (Math.abs(key - bucketY) <= 1.5) {
-        existingKey = key;
-        break;
-      }
-    }
-    const targetKey = existingKey ?? bucketY;
-    const current = buckets.get(targetKey) ?? [];
-    current.push(item);
-    buckets.set(targetKey, current);
-  }
-
-  return [...buckets.entries()]
-    .sort((left, right) => right[0] - left[0])
-    .map(([y, group]) => {
-      const cells = splitPdfLineIntoCells(group);
-      return {
-        page: pageNumber,
-        y,
-        cells,
-        text: collapseWhitespace(cells.map((cell) => cell.text).join(" | ")),
-      };
-    })
-    .filter((line) => line.text.length > 0);
-}
-
 function parsePdfFieldValue(input: string): string | number {
   const cleaned = collapseRepeatedHalves(input);
   const numeric = safeNum(cleaned);
@@ -280,71 +190,6 @@ function extractPdfLabelValue(line: PdfLine): { label: string; value: string | n
   }
 
   return { label, value, kind };
-}
-
-async function extractPdfLines(buffer: Buffer): Promise<PdfLine[]> {
-  // pdfjs-dist expects browser geometry classes even when we only extract text.
-  // Some local Node installs do not load the optional canvas package, so provide
-  // the minimal constructor surface needed for text extraction.
-  const globalScope = globalThis as Record<string, unknown>;
-  if (!globalScope.DOMMatrix) {
-    globalScope.DOMMatrix = class DOMMatrix {
-      a = 1;
-      b = 0;
-      c = 0;
-      d = 1;
-      e = 0;
-      f = 0;
-    };
-  }
-  if (!globalScope.ImageData) {
-    globalScope.ImageData = class ImageData {};
-  }
-  if (!globalScope.Path2D) {
-    globalScope.Path2D = class Path2D {};
-  }
-
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const loadingTask = pdfjs.getDocument({
-    data: new Uint8Array(buffer),
-    isEvalSupported: false,
-    useWorkerFetch: false,
-    standardFontDataUrl: PDFJS_STANDARD_FONT_DATA_URL,
-  }) as PdfJsLoadingTask;
-
-  const lines: PdfLine[] = [];
-  let document: PdfJsDocumentProxy | null = null;
-  try {
-    document = await loadingTask.promise;
-    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
-      const page = await document.getPage(pageNumber);
-      try {
-        const textContent = await page.getTextContent();
-        const items = textContent.items
-          .filter((item): item is typeof item & { str: string; transform: number[]; width: number; height: number } => "str" in item)
-          .map((item) => ({
-            str: item.str,
-            x: item.transform[4] ?? 0,
-            y: item.transform[5] ?? 0,
-            width: item.width ?? 0,
-            height: item.height ?? 0,
-          }))
-          .filter((item) => item.str.length > 0);
-
-        lines.push(...groupPdfItemsIntoLines(items, pageNumber));
-      } finally {
-        page.cleanup();
-      }
-    }
-  } finally {
-    if (document) {
-      await document.destroy();
-    } else {
-      await loadingTask.destroy();
-    }
-  }
-
-  return lines;
 }
 
 function buildStructuredPdfRows(lines: PdfLine[]): Array<Record<string, string | number>> {
@@ -453,33 +298,55 @@ export async function parseCsv(filePath: string): Promise<ParsedDocument> {
   };
 }
 
-export async function parsePdf(filePath: string, jobId?: string): Promise<ParsedDocument> {
+export async function parsePdf(
+  filePath: string,
+  jobId?: string,
+  runtimeOptions: PdfParserIsolationOptions = {},
+): Promise<ParsedDocument> {
   const buffer = await fs.readFile(filePath);
-  return parsePdfBytes(buffer, jobId);
+  return parsePdfBytes(buffer, jobId, runtimeOptions);
 }
 
-export async function parsePdfBytes(bytes: Uint8Array, jobId?: string): Promise<ParsedDocument> {
+export async function parsePdfBytes(
+  bytes: Uint8Array,
+  jobId?: string,
+  runtimeOptions: PdfParserIsolationOptions = {},
+): Promise<ParsedDocument> {
+  const timeoutMs = runtimeOptions.timeoutMs ?? PDF_PARSE_TIMEOUT_MS;
   if (jobId) {
-    console.log(`[job:${jobId}] pdf-layout-parse-start timeout=${PDF_PARSE_TIMEOUT_MS}ms`);
+    console.log(`[job:${jobId}] pdf-layout-parse-start timeout=${timeoutMs}ms isolation=worker_thread`);
   } else {
-    console.log(`[pdf-layout-parse] start timeout=${PDF_PARSE_TIMEOUT_MS}ms`);
+    console.log(`[pdf-layout-parse] start timeout=${timeoutMs}ms isolation=worker_thread`);
   }
 
-  let timer: NodeJS.Timeout | undefined;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      reject(new Error("PDF parsing timed out. The file may be corrupted or too complex to process."));
-    }, PDF_PARSE_TIMEOUT_MS);
-  });
-
-  const lines = await Promise.race([extractPdfLines(Buffer.from(bytes)), timeoutPromise]).finally(() => {
-    if (timer) {
-      clearTimeout(timer);
-    }
+  let pageCount: number | null = null;
+  const startedAt = Date.now();
+  const lines = await runIsolatedPdfParser(Buffer.from(bytes), {
+    ...runtimeOptions,
+    timeoutMs,
+    onStage: (diagnostic) => {
+      if (diagnostic.stage === "document_loaded") pageCount = diagnostic.pageCount ?? null;
+      logPdfParserStage(jobId, diagnostic);
+      runtimeOptions.onStage?.(diagnostic);
+    },
   });
   const rows = buildStructuredPdfRows(lines).slice(0, 1500);
   const extraction = summarizePdfExtraction(rows, lines);
   const text = lines.map((line) => line.text).join(" ");
+
+  const completion = {
+    stage: "completed",
+    elapsedMs: Math.max(0, Date.now() - startedAt),
+    pageCount,
+    lineCount: lines.length,
+    timeoutMechanism: "worker_thread_termination",
+    canvasRuntime: "not_required_for_text_extraction",
+  };
+  if (jobId) {
+    console.info(`[job:${jobId}] pdf-layout-parse-complete`, JSON.stringify(completion));
+  } else {
+    console.info("[pdf-layout-parse] complete", JSON.stringify(completion));
+  }
 
   return {
     sourceType: "pdf",
@@ -488,4 +355,9 @@ export async function parsePdfBytes(bytes: Uint8Array, jobId?: string): Promise<
     textPreview: text.slice(0, 1500),
     extraction,
   };
+}
+
+function logPdfParserStage(jobId: string | undefined, diagnostic: PdfParserStageDiagnostic): void {
+  if (!jobId) return;
+  console.info(`[job:${jobId}] pdf-layout-stage`, JSON.stringify(diagnostic));
 }
