@@ -60,7 +60,7 @@ import { buildSingleStatementReportV1, buildUnableToAnalyzeReportV1 } from "./re
 import type { SingleStatementReportV1 } from "./reporting/v1/index.js";
 import { renderMultiStatementGlobalReportMarkdown } from "./reporting/buildMultiStatement.js";
 import { createJob, getJob, getJobByUploadId, listEvents, listStatementJobsForMerchant, pruneJobs, updateJob } from "./store.js";
-import { enqueueJob, hydrateQueuedJobs } from "./worker.js";
+import { enqueueJob, hydrateQueuedJobs, processJob } from "./worker.js";
 import { createMultiStatementAnalysisJob } from "./multiStatementOrchestrator.js";
 import {
   getLatestMultiStatementAnalysisForJob,
@@ -646,7 +646,11 @@ async function handleCreateAnonymousJob(req: IncomingMessage, res: ServerRespons
   });
 
   setPendingStatementJobCookie(req, res, job.id);
-  enqueueJob(job.id);
+  if (process.env.VERCEL_ENV === "preview") {
+    await processJob(job.id);
+  } else {
+    enqueueJob(job.id);
+  }
   json(res, 201, { jobId: job.id });
 }
 
