@@ -109,6 +109,22 @@ describe("fee knowledge intelligence state model", () => {
       semanticVerificationStatus: "completed",
     });
     expect(research.claimSupports[0]!.evidenceDecision).not.toMatch(/^verified_/);
+    expect(research.diagnostics).toMatchObject({
+      policyVersion: "fee_knowledge_research_diagnostics_v1",
+      enabled: true,
+      questionCount: 1,
+      selectedQuestionCount: 1,
+      searchCallCount: 1,
+      candidateCount: 1,
+      retrievalAttemptCount: 1,
+      semanticVerificationAttemptCount: 1,
+      investigative: {
+        statement: { attempted: false, status: "disabled" },
+        retrievedDocument: { attemptCount: 0 },
+      },
+    });
+    expect(research.diagnostics.elapsedMs).toBeGreaterThanOrEqual(0);
+    expect(JSON.stringify(research.diagnostics)).not.toMatch(/evidence\.test|Official rates|network assessment rates|https?:\/\//i);
     expect(research.intelligence.some((item) =>
       item.origin === "retrieved_document" &&
       item.state === "source_derived_candidate_evidence" &&
@@ -319,6 +335,19 @@ describe("fee knowledge intelligence state model", () => {
       semanticVerificationStatus: "completed",
     });
     expect(research.claimSupports).toHaveLength(1);
+    expect(research.diagnostics).toMatchObject({
+      enabled: true,
+      searchCallCount: 1,
+      retrievalAttemptCount: 1,
+      investigative: {
+        statement: { attempted: true, status: "completed" },
+        retrievedDocument: { attemptCount: 1, statusCounts: { completed: 1 } },
+      },
+      semanticVerificationAttemptCount: 1,
+      claimSupportCount: 1,
+      verifiedClaimSupportCount: 0,
+    });
+    expect(JSON.stringify(research.diagnostics)).not.toMatch(/discover\.test|Discover Rules|Network Assessment|semantic_supports_alias_candidate|https?:\/\//i);
     expect(research.intelligence.some((item) =>
       item.origin === "retrieved_document" &&
       item.state === "source_derived_candidate_evidence" &&

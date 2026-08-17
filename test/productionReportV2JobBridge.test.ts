@@ -36,6 +36,39 @@ describe("production report V2 job bridge", () => {
     expect(runtimeInput).not.toHaveProperty("merchantLanguageInterpretation");
   });
 
+  it("logs only the bounded server-side Package 3 diagnostic summary", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    const runtimeDiagnostics = {
+      policyVersion: "package_3_runtime_diagnostics_v1",
+      feeKnowledgeResearch: null,
+      stageElapsedMs: {
+        canonicalConstruction: 2, feeKnowledgeResearch: 0, wholeStatementFeeIntelligence: 7,
+        merchantAttentionConstruction: 3, merchantLanguageAi: 5, productionProjection: 1, totalPackage3Runtime: 18,
+      },
+      wholeStatementFeeIntelligence: {
+        provider: "openai", model: "gpt-safe", attempted: true, reviewStatus: "completed",
+        canonicalAdmissionStatus: "admitted", canonicalCapabilityStatus: "completed", groundingStatus: "grounded",
+        expectedFeeRowCount: 2, reviewedFeeRowCount: 2, acceptedRecordCount: 2, needsVerificationCount: 0,
+        humanReviewCount: 0, rejectedRecordCount: 0, safeReasonCodes: ["whole_statement_fee_intelligence_completed"],
+        admittedFeeKnowledgeAvailable: true, elapsedMs: 7,
+      },
+      merchantLanguageAi: {
+        provider: "openai", model: "gpt-safe", attempted: true, status: "admitted",
+        eligibleItemCount: 2, admittedItemCount: 2, safeReasonCodes: ["merchant_language_ai_admitted"], elapsedMs: 5,
+      },
+    } as const;
+    await buildProductionReportV2ForJob({
+      ...input,
+      env: { RATEREVEAL_REPORT_V2_ENABLED: "true" },
+      build: async () => ({ projection: unableProjection, runtimeDiagnostics }),
+    });
+    expect(infoSpy).toHaveBeenCalledTimes(1);
+    const serialized = JSON.stringify(infoSpy.mock.calls);
+    expect(serialized).toContain("package-3-runtime-diagnostics");
+    expect(serialized).not.toMatch(/prompt|response text|merchant identity|account|filename|api.?key/i);
+    infoSpy.mockRestore();
+  });
+
   it("fails safely without replacing existing report paths when projection fails", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const projection = await buildProductionReportV2ForJob({

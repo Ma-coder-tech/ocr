@@ -28,6 +28,7 @@ import {
 import { buildRetrievedDocumentIntelligence, buildStatementGroundedIntelligence } from "./feeKnowledgeIntelligence.js";
 import {
   candidateEvidenceLocatorHash,
+  feeKnowledgeInvestigativeIntelligenceEnabled,
   runFeeKnowledgeInvestigativeIntelligence,
   type FeeKnowledgeInvestigativeIntelligenceOptions,
 } from "./feeKnowledgeInvestigativeIntelligence.js";
@@ -156,6 +157,67 @@ export type FeeKnowledgeResearchResult = {
   candidates: FeeKnowledgeResearchCandidateRecord[];
   intelligence: FeeKnowledgeIntelligenceRecord[];
   claimSupports: FeeKnowledgeClaimSupportRecord[];
+  diagnostics: FeeKnowledgeResearchDiagnostics;
+};
+
+type FeeKnowledgeResearchCoreResult = Omit<FeeKnowledgeResearchResult, "diagnostics">;
+
+export type FeeKnowledgeResearchDiagnostics = {
+  policyVersion: "fee_knowledge_research_diagnostics_v1";
+  enabled: boolean;
+  questionCount: number;
+  selectedQuestionCount: number;
+  searchCallCount: number;
+  searchAttemptStatusCounts: Record<string, number>;
+  candidateCount: number;
+  retrievalAttemptCount: number;
+  retrievalStatusCounts: Record<string, number>;
+  investigative: {
+    statement: {
+      attempted: boolean;
+      status: "disabled" | "completed" | "provider_unavailable" | "failed";
+      outputRecordCount: number;
+      safeReasonCodes: string[];
+    };
+    retrievedDocument: {
+      attemptCount: number;
+      statusCounts: Record<string, number>;
+      outputRecordCount: number;
+      safeReasonCodes: string[];
+    };
+  };
+  semanticVerificationAttemptCount: number;
+  semanticVerificationStatusCounts: Record<string, number>;
+  claimSupportCount: number;
+  verifiedClaimSupportCount: number;
+  safeReasonCodes: string[];
+  elapsedMs: number;
+  stageElapsedMs: {
+    planning: number;
+    webSearchDiscovery: number;
+    retrieval: number;
+    statementInvestigativeIntelligence: number;
+    retrievedDocumentInvestigativeIntelligence: number;
+    semanticVerification: number;
+  };
+};
+
+type MutableFeeKnowledgeResearchDiagnosticState = {
+  startedAt: number;
+  enabled: boolean;
+  questionCount: number;
+  selectedQuestionCount: number;
+  searchCallCount: number;
+  retrievalAttemptCount: number;
+  statementInvestigativeAttempted: boolean;
+  statementInvestigativeStatus: FeeKnowledgeResearchDiagnostics["investigative"]["statement"]["status"];
+  statementInvestigativeOutputRecordCount: number;
+  statementInvestigativeReasonCodes: Set<string>;
+  retrievedInvestigativeAttemptCount: number;
+  retrievedInvestigativeStatuses: string[];
+  retrievedInvestigativeOutputRecordCount: number;
+  retrievedInvestigativeReasonCodes: Set<string>;
+  stageElapsedMs: FeeKnowledgeResearchDiagnostics["stageElapsedMs"];
 };
 
 export class FeeKnowledgeSearchProviderError extends Error {
@@ -174,36 +236,43 @@ export async function runFeeKnowledgeResearch(input: {
   options?: FeeKnowledgeResearchOptions;
 }): Promise<FeeKnowledgeResearchResult> {
   const options = input.options ?? {};
-  if (!researchEnabled(options)) {
-    return {
+  const enabled = researchEnabled(options);
+  const diagnosticState = initialResearchDiagnosticState(enabled, input.questions.length);
+  if (!enabled) {
+    return snapshotResearchResult({
       attempts: input.questions.map((question, index) => attemptRecord(question, index, "disabled", [], ["fee_knowledge_research_disabled"])),
       candidates: [],
       intelligence: buildStatementGroundedIntelligence({ analysis: input.analysis, questions: input.questions }),
       claimSupports: [],
-    };
+    }, buildResearchDiagnostics(diagnosticState, {
+      attempts: input.questions.map((question, index) => attemptRecord(question, index, "disabled", [], ["fee_knowledge_research_disabled"])),
+      candidates: [],
+      claimSupports: [],
+    }));
   }
   if (input.questions.length === 0) {
-    return {
+    const notNeededAttempt: FeeKnowledgeResearchAttemptRecord = {
+      type: "fee_knowledge_research_attempt",
+      policyVersion: FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
+      attemptId: "research_not_needed",
+      questionRef: `question_${"0".repeat(64)}`,
+      feeRowRef: "__statement__",
+      sanitizedQuestionCategory: "classification",
+      triggerReason: "not_needed",
+      status: "not_needed",
+      resultCount: 0,
+      candidateIds: [],
+      reasonCodes: ["fee_knowledge_research_not_needed"],
+      providerDetailsStripped: true,
+    };
+    return snapshotResearchResult({
       attempts: [
-        {
-          type: "fee_knowledge_research_attempt",
-          policyVersion: FEE_KNOWLEDGE_RESEARCH_POLICY_VERSION,
-          attemptId: "research_not_needed",
-          questionRef: `question_${"0".repeat(64)}`,
-          feeRowRef: "__statement__",
-          sanitizedQuestionCategory: "classification",
-          triggerReason: "not_needed",
-          status: "not_needed",
-          resultCount: 0,
-          candidateIds: [],
-          reasonCodes: ["fee_knowledge_research_not_needed"],
-          providerDetailsStripped: true,
-        },
+        notNeededAttempt,
       ],
       candidates: [],
       intelligence: [],
       claimSupports: [],
-    };
+    }, buildResearchDiagnostics(diagnosticState, { attempts: [notNeededAttempt], candidates: [], claimSupports: [] }));
   }
 
   const attempts: FeeKnowledgeResearchAttemptRecord[] = [];
@@ -213,7 +282,7 @@ export async function runFeeKnowledgeResearch(input: {
     questions: input.questions,
   });
   const claimSupports: FeeKnowledgeClaimSupportRecord[] = [];
-  return withAbortTimeout(async (abortSignal) => {
+  const result = await withAbortTimeout(async (abortSignal) => {
     const searchAdapter = options.adapter ?? openAiWebSearchAdapter({ apiKey: options.openAiApiKey, modelName: options.openAiModelName, fetchImpl: options.fetchImpl });
     const semanticSupportAdapter =
       options.semanticSupportAdapter ?? openAiSemanticSupportAdapter({ apiKey: options.openAiApiKey, modelName: options.openAiModelName, fetchImpl: options.fetchImpl });
@@ -221,26 +290,46 @@ export async function runFeeKnowledgeResearch(input: {
       ? { openAiApiKey: options.openAiApiKey, openAiModelName: options.openAiModelName, fetchImpl: options.fetchImpl, ...options.investigativeIntelligence }
       : undefined;
     const sourcePacket = buildFeeKnowledgeSourcePacket({ analysis: input.analysis, registry: input.registry });
+    const planningStartedAt = Date.now();
     const researchPlan = planFeeKnowledgeResearchQuestions(input.questions, FEE_KNOWLEDGE_RESEARCH_LIMITS);
+    diagnosticState.stageElapsedMs.planning += elapsedSince(planningStartedAt);
+    diagnosticState.selectedQuestionCount = researchPlan.selected.length;
     const selectedQuestions = researchPlan.selectedQuestions;
     const selectedQuestionItems = researchPlan.selected;
     const skippedQuestions = researchPlan.notSelectedQuestions;
     let remainingCandidates = FEE_KNOWLEDGE_RESEARCH_LIMITS.maxRetrievalCandidates;
-    intelligence.push(...await runFeeKnowledgeInvestigativeIntelligence({
+    const statementInvestigationEnabled = feeKnowledgeInvestigativeIntelligenceEnabled(investigativeOptions);
+    diagnosticState.statementInvestigativeAttempted = statementInvestigationEnabled;
+    const statementInvestigationStartedAt = Date.now();
+    const statementInvestigation = await runFeeKnowledgeInvestigativeIntelligence({
       scope: "statement",
       analysis: input.analysis,
       questions: selectedQuestions,
       existingIntelligence: intelligence,
       options: investigativeOptions,
       abortSignal,
-    }));
+    });
+    diagnosticState.stageElapsedMs.statementInvestigativeIntelligence += elapsedSince(statementInvestigationStartedAt);
+    diagnosticState.statementInvestigativeOutputRecordCount = statementInvestigation.length;
+    diagnosticState.statementInvestigativeStatus = statementInvestigationEnabled
+      ? investigativeStatus(statementInvestigation)
+      : "disabled";
+    safeInvestigativeReasonCodes(statementInvestigation).forEach((code) => diagnosticState.statementInvestigativeReasonCodes.add(code));
+    intelligence.push(...statementInvestigation);
 
     for (const item of selectedQuestionItems) {
       const question = item.question;
       const index = item.originalIndex;
       const attemptId = attemptIdFor(question, index);
       try {
-        const discovered = await searchAdapter({ attemptId, questions: [question], limits: FEE_KNOWLEDGE_RESEARCH_LIMITS }, { abortSignal });
+        diagnosticState.searchCallCount += 1;
+        const searchStartedAt = Date.now();
+        let discovered: FeeKnowledgeDiscoveryCandidate[];
+        try {
+          discovered = await searchAdapter({ attemptId, questions: [question], limits: FEE_KNOWLEDGE_RESEARCH_LIMITS }, { abortSignal });
+        } finally {
+          diagnosticState.stageElapsedMs.webSearchDiscovery += elapsedSince(searchStartedAt);
+        }
         const bounded = rankFeeKnowledgeDiscoveryCandidates(dedupeCandidates(discovered), question)
           .slice(0, Math.min(remainingCandidates, FEE_KNOWLEDGE_RESEARCH_LIMITS.maxResultCandidatesPerSearch));
         remainingCandidates -= bounded.length;
@@ -264,11 +353,14 @@ export async function runFeeKnowledgeResearch(input: {
             claimSupportDecisionRef: null,
           })) - 1;
           candidateIds.push(candidateId);
+          diagnosticState.retrievalAttemptCount += 1;
+          const retrievalStartedAt = Date.now();
           const retrieved = await retrieveFeeKnowledgeDocument(candidate.url, {
             abortSignal,
             fetchImpl: options.fetchImpl,
             resolveHost: options.resolveHost,
           });
+          diagnosticState.stageElapsedMs.retrieval += elapsedSince(retrievalStartedAt);
           candidates[pendingIndex] = candidateAfterRetrieval(candidates[pendingIndex]!, retrieved);
           intelligence.push(...buildRetrievedDocumentIntelligence({
             candidateId,
@@ -276,7 +368,10 @@ export async function runFeeKnowledgeResearch(input: {
             question,
             retrieved,
           }));
-          intelligence.push(...await runFeeKnowledgeInvestigativeIntelligence({
+          const retrievedInvestigationEnabled = feeKnowledgeInvestigativeIntelligenceEnabled(investigativeOptions);
+          if (retrievedInvestigationEnabled) diagnosticState.retrievedInvestigativeAttemptCount += 1;
+          const retrievedInvestigationStartedAt = Date.now();
+          const retrievedInvestigation = await runFeeKnowledgeInvestigativeIntelligence({
             scope: "retrieved_document",
             analysis: input.analysis,
             questions: [question],
@@ -290,21 +385,34 @@ export async function runFeeKnowledgeResearch(input: {
               retrieved,
             },
             abortSignal,
-          }));
-          const aiCandidateEvidenceLocatorHash = candidateEvidenceLocatorHash(intelligence, candidateId);
-          const verification = await verifyCandidate({
-            candidateId,
-            attemptId,
-            candidate,
-            retrieved,
-            question,
-            questionOrdinal: index,
-            semanticSupportAdapter,
-            domainIdentityPolicy: options.domainIdentityPolicy,
-            priorClaimSupports: [...sourcePacket.claimSupports, ...claimSupports],
-            candidateEvidenceLocatorHash: aiCandidateEvidenceLocatorHash,
-            abortSignal,
           });
+          diagnosticState.stageElapsedMs.retrievedDocumentInvestigativeIntelligence += elapsedSince(retrievedInvestigationStartedAt);
+          diagnosticState.retrievedInvestigativeOutputRecordCount += retrievedInvestigation.length;
+          diagnosticState.retrievedInvestigativeStatuses.push(
+            retrievedInvestigationEnabled ? investigativeStatus(retrievedInvestigation) : "disabled",
+          );
+          safeInvestigativeReasonCodes(retrievedInvestigation).forEach((code) => diagnosticState.retrievedInvestigativeReasonCodes.add(code));
+          intelligence.push(...retrievedInvestigation);
+          const aiCandidateEvidenceLocatorHash = candidateEvidenceLocatorHash(intelligence, candidateId);
+          const semanticVerificationStartedAt = Date.now();
+          let verification: Awaited<ReturnType<typeof verifyCandidate>>;
+          try {
+            verification = await verifyCandidate({
+              candidateId,
+              attemptId,
+              candidate,
+              retrieved,
+              question,
+              questionOrdinal: index,
+              semanticSupportAdapter,
+              domainIdentityPolicy: options.domainIdentityPolicy,
+              priorClaimSupports: [...sourcePacket.claimSupports, ...claimSupports],
+              candidateEvidenceLocatorHash: aiCandidateEvidenceLocatorHash,
+              abortSignal,
+            });
+          } finally {
+            diagnosticState.stageElapsedMs.semanticVerification += elapsedSince(semanticVerificationStartedAt);
+          }
           candidates[pendingIndex] = verification.candidate;
           if (verification.claimSupport) {
             claimSupports.push(verification.claimSupport);
@@ -336,7 +444,7 @@ export async function runFeeKnowledgeResearch(input: {
       attempts.push(attemptRecord(item.question, item.originalIndex, "not_selected_planning", [], ["fee_knowledge_research_not_selected_planning"]));
     }
 
-    return snapshotResearchResult({ attempts, candidates, intelligence, claimSupports });
+    return { attempts, candidates, intelligence, claimSupports };
   }, options.timeoutMs ?? FEE_KNOWLEDGE_RESEARCH_LIMITS.totalDeadlineMs).catch((error) => {
     const timedOut = /timed out|aborted|abort/i.test(error instanceof Error ? error.message : String(error));
     return terminalResearchSnapshot({
@@ -348,6 +456,7 @@ export async function runFeeKnowledgeResearch(input: {
       status: timedOut ? "timed_out" : "failed",
     });
   });
+  return snapshotResearchResult(result, buildResearchDiagnostics(diagnosticState, result));
 }
 
 export function defaultFeeKnowledgeResearchQuestions(
@@ -1045,12 +1154,16 @@ function candidateAfterRetrieval(
   };
 }
 
-function snapshotResearchResult(result: FeeKnowledgeResearchResult): FeeKnowledgeResearchResult {
+function snapshotResearchResult(
+  result: FeeKnowledgeResearchCoreResult,
+  diagnostics: FeeKnowledgeResearchDiagnostics,
+): FeeKnowledgeResearchResult {
   return structuredClone({
     attempts: result.attempts,
     candidates: result.candidates,
     intelligence: result.intelligence,
     claimSupports: result.claimSupports,
+    diagnostics,
   });
 }
 
@@ -1061,7 +1174,7 @@ function terminalResearchSnapshot(input: {
   intelligence: readonly FeeKnowledgeIntelligenceRecord[];
   claimSupports: readonly FeeKnowledgeClaimSupportRecord[];
   status: "failed" | "timed_out";
-}): FeeKnowledgeResearchResult {
+}): FeeKnowledgeResearchCoreResult {
   const candidates = structuredClone([...input.candidates]);
   for (let index = 0; index < candidates.length; index += 1) {
     const candidate = candidates[index]!;
@@ -1097,12 +1210,12 @@ function terminalResearchSnapshot(input: {
     const candidateIds = candidates.filter((candidate) => candidate.questionRef === questionRef).map((candidate) => candidate.candidateId);
     attemptsByQuestion.set(questionRef, attemptRecord(question, index, status, candidateIds, [researchFailureReason(status)]));
   }
-  return snapshotResearchResult({
+  return {
     attempts: input.questions.map((question, index) => attemptsByQuestion.get(feeKnowledgeQuestionRef(question, index))!),
     candidates,
     intelligence: structuredClone([...input.intelligence]),
     claimSupports: structuredClone([...input.claimSupports]),
-  });
+  };
 }
 
 function upsertAttempt(
@@ -1153,6 +1266,114 @@ function attemptIdFor(question: FeeKnowledgeResearchQuestion, index: number): st
 
 function researchEnabled(options: FeeKnowledgeResearchOptions): boolean {
   return options.enabled ?? /^(1|true|yes|on)$/i.test(process.env.RATEREVEAL_FEE_KNOWLEDGE_RESEARCH_ENABLED ?? "");
+}
+
+function initialResearchDiagnosticState(
+  enabled: boolean,
+  questionCount: number,
+): MutableFeeKnowledgeResearchDiagnosticState {
+  return {
+    startedAt: Date.now(),
+    enabled,
+    questionCount,
+    selectedQuestionCount: 0,
+    searchCallCount: 0,
+    retrievalAttemptCount: 0,
+    statementInvestigativeAttempted: false,
+    statementInvestigativeStatus: "disabled",
+    statementInvestigativeOutputRecordCount: 0,
+    statementInvestigativeReasonCodes: new Set<string>(),
+    retrievedInvestigativeAttemptCount: 0,
+    retrievedInvestigativeStatuses: [],
+    retrievedInvestigativeOutputRecordCount: 0,
+    retrievedInvestigativeReasonCodes: new Set<string>(),
+    stageElapsedMs: {
+      planning: 0,
+      webSearchDiscovery: 0,
+      retrieval: 0,
+      statementInvestigativeIntelligence: 0,
+      retrievedDocumentInvestigativeIntelligence: 0,
+      semanticVerification: 0,
+    },
+  };
+}
+
+function buildResearchDiagnostics(
+  state: MutableFeeKnowledgeResearchDiagnosticState,
+  result: Pick<FeeKnowledgeResearchCoreResult, "attempts" | "candidates" | "claimSupports">,
+): FeeKnowledgeResearchDiagnostics {
+  const safeReasonCodes = new Set<string>();
+  for (const attempt of result.attempts) attempt.reasonCodes.filter(safeReasonCode).forEach((code) => safeReasonCodes.add(code));
+  for (const candidate of result.candidates) candidate.reasonCodes.filter(safeReasonCode).forEach((code) => safeReasonCodes.add(code));
+  for (const support of result.claimSupports) {
+    support.semanticSupport.reasonCodes
+      .filter((code) => safeReasonCode(code) && code.startsWith("fee_knowledge_"))
+      .forEach((code) => safeReasonCodes.add(code));
+  }
+  state.statementInvestigativeReasonCodes.forEach((code) => safeReasonCodes.add(code));
+  state.retrievedInvestigativeReasonCodes.forEach((code) => safeReasonCodes.add(code));
+  return {
+    policyVersion: "fee_knowledge_research_diagnostics_v1",
+    enabled: state.enabled,
+    questionCount: state.questionCount,
+    selectedQuestionCount: state.selectedQuestionCount,
+    searchCallCount: state.searchCallCount,
+    searchAttemptStatusCounts: countBy(result.attempts.map((attempt) => attempt.status)),
+    candidateCount: result.candidates.length,
+    retrievalAttemptCount: state.retrievalAttemptCount,
+    retrievalStatusCounts: countBy(result.candidates.map((candidate) => candidate.retrievalStatus)),
+    investigative: {
+      statement: {
+        attempted: state.statementInvestigativeAttempted,
+        status: state.statementInvestigativeStatus,
+        outputRecordCount: state.statementInvestigativeOutputRecordCount,
+        safeReasonCodes: [...state.statementInvestigativeReasonCodes].filter(safeReasonCode).sort(),
+      },
+      retrievedDocument: {
+        attemptCount: state.retrievedInvestigativeAttemptCount,
+        statusCounts: countBy(state.retrievedInvestigativeStatuses),
+        outputRecordCount: state.retrievedInvestigativeOutputRecordCount,
+        safeReasonCodes: [...state.retrievedInvestigativeReasonCodes].filter(safeReasonCode).sort(),
+      },
+    },
+    semanticVerificationAttemptCount: result.candidates.filter((candidate) =>
+      candidate.semanticVerificationStatus !== "not_started" && candidate.semanticVerificationStatus !== "not_eligible"
+    ).length,
+    semanticVerificationStatusCounts: countBy(result.candidates.map((candidate) => candidate.semanticVerificationStatus)),
+    claimSupportCount: result.claimSupports.length,
+    verifiedClaimSupportCount: result.claimSupports.filter((support) => isVerifiedDocumentationDecision(support.evidenceDecision)).length,
+    safeReasonCodes: [...safeReasonCodes].sort(),
+    elapsedMs: elapsedSince(state.startedAt),
+    stageElapsedMs: { ...state.stageElapsedMs },
+  };
+}
+
+function investigativeStatus(
+  records: readonly FeeKnowledgeIntelligenceRecord[],
+): FeeKnowledgeResearchDiagnostics["investigative"]["statement"]["status"] {
+  if (records.some((record) => record.reasonCodes.includes("fee_knowledge_ai_investigative_unavailable_before_send"))) {
+    return "provider_unavailable";
+  }
+  if (records.some((record) => record.reasonCodes.includes("fee_knowledge_ai_investigative_provider_failed"))) {
+    return "failed";
+  }
+  return "completed";
+}
+
+function safeInvestigativeReasonCodes(records: readonly FeeKnowledgeIntelligenceRecord[]): string[] {
+  return [...new Set(records.flatMap((record) => record.reasonCodes).filter((code) =>
+    safeReasonCode(code) && code.startsWith("fee_knowledge_ai_investigative_")
+  ))].sort();
+}
+
+function countBy(values: readonly string[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const value of values) counts[value] = (counts[value] ?? 0) + 1;
+  return Object.fromEntries(Object.entries(counts).sort(([left], [right]) => left.localeCompare(right)));
+}
+
+function elapsedSince(startedAt: number): number {
+  return Math.max(0, Date.now() - startedAt);
 }
 
 async function withAbortTimeout<T>(operation: (abortSignal: AbortSignal) => Promise<T>, timeoutMs: number): Promise<T> {

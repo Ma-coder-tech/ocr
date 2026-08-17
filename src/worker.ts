@@ -113,6 +113,7 @@ export async function processJob(jobId: string): Promise<void> {
 
   try {
     const job = startJobAttempt(jobId);
+    const jobStartedAt = Date.now();
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
     const [{ parseCsv, parsePdf }, { analyzeStatementDocumentWithOptionalAi }, { evaluateChecklistReport }] =
@@ -122,7 +123,9 @@ export async function processJob(jobId: string): Promise<void> {
         import("./checklistEngine.js"),
       ]);
 
+    const parserStartedAt = Date.now();
     const parsed = job.fileType === "csv" ? await parseCsv(job.filePath) : await parsePdf(job.filePath, jobId);
+    logSafeStageDuration(jobId, "pdf_parser", parserStartedAt);
     console.log(`[job:${jobId}] parsed`, {
       fileType: job.fileType,
       headers: parsed.headers.slice(0, 8),
@@ -161,7 +164,9 @@ export async function processJob(jobId: string): Promise<void> {
     stageUpdate(jobId, "extracting_fee_line_items", 48, "Extracting fee line items");
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
+    const optionalLegacyStartedAt = Date.now();
     let summary = await analyzeStatementDocumentWithOptionalAi(parsed, job.businessType, { sourceFileName: job.fileName });
+    logSafeStageDuration(jobId, "optional_legacy_processing", optionalLegacyStartedAt);
     console.log(`[job:${jobId}] deterministic-summary`, {
       businessType: job.businessType,
       processor: summary.processorName,
@@ -241,6 +246,7 @@ export async function processJob(jobId: string): Promise<void> {
       };
     }
 
+    const productionRuntimeStartedAt = Date.now();
     const productionReportV2 = await buildProductionReportV2ForJob({
       jobId: job.id,
       document: parsed,
@@ -248,7 +254,9 @@ export async function processJob(jobId: string): Promise<void> {
       businessType: job.businessType,
     });
     if (productionReportV2) {
+      const persistenceStartedAt = Date.now();
       updateJob(jobId, { productionReportV2 }, "Production report ready");
+      logSafeStageDuration(jobId, "production_projection_persistence", persistenceStartedAt);
     } else {
       await maybeRunCanonicalRuntimeShadow({
         jobId: job.id,
@@ -285,6 +293,7 @@ export async function processJob(jobId: string): Promise<void> {
       },
       "Report ready",
     );
+    logSafeStageDuration(jobId, "total_job_completion", jobStartedAt);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown processing error";
     const retry = retryJobOrFail(jobId, message);
@@ -292,6 +301,13 @@ export async function processJob(jobId: string): Promise<void> {
       scheduleTickAfter(retry.delayMs);
     }
   }
+}
+
+function logSafeStageDuration(jobId: string, stage: string, startedAt: number): void {
+  console.info(`[job:${jobId}] package-4-stage-diagnostics`, JSON.stringify({
+    stage,
+    elapsedMs: Math.max(0, Date.now() - startedAt),
+  }));
 }
 
 async function failJobWithProductionReportRecovery(input: {

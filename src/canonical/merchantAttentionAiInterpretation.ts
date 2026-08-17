@@ -107,6 +107,21 @@ export type MerchantAttentionAiAdmissionResult = {
   errors: string[];
 };
 
+export type MerchantAttentionAiAdmissionDiagnosticCode =
+  | "schema_rejected"
+  | "exact_coverage_mismatch"
+  | "semantic_support_linkage_mismatch"
+  | "semantic_claim_count_changed"
+  | "unsupported_semantic_tokens"
+  | "logical_qualification_changed"
+  | "unsafe_language"
+  | "unsupported_positive_claim"
+  | "action_permission_exceeded"
+  | "question_shape_mismatch"
+  | "toolkit_shape_mismatch"
+  | "privacy_rejected"
+  | "semantic_admission_rejected";
+
 const OUTPUT_ROOT_KEYS = new Set([
   "type",
   "policyVersion",
@@ -311,6 +326,41 @@ export function admitMerchantAttentionAiInterpretation(input: {
       },
     },
   };
+}
+
+/**
+ * Converts detailed admission errors into a closed, prose-free diagnostic
+ * taxonomy. Detailed errors may reference generated fields or tokens and must
+ * never be persisted or logged.
+ */
+export function merchantAttentionAiAdmissionDiagnosticCodes(
+  errors: readonly string[],
+): MerchantAttentionAiAdmissionDiagnosticCode[] {
+  const codes = new Set<MerchantAttentionAiAdmissionDiagnosticCode>();
+  for (const error of errors) {
+    if (/cover each AI-language-eligible attention item exactly once|duplicates |references unknown item/i.test(error)) {
+      codes.add("exact_coverage_mismatch");
+    }
+    if (/semantic support refs/i.test(error)) codes.add("semantic_support_linkage_mismatch");
+    if (/preserve the canonical semantic-claim count/i.test(error)) codes.add("semantic_claim_count_changed");
+    if (/adds unsupported semantic tokens/i.test(error)) codes.add("unsupported_semantic_tokens");
+    if (/alters canonical qualification, modality, negation, conditionality, or evidentiary scope/i.test(error)) {
+      codes.add("logical_qualification_changed");
+    }
+    if (/contains unsafe merchant language/i.test(error)) codes.add("unsafe_language");
+    if (/contains an unsupported positive claim/i.test(error)) codes.add("unsupported_positive_claim");
+    if (/exceeds its action permission/i.test(error)) codes.add("action_permission_exceeded");
+    if (/canonical question shape|cannot create a question|\.question(?:\.|\s)/i.test(error)) codes.add("question_shape_mismatch");
+    if (/Action Toolkit shape|cannot create an Action Toolkit|\.actionToolkit(?:\.|\s)/i.test(error)) codes.add("toolkit_shape_mismatch");
+    if (/authority or privacy declarations are unsafe|forbidden authoritative or private field/i.test(error)) codes.add("privacy_rejected");
+    if (
+      /output must be an object|unexpected field|missing field|type is invalid|policy version is invalid|outputId is required|items must be an array|must be an object|is required|is invalid|has no attention item id/i.test(error)
+    ) {
+      codes.add("schema_rejected");
+    }
+  }
+  if (codes.size === 0 && errors.length > 0) codes.add("semantic_admission_rejected");
+  return [...codes].sort();
 }
 
 function validateOutputShape(output: unknown, model: CanonicalMerchantAttentionModel): string[] {

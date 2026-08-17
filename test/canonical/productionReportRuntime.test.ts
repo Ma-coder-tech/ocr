@@ -23,6 +23,21 @@ describe("Package 3 production report runtime", () => {
     expect(result.projection.report).not.toBeNull();
     expect(result.projection.report!.merchantLanguage).toEqual({ source: "deterministic_fallback", degraded: true });
     expect(result.merchantLanguageRuntime).toMatchObject({ status: "provider_unavailable", attempted: false });
+    expect(result.runtimeDiagnostics).toMatchObject({
+      policyVersion: "package_3_runtime_diagnostics_v1",
+      wholeStatementFeeIntelligence: {
+        provider: "none",
+        attempted: false,
+        reviewStatus: "disabled",
+        canonicalAdmissionStatus: "not_admitted",
+        admittedFeeKnowledgeAvailable: false,
+      },
+      merchantLanguageAi: {
+        provider: "none",
+        attempted: false,
+        status: "provider_unavailable",
+      },
+    });
     expect(result.projection.header).toMatchObject({
       merchantName: "XPRESS FIX",
       processor: expect.any(String),
@@ -30,6 +45,7 @@ describe("Package 3 production report runtime", () => {
       statementScope: "One statement analyzed.",
     });
     expect(JSON.stringify(result.merchantLanguageRuntime)).not.toMatch(/providerName|modelName|prompt|response|apiKey/i);
+    expect(JSON.stringify(result.runtimeDiagnostics)).not.toMatch(/XPRESS FIX|\.pdf|\/Users\/|raw statement|prompt|response|apiKey/i);
   });
 
   it("projects admitted whole-statement meaning into Merchant Attention without a live provider", async () => {
@@ -62,6 +78,12 @@ describe("Package 3 production report runtime", () => {
     expect(projectedRow?.whatRateRevealKnows).toBe(
       attention?.evidenceBoundary.reasonableConclusion.summary.replace(/itemized/gi, "broken down"),
     );
+    expect(runtime.runtimeDiagnostics?.wholeStatementFeeIntelligence).toMatchObject({
+      provider: "custom_adapter",
+      attempted: true,
+      reviewStatus: "completed",
+      canonicalAdmissionStatus: "admitted",
+    });
   });
 });
 

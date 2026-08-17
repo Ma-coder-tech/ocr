@@ -91,7 +91,7 @@ export async function runFeeKnowledgeInvestigativeIntelligence(input: {
   abortSignal: AbortSignal;
 }): Promise<FeeKnowledgeIntelligenceRecord[]> {
   const options = input.options ?? {};
-  if (!investigativeEnabled(options)) return [];
+  if (!feeKnowledgeInvestigativeIntelligenceEnabled(options)) return [];
   const adapter = options.adapter ?? openAiInvestigativeIntelligenceAdapter(options);
   try {
     const response = await adapter({
@@ -445,7 +445,9 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
   }
 }
 
-function investigativeEnabled(options: FeeKnowledgeInvestigativeIntelligenceOptions): boolean {
+export function feeKnowledgeInvestigativeIntelligenceEnabled(
+  options: FeeKnowledgeInvestigativeIntelligenceOptions = {},
+): boolean {
   return options.enabled ?? /^(1|true|yes|on)$/i.test(process.env.RATEREVEAL_FEE_KNOWLEDGE_INVESTIGATIVE_AI_ENABLED ?? "");
 }
 
