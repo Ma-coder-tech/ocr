@@ -312,7 +312,7 @@ describe("Package 2 canonical merchant attention", () => {
         newSemanticClaimsAllowed: false,
       },
       runtimeBoundary: {
-        providerTransportStatus: "not_implemented_in_package_2",
+        providerTransportStatus: "implemented_in_package_3",
         productionReadyWithoutAdmittedProviderOutput: false,
         deterministicFallbackIsDegradedPath: true,
       },
