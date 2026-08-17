@@ -106,7 +106,7 @@ async function tick(): Promise<void> {
   }
 }
 
-export async function processJob(jobId: string): Promise<void> {
+export async function processJob(jobId: string, options: { scheduleRetry?: boolean } = {}): Promise<void> {
   const queuedJob = getJob(jobId);
   if (!queuedJob || queuedJob.status === "completed" || queuedJob.status === "failed") return;
   const stageDelayMs = Number(process.env.STAGE_DELAY_MS ?? 0);
@@ -297,9 +297,19 @@ export async function processJob(jobId: string): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown processing error";
     const retry = retryJobOrFail(jobId, message);
-    if (retry.retrying) {
+    if (retry.retrying && options.scheduleRetry !== false) {
       scheduleTickAfter(retry.delayMs);
     }
+  }
+}
+
+export async function processJobUntilTerminal(jobId: string): Promise<void> {
+  while (true) {
+    await processJob(jobId, { scheduleRetry: false });
+    const current = getJob(jobId);
+    if (!current || current.status === "completed" || current.status === "failed") return;
+    const nextRunAt = current.nextRunAt ? new Date(current.nextRunAt).getTime() : Date.now();
+    await delay(Math.max(0, nextRunAt - Date.now()));
   }
 }
 

@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 const SESSION_COOKIE = "feeclear_session";
 const PENDING_JOB_COOKIE = "feeclear_pending_job";
+const PREVIEW_JOB_ACCESS_COOKIE = "ratereveal_preview_job_access";
 const SESSION_TTL_DAYS = 30;
 const PENDING_JOB_TTL_SECONDS = 2 * 60 * 60;
 
@@ -75,6 +76,11 @@ export function readPendingStatementJobId(req: IncomingMessage): string | null {
   return cookies[PENDING_JOB_COOKIE] ?? null;
 }
 
+export function readPreviewJobAccessKey(req: IncomingMessage): string | null {
+  const cookies = parseCookies(req.headers.cookie);
+  return cookies[PREVIEW_JOB_ACCESS_COOKIE] ?? null;
+}
+
 export function setSessionCookie(req: IncomingMessage, res: ServerResponse, token: string): void {
   const secure = isSecureRequest(req);
   const parts = [
@@ -117,6 +123,19 @@ export function setPendingStatementJobCookie(req: IncomingMessage, res: ServerRe
   if (secure) {
     parts.push("Secure");
   }
+  appendSetCookie(res, parts.join("; "));
+}
+
+export function setPreviewJobAccessCookie(req: IncomingMessage, res: ServerResponse, accessKey: string): void {
+  const secure = isSecureRequest(req);
+  const parts = [
+    `${PREVIEW_JOB_ACCESS_COOKIE}=${encodeURIComponent(accessKey)}`,
+    "HttpOnly",
+    "Path=/",
+    "SameSite=Lax",
+    `Max-Age=${PENDING_JOB_TTL_SECONDS}`,
+  ];
+  if (secure) parts.push("Secure");
   appendSetCookie(res, parts.join("; "));
 }
 
