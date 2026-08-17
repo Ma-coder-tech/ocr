@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import {
   admitMerchantAttentionAiInterpretation,
   buildMerchantAttentionAiInterpretationPacket,
+  merchantAttentionAiAdmissionDiagnosticCodes,
   type MerchantAttentionAiInterpretationPacket,
 } from "./merchantAttentionAiInterpretation.js";
 import type {
@@ -68,6 +69,11 @@ export type MerchantAttentionAiRuntimeResult = {
   model: CanonicalMerchantAttentionModel;
 };
 
+export type MerchantAttentionAiRuntimeProviderSelection = {
+  provider: RuntimeProvider | "custom_adapter" | "none";
+  model: string | null;
+};
+
 export async function runMerchantAttentionAiRuntime(input: {
   model: CanonicalMerchantAttentionModel;
   options?: MerchantAttentionAiRuntimeOptions;
@@ -131,7 +137,16 @@ export async function runMerchantAttentionAiRuntime(input: {
     };
     const admission = admitMerchantAttentionAiInterpretation({ model: input.model, output: combined });
     if (!admission.admitted) {
-      return fallback("rejected", true, eligibleItemCount, input.model, "merchant_language_ai_semantic_admission_rejected");
+      const diagnosticCodes = merchantAttentionAiAdmissionDiagnosticCodes(admission.errors)
+        .map((code) => `merchant_language_ai_rejection_${code}`);
+      return fallback(
+        "rejected",
+        true,
+        eligibleItemCount,
+        input.model,
+        "merchant_language_ai_semantic_admission_rejected",
+        diagnosticCodes,
+      );
     }
     return {
       status: "admitted",
@@ -159,8 +174,16 @@ function fallback(
   eligibleItemCount: number,
   model: CanonicalMerchantAttentionModel,
   reasonCode: string,
+  diagnosticCodes: readonly string[] = [],
 ): MerchantAttentionAiRuntimeResult {
-  return { status, attempted, eligibleItemCount, admittedItemCount: 0, reasonCodes: [reasonCode], model };
+  return {
+    status,
+    attempted,
+    eligibleItemCount,
+    admittedItemCount: 0,
+    reasonCodes: [...new Set([reasonCode, ...diagnosticCodes])].sort(),
+    model,
+  };
 }
 
 function chunkPacket(
@@ -296,6 +319,14 @@ function providerAttempts(options: MerchantAttentionAiRuntimeOptions): Array<{ p
       ? options.anthropicModelName ?? options.modelName ?? process.env.RATEREVEAL_MERCHANT_LANGUAGE_ANTHROPIC_MODEL ?? "claude-opus-4-8"
       : options.openAiModelName ?? options.modelName ?? process.env.RATEREVEAL_MERCHANT_LANGUAGE_OPENAI_MODEL ?? "gpt-5.4-mini",
   }));
+}
+
+export function merchantAttentionAiRuntimeProviderSelection(
+  options: MerchantAttentionAiRuntimeOptions = {},
+): MerchantAttentionAiRuntimeProviderSelection {
+  if (options.adapter) return { provider: "custom_adapter", model: null };
+  const attempt = providerAttempts(options)[0];
+  return attempt ? { provider: attempt.provider, model: attempt.modelName } : { provider: "none", model: null };
 }
 
 function providerKey(provider: RuntimeProvider, options: MerchantAttentionAiRuntimeOptions): string | undefined {

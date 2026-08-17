@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { runMerchantAttentionAiRuntime } from "../../src/canonical/merchantAttentionAiRuntime.js";
+import { merchantAttentionAiAdmissionDiagnosticCodes } from "../../src/canonical/merchantAttentionAiInterpretation.js";
 import { package3Analysis, validPackage3Interpretation } from "./package3TestFixture.js";
 
 describe("Package 3 merchant-language AI runtime", () => {
@@ -48,7 +49,39 @@ describe("Package 3 merchant-language AI runtime", () => {
     strengthenedOutput.items[0].reasonableConclusion = "This fee is definitely removable.";
     const strengthened = await runMerchantAttentionAiRuntime({ model: analysis.merchantAttention, options: { adapter: async () => strengthenedOutput } });
     expect([timedOut.status, invalid.status, strengthened.status]).toEqual(["timed_out", "rejected", "rejected"]);
+    expect(strengthened.reasonCodes).toContain("merchant_language_ai_rejection_unsafe_language");
+    expect(JSON.stringify(strengthened.reasonCodes)).not.toContain("This fee is definitely removable");
     for (const result of [timedOut, invalid, strengthened]) expect(result.model).toEqual(analysis.merchantAttention);
+  });
+
+  it("maps detailed semantic admission failures to a closed prose-free diagnostic taxonomy", () => {
+    const codes = merchantAttentionAiAdmissionDiagnosticCodes([
+      "AI merchant interpretation must cover each AI-language-eligible attention item exactly once.",
+      "AI merchant interpretation item fails semantic fidelity: semantic support refs do not exactly link every generated field to its canonical meaning.",
+      "AI merchant interpretation item fails semantic fidelity: remainingUncertainty must preserve the canonical semantic-claim count.",
+      "AI merchant interpretation item fails semantic fidelity: reasonableConclusion adds unsupported semantic tokens: invented-token.",
+      "AI merchant interpretation item fails semantic fidelity: reasonableConclusion alters canonical qualification, modality, negation, conditionality, or evidentiary scope.",
+      "AI merchant interpretation item contains unsafe merchant language: generated private prose.",
+      "AI merchant interpretation item contains an unsupported positive claim: generated positive prose.",
+      "AI merchant interpretation item exceeds its action permission: generated action prose.",
+      "AI merchant interpretation item must include its canonical question shape.",
+      "AI merchant interpretation item must include its canonical Action Toolkit shape.",
+      "AI merchant interpretation contains a forbidden authoritative or private field at output.privateValue.",
+    ]);
+    expect(codes).toEqual([
+      "action_permission_exceeded",
+      "exact_coverage_mismatch",
+      "logical_qualification_changed",
+      "privacy_rejected",
+      "question_shape_mismatch",
+      "semantic_claim_count_changed",
+      "semantic_support_linkage_mismatch",
+      "toolkit_shape_mismatch",
+      "unsafe_language",
+      "unsupported_positive_claim",
+      "unsupported_semantic_tokens",
+    ]);
+    expect(JSON.stringify(codes)).not.toMatch(/invented-token|generated .*prose|privateValue/i);
   });
 
   it("returns provider-unavailable with zero calls when no credential or adapter exists", async () => {

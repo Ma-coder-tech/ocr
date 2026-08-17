@@ -41,9 +41,11 @@ import {
   hashPassword,
   hashSessionToken,
   readPendingStatementJobId,
+  readPreviewJobAccessKey,
   readSessionToken,
   sessionExpiryIso,
   setPendingStatementJobCookie,
+  setPreviewJobAccessCookie,
   setSessionCookie,
   verifyPassword,
 } from "./auth.js";
@@ -60,7 +62,13 @@ import { buildSingleStatementReportV1, buildUnableToAnalyzeReportV1 } from "./re
 import type { SingleStatementReportV1 } from "./reporting/v1/index.js";
 import { renderMultiStatementGlobalReportMarkdown } from "./reporting/buildMultiStatement.js";
 import { createJob, getJob, getJobByUploadId, listEvents, listStatementJobsForMerchant, pruneJobs, updateJob } from "./store.js";
-import { enqueueJob, hydrateQueuedJobs } from "./worker.js";
+import { enqueueJob, hydrateQueuedJobs, processJobUntilTerminal } from "./worker.js";
+import {
+  createPreviewJobAccessKey,
+  previewAsyncJobExecutionEnabled,
+  readPreviewJobPayload,
+  schedulePreviewJobExecution,
+} from "./previewJobExecution.js";
 import { createMultiStatementAnalysisJob } from "./multiStatementOrchestrator.js";
 import {
   getLatestMultiStatementAnalysisForJob,
@@ -77,6 +85,7 @@ const APP_ORIGIN = process.env.APP_ORIGIN ?? `http://${host}:${port}`;
 const isDevelopment = process.env.NODE_ENV === "development";
 const isVercel = Boolean(process.env.VERCEL) || Boolean(process.env.VERCEL_ENV);
 const reportV1Enabled = process.env.RATEREVEAL_REPORT_V1_ENABLED === "true";
+const reportV2Enabled = process.env.RATEREVEAL_REPORT_V2_ENABLED === "true";
 const dataRoot = isVercel ? path.join("/tmp", "ocr-data") : path.resolve("data");
 const uploadDir = path.join(dataRoot, "uploads");
 const publicDir = path.resolve("public");
@@ -276,7 +285,7 @@ function getRateLimitConfig(pathname: string, method: string): RateLimitConfig |
 
   if (
     method === "POST" &&
-    (pathname === "/api/jobs" || pathname === "/api/dashboard/statements/validate" || pathname === "/api/multi-statement/upload")
+    (pathname === "/api/jobs" || pathname === "/api/preview-jobs" || pathname === "/api/dashboard/statements/validate" || pathname === "/api/multi-statement/upload")
   ) {
     return { limit: 5, windowMs: 60 * 1000, key: `upload:${pathname}` };
   }
@@ -478,6 +487,7 @@ async function cleanupOldFiles(dir: string, retentionHours: number): Promise<voi
 }
 
 async function writeUploadedFile(file: File, finalPath: string): Promise<void> {
+  await fs.mkdir(path.dirname(finalPath), { recursive: true });
   const source = Readable.fromWeb(file.stream() as unknown as NodeReadableStream<Uint8Array>);
   await pipeline(source, createWriteStream(finalPath));
 }
@@ -599,7 +609,11 @@ async function validateProcessorStatementPdf(input: {
   };
 }
 
-async function handleCreateAnonymousJob(req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function handleCreateAnonymousJob(
+  req: IncomingMessage,
+  res: ServerResponse,
+  options: { previewBackground?: boolean } = {},
+): Promise<void> {
   let form: FormData;
   try {
     form = await readMultipartForm(req);
@@ -644,7 +658,35 @@ async function handleCreateAnonymousJob(req: IncomingMessage, res: ServerRespons
   });
 
   setPendingStatementJobCookie(req, res, job.id);
-  enqueueJob(job.id);
+  if (options.previewBackground) {
+    const accessKey = createPreviewJobAccessKey();
+    setPreviewJobAccessCookie(req, res, accessKey);
+    try {
+      await schedulePreviewJobExecution({
+        jobId: job.id,
+        accessKey,
+        initialPayload: buildAnonymousJobPayload(job),
+        run: async () => {
+          await processJobUntilTerminal(job.id);
+          const completedJob = getJob(job.id);
+          if (!completedJob) throw new Error("preview_job_missing_after_processing");
+          return buildAnonymousJobPayload(completedJob);
+        },
+      });
+    } catch (error) {
+      console.error("[preview-job-execution] scheduling-failed", error instanceof Error ? error.message : "unknown");
+      updateJob(job.id, {
+        status: "failed",
+        progress: 100,
+        error: "The Preview analysis service could not start this job safely.",
+      }, "Preview job scheduling failed");
+      await fs.unlink(finalPath).catch(() => undefined);
+      json(res, 503, { error: "The Preview analysis service is temporarily unavailable." });
+      return;
+    }
+  } else {
+    enqueueJob(job.id);
+  }
   json(res, 201, { jobId: job.id });
 }
 
@@ -1284,6 +1326,7 @@ async function handleAuthenticatedJob(req: IncomingMessage, res: ServerResponse,
         })
       : null,
     reportV1: reportV1ForJob(job),
+    productionReportV2: reportV2Enabled ? job.productionReportV2 ?? null : null,
     statement: statement ? statementSummaryPayload(statement) : null,
     redirectTo,
   });
@@ -1556,6 +1599,14 @@ async function handleStatementUploadContext(res: ServerResponse, merchant: Authe
 async function handleAnonymousJobLookup(req: IncomingMessage, res: ServerResponse, jobId: string): Promise<void> {
   const job = getJob(jobId);
   if (!job) {
+    const accessKey = readPreviewJobAccessKey(req);
+    const cachedPayload = accessKey
+      ? await readPreviewJobPayload({ jobId, accessKey }).catch(() => null)
+      : null;
+    if (cachedPayload) {
+      json(res, 200, cachedPayload);
+      return;
+    }
     json(res, 404, { error: "Job not found" });
     return;
   }
@@ -1568,7 +1619,11 @@ async function handleAnonymousJobLookup(req: IncomingMessage, res: ServerRespons
     }
   }
 
-  json(res, 200, {
+  json(res, 200, buildAnonymousJobPayload(job));
+}
+
+export function buildAnonymousJobPayload(job: Job): Record<string, unknown> {
+  return {
     id: job.id,
     fileName: job.fileName,
     businessType: job.businessType,
@@ -1584,10 +1639,15 @@ async function handleAnonymousJobLookup(req: IncomingMessage, res: ServerRespons
         })
       : null,
     reportV1: reportV1ForJob(job),
-  });
+    productionReportV2: reportV2Enabled ? job.productionReportV2 ?? null : null,
+  };
 }
 
-async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function route(
+  req: IncomingMessage,
+  res: ServerResponse,
+  context: { previewJobWorker?: boolean } = {},
+): Promise<void> {
   const method = req.method ?? "GET";
   const url = new URL(req.url ?? "/", APP_ORIGIN);
   const pathname = url.pathname;
@@ -1598,6 +1658,23 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
 
   if (!applyRateLimit(req, res, pathname, method)) {
+    return;
+  }
+
+  if (
+    method === "POST" &&
+    pathname === "/api/jobs" &&
+    previewAsyncJobExecutionEnabled() &&
+    !context.previewJobWorker
+  ) {
+    res.statusCode = 307;
+    res.setHeader("Location", "/api/preview-jobs");
+    res.end();
+    return;
+  }
+
+  if (method === "POST" && pathname === "/api/preview-jobs" && context.previewJobWorker) {
+    await handleCreateAnonymousJob(req, res, { previewBackground: true });
     return;
   }
 
@@ -1942,6 +2019,21 @@ export default function app(req: IncomingMessage, res: ServerResponse): void {
       error: "An unexpected server error occurred.",
       errorId,
       ...(isDevelopment ? { detail: error instanceof Error ? error.message : String(error) } : {}),
+    });
+  });
+}
+
+export function previewJobApp(req: IncomingMessage, res: ServerResponse): void {
+  if (!previewAsyncJobExecutionEnabled()) {
+    sendText(res, 404, "text/plain; charset=utf-8", "Not found");
+    return;
+  }
+  void route(req, res, { previewJobWorker: true }).catch((error) => {
+    const errorId = randomUUID();
+    console.error("[preview-job-server-error]", errorId, error);
+    json(res, 500, {
+      error: "An unexpected Preview job error occurred.",
+      errorId,
     });
   });
 }

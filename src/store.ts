@@ -35,6 +35,15 @@ function mapJob(row: Record<string, unknown> | undefined): Job | undefined {
       summary = undefined;
     }
   }
+  let productionReportV2: Job["productionReportV2"] | undefined;
+  if (row.production_report_v2_json) {
+    try {
+      productionReportV2 = JSON.parse(String(row.production_report_v2_json)) as Job["productionReportV2"];
+    } catch (e) {
+      console.error("[store] corrupt production_report_v2_json for job", row.id, e);
+      productionReportV2 = undefined;
+    }
+  }
 
   return {
     id: String(row.id),
@@ -60,6 +69,7 @@ function mapJob(row: Record<string, unknown> | undefined): Job | undefined {
     nextRunAt: row.next_run_at ? String(row.next_run_at) : null,
     error: row.error ? String(row.error) : undefined,
     summary,
+    productionReportV2,
     events: listEvents(String(row.id)),
   };
 }
@@ -167,6 +177,7 @@ export function updateJob(
       | "progress"
       | "error"
       | "summary"
+      | "productionReportV2"
       | "detectedStatementPeriod"
       | "merchantId"
       | "statementSlot"
@@ -187,6 +198,7 @@ export function updateJob(
   const nextProgress = patch.progress ?? current.progress;
   const nextError = hasOwn(patch, "error") ? patch.error ?? null : current.error ?? null;
   const nextSummary = hasOwn(patch, "summary") ? patch.summary : current.summary;
+  const nextProductionReportV2 = hasOwn(patch, "productionReportV2") ? patch.productionReportV2 : current.productionReportV2;
   const nextUploadId = patch.uploadId !== undefined ? patch.uploadId : current.uploadId ?? null;
   const nextDetectedStatementPeriod =
     patch.detectedStatementPeriod !== undefined ? patch.detectedStatementPeriod : current.detectedStatementPeriod ?? null;
@@ -202,7 +214,7 @@ export function updateJob(
   db.prepare(`
     UPDATE analysis_jobs
     SET upload_id = ?, merchant_id = ?, statement_slot = ?, replace_statement_id = ?, detected_statement_period = ?,
-        status = ?, progress = ?, attempt_count = ?, max_attempts = ?, next_run_at = ?, error = ?, summary_json = ?, updated_at = ?
+        status = ?, progress = ?, attempt_count = ?, max_attempts = ?, next_run_at = ?, error = ?, summary_json = ?, production_report_v2_json = ?, updated_at = ?
     WHERE id = ?
   `).run(
     nextUploadId,
@@ -217,6 +229,7 @@ export function updateJob(
     nextNextRunAt,
     nextError,
     nextSummary ? JSON.stringify(nextSummary) : null,
+    nextProductionReportV2 ? JSON.stringify(nextProductionReportV2) : null,
     updatedAt,
     id,
   );

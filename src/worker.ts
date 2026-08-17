@@ -3,6 +3,7 @@ import { createOrReplaceComparison, getStatementsForMerchant, persistStatementFr
 import type { AnalysisSummary } from "./types.js";
 import type { ParsedDocument } from "./parser.js";
 import { detectPreflightFailure } from "./preflight.js";
+import { buildProductionReportV2ForJob } from "./productionReportV2JobBridge.js";
 import {
   failJob,
   getJob,
@@ -105,13 +106,14 @@ async function tick(): Promise<void> {
   }
 }
 
-async function processJob(jobId: string): Promise<void> {
+export async function processJob(jobId: string, options: { scheduleRetry?: boolean } = {}): Promise<void> {
   const queuedJob = getJob(jobId);
   if (!queuedJob || queuedJob.status === "completed" || queuedJob.status === "failed") return;
   const stageDelayMs = Number(process.env.STAGE_DELAY_MS ?? 0);
 
   try {
     const job = startJobAttempt(jobId);
+    const jobStartedAt = Date.now();
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
     const [{ parseCsv, parsePdf }, { analyzeStatementDocumentWithOptionalAi }, { evaluateChecklistReport }] =
@@ -121,7 +123,9 @@ async function processJob(jobId: string): Promise<void> {
         import("./checklistEngine.js"),
       ]);
 
+    const parserStartedAt = Date.now();
     const parsed = job.fileType === "csv" ? await parseCsv(job.filePath) : await parsePdf(job.filePath, jobId);
+    logSafeStageDuration(jobId, "pdf_parser", parserStartedAt);
     console.log(`[job:${jobId}] parsed`, {
       fileType: job.fileType,
       headers: parsed.headers.slice(0, 8),
@@ -131,16 +135,26 @@ async function processJob(jobId: string): Promise<void> {
     });
 
     if (job.fileType === "pdf" && parsed.extraction.mode === "unusable") {
-      failJob(
+      await failJobWithProductionReportRecovery({
         jobId,
-        "This PDF appears to be a scanned image. Please upload a text-based PDF exported directly from your processor's portal. Most processors provide downloadable PDF statements that are text-based.",
-      );
+        document: parsed,
+        businessType: job.businessType,
+        legacySummary: null,
+        error:
+          "This PDF appears to be a scanned image. Please upload a text-based PDF exported directly from your processor's portal. Most processors provide downloadable PDF statements that are text-based.",
+      });
       return;
     }
 
     const preflightFailure = detectPreflightFailure(parsed);
     if (preflightFailure) {
-      failJob(jobId, preflightFailure);
+      await failJobWithProductionReportRecovery({
+        jobId,
+        document: parsed,
+        businessType: job.businessType,
+        legacySummary: null,
+        error: preflightFailure,
+      });
       return;
     }
 
@@ -150,7 +164,9 @@ async function processJob(jobId: string): Promise<void> {
     stageUpdate(jobId, "extracting_fee_line_items", 48, "Extracting fee line items");
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
+    const optionalLegacyStartedAt = Date.now();
     let summary = await analyzeStatementDocumentWithOptionalAi(parsed, job.businessType, { sourceFileName: job.fileName });
+    logSafeStageDuration(jobId, "optional_legacy_processing", optionalLegacyStartedAt);
     console.log(`[job:${jobId}] deterministic-summary`, {
       businessType: job.businessType,
       processor: summary.processorName,
@@ -161,12 +177,24 @@ async function processJob(jobId: string): Promise<void> {
     });
 
     if (summary.totalVolume <= 0) {
-      failJob(jobId, "We could not find your total processing volume.");
+      await failJobWithProductionReportRecovery({
+        jobId,
+        document: parsed,
+        businessType: job.businessType,
+        legacySummary: summary,
+        error: "We could not find your total processing volume.",
+      });
       return;
     }
 
     if (summary.totalFees <= 0) {
-      failJob(jobId, "We could not find your total fees.");
+      await failJobWithProductionReportRecovery({
+        jobId,
+        document: parsed,
+        businessType: job.businessType,
+        legacySummary: summary,
+        error: "We could not find your total fees.",
+      });
       return;
     }
 
@@ -218,12 +246,25 @@ async function processJob(jobId: string): Promise<void> {
       };
     }
 
-    await maybeRunCanonicalRuntimeShadow({
+    const productionRuntimeStartedAt = Date.now();
+    const productionReportV2 = await buildProductionReportV2ForJob({
       jobId: job.id,
-      parsed,
-      summary,
+      document: parsed,
+      legacySummary: summary,
       businessType: job.businessType,
     });
+    if (productionReportV2) {
+      const persistenceStartedAt = Date.now();
+      updateJob(jobId, { productionReportV2 }, "Production report ready");
+      logSafeStageDuration(jobId, "production_projection_persistence", persistenceStartedAt);
+    } else {
+      await maybeRunCanonicalRuntimeShadow({
+        jobId: job.id,
+        parsed,
+        summary,
+        businessType: job.businessType,
+      });
+    }
 
     stageUpdate(jobId, "comparing_to_benchmark", 90, "Comparing to your business benchmark");
     if (stageDelayMs > 0) await delay(stageDelayMs);
@@ -252,13 +293,50 @@ async function processJob(jobId: string): Promise<void> {
       },
       "Report ready",
     );
+    logSafeStageDuration(jobId, "total_job_completion", jobStartedAt);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown processing error";
     const retry = retryJobOrFail(jobId, message);
-    if (retry.retrying) {
+    if (retry.retrying && options.scheduleRetry !== false) {
       scheduleTickAfter(retry.delayMs);
     }
   }
+}
+
+export async function processJobUntilTerminal(jobId: string): Promise<void> {
+  while (true) {
+    await processJob(jobId, { scheduleRetry: false });
+    const current = getJob(jobId);
+    if (!current || current.status === "completed" || current.status === "failed") return;
+    const nextRunAt = current.nextRunAt ? new Date(current.nextRunAt).getTime() : Date.now();
+    await delay(Math.max(0, nextRunAt - Date.now()));
+  }
+}
+
+function logSafeStageDuration(jobId: string, stage: string, startedAt: number): void {
+  console.info(`[job:${jobId}] package-4-stage-diagnostics`, JSON.stringify({
+    stage,
+    elapsedMs: Math.max(0, Date.now() - startedAt),
+  }));
+}
+
+async function failJobWithProductionReportRecovery(input: {
+  jobId: string;
+  document: ParsedDocument;
+  businessType: AnalysisSummary["businessType"];
+  legacySummary: AnalysisSummary | null;
+  error: string;
+}): Promise<void> {
+  const projection = await buildProductionReportV2ForJob({
+    jobId: input.jobId,
+    document: input.document,
+    businessType: input.businessType,
+    legacySummary: input.legacySummary,
+  });
+  if (projection?.experience === "unable_to_complete") {
+    updateJob(input.jobId, { productionReportV2: projection }, "Safe recovery report ready");
+  }
+  failJob(input.jobId, input.error);
 }
 
 async function runAiRefinement(summary: AnalysisSummary) {

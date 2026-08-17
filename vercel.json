@@ -3,10 +3,30 @@
   "builds": [
     {
       "src": "api/index.ts",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "node_modules/pdfjs-dist/**",
+          "src/pdfParserWorker.mjs"
+        ]
+      }
+    },
+    {
+      "src": "api/preview-jobs.ts",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "node_modules/pdfjs-dist/**",
+          "src/pdfParserWorker.mjs"
+        ]
+      }
     }
   ],
   "routes": [
+    {
+      "src": "/api/preview-jobs",
+      "dest": "api/preview-jobs.ts"
+    },
     {
       "src": "/(.*)",
       "dest": "api/index.ts"

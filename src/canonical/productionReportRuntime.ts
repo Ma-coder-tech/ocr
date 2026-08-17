@@ -1,5 +1,6 @@
 import {
   buildCanonicalRuntimeAnalysisWithRuntimeAi,
+  type CanonicalRuntimeDiagnostics,
   type CanonicalRuntimeAdapterInput,
 } from "./runtimeAdapter.js";
 import { buildProductionReportProjection } from "./productionReportProjection.js";
@@ -14,6 +15,7 @@ export type ProductionReportRuntimeResult = {
     admittedItemCount: number;
     reasonCodes: string[];
   } | null;
+  runtimeDiagnostics: CanonicalRuntimeDiagnostics;
 };
 
 /**
@@ -24,9 +26,21 @@ export type ProductionReportRuntimeResult = {
 export async function buildProductionReportFromRuntime(
   input: CanonicalRuntimeAdapterInput,
 ): Promise<ProductionReportRuntimeResult> {
+  const runtimeStartedAt = Date.now();
   const result = await buildCanonicalRuntimeAnalysisWithRuntimeAi(input);
+  const projectionStartedAt = Date.now();
+  const projection = buildProductionReportProjection(result.analysis);
+  const projectionElapsedMs = Math.max(0, Date.now() - projectionStartedAt);
   return {
-    projection: buildProductionReportProjection(result.analysis),
+    projection,
     merchantLanguageRuntime: result.merchantLanguageRuntime,
+    runtimeDiagnostics: {
+      ...result.runtimeDiagnostics!,
+      stageElapsedMs: {
+        ...result.runtimeDiagnostics!.stageElapsedMs,
+        productionProjection: projectionElapsedMs,
+        totalPackage3Runtime: Math.max(0, Date.now() - runtimeStartedAt),
+      },
+    },
   };
 }

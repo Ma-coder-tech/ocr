@@ -83,6 +83,7 @@ function migrate(): void {
       next_run_at TEXT,
       error TEXT,
       summary_json TEXT,
+      production_report_v2_json TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -282,6 +283,7 @@ function migrate(): void {
   ensureColumn("analysis_jobs", "attempt_count", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("analysis_jobs", "max_attempts", "INTEGER NOT NULL DEFAULT 3");
   ensureColumn("analysis_jobs", "next_run_at", "TEXT");
+  ensureColumn("analysis_jobs", "production_report_v2_json", "TEXT");
   ensureColumn("statements", "analysis_status", "TEXT NOT NULL DEFAULT 'completed'");
   ensureColumn("statements", "processor_markup_bps", "REAL");
   ensureColumn("comparisons", "processor_markup_bps_delta", "REAL");

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ProductionReportProjection } from "../src/canonical/productionReportProjectionTypes.js";
 
 type StoreModule = typeof import("../src/store.js");
 type DbModule = typeof import("../src/db.js");
@@ -91,5 +92,19 @@ describe("store", () => {
 
     const loaded = store.getJob(job.id);
     expect(loaded?.summary).toBeUndefined();
+  });
+
+  it("persists the Package 3 production report projection for completed-job transport", () => {
+    const job = store.createJob({ fileName: "statement.pdf", filePath: "/tmp/statement.pdf", fileType: "pdf", businessType: "retail" });
+    const projection: ProductionReportProjection = {
+      schemaVersion: "ratereveal_production_report_v2",
+      experience: "unable_to_complete",
+      header: { title: "Your RateReveal statement review", merchantName: null, processor: null, statementPeriod: null, statementScope: "One statement analyzed." },
+      recovery: { title: "We couldn't complete this statement review", reasonCode: "review_could_not_be_completed", explanation: "Try another statement.", nextSteps: ["Upload another statement."] },
+      report: null,
+    };
+
+    store.updateJob(job.id, { productionReportV2: projection });
+    expect(store.getJob(job.id)?.productionReportV2).toEqual(projection);
   });
 });

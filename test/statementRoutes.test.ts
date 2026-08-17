@@ -137,6 +137,7 @@ describe("statement dashboard routes", () => {
     vi.doMock("../src/worker.js", () => ({
       enqueueJob: vi.fn(),
       hydrateQueuedJobs: vi.fn(),
+      processJobUntilTerminal: vi.fn(),
     }));
     previousEnv = {
       FEECLEAR_DB_PATH: process.env.FEECLEAR_DB_PATH,

@@ -12,6 +12,7 @@ import { buildFeeKnowledgeSourcePacket } from "./feeKnowledgeRegistry.js";
 import {
   defaultFeeKnowledgeResearchQuestions,
   runFeeKnowledgeResearch,
+  type FeeKnowledgeResearchDiagnostics,
   type FeeKnowledgeResearchOptions,
 } from "./feeKnowledgeResearch.js";
 import type {
@@ -89,6 +90,16 @@ export type WholeStatementFeeIntelligenceProviderUsage = {
 export type WholeStatementFeeIntelligenceRuntimeResult = {
   output: CanonicalAiWholeStatementFeeIntelligenceOutput;
   feeKnowledgeIntelligence: FeeKnowledgeIntelligenceRecord[];
+  diagnostics: {
+    research: FeeKnowledgeResearchDiagnostics | null;
+    providerReviewElapsedMs: number;
+    totalElapsedMs: number;
+  };
+};
+
+export type WholeStatementFeeIntelligenceRuntimeProviderSelection = {
+  provider: RuntimeProvider | "custom_adapter" | "none";
+  model: string | null;
 };
 
 type ProviderTransportTrace = {
@@ -118,6 +129,7 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
   analysis: CanonicalStatementAnalysis;
   options?: WholeStatementFeeIntelligenceRuntimeOptions;
 }): Promise<WholeStatementFeeIntelligenceRuntimeResult> {
+  const runtimeStartedAt = Date.now();
   const options = input.options ?? {};
   const registry = options.sourceRegistry ?? { approvedExternalSourceRefs: [] };
   if (!runtimeEnabled(options)) {
@@ -128,6 +140,7 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
         "whole_statement_fee_intelligence_disabled",
       ),
       feeKnowledgeIntelligence: [],
+      diagnostics: { research: null, providerReviewElapsedMs: 0, totalElapsedMs: elapsedSince(runtimeStartedAt) },
     };
   }
   const research = await runFeeKnowledgeResearch({
@@ -154,9 +167,11 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
         "whole_statement_fee_intelligence_no_admitted_fee_rows",
       ),
       feeKnowledgeIntelligence: [],
+      diagnostics: { research: research.diagnostics, providerReviewElapsedMs: 0, totalElapsedMs: elapsedSince(runtimeStartedAt) },
     };
   }
 
+  const providerReviewStartedAt = Date.now();
   try {
     const timeoutMs = options.timeoutMs ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_TIMEOUT_MS ?? 12000);
     const raw = await withAbortTimeout(
@@ -169,6 +184,11 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
       feeKnowledgeIntelligence: validation.ok && ["completed", "partial"].includes(validation.output.reviewStatus)
         ? sourceProvenancePacket.intelligence
         : [],
+      diagnostics: {
+        research: research.diagnostics,
+        providerReviewElapsedMs: elapsedSince(providerReviewStartedAt),
+        totalElapsedMs: elapsedSince(runtimeStartedAt),
+      },
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
@@ -180,8 +200,17 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
         timedOut ? "whole_statement_fee_intelligence_timed_out" : "whole_statement_fee_intelligence_failed",
       ),
       feeKnowledgeIntelligence: [],
+      diagnostics: {
+        research: research.diagnostics,
+        providerReviewElapsedMs: elapsedSince(providerReviewStartedAt),
+        totalElapsedMs: elapsedSince(runtimeStartedAt),
+      },
     };
   }
+}
+
+function elapsedSince(startedAt: number): number {
+  return Math.max(0, Date.now() - startedAt);
 }
 
 async function executeProviderReview(
@@ -411,6 +440,14 @@ function providerAttempts(options: WholeStatementFeeIntelligenceRuntimeOptions):
   return providers
     .filter((provider) => Boolean(providerApiKey(provider, options)))
     .map((provider) => ({ provider, modelName: modelNameForProvider(provider, options) }));
+}
+
+export function wholeStatementFeeIntelligenceRuntimeProviderSelection(
+  options: WholeStatementFeeIntelligenceRuntimeOptions = {},
+): WholeStatementFeeIntelligenceRuntimeProviderSelection {
+  if (options.adapter) return { provider: "custom_adapter", model: null };
+  const attempt = providerAttempts(options)[0];
+  return attempt ? { provider: attempt.provider, model: attempt.modelName } : { provider: "none", model: null };
 }
 
 function providerPreference(options: WholeStatementFeeIntelligenceRuntimeOptions): RuntimeProviderPreference {

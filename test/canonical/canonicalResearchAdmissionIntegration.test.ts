@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { Worker } from "node:worker_threads";
 import { describe, expect, it } from "vitest";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
 import { buildFeeKnowledgeSourcePacket } from "../../src/canonical/feeKnowledgeRegistry.js";
@@ -28,6 +29,89 @@ import { analyzeStatementDocument } from "../../src/statementParserOrchestrator.
 import { buildCanonicalRuntimeAnalysis } from "../../src/canonical/runtimeAdapter.js";
 
 describe("canonical research admission integration", () => {
+  it("isolates a retrieved research PDF and preserves fingerprinted locator-backed semantic verification", async () => {
+    const pdfBytes = await readFile(path.resolve(process.cwd(), "test/fixtures/canonical/synthetic-pdfs/fiserv-summary-synthetic.pdf"));
+    const current = {
+      ...question("feerow_aaaaaaaaaaaaaaaaaaaaaaaa", "Synthetic Processor Fee"),
+      processorOrNetwork: "Synthetic Processor",
+    };
+    const result = await runFeeKnowledgeResearch({
+      analysis: analysis(),
+      questions: [current],
+      options: {
+        enabled: true,
+        timeoutMs: 5_000,
+        domainIdentityPolicy: {
+          policyVersion: FEE_KNOWLEDGE_DOMAIN_IDENTITY_POLICY_VERSION,
+          reviewedPublisherDomains: [{ publisherId: "synthetic_processor", aliases: ["synthetic processor"], officialDomains: ["evidence.test"] }],
+          identityEvidence: [],
+        },
+        resolveHost: async () => ["93.184.216.34"],
+        adapter: async () => [{ url: "https://evidence.test/official-guide.pdf", title: "Official guide", publisher: "Synthetic Processor" }],
+        fetchImpl: async () => new Response(pdfBytes, { status: 200, headers: { "content-type": "application/pdf" } }),
+        semanticSupportAdapter: async ({ structuredClaim, documentFingerprint, locatorTextHash, boundedEvidenceExcerpt }) => {
+          expect(documentFingerprint).toMatch(/^sha256:[a-f0-9]{64}$/);
+          expect(locatorTextHash).toMatch(/^[a-f0-9]{16}$/);
+          expect(boundedEvidenceExcerpt).toContain("Synthetic Processor Fee");
+          return {
+            type: "fee_knowledge_semantic_support_decision",
+            policyVersion: FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION,
+            decision: "supports",
+            structuredClaim,
+            reasonCodes: ["synthetic_semantic_support"],
+            providerDetailsStripped: true,
+          };
+        },
+      },
+    });
+
+    expect(result.candidates[0]).toMatchObject({
+      retrievalStatus: "retrieved_text",
+      semanticVerificationStatus: "completed",
+      sourceFingerprint: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+      locatorHash: expect.stringMatching(/^[a-f0-9]{16}$/),
+    });
+    expect(result.claimSupports).toHaveLength(1);
+    expect(result.diagnostics.candidateContentTypeCounts).toEqual({ html: 0, text: 0, pdf: 1, other_or_unknown: 0 });
+    expect(result.diagnostics.retrievedPdf).toMatchObject({ attemptCount: 1, successfulCount: 1, timedOutCount: 0, failedCount: 0 });
+  });
+
+  it("degrades a blocking retrieved research PDF at candidate level without killing research", async () => {
+    let worker: Worker | undefined;
+    const startedAt = Date.now();
+    const result = await runFeeKnowledgeResearch({
+      analysis: analysis(),
+      questions: [question("feerow_aaaaaaaaaaaaaaaaaaaaaaaa", "Alpha Fee")],
+      options: {
+        enabled: true,
+        timeoutMs: 2_000,
+        pdfExtractionTimeoutMs: 40,
+        pdfIsolationWorkerFactoryForTesting: () => {
+          worker = new Worker("while (true) {}", { eval: true, stdout: true, stderr: true });
+          return worker;
+        },
+        domainIdentityPolicy: domainPolicy(),
+        resolveHost: async () => ["93.184.216.34"],
+        adapter: async () => [{ url: "https://evidence.test/blocking.pdf", title: "Official guide", publisher: "Fiserv" }],
+        fetchImpl: async () => new Response(new Uint8Array([37, 80, 68, 70]), { status: 200, headers: { "content-type": "application/pdf" } }),
+      },
+    });
+
+    expect(Date.now() - startedAt).toBeLessThan(1_000);
+    expect(worker?.threadId).toBe(-1);
+    expect(result.attempts[0]).toMatchObject({ status: "completed", resultCount: 1 });
+    expect(result.candidates[0]).toMatchObject({
+      retrievalStatus: "timed_out",
+      verificationStatus: "rejected",
+      semanticVerificationStatus: "not_started",
+      reasonCodes: expect.arrayContaining(["fee_knowledge_pdf_extraction_timed_out", "fee_knowledge_semantic_support_not_run"]),
+      safeRetrievalDiagnostics: { outcomeClass: "watchdog_timeout", contentType: "application/pdf" },
+    });
+    expect(result.claimSupports).toEqual([]);
+    expect(result.diagnostics.retrievedPdf).toMatchObject({ attemptCount: 1, successfulCount: 0, timedOutCount: 1, failedCount: 0 });
+    expect(result.diagnostics.safeReasonCodes).toContain("fee_knowledge_pdf_extraction_timed_out");
+  });
+
   it("keeps two questions and every selected candidate independently attributable", async () => {
     const currentAnalysis = await analysisWithCanonicalFeeRows();
     const [firstRow, secondRow] = currentAnalysis.feeLedger.rows;

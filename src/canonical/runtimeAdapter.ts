@@ -13,6 +13,7 @@ import {
 } from "./runtimeAiCapabilityAdapter.js";
 import {
   runWholeStatementFeeIntelligenceRuntimeWithContext,
+  wholeStatementFeeIntelligenceRuntimeProviderSelection,
   type WholeStatementFeeIntelligenceRuntimeOptions,
 } from "./wholeStatementFeeIntelligenceRuntime.js";
 import {
@@ -22,6 +23,7 @@ import {
 import { validateCanonicalStatementAnalysis } from "./validate.js";
 import { buildCanonicalMerchantAttentionModel } from "./merchantAttention.js";
 import {
+  merchantAttentionAiRuntimeProviderSelection,
   runMerchantAttentionAiRuntime,
   type MerchantAttentionAiRuntimeOptions,
   type MerchantAttentionAiRuntimeResult,
@@ -34,11 +36,13 @@ import type {
   CanonicalAiCapabilityHarnessInput,
 } from "./buildCanonicalAiCapabilities.js";
 import type {
+  CanonicalAiCapabilityRecord,
   CanonicalAiCapabilityStatus,
   CanonicalAiWholeStatementFeeIntelligenceOutput,
   CanonicalStatementAnalysis,
 } from "./types.js";
 import type { FeeKnowledgeIntelligenceRecord } from "./feeKnowledgeTypes.js";
+import type { FeeKnowledgeResearchDiagnostics } from "./feeKnowledgeResearch.js";
 
 export type CanonicalRuntimeInputAdmissionStatus =
   | "canonical_evidence"
@@ -169,6 +173,49 @@ export type CanonicalRuntimeAdapterResult = {
   inputAdmission: CanonicalRuntimeInputAdmission[];
   runtimeAiCapabilitySnapshots: RuntimeAiCapabilitySnapshot[];
   merchantLanguageRuntime: Omit<MerchantAttentionAiRuntimeResult, "model"> | null;
+  runtimeDiagnostics: CanonicalRuntimeDiagnostics | null;
+};
+
+export type CanonicalRuntimeDiagnostics = {
+  policyVersion: "package_3_runtime_diagnostics_v1";
+  feeKnowledgeResearch: FeeKnowledgeResearchDiagnostics | null;
+  stageElapsedMs: {
+    canonicalConstruction: number;
+    feeKnowledgeResearch: number;
+    wholeStatementFeeIntelligence: number;
+    merchantAttentionConstruction: number;
+    merchantLanguageAi: number;
+    productionProjection: number;
+    totalPackage3Runtime: number;
+  };
+  wholeStatementFeeIntelligence: {
+    provider: "anthropic" | "openai" | "custom_adapter" | "none";
+    model: string | null;
+    attempted: boolean;
+    reviewStatus: CanonicalAiWholeStatementFeeIntelligenceOutput["reviewStatus"];
+    canonicalAdmissionStatus: "admitted" | "not_admitted";
+    canonicalCapabilityStatus: CanonicalAiCapabilityStatus | "not_recorded";
+    groundingStatus: CanonicalAiCapabilityRecord["groundingStatus"] | "not_recorded";
+    expectedFeeRowCount: number;
+    reviewedFeeRowCount: number;
+    acceptedRecordCount: number;
+    needsVerificationCount: number;
+    humanReviewCount: number;
+    rejectedRecordCount: number;
+    safeReasonCodes: string[];
+    admittedFeeKnowledgeAvailable: boolean;
+    elapsedMs: number;
+  };
+  merchantLanguageAi: {
+    provider: "anthropic" | "openai" | "custom_adapter" | "none";
+    model: string | null;
+    attempted: boolean;
+    status: MerchantAttentionAiRuntimeResult["status"];
+    eligibleItemCount: number;
+    admittedItemCount: number;
+    safeReasonCodes: string[];
+    elapsedMs: number;
+  };
 };
 
 export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInput): CanonicalRuntimeAdapterResult {
@@ -223,15 +270,18 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
     inputAdmission: canonicalRuntimeInputAdmissionTable(),
     runtimeAiCapabilitySnapshots: runtimeAi.snapshots,
     merchantLanguageRuntime: null,
+    runtimeDiagnostics: null,
   };
 }
 
 export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: CanonicalRuntimeAdapterInput): Promise<CanonicalRuntimeAdapterResult> {
+  const runtimeStartedAt = Date.now();
   const document = cloneJson(input.document);
   const businessType = input.businessType;
   const runtimeDocumentRef = opaqueRuntimeRef(input.runtimeDocumentRef);
   const legacySummary = cloneJson(input.legacySummary ?? null);
 
+  const canonicalConstructionStartedAt = Date.now();
   const analysis = buildCanonicalStatementFactsFromParsedDocument(document, {
     businessType,
     businessProfile: runtimeBusinessProfile(input.businessProfile, businessType),
@@ -242,6 +292,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     summary: legacySummary,
     analysis,
   });
+  const canonicalConstructionElapsedMs = elapsedSince(canonicalConstructionStartedAt);
   const wholeStatementRuntime = await runWholeStatementFeeIntelligenceRuntimeWithContext({
     analysis,
     options: input.wholeStatementFeeIntelligence,
@@ -278,6 +329,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     harnessInputs,
     deterministicRuntimeSafetyReview,
   });
+  const merchantAttentionStartedAt = Date.now();
   const deterministicAnalysis = rebuildCustomerProjectionLayers(
     analysis,
     aiCapabilities,
@@ -285,14 +337,85 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
       ? wholeStatementRuntime.feeKnowledgeIntelligence
       : [],
   );
+  const merchantAttentionElapsedMs = elapsedSince(merchantAttentionStartedAt);
+  const merchantLanguageStartedAt = Date.now();
   const merchantLanguageRuntime = await runMerchantAttentionAiRuntime({
     model: deterministicAnalysis.merchantAttention,
     options: input.merchantLanguageInterpretation,
   });
+  const merchantLanguageElapsedMs = elapsedSince(merchantLanguageStartedAt);
   const finalAnalysis = validateCanonicalStatementAnalysis({
     ...deterministicAnalysis,
     merchantAttention: merchantLanguageRuntime.model,
   });
+  const wholeStatementCapability = finalAnalysis.aiCapabilities.capabilities.find(
+    (capability) => capability.capability === "whole_statement_fee_intelligence_review",
+  );
+  const wholeStatementProvider = wholeStatementFeeIntelligenceRuntimeProviderSelection(
+    input.wholeStatementFeeIntelligence,
+  );
+  const merchantLanguageProvider = merchantAttentionAiRuntimeProviderSelection(
+    input.merchantLanguageInterpretation,
+  );
+  const runtimeDiagnostics: CanonicalRuntimeDiagnostics = {
+    policyVersion: "package_3_runtime_diagnostics_v1",
+    feeKnowledgeResearch: wholeStatementRuntime.diagnostics.research,
+    stageElapsedMs: {
+      canonicalConstruction: canonicalConstructionElapsedMs,
+      feeKnowledgeResearch: wholeStatementRuntime.diagnostics.research?.elapsedMs ?? 0,
+      wholeStatementFeeIntelligence: wholeStatementRuntime.diagnostics.providerReviewElapsedMs,
+      merchantAttentionConstruction: merchantAttentionElapsedMs,
+      merchantLanguageAi: merchantLanguageElapsedMs,
+      productionProjection: 0,
+      totalPackage3Runtime: elapsedSince(runtimeStartedAt),
+    },
+    wholeStatementFeeIntelligence: {
+      provider: wholeStatementProvider.provider,
+      model: wholeStatementProvider.model,
+      attempted: wholeStatementSnapshot.attempted,
+      reviewStatus: wholeStatementOutput.reviewStatus,
+      canonicalAdmissionStatus:
+        wholeStatementCapability?.status === "completed"
+        && wholeStatementCapability.groundingStatus === "grounded"
+        && wholeStatementCapability.output?.type === "whole_statement_fee_intelligence_review"
+          ? "admitted"
+          : "not_admitted",
+      canonicalCapabilityStatus: wholeStatementCapability?.status ?? "not_recorded",
+      groundingStatus: wholeStatementCapability?.groundingStatus ?? "not_recorded",
+      expectedFeeRowCount: wholeStatementOutput.coverageProof.expectedFeeRowRefs.length,
+      reviewedFeeRowCount: wholeStatementOutput.coverageProof.reviewedFeeRowRefs.length,
+      acceptedRecordCount: wholeStatementOutput.acceptanceRecords.filter(
+        (record) => record.status === "accepted" || record.status === "accepted_with_conditions",
+      ).length,
+      needsVerificationCount: wholeStatementOutput.acceptanceRecords.filter(
+        (record) => record.status === "needs_verification",
+      ).length,
+      humanReviewCount: wholeStatementOutput.acceptanceRecords.filter(
+        (record) => record.status === "human_review",
+      ).length,
+      rejectedRecordCount: wholeStatementOutput.acceptanceRecords.filter(
+        (record) => record.status === "rejected",
+      ).length,
+      safeReasonCodes: [...new Set([
+        ...wholeStatementOutput.reasonCodes,
+        ...(wholeStatementCapability?.limitationCodes ?? []),
+      ])].sort(),
+      admittedFeeKnowledgeAvailable:
+        ["completed", "partial"].includes(wholeStatementOutput.reviewStatus)
+        && wholeStatementRuntime.feeKnowledgeIntelligence.length > 0,
+      elapsedMs: wholeStatementRuntime.diagnostics.providerReviewElapsedMs,
+    },
+    merchantLanguageAi: {
+      provider: merchantLanguageProvider.provider,
+      model: merchantLanguageProvider.model,
+      attempted: merchantLanguageRuntime.attempted,
+      status: merchantLanguageRuntime.status,
+      eligibleItemCount: merchantLanguageRuntime.eligibleItemCount,
+      admittedItemCount: merchantLanguageRuntime.admittedItemCount,
+      safeReasonCodes: [...merchantLanguageRuntime.reasonCodes],
+      elapsedMs: merchantLanguageElapsedMs,
+    },
+  };
 
   return {
     analysis: finalAnalysis,
@@ -309,6 +432,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
       admittedItemCount: merchantLanguageRuntime.admittedItemCount,
       reasonCodes: [...merchantLanguageRuntime.reasonCodes],
     },
+    runtimeDiagnostics,
   };
 }
 
@@ -367,6 +491,10 @@ export function opaqueRuntimeRef(value: string): string {
 
 function cloneJson<T>(value: T): T {
   return value === undefined ? value : JSON.parse(JSON.stringify(value));
+}
+
+function elapsedSince(startedAt: number): number {
+  return Math.max(0, Date.now() - startedAt);
 }
 
 function snapshotForWholeStatementFeeIntelligence(output: CanonicalAiWholeStatementFeeIntelligenceOutput): RuntimeAiCapabilitySnapshot {

@@ -18,12 +18,19 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { type ChangeEvent, type DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, type ChangeEvent, type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ResultsScreen } from "./ResultsScreen";
+import { readRateRevealApiJson } from "./apiResponse";
 import type { BusinessTypeId, JobResponse, JobStatus } from "./reportAdapter";
 import { ReportV1Gallery } from "./report-v1/ReportV1Gallery";
 import { ReportV1Gate } from "./report-v1/ReportV1Gate";
 import { guardSingleStatementReportV1 } from "./report-v1/reportV1Guard";
+import { ReportV2Gate } from "./report-v2/ReportV2Gate";
+import { guardProductionReportV2, reportV2FeatureEnabled } from "./report-v2/reportV2Guard";
+
+const DevelopmentReportV2Gallery = import.meta.env.DEV
+  ? lazy(async () => ({ default: (await import("./report-v2/ReportV2Gallery")).ReportV2Gallery }))
+  : null;
 
 type BusinessOption = {
   id: string;
@@ -167,7 +174,10 @@ export function App() {
   const canAnalyze = Boolean(file && selectedBusiness && !hasStarted);
   const showResults = jobStatus === "completed" && Boolean(job?.summary && job.customerReport);
   const showV1Result = Boolean(job?.reportV1 && guardSingleStatementReportV1(job.reportV1).ok && (jobStatus === "completed" || jobStatus === "failed"));
-  const showDevGallery = import.meta.env.DEV && window.location.hash === "#report-v1-gallery";
+  const v2Enabled = reportV2FeatureEnabled();
+  const showV2Result = Boolean(v2Enabled && job && guardProductionReportV2(job.productionReportV2).ok && (jobStatus === "completed" || jobStatus === "failed"));
+  const showDevV1Gallery = import.meta.env.DEV && window.location.hash === "#report-v1-gallery";
+  const showDevV2Gallery = import.meta.env.DEV && new URLSearchParams(window.location.search).has("report-v2-gallery");
 
   useEffect(() => {
     return () => {
@@ -237,7 +247,7 @@ export function App() {
         method: "POST",
         body: form,
       });
-      const payload = (await response.json()) as { jobId?: string; error?: string };
+      const payload = await readRateRevealApiJson<{ jobId?: string; error?: string }>(response);
 
       if (!response.ok || !payload.jobId) {
         throw new Error(payload.error ?? "We couldn't start the analysis. Try again.");
@@ -256,7 +266,7 @@ export function App() {
   async function pollJob(jobId: string) {
     try {
       const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`);
-      const payload = (await response.json()) as JobResponse | { error?: string };
+      const payload = await readRateRevealApiJson<JobResponse | { error?: string }>(response);
 
       if (!response.ok || !("status" in payload)) {
         throw new Error("error" in payload && payload.error ? payload.error : "We couldn't check analysis progress.");
@@ -267,6 +277,7 @@ export function App() {
       setJobProgress(Math.max(payload.progress, payload.status === "completed" ? 100 : 14));
 
       if (payload.status === "failed") {
+        if (reportV2FeatureEnabled() && guardProductionReportV2(payload.productionReportV2).ok) return;
         if (payload.reportV1 && guardSingleStatementReportV1(payload.reportV1).ok) return;
         setError(payload.error ?? "We couldn't read this statement. Make sure it's a full processor statement, not a summary or receipt, and try again.");
         return;
@@ -282,13 +293,17 @@ export function App() {
     }
   }
 
+  if (showDevV2Gallery && DevelopmentReportV2Gallery) {
+    return <Suspense fallback={<main className="page-shell">Loading synthetic report gallery…</main>}><DevelopmentReportV2Gallery /></Suspense>;
+  }
+
   return (
-    <main className="page-shell">
-      {showDevGallery ? (
+    <main className={showV2Result ? "rr-v2-host" : "page-shell"}>
+      {showDevV1Gallery ? (
         <ReportV1Gallery />
       ) : (
         <>
-      <nav className="topbar" aria-label="Primary">
+      {!showV2Result ? <nav className="topbar" aria-label="Primary">
         <a className="brand" href="/" aria-label="RateReveal home">
           <span className="brand-mark">R</span>
           <span>RateReveal</span>
@@ -302,12 +317,14 @@ export function App() {
             Sign in
           </a>
         )}
-      </nav>
+      </nav> : null}
 
-      {(showResults || showV1Result) && job ? (
-        <ReportV1Gate reportV1={job.reportV1} onStartOver={resetAnalysis}>
-          {showResults ? <ResultsScreen job={job} selectedBusinessLabel={selectedBusiness?.benchmarkLabel ?? null} onStartOver={resetAnalysis} /> : null}
-        </ReportV1Gate>
+      {(showV2Result || showResults || showV1Result) && job ? (
+        <ReportV2Gate enabled={v2Enabled} productionReportV2={job.productionReportV2} onStartOver={resetAnalysis}>
+          <ReportV1Gate reportV1={job.reportV1} onStartOver={resetAnalysis}>
+            {showResults ? <ResultsScreen job={job} selectedBusinessLabel={selectedBusiness?.benchmarkLabel ?? null} onStartOver={resetAnalysis} /> : null}
+          </ReportV1Gate>
+        </ReportV2Gate>
       ) : (
         <>
           <section className="hero-section" aria-labelledby="hero-title">
