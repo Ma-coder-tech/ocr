@@ -524,6 +524,180 @@ describe("canonical whole-statement fee intelligence review", () => {
       completedRequestBatchCount: 6,
       incompleteOutputCount: 0,
     });
+    expect(result.diagnostics.provider.batchCoverage).toHaveLength(6);
+    expect(result.diagnostics.provider.batchCoverage.map((batch) => ({
+      batchOrdinal: batch.batchOrdinal,
+      expectedRowCount: batch.expectedRowCount,
+      returnedRowCount: batch.returnedRowCount,
+      uniqueReturnedRowCount: batch.uniqueReturnedRowCount,
+      missingRowCount: batch.missingRowCount,
+      duplicateRowCount: batch.duplicateRowCount,
+      unknownRowCount: batch.unknownRowCount,
+      crossBatchRowCount: batch.crossBatchRowCount,
+      malformedRowCount: batch.malformedRowCount,
+      attemptCount: batch.attemptCount,
+      structuredOutputCompleted: batch.structuredOutputCompleted,
+      exactCoverage: batch.exactCoverage,
+    }))).toEqual([
+      { batchOrdinal: 1, expectedRowCount: 20, returnedRowCount: 20, uniqueReturnedRowCount: 20, missingRowCount: 0, duplicateRowCount: 0, unknownRowCount: 0, crossBatchRowCount: 0, malformedRowCount: 0, attemptCount: 1, structuredOutputCompleted: true, exactCoverage: true },
+      { batchOrdinal: 2, expectedRowCount: 20, returnedRowCount: 20, uniqueReturnedRowCount: 20, missingRowCount: 0, duplicateRowCount: 0, unknownRowCount: 0, crossBatchRowCount: 0, malformedRowCount: 0, attemptCount: 1, structuredOutputCompleted: true, exactCoverage: true },
+      { batchOrdinal: 3, expectedRowCount: 20, returnedRowCount: 20, uniqueReturnedRowCount: 20, missingRowCount: 0, duplicateRowCount: 0, unknownRowCount: 0, crossBatchRowCount: 0, malformedRowCount: 0, attemptCount: 1, structuredOutputCompleted: true, exactCoverage: true },
+      { batchOrdinal: 4, expectedRowCount: 20, returnedRowCount: 20, uniqueReturnedRowCount: 20, missingRowCount: 0, duplicateRowCount: 0, unknownRowCount: 0, crossBatchRowCount: 0, malformedRowCount: 0, attemptCount: 1, structuredOutputCompleted: true, exactCoverage: true },
+      { batchOrdinal: 5, expectedRowCount: 20, returnedRowCount: 20, uniqueReturnedRowCount: 20, missingRowCount: 0, duplicateRowCount: 0, unknownRowCount: 0, crossBatchRowCount: 0, malformedRowCount: 0, attemptCount: 1, structuredOutputCompleted: true, exactCoverage: true },
+      { batchOrdinal: 6, expectedRowCount: 5, returnedRowCount: 5, uniqueReturnedRowCount: 5, missingRowCount: 0, duplicateRowCount: 0, unknownRowCount: 0, crossBatchRowCount: 0, malformedRowCount: 0, attemptCount: 1, structuredOutputCompleted: true, exactCoverage: true },
+    ]);
+    expect(JSON.stringify(result.diagnostics.provider.batchCoverage)).not.toMatch(/SYNTHETIC FEE|feerow_/i);
+  });
+
+  it.each([
+    {
+      name: "duplicate assigned row",
+      mutate: (review: ReturnType<typeof validReview>) => ({
+        ...review,
+        rowInterpretations: [review.rowInterpretations[0]!, ...review.rowInterpretations],
+      }),
+      expected: { returnedRowCount: 21, uniqueReturnedRowCount: 20, missingRowCount: 0, duplicateRowCount: 1, unknownRowCount: 0, crossBatchRowCount: 0 },
+    },
+    {
+      name: "omitted assigned row",
+      mutate: (review: ReturnType<typeof validReview>) => ({
+        ...review,
+        rowInterpretations: review.rowInterpretations.slice(1),
+      }),
+      expected: { returnedRowCount: 19, uniqueReturnedRowCount: 19, missingRowCount: 1, duplicateRowCount: 0, unknownRowCount: 0, crossBatchRowCount: 0 },
+    },
+    {
+      name: "unknown row",
+      mutate: (review: ReturnType<typeof validReview>) => ({
+        ...review,
+        rowInterpretations: [
+          ...review.rowInterpretations,
+          { ...review.rowInterpretations[0]!, feeRowRef: "feerow_unknown_outside_statement" },
+        ],
+      }),
+      expected: { returnedRowCount: 21, uniqueReturnedRowCount: 21, missingRowCount: 0, duplicateRowCount: 0, unknownRowCount: 1, crossBatchRowCount: 0 },
+    },
+    {
+      name: "malformed row linkage",
+      mutate: (review: ReturnType<typeof validReview>) => ({
+        ...review,
+        rowInterpretations: [
+          { ...review.rowInterpretations[0]!, feeRowRef: 42 as never },
+          ...review.rowInterpretations.slice(1),
+        ],
+      }),
+      expected: { returnedRowCount: 20, uniqueReturnedRowCount: 19, missingRowCount: 1, duplicateRowCount: 0, unknownRowCount: 0, crossBatchRowCount: 0, malformedRowCount: 1, structuredOutputCompleted: false },
+    },
+  ])("rejects a $name before it can enter the merged result", async ({ mutate, expected }) => {
+    const analysis = package3Analysis(Array.from({ length: 105 }, (_, index) => ({
+      label: `SYNTHETIC FEE ${String(index + 1).padStart(3, "0")}`,
+      amount: 1 + (index % 17) / 10,
+    })));
+    const result = await runWholeStatementFeeIntelligenceRuntimeWithContext({
+      analysis,
+      options: {
+        enabled: true,
+        maxRowsPerRequest: 20,
+        maxConcurrentRequests: 1,
+        maxBatchCoverageRetries: 0,
+        adapter: async (packet) => mutate(validReview(packet)),
+      },
+    });
+
+    expect(result.output.reviewStatus).toBe("rejected");
+    expect(result.output.rowInterpretations).toEqual([]);
+    expect(result.output.acceptanceRecords).toEqual([]);
+    expect(result.diagnostics.provider.completedRequestBatchCount).toBe(0);
+    expect(result.diagnostics.provider.batchCoverage).toEqual([
+      expect.objectContaining({
+        batchOrdinal: 1,
+        expectedRowCount: 20,
+        attemptCount: 1,
+        structuredOutputCompleted: true,
+        exactCoverage: false,
+        ...expected,
+      }),
+    ]);
+    expect(JSON.stringify(result.diagnostics.provider.batchCoverage)).not.toMatch(/SYNTHETIC FEE|feerow_/i);
+  });
+
+  it("rejects a globally valid but out-of-batch row before merge", async () => {
+    const analysis = package3Analysis(Array.from({ length: 105 }, (_, index) => ({
+      label: `SYNTHETIC FEE ${String(index + 1).padStart(3, "0")}`,
+      amount: 1 + (index % 17) / 10,
+    })));
+    const globalReview = validReview(buildWholeStatementFeeIntelligencePacket(analysis));
+    const result = await runWholeStatementFeeIntelligenceRuntimeWithContext({
+      analysis,
+      options: {
+        enabled: true,
+        maxRowsPerRequest: 20,
+        maxConcurrentRequests: 1,
+        maxBatchCoverageRetries: 0,
+        adapter: async (packet) => {
+          const review = validReview(packet);
+          return {
+            ...review,
+            rowInterpretations: [...review.rowInterpretations, globalReview.rowInterpretations[20]!],
+          };
+        },
+      },
+    });
+
+    expect(result.output.reviewStatus).toBe("rejected");
+    expect(result.output.rowInterpretations).toEqual([]);
+    expect(result.diagnostics.provider.batchCoverage).toEqual([
+      expect.objectContaining({
+        batchOrdinal: 1,
+        expectedRowCount: 20,
+        returnedRowCount: 21,
+        uniqueReturnedRowCount: 21,
+        missingRowCount: 0,
+        duplicateRowCount: 0,
+        unknownRowCount: 0,
+        crossBatchRowCount: 1,
+        attemptCount: 1,
+        exactCoverage: false,
+      }),
+    ]);
+  });
+
+  it("retries a coverage-invalid batch without merging its duplicated record", async () => {
+    const analysis = package3Analysis(Array.from({ length: 105 }, (_, index) => ({
+      label: `SYNTHETIC FEE ${String(index + 1).padStart(3, "0")}`,
+      amount: 1 + (index % 17) / 10,
+    })));
+    const attemptsByFirstRef = new Map<string, number>();
+    const result = await runWholeStatementFeeIntelligenceRuntimeWithContext({
+      analysis,
+      options: {
+        enabled: true,
+        maxRowsPerRequest: 20,
+        maxConcurrentRequests: 1,
+        maxBatchCoverageRetries: 1,
+        adapter: async (packet) => {
+          const key = packet.admittedFeeRows[0]!.feeRowRef;
+          const attempt = (attemptsByFirstRef.get(key) ?? 0) + 1;
+          attemptsByFirstRef.set(key, attempt);
+          const review = validReview(packet);
+          if (attemptsByFirstRef.size === 1 && attempt === 1) {
+            return { ...review, rowInterpretations: [review.rowInterpretations[0]!, ...review.rowInterpretations] };
+          }
+          return review;
+        },
+      },
+    });
+
+    expect(result.output.reviewStatus).toBe("completed");
+    expect(result.output.coverageProof).toMatchObject({ exactCoverage: true, missingFeeRowRefs: [], duplicatedFeeRowRefs: [], unknownFeeRowRefs: [] });
+    expect(result.output.coverageProof.reviewedFeeRowRefs).toHaveLength(105);
+    expect(result.diagnostics.provider.completedRequestBatchCount).toBe(6);
+    expect(result.diagnostics.provider.batchCoverage).toHaveLength(7);
+    expect(result.diagnostics.provider.batchCoverage.slice(0, 2)).toEqual([
+      expect.objectContaining({ batchOrdinal: 1, attemptCount: 1, returnedRowCount: 21, duplicateRowCount: 1, exactCoverage: false }),
+      expect.objectContaining({ batchOrdinal: 1, attemptCount: 2, returnedRowCount: 20, duplicateRowCount: 0, exactCoverage: true }),
+    ]);
+    expect(result.diagnostics.provider.batchCoverage.filter((batch) => batch.exactCoverage)).toHaveLength(6);
   });
 
   it("classifies max-output termination as exhaustion before accessing a missing structured output", async () => {
@@ -711,7 +885,7 @@ describe("canonical whole-statement fee intelligence review", () => {
     expect(financialProjection(result.analysis)).toEqual(financialProjection(baseline));
   });
 
-  it("preserves unsuccessful runtime coverage diagnostics without creating trusted AI output or mutating B-E/Report V1", async () => {
+  it("preserves privacy-safe batch coverage diagnostics without creating trusted AI output or mutating B-E/Report V1", async () => {
     const document = syntheticRuntimeFeeStatement();
     const legacySummary = analyzeDocument(document, "restaurant_food_beverage");
     const legacyBefore = JSON.parse(JSON.stringify(legacySummary));
@@ -749,12 +923,9 @@ describe("canonical whole-statement fee intelligence review", () => {
     expect(incompleteRuntimeReview.reviewStatus).toBe("rejected");
     expect(incompleteRuntimeReview.coverageProof.exactCoverage).toBe(false);
     expect(incompleteRuntimeReview.coverageProof.expectedFeeRowRefs.length).toBeGreaterThan(0);
-    expect(incompleteRuntimeReview.coverageProof.reviewedFeeRowRefs).toHaveLength(
-      incompleteRuntimeReview.coverageProof.expectedFeeRowRefs.length - 1,
-    );
-    expect(incompleteRuntimeReview.coverageProof.missingFeeRowRefs).toHaveLength(1);
-    expect(incompleteRuntimeReview.coverageProof.reviewedFeeRowRefs).not.toContain(
-      incompleteRuntimeReview.coverageProof.missingFeeRowRefs[0],
+    expect(incompleteRuntimeReview.coverageProof.reviewedFeeRowRefs).toEqual([]);
+    expect(incompleteRuntimeReview.coverageProof.missingFeeRowRefs).toHaveLength(
+      incompleteRuntimeReview.coverageProof.expectedFeeRowRefs.length,
     );
     expect(incompleteRuntimeReview.coverageProof.duplicatedFeeRowRefs).toEqual([]);
     expect(incompleteRuntimeReview.coverageProof.unknownFeeRowRefs).toEqual([]);
@@ -762,6 +933,13 @@ describe("canonical whole-statement fee intelligence review", () => {
     expect(incompleteRuntimeReview.coverageProof.malformedFeeRowRefCount).toBe(0);
     expect(incompleteRuntimeReview.acceptanceRecordCount).toBe(0);
     expect(incompleteRuntimeReview.authoritative).toBe(false);
+    expect(incomplete.runtimeDiagnostics?.wholeStatementFeeIntelligence.providerDiagnostics.batchCoverage).toEqual([
+      expect.objectContaining({ attemptCount: 1, missingRowCount: 1, exactCoverage: false }),
+      expect.objectContaining({ attemptCount: 2, missingRowCount: 1, exactCoverage: false }),
+    ]);
+    expect(JSON.stringify(incomplete.runtimeDiagnostics?.wholeStatementFeeIntelligence.providerDiagnostics.batchCoverage)).not.toMatch(
+      /feeRowRef|selectedLabel|merchant|prompt|response/i,
+    );
     expect(financialProjection(incomplete.analysis)).toEqual(financialProjection(baseline));
 
     const safetyBlocked = await buildCanonicalRuntimeAnalysisWithRuntimeAi({
@@ -793,9 +971,12 @@ describe("canonical whole-statement fee intelligence review", () => {
     expect(safetyBlocked.analysis.aiCapabilities.summary.financialReadiness).toBe("limited");
     expect(safetyRuntimeReview.reviewStatus).toBe("safety_blocked");
     expect(safetyRuntimeReview.coverageProof.exactCoverage).toBe(false);
-    expect(safetyRuntimeReview.coverageProof.malformedFeeRowRefs).toEqual(["malformed_fee_row_ref"]);
-    expect(safetyRuntimeReview.coverageProof.malformedFeeRowRefCount).toBe(1);
+    expect(safetyRuntimeReview.coverageProof.malformedFeeRowRefs).toEqual([]);
+    expect(safetyRuntimeReview.coverageProof.malformedFeeRowRefCount).toBe(0);
     expect(safetyRuntimeReview.acceptanceRecordCount).toBe(0);
+    expect(safetyBlocked.runtimeDiagnostics?.wholeStatementFeeIntelligence.providerDiagnostics.batchCoverage).toEqual([
+      expect.objectContaining({ attemptCount: 1, unknownRowCount: 1, exactCoverage: false }),
+    ]);
     expect(JSON.stringify(safetyRuntimeReview)).not.toMatch(/raw prompt|unsafe-file|openai|anthropic|gpt|claude/i);
     expect(financialProjection(safetyBlocked.analysis)).toEqual(financialProjection(baseline));
 
