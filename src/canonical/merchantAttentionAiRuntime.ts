@@ -73,8 +73,8 @@ export type MerchantAttentionAiProviderDiagnostics = {
   completedRequestBatchCount: number;
   processedItemCount: number;
   transportAttemptCount: number;
-  providerResponseCount: number;
-  structuredResponseCount: number;
+  providerReplyCount: number;
+  structuredResultCount: number;
   retryCount: number;
   inputTokens: number;
   cachedInputTokens: number;
@@ -609,8 +609,8 @@ function summarizeProviderDiagnostics(
     completedRequestBatchCount,
     processedItemCount,
     transportAttemptCount: sumNumbers(usages.map((item) => item.transportAttemptCount)) + (unobservedAccounting?.transportAttemptCount ?? 0),
-    providerResponseCount: sumNumbers(usages.map((item) => item.providerResponseCount)) + (unobservedAccounting?.providerResponseCount ?? 0),
-    structuredResponseCount: usages.filter((item) => item.structuredOutputReceived).length,
+    providerReplyCount: sumNumbers(usages.map((item) => item.providerResponseCount)) + (unobservedAccounting?.providerResponseCount ?? 0),
+    structuredResultCount: usages.filter((item) => item.structuredOutputReceived).length,
     retryCount: sumNumbers(usages.map((item) => item.retryCount)) + (unobservedAccounting?.retryCount ?? 0),
     inputTokens: sumNumbers(usages.map((item) => item.inputTokens)) + (unobservedAccounting?.inputTokens ?? 0),
     cachedInputTokens: sumNumbers(usages.map((item) => item.cachedInputTokens)) + (unobservedAccounting?.cachedInputTokens ?? 0),
@@ -629,8 +629,8 @@ function emptyProviderDiagnostics(requestBatchCount: number): MerchantAttentionA
     completedRequestBatchCount: 0,
     processedItemCount: 0,
     transportAttemptCount: 0,
-    providerResponseCount: 0,
-    structuredResponseCount: 0,
+    providerReplyCount: 0,
+    structuredResultCount: 0,
     retryCount: 0,
     inputTokens: 0,
     cachedInputTokens: 0,

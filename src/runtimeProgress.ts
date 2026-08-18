@@ -56,6 +56,8 @@ export const RUNTIME_CHECKPOINT_COUNTER_KEYS = [
   "transportAttemptCount",
   "providerResponseCount",
   "structuredResponseCount",
+  "providerReplyCount",
+  "structuredResultCount",
   "retryCount",
   "inputTokenCount",
   "cachedInputTokenCount",

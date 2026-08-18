@@ -115,8 +115,8 @@ export type WholeStatementFeeIntelligenceProviderDiagnostics = {
   requestBatchCount: number;
   completedRequestBatchCount: number;
   transportAttemptCount: number;
-  providerResponseCount: number;
-  structuredResponseCount: number;
+  providerReplyCount: number;
+  structuredResultCount: number;
   retryCount: number;
   inputTokens: number;
   cachedInputTokens: number;
@@ -455,9 +455,9 @@ function summarizeProviderDiagnostics(
     completedRequestBatchCount,
     transportAttemptCount: sumNumbers(usages.map((usage) => usage.transportAttemptCount))
       + (unobservedAccounting?.transportAttemptCount ?? 0),
-    providerResponseCount: sumNumbers(usages.map((usage) => usage.providerResponseCount))
+    providerReplyCount: sumNumbers(usages.map((usage) => usage.providerResponseCount))
       + (unobservedAccounting?.providerResponseCount ?? 0),
-    structuredResponseCount: usages.filter((usage) => usage.structuredOutputReceived).length,
+    structuredResultCount: usages.filter((usage) => usage.structuredOutputReceived).length,
     retryCount: sumNumbers(usages.map((usage) => usage.retryCount)) + (unobservedAccounting?.retryCount ?? 0),
     inputTokens: sumNumbers(usages.map((usage) => usage.inputTokens)) + (unobservedAccounting?.inputTokens ?? 0),
     cachedInputTokens: sumNumbers(usages.map((usage) => usage.cachedInputTokens)) + (unobservedAccounting?.cachedInputTokens ?? 0),
@@ -473,8 +473,8 @@ function providerProgressCounters(diagnostics: WholeStatementFeeIntelligenceProv
     requestBatchCount: diagnostics.requestBatchCount,
     completedRequestBatchCount: diagnostics.completedRequestBatchCount,
     transportAttemptCount: diagnostics.transportAttemptCount,
-    providerResponseCount: diagnostics.providerResponseCount,
-    structuredResponseCount: diagnostics.structuredResponseCount,
+    providerReplyCount: diagnostics.providerReplyCount,
+    structuredResultCount: diagnostics.structuredResultCount,
     retryCount: diagnostics.retryCount,
     inputTokenCount: diagnostics.inputTokens,
     cachedInputTokenCount: diagnostics.cachedInputTokens,
@@ -488,8 +488,8 @@ function emptyProviderDiagnostics(requestBatchCount: number): WholeStatementFeeI
     requestBatchCount,
     completedRequestBatchCount: 0,
     transportAttemptCount: 0,
-    providerResponseCount: 0,
-    structuredResponseCount: 0,
+    providerReplyCount: 0,
+    structuredResultCount: 0,
     retryCount: 0,
     inputTokens: 0,
     cachedInputTokens: 0,
