@@ -40,7 +40,10 @@ describe("Package 3 fixture-safe full-pipeline rehearsal", () => {
         feeKnowledgeResearch: { enabled: false },
         maxRowsPerRequest: 20,
         maxConcurrentRequests: 2,
-        adapter: async (packet) => validWholeStatementReview(packet),
+        adapter: async (packet) => ({
+          ...validWholeStatementReview(packet),
+          evidenceRefs: ["srcocc_provider_top_level_is_non_authoritative"],
+        }),
       },
     });
 
@@ -62,12 +65,14 @@ describe("Package 3 fixture-safe full-pipeline rehearsal", () => {
     expect(wholeStatement.diagnostics.provider.batchCoverage).toHaveLength(6);
     expect(wholeStatement.diagnostics.provider.batchCoverage.every((batch) =>
       batch.exactCoverage
-      && batch.exactEvidenceLinkage
-      && batch.rejectedTopLevelEvidenceCount === 0
-      && batch.foreignTopLevelEvidenceCount === 0
-      && batch.duplicateTopLevelEvidenceCount === 0
-      && batch.missingTopLevelEvidenceCount === 0
+      && !batch.exactEvidenceLinkage
+      && batch.foreignTopLevelEvidenceCount === 1
+      && batch.rejectedTopLevelEvidenceCount === 1
     )).toBe(true);
+    expect(wholeStatement.output.evidenceRefs).toEqual(
+      [...new Set(wholeStatement.output.rowInterpretations.flatMap((row) => row.evidenceRefs))].sort(),
+    );
+    expect(wholeStatement.output.evidenceRefs).not.toContain("srcocc_provider_top_level_is_non_authoritative");
 
     const grounded = analysisWithGroundedWholeStatement(initial, wholeStatement.output);
     const wholeStatementCapability = grounded.aiCapabilities.capabilities.find(

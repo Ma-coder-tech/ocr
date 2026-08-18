@@ -56,6 +56,16 @@ export const FEE_KNOWLEDGE_RESEARCH_LIMITS = {
   maxResultCandidatesPerSearch: 4,
 } as const satisfies FeeKnowledgeResearchLimits;
 
+export const FEE_KNOWLEDGE_PRODUCT_RUNTIME_POLICY = {
+  policyVersion: "fee_knowledge_product_runtime_policy_v1",
+  totalDeadlineMs: 240_000,
+  maxConcurrentSearchCalls: 4,
+  webSearchCallTimeoutMs: 60_000,
+  semanticVerificationCallTimeoutMs: 20_000,
+  retrievedDocumentInvestigationMode: "when_deterministic_locator_missing",
+  statementInvestigationMode: "whole_statement_runtime_owns_statement_interpretation",
+} as const;
+
 const DEFAULT_OPENAI_WEB_SEARCH_MODEL = "gpt-5";
 export const OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS = 2_000;
 export const WEB_SEARCH_PROVIDER_MAX_TOOL_CALLS = 1;
@@ -337,7 +347,8 @@ export async function runFeeKnowledgeResearch(input: {
     const selectedQuestionItems = researchPlan.selected;
     const skippedQuestions = researchPlan.notSelectedQuestions;
     let remainingCandidates = FEE_KNOWLEDGE_RESEARCH_LIMITS.maxRetrievalCandidates;
-    const statementInvestigationEnabled = feeKnowledgeInvestigativeIntelligenceEnabled(investigativeOptions);
+    const statementInvestigationEnabled = feeKnowledgeInvestigativeIntelligenceEnabled(investigativeOptions)
+      && investigativeOptions?.statementScopeEnabled === true;
     diagnosticState.statementInvestigativeAttempted = statementInvestigationEnabled;
     const statementInvestigationStartedAt = Date.now();
     await emitRuntimeProgress(options.progressReporter, {
@@ -345,14 +356,16 @@ export async function runFeeKnowledgeResearch(input: {
       status: statementInvestigationEnabled ? "running" : "degraded",
       reasonCodes: statementInvestigationEnabled ? [] : ["fee_knowledge_investigative_intelligence_disabled"],
     });
-    const statementInvestigation = await runFeeKnowledgeInvestigativeIntelligence({
-      scope: "statement",
-      analysis: input.analysis,
-      questions: selectedQuestions,
-      existingIntelligence: intelligence,
-      options: investigativeOptions,
-      abortSignal,
-    });
+    const statementInvestigation = statementInvestigationEnabled
+      ? await runFeeKnowledgeInvestigativeIntelligence({
+          scope: "statement",
+          analysis: input.analysis,
+          questions: selectedQuestions,
+          existingIntelligence: intelligence,
+          options: investigativeOptions,
+          abortSignal,
+        })
+      : [];
     diagnosticState.stageElapsedMs.statementInvestigativeIntelligence += elapsedSince(statementInvestigationStartedAt);
     diagnosticState.statementInvestigativeOutputRecordCount = statementInvestigation.length;
     diagnosticState.statementInvestigativeStatus = statementInvestigationEnabled
@@ -367,35 +380,76 @@ export async function runFeeKnowledgeResearch(input: {
         : "degraded",
       elapsedMs: elapsedSince(statementInvestigationStartedAt),
       counters: { statementInvestigativeOutputCount: statementInvestigation.length },
-      reasonCodes: statementInvestigationEnabled && diagnosticState.statementInvestigativeStatus !== "completed"
-        ? ["fee_knowledge_statement_investigative_degraded"]
-        : [],
+      reasonCodes: statementInvestigationEnabled
+        ? diagnosticState.statementInvestigativeStatus !== "completed"
+          ? ["fee_knowledge_statement_investigative_degraded"]
+          : []
+        : ["fee_knowledge_statement_investigative_owned_by_whole_statement_runtime"],
     });
+
+    const discoveryByAttemptId = new Map<string, Promise<{
+      discovered: FeeKnowledgeDiscoveryCandidate[];
+      error: unknown | null;
+    }>>();
+    if (selectedQuestionItems.length > FEE_KNOWLEDGE_PRODUCT_RUNTIME_POLICY.maxConcurrentSearchCalls) {
+      throw new Error("fee_knowledge_product_search_concurrency_policy_exceeded");
+    }
+    diagnosticState.searchCallCount = selectedQuestionItems.length;
+    for (const [discoveryIndex, item] of selectedQuestionItems.entries()) {
+      const attemptId = attemptIdFor(item.question, item.originalIndex);
+      discoveryByAttemptId.set(attemptId, (async () => {
+        const searchStartedAt = Date.now();
+        await emitRuntimeProgress(options.progressReporter, {
+          stage: "discovery",
+          status: "running",
+          counters: { searchCallCount: discoveryIndex + 1 },
+        });
+        try {
+          const discovered = await withParentAbortTimeout(
+            abortSignal,
+            FEE_KNOWLEDGE_PRODUCT_RUNTIME_POLICY.webSearchCallTimeoutMs,
+            (callSignal) => searchAdapter(
+              { attemptId, questions: [item.question], limits: FEE_KNOWLEDGE_RESEARCH_LIMITS },
+              { abortSignal: callSignal },
+            ),
+            "fee_knowledge_web_search_timed_out",
+          );
+          await emitRuntimeProgress(options.progressReporter, {
+            stage: "discovery",
+            status: "completed",
+            elapsedMs: elapsedSince(searchStartedAt),
+            counters: { searchCallCount: discoveryIndex + 1 },
+          });
+          return { discovered, error: null };
+        } catch (error) {
+          const timedOut = !abortSignal.aborted && isTimeoutError(error);
+          const normalizedError = timedOut
+            ? new FeeKnowledgeSearchProviderError("timed_out", "fee_knowledge_web_search_timed_out")
+            : error;
+          await emitRuntimeProgress(options.progressReporter, {
+            stage: "discovery",
+            status: timedOut || abortSignal.aborted ? "timed_out" : "degraded",
+            elapsedMs: elapsedSince(searchStartedAt),
+            counters: { searchCallCount: discoveryIndex + 1 },
+            reasonCodes: [timedOut ? "fee_knowledge_web_search_timed_out" : abortSignal.aborted
+              ? "fee_knowledge_research_graph_timed_out"
+              : "fee_knowledge_discovery_degraded"],
+          });
+          return { discovered: [], error: normalizedError };
+        } finally {
+          diagnosticState.stageElapsedMs.webSearchDiscovery += elapsedSince(searchStartedAt);
+        }
+      })());
+    }
 
     for (const item of selectedQuestionItems) {
       const question = item.question;
       const index = item.originalIndex;
       const attemptId = attemptIdFor(question, index);
       try {
-        diagnosticState.searchCallCount += 1;
-        const searchStartedAt = Date.now();
-        await emitRuntimeProgress(options.progressReporter, {
-          stage: "discovery",
-          status: "running",
-          counters: { searchCallCount: diagnosticState.searchCallCount },
-        });
-        let discovered: FeeKnowledgeDiscoveryCandidate[];
-        try {
-          discovered = await searchAdapter({ attemptId, questions: [question], limits: FEE_KNOWLEDGE_RESEARCH_LIMITS }, { abortSignal });
-        } finally {
-          diagnosticState.stageElapsedMs.webSearchDiscovery += elapsedSince(searchStartedAt);
-        }
-        await emitRuntimeProgress(options.progressReporter, {
-          stage: "discovery",
-          status: "completed",
-          elapsedMs: elapsedSince(searchStartedAt),
-          counters: { searchCallCount: diagnosticState.searchCallCount },
-        });
+        const discovery = await discoveryByAttemptId.get(attemptId);
+        if (!discovery || discovery.error) throw discovery?.error ?? new Error("fee_knowledge_discovery_result_missing");
+        const discovered = discovery.discovered;
         const bounded = rankFeeKnowledgeDiscoveryCandidates(dedupeCandidates(discovered), question)
           .slice(0, Math.min(remainingCandidates, FEE_KNOWLEDGE_RESEARCH_LIMITS.maxResultCandidatesPerSearch));
         remainingCandidates -= bounded.length;
@@ -458,51 +512,50 @@ export async function runFeeKnowledgeResearch(input: {
             question,
             retrieved,
           }));
-          const retrievedInvestigationEnabled = feeKnowledgeInvestigativeIntelligenceEnabled(investigativeOptions);
-          if (retrievedInvestigationEnabled) diagnosticState.retrievedInvestigativeAttemptCount += 1;
-          const retrievedInvestigationStartedAt = Date.now();
-          await emitRuntimeProgress(options.progressReporter, {
-            stage: "investigative_intelligence",
-            status: retrievedInvestigationEnabled ? "running" : "degraded",
-            counters: { retrievedInvestigativeAttemptCount: diagnosticState.retrievedInvestigativeAttemptCount },
-            reasonCodes: retrievedInvestigationEnabled ? [] : ["fee_knowledge_investigative_intelligence_disabled"],
-          });
-          const retrievedInvestigation = await runFeeKnowledgeInvestigativeIntelligence({
-            scope: "retrieved_document",
-            analysis: input.analysis,
-            questions: [question],
-            existingIntelligence: intelligence,
-            options: investigativeOptions,
-            candidate: {
-              candidateId,
-              attemptId,
-              question,
-              candidateRecord: candidates[pendingIndex]!,
-              retrieved,
-            },
-            abortSignal,
-          });
-          diagnosticState.stageElapsedMs.retrievedDocumentInvestigativeIntelligence += elapsedSince(retrievedInvestigationStartedAt);
-          diagnosticState.retrievedInvestigativeOutputRecordCount += retrievedInvestigation.length;
-          diagnosticState.retrievedInvestigativeStatuses.push(
-            retrievedInvestigationEnabled ? investigativeStatus(retrievedInvestigation) : "disabled",
-          );
-          safeInvestigativeReasonCodes(retrievedInvestigation).forEach((code) => diagnosticState.retrievedInvestigativeReasonCodes.add(code));
-          intelligence.push(...retrievedInvestigation);
-          await emitRuntimeProgress(options.progressReporter, {
-            stage: "investigative_intelligence",
-            status: retrievedInvestigationEnabled && investigativeStatus(retrievedInvestigation) === "completed"
-              ? "completed"
-              : "degraded",
-            elapsedMs: elapsedSince(retrievedInvestigationStartedAt),
-            counters: {
-              retrievedInvestigativeAttemptCount: diagnosticState.retrievedInvestigativeAttemptCount,
-              retrievedInvestigativeOutputCount: retrievedInvestigation.length,
-            },
-            reasonCodes: retrievedInvestigationEnabled && investigativeStatus(retrievedInvestigation) !== "completed"
-              ? ["fee_knowledge_retrieved_investigative_degraded"]
-              : [],
-          });
+          const retrievedInvestigationEnabled = feeKnowledgeInvestigativeIntelligenceEnabled(investigativeOptions)
+            && feeKnowledgeCandidateNeedsInvestigativeLocator({ retrieved, question });
+          let retrievedInvestigation: FeeKnowledgeIntelligenceRecord[] = [];
+          if (retrievedInvestigationEnabled) {
+            diagnosticState.retrievedInvestigativeAttemptCount += 1;
+            const retrievedInvestigationStartedAt = Date.now();
+            await emitRuntimeProgress(options.progressReporter, {
+              stage: "investigative_intelligence",
+              status: "running",
+              counters: { retrievedInvestigativeAttemptCount: diagnosticState.retrievedInvestigativeAttemptCount },
+            });
+            retrievedInvestigation = await runFeeKnowledgeInvestigativeIntelligence({
+              scope: "retrieved_document",
+              analysis: input.analysis,
+              questions: [question],
+              existingIntelligence: intelligence,
+              options: investigativeOptions,
+              candidate: {
+                candidateId,
+                attemptId,
+                question,
+                candidateRecord: candidates[pendingIndex]!,
+                retrieved,
+              },
+              abortSignal,
+            });
+            diagnosticState.stageElapsedMs.retrievedDocumentInvestigativeIntelligence += elapsedSince(retrievedInvestigationStartedAt);
+            diagnosticState.retrievedInvestigativeOutputRecordCount += retrievedInvestigation.length;
+            diagnosticState.retrievedInvestigativeStatuses.push(investigativeStatus(retrievedInvestigation));
+            safeInvestigativeReasonCodes(retrievedInvestigation).forEach((code) => diagnosticState.retrievedInvestigativeReasonCodes.add(code));
+            intelligence.push(...retrievedInvestigation);
+            await emitRuntimeProgress(options.progressReporter, {
+              stage: "investigative_intelligence",
+              status: investigativeStatus(retrievedInvestigation) === "completed" ? "completed" : "degraded",
+              elapsedMs: elapsedSince(retrievedInvestigationStartedAt),
+              counters: {
+                retrievedInvestigativeAttemptCount: diagnosticState.retrievedInvestigativeAttemptCount,
+                retrievedInvestigativeOutputCount: retrievedInvestigation.length,
+              },
+              reasonCodes: investigativeStatus(retrievedInvestigation) !== "completed"
+                ? ["fee_knowledge_retrieved_investigative_degraded"]
+                : [],
+            });
+          }
           const aiCandidateEvidenceLocatorHash = candidateEvidenceLocatorHash(intelligence, candidateId);
           const semanticVerificationStartedAt = Date.now();
           await emitRuntimeProgress(options.progressReporter, {
@@ -519,7 +572,17 @@ export async function runFeeKnowledgeResearch(input: {
               retrieved,
               question,
               questionOrdinal: index,
-              semanticSupportAdapter,
+              semanticSupportAdapter: (request, context) => withParentAbortTimeout(
+                context.abortSignal,
+                FEE_KNOWLEDGE_PRODUCT_RUNTIME_POLICY.semanticVerificationCallTimeoutMs,
+                (callSignal) => semanticSupportAdapter(request, { abortSignal: callSignal }),
+                "fee_knowledge_semantic_timed_out",
+              ).catch((error) => {
+                if (!context.abortSignal.aborted && isTimeoutError(error)) {
+                  return unsupportedSemanticDecision(request.structuredClaim, "fee_knowledge_semantic_timed_out");
+                }
+                throw error;
+              }),
               domainIdentityPolicy: options.domainIdentityPolicy,
               priorClaimSupports: [...sourcePacket.claimSupports, ...claimSupports],
               candidateEvidenceLocatorHash: aiCandidateEvidenceLocatorHash,
@@ -582,7 +645,7 @@ export async function runFeeKnowledgeResearch(input: {
     }
 
     return { attempts, candidates, intelligence, claimSupports };
-  }, options.timeoutMs ?? FEE_KNOWLEDGE_RESEARCH_LIMITS.totalDeadlineMs).catch((error) => {
+  }, options.timeoutMs ?? FEE_KNOWLEDGE_PRODUCT_RUNTIME_POLICY.totalDeadlineMs).catch((error) => {
     const timedOut = /timed out|aborted|abort/i.test(error instanceof Error ? error.message : String(error));
     return terminalResearchSnapshot({
       questions: input.questions,
@@ -1022,6 +1085,27 @@ function safeUsageInteger(value: unknown): number | null {
 
 export function extractDiscoveryCandidates(raw: unknown): FeeKnowledgeDiscoveryCandidate[] {
   return dedupeCandidates([...extractWebSearchCallSources(raw), ...extractUrlCitationAnnotations(raw)]);
+}
+
+export function feeKnowledgeCandidateNeedsInvestigativeLocator(input: {
+  retrieved: RetrievedDocument;
+  question: FeeKnowledgeResearchQuestion;
+}): boolean {
+  if (input.retrieved.status !== "retrieved_text" || !input.retrieved.documentFingerprint) return false;
+  const firstCitation = validateClaimCitation({
+    document: input.retrieved,
+    requiredText: bestRequiredText(input.question),
+  });
+  const citation = firstCitation.locator
+    ? validateClaimCitation({
+        document: input.retrieved,
+        requiredText: bestRequiredText(input.question),
+        locatorId: firstCitation.locator.locatorId,
+        expectedDocumentFingerprint: input.retrieved.documentFingerprint,
+        expectedLocatorTextHash: firstCitation.locator.textHash,
+      })
+    : firstCitation;
+  return !citation.exists || !citation.locator;
 }
 
 export async function verifyCandidate(input: {
@@ -1568,6 +1652,39 @@ async function withAbortTimeout<T>(operation: (abortSignal: AbortSignal) => Prom
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+async function withParentAbortTimeout<T>(
+  parentSignal: AbortSignal,
+  timeoutMs: number,
+  operation: (abortSignal: AbortSignal) => Promise<T>,
+  reasonCode: string,
+): Promise<T> {
+  if (parentSignal.aborted) throw parentSignal.reason ?? new Error("fee_knowledge_research_graph_timed_out");
+  const controller = new AbortController();
+  const onParentAbort = () => controller.abort(parentSignal.reason);
+  parentSignal.addEventListener("abort", onParentAbort, { once: true });
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeoutError = Object.assign(new Error(reasonCode), { name: "AbortError" });
+  try {
+    return await Promise.race([
+      operation(controller.signal),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort(timeoutError);
+          reject(timeoutError);
+        }, timeoutMs);
+        timer.unref?.();
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    parentSignal.removeEventListener("abort", onParentAbort);
+  }
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return /timed_out|timed out|timeout/i.test(error instanceof Error ? error.message : String(error));
 }
 
 function extractWebSearchCallSources(raw: unknown): FeeKnowledgeDiscoveryCandidate[] {

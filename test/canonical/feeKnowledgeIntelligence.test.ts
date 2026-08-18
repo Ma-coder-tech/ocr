@@ -260,7 +260,7 @@ describe("fee knowledge intelligence state model", () => {
         options: {
           enabled: true,
           adapter: async () => [],
-          investigativeIntelligence: { enabled: true, adapter: investigativeAdapter },
+          investigativeIntelligence: { enabled: true, statementScopeEnabled: true, adapter: investigativeAdapter },
         },
       });
 
@@ -336,7 +336,7 @@ describe("fee knowledge intelligence state model", () => {
         ),
         semanticSupportAdapter,
         domainIdentityPolicy: domainPolicy(question.processorOrNetwork ?? "Fiserv", "discover.test"),
-        investigativeIntelligence: { enabled: true, adapter: investigativeAdapter },
+        investigativeIntelligence: { enabled: true, statementScopeEnabled: true, adapter: investigativeAdapter },
       },
     });
 

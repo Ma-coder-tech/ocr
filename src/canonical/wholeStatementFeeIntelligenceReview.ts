@@ -349,32 +349,16 @@ export function validateWholeStatementFeeIntelligenceReviewForPacket(
   if (source.financialMutationAllowed !== false) errors.push("whole_statement_fee_intelligence_financial_mutation_invalid");
   if (source.providerDetailsStripped !== true) errors.push("whole_statement_fee_intelligence_provider_details_invalid");
 
-  const evidenceRefs = stringArray(source.evidenceRefs, "evidenceRefs", errors);
   const factRefs = stringArray(source.factRefs, "factRefs", errors);
   const limitationCodes = enumArray(source.limitationCodes, LIMITATION_CODES, "limitationCodes", errors);
   const reasonCodes = reasonCodeArray(source.reasonCodes, "reasonCodes", errors);
   const rowInterpretations = interpretationArray(source.rowInterpretations, packet, analysis, registry, errors);
-  const evidenceLinkage = topLevelEvidenceLinkageFor({
-    rawTopLevelEvidenceRefs: source.evidenceRefs,
-    providerTopLevelEvidenceRefs: evidenceRefs,
-    admittedRowEvidenceRefs: rowInterpretations.flatMap((interpretation) => interpretation.evidenceRefs),
-    canonicalEvidenceIds: new Set(analysis.evidence.map((record) => record.id)),
-  });
-  if (evidenceLinkage.diagnostics.duplicateTopLevelEvidenceCount > 0) {
-    errors.push("whole_statement_fee_intelligence_top_level_evidence_ref_duplicate");
-  }
-  if (evidenceLinkage.diagnostics.malformedTopLevelEvidenceCount > 0) {
-    errors.push("whole_statement_fee_intelligence_top_level_evidence_ref_malformed");
-  }
-  if (evidenceLinkage.diagnostics.foreignTopLevelEvidenceCount > 0) {
-    errors.push("whole_statement_fee_intelligence_top_level_evidence_ref_foreign");
-  }
-  if (evidenceLinkage.diagnostics.rejectedTopLevelEvidenceCount > evidenceLinkage.diagnostics.foreignTopLevelEvidenceCount) {
-    errors.push("whole_statement_fee_intelligence_top_level_evidence_ref_not_admitted_at_row");
-  }
-  if (evidenceLinkage.diagnostics.missingTopLevelEvidenceCount > 0) {
-    errors.push("whole_statement_fee_intelligence_top_level_evidence_ref_missing_from_row_union");
-  }
+  // Aggregate evidence is canonical bookkeeping owned by RateReveal. Provider-supplied
+  // top-level evidenceRefs are intentionally non-authoritative: every admitted ref is
+  // derived from row interpretations only after row-scoped canonical validation.
+  const canonicalEvidenceRefs = unique(
+    rowInterpretations.flatMap((interpretation) => interpretation.evidenceRefs),
+  ).sort();
   const coverageProof = coverageProofFor(packet.admittedFeeRows.map((row) => row.feeRowRef), rowInterpretations, errors, reviewStatus === "completed");
   const cleanReviewedCoverage = coverageProof.duplicatedFeeRowRefs.length === 0
     && coverageProof.unknownFeeRowRefs.length === 0
@@ -410,7 +394,7 @@ export function validateWholeStatementFeeIntelligenceReviewForPacket(
     type: "whole_statement_fee_intelligence_review",
     reviewPolicyVersion: WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION,
     reviewStatus,
-    evidenceRefs: evidenceLinkage.canonicalEvidenceRefs,
+    evidenceRefs: canonicalEvidenceRefs,
     factRefs: unique(factRefs).sort(),
     limitationCodes: unique(limitationCodes).sort(),
     coverageProof,

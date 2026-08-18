@@ -268,7 +268,6 @@ describe("canonical whole-statement fee intelligence review", () => {
         ...review,
         evidenceRefs: [...review.evidenceRefs, "srcocc_provider_invented"],
       }),
-      expectedError: "whole_statement_fee_intelligence_top_level_evidence_ref_foreign",
     },
     {
       name: "unknown evidence reference",
@@ -276,7 +275,6 @@ describe("canonical whole-statement fee intelligence review", () => {
         ...review,
         evidenceRefs: [...review.evidenceRefs, "ev_unknown_outside_statement"],
       }),
-      expectedError: "whole_statement_fee_intelligence_top_level_evidence_ref_foreign",
     },
     {
       name: "duplicate evidence reference",
@@ -284,7 +282,6 @@ describe("canonical whole-statement fee intelligence review", () => {
         ...review,
         evidenceRefs: [review.evidenceRefs[0]!, ...review.evidenceRefs],
       }),
-      expectedError: "whole_statement_fee_intelligence_top_level_evidence_ref_duplicate",
     },
     {
       name: "missing row-admitted evidence reference",
@@ -292,23 +289,24 @@ describe("canonical whole-statement fee intelligence review", () => {
         ...review,
         evidenceRefs: review.evidenceRefs.slice(1),
       }),
-      expectedError: "whole_statement_fee_intelligence_top_level_evidence_ref_missing_from_row_union",
     },
-  ])("rejects a $name before canonical Merchant Attention construction", ({ mutate, expectedError }) => {
+  ])("treats a provider top-level $name as non-authoritative bookkeeping", ({ mutate }) => {
     const analysis = everyRowAnalysis();
-    const review = mutate(validReview(buildWholeStatementFeeIntelligencePacket(analysis)));
+    const canonicalReview = validReview(buildWholeStatementFeeIntelligencePacket(analysis));
+    const expectedEvidenceRefs = [...new Set(canonicalReview.rowInterpretations.flatMap((row) => row.evidenceRefs))].sort();
+    const review = mutate(canonicalReview);
     const result = validateWholeStatementFeeIntelligenceReview(review, analysis);
 
-    expect(result.ok).toBe(false);
-    expect(result.output.reviewStatus).toBe("rejected");
-    expect(result.output.evidenceRefs).toEqual([]);
-    expect(result.output.rowInterpretations).toEqual([]);
-    expect(result.output.acceptanceRecords).toEqual([]);
-    expect(result.errors).toContain(expectedError);
-    expect(JSON.stringify(result.errors)).not.toMatch(/srcocc_provider_invented|ev_unknown_outside_statement/);
+    expect(result.ok).toBe(true);
+    expect(result.output.reviewStatus).toBe("completed");
+    expect(result.output.evidenceRefs).toEqual(expectedEvidenceRefs);
+    expect(result.output.evidenceRefs).not.toContain("srcocc_provider_invented");
+    expect(result.output.evidenceRefs).not.toContain("ev_unknown_outside_statement");
+    expect(result.output.rowInterpretations).toHaveLength(canonicalReview.rowInterpretations.length);
+    expect(result.output.acceptanceRecords).toHaveLength(canonicalReview.rowInterpretations.length);
   });
 
-  it("rejects canonical top-level evidence that was not admitted by any row", () => {
+  it("does not grant authority to canonical evidence named only by the provider top level", () => {
     const analysis = everyRowAnalysis();
     const extraEvidenceRef = "ev_canonical_not_row_admitted";
     analysis.evidence.push({ ...analysis.evidence[0]!, id: extraEvidenceRef });
@@ -318,11 +316,10 @@ describe("canonical whole-statement fee intelligence review", () => {
       evidenceRefs: [...review.evidenceRefs, extraEvidenceRef],
     }, analysis);
 
-    expect(result.ok).toBe(false);
-    expect(result.output.reviewStatus).toBe("rejected");
-    expect(result.errors).toContain("whole_statement_fee_intelligence_top_level_evidence_ref_not_admitted_at_row");
-    expect(result.errors).not.toContain("whole_statement_fee_intelligence_top_level_evidence_ref_foreign");
-    expect(result.output.evidenceRefs).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.output.reviewStatus).toBe("completed");
+    expect(result.output.evidenceRefs).not.toContain(extraEvidenceRef);
+    expect(result.output.evidenceRefs).toEqual([...new Set(review.rowInterpretations.flatMap((row) => row.evidenceRefs))].sort());
   });
 
   it("rejects missing, duplicated, unknown, and malformed row coverage while preserving sanitized diagnostics", () => {
@@ -784,7 +781,7 @@ describe("canonical whole-statement fee intelligence review", () => {
     expect(result.diagnostics.provider.batchCoverage.filter((batch) => batch.exactCoverage)).toHaveLength(6);
   });
 
-  it("retries invalid top-level evidence linkage without merging foreign evidence", async () => {
+  it("does not retry or merge non-authoritative provider top-level evidence", async () => {
     const analysis = package3Analysis(Array.from({ length: 105 }, (_, index) => ({
       label: `SYNTHETIC FEE ${String(index + 1).padStart(3, "0")}`,
       amount: 1 + (index % 17) / 10,
@@ -811,8 +808,8 @@ describe("canonical whole-statement fee intelligence review", () => {
     expect(result.output.coverageProof.reviewedFeeRowRefs).toHaveLength(105);
     expect(result.output.evidenceRefs).not.toContain("srcocc_provider_invented");
     expect(result.diagnostics.provider.completedRequestBatchCount).toBe(6);
-    expect(result.diagnostics.provider.batchCoverage).toHaveLength(7);
-    expect(result.diagnostics.provider.batchCoverage.slice(0, 2)).toEqual([
+    expect(result.diagnostics.provider.batchCoverage).toHaveLength(6);
+    expect(result.diagnostics.provider.batchCoverage.slice(0, 1)).toEqual([
       expect.objectContaining({
         batchOrdinal: 1,
         attemptCount: 1,
@@ -821,19 +818,11 @@ describe("canonical whole-statement fee intelligence review", () => {
         rejectedTopLevelEvidenceCount: 1,
         exactEvidenceLinkage: false,
       }),
-      expect.objectContaining({
-        batchOrdinal: 1,
-        attemptCount: 2,
-        exactCoverage: true,
-        foreignTopLevelEvidenceCount: 0,
-        rejectedTopLevelEvidenceCount: 0,
-        exactEvidenceLinkage: true,
-      }),
     ]);
     expect(JSON.stringify(result.diagnostics.provider.batchCoverage)).not.toMatch(/srcocc_|feerow_|SYNTHETIC FEE/i);
   });
 
-  it("fails closed when invalid top-level evidence linkage exhausts its bounded attempts", async () => {
+  it("still fails closed when a row-level evidence reference is foreign", async () => {
     const analysis = package3Analysis(Array.from({ length: 105 }, (_, index) => ({
       label: `SYNTHETIC FEE ${String(index + 1).padStart(3, "0")}`,
       amount: 1 + (index % 17) / 10,
@@ -847,7 +836,13 @@ describe("canonical whole-statement fee intelligence review", () => {
         maxBatchCoverageRetries: 0,
         adapter: async (packet) => {
           const review = validReview(packet);
-          return { ...review, evidenceRefs: [review.evidenceRefs[0]!, ...review.evidenceRefs] };
+          return {
+            ...review,
+            rowInterpretations: [
+              { ...review.rowInterpretations[0]!, evidenceRefs: [...review.rowInterpretations[0]!.evidenceRefs, "srcocc_provider_invented"] },
+              ...review.rowInterpretations.slice(1),
+            ],
+          };
         },
       },
     });
@@ -862,9 +857,8 @@ describe("canonical whole-statement fee intelligence review", () => {
         batchOrdinal: 1,
         attemptCount: 1,
         exactCoverage: true,
-        duplicateTopLevelEvidenceCount: 1,
-        rejectedTopLevelEvidenceCount: 1,
-        exactEvidenceLinkage: false,
+        duplicateTopLevelEvidenceCount: 0,
+        exactEvidenceLinkage: true,
       }),
     ]);
   });

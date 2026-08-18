@@ -327,19 +327,19 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
             sourceProvenancePacket,
           );
           const batchSafetyBlocked = batchValidation.output.reviewStatus === "safety_blocked";
-          const batchAdmissionExact = coverage.exactCoverage && coverage.exactEvidenceLinkage;
-          const evidenceLinkageRejected = coverage.exactCoverage && !coverage.exactEvidenceLinkage;
+          const batchValidationRejected = !batchValidation.ok && !batchSafetyBlocked;
+          const batchAdmissionExact = coverage.exactCoverage && batchValidation.ok;
           const retrying = !batchAdmissionExact && attemptIndex < maxBatchCoverageRetries;
           const progressReasonCodes = batchSafetyBlocked
             ? ["whole_statement_fee_intelligence_batch_safety_blocked"]
-            : evidenceLinkageRejected
+            : batchValidationRejected
               ? [retrying
-                  ? "whole_statement_fee_intelligence_batch_evidence_linkage_retrying"
-                  : "whole_statement_fee_intelligence_batch_evidence_linkage_rejected"]
+                  ? "whole_statement_fee_intelligence_batch_validation_retrying"
+                  : "whole_statement_fee_intelligence_batch_validation_rejected"]
               : coverage.exactCoverage
                 ? [
                     "whole_statement_fee_intelligence_batch_coverage_exact",
-                    "whole_statement_fee_intelligence_batch_evidence_linkage_exact",
+                    "whole_statement_fee_intelligence_aggregate_evidence_derived_from_rows",
                   ]
                 : [retrying
                     ? "whole_statement_fee_intelligence_batch_coverage_retrying"
@@ -363,9 +363,9 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
             if (retrying) continue;
             throw new WholeStatementBatchCoverageError();
           }
-          if (!coverage.exactEvidenceLinkage) {
+          if (!batchValidation.ok) {
             if (retrying) continue;
-            throw new WholeStatementBatchEvidenceLinkageError();
+            throw new WholeStatementBatchValidationError();
           }
           return raw;
         }
@@ -418,14 +418,14 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
     const message = error instanceof Error ? error.message : "";
     const timedOut = /timed out|timeout/i.test(message);
     const batchCoverageRejected = error instanceof WholeStatementBatchCoverageError;
-    const batchEvidenceLinkageRejected = error instanceof WholeStatementBatchEvidenceLinkageError;
+    const batchValidationRejected = error instanceof WholeStatementBatchValidationError;
     const batchSafetyBlocked = error instanceof WholeStatementBatchSafetyError;
     const runtimeFailureReason = timedOut
       ? "whole_statement_fee_intelligence_timed_out"
       : batchSafetyBlocked
         ? "whole_statement_fee_intelligence_batch_safety_blocked"
-        : batchEvidenceLinkageRejected
-          ? "whole_statement_fee_intelligence_batch_evidence_linkage_rejected"
+        : batchValidationRejected
+          ? "whole_statement_fee_intelligence_batch_validation_rejected"
         : batchCoverageRejected
           ? "whole_statement_fee_intelligence_batch_coverage_rejected"
           : "whole_statement_fee_intelligence_failed";
@@ -443,7 +443,7 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
     ])];
     await emitRuntimeProgress(options.progressReporter, {
       stage: "whole_statement_intelligence",
-      status: timedOut ? "timed_out" : batchCoverageRejected || batchEvidenceLinkageRejected || batchSafetyBlocked ? "degraded" : "failed",
+      status: timedOut ? "timed_out" : batchCoverageRejected || batchValidationRejected || batchSafetyBlocked ? "degraded" : "failed",
       elapsedMs: elapsedSince(providerReviewStartedAt),
       provider: providerSelection.provider,
       model: providerSelection.model,
@@ -457,7 +457,7 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
     return {
       output: failedWholeStatementFeeIntelligenceOutput(
         input.analysis,
-        timedOut ? "timed_out" : batchSafetyBlocked ? "safety_blocked" : batchCoverageRejected || batchEvidenceLinkageRejected ? "rejected" : "failed",
+        timedOut ? "timed_out" : batchSafetyBlocked ? "safety_blocked" : batchCoverageRejected || batchValidationRejected ? "rejected" : "failed",
         runtimeFailureReason,
       ),
       feeKnowledgeIntelligence: [],
@@ -529,10 +529,10 @@ class WholeStatementBatchCoverageError extends Error {
   }
 }
 
-class WholeStatementBatchEvidenceLinkageError extends Error {
+class WholeStatementBatchValidationError extends Error {
   constructor() {
-    super("whole_statement_fee_intelligence_batch_evidence_linkage_rejected");
-    this.name = "WholeStatementBatchEvidenceLinkageError";
+    super("whole_statement_fee_intelligence_batch_validation_rejected");
+    this.name = "WholeStatementBatchValidationError";
   }
 }
 
