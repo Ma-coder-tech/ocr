@@ -17,6 +17,7 @@ import {
 import { validateCanonicalAiAdmissionAudit } from "../../src/canonical/aiAdmissionDiagnostics.js";
 import type { CanonicalEvidenceRecord, CanonicalStatementAnalysis } from "../../src/canonical/types.js";
 import type { ParsedDocument } from "../../src/parser.js";
+import { package3Analysis } from "./package3TestFixture.js";
 
 describe("canonical whole-statement admission", () => {
   it("admits a validated statement-grounded review without changing Packages B-E", () => {
@@ -33,6 +34,67 @@ describe("canonical whole-statement admission", () => {
     expect(capability).toMatchObject({ status: "completed", groundingStatus: "grounded", executionRef: result.admission.executionRef });
     expect(financialProjection(result.analysis)).toEqual(before);
     expect(validateCanonicalAiAdmissionAudit(result.aiAdmissionAudit)).toEqual([]);
+  });
+
+  it("canonically grounds an exact 105-row merged review using only row-admitted evidence", () => {
+    const analysis = package3Analysis(Array.from({ length: 105 }, (_, index) => ({
+      label: `SYNTHETIC FEE ${String(index + 1).padStart(3, "0")}`,
+      amount: 1 + (index % 17) / 10,
+    })));
+    const identityEvidenceRefs = [...analysis.financialFacts.processedSales.evidenceRefs];
+    analysis.identity.processorName.evidenceRefs = identityEvidenceRefs;
+    analysis.identity.processorFamily.evidenceRefs = identityEvidenceRefs;
+    analysis.identity.statementPeriod.evidenceRefs = identityEvidenceRefs;
+    analysis.businessQualification.status = "unavailable";
+    analysis.businessQualification.resolvedSegmentId = null;
+    analysis.aiCapabilities = buildCanonicalAiCapabilities({
+      identity: analysis.identity,
+      businessQualification: analysis.businessQualification,
+      financialFacts: analysis.financialFacts,
+      feeLedger: analysis.feeLedger,
+      feeOwnershipActionability: analysis.feeOwnershipActionability,
+      opportunityEngine: analysis.opportunityEngine,
+      evidence: analysis.evidence,
+    });
+    analysis.customerState = buildCanonicalCustomerState({
+      identity: analysis.identity,
+      financialFacts: analysis.financialFacts,
+      feeLedger: analysis.feeLedger,
+      feeOwnershipActionability: analysis.feeOwnershipActionability,
+      opportunityEngine: analysis.opportunityEngine,
+      aiCapabilities: analysis.aiCapabilities,
+      rateComparison: analysis.customerState.rateComparison,
+    });
+    analysis.merchantAttention = buildCanonicalMerchantAttentionModel(analysis);
+    const before = financialProjection(analysis);
+    const sourcePacket = buildFeeKnowledgeSourcePacket({ analysis, registry: null });
+    const packet = buildWholeStatementFeeIntelligencePacket(analysis, { approvedExternalSourceRefs: [] }, sourcePacket);
+    const validation = validateWholeStatementFeeIntelligenceReview(
+      validReview(packet),
+      analysis,
+      { approvedExternalSourceRefs: [] },
+      sourcePacket,
+    );
+    const result = admitWholeStatementFeeIntelligence({ analysis, validation, sourcePacket });
+
+    expect(validation.ok).toBe(true);
+    expect(validation.output.coverageProof).toMatchObject({
+      exactCoverage: true,
+      missingFeeRowRefs: [],
+      duplicatedFeeRowRefs: [],
+      unknownFeeRowRefs: [],
+      malformedFeeRowRefs: [],
+    });
+    expect(validation.output.coverageProof.reviewedFeeRowRefs).toHaveLength(105);
+    expect(result.admission).toMatchObject({
+      admissionDisposition: "admitted",
+      groundingStatus: "grounded",
+      authoritative: false,
+      financialMutationAllowed: false,
+    });
+    expect(result.admission.wholeStatementOutput?.rowInterpretations).toHaveLength(105);
+    expect(result.analysis.merchantAttention.items.length).toBeGreaterThan(0);
+    expect(financialProjection(result.analysis)).toEqual(before);
   });
 
   it("carries admitted fee-knowledge resolution intelligence through the normal admission rebuild", () => {

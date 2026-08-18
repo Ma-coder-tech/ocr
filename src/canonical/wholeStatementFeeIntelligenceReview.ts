@@ -87,6 +87,19 @@ export type CanonicalWholeStatementFeeIntelligenceValidationResult =
       errors: string[];
     };
 
+export type WholeStatementTopLevelEvidenceLinkageDiagnostics = {
+  topLevelEvidenceCount: number;
+  uniqueTopLevelEvidenceCount: number;
+  validTopLevelEvidenceCount: number;
+  rejectedTopLevelEvidenceCount: number;
+  foreignTopLevelEvidenceCount: number;
+  duplicateTopLevelEvidenceCount: number;
+  malformedTopLevelEvidenceCount: number;
+  rowAdmittedEvidenceCount: number;
+  missingTopLevelEvidenceCount: number;
+  exactEvidenceLinkage: boolean;
+};
+
 const OUTPUT_ALLOWED_KEYS = [
   "type",
   "reviewPolicyVersion",
@@ -341,6 +354,27 @@ export function validateWholeStatementFeeIntelligenceReviewForPacket(
   const limitationCodes = enumArray(source.limitationCodes, LIMITATION_CODES, "limitationCodes", errors);
   const reasonCodes = reasonCodeArray(source.reasonCodes, "reasonCodes", errors);
   const rowInterpretations = interpretationArray(source.rowInterpretations, packet, analysis, registry, errors);
+  const evidenceLinkage = topLevelEvidenceLinkageFor({
+    rawTopLevelEvidenceRefs: source.evidenceRefs,
+    providerTopLevelEvidenceRefs: evidenceRefs,
+    admittedRowEvidenceRefs: rowInterpretations.flatMap((interpretation) => interpretation.evidenceRefs),
+    canonicalEvidenceIds: new Set(analysis.evidence.map((record) => record.id)),
+  });
+  if (evidenceLinkage.diagnostics.duplicateTopLevelEvidenceCount > 0) {
+    errors.push("whole_statement_fee_intelligence_top_level_evidence_ref_duplicate");
+  }
+  if (evidenceLinkage.diagnostics.malformedTopLevelEvidenceCount > 0) {
+    errors.push("whole_statement_fee_intelligence_top_level_evidence_ref_malformed");
+  }
+  if (evidenceLinkage.diagnostics.foreignTopLevelEvidenceCount > 0) {
+    errors.push("whole_statement_fee_intelligence_top_level_evidence_ref_foreign");
+  }
+  if (evidenceLinkage.diagnostics.rejectedTopLevelEvidenceCount > evidenceLinkage.diagnostics.foreignTopLevelEvidenceCount) {
+    errors.push("whole_statement_fee_intelligence_top_level_evidence_ref_not_admitted_at_row");
+  }
+  if (evidenceLinkage.diagnostics.missingTopLevelEvidenceCount > 0) {
+    errors.push("whole_statement_fee_intelligence_top_level_evidence_ref_missing_from_row_union");
+  }
   const coverageProof = coverageProofFor(packet.admittedFeeRows.map((row) => row.feeRowRef), rowInterpretations, errors, reviewStatus === "completed");
   const cleanReviewedCoverage = coverageProof.duplicatedFeeRowRefs.length === 0
     && coverageProof.unknownFeeRowRefs.length === 0
@@ -376,7 +410,7 @@ export function validateWholeStatementFeeIntelligenceReviewForPacket(
     type: "whole_statement_fee_intelligence_review",
     reviewPolicyVersion: WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION,
     reviewStatus,
-    evidenceRefs: unique(evidenceRefs).sort(),
+    evidenceRefs: evidenceLinkage.canonicalEvidenceRefs,
     factRefs: unique(factRefs).sort(),
     limitationCodes: unique(limitationCodes).sort(),
     coverageProof,
@@ -388,6 +422,88 @@ export function validateWholeStatementFeeIntelligenceReviewForPacket(
     providerDetailsStripped: true,
   };
   return { ok: true, packet, output, errors: [] };
+}
+
+export function wholeStatementTopLevelEvidenceLinkageDiagnostics(
+  rawReview: unknown,
+  analysis: Pick<CanonicalStatementAnalysis, "evidence">,
+  packet?: Pick<CanonicalWholeStatementFeeIntelligencePacket, "admittedFeeRows">,
+): WholeStatementTopLevelEvidenceLinkageDiagnostics {
+  const source = isPlainRecord(rawReview) ? rawReview : null;
+  const rowInterpretations = source && Array.isArray(source.rowInterpretations) ? source.rowInterpretations : [];
+  const allowedEvidenceByRow = packet
+    ? new Map(packet.admittedFeeRows.map((row) => [row.feeRowRef, new Set(row.evidenceRefs)]))
+    : null;
+  const admittedRowEvidenceRefs = rowInterpretations.flatMap((interpretation) => {
+    if (!isPlainRecord(interpretation) || !Array.isArray(interpretation.evidenceRefs)) return [];
+    const allowedEvidence = typeof interpretation.feeRowRef === "string"
+      ? allowedEvidenceByRow?.get(interpretation.feeRowRef)
+      : null;
+    return interpretation.evidenceRefs.filter((ref): ref is string =>
+      typeof ref === "string"
+      && (!allowedEvidenceByRow || Boolean(allowedEvidence?.has(ref)))
+    );
+  });
+  const providerTopLevelEvidenceRefs = source && Array.isArray(source.evidenceRefs)
+    ? source.evidenceRefs.filter((ref): ref is string => typeof ref === "string")
+    : [];
+  return topLevelEvidenceLinkageFor({
+    rawTopLevelEvidenceRefs: source?.evidenceRefs,
+    providerTopLevelEvidenceRefs,
+    admittedRowEvidenceRefs,
+    canonicalEvidenceIds: new Set(analysis.evidence.map((record) => record.id)),
+  }).diagnostics;
+}
+
+function topLevelEvidenceLinkageFor(input: {
+  rawTopLevelEvidenceRefs: unknown;
+  providerTopLevelEvidenceRefs: readonly string[];
+  admittedRowEvidenceRefs: readonly string[];
+  canonicalEvidenceIds: ReadonlySet<string>;
+}): {
+  diagnostics: WholeStatementTopLevelEvidenceLinkageDiagnostics;
+  canonicalEvidenceRefs: string[];
+} {
+  const rawTopLevelEvidenceRefs = Array.isArray(input.rawTopLevelEvidenceRefs)
+    ? input.rawTopLevelEvidenceRefs
+    : [];
+  const uniqueTopLevelEvidenceRefs = unique(input.providerTopLevelEvidenceRefs).sort();
+  const canonicalRowEvidenceRefs = unique(input.admittedRowEvidenceRefs).sort();
+  const canonicalRowEvidenceSet = new Set(canonicalRowEvidenceRefs);
+  const malformedTopLevelEvidenceCount = rawTopLevelEvidenceRefs.filter((ref) => typeof ref !== "string").length;
+  const duplicateTopLevelEvidenceCount = input.providerTopLevelEvidenceRefs.length - uniqueTopLevelEvidenceRefs.length;
+  const foreignTopLevelEvidenceCount = input.providerTopLevelEvidenceRefs.filter((ref) =>
+    /^srcocc_/i.test(ref) || !input.canonicalEvidenceIds.has(ref)
+  ).length;
+  const validTopLevelEvidenceRefs = uniqueTopLevelEvidenceRefs.filter((ref) =>
+    !/^srcocc_/i.test(ref) && input.canonicalEvidenceIds.has(ref) && canonicalRowEvidenceSet.has(ref)
+  );
+  const missingTopLevelEvidenceCount = canonicalRowEvidenceRefs.filter((ref) =>
+    !uniqueTopLevelEvidenceRefs.includes(ref)
+  ).length;
+  const rejectedTopLevelEvidenceCount = Math.max(0, rawTopLevelEvidenceRefs.length - validTopLevelEvidenceRefs.length);
+  const exactEvidenceLinkage = Array.isArray(input.rawTopLevelEvidenceRefs)
+    && malformedTopLevelEvidenceCount === 0
+    && duplicateTopLevelEvidenceCount === 0
+    && foreignTopLevelEvidenceCount === 0
+    && rejectedTopLevelEvidenceCount === 0
+    && missingTopLevelEvidenceCount === 0
+    && validTopLevelEvidenceRefs.length === canonicalRowEvidenceRefs.length;
+  return {
+    diagnostics: {
+      topLevelEvidenceCount: rawTopLevelEvidenceRefs.length,
+      uniqueTopLevelEvidenceCount: uniqueTopLevelEvidenceRefs.length,
+      validTopLevelEvidenceCount: validTopLevelEvidenceRefs.length,
+      rejectedTopLevelEvidenceCount,
+      foreignTopLevelEvidenceCount,
+      duplicateTopLevelEvidenceCount,
+      malformedTopLevelEvidenceCount,
+      rowAdmittedEvidenceCount: canonicalRowEvidenceRefs.length,
+      missingTopLevelEvidenceCount,
+      exactEvidenceLinkage,
+    },
+    canonicalEvidenceRefs: canonicalRowEvidenceRefs,
+  };
 }
 
 export function failedWholeStatementFeeIntelligenceOutput(

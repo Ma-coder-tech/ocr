@@ -4,10 +4,12 @@ import {
   WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION,
   buildWholeStatementFeeIntelligencePacket,
   failedWholeStatementFeeIntelligenceOutput,
+  wholeStatementTopLevelEvidenceLinkageDiagnostics,
   validateWholeStatementFeeIntelligenceReview,
   validateWholeStatementFeeIntelligenceReviewForPacket,
   type ApprovedWholeStatementFeeIntelligenceSourceRegistry,
   type CanonicalWholeStatementFeeIntelligencePacket,
+  type WholeStatementTopLevelEvidenceLinkageDiagnostics,
 } from "./wholeStatementFeeIntelligenceReview.js";
 import { buildFeeKnowledgeSourcePacket } from "./feeKnowledgeRegistry.js";
 import {
@@ -93,7 +95,7 @@ export type WholeStatementFeeIntelligenceRuntimeOptions = {
   progressReporter?: RuntimeProgressReporter;
 };
 
-export type WholeStatementFeeIntelligenceBatchCoverageDiagnostics = {
+export type WholeStatementFeeIntelligenceBatchCoverageDiagnostics = WholeStatementTopLevelEvidenceLinkageDiagnostics & {
   batchOrdinal: number;
   expectedRowCount: number;
   returnedRowCount: number;
@@ -311,23 +313,41 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
           const coverage = batchCoverageDiagnosticsFor({
             raw,
             packet: requestPacket,
+            analysis: input.analysis,
             globalExpectedRowRefs,
             batchOrdinal: batchIndex + 1,
             attemptCount,
           });
           batchCoverage.push(coverage);
-          const batchSafetyBlocked = validateWholeStatementFeeIntelligenceReviewForPacket(
+          const batchValidation = validateWholeStatementFeeIntelligenceReviewForPacket(
             raw,
             requestPacket,
             input.analysis,
             registry,
             sourceProvenancePacket,
-          ).output.reviewStatus === "safety_blocked";
-          const retrying = !coverage.exactCoverage && attemptIndex < maxBatchCoverageRetries;
-          if (coverage.exactCoverage) completedRequestBatchCount += 1;
+          );
+          const batchSafetyBlocked = batchValidation.output.reviewStatus === "safety_blocked";
+          const batchAdmissionExact = coverage.exactCoverage && coverage.exactEvidenceLinkage;
+          const evidenceLinkageRejected = coverage.exactCoverage && !coverage.exactEvidenceLinkage;
+          const retrying = !batchAdmissionExact && attemptIndex < maxBatchCoverageRetries;
+          const progressReasonCodes = batchSafetyBlocked
+            ? ["whole_statement_fee_intelligence_batch_safety_blocked"]
+            : evidenceLinkageRejected
+              ? [retrying
+                  ? "whole_statement_fee_intelligence_batch_evidence_linkage_retrying"
+                  : "whole_statement_fee_intelligence_batch_evidence_linkage_rejected"]
+              : coverage.exactCoverage
+                ? [
+                    "whole_statement_fee_intelligence_batch_coverage_exact",
+                    "whole_statement_fee_intelligence_batch_evidence_linkage_exact",
+                  ]
+                : [retrying
+                    ? "whole_statement_fee_intelligence_batch_coverage_retrying"
+                    : "whole_statement_fee_intelligence_batch_coverage_rejected"];
+          if (batchAdmissionExact) completedRequestBatchCount += 1;
           await emitRuntimeProgress(options.progressReporter, {
             stage: "whole_statement_intelligence",
-            status: coverage.exactCoverage || retrying ? "running" : "degraded",
+            status: batchAdmissionExact || retrying ? "running" : "degraded",
             provider: providerSelection.provider,
             model: providerSelection.model,
             counters: {
@@ -336,18 +356,16 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
               completedRequestBatchCount,
               ...batchCoverageProgressCounters(coverage),
             },
-            reasonCodes: [batchSafetyBlocked
-              ? "whole_statement_fee_intelligence_batch_safety_blocked"
-              : coverage.exactCoverage
-              ? "whole_statement_fee_intelligence_batch_coverage_exact"
-              : retrying
-                ? "whole_statement_fee_intelligence_batch_coverage_retrying"
-                : "whole_statement_fee_intelligence_batch_coverage_rejected"],
+            reasonCodes: progressReasonCodes,
           });
           if (batchSafetyBlocked) throw new WholeStatementBatchSafetyError();
           if (!coverage.exactCoverage) {
             if (retrying) continue;
             throw new WholeStatementBatchCoverageError();
+          }
+          if (!coverage.exactEvidenceLinkage) {
+            if (retrying) continue;
+            throw new WholeStatementBatchEvidenceLinkageError();
           }
           return raw;
         }
@@ -400,11 +418,14 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
     const message = error instanceof Error ? error.message : "";
     const timedOut = /timed out|timeout/i.test(message);
     const batchCoverageRejected = error instanceof WholeStatementBatchCoverageError;
+    const batchEvidenceLinkageRejected = error instanceof WholeStatementBatchEvidenceLinkageError;
     const batchSafetyBlocked = error instanceof WholeStatementBatchSafetyError;
     const runtimeFailureReason = timedOut
       ? "whole_statement_fee_intelligence_timed_out"
       : batchSafetyBlocked
         ? "whole_statement_fee_intelligence_batch_safety_blocked"
+        : batchEvidenceLinkageRejected
+          ? "whole_statement_fee_intelligence_batch_evidence_linkage_rejected"
         : batchCoverageRejected
           ? "whole_statement_fee_intelligence_batch_coverage_rejected"
           : "whole_statement_fee_intelligence_failed";
@@ -422,7 +443,7 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
     ])];
     await emitRuntimeProgress(options.progressReporter, {
       stage: "whole_statement_intelligence",
-      status: timedOut ? "timed_out" : batchCoverageRejected || batchSafetyBlocked ? "degraded" : "failed",
+      status: timedOut ? "timed_out" : batchCoverageRejected || batchEvidenceLinkageRejected || batchSafetyBlocked ? "degraded" : "failed",
       elapsedMs: elapsedSince(providerReviewStartedAt),
       provider: providerSelection.provider,
       model: providerSelection.model,
@@ -436,7 +457,7 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
     return {
       output: failedWholeStatementFeeIntelligenceOutput(
         input.analysis,
-        timedOut ? "timed_out" : batchSafetyBlocked ? "safety_blocked" : batchCoverageRejected ? "rejected" : "failed",
+        timedOut ? "timed_out" : batchSafetyBlocked ? "safety_blocked" : batchCoverageRejected || batchEvidenceLinkageRejected ? "rejected" : "failed",
         runtimeFailureReason,
       ),
       feeKnowledgeIntelligence: [],
@@ -508,6 +529,13 @@ class WholeStatementBatchCoverageError extends Error {
   }
 }
 
+class WholeStatementBatchEvidenceLinkageError extends Error {
+  constructor() {
+    super("whole_statement_fee_intelligence_batch_evidence_linkage_rejected");
+    this.name = "WholeStatementBatchEvidenceLinkageError";
+  }
+}
+
 class WholeStatementBatchSafetyError extends Error {
   constructor() {
     super("whole_statement_fee_intelligence_batch_safety_blocked");
@@ -518,6 +546,7 @@ class WholeStatementBatchSafetyError extends Error {
 function batchCoverageDiagnosticsFor(input: {
   raw: unknown;
   packet: CanonicalWholeStatementFeeIntelligencePacket;
+  analysis: Pick<CanonicalStatementAnalysis, "evidence">;
   globalExpectedRowRefs: ReadonlySet<string>;
   batchOrdinal: number;
   attemptCount: number;
@@ -550,7 +579,9 @@ function batchCoverageDiagnosticsFor(input: {
     && unknownRowCount === 0
     && crossBatchRowCount === 0
     && malformedRowCount === 0;
+  const evidenceLinkage = wholeStatementTopLevelEvidenceLinkageDiagnostics(input.raw, input.analysis, input.packet);
   return {
+    ...evidenceLinkage,
     batchOrdinal: input.batchOrdinal,
     expectedRowCount: expectedRowRefs.length,
     returnedRowCount,
@@ -585,6 +616,16 @@ function batchCoverageProgressCounters(diagnostics: WholeStatementFeeIntelligenc
     batchMalformedRowCount: diagnostics.malformedRowCount,
     batchAttemptCount: diagnostics.attemptCount,
     batchStructuredOutputCompletedCount: diagnostics.structuredOutputCompleted ? 1 : 0,
+    batchTopLevelEvidenceCount: diagnostics.topLevelEvidenceCount,
+    batchUniqueTopLevelEvidenceCount: diagnostics.uniqueTopLevelEvidenceCount,
+    batchValidTopLevelEvidenceCount: diagnostics.validTopLevelEvidenceCount,
+    batchRejectedTopLevelEvidenceCount: diagnostics.rejectedTopLevelEvidenceCount,
+    batchForeignTopLevelEvidenceCount: diagnostics.foreignTopLevelEvidenceCount,
+    batchDuplicateTopLevelEvidenceCount: diagnostics.duplicateTopLevelEvidenceCount,
+    batchMalformedTopLevelEvidenceCount: diagnostics.malformedTopLevelEvidenceCount,
+    batchRowAdmittedEvidenceCount: diagnostics.rowAdmittedEvidenceCount,
+    batchMissingTopLevelEvidenceCount: diagnostics.missingTopLevelEvidenceCount,
+    batchEvidenceLinkageExactCount: diagnostics.exactEvidenceLinkage ? 1 : 0,
   };
 }
 
