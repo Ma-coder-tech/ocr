@@ -54,6 +54,29 @@ describe("Package 3 merchant-language AI runtime", () => {
     for (const result of [timedOut, invalid, strengthened]) expect(result.model).toEqual(analysis.merchantAttention);
   });
 
+  it("retains independently admissible AI wording while fail-closed canonicalizing unsupported lexical fields", async () => {
+    const analysis = package3Analysis([{ label: "ADDITIONAL FEES", amount: 9.48 }]);
+    const output = validPackage3Interpretation(analysis.merchantAttention);
+    const expectedTitle = output.items[0].merchantTitle;
+    output.items[0].whyThisDeservesAttention = `${analysis.merchantAttention.items[0].whyThisDeservesAttention} Mysterious.`;
+
+    const result = await runMerchantAttentionAiRuntime({
+      model: analysis.merchantAttention,
+      options: { adapter: async () => output },
+    });
+
+    expect(result.status).toBe("admitted");
+    expect(result.reasonCodes).toContain("merchant_language_ai_admitted_with_canonical_field_stabilization");
+    expect(result.model.items[0].merchantTitle).toBe(expectedTitle);
+    expect(result.model.items[0].whyThisDeservesAttention).toBe(analysis.merchantAttention.items[0].whyThisDeservesAttention);
+    expect(result.diagnostics).toMatchObject({
+      semanticStabilizationApplied: true,
+      canonicalFieldSubstitutionCount: 1,
+    });
+    expect(result.diagnostics.admittedGeneratedFieldCount).toBeGreaterThan(0);
+    expect(JSON.stringify(result.model)).not.toContain("Mysterious");
+  });
+
   it("maps detailed semantic admission failures to a closed prose-free diagnostic taxonomy", () => {
     const codes = merchantAttentionAiAdmissionDiagnosticCodes([
       "AI merchant interpretation must cover each AI-language-eligible attention item exactly once.",
@@ -181,7 +204,9 @@ describe("Package 3 merchant-language AI runtime", () => {
           return {
             ...full,
             outputId: `merchant_language_batch_${observed.length}`,
-            items: full.items.filter((item: any) => allowed.has(item.attentionItemId)),
+            items: full.items
+              .filter((item: any) => allowed.has(item.attentionItemId))
+              .map((item: any) => ({ ...item, whyThisDeservesAttention: `${item.whyThisDeservesAttention} Mysterious.` })),
           };
         },
       },
@@ -196,7 +221,11 @@ describe("Package 3 merchant-language AI runtime", () => {
       processedItemCount: 32,
       incompleteOutputCount: 0,
       schemaValidationFailureCount: 0,
+      semanticStabilizationApplied: true,
+      canonicalFieldSubstitutionCount: 32,
     });
+    expect(result.diagnostics.admittedGeneratedFieldCount).toBeGreaterThan(0);
+    expect(JSON.stringify(result.model)).not.toContain("Mysterious");
   });
 
   it("keeps output exhaustion distinct from semantic admission and records only safe diagnostics", async () => {

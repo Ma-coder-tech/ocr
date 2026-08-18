@@ -4,6 +4,7 @@ import {
   admitMerchantAttentionAiInterpretation,
   buildMerchantAttentionAiInterpretationPacket,
   merchantAttentionAiAdmissionDiagnosticCodes,
+  stabilizeMerchantAttentionAiInterpretation,
   type MerchantAttentionAiInterpretationPacket,
 } from "./merchantAttentionAiInterpretation.js";
 import type {
@@ -80,6 +81,9 @@ export type MerchantAttentionAiProviderDiagnostics = {
   outputTokens: number;
   incompleteOutputCount: number;
   schemaValidationFailureCount: number;
+  semanticStabilizationApplied: boolean;
+  admittedGeneratedFieldCount: number;
+  canonicalFieldSubstitutionCount: number;
   safeReasonCodes: string[];
 };
 
@@ -210,7 +214,19 @@ export async function runMerchantAttentionAiRuntime(input: {
       financialMutationAllowed: false,
       providerDetailsStripped: true,
     };
-    const admission = admitMerchantAttentionAiInterpretation({ model: input.model, output: combined });
+    let admission = admitMerchantAttentionAiInterpretation({ model: input.model, output: combined });
+    let semanticStabilizationApplied = false;
+    let admittedGeneratedFieldCount = 0;
+    let canonicalFieldSubstitutionCount = 0;
+    if (!admission.admitted) {
+      const stabilized = stabilizeMerchantAttentionAiInterpretation({ model: input.model, output: combined });
+      if (stabilized) {
+        admission = admitMerchantAttentionAiInterpretation({ model: input.model, output: stabilized.output });
+        semanticStabilizationApplied = admission.admitted;
+        admittedGeneratedFieldCount = stabilized.admittedGeneratedFieldCount;
+        canonicalFieldSubstitutionCount = stabilized.canonicalFieldSubstitutionCount;
+      }
+    }
     if (!admission.admitted) {
       const diagnosticCodes = merchantAttentionAiAdmissionDiagnosticCodes(admission.errors)
         .map((code) => `merchant_language_ai_rejection_${code}`);
@@ -229,13 +245,19 @@ export async function runMerchantAttentionAiRuntime(input: {
       attempted: true,
       eligibleItemCount,
       admittedItemCount: admission.model.interpretation.coverage.admittedItemCount,
-      reasonCodes: ["merchant_language_ai_admitted"],
+      reasonCodes: [
+        "merchant_language_ai_admitted",
+        ...(semanticStabilizationApplied ? ["merchant_language_ai_admitted_with_canonical_field_stabilization"] : []),
+      ],
       model: admission.model,
       diagnostics: summarizeProviderDiagnostics(
         packets.length,
         completedRequestBatchCount,
         processedItemCount,
         providerUsages,
+        undefined,
+        0,
+        { semanticStabilizationApplied, admittedGeneratedFieldCount, canonicalFieldSubstitutionCount },
       ),
     };
   } catch (error) {
@@ -344,6 +366,7 @@ function buildPrompt(packet: MerchantAttentionAiInterpretationPacket): string {
     "Copy every semanticSupportUnits supportRef exactly once into that item's semanticSupportRefs.",
     "Preserve the exact number of remainingUncertainty, avoidClaiming, and successCriteria entries and preserve required null/non-null shapes.",
     "If a plain-English rewrite cannot stay within the field's supported words and qualifications, copy that field's canonicalMeaning verbatim.",
+    "Do not put digits or currency symbols in merchant-language fields; financial values remain in the authoritative report fields.",
     "Never create or alter amounts, evidence, benchmarks, savings, contract terms, removability, or actionability.",
     "Use: Ask for a breakdown; Needs an explanation; What still needs checking; What your statement shows; What this likely means; What we still need to confirm.",
     "Do not use internal package, policy, provider, prompt, model, file, or path language.",
@@ -354,31 +377,35 @@ function buildPrompt(packet: MerchantAttentionAiInterpretationPacket): string {
 
 function responseSchema(packet?: MerchantAttentionAiInterpretationPacket): unknown {
   const { z } = require("zod/v3") as { z: any };
+  const language = (maximum: number, allowEmpty = false) => {
+    const value = z.string().max(maximum).regex(/^[^0-9$€£¥]*$/);
+    return allowEmpty ? value : value.min(1);
+  };
   const question = z.object({
-    question: z.string().min(1).max(500),
-    whatRateRevealKnows: z.string().min(1).max(800),
-    whatRemainsUncertain: z.string().min(1).max(800),
-    safeNextStep: z.string().min(1).max(800),
+    question: language(500),
+    whatRateRevealKnows: language(800),
+    whatRemainsUncertain: language(800),
+    safeNextStep: language(800),
   }).strict().nullable();
   const toolkit = z.object({
-    whatToDo: z.string().min(1).max(800),
-    why: z.string().min(1).max(800),
-    exactAsk: z.string().max(1200).nullable(),
-    unclearAnswerFollowUp: z.string().max(1200).nullable(),
-    avoidClaiming: z.array(z.string().min(1).max(500)).max(12),
-    successCriteria: z.array(z.string().min(1).max(500)).max(12),
+    whatToDo: language(800),
+    why: language(800),
+    exactAsk: language(1200, true).nullable(),
+    unclearAnswerFollowUp: language(1200, true).nullable(),
+    avoidClaiming: z.array(language(500)).max(12),
+    successCriteria: z.array(language(500)).max(12),
   }).strict().nullable();
   const attentionItemId = packet && packet.items.length > 0
     ? z.enum(packet.items.map((item) => item.attentionItemId) as [string, ...string[]])
     : z.string().min(1).max(160);
   const items = z.array(z.object({
       attentionItemId,
-      merchantTitle: z.string().min(1).max(300),
-      whyThisDeservesAttention: z.string().min(1).max(1200),
-      reasonableConclusion: z.string().min(1).max(1200),
-      remainingUncertainty: z.array(z.string().min(1).max(600)).max(20),
-      safeNextAction: z.string().min(1).max(1200),
-      resolutionMeaning: z.string().min(1).max(1200),
+      merchantTitle: language(300),
+      whyThisDeservesAttention: language(1200),
+      reasonableConclusion: language(1200),
+      remainingUncertainty: z.array(language(600)).max(20),
+      safeNextAction: language(1200),
+      resolutionMeaning: language(1200),
       question,
       actionToolkit: toolkit,
       semanticSupportRefs: z.array(z.string().min(1).max(200)).max(80),
@@ -563,6 +590,11 @@ function summarizeProviderDiagnostics(
   usages: readonly MerchantAttentionAiProviderUsage[],
   error?: unknown,
   schemaValidationFailureCount = 0,
+  stabilization: Pick<MerchantAttentionAiProviderDiagnostics, "semanticStabilizationApplied" | "admittedGeneratedFieldCount" | "canonicalFieldSubstitutionCount"> = {
+    semanticStabilizationApplied: false,
+    admittedGeneratedFieldCount: 0,
+    canonicalFieldSubstitutionCount: 0,
+  },
 ): MerchantAttentionAiProviderDiagnostics {
   const accounting = safeProviderFailureAccounting(error);
   const accountingAlreadyObserved = accounting !== null && usages.some((item) =>
@@ -586,6 +618,7 @@ function summarizeProviderDiagnostics(
     incompleteOutputCount: usages.filter((item) => item.outputIncomplete).length
       + (!accountingAlreadyObserved && error !== undefined && safeProviderReasonCodes(error, "provider_structured_output_failed").includes("provider_output_exhausted") ? 1 : 0),
     schemaValidationFailureCount,
+    ...stabilization,
     safeReasonCodes: [...reasonCodes].sort(),
   };
 }
@@ -604,6 +637,9 @@ function emptyProviderDiagnostics(requestBatchCount: number): MerchantAttentionA
     outputTokens: 0,
     incompleteOutputCount: 0,
     schemaValidationFailureCount: 0,
+    semanticStabilizationApplied: false,
+    admittedGeneratedFieldCount: 0,
+    canonicalFieldSubstitutionCount: 0,
     safeReasonCodes: [],
   };
 }

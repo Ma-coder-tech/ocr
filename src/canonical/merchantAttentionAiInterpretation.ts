@@ -107,6 +107,12 @@ export type MerchantAttentionAiAdmissionResult = {
   errors: string[];
 };
 
+export type MerchantAttentionAiSemanticStabilizationResult = {
+  output: CanonicalMerchantAttentionAiInterpretationOutput;
+  admittedGeneratedFieldCount: number;
+  canonicalFieldSubstitutionCount: number;
+};
+
 export type MerchantAttentionAiAdmissionDiagnosticCode =
   | "schema_rejected"
   | "exact_coverage_mismatch"
@@ -363,6 +369,58 @@ export function merchantAttentionAiAdmissionDiagnosticCodes(
   return [...codes].sort();
 }
 
+/**
+ * Salvages only field values that independently satisfy the unchanged final
+ * admission gate. A rejected provider field is replaced with its accepted,
+ * privacy-minimized canonical meaning; coverage, linkage, shapes, authority,
+ * and privacy failures are never repairable here.
+ */
+export function stabilizeMerchantAttentionAiInterpretation(input: {
+  model: CanonicalMerchantAttentionModel;
+  output: CanonicalMerchantAttentionAiInterpretationOutput;
+}): MerchantAttentionAiSemanticStabilizationResult | null {
+  const initial = admitMerchantAttentionAiInterpretation(input);
+  if (initial.admitted) {
+    return {
+      output: input.output,
+      admittedGeneratedFieldCount: input.output.items.reduce((count, item) => count + merchantLanguageFieldPaths(item).length, 0),
+      canonicalFieldSubstitutionCount: 0,
+    };
+  }
+  const repairable = new Set<MerchantAttentionAiAdmissionDiagnosticCode>([
+    "semantic_claim_count_changed",
+    "unsupported_semantic_tokens",
+  ]);
+  const diagnosticCodes = merchantAttentionAiAdmissionDiagnosticCodes(initial.errors);
+  if (diagnosticCodes.length === 0 || diagnosticCodes.some((code) => !repairable.has(code))) return null;
+
+  const baseline = canonicalMerchantLanguageOutput(input.model, input.output.outputId);
+  if (!admitMerchantAttentionAiInterpretation({ model: input.model, output: baseline }).admitted) return null;
+
+  const generatedById = new Map(input.output.items.map((item) => [item.attentionItemId, item]));
+  let admittedGeneratedFieldCount = 0;
+  let canonicalFieldSubstitutionCount = 0;
+  for (const item of baseline.items) {
+    const generated = generatedById.get(item.attentionItemId);
+    if (!generated) return null;
+    for (const path of merchantLanguageFieldPaths(generated)) {
+      const candidate = structuredClone(baseline);
+      const candidateItem = candidate.items.find((entry) => entry.attentionItemId === item.attentionItemId);
+      if (!candidateItem) return null;
+      setNestedValue(candidateItem as unknown as Record<string, unknown>, path, structuredClone(getNestedValue(generated as unknown as Record<string, unknown>, path)));
+      if (admitMerchantAttentionAiInterpretation({ model: input.model, output: candidate }).admitted) {
+        setNestedValue(item as unknown as Record<string, unknown>, path, structuredClone(getNestedValue(generated as unknown as Record<string, unknown>, path)));
+        admittedGeneratedFieldCount += 1;
+      } else {
+        canonicalFieldSubstitutionCount += 1;
+      }
+    }
+  }
+  if (admittedGeneratedFieldCount === 0) return null;
+  if (!admitMerchantAttentionAiInterpretation({ model: input.model, output: baseline }).admitted) return null;
+  return { output: baseline, admittedGeneratedFieldCount, canonicalFieldSubstitutionCount };
+}
+
 function validateOutputShape(output: unknown, model: CanonicalMerchantAttentionModel): string[] {
   const errors: string[] = [];
   if (!isRecord(output)) return ["AI merchant interpretation output must be an object."];
@@ -465,6 +523,89 @@ function semanticSupportUnits(item: CanonicalMerchantAttentionItem): MerchantAtt
     }));
 }
 
+function canonicalMerchantLanguageOutput(
+  model: CanonicalMerchantAttentionModel,
+  outputId: string,
+): CanonicalMerchantAttentionAiInterpretationOutput {
+  return {
+    type: "merchant_attention_ai_interpretation",
+    policyVersion: MERCHANT_ATTENTION_AI_INTERPRETATION_POLICY_VERSION,
+    outputId,
+    items: model.items
+      .filter((item) => item.merchantLanguageEligibility.eligibleForAiInterpretation)
+      .map((item) => ({
+        attentionItemId: item.id,
+        merchantTitle: minimizeMerchantLanguageSupport(item.merchantTitle),
+        whyThisDeservesAttention: minimizeMerchantLanguageSupport(item.whyThisDeservesAttention),
+        reasonableConclusion: minimizeMerchantLanguageSupport(item.evidenceBoundary.reasonableConclusion.summary),
+        remainingUncertainty: item.evidenceBoundary.remainingUncertainty.map(minimizeMerchantLanguageSupport),
+        safeNextAction: minimizeMerchantLanguageSupport(item.safestNextAction.instruction),
+        resolutionMeaning: minimizeMerchantLanguageSupport(item.resolution.merchantMeaning),
+        question: item.questionToResolve ? {
+          question: minimizeMerchantLanguageSupport(item.questionToResolve.question),
+          whatRateRevealKnows: minimizeMerchantLanguageSupport(item.questionToResolve.whatRateRevealKnows),
+          whatRemainsUncertain: minimizeMerchantLanguageSupport(item.questionToResolve.whatRemainsUncertain),
+          safeNextStep: minimizeMerchantLanguageSupport(item.questionToResolve.safeNextStep),
+        } : null,
+        actionToolkit: item.actionToolkit ? {
+          whatToDo: minimizeMerchantLanguageSupport(item.actionToolkit.whatToDo),
+          why: minimizeMerchantLanguageSupport(item.actionToolkit.why),
+          exactAsk: item.actionToolkit.exactAsk ? minimizeMerchantLanguageSupport(item.actionToolkit.exactAsk) : null,
+          unclearAnswerFollowUp: item.actionToolkit.unclearAnswerFollowUp
+            ? minimizeMerchantLanguageSupport(item.actionToolkit.unclearAnswerFollowUp)
+            : null,
+          avoidClaiming: item.actionToolkit.avoidClaiming.map(minimizeMerchantLanguageSupport),
+          successCriteria: item.actionToolkit.successCriteria.map(minimizeMerchantLanguageSupport),
+        } : null,
+        semanticSupportRefs: semanticSupportUnits(item).map((unit) => unit.supportRef),
+      })),
+    authoritative: false,
+    financialMutationAllowed: false,
+    providerDetailsStripped: true,
+  };
+}
+
+function merchantLanguageFieldPaths(
+  item: CanonicalMerchantAttentionAiInterpretationOutput["items"][number],
+): string[][] {
+  const paths = [
+    ["merchantTitle"],
+    ["whyThisDeservesAttention"],
+    ["reasonableConclusion"],
+    ["remainingUncertainty"],
+    ["safeNextAction"],
+    ["resolutionMeaning"],
+  ];
+  if (item.question) {
+    for (const field of ["question", "whatRateRevealKnows", "whatRemainsUncertain", "safeNextStep"]) paths.push(["question", field]);
+  }
+  if (item.actionToolkit) {
+    for (const field of ["whatToDo", "why", "exactAsk", "unclearAnswerFollowUp", "avoidClaiming", "successCriteria"]) {
+      paths.push(["actionToolkit", field]);
+    }
+  }
+  return paths;
+}
+
+function getNestedValue(value: Record<string, unknown>, path: readonly string[]): unknown {
+  let current: unknown = value;
+  for (const segment of path) {
+    if (!isRecord(current)) return undefined;
+    current = current[segment];
+  }
+  return current;
+}
+
+function setNestedValue(value: Record<string, unknown>, path: readonly string[], replacement: unknown): void {
+  let current = value;
+  for (const segment of path.slice(0, -1)) {
+    const next = current[segment];
+    if (!isRecord(next)) throw new Error("Merchant-language field path is invalid.");
+    current = next;
+  }
+  current[path.at(-1)!] = replacement;
+}
+
 function semanticFidelityErrors(canonical: CanonicalMerchantAttentionItem, value: Record<string, unknown>): string[] {
   const errors: string[] = [];
   const units = semanticSupportUnits(canonical);
@@ -479,7 +620,7 @@ function semanticFidelityErrors(canonical: CanonicalMerchantAttentionItem, value
   }
 
   const generated = generatedLanguageFieldValues(value);
-  const canonicalByField = new Map(merchantLanguageFieldValues(canonical).map((entry) => [entry.field, entry.canonicalMeaning]));
+  const canonicalByField = new Map(semanticSupportUnits(canonical).map((entry) => [entry.field, entry.canonicalMeaning]));
   const expectedArrayLengths = {
     remainingUncertainty: canonical.evidenceBoundary.remainingUncertainty.length,
     "actionToolkit.avoidClaiming": canonical.actionToolkit?.avoidClaiming.length ?? 0,
@@ -908,6 +1049,7 @@ function minimizeMerchantLanguageSupport(value: string): string {
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted]")
     .replace(/[$€£¥]\s*\d[\d,.]*/g, "[amount]")
     .replace(/\b\d[\d\s().-]{3,}\d\b/g, "[redacted]")
+    .replace(/\b\S*\d\S*\b/g, "[number]")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 500);
