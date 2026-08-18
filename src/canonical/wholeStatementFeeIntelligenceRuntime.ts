@@ -265,7 +265,7 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
   try {
     const timeoutMs = options.timeoutMs ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_TIMEOUT_MS ?? 12000);
     const concurrency = boundedPositiveInteger(
-      options.maxConcurrentRequests ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_MAX_CONCURRENT_REQUESTS ?? 2),
+      options.maxConcurrentRequests ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_MAX_CONCURRENT_REQUESTS ?? 1),
       4,
       "Whole-statement request concurrency",
     );
