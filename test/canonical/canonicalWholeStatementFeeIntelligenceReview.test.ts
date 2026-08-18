@@ -6,6 +6,7 @@ import { buildCanonicalRuntimeAnalysisWithRuntimeAi } from "../../src/canonical/
 import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
 import {
   runWholeStatementFeeIntelligenceRuntime,
+  runWholeStatementFeeIntelligenceRuntimeWithContext,
   wholeStatementFeeIntelligenceProviderAdapter,
 } from "../../src/canonical/wholeStatementFeeIntelligenceRuntime.js";
 import { buildSingleStatementReportV1 } from "../../src/reporting/v1/index.js";
@@ -23,6 +24,7 @@ import type {
   MoneyAmount,
 } from "../../src/canonical/types.js";
 import type { ParsedDocument } from "../../src/parser.js";
+import { package3Analysis } from "./package3TestFixture.js";
 
 describe("canonical whole-statement fee intelligence review", () => {
   it("builds a sanitized packet covering every admitted fee row, not only material unresolved rows", () => {
@@ -489,6 +491,82 @@ describe("canonical whole-statement fee intelligence review", () => {
     expect(openai.reviewStatus).toBe("completed");
     expect(anthropicSignal).toBeInstanceOf(AbortSignal);
     expect(openAiSignal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("covers and deterministically merges all 105 rows across bounded provider batches", async () => {
+    const analysis = package3Analysis(Array.from({ length: 105 }, (_, index) => ({
+      label: `SYNTHETIC FEE ${String(index + 1).padStart(3, "0")}`,
+      amount: 1 + (index % 17) / 10,
+    })));
+    const observedBatches: string[][] = [];
+    const result = await runWholeStatementFeeIntelligenceRuntimeWithContext({
+      analysis,
+      options: {
+        enabled: true,
+        maxRowsPerRequest: 20,
+        maxConcurrentRequests: 2,
+        adapter: async (packet) => {
+          const batchOrdinal = observedBatches.length;
+          observedBatches.push(packet.admittedFeeRows.map((row) => row.feeRowRef));
+          await new Promise((resolve) => setTimeout(resolve, batchOrdinal % 2 === 0 ? 4 : 1));
+          return validReview(packet);
+        },
+      },
+    });
+
+    expect(observedBatches.map((batch) => batch.length).sort((left, right) => right - left)).toEqual([20, 20, 20, 20, 20, 5]);
+    expect(new Set(observedBatches.flat()).size).toBe(105);
+    expect(result.output).toMatchObject({ reviewStatus: "completed", financialMutationAllowed: false });
+    expect(result.output.coverageProof).toMatchObject({ exactCoverage: true, missingFeeRowRefs: [] });
+    expect(result.output.coverageProof.reviewedFeeRowRefs).toHaveLength(105);
+    expect(result.diagnostics.provider).toMatchObject({
+      requestBatchCount: 6,
+      completedRequestBatchCount: 6,
+      incompleteOutputCount: 0,
+    });
+  });
+
+  it("classifies max-output termination as exhaustion before accessing a missing structured output", async () => {
+    const analysis = everyRowAnalysis();
+    const progress: any[] = [];
+    const result = await runWholeStatementFeeIntelligenceRuntimeWithContext({
+      analysis,
+      options: {
+        enabled: true,
+        provider: "openai",
+        openAiApiKey: "test-key",
+        maxRowsPerRequest: 20,
+        progressReporter: (event) => { progress.push(event); },
+        sdk: {
+          generateObject: async () => ({ object: null }),
+          generateText: async () => ({
+            finishReason: "length",
+            rawFinishReason: "max_output_tokens",
+            usage: { inputTokens: 36906, outputTokens: 5000 },
+            response: { id: "safe-request-id" },
+            get output() { throw new Error("output getter must not be reached"); },
+          }),
+          Output: { object: () => ({}) },
+          createOpenAI: () => () => ({ fake: true }),
+        },
+      },
+    });
+
+    expect(result.output.reviewStatus).toBe("failed");
+    expect(result.diagnostics.provider).toMatchObject({
+      requestBatchCount: 1,
+      completedRequestBatchCount: 0,
+      inputTokens: 36906,
+      outputTokens: 5000,
+      incompleteOutputCount: 1,
+    });
+    expect(result.diagnostics.provider.safeReasonCodes).toEqual(expect.arrayContaining([
+      "provider_finish_reason_length",
+      "provider_raw_finish_reason_max_output_tokens",
+      "provider_output_exhausted",
+    ]));
+    expect(progress.at(-1)?.reasonCodes).toEqual(expect.arrayContaining(["provider_output_exhausted"]));
+    expect(JSON.stringify(progress)).not.toMatch(/output getter|prompt|response body|SYNTHETIC FEE/i);
   });
 
   it("classifies OpenAI structured-output failures before HTTP send as local request construction", async () => {

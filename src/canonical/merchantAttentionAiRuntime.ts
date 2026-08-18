@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
 import {
   admitMerchantAttentionAiInterpretation,
@@ -9,6 +10,13 @@ import type {
   CanonicalMerchantAttentionAiInterpretationOutput,
   CanonicalMerchantAttentionModel,
 } from "./types.js";
+import {
+  SafeProviderFailureError,
+  safeProviderFailureAccounting,
+  safeProviderFailureError,
+  safeProviderReasonCodes,
+  type SafeProviderFailureOperationPhase,
+} from "./providerFailureDiagnostics.js";
 
 const require = createRequire(import.meta.url);
 const MERCHANT_LANGUAGE_AI_MAX_TIMEOUT_MS = 120_000;
@@ -21,13 +29,21 @@ type ProviderUsage = {
   cachedInputTokens?: number;
   outputTokens?: number;
 };
-type ProviderResult = { object?: unknown; output?: unknown; usage?: ProviderUsage; response?: { id?: string } };
+type ProviderResult = {
+  object?: unknown;
+  output?: unknown;
+  usage?: ProviderUsage;
+  response?: { id?: string };
+  finishReason?: string;
+  rawFinishReason?: string;
+};
+type AiProviderFetch = typeof fetch;
 type AiSdk = {
   generateObject: (options: Record<string, unknown>) => Promise<ProviderResult>;
   generateText?: (options: Record<string, unknown>) => Promise<ProviderResult>;
   Output?: { object: (options: Record<string, unknown>) => unknown };
-  createAnthropic?: (options: { apiKey?: string }) => (modelName: string) => unknown;
-  createOpenAI?: (options: { apiKey?: string }) => (modelName: string) => unknown;
+  createAnthropic?: (options: { apiKey?: string; headers?: Record<string, string>; fetch?: AiProviderFetch }) => (modelName: string) => unknown;
+  createOpenAI?: (options: { apiKey?: string; headers?: Record<string, string>; fetch?: AiProviderFetch }) => (modelName: string) => unknown;
 };
 
 export type MerchantAttentionAiRuntimeAdapter = (
@@ -40,6 +56,31 @@ export type MerchantAttentionAiProviderUsage = {
   inputTokens: number | null;
   cachedInputTokens: number | null;
   outputTokens: number | null;
+  finishReason: string | null;
+  rawFinishReason: string | null;
+  structuredOutputReceived: boolean;
+  generationCompleted: boolean;
+  outputIncomplete: boolean;
+  transportAttemptCount: number;
+  providerResponseCount: number;
+  retryCount: number;
+  reasonCodes: string[];
+};
+
+export type MerchantAttentionAiProviderDiagnostics = {
+  requestBatchCount: number;
+  completedRequestBatchCount: number;
+  processedItemCount: number;
+  transportAttemptCount: number;
+  providerResponseCount: number;
+  structuredResponseCount: number;
+  retryCount: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  incompleteOutputCount: number;
+  schemaValidationFailureCount: number;
+  safeReasonCodes: string[];
 };
 
 export type MerchantAttentionAiRuntimeOptions = {
@@ -68,6 +109,18 @@ export type MerchantAttentionAiRuntimeResult = {
   admittedItemCount: number;
   reasonCodes: string[];
   model: CanonicalMerchantAttentionModel;
+  diagnostics: MerchantAttentionAiProviderDiagnostics;
+};
+
+type ProviderTransportTrace = {
+  localTraceId: string;
+  transport: "ai_sdk_generate_text_structured_output" | "ai_sdk_generate_object_structured_output";
+  httpSendInitiated: boolean;
+  providerResponseReceived: boolean;
+  httpStatus: number | null;
+  requestId: string | null;
+  transportAttemptCount: number;
+  providerResponseCount: number;
 };
 
 export type MerchantAttentionAiRuntimeProviderSelection = {
@@ -109,6 +162,9 @@ export async function runMerchantAttentionAiRuntime(input: {
     return fallback("provider_unavailable", false, eligibleItemCount, input.model, "merchant_language_ai_provider_unavailable");
   }
 
+  const providerUsages: MerchantAttentionAiProviderUsage[] = [];
+  let completedRequestBatchCount = 0;
+  let processedItemCount = 0;
   try {
     const timeoutMs = boundedPositiveInteger(
       options.timeoutMs ?? Number(process.env.RATEREVEAL_MERCHANT_LANGUAGE_AI_TIMEOUT_MS ?? 8000),
@@ -120,12 +176,30 @@ export async function runMerchantAttentionAiRuntime(input: {
       const raw = await withAbortTimeout(
         (abortSignal) => options.adapter
           ? options.adapter(requestPacket, { abortSignal })
-          : executeProvider(requestPacket, options, abortSignal),
+          : executeProvider(requestPacket, {
+              ...options,
+              onProviderUsage: (usage) => {
+                providerUsages.push(usage);
+                options.onProviderUsage?.(usage);
+              },
+            }, abortSignal),
         timeoutMs,
       );
-      const parsed = parseProviderOutput(raw);
-      if (!parsed) return fallback("rejected", true, eligibleItemCount, input.model, "merchant_language_ai_schema_rejected");
+      const parsed = parseProviderOutput(raw, requestPacket);
+      if (!parsed) {
+        return fallback(
+          "rejected",
+          true,
+          eligibleItemCount,
+          input.model,
+          "merchant_language_ai_schema_rejected",
+          [],
+          summarizeProviderDiagnostics(packets.length, completedRequestBatchCount, processedItemCount, providerUsages, undefined, 1),
+        );
+      }
       parsedOutputs.push(parsed);
+      completedRequestBatchCount += 1;
+      processedItemCount += parsed.items.length;
     }
     const combined: CanonicalMerchantAttentionAiInterpretationOutput = {
       type: "merchant_attention_ai_interpretation",
@@ -147,6 +221,7 @@ export async function runMerchantAttentionAiRuntime(input: {
         input.model,
         "merchant_language_ai_semantic_admission_rejected",
         diagnosticCodes,
+        summarizeProviderDiagnostics(packets.length, completedRequestBatchCount, processedItemCount, providerUsages),
       );
     }
     return {
@@ -156,6 +231,12 @@ export async function runMerchantAttentionAiRuntime(input: {
       admittedItemCount: admission.model.interpretation.coverage.admittedItemCount,
       reasonCodes: ["merchant_language_ai_admitted"],
       model: admission.model,
+      diagnostics: summarizeProviderDiagnostics(
+        packets.length,
+        completedRequestBatchCount,
+        processedItemCount,
+        providerUsages,
+      ),
     };
   } catch (error) {
     const timedOut = /timed out|timeout/i.test(error instanceof Error ? error.message : "");
@@ -165,6 +246,8 @@ export async function runMerchantAttentionAiRuntime(input: {
       eligibleItemCount,
       input.model,
       timedOut ? "merchant_language_ai_timed_out" : "merchant_language_ai_provider_failed",
+      safeProviderReasonCodes(error, timedOut ? "provider_call_timed_out" : "provider_structured_output_failed"),
+      summarizeProviderDiagnostics(packets.length, completedRequestBatchCount, processedItemCount, providerUsages, error),
     );
   }
 }
@@ -176,6 +259,7 @@ function fallback(
   model: CanonicalMerchantAttentionModel,
   reasonCode: string,
   diagnosticCodes: readonly string[] = [],
+  diagnostics: MerchantAttentionAiProviderDiagnostics = emptyProviderDiagnostics(0),
 ): MerchantAttentionAiRuntimeResult {
   return {
     status,
@@ -184,6 +268,7 @@ function fallback(
     admittedItemCount: 0,
     reasonCodes: [...new Set([reasonCode, ...diagnosticCodes])].sort(),
     model,
+    diagnostics,
   };
 }
 
@@ -206,10 +291,16 @@ async function executeProvider(
   const sdk = options.sdk ?? loadSdk();
   let lastError: Error | null = null;
   for (const attempt of providerAttempts(options)) {
+    const trace = createProviderTransportTrace(
+      attempt.provider === "openai" ? "ai_sdk_generate_text_structured_output" : "ai_sdk_generate_object_structured_output",
+    );
+    let operationPhase: SafeProviderFailureOperationPhase = "request_serialization";
     try {
+      operationPhase = "request_serialization";
       const prompt = buildPrompt(packet);
+      operationPhase = "request_construction";
       const common = {
-        model: providerModel(attempt.provider, attempt.modelName, options, sdk),
+        model: providerModel(attempt.provider, attempt.modelName, options, sdk, trace),
         prompt,
         abortSignal,
         maxOutputTokens: boundedPositiveInteger(
@@ -219,18 +310,26 @@ async function executeProvider(
         ),
         maxRetries: Math.min(Math.max(options.maxRetries ?? 1, 0), 2),
       };
+      operationPhase = "request_initiation";
       const result = attempt.provider === "openai"
         ? await sdk.generateText!({
             ...common,
-            output: sdk.Output!.object({ schema: responseSchema(), name: "merchant_attention_ai_interpretation" }),
+            output: sdk.Output!.object({ schema: responseSchema(packet), name: "merchant_attention_ai_interpretation" }),
             providerOptions: { openai: { store: false } },
             experimental_telemetry: { isEnabled: false },
           })
-        : await sdk.generateObject({ ...common, schema: responseSchema() });
-      try { options.onProviderUsage?.(usage(result)); } catch { /* Observability must not change report admission. */ }
-      return attempt.provider === "openai" ? result.output : result.object;
+        : await sdk.generateObject({ ...common, schema: responseSchema(packet) });
+      if (attempt.provider === "openai" && result.finishReason !== undefined && result.finishReason !== "stop") {
+        try { options.onProviderUsage?.(usage(result, trace, false)); } catch { /* Observability must not change report admission. */ }
+        throw safeProviderFailureError(result, traceResponse(trace), providerFailureContext(operationPhase, trace));
+      }
+      const output = attempt.provider === "openai" ? result.output : result.object;
+      try { options.onProviderUsage?.(usage(result, trace, output !== undefined)); } catch { /* Observability must not change report admission. */ }
+      return output;
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error("Merchant-language provider failed.");
+      lastError = error instanceof SafeProviderFailureError
+        ? error
+        : safeProviderFailureError(error, traceResponse(trace), providerFailureContext(operationPhase, trace));
     }
   }
   throw lastError ?? new Error("Merchant-language provider unavailable.");
@@ -240,6 +339,11 @@ function buildPrompt(packet: MerchantAttentionAiInterpretationPacket): string {
   return [
     "Rewrite only the accepted structured meanings below into concise merchant-friendly language.",
     "Preserve every negation, uncertainty, modality, conditional, time boundary, and evidentiary scope exactly.",
+    "Process every input item exactly once, in input order, and copy each attentionItemId exactly.",
+    "For each output field, use only meaning and vocabulary supported by that field's semanticSupportUnits canonicalMeaning.",
+    "Copy every semanticSupportUnits supportRef exactly once into that item's semanticSupportRefs.",
+    "Preserve the exact number of remainingUncertainty, avoidClaiming, and successCriteria entries and preserve required null/non-null shapes.",
+    "If a plain-English rewrite cannot stay within the field's supported words and qualifications, copy that field's canonicalMeaning verbatim.",
     "Never create or alter amounts, evidence, benchmarks, savings, contract terms, removability, or actionability.",
     "Use: Ask for a breakdown; Needs an explanation; What still needs checking; What your statement shows; What this likely means; What we still need to confirm.",
     "Do not use internal package, policy, provider, prompt, model, file, or path language.",
@@ -248,7 +352,7 @@ function buildPrompt(packet: MerchantAttentionAiInterpretationPacket): string {
   ].join("\n");
 }
 
-function responseSchema(): unknown {
+function responseSchema(packet?: MerchantAttentionAiInterpretationPacket): unknown {
   const { z } = require("zod/v3") as { z: any };
   const question = z.object({
     question: z.string().min(1).max(500),
@@ -264,12 +368,11 @@ function responseSchema(): unknown {
     avoidClaiming: z.array(z.string().min(1).max(500)).max(12),
     successCriteria: z.array(z.string().min(1).max(500)).max(12),
   }).strict().nullable();
-  return z.object({
-    type: z.literal("merchant_attention_ai_interpretation"),
-    policyVersion: z.literal("merchant_attention_ai_interpretation_v1"),
-    outputId: z.string().regex(/^merchant_language_[a-z0-9_-]{1,80}$/),
-    items: z.array(z.object({
-      attentionItemId: z.string().min(1).max(160),
+  const attentionItemId = packet && packet.items.length > 0
+    ? z.enum(packet.items.map((item) => item.attentionItemId) as [string, ...string[]])
+    : z.string().min(1).max(160);
+  const items = z.array(z.object({
+      attentionItemId,
       merchantTitle: z.string().min(1).max(300),
       whyThisDeservesAttention: z.string().min(1).max(1200),
       reasonableConclusion: z.string().min(1).max(1200),
@@ -279,15 +382,24 @@ function responseSchema(): unknown {
       question,
       actionToolkit: toolkit,
       semanticSupportRefs: z.array(z.string().min(1).max(200)).max(80),
-    }).strict()).max(100),
+    }).strict()).max(100);
+  const exactItems = packet ? items.length(packet.items.length) : items;
+  return z.object({
+    type: z.literal("merchant_attention_ai_interpretation"),
+    policyVersion: z.literal("merchant_attention_ai_interpretation_v1"),
+    outputId: z.string().regex(/^merchant_language_[a-z0-9_-]{1,80}$/),
+    items: exactItems,
     authoritative: z.literal(false),
     financialMutationAllowed: z.literal(false),
     providerDetailsStripped: z.literal(true),
   }).strict();
 }
 
-function parseProviderOutput(value: unknown): CanonicalMerchantAttentionAiInterpretationOutput | null {
-  const result = (responseSchema() as { safeParse: (input: unknown) => { success: boolean; data?: unknown } }).safeParse(value);
+function parseProviderOutput(
+  value: unknown,
+  packet?: MerchantAttentionAiInterpretationPacket,
+): CanonicalMerchantAttentionAiInterpretationOutput | null {
+  const result = (responseSchema(packet) as { safeParse: (input: unknown) => { success: boolean; data?: unknown } }).safeParse(value);
   return result.success ? result.data as CanonicalMerchantAttentionAiInterpretationOutput : null;
 }
 
@@ -336,11 +448,21 @@ function providerKey(provider: RuntimeProvider, options: MerchantAttentionAiRunt
     : options.openAiApiKey ?? options.apiKey ?? process.env.OPENAI_API_KEY;
 }
 
-function providerModel(provider: RuntimeProvider, modelName: string, options: MerchantAttentionAiRuntimeOptions, sdk: AiSdk): unknown {
+function providerModel(
+  provider: RuntimeProvider,
+  modelName: string,
+  options: MerchantAttentionAiRuntimeOptions,
+  sdk: AiSdk,
+  trace: ProviderTransportTrace,
+): unknown {
   const key = providerKey(provider, options);
   const factory = provider === "anthropic" ? sdk.createAnthropic : sdk.createOpenAI;
   if (!key || !factory) throw new Error("Merchant-language provider factory unavailable.");
-  return factory({ apiKey: key })(modelName);
+  return factory({
+    apiKey: key,
+    headers: { "x-ratereveal-trace-id": trace.localTraceId },
+    fetch: tracedProviderFetch(trace),
+  })(modelName);
 }
 
 function loadSdk(): AiSdk {
@@ -350,14 +472,154 @@ function loadSdk(): AiSdk {
   return { ...ai, ...anthropic, ...openai };
 }
 
-function usage(result: ProviderResult): MerchantAttentionAiProviderUsage {
+function usage(
+  result: ProviderResult,
+  trace: ProviderTransportTrace,
+  structuredOutputReceived: boolean,
+): MerchantAttentionAiProviderUsage {
   const integer = (value: unknown) => Number.isInteger(value) && Number(value) >= 0 ? Number(value) : null;
+  const finishReason = safeCode(result.finishReason);
+  const rawFinishReason = safeCode(result.rawFinishReason);
+  const outputIncomplete = finishReason !== null && finishReason !== "stop";
   return {
     requestId: typeof result.response?.id === "string" && result.response.id ? result.response.id : null,
     inputTokens: integer(result.usage?.inputTokens),
     cachedInputTokens: integer(result.usage?.inputTokenDetails?.cacheReadTokens ?? result.usage?.cachedInputTokens) ?? 0,
     outputTokens: integer(result.usage?.outputTokens),
+    finishReason,
+    rawFinishReason,
+    structuredOutputReceived,
+    generationCompleted: finishReason === null || finishReason === "stop",
+    outputIncomplete,
+    transportAttemptCount: trace.transportAttemptCount,
+    providerResponseCount: trace.providerResponseCount,
+    retryCount: Math.max(0, trace.transportAttemptCount - 1),
+    reasonCodes: [
+      ...(finishReason ? [`provider_finish_reason_${finishReason}`] : []),
+      ...(rawFinishReason ? [`provider_raw_finish_reason_${rawFinishReason}`] : []),
+      structuredOutputReceived ? "provider_structured_output_received" : "provider_structured_output_not_received",
+      outputIncomplete ? "provider_output_exhausted" : "provider_generation_completed",
+    ],
   };
+}
+
+function createProviderTransportTrace(transport: ProviderTransportTrace["transport"]): ProviderTransportTrace {
+  return {
+    localTraceId: randomBytes(8).toString("hex"),
+    transport,
+    httpSendInitiated: false,
+    providerResponseReceived: false,
+    httpStatus: null,
+    requestId: null,
+    transportAttemptCount: 0,
+    providerResponseCount: 0,
+  };
+}
+
+function tracedProviderFetch(trace: ProviderTransportTrace): AiProviderFetch {
+  return async (input, init) => {
+    trace.httpSendInitiated = true;
+    trace.transportAttemptCount += 1;
+    const response = await globalThis.fetch(input, init);
+    trace.providerResponseReceived = true;
+    trace.providerResponseCount += 1;
+    trace.httpStatus = response.status;
+    trace.requestId = safeString(response.headers.get("x-request-id")) ?? trace.requestId;
+    return response;
+  };
+}
+
+function traceResponse(trace: ProviderTransportTrace): { status?: unknown; headers?: unknown } | undefined {
+  if (!trace.providerResponseReceived) return undefined;
+  return {
+    status: trace.httpStatus,
+    headers: trace.requestId ? { "x-request-id": trace.requestId } : undefined,
+  };
+}
+
+function providerFailureContext(
+  operationPhase: SafeProviderFailureOperationPhase,
+  trace: ProviderTransportTrace,
+) {
+  return {
+    operationPhase: trace.providerResponseReceived
+      ? trace.httpStatus !== null && trace.httpStatus >= 400 ? "provider_response" as const : "sdk_structured_output_handling" as const
+      : trace.httpSendInitiated ? "response_wait" as const : operationPhase,
+    transport: trace.transport,
+    localTraceId: trace.localTraceId,
+    httpSendInitiated: trace.httpSendInitiated,
+    providerResponseReceived: trace.providerResponseReceived,
+    httpStatus: trace.httpStatus,
+    requestId: trace.requestId,
+    transportAttemptCount: trace.transportAttemptCount,
+    providerResponseCount: trace.providerResponseCount,
+  };
+}
+
+function summarizeProviderDiagnostics(
+  requestBatchCount: number,
+  completedRequestBatchCount: number,
+  processedItemCount: number,
+  usages: readonly MerchantAttentionAiProviderUsage[],
+  error?: unknown,
+  schemaValidationFailureCount = 0,
+): MerchantAttentionAiProviderDiagnostics {
+  const accounting = safeProviderFailureAccounting(error);
+  const accountingAlreadyObserved = accounting !== null && usages.some((item) =>
+    (accounting.requestId !== null && item.requestId === accounting.requestId)
+    || (item.outputIncomplete && safeProviderReasonCodes(error, "provider_structured_output_failed").includes("provider_output_exhausted"))
+  );
+  const unobservedAccounting = accountingAlreadyObserved ? null : accounting;
+  const reasonCodes = new Set(usages.flatMap((item) => item.reasonCodes));
+  if (error !== undefined) safeProviderReasonCodes(error, "provider_structured_output_failed").forEach((code) => reasonCodes.add(code));
+  return {
+    requestBatchCount,
+    completedRequestBatchCount,
+    processedItemCount,
+    transportAttemptCount: sumNumbers(usages.map((item) => item.transportAttemptCount)) + (unobservedAccounting?.transportAttemptCount ?? 0),
+    providerResponseCount: sumNumbers(usages.map((item) => item.providerResponseCount)) + (unobservedAccounting?.providerResponseCount ?? 0),
+    structuredResponseCount: usages.filter((item) => item.structuredOutputReceived).length,
+    retryCount: sumNumbers(usages.map((item) => item.retryCount)) + (unobservedAccounting?.retryCount ?? 0),
+    inputTokens: sumNumbers(usages.map((item) => item.inputTokens)) + (unobservedAccounting?.inputTokens ?? 0),
+    cachedInputTokens: sumNumbers(usages.map((item) => item.cachedInputTokens)) + (unobservedAccounting?.cachedInputTokens ?? 0),
+    outputTokens: sumNumbers(usages.map((item) => item.outputTokens)) + (unobservedAccounting?.outputTokens ?? 0),
+    incompleteOutputCount: usages.filter((item) => item.outputIncomplete).length
+      + (!accountingAlreadyObserved && error !== undefined && safeProviderReasonCodes(error, "provider_structured_output_failed").includes("provider_output_exhausted") ? 1 : 0),
+    schemaValidationFailureCount,
+    safeReasonCodes: [...reasonCodes].sort(),
+  };
+}
+
+function emptyProviderDiagnostics(requestBatchCount: number): MerchantAttentionAiProviderDiagnostics {
+  return {
+    requestBatchCount,
+    completedRequestBatchCount: 0,
+    processedItemCount: 0,
+    transportAttemptCount: 0,
+    providerResponseCount: 0,
+    structuredResponseCount: 0,
+    retryCount: 0,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    incompleteOutputCount: 0,
+    schemaValidationFailureCount: 0,
+    safeReasonCodes: [],
+  };
+}
+
+function sumNumbers(values: readonly (number | null | undefined)[]): number {
+  return values.reduce<number>((sum, value) => sum + (Number.isInteger(value) && Number(value) >= 0 ? Number(value) : 0), 0);
+}
+
+function safeString(value: unknown): string | null {
+  return typeof value === "string" && /^[A-Za-z0-9._:-]{1,128}$/.test(value) ? value : null;
+}
+
+function safeCode(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.toLowerCase().replace(/[^a-z0-9_:-]+/g, "_").replace(/^_+|_+$/g, "");
+  return /^[a-z0-9][a-z0-9_:-]{0,80}$/.test(normalized) ? normalized : null;
 }
 
 async function withAbortTimeout<T>(operation: (signal: AbortSignal) => Promise<T>, timeoutMs: number): Promise<T> {

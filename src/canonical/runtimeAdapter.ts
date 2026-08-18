@@ -14,6 +14,7 @@ import {
 import {
   runWholeStatementFeeIntelligenceRuntimeWithContext,
   wholeStatementFeeIntelligenceRuntimeProviderSelection,
+  type WholeStatementFeeIntelligenceProviderDiagnostics,
   type WholeStatementFeeIntelligenceRuntimeOptions,
 } from "./wholeStatementFeeIntelligenceRuntime.js";
 import {
@@ -26,6 +27,7 @@ import {
   merchantAttentionAiRuntimeProviderSelection,
   runMerchantAttentionAiRuntime,
   type MerchantAttentionAiRuntimeOptions,
+  type MerchantAttentionAiProviderDiagnostics,
   type MerchantAttentionAiRuntimeResult,
 } from "./merchantAttentionAiRuntime.js";
 import type { BusinessTypeId } from "../businessTypes.js";
@@ -212,6 +214,7 @@ export type CanonicalRuntimeDiagnostics = {
     safeReasonCodes: string[];
     admittedFeeKnowledgeAvailable: boolean;
     elapsedMs: number;
+    providerDiagnostics: WholeStatementFeeIntelligenceProviderDiagnostics;
   };
   merchantLanguageAi: {
     provider: "anthropic" | "openai" | "custom_adapter" | "none";
@@ -222,6 +225,7 @@ export type CanonicalRuntimeDiagnostics = {
     admittedItemCount: number;
     safeReasonCodes: string[];
     elapsedMs: number;
+    providerDiagnostics: MerchantAttentionAiProviderDiagnostics;
   };
 };
 
@@ -431,8 +435,23 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     counters: {
       eligibleItemCount: merchantLanguageRuntime.eligibleItemCount,
       admittedItemCount: merchantLanguageRuntime.admittedItemCount,
+      requestBatchCount: merchantLanguageRuntime.diagnostics.requestBatchCount,
+      completedRequestBatchCount: merchantLanguageRuntime.diagnostics.completedRequestBatchCount,
+      processedItemCount: merchantLanguageRuntime.diagnostics.processedItemCount,
+      transportAttemptCount: merchantLanguageRuntime.diagnostics.transportAttemptCount,
+      providerResponseCount: merchantLanguageRuntime.diagnostics.providerResponseCount,
+      structuredResponseCount: merchantLanguageRuntime.diagnostics.structuredResponseCount,
+      retryCount: merchantLanguageRuntime.diagnostics.retryCount,
+      inputTokenCount: merchantLanguageRuntime.diagnostics.inputTokens,
+      cachedInputTokenCount: merchantLanguageRuntime.diagnostics.cachedInputTokens,
+      outputTokenCount: merchantLanguageRuntime.diagnostics.outputTokens,
+      incompleteOutputCount: merchantLanguageRuntime.diagnostics.incompleteOutputCount,
+      schemaValidationFailureCount: merchantLanguageRuntime.diagnostics.schemaValidationFailureCount,
     },
-    reasonCodes: merchantLanguageRuntime.reasonCodes,
+    reasonCodes: [...new Set([
+      ...merchantLanguageRuntime.reasonCodes,
+      ...merchantLanguageRuntime.diagnostics.safeReasonCodes,
+    ])],
   });
   const finalAnalysis = validateCanonicalStatementAnalysis({
     ...deterministicAnalysis,
@@ -491,6 +510,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
         ["completed", "partial"].includes(wholeStatementOutput.reviewStatus)
         && wholeStatementRuntime.feeKnowledgeIntelligence.length > 0,
       elapsedMs: wholeStatementRuntime.diagnostics.providerReviewElapsedMs,
+      providerDiagnostics: wholeStatementRuntime.diagnostics.provider,
     },
     merchantLanguageAi: {
       provider: merchantLanguageProvider.provider,
@@ -501,6 +521,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
       admittedItemCount: merchantLanguageRuntime.admittedItemCount,
       safeReasonCodes: [...merchantLanguageRuntime.reasonCodes],
       elapsedMs: merchantLanguageElapsedMs,
+      providerDiagnostics: merchantLanguageRuntime.diagnostics,
     },
   };
 
@@ -518,6 +539,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
       eligibleItemCount: merchantLanguageRuntime.eligibleItemCount,
       admittedItemCount: merchantLanguageRuntime.admittedItemCount,
       reasonCodes: [...merchantLanguageRuntime.reasonCodes],
+      diagnostics: merchantLanguageRuntime.diagnostics,
     },
     runtimeDiagnostics,
   };
