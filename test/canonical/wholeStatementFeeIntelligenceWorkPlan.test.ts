@@ -195,12 +195,12 @@ describe("whole-statement fee intelligence work plan", () => {
 
     expect(analysis.feeLedger.rows).toHaveLength(28);
     expect(workUnitReservations).toEqual([
-      { rowCount: 18, maximumInputTokens: 126_385, maximumOutputTokens: 4_120 },
-      { rowCount: 10, maximumInputTokens: 98_326, maximumOutputTokens: 2_600 },
+      { rowCount: 18, maximumInputTokens: 126_750, maximumOutputTokens: 4_120 },
+      { rowCount: 10, maximumInputTokens: 98_691, maximumOutputTokens: 2_600 },
     ]);
-    expect(package5BParentEnvelope).toBe(0.19877425);
-    expect(singleCopyStageSum).toBe(0.40889425);
-    expect(slotExpandedEnvelope.totalEstimatedEnvelopeUsd).toBe(1.44197425);
+    expect(package5BParentEnvelope).toBe(0.19932175);
+    expect(singleCopyStageSum).toBe(0.40944175);
+    expect(slotExpandedEnvelope.totalEstimatedEnvelopeUsd).toBe(1.44252175);
     expect(singleCopyStageSum).toBeLessThan(slotExpandedEnvelope.totalEstimatedEnvelopeUsd);
   }, 30_000);
 
@@ -405,14 +405,14 @@ describe("whole-statement fee intelligence work plan", () => {
       wholeStatementFeeIntelligenceProviderInputBytes(unit.packet)
     ));
     expect(workUnits.map((unit) => unit.maximumInputTokens)).toEqual([
-      26031,
-      26362,
-      25985,
-      25991,
-      26341,
-      26035,
-      25973,
-      12757,
+      26396,
+      26727,
+      26350,
+      26356,
+      26706,
+      26400,
+      26338,
+      13122,
     ]);
     expect(workUnits.map((unit) => unit.maximumOutputTokens)).toEqual([
       4_120,
@@ -425,16 +425,16 @@ describe("whole-statement fee intelligence work plan", () => {
       2_500,
     ]);
     expect(workUnits.map((unit) => unit.worstCaseCostUsd)).toEqual([
-      0.03806325,
-      0.0383115,
-      0.03802875,
-      0.03803325,
-      0.03829575,
-      0.03806625,
-      0.03801975,
-      0.02081775,
+      0.038337,
+      0.03858525,
+      0.0383025,
+      0.038307,
+      0.0385695,
+      0.03834,
+      0.0382935,
+      0.0210915,
     ]);
-    expect(worstCaseTotalUsd).toBe(0.28763625);
+    expect(worstCaseTotalUsd).toBe(0.28982625);
     expect(worstCaseTotalUsd).toBeLessThan(2);
   }, 30_000);
 });

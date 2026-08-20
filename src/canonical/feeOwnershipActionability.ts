@@ -308,7 +308,7 @@ function deterministicCandidates(
     }
   }
 
-  if (rowRole === "credit" || /\b(credit|refund|reversal)\b/.test(context.normalizedCombined)) {
+  if (rowRole === "credit") {
     candidates.push(
       candidate(feeRowId, context, {
         category: "credit",

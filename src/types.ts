@@ -326,6 +326,10 @@ export type InterchangeAuditRow = {
   cardBrand: CardBrand;
   cardType?: string;
   entryMode?: string;
+  /** Share of the brand-section sales volume printed by the statement, when present. */
+  salesSharePercent?: number | null;
+  /** Share of the brand-section transaction count printed by the statement, when present. */
+  transactionSharePercent?: number | null;
   transactionCount: number | null;
   volume: number | null;
   ratePercent: number | null;
@@ -336,6 +340,7 @@ export type InterchangeAuditRow = {
   variance: number | null;
   sourceSection: string;
   evidenceLine: string;
+  pageNumber?: number | null;
   rowIndex: number;
   confidence: number;
   downgradeIndicators: string[];

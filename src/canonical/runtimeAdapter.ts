@@ -14,6 +14,7 @@ import {
 import {
   runWholeStatementFeeIntelligenceRuntimeWithContext,
   wholeStatementFeeIntelligenceRuntimeProviderSelection,
+  type WholeStatementFeeIntelligenceProviderDiagnostics,
   type WholeStatementFeeIntelligenceRuntimeOptions,
 } from "./wholeStatementFeeIntelligenceRuntime.js";
 import {
@@ -26,6 +27,7 @@ import {
   merchantAttentionAiRuntimeProviderSelection,
   runMerchantAttentionAiRuntime,
   type MerchantAttentionAiRuntimeOptions,
+  type MerchantAttentionAiProviderDiagnostics,
   type MerchantAttentionAiRuntimeResult,
 } from "./merchantAttentionAiRuntime.js";
 import type { BusinessTypeId } from "../businessTypes.js";
@@ -43,6 +45,12 @@ import type {
 } from "./types.js";
 import type { FeeKnowledgeIntelligenceRecord } from "./feeKnowledgeTypes.js";
 import type { FeeKnowledgeResearchDiagnostics } from "./feeKnowledgeResearch.js";
+import {
+  emitRuntimeProgress,
+  runtimeProgressFailureReason,
+  runtimeProgressFailureStatus,
+  type RuntimeProgressReporter,
+} from "../runtimeProgress.js";
 
 export type CanonicalRuntimeInputAdmissionStatus =
   | "canonical_evidence"
@@ -165,6 +173,7 @@ export type CanonicalRuntimeAdapterInput = {
   businessProfile?: CanonicalBusinessProfileInput | null;
   wholeStatementFeeIntelligence?: WholeStatementFeeIntelligenceRuntimeOptions;
   merchantLanguageInterpretation?: MerchantAttentionAiRuntimeOptions;
+  progressReporter?: RuntimeProgressReporter;
 };
 
 export type CanonicalRuntimeAdapterResult = {
@@ -205,6 +214,7 @@ export type CanonicalRuntimeDiagnostics = {
     safeReasonCodes: string[];
     admittedFeeKnowledgeAvailable: boolean;
     elapsedMs: number;
+    providerDiagnostics: WholeStatementFeeIntelligenceProviderDiagnostics;
   };
   merchantLanguageAi: {
     provider: "anthropic" | "openai" | "custom_adapter" | "none";
@@ -215,6 +225,7 @@ export type CanonicalRuntimeDiagnostics = {
     admittedItemCount: number;
     safeReasonCodes: string[];
     elapsedMs: number;
+    providerDiagnostics: MerchantAttentionAiProviderDiagnostics;
   };
 };
 
@@ -282,20 +293,43 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
   const legacySummary = cloneJson(input.legacySummary ?? null);
 
   const canonicalConstructionStartedAt = Date.now();
-  const analysis = buildCanonicalStatementFactsFromParsedDocument(document, {
-    businessType,
-    businessProfile: runtimeBusinessProfile(input.businessProfile, businessType),
-    sourceAnalysisId: runtimeDocumentRef,
-    sourceFileName: null,
+  await emitRuntimeProgress(input.progressReporter, {
+    stage: "canonical_construction",
+    status: "running",
   });
+  let analysis: CanonicalStatementAnalysis;
+  try {
+    analysis = buildCanonicalStatementFactsFromParsedDocument(document, {
+      businessType,
+      businessProfile: runtimeBusinessProfile(input.businessProfile, businessType),
+      sourceAnalysisId: runtimeDocumentRef,
+      sourceFileName: null,
+    });
+  } catch (error) {
+    await emitRuntimeProgress(input.progressReporter, {
+      stage: "canonical_construction",
+      status: runtimeProgressFailureStatus(error),
+      elapsedMs: elapsedSince(canonicalConstructionStartedAt),
+      reasonCodes: [runtimeProgressFailureReason(error, "canonical_construction")],
+    });
+    throw error;
+  }
   const runtimeAi = buildRuntimeAiCapabilityHarnessInputs({
     summary: legacySummary,
     analysis,
   });
   const canonicalConstructionElapsedMs = elapsedSince(canonicalConstructionStartedAt);
+  await emitRuntimeProgress(input.progressReporter, {
+    stage: "canonical_construction",
+    status: "completed",
+    elapsedMs: canonicalConstructionElapsedMs,
+  });
   const wholeStatementRuntime = await runWholeStatementFeeIntelligenceRuntimeWithContext({
     analysis,
-    options: input.wholeStatementFeeIntelligence,
+    options: {
+      ...input.wholeStatementFeeIntelligence,
+      progressReporter: input.progressReporter,
+    },
   });
   const wholeStatementOutput = wholeStatementRuntime.output;
   const wholeStatementHarnessInput: CanonicalAiCapabilityHarnessInput = {
@@ -330,20 +364,95 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     deterministicRuntimeSafetyReview,
   });
   const merchantAttentionStartedAt = Date.now();
-  const deterministicAnalysis = rebuildCustomerProjectionLayers(
-    analysis,
-    aiCapabilities,
-    ["completed", "partial"].includes(wholeStatementOutput.reviewStatus)
-      ? wholeStatementRuntime.feeKnowledgeIntelligence
-      : [],
-  );
-  const merchantAttentionElapsedMs = elapsedSince(merchantAttentionStartedAt);
-  const merchantLanguageStartedAt = Date.now();
-  const merchantLanguageRuntime = await runMerchantAttentionAiRuntime({
-    model: deterministicAnalysis.merchantAttention,
-    options: input.merchantLanguageInterpretation,
+  await emitRuntimeProgress(input.progressReporter, {
+    stage: "merchant_attention",
+    status: "running",
   });
+  let deterministicAnalysis: CanonicalStatementAnalysis;
+  try {
+    deterministicAnalysis = rebuildCustomerProjectionLayers(
+      analysis,
+      aiCapabilities,
+      ["completed", "partial"].includes(wholeStatementOutput.reviewStatus)
+        ? wholeStatementRuntime.feeKnowledgeIntelligence
+        : [],
+    );
+  } catch (error) {
+    await emitRuntimeProgress(input.progressReporter, {
+      stage: "merchant_attention",
+      status: runtimeProgressFailureStatus(error),
+      elapsedMs: elapsedSince(merchantAttentionStartedAt),
+      reasonCodes: [runtimeProgressFailureReason(error, "merchant_attention")],
+    });
+    throw error;
+  }
+  const merchantAttentionElapsedMs = elapsedSince(merchantAttentionStartedAt);
+  await emitRuntimeProgress(input.progressReporter, {
+    stage: "merchant_attention",
+    status: "completed",
+    elapsedMs: merchantAttentionElapsedMs,
+  });
+  const merchantLanguageStartedAt = Date.now();
+  const merchantLanguageProvider = merchantAttentionAiRuntimeProviderSelection(
+    input.merchantLanguageInterpretation,
+  );
+  await emitRuntimeProgress(input.progressReporter, {
+    stage: "merchant_language",
+    status: "running",
+    provider: merchantLanguageProvider.provider,
+    model: merchantLanguageProvider.model,
+  });
+  let merchantLanguageRuntime: MerchantAttentionAiRuntimeResult;
+  try {
+    merchantLanguageRuntime = await runMerchantAttentionAiRuntime({
+      model: deterministicAnalysis.merchantAttention,
+      options: input.merchantLanguageInterpretation,
+    });
+  } catch (error) {
+    await emitRuntimeProgress(input.progressReporter, {
+      stage: "merchant_language",
+      status: runtimeProgressFailureStatus(error),
+      elapsedMs: elapsedSince(merchantLanguageStartedAt),
+      provider: merchantLanguageProvider.provider,
+      model: merchantLanguageProvider.model,
+      reasonCodes: [runtimeProgressFailureReason(error, "merchant_language")],
+    });
+    throw error;
+  }
   const merchantLanguageElapsedMs = elapsedSince(merchantLanguageStartedAt);
+  await emitRuntimeProgress(input.progressReporter, {
+    stage: "merchant_language",
+    status: merchantLanguageRuntime.status === "admitted" || merchantLanguageRuntime.status === "not_needed"
+      ? "completed"
+      : merchantLanguageRuntime.status === "timed_out"
+        ? "timed_out"
+        : merchantLanguageRuntime.status === "failed"
+          ? "failed"
+          : "degraded",
+    elapsedMs: merchantLanguageElapsedMs,
+    provider: merchantLanguageProvider.provider,
+    model: merchantLanguageProvider.model,
+    counters: {
+      eligibleItemCount: merchantLanguageRuntime.eligibleItemCount,
+      admittedItemCount: merchantLanguageRuntime.admittedItemCount,
+      requestBatchCount: merchantLanguageRuntime.diagnostics.requestBatchCount,
+      completedRequestBatchCount: merchantLanguageRuntime.diagnostics.completedRequestBatchCount,
+      processedItemCount: merchantLanguageRuntime.diagnostics.processedItemCount,
+      transportAttemptCount: merchantLanguageRuntime.diagnostics.transportAttemptCount,
+      providerReplyCount: merchantLanguageRuntime.diagnostics.providerReplyCount,
+      structuredResultCount: merchantLanguageRuntime.diagnostics.structuredResultCount,
+      retryCount: merchantLanguageRuntime.diagnostics.retryCount,
+      inputTokenCount: merchantLanguageRuntime.diagnostics.inputTokens,
+      cachedInputTokenCount: merchantLanguageRuntime.diagnostics.cachedInputTokens,
+      outputTokenCount: merchantLanguageRuntime.diagnostics.outputTokens,
+      incompleteOutputCount: merchantLanguageRuntime.diagnostics.incompleteOutputCount,
+      schemaValidationFailureCount: merchantLanguageRuntime.diagnostics.schemaValidationFailureCount,
+    },
+    reasonCodes: [...new Set([
+      ...merchantLanguageRuntime.reasonCodes,
+      ...merchantLanguageRuntime.diagnostics.safeReasonCodes,
+    ])],
+  });
   const finalAnalysis = validateCanonicalStatementAnalysis({
     ...deterministicAnalysis,
     merchantAttention: merchantLanguageRuntime.model,
@@ -353,9 +462,6 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
   );
   const wholeStatementProvider = wholeStatementFeeIntelligenceRuntimeProviderSelection(
     input.wholeStatementFeeIntelligence,
-  );
-  const merchantLanguageProvider = merchantAttentionAiRuntimeProviderSelection(
-    input.merchantLanguageInterpretation,
   );
   const runtimeDiagnostics: CanonicalRuntimeDiagnostics = {
     policyVersion: "package_3_runtime_diagnostics_v1",
@@ -404,6 +510,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
         ["completed", "partial"].includes(wholeStatementOutput.reviewStatus)
         && wholeStatementRuntime.feeKnowledgeIntelligence.length > 0,
       elapsedMs: wholeStatementRuntime.diagnostics.providerReviewElapsedMs,
+      providerDiagnostics: wholeStatementRuntime.diagnostics.provider,
     },
     merchantLanguageAi: {
       provider: merchantLanguageProvider.provider,
@@ -414,6 +521,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
       admittedItemCount: merchantLanguageRuntime.admittedItemCount,
       safeReasonCodes: [...merchantLanguageRuntime.reasonCodes],
       elapsedMs: merchantLanguageElapsedMs,
+      providerDiagnostics: merchantLanguageRuntime.diagnostics,
     },
   };
 
@@ -431,6 +539,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
       eligibleItemCount: merchantLanguageRuntime.eligibleItemCount,
       admittedItemCount: merchantLanguageRuntime.admittedItemCount,
       reasonCodes: [...merchantLanguageRuntime.reasonCodes],
+      diagnostics: merchantLanguageRuntime.diagnostics,
     },
     runtimeDiagnostics,
   };

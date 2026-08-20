@@ -71,6 +71,7 @@ export type FeeKnowledgeInvestigativeIntelligenceAdapter = (
 
 export type FeeKnowledgeInvestigativeIntelligenceOptions = {
   enabled?: boolean;
+  statementScopeEnabled?: boolean;
   openAiApiKey?: string;
   openAiModelName?: string;
   maximumInputBytes?: number;

@@ -54,6 +54,29 @@ describe("Package 3 merchant-language AI runtime", () => {
     for (const result of [timedOut, invalid, strengthened]) expect(result.model).toEqual(analysis.merchantAttention);
   });
 
+  it("retains independently admissible AI wording while fail-closed canonicalizing unsupported lexical fields", async () => {
+    const analysis = package3Analysis([{ label: "ADDITIONAL FEES", amount: 9.48 }]);
+    const output = validPackage3Interpretation(analysis.merchantAttention);
+    const expectedTitle = output.items[0].merchantTitle;
+    output.items[0].whyThisDeservesAttention = `${analysis.merchantAttention.items[0].whyThisDeservesAttention} Mysterious.`;
+
+    const result = await runMerchantAttentionAiRuntime({
+      model: analysis.merchantAttention,
+      options: { adapter: async () => output },
+    });
+
+    expect(result.status).toBe("admitted");
+    expect(result.reasonCodes).toContain("merchant_language_ai_admitted_with_canonical_field_stabilization");
+    expect(result.model.items[0].merchantTitle).toBe(expectedTitle);
+    expect(result.model.items[0].whyThisDeservesAttention).toBe(analysis.merchantAttention.items[0].whyThisDeservesAttention);
+    expect(result.diagnostics).toMatchObject({
+      semanticStabilizationApplied: true,
+      canonicalFieldSubstitutionCount: 1,
+    });
+    expect(result.diagnostics.admittedGeneratedFieldCount).toBeGreaterThan(0);
+    expect(JSON.stringify(result.model)).not.toContain("Mysterious");
+  });
+
   it("maps detailed semantic admission failures to a closed prose-free diagnostic taxonomy", () => {
     const codes = merchantAttentionAiAdmissionDiagnosticCodes([
       "AI merchant interpretation must cover each AI-language-eligible attention item exactly once.",
@@ -115,7 +138,15 @@ describe("Package 3 merchant-language AI runtime", () => {
       },
     });
     expect(result.status).toBe("admitted");
-    expect(usage).toEqual([{ requestId: "safe-request-id", inputTokens: 120, cachedInputTokens: 20, outputTokens: 80 }]);
+    expect(usage).toEqual([expect.objectContaining({
+      requestId: "safe-request-id",
+      inputTokens: 120,
+      cachedInputTokens: 20,
+      outputTokens: 80,
+      structuredOutputReceived: true,
+      generationCompleted: true,
+      outputIncomplete: false,
+    })]);
     expect(JSON.stringify(usage)).not.toMatch(/test-only-key|prompt|response body/i);
   });
 
@@ -140,6 +171,108 @@ describe("Package 3 merchant-language AI runtime", () => {
     });
     expect(calls).toBe(result.eligibleItemCount);
     expect(result).toMatchObject({ status: "admitted", admittedItemCount: result.eligibleItemCount });
+  });
+
+  it("accepts the explicit staging timeout envelope while preserving packet admission", async () => {
+    const analysis = package3Analysis([{ label: "ADDITIONAL FEES", amount: 9.48 }]);
+    const result = await runMerchantAttentionAiRuntime({
+      model: analysis.merchantAttention,
+      options: {
+        timeoutMs: 60_000,
+        adapter: async () => validPackage3Interpretation(analysis.merchantAttention),
+      },
+    });
+
+    expect(result).toMatchObject({ status: "admitted", admittedItemCount: result.eligibleItemCount });
+  });
+
+  it("covers all 32 eligible items across the existing 12/12/8 packets before exact semantic admission", async () => {
+    const analysis = package3Analysis(Array.from({ length: 32 }, (_, index) => ({
+      label: `ADDITIONAL FEES ${String(index + 1).padStart(3, "0")}`,
+      amount: 1 + (index % 17) / 10,
+    })));
+    const full = validPackage3Interpretation(analysis.merchantAttention);
+    const observed: string[][] = [];
+    const result = await runMerchantAttentionAiRuntime({
+      model: analysis.merchantAttention,
+      options: {
+        maxItemsPerRequest: 12,
+        maxOutputTokens: 12_000,
+        adapter: async (packet) => {
+          const allowed = new Set(packet.items.map((item) => item.attentionItemId));
+          observed.push([...allowed]);
+          return {
+            ...full,
+            outputId: `merchant_language_batch_${observed.length}`,
+            items: full.items
+              .filter((item: any) => allowed.has(item.attentionItemId))
+              .map((item: any) => ({ ...item, whyThisDeservesAttention: `${item.whyThisDeservesAttention} Mysterious.` })),
+          };
+        },
+      },
+    });
+
+    expect(observed.map((packet) => packet.length)).toEqual([12, 12, 8]);
+    expect(new Set(observed.flat()).size).toBe(32);
+    expect(result).toMatchObject({ status: "admitted", eligibleItemCount: 32, admittedItemCount: 32 });
+    expect(result.diagnostics).toMatchObject({
+      requestBatchCount: 3,
+      completedRequestBatchCount: 3,
+      processedItemCount: 32,
+      incompleteOutputCount: 0,
+      schemaValidationFailureCount: 0,
+      semanticStabilizationApplied: true,
+      canonicalFieldSubstitutionCount: 32,
+    });
+    expect(result.diagnostics.admittedGeneratedFieldCount).toBeGreaterThan(0);
+    expect(JSON.stringify(result.model)).not.toContain("Mysterious");
+  });
+
+  it("keeps output exhaustion distinct from semantic admission and records only safe diagnostics", async () => {
+    const analysis = package3Analysis(Array.from({ length: 12 }, (_, index) => ({
+      label: `ADDITIONAL FEES ${String(index + 1).padStart(3, "0")}`,
+      amount: 1 + index / 10,
+    })));
+    const result = await runMerchantAttentionAiRuntime({
+      model: analysis.merchantAttention,
+      options: {
+        provider: "openai",
+        openAiApiKey: "test-key",
+        maxItemsPerRequest: 12,
+        sdk: {
+          generateObject: async () => ({}),
+          generateText: async () => ({
+            finishReason: "length",
+            rawFinishReason: "max_output_tokens",
+            usage: { inputTokens: 15481, outputTokens: 6000 },
+            response: { id: "safe-request-id" },
+            get output() { throw new Error("output getter must not be reached"); },
+          }),
+          Output: { object: () => ({}) },
+          createOpenAI: () => () => ({ fake: true }),
+        },
+      },
+    });
+
+    expect(result).toMatchObject({ status: "failed", admittedItemCount: 0 });
+    expect(result.reasonCodes).toEqual(expect.arrayContaining([
+      "merchant_language_ai_provider_failed",
+      "provider_output_exhausted",
+    ]));
+    expect(result.diagnostics).toMatchObject({
+      requestBatchCount: 1,
+      completedRequestBatchCount: 0,
+      processedItemCount: 0,
+      inputTokens: 15481,
+      outputTokens: 6000,
+      incompleteOutputCount: 1,
+    });
+    expect(result.diagnostics.safeReasonCodes).toEqual(expect.arrayContaining([
+      "provider_finish_reason_length",
+      "provider_raw_finish_reason_max_output_tokens",
+      "provider_output_exhausted",
+    ]));
+    expect(JSON.stringify(result.diagnostics)).not.toMatch(/output getter|prompt|response body|ADDITIONAL FEES/i);
   });
 });
 

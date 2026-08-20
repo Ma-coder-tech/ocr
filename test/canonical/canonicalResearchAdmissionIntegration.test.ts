@@ -10,6 +10,8 @@ import {
 } from "../../src/canonical/feeKnowledgeClaimSupportDecision.js";
 import { validateResearchLinkage } from "../../src/canonical/wholeStatementFeeIntelligenceAdmission.js";
 import {
+  FEE_KNOWLEDGE_PRODUCT_RUNTIME_POLICY,
+  FEE_KNOWLEDGE_RESEARCH_LIMITS,
   feeKnowledgeQuestionRef,
   FeeKnowledgeSearchProviderError,
   openAiSemanticSupportAdapter,
@@ -254,6 +256,87 @@ describe("canonical research admission integration", () => {
     expect(result.attempts.some((attempt) => attempt.status === "completed")).toBe(true);
     expect(result.attempts.some((attempt) => attempt.status === "timed_out")).toBe(true);
     expect(result.candidates).toHaveLength(1);
+    expect(result.claimSupports).toHaveLength(1);
+  });
+
+  it("starts independent selected-question discovery concurrently while preserving deterministic attribution", async () => {
+    const questions = [
+      question("feerow_aaaaaaaaaaaaaaaaaaaaaaaa", "Alpha Fee"),
+      question("feerow_bbbbbbbbbbbbbbbbbbbbbbbb", "Beta Fee"),
+      question("feerow_cccccccccccccccccccccccc", "Gamma Fee"),
+    ];
+    let activeSearches = 0;
+    let maximumActiveSearches = 0;
+    const result = await runFeeKnowledgeResearch({
+      analysis: analysis(),
+      questions,
+      options: {
+        enabled: true,
+        timeoutMs: 1_000,
+        adapter: async () => {
+          activeSearches += 1;
+          maximumActiveSearches = Math.max(maximumActiveSearches, activeSearches);
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          activeSearches -= 1;
+          return [];
+        },
+      },
+    });
+
+    expect(maximumActiveSearches).toBe(questions.length);
+    expect(result.attempts).toHaveLength(questions.length);
+    expect(result.attempts.every((attempt) => attempt.status === "completed")).toBe(true);
+    expect(result.diagnostics.searchCallCount).toBe(questions.length);
+    expect(FEE_KNOWLEDGE_PRODUCT_RUNTIME_POLICY.maxConcurrentSearchCalls).toBeGreaterThanOrEqual(questions.length);
+    expect(FEE_KNOWLEDGE_RESEARCH_LIMITS.totalDeadlineMs).toBe(660_000);
+    expect(FEE_KNOWLEDGE_PRODUCT_RUNTIME_POLICY.totalDeadlineMs).toBe(240_000);
+  });
+
+  it("skips redundant retrieved-document AI when deterministic citation grounding already exists", async () => {
+    const current = question("feerow_aaaaaaaaaaaaaaaaaaaaaaaa", "Alpha Fee");
+    let investigativeCalls = 0;
+    let semanticCalls = 0;
+    const result = await runFeeKnowledgeResearch({
+      analysis: analysis(),
+      questions: [current],
+      options: {
+        enabled: true,
+        timeoutMs: 1_000,
+        domainIdentityPolicy: domainPolicy(),
+        resolveHost: async () => ["93.184.216.34"],
+        adapter: async () => [{ url: "https://evidence.test/alpha", title: "Official guide", publisher: "Fiserv" }],
+        fetchImpl: async () => htmlResponse("Fiserv official guide explains Alpha Fee for 2026."),
+        investigativeIntelligence: {
+          enabled: true,
+          adapter: async () => {
+            investigativeCalls += 1;
+            return { findings: [] };
+          },
+        },
+        semanticSupportAdapter: async ({ structuredClaim }) => {
+          semanticCalls += 1;
+          return {
+            type: "fee_knowledge_semantic_support_decision",
+            policyVersion: FEE_KNOWLEDGE_CLAIM_SUPPORT_POLICY_VERSION,
+            decision: "supports",
+            structuredClaim,
+            reasonCodes: ["synthetic_semantic_support"],
+            providerDetailsStripped: true,
+          };
+        },
+      },
+    });
+
+    expect(investigativeCalls).toBe(0);
+    expect(semanticCalls).toBe(1);
+    expect(result.candidates[0]).toMatchObject({
+      retrievalStatus: "retrieved_text",
+      semanticVerificationStatus: "completed",
+    });
+    expect(result.diagnostics.investigative).toMatchObject({
+      statement: { attempted: false, status: "disabled" },
+      retrievedDocument: { attemptCount: 0, outputRecordCount: 0 },
+    });
     expect(result.claimSupports).toHaveLength(1);
   });
 

@@ -23,6 +23,9 @@ export type SafeProviderFailureDiagnostic = {
   inputTokens: number | null;
   cachedInputTokens: number | null;
   outputTokens: number | null;
+  transportAttemptCount: number;
+  providerResponseCount: number;
+  retryCount: number;
 };
 
 export type SafeProviderFailureOperationPhase =
@@ -43,6 +46,8 @@ export type SafeProviderFailureContext = {
   providerResponseReceived?: boolean | null;
   httpStatus?: number | null;
   requestId?: string | null;
+  transportAttemptCount?: number | null;
+  providerResponseCount?: number | null;
 };
 
 const ALLOWED_ERROR_TYPES = new Set([
@@ -86,6 +91,9 @@ export class SafeProviderFailureError extends Error {
     inputTokens: number | null;
     cachedInputTokens: number | null;
     outputTokens: number | null;
+    transportAttemptCount: number;
+    providerResponseCount: number;
+    retryCount: number;
   };
 
   constructor(diagnostic: SafeProviderFailureDiagnostic) {
@@ -99,6 +107,9 @@ export class SafeProviderFailureError extends Error {
       inputTokens: diagnostic.inputTokens,
       cachedInputTokens: diagnostic.cachedInputTokens,
       outputTokens: diagnostic.outputTokens,
+      transportAttemptCount: diagnostic.transportAttemptCount,
+      providerResponseCount: diagnostic.providerResponseCount,
+      retryCount: diagnostic.retryCount,
     };
   }
 }
@@ -122,6 +133,9 @@ export function safeProviderPostResponseFailureError(
     inputTokens: null,
     cachedInputTokens: null,
     outputTokens: null,
+    transportAttemptCount: 1,
+    providerResponseCount: 1,
+    retryCount: 0,
   });
 }
 
@@ -202,7 +216,15 @@ function normalizeProviderFailure(error: unknown, response?: {
     inputTokens: usage.inputTokens,
     cachedInputTokens: usage.cachedInputTokens,
     outputTokens: usage.outputTokens,
+    transportAttemptCount: safeCount(context.transportAttemptCount),
+    providerResponseCount: safeCount(context.providerResponseCount),
+    retryCount: Math.max(0, safeCount(context.transportAttemptCount) - 1),
   };
+}
+
+export function safeProviderFailureAccounting(error: unknown): SafeProviderFailureError["accounting"] | null {
+  if (!(error instanceof SafeProviderFailureError)) return null;
+  return { ...error.accounting };
 }
 
 function classifyFailure(input: {
@@ -269,6 +291,10 @@ function safeUsageFromError(record: Record<string, unknown> | null): {
 
 function safeNonnegativeInteger(value: unknown): number | null {
   return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : null;
+}
+
+function safeCount(value: unknown): number {
+  return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 1000 ? Number(value) : 0;
 }
 
 function safeHttpStatus(value: unknown): number | null {

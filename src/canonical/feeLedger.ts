@@ -50,7 +50,7 @@ export function buildCanonicalFeeLedger(input: {
     const evidenceText = stringOrNull(row.evidenceLine) ?? label;
     const pageNumber = numberOrNull(row.pageNumber);
     const line = findSourceLine(documentIr, evidenceText, pageNumber, lineUseCounts);
-    const role = roleForFeeRow(row, amount);
+    const role = roleForFeeRow(row, amount, evidenceText);
     const evidence = attachParserInterpretation(
       makeEvidenceRecord({
         documentId: input.documentId,
@@ -442,12 +442,33 @@ function excludedDecision(
   };
 }
 
-function roleForFeeRow(row: Record<string, unknown>, amount: MoneyAmount): CanonicalFeeRowRole {
+function hasFinancialCreditContext(row: Record<string, unknown>, label: string, evidenceText: string): boolean {
+  const rowContext = [row.sourceFeeType, row.feeType, row.type, row.bucket, row.sourceSection]
+    .map((value) => String(value ?? ""))
+    .join(" ")
+    .toLowerCase();
+  const normalizedLabel = label.toLowerCase();
+  const creditWord = /\bcredit\b/.test(normalizedLabel);
+  const refundOrReversal = /\b(refund|reversal)\b/.test(normalizedLabel);
+  const explicitCreditSection = /\b(credits?|refunds?|reversals?)\b/.test(rowContext);
+  const productFeeContext = /\b(interchange|program fees?|assessment|network fee|card brand)\b/.test(rowContext);
+
+  if (productFeeContext && !explicitCreditSection) return false;
+  if (refundOrReversal) return true;
+  if (!creditWord) return false;
+
+  // Processor fee tables print charges as negative deductions and merchant
+  // credits as positive offsets. A product label such as "... CREDIT" is not
+  // financial direction by itself.
+  return explicitCreditSection || printedAmountSign(evidenceText) === 1;
+}
+
+function roleForFeeRow(row: Record<string, unknown>, amount: MoneyAmount, evidenceText = ""): CanonicalFeeRowRole {
   const label = labelForFeeRow(row);
   const context = `${label} ${String(row.sourceSection ?? "")}`.toLowerCase();
   if (amount.amountMinor === 0) return "zero_dollar_reference_row";
   if (/\b(total|subtotal)\b/.test(label.toLowerCase())) return "section_subtotal";
-  if (/\b(credit|refund|reversal)\b/.test(context)) return "credit";
+  if (hasFinancialCreditContext(row, label, evidenceText)) return "credit";
   if (/\b(adjustment|chargeback)\b/.test(context)) return "adjustment";
   if (/\b(interchange|program fees?)\b/.test(context)) return "interchange_detail_row";
   if (/\b(rate only|rate reference)\b/.test(context)) return "informational_rate_row";
@@ -460,7 +481,7 @@ function contributesToUniqueTotal(role: CanonicalFeeRowRole, signedAmount: Money
 }
 
 function signedAmountForRow(row: Record<string, unknown>, amount: MoneyAmount, evidenceText: string): MoneyAmount {
-  const role = roleForFeeRow(row, amount);
+  const role = roleForFeeRow(row, amount, evidenceText);
   if (role === "credit") return { ...amount, amountMinor: -Math.abs(amount.amountMinor) };
   if (role === "adjustment") {
     const sign = printedAmountSign(evidenceText);

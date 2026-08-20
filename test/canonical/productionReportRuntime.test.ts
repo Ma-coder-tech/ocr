@@ -7,16 +7,19 @@ import {
   WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION,
   type CanonicalWholeStatementFeeIntelligencePacket,
 } from "../../src/canonical/wholeStatementFeeIntelligenceReview.js";
+import type { RuntimeProgressEvent } from "../../src/runtimeProgress.js";
 
 describe("Package 3 production report runtime", () => {
   it("runs canonical analysis, safe merchant-language degradation, and report projection in the required order", async () => {
     const document = await parsePdf("test/fixtures/pdfs/fiserv_ABDUL_BASHER_Aug_2025.pdf");
+    const progress: RuntimeProgressEvent[] = [];
     const result = await buildProductionReportFromRuntime({
       document,
       businessType: "restaurant_food_beverage",
       runtimeDocumentRef: "job_package_3_runtime_integration",
       wholeStatementFeeIntelligence: { enabled: false },
       merchantLanguageInterpretation: { anthropicApiKey: "", openAiApiKey: "" },
+      progressReporter: (event) => { progress.push(event); },
     });
 
     expect(result.projection.experience).toBe("analysis_available_with_open_questions");
@@ -46,6 +49,18 @@ describe("Package 3 production report runtime", () => {
     });
     expect(JSON.stringify(result.merchantLanguageRuntime)).not.toMatch(/providerName|modelName|prompt|response|apiKey/i);
     expect(JSON.stringify(result.runtimeDiagnostics)).not.toMatch(/XPRESS FIX|\.pdf|\/Users\/|raw statement|prompt|response|apiKey/i);
+    expect(progress.map(({ stage, status }) => `${stage}:${status}`)).toEqual([
+      "canonical_construction:running",
+      "canonical_construction:completed",
+      "whole_statement_intelligence:degraded",
+      "merchant_attention:running",
+      "merchant_attention:completed",
+      "merchant_language:running",
+      "merchant_language:degraded",
+      "projection:running",
+      "projection:completed",
+    ]);
+    expect(JSON.stringify(progress)).not.toMatch(/XPRESS FIX|\.pdf|\/Users\/|raw statement|prompt|response|apiKey/i);
   });
 
   it("projects admitted whole-statement meaning into Merchant Attention without a live provider", async () => {

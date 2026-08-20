@@ -16,6 +16,8 @@
     "build:all": "npm run build && npm run build:web",
     "typecheck:web": "tsc -p web/tsconfig.json",
     "start": "NODE_ENV=production node dist/server.js",
+    "staging:start": "node scripts/staging-runtime-preflight.mjs",
+    "staging:daemon": "node scripts/staging-runtime-daemon.mjs",
     "test": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs ./node_modules/vitest/vitest.mjs run",
     "parser:audit": "tsx scripts/parser-audit.ts",
     "corpus:test": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs ./node_modules/vitest/vitest.mjs run test/canonical",

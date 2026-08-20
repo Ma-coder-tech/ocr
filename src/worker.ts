@@ -1,4 +1,5 @@
 import { setTimeout as delay } from "node:timers/promises";
+import { randomUUID } from "node:crypto";
 import { createOrReplaceComparison, getStatementsForMerchant, persistStatementFromSummary } from "./accountStore.js";
 import type { AnalysisSummary } from "./types.js";
 import type { ParsedDocument } from "./parser.js";
@@ -6,6 +7,7 @@ import { detectPreflightFailure } from "./preflight.js";
 import { buildProductionReportV2ForJob } from "./productionReportV2JobBridge.js";
 import {
   failJob,
+  appendJobCheckpoint,
   getJob,
   getNextQueuedJob,
   getNextQueuedJobDelayMs,
@@ -16,6 +18,12 @@ import {
   startJobAttempt,
   updateJob,
 } from "./store.js";
+import {
+  emitRuntimeProgress,
+  runtimeProgressFailureReason,
+  runtimeProgressFailureStatus,
+  type RuntimeProgressReporter,
+} from "./runtimeProgress.js";
 
 const queue = new Set<string>();
 let busy = false;
@@ -110,10 +118,20 @@ export async function processJob(jobId: string, options: { scheduleRetry?: boole
   const queuedJob = getJob(jobId);
   if (!queuedJob || queuedJob.status === "completed" || queuedJob.status === "failed") return;
   const stageDelayMs = Number(process.env.STAGE_DELAY_MS ?? 0);
+  const executionId = `runtime_${randomUUID().replaceAll("-", "")}`;
+  const attemptCount = queuedJob.attemptCount + 1;
+  const progressReporter: RuntimeProgressReporter = (event) => {
+    appendJobCheckpoint(jobId, { attemptCount, executionId, event });
+  };
 
   try {
     const job = startJobAttempt(jobId);
     const jobStartedAt = Date.now();
+    await emitRuntimeProgress(progressReporter, {
+      stage: "queued",
+      status: "completed",
+      elapsedMs: 0,
+    });
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
     const [{ parseCsv, parsePdf }, { analyzeStatementDocumentWithOptionalAi }, { evaluateChecklistReport }] =
@@ -124,7 +142,24 @@ export async function processJob(jobId: string, options: { scheduleRetry?: boole
       ]);
 
     const parserStartedAt = Date.now();
-    const parsed = job.fileType === "csv" ? await parseCsv(job.filePath) : await parsePdf(job.filePath, jobId);
+    await emitRuntimeProgress(progressReporter, { stage: "parser", status: "running" });
+    let parsed: ParsedDocument;
+    try {
+      parsed = job.fileType === "csv" ? await parseCsv(job.filePath) : await parsePdf(job.filePath, jobId);
+      await emitRuntimeProgress(progressReporter, {
+        stage: "parser",
+        status: "completed",
+        elapsedMs: Math.max(0, Date.now() - parserStartedAt),
+      });
+    } catch (error) {
+      await emitRuntimeProgress(progressReporter, {
+        stage: "parser",
+        status: runtimeProgressFailureStatus(error),
+        elapsedMs: Math.max(0, Date.now() - parserStartedAt),
+        reasonCodes: [runtimeProgressFailureReason(error, "parser")],
+      });
+      throw error;
+    }
     logSafeStageDuration(jobId, "pdf_parser", parserStartedAt);
     console.log(`[job:${jobId}] parsed`, {
       fileType: job.fileType,
@@ -140,6 +175,7 @@ export async function processJob(jobId: string, options: { scheduleRetry?: boole
         document: parsed,
         businessType: job.businessType,
         legacySummary: null,
+        progressReporter,
         error:
           "This PDF appears to be a scanned image. Please upload a text-based PDF exported directly from your processor's portal. Most processors provide downloadable PDF statements that are text-based.",
       });
@@ -153,6 +189,7 @@ export async function processJob(jobId: string, options: { scheduleRetry?: boole
         document: parsed,
         businessType: job.businessType,
         legacySummary: null,
+        progressReporter,
         error: preflightFailure,
       });
       return;
@@ -165,7 +202,24 @@ export async function processJob(jobId: string, options: { scheduleRetry?: boole
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
     const optionalLegacyStartedAt = Date.now();
-    let summary = await analyzeStatementDocumentWithOptionalAi(parsed, job.businessType, { sourceFileName: job.fileName });
+    await emitRuntimeProgress(progressReporter, { stage: "deterministic_analysis", status: "running" });
+    let summary: AnalysisSummary;
+    try {
+      summary = await analyzeStatementDocumentWithOptionalAi(parsed, job.businessType, { sourceFileName: job.fileName });
+      await emitRuntimeProgress(progressReporter, {
+        stage: "deterministic_analysis",
+        status: "completed",
+        elapsedMs: Math.max(0, Date.now() - optionalLegacyStartedAt),
+      });
+    } catch (error) {
+      await emitRuntimeProgress(progressReporter, {
+        stage: "deterministic_analysis",
+        status: runtimeProgressFailureStatus(error),
+        elapsedMs: Math.max(0, Date.now() - optionalLegacyStartedAt),
+        reasonCodes: [runtimeProgressFailureReason(error, "deterministic_analysis")],
+      });
+      throw error;
+    }
     logSafeStageDuration(jobId, "optional_legacy_processing", optionalLegacyStartedAt);
     console.log(`[job:${jobId}] deterministic-summary`, {
       businessType: job.businessType,
@@ -182,6 +236,7 @@ export async function processJob(jobId: string, options: { scheduleRetry?: boole
         document: parsed,
         businessType: job.businessType,
         legacySummary: summary,
+        progressReporter,
         error: "We could not find your total processing volume.",
       });
       return;
@@ -193,6 +248,7 @@ export async function processJob(jobId: string, options: { scheduleRetry?: boole
         document: parsed,
         businessType: job.businessType,
         legacySummary: summary,
+        progressReporter,
         error: "We could not find your total fees.",
       });
       return;
@@ -252,10 +308,28 @@ export async function processJob(jobId: string, options: { scheduleRetry?: boole
       document: parsed,
       legacySummary: summary,
       businessType: job.businessType,
+      progressReporter,
     });
     if (productionReportV2) {
       const persistenceStartedAt = Date.now();
-      updateJob(jobId, { productionReportV2 }, "Production report ready");
+      await emitRuntimeProgress(progressReporter, { stage: "persistence", status: "running" });
+      try {
+        updateJob(jobId, { productionReportV2 }, "Production report ready");
+      } catch (error) {
+        await emitRuntimeProgress(progressReporter, {
+          stage: "persistence",
+          status: runtimeProgressFailureStatus(error),
+          elapsedMs: Math.max(0, Date.now() - persistenceStartedAt),
+          reasonCodes: [runtimeProgressFailureReason(error, "projection_persistence")],
+        });
+        throw error;
+      }
+      await emitRuntimeProgress(progressReporter, {
+        stage: "persistence",
+        status: "completed",
+        elapsedMs: Math.max(0, Date.now() - persistenceStartedAt),
+        counters: { projectionCount: 1 },
+      });
       logSafeStageDuration(jobId, "production_projection_persistence", persistenceStartedAt);
     } else {
       await maybeRunCanonicalRuntimeShadow({
@@ -293,10 +367,27 @@ export async function processJob(jobId: string, options: { scheduleRetry?: boole
       },
       "Report ready",
     );
+    await emitRuntimeProgress(progressReporter, {
+      stage: "terminal",
+      status: "completed",
+      elapsedMs: Math.max(0, Date.now() - jobStartedAt),
+      counters: { projectionCount: productionReportV2 ? 1 : 0 },
+    });
     logSafeStageDuration(jobId, "total_job_completion", jobStartedAt);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown processing error";
     const retry = retryJobOrFail(jobId, message);
+    await emitRuntimeProgress(progressReporter, retry.retrying
+      ? {
+          stage: "queued",
+          status: "waiting",
+          reasonCodes: ["analysis_retry_scheduled"],
+        }
+      : {
+          stage: "terminal",
+          status: runtimeProgressFailureStatus(error),
+          reasonCodes: [runtimeProgressFailureReason(error, "analysis")],
+        });
     if (retry.retrying && options.scheduleRetry !== false) {
       scheduleTickAfter(retry.delayMs);
     }
@@ -326,17 +417,43 @@ async function failJobWithProductionReportRecovery(input: {
   businessType: AnalysisSummary["businessType"];
   legacySummary: AnalysisSummary | null;
   error: string;
+  progressReporter?: RuntimeProgressReporter;
 }): Promise<void> {
   const projection = await buildProductionReportV2ForJob({
     jobId: input.jobId,
     document: input.document,
     businessType: input.businessType,
     legacySummary: input.legacySummary,
+    progressReporter: input.progressReporter,
   });
   if (projection?.experience === "unable_to_complete") {
-    updateJob(input.jobId, { productionReportV2: projection }, "Safe recovery report ready");
+    const persistenceStartedAt = Date.now();
+    await emitRuntimeProgress(input.progressReporter, { stage: "persistence", status: "running" });
+    try {
+      updateJob(input.jobId, { productionReportV2: projection }, "Safe recovery report ready");
+    } catch (error) {
+      await emitRuntimeProgress(input.progressReporter, {
+        stage: "persistence",
+        status: runtimeProgressFailureStatus(error),
+        elapsedMs: Math.max(0, Date.now() - persistenceStartedAt),
+        reasonCodes: [runtimeProgressFailureReason(error, "recovery_projection_persistence")],
+      });
+      throw error;
+    }
+    await emitRuntimeProgress(input.progressReporter, {
+      stage: "persistence",
+      status: "completed",
+      elapsedMs: Math.max(0, Date.now() - persistenceStartedAt),
+      counters: { projectionCount: 1 },
+    });
   }
   failJob(input.jobId, input.error);
+  await emitRuntimeProgress(input.progressReporter, {
+    stage: "terminal",
+    status: "failed",
+    counters: { projectionCount: projection?.experience === "unable_to_complete" ? 1 : 0 },
+    reasonCodes: ["analysis_preflight_failed"],
+  });
 }
 
 async function runAiRefinement(summary: AnalysisSummary) {

@@ -37,6 +37,9 @@ describe("store", () => {
     expect(created?.uploadId).toBe("upload-1");
     expect(created?.statementSlot).toBe(2);
     expect(created?.attemptCount).toBe(0);
+    expect(store.listJobCheckpoints(job.id)).toMatchObject([
+      { sequence: 1, stage: "queued", status: "waiting", attemptCount: 0 },
+    ]);
 
     const updated = store.updateJob(job.id, {
       status: "verifying_statement",
@@ -106,5 +109,18 @@ describe("store", () => {
 
     store.updateJob(job.id, { productionReportV2: projection });
     expect(store.getJob(job.id)?.productionReportV2).toEqual(projection);
+  });
+
+  it("requeues interrupted work with a persisted restart checkpoint", () => {
+    const job = store.createJob({ fileName: "statement.pdf", filePath: "/tmp/statement.pdf", fileType: "pdf", businessType: "retail" });
+    store.startJobAttempt(job.id);
+    expect(store.requeueInterruptedJobs()).toBe(1);
+    expect(store.getJob(job.id)?.status).toBe("queued");
+    expect(store.listJobCheckpoints(job.id).at(-1)).toMatchObject({
+      stage: "queued",
+      status: "waiting",
+      attemptCount: 1,
+      reasonCodes: ["job_resumed_after_restart"],
+    });
   });
 });

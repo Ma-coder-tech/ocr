@@ -4,9 +4,12 @@ import {
   WHOLE_STATEMENT_FEE_INTELLIGENCE_REVIEW_POLICY_VERSION,
   buildWholeStatementFeeIntelligencePacket,
   failedWholeStatementFeeIntelligenceOutput,
+  wholeStatementTopLevelEvidenceLinkageDiagnostics,
   validateWholeStatementFeeIntelligenceReview,
+  validateWholeStatementFeeIntelligenceReviewForPacket,
   type ApprovedWholeStatementFeeIntelligenceSourceRegistry,
   type CanonicalWholeStatementFeeIntelligencePacket,
+  type WholeStatementTopLevelEvidenceLinkageDiagnostics,
 } from "./wholeStatementFeeIntelligenceReview.js";
 import { buildFeeKnowledgeSourcePacket } from "./feeKnowledgeRegistry.js";
 import {
@@ -20,8 +23,15 @@ import type {
   CanonicalStatementAnalysis,
 } from "./types.js";
 import type { FeeKnowledgeIntelligenceRecord } from "./feeKnowledgeTypes.js";
-import { safeProviderFailureError, type SafeProviderFailureOperationPhase } from "./providerFailureDiagnostics.js";
+import {
+  SafeProviderFailureError,
+  safeProviderFailureAccounting,
+  safeProviderFailureError,
+  safeProviderReasonCodes,
+  type SafeProviderFailureOperationPhase,
+} from "./providerFailureDiagnostics.js";
 import { serializeWholeStatementFeeIntelligenceProviderInput } from "./wholeStatementFeeIntelligenceProviderInput.js";
+import { emitRuntimeProgress, type RuntimeProgressReporter } from "../runtimeProgress.js";
 
 const require = createRequire(import.meta.url);
 
@@ -31,7 +41,12 @@ type ProviderUsage = {
   cachedInputTokens?: number;
   outputTokens?: number;
 };
-type ProviderResultMetadata = { usage?: ProviderUsage; response?: { id?: string } };
+type ProviderResultMetadata = {
+  usage?: ProviderUsage;
+  response?: { id?: string };
+  finishReason?: string;
+  rawFinishReason?: string;
+};
 type GenerateObject = (options: Record<string, unknown>) => Promise<{ object: unknown } & ProviderResultMetadata>;
 type GenerateText = (options: Record<string, unknown>) => Promise<{ output: unknown } & ProviderResultMetadata>;
 type AiModelFactory = (modelName: string) => unknown;
@@ -67,13 +82,32 @@ export type WholeStatementFeeIntelligenceRuntimeOptions = {
   openAiModelName?: string;
   maxOutputTokens?: number;
   maxInputTokens?: number;
+  maxRowsPerRequest?: number;
+  maxConcurrentRequests?: number;
   maxRetries?: number;
+  maxBatchCoverageRetries?: number;
   timeoutMs?: number;
   sdk?: AiSdk;
   adapter?: WholeStatementFeeIntelligenceRuntimeAdapter;
   sourceRegistry?: ApprovedWholeStatementFeeIntelligenceSourceRegistry;
   feeKnowledgeResearch?: FeeKnowledgeResearchOptions;
   onProviderUsage?: (usage: WholeStatementFeeIntelligenceProviderUsage) => void;
+  progressReporter?: RuntimeProgressReporter;
+};
+
+export type WholeStatementFeeIntelligenceBatchCoverageDiagnostics = WholeStatementTopLevelEvidenceLinkageDiagnostics & {
+  batchOrdinal: number;
+  expectedRowCount: number;
+  returnedRowCount: number;
+  uniqueReturnedRowCount: number;
+  missingRowCount: number;
+  duplicateRowCount: number;
+  unknownRowCount: number;
+  crossBatchRowCount: number;
+  malformedRowCount: number;
+  attemptCount: number;
+  structuredOutputCompleted: boolean;
+  exactCoverage: boolean;
 };
 
 export type WholeStatementFeeIntelligenceProviderUsage = {
@@ -85,6 +119,30 @@ export type WholeStatementFeeIntelligenceProviderUsage = {
   httpStatus?: number | null;
   httpSendInitiated?: boolean;
   providerResponseReceived?: boolean;
+  finishReason?: string | null;
+  rawFinishReason?: string | null;
+  structuredOutputReceived?: boolean;
+  generationCompleted?: boolean;
+  outputIncomplete?: boolean;
+  transportAttemptCount?: number;
+  providerResponseCount?: number;
+  retryCount?: number;
+  reasonCodes?: string[];
+};
+
+export type WholeStatementFeeIntelligenceProviderDiagnostics = {
+  requestBatchCount: number;
+  completedRequestBatchCount: number;
+  transportAttemptCount: number;
+  providerReplyCount: number;
+  structuredResultCount: number;
+  retryCount: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  incompleteOutputCount: number;
+  batchCoverage: WholeStatementFeeIntelligenceBatchCoverageDiagnostics[];
+  safeReasonCodes: string[];
 };
 
 export type WholeStatementFeeIntelligenceRuntimeResult = {
@@ -94,6 +152,7 @@ export type WholeStatementFeeIntelligenceRuntimeResult = {
     research: FeeKnowledgeResearchDiagnostics | null;
     providerReviewElapsedMs: number;
     totalElapsedMs: number;
+    provider: WholeStatementFeeIntelligenceProviderDiagnostics;
   };
 };
 
@@ -110,6 +169,8 @@ type ProviderTransportTrace = {
   providerResponseReceived: boolean;
   httpStatus: number | null;
   requestId: string | null;
+  transportAttemptCount: number;
+  providerResponseCount: number;
 };
 
 export function wholeStatementFeeIntelligenceProviderAdapter(
@@ -133,6 +194,12 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
   const options = input.options ?? {};
   const registry = options.sourceRegistry ?? { approvedExternalSourceRefs: [] };
   if (!runtimeEnabled(options)) {
+    await emitRuntimeProgress(options.progressReporter, {
+      stage: "whole_statement_intelligence",
+      status: "degraded",
+      provider: "none",
+      reasonCodes: ["whole_statement_fee_intelligence_disabled"],
+    });
     return {
       output: failedWholeStatementFeeIntelligenceOutput(
         input.analysis,
@@ -140,14 +207,22 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
         "whole_statement_fee_intelligence_disabled",
       ),
       feeKnowledgeIntelligence: [],
-      diagnostics: { research: null, providerReviewElapsedMs: 0, totalElapsedMs: elapsedSince(runtimeStartedAt) },
+      diagnostics: {
+        research: null,
+        providerReviewElapsedMs: 0,
+        totalElapsedMs: elapsedSince(runtimeStartedAt),
+        provider: emptyProviderDiagnostics(0),
+      },
     };
   }
   const research = await runFeeKnowledgeResearch({
     analysis: input.analysis,
     registry,
     questions: defaultFeeKnowledgeResearchQuestions(input.analysis, registry),
-    options: options.feeKnowledgeResearch,
+    options: {
+      ...options.feeKnowledgeResearch,
+      progressReporter: options.progressReporter,
+    },
   });
   const sourceProvenancePacket = buildFeeKnowledgeSourcePacket({
     analysis: input.analysis,
@@ -160,6 +235,16 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
   const packet = buildWholeStatementFeeIntelligencePacket(input.analysis, registry, sourceProvenancePacket);
 
   if (packet.admittedFeeRows.length === 0) {
+    await emitRuntimeProgress(options.progressReporter, {
+      stage: "whole_statement_intelligence",
+      status: "degraded",
+      provider: "none",
+      counters: {
+        expectedFeeRowCount: packet.admittedFeeRows.length,
+        reviewedFeeRowCount: 0,
+      },
+      reasonCodes: ["whole_statement_fee_intelligence_no_admitted_fee_rows"],
+    });
     return {
       output: failedWholeStatementFeeIntelligenceOutput(
         input.analysis,
@@ -167,18 +252,156 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
         "whole_statement_fee_intelligence_no_admitted_fee_rows",
       ),
       feeKnowledgeIntelligence: [],
-      diagnostics: { research: research.diagnostics, providerReviewElapsedMs: 0, totalElapsedMs: elapsedSince(runtimeStartedAt) },
+      diagnostics: {
+        research: research.diagnostics,
+        providerReviewElapsedMs: 0,
+        totalElapsedMs: elapsedSince(runtimeStartedAt),
+        provider: emptyProviderDiagnostics(0),
+      },
     };
   }
 
   const providerReviewStartedAt = Date.now();
+  const providerSelection = wholeStatementFeeIntelligenceRuntimeProviderSelection(options);
+  const rowsPerRequest = boundedPositiveInteger(
+    options.maxRowsPerRequest ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_MAX_ROWS_PER_REQUEST ?? 20),
+    100,
+    "Whole-statement row batch limit",
+  );
+  const requestPackets = chunkWholeStatementPacket(packet, rowsPerRequest);
+  const providerUsages: WholeStatementFeeIntelligenceProviderUsage[] = [];
+  const batchCoverage: WholeStatementFeeIntelligenceBatchCoverageDiagnostics[] = [];
+  let completedRequestBatchCount = 0;
+  await emitRuntimeProgress(options.progressReporter, {
+    stage: "whole_statement_intelligence",
+    status: "running",
+    provider: providerSelection.provider,
+    model: providerSelection.model,
+    counters: {
+      expectedFeeRowCount: packet.admittedFeeRows.length,
+      requestBatchCount: requestPackets.length,
+      completedRequestBatchCount: 0,
+    },
+  });
   try {
     const timeoutMs = options.timeoutMs ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_TIMEOUT_MS ?? 12000);
-    const raw = await withAbortTimeout(
-      (abortSignal) => (options.adapter ? options.adapter(packet, { abortSignal }) : executeProviderReview(packet, options, abortSignal)),
+    const concurrency = boundedPositiveInteger(
+      options.maxConcurrentRequests ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_MAX_CONCURRENT_REQUESTS ?? 1),
+      4,
+      "Whole-statement request concurrency",
+    );
+    const maxBatchCoverageRetries = boundedNonNegativeInteger(
+      options.maxBatchCoverageRetries
+        ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_MAX_BATCH_COVERAGE_RETRIES ?? 1),
+      2,
+      "Whole-statement batch coverage retry limit",
+    );
+    const globalExpectedRowRefs = new Set(packet.admittedFeeRows.map((row) => row.feeRowRef));
+    const rawBatches = await withAbortTimeout(
+      (abortSignal) => mapWithConcurrency(requestPackets, concurrency, async (requestPacket, batchIndex) => {
+        for (let attemptIndex = 0; attemptIndex <= maxBatchCoverageRetries; attemptIndex += 1) {
+          const attemptCount = attemptIndex + 1;
+          const raw = options.adapter
+            ? await options.adapter(requestPacket, { abortSignal })
+            : await executeProviderReview(requestPacket, {
+                ...options,
+                onProviderUsage: (usage) => {
+                  providerUsages.push(usage);
+                  options.onProviderUsage?.(usage);
+                },
+              }, abortSignal);
+          const coverage = batchCoverageDiagnosticsFor({
+            raw,
+            packet: requestPacket,
+            analysis: input.analysis,
+            globalExpectedRowRefs,
+            batchOrdinal: batchIndex + 1,
+            attemptCount,
+          });
+          batchCoverage.push(coverage);
+          const batchValidation = validateWholeStatementFeeIntelligenceReviewForPacket(
+            raw,
+            requestPacket,
+            input.analysis,
+            registry,
+            sourceProvenancePacket,
+          );
+          const batchSafetyBlocked = batchValidation.output.reviewStatus === "safety_blocked";
+          const batchValidationRejected = !batchValidation.ok && !batchSafetyBlocked;
+          const batchAdmissionExact = coverage.exactCoverage && batchValidation.ok;
+          const retrying = !batchAdmissionExact && attemptIndex < maxBatchCoverageRetries;
+          const progressReasonCodes = batchSafetyBlocked
+            ? ["whole_statement_fee_intelligence_batch_safety_blocked"]
+            : batchValidationRejected
+              ? [retrying
+                  ? "whole_statement_fee_intelligence_batch_validation_retrying"
+                  : "whole_statement_fee_intelligence_batch_validation_rejected"]
+              : coverage.exactCoverage
+                ? [
+                    "whole_statement_fee_intelligence_batch_coverage_exact",
+                    "whole_statement_fee_intelligence_aggregate_evidence_derived_from_rows",
+                  ]
+                : [retrying
+                    ? "whole_statement_fee_intelligence_batch_coverage_retrying"
+                    : "whole_statement_fee_intelligence_batch_coverage_rejected"];
+          if (batchAdmissionExact) completedRequestBatchCount += 1;
+          await emitRuntimeProgress(options.progressReporter, {
+            stage: "whole_statement_intelligence",
+            status: batchAdmissionExact || retrying ? "running" : "degraded",
+            provider: providerSelection.provider,
+            model: providerSelection.model,
+            counters: {
+              expectedFeeRowCount: packet.admittedFeeRows.length,
+              requestBatchCount: requestPackets.length,
+              completedRequestBatchCount,
+              ...batchCoverageProgressCounters(coverage),
+            },
+            reasonCodes: progressReasonCodes,
+          });
+          if (batchSafetyBlocked) throw new WholeStatementBatchSafetyError();
+          if (!coverage.exactCoverage) {
+            if (retrying) continue;
+            throw new WholeStatementBatchCoverageError();
+          }
+          if (!batchValidation.ok) {
+            if (retrying) continue;
+            throw new WholeStatementBatchValidationError();
+          }
+          return raw;
+        }
+        throw new WholeStatementBatchCoverageError();
+      }),
       timeoutMs,
     );
+    const raw = rawBatches.length === 1 ? rawBatches[0] : mergeWholeStatementProviderResponses(rawBatches);
     const validation = validateWholeStatementFeeIntelligenceReview(raw, input.analysis, registry, sourceProvenancePacket);
+    const providerDiagnostics = summarizeProviderDiagnostics(
+      requestPackets.length,
+      completedRequestBatchCount,
+      providerUsages,
+      batchCoverage,
+    );
+    await emitRuntimeProgress(options.progressReporter, {
+      stage: "whole_statement_intelligence",
+      status: validation.ok && ["completed", "partial"].includes(validation.output.reviewStatus)
+        ? "completed"
+        : "degraded",
+      elapsedMs: elapsedSince(providerReviewStartedAt),
+      provider: providerSelection.provider,
+      model: providerSelection.model,
+      counters: {
+        expectedFeeRowCount: validation.output.coverageProof.expectedFeeRowRefs.length,
+        reviewedFeeRowCount: validation.output.coverageProof.reviewedFeeRowRefs.length,
+        acceptedRecordCount: validation.output.acceptanceRecords.filter((record) =>
+          record.status === "accepted" || record.status === "accepted_with_conditions"
+        ).length,
+        needsVerificationCount: validation.output.acceptanceRecords.filter((record) => record.status === "needs_verification").length,
+        humanReviewCount: validation.output.acceptanceRecords.filter((record) => record.status === "human_review").length,
+        rejectedRecordCount: validation.output.acceptanceRecords.filter((record) => record.status === "rejected").length,
+        ...providerProgressCounters(providerDiagnostics),
+      },
+      reasonCodes: [...new Set([...validation.output.reasonCodes, ...providerDiagnostics.safeReasonCodes])],
+    });
     return {
       output: validation.output,
       feeKnowledgeIntelligence: validation.ok && ["completed", "partial"].includes(validation.output.reviewStatus)
@@ -188,22 +411,61 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
         research: research.diagnostics,
         providerReviewElapsedMs: elapsedSince(providerReviewStartedAt),
         totalElapsedMs: elapsedSince(runtimeStartedAt),
+        provider: providerDiagnostics,
       },
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     const timedOut = /timed out|timeout/i.test(message);
+    const batchCoverageRejected = error instanceof WholeStatementBatchCoverageError;
+    const batchValidationRejected = error instanceof WholeStatementBatchValidationError;
+    const batchSafetyBlocked = error instanceof WholeStatementBatchSafetyError;
+    const runtimeFailureReason = timedOut
+      ? "whole_statement_fee_intelligence_timed_out"
+      : batchSafetyBlocked
+        ? "whole_statement_fee_intelligence_batch_safety_blocked"
+        : batchValidationRejected
+          ? "whole_statement_fee_intelligence_batch_validation_rejected"
+        : batchCoverageRejected
+          ? "whole_statement_fee_intelligence_batch_coverage_rejected"
+          : "whole_statement_fee_intelligence_failed";
+    const providerDiagnostics = summarizeProviderDiagnostics(
+      requestPackets.length,
+      completedRequestBatchCount,
+      providerUsages,
+      batchCoverage,
+      error,
+    );
+    const failureReasonCodes = [...new Set([
+      runtimeFailureReason,
+      ...safeProviderReasonCodes(error, timedOut ? "provider_call_timed_out" : "provider_structured_output_failed"),
+      ...providerDiagnostics.safeReasonCodes,
+    ])];
+    await emitRuntimeProgress(options.progressReporter, {
+      stage: "whole_statement_intelligence",
+      status: timedOut ? "timed_out" : batchCoverageRejected || batchValidationRejected || batchSafetyBlocked ? "degraded" : "failed",
+      elapsedMs: elapsedSince(providerReviewStartedAt),
+      provider: providerSelection.provider,
+      model: providerSelection.model,
+      counters: {
+        expectedFeeRowCount: packet.admittedFeeRows.length,
+        reviewedFeeRowCount: 0,
+        ...providerProgressCounters(providerDiagnostics),
+      },
+      reasonCodes: failureReasonCodes,
+    });
     return {
       output: failedWholeStatementFeeIntelligenceOutput(
         input.analysis,
-        timedOut ? "timed_out" : "failed",
-        timedOut ? "whole_statement_fee_intelligence_timed_out" : "whole_statement_fee_intelligence_failed",
+        timedOut ? "timed_out" : batchSafetyBlocked ? "safety_blocked" : batchCoverageRejected || batchValidationRejected ? "rejected" : "failed",
+        runtimeFailureReason,
       ),
       feeKnowledgeIntelligence: [],
       diagnostics: {
         research: research.diagnostics,
         providerReviewElapsedMs: elapsedSince(providerReviewStartedAt),
         totalElapsedMs: elapsedSince(runtimeStartedAt),
+        provider: providerDiagnostics,
       },
     };
   }
@@ -211,6 +473,249 @@ export async function runWholeStatementFeeIntelligenceRuntimeWithContext(input: 
 
 function elapsedSince(startedAt: number): number {
   return Math.max(0, Date.now() - startedAt);
+}
+
+function chunkWholeStatementPacket(
+  packet: CanonicalWholeStatementFeeIntelligencePacket,
+  rowsPerRequest: number,
+): CanonicalWholeStatementFeeIntelligencePacket[] {
+  const packets: CanonicalWholeStatementFeeIntelligencePacket[] = [];
+  for (let index = 0; index < packet.admittedFeeRows.length; index += rowsPerRequest) {
+    packets.push({ ...packet, admittedFeeRows: packet.admittedFeeRows.slice(index, index + rowsPerRequest) });
+  }
+  return packets;
+}
+
+async function mapWithConcurrency<T, R>(
+  values: readonly T[],
+  concurrency: number,
+  worker: (value: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let nextIndex = 0;
+  const runners = Array.from({ length: Math.min(concurrency, values.length) }, async () => {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await worker(values[index]!, index);
+    }
+  });
+  await Promise.all(runners);
+  return results;
+}
+
+function mergeWholeStatementProviderResponses(values: readonly unknown[]): unknown {
+  const parsed = values.map((value) => {
+    const result = (reviewResponseSchema() as { safeParse: (input: unknown) => { success: boolean; data?: unknown } }).safeParse(value);
+    if (!result.success) throw new Error("whole_statement_fee_intelligence_batch_schema_rejected");
+    return result.data as Record<string, unknown>;
+  });
+  const first = parsed[0];
+  if (!first) throw new Error("whole_statement_fee_intelligence_batch_response_missing");
+  return {
+    ...first,
+    evidenceRefs: uniqueStrings(parsed.flatMap((value) => value.evidenceRefs)),
+    factRefs: uniqueStrings(parsed.flatMap((value) => value.factRefs)),
+    limitationCodes: uniqueStrings(parsed.flatMap((value) => value.limitationCodes)),
+    rowInterpretations: parsed.flatMap((value) => Array.isArray(value.rowInterpretations) ? value.rowInterpretations : []),
+    reasonCodes: uniqueStrings(parsed.flatMap((value) => value.reasonCodes)),
+  };
+}
+
+class WholeStatementBatchCoverageError extends Error {
+  constructor() {
+    super("whole_statement_fee_intelligence_batch_coverage_rejected");
+    this.name = "WholeStatementBatchCoverageError";
+  }
+}
+
+class WholeStatementBatchValidationError extends Error {
+  constructor() {
+    super("whole_statement_fee_intelligence_batch_validation_rejected");
+    this.name = "WholeStatementBatchValidationError";
+  }
+}
+
+class WholeStatementBatchSafetyError extends Error {
+  constructor() {
+    super("whole_statement_fee_intelligence_batch_safety_blocked");
+    this.name = "WholeStatementBatchSafetyError";
+  }
+}
+
+function batchCoverageDiagnosticsFor(input: {
+  raw: unknown;
+  packet: CanonicalWholeStatementFeeIntelligencePacket;
+  analysis: Pick<CanonicalStatementAnalysis, "evidence">;
+  globalExpectedRowRefs: ReadonlySet<string>;
+  batchOrdinal: number;
+  attemptCount: number;
+}): WholeStatementFeeIntelligenceBatchCoverageDiagnostics {
+  const expectedRowRefs = input.packet.admittedFeeRows.map((row) => row.feeRowRef);
+  const expectedRowRefSet = new Set(expectedRowRefs);
+  const source = isPlainRuntimeRecord(input.raw) ? input.raw : null;
+  const rowInterpretations = source && Array.isArray(source.rowInterpretations) ? source.rowInterpretations : null;
+  const returnedRowCount = rowInterpretations?.length ?? 0;
+  const returnedRowRefs = rowInterpretations
+    ? rowInterpretations
+      .map((row) => isPlainRuntimeRecord(row) ? row.feeRowRef : null)
+      .filter((ref): ref is string => typeof ref === "string")
+    : [];
+  const uniqueReturnedRowRefs = new Set(returnedRowRefs);
+  const duplicateRowCount = returnedRowRefs.length - uniqueReturnedRowRefs.size;
+  const malformedRowCount = returnedRowCount - returnedRowRefs.length;
+  const missingRowCount = expectedRowRefs.filter((ref) => !uniqueReturnedRowRefs.has(ref)).length;
+  const crossBatchRowCount = returnedRowRefs.filter((ref) =>
+    !expectedRowRefSet.has(ref) && input.globalExpectedRowRefs.has(ref)
+  ).length;
+  const unknownRowCount = returnedRowRefs.filter((ref) => !input.globalExpectedRowRefs.has(ref)).length;
+  const structuredOutputCompleted = rowInterpretations !== null
+    && rowInterpretations.every((row) => isPlainRuntimeRecord(row) && typeof row.feeRowRef === "string");
+  const exactCoverage = structuredOutputCompleted
+    && returnedRowCount === expectedRowRefs.length
+    && uniqueReturnedRowRefs.size === expectedRowRefs.length
+    && missingRowCount === 0
+    && duplicateRowCount === 0
+    && unknownRowCount === 0
+    && crossBatchRowCount === 0
+    && malformedRowCount === 0;
+  const evidenceLinkage = wholeStatementTopLevelEvidenceLinkageDiagnostics(input.raw, input.analysis, input.packet);
+  return {
+    ...evidenceLinkage,
+    batchOrdinal: input.batchOrdinal,
+    expectedRowCount: expectedRowRefs.length,
+    returnedRowCount,
+    uniqueReturnedRowCount: uniqueReturnedRowRefs.size,
+    missingRowCount,
+    duplicateRowCount,
+    unknownRowCount,
+    crossBatchRowCount,
+    malformedRowCount,
+    attemptCount: input.attemptCount,
+    structuredOutputCompleted,
+    exactCoverage,
+  };
+}
+
+function isPlainRuntimeRecord(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function batchCoverageProgressCounters(diagnostics: WholeStatementFeeIntelligenceBatchCoverageDiagnostics) {
+  return {
+    batchOrdinal: diagnostics.batchOrdinal,
+    batchExpectedRowCount: diagnostics.expectedRowCount,
+    batchReturnedRowCount: diagnostics.returnedRowCount,
+    batchUniqueReturnedRowCount: diagnostics.uniqueReturnedRowCount,
+    batchMissingRowCount: diagnostics.missingRowCount,
+    batchDuplicateRowCount: diagnostics.duplicateRowCount,
+    batchUnknownRowCount: diagnostics.unknownRowCount,
+    batchCrossBatchRowCount: diagnostics.crossBatchRowCount,
+    batchMalformedRowCount: diagnostics.malformedRowCount,
+    batchAttemptCount: diagnostics.attemptCount,
+    batchStructuredOutputCompletedCount: diagnostics.structuredOutputCompleted ? 1 : 0,
+    batchTopLevelEvidenceCount: diagnostics.topLevelEvidenceCount,
+    batchUniqueTopLevelEvidenceCount: diagnostics.uniqueTopLevelEvidenceCount,
+    batchValidTopLevelEvidenceCount: diagnostics.validTopLevelEvidenceCount,
+    batchRejectedTopLevelEvidenceCount: diagnostics.rejectedTopLevelEvidenceCount,
+    batchForeignTopLevelEvidenceCount: diagnostics.foreignTopLevelEvidenceCount,
+    batchDuplicateTopLevelEvidenceCount: diagnostics.duplicateTopLevelEvidenceCount,
+    batchMalformedTopLevelEvidenceCount: diagnostics.malformedTopLevelEvidenceCount,
+    batchRowAdmittedEvidenceCount: diagnostics.rowAdmittedEvidenceCount,
+    batchMissingTopLevelEvidenceCount: diagnostics.missingTopLevelEvidenceCount,
+    batchEvidenceLinkageExactCount: diagnostics.exactEvidenceLinkage ? 1 : 0,
+  };
+}
+
+function uniqueStrings(values: readonly unknown[]): string[] {
+  return [...new Set(values.filter((value): value is string => typeof value === "string"))].sort();
+}
+
+function summarizeProviderDiagnostics(
+  requestBatchCount: number,
+  completedRequestBatchCount: number,
+  usages: readonly WholeStatementFeeIntelligenceProviderUsage[],
+  batchCoverage: readonly WholeStatementFeeIntelligenceBatchCoverageDiagnostics[],
+  error?: unknown,
+): WholeStatementFeeIntelligenceProviderDiagnostics {
+  const accounting = safeProviderFailureAccounting(error);
+  const accountingAlreadyObserved = accounting !== null && usages.some((usage) =>
+    (accounting.requestId !== null && usage.requestId === accounting.requestId)
+    || (usage.outputIncomplete && safeProviderReasonCodes(error, "provider_structured_output_failed").includes("provider_output_exhausted"))
+  );
+  const unobservedAccounting = accountingAlreadyObserved ? null : accounting;
+  const safeReasonCodes = new Set(usages.flatMap((usage) => usage.reasonCodes ?? []));
+  safeProviderReasonCodes(error, "provider_completed").forEach((code) => safeReasonCodes.add(code));
+  if (error === undefined) safeReasonCodes.delete("provider_completed");
+  return {
+    requestBatchCount,
+    completedRequestBatchCount,
+    transportAttemptCount: sumNumbers(usages.map((usage) => usage.transportAttemptCount))
+      + (unobservedAccounting?.transportAttemptCount ?? 0),
+    providerReplyCount: sumNumbers(usages.map((usage) => usage.providerResponseCount))
+      + (unobservedAccounting?.providerResponseCount ?? 0),
+    structuredResultCount: usages.filter((usage) => usage.structuredOutputReceived).length,
+    retryCount: sumNumbers(usages.map((usage) => usage.retryCount)) + (unobservedAccounting?.retryCount ?? 0),
+    inputTokens: sumNumbers(usages.map((usage) => usage.inputTokens)) + (unobservedAccounting?.inputTokens ?? 0),
+    cachedInputTokens: sumNumbers(usages.map((usage) => usage.cachedInputTokens)) + (unobservedAccounting?.cachedInputTokens ?? 0),
+    outputTokens: sumNumbers(usages.map((usage) => usage.outputTokens)) + (unobservedAccounting?.outputTokens ?? 0),
+    incompleteOutputCount: usages.filter((usage) => usage.outputIncomplete).length
+      + (!accountingAlreadyObserved && error !== undefined && safeProviderReasonCodes(error, "provider_structured_output_failed").includes("provider_output_exhausted") ? 1 : 0),
+    batchCoverage: [...batchCoverage].sort((left, right) =>
+      left.batchOrdinal - right.batchOrdinal || left.attemptCount - right.attemptCount
+    ),
+    safeReasonCodes: [...safeReasonCodes].filter(Boolean).sort(),
+  };
+}
+
+function providerProgressCounters(diagnostics: WholeStatementFeeIntelligenceProviderDiagnostics) {
+  return {
+    requestBatchCount: diagnostics.requestBatchCount,
+    completedRequestBatchCount: diagnostics.completedRequestBatchCount,
+    transportAttemptCount: diagnostics.transportAttemptCount,
+    providerReplyCount: diagnostics.providerReplyCount,
+    structuredResultCount: diagnostics.structuredResultCount,
+    retryCount: diagnostics.retryCount,
+    inputTokenCount: diagnostics.inputTokens,
+    cachedInputTokenCount: diagnostics.cachedInputTokens,
+    outputTokenCount: diagnostics.outputTokens,
+    incompleteOutputCount: diagnostics.incompleteOutputCount,
+  };
+}
+
+function emptyProviderDiagnostics(requestBatchCount: number): WholeStatementFeeIntelligenceProviderDiagnostics {
+  return {
+    requestBatchCount,
+    completedRequestBatchCount: 0,
+    transportAttemptCount: 0,
+    providerReplyCount: 0,
+    structuredResultCount: 0,
+    retryCount: 0,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    incompleteOutputCount: 0,
+    batchCoverage: [],
+    safeReasonCodes: [],
+  };
+}
+
+function sumNumbers(values: readonly (number | null | undefined)[]): number {
+  return values.reduce<number>((sum, value) => sum + (Number.isInteger(value) && Number(value) >= 0 ? Number(value) : 0), 0);
+}
+
+function boundedPositiveInteger(value: unknown, maximum: number, label: string): number {
+  if (!Number.isInteger(value) || Number(value) <= 0 || Number(value) > maximum) throw new Error(`${label} must be a positive bounded integer.`);
+  return Number(value);
+}
+
+function boundedNonNegativeInteger(value: unknown, maximum: number, label: string): number {
+  if (!Number.isInteger(value) || Number(value) < 0 || Number(value) > maximum) {
+    throw new Error(`${label} must be a bounded non-negative integer.`);
+  }
+  return Number(value);
 }
 
 async function executeProviderReview(
@@ -264,8 +769,14 @@ async function executeProviderReview(
           maxOutputTokens: options.maxOutputTokens ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_MAX_OUTPUT_TOKENS ?? 5000),
           maxRetries: options.maxRetries,
         });
-        options.onProviderUsage?.(providerUsage(result, trace));
-        return result.output;
+        if (result.finishReason !== undefined && result.finishReason !== "stop") {
+          const usage = providerUsage(result, trace, false);
+          options.onProviderUsage?.(usage);
+          throw safeProviderFailureError(result, traceResponse(trace), providerFailureContext(operationPhase, trace));
+        }
+        const output = result.output;
+        options.onProviderUsage?.(providerUsage(result, trace, output !== undefined));
+        return output;
       }
       const model = modelFor(attempt.provider, attempt.modelName, options, sdk, trace);
       operationPhase = "request_initiation";
@@ -277,18 +788,13 @@ async function executeProviderReview(
         maxOutputTokens: options.maxOutputTokens ?? Number(process.env.RATEREVEAL_WHOLE_STATEMENT_FEE_INTELLIGENCE_MAX_OUTPUT_TOKENS ?? 5000),
         maxRetries: options.maxRetries,
       });
-      options.onProviderUsage?.(providerUsage(result, trace));
-      return result.object;
+      const output = result.object;
+      options.onProviderUsage?.(providerUsage(result, trace, output !== undefined));
+      return output;
     } catch (error) {
-      lastError = safeProviderFailureError(error, traceResponse(trace), {
-        operationPhase: operationPhaseForFailure(operationPhase, trace),
-        transport: trace.transport,
-        localTraceId: trace.localTraceId,
-        httpSendInitiated: trace.httpSendInitiated,
-        providerResponseReceived: trace.providerResponseReceived,
-        httpStatus: trace.httpStatus,
-        requestId: trace.requestId,
-      });
+      lastError = error instanceof SafeProviderFailureError
+        ? error
+        : safeProviderFailureError(error, traceResponse(trace), providerFailureContext(operationPhase, trace));
     }
   }
   throw lastError ?? new Error("Whole-statement fee intelligence provider failed.");
@@ -300,7 +806,14 @@ function assertPromptWithinInputLimit(prompt: string, maximumInputTokens: number
   if (Buffer.byteLength(prompt, "utf8") > maximumInputTokens) throw new Error("Whole-statement prompt exceeds approved maximum input tokens.");
 }
 
-function providerUsage(result: ProviderResultMetadata, trace?: ProviderTransportTrace): WholeStatementFeeIntelligenceProviderUsage {
+function providerUsage(
+  result: ProviderResultMetadata,
+  trace?: ProviderTransportTrace,
+  structuredOutputReceived = false,
+): WholeStatementFeeIntelligenceProviderUsage {
+  const finishReason = safeCode(result.finishReason);
+  const rawFinishReason = safeCode(result.rawFinishReason);
+  const outputIncomplete = finishReason !== null && finishReason !== "stop";
   return {
     requestId: safeString(result.response?.id) ?? trace?.requestId ?? null,
     inputTokens: safeInteger(result.usage?.inputTokens),
@@ -310,6 +823,20 @@ function providerUsage(result: ProviderResultMetadata, trace?: ProviderTransport
     httpStatus: trace?.httpStatus ?? null,
     httpSendInitiated: trace?.httpSendInitiated ?? false,
     providerResponseReceived: trace?.providerResponseReceived ?? false,
+    finishReason,
+    rawFinishReason,
+    structuredOutputReceived,
+    generationCompleted: finishReason === null || finishReason === "stop",
+    outputIncomplete,
+    transportAttemptCount: trace?.transportAttemptCount ?? 0,
+    providerResponseCount: trace?.providerResponseCount ?? 0,
+    retryCount: Math.max(0, (trace?.transportAttemptCount ?? 0) - 1),
+    reasonCodes: [
+      ...(finishReason ? [`provider_finish_reason_${finishReason}`] : []),
+      ...(rawFinishReason ? [`provider_raw_finish_reason_${rawFinishReason}`] : []),
+      structuredOutputReceived ? "provider_structured_output_received" : "provider_structured_output_not_received",
+      outputIncomplete ? "provider_output_exhausted" : "provider_generation_completed",
+    ],
   };
 }
 
@@ -319,6 +846,12 @@ function safeInteger(value: unknown): number | null {
 
 function safeString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function safeCode(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.toLowerCase().replace(/[^a-z0-9_:-]+/g, "_").replace(/^_+|_+$/g, "");
+  return /^[a-z0-9][a-z0-9_:-]{0,80}$/.test(normalized) ? normalized : null;
 }
 
 function buildPrompt(packet: CanonicalWholeStatementFeeIntelligencePacket): string {
@@ -505,21 +1038,42 @@ function createProviderTransportTrace(
     providerResponseReceived: false,
     httpStatus: null,
     requestId: null,
+    transportAttemptCount: 0,
+    providerResponseCount: 0,
   };
 }
 
 function tracedProviderFetch(trace: ProviderTransportTrace): AiProviderFetch {
   return async (input, init) => {
     trace.httpSendInitiated = true;
+    trace.transportAttemptCount += 1;
     try {
       const response = await globalThis.fetch(input, init);
       trace.providerResponseReceived = true;
+      trace.providerResponseCount += 1;
       trace.httpStatus = response.status;
       trace.requestId = safeString(response.headers.get("x-request-id")) ?? trace.requestId;
       return response;
     } catch (error) {
       throw error;
     }
+  };
+}
+
+function providerFailureContext(
+  operationPhase: SafeProviderFailureOperationPhase,
+  trace: ProviderTransportTrace,
+) {
+  return {
+    operationPhase: operationPhaseForFailure(operationPhase, trace),
+    transport: trace.transport,
+    localTraceId: trace.localTraceId,
+    httpSendInitiated: trace.httpSendInitiated,
+    providerResponseReceived: trace.providerResponseReceived,
+    httpStatus: trace.httpStatus,
+    requestId: trace.requestId,
+    transportAttemptCount: trace.transportAttemptCount,
+    providerResponseCount: trace.providerResponseCount,
   };
 }
 

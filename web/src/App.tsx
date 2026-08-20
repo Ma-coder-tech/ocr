@@ -154,6 +154,7 @@ const statusCopy: Record<JobStatus, string> = {
 };
 
 export function App() {
+  const [persistedJobId, setPersistedJobId] = useState<string | null>(() => persistedJobIdFromLocation());
   const analysisRef = useRef<HTMLElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pollTimerRef = useRef<number | null>(null);
@@ -161,9 +162,10 @@ export function App() {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [job, setJob] = useState<JobResponse | null>(null);
-  const [jobStatus, setJobStatus] = useState<JobStatus>("idle");
-  const [jobProgress, setJobProgress] = useState(0);
+  const [jobStatus, setJobStatus] = useState<JobStatus>(persistedJobId ? "queued" : "idle");
+  const [jobProgress, setJobProgress] = useState(persistedJobId ? 14 : 0);
   const [error, setError] = useState<string | null>(null);
+  const [rehydratingPersistedJob, setRehydratingPersistedJob] = useState(Boolean(persistedJobId));
 
   const selectedBusiness = useMemo(
     () => businessOptions.find((option) => option.id === selectedBusinessId) ?? null,
@@ -176,14 +178,51 @@ export function App() {
   const showV1Result = Boolean(job?.reportV1 && guardSingleStatementReportV1(job.reportV1).ok && (jobStatus === "completed" || jobStatus === "failed"));
   const v2Enabled = reportV2FeatureEnabled();
   const showV2Result = Boolean(v2Enabled && job && guardProductionReportV2(job.productionReportV2).ok && (jobStatus === "completed" || jobStatus === "failed"));
+  const hasPersistedReportExperience = showV2Result || showV1Result || showResults;
   const showDevV1Gallery = import.meta.env.DEV && window.location.hash === "#report-v1-gallery";
   const showDevV2Gallery = import.meta.env.DEV && new URLSearchParams(window.location.search).has("report-v2-gallery");
 
   useEffect(() => {
+    let active = true;
+
+    async function retrievePersistedJob() {
+      if (!persistedJobId) return;
+      try {
+        const response = await fetch(`/api/jobs/${encodeURIComponent(persistedJobId)}`);
+        const payload = await readRateRevealApiJson<JobResponse | { error?: string }>(response);
+        if (!response.ok || !("status" in payload)) {
+          throw new Error("persisted_report_unavailable");
+        }
+        if (!active) return;
+
+        setJob(payload);
+        setJobStatus(payload.status);
+        setJobProgress(Math.max(payload.progress, payload.status === "completed" ? 100 : 14));
+        setSelectedBusinessId(
+          businessOptions.find((option) => option.apiBusinessType === payload.businessType)?.id ?? null,
+        );
+        setRehydratingPersistedJob(false);
+
+        if (payload.status !== "completed" && payload.status !== "failed") {
+          pollTimerRef.current = window.setTimeout(retrievePersistedJob, 1200);
+        }
+      } catch {
+        if (!active) return;
+        setJob(null);
+        setJobStatus("failed");
+        setJobProgress(100);
+        setRehydratingPersistedJob(false);
+        setError("We couldn't open this saved report. It may be unavailable, expired, or require the account that created it.");
+      }
+    }
+
+    if (persistedJobId) void retrievePersistedJob();
+
     return () => {
+      active = false;
       if (pollTimerRef.current) window.clearTimeout(pollTimerRef.current);
     };
-  }, []);
+  }, [persistedJobId]);
 
   function scrollToAnalyzer() {
     analysisRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -206,6 +245,9 @@ export function App() {
     setJobProgress(0);
     setError(null);
     setIsDragging(false);
+    setRehydratingPersistedJob(false);
+    setPersistedJobId(null);
+    clearPersistedJobIdFromLocation();
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -295,6 +337,17 @@ export function App() {
 
   if (showDevV2Gallery && DevelopmentReportV2Gallery) {
     return <Suspense fallback={<main className="page-shell">Loading synthetic report gallery…</main>}><DevelopmentReportV2Gallery /></Suspense>;
+  }
+
+  if (persistedJobId && !hasPersistedReportExperience) {
+    const waiting = rehydratingPersistedJob || (jobStatus !== "completed" && jobStatus !== "failed");
+    return (
+      <PersistedReportState
+        waiting={waiting}
+        message={error}
+        onStartOver={resetAnalysis}
+      />
+    );
   }
 
   return (
@@ -472,6 +525,61 @@ export function App() {
       )}
     </main>
   );
+}
+
+function PersistedReportState(props: { waiting: boolean; message: string | null; onStartOver: () => void }) {
+  return (
+    <main className="page-shell">
+      <nav className="topbar" aria-label="Primary">
+        <a className="brand" href="/" aria-label="RateReveal home">
+          <span className="brand-mark">R</span>
+          <span>RateReveal</span>
+        </a>
+      </nav>
+      <section className="analysis-section" aria-live="polite">
+        <div className={`processing-card${props.waiting ? "" : " failed"}`}>
+          {props.waiting ? (
+            <>
+              <div className="processing-topline">
+                <span>Saved statement review</span>
+                <strong>Opening your report</strong>
+              </div>
+              <div className="progress-track" aria-label="Opening saved report">
+                <span style={{ width: "72%" }} />
+              </div>
+              <p>Retrieving the completed report securely. No new analysis is being run.</p>
+            </>
+          ) : (
+            <>
+              <div className="processing-topline">
+                <span>Saved statement review</span>
+                <strong>Report unavailable</strong>
+              </div>
+              <div className="failure-box">
+                <X size={22} aria-hidden="true" />
+                <p>{props.message ?? "This completed job does not contain a supported merchant report."}</p>
+              </div>
+              <button className="secondary-button retry" type="button" onClick={props.onStartOver}>
+                Start a new review
+              </button>
+            </>
+          )}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function persistedJobIdFromLocation(): string | null {
+  const value = new URLSearchParams(window.location.search).get("job")?.trim() ?? "";
+  return value || null;
+}
+
+function clearPersistedJobIdFromLocation(): void {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("job")) return;
+  url.searchParams.delete("job");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 function ProcessingPanel(props: {
