@@ -371,10 +371,10 @@ function labelFromRecord(row: Record<string, string | number>, entries: FieldHit
 
 function detectCardBrand(input: string): CardBrand {
   const lower = normalize(input);
-  if (/\bamex\b|american express|optblue/.test(lower)) return "AmEx";
-  if (/\bmastercard\b|\bmaster card\b|\bmc\b|mstrcard|mastrcard/.test(lower)) return "Mastercard";
-  if (/\bdiscover\b|\bdisc\b/.test(lower)) return "Discover";
-  if (/\bvisa\b/.test(lower)) return "Visa";
+  if (/\bamex\b|american express|optblue|\baxp(?:\b|-)/.test(lower)) return "AmEx";
+  if (/\bmastercard\b|\bmaster card\b|\bmc\b|\bmc-|mstrcard|mastrcard/.test(lower)) return "Mastercard";
+  if (/\bdiscover\b|\bdisc\b|\bdscvr(?:\b|-)/.test(lower)) return "Discover";
+  if (/\bvisa\b|\bvi(?:\b|-)/.test(lower)) return "Visa";
   return "Unknown";
 }
 
@@ -1670,6 +1670,109 @@ function recordFromCells(cells: string[], headers: string[], baseRow: Record<str
   return mapped;
 }
 
+function rowPageNumber(row: Record<string, string | number>): number | null {
+  const match = String(row.page ?? "").match(/page-(\d+)/i);
+  return match ? Number(match[1]) : null;
+}
+
+function percentFromCell(cell: string): number | null {
+  const match = cell.match(/(?:^|\s)(\d+(?:\.\d+)?)%(?:\s|$)/);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Fiserv/BASYS prints its interchange cost table with two percentage-share
+ * columns surrounding the transaction count. PDF extraction sometimes joins
+ * either percentage to its neighboring cell, so header-position mapping is
+ * not reliable. Parse the stable row grammar from left to right and validate
+ * the rate/per-item/subtotal relationship before admitting the row.
+ */
+function fiservWideInterchangeRowFromLine(
+  row: Record<string, string | number>,
+  line: string,
+  rowIndex: number,
+  section: SectionContext,
+): InterchangeAuditRow | null {
+  if (section.type !== "interchange_detail") return null;
+
+  const cells = splitCells(line);
+  if (cells.length < 6 || cells.length > 7) return null;
+
+  const label = collapseWhitespace(cells[0] ?? "");
+  if (!label || /\b(total|subtotal)\b/i.test(label)) return null;
+  const cardBrand = detectCardBrand(label);
+  if (cardBrand === "Unknown") return null;
+
+  const volumeCell = cells[1] ?? "";
+  const volumeMatch = volumeCell.match(/^\$?([\d,]+\.\d{2})(?:\s+(\d+(?:\.\d+)?)%)?$/);
+  if (!volumeMatch) return null;
+  const volume = parseAmount(volumeMatch[1]);
+  if (volume === null) return null;
+
+  let cursor = 2;
+  let salesSharePercent = volumeMatch[2] ? Number(volumeMatch[2]) : null;
+  if (salesSharePercent === null && /^\d+(?:\.\d+)?%$/.test(cells[cursor] ?? "")) {
+    salesSharePercent = percentFromCell(cells[cursor] ?? "");
+    cursor += 1;
+  }
+
+  const transactionCell = cells[cursor] ?? "";
+  if (!/^\d[\d,]*$/.test(transactionCell)) return null;
+  const transactionCount = parseAmount(transactionCell);
+  cursor += 1;
+
+  const shareAndRateCell = cells[cursor] ?? "";
+  const shareAndRateMatch = shareAndRateCell.match(/^(\d+(?:\.\d+)?)%\s+(0\.\d{4})$/);
+  if (!shareAndRateMatch) return null;
+  const transactionSharePercent = Number(shareAndRateMatch[1]);
+  const rate = parseRate(shareAndRateMatch[2], "rate");
+  cursor += 1;
+
+  const perItemCell = cells[cursor] ?? "";
+  const perItemMatch = perItemCell.match(/^\$?(0\.\d{3})$/);
+  if (!perItemMatch) return null;
+  const perItemFee = parseAmount(perItemMatch[1]);
+  cursor += 1;
+
+  const totalPaidCell = cells[cursor] ?? "";
+  if (cursor !== cells.length - 1 || !/^-\$[\d,]+\.\d{2}$/.test(totalPaidCell)) return null;
+  const totalPaid = parseAmount(totalPaidCell);
+  if (transactionCount === null || rate === null || perItemFee === null || totalPaid === null) return null;
+
+  const expectedTotalPaid = expectedPaid(volume, rate.percent, transactionCount, perItemFee);
+  const variance = expectedTotalPaid === null ? null : round2(totalPaid - expectedTotalPaid);
+  // The displayed fractional rate has four decimal places and the per-item
+  // component has three. Their unprinted half-unit precision can legitimately
+  // move a row subtotal by more than one cent on larger volumes/counts.
+  const sourceRoundingTolerance = round2(volume * 0.00005 + transactionCount * 0.0005 + 0.01);
+  if (variance === null || Math.abs(variance) > sourceRoundingTolerance) return null;
+
+  return {
+    label,
+    cardBrand,
+    cardType: detectCardType(label),
+    entryMode: detectEntryMode(label),
+    salesSharePercent,
+    transactionSharePercent,
+    transactionCount: Math.round(transactionCount),
+    volume: round2(volume),
+    ratePercent: rate.percent,
+    rateBps: rate.bps,
+    perItemFee: round4(perItemFee),
+    totalPaid: round2(totalPaid),
+    expectedTotalPaid,
+    variance,
+    sourceSection: `Interchange Cost — ${cardBrand}`,
+    evidenceLine: line,
+    pageNumber: rowPageNumber(row),
+    rowIndex,
+    confidence: Math.abs(variance) <= 0.01 ? 0.98 : 0.94,
+    downgradeIndicators: downgradeIndicators(label),
+  };
+}
+
 function fallbackInterchangeRowFromLine(line: string, rowIndex: number, section: SectionContext): InterchangeAuditRow | null {
   if (section.type !== "interchange_detail") return null;
   if (/^\s*(total|subtotal|grand total)\b/i.test(line)) return null;
@@ -2050,6 +2153,12 @@ export function extractStructuredStatementFacts(
       if (processorCandidate) {
         processorMarkupRows.push(processorMarkupRowFromCandidate(processorCandidate));
       }
+    }
+
+    const fiservWideRow = fiservWideInterchangeRowFromLine(row, evidence, rowIndex, currentSection);
+    if (fiservWideRow) {
+      interchangeRows.push(fiservWideRow);
+      return;
     }
 
     const columnRow = buildInterchangeRow(mappedRow, rowIndex, currentSection, evidence);

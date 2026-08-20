@@ -537,6 +537,54 @@ describe("canonical fee ledger", () => {
     });
   });
 
+  it("does not treat credit product vocabulary as financial credit without source-direction context", () => {
+    const lines = [
+      "VI-CPS/RESTAURANT CREDIT | Interchange charges | -$33.72",
+      "VISA CREDIT ASSESSMENT | Card brand assessment | -$4.25",
+      "CREDIT TRANSACTION PRODUCT | Program fees | -$8.00",
+      "Merchant Credit | $5.00",
+      "Total Fees | -$40.97",
+    ];
+    const ledger = ledgerFromRows({
+      documentId: "doc_credit_product_vocabulary",
+      lines,
+      rows: [
+        feeRow({
+          description: "VI-CPS/RESTAURANT CREDIT",
+          amount: 33.72,
+          evidenceLine: lines[0]!,
+          sourceFeeType: "Interchange charges",
+        }),
+        feeRow({
+          description: "VISA CREDIT ASSESSMENT",
+          amount: 4.25,
+          evidenceLine: lines[1]!,
+          sourceFeeType: "Card brand assessment",
+        }),
+        feeRow({
+          description: "CREDIT TRANSACTION PRODUCT",
+          amount: 8,
+          evidenceLine: lines[2]!,
+          sourceFeeType: "Program fees",
+        }),
+        feeRow({ description: "Merchant Credit", amount: 5, evidenceLine: lines[3]! }),
+      ],
+      printedTotal: 40.97,
+    });
+
+    expect(ledger.rows.map((row) => [row.selectedLabel, row.role, row.signedAmount?.amountMinor])).toEqual([
+      ["VI-CPS/RESTAURANT CREDIT", "individual_charge", 3372],
+      ["VISA CREDIT ASSESSMENT", "individual_charge", 425],
+      ["CREDIT TRANSACTION PRODUCT", "individual_charge", 800],
+      ["Merchant Credit", "credit", -500],
+    ]);
+    expect(ledger.uniqueChargeTotal).toEqual({ amountMinor: 4097, currency: "USD" });
+
+    const ownership = buildCanonicalFeeOwnershipActionability(ledger);
+    expect(ownership.rowClassifications.slice(0, 3).every((item) => item.selected.category !== "credit")).toBe(true);
+    expect(ownership.rowClassifications[3]?.selected.category).toBe("credit");
+  });
+
   it("preserves an explicit negative credit sign and keeps conflicting control basis partial", () => {
     const lines = ["Service Fee | -$10.00", "Credit Reversal | -$2.00", "Total Fees | -$12.00"];
     const ledger = ledgerFromRows({
@@ -769,12 +817,22 @@ function feeInterpretation(id: string, sourceOccurrenceId: string, label: string
   };
 }
 
-function feeRow(input: { network?: string; description: string; amount: number; evidenceLine: string; sourceSection?: string; type?: string; bucket?: string }) {
+function feeRow(input: {
+  network?: string;
+  description: string;
+  amount: number;
+  evidenceLine: string;
+  sourceSection?: string;
+  sourceFeeType?: string;
+  type?: string;
+  bucket?: string;
+}) {
   return {
     network: input.network,
     description: input.description,
     amount: input.amount,
     sourceSection: input.sourceSection ?? "FEES",
+    sourceFeeType: input.sourceFeeType,
     evidenceLine: input.evidenceLine,
     pageNumber: 1,
     confidence: "high",
