@@ -29,6 +29,7 @@ export * from "./economicGoldObservation.js";
 export * from "./fiservEconomicAdapter.js";
 export * from "./synthesisTypes.js";
 export * from "./synthesisVersionManifest.js";
+export * from "./knowledge/index.js";
 export * from "./synthesisAnalysis.js";
 export * from "./synthesisSemantics.js";
 export * from "./synthesisValidate.js";
