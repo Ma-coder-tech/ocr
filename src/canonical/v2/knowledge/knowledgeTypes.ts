@@ -239,7 +239,7 @@ export type KnowledgeCandidatePacket = {
     exactValue: string | null;
   };
   provenance: {
-    adapter: "supplied" | "reference_rate_catalog" | "legacy_fiserv_fee_reference";
+    adapter: "supplied" | "reference_rate_catalog" | "legacy_fiserv_fee_reference" | "bounded_intelligence_runtime";
     sourceRecordRef: string;
     sourceVersion: string | null;
     sourceAuthorityClaim: KnowledgeSourceAuthority;

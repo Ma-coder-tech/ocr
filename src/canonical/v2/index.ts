@@ -37,3 +37,4 @@ export * from "./synthesisCompareLegacy.js";
 export * from "./synthesisDiagnostics.js";
 export * from "./synthesisGoldObservation.js";
 export * from "./fiservSynthesisAdapter.js";
+export * from "./intelligence/index.js";

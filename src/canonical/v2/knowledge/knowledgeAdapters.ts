@@ -9,7 +9,7 @@ import {
   type KnowledgeScope,
   type KnowledgeSourceAuthority,
 } from "./knowledgeTypes.js";
-import { hasExactKeys, isRecord, isSafeStructuredString, isValidIsoDay, validateScopeShape, validClosedOpenInterval } from "./knowledgeSafety.js";
+import { containsPrivateLocatorOrPayload, hasExactKeys, isRecord, isSafeStructuredString, isValidIsoDay, validateScopeShape, validClosedOpenInterval } from "./knowledgeSafety.js";
 import { validateKnowledgeClaimValue } from "./knowledgeValidate.js";
 
 const PACKET_KEYS = [
@@ -106,6 +106,7 @@ export function validateKnowledgeCandidatePacket(packet: KnowledgeCandidatePacke
   const issues: string[] = [];
   if (!isRecord(raw) || !hasExactKeys(raw, PACKET_KEYS)) return ["invalid_candidate_packet_shape"];
   if (!isSafeStructuredString(raw.candidateId) || !isSafeStructuredString(raw.proposedSubjectCode)) issues.push("invalid_candidate_identity");
+  if (raw.lifecycle !== "candidate" || raw.requiresHumanAdmission !== true || raw.privacy !== "private_by_default") issues.push("invalid_candidate_authority_state");
   if (!SOURCE_AUTHORITIES.has(String(raw.sourceAuthority))) issues.push("invalid_candidate_source_authority");
   if (raw.claimedConfidence !== null && !["high", "medium", "low", "unresolved"].includes(String(raw.claimedConfidence))) issues.push("invalid_candidate_confidence");
   issues.push(...validateKnowledgeClaimValue(raw.proposedClaimType, raw.proposedValue).map((item) => item.code));
@@ -120,18 +121,42 @@ export function validateKnowledgeCandidatePacket(packet: KnowledgeCandidatePacke
     || !isRecord(raw.basis) || !hasExactKeys(raw.basis, ["code", "unit", "denominator", "currency", "exactValue"])
     || Object.values(raw.basis).some((item) => item !== null && typeof item !== "string")
     || !isRecord(raw.provenance) || !hasExactKeys(raw.provenance, ["adapter", "sourceRecordRef", "sourceVersion", "sourceAuthorityClaim", "sourceFieldRefs"])
-    || !["supplied", "reference_rate_catalog", "legacy_fiserv_fee_reference"].includes(String(raw.provenance?.adapter))
+    || !["supplied", "reference_rate_catalog", "legacy_fiserv_fee_reference", "bounded_intelligence_runtime"].includes(String(raw.provenance?.adapter))
     || !isSafeStructuredString(raw.provenance?.sourceRecordRef) || !SOURCE_AUTHORITIES.has(String(raw.provenance?.sourceAuthorityClaim))
-    || !Array.isArray(raw.provenance?.sourceFieldRefs)) issues.push("invalid_candidate_metadata");
+    || !Array.isArray(raw.provenance?.sourceFieldRefs) || raw.provenance.sourceFieldRefs.some((item) => !isSafeStructuredString(item))) issues.push("invalid_candidate_metadata");
+  if (raw.tenantRef !== null && !isSafeStructuredString(raw.tenantRef)) issues.push("invalid_candidate_tenant_ref");
+  if (raw.accountRef !== null && !isSafeStructuredString(raw.accountRef)) issues.push("invalid_candidate_account_ref");
   if (!["reusable", "tenant_private", "account_private"].includes(String(raw.proposedVisibility))) issues.push("invalid_candidate_visibility");
   else if (raw.proposedVisibility === "reusable" && (raw.tenantRef !== null || raw.accountRef !== null)) issues.push("candidate_reusable_boundary_contamination");
   else if (raw.proposedVisibility === "reusable" && Array.isArray(raw.evidence) && raw.evidence.some((item) => isRecord(item) && item.private === true)) issues.push("candidate_reusable_private_evidence");
   else if (raw.proposedVisibility === "tenant_private" && (raw.tenantRef === null || raw.accountRef !== null)) issues.push("invalid_candidate_tenant_boundary");
   else if (raw.proposedVisibility === "account_private" && (raw.tenantRef === null || raw.accountRef === null)) issues.push("invalid_candidate_account_boundary");
+  if (isRecord(raw.provenance) && raw.provenance.adapter === "bounded_intelligence_runtime") {
+    if (raw.proposedVisibility !== "account_private" || raw.tenantRef === null || raw.accountRef === null) {
+      issues.push("bounded_intelligence_candidate_requires_account_private_boundary");
+    }
+    const strings = [
+      raw.candidateId,
+      raw.provenance.sourceRecordRef,
+      raw.provenance.sourceVersion,
+      ...(Array.isArray(raw.provenance.sourceFieldRefs) ? raw.provenance.sourceFieldRefs : []),
+      ...(Array.isArray(raw.evidence) ? raw.evidence.flatMap((item) => isRecord(item) ? [item.ref] : []) : []),
+      ...(Array.isArray(raw.limitations) ? raw.limitations : []),
+      ...(Array.isArray(raw.knownConflictCodes) ? raw.knownConflictCodes : []),
+    ];
+    if (strings.some((item) => typeof item === "string" && containsPrivateLocatorOrPayload(item))) {
+      issues.push("bounded_intelligence_candidate_contains_private_payload");
+    }
+  }
   return [...new Set(issues)];
 }
 
 export function ingestKnowledgeCandidatePacket(packet: KnowledgeCandidatePacket): Readonly<KnowledgeCandidatePacket> {
+  if (packet.provenance.adapter === "bounded_intelligence_runtime"
+    && (packet.lifecycle !== "candidate" || packet.requiresHumanAdmission !== true || packet.privacy !== "private_by_default"
+      || packet.proposedVisibility !== "account_private")) {
+    throw new Error("bounded_intelligence_candidate_authority_strengthening_refused");
+  }
   const normalized: KnowledgeCandidatePacket = {
     ...packet,
     lifecycle: "candidate",
