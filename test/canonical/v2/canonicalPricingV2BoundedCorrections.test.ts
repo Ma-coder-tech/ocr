@@ -256,6 +256,8 @@ function admittedTemplateFoundation() {
   const evidenceRef = foundation.sourceModel.evidence[0]!.id;
   foundation.templateCapability.identityStatus = "proven";
   foundation.templateCapability.admissionStatus = "admitted";
+  foundation.templateCapability.admissionAuthority = { lifecycle: "admitted", authorityClass: "product_owner", authorityRef: "test-product-owner",
+    admittedAt: "2026-08-23T00:00:00.000Z", admissionVersion: "test-v1", effectiveFrom: null, effectiveTo: null };
   foundation.templateCapability.completenessStatus = "complete";
   foundation.templateCapability.admissionProofEvidenceRefs = [evidenceRef];
   return foundation;

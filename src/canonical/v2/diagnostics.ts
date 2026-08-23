@@ -7,7 +7,8 @@ export type PrivacySafeCanonicalEconomicsV2Diagnostic = {
   provenanceStatus: CanonicalEconomicsV2Foundation["identity"]["provenanceStatus"];
   templateAdmissionStatus: CanonicalEconomicsV2Foundation["templateCapability"]["admissionStatus"];
   templateCompletenessStatus: CanonicalEconomicsV2Foundation["templateCapability"]["completenessStatus"];
-  documentCompletenessStatus: CanonicalEconomicsV2Foundation["documentIntegrity"]["completenessStatus"];
+  suppliedDocumentIntegrityStatus: CanonicalEconomicsV2Foundation["documentIntegrity"]["suppliedDocumentStatus"];
+  statementCompletenessStatus: CanonicalEconomicsV2Foundation["documentIntegrity"]["completenessStatus"];
   validationStatus: "valid" | "invalid";
   factStatusCounts: Record<"available" | "unavailable" | "ambiguous" | "unsupported", number>;
   effectiveRateState: CanonicalEconomicsV2Foundation["metrics"]["headlineEffectiveRate"]["state"];
@@ -38,7 +39,8 @@ export function privacySafeCanonicalEconomicsV2Diagnostic(
     provenanceStatus: foundation.identity.provenanceStatus,
     templateAdmissionStatus: foundation.templateCapability.admissionStatus,
     templateCompletenessStatus: foundation.templateCapability.completenessStatus,
-    documentCompletenessStatus: foundation.documentIntegrity.completenessStatus,
+    suppliedDocumentIntegrityStatus: foundation.documentIntegrity.suppliedDocumentStatus,
+    statementCompletenessStatus: foundation.documentIntegrity.completenessStatus,
     validationStatus: foundation.validation.status,
     factStatusCounts,
     effectiveRateState: foundation.metrics.headlineEffectiveRate.state,

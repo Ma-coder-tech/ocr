@@ -31,7 +31,8 @@
     "bakeoff:azure": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/azure-layout-bakeoff.ts",
     "bakeoff:document-ir": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/document-ir-bakeoff.ts",
     "bakeoff:fiserv-document-ir": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/document-ir-bakeoff.ts",
-    "validate:foundation": "node scripts/validate-merchant-foundation.mjs"
+    "validate:foundation": "node scripts/validate-merchant-foundation.mjs",
+    "evaluate:fiserv-one": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/run-fiserv-pre-uat-evaluation.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",

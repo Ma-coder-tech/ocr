@@ -146,6 +146,8 @@ describe("Canonical Economics V2 observational Fiserv adapter", () => {
         detectedVersion: "test-v1",
         identityStatus: "proven",
         admissionStatus: "admitted",
+        admissionAuthority: { lifecycle: "admitted", authorityClass: "product_owner", authorityRef: "test-product-owner",
+          admittedAt: "2026-08-23T00:00:00.000Z", admissionVersion: "test-v1", effectiveFrom: null, effectiveTo: null },
         completenessStatus: "complete",
         admissionProofEvidenceRefs: [proofRef],
         capabilities: [{

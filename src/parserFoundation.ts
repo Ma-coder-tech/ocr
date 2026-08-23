@@ -16,6 +16,8 @@ export type ParserConfidence = "high" | "medium" | "low" | "needs_review";
 export type FinancialCandidateRole =
   | "total_volume"
   | "gross_sales"
+  | "refund_volume"
+  | "settlement_adjustment"
   | "amount_funded"
   | "total_fees"
   | "interchange_detail_total"
@@ -56,6 +58,9 @@ export type SupportingTransactionCount = {
   role: string;
   value: number;
   reason: string;
+  sourceSection?: string;
+  pageNumber?: number | null;
+  evidenceLine?: string | null;
 };
 
 export type SelectedStatementFinancials = SelectedFinancialFacts & {

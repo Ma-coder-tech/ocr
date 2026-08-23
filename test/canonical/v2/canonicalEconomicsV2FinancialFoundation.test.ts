@@ -66,10 +66,49 @@ describe("Canonical Economics V2 financial foundation", () => {
       "Template completeness cannot be complete without admitted, proven template identity.",
     );
     expect(foundation.documentIntegrity).toMatchObject({
+      suppliedDocumentStatus: "unknown",
       observedPageCount: 4,
+      processedPageCount: null,
       expectedPageCount: null,
       completenessStatus: "unknown",
     });
+  });
+
+  it("separates a completely processed supplied PDF from unproven processor-statement completeness", () => {
+    const fixture = v2SyntheticStatement();
+    const foundation = buildCanonicalEconomicsV2FromFiserv({
+      ...fixture,
+      sourceDocumentRef: "SYNTH-RB-SUPPLIED-COMPLETE-STATEMENT-UNKNOWN",
+      parserId: "synthetic_fiserv_foundation_parser",
+      provenanceStatus: "observational",
+      feeRowAdmissions: [],
+      templateAdmission: { admissionStatus: "unknown", completenessStatus: "unknown", identityStatus: "observed" },
+      documentIntegrity: {
+        suppliedDocumentStatus: "complete_supplied_document",
+        observedPageCount: 4,
+        processedPageCount: 4,
+        fatalPageErrorCount: 0,
+        extractionLineageComplete: true,
+        localIngestionTruncated: false,
+        completenessStatus: "unknown",
+      },
+    });
+
+    expect(foundation.validation).toMatchObject({ status: "valid", errors: [] });
+    expect(foundation.documentIntegrity).toMatchObject({
+      suppliedDocumentStatus: "complete_supplied_document",
+      observedPageCount: 4,
+      processedPageCount: 4,
+      completenessStatus: "unknown",
+      expectedPageCount: null,
+    });
+    expect(foundation.templateCapability).toMatchObject({ admissionStatus: "unknown", completenessStatus: "unknown" });
+
+    const invalid = structuredClone(foundation);
+    invalid.documentIntegrity.processedPageCount = 3;
+    expect(validateCanonicalEconomicsV2Foundation(invalid).validation.errors).toContain(
+      "Complete supplied-document integrity requires all enumerated pages to be processed.",
+    );
   });
 
   it("models document integrity independently from template admission", () => {
@@ -117,10 +156,16 @@ describe("Canonical Economics V2 financial foundation", () => {
     const proofRef = foundation.sourceModel.evidence[0]!.id;
     foundation.templateCapability.identityStatus = "proven";
     foundation.templateCapability.admissionStatus = "admitted";
+    foundation.templateCapability.admissionAuthority = testAdmissionAuthority();
     foundation.templateCapability.completenessStatus = "complete";
     foundation.templateCapability.admissionProofEvidenceRefs = [proofRef];
 
     expect(validateCanonicalEconomicsV2Foundation(foundation).validation.status).toBe("valid");
+
+    foundation.templateCapability.admissionAuthority = null;
+    expect(validateCanonicalEconomicsV2Foundation(foundation).validation.errors).toContain(
+      "Admitted template capability requires versioned approved human admission authority metadata.",
+    );
   });
 
   it("exposes only foundational Gold observations and no pricing, ownership, benchmark, or savings fields", () => {
@@ -147,4 +192,9 @@ function buildSynthetic(options: { includeGrossBasedRateDiagnostic?: boolean } =
     provenanceStatus: "approved_synthetic",
     includeGrossBasedRateDiagnostic: options.includeGrossBasedRateDiagnostic,
   });
+}
+
+function testAdmissionAuthority() {
+  return { lifecycle: "admitted" as const, authorityClass: "product_owner" as const, authorityRef: "test-product-owner",
+    admittedAt: "2026-08-23T00:00:00.000Z", admissionVersion: "test-v1", effectiveFrom: null, effectiveTo: null };
 }

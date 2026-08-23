@@ -32,9 +32,21 @@ export type CanonicalEconomicsV2TemplateAdmissionStatus =
 
 export type CanonicalEconomicsV2CompletenessStatus = "complete" | "incomplete" | "unknown" | "unavailable";
 
+export type CanonicalEconomicsV2SuppliedDocumentIntegrityStatus =
+  | "complete_supplied_document"
+  | "incomplete_or_corrupt_supplied_document"
+  | "unknown"
+  | "unavailable";
+
 export type CanonicalEconomicsV2DocumentIntegrity = {
+  suppliedDocumentStatus: CanonicalEconomicsV2SuppliedDocumentIntegrityStatus;
   observedPageCount: number | null;
+  processedPageCount: number | null;
+  fatalPageErrorCount: number | null;
+  extractionLineageComplete: boolean | null;
+  localIngestionTruncated: boolean | null;
   expectedPageCount: number | null;
+  /** Processor-statement completeness; independent from supplied-document processing integrity. */
   completenessStatus: CanonicalEconomicsV2CompletenessStatus;
   missingPageNumbers: number[];
   proofEvidenceRefs: string[];
@@ -44,16 +56,20 @@ export type CanonicalEconomicsV2DocumentIntegrity = {
 export type CanonicalEconomicsV2CapabilityStatus = "supported" | "unsupported" | "unknown" | "unavailable";
 
 export type CanonicalEconomicsV2CapabilityId =
+  | "processor_identity"
+  | "statement_period"
   | "gross_sale_volume"
   | "refund_volume"
   | "canonical_net_submitted_card_volume"
   | "gross_sale_transaction_count"
+  | "submitted_transaction_count"
   | "refund_transaction_count"
   | "fee_total"
   | "funding_batches"
   | "settlement_adjustments"
   | "chargeback_financial_populations"
   | "fee_detail"
+  | "non_fee_financial_flow_exclusions"
   | "reconciliation_controls";
 
 export type CanonicalEconomicsV2TemplateCapability = {
@@ -69,6 +85,15 @@ export type CanonicalEconomicsV2TemplateProfile = {
   detectedVersion: string | null;
   identityStatus: "observed" | "proven" | "unknown" | "unavailable";
   admissionStatus: CanonicalEconomicsV2TemplateAdmissionStatus;
+  admissionAuthority: {
+    lifecycle: "admitted" | "admitted_with_conditions";
+    authorityClass: "product_owner" | "authorized_domain_reviewer" | "data_steward";
+    authorityRef: string;
+    admittedAt: string;
+    admissionVersion: string;
+    effectiveFrom: string | null;
+    effectiveTo: string | null;
+  } | null;
   completenessStatus: CanonicalEconomicsV2CompletenessStatus;
   admissionProofEvidenceRefs: string[];
   capabilities: CanonicalEconomicsV2TemplateCapability[];

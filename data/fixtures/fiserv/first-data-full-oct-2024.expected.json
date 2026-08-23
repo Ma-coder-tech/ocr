@@ -5746,7 +5746,20 @@
     "status": "accepted_with_warnings",
     "reason": "Accepted with parser caveat(s): supportingFeeAgreement, interchange_detail_total_differs_from_fee_summary, reportable_sales_excluded.",
     "confidence": "high",
-    "reportable": true
+    "reportable": true,
+    "validationState": {
+      "topLevelTotals": "validated",
+      "feeLedger": "validated",
+      "batchLedger": "validated",
+      "feeClassification": "validated",
+      "orphanTotals": "none",
+      "customerFacingTotalsAllowed": true,
+      "feeLedgerAllowed": true,
+      "batchDetailAllowed": true,
+      "feeClassificationAllowed": true,
+      "blockingReasons": [],
+      "warningReasons": []
+    }
   },
   "confidence": {
     "overall": "high",

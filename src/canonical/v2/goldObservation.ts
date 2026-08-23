@@ -23,6 +23,9 @@ export function canonicalEconomicsV2GoldObservation(
     "source.provenance": foundation.identity.provenanceStatus,
     "source.template_admission": foundation.templateCapability.admissionStatus,
     "source.template_completeness": foundation.templateCapability.completenessStatus,
+    "source.supplied_document_integrity": foundation.documentIntegrity.suppliedDocumentStatus,
+    "statement.completeness": publicDocumentCompleteness(foundation),
+    // Compatibility alias; semantics are processor-statement completeness, not supplied-file processing integrity.
     "document.completeness": publicDocumentCompleteness(foundation),
   };
   const valueContexts: Record<string, { denominator: string }> = {};

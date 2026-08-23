@@ -24,7 +24,9 @@ import type {
   CanonicalEconomicsV2ReconciliationReference,
   CanonicalEconomicsV2SemanticAmendment,
   CanonicalEconomicsV2SourceProvenance,
+  CanonicalEconomicsV2SuppliedDocumentIntegrityStatus,
   CanonicalEconomicsV2TemplateAdmissionStatus,
+  CanonicalEconomicsV2TemplateProfile,
 } from "./types.js";
 import { CANONICAL_ECONOMICS_V2_VERSION_MANIFEST, RB_SEMANTIC_AMENDMENT_REASONS } from "./versionManifest.js";
 import { validateCanonicalEconomicsV2Foundation } from "./validate.js";
@@ -35,6 +37,7 @@ export type CanonicalEconomicsV2TemplateAdmissionInput = {
   detectedVersion?: string | null;
   identityStatus?: "observed" | "proven" | "unknown" | "unavailable";
   admissionStatus?: CanonicalEconomicsV2TemplateAdmissionStatus;
+  admissionAuthority?: CanonicalEconomicsV2TemplateProfile["admissionAuthority"];
   completenessStatus?: CanonicalEconomicsV2CompletenessStatus;
   admissionProofEvidenceRefs?: string[];
   capabilities?: Array<{
@@ -47,7 +50,14 @@ export type CanonicalEconomicsV2TemplateAdmissionInput = {
 };
 
 export type CanonicalEconomicsV2DocumentIntegrityInput = {
+  suppliedDocumentStatus?: CanonicalEconomicsV2SuppliedDocumentIntegrityStatus;
+  observedPageCount?: number | null;
+  processedPageCount?: number | null;
+  fatalPageErrorCount?: number | null;
+  extractionLineageComplete?: boolean | null;
+  localIngestionTruncated?: boolean | null;
   expectedPageCount?: number | null;
+  /** Processor-statement completeness; not supplied-document processing completeness. */
   completenessStatus?: CanonicalEconomicsV2CompletenessStatus;
   missingPageNumbers?: number[];
   proofOccurrenceKeys?: string[];
@@ -185,6 +195,7 @@ export function buildCanonicalEconomicsV2FromFiserv(
       detectedVersion: templateInput.detectedVersion ?? null,
       identityStatus: templateInput.identityStatus ?? (stringOrNull(identity.statementFamily) ? "observed" : "unknown"),
       admissionStatus: templateInput.admissionStatus ?? "unknown",
+      admissionAuthority: templateInput.admissionAuthority ?? null,
       completenessStatus: templateInput.completenessStatus ?? "unknown",
       admissionProofEvidenceRefs: unique(templateInput.admissionProofEvidenceRefs ?? []),
       capabilities: (templateInput.capabilities ?? []).map((capability) => ({
@@ -197,7 +208,7 @@ export function buildCanonicalEconomicsV2FromFiserv(
         ...(templateInput.limitations ?? []),
         ...(templateInput.admissionStatus === "admitted"
           ? []
-          : ["Parsing success does not establish versioned template admission or document completeness."]),
+          : ["Parsing success does not establish versioned template admission or processor-statement completeness."]),
       ]),
     },
     documentIntegrity: buildDocumentIntegrity({
@@ -315,9 +326,9 @@ function buildOccurrenceInputs(input: {
     const role = stringOrNull(row.role) ?? "unknown";
     occurrences.push({
       key: `count:${index}:${role}`,
-      sourceSection: "TRANSACTION COUNTS",
-      pageNumber: null,
-      evidenceLine: null,
+      sourceSection: stringOrNull(row.sourceSection) ?? "TRANSACTION COUNTS",
+      pageNumber: numberOrNull(row.pageNumber),
+      evidenceLine: stringOrNull(row.evidenceLine),
       sourceLabel: stringOrNull(row.reason) ?? role,
       semanticRole: roleForCount(role),
       printedCount: integerOrNull(row.value),
@@ -466,7 +477,7 @@ function buildFinancialPopulations(input: {
       id: "fact_v2_gross_sale_volume",
       population: "gross_sale_volume",
       value: selectedWithOccurrence("grossSales", "gross_sale"),
-      provenanceStatus: input.provenanceStatus,
+      provenanceStatus: provenanceForCapability(input.templateAdmission, "gross_sale_volume", input.provenanceStatus),
       evidenceRefs: evidenceRefs("gross_sale"),
       occurrenceRefs: occurrenceRefs("gross_sale"),
       limitationsIfUnavailable: ["The deterministic parser did not expose a proven gross-sale volume population."],
@@ -475,7 +486,7 @@ function buildFinancialPopulations(input: {
       id: "fact_v2_refund_volume",
       population: "refund_volume",
       value: selectedWithOccurrence("refunds", "refund"),
-      provenanceStatus: input.provenanceStatus,
+      provenanceStatus: provenanceForCapability(input.templateAdmission, "refund_volume", input.provenanceStatus),
       evidenceRefs: evidenceRefs("refund"),
       occurrenceRefs: occurrenceRefs("refund"),
       limitationsIfUnavailable: ["The deterministic parser did not expose a proven refund-volume population."],
@@ -484,7 +495,7 @@ function buildFinancialPopulations(input: {
       id: "fact_v2_canonical_net_submitted_card_volume",
       population: "canonical_net_submitted_card_volume",
       value: selectedWithOccurrence("totalVolume", "net_submitted"),
-      provenanceStatus: input.provenanceStatus,
+      provenanceStatus: provenanceForCapability(input.templateAdmission, "canonical_net_submitted_card_volume", input.provenanceStatus),
       evidenceRefs: evidenceRefs("net_submitted"),
       occurrenceRefs: occurrenceRefs("net_submitted"),
       limitationsIfUnavailable: ["Canonical net submitted card volume is unavailable."],
@@ -502,7 +513,7 @@ function buildFinancialPopulations(input: {
       id: "fact_v2_total_statement_processing_fees",
       population: "total_statement_processing_fees",
       value: selectedWithOccurrence("totalFees", "fee_charge"),
-      provenanceStatus: input.provenanceStatus,
+      provenanceStatus: provenanceForCapability(input.templateAdmission, "fee_total", input.provenanceStatus),
       evidenceRefs: evidenceRefs("fee_charge"),
       occurrenceRefs: occurrenceRefs("fee_charge"),
       limitationsIfUnavailable: ["The unique authoritative statement-processing-fee total is unavailable."],
@@ -520,7 +531,7 @@ function buildFinancialPopulations(input: {
       id: "fact_v2_settlement_adjustment_amount",
       population: "settlement_adjustment_amount",
       value: adjustmentPopulationProven ? sum(adjustmentValues) : null,
-      provenanceStatus: input.provenanceStatus,
+      provenanceStatus: provenanceForCapability(input.templateAdmission, "settlement_adjustments", input.provenanceStatus),
       evidenceRefs: evidenceRefs("settlement_adjustment"),
       occurrenceRefs: occurrenceRefs("settlement_adjustment"),
       limitationsIfUnavailable: ["Settlement adjustments were not separately proven by a reconciled funding ledger."],
@@ -586,12 +597,12 @@ function buildFinancialPopulations(input: {
       id: "fact_v2_gross_sale_transaction_count",
       population: "gross_sale_transaction_count",
       result: grossCount,
-      provenanceStatus: input.provenanceStatus,
+      provenanceStatus: provenanceForCapability(input.templateAdmission, "gross_sale_transaction_count", input.provenanceStatus),
       evidenceRefs: evidenceRefs("gross_sale_count"),
       occurrenceRefs: occurrenceRefs("gross_sale_count"),
       unavailableReason: grossCountPopulationProven
         ? "No unique count explicitly identified as gross-sale transactions was proven; card-type and submitted counts are not substitutes."
-        : "Gross-sale count requires an admitted, complete template capability with population proof; parser success or a card-type subtotal is insufficient.",
+        : "Gross-sale count requires an admitted claim-specific template capability with population proof; parser success or a card-type subtotal is insufficient.",
     }),
     refundTransactionCount: countFactWithAmbiguity({
       id: "fact_v2_refund_transaction_count",
@@ -606,7 +617,7 @@ function buildFinancialPopulations(input: {
       id: "fact_v2_submitted_transaction_count",
       population: "submitted_transaction_count",
       result: submittedCount,
-      provenanceStatus: input.provenanceStatus,
+      provenanceStatus: provenanceForCapability(input.templateAdmission, "submitted_transaction_count", input.provenanceStatus),
       evidenceRefs: evidenceRefs("submitted_count"),
       occurrenceRefs: occurrenceRefs("submitted_count"),
       unavailableReason: "No count explicitly identified as submitted transactions was proven.",
@@ -804,6 +815,8 @@ function roleForField(field: string): CanonicalEconomicsV2OccurrenceRole {
 
 function roleForCandidate(role: string): CanonicalEconomicsV2OccurrenceRole {
   if (role === "gross_sales") return "gross_sale";
+  if (role === "refund_volume") return "refund";
+  if (role === "settlement_adjustment") return "settlement_adjustment";
   if (role === "total_volume") return "net_submitted";
   if (role === "total_fees") return "fee_charge";
   if (role === "amount_funded") return "funded_amount";
@@ -836,10 +849,23 @@ function hasAdmittedGrossSaleCountCapability(input: CanonicalEconomicsV2Template
   const capability = input.capabilities?.find((item) => item.capability === "gross_sale_transaction_count");
   return input.identityStatus === "proven" &&
     input.admissionStatus === "admitted" &&
-    input.completenessStatus === "complete" &&
+    input.admissionAuthority !== null && input.admissionAuthority !== undefined &&
     (input.admissionProofEvidenceRefs?.length ?? 0) > 0 &&
     capability?.status === "supported" &&
     (capability.proofEvidenceRefs?.length ?? 0) > 0;
+}
+
+function provenanceForCapability(
+  input: CanonicalEconomicsV2TemplateAdmissionInput,
+  capabilityId: CanonicalEconomicsV2CapabilityId,
+  fallback: CanonicalEconomicsV2SourceProvenance,
+): CanonicalEconomicsV2SourceProvenance {
+  const capability = input.capabilities?.find((item) => item.capability === capabilityId);
+  const admitted = input.identityStatus === "proven" && input.admissionStatus === "admitted"
+    && input.admissionAuthority !== null && input.admissionAuthority !== undefined
+    && (input.admissionProofEvidenceRefs?.length ?? 0) > 0
+    && capability?.status === "supported" && (capability.proofEvidenceRefs?.length ?? 0) > 0;
+  return admitted ? "authoritative" : fallback;
 }
 
 function admittedChargebackFeeRows(input: {
@@ -887,16 +913,25 @@ function buildDocumentIntegrity(input: {
     .map((occurrenceRef) => input.sourceModel.occurrences.find((occurrence) => occurrence.id === occurrenceRef)?.evidenceRef)
     .filter((value): value is string => Boolean(value)));
   const completenessStatus = declared?.completenessStatus ?? "unknown";
+  const suppliedDocumentStatus = declared?.suppliedDocumentStatus ?? "unknown";
   return {
-    observedPageCount: input.observedPageCount,
+    suppliedDocumentStatus,
+    observedPageCount: declared?.observedPageCount ?? input.observedPageCount,
+    processedPageCount: declared?.processedPageCount ?? null,
+    fatalPageErrorCount: declared?.fatalPageErrorCount ?? null,
+    extractionLineageComplete: declared?.extractionLineageComplete ?? null,
+    localIngestionTruncated: declared?.localIngestionTruncated ?? null,
     expectedPageCount: declared?.expectedPageCount ?? null,
     completenessStatus,
     missingPageNumbers: uniqueNumbers(declared?.missingPageNumbers ?? []),
     proofEvidenceRefs,
     limitations: unique([
       ...(declared?.limitations ?? []),
+      ...(suppliedDocumentStatus === "unknown"
+        ? ["Supplied-document processing integrity is not proven."]
+        : []),
       ...(completenessStatus === "unknown"
-        ? ["Document completeness is not proven; observed pages do not establish an expected page count."]
+        ? ["Processor-statement completeness is not proven; processing every supplied page does not establish an expected statement page count."]
         : []),
     ]),
   };

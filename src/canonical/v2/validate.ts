@@ -150,6 +150,12 @@ function validateDocumentIntegrity(
   if (integrity.observedPageCount !== null && (!Number.isSafeInteger(integrity.observedPageCount) || integrity.observedPageCount < 0)) {
     errors.push("Observed document page count must be a non-negative integer or null.");
   }
+  if (integrity.processedPageCount !== null && (!Number.isSafeInteger(integrity.processedPageCount) || integrity.processedPageCount < 0)) {
+    errors.push("Processed supplied-document page count must be a non-negative integer or null.");
+  }
+  if (integrity.fatalPageErrorCount !== null && (!Number.isSafeInteger(integrity.fatalPageErrorCount) || integrity.fatalPageErrorCount < 0)) {
+    errors.push("Fatal supplied-document page-error count must be a non-negative integer or null.");
+  }
   if (integrity.expectedPageCount !== null && (!Number.isSafeInteger(integrity.expectedPageCount) || integrity.expectedPageCount <= 0)) {
     errors.push("Expected document page count must be a positive integer or null.");
   }
@@ -157,22 +163,37 @@ function validateDocumentIntegrity(
     errors.push("Missing document page numbers must be positive integers.");
   }
   for (const ref of integrity.proofEvidenceRefs) {
-    if (!evidenceIds.has(ref)) errors.push(`Document integrity has broken evidence ref ${ref}.`);
+    if (!evidenceIds.has(ref)) errors.push(`Statement-completeness proof has broken evidence ref ${ref}.`);
+  }
+  if (integrity.suppliedDocumentStatus === "complete_supplied_document") {
+    if (integrity.observedPageCount === null || integrity.processedPageCount !== integrity.observedPageCount) {
+      errors.push("Complete supplied-document integrity requires all enumerated pages to be processed.");
+    }
+    if (integrity.fatalPageErrorCount !== 0) errors.push("Complete supplied-document integrity requires zero fatal page errors.");
+    if (integrity.extractionLineageComplete !== true) errors.push("Complete supplied-document integrity requires complete extraction lineage.");
+    if (integrity.localIngestionTruncated !== false) errors.push("Complete supplied-document integrity prohibits local ingestion truncation.");
+  }
+  if (integrity.suppliedDocumentStatus === "incomplete_or_corrupt_supplied_document") {
+    const failureObserved = integrity.fatalPageErrorCount !== null && integrity.fatalPageErrorCount > 0
+      || integrity.observedPageCount !== null && integrity.processedPageCount !== integrity.observedPageCount
+      || integrity.extractionLineageComplete === false
+      || integrity.localIngestionTruncated === true;
+    if (!failureObserved) errors.push("Incomplete supplied-document integrity requires deterministic ingestion, page-processing, lineage, or truncation evidence.");
   }
   if (integrity.completenessStatus === "complete") {
     if (integrity.expectedPageCount === null || integrity.observedPageCount !== integrity.expectedPageCount) {
-      errors.push("Complete document integrity requires equal known observed and expected page counts.");
+      errors.push("Proven-complete processor statement requires equal known observed and expected page counts.");
     }
-    if (integrity.missingPageNumbers.length > 0) errors.push("Complete document integrity cannot list missing pages.");
-    if (integrity.proofEvidenceRefs.length === 0) errors.push("Complete document integrity requires explicit source evidence.");
+    if (integrity.missingPageNumbers.length > 0) errors.push("Proven-complete processor statement cannot list missing pages.");
+    if (integrity.proofEvidenceRefs.length === 0) errors.push("Proven-complete processor statement requires explicit structural source evidence.");
   }
   if (integrity.completenessStatus === "incomplete") {
-    if (integrity.proofEvidenceRefs.length === 0) errors.push("Incomplete document integrity requires explicit source evidence.");
+    if (integrity.proofEvidenceRefs.length === 0) errors.push("Proven-incomplete processor statement requires explicit structural source evidence.");
     const countProvesIncomplete = integrity.observedPageCount !== null &&
       integrity.expectedPageCount !== null &&
       integrity.observedPageCount < integrity.expectedPageCount;
     if (!countProvesIncomplete && integrity.missingPageNumbers.length === 0) {
-      errors.push("Incomplete document integrity requires a known page-count shortfall or explicit missing-page evidence.");
+      errors.push("Proven-incomplete processor statement requires a known page-count shortfall or explicit missing-page evidence.");
     }
   }
 }
@@ -192,6 +213,18 @@ function validateTemplateCapability(
   warnings: string[],
 ): void {
   const profile = foundation.templateCapability;
+  if (profile.admissionStatus === "admitted") {
+    const authority = profile.admissionAuthority;
+    if (!authority || !["product_owner", "authorized_domain_reviewer", "data_steward"].includes(authority.authorityClass)
+      || !authority.authorityRef || !authority.admissionVersion || Number.isNaN(Date.parse(authority.admittedAt))) {
+      errors.push("Admitted template capability requires versioned approved human admission authority metadata.");
+    }
+    if (profile.identityStatus !== "proven" || profile.admissionProofEvidenceRefs.length === 0) {
+      errors.push("Admitted template capability requires proven identity and claim-scoped evidence.");
+    }
+  } else if (profile.admissionAuthority !== null) {
+    errors.push("Non-admitted template capability cannot carry admission authority metadata.");
+  }
   if (profile.completenessStatus === "complete") {
     if (profile.admissionStatus !== "admitted" || profile.identityStatus !== "proven") {
       errors.push("Template completeness cannot be complete without admitted, proven template identity.");
@@ -250,7 +283,7 @@ function validateFinancialRelationships(foundation: CanonicalEconomicsV2Foundati
     );
     const capabilityProven = foundation.templateCapability.identityStatus === "proven" &&
       foundation.templateCapability.admissionStatus === "admitted" &&
-      foundation.templateCapability.completenessStatus === "complete" &&
+      foundation.templateCapability.admissionAuthority !== null &&
       foundation.templateCapability.admissionProofEvidenceRefs.length > 0 &&
       countCapability?.status === "supported" &&
       countCapability.proofEvidenceRefs.length > 0;
