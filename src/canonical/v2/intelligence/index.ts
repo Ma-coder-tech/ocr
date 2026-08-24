@@ -22,6 +22,7 @@ export * from "./publicRetrievalAdapters.js";
 export * from "./publicDocumentExtraction.js";
 export * from "./providerSchemas.js";
 export * from "./liveProviderPorts.js";
+export * from "./providerReadiness.js";
 export * from "./intelligenceValidate.js";
 export * from "./intelligenceCompareLegacy.js";
 export * from "./intelligenceGoldObservation.js";

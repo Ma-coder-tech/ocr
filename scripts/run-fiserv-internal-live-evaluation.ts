@@ -13,6 +13,7 @@ import {
   createInternalLiveIntelligencePorts,
   PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS,
   ProviderOperationAuditLog,
+  runProviderReadinessProbe,
   runFiservInternalAnalysisEvaluationV1,
   type InternalLiveExecutionCapabilityV1,
   type ProviderSafeQuestionContextV1,
@@ -29,7 +30,7 @@ const OPENAI_SERVICE = "RateReveal/OpenAI";
 const REPOSITORY_BRANCH = "codex/e2e-internal-analysis-v1";
 export const KEYCHAIN_READ_TIMEOUT_MS = 120_000;
 
-type RunnerMode = "live" | "readiness";
+type RunnerMode = "live" | "readiness" | "provider-readiness";
 type KeychainService = typeof OPENROUTER_SERVICE | typeof OPENAI_SERVICE;
 type KeychainFailureCategory = "keychain_entry_missing" | "keychain_access_denied_or_cancelled"
   | "keychain_locked" | "keychain_broker_timeout" | "keychain_read_failed";
@@ -65,6 +66,11 @@ export type InternalLiveRunnerDependencies = {
     capability: InternalLiveExecutionCapabilityV1;
     providerAudit: ProviderOperationAuditLog;
   }): Promise<{ executionStatus: string; researchOutcome: string; artifactPath: string }>;
+  executeProviderReadiness(input: {
+    runId: string;
+    capability: InternalLiveExecutionCapabilityV1;
+    providerAudit: ProviderOperationAuditLog;
+  }): ReturnType<typeof runProviderReadinessProbe>;
   log(line: string): void;
 };
 
@@ -125,10 +131,10 @@ export async function runInternalLiveRunner(
     process.env.OPENROUTER_SEARCH_MODEL = STATEMENT_ONE_INTERNAL_LIVE_PROFILE.searchModel;
     process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = STATEMENT_ONE_INTERNAL_LIVE_PROFILE.openAiModel;
 
-    await constructLiveCapability(
-      `internal-live-readiness-${randomUUID()}`,
-      outputRoot,
-    );
+    const preflightRunId = args.mode === "provider-readiness"
+      ? `provider-readiness-${randomUUID()}` : `internal-live-readiness-${randomUUID()}`;
+    const preflightCapability = await constructLiveCapability(preflightRunId, outputRoot,
+      args.mode === "provider-readiness" ? providerReadinessContexts() : statementOneProviderContexts());
     if (args.mode === "readiness") {
       log("executionStatus: readiness_passed");
       log("researchOutcome: not_started");
@@ -136,6 +142,34 @@ export async function runInternalLiveRunner(
       log("Preflight: passed; zero external sends");
       log("Provider sends: 0");
       return 0;
+    }
+    if (args.mode === "provider-readiness") {
+      runId = preflightRunId;
+      const capability = preflightCapability;
+      log("Preflight: passed; zero external sends");
+      log(`Provider readiness run ID: ${runId}`);
+      log("Statement analysis executed: no");
+      log("Private statement data provider-bound: no");
+      log("Retries: 0; fallback: disabled; adaptive search: disabled; language call: disabled");
+      log("Provider sends: 0");
+      try {
+        const probe = await (overrides.executeProviderReadiness ?? ((input) => runProviderReadinessProbe(input.runId, input.capability, input.providerAudit)))({
+          runId, capability, providerAudit,
+        });
+        log(`OpenRouter readiness: ${probe.openRouter.status}; tool execution: ${probe.openRouter.toolExecutionState}; candidates: ${probe.openRouter.candidateCount}`);
+        log(`Investigative OpenAI readiness: ${probe.investigativeOpenAi.status}; structured output: ${probe.investigativeOpenAi.structuredOutputValidation}`);
+        log(`Semantic OpenAI readiness: ${probe.semanticOpenAi.status}; structured output: ${probe.semanticOpenAi.structuredOutputValidation}`);
+        log(`Provider sends: ${sendCount(providerAudit)}`);
+        log("Statement analysis executed: no");
+        log("Numbered Statement run created: no");
+        log(`Safe provider receipts: ${JSON.stringify(providerAudit.snapshot())}`);
+        log("executionStatus: provider_readiness_passed");
+        log("researchOutcome: not_started");
+        return 0;
+      } catch (error) {
+        log(`Safe provider receipts: ${JSON.stringify(providerAudit.snapshot())}`);
+        throw error;
+      }
     }
 
     lockPath = path.join(outputRoot, `.${RUN_PREFIX}.lock`);
@@ -146,7 +180,7 @@ export async function runInternalLiveRunner(
     runId = await allocateRunId(outputRoot, args.runId);
     outputDirectory = path.join(outputRoot, runId);
     await assertAbsent(outputDirectory);
-    const capability = await constructLiveCapability(runId, outputRoot);
+    const capability = await constructLiveCapability(runId, outputRoot, statementOneProviderContexts());
     log("Preflight: passed; zero external sends");
     log(`Run ID: ${runId}`);
     log(`Profile: ${PROFILE_CODE}`);
@@ -193,7 +227,7 @@ export async function runInternalLiveRunner(
   }
 }
 
-async function constructLiveCapability(runId: string, outputRoot: string): Promise<InternalLiveExecutionCapabilityV1> {
+async function constructLiveCapability(runId: string, outputRoot: string, questionContexts: ProviderSafeQuestionContextV1[]): Promise<InternalLiveExecutionCapabilityV1> {
   return createInternalLiveExecutionCapability({
     schemaVersion: "internal_live_preflight_input_v1",
     runMode: "internal_live_evaluation",
@@ -203,7 +237,7 @@ async function constructLiveCapability(runId: string, outputRoot: string): Promi
     approvedOpenRouterSearchModel: STATEMENT_ONE_INTERNAL_LIVE_PROFILE.searchModel,
     approvedOpenAiModel: STATEMENT_ONE_INTERNAL_LIVE_PROFILE.openAiModel,
     sourceAuthorityAdmissions: [...PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS],
-    questionContexts: statementOneProviderContexts(),
+    questionContexts,
     languageCapability: "disabled",
   });
 }
@@ -268,6 +302,13 @@ function statementOneProviderContexts(): ProviderSafeQuestionContextV1[] {
       safeResearchLabel: "non swiped discount", questionText: "Does an eligible authoritative public source define non swiped discount terminology, calculation, or program context, and exactly what remains account specific?",
       processorProgram: "fiserv_first_data", periodYear: "2024", allowedContext: "public_product_terminology_only" },
   ];
+}
+
+function providerReadinessContexts(): ProviderSafeQuestionContextV1[] {
+  return [{ schemaVersion: "provider_safe_question_context_v1", providerContextId: `provider-context-${randomUUID()}`,
+    questionClass: "application_fee_public_definition", claimType: "processor_term", subjectCode: "application_fee_terminology",
+    safeResearchLabel: "application fee", questionText: "Does public documentation define application fee terminology for a public product context?",
+    processorProgram: null, periodYear: "2026", allowedContext: "public_product_terminology_only" }];
 }
 
 async function readCredentialsSerially(
@@ -456,7 +497,15 @@ async function preserveSafeFailureArtifact(
     const safeReceipts = audit.snapshot().map((receipt) => ({ receiptId: receipt.receiptId, operation: receipt.operation,
       providerCode: receipt.providerCode, actualSendCount: receipt.actualSendCount, retryCount: receipt.retryCount,
       completionState: receipt.completionState, usageState: receipt.usageState, outputTokens: receipt.outputTokens,
-      providerRequestCount: receipt.providerRequestCount, usageCostUsd: receipt.usageCostUsd, safeReasonCode: receipt.safeReasonCode }));
+      providerRequestCount: receipt.providerRequestCount, usageCostUsd: receipt.usageCostUsd,
+      providerConfigurationCode: receipt.providerConfigurationCode, httpStatus: receipt.httpStatus,
+      localRequestId: receipt.localRequestId, providerRequestId: receipt.providerRequestId, providerResponseId: receipt.providerResponseId,
+      requestedModelIdentifier: receipt.requestedModelIdentifier, returnedModelIdentifier: receipt.returnedModelIdentifier,
+      finishReason: receipt.finishReason, toolExecutionState: receipt.toolExecutionState,
+      annotationCount: receipt.annotationCount, normalizedCandidateCount: receipt.normalizedCandidateCount,
+      providerErrorType: receipt.providerErrorType, providerErrorCode: receipt.providerErrorCode,
+      providerErrorParam: receipt.providerErrorParam, structuredOutputValidation: receipt.structuredOutputValidation,
+      safeReasonCode: receipt.safeReasonCode }));
     await writeFile(failurePath, `${JSON.stringify({ schemaVersion: "internal_live_run_failure_v1", runId,
       executionStatus: "failed", researchOutcome: "research_unavailable", safeFailureCode: failureCode,
       externalSendCount: providerSends, providerReceipts: safeReceipts }, null, 2)}\n`, { flag: "wx", mode: 0o600 });
@@ -476,7 +525,7 @@ function parseArguments(argv: string[]): InternalLiveRunnerArguments {
   const allowed = new Set(["mode", "profile", "authorization", "run-id", "output-root"]);
   if ([...values.keys()].some((key) => !allowed.has(key))) throw new Error("internal_live_cli_arguments_invalid");
   const mode = values.get("mode") ?? "live";
-  if (mode !== "live" && mode !== "readiness") throw new Error("internal_live_cli_mode_invalid");
+  if (mode !== "live" && mode !== "readiness" && mode !== "provider-readiness") throw new Error("internal_live_cli_mode_invalid");
   return { mode, profile: values.get("profile") ?? null, authorization: values.get("authorization") ?? null,
     runId: values.get("run-id") ?? "auto", outputRoot: values.get("output-root") ?? DEFAULT_OUTPUT_ROOT };
 }

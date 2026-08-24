@@ -6,10 +6,11 @@ import type { ProviderOperationReceiptV1 } from "../internalAnalysis/internalAna
 import { assertProviderOutboundPacketSafe, assertProviderSafeQuestionContext } from "./providerPrivacy.js";
 import { APPROVED_OPENROUTER_ENDPOINT, APPROVED_OPENAI_ENDPOINT, OPENROUTER_SEARCH_CONFIGURATION_CODE, OPENROUTER_SEARCH_ENGINE,
   type InternalLiveExecutionCapabilityV1, LiveOperationTransportError, requireLiveCapabilityBinding } from "./providerPreflight.js";
-import { INVESTIGATIVE_RESPONSE_SCHEMA_ID, INVESTIGATIVE_RESPONSE_SCHEMA_V1, OPENROUTER_SEARCH_IDENTITY_SCHEMA_ID,
+import { INVESTIGATIVE_RESPONSE_SCHEMA_ID, INVESTIGATIVE_RESPONSE_SCHEMA_V1,
   SEMANTIC_RESPONSE_SCHEMA_ID, SEMANTIC_RESPONSE_SCHEMA_V1 } from "./providerSchemas.js";
 
 const OPENROUTER_SEARCH_MAX_OUTPUT_TOKENS = 512;
+const OPENAI_STRUCTURED_CONFIGURATION_CODE = "openai_responses_structured_output_v2";
 
 export class ProviderOperationAuditLog {
   private readonly values = new Map<string, ProviderOperationReceiptV1>();
@@ -26,8 +27,9 @@ export class ProviderOperationAuditLog {
 }
 
 type LiveJsonRequest = { url: string; method: "GET" | "POST"; headers: Record<string, string>; body: string | null; timeoutMs: number; cancellationSignal: AbortSignal | null };
+type SafeHttpMetadata = { status: number; providerRequestId: string | null };
 
-async function sendLiveJson(request: LiveJsonRequest, onSend: () => void): Promise<{ status: number; body: unknown }> {
+async function sendLiveJson(request: LiveJsonRequest, onSend: () => void, onResponse: (metadata: SafeHttpMetadata) => void): Promise<{ status: number; body: unknown; providerRequestId: string | null }> {
   const controller = new AbortController(); let timedOut = false; let externallyCancelled = false; let sent = false;
   if (request.cancellationSignal?.aborted) throw new LiveOperationTransportError("before_send", "provider_operation_cancelled_before_send");
   if (typeof globalThis.fetch !== "function") throw new LiveOperationTransportError("before_send", "provider_transport_unavailable");
@@ -37,7 +39,9 @@ async function sendLiveJson(request: LiveJsonRequest, onSend: () => void): Promi
   try {
     onSend(); sent = true;
     const response = await fetch(request.url, { method: request.method, headers: request.headers, body: request.body, redirect: "error", signal: controller.signal });
-    return { status: response.status, body: await response.json() as unknown };
+    const providerRequestId = safeIdentifier(response.headers?.get?.("x-request-id"));
+    onResponse({ status: response.status, providerRequestId });
+    return { status: response.status, body: await response.json() as unknown, providerRequestId };
   } catch (error) {
     throw new LiveOperationTransportError(timedOut ? "timed_out" : externallyCancelled ? "cancelled" : sent ? "after_send" : "before_send", safeError(error));
   } finally { clearTimeout(timer); request.cancellationSignal?.removeEventListener("abort", cancel); }
@@ -54,13 +58,14 @@ export function createLiveOpenRouterSearchAdapter(capability: InternalLiveExecut
     const receiptId = receiptIdentity("openrouter", operationId); const started = binding.clock.nowMs();
     audit.reserve(baseReceipt(receiptId, request.reservationId, operationId, "search", "openrouter_web_search", OPENROUTER_SEARCH_CONFIGURATION_CODE));
     const query = request.queryText;
-    const providerRequestId = `provider-request-${randomUUID()}`;
+    const localRequestId = `provider-request-${randomUUID()}`;
+    audit.settle(receiptId, { localRequestId, requestedModelIdentifier: binding.openRouterSearchModel });
     try {
       const body = JSON.stringify({ model: binding.openRouterSearchModel, store: false, stream: false,
         max_tokens: OPENROUTER_SEARCH_MAX_OUTPUT_TOKENS, reasoning: { effort: "none", exclude: true },
         messages: [
-          { role: "system", content: "Run exactly one bounded public web search. Return only the requested identity JSON. Search annotations are discovery candidates; do not make economic conclusions." },
-          { role: "user", content: JSON.stringify({ schemaVersion: OPENROUTER_SEARCH_IDENTITY_SCHEMA_ID, providerRequestId, query, maximumCandidates: request.maximumCandidates }) },
+          { role: "system", content: "Run exactly one bounded public web search. Search annotations are discovery candidates; do not make economic conclusions." },
+          { role: "user", content: JSON.stringify({ query, maximumCandidates: request.maximumCandidates }) },
         ],
         tools: [{ type: "openrouter:web_search", parameters: { engine: OPENROUTER_SEARCH_ENGINE, max_results: request.maximumCandidates,
           max_total_results: request.maximumCandidates, max_uses: 1, max_characters: 1_000 } }],
@@ -73,16 +78,27 @@ export function createLiveOpenRouterSearchAdapter(capability: InternalLiveExecut
       const response = await sendLiveJson({ url: APPROVED_OPENROUTER_ENDPOINT, method: "POST", headers: { Authorization: `Bearer ${binding.openRouterApiKey}`,
         "Content-Type": "application/json", "X-OpenRouter-Metadata": "enabled" }, body,
         timeoutMs: RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET.searchTimeoutMs, cancellationSignal: binding.cancellationSignal },
-        () => audit.settle(receiptId, { actualSendCount: 1, sendState: "sent" }));
-      if (response.status === 429) throw new LiveOperationTransportError("after_send", "openrouter_search_rate_limited");
-      if (response.status < 200 || response.status >= 300) throw new LiveOperationTransportError("after_send", "openrouter_search_http_failure");
-      const normalized = normalizeOpenRouterSearchResponse(response.body, { request, providerRequestId, expectedModel: binding.openRouterSearchModel });
+        () => audit.settle(receiptId, { actualSendCount: 1, sendState: "sent" }),
+        (metadata) => audit.settle(receiptId, { httpStatus: metadata.status, providerRequestId: metadata.providerRequestId }));
+      if (response.status < 200 || response.status >= 300) {
+        audit.settle(receiptId, safeProviderError(response.body));
+        if (response.status === 429) throw new LiveOperationTransportError("after_send", "openrouter_search_rate_limited");
+        throw new LiveOperationTransportError("after_send", "openrouter_search_http_failure");
+      }
+      audit.settle(receiptId, openRouterEnvelopeDiagnostics(response.body));
+      const normalized = normalizeOpenRouterSearchResponse(response.body, { request, expectedModel: binding.openRouterSearchModel });
       const toolReason = normalized.providerMetadata.finishReason === "length" ? "openrouter_search_response_truncated"
         : normalized.providerMetadata.toolExecutionState === "verified" ? "search_completed"
           : normalized.providerMetadata.toolExecutionState === "not_executed" ? "search_tool_not_executed" : "search_tool_execution_unverified";
       audit.settle(receiptId, { completionState: normalized.providerMetadata.toolExecutionState === "verified" ? "completed" : "failed",
         elapsedMs: elapsed(binding.clock.nowMs(), started), usageState: normalized.usageKnown ? "known" : "unknown_possible_billable",
         outputTokens: normalized.outputTokens, providerRequestCount: normalized.providerRequestCount, usageCostUsd: normalized.usageCostUsd,
+        providerResponseId: normalized.providerMetadata.providerResponseId,
+        returnedModelIdentifier: normalized.providerMetadata.modelIdentifier,
+        finishReason: normalized.providerMetadata.finishReason,
+        toolExecutionState: normalized.providerMetadata.toolExecutionState,
+        annotationCount: normalized.providerMetadata.annotationCount,
+        normalizedCandidateCount: normalized.providerMetadata.normalizedCandidateCount,
         safeReasonCode: toolReason });
       const candidates = normalized.candidates;
       return { attemptId: request.attemptId, questionId: request.questionId, candidates, suggestedAdaptiveReason: null,
@@ -91,7 +107,7 @@ export function createLiveOpenRouterSearchAdapter(capability: InternalLiveExecut
   } };
 }
 
-export function normalizeOpenRouterSearchResponse(body: unknown, context: { request: SearchRequest; providerRequestId: string; expectedModel: string }): {
+export function normalizeOpenRouterSearchResponse(body: unknown, context: { request: SearchRequest; expectedModel: string }): {
   candidates: SearchResponse["candidates"]; providerRequestCount: number | null; outputTokens: number | null; usageCostUsd: number | null; usageKnown: boolean;
   providerMetadata: SearchResponse["providerMetadata"];
 } {
@@ -105,7 +121,7 @@ export function normalizeOpenRouterSearchResponse(body: unknown, context: { requ
   if (choices.length !== 1) throw new Error("openrouter_search_response_malformed");
   const choice = record(choices[0]); const message = record(choice.message);
   if (choice.index !== 0 || message.role !== "assistant" || !("content" in message)) throw new Error("openrouter_search_response_malformed");
-  validateOpenRouterSearchContent(message.content, context.providerRequestId);
+  if (message.content !== null && typeof message.content !== "string") throw new Error("openrouter_search_response_malformed");
   const finishReason = choice.finish_reason === null || choice.finish_reason === undefined ? null
     : typeof choice.finish_reason === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,95}$/.test(choice.finish_reason) ? choice.finish_reason
       : (() => { throw new Error("openrouter_search_response_malformed"); })();
@@ -174,24 +190,38 @@ async function sendOpenAiStructured<TRequest extends { batchId: string; attemptI
 ): Promise<StructuredBatchResponse<TOutput>> {
   const binding = requireLiveCapabilityBinding(capability); const operationId = reservationOperationId(request.reservationId, ":call");
   const receiptId = receiptIdentity(operation, operationId); const started = binding.clock.nowMs();
-  audit.reserve(baseReceipt(receiptId, request.reservationId, operationId, operation, "openai_responses_api"));
+  const localRequestId = `provider-request-${randomUUID()}`;
+  audit.reserve(baseReceipt(receiptId, request.reservationId, operationId, operation, "openai_responses_api", OPENAI_STRUCTURED_CONFIGURATION_CODE));
+  audit.settle(receiptId, { localRequestId, requestedModelIdentifier: binding.model, structuredOutputValidation: "not_reached" });
   try {
     const body = JSON.stringify({ model: binding.model, store: false, max_output_tokens: request.maximumOutputTokens,
       input: [{ role: "system", content: [{ type: "input_text", text: systemText }] }, { role: "user", content: [{ type: "input_text", text: JSON.stringify(request) }] }],
       text: { format: { type: "json_schema", name: schemaName, strict: true, schema } } });
     assertProviderOutboundPacketSafe({ provider: "openai_responses_api", url: APPROVED_OPENAI_ENDPOINT, method: "POST", headerNames: ["Authorization", "Content-Type"], body });
     const response = await sendLiveJson({ url: APPROVED_OPENAI_ENDPOINT, method: "POST", headers: { Authorization: `Bearer ${binding.openAiApiKey}`, "Content-Type": "application/json" }, body, timeoutMs: 20_000, cancellationSignal: binding.cancellationSignal },
-      () => audit.settle(receiptId, { actualSendCount: 1, sendState: "sent" }));
-    if (response.status < 200 || response.status >= 300) throw new LiveOperationTransportError("after_send", "openai_responses_http_failure");
-    const envelope = record(response.body); const parsed = JSON.parse(extractOutputText(envelope)) as Record<string, unknown>;
+      () => audit.settle(receiptId, { actualSendCount: 1, sendState: "sent" }),
+      (metadata) => audit.settle(receiptId, { httpStatus: metadata.status, providerRequestId: metadata.providerRequestId }));
+    if (response.status < 200 || response.status >= 300) {
+      audit.settle(receiptId, { ...safeProviderError(response.body), structuredOutputValidation: "not_reached" });
+      throw new LiveOperationTransportError("after_send", "openai_responses_http_failure");
+    }
+    const envelope = record(response.body);
+    audit.settle(receiptId, { providerResponseId: safeIdentifier(envelope.id), returnedModelIdentifier: safeModel(envelope.model) });
+    let parsed: Record<string, unknown>;
+    try { parsed = JSON.parse(extractOutputText(envelope)) as Record<string, unknown>; }
+    catch (error) { audit.settle(receiptId, { structuredOutputValidation: "failed" }); throw error; }
     if (typeof parsed.batchId !== "string" || typeof parsed.attemptId !== "string" || parsed.batchId !== request.batchId || parsed.attemptId !== request.attemptId
       || parsed.schemaVersion !== schemaName
       || !Array.isArray(parsed.items) || new Set(parsed.items.map((item) => record(item).itemId)).size !== parsed.items.length
       || parsed.items.length !== request.expectedItemIds.length
-      || parsed.items.some((item) => !request.expectedItemIds.includes(String(record(item).itemId)))) throw new Error("openai_response_identity_invalid");
+      || parsed.items.some((item) => !request.expectedItemIds.includes(String(record(item).itemId)))) {
+      audit.settle(receiptId, { structuredOutputValidation: "failed" });
+      throw new Error("openai_response_identity_invalid");
+    }
     const usage = record(envelope.usage).output_tokens; const outputTokens = Number.isInteger(usage) && Number(usage) >= 0 ? Number(usage) : null;
     audit.settle(receiptId, { completionState: "completed", elapsedMs: elapsed(binding.clock.nowMs(), started),
-      usageState: outputTokens === null ? "unknown_possible_billable" : "known", outputTokens, safeReasonCode: outputTokens === null ? "provider_usage_unknown" : "structured_response_completed" });
+      usageState: outputTokens === null ? "unknown_possible_billable" : "known", outputTokens, structuredOutputValidation: "passed",
+      safeReasonCode: outputTokens === null ? "provider_usage_unknown" : "structured_response_completed" });
     return { batchId: parsed.batchId, attemptId: parsed.attemptId, schemaVersion: String(parsed.schemaVersion ?? ""), items: parsed.items as TOutput[], reportedOutputTokens: outputTokens };
   } catch (error) { settleFailure(audit, receiptId, error, elapsed(binding.clock.nowMs(), started)); throw error; }
 }
@@ -200,7 +230,12 @@ function baseReceipt(receiptId: string, reservationId: string, operationId: stri
   providerConfigurationCode: string | null = null): ProviderOperationReceiptV1 {
   return { receiptId, reservationId, operationId, operation, providerCode, logicalAttempt: 1, actualSendCount: 0, retryCount: 0,
     sendState: "not_sent", completionState: "reserved", elapsedMs: 0, usageState: "known", outputTokens: null,
-    providerRequestCount: null, usageCostUsd: null, providerConfigurationCode, safeReasonCode: "reserved" };
+    providerRequestCount: null, usageCostUsd: null, providerConfigurationCode,
+    httpStatus: null, localRequestId: null, providerRequestId: null, providerResponseId: null,
+    requestedModelIdentifier: null, returnedModelIdentifier: null, finishReason: null, toolExecutionState: null,
+    annotationCount: null, normalizedCandidateCount: null, providerErrorType: null, providerErrorCode: null, providerErrorParam: null,
+    structuredOutputValidation: operation === "investigative_model" || operation === "semantic_model" ? "not_reached" : "not_applicable",
+    safeReasonCode: "reserved" };
 }
 function settleFailure(audit: ProviderOperationAuditLog, receiptId: string, error: unknown, elapsedMs: number): void {
   const state = error instanceof LiveOperationTransportError ? error.transportState : "before_send";
@@ -208,16 +243,27 @@ function settleFailure(audit: ProviderOperationAuditLog, receiptId: string, erro
   const completionState = !sent ? "not_sent" : state === "timed_out" ? "timed_out" : state === "cancelled" ? "cancelled" : "failed";
   audit.settle(receiptId, { completionState, elapsedMs, usageState: sent ? "unknown_possible_billable" : "known", safeReasonCode: safeError(error) });
 }
-function validateOpenRouterSearchContent(content: unknown, providerRequestId: string): void {
-  if (content === null || content === "") return;
-  if (typeof content !== "string") throw new Error("openrouter_search_response_malformed");
-  const trimmed = content.trim();
-  if (!trimmed) return;
-  let parsed: unknown;
-  try { parsed = JSON.parse(trimmed); } catch { return; }
-  const identity = record(parsed);
-  if (identity.schemaVersion !== OPENROUTER_SEARCH_IDENTITY_SCHEMA_ID || identity.providerRequestId !== providerRequestId
-    || Object.keys(identity).sort().join("|") !== "providerRequestId|schemaVersion") throw new Error("openrouter_response_identity_invalid");
+function openRouterEnvelopeDiagnostics(body: unknown): Partial<ProviderOperationReceiptV1> {
+  const envelope = record(body); const choices = asArray(envelope.choices); const choice = record(choices[0]); const message = record(choice.message);
+  const annotations = Array.isArray(message.annotations) ? message.annotations : [];
+  const usage = record(envelope.usage); const serverToolUse = record(usage.server_tool_use);
+  const requestCount = Number.isSafeInteger(serverToolUse.web_search_requests) && Number(serverToolUse.web_search_requests) >= 0
+    ? Number(serverToolUse.web_search_requests) : null;
+  const finishReason = safeDiagnostic(choice.finish_reason);
+  const toolExecutionState = finishReason === "length" ? "unverified"
+    : requestCount === 1 || annotations.length > 0 ? "verified" : requestCount === 0 ? "not_executed" : "unverified";
+  return { providerResponseId: safeIdentifier(envelope.id), returnedModelIdentifier: safeModel(envelope.model), finishReason,
+    providerRequestCount: requestCount, toolExecutionState, annotationCount: annotations.length, normalizedCandidateCount: 0 };
+}
+function safeProviderError(body: unknown): Pick<ProviderOperationReceiptV1, "providerErrorType" | "providerErrorCode" | "providerErrorParam"> {
+  const error = record(record(body).error);
+  return { providerErrorType: safeDiagnostic(error.type), providerErrorCode: safeDiagnostic(error.code), providerErrorParam: safeDiagnostic(error.param) };
+}
+function safeIdentifier(value: unknown): string | null { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(value) ? value : null; }
+function safeModel(value: unknown): string | null { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:\/-]{0,255}$/.test(value) ? value : null; }
+function safeDiagnostic(value: unknown): string | null {
+  const text = typeof value === "number" && Number.isSafeInteger(value) ? String(value) : typeof value === "string" ? value : "";
+  return /^[A-Za-z0-9][A-Za-z0-9_.:\[\]-]{0,127}$/.test(text) ? text : null;
 }
 function extractOutputText(body: Record<string, unknown>): string { if (typeof body.output_text === "string") return body.output_text;
   for (const output of asArray(body.output)) for (const content of asArray(record(output).content)) { const text = record(content).text; if (typeof text === "string") return text; }

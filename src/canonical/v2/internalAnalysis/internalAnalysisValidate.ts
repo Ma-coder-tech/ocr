@@ -17,7 +17,10 @@ const EVIDENCE_KEYS = ["evidenceId", "supportId", "questionId", "candidateId", "
   "documentId", "documentFingerprint", "locator", "boundedSupportingExcerpt", "semanticVerification", "limitations"] as const;
 const LOCATOR_KEYS = ["locatorId", "page", "sectionCode", "lineStart", "lineEnd"] as const;
 const RECEIPT_KEYS = ["receiptId", "reservationId", "operationId", "operation", "providerCode", "logicalAttempt", "actualSendCount", "retryCount",
-  "sendState", "completionState", "elapsedMs", "usageState", "outputTokens", "providerRequestCount", "usageCostUsd", "providerConfigurationCode", "safeReasonCode"] as const;
+  "sendState", "completionState", "elapsedMs", "usageState", "outputTokens", "providerRequestCount", "usageCostUsd", "providerConfigurationCode",
+  "httpStatus", "localRequestId", "providerRequestId", "providerResponseId", "requestedModelIdentifier", "returnedModelIdentifier", "finishReason",
+  "toolExecutionState", "annotationCount", "normalizedCandidateCount", "providerErrorType", "providerErrorCode", "providerErrorParam",
+  "structuredOutputValidation", "safeReasonCode"] as const;
 const FINDING_ARRAYS = ["canonicalFacts", "admittedKnowledge", "supportedResearchFindings", "investigativeHypotheses", "contradictions", "unresolvedQuestions"] as const;
 const ANALYSIS_ARRAYS = [...FINDING_ARRAYS, "amendmentIds", "researchQuestionOutcomes", "statementObservations", "recommendations", "impact", "limitations"] as const;
 const RESEARCH_OUTCOMES = ["research_completed", "completed_with_unresolved_evidence", "research_unavailable_due_to_timeout",
@@ -169,8 +172,18 @@ export function validateInternalAnalysisReferenceGraph(analysis: InternalStateme
   if (analysis.admittedKnowledge.some((item) => item.knowledgeRefs.some((ref) => !rfRefs.has(ref)))) issues.push("internal_analysis_knowledge_reference_invalid");
   for (const entry of manifest.entries) {
     const outcome = outcomes.get(entry.supportId);
-    if (!outcome || outcome.questionId !== entry.questionId || outcome.candidateId !== entry.candidateId || outcome.documentId !== entry.documentId
-      || outcome.locatorId !== entry.locator.locatorId || outcome.status !== entry.semanticVerification) issues.push("public_source_manifest_reference_graph_invalid");
+    const retrievedUnverified = !outcome && entry.semanticVerification === "verification_unavailable"
+      && entry.limitations.includes("source_existence_and_provenance_established")
+      && entry.limitations.includes("semantic_verification_not_completed")
+      && entry.limitations.includes("not_supported_research_finding");
+    if (!retrievedUnverified && (!outcome || outcome.questionId !== entry.questionId || outcome.candidateId !== entry.candidateId
+      || outcome.documentId !== entry.documentId || outcome.locatorId !== entry.locator.locatorId
+      || outcome.status !== entry.semanticVerification)) issues.push("public_source_manifest_reference_graph_invalid");
+  }
+  const unverifiedEvidenceIds = new Set(manifest.entries.filter((entry) => entry.semanticVerification === "verification_unavailable"
+    && entry.limitations.includes("semantic_verification_not_completed")).map((entry) => entry.evidenceId));
+  if (analysis.supportedResearchFindings.some((finding) => finding.researchEvidenceRefs.some((ref) => unverifiedEvidenceIds.has(ref)))) {
+    issues.push("retrieved_unverified_evidence_cannot_support_finding");
   }
   return [...new Set(issues)].sort();
 }
@@ -218,6 +231,14 @@ export function validateRgInternalAuditV1(audit: RgInternalAuditV1): string[] {
     || !Number.isSafeInteger(item.elapsedMs) || item.elapsedMs < 0 || (item.outputTokens !== null && (!Number.isSafeInteger(item.outputTokens) || item.outputTokens < 0))
     || (item.providerRequestCount !== null && (!Number.isSafeInteger(item.providerRequestCount) || item.providerRequestCount < 0))
     || (item.usageCostUsd !== null && (!Number.isFinite(item.usageCostUsd) || item.usageCostUsd < 0))
+    || (item.httpStatus !== null && (!Number.isSafeInteger(item.httpStatus) || item.httpStatus < 100 || item.httpStatus > 599))
+    || ![item.localRequestId, item.providerRequestId, item.providerResponseId].every((value) => value === null || isSafeStructuredString(value))
+    || ![item.requestedModelIdentifier, item.returnedModelIdentifier].every((value) => value === null || safeProviderModel(value))
+    || (item.finishReason !== null && !isSafeStructuredString(item.finishReason))
+    || (item.toolExecutionState !== null && !["verified", "unverified", "not_executed"].includes(String(item.toolExecutionState)))
+    || [item.annotationCount, item.normalizedCandidateCount].some((value) => value !== null && (!Number.isSafeInteger(value) || value < 0))
+    || ![item.providerErrorType, item.providerErrorCode, item.providerErrorParam].every((value) => value === null || isSafeProviderDiagnostic(value))
+    || !["not_applicable", "not_reached", "passed", "failed"].includes(String(item.structuredOutputValidation))
     || !["known", "unknown_possible_billable"].includes(String(item.usageState))
     || (item.usageState === "unknown_possible_billable" && item.actualSendCount !== 1))) issues.push("rg_internal_audit_one_attempt_invariant_failed");
   if (new Set(audit.providerOperationReceipts.map((item) => item.receiptId)).size !== audit.providerOperationReceipts.length
@@ -248,6 +269,8 @@ function containsPrivateProviderMaterial(value: string): boolean {
 function arraysOfSafeIds(...values: unknown[]): boolean { return values.every((value) => Array.isArray(value) && value.every(isSafeStructuredString) && new Set(value).size === value.length); }
 function safeStringArray(value: unknown): boolean { return Array.isArray(value) && value.every(isSafeStructuredString) && new Set(value).size === value.length; }
 function safeDisplayText(value: unknown, maximumLength: number): value is string { return typeof value === "string" && value.length <= maximumLength && !/[\0-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(value); }
+function safeProviderModel(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:\/-]{0,255}$/.test(value); }
+function isSafeProviderDiagnostic(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:\[\]-]{0,127}$/.test(value); }
 function safeNullableMoney(value: unknown): boolean { return value === null || (Number.isSafeInteger(value) && Number(value) >= 0); }
 function validFindingValue(value: unknown): boolean {
   if (value === null) return true;

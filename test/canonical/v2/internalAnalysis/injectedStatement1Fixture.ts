@@ -34,7 +34,12 @@ export function createInjectedStatement1Fixture() {
       operationId, operation, providerCode, logicalAttempt: 1, actualSendCount: 0, retryCount: 0,
       sendState: "not_sent", completionState: "completed", elapsedMs: 1, usageState: "known", outputTokens: null,
       providerRequestCount: operation === "search" ? 1 : null, usageCostUsd: operation === "search" ? 0 : null,
-      providerConfigurationCode: operation === "search" ? "injected_openrouter_perplexity_v1" : null, safeReasonCode: "injected_response" });
+      providerConfigurationCode: operation === "search" ? "injected_openrouter_perplexity_v1" : null,
+      httpStatus: null, localRequestId: null, providerRequestId: null, providerResponseId: null,
+      requestedModelIdentifier: null, returnedModelIdentifier: null, finishReason: null, toolExecutionState: null,
+      annotationCount: null, normalizedCandidateCount: null, providerErrorType: null, providerErrorCode: null, providerErrorParam: null,
+      structuredOutputValidation: operation === "investigative_model" || operation === "semantic_model" ? "passed" : "not_applicable",
+      safeReasonCode: "injected_response" });
   };
   const htmlByCandidate = new Map<string, string>();
   const approvedNonSwipedPath = "/content/dam/firstdata/us/en/documents/pdf/How_to_Read_Your_statement_swipe_Non_swipe.pdf";

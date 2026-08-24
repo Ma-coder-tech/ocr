@@ -29,15 +29,21 @@ export function createNodeHttpsRetrievalPort(capability: InternalLiveExecutionCa
     config.audit.reserve({ receiptId, reservationId: request.reservationId, operationId, operation: "retrieval", providerCode: "node_https_pinned",
       logicalAttempt: 1, actualSendCount: 0, retryCount: 0, sendState: "not_sent", completionState: "reserved", elapsedMs: 0,
       usageState: "known", outputTokens: null, providerRequestCount: null, usageCostUsd: null, providerConfigurationCode: "ratereveal_node_https_pinned_v2",
+      httpStatus: null, localRequestId: null, providerRequestId: null, providerResponseId: null,
+      requestedModelIdentifier: null, returnedModelIdentifier: null, finishReason: null, toolExecutionState: null,
+      annotationCount: null, normalizedCandidateCount: null, providerErrorType: null, providerErrorCode: null, providerErrorParam: null,
+      structuredOutputValidation: "not_applicable",
       safeReasonCode: "reserved" });
     try {
       const result = await sendPinnedGet(request, request.permit, config, () => config.audit.settle(receiptId, { actualSendCount: 1, sendState: "sent" }));
       if (!request.permit.approvedAddresses.includes(result.connectedAddress)) throw new Error("retrieval_dns_rebinding_or_unpinned_connection");
       if (result.redirectUrl) {
-        config.audit.settle(receiptId, { completionState: "completed", elapsedMs: elapsed(binding.clock.nowMs(), started), safeReasonCode: "retrieval_redirect_not_followed" });
+        config.audit.settle(receiptId, { completionState: "completed", elapsedMs: elapsed(binding.clock.nowMs(), started),
+          httpStatus: result.statusCode, safeReasonCode: "retrieval_redirect_not_followed" });
         return emptyResponse(request, result.connectedAddress, "safety_blocked", result.streamedBytes);
       }
-      config.audit.settle(receiptId, { completionState: "completed", elapsedMs: elapsed(binding.clock.nowMs(), started), safeReasonCode: "retrieval_completed" });
+      config.audit.settle(receiptId, { completionState: "completed", elapsedMs: elapsed(binding.clock.nowMs(), started),
+        httpStatus: result.statusCode, safeReasonCode: "retrieval_completed" });
       return { questionId: request.questionId, candidateId: request.candidateId, documentId: request.documentId,
         status: result.statusCode >= 200 && result.statusCode < 300 ? "retrieved" : "inaccessible", connectedAddress: result.connectedAddress,
         redirects: [], mimeType: result.mimeType, content: result.content, byteLength: result.content?.byteLength ?? 0, streamedByteLength: result.streamedBytes,

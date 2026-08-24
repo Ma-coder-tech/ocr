@@ -10,8 +10,10 @@ import {
   createInternalLiveExecutionCapability, createLiveOpenRouterSearchAdapter, createLiveOpenAiInvestigativeAdapter,
   createLiveOpenAiSemanticAdapter, createInternalLiveIntelligencePorts,
   createDestinationPermit, createNodeHttpsRetrievalPort, createPublicDocumentExtractionPort, createPublicSourceAuthorityAdmission,
-  INVESTIGATIVE_RESPONSE_SCHEMA_HASH, OPENROUTER_SEARCH_IDENTITY_SCHEMA_HASH, type SearchRequest,
-  inspectProviderOutboundPacket, normalizeOpenRouterSearchResponse, runInternalProviderPreflight, sanitizePublicDocumentTextForProvider,
+  INVESTIGATIVE_RESPONSE_SCHEMA_HASH, INVESTIGATIVE_RESPONSE_SCHEMA_V1, OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH,
+  SEMANTIC_RESPONSE_SCHEMA_V1, type SearchRequest,
+  inspectProviderOutboundPacket, normalizeOpenRouterSearchResponse, runInternalProviderPreflight, runProviderReadinessProbe,
+  sanitizePublicDocumentTextForProvider,
 } from "../../../../src/canonical/v2/index.js";
 import { unsafeProviderContext } from "./injectedStatement1Fixture.js";
 
@@ -48,9 +50,9 @@ const searchRequest: SearchRequest = { reservationId: "attempt-one:call", attemp
 describe("internal-analysis construction-bound provider seams", () => {
   it("binds fixed endpoints, exact schemas, one send, and truthful success receipts", async () => {
     const cap = await capability(); const sent: Array<{ url: string; init: RequestInit }> = [];
-    globalThis.fetch = vi.fn(async (url, init) => { sent.push({ url: String(url), init: init! }); const request = JSON.parse(String(init?.body));
-      const identity = JSON.parse(request.messages[1].content); return { status: 200,
-        json: async () => openRouterResponse(identity.providerRequestId, [{ url: "https://docs.example.test/application-fee", title: "Official title", content: "discard me" }]) } as Response; });
+    globalThis.fetch = vi.fn(async (url, init) => { sent.push({ url: String(url), init: init! }); return { status: 200,
+      headers: new Headers({ "x-request-id": "or-http-request-001" }),
+      json: async () => openRouterResponse([{ url: "https://docs.example.test/application-fee", title: "Official title", content: "discard me" }]) } as Response; });
     const audit = new ProviderOperationAuditLog(); const response = await createLiveOpenRouterSearchAdapter(cap, audit).search(searchRequest);
     expect(sent).toHaveLength(1); expect(sent[0]!.url).toBe(APPROVED_OPENROUTER_ENDPOINT); expect(response.candidates[0]).toMatchObject({ rank: 1, locatorHint: null,
       discoveryMetadata: { providerCode: "openrouter_web_search", configurationCode: OPENROUTER_SEARCH_CONFIGURATION_CODE, sourceDomain: "docs.example.test", providerSnippetUsedAsEvidence: false } });
@@ -60,50 +62,55 @@ describe("internal-analysis construction-bound provider seams", () => {
       reasoning: { effort: "none", exclude: true }, tool_choice: "required", max_tool_calls: 1,
       tools: [{ type: "openrouter:web_search", parameters: { engine: "perplexity", max_results: 3, max_total_results: 3, max_uses: 1 } }],
       provider: { only: ["openai"], allow_fallbacks: false, require_parameters: true, data_collection: "deny" } });
+    expect(requestBody.messages[1].content).toBe(JSON.stringify({ query: searchRequest.queryText, maximumCandidates: 3 }));
+    expect(requestBody.messages[1].content).not.toContain("providerRequestId");
     expect(audit.snapshot()).toEqual([expect.objectContaining({ reservationId: "attempt-one:call", actualSendCount: 1, sendState: "sent", completionState: "completed",
-      retryCount: 0, providerRequestCount: 1, usageCostUsd: 0.0123, providerConfigurationCode: OPENROUTER_SEARCH_CONFIGURATION_CODE })]);
-    expect(cap.searchIdentitySchemaHash).toBe(OPENROUTER_SEARCH_IDENTITY_SCHEMA_HASH);
+      retryCount: 0, providerRequestCount: 1, usageCostUsd: 0.0123, providerConfigurationCode: OPENROUTER_SEARCH_CONFIGURATION_CODE,
+      httpStatus: 200, providerRequestId: "or-http-request-001", providerResponseId: "chatcmpl-openrouter-test",
+      requestedModelIdentifier: "openai/gpt-5.2", returnedModelIdentifier: "openai/gpt-5.2",
+      finishReason: null, toolExecutionState: "verified", annotationCount: 1, normalizedCandidateCount: 1 })]);
+    expect(audit.snapshot()[0]!.localRequestId).toMatch(/^provider-request-[0-9a-f-]{36}$/);
+    expect(cap.searchResponseContractHash).toBe(OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH);
     expect(cap.investigativeSchemaHash).toBe(INVESTIGATIVE_RESPONSE_SCHEMA_HASH); expect(cap.openAiEndpoint).toBe(APPROVED_OPENAI_ENDPOINT);
     expect(cap.authorityRegistryHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("normalizes documented OpenRouter citation responses without treating provider prose as evidence", () => {
-    const providerRequestId = "provider-request-00000000-0000-4000-8000-000000000000";
     const documented = [
       { name: "assistant prose", content: "Here are the public results.", annotations: [citation("https://docs.example.test/application-fee", "Official title")] },
       { name: "empty text", content: "", annotations: [citation("https://docs.example.test/application-fee", "Official title")] },
       { name: "null text", content: null, annotations: [citation("https://docs.example.test/application-fee", "Official title")] },
-      { name: "structured identity", content: JSON.stringify({ schemaVersion: "openrouter_search_identity_v1", providerRequestId }),
+      { name: "arbitrary structured model content", content: JSON.stringify({ result: "model generated content is not transport identity" }),
         annotations: [citation("https://docs.example.test/application-fee", "Official title")] },
     ];
     for (const fixture of documented) {
-      const body = openRouterResponse(providerRequestId, [], { choices: [{ index: 0, message: { role: "assistant", content: fixture.content,
+      const body = openRouterResponse([], { choices: [{ index: 0, message: { role: "assistant", content: fixture.content,
         annotations: fixture.annotations, provider_metadata: { ignored: true } } }], unrelated_provider_metadata: { ignored: true } });
-      const normalized = normalizeOpenRouterSearchResponse(body, { request: searchRequest, providerRequestId, expectedModel: "openai/gpt-5.2" });
+      const normalized = normalizeOpenRouterSearchResponse(body, { request: searchRequest, expectedModel: "openai/gpt-5.2" });
       expect(normalized.candidates, fixture.name).toHaveLength(1);
       expect(normalized.candidates[0]).toMatchObject({ url: "https://docs.example.test/application-fee", title: "Official title" });
       expect(JSON.stringify(normalized), fixture.name).not.toContain("provider snippet must be discarded");
     }
 
-    const noSearch = openRouterResponse(providerRequestId, [], { choices: [{ index: 0, message: { role: "assistant", content: "No usable public result." } }],
+    const noSearch = openRouterResponse([], { choices: [{ index: 0, message: { role: "assistant", content: "No usable public result." } }],
       usage: { completion_tokens: 4, cost: 0.001, server_tool_use: { web_search_requests: 0 } } });
-    const normalizedNoSearch = normalizeOpenRouterSearchResponse(noSearch, { request: searchRequest, providerRequestId, expectedModel: "openai/gpt-5.2" });
+    const normalizedNoSearch = normalizeOpenRouterSearchResponse(noSearch, { request: searchRequest, expectedModel: "openai/gpt-5.2" });
     expect(normalizedNoSearch).toMatchObject({ candidates: [], providerRequestCount: 0, usageKnown: true,
       providerMetadata: { toolExecutionState: "not_executed", annotationCount: 0, normalizedCandidateCount: 0 } });
 
-    const executionUnverified = openRouterResponse(providerRequestId, [], { choices: [{ index: 0,
+    const executionUnverified = openRouterResponse([], { choices: [{ index: 0,
       finish_reason: "stop", message: { role: "assistant", content: "No usable public result." } }], usage: { completion_tokens: 4 } });
-    expect(normalizeOpenRouterSearchResponse(executionUnverified, { request: searchRequest, providerRequestId,
+    expect(normalizeOpenRouterSearchResponse(executionUnverified, { request: searchRequest,
       expectedModel: "openai/gpt-5.2" })).toMatchObject({ candidates: [], providerRequestCount: null,
       providerMetadata: { providerResponseId: "chatcmpl-openrouter-test", modelIdentifier: "openai/gpt-5.2",
         finishReason: "stop", toolExecutionState: "unverified", annotationCount: 0, normalizedCandidateCount: 0,
         providerCompletionState: "completed" } });
 
-    const truncated = openRouterResponse(providerRequestId, [{ url: "https://docs.example.test/application-fee", title: "Official title" }], {
+    const truncated = openRouterResponse([{ url: "https://docs.example.test/application-fee", title: "Official title" }], {
       choices: [{ index: 0, finish_reason: "length", message: { role: "assistant", content: "", annotations: [citation("https://docs.example.test/application-fee", "Official title")] } }],
       usage: { completion_tokens: 512, cost: 0.02, server_tool_use: { web_search_requests: 1 } },
     });
-    expect(normalizeOpenRouterSearchResponse(truncated, { request: searchRequest, providerRequestId,
+    expect(normalizeOpenRouterSearchResponse(truncated, { request: searchRequest,
       expectedModel: "openai/gpt-5.2" })).toMatchObject({ candidates: [expect.objectContaining({ url: "https://docs.example.test/application-fee" })],
       providerMetadata: { finishReason: "length", toolExecutionState: "unverified", annotationCount: 1, normalizedCandidateCount: 1 } });
   });
@@ -111,8 +118,8 @@ describe("internal-analysis construction-bound provider seams", () => {
   it("fails a length-truncated OpenRouter response closed while preserving safe usage", async () => {
     const cap = await capability(); const audit = new ProviderOperationAuditLog();
     globalThis.fetch = vi.fn(async (_url, init) => {
-      const request = JSON.parse(String(init?.body)); const identity = JSON.parse(request.messages[1].content);
-      return { status: 200, json: async () => openRouterResponse(identity.providerRequestId,
+      void init;
+      return { status: 200, json: async () => openRouterResponse(
         [{ url: "https://docs.example.test/application-fee", title: "Official title" }], {
           choices: [{ index: 0, finish_reason: "length", message: { role: "assistant", content: "",
             annotations: [citation("https://docs.example.test/application-fee", "Official title")] } }],
@@ -134,32 +141,35 @@ describe("internal-analysis construction-bound provider seams", () => {
         annotations: [citation("https://docs.example.test/application-fee", "One"), citation("https://docs.example.test/application-fee", "Two")] } }] }), reason: "duplicate_url" },
       { name: "too-many", mutate: (response) => ({ ...response, choices: [{ ...response.choices[0], message: { ...response.choices[0]!.message,
         annotations: Array.from({ length: 4 }, (_, index) => citation(`https://docs.example.test/application-fee-${index}`, `Title ${index}`)) } }] }), reason: "result_cap_exceeded" },
-      { name: "wrong-identity", mutate: (response) => ({ ...response, choices: [{ ...response.choices[0], message: { ...response.choices[0]!.message,
-        content: JSON.stringify({ schemaVersion: "openrouter_search_identity_v1", providerRequestId: "provider-request-00000000-0000-4000-8000-000000000000" }) } }] }), reason: "identity_invalid" },
+      { name: "wrong-model", mutate: (response) => ({ ...response, model: "openai/different-model" }), reason: "identity_invalid" },
       { name: "fallback", mutate: (response) => ({ ...response, openrouter_metadata: { attempts: [{ provider: "one" }, { provider: "two" }] } }), reason: "fallback_or_retry_detected" },
     ];
     for (const item of cases) {
       const cap = await capability(); const audit = new ProviderOperationAuditLog(); let sends = 0;
-      globalThis.fetch = vi.fn(async (_url, init) => { sends += 1; const request = JSON.parse(String(init?.body)); const identity = JSON.parse(request.messages[1].content);
-        return { status: 200, json: async () => item.mutate(openRouterResponse(identity.providerRequestId, [])) } as Response; });
+      globalThis.fetch = vi.fn(async () => { sends += 1;
+        return { status: 200, json: async () => item.mutate(openRouterResponse([])) } as Response; });
       await expect(createLiveOpenRouterSearchAdapter(cap, audit).search(searchRequest)).rejects.toThrow(item.reason);
-      expect(sends, item.name).toBe(1); expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, retryCount: 0, completionState: "failed", usageState: "unknown_possible_billable" });
+      expect(sends, item.name).toBe(1); expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, retryCount: 0, completionState: "failed", usageState: "unknown_possible_billable",
+        httpStatus: 200, providerResponseId: "chatcmpl-openrouter-test", returnedModelIdentifier: item.name === "wrong-model" ? "openai/different-model" : "openai/gpt-5.2" });
     }
   });
 
   it("preserves missing OpenRouter usage as unknown, distinguishes rate limits, and forbids a second send for one reservation", async () => {
     const cap = await capability(); const audit = new ProviderOperationAuditLog(); let sends = 0;
-    globalThis.fetch = vi.fn(async (_url, init) => { sends += 1; const request = JSON.parse(String(init?.body)); const identity = JSON.parse(request.messages[1].content);
-      const response = openRouterResponse(identity.providerRequestId, [{ url: "https://docs.example.test/application-fee", title: "Official title" }]);
+    globalThis.fetch = vi.fn(async () => { sends += 1;
+      const response = openRouterResponse([{ url: "https://docs.example.test/application-fee", title: "Official title" }]);
       return { status: 200, json: async () => ({ ...response, usage: undefined }) } as Response; });
     const adapter = createLiveOpenRouterSearchAdapter(cap, audit); await adapter.search(searchRequest);
     expect(audit.snapshot()[0]).toMatchObject({ providerRequestCount: null, usageCostUsd: null, outputTokens: null, usageState: "unknown_possible_billable" });
     await expect(adapter.search(searchRequest)).rejects.toThrow("duplicate_provider_operation_receipt"); expect(sends).toBe(1);
 
     const rateCap = await capability(); const rateAudit = new ProviderOperationAuditLog(); let rateSends = 0;
-    globalThis.fetch = vi.fn(async () => { rateSends += 1; return { status: 429, json: async () => ({ error: { code: 429 } }) } as Response; });
+    globalThis.fetch = vi.fn(async () => { rateSends += 1; return { status: 429, headers: new Headers({ "x-request-id": "or-rate-request-001" }),
+      json: async () => ({ error: { type: "rate_limit_error", code: 429, param: "web_search", message: "unsafe provider prose" } }) } as Response; });
     await expect(createLiveOpenRouterSearchAdapter(rateCap, rateAudit).search(searchRequest)).rejects.toThrow("rate_limited");
-    expect(rateSends).toBe(1); expect(rateAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, retryCount: 0, completionState: "failed", usageState: "unknown_possible_billable" });
+    expect(rateSends).toBe(1); expect(rateAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, retryCount: 0, completionState: "failed", usageState: "unknown_possible_billable",
+      httpStatus: 429, providerRequestId: "or-rate-request-001", providerErrorType: "rate_limit_error", providerErrorCode: "429", providerErrorParam: "web_search" });
+    expect(JSON.stringify(rateAudit.snapshot())).not.toContain("unsafe provider prose");
   });
 
   it("rejects unsupported OpenRouter engine/loop/fallback preflight configurations", () => {
@@ -180,13 +190,98 @@ describe("internal-analysis construction-bound provider seams", () => {
 
   it("uses exact OpenAI Responses schema, store=false, identity, token usage, and one send", async () => {
     const cap = await capability(); let requestBody = "";
-    globalThis.fetch = vi.fn(async (_url, init) => { requestBody = String(init?.body); return { status: 200, json: async () => ({
+    globalThis.fetch = vi.fn(async (_url, init) => { requestBody = String(init?.body); return { status: 200,
+      headers: new Headers({ "x-request-id": "oa-http-request-001" }), json: async () => ({ id: "resp-openai-test-001", model: "approved-test-model",
       output_text: JSON.stringify({ batchId: "batch-one", attemptId: "attempt-one", schemaVersion: "investigative_observation_v1", items: [] }), usage: { output_tokens: 7 } }) } as Response; });
     const audit = new ProviderOperationAuditLog(); const adapter = createLiveOpenAiInvestigativeAdapter(cap, audit);
     await adapter.investigate({ batchId: "batch-one", attemptId: "attempt-one", schemaVersion: "investigative_observation_v1", expectedItemIds: [],
       reservationId: "operation-one:call", maximumOutputTokens: 1_200, logicalAttempt: 1, items: [], untrustedContentPolicy: "data_only_no_instructions" });
     const body = JSON.parse(requestBody); expect(body).toMatchObject({ store: false, max_output_tokens: 1_200, text: { format: { type: "json_schema", strict: true } } });
-    expect(body.text.format.schema).not.toEqual({}); expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "completed", outputTokens: 7, usageState: "known" });
+    expect(body.text.format.schema).not.toEqual({}); expect(body).not.toHaveProperty("reasoning");
+    expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "completed", outputTokens: 7, usageState: "known",
+      httpStatus: 200, providerRequestId: "oa-http-request-001", providerResponseId: "resp-openai-test-001",
+      requestedModelIdentifier: "approved-test-model", returnedModelIdentifier: "approved-test-model", structuredOutputValidation: "passed" });
+  });
+
+  it("uses provider-compatible explicit types for every strict Structured Outputs enum and const", () => {
+    for (const schema of [INVESTIGATIVE_RESPONSE_SCHEMA_V1, SEMANTIC_RESPONSE_SCHEMA_V1]) {
+      const issues: string[] = [];
+      inspectStrictSchemaSubset(schema, "$", issues);
+      expect(issues).toEqual([]);
+    }
+  });
+
+  it("retains only allowlisted OpenAI non-2xx diagnostics after exactly one possibly billable send", async () => {
+    const cap = await capability(); const audit = new ProviderOperationAuditLog(); let sends = 0;
+    globalThis.fetch = vi.fn(async () => { sends += 1; return { status: 400,
+      headers: new Headers({ "x-request-id": "req-safe-openai-400" }),
+      json: async () => ({ error: { type: "invalid_request_error", code: "unsupported_value", param: "reasoning.effort",
+        message: "unsafe raw message with request details", internal_debug: "must not persist" } }) } as Response; });
+    await expect(createLiveOpenAiInvestigativeAdapter(cap, audit).investigate({ batchId: "batch-http-failure", attemptId: "attempt-http-failure",
+      schemaVersion: "investigative_observation_v1", expectedItemIds: [], reservationId: "operation-http-failure:call",
+      maximumOutputTokens: 1_200, logicalAttempt: 1, items: [], untrustedContentPolicy: "data_only_no_instructions" }))
+      .rejects.toThrow("openai_responses_http_failure");
+    expect(sends).toBe(1);
+    expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, retryCount: 0, completionState: "failed",
+      usageState: "unknown_possible_billable", httpStatus: 400, providerRequestId: "req-safe-openai-400",
+      requestedModelIdentifier: "approved-test-model", providerErrorType: "invalid_request_error",
+      providerErrorCode: "unsupported_value", providerErrorParam: "reasoning.effort", structuredOutputValidation: "not_reached" });
+    expect(JSON.stringify(audit.snapshot())).not.toMatch(/unsafe raw message|internal_debug/);
+  });
+
+  it("runs the synthetic provider-readiness boundary in exactly three sequential sends with no Statement data", async () => {
+    const cap = await capability(); const audit = new ProviderOperationAuditLog(); const outboundBodies: string[] = [];
+    globalThis.fetch = vi.fn(async (_url, init) => {
+      const bodyText = String(init?.body); outboundBodies.push(bodyText); const call = outboundBodies.length;
+      if (call === 1) return { status: 200, headers: new Headers({ "x-request-id": "readiness-or-001" }), json: async () =>
+        openRouterResponse([{ url: "https://platform.openai.com/docs/api-reference/responses", title: "Responses API" }]) } as Response;
+      const body = JSON.parse(bodyText); const request = JSON.parse(body.input[1].content[0].text);
+      if (call === 2) {
+        const item = request.items[0]; const locator = item.locators[0];
+        return { status: 200, headers: new Headers({ "x-request-id": "readiness-oa-investigative-001" }), json: async () => ({
+          id: "resp-readiness-investigative", model: "approved-test-model", usage: { output_tokens: 91 },
+          output_text: JSON.stringify({ batchId: request.batchId, attemptId: request.attemptId, schemaVersion: request.schemaVersion,
+            items: [{ itemId: item.itemId, questionId: item.questionId, candidateId: item.candidateId, documentId: item.documentId,
+              locatorId: locator.locatorId, documentFingerprint: item.documentFingerprint, interpretationCode: "bounded_public_term_definition",
+              proposedValue: { kind: "term", termCode: "application_fee_terminology", termValue: "scope_limited" },
+              sourceAuthorityCandidate: "processor_publication", effectiveFromCandidate: null, effectiveToCandidate: null,
+              limitationCodes: ["synthetic_readiness_only", "not_production_evidence"], financialMutationAllowed: false }] }),
+        }) } as Response;
+      }
+      const item = request.items[0];
+      return { status: 200, headers: new Headers({ "x-request-id": "readiness-oa-semantic-001" }), json: async () => ({
+        id: "resp-readiness-semantic", model: "approved-test-model", usage: { output_tokens: 88 },
+        output_text: JSON.stringify({ batchId: request.batchId, attemptId: request.attemptId, schemaVersion: request.schemaVersion,
+          items: [{ itemId: item.itemId, supportId: "readiness-support-001", questionId: item.question.questionId,
+            claimType: item.question.claimType, subjectCode: item.question.subjectCode, candidateId: item.candidate.candidateId,
+            documentId: item.documentId, locatorId: item.locator.locatorId, documentFingerprint: item.locator.documentFingerprint,
+            investigativeObservationId: item.itemId, sourceAuthority: "processor_publication", sourceEffectiveFrom: null,
+            sourceEffectiveTo: null, applicabilityScope: item.question.scope, proposedValue: item.proposedValue,
+            assertionBasisCode: "claim_specific_public_definition", verificationStatus: "supported_candidate",
+            limitationCodes: ["synthetic_readiness_only", "not_production_evidence"], admissionAuthority: "none", financialMutationAllowed: false }] }),
+      }) } as Response;
+    });
+    const result = await runProviderReadinessProbe("provider-readiness-test", cap, audit);
+    expect(outboundBodies).toHaveLength(3);
+    expect(result).toMatchObject({ statementAnalysisExecuted: false, privateStatementDataProviderBound: false,
+      openRouter: { status: "passed", toolExecutionState: "verified" },
+      investigativeOpenAi: { status: "passed", structuredOutputValidation: "passed" },
+      semanticOpenAi: { status: "passed", structuredOutputValidation: "passed" } });
+    expect(result.receipts.map((receipt) => [receipt.operation, receipt.actualSendCount, receipt.retryCount])).toEqual([
+      ["search", 1, 0], ["investigative_model", 1, 0], ["semantic_model", 1, 0],
+    ]);
+    expect(outboundBodies.join("\n")).not.toMatch(/SAMPLE_MERCHANT|fsv-03-clover|merchant-private|account-private|statement-one-live-internal-evaluation/);
+  });
+
+  it("stops provider readiness after the first failed operation without retry or later sends", async () => {
+    const cap = await capability(); const audit = new ProviderOperationAuditLog(); let sends = 0;
+    globalThis.fetch = vi.fn(async () => { sends += 1; return { status: 502, headers: new Headers({ "x-request-id": "readiness-or-failed" }),
+      json: async () => ({ error: { type: "upstream_error", code: "bad_gateway", message: "discard this" } }) } as Response; });
+    await expect(runProviderReadinessProbe("provider-readiness-failed", cap, audit)).rejects.toThrow("openrouter_search_http_failure");
+    expect(sends).toBe(1);
+    expect(audit.snapshot()).toEqual([expect.objectContaining({ operation: "search", actualSendCount: 1, retryCount: 0,
+      completionState: "failed", httpStatus: 502, providerErrorType: "upstream_error", providerErrorCode: "bad_gateway" })]);
+    expect(JSON.stringify(audit.snapshot())).not.toContain("discard this");
   });
 
   it("rejects nested, percent-encoded, and base64 private payloads before send", async () => {
@@ -408,13 +503,29 @@ describe("internal-analysis construction-bound provider seams", () => {
   });
 });
 
-function openRouterResponse(providerRequestId: string, citations: Array<{ url: string; title: string; content?: string }>, overrides: Record<string, unknown> = {}) {
+function openRouterResponse(citations: Array<{ url: string; title: string; content?: string }>, overrides: Record<string, unknown> = {}) {
   return { id: "chatcmpl-openrouter-test", model: "openai/gpt-5.2", choices: [{ index: 0, message: { role: "assistant",
-    content: JSON.stringify({ schemaVersion: "openrouter_search_identity_v1", providerRequestId }),
+    content: "Provider-generated discovery summary; never treated as evidence or transport identity.",
     annotations: citations.map((url_citation) => ({ type: "url_citation", url_citation })) } }],
     usage: { prompt_tokens: 50, completion_tokens: 12, total_tokens: 62, cost: 0.0123, server_tool_use: { web_search_requests: 1 } }, ...overrides };
 }
 
 function citation(url: string, title: string) { return { type: "url_citation", url_citation: { url, title, content: "provider snippet must be discarded" } }; }
+
+function inspectStrictSchemaSubset(value: unknown, path: string, issues: string[]): void {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return;
+  const schema = value as Record<string, unknown>;
+  if (("const" in schema || "enum" in schema) && typeof schema.type !== "string") issues.push(`${path}:literal_type_missing`);
+  if (schema.type === "object") {
+    const properties = schema.properties as Record<string, unknown> | undefined;
+    if (schema.additionalProperties !== false) issues.push(`${path}:additional_properties_not_closed`);
+    if (!properties || !Array.isArray(schema.required)
+      || [...schema.required].sort().join("|") !== Object.keys(properties).sort().join("|")) issues.push(`${path}:required_fields_incomplete`);
+  }
+  for (const [key, child] of Object.entries(schema)) {
+    if (Array.isArray(child)) child.forEach((item, index) => inspectStrictSchemaSubset(item, `${path}.${key}[${index}]`, issues));
+    else inspectStrictSchemaSubset(child, `${path}.${key}`, issues);
+  }
+}
 
 function restore(name: string, value: string | undefined): void { if (value === undefined) delete process.env[name]; else process.env[name] = value; }

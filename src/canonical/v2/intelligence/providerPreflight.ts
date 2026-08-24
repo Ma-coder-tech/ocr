@@ -5,7 +5,7 @@ import { canonicalJson, isSafeStructuredString } from "../knowledge/knowledgeSaf
 import type { IntelligencePorts, ProviderSafeQuestionContextV1, PublicSourceAuthorityAdmission, RuntimeClock } from "./intelligenceTypes.js";
 import { inspectProviderSafeQuestionContext } from "./providerPrivacy.js";
 import { validatePublicSourceAuthorityAdmissions } from "./sourceAuthority.js";
-import { INVESTIGATIVE_RESPONSE_SCHEMA_HASH, OPENROUTER_SEARCH_IDENTITY_SCHEMA_HASH, SEMANTIC_RESPONSE_SCHEMA_HASH } from "./providerSchemas.js";
+import { INVESTIGATIVE_RESPONSE_SCHEMA_HASH, OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH, SEMANTIC_RESPONSE_SCHEMA_HASH } from "./providerSchemas.js";
 
 export const APPROVED_OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions" as const;
 export const APPROVED_OPENAI_ENDPOINT = "https://api.openai.com/v1/responses" as const;
@@ -14,7 +14,7 @@ export const LIVE_OPENROUTER_MODEL_ENV = "OPENROUTER_SEARCH_MODEL" as const;
 export const LIVE_OPENAI_KEY_ENV = "OPENAI_API_KEY" as const;
 export const LIVE_OPENAI_MODEL_ENV = "OPENAI_INTERNAL_ANALYSIS_MODEL" as const;
 export const OPENROUTER_SEARCH_ENGINE = "perplexity" as const;
-export const OPENROUTER_SEARCH_CONFIGURATION_CODE = "openrouter_server_web_search_perplexity_v2" as const;
+export const OPENROUTER_SEARCH_CONFIGURATION_CODE = "openrouter_server_web_search_perplexity_v3" as const;
 export const APPROVED_OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2" as const;
 
 export type InternalLiveExecutionCapabilityV1 = Readonly<{
@@ -29,7 +29,7 @@ export type InternalLiveExecutionCapabilityV1 = Readonly<{
   openAiEndpoint: typeof APPROVED_OPENAI_ENDPOINT;
   searchModelCode: string;
   modelCode: string;
-  searchIdentitySchemaHash: string;
+  searchResponseContractHash: string;
   investigativeSchemaHash: string;
   semanticSchemaHash: string;
   authorityRegistryHash: string;
@@ -87,7 +87,7 @@ export async function createInternalLiveExecutionCapability(input: InternalLiveP
     openRouterEndpoint: APPROVED_OPENROUTER_ENDPOINT, openRouterSearchEngine: OPENROUTER_SEARCH_ENGINE,
     openRouterSearchConfigurationCode: OPENROUTER_SEARCH_CONFIGURATION_CODE, openAiEndpoint: APPROVED_OPENAI_ENDPOINT,
     searchModelCode: safeModelCode(openRouterSearchModel), modelCode: safeModelCode(model),
-    searchIdentitySchemaHash: OPENROUTER_SEARCH_IDENTITY_SCHEMA_HASH,
+    searchResponseContractHash: OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH,
     investigativeSchemaHash: INVESTIGATIVE_RESPONSE_SCHEMA_HASH, semanticSchemaHash: SEMANTIC_RESPONSE_SCHEMA_HASH,
     authorityRegistryHash: createHash("sha256").update(canonicalJson(input.sourceAuthorityAdmissions)).digest("hex"), languageCapability: "disabled" as const,
   });
@@ -100,7 +100,7 @@ export function requireLiveCapabilityBinding(capability: InternalLiveExecutionCa
   if (!binding || capability.openRouterEndpoint !== APPROVED_OPENROUTER_ENDPOINT || capability.openRouterSearchEngine !== OPENROUTER_SEARCH_ENGINE
     || capability.openRouterSearchConfigurationCode !== OPENROUTER_SEARCH_CONFIGURATION_CODE || capability.openAiEndpoint !== APPROVED_OPENAI_ENDPOINT
     || capability.searchModelCode !== safeModelCode(binding.openRouterSearchModel) || capability.modelCode !== safeModelCode(binding.model)
-    || capability.searchIdentitySchemaHash !== OPENROUTER_SEARCH_IDENTITY_SCHEMA_HASH
+    || capability.searchResponseContractHash !== OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH
     || capability.investigativeSchemaHash !== INVESTIGATIVE_RESPONSE_SCHEMA_HASH || capability.semanticSchemaHash !== SEMANTIC_RESPONSE_SCHEMA_HASH) {
     throw new Error("internal_live_execution_capability_invalid");
   }

@@ -183,6 +183,43 @@ describe("durable internal live runner", () => {
     expect(await readdir(outputRoot)).toEqual([]);
   });
 
+  it("runs provider-readiness without allocating a numbered Statement directory", async () => {
+    const outputRoot = await mkdtemp(path.join(os.tmpdir(), "rr-live-runner-provider-readiness-"));
+    const lines: string[] = []; let statementExecutions = 0; let probeExecutions = 0;
+    const code = await runInternalLiveRunner({ mode: "provider-readiness", profile: "statement-one",
+      authorization: "product-owner-approved", runId: "auto", outputRoot }, {
+      ...syntheticStaticChecks,
+      log: (line) => lines.push(line),
+      readCredential: async (service) => service.endsWith("OpenRouter")
+        ? "synthetic-openrouter-readiness-key-123456789" : "synthetic-openai-readiness-key-123456789",
+      execute: async () => { statementExecutions += 1; throw new Error("statement_must_not_execute"); },
+      executeProviderReadiness: async ({ runId, providerAudit }) => {
+        probeExecutions += 1;
+        for (const [index, operation] of (["search", "investigative_model", "semantic_model"] as const).entries()) {
+          providerAudit.record({ receiptId: `readiness-receipt-${index}`, reservationId: `readiness-operation-${index}:call`,
+            operationId: `readiness-operation-${index}`, operation, providerCode: operation === "search" ? "openrouter_web_search" : "openai_responses_api",
+            logicalAttempt: 1, actualSendCount: 1, retryCount: 0, sendState: "sent", completionState: "completed", elapsedMs: 1,
+            usageState: "known", outputTokens: 1, providerRequestCount: operation === "search" ? 1 : null, usageCostUsd: null,
+            providerConfigurationCode: "synthetic_readiness_test", httpStatus: 200, localRequestId: `local-${index}`,
+            providerRequestId: `request-${index}`, providerResponseId: `response-${index}`, requestedModelIdentifier: "synthetic-model",
+            returnedModelIdentifier: "synthetic-model", finishReason: operation === "search" ? "stop" : null,
+            toolExecutionState: operation === "search" ? "verified" : null, annotationCount: operation === "search" ? 1 : null,
+            normalizedCandidateCount: operation === "search" ? 1 : null, providerErrorType: null, providerErrorCode: null,
+            providerErrorParam: null, structuredOutputValidation: operation === "search" ? "not_applicable" : "passed",
+            safeReasonCode: "synthetic_readiness_completed" });
+        }
+        return { schemaVersion: "provider_readiness_probe_result_v1", runId, statementAnalysisExecuted: false,
+          privateStatementDataProviderBound: false, openRouter: { status: "passed", candidateCount: 1, toolExecutionState: "verified" },
+          investigativeOpenAi: { status: "passed", structuredOutputValidation: "passed" },
+          semanticOpenAi: { status: "passed", structuredOutputValidation: "passed" }, receipts: providerAudit.snapshot() };
+      },
+    });
+    expect(code).toBe(0); expect(statementExecutions).toBe(0); expect(probeExecutions).toBe(1);
+    expect(lines).toEqual(expect.arrayContaining(["Provider sends: 0", "Provider sends: 3", "Statement analysis executed: no",
+      "Numbered Statement run created: no", "executionStatus: provider_readiness_passed", "researchOutcome: not_started"]));
+    expect(await readdir(outputRoot)).toEqual([]);
+  });
+
   it("stops after a first-service failure and retains only a safe missing-entry classification", async () => {
     const outputRoot = await mkdtemp(path.join(os.tmpdir(), "rr-live-runner-keychain-missing-"));
     const lines: string[] = [];

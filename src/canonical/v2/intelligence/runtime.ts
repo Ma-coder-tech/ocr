@@ -844,13 +844,18 @@ async function runBoundedIntelligenceRuntimeInternal(
       return [];
     }
   });
-  const privateReviewBundles: PrivateResearchReviewBundle[] = supports.flatMap((support) => {
-    const packet = candidatePackets.find((item) => item.candidateId.endsWith(support.supportId.replace(/[^A-Za-z0-9_.:-]+/g, "-").slice(0, 96)));
-    const question = questions.find((item) => item.questionId === support.questionId);
-    const candidate = candidates.find((item) => item.candidateId === support.candidateId);
-    const document = internalDocuments.find((item) => item.extraction.documentId === support.documentId);
-    const locator = document ? document.extraction.locators.find((item) => item.locatorId === support.locatorId) : undefined;
-    if (!question?.scope.tenantRef || !question.scope.accountRef || !candidate?.authorityAdmissionRef || !document || !locator) return [];
+  const privateReviewBundles: PrivateResearchReviewBundle[] = internalDocuments.flatMap((document) => {
+    const locator = document.locator;
+    const question = questions.find((item) => item.questionId === document.candidate.questionId);
+    const candidate = candidates.find((item) => item.candidateId === document.candidate.candidateId);
+    const support = supports.find((item) => item.questionId === document.candidate.questionId
+      && item.candidateId === document.candidate.candidateId && item.documentId === document.extraction.documentId
+      && item.locatorId === locator?.locatorId);
+    const supportId = support?.supportId ?? `support-unverified-${createHash("sha256").update(`${document.candidate.candidateId}\0${document.extraction.documentId}\0${locator?.locatorId ?? "none"}`).digest("hex").slice(0, 20)}`;
+    const packet = support ? candidatePackets.find((item) => item.candidateId.endsWith(support.supportId.replace(/[^A-Za-z0-9_.:-]+/g, "-").slice(0, 96))) : undefined;
+    if (!question?.scope.tenantRef || !question.scope.accountRef || !candidate?.authorityAdmissionRef || !locator) return [];
+    const unverifiedLimitations = support ? [] : ["source_existence_and_provenance_established", "semantic_verification_not_completed",
+      "not_supported_research_finding", "canonical_and_economic_authority_unchanged"];
     return [{ privacy: "account_private_ephemeral", persistence: "none", tenantRef: question.scope.tenantRef, accountRef: question.scope.accountRef,
       candidatePacketId: packet?.candidateId ?? null, questionId: question.questionId, candidateId: candidate.candidateId, sourceUrl: candidate.url,
       sourceTitle: candidate.title?.slice(0, 200) || candidate.sourceTypeCode, sourceAuthority: candidate.claimedAuthority,
@@ -858,7 +863,8 @@ async function runBoundedIntelligenceRuntimeInternal(
       documentFingerprint: document.extraction.documentFingerprint, locatorId: locator.locatorId, locatorPage: locator.page,
       locatorSectionCode: locator.sectionCode, locatorLineStart: locator.lineStart, locatorLineEnd: locator.lineEnd,
       locatorTextExcerpt: locator.text.slice(0, 512),
-      supportId: support.supportId, semanticDecision: support.verificationStatus, limitationCodes: [...support.limitationCodes] }];
+      supportId, semanticDecision: support?.verificationStatus ?? "verification_unavailable",
+      limitationCodes: [...new Set([...(support?.limitationCodes ?? []), ...unverifiedLimitations])] }];
   });
   stage(statuses, "knowledge_candidate_output", candidatePackets.length > 0 ? "completed_with_candidates" : "completed_no_support");
 

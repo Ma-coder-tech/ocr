@@ -17,9 +17,13 @@ Each Keychain lookup has a 120-second timeout. This allows time to notice and ap
 
 ## Live provider and retrieval diagnostics
 
-The OpenRouter discovery request uses the beta `openrouter:web_search` server tool with the Perplexity engine, one allowed tool call, no fallback, reasoning disabled, and a 512-token completion ceiling. A `finish_reason` of `length` is always retained as `openrouter_search_response_truncated` and never accepted as verified tool execution, even if citations are present. Search candidates remain limited to documented `url_citation` annotations; assistant prose is never evidence.
+The OpenRouter discovery request uses the beta `openrouter:web_search` server tool with the Perplexity engine, one allowed tool call, no fallback, reasoning disabled, and a 512-token completion ceiling. A `finish_reason` of `length` is always retained as `openrouter_search_response_truncated` and never accepted as verified tool execution, even if citations are present. Search candidates remain limited to documented `url_citation` annotations; assistant prose is neither evidence nor a transport-identity channel. The synchronous local operation binds each response to its reserved request; the documented response envelope (`id`, requested `model`, one assistant choice at index zero) is validated independently of generated text.
+
+Provider receipts retain only allowlisted operational diagnostics: HTTP status, local request ID, safe provider request/response IDs, requested and returned model identifiers, finish reason, search-tool and citation counts, structured-output validation state, and bounded provider error `type`, `code`, and `param`. Provider error messages, response prose, hidden reasoning, credentials, and private statement content are not retained. A failed post-send operation remains marked as possibly billable when complete usage is unavailable.
 
 Independent public retrieval uses Node HTTPS with an approved DNS resolution permit and exactly one pinned address per request. The socket family is fixed to that pinned address because Node network-family auto-selection requests an address array from custom lookup callbacks and is incompatible with the scalar single-address pin. The retriever retains only bounded safe failure categories for destination pinning, DNS resolution, network connection, TLS validation, timeout, cancellation, and unclassified transport failures. It never persists raw socket errors, addresses, proxy details, or credentials.
+
+When an admitted public document was successfully retrieved, fingerprinted, and grounded but a later investigative or semantic operation did not complete, the public-evidence manifest retains that provenance as `verification_unavailable`. Such an entry must carry `source_existence_and_provenance_established`, `semantic_verification_not_completed`, and `not_supported_research_finding`; it cannot support a research finding, recommendation, savings claim, or canonical/economic mutation.
 
 ## Codex interface
 
@@ -38,6 +42,14 @@ npm run evaluate:fiserv-internal-live -- --mode readiness --profile statement-on
 ```
 
 Readiness mode verifies the branch, clean worktree, local/remote HEAD agreement, committed network profile, serial accessibility of both Keychain items, and provider-capability construction. It does not allocate a numbered Statement-1 run directory, construct provider ports, or execute analysis. It reports `Provider sends: 0` and clears the credential environment on exit.
+
+For a separately authorized synthetic provider-boundary probe, Codex uses:
+
+```sh
+npm run evaluate:fiserv-internal-live -- --mode provider-readiness --profile statement-one --authorization product-owner-approved --run-id auto
+```
+
+Provider-readiness mode retains the repository/network/Keychain/preflight gates, creates no numbered Statement run directory, and sends no Statement PDF or private statement data. It performs exactly three sequential synthetic operations: one OpenRouter discovery request, one direct OpenAI investigative structured-output request, and one independent direct OpenAI semantic structured-output request. It stops on the first failure and has zero retries, no fallback, no adaptive search, and no language call. This mode requires its own explicit product-owner authorization and never continues automatically into live analysis.
 
 For both readiness and live modes, the lifecycle before a numbered run is: authorization/profile validation → repository and network checks → serial bounded Keychain reads → zero-send capability preflight. Only a normal live mode that passes those stages acquires the allocation lock and finalizes a fresh run ID.
 
