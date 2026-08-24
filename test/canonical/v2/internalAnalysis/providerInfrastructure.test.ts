@@ -56,7 +56,8 @@ describe("internal-analysis construction-bound provider seams", () => {
       discoveryMetadata: { providerCode: "openrouter_web_search", configurationCode: OPENROUTER_SEARCH_CONFIGURATION_CODE, sourceDomain: "docs.example.test", providerSnippetUsedAsEvidence: false } });
     expect(JSON.stringify(response)).not.toContain("discard me");
     const requestBody = JSON.parse(String(sent[0]!.init.body));
-    expect(requestBody).toMatchObject({ model: "openai/gpt-5.2", store: false, stream: false, tool_choice: "required", max_tool_calls: 1,
+    expect(requestBody).toMatchObject({ model: "openai/gpt-5.2", store: false, stream: false, max_tokens: 512,
+      reasoning: { effort: "none", exclude: true }, tool_choice: "required", max_tool_calls: 1,
       tools: [{ type: "openrouter:web_search", parameters: { engine: "perplexity", max_results: 3, max_total_results: 3, max_uses: 1 } }],
       provider: { only: ["openai"], allow_fallbacks: false, require_parameters: true, data_collection: "deny" } });
     expect(audit.snapshot()).toEqual([expect.objectContaining({ reservationId: "attempt-one:call", actualSendCount: 1, sendState: "sent", completionState: "completed",
@@ -97,6 +98,31 @@ describe("internal-analysis construction-bound provider seams", () => {
       providerMetadata: { providerResponseId: "chatcmpl-openrouter-test", modelIdentifier: "openai/gpt-5.2",
         finishReason: "stop", toolExecutionState: "unverified", annotationCount: 0, normalizedCandidateCount: 0,
         providerCompletionState: "completed" } });
+
+    const truncated = openRouterResponse(providerRequestId, [{ url: "https://docs.example.test/application-fee", title: "Official title" }], {
+      choices: [{ index: 0, finish_reason: "length", message: { role: "assistant", content: "", annotations: [citation("https://docs.example.test/application-fee", "Official title")] } }],
+      usage: { completion_tokens: 512, cost: 0.02, server_tool_use: { web_search_requests: 1 } },
+    });
+    expect(normalizeOpenRouterSearchResponse(truncated, { request: searchRequest, providerRequestId,
+      expectedModel: "openai/gpt-5.2" })).toMatchObject({ candidates: [expect.objectContaining({ url: "https://docs.example.test/application-fee" })],
+      providerMetadata: { finishReason: "length", toolExecutionState: "unverified", annotationCount: 1, normalizedCandidateCount: 1 } });
+  });
+
+  it("fails a length-truncated OpenRouter response closed while preserving safe usage", async () => {
+    const cap = await capability(); const audit = new ProviderOperationAuditLog();
+    globalThis.fetch = vi.fn(async (_url, init) => {
+      const request = JSON.parse(String(init?.body)); const identity = JSON.parse(request.messages[1].content);
+      return { status: 200, json: async () => openRouterResponse(identity.providerRequestId,
+        [{ url: "https://docs.example.test/application-fee", title: "Official title" }], {
+          choices: [{ index: 0, finish_reason: "length", message: { role: "assistant", content: "",
+            annotations: [citation("https://docs.example.test/application-fee", "Official title")] } }],
+          usage: { completion_tokens: 512, cost: 0.02, server_tool_use: { web_search_requests: 1 } },
+        }) } as Response;
+    });
+    const response = await createLiveOpenRouterSearchAdapter(cap, audit).search(searchRequest);
+    expect(response.providerMetadata).toMatchObject({ finishReason: "length", toolExecutionState: "unverified" });
+    expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "failed", outputTokens: 512,
+      providerRequestCount: 1, usageCostUsd: 0.02, safeReasonCode: "openrouter_search_response_truncated" });
   });
 
   it("fails malformed, URL-less, duplicate, excessive, wrong-identity, and hidden-fallback OpenRouter responses closed", async () => {
@@ -254,8 +280,9 @@ describe("internal-analysis construction-bound provider seams", () => {
       recordReceivedBytes: () => "continue" as const, authorizeRedirect: async () => permit });
 
     const redirectAudit = new ProviderOperationAuditLog(); const redirectCap = await capability();
-    let redirectSends = 0;
+    let redirectSends = 0; let redirectOptions: any = null;
     const redirectSpy = vi.spyOn(https, "request").mockImplementation(((options: any, callback: any) => {
+      redirectOptions = options;
       const req = new EventEmitter() as any; req.setTimeout = () => req; req.destroy = (error?: Error) => { if (error) req.emit("error", error); };
       req.end = () => { redirectSends += 1; const response = new EventEmitter() as any; response.statusCode = 302;
         response.headers = { location: "https://other.example.test/redirect" }; response.socket = { remoteAddress: "93.184.216.34" }; response.destroy = () => undefined; callback(response); };
@@ -263,6 +290,7 @@ describe("internal-analysis construction-bound provider seams", () => {
     }) as never);
     const redirect = await createNodeHttpsRetrievalPort(redirectCap, { audit: redirectAudit }).retrieve(request(new AbortController().signal));
     expect(redirect).toMatchObject({ status: "safety_blocked", redirects: [], content: null }); expect(redirectSends).toBe(1);
+    expect(redirectOptions).toMatchObject({ hostname: "docs.example.test", family: 4 });
     expect(redirectAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "completed", safeReasonCode: "retrieval_redirect_not_followed", retryCount: 0 });
     redirectSpy.mockRestore();
 
@@ -283,6 +311,29 @@ describe("internal-analysis construction-bound provider seams", () => {
     const pending = createNodeHttpsRetrievalPort(cancelCap, { audit: cancelAudit }).retrieve(request(cancellation.signal)); const rejected = expect(pending).rejects.toThrow("retrieval_cancelled");
     cancellation.abort(); await rejected; expect(cancelSends).toBe(1);
     expect(cancelAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "cancelled", usageState: "unknown_possible_billable", retryCount: 0 });
+
+    vi.restoreAllMocks();
+    const pinAudit = new ProviderOperationAuditLog(); const pinCap = await capability();
+    vi.spyOn(https, "request").mockImplementation(((_options: any, _callback: any) => {
+      const req = new EventEmitter() as any; req.setTimeout = () => req; req.destroy = () => undefined;
+      req.end = () => { const error = new TypeError("Invalid IP address") as NodeJS.ErrnoException; error.code = "ERR_INVALID_IP_ADDRESS"; req.emit("error", error); };
+      return req;
+    }) as never);
+    await expect(createNodeHttpsRetrievalPort(pinCap, { audit: pinAudit }).retrieve(request(new AbortController().signal))).rejects.toThrow("Invalid IP address");
+    expect(pinAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "failed",
+      providerConfigurationCode: "ratereveal_node_https_pinned_v2", safeReasonCode: "retrieval_destination_pin_invalid" });
+
+    for (const [code, safeReasonCode] of [["ECONNRESET", "retrieval_network_connect_failed"],
+      ["ERR_TLS_CERT_ALTNAME_INVALID", "retrieval_tls_validation_failed"]] as const) {
+      vi.restoreAllMocks(); const categoryAudit = new ProviderOperationAuditLog(); const categoryCap = await capability();
+      vi.spyOn(https, "request").mockImplementation(((_options: any, _callback: any) => {
+        const req = new EventEmitter() as any; req.setTimeout = () => req; req.destroy = () => undefined;
+        req.end = () => { const error = new Error("unsafe raw transport detail") as NodeJS.ErrnoException; error.code = code; req.emit("error", error); };
+        return req;
+      }) as never);
+      await expect(createNodeHttpsRetrievalPort(categoryCap, { audit: categoryAudit }).retrieve(request(new AbortController().signal))).rejects.toThrow();
+      expect(categoryAudit.snapshot()[0]).toMatchObject({ completionState: "failed", safeReasonCode });
+    }
   });
 
   it("fails missing credentials, caller-asserted external preflight, and forged capabilities before send", async () => {

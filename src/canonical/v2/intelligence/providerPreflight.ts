@@ -14,7 +14,7 @@ export const LIVE_OPENROUTER_MODEL_ENV = "OPENROUTER_SEARCH_MODEL" as const;
 export const LIVE_OPENAI_KEY_ENV = "OPENAI_API_KEY" as const;
 export const LIVE_OPENAI_MODEL_ENV = "OPENAI_INTERNAL_ANALYSIS_MODEL" as const;
 export const OPENROUTER_SEARCH_ENGINE = "perplexity" as const;
-export const OPENROUTER_SEARCH_CONFIGURATION_CODE = "openrouter_server_web_search_perplexity_v1" as const;
+export const OPENROUTER_SEARCH_CONFIGURATION_CODE = "openrouter_server_web_search_perplexity_v2" as const;
 export const APPROVED_OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2" as const;
 
 export type InternalLiveExecutionCapabilityV1 = Readonly<{

@@ -9,9 +9,13 @@ import { type InternalLiveExecutionCapabilityV1, LiveOperationTransportError, re
 export function createNodeDestinationResolutionPort(capability: InternalLiveExecutionCapabilityV1): NonNullable<IntelligencePorts["destination"]> {
   requireLiveCapabilityBinding(capability);
   return { async resolve(candidateId, normalizedUrl): Promise<DestinationResolution> {
-    const url = new URL(normalizedUrl);
-    const addresses = [...new Set((await lookup(url.hostname, { all: true, verbatim: true })).map((item) => item.address))].sort();
-    return { candidateId, normalizedUrl, addresses, permitId: `permit-${createHash("sha256").update(`${candidateId}\0${normalizedUrl}\0${addresses.join("|")}`).digest("hex").slice(0, 20)}` };
+    try {
+      const url = new URL(normalizedUrl);
+      const addresses = [...new Set((await lookup(url.hostname, { all: true, verbatim: true })).map((item) => item.address))].sort();
+      return { candidateId, normalizedUrl, addresses, permitId: `permit-${createHash("sha256").update(`${candidateId}\0${normalizedUrl}\0${addresses.join("|")}`).digest("hex").slice(0, 20)}` };
+    } catch (error) {
+      throw new Error(classifyDestinationResolutionError(error));
+    }
   } };
 }
 
@@ -24,7 +28,7 @@ export function createNodeHttpsRetrievalPort(capability: InternalLiveExecutionCa
     const started = binding.clock.nowMs();
     config.audit.reserve({ receiptId, reservationId: request.reservationId, operationId, operation: "retrieval", providerCode: "node_https_pinned",
       logicalAttempt: 1, actualSendCount: 0, retryCount: 0, sendState: "not_sent", completionState: "reserved", elapsedMs: 0,
-      usageState: "known", outputTokens: null, providerRequestCount: null, usageCostUsd: null, providerConfigurationCode: "ratereveal_node_https_pinned_v1",
+      usageState: "known", outputTokens: null, providerRequestCount: null, usageCostUsd: null, providerConfigurationCode: "ratereveal_node_https_pinned_v2",
       safeReasonCode: "reserved" });
     try {
       const result = await sendPinnedGet(request, request.permit, config, () => config.audit.settle(receiptId, { actualSendCount: 1, sendState: "sent" }));
@@ -43,7 +47,8 @@ export function createNodeHttpsRetrievalPort(capability: InternalLiveExecutionCa
       const timedOut = error instanceof Error && error.message === "retrieval_timeout";
       const cancelled = request.signal.aborted && !timedOut;
       config.audit.settle(receiptId, { completionState: !sent ? "not_sent" : timedOut ? "timed_out" : cancelled ? "cancelled" : "failed",
-        elapsedMs: elapsed(binding.clock.nowMs(), started), usageState: sent ? "unknown_possible_billable" : "known", safeReasonCode: safeError(error) });
+        elapsedMs: elapsed(binding.clock.nowMs(), started), usageState: sent ? "unknown_possible_billable" : "known",
+        safeReasonCode: classifyRetrievalError(error, { timedOut, cancelled }) });
       throw timedOut ? new LiveOperationTransportError("timed_out", "retrieval_timeout") : error;
     }
   } };
@@ -57,6 +62,7 @@ Promise<{ statusCode: number; connectedAddress: string; mimeType: string | null;
     const req = https.request({ protocol: "https:", hostname: parsed.hostname, port: parsed.port || 443,
       path: `${parsed.pathname}${parsed.search}`, method: "GET", headers: { Host: parsed.host, Accept: "text/html,application/pdf,text/plain",
         "User-Agent": config.userAgent ?? "RateReveal-Internal-Evaluation/1.0" },
+      family: isIP(pinnedAddress),
       lookup: (_hostname, _options, callback) => callback(null, pinnedAddress, isIP(pinnedAddress)), signal: request.signal,
     }, (response) => {
       const connectedAddress = response.socket.remoteAddress ?? pinnedAddress; const statusCode = response.statusCode ?? 0; const location = response.headers.location;
@@ -80,5 +86,34 @@ function emptyResponse(request: RetrievalRequest, connectedAddress: string, stat
     redirects: [], mimeType: null, content: null, byteLength: 0, streamedByteLength,
     safetyContract: { streamingByteLimitEnforced: true, abortSignalObserved: true, destinationPermitEnforced: true } };
 }
-function safeError(error: unknown): string { const value = error instanceof Error ? error.message : "retrieval_failed"; return /^[a-z][a-z0-9_]{0,95}$/.test(value) ? value : "retrieval_failed"; }
+function classifyDestinationResolutionError(error: unknown): string {
+  const codes = errorCodes(error);
+  return codes.some((code) => ["ENOTFOUND", "EAI_AGAIN", "EAI_FAIL", "ENODATA"].includes(code))
+    ? "retrieval_destination_resolution_failed" : "retrieval_destination_resolution_unclassified";
+}
+function classifyRetrievalError(error: unknown, state: { timedOut: boolean; cancelled: boolean }): string {
+  if (state.timedOut) return "retrieval_timeout";
+  if (state.cancelled) return "retrieval_cancelled";
+  const codes = errorCodes(error);
+  if (codes.includes("ERR_INVALID_IP_ADDRESS")) return "retrieval_destination_pin_invalid";
+  if (codes.some((code) => ["ERR_TLS_CERT_ALTNAME_INVALID", "CERT_HAS_EXPIRED", "DEPTH_ZERO_SELF_SIGNED_CERT",
+    "SELF_SIGNED_CERT_IN_CHAIN", "UNABLE_TO_VERIFY_LEAF_SIGNATURE"].includes(code))) return "retrieval_tls_validation_failed";
+  if (codes.some((code) => ["ECONNREFUSED", "ECONNRESET", "EHOSTUNREACH", "ENETDOWN", "ENETUNREACH", "EPIPE"].includes(code))) {
+    return "retrieval_network_connect_failed";
+  }
+  const value = error instanceof Error ? error.message : "retrieval_failed";
+  return /^[a-z][a-z0-9_]{0,95}$/.test(value) ? value : "retrieval_transport_unclassified";
+}
+function errorCodes(error: unknown): string[] {
+  const values: unknown[] = [error]; const codes = new Set<string>();
+  while (values.length > 0) {
+    const value = values.shift();
+    if (!value || typeof value !== "object") continue;
+    const record = value as { code?: unknown; cause?: unknown; errors?: unknown };
+    if (typeof record.code === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(record.code)) codes.add(record.code);
+    if (record.cause) values.push(record.cause);
+    if (Array.isArray(record.errors)) values.push(...record.errors);
+  }
+  return [...codes];
+}
 function elapsed(now: number, started: number): number { return Math.max(0, Math.round(now - started)); }

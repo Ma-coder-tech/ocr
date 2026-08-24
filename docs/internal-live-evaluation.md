@@ -15,6 +15,12 @@ On first authorized Codex access, macOS may display a SecurityAgent prompt stati
 
 Each Keychain lookup has a 120-second timeout. This allows time to notice and approve a macOS dialog while preventing an unattended SecurityAgent prompt from blocking Codex indefinitely. A timeout terminates that lookup, starts no second lookup, sends nothing to a provider, and clears any credential reference already acquired by the broker. Keychain failures retain only the service code (`openrouter` or `openai`) and one safe category: entry missing, access denied/cancelled, keychain locked, broker timeout, or unclassified read failure. Raw Keychain output is never logged or persisted.
 
+## Live provider and retrieval diagnostics
+
+The OpenRouter discovery request uses the beta `openrouter:web_search` server tool with the Perplexity engine, one allowed tool call, no fallback, reasoning disabled, and a 512-token completion ceiling. A `finish_reason` of `length` is always retained as `openrouter_search_response_truncated` and never accepted as verified tool execution, even if citations are present. Search candidates remain limited to documented `url_citation` annotations; assistant prose is never evidence.
+
+Independent public retrieval uses Node HTTPS with an approved DNS resolution permit and exactly one pinned address per request. The socket family is fixed to that pinned address because Node network-family auto-selection requests an address array from custom lookup callbacks and is incompatible with the scalar single-address pin. The retriever retains only bounded safe failure categories for destination pinning, DNS resolution, network connection, TLS validation, timeout, cancellation, and unclassified transport failures. It never persists raw socket errors, addresses, proxy details, or credentials.
+
 ## Codex interface
 
 After separate, explicit product-owner authorization for one live evaluation, Codex runs:

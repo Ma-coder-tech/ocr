@@ -9,6 +9,8 @@ import { APPROVED_OPENROUTER_ENDPOINT, APPROVED_OPENAI_ENDPOINT, OPENROUTER_SEAR
 import { INVESTIGATIVE_RESPONSE_SCHEMA_ID, INVESTIGATIVE_RESPONSE_SCHEMA_V1, OPENROUTER_SEARCH_IDENTITY_SCHEMA_ID,
   SEMANTIC_RESPONSE_SCHEMA_ID, SEMANTIC_RESPONSE_SCHEMA_V1 } from "./providerSchemas.js";
 
+const OPENROUTER_SEARCH_MAX_OUTPUT_TOKENS = 512;
+
 export class ProviderOperationAuditLog {
   private readonly values = new Map<string, ProviderOperationReceiptV1>();
   reserve(receipt: ProviderOperationReceiptV1): void {
@@ -54,7 +56,8 @@ export function createLiveOpenRouterSearchAdapter(capability: InternalLiveExecut
     const query = request.queryText;
     const providerRequestId = `provider-request-${randomUUID()}`;
     try {
-      const body = JSON.stringify({ model: binding.openRouterSearchModel, store: false, stream: false, max_tokens: 128,
+      const body = JSON.stringify({ model: binding.openRouterSearchModel, store: false, stream: false,
+        max_tokens: OPENROUTER_SEARCH_MAX_OUTPUT_TOKENS, reasoning: { effort: "none", exclude: true },
         messages: [
           { role: "system", content: "Run exactly one bounded public web search. Return only the requested identity JSON. Search annotations are discovery candidates; do not make economic conclusions." },
           { role: "user", content: JSON.stringify({ schemaVersion: OPENROUTER_SEARCH_IDENTITY_SCHEMA_ID, providerRequestId, query, maximumCandidates: request.maximumCandidates }) },
@@ -74,8 +77,9 @@ export function createLiveOpenRouterSearchAdapter(capability: InternalLiveExecut
       if (response.status === 429) throw new LiveOperationTransportError("after_send", "openrouter_search_rate_limited");
       if (response.status < 200 || response.status >= 300) throw new LiveOperationTransportError("after_send", "openrouter_search_http_failure");
       const normalized = normalizeOpenRouterSearchResponse(response.body, { request, providerRequestId, expectedModel: binding.openRouterSearchModel });
-      const toolReason = normalized.providerMetadata.toolExecutionState === "verified" ? "search_completed"
-        : normalized.providerMetadata.toolExecutionState === "not_executed" ? "search_tool_not_executed" : "search_tool_execution_unverified";
+      const toolReason = normalized.providerMetadata.finishReason === "length" ? "openrouter_search_response_truncated"
+        : normalized.providerMetadata.toolExecutionState === "verified" ? "search_completed"
+          : normalized.providerMetadata.toolExecutionState === "not_executed" ? "search_tool_not_executed" : "search_tool_execution_unverified";
       audit.settle(receiptId, { completionState: normalized.providerMetadata.toolExecutionState === "verified" ? "completed" : "failed",
         elapsedMs: elapsed(binding.clock.nowMs(), started), usageState: normalized.usageKnown ? "known" : "unknown_possible_billable",
         outputTokens: normalized.outputTokens, providerRequestCount: normalized.providerRequestCount, usageCostUsd: normalized.usageCostUsd,
@@ -136,7 +140,8 @@ export function normalizeOpenRouterSearchResponse(body: unknown, context: { requ
   if (requestCount !== null && (requestCount > 1 || (requestCount === 0 && candidates.length > 0))) throw new Error("openrouter_search_request_count_invalid");
   const outputTokens = Number.isSafeInteger(usage.completion_tokens) && Number(usage.completion_tokens) >= 0 ? Number(usage.completion_tokens) : null;
   const usageCostUsd = typeof usage.cost === "number" && Number.isFinite(usage.cost) && usage.cost >= 0 ? usage.cost : null;
-  const toolExecutionState = requestCount === 1 || candidates.length > 0 ? "verified" : requestCount === 0 ? "not_executed" : "unverified";
+  const toolExecutionState = finishReason === "length" ? "unverified"
+    : requestCount === 1 || candidates.length > 0 ? "verified" : requestCount === 0 ? "not_executed" : "unverified";
   return { candidates, providerRequestCount: requestCount, outputTokens, usageCostUsd,
     usageKnown: requestCount !== null && outputTokens !== null && usageCostUsd !== null,
     providerMetadata: { providerResponseId: envelope.id, modelIdentifier: envelope.model, finishReason,
