@@ -4,7 +4,7 @@ import type { IntelligencePorts, InvestigativeObservation, SearchRequest, Search
 import type { ProviderOperationReceiptV1 } from "../internalAnalysis/internalAnalysisTypes.js";
 import { assertProviderOutboundPacketSafe, assertProviderSafeQuestionContext } from "./providerPrivacy.js";
 import { APPROVED_OPENROUTER_ENDPOINT, APPROVED_OPENAI_ENDPOINT, OPENROUTER_SEARCH_CONFIGURATION_CODE, OPENROUTER_SEARCH_ENGINE,
-  type InternalLiveExecutionCapabilityV1, requireLiveCapabilityBinding } from "./providerPreflight.js";
+  type InternalLiveExecutionCapabilityV1, LiveOperationTransportError, requireLiveCapabilityBinding } from "./providerPreflight.js";
 import { INVESTIGATIVE_RESPONSE_SCHEMA_ID, INVESTIGATIVE_RESPONSE_SCHEMA_V1, OPENROUTER_SEARCH_IDENTITY_SCHEMA_ID,
   OPENROUTER_SEARCH_IDENTITY_SCHEMA_V1, SEMANTIC_RESPONSE_SCHEMA_ID, SEMANTIC_RESPONSE_SCHEMA_V1 } from "./providerSchemas.js";
 
@@ -22,14 +22,12 @@ export class ProviderOperationAuditLog {
   snapshot(): ProviderOperationReceiptV1[] { return [...this.values.values()].map((item) => ({ ...item })); }
 }
 
-type TransportErrorState = "before_send" | "after_send" | "timed_out" | "cancelled";
-class LiveTransportError extends Error { constructor(public readonly transportState: TransportErrorState, reason: string) { super(reason); } }
 type LiveJsonRequest = { url: string; method: "GET" | "POST"; headers: Record<string, string>; body: string | null; timeoutMs: number; cancellationSignal: AbortSignal | null };
 
 async function sendLiveJson(request: LiveJsonRequest, onSend: () => void): Promise<{ status: number; body: unknown }> {
   const controller = new AbortController(); let timedOut = false; let externallyCancelled = false; let sent = false;
-  if (request.cancellationSignal?.aborted) throw new LiveTransportError("before_send", "provider_operation_cancelled_before_send");
-  if (typeof globalThis.fetch !== "function") throw new LiveTransportError("before_send", "provider_transport_unavailable");
+  if (request.cancellationSignal?.aborted) throw new LiveOperationTransportError("before_send", "provider_operation_cancelled_before_send");
+  if (typeof globalThis.fetch !== "function") throw new LiveOperationTransportError("before_send", "provider_transport_unavailable");
   const cancel = () => { externallyCancelled = true; controller.abort(); };
   request.cancellationSignal?.addEventListener("abort", cancel, { once: true });
   const timer = setTimeout(() => { timedOut = true; controller.abort(); }, request.timeoutMs);
@@ -38,7 +36,7 @@ async function sendLiveJson(request: LiveJsonRequest, onSend: () => void): Promi
     const response = await fetch(request.url, { method: request.method, headers: request.headers, body: request.body, redirect: "error", signal: controller.signal });
     return { status: response.status, body: await response.json() as unknown };
   } catch (error) {
-    throw new LiveTransportError(timedOut ? "timed_out" : externallyCancelled ? "cancelled" : sent ? "after_send" : "before_send", safeError(error));
+    throw new LiveOperationTransportError(timedOut ? "timed_out" : externallyCancelled ? "cancelled" : sent ? "after_send" : "before_send", safeError(error));
   } finally { clearTimeout(timer); request.cancellationSignal?.removeEventListener("abort", cancel); }
 }
 
@@ -71,8 +69,8 @@ export function createLiveOpenRouterSearchAdapter(capability: InternalLiveExecut
       const response = await sendLiveJson({ url: APPROVED_OPENROUTER_ENDPOINT, method: "POST", headers: { Authorization: `Bearer ${binding.openRouterApiKey}`,
         "Content-Type": "application/json", "X-OpenRouter-Metadata": "enabled" }, body, timeoutMs: 8_000, cancellationSignal: binding.cancellationSignal },
         () => audit.settle(receiptId, { actualSendCount: 1, sendState: "sent" }));
-      if (response.status === 429) throw new LiveTransportError("after_send", "openrouter_search_rate_limited");
-      if (response.status < 200 || response.status >= 300) throw new LiveTransportError("after_send", "openrouter_search_http_failure");
+      if (response.status === 429) throw new LiveOperationTransportError("after_send", "openrouter_search_rate_limited");
+      if (response.status < 200 || response.status >= 300) throw new LiveOperationTransportError("after_send", "openrouter_search_http_failure");
       const normalized = normalizeOpenRouterSearchResponse(response.body, { request, providerRequestId, expectedModel: binding.openRouterSearchModel });
       audit.settle(receiptId, { completionState: "completed", elapsedMs: elapsed(binding.clock.nowMs(), started), usageState: normalized.usageKnown ? "known" : "unknown_possible_billable",
         outputTokens: normalized.outputTokens, providerRequestCount: normalized.providerRequestCount, usageCostUsd: normalized.usageCostUsd,
@@ -94,12 +92,10 @@ export function normalizeOpenRouterSearchResponse(body: unknown, context: { requ
   if (attempts.length > 1) throw new Error("openrouter_fallback_or_retry_detected");
   const choices = asArray(envelope.choices);
   if (choices.length !== 1) throw new Error("openrouter_search_response_malformed");
-  const message = record(record(choices[0]).message);
-  if (typeof message.content !== "string") throw new Error("openrouter_search_response_malformed");
-  let identity: Record<string, unknown>;
-  try { identity = record(JSON.parse(message.content)); } catch { throw new Error("openrouter_search_response_malformed"); }
-  if (identity.schemaVersion !== OPENROUTER_SEARCH_IDENTITY_SCHEMA_ID || identity.providerRequestId !== context.providerRequestId
-    || Object.keys(identity).sort().join("|") !== "providerRequestId|schemaVersion") throw new Error("openrouter_response_identity_invalid");
+  const choice = record(choices[0]); const message = record(choice.message);
+  if (choice.index !== 0 || message.role !== "assistant" || !("content" in message)) throw new Error("openrouter_search_response_malformed");
+  validateOpenRouterSearchContent(message.content, context.providerRequestId);
+  if (message.annotations !== undefined && !Array.isArray(message.annotations)) throw new Error("openrouter_search_response_malformed");
   const annotations = asArray(message.annotations);
   if (annotations.length > context.request.maximumCandidates) throw new Error("openrouter_search_result_cap_exceeded");
   const seenUrls = new Set<string>();
@@ -127,7 +123,7 @@ export function normalizeOpenRouterSearchResponse(body: unknown, context: { requ
   });
   const usage = record(envelope.usage); const serverToolUse = record(usage.server_tool_use);
   const requestCount = Number.isSafeInteger(serverToolUse.web_search_requests) && Number(serverToolUse.web_search_requests) >= 0 ? Number(serverToolUse.web_search_requests) : null;
-  if (requestCount !== null && requestCount !== 1) throw new Error("openrouter_search_request_count_invalid");
+  if (requestCount !== null && (requestCount > 1 || (requestCount === 0 && candidates.length > 0))) throw new Error("openrouter_search_request_count_invalid");
   const outputTokens = Number.isSafeInteger(usage.completion_tokens) && Number(usage.completion_tokens) >= 0 ? Number(usage.completion_tokens) : null;
   const usageCostUsd = typeof usage.cost === "number" && Number.isFinite(usage.cost) && usage.cost >= 0 ? usage.cost : null;
   return { candidates, providerRequestCount: requestCount, outputTokens, usageCostUsd,
@@ -167,7 +163,7 @@ async function sendOpenAiStructured<TRequest extends { batchId: string; attemptI
     assertProviderOutboundPacketSafe({ provider: "openai_responses_api", url: APPROVED_OPENAI_ENDPOINT, method: "POST", headerNames: ["Authorization", "Content-Type"], body });
     const response = await sendLiveJson({ url: APPROVED_OPENAI_ENDPOINT, method: "POST", headers: { Authorization: `Bearer ${binding.openAiApiKey}`, "Content-Type": "application/json" }, body, timeoutMs: 20_000, cancellationSignal: binding.cancellationSignal },
       () => audit.settle(receiptId, { actualSendCount: 1, sendState: "sent" }));
-    if (response.status < 200 || response.status >= 300) throw new LiveTransportError("after_send", "openai_responses_http_failure");
+    if (response.status < 200 || response.status >= 300) throw new LiveOperationTransportError("after_send", "openai_responses_http_failure");
     const envelope = record(response.body); const parsed = JSON.parse(extractOutputText(envelope)) as Record<string, unknown>;
     if (typeof parsed.batchId !== "string" || typeof parsed.attemptId !== "string" || parsed.batchId !== request.batchId || parsed.attemptId !== request.attemptId
       || parsed.schemaVersion !== schemaName
@@ -188,10 +184,21 @@ function baseReceipt(receiptId: string, reservationId: string, operationId: stri
     providerRequestCount: null, usageCostUsd: null, providerConfigurationCode, safeReasonCode: "reserved" };
 }
 function settleFailure(audit: ProviderOperationAuditLog, receiptId: string, error: unknown, elapsedMs: number): void {
-  const state = error instanceof LiveTransportError ? error.transportState : "before_send";
+  const state = error instanceof LiveOperationTransportError ? error.transportState : "before_send";
   const sent = audit.snapshot().find((item) => item.receiptId === receiptId)?.actualSendCount === 1;
   const completionState = !sent ? "not_sent" : state === "timed_out" ? "timed_out" : state === "cancelled" ? "cancelled" : "failed";
   audit.settle(receiptId, { completionState, elapsedMs, usageState: sent ? "unknown_possible_billable" : "known", safeReasonCode: safeError(error) });
+}
+function validateOpenRouterSearchContent(content: unknown, providerRequestId: string): void {
+  if (content === null || content === "") return;
+  if (typeof content !== "string") throw new Error("openrouter_search_response_malformed");
+  const trimmed = content.trim();
+  if (!trimmed) return;
+  let parsed: unknown;
+  try { parsed = JSON.parse(trimmed); } catch { return; }
+  const identity = record(parsed);
+  if (identity.schemaVersion !== OPENROUTER_SEARCH_IDENTITY_SCHEMA_ID || identity.providerRequestId !== providerRequestId
+    || Object.keys(identity).sort().join("|") !== "providerRequestId|schemaVersion") throw new Error("openrouter_response_identity_invalid");
 }
 function extractOutputText(body: Record<string, unknown>): string { if (typeof body.output_text === "string") return body.output_text;
   for (const output of asArray(body.output)) for (const content of asArray(record(output).content)) { const text = record(content).text; if (typeof text === "string") return text; }

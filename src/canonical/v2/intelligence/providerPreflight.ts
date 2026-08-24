@@ -40,6 +40,11 @@ type LiveBinding = { openRouterApiKey: string; openRouterSearchModel: string; op
 const liveBindings = new WeakMap<object, LiveBinding>();
 const livePorts = new WeakMap<object, object>();
 
+export type LiveOperationTransportState = "before_send" | "after_send" | "timed_out" | "cancelled";
+export class LiveOperationTransportError extends Error {
+  constructor(public readonly transportState: LiveOperationTransportState, reason: string) { super(reason); }
+}
+
 export type InternalLivePreflightInputV1 = {
   schemaVersion: "internal_live_preflight_input_v1";
   runMode: "internal_live_evaluation";
@@ -118,7 +123,8 @@ function createSystemRuntimeClock(): RuntimeClock {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         return await Promise.race([
-          operation().then((value) => ({ status: "completed" as const, value })).catch((error) => ({ status: "failed" as const, reasonCode: safeReason(error) })),
+          operation().then((value) => ({ status: "completed" as const, value })).catch((error) => error instanceof LiveOperationTransportError && error.transportState === "timed_out"
+            ? ({ status: "timeout" as const }) : ({ status: "failed" as const, reasonCode: safeReason(error) })),
           new Promise<{ status: "timeout" }>((resolve) => { timer = setTimeout(() => resolve({ status: "timeout" }), timeoutMs); }),
         ]);
       } finally { if (timer) clearTimeout(timer); }

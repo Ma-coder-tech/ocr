@@ -185,6 +185,8 @@ export function validateRgInternalAuditV1(audit: RgInternalAuditV1): string[] {
     return !reservation || reservation.operationId !== receipt.operationId || reservation.dimension !== expectedDimensions[receipt.operation]
       || (receipt.completionState === "completed" && reservation.state !== "completed")
       || (receipt.completionState === "timed_out" && reservation.state !== "timeout")
+      || (receipt.completionState === "failed" && reservation.state !== "failed")
+      || (receipt.completionState === "cancelled" && reservation.state !== "failed")
       || (receipt.completionState === "not_sent" && !["failed", "released"].includes(reservation.state));
   })) issues.push("rg_internal_audit_receipt_reservation_binding_invalid");
   return [...new Set(issues)].sort();

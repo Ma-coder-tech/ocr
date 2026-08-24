@@ -1,0 +1,113 @@
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, readdir } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import {
+  LiveOperationTransportError,
+  runFiservInternalAnalysisEvaluationV1,
+  type RuntimeClock,
+  type SearchRequest,
+  validateRgInternalAuditV1,
+} from "../../../../src/canonical/v2/index.js";
+import { createInjectedStatement1Fixture } from "./injectedStatement1Fixture.js";
+
+const statementOne = path.resolve(process.cwd(), "test/fixtures/pdfs/SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf");
+
+class TimeoutAwareInjectedClock implements RuntimeClock {
+  private current = 0;
+  nowMs(): number { return this.current; }
+  async runWithTimeout<T>(_timeoutMs: number, operation: () => Promise<T>) {
+    this.current += 1;
+    try { return { status: "completed" as const, value: await operation() }; }
+    catch (error) {
+      return error instanceof LiveOperationTransportError && error.transportState === "timed_out"
+        ? { status: "timeout" as const }
+        : { status: "failed" as const, reasonCode: error instanceof Error ? error.message : "injected_operation_failed" };
+    }
+  }
+}
+
+describe("Statement 1 live-search failure recovery", () => {
+  it.each([
+    { firstOutcome: "timeout" as const, expectedAttemptStatus: "timeout", expectedReservationState: "timeout", expectedReason: "search_timeout" },
+    { firstOutcome: "malformed" as const, expectedAttemptStatus: "failed", expectedReservationState: "failed", expectedReason: "openrouter_search_response_malformed" },
+  ])("keeps mixed $firstOutcome/no-candidate research unresolved with a valid bundle", async ({ firstOutcome, expectedAttemptStatus, expectedReservationState, expectedReason }) => {
+    const outputDirectory = await mkdtemp(path.join(os.tmpdir(), `statement-one-${firstOutcome}-recovery-`));
+    const injected = createInjectedStatement1Fixture();
+    injected.ports.clock = new TimeoutAwareInjectedClock();
+    let calls = 0;
+    injected.ports.search = {
+      providerCode: "injected_openrouter_search_contract",
+      async search(request: SearchRequest) {
+        calls += 1;
+        const firstQuestion = calls === 1;
+        const completionState = firstQuestion ? (firstOutcome === "timeout" ? "timed_out" : "failed") : "completed";
+        injected.providerAudit.record({
+          receiptId: `mixed-search-receipt-${calls}`,
+          reservationId: request.reservationId,
+          operationId: request.attemptId,
+          operation: "search",
+          providerCode: "injected_openrouter_search_contract",
+          logicalAttempt: 1,
+          actualSendCount: 0,
+          retryCount: 0,
+          sendState: "not_sent",
+          completionState,
+          elapsedMs: 1,
+          usageState: "known",
+          outputTokens: null,
+          providerRequestCount: firstQuestion ? null : 0,
+          usageCostUsd: firstQuestion ? null : 0,
+          providerConfigurationCode: "injected_openrouter_perplexity_v1",
+          safeReasonCode: firstQuestion ? (firstOutcome === "timeout" ? "provider_operation_failed" : "openrouter_search_response_malformed") : "search_completed_no_candidates",
+        });
+        if (firstQuestion) {
+          if (firstOutcome === "timeout") throw new LiveOperationTransportError("timed_out", "provider_operation_failed");
+          throw new Error("openrouter_search_response_malformed");
+        }
+        return { attemptId: request.attemptId, questionId: request.questionId, candidates: [], suggestedAdaptiveReason: null,
+          outputAccounting: "search_discovery_not_model_generation" as const };
+      },
+    };
+
+    const result = await runFiservInternalAnalysisEvaluationV1({
+      statementPaths: [statementOne], safeStatementId: "fsv-03-clover-short-jun",
+      runVersion: "run-3-foundational-admissions-pricing-fixed", outputDirectory,
+      sourceProfile: { statementCompleteness: "unknown" }, internalRunId: `statement-one-${firstOutcome}-recovery`,
+      evaluatedAt: "2026-08-24T00:00:00.000Z", tenantRef: "tenant-private-fixture", accountRef: "account-private-fixture",
+      admittedKnowledge: [], ports: injected.ports, providerAudit: injected.providerAudit,
+      providerPreflight: injected.providerPreflight, publicSourceAuthorityAdmissions: injected.publicSourceAuthorityAdmissions,
+    });
+
+    expect(calls).toBe(2);
+    expect(result.investigationOrigins.origins).toHaveLength(2);
+    expect(result.runtime.searchAttempts).toHaveLength(2);
+    expect(result.runtime.searchAttempts[0]).toMatchObject({ status: expectedAttemptStatus, candidateIds: [], reasonCodes: [expectedReason] });
+    expect(result.runtime.searchAttempts[1]).toMatchObject({ status: "no_candidates", candidateIds: [], reasonCodes: ["no_eligible_discovery_candidates"] });
+    expect(result.runtime.candidates).toEqual([]);
+    expect(result.runtime.documents).toEqual([]);
+    expect(result.runtime.supports).toEqual([]);
+    expect(result.analysis).toMatchObject({ terminalStatus: "research_unavailable", canonicalTruthPreserved: true });
+    expect(result.analysis.unresolvedQuestions).toHaveLength(2);
+    expect(result.analysis.supportedResearchFindings).toEqual([]);
+    expect(result.analysis.recommendations).not.toContainEqual(expect.objectContaining({ kind: "supported_economic_action" }));
+    expect(result.analysis.impact.some((item) => item.state.startsWith("potential_reduction"))).toBe(false);
+    expect(result.rgAudit.externalNetworkCallCount).toBe(0);
+    expect(result.rgAudit.providerOperationReceipts).toHaveLength(2);
+    expect(result.rgAudit.providerOperationReceipts.every((receipt) => receipt.retryCount === 0 && receipt.actualSendCount === 0)).toBe(true);
+    const firstReceipt = result.rgAudit.providerOperationReceipts[0]!;
+    const firstReservation = result.rgAudit.budget.reservations.find((reservation) => reservation.reservationId === firstReceipt.reservationId);
+    expect(firstReceipt.completionState).toBe(firstOutcome === "timeout" ? "timed_out" : "failed");
+    expect(firstReservation?.state).toBe(expectedReservationState);
+    expect(validateRgInternalAuditV1(result.rgAudit)).toEqual([]);
+    expect(result.analysis.canonicalBeforeHash).toBe(result.analysis.canonicalAfterHash);
+    expect((await readdir(outputDirectory)).sort()).toEqual([
+      "internal-analysis.json", "internal-analysis.md", "public-source-evidence.json", "review.md",
+      "rg-audit.json", "rh-projection.json", "run-audit.json",
+    ]);
+    const projection = await readFile(path.join(outputDirectory, "rh-projection.json"));
+    expect(createHash("sha256").update(projection).digest("hex"))
+      .toBe("5e2fc1e17eaaacb4e891be1986f43982b139d94ef6e3bb092b5bcfee407158ac");
+  }, 30_000);
+});

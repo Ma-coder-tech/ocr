@@ -4,7 +4,7 @@ import https from "node:https";
 import { isIP } from "node:net";
 import type { DestinationResolution, IntelligencePorts, RetrievalRequest, RetrievalResponse } from "./intelligenceTypes.js";
 import { ProviderOperationAuditLog } from "./providerAdapters.js";
-import { type InternalLiveExecutionCapabilityV1, requireLiveCapabilityBinding } from "./providerPreflight.js";
+import { type InternalLiveExecutionCapabilityV1, LiveOperationTransportError, requireLiveCapabilityBinding } from "./providerPreflight.js";
 
 export function createNodeDestinationResolutionPort(capability: InternalLiveExecutionCapabilityV1): NonNullable<IntelligencePorts["destination"]> {
   requireLiveCapabilityBinding(capability);
@@ -44,7 +44,7 @@ export function createNodeHttpsRetrievalPort(capability: InternalLiveExecutionCa
       const cancelled = request.signal.aborted && !timedOut;
       config.audit.settle(receiptId, { completionState: !sent ? "not_sent" : timedOut ? "timed_out" : cancelled ? "cancelled" : "failed",
         elapsedMs: elapsed(binding.clock.nowMs(), started), usageState: sent ? "unknown_possible_billable" : "known", safeReasonCode: safeError(error) });
-      throw error;
+      throw timedOut ? new LiveOperationTransportError("timed_out", "retrieval_timeout") : error;
     }
   } };
 }

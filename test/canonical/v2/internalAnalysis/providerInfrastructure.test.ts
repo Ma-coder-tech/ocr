@@ -8,10 +8,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   APPROVED_OPENROUTER_ENDPOINT, APPROVED_OPENAI_ENDPOINT, OPENROUTER_SEARCH_CONFIGURATION_CODE, ProviderOperationAuditLog, assertInternalProviderPreflight,
   createInternalLiveExecutionCapability, createLiveOpenRouterSearchAdapter, createLiveOpenAiInvestigativeAdapter,
-  createLiveOpenAiSemanticAdapter,
+  createLiveOpenAiSemanticAdapter, createInternalLiveIntelligencePorts,
   createDestinationPermit, createNodeHttpsRetrievalPort, createPublicDocumentExtractionPort, createPublicSourceAuthorityAdmission,
   INVESTIGATIVE_RESPONSE_SCHEMA_HASH, OPENROUTER_SEARCH_IDENTITY_SCHEMA_HASH, type SearchRequest,
-  inspectProviderOutboundPacket, runInternalProviderPreflight, sanitizePublicDocumentTextForProvider,
+  inspectProviderOutboundPacket, normalizeOpenRouterSearchResponse, runInternalProviderPreflight, sanitizePublicDocumentTextForProvider,
 } from "../../../../src/canonical/v2/index.js";
 import { unsafeProviderContext } from "./injectedStatement1Fixture.js";
 
@@ -65,16 +65,40 @@ describe("internal-analysis construction-bound provider seams", () => {
     expect(cap.authorityRegistryHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it("normalizes documented OpenRouter citation responses without treating provider prose as evidence", () => {
+    const providerRequestId = "provider-request-00000000-0000-4000-8000-000000000000";
+    const documented = [
+      { name: "assistant prose", content: "Here are the public results.", annotations: [citation("https://docs.example.test/application-fee", "Official title")] },
+      { name: "empty text", content: "", annotations: [citation("https://docs.example.test/application-fee", "Official title")] },
+      { name: "null text", content: null, annotations: [citation("https://docs.example.test/application-fee", "Official title")] },
+      { name: "structured identity", content: JSON.stringify({ schemaVersion: "openrouter_search_identity_v1", providerRequestId }),
+        annotations: [citation("https://docs.example.test/application-fee", "Official title")] },
+    ];
+    for (const fixture of documented) {
+      const body = openRouterResponse(providerRequestId, [], { choices: [{ index: 0, message: { role: "assistant", content: fixture.content,
+        annotations: fixture.annotations, provider_metadata: { ignored: true } } }], unrelated_provider_metadata: { ignored: true } });
+      const normalized = normalizeOpenRouterSearchResponse(body, { request: searchRequest, providerRequestId, expectedModel: "openai/gpt-5.2" });
+      expect(normalized.candidates, fixture.name).toHaveLength(1);
+      expect(normalized.candidates[0]).toMatchObject({ url: "https://docs.example.test/application-fee", title: "Official title" });
+      expect(JSON.stringify(normalized), fixture.name).not.toContain("provider snippet must be discarded");
+    }
+
+    const noSearch = openRouterResponse(providerRequestId, [], { choices: [{ index: 0, message: { role: "assistant", content: "No usable public result." } }],
+      usage: { completion_tokens: 4, cost: 0.001, server_tool_use: { web_search_requests: 0 } } });
+    const normalizedNoSearch = normalizeOpenRouterSearchResponse(noSearch, { request: searchRequest, providerRequestId, expectedModel: "openai/gpt-5.2" });
+    expect(normalizedNoSearch).toMatchObject({ candidates: [], providerRequestCount: 0, usageKnown: true });
+  });
+
   it("fails malformed, URL-less, duplicate, excessive, wrong-identity, and hidden-fallback OpenRouter responses closed", async () => {
     const cases: Array<{ name: string; mutate: (response: ReturnType<typeof openRouterResponse>) => unknown; reason: string }> = [
-      { name: "malformed", mutate: (response) => ({ ...response, choices: [{ message: { content: "not-json", annotations: [] } }] }), reason: "response_malformed" },
-      { name: "missing-url", mutate: (response) => ({ ...response, choices: [{ message: { ...response.choices[0]!.message,
+      { name: "malformed", mutate: (response) => ({ ...response, choices: [{ index: 0, message: { role: "assistant", content: [], annotations: [] } }] }), reason: "response_malformed" },
+      { name: "missing-url", mutate: (response) => ({ ...response, choices: [{ ...response.choices[0], message: { ...response.choices[0]!.message,
         annotations: [{ type: "url_citation", url_citation: { title: "Missing URL" } }] } }] }), reason: "result_malformed" },
-      { name: "duplicate-url", mutate: (response) => ({ ...response, choices: [{ message: { ...response.choices[0]!.message,
+      { name: "duplicate-url", mutate: (response) => ({ ...response, choices: [{ ...response.choices[0], message: { ...response.choices[0]!.message,
         annotations: [citation("https://docs.example.test/application-fee", "One"), citation("https://docs.example.test/application-fee", "Two")] } }] }), reason: "duplicate_url" },
-      { name: "too-many", mutate: (response) => ({ ...response, choices: [{ message: { ...response.choices[0]!.message,
+      { name: "too-many", mutate: (response) => ({ ...response, choices: [{ ...response.choices[0], message: { ...response.choices[0]!.message,
         annotations: Array.from({ length: 4 }, (_, index) => citation(`https://docs.example.test/application-fee-${index}`, `Title ${index}`)) } }] }), reason: "result_cap_exceeded" },
-      { name: "wrong-identity", mutate: (response) => ({ ...response, choices: [{ message: { ...response.choices[0]!.message,
+      { name: "wrong-identity", mutate: (response) => ({ ...response, choices: [{ ...response.choices[0], message: { ...response.choices[0]!.message,
         content: JSON.stringify({ schemaVersion: "openrouter_search_identity_v1", providerRequestId: "provider-request-00000000-0000-4000-8000-000000000000" }) } }] }), reason: "identity_invalid" },
       { name: "fallback", mutate: (response) => ({ ...response, openrouter_metadata: { attempts: [{ provider: "one" }, { provider: "two" }] } }), reason: "fallback_or_retry_detected" },
     ];
@@ -174,6 +198,19 @@ describe("internal-analysis construction-bound provider seams", () => {
     await vi.advanceTimersByTimeAsync(8_001);
     await rejected; expect(calls).toBe(1);
     expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "timed_out", usageState: "unknown_possible_billable", retryCount: 0 });
+  });
+
+  it("propagates the live transport timeout as a runtime timeout without retry", async () => {
+    vi.useFakeTimers(); const cap = await capability(); const audit = new ProviderOperationAuditLog(); let calls = 0;
+    globalThis.fetch = vi.fn(async (_url, init) => { calls += 1; return new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+    }); });
+    const ports = createInternalLiveIntelligencePorts(cap, audit);
+    const pending = ports.clock.runWithTimeout(8_000, () => ports.search!.search(searchRequest));
+    await vi.advanceTimersByTimeAsync(8_001);
+    await expect(pending).resolves.toEqual({ status: "timeout" });
+    expect(calls).toBe(1);
+    expect(audit.snapshot()[0]).toMatchObject({ completionState: "timed_out", actualSendCount: 1, retryCount: 0 });
   });
 
   it("records construction-bound cancellation after one send without retry", async () => {
