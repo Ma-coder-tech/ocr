@@ -446,6 +446,18 @@ export type CandidateClaimSupport = {
   financialMutationAllowed: false;
 };
 
+/**
+ * The semantic provider's authoritative output. Identity, provenance, policy,
+ * and the proposed value are already known from SemanticVerificationInput and
+ * are bound locally after this judgment is validated.
+ */
+export type SemanticModelJudgment = {
+  sourceEffectiveFrom: string | null;
+  sourceEffectiveTo: string | null;
+  verificationStatus: SemanticVerificationStatus;
+  limitationCodes: string[];
+};
+
 export type StructuredBatchRequest<T> = {
   batchId: string;
   attemptId: string;

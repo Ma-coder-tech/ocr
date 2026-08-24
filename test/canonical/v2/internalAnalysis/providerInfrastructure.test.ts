@@ -11,9 +11,9 @@ import {
   createLiveOpenAiSemanticAdapter, createInternalLiveIntelligencePorts,
   createDestinationPermit, createNodeHttpsRetrievalPort, createPublicDocumentExtractionPort, createPublicSourceAuthorityAdmission,
   INVESTIGATIVE_RESPONSE_SCHEMA_HASH, INVESTIGATIVE_RESPONSE_SCHEMA_V1, OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH,
-  ProviderReadinessDiagnosticLog, SEMANTIC_RESPONSE_SCHEMA_V1, type SearchRequest,
+  ProviderReadinessDiagnosticLog, SEMANTIC_RESPONSE_SCHEMA_V1, type SearchRequest, type SemanticVerificationInput,
   inspectProviderOutboundPacket, normalizeOpenRouterSearchResponse, runInternalProviderPreflight, runProviderReadinessProbe,
-  sanitizePublicDocumentTextForProvider,
+  sanitizePublicDocumentTextForProvider, validateSemanticMember,
 } from "../../../../src/canonical/v2/index.js";
 import { unsafeProviderContext } from "./injectedStatement1Fixture.js";
 
@@ -211,6 +211,61 @@ describe("internal-analysis construction-bound provider seams", () => {
     }
   });
 
+  it("binds semantic judgments to immutable positional inputs without model-authored identity", async () => {
+    const cap = await capability(); const audit = new ProviderOperationAuditLog(); let requestBody = "";
+    const inputs = [semanticInput("one", "application_fee_terminology"), semanticInput("two", "non_swiped_discount_terminology")];
+    globalThis.fetch = vi.fn(async (_url, init) => {
+      requestBody = String(init?.body);
+      return { status: 200, headers: new Headers({ "x-request-id": "semantic-binding-request" }), json: async () => ({
+        id: "resp-semantic-binding", model: "approved-test-model", usage: { output_tokens: 41 },
+        output_text: JSON.stringify({ judgments: {
+          slot0: { sourceEffectiveFrom: "2024-01-01", sourceEffectiveTo: null, verificationStatus: "supported_candidate", limitationCodes: ["first_judgment"] },
+          slot1: { sourceEffectiveFrom: null, sourceEffectiveTo: "2025-01-01", verificationStatus: "contradicted", limitationCodes: ["second_judgment"] },
+          slot2: null, slot3: null,
+        } }),
+      }) } as Response;
+    });
+    const response = await createLiveOpenAiSemanticAdapter(cap, audit).verify(semanticRequest(inputs));
+    const body = JSON.parse(requestBody); const providerInput = JSON.parse(body.input[1].content[0].text);
+    expect(Object.keys(providerInput)).toEqual(["semanticInputs"]);
+    expect(providerInput.semanticInputs.map((entry: any) => entry.slotIndex)).toEqual([0, 1]);
+    expect(JSON.stringify(body.text.format.schema)).not.toMatch(/itemId|questionId|candidateId|documentId|documentFingerprint|locatorId|investigativeObservationId|proposedValue|sourceAuthority/);
+    expect(response.items).toHaveLength(2);
+    expect(response.items[0]).toMatchObject({ itemId: "observation-one", investigativeObservationId: "observation-one",
+      questionId: "question-one", candidateId: "candidate-one", documentId: "document-one", locatorId: "locator-one",
+      documentFingerprint: "a".repeat(64), subjectCode: "application_fee_terminology", verificationStatus: "supported_candidate",
+      limitationCodes: ["first_judgment"], sourceEffectiveFrom: "2024-01-01", admissionAuthority: "none", financialMutationAllowed: false });
+    expect(response.items[1]).toMatchObject({ itemId: "observation-two", investigativeObservationId: "observation-two",
+      questionId: "question-two", candidateId: "candidate-two", documentId: "document-two", locatorId: "locator-two",
+      documentFingerprint: "b".repeat(64), subjectCode: "non_swiped_discount_terminology", verificationStatus: "contradicted",
+      limitationCodes: ["second_judgment"], sourceEffectiveTo: "2025-01-01", admissionAuthority: "none", financialMutationAllowed: false });
+    expect(response.items[0]!.supportId).not.toBe(response.items[1]!.supportId);
+    expect(validateSemanticMember(response.items[0], inputs[0]!)).toEqual([]);
+    expect(validateSemanticMember(response.items[1], inputs[1]!)).toEqual([]);
+    expect(validateSemanticMember({ ...response.items[0], investigativeObservationId: inputs[1]!.itemId }, inputs[0]!))
+      .toContain("semantic_member_identity_mismatch");
+    expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, structuredOutputValidation: "passed", retryCount: 0 });
+  });
+
+  it("fails semantic request lineage and unused output slots closed", async () => {
+    const cap = await capability(); const invalidAudit = new ProviderOperationAuditLog(); const fetchSpy = vi.fn(); globalThis.fetch = fetchSpy as never;
+    const input = semanticInput("one", "application_fee_terminology");
+    await expect(createLiveOpenAiSemanticAdapter(cap, invalidAudit).verify(semanticRequest([{ ...input, documentId: "cross-document" }])))
+      .rejects.toThrow("semantic_request_identity_invalid");
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    const cap2 = await capability(); const slotAudit = new ProviderOperationAuditLog();
+    globalThis.fetch = vi.fn(async () => ({ status: 200, json: async () => ({ id: "resp-unused-slot", model: "approved-test-model",
+      output_text: JSON.stringify({ judgments: {
+        slot0: { sourceEffectiveFrom: null, sourceEffectiveTo: null, verificationStatus: "unsupported", limitationCodes: [] },
+        slot1: { sourceEffectiveFrom: null, sourceEffectiveTo: null, verificationStatus: "supported_candidate", limitationCodes: [] },
+        slot2: null, slot3: null,
+      } }), usage: { output_tokens: 20 } }) } as Response));
+    await expect(createLiveOpenAiSemanticAdapter(cap2, slotAudit).verify(semanticRequest([input])))
+      .rejects.toThrow("semantic_judgment_unused_slot_invalid");
+    expect(slotAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, structuredOutputValidation: "failed", retryCount: 0 });
+  });
+
   it("retains only allowlisted OpenAI non-2xx diagnostics after exactly one possibly billable send", async () => {
     const cap = await capability(); const audit = new ProviderOperationAuditLog(); let sends = 0;
     globalThis.fetch = vi.fn(async () => { sends += 1; return { status: 400,
@@ -248,17 +303,11 @@ describe("internal-analysis construction-bound provider seams", () => {
               limitationCodes: ["synthetic_readiness_only", "not_production_evidence"], financialMutationAllowed: false }] }),
         }) } as Response;
       }
-      const item = request.items[0];
       return { status: 200, headers: new Headers({ "x-request-id": "readiness-oa-semantic-001" }), json: async () => ({
         id: "resp-readiness-semantic", model: "approved-test-model", usage: { output_tokens: 88 },
-        output_text: JSON.stringify({ batchId: request.batchId, attemptId: request.attemptId, schemaVersion: request.schemaVersion,
-          items: [{ itemId: item.itemId, supportId: "readiness-support-001", questionId: item.question.questionId,
-            claimType: item.question.claimType, subjectCode: item.question.subjectCode, candidateId: item.candidate.candidateId,
-            documentId: item.documentId, locatorId: item.locator.locatorId, documentFingerprint: item.locator.documentFingerprint,
-            investigativeObservationId: item.itemId, sourceAuthority: "processor_publication", sourceEffectiveFrom: null,
-            sourceEffectiveTo: null, applicabilityScope: item.question.scope, proposedValue: item.proposedValue,
-            assertionBasisCode: "claim_specific_public_definition", verificationStatus: "supported_candidate",
-            limitationCodes: ["synthetic_readiness_only", "not_production_evidence"], admissionAuthority: "none", financialMutationAllowed: false }] }),
+        output_text: JSON.stringify({ judgments: { slot0: { sourceEffectiveFrom: null, sourceEffectiveTo: null,
+          verificationStatus: "supported_candidate", limitationCodes: ["synthetic_readiness_only", "not_production_evidence"] },
+          slot1: null, slot2: null, slot3: null } }),
       }) } as Response;
     });
     const result = await runProviderReadinessProbe("provider-readiness-test", cap, audit);
@@ -274,7 +323,7 @@ describe("internal-analysis construction-bound provider seams", () => {
     expect(outboundBodies.join("\n")).not.toMatch(/SAMPLE_MERCHANT|fsv-03-clover|merchant-private|account-private|statement-one-live-internal-evaluation/);
   });
 
-  it("retains semantic issue codes and fails readiness closed without retaining provider prose", async () => {
+  it("rejects non-judgment semantic fields before local binding without retaining provider prose", async () => {
     const cap = await capability(); const audit = new ProviderOperationAuditLog(); const diagnostics = new ProviderReadinessDiagnosticLog(); let call = 0;
     globalThis.fetch = vi.fn(async (_url, init) => {
       call += 1;
@@ -293,28 +342,22 @@ describe("internal-analysis construction-bound provider seams", () => {
               limitationCodes: ["synthetic_readiness_only"], financialMutationAllowed: false }] }),
         }) } as Response;
       }
-      const item = request.items[0];
       return { status: 200, headers: new Headers({ "x-request-id": "readiness-semantic-diagnostic" }), json: async () => ({
         id: "resp-readiness-semantic-diagnostic", model: "approved-test-model", usage: { output_tokens: 88 },
         unsafe_provider_prose: "must never be retained",
-        output_text: JSON.stringify({ batchId: request.batchId, attemptId: request.attemptId, schemaVersion: request.schemaVersion,
-          items: [{ itemId: item.itemId, supportId: "readiness-support-diagnostic", questionId: item.question.questionId,
-            claimType: item.question.claimType, subjectCode: item.question.subjectCode, candidateId: item.candidate.candidateId,
-            documentId: item.documentId, locatorId: item.locator.locatorId, documentFingerprint: item.locator.documentFingerprint,
-            investigativeObservationId: item.itemId, sourceAuthority: "official_network_publication", sourceEffectiveFrom: null,
-            sourceEffectiveTo: null, applicabilityScope: item.question.scope, proposedValue: item.proposedValue,
-            assertionBasisCode: "claim_specific_public_definition", verificationStatus: "wrong_authority",
-            limitationCodes: ["synthetic_readiness_only"], admissionAuthority: "none", financialMutationAllowed: false }] }),
+        output_text: JSON.stringify({ judgments: { slot0: { sourceEffectiveFrom: null, sourceEffectiveTo: null,
+          verificationStatus: "wrong_authority", limitationCodes: ["synthetic_readiness_only"],
+          investigativeObservationId: "model-authored-identity-is-forbidden" }, slot1: null, slot2: null, slot3: null } }),
       }) } as Response;
     });
     await expect(runProviderReadinessProbe("provider-readiness-diagnostic", cap, audit, diagnostics))
-      .rejects.toThrow("provider_readiness_semantic_contract_invalid");
+      .rejects.toThrow("semantic_judgment_shape_invalid");
     expect(call).toBe(3);
-    expect(diagnostics.snapshot()).toMatchObject({ semanticMemberValidationState: "failed",
-      semanticMemberIssues: ["semantic_member_state_invalid"],
-      semanticMismatchDimensions: ["required_source_authority"] });
+    expect(diagnostics.snapshot()).toMatchObject({ semanticMemberValidationState: "not_reached",
+      semanticMemberIssues: [], semanticMismatchDimensions: [] });
     expect(JSON.stringify(diagnostics.snapshot())).not.toContain("must never be retained");
-    expect(audit.snapshot().every((receipt) => receipt.retryCount === 0)).toBe(true);
+    expect(audit.snapshot().at(-1)).toMatchObject({ operation: "semantic_model", actualSendCount: 1,
+      completionState: "failed", structuredOutputValidation: "failed", retryCount: 0 });
   });
 
   it("stops provider readiness after the first failed operation without retry or later sends", async () => {
@@ -555,6 +598,33 @@ function openRouterResponse(citations: Array<{ url: string; title: string; conte
 }
 
 function citation(url: string, title: string) { return { type: "url_citation", url_citation: { url, title, content: "provider snippet must be discarded" } }; }
+
+function semanticInput(suffix: "one" | "two", subjectCode: "application_fee_terminology" | "non_swiped_discount_terminology"): SemanticVerificationInput {
+  const fingerprint = (suffix === "one" ? "a" : "b").repeat(64);
+  return {
+    itemId: `observation-${suffix}`,
+    question: { questionId: `question-${suffix}`, claimType: "processor_term", subjectCode, asOf: "2024-06-30",
+      scope: { processor: "fiserv_first_data", processorProgram: null, network: null, region: "us", jurisdiction: "us" },
+      requiredSourceAuthorities: ["processor_publication"], requiredEvidenceClasses: ["official_processor_terminology"],
+      possibleAnswerCodes: ["official_definition_found", "scope_limited", "account_document_required", "unresolved"], limitations: [] },
+    candidate: { candidateId: `candidate-${suffix}`, questionId: `question-${suffix}`, attemptId: `attempt-${suffix}`,
+      title: `Public terminology ${suffix}`, claimedAuthority: "processor_publication", sourceTypeCode: "official_processor_terminology",
+      rank: suffix === "one" ? 1 : 2, publicationDate: null, effectiveFrom: null, effectiveTo: null, locatorHint: null,
+      selectionReasonCode: "provider_neutral_public_discovery", discoveryMetadata: { providerCode: "test", configurationCode: "test_v1",
+        sourceDomain: "docs.example.test", providerRank: suffix === "one" ? 1 : 2, providerSnippetUsedAsEvidence: false },
+      retrievalEligibility: "eligible", authorityAdmissionRef: "live-test-admission", authorityPublicationFamilyCode: "official_processor_terminology" },
+    documentId: `document-${suffix}`,
+    locator: { locatorId: `locator-${suffix}`, documentId: `document-${suffix}`, documentFingerprint: fingerprint,
+      page: 1, sectionCode: "public_glossary", lineStart: 1, lineEnd: 1, text: `Synthetic public evidence ${suffix}.` },
+    proposedValue: { kind: "term", termCode: subjectCode, termValue: "scope_limited" },
+  };
+}
+
+function semanticRequest(items: SemanticVerificationInput[]) {
+  return { batchId: "semantic-binding-batch", attemptId: "semantic-binding-attempt", schemaVersion: "semantic_verification_v1",
+    expectedItemIds: items.map((item) => item.itemId), reservationId: `semantic-binding-${items.length}:call`, maximumOutputTokens: 1_200,
+    logicalAttempt: 1 as const, items, untrustedContentPolicy: "data_only_no_instructions" as const };
+}
 
 function inspectStrictSchemaSubset(value: unknown, path: string, issues: string[]): void {
   if (!value || typeof value !== "object" || Array.isArray(value)) return;

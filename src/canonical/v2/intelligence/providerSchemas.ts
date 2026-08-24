@@ -38,27 +38,17 @@ const investigativeItem = {
   },
 } as const;
 
-const semanticItem = {
+const semanticJudgment = {
   type: "object", additionalProperties: false,
-  required: ["itemId", "supportId", "questionId", "claimType", "subjectCode", "candidateId", "documentId", "locatorId", "documentFingerprint",
-    "investigativeObservationId", "sourceAuthority", "sourceEffectiveFrom", "sourceEffectiveTo", "applicabilityScope", "proposedValue",
-    "assertionBasisCode", "verificationStatus", "limitationCodes", "admissionAuthority", "financialMutationAllowed"],
+  required: ["sourceEffectiveFrom", "sourceEffectiveTo", "verificationStatus", "limitationCodes"],
   properties: {
-    itemId: safeString, supportId: safeString, questionId: safeString, claimType: { type: "string", const: "processor_term" },
-    subjectCode: { type: "string", enum: ["application_fee_terminology", "non_swiped_discount_terminology"] }, candidateId: safeString,
-    documentId: safeString, locatorId: safeString, documentFingerprint: { type: "string", pattern: "^[a-f0-9]{64}$" },
-    investigativeObservationId: safeString, sourceAuthority: { type: "string", enum: ["processor_publication", "official_network_publication"] },
     sourceEffectiveFrom: nullableDay, sourceEffectiveTo: nullableDay,
-    applicabilityScope: {
-      type: "object", additionalProperties: false, required: ["processor", "processorProgram", "network", "region", "jurisdiction"],
-      properties: Object.fromEntries(["processor", "processorProgram", "network", "region", "jurisdiction"].map((key) => [key,
-        { anyOf: [{ type: "string", pattern: "^[a-z][a-z0-9_]{0,63}$" }, { type: "null" }] }])),
-    },
-    proposedValue: neutralTerm, assertionBasisCode: { type: "string", const: "claim_specific_public_definition" },
     verificationStatus: { type: "string", enum: ["supported_candidate", "partially_supported", "unsupported", "contradicted", "wrong_authority", "wrong_scope", "wrong_period", "locator_unproven", "verification_unavailable"] },
-    limitationCodes: stringArray, admissionAuthority: { type: "string", const: "none" }, financialMutationAllowed: { type: "boolean", const: false },
+    limitationCodes: stringArray,
   },
 } as const;
+
+const semanticJudgmentSlot = { anyOf: [semanticJudgment, { type: "null" }] } as const;
 
 function envelope(item: object, schemaVersion: string) {
   return {
@@ -68,9 +58,17 @@ function envelope(item: object, schemaVersion: string) {
 }
 
 export const INVESTIGATIVE_RESPONSE_SCHEMA_ID = "investigative_observation_v1" as const;
-export const SEMANTIC_RESPONSE_SCHEMA_ID = "semantic_verification_v1" as const;
+export const SEMANTIC_RESPONSE_SCHEMA_ID = "semantic_judgment_v1" as const;
 export const INVESTIGATIVE_RESPONSE_SCHEMA_V1 = Object.freeze(envelope(investigativeItem, INVESTIGATIVE_RESPONSE_SCHEMA_ID));
-export const SEMANTIC_RESPONSE_SCHEMA_V1 = Object.freeze(envelope(semanticItem, SEMANTIC_RESPONSE_SCHEMA_ID));
+export const SEMANTIC_RESPONSE_SCHEMA_V1 = Object.freeze({
+  type: "object", additionalProperties: false, required: ["judgments"],
+  properties: {
+    judgments: {
+      type: "object", additionalProperties: false, required: ["slot0", "slot1", "slot2", "slot3"],
+      properties: { slot0: semanticJudgmentSlot, slot1: semanticJudgmentSlot, slot2: semanticJudgmentSlot, slot3: semanticJudgmentSlot },
+    },
+  },
+} as const);
 export const OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH = createHash("sha256").update(canonicalJson(OPENROUTER_SEARCH_RESPONSE_CONTRACT_V1)).digest("hex");
 export const INVESTIGATIVE_RESPONSE_SCHEMA_HASH = createHash("sha256").update(canonicalJson(INVESTIGATIVE_RESPONSE_SCHEMA_V1)).digest("hex");
 export const SEMANTIC_RESPONSE_SCHEMA_HASH = createHash("sha256").update(canonicalJson(SEMANTIC_RESPONSE_SCHEMA_V1)).digest("hex");

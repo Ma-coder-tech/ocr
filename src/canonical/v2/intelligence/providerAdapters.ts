@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { IntelligencePorts, InvestigativeObservation, SearchRequest, SearchResponse, SemanticVerificationInput,
-  StructuredBatchRequest, StructuredBatchResponse, CandidateClaimSupport } from "./intelligenceTypes.js";
+  StructuredBatchRequest, StructuredBatchResponse, CandidateClaimSupport, SemanticModelJudgment } from "./intelligenceTypes.js";
 import { RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET } from "./budgetLedger.js";
 import type { ProviderOperationReceiptV1 } from "../internalAnalysis/internalAnalysisTypes.js";
 import { assertProviderOutboundPacketSafe, assertProviderSafeQuestionContext } from "./providerPrivacy.js";
@@ -8,6 +8,7 @@ import { APPROVED_OPENROUTER_ENDPOINT, APPROVED_OPENAI_ENDPOINT, OPENROUTER_SEAR
   type InternalLiveExecutionCapabilityV1, LiveOperationTransportError, requireLiveCapabilityBinding } from "./providerPreflight.js";
 import { INVESTIGATIVE_RESPONSE_SCHEMA_ID, INVESTIGATIVE_RESPONSE_SCHEMA_V1,
   SEMANTIC_RESPONSE_SCHEMA_ID, SEMANTIC_RESPONSE_SCHEMA_V1 } from "./providerSchemas.js";
+import { asSemanticModelJudgment, validateSemanticModelJudgment } from "./structuredMemberValidation.js";
 
 const OPENROUTER_SEARCH_MAX_OUTPUT_TOKENS = 512;
 const OPENAI_STRUCTURED_CONFIGURATION_CODE = "openai_responses_structured_output_v2";
@@ -178,15 +179,21 @@ export function createLiveOpenAiInvestigativeAdapter(capability: InternalLiveExe
 export function createLiveOpenAiSemanticAdapter(capability: InternalLiveExecutionCapabilityV1, audit: ProviderOperationAuditLog): NonNullable<IntelligencePorts["semantic"]> {
   requireLiveCapabilityBinding(capability);
   return { providerCode: "openai_responses_api", modelCode: capability.modelCode, async verify(request) {
-    return sendOpenAiStructured<StructuredBatchRequest<SemanticVerificationInput>, CandidateClaimSupport>(capability, audit, request,
+    const immutableRequest = structuredClone(request);
+    assertSemanticRequestBinding(immutableRequest);
+    const providerInput = { semanticInputs: immutableRequest.items.map((input, slotIndex) => ({ slotIndex, input })) };
+    return sendOpenAiStructured<StructuredBatchRequest<SemanticVerificationInput>, CandidateClaimSupport>(capability, audit, immutableRequest,
       "semantic_model", SEMANTIC_RESPONSE_SCHEMA_ID, SEMANTIC_RESPONSE_SCHEMA_V1,
-      "Verify the exact neutral proposed value against the exact public locator, admitted publication family, product scope, and period. Do not substitute or strengthen it.");
+      "Verify each exact neutral proposed value against its exact public locator, admitted publication family, product scope, and period. Each judgment slotN applies only to semanticInputs slotIndex N; return null for unused slots. Return only semantic judgments. Identity, provenance, proposed values, and policy metadata are bound locally and are not response fields. Do not substitute or strengthen any value.",
+      providerInput, (parsed) => projectSemanticJudgments(immutableRequest, parsed));
   } };
 }
 
 async function sendOpenAiStructured<TRequest extends { batchId: string; attemptId: string; reservationId: string; maximumOutputTokens: number; logicalAttempt: 1; expectedItemIds: string[] }, TOutput>(
   capability: InternalLiveExecutionCapabilityV1, audit: ProviderOperationAuditLog, request: TRequest,
   operation: "investigative_model" | "semantic_model", schemaName: string, schema: object, systemText: string,
+  providerInput: unknown = request,
+  projectResponse?: (parsed: Record<string, unknown>) => StructuredBatchResponse<TOutput>,
 ): Promise<StructuredBatchResponse<TOutput>> {
   const binding = requireLiveCapabilityBinding(capability); const operationId = reservationOperationId(request.reservationId, ":call");
   const receiptId = receiptIdentity(operation, operationId); const started = binding.clock.nowMs();
@@ -195,7 +202,7 @@ async function sendOpenAiStructured<TRequest extends { batchId: string; attemptI
   audit.settle(receiptId, { localRequestId, requestedModelIdentifier: binding.model, structuredOutputValidation: "not_reached" });
   try {
     const body = JSON.stringify({ model: binding.model, store: false, max_output_tokens: request.maximumOutputTokens,
-      input: [{ role: "system", content: [{ type: "input_text", text: systemText }] }, { role: "user", content: [{ type: "input_text", text: JSON.stringify(request) }] }],
+      input: [{ role: "system", content: [{ type: "input_text", text: systemText }] }, { role: "user", content: [{ type: "input_text", text: JSON.stringify(providerInput) }] }],
       text: { format: { type: "json_schema", name: schemaName, strict: true, schema } } });
     assertProviderOutboundPacketSafe({ provider: "openai_responses_api", url: APPROVED_OPENAI_ENDPOINT, method: "POST", headerNames: ["Authorization", "Content-Type"], body });
     const response = await sendLiveJson({ url: APPROVED_OPENAI_ENDPOINT, method: "POST", headers: { Authorization: `Bearer ${binding.openAiApiKey}`, "Content-Type": "application/json" }, body, timeoutMs: 20_000, cancellationSignal: binding.cancellationSignal },
@@ -210,20 +217,90 @@ async function sendOpenAiStructured<TRequest extends { batchId: string; attemptI
     let parsed: Record<string, unknown>;
     try { parsed = JSON.parse(extractOutputText(envelope)) as Record<string, unknown>; }
     catch (error) { audit.settle(receiptId, { structuredOutputValidation: "failed" }); throw error; }
-    if (typeof parsed.batchId !== "string" || typeof parsed.attemptId !== "string" || parsed.batchId !== request.batchId || parsed.attemptId !== request.attemptId
-      || parsed.schemaVersion !== schemaName
-      || !Array.isArray(parsed.items) || new Set(parsed.items.map((item) => record(item).itemId)).size !== parsed.items.length
-      || parsed.items.length !== request.expectedItemIds.length
-      || parsed.items.some((item) => !request.expectedItemIds.includes(String(record(item).itemId)))) {
-      audit.settle(receiptId, { structuredOutputValidation: "failed" });
-      throw new Error("openai_response_identity_invalid");
-    }
+    let projected: StructuredBatchResponse<TOutput>;
+    try { projected = projectResponse ? projectResponse(parsed) : projectEchoedStructuredResponse(request, schemaName, parsed); }
+    catch (error) { audit.settle(receiptId, { structuredOutputValidation: "failed" }); throw error; }
     const usage = record(envelope.usage).output_tokens; const outputTokens = Number.isInteger(usage) && Number(usage) >= 0 ? Number(usage) : null;
     audit.settle(receiptId, { completionState: "completed", elapsedMs: elapsed(binding.clock.nowMs(), started),
       usageState: outputTokens === null ? "unknown_possible_billable" : "known", outputTokens, structuredOutputValidation: "passed",
       safeReasonCode: outputTokens === null ? "provider_usage_unknown" : "structured_response_completed" });
-    return { batchId: parsed.batchId, attemptId: parsed.attemptId, schemaVersion: String(parsed.schemaVersion ?? ""), items: parsed.items as TOutput[], reportedOutputTokens: outputTokens };
+    return { ...projected, reportedOutputTokens: outputTokens };
   } catch (error) { settleFailure(audit, receiptId, error, elapsed(binding.clock.nowMs(), started)); throw error; }
+}
+
+function projectEchoedStructuredResponse<TOutput>(
+  request: { batchId: string; attemptId: string; expectedItemIds: string[] }, schemaName: string, parsed: Record<string, unknown>,
+): StructuredBatchResponse<TOutput> {
+  if (typeof parsed.batchId !== "string" || typeof parsed.attemptId !== "string" || parsed.batchId !== request.batchId || parsed.attemptId !== request.attemptId
+    || parsed.schemaVersion !== schemaName
+    || !Array.isArray(parsed.items) || new Set(parsed.items.map((item) => record(item).itemId)).size !== parsed.items.length
+    || parsed.items.length !== request.expectedItemIds.length
+    || parsed.items.some((item) => !request.expectedItemIds.includes(String(record(item).itemId)))) throw new Error("openai_response_identity_invalid");
+  return { batchId: parsed.batchId, attemptId: parsed.attemptId, schemaVersion: String(parsed.schemaVersion),
+    items: parsed.items as TOutput[], reportedOutputTokens: null };
+}
+
+const SEMANTIC_SLOT_KEYS = ["slot0", "slot1", "slot2", "slot3"] as const;
+
+function assertSemanticRequestBinding(request: StructuredBatchRequest<SemanticVerificationInput>): void {
+  const itemIds = request.items.map((item) => item.itemId);
+  if (request.items.length < 1 || request.items.length > SEMANTIC_SLOT_KEYS.length
+    || itemIds.length !== request.expectedItemIds.length || new Set(itemIds).size !== itemIds.length
+    || itemIds.some((itemId, index) => itemId !== request.expectedItemIds[index])
+    || request.items.some((item) => item.question.questionId !== item.candidate.questionId
+      || item.documentId !== item.locator.documentId || !/^[a-f0-9]{64}$/.test(item.locator.documentFingerprint))) {
+    throw new Error("semantic_request_identity_invalid");
+  }
+}
+
+function projectSemanticJudgments(
+  request: StructuredBatchRequest<SemanticVerificationInput>, parsed: Record<string, unknown>,
+): StructuredBatchResponse<CandidateClaimSupport> {
+  if (!hasExactObjectKeys(parsed, ["judgments"])) throw new Error("semantic_judgment_envelope_invalid");
+  const judgments = record(parsed.judgments);
+  if (!hasExactObjectKeys(judgments, SEMANTIC_SLOT_KEYS)) throw new Error("semantic_judgment_slots_invalid");
+  const items = request.items.map((input, index) => {
+    const raw = judgments[SEMANTIC_SLOT_KEYS[index]!];
+    const issues = validateSemanticModelJudgment(raw);
+    if (issues.length > 0) throw new Error(issues[0]);
+    return bindSemanticModelJudgment(input, asSemanticModelJudgment(raw));
+  });
+  for (let index = request.items.length; index < SEMANTIC_SLOT_KEYS.length; index += 1) {
+    if (judgments[SEMANTIC_SLOT_KEYS[index]!] !== null) throw new Error("semantic_judgment_unused_slot_invalid");
+  }
+  return { batchId: request.batchId, attemptId: request.attemptId, schemaVersion: request.schemaVersion, items, reportedOutputTokens: null };
+}
+
+export function bindSemanticModelJudgment(input: SemanticVerificationInput, judgment: SemanticModelJudgment): CandidateClaimSupport {
+  const lineage = [input.itemId, input.question.questionId, input.candidate.candidateId, input.documentId,
+    input.locator.documentFingerprint, input.locator.locatorId].join("\0");
+  return {
+    itemId: input.itemId,
+    supportId: `semantic-support-${createHash("sha256").update(lineage).digest("hex").slice(0, 24)}`,
+    questionId: input.question.questionId,
+    claimType: input.question.claimType,
+    subjectCode: input.question.subjectCode,
+    candidateId: input.candidate.candidateId,
+    documentId: input.documentId,
+    locatorId: input.locator.locatorId,
+    documentFingerprint: input.locator.documentFingerprint,
+    investigativeObservationId: input.itemId,
+    sourceAuthority: input.candidate.claimedAuthority,
+    sourceEffectiveFrom: judgment.sourceEffectiveFrom,
+    sourceEffectiveTo: judgment.sourceEffectiveTo,
+    applicabilityScope: structuredClone(input.question.scope),
+    proposedValue: structuredClone(input.proposedValue),
+    assertionBasisCode: "claim_specific_public_definition",
+    verificationStatus: judgment.verificationStatus,
+    limitationCodes: [...judgment.limitationCodes],
+    admissionAuthority: "none",
+    financialMutationAllowed: false,
+  };
+}
+
+function hasExactObjectKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
+  const actual = Object.keys(value).sort(); const wanted = [...expected].sort();
+  return actual.length === wanted.length && actual.every((key, index) => key === wanted[index]);
 }
 
 function baseReceipt(receiptId: string, reservationId: string, operationId: string, operation: ProviderOperationReceiptV1["operation"], providerCode: string,

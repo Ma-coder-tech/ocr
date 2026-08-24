@@ -3,6 +3,7 @@ import { validateKnowledgeClaimValue } from "../knowledge/knowledgeValidate.js";
 import type {
   CandidateClaimSupport,
   InvestigativeObservation,
+  SemanticModelJudgment,
   SemanticVerificationInput,
   ThemeLanguageCandidate,
   ThemeLanguageInput,
@@ -21,6 +22,7 @@ const LANGUAGE_KEYS = [
   "itemId", "themeRef", "text", "deterministicFallbackText", "factRefs", "driverRefs", "leverRefs", "limitationCodes", "actionabilityCode",
   "uncertaintyState", "claimClasses", "source", "authority", "customerVisible", "reportPermission", "validation",
 ] as const;
+const SEMANTIC_JUDGMENT_KEYS = ["sourceEffectiveFrom", "sourceEffectiveTo", "verificationStatus", "limitationCodes"] as const;
 
 function canonicalArray(value: unknown): boolean {
   return Array.isArray(value) && value.every(isCanonicalCode);
@@ -76,6 +78,18 @@ export function validateSemanticMember(value: unknown, expected: SemanticVerific
   return [...new Set(issues)];
 }
 
+export function validateSemanticModelJudgment(value: unknown): string[] {
+  if (!isRecord(value) || !hasExactKeys(value, SEMANTIC_JUDGMENT_KEYS)) return ["semantic_judgment_shape_invalid"];
+  const issues: string[] = [];
+  if (!canonicalArray(value.limitationCodes)
+    || !["supported_candidate", "partially_supported", "unsupported", "contradicted", "wrong_authority", "wrong_scope", "wrong_period", "locator_unproven", "verification_unavailable"].includes(String(value.verificationStatus))) {
+    issues.push("semantic_judgment_state_invalid");
+  }
+  if (value.sourceEffectiveFrom !== null && !isValidIsoDay(value.sourceEffectiveFrom)) issues.push("semantic_judgment_period_invalid");
+  if (value.sourceEffectiveTo !== null && !isValidIsoDay(value.sourceEffectiveTo)) issues.push("semantic_judgment_period_invalid");
+  return [...new Set(issues)];
+}
+
 export function validateLanguageMemberShape(value: unknown, expected: ThemeLanguageInput): string[] {
   if (!isRecord(value) || !hasExactKeys(value, LANGUAGE_KEYS)) return ["language_member_shape_invalid"];
   const issues: string[] = [];
@@ -94,4 +108,5 @@ export function validateLanguageMemberShape(value: unknown, expected: ThemeLangu
 
 export function asInvestigativeObservation(value: unknown): InvestigativeObservation { return value as InvestigativeObservation; }
 export function asCandidateClaimSupport(value: unknown): CandidateClaimSupport { return value as CandidateClaimSupport; }
+export function asSemanticModelJudgment(value: unknown): SemanticModelJudgment { return value as SemanticModelJudgment; }
 export function asThemeLanguageCandidate(value: unknown): ThemeLanguageCandidate { return value as ThemeLanguageCandidate; }
