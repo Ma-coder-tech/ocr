@@ -9,14 +9,16 @@ import {
   type IntelligencePorts,
   type ThemeLanguageCandidate,
 } from "../../../../src/canonical/v2/index.js";
-import { admittedRule, disabledPorts, FakeClock, officialSourceAdmission, questionOrigin, queryScope, unknownItem } from "./intelligenceFixtures.js";
+import { admittedRule, disabledPorts, FakeClock, officialSourceAdmission, questionOrigin, queryScope,
+  unknownItem, verifiedSearchMetadata } from "./intelligenceFixtures.js";
 
 function runtimeInput(overrides: Record<string, unknown> = {}) {
-  return {
+  const result = {
     runId: "rg-run-1",
     canonicalTruth: { facts: [{ id: "notice-1", amount: 125 }] },
     canonicalReferenceIds: ["notice-1", "theme-1", "fact-1"],
     admittedKnowledge: [],
+    providerExecution: "injected_evaluation",
     unknownQueue: [unknownItem()],
     questionOrigins: [questionOrigin()],
     publicSourceAuthorityAdmissions: [officialSourceAdmission],
@@ -24,6 +26,7 @@ function runtimeInput(overrides: Record<string, unknown> = {}) {
     languageInputs: [{ itemId: "language-1", themeRef: "theme-1", themeType: "pricing_structure", factRefs: ["fact-1"], driverRefs: [], leverRefs: [], limitationCodes: ["rule_unresolved"], actionabilityCode: "verification_only", uncertaintyState: "unresolved" }],
     ...overrides,
   } as Parameters<typeof runBoundedIntelligenceRuntime>[0];
+  return result;
 }
 
 function fullFakePorts(clock = new FakeClock()): IntelligencePorts {
@@ -36,6 +39,7 @@ function fullFakePorts(clock = new FakeClock()): IntelligencePorts {
           attemptId: request.attemptId,
           questionId: request.questionId,
           suggestedAdaptiveReason: null,
+          providerMetadata: verifiedSearchMetadata(1),
           outputAccounting: "search_discovery_not_model_generation",
           candidates: [{
             candidateId: `${request.questionId}-candidate-1`, questionId: request.questionId, attemptId: request.attemptId,
@@ -192,7 +196,8 @@ describe("Canonical Intelligence V2 bounded runtime", () => {
         providerCode: "fake_search",
         async search(request) {
           return {
-            attemptId: request.attemptId, questionId: request.questionId, suggestedAdaptiveReason: null, outputAccounting: "search_discovery_not_model_generation",
+            attemptId: request.attemptId, questionId: request.questionId, suggestedAdaptiveReason: null,
+            providerMetadata: verifiedSearchMetadata(5), outputAccounting: "search_discovery_not_model_generation",
             candidates: Array.from({ length: 5 }, (_, index) => ({
               candidateId: `${request.questionId}-candidate-${index + 1}`, questionId: request.questionId, attemptId: request.attemptId,
               url: `https://example.com/rule-${index + 1}`, claimedAuthority: "official_network_publication" as const, sourceTypeCode: "official_rule",
@@ -219,7 +224,7 @@ describe("Canonical Intelligence V2 bounded runtime", () => {
     expect(Math.max(...result.questions.map((question) => result.candidates.filter((candidate) => candidate.questionId === question.questionId).length))).toBeLessThanOrEqual(3);
   });
 
-  it("uses one adaptive search only for a retained close-enough official candidate", async () => {
+  it("uses at most one adaptive search for a retained close-enough source or an executed zero-result search", async () => {
     let call = 0;
     const ports: IntelligencePorts = {
       clock: new FakeClock(),
@@ -230,6 +235,7 @@ describe("Canonical Intelligence V2 bounded runtime", () => {
           return {
             attemptId: request.attemptId, questionId: request.questionId,
             suggestedAdaptiveReason: call === 1 ? "right_program_wrong_period" : null,
+            providerMetadata: verifiedSearchMetadata(1, call),
             outputAccounting: "search_discovery_not_model_generation",
             candidates: [{
               candidateId: `candidate-${call}`, questionId: request.questionId, attemptId: request.attemptId,
@@ -253,14 +259,15 @@ describe("Canonical Intelligence V2 bounded runtime", () => {
         providerCode: "fake_search",
         async search(request) {
           call += 1;
-          return { attemptId: request.attemptId, questionId: request.questionId, suggestedAdaptiveReason: "official_subsection_missing", outputAccounting: "search_discovery_not_model_generation" as const, candidates: [] };
+          return { attemptId: request.attemptId, questionId: request.questionId, suggestedAdaptiveReason: "official_subsection_missing",
+            providerMetadata: verifiedSearchMetadata(0, call), outputAccounting: "search_discovery_not_model_generation" as const, candidates: [] };
         },
       },
     };
     const noCandidate = await runBoundedIntelligenceRuntime(runtimeInput({ languageInputs: [] }), noCandidatePorts);
-    expect(call).toBe(1);
-    expect(noCandidate.searchAttempts).toHaveLength(1);
-    expect(noCandidate.budget.consumed.adaptive_searches).toBe(0);
+    expect(call).toBe(2);
+    expect(noCandidate.searchAttempts.map((attempt) => attempt.kind)).toEqual(["initial", "adaptive"]);
+    expect(noCandidate.budget.consumed.adaptive_searches).toBe(1);
   });
 
   it.each(["encrypted_pdf", "malformed_pdf", "unsupported_pdf", "extraction_failed"] as const)("degrades safely for %s without promoting snippets", async (documentState) => {
@@ -363,6 +370,7 @@ describe("Canonical Intelligence V2 bounded runtime", () => {
         async search(request) {
           return {
             attemptId: request.attemptId, questionId: request.questionId, suggestedAdaptiveReason: null, outputAccounting: "search_discovery_not_model_generation",
+            providerMetadata: verifiedSearchMetadata(1),
             candidates: [{
               candidateId: "injection-candidate", questionId: request.questionId, attemptId: request.attemptId,
               url: "https://example.com/injection", claimedAuthority: "official_network_publication", sourceTypeCode: "official_rule", rank: 1,

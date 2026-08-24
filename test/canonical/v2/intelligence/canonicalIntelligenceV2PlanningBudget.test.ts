@@ -9,7 +9,8 @@ import {
   type RuntimeClock,
   validateRgFreeV1Budget,
 } from "../../../../src/canonical/v2/index.js";
-import { admittedRule, officialSourceAdmission, questionOrigin, queryScope, unknownItem } from "./intelligenceFixtures.js";
+import { admittedRule, officialSourceAdmission, questionOrigin, queryScope, unknownItem,
+  verifiedSearchMetadata } from "./intelligenceFixtures.js";
 
 describe("Canonical Intelligence V2 question planning and RG-FREE-v1 budget", () => {
   it("implements the exact approved RG-FREE-v1 profile and consumes failed/unknown calls", () => {
@@ -90,19 +91,22 @@ describe("Canonical Intelligence V2 question planning and RG-FREE-v1 budget", ()
   });
 
   it("lets sequential 15-second and 30-second searches complete inside the 40-second/180-second live timing amendment", async () => {
-    const clock = new LatencyClock([15_000, 30_000]);
+    const clock = new LatencyClock([15_000, 1, 30_000, 1]);
     const second = unknownItem({ id: "unknown-rule-2", subjectCode: "second_public_rule" });
+    const first = unknownItem();
     const result = await runBoundedIntelligenceRuntime({ runId: "live-timing-two-searches", canonicalTruth: {}, canonicalReferenceIds: [],
-      admittedKnowledge: [], unknownQueue: [unknownItem(), second], questionOrigins: [questionOrigin(), questionOrigin("unknown-rule-2")],
+      admittedKnowledge: [], unknownQueue: [first, second], questionOrigins: [questionOrigin(), questionOrigin("unknown-rule-2")],
       publicSourceAuthorityAdmissions: [officialSourceAdmission], deterministicNotApplicableUnknownRefs: [], languageInputs: [],
       profile: RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET, providerExecution: "injected_evaluation" }, {
       clock, search: { providerCode: "timing_test_search", async search(request) { return { attemptId: request.attemptId,
         questionId: request.questionId, candidates: [], suggestedAdaptiveReason: null,
+        providerMetadata: verifiedSearchMetadata(0),
         outputAccounting: "search_discovery_not_model_generation" }; } },
     });
-    expect(clock.requestedTimeouts).toEqual([40_000, 40_000]);
-    expect(clock.nowMs()).toBe(45_000);
-    expect(result.searchAttempts).toHaveLength(2);
+    expect(clock.requestedTimeouts).toEqual([40_000, 40_000, 40_000, 40_000]);
+    expect(clock.nowMs()).toBe(45_002);
+    expect(result.searchAttempts).toHaveLength(4);
+    expect(result.searchAttempts.filter((attempt) => attempt.kind === "adaptive")).toHaveLength(2);
     expect(result.searchAttempts.every((attempt) => attempt.status === "no_candidates"
       && attempt.reasonCodes.includes("provider_search_completed_zero_candidates"))).toBe(true);
     expect(RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET.globalWallTimeMs).toBe(180_000);
@@ -116,6 +120,7 @@ describe("Canonical Intelligence V2 question planning and RG-FREE-v1 budget", ()
       profile: RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET, providerExecution: "injected_evaluation" }, {
       clock, search: { providerCode: "timing_test_search", async search(request) { calls += 1; return { attemptId: request.attemptId,
         questionId: request.questionId, candidates: [], suggestedAdaptiveReason: null,
+        providerMetadata: verifiedSearchMetadata(0),
         outputAccounting: "search_discovery_not_model_generation" }; } },
     });
     expect(clock.requestedTimeouts).toEqual([40_000]);

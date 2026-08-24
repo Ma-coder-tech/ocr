@@ -6,6 +6,8 @@ import {
   PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS,
   authorityAdmissionForCandidate,
   createPublicSourceAuthorityAdmission,
+  knownExactDocumentCandidatesForQuestion,
+  safePublicSearchQuery,
   verifyRetrievedDocumentAuthority,
   type DiscoveryCandidate,
   type RuntimeResearchQuestion,
@@ -21,7 +23,7 @@ function question(subjectCode = "non_swiped_discount_terminology", overrides: Pa
     originatingDependencyRefs: [], originatingThemeRefs: [], relatedCanonicalRefs: ["statement-observation"], scope, asOf: "2024-06-30",
     requiredSourceAuthorities: ["processor_publication"], requiredEvidenceClasses: ["official_processor_terminology"], materiality: "material",
     blockingEffect: "limits_authority", priority: "material_operational_action", reportDecisionCode: `${subjectCode}_review`,
-    possibleAnswerCodes: ["official_definition_found", "scope_limited", "account_document_required", "unresolved"],
+    possibleAnswerCodes: ["official_definition_found", "scope_limited", "account_document_required", "unresolved"], publicResearchPlausible: true,
     rfResolution: { status: "unresolved_no_admitted_knowledge", claimType: "processor_term", subjectCode, value: null,
       selectedEntryRefs: [], corroboratingEntryRefs: [], rejectedCounts: {}, conflictEntryCount: 0, asOf: "2024-06-30", scope,
       sourceAuthorities: [] }, eligibility: "eligible", selection: "selected", reasonCodes: [], limitations: [], ...overrides,
@@ -39,6 +41,36 @@ function candidate(url = FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_URL, overrides: Pa
 }
 
 describe("production public-source authority registry", () => {
+  it("generates a deterministic retrieval candidate only for the exact admitted Non-Swiped question", () => {
+    const nonSwiped = question();
+    const known = knownExactDocumentCandidatesForQuestion({ question: nonSwiped,
+      admissions: PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS });
+    expect(known).toHaveLength(1);
+    expect(known[0]).toMatchObject({ url: FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_URL,
+      selectionReasonCode: "known_exact_authority_admission", retrievalEligibility: "eligible",
+      authorityAdmissionRef: FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_ADMISSION.admissionId,
+      discoveryMetadata: { providerCode: "rate_reveal_authority_registry", configurationCode: "known_exact_document_v1",
+        providerSnippetUsedAsEvidence: false } });
+    expect(knownExactDocumentCandidatesForQuestion({ question: question("application_fee_terminology"),
+      admissions: PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS })).toEqual([]);
+  });
+
+  it("constructs natural public queries from safe 2024 context without private statement data or expected answers", () => {
+    const application = question("application_fee_terminology");
+    const context = { schemaVersion: "provider_safe_question_context_v1" as const,
+      providerContextId: "provider-context-00000000-0000-4000-8000-000000000000",
+      questionClass: "application_fee_public_definition", claimType: "processor_term" as const,
+      subjectCode: "application_fee_terminology", safeResearchLabel: "application fee",
+      questionText: "Does an eligible authoritative public source define application fee terminology?",
+      processorProgram: "fiserv_first_data", periodYear: "2024", allowedContext: "public_product_terminology_only" as const };
+    const initial = safePublicSearchQuery({ question: application, context, kind: "initial" });
+    const adaptive = safePublicSearchQuery({ question: application, context, kind: "adaptive" });
+    expect(initial.queryText).toBe("application fee Fiserv First Data payment processing official documentation United States 2024 definition");
+    expect(adaptive.queryText).toBe("application fee Fiserv First Data payment processing public support guide fee schedule terminology United States 2024");
+    expect(initial.queryText).not.toMatch(/application_fee|tenant|account|merchant|statement|\.pdf|official_definition_found/i);
+    expect(adaptive.queryText).not.toBe(initial.queryText);
+  });
+
   it("contains one exact-document Non-Swiped admission and no Application Fee admission", () => {
     expect(PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS).toEqual([FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_ADMISSION]);
     expect(FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_ADMISSION).toMatchObject({

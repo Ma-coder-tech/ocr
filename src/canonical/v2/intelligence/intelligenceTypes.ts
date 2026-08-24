@@ -20,6 +20,7 @@ export const RG_SEMANTIC_AMENDMENT_IDS = [
   "RG-AMEND-008-AI-NON-MUTATION",
   "RG-AMEND-009-UNTRUSTED-CONTENT-ISOLATION",
   "RG-AMEND-010-BOUNDED-THEME-LANGUAGE-CANDIDATE",
+  "RG-AMEND-012-KNOWN-AUTHORITY-DISCOVERY-RESILIENCE",
 ] as const;
 
 export const RG_INTERNAL_LIVE_TIMING_AMENDMENT_ID = "RG-AMEND-011-INTERNAL-LIVE-TIMING-V2" as const;
@@ -192,6 +193,7 @@ export type RuntimeResearchQuestion = {
   priority: RuntimeQuestionPriority;
   reportDecisionCode: string;
   possibleAnswerCodes: string[];
+  publicResearchPlausible: boolean;
   rfResolution: KnowledgeResolution;
   eligibility:
     | "eligible"
@@ -212,10 +214,25 @@ export type SearchAttempt = {
   questionId: string;
   kind: "initial" | "adaptive";
   queryTerms: string[];
+  queryText: string;
   status: "completed" | "no_candidates" | "failed" | "timeout" | "disabled" | "budget_exhausted";
-  adaptiveReason: "right_program_wrong_period" | "official_subsection_missing" | "publication_version_missing" | null;
+  adaptiveReason: "right_program_wrong_period" | "official_subsection_missing" | "publication_version_missing" | "zero_candidates_safe_query_variant" | null;
   candidateIds: string[];
   reasonCodes: string[];
+  providerMetadata: SearchProviderMetadataV1 | null;
+};
+
+export type SearchToolExecutionState = "verified" | "unverified" | "not_executed";
+
+export type SearchProviderMetadataV1 = {
+  providerResponseId: string | null;
+  modelIdentifier: string | null;
+  finishReason: string | null;
+  webSearchRequestCount: number | null;
+  annotationCount: number;
+  normalizedCandidateCount: number;
+  providerCompletionState: "completed";
+  toolExecutionState: SearchToolExecutionState;
 };
 
 export type SearchDiscoveryCandidate = {
@@ -252,6 +269,7 @@ export type SearchRequest = {
   attemptId: string;
   questionId: string;
   queryTerms: string[];
+  queryText: string;
   allowedAuthorities: KnowledgeSourceAuthority[];
   maximumCandidates: number;
   outputAccounting: "search_discovery_not_model_generation";
@@ -264,6 +282,7 @@ export type SearchResponse = {
   questionId: string;
   candidates: SearchDiscoveryCandidate[];
   suggestedAdaptiveReason: SearchAttempt["adaptiveReason"];
+  providerMetadata: SearchProviderMetadataV1;
   outputAccounting: "search_discovery_not_model_generation";
 };
 

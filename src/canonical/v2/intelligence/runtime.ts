@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { canonicalJson, isSafeStructuredString } from "../knowledge/knowledgeSafety.js";
 import type { KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 import { IntelligenceBudgetExceeded, IntelligenceBudgetLedger, RG_FREE_V1_BUDGET, validateRgFreeV1Budget } from "./budgetLedger.js";
-import { planRuntimeResearchQuestions, safeSearchTerms } from "./questionPlanning.js";
+import { planRuntimeResearchQuestions, safePublicSearchQuery, safeSearchTerms } from "./questionPlanning.js";
 import {
   bindInvestigativeLocator,
   createDestinationPermit,
@@ -12,7 +12,8 @@ import {
   validateRetrievalResponse,
 } from "./retrievalSafety.js";
 import { RemoteConcurrencyGuard } from "./remoteConcurrency.js";
-import { authorityAdmissionForCandidate, deriveAdaptiveSearchReason, validatePublicSourceAuthorityAdmissions, verifyRetrievedDocumentAuthority } from "./sourceAuthority.js";
+import { authorityAdmissionForCandidate, deriveAdaptiveSearchReason, knownExactDocumentCandidatesForQuestion,
+  validatePublicSourceAuthorityAdmissions, verifyRetrievedDocumentAuthority } from "./sourceAuthority.js";
 import { detectSemanticConflicts, supportToKnowledgeCandidatePacket, validateSemanticSupport } from "./semanticVerification.js";
 import { asCandidateClaimSupport, asInvestigativeObservation, asThemeLanguageCandidate, validateInvestigativeMember, validateLanguageMemberShape, validateSemanticMember } from "./structuredMemberValidation.js";
 import { partitionStructuredItems, validateStructuredBatchResponse } from "./structuredBatching.js";
@@ -31,6 +32,7 @@ import type {
   IntelligenceTimeoutResult,
   InvestigativeObservation,
   PrivateResearchReviewBundle,
+  ProviderSafeQuestionContextV1,
   RuntimeSecurityEvent,
   SemanticConflict,
   RuntimeDocumentResult,
@@ -173,19 +175,27 @@ async function performSearch(params: {
   startedAtMs: number;
   adaptiveReason: SearchAttempt["adaptiveReason"];
   guard: RemoteConcurrencyGuard;
+  context?: ProviderSafeQuestionContextV1;
 }): Promise<{ attempt: SearchAttempt; candidates: DiscoveryCandidate[]; responseAdaptiveReason: SearchAttempt["adaptiveReason"] }> {
   const profile = params.ledger.profile;
   const attemptId = operationId(params.input.runId, `search-${params.kind}`, params.sequence);
-  const queryTerms = [...safeSearchTerms(params.question), ...(params.kind === "adaptive" && params.adaptiveReason ? [params.adaptiveReason] : [])].sort();
+  const injectedFallback = params.input.providerExecution === "injected_evaluation" && !params.context
+    ? safeSearchTerms(params.question) : null;
+  if (!params.context && !injectedFallback) throw new Error("provider_question_context_required_for_non_injected_search");
+  const { queryTerms, queryText } = params.context
+    ? safePublicSearchQuery({ question: params.question, context: params.context, kind: params.kind })
+    : { queryTerms: injectedFallback!, queryText: injectedFallback!.join(" ") };
   const base: SearchAttempt = {
     attemptId,
     questionId: params.question.questionId,
     kind: params.kind,
     queryTerms,
+    queryText,
     status: "failed",
     adaptiveReason: params.kind === "adaptive" ? params.adaptiveReason : null,
     candidateIds: [],
     reasonCodes: [],
+    providerMetadata: null,
   };
   if (!params.ports.search) return { attempt: { ...base, status: "disabled", reasonCodes: ["search_provider_disabled"] }, candidates: [], responseAdaptiveReason: null };
   if (expired(params.ports, params.startedAtMs, profile.globalWallTimeMs)) {
@@ -207,6 +217,7 @@ async function performSearch(params: {
     attemptId,
     questionId: params.question.questionId,
     queryTerms,
+    queryText,
     allowedAuthorities: [...params.question.requiredSourceAuthorities],
     maximumCandidates: profile.maxCandidatesPerQuestion,
     outputAccounting: "search_discovery_not_model_generation",
@@ -229,6 +240,21 @@ async function performSearch(params: {
     if (params.kind === "adaptive") params.ledger.settle(`${attemptId}:adaptive`, { state: "failed" });
     return { attempt: { ...base, status: "failed", reasonCodes: ["search_response_identity_mismatch"] }, candidates: [], responseAdaptiveReason: null };
   }
+  if (response.providerMetadata.normalizedCandidateCount !== response.candidates.length
+    || response.providerMetadata.annotationCount < response.candidates.length
+    || response.providerMetadata.providerCompletionState !== "completed") {
+    params.ledger.settle(`${attemptId}:call`, { state: "failed", actualAmount: 1 });
+    if (params.kind === "adaptive") params.ledger.settle(`${attemptId}:adaptive`, { state: "failed", actualAmount: 1 });
+    return { attempt: { ...base, status: "failed", providerMetadata: response.providerMetadata,
+      reasonCodes: ["search_provider_metadata_malformed"] }, candidates: [], responseAdaptiveReason: null };
+  }
+  if (response.providerMetadata.toolExecutionState !== "verified") {
+    params.ledger.settle(`${attemptId}:call`, { state: "failed", actualAmount: 1 });
+    if (params.kind === "adaptive") params.ledger.settle(`${attemptId}:adaptive`, { state: "failed", actualAmount: 1 });
+    const reason = response.providerMetadata.toolExecutionState === "not_executed" ? "search_tool_not_executed" : "search_tool_execution_unverified";
+    return { attempt: { ...base, status: "failed", providerMetadata: response.providerMetadata, reasonCodes: [reason] },
+      candidates: [], responseAdaptiveReason: null };
+  }
   const responseCandidateIds = response.candidates.map((candidate) => candidate.candidateId);
   if (new Set(responseCandidateIds).size !== responseCandidateIds.length) {
     params.ledger.settle(`${attemptId}:call`, { state: "failed", actualAmount: 1 });
@@ -247,9 +273,12 @@ async function performSearch(params: {
       status: candidates.length > 0 ? "completed" : "no_candidates",
       candidateIds: candidates.map((candidate) => candidate.candidateId),
       reasonCodes: candidates.length > 0 ? ["discovery_candidates_retained_by_authority"] : [noCandidateReason],
+      providerMetadata: response.providerMetadata,
     },
     candidates,
-    responseAdaptiveReason: deriveAdaptiveSearchReason({ suggested: response.suggestedAdaptiveReason, question: params.question, candidates }),
+    responseAdaptiveReason: candidates.length === 0 && params.question.publicResearchPlausible
+      ? "zero_candidates_safe_query_variant"
+      : deriveAdaptiveSearchReason({ suggested: response.suggestedAdaptiveReason, question: params.question, candidates }),
   };
 }
 
@@ -540,20 +569,44 @@ async function runBoundedIntelligenceRuntimeInternal(
   const searchAttempts: SearchAttempt[] = [];
   const candidates: DiscoveryCandidate[] = [];
   const retainedCandidateIds = new Set<string>();
-  let searchSequence = 0;
+  const knownAuthorityQuestionIds = new Set<string>();
   for (const question of questions.filter((item) => item.selection === "selected")) {
+    const known = knownExactDocumentCandidatesForQuestion({ question, admissions: input.publicSourceAuthorityAdmissions });
+    for (const candidate of known.slice(0, profile.maxCandidatesPerQuestion)) {
+      try {
+        ledger.reserveAndComplete({ reservationId: `${input.runId}:candidate:${candidate.candidateId}`,
+          operationId: candidate.attemptId, dimension: "candidates", amount: 1 });
+      } catch (error) {
+        if (error instanceof IntelligenceBudgetExceeded) { reasonCodes.push(`budget_exhausted:${error.dimension}`); break; }
+        throw error;
+      }
+      if (!retainedCandidateIds.has(candidate.candidateId)) {
+        retainedCandidateIds.add(candidate.candidateId);
+        candidates.push(candidate);
+        knownAuthorityQuestionIds.add(question.questionId);
+      }
+    }
+  }
+  let searchSequence = 0;
+  for (const question of questions.filter((item) => item.selection === "selected" && !knownAuthorityQuestionIds.has(item.questionId))) {
+    const context = contextBindings.find((item) => item.unknownRef === question.originatingUnknownRef)?.context;
+    if (!context && input.providerExecution !== "injected_evaluation") {
+      reasonCodes.push("provider_question_context_missing");
+      continue;
+    }
     searchSequence += 1;
-    const initial = await performSearch({ input, question, kind: "initial", sequence: searchSequence, existingCandidates: [], ports, ledger, startedAtMs, adaptiveReason: null, guard });
+    const initial = await performSearch({ input, question, kind: "initial", sequence: searchSequence, existingCandidates: [], ports, ledger, startedAtMs, adaptiveReason: null, guard, context });
     searchAttempts.push(initial.attempt);
     if (initial.attempt.status !== "completed") reasonCodes.push(...initial.attempt.reasonCodes);
     for (const candidate of initial.candidates) {
       if (retainedCandidateIds.has(candidate.candidateId)) { initial.attempt.status = "failed"; initial.attempt.reasonCodes.push("candidate_identity_cross_question_rejected"); reasonCodes.push("candidate_identity_cross_question_rejected"); continue; }
       retainedCandidateIds.add(candidate.candidateId); candidates.push(candidate);
     }
-    const permittedAdaptive = initial.responseAdaptiveReason !== null && ["right_program_wrong_period", "official_subsection_missing", "publication_version_missing"].includes(initial.responseAdaptiveReason);
-    if (permittedAdaptive && initial.candidates.length > 0 && initial.candidates.length < profile.maxCandidatesPerQuestion && !expired(ports, startedAtMs, profile.globalWallTimeMs)) {
+    const permittedAdaptive = initial.responseAdaptiveReason !== null && ["right_program_wrong_period", "official_subsection_missing", "publication_version_missing", "zero_candidates_safe_query_variant"].includes(initial.responseAdaptiveReason);
+    if (permittedAdaptive && initial.candidates.length < profile.maxCandidatesPerQuestion
+      && ledger.snapshot().remaining.candidates > 0 && !expired(ports, startedAtMs, profile.globalWallTimeMs)) {
       searchSequence += 1;
-      const adaptive = await performSearch({ input, question, kind: "adaptive", sequence: searchSequence, existingCandidates: initial.candidates, ports, ledger, startedAtMs, adaptiveReason: initial.responseAdaptiveReason, guard });
+      const adaptive = await performSearch({ input, question, kind: "adaptive", sequence: searchSequence, existingCandidates: initial.candidates, ports, ledger, startedAtMs, adaptiveReason: initial.responseAdaptiveReason, guard, context });
       searchAttempts.push(adaptive.attempt);
       if (adaptive.attempt.status !== "completed") reasonCodes.push(...adaptive.attempt.reasonCodes);
       for (const candidate of adaptive.candidates) {

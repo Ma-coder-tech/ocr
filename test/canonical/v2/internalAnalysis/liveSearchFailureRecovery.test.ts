@@ -32,6 +32,46 @@ class TimeoutAwareInjectedClock implements RuntimeClock {
 }
 
 describe("Statement 1 live-search failure recovery", () => {
+  it("fails missing search-tool execution evidence closed without an adaptive search", async () => {
+    const outputDirectory = await mkdtemp(path.join(os.tmpdir(), "statement-one-search-tool-unverified-"));
+    const injected = createInjectedStatement1Fixture();
+    let calls = 0;
+    injected.ports.search = {
+      providerCode: "injected_openrouter_search_contract",
+      async search(request: SearchRequest) {
+        calls += 1;
+        injected.providerAudit.record({ receiptId: "unverified-search-receipt", reservationId: request.reservationId,
+          operationId: request.attemptId, operation: "search", providerCode: "injected_openrouter_search_contract",
+          logicalAttempt: 1, actualSendCount: 0, retryCount: 0, sendState: "not_sent", completionState: "failed",
+          elapsedMs: 1, usageState: "known", outputTokens: null, providerRequestCount: null, usageCostUsd: 0,
+          providerConfigurationCode: "injected_openrouter_perplexity_v1", safeReasonCode: "search_tool_execution_unverified" });
+        return { attemptId: request.attemptId, questionId: request.questionId, candidates: [], suggestedAdaptiveReason: null,
+          providerMetadata: { providerResponseId: "injected-unverified", modelIdentifier: "openai/gpt-5.2", finishReason: "stop",
+            webSearchRequestCount: null, annotationCount: 0, normalizedCandidateCount: 0,
+            providerCompletionState: "completed" as const, toolExecutionState: "unverified" as const },
+          outputAccounting: "search_discovery_not_model_generation" as const };
+      },
+    };
+    const result = await runFiservInternalAnalysisEvaluationV1({
+      statementPaths: [statementOne], safeStatementId: "fsv-03-clover-short-jun",
+      runVersion: "run-3-foundational-admissions-pricing-fixed", outputDirectory,
+      sourceProfile: { statementCompleteness: "unknown" }, internalRunId: "statement-one-search-tool-unverified",
+      evaluatedAt: "2026-08-24T00:00:00.000Z", tenantRef: "tenant-private-fixture", accountRef: "account-private-fixture",
+      admittedKnowledge: [], ports: injected.ports, providerAudit: injected.providerAudit,
+      providerPreflight: injected.providerPreflight, publicSourceAuthorityAdmissions: injected.publicSourceAuthorityAdmissions,
+    });
+    expect(calls).toBe(1);
+    expect(result.runtime.searchAttempts).toEqual([expect.objectContaining({ status: "failed",
+      reasonCodes: ["search_tool_execution_unverified"], providerMetadata: expect.objectContaining({ toolExecutionState: "unverified" }) })]);
+    expect(result.analysis.researchOutcome).toBe("search_tool_execution_unverified");
+    expect(result.analysis.researchQuestionOutcomes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ questionClass: "application_fee_public_definition", outcome: "search_tool_execution_unverified" }),
+      expect.objectContaining({ questionClass: "non_swiped_discount_public_definition", outcome: "research_completed" }),
+    ]));
+    expect(result.rgAudit.externalNetworkCallCount).toBe(0);
+    expect(validateRgInternalAuditV1(result.rgAudit)).toEqual([]);
+  }, 30_000);
+
   it.each([
     { firstOutcome: "timeout" as const, failureCall: 1, expectedAttemptStatus: "timeout", expectedReservationState: "timeout", expectedReason: "search_timeout" },
     { firstOutcome: "timeout" as const, failureCall: 2, expectedAttemptStatus: "timeout", expectedReservationState: "timeout", expectedReason: "search_timeout" },
@@ -73,6 +113,9 @@ describe("Statement 1 live-search failure recovery", () => {
           throw new Error("openrouter_search_response_malformed");
         }
         return { attemptId: request.attemptId, questionId: request.questionId, candidates: [], suggestedAdaptiveReason: null,
+          providerMetadata: { providerResponseId: `injected-mixed-${calls}`, modelIdentifier: "openai/gpt-5.2", finishReason: "stop",
+            webSearchRequestCount: 1, annotationCount: 0, normalizedCandidateCount: 0,
+            providerCompletionState: "completed" as const, toolExecutionState: "verified" as const },
           outputAccounting: "search_discovery_not_model_generation" as const };
       },
     };
@@ -86,45 +129,47 @@ describe("Statement 1 live-search failure recovery", () => {
       providerPreflight: injected.providerPreflight, publicSourceAuthorityAdmissions: injected.publicSourceAuthorityAdmissions,
     });
 
-    expect(calls).toBe(2);
+    const expectedSearchCalls = failureCall === 1 ? 1 : 2;
+    expect(calls).toBe(expectedSearchCalls);
     expect(result.investigationOrigins.origins).toHaveLength(2);
-    expect(result.runtime.searchAttempts).toHaveLength(2);
-    expect(clock.requestedTimeouts).toEqual([40_000, 40_000]);
+    expect(result.runtime.searchAttempts).toHaveLength(expectedSearchCalls);
+    expect(clock.requestedTimeouts).toEqual([
+      ...Array(expectedSearchCalls).fill(40_000), 12_000, 12_000, 20_000, 20_000,
+    ]);
     expect(result.runtime.searchAttempts[failureCall - 1]).toMatchObject({ status: expectedAttemptStatus, candidateIds: [], reasonCodes: [expectedReason] });
-    expect(result.runtime.searchAttempts[failureCall === 1 ? 1 : 0]).toMatchObject({ status: "no_candidates", candidateIds: [], reasonCodes: ["provider_search_completed_zero_candidates"] });
-    expect(result.runtime.candidates).toEqual([]);
-    expect(result.runtime.documents).toEqual([]);
-    expect(result.runtime.supports).toEqual([]);
+    if (failureCall === 2) expect(result.runtime.searchAttempts[0]).toMatchObject({ status: "no_candidates", candidateIds: [],
+      reasonCodes: ["provider_search_completed_zero_candidates"] });
+    expect(result.runtime.candidates).toHaveLength(1);
+    expect(result.runtime.documents).toHaveLength(1);
+    expect(result.runtime.supports).toHaveLength(1);
     expect(result.analysis).toMatchObject({ executionStatus: "completed",
       researchOutcome: firstOutcome === "timeout" ? "research_unavailable_due_to_timeout" : "provider_failure",
       terminalStatus: "research_unavailable", canonicalTruthPreserved: true });
-    expect(result.analysis.researchQuestionOutcomes.map((outcome) => outcome.outcome)).toEqual(firstOutcome === "timeout"
-      ? (failureCall === 1 ? ["research_unavailable_due_to_timeout", "no_eligible_public_evidence_found"]
-        : ["no_eligible_public_evidence_found", "research_unavailable_due_to_timeout"])
-      : ["provider_failure", "no_eligible_public_evidence_found"]);
+    expect(result.analysis.researchQuestionOutcomes.map((outcome) => outcome.outcome)).toEqual([
+      firstOutcome === "timeout" ? "research_unavailable_due_to_timeout" : "provider_failure", "research_completed",
+    ]);
     const nonSwipedOutcome = result.analysis.researchQuestionOutcomes.find((outcome) => outcome.questionClass === "non_swiped_discount_public_definition")!;
     const applicationOutcome = result.analysis.researchQuestionOutcomes.find((outcome) => outcome.questionClass === "application_fee_public_definition")!;
     expect(nonSwipedOutcome.publicResearchStillPossible).toBe(true);
     expect(applicationOutcome.publicResearchStillPossible).toBe(false);
-    expect(result.analysis.recommendations.some((recommendation) => recommendation.kind === "research_followup"))
-      .toBe(firstOutcome === "timeout" && failureCall === 2);
-    expect(result.analysis.recommendations.filter((recommendation) => recommendation.kind === "documentation_request")).toHaveLength(2);
+    expect(result.analysis.recommendations.filter((recommendation) => recommendation.kind === "documentation_request")).toHaveLength(1);
     if (firstOutcome === "timeout") {
-      const timedOutQuestion = result.analysis.researchQuestionOutcomes[failureCall - 1]!;
+      const timedOutQuestion = applicationOutcome;
       const timedOutFinding = result.analysis.unresolvedQuestions.find((finding) => finding.findingId.endsWith(createHash("sha256")
         .update(timedOutQuestion.questionId).digest("hex").slice(0, 20)))!;
       expect(timedOutFinding.limitations).toEqual(expect.arrayContaining([
         "public_research_provider_timed_out", "no_conclusion_about_public_source_availability",
       ]));
     }
-    expect(result.analysis.unresolvedQuestions).toHaveLength(2);
-    expect(result.analysis.supportedResearchFindings).toEqual([]);
+    expect(result.analysis.unresolvedQuestions).toHaveLength(1);
+    expect(result.analysis.supportedResearchFindings).toHaveLength(1);
     expect(result.analysis.recommendations).not.toContainEqual(expect.objectContaining({ kind: "supported_economic_action" }));
     expect(result.analysis.impact.some((item) => item.state.startsWith("potential_reduction"))).toBe(false);
     expect(result.rgAudit.externalNetworkCallCount).toBe(0);
-    expect(result.rgAudit.providerOperationReceipts).toHaveLength(2);
+    expect(result.rgAudit.providerOperationReceipts).toHaveLength(expectedSearchCalls + 3);
     expect(result.rgAudit.providerOperationReceipts.every((receipt) => receipt.retryCount === 0 && receipt.actualSendCount === 0)).toBe(true);
-    const failureReceipt = result.rgAudit.providerOperationReceipts[failureCall - 1]!;
+    const failureReceipt = result.rgAudit.providerOperationReceipts.find((receipt) => receipt.operation === "search"
+      && receipt.completionState === (firstOutcome === "timeout" ? "timed_out" : "failed"))!;
     const failureReservation = result.rgAudit.budget.reservations.find((reservation) => reservation.reservationId === failureReceipt.reservationId);
     expect(failureReceipt.completionState).toBe(firstOutcome === "timeout" ? "timed_out" : "failed");
     expect(failureReservation?.state).toBe(expectedReservationState);

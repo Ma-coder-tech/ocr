@@ -90,6 +90,6 @@ function baseManifest() { return { schemaVersion: "public_source_evidence_manife
     boundedSupportingExcerpt: "Public excerpt", semanticVerification: "supported_candidate", limitations: [] }] }; }
 function baseAudit() { return { schemaVersion: "rg_internal_analysis_audit_v1", runId: "run", executionMode: "injected_evaluation", externalNetworkCallCount: 0,
   liveTimingPolicy: { amendmentId: "RG-AMEND-011-INTERNAL-LIVE-TIMING-V2", searchTimeoutMs: 40_000, globalWallTimeMs: 180_000 },
-  providerOperationReceipts: [], questions: [], verificationOutcomes: [], budget: { profile: "RG-FREE-v1", limits: {}, consumed: {}, remaining: {}, reservations: [], exhaustedDimensions: [] },
+  providerOperationReceipts: [], searchAttempts: [], questions: [], verificationOutcomes: [], budget: { profile: "RG-FREE-v1", limits: {}, consumed: {}, remaining: {}, reservations: [], exhaustedDimensions: [] },
   diagnostics: { schemaVersion: "canonical_intelligence_v2_diagnostics_v1", stageStatuses: {}, counts: {}, elapsedMs: {}, providerCodes: [], modelCodes: [], tokenUsage: 0, reasonCodes: [] },
   canonicalBeforeHash: "same", canonicalAfterHash: "same", canonicalTruthPreserved: true, rfSnapshotHash: "hash", rfEntryRefs: [], policyVersions: [] }; }

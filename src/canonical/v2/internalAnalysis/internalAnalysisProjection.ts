@@ -81,6 +81,8 @@ export function buildInternalStatementAnalysisV1(input: {
       const researchOutcome = researchQuestionOutcomes.find((outcome) => outcome.questionId === question.questionId);
       const operationalLimitations = researchOutcome?.outcome === "research_unavailable_due_to_timeout"
         ? ["public_research_attempted", "public_research_provider_timed_out", "no_conclusion_about_public_source_availability"]
+        : researchOutcome?.outcome === "search_tool_execution_unverified"
+          ? ["public_search_tool_execution_unverified", "no_conclusion_about_public_source_availability"]
         : researchOutcome?.outcome === "no_eligible_public_evidence_found"
           ? ["public_discovery_completed_without_candidates", "no_public_evidence_produced"]
           : researchOutcome?.outcome === "source_rejected_by_authority_policy"
@@ -188,18 +190,19 @@ function researchQuestionOutcome(question: RuntimeResearchQuestion, runtime: Bou
   const outcome: InternalResearchQuestionOutcomeV1["outcome"] = supports.some((support) => support.verificationStatus === "supported_candidate")
     ? "research_completed"
     : attempts.some((attempt) => attempt.status === "timeout") ? "research_unavailable_due_to_timeout"
+      : reasonCodes.some((code) => ["search_tool_execution_unverified", "search_tool_not_executed"].includes(code)) ? "search_tool_execution_unverified"
       : attempts.some((attempt) => ["failed", "disabled", "budget_exhausted"].includes(attempt.status)) ? "provider_failure"
         : reasonCodes.includes("all_discovery_candidates_rejected_by_authority") ? "source_rejected_by_authority_policy"
           : reasonCodes.includes("provider_search_completed_zero_candidates") ? "no_eligible_public_evidence_found"
             : "completed_with_unresolved_evidence";
   return { questionId: question.questionId, questionClass: origin.questionClass, subjectCode: origin.subjectCode, outcome,
-    attempted: attempts.some((attempt) => attempt.status !== "disabled"), operationalReasonCodes: reasonCodes,
+    attempted: retainedCandidateCount > 0 || attempts.some((attempt) => attempt.status !== "disabled"), operationalReasonCodes: reasonCodes,
     retainedCandidateCount, publicResearchStillPossible };
 }
 
 function overallResearchOutcome(outcomes: InternalResearchQuestionOutcomeV1[]): InternalStatementAnalysisV1["researchOutcome"] {
   if (outcomes.length > 0 && outcomes.every((outcome) => outcome.outcome === "research_completed")) return "research_completed";
-  for (const outcome of ["research_unavailable_due_to_timeout", "provider_failure", "source_rejected_by_authority_policy", "no_eligible_public_evidence_found"] as const) {
+  for (const outcome of ["research_unavailable_due_to_timeout", "search_tool_execution_unverified", "provider_failure", "source_rejected_by_authority_policy", "no_eligible_public_evidence_found"] as const) {
     if (outcomes.some((item) => item.outcome === outcome)) return outcome;
   }
   return "completed_with_unresolved_evidence";

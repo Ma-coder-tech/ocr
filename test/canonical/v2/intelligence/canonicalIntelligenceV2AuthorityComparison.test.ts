@@ -11,8 +11,8 @@ import { buildSynthesis } from "../synthesisFixtures.js";
 import { disabledPorts } from "./intelligenceFixtures.js";
 
 describe("Canonical Intelligence V2 authority, comparison, and RA-RF invariance", () => {
-  it("freezes all ten and only the ten approved RG semantic amendments", () => {
-    expect(RG_SEMANTIC_AMENDMENT_IDS).toHaveLength(10);
+  it("freezes all eleven and only the eleven approved RG semantic amendments", () => {
+    expect(RG_SEMANTIC_AMENDMENT_IDS).toHaveLength(11);
     expect(CANONICAL_INTELLIGENCE_V2_VERSION_MANIFEST).toMatchObject({
       authority: "shadow_non_authoritative",
       persistence: "none",

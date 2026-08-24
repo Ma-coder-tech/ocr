@@ -68,6 +68,19 @@ export function questionOrigin(unknownRef = "unknown-rule-1", overrides: Partial
   });
 }
 
+export function verifiedSearchMetadata(candidateCount: number, sequence = 1) {
+  return {
+    providerResponseId: `injected-search-response-${sequence}`,
+    modelIdentifier: "injected-search-model",
+    finishReason: "stop",
+    webSearchRequestCount: 1,
+    annotationCount: candidateCount,
+    normalizedCandidateCount: candidateCount,
+    providerCompletionState: "completed" as const,
+    toolExecutionState: "verified" as const,
+  };
+}
+
 export const officialSourceAdmission = createPublicSourceAuthorityAdmission({
   admissionId: "public-source-admission-1", admissionVersion: 1, authority: "official_network_publication", origin: "https://example.com",
   publicationFamilyCode: "official_network_rules", publicationMetadata: { title: "Official network rules", version: "v1", publicationDate: null,

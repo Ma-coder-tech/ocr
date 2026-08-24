@@ -81,19 +81,22 @@ describe("Statement-observation origin eligibility and RF-first wiring", () => {
         publicSourceAuthorityAdmissions: [], deterministicNotApplicableUnknownRefs: [], languageInputs: [] }, {
         clock: new Clock(), search: { providerCode: "injected_no_candidate_search", async search(request) { searches += 1;
           return { attemptId: request.attemptId, questionId: request.questionId, candidates: [], suggestedAdaptiveReason: null,
+            providerMetadata: { providerResponseId: `injected-rf-${searches}`, modelIdentifier: "injected-search",
+              finishReason: "stop", webSearchRequestCount: 1, annotationCount: 0, normalizedCandidateCount: 0,
+              providerCompletionState: "completed" as const, toolExecutionState: "verified" as const },
             outputAccounting: "search_discovery_not_model_generation" }; } },
       });
       return { result, searches, origins };
     };
     const resolved = await run([termEntry("application-admitted", "application_fee_terminology", "defined_public_term")]);
-    expect(resolved.searches).toBe(1);
+    expect(resolved.searches).toBe(2);
     expect(resolved.result.questions.find((item) => item.subjectCode === "application_fee_terminology"))
       .toMatchObject({ eligibility: "rf_resolved", selection: "not_eligible", rfResolution: { status: "resolved_single" } });
     const conflict = await run([
       termEntry("application-conflict-a", "application_fee_terminology", "definition_a"),
       termEntry("application-conflict-b", "application_fee_terminology", "definition_b"),
     ]);
-    expect(conflict.searches).toBe(1);
+    expect(conflict.searches).toBe(2);
     expect(conflict.result.questions.find((item) => item.subjectCode === "application_fee_terminology"))
       .toMatchObject({ eligibility: "unresolved_review_required", selection: "not_eligible", rfResolution: { status: "unresolved_conflict" } });
     expect(conflict.result.rfConflictsPreserved).toBe(true);

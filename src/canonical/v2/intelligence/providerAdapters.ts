@@ -7,7 +7,7 @@ import { assertProviderOutboundPacketSafe, assertProviderSafeQuestionContext } f
 import { APPROVED_OPENROUTER_ENDPOINT, APPROVED_OPENAI_ENDPOINT, OPENROUTER_SEARCH_CONFIGURATION_CODE, OPENROUTER_SEARCH_ENGINE,
   type InternalLiveExecutionCapabilityV1, LiveOperationTransportError, requireLiveCapabilityBinding } from "./providerPreflight.js";
 import { INVESTIGATIVE_RESPONSE_SCHEMA_ID, INVESTIGATIVE_RESPONSE_SCHEMA_V1, OPENROUTER_SEARCH_IDENTITY_SCHEMA_ID,
-  OPENROUTER_SEARCH_IDENTITY_SCHEMA_V1, SEMANTIC_RESPONSE_SCHEMA_ID, SEMANTIC_RESPONSE_SCHEMA_V1 } from "./providerSchemas.js";
+  SEMANTIC_RESPONSE_SCHEMA_ID, SEMANTIC_RESPONSE_SCHEMA_V1 } from "./providerSchemas.js";
 
 export class ProviderOperationAuditLog {
   private readonly values = new Map<string, ProviderOperationReceiptV1>();
@@ -51,7 +51,7 @@ export function createLiveOpenRouterSearchAdapter(capability: InternalLiveExecut
       || request.allowedAuthorities.length !== 1) throw new Error("openrouter_search_request_contract_invalid");
     const receiptId = receiptIdentity("openrouter", operationId); const started = binding.clock.nowMs();
     audit.reserve(baseReceipt(receiptId, request.reservationId, operationId, "search", "openrouter_web_search", OPENROUTER_SEARCH_CONFIGURATION_CODE));
-    const query = request.queryTerms.map((term) => term.replace(/_/g, " ")).join(" ");
+    const query = request.queryText;
     const providerRequestId = `provider-request-${randomUUID()}`;
     try {
       const body = JSON.stringify({ model: binding.openRouterSearchModel, store: false, stream: false, max_tokens: 128,
@@ -61,9 +61,9 @@ export function createLiveOpenRouterSearchAdapter(capability: InternalLiveExecut
         ],
         tools: [{ type: "openrouter:web_search", parameters: { engine: OPENROUTER_SEARCH_ENGINE, max_results: request.maximumCandidates,
           max_total_results: request.maximumCandidates, max_uses: 1, max_characters: 1_000 } }],
+        tool_choice: "required",
         max_tool_calls: 1,
         provider: { only: ["openai"], allow_fallbacks: false, require_parameters: true, data_collection: "deny" },
-        response_format: { type: "json_schema", json_schema: { name: OPENROUTER_SEARCH_IDENTITY_SCHEMA_ID, strict: true, schema: OPENROUTER_SEARCH_IDENTITY_SCHEMA_V1 } },
       });
       assertProviderOutboundPacketSafe({ provider: "openrouter_web_search", url: APPROVED_OPENROUTER_ENDPOINT, method: "POST",
         headerNames: ["Authorization", "Content-Type", "X-OpenRouter-Metadata"], body });
@@ -74,17 +74,22 @@ export function createLiveOpenRouterSearchAdapter(capability: InternalLiveExecut
       if (response.status === 429) throw new LiveOperationTransportError("after_send", "openrouter_search_rate_limited");
       if (response.status < 200 || response.status >= 300) throw new LiveOperationTransportError("after_send", "openrouter_search_http_failure");
       const normalized = normalizeOpenRouterSearchResponse(response.body, { request, providerRequestId, expectedModel: binding.openRouterSearchModel });
-      audit.settle(receiptId, { completionState: "completed", elapsedMs: elapsed(binding.clock.nowMs(), started), usageState: normalized.usageKnown ? "known" : "unknown_possible_billable",
+      const toolReason = normalized.providerMetadata.toolExecutionState === "verified" ? "search_completed"
+        : normalized.providerMetadata.toolExecutionState === "not_executed" ? "search_tool_not_executed" : "search_tool_execution_unverified";
+      audit.settle(receiptId, { completionState: normalized.providerMetadata.toolExecutionState === "verified" ? "completed" : "failed",
+        elapsedMs: elapsed(binding.clock.nowMs(), started), usageState: normalized.usageKnown ? "known" : "unknown_possible_billable",
         outputTokens: normalized.outputTokens, providerRequestCount: normalized.providerRequestCount, usageCostUsd: normalized.usageCostUsd,
-        safeReasonCode: normalized.usageKnown ? "search_completed" : "provider_usage_unknown" });
+        safeReasonCode: toolReason });
       const candidates = normalized.candidates;
-      return { attemptId: request.attemptId, questionId: request.questionId, candidates, suggestedAdaptiveReason: null, outputAccounting: "search_discovery_not_model_generation" };
+      return { attemptId: request.attemptId, questionId: request.questionId, candidates, suggestedAdaptiveReason: null,
+        providerMetadata: normalized.providerMetadata, outputAccounting: "search_discovery_not_model_generation" };
     } catch (error) { settleFailure(audit, receiptId, error, elapsed(binding.clock.nowMs(), started)); throw error; }
   } };
 }
 
 export function normalizeOpenRouterSearchResponse(body: unknown, context: { request: SearchRequest; providerRequestId: string; expectedModel: string }): {
   candidates: SearchResponse["candidates"]; providerRequestCount: number | null; outputTokens: number | null; usageCostUsd: number | null; usageKnown: boolean;
+  providerMetadata: SearchResponse["providerMetadata"];
 } {
   const envelope = record(body);
   if (typeof envelope.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(envelope.id) || envelope.model !== context.expectedModel) {
@@ -97,6 +102,9 @@ export function normalizeOpenRouterSearchResponse(body: unknown, context: { requ
   const choice = record(choices[0]); const message = record(choice.message);
   if (choice.index !== 0 || message.role !== "assistant" || !("content" in message)) throw new Error("openrouter_search_response_malformed");
   validateOpenRouterSearchContent(message.content, context.providerRequestId);
+  const finishReason = choice.finish_reason === null || choice.finish_reason === undefined ? null
+    : typeof choice.finish_reason === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,95}$/.test(choice.finish_reason) ? choice.finish_reason
+      : (() => { throw new Error("openrouter_search_response_malformed"); })();
   if (message.annotations !== undefined && !Array.isArray(message.annotations)) throw new Error("openrouter_search_response_malformed");
   const annotations = asArray(message.annotations);
   if (annotations.length > context.request.maximumCandidates) throw new Error("openrouter_search_result_cap_exceeded");
@@ -128,8 +136,12 @@ export function normalizeOpenRouterSearchResponse(body: unknown, context: { requ
   if (requestCount !== null && (requestCount > 1 || (requestCount === 0 && candidates.length > 0))) throw new Error("openrouter_search_request_count_invalid");
   const outputTokens = Number.isSafeInteger(usage.completion_tokens) && Number(usage.completion_tokens) >= 0 ? Number(usage.completion_tokens) : null;
   const usageCostUsd = typeof usage.cost === "number" && Number.isFinite(usage.cost) && usage.cost >= 0 ? usage.cost : null;
+  const toolExecutionState = requestCount === 1 || candidates.length > 0 ? "verified" : requestCount === 0 ? "not_executed" : "unverified";
   return { candidates, providerRequestCount: requestCount, outputTokens, usageCostUsd,
-    usageKnown: requestCount !== null && outputTokens !== null && usageCostUsd !== null };
+    usageKnown: requestCount !== null && outputTokens !== null && usageCostUsd !== null,
+    providerMetadata: { providerResponseId: envelope.id, modelIdentifier: envelope.model, finishReason,
+      webSearchRequestCount: requestCount, annotationCount: annotations.length, normalizedCandidateCount: candidates.length,
+      providerCompletionState: "completed", toolExecutionState } };
 }
 
 export function createLiveOpenAiInvestigativeAdapter(capability: InternalLiveExecutionCapabilityV1, audit: ProviderOperationAuditLog): NonNullable<IntelligencePorts["investigative"]> {

@@ -5,6 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_URL,
+  createPublicSourceAuthorityAdmission,
   runFiservInternalAnalysisEvaluationV1,
   validateInternalStatementAnalysisV1,
   validatePublicSourceEvidenceManifestV1,
@@ -46,12 +47,18 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
       ["non_swiped_discount_terminology", "eligible", "selected"],
     ]);
     expect(result.runtime.candidates).toHaveLength(1);
-    expect(result.runtime.candidates[0]).toMatchObject({ candidateId: "injected-non-swiped-definition",
-      authorityPublicationFamilyCode: "first_data_us_swipe_non_swipe_statement_guide" });
+    expect(result.runtime.candidates[0]).toMatchObject({
+      authorityPublicationFamilyCode: "first_data_us_swipe_non_swipe_statement_guide",
+      selectionReasonCode: "known_exact_authority_admission",
+    });
     expect(result.runtime.searchAttempts.find((item) => item.questionId === result.runtime.questions
       .find((question) => question.subjectCode === "application_fee_terminology")!.questionId)).toMatchObject({
       status: "no_candidates", candidateIds: [], reasonCodes: ["all_discovery_candidates_rejected_by_authority"],
     });
+    expect(result.runtime.searchAttempts.map((attempt) => ({ kind: attempt.kind, adaptiveReason: attempt.adaptiveReason }))).toEqual([
+      { kind: "initial", adaptiveReason: null },
+      { kind: "adaptive", adaptiveReason: "zero_candidates_safe_query_variant" },
+    ]);
     expect(result.runtime.supports.map((item) => item.verificationStatus)).toEqual(["supported_candidate"]);
     expect(result.runtime.supports[0]!.subjectCode).toBe("non_swiped_discount_terminology");
     expect(result.runtime.supports[0]!.limitationCodes).toEqual(expect.arrayContaining([
@@ -84,7 +91,7 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     expect(result.analysis.canonicalBeforeHash).toBe(result.analysis.canonicalAfterHash);
     expect(result.rgAudit).toMatchObject({ executionMode: "injected_evaluation", externalNetworkCallCount: 0,
       canonicalTruthPreserved: true, budget: { profile: "RG-FREE-v1" } });
-    expect(result.rgAudit.budget.consumed).toMatchObject({ search_calls: 2, candidates: 1, retrieval_documents: 1,
+    expect(result.rgAudit.budget.consumed).toMatchObject({ search_calls: 2, adaptive_searches: 1, candidates: 1, retrieval_documents: 1,
       investigative_ai_calls: 1, semantic_verification_calls: 1, semantic_support_items: 1, language_calls: 0,
       model_output_tokens: 320 });
     expect(result.rgAudit.providerOperationReceipts).toHaveLength(5);
@@ -116,5 +123,47 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     const projection = await readFile(path.join(outputDirectory, "rh-projection.json"));
     expect(createHash("sha256").update(projection).digest("hex"))
       .toBe("5e2fc1e17eaaacb4e891be1986f43982b139d94ef6e3bb092b5bcfee407158ac");
+  }, 30_000);
+
+  it("fails a changed known-source fingerprint closed before investigation", async () => {
+    const outputDirectory = await mkdtemp(path.join(os.tmpdir(), "internal-analysis-fingerprint-mismatch-"));
+    const injected = createInjectedStatement1Fixture();
+    injected.publicSourceAuthorityAdmissions = [createPublicSourceAuthorityAdmission({
+      ...injected.publicSourceAuthorityAdmissions[0]!, approvedDocumentFingerprints: ["0".repeat(64)],
+    })];
+    const result = await runFiservInternalAnalysisEvaluationV1({
+      statementPaths: [statementOne], safeStatementId: "fsv-03-clover-short-jun",
+      runVersion: "run-3-foundational-admissions-pricing-fixed", outputDirectory,
+      sourceProfile: { statementCompleteness: "unknown" }, internalRunId: "statement-one-fingerprint-mismatch",
+      evaluatedAt: "2026-08-24T00:00:00.000Z", tenantRef: "tenant-private-fixture", accountRef: "account-private-fixture",
+      admittedKnowledge: [], ports: injected.ports, providerAudit: injected.providerAudit,
+      providerPreflight: injected.providerPreflight, publicSourceAuthorityAdmissions: injected.publicSourceAuthorityAdmissions,
+    });
+    expect(result.runtime.documents).toEqual([expect.objectContaining({ state: "safety_blocked",
+      reasonCodes: ["source_authority_document_fingerprint_mismatch"] })]);
+    expect(result.runtime.supports).toEqual([]);
+    expect(result.rgAudit.providerOperationReceipts.some((receipt) => receipt.operation === "investigative_model"
+      || receipt.operation === "semantic_model")).toBe(false);
+    expect(result.analysis.canonicalBeforeHash).toBe(result.analysis.canonicalAfterHash);
+  }, 30_000);
+
+  it("does not promote retrieved known-source evidence without independent semantic verification", async () => {
+    const outputDirectory = await mkdtemp(path.join(os.tmpdir(), "internal-analysis-semantic-required-"));
+    const injected = createInjectedStatement1Fixture();
+    injected.ports.semantic = undefined;
+    const result = await runFiservInternalAnalysisEvaluationV1({
+      statementPaths: [statementOne], safeStatementId: "fsv-03-clover-short-jun",
+      runVersion: "run-3-foundational-admissions-pricing-fixed", outputDirectory,
+      sourceProfile: { statementCompleteness: "unknown" }, internalRunId: "statement-one-semantic-required",
+      evaluatedAt: "2026-08-24T00:00:00.000Z", tenantRef: "tenant-private-fixture", accountRef: "account-private-fixture",
+      admittedKnowledge: [], ports: injected.ports, providerAudit: injected.providerAudit,
+      providerPreflight: injected.providerPreflight, publicSourceAuthorityAdmissions: injected.publicSourceAuthorityAdmissions,
+    });
+    expect(result.runtime.documents).toEqual([expect.objectContaining({ state: "retrieved_extracted" })]);
+    expect(result.runtime.diagnostics.stageStatuses).toMatchObject({ investigative_intelligence: "completed",
+      semantic_verification: "disabled_no_provider" });
+    expect(result.runtime.supports).toEqual([]);
+    expect(result.analysis.supportedResearchFindings).toEqual([]);
+    expect(result.analysis.canonicalBeforeHash).toBe(result.analysis.canonicalAfterHash);
   }, 30_000);
 });

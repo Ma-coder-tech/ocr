@@ -21,7 +21,7 @@ const RECEIPT_KEYS = ["receiptId", "reservationId", "operationId", "operation", 
 const FINDING_ARRAYS = ["canonicalFacts", "admittedKnowledge", "supportedResearchFindings", "investigativeHypotheses", "contradictions", "unresolvedQuestions"] as const;
 const ANALYSIS_ARRAYS = [...FINDING_ARRAYS, "amendmentIds", "researchQuestionOutcomes", "statementObservations", "recommendations", "impact", "limitations"] as const;
 const RESEARCH_OUTCOMES = ["research_completed", "completed_with_unresolved_evidence", "research_unavailable_due_to_timeout",
-  "no_eligible_public_evidence_found", "source_rejected_by_authority_policy", "provider_failure"] as const;
+  "no_eligible_public_evidence_found", "source_rejected_by_authority_policy", "search_tool_execution_unverified", "provider_failure"] as const;
 const SUPPORT_STATUSES = ["supported_candidate", "partially_supported", "unsupported", "contradicted", "wrong_authority", "wrong_scope", "wrong_period",
   "locator_unproven", "malformed", "verification_unavailable", "not_applicable", "rf_resolved"] as const;
 
@@ -177,7 +177,8 @@ export function validateInternalAnalysisReferenceGraph(analysis: InternalStateme
 
 export function validateRgInternalAuditV1(audit: RgInternalAuditV1): string[] {
   const issues: string[] = [];
-  if (!isRecord(audit) || !Array.isArray(audit.providerOperationReceipts) || !Array.isArray(audit.verificationOutcomes) || !Array.isArray(audit.rfEntryRefs)
+  if (!isRecord(audit) || !Array.isArray(audit.providerOperationReceipts) || !Array.isArray(audit.searchAttempts)
+    || !Array.isArray(audit.verificationOutcomes) || !Array.isArray(audit.rfEntryRefs)
     || !isRecord(audit.budget) || !Array.isArray(audit.budget.reservations)) return ["rg_internal_audit_shape_invalid"];
   if (audit.schemaVersion !== "rg_internal_analysis_audit_v1") issues.push("rg_internal_audit_identity_invalid");
   if (!isRecord(audit.liveTimingPolicy) || !hasExactKeys(audit.liveTimingPolicy, ["amendmentId", "searchTimeoutMs", "globalWallTimeMs"])
@@ -187,6 +188,26 @@ export function validateRgInternalAuditV1(audit: RgInternalAuditV1): string[] {
   }
   if (audit.canonicalBeforeHash !== audit.canonicalAfterHash || !audit.canonicalTruthPreserved) issues.push("rg_internal_audit_canonical_invariance_failed");
   if (audit.externalNetworkCallCount !== audit.providerOperationReceipts.reduce((sum, item) => sum + item.actualSendCount, 0)) issues.push("rg_internal_audit_external_call_count_mismatch");
+  if (audit.searchAttempts.some((attempt) => {
+    if (!isRecord(attempt) || !isSafeStructuredString(attempt.attemptId) || !isSafeStructuredString(attempt.questionId)
+      || !["initial", "adaptive"].includes(String(attempt.kind)) || !safeDisplayText(attempt.queryText, 1_000)
+      || containsPrivateProviderMaterial(attempt.queryText) || !Array.isArray(attempt.queryTerms)
+      || attempt.queryTerms.some((term) => !safeDisplayText(term, 300) || containsPrivateProviderMaterial(term))
+      || !Array.isArray(attempt.candidateIds) || !attempt.candidateIds.every(isSafeStructuredString)
+      || !Array.isArray(attempt.reasonCodes) || !attempt.reasonCodes.every(isSafeStructuredString)) return true;
+    const metadata = attempt.providerMetadata;
+    return metadata !== null && (!isRecord(metadata)
+      || (metadata.providerResponseId !== null && !isSafeStructuredString(metadata.providerResponseId))
+      || (metadata.modelIdentifier !== null && !safeDisplayText(metadata.modelIdentifier, 200))
+      || (metadata.finishReason !== null && !isSafeStructuredString(metadata.finishReason))
+      || !["verified", "unverified", "not_executed"].includes(String(metadata.toolExecutionState))
+      || metadata.providerCompletionState !== "completed"
+      || ![metadata.annotationCount, metadata.normalizedCandidateCount].every((value) => Number.isSafeInteger(value) && Number(value) >= 0)
+      || (metadata.webSearchRequestCount !== null
+        && (!Number.isSafeInteger(metadata.webSearchRequestCount) || metadata.webSearchRequestCount < 0)));
+  })) {
+    issues.push("rg_internal_audit_search_diagnostics_invalid");
+  }
   if (audit.providerOperationReceipts.some((item) => !isRecord(item) || !hasExactKeys(item, RECEIPT_KEYS)
     || ![item.receiptId, item.reservationId, item.operationId, item.providerCode, item.safeReasonCode].every(isSafeStructuredString)
     || (item.providerConfigurationCode !== null && !isSafeStructuredString(item.providerConfigurationCode))

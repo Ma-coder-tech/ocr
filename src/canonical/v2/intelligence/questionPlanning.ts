@@ -3,7 +3,7 @@ import { resolveKnowledge } from "../knowledge/knowledgeResolver.js";
 import { canonicalJson, isCanonicalCode, isSafeStructuredString } from "../knowledge/knowledgeSafety.js";
 import { validateKnowledgeQuery } from "../knowledge/knowledgeValidate.js";
 import type { KnowledgeEntry, KnowledgeQuery, KnowledgeSourceAuthority, KnowledgeUnknownQueueItem } from "../knowledge/knowledgeTypes.js";
-import type { RuntimeQuestionOrigin, RuntimeQuestionPriority, RuntimeResearchQuestion } from "./intelligenceTypes.js";
+import type { ProviderSafeQuestionContextV1, RuntimeQuestionOrigin, RuntimeQuestionPriority, RuntimeResearchQuestion } from "./intelligenceTypes.js";
 
 const PUBLIC_RESEARCH_AUTHORITIES = new Set<KnowledgeSourceAuthority>([
   "official_network_publication",
@@ -161,6 +161,7 @@ export function planRuntimeResearchQuestions(params: {
       priority: sorted.map(({ origin }) => origin.priority).sort((left, right) => PRIORITY_RANK[left] - PRIORITY_RANK[right])[0]!,
       reportDecisionCode: primary.origin.reportDecisionCode,
       possibleAnswerCodes: [...new Set(sorted.flatMap(({ origin }) => origin.possibleAnswerCodes))].sort(),
+      publicResearchPlausible: sorted.some(({ origin }) => origin.publicResearchPlausible),
       rfResolution: resolution,
       eligibility,
       selection: eligibility === "eligible" ? "not_selected" : "not_eligible",
@@ -193,4 +194,26 @@ export function safeSearchTerms(question: RuntimeResearchQuestion): string[] {
     ...allowedScope.map((dimension) => question.scope[dimension]).filter((item): item is string => typeof item === "string"),
     ...question.requiredEvidenceClasses,
   ])].filter((item) => isCanonicalCode(item) || /^\d{4}$/.test(item)).sort();
+}
+
+export function safePublicSearchQuery(params: {
+  question: RuntimeResearchQuestion;
+  context: ProviderSafeQuestionContextV1;
+  kind: "initial" | "adaptive";
+}): { queryText: string; queryTerms: string[] } {
+  const { question, context, kind } = params;
+  if (question.selection !== "selected" || context.subjectCode !== question.subjectCode
+    || context.claimType !== question.claimType || context.periodYear !== question.asOf.slice(0, 4)) {
+    throw new Error("public_search_context_identity_mismatch");
+  }
+  const processorName = context.processorProgram === "fiserv_first_data" ? "Fiserv First Data" : "payment processor";
+  const region = question.scope.region === "us" || question.scope.jurisdiction === "us" ? "United States" : "public";
+  const initial = [context.safeResearchLabel, processorName, "payment processing", "official documentation", region, context.periodYear, "definition"];
+  const adaptive = [context.safeResearchLabel, processorName, "payment processing", "public support guide", "fee schedule terminology", region, context.periodYear];
+  const queryTerms = kind === "initial" ? initial : adaptive;
+  const queryText = queryTerms.join(" ");
+  if (/\b(?:tenant|account|merchant|statement total|transaction amount|fee inventory)\b|\.pdf\b|[\\/]/i.test(queryText)) {
+    throw new Error("public_search_query_private_material_rejected");
+  }
+  return { queryText, queryTerms };
 }

@@ -33,14 +33,16 @@ import {
   type SemanticVerificationInput,
   type ThemeLanguageInput,
 } from "../../../../src/canonical/v2/index.js";
-import { admittedRule, disabledPorts, FakeClock, officialSourceAdmission, questionOrigin, queryScope, unknownItem } from "./intelligenceFixtures.js";
+import { admittedRule, disabledPorts, FakeClock, officialSourceAdmission, questionOrigin, queryScope,
+  unknownItem, verifiedSearchMetadata } from "./intelligenceFixtures.js";
 
 function input(overrides: Partial<BoundedIntelligenceRuntimeInput> = {}): BoundedIntelligenceRuntimeInput {
-  return {
+  const result = {
     runId: "rg-bounded-correction",
     canonicalTruth: { notice: "notice-1" },
     canonicalReferenceIds: ["notice-1", "theme-1", "fact-1"],
     admittedKnowledge: [],
+    providerExecution: "injected_evaluation",
     unknownQueue: [unknownItem()],
     questionOrigins: [questionOrigin()],
     publicSourceAuthorityAdmissions: [officialSourceAdmission],
@@ -48,6 +50,7 @@ function input(overrides: Partial<BoundedIntelligenceRuntimeInput> = {}): Bounde
     languageInputs: [],
     ...overrides,
   };
+  return result;
 }
 
 function successfulPorts(clock: FakeClock = new FakeClock(), extractedText = "Official rule applies for the admitted period."): IntelligencePorts {
@@ -55,6 +58,7 @@ function successfulPorts(clock: FakeClock = new FakeClock(), extractedText = "Of
     clock,
     search: { providerCode: "test_search", async search(request) {
       return { attemptId: request.attemptId, questionId: request.questionId, suggestedAdaptiveReason: null,
+        providerMetadata: verifiedSearchMetadata(1),
         outputAccounting: "search_discovery_not_model_generation", candidates: [{ candidateId: `${request.questionId}-candidate`, questionId: request.questionId,
           attemptId: request.attemptId, url: "https://example.com/rule", claimedAuthority: "official_network_publication", sourceTypeCode: "official_rule",
           rank: 1, publicationDate: "2026-01-01", effectiveFrom: "2026-01-01", effectiveTo: null, locatorHint: "official rule",
@@ -183,7 +187,8 @@ describe("Canonical Intelligence V2 bounded RG corrections", () => {
   it("11 rejects adaptive-search reason spoofing", async () => {
     let calls = 0; const ports = successfulPorts();
     ports.search = { providerCode: "test", async search(request) { calls += 1; return { attemptId: request.attemptId, questionId: request.questionId,
-      suggestedAdaptiveReason: "right_program_wrong_period", outputAccounting: "search_discovery_not_model_generation", candidates: [{ candidateId: "candidate",
+      suggestedAdaptiveReason: "right_program_wrong_period", providerMetadata: verifiedSearchMetadata(1),
+      outputAccounting: "search_discovery_not_model_generation", candidates: [{ candidateId: "candidate",
         questionId: request.questionId, attemptId: request.attemptId, url: "https://example.com/current", claimedAuthority: "official_network_publication", sourceTypeCode: "official_rule", rank: 1,
         publicationDate: null, effectiveFrom: "2026-01-01", effectiveTo: null, locatorHint: null, selectionReasonCode: "provider_suggestion",
         discoveryMetadata: discoveryMetadata(1) }] }; } };
@@ -197,13 +202,15 @@ describe("Canonical Intelligence V2 bounded RG corrections", () => {
 
   it("13 degrades duplicate candidate IDs safely", async () => {
     const ports = successfulPorts(); const base = ports.search!;
-    ports.search = { ...base, async search(request) { const response = await base.search(request); response.candidates.push({ ...response.candidates[0]! }); return response; } };
+    ports.search = { ...base, async search(request) { const response = await base.search(request); response.candidates.push({ ...response.candidates[0]! });
+      response.providerMetadata = verifiedSearchMetadata(response.candidates.length); return response; } };
     const result = await runBoundedIntelligenceRuntime(input(), ports); expect(result.searchAttempts[0]).toMatchObject({ status: "failed", reasonCodes: ["duplicate_candidate_identity_rejected"] });
   });
 
   it("14 deduplicates duplicate URLs without crossing question identity", async () => {
     const ports = successfulPorts(); const base = ports.search!;
-    ports.search = { ...base, async search(request) { const response = await base.search(request); response.candidates.push({ ...response.candidates[0]!, candidateId: "candidate-two", rank: 2 }); return response; } };
+    ports.search = { ...base, async search(request) { const response = await base.search(request); response.candidates.push({ ...response.candidates[0]!, candidateId: "candidate-two", rank: 2 });
+      response.providerMetadata = verifiedSearchMetadata(response.candidates.length); return response; } };
     const result = await runBoundedIntelligenceRuntime(input(), ports); expect(result.candidates).toHaveLength(1); expect(result.candidates[0]!.questionId).toBe(result.questions[0]!.questionId);
   });
 
@@ -382,7 +389,7 @@ describe("Canonical Intelligence V2 bounded RG corrections", () => {
   });
 
   it("40 acceptance with provider-disabled ports makes zero live calls", async () => {
-    const result = await runBoundedIntelligenceRuntime(input({ unknownQueue: [], questionOrigins: [] }), disabledPorts());
+    const result = await runBoundedIntelligenceRuntime(input({ unknownQueue: [], questionOrigins: [], providerExecution: undefined }), disabledPorts());
     expect(result.providerExecution).toBe("provider_disabled"); expect(result.budget.reservations).toEqual([]); expect(result.terminalStatus).toBe("disabled_no_provider");
   });
 });

@@ -47,7 +47,7 @@ export function createInjectedStatement1Fixture() {
       providerCode: "injected_openrouter_search_contract",
       async search(request: SearchRequest) {
         providerPayloads.push(JSON.stringify(request)); receipt("search", "injected_openrouter_search_contract", request.reservationId, request.attemptId);
-        const application = request.queryTerms.some((term) => term.includes("application_fee"));
+        const application = request.queryText.toLowerCase().includes("application fee");
         const definitions = application ? [
           { id: "application-paysafe", url: "https://www.paysafe.com/us-en/merchant-welcome-portal/faqs/", title: "Paysafe Application Fee", hint: "Application Fee",
             body: "A plausible official definition from the wrong processor program." },
@@ -76,6 +76,9 @@ export function createInjectedStatement1Fixture() {
               sourceDomain, providerRank: index + 1, providerSnippetUsedAsEvidence: false as const } };
         });
         return { attemptId: request.attemptId, questionId: request.questionId, candidates, suggestedAdaptiveReason: null,
+          providerMetadata: { providerResponseId: `injected-response-${sequence}`, modelIdentifier: "openai/gpt-5.2", finishReason: "stop",
+            webSearchRequestCount: 1, annotationCount: candidates.length, normalizedCandidateCount: candidates.length,
+            providerCompletionState: "completed" as const, toolExecutionState: "verified" as const },
           outputAccounting: "search_discovery_not_model_generation" as const };
       },
     },
@@ -87,7 +90,8 @@ export function createInjectedStatement1Fixture() {
     retrieval: {
       async retrieve(request) {
         receipt("retrieval", "injected_https_retrieval_contract", request.reservationId, request.reservationId.slice(0, -":document".length));
-        const content = new TextEncoder().encode(htmlByCandidate.get(request.candidateId) ?? "");
+        const content = new TextEncoder().encode(request.permit.normalizedUrl.endsWith(approvedNonSwipedPath)
+          ? approvedNonSwipedBody : htmlByCandidate.get(request.candidateId) ?? "");
         downloadedBuffers.push(content);
         request.recordReceivedBytes(content.byteLength);
         return { questionId: request.questionId, candidateId: request.candidateId, documentId: request.documentId,

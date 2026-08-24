@@ -28,4 +28,5 @@ export const RG_SEMANTIC_AMENDMENT_REASONS: Record<RgSemanticAmendmentId, string
   "RG-AMEND-008-AI-NON-MUTATION": "AI observations have no financial, economic, knowledge-admission, or report mutation authority.",
   "RG-AMEND-009-UNTRUSTED-CONTENT-ISOLATION": "Statement and external content remain untrusted data and cannot modify runtime instructions or tools.",
   "RG-AMEND-010-BOUNDED-THEME-LANGUAGE-CANDIDATE": "Theme language remains non-authoritative, validated against canonical references, and always has a deterministic fallback.",
+  "RG-AMEND-012-KNOWN-AUTHORITY-DISCOVERY-RESILIENCE": "Exact admitted public documents may enter independent retrieval deterministically, while open discovery requires verified tool execution and bounded safe-query adaptation.",
 };

@@ -1,4 +1,4 @@
-import type { BudgetSnapshot, IntelligenceDiagnostic, SemanticVerificationStatus } from "../intelligence/intelligenceTypes.js";
+import type { BudgetSnapshot, IntelligenceDiagnostic, SearchAttempt, SemanticVerificationStatus } from "../intelligence/intelligenceTypes.js";
 export type { ProviderSafeQuestionContextV1 } from "../intelligence/intelligenceTypes.js";
 import type { KnowledgeClaimValue, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 
@@ -119,6 +119,7 @@ export type InternalResearchOutcomeV1 =
   | "research_unavailable_due_to_timeout"
   | "no_eligible_public_evidence_found"
   | "source_rejected_by_authority_policy"
+  | "search_tool_execution_unverified"
   | "provider_failure";
 
 export type InternalResearchQuestionOutcomeV1 = {
@@ -195,6 +196,7 @@ export type RgInternalAuditV1 = {
     globalWallTimeMs: 180_000;
   };
   providerOperationReceipts: ProviderOperationReceiptV1[];
+  searchAttempts: SearchAttempt[];
   questions: Array<{
     questionId: string;
     subjectCode: string;

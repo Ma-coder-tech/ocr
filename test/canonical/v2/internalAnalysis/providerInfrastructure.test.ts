@@ -41,7 +41,8 @@ async function capability(cancellationSignal?: AbortSignal) {
 }
 
 const searchRequest: SearchRequest = { reservationId: "attempt-one:call", attemptId: "attempt-one", questionId: "question-one",
-  queryTerms: ["application_fee_terminology", "fiserv_first_data"], allowedAuthorities: ["processor_publication"], maximumCandidates: 3,
+  queryTerms: ["application fee", "Fiserv First Data"], queryText: "application fee Fiserv First Data official documentation United States 2024 definition",
+  allowedAuthorities: ["processor_publication"], maximumCandidates: 3,
   outputAccounting: "search_discovery_not_model_generation", logicalAttempt: 1, untrustedContentPolicy: "data_only_no_instructions" };
 
 describe("internal-analysis construction-bound provider seams", () => {
@@ -55,7 +56,7 @@ describe("internal-analysis construction-bound provider seams", () => {
       discoveryMetadata: { providerCode: "openrouter_web_search", configurationCode: OPENROUTER_SEARCH_CONFIGURATION_CODE, sourceDomain: "docs.example.test", providerSnippetUsedAsEvidence: false } });
     expect(JSON.stringify(response)).not.toContain("discard me");
     const requestBody = JSON.parse(String(sent[0]!.init.body));
-    expect(requestBody).toMatchObject({ model: "openai/gpt-5.2", store: false, stream: false, max_tool_calls: 1,
+    expect(requestBody).toMatchObject({ model: "openai/gpt-5.2", store: false, stream: false, tool_choice: "required", max_tool_calls: 1,
       tools: [{ type: "openrouter:web_search", parameters: { engine: "perplexity", max_results: 3, max_total_results: 3, max_uses: 1 } }],
       provider: { only: ["openai"], allow_fallbacks: false, require_parameters: true, data_collection: "deny" } });
     expect(audit.snapshot()).toEqual([expect.objectContaining({ reservationId: "attempt-one:call", actualSendCount: 1, sendState: "sent", completionState: "completed",
@@ -86,7 +87,16 @@ describe("internal-analysis construction-bound provider seams", () => {
     const noSearch = openRouterResponse(providerRequestId, [], { choices: [{ index: 0, message: { role: "assistant", content: "No usable public result." } }],
       usage: { completion_tokens: 4, cost: 0.001, server_tool_use: { web_search_requests: 0 } } });
     const normalizedNoSearch = normalizeOpenRouterSearchResponse(noSearch, { request: searchRequest, providerRequestId, expectedModel: "openai/gpt-5.2" });
-    expect(normalizedNoSearch).toMatchObject({ candidates: [], providerRequestCount: 0, usageKnown: true });
+    expect(normalizedNoSearch).toMatchObject({ candidates: [], providerRequestCount: 0, usageKnown: true,
+      providerMetadata: { toolExecutionState: "not_executed", annotationCount: 0, normalizedCandidateCount: 0 } });
+
+    const executionUnverified = openRouterResponse(providerRequestId, [], { choices: [{ index: 0,
+      finish_reason: "stop", message: { role: "assistant", content: "No usable public result." } }], usage: { completion_tokens: 4 } });
+    expect(normalizeOpenRouterSearchResponse(executionUnverified, { request: searchRequest, providerRequestId,
+      expectedModel: "openai/gpt-5.2" })).toMatchObject({ candidates: [], providerRequestCount: null,
+      providerMetadata: { providerResponseId: "chatcmpl-openrouter-test", modelIdentifier: "openai/gpt-5.2",
+        finishReason: "stop", toolExecutionState: "unverified", annotationCount: 0, normalizedCandidateCount: 0,
+        providerCompletionState: "completed" } });
   });
 
   it("fails malformed, URL-less, duplicate, excessive, wrong-identity, and hidden-fallback OpenRouter responses closed", async () => {
@@ -156,7 +166,7 @@ describe("internal-analysis construction-bound provider seams", () => {
   it("rejects nested, percent-encoded, and base64 private payloads before send", async () => {
     const cap = await capability(); const audit = new ProviderOperationAuditLog(); const fetchSpy = vi.fn(); globalThis.fetch = fetchSpy as never;
     await expect(createLiveOpenRouterSearchAdapter(cap, audit).search({ ...searchRequest,
-      queryTerms: [encodeURIComponent("merchant id MID 123456789")] })).rejects.toThrow("provider_private_payload_blocked");
+      queryText: encodeURIComponent("merchant id MID 123456789") })).rejects.toThrow("provider_private_payload_blocked");
     expect(fetchSpy).not.toHaveBeenCalled(); expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 0, completionState: "not_sent", usageState: "known" });
     const encoded = Buffer.from("/Users/private/merchant-statement.pdf").toString("base64");
     expect(inspectProviderOutboundPacket({ provider: "openai_responses_api", url: APPROVED_OPENAI_ENDPOINT, method: "POST", headerNames: ["Authorization"],

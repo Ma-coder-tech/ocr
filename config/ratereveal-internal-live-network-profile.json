@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "ratereveal_internal_live_network_profile_v1",
+  "mode": "allowlist",
+  "allowedHosts": [
+    "openrouter.ai",
+    "api.openai.com",
+    "merchants.fiserv.com"
+  ],
+  "wildcardsAllowed": false,
+  "registryOriginsAutoAllowed": false,
+  "purpose": "Codex-owned authorized RateReveal internal live evaluation only"
+}

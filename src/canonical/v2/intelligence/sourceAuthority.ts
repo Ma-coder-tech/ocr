@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { isCanonicalCode, isSafeStructuredString, isValidIsoDay, validClosedOpenInterval } from "../knowledge/knowledgeSafety.js";
 import { KNOWLEDGE_CLAIM_TYPES } from "../knowledge/knowledgeTypes.js";
 import type { DiscoveryCandidate, PublicSourceAuthorityAdmission, RuntimeResearchQuestion, SearchAttempt } from "./intelligenceTypes.js";
@@ -124,6 +125,54 @@ export function authorityAdmissionForCandidate(params: {
     && pathMatches(admission, url.pathname)) ?? null;
 }
 
+export function knownExactDocumentCandidatesForQuestion(params: {
+  question: RuntimeResearchQuestion;
+  admissions: readonly PublicSourceAuthorityAdmission[];
+}): DiscoveryCandidate[] {
+  if (params.question.selection !== "selected") return [];
+  const candidates: DiscoveryCandidate[] = [];
+  for (const admission of params.admissions) {
+    if (admission.pathMatchMode !== "exact_document" || admission.approvedDocumentFingerprints.length === 0) continue;
+    for (const [index, pathname] of admission.allowedPathPrefixes.entries()) {
+      const url = new URL(pathname, admission.origin).toString();
+      const attemptId = `known-authority-${digest(`${params.question.questionId}\0${admission.admissionId}`)}`;
+      const candidateId = `candidate-${digest(`${params.question.questionId}\0${admission.admissionId}\0${url}`)}`;
+      const sourceTypeCode = [...admission.allowedSourceTypeCodes].sort()[0];
+      if (!sourceTypeCode) continue;
+      const provisional: DiscoveryCandidate = {
+        candidateId,
+        questionId: params.question.questionId,
+        attemptId,
+        url,
+        title: admission.publicationMetadata.title,
+        claimedAuthority: admission.authority,
+        sourceTypeCode,
+        rank: index + 1,
+        publicationDate: admission.publicationMetadata.publicationDate,
+        effectiveFrom: admission.publicationMetadata.effectiveFrom,
+        effectiveTo: admission.publicationMetadata.effectiveTo,
+        locatorHint: null,
+        selectionReasonCode: "known_exact_authority_admission",
+        discoveryMetadata: {
+          providerCode: "rate_reveal_authority_registry",
+          configurationCode: "known_exact_document_v1",
+          sourceDomain: new URL(url).hostname.toLowerCase(),
+          providerRank: index + 1,
+          providerSnippetUsedAsEvidence: false,
+        },
+        retrievalEligibility: "eligible",
+        authorityAdmissionRef: admission.admissionId,
+        authorityPublicationFamilyCode: admission.publicationFamilyCode,
+      };
+      const matched = authorityAdmissionForCandidate({ candidate: provisional, question: params.question, admissions: [admission] });
+      if (matched?.admissionId === admission.admissionId && params.question.requiredSourceAuthorities.includes(admission.authority)) {
+        candidates.push(provisional);
+      }
+    }
+  }
+  return candidates.sort((left, right) => left.rank - right.rank || left.candidateId.localeCompare(right.candidateId));
+}
+
 export function verifyRetrievedDocumentAuthority(params: {
   admission: PublicSourceAuthorityAdmission;
   candidate: DiscoveryCandidate;
@@ -154,4 +203,8 @@ export function deriveAdaptiveSearchReason(params: {
     && ((candidate.effectiveFrom !== null && isValidIsoDay(candidate.effectiveFrom) && params.question.asOf < candidate.effectiveFrom)
       || (candidate.effectiveTo !== null && isValidIsoDay(candidate.effectiveTo) && params.question.asOf >= candidate.effectiveTo)));
   return wrongPeriodOfficial ? "right_program_wrong_period" : null;
+}
+
+function digest(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 20);
 }
