@@ -69,11 +69,15 @@ export function questionOrigin(unknownRef = "unknown-rule-1", overrides: Partial
 }
 
 export const officialSourceAdmission = createPublicSourceAuthorityAdmission({
-  admissionId: "public-source-admission-1", authority: "official_network_publication", origin: "https://example.com",
-  publicationFamilyCode: "official_network_rules", allowedClaimTypes: ["notice_external_rule"],
+  admissionId: "public-source-admission-1", admissionVersion: 1, authority: "official_network_publication", origin: "https://example.com",
+  publicationFamilyCode: "official_network_rules", publicationMetadata: { title: "Official network rules", version: "v1", publicationDate: null,
+    samplePeriodStart: null, samplePeriodEnd: null, effectiveFrom: null, effectiveTo: null, periodApplicabilityPolicy: "period_not_applicable",
+    retrievalVerifiedOn: "2026-08-24", provenanceUrls: [] }, pathMatchMode: "path_family", maximumEvidentiaryScope: "claim_class_only",
+  allowedClaimTypes: ["notice_external_rule"],
   allowedEvidenceClasses: ["official_rule_publication"], allowedSourceTypeCodes: ["official_rule"],
   allowedSubjectCodes: ["visa_future_rule"], allowedProcessorPrograms: ["program-a"],
-  allowedPathPrefixes: ["/rule*", "/official-rule", "/current", "/injection"],
+  allowedGeographyCodes: ["us"], allowedPathPrefixes: ["/rule*", "/official-rule", "/current", "/injection"],
+  approvedDocumentFingerprints: [],
 });
 
 export function admittedRule(overrides: Partial<KnowledgeEntry> = {}): KnowledgeEntry {

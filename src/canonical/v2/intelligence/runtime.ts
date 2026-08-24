@@ -12,13 +12,13 @@ import {
   validateRetrievalResponse,
 } from "./retrievalSafety.js";
 import { RemoteConcurrencyGuard } from "./remoteConcurrency.js";
-import { authorityAdmissionForCandidate, deriveAdaptiveSearchReason, validatePublicSourceAuthorityAdmissions } from "./sourceAuthority.js";
+import { authorityAdmissionForCandidate, deriveAdaptiveSearchReason, validatePublicSourceAuthorityAdmissions, verifyRetrievedDocumentAuthority } from "./sourceAuthority.js";
 import { detectSemanticConflicts, supportToKnowledgeCandidatePacket, validateSemanticSupport } from "./semanticVerification.js";
 import { asCandidateClaimSupport, asInvestigativeObservation, asThemeLanguageCandidate, validateInvestigativeMember, validateLanguageMemberShape, validateSemanticMember } from "./structuredMemberValidation.js";
 import { partitionStructuredItems, validateStructuredBatchResponse } from "./structuredBatching.js";
 import { deterministicThemeLanguageFallback, validateThemeLanguageCandidate, validateThemeLanguageInput } from "./themeLanguage.js";
 import { RG_SEMANTIC_AMENDMENT_IDS } from "./intelligenceTypes.js";
-import { assertProviderSafeQuestionContext, providerSafeScope } from "./providerPrivacy.js";
+import { assertProviderSafeQuestionContext, providerSafeScope, sanitizePublicDocumentTextForProvider } from "./providerPrivacy.js";
 import type {
   BoundedIntelligenceRuntimeInput,
   BoundedIntelligenceRuntimeResult,
@@ -253,6 +253,7 @@ async function performSearch(params: {
 async function retrieveCandidate(params: {
   input: BoundedIntelligenceRuntimeInput;
   candidate: DiscoveryCandidate;
+  question: RuntimeResearchQuestion;
   ports: IntelligencePorts;
   ledger: IntelligenceBudgetLedger;
   sequence: number;
@@ -363,6 +364,16 @@ async function retrieveCandidate(params: {
   }
   const extractionOperation = operationId(params.input.runId, "extraction", params.sequence);
   const contentFingerprint = createHash("sha256").update(response.content).digest("hex");
+  const admission = params.input.publicSourceAuthorityAdmissions.find((item) => item.admissionId === params.candidate.authorityAdmissionRef);
+  const finalUrl = response.redirects.at(-1)?.normalizedUrl ?? permit.normalizedUrl;
+  const documentAuthority = admission ? verifyRetrievedDocumentAuthority({ admission, candidate: params.candidate,
+    question: params.question, finalUrl, documentFingerprint: contentFingerprint })
+    : { eligible: false, reasonCode: "source_authority_admission_missing_after_retrieval" };
+  if (!documentAuthority.eligible) {
+    response.content.fill(0);
+    return { result: { ...base, state: "safety_blocked", mimeType: response.mimeType, byteLength: response.byteLength,
+      reasonCodes: [documentAuthority.reasonCode] }, internal: null };
+  }
   try {
     params.ledger.reserve({ reservationId: `${extractionOperation}:call`, operationId: extractionOperation, dimension: "pdf_extractions", amount: 1 });
   } catch (error) {
@@ -403,7 +414,9 @@ async function retrieveCandidate(params: {
       { eventId: `${documentId}-tool-refusal`, category: "tool_instruction_refused", disposition: "rejected", stage: "investigative_boundary" },
     );
   }
-  const locator = deterministicLocatorGrounding(params.candidate, extraction);
+  const trustedLocatorHint = params.question.claimType === "processor_term"
+    ? params.question.subjectCode.replace(/_terminology$/, "").replace(/_/g, " ") : params.candidate.locatorHint;
+  const locator = deterministicLocatorGrounding({ ...params.candidate, locatorHint: trustedLocatorHint }, extraction);
   const result: RuntimeDocumentResult = {
     ...base,
     state: extraction.state,
@@ -551,7 +564,9 @@ async function runBoundedIntelligenceRuntimeInternal(
   const documents: RuntimeDocumentResult[] = [];
   const internalDocuments: InternalDocument[] = [];
   for (let index = 0; index < candidates.length; index += 1) {
-    const retrieved = await retrieveCandidate({ input, candidate: candidates[index]!, ports, ledger, sequence: index + 1, startedAtMs, guard, securityEvents });
+    const candidate = candidates[index]!;
+    const question = questions.find((item) => item.questionId === candidate.questionId)!;
+    const retrieved = await retrieveCandidate({ input, candidate, question, ports, ledger, sequence: index + 1, startedAtMs, guard, securityEvents });
     documents.push(retrieved.result);
     if (retrieved.internal) internalDocuments.push(retrieved.internal);
   }
@@ -572,7 +587,8 @@ async function runBoundedIntelligenceRuntimeInternal(
       candidateId: document.candidate.candidateId,
       documentId: document.extraction.documentId,
       documentFingerprint: document.extraction.documentFingerprint,
-      text: (document.extraction.text ?? document.extraction.locators.map((item) => item.text).join("\n")).slice(0, 131_072),
+      text: sanitizePublicDocumentTextForProvider(document.extraction.text
+        ?? document.extraction.locators.map((item) => item.text).join("\n")).slice(0, 131_072),
       locators: [document.locator!].map(({ locatorId, documentId, documentFingerprint, page, sectionCode, lineStart, lineEnd }) => ({ locatorId, documentId, documentFingerprint, page, sectionCode, lineStart, lineEnd })),
       ...(questionContext ? { questionContext } : {}),
     };
@@ -653,6 +669,9 @@ async function runBoundedIntelligenceRuntimeInternal(
     const question = questions.find((item) => item.questionId === observation.questionId)!;
     const document = internalDocuments.find((item) => item.candidate.candidateId === observation.candidateId && item.extraction.documentId === observation.documentId)!;
     const locator = bindInvestigativeLocator({ observation, extraction: document.extraction, expectedLocatorId: document.locator?.locatorId ?? null })!;
+    const admission = input.publicSourceAuthorityAdmissions.find((item) => item.admissionId === document.candidate.authorityAdmissionRef);
+    const authorityLimitations = admission?.maximumEvidentiaryScope === "terminology_example_presentation_only"
+      ? ["terminology_example_presentation_only", "public_scope_applicability_unproven", "ownership_control_and_savings_unresolved"] : [];
     return {
       itemId: observation.itemId,
       question: {
@@ -664,11 +683,11 @@ async function runBoundedIntelligenceRuntimeInternal(
         requiredSourceAuthorities: [...question.requiredSourceAuthorities],
         requiredEvidenceClasses: [...question.requiredEvidenceClasses],
         possibleAnswerCodes: [...question.possibleAnswerCodes],
-        limitations: [...question.limitations],
+        limitations: [...new Set([...question.limitations, ...authorityLimitations])],
       },
       candidate: candidateWithoutUrl(document.candidate),
       documentId: document.extraction.documentId,
-      locator,
+      locator: { ...locator, text: sanitizePublicDocumentTextForProvider(locator.text) },
       proposedValue: observation.proposedValue,
     };
   }).slice(0, profile.maxSemanticSupportItems);
@@ -745,7 +764,11 @@ async function runBoundedIntelligenceRuntimeInternal(
           reasonCodes.push("semantic_observation_origin_identity_rejected"); continue;
         }
         const validated = validateSemanticSupport({ question: fullQuestion, candidate: semanticInput.candidate, locator: semanticInput.locator, support, expectedObservationId: semanticInput.itemId, expectedProposedValue: semanticInput.proposedValue });
-        supports.push({ ...support, verificationStatus: validated.status, limitationCodes: [...new Set([...support.limitationCodes, ...validated.reasonCodes])] });
+        const admission = input.publicSourceAuthorityAdmissions.find((item) => item.admissionId === semanticInput.candidate.authorityAdmissionRef);
+        const authorityLimitations = admission?.maximumEvidentiaryScope === "terminology_example_presentation_only"
+          ? ["terminology_example_presentation_only", "public_scope_applicability_unproven", "ownership_control_and_savings_unresolved"] : [];
+        supports.push({ ...support, verificationStatus: validated.status,
+          limitationCodes: [...new Set([...support.limitationCodes, ...validated.reasonCodes, ...authorityLimitations])] });
       }
     }
     stage(statuses, "semantic_verification", supports.some((item) => item.verificationStatus === "supported_candidate") ? "completed_with_candidates" : "completed_no_support");

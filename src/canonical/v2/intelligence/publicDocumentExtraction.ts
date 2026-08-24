@@ -70,7 +70,12 @@ async function extractPdf(content: Uint8Array): Promise<PublicLine[]> {
         if (pageText) lines.push({ page: pageNumber, sectionCode: "pdf_page", text: pageText });
       } finally { page.cleanup(); }
     }
-  } finally { await document.destroy(); pdfBytes.fill(0); }
+  } finally {
+    await document.destroy();
+    // PDF.js may transfer and detach its private copy; the caller still wipes the
+    // independently retained retrieval buffer after extraction.
+    if (pdfBytes.byteLength > 0) pdfBytes.fill(0);
+  }
   return lines;
 }
 

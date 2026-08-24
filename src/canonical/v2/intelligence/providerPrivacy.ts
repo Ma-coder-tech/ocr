@@ -52,14 +52,25 @@ export function assertProviderSafeQuestionContext(context: ProviderSafeQuestionC
   if (!result.valid) throw new Error(`provider_private_payload_blocked:${result.reasonCodes.join(",")}`);
 }
 
+export function sanitizePublicDocumentTextForProvider(value: string): string {
+  return value
+    .replace(/\$\s*-?\d[\d,]*(?:\.\d+)?/g, "[public_sample_amount]")
+    .replace(/\b(?:merchant|account)\s*(?:id|number)\b/gi, "public sample identifier")
+    .replace(/\bMID\b/g, "public sample identifier")
+    .replace(/\b\d{6,}\b/g, "[public_sample_number]");
+}
+
 function visit(value: unknown, reasons: string[], key = ""): void {
   if (FORBIDDEN_KEY.test(key)) reasons.push("provider_forbidden_private_key");
   const opaqueProviderId = typeof value === "string"
     && ((key === "providerContextId" && /^provider-context-[0-9a-f-]{36}$/.test(value))
       || (key === "providerRequestId" && /^provider-request-[0-9a-f-]{36}$/.test(value)));
   if (typeof value === "string" && !opaqueProviderId) {
-    inspectString(value, reasons);
-    if (/^\s*[\[{]/.test(value)) { try { visit(JSON.parse(value), reasons, key); } catch { /* ordinary public text */ } }
+    let inspectedAsJson = false;
+    if (/^\s*[\[{]/.test(value)) {
+      try { visit(JSON.parse(value), reasons, key); inspectedAsJson = true; } catch { /* ordinary public text */ }
+    }
+    if (!inspectedAsJson) inspectString(value, reasons);
   }
   if (Array.isArray(value)) value.forEach((item) => visit(item, reasons, key));
   else if (value && typeof value === "object") Object.entries(value as Record<string, unknown>).forEach(([childKey, child]) => visit(child, reasons, childKey));

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_URL,
   runFiservInternalAnalysisEvaluationV1,
   validateInternalStatementAnalysisV1,
   validatePublicSourceEvidenceManifestV1,
@@ -44,16 +45,30 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
       ["application_fee_terminology", "eligible", "selected"],
       ["non_swiped_discount_terminology", "eligible", "selected"],
     ]);
-    expect(result.runtime.supports.map((item) => item.verificationStatus).sort()).toEqual([
-      "partially_supported", "supported_candidate", "wrong_scope",
-    ]);
+    expect(result.runtime.candidates).toHaveLength(1);
+    expect(result.runtime.candidates[0]).toMatchObject({ candidateId: "injected-non-swiped-definition",
+      authorityPublicationFamilyCode: "first_data_us_swipe_non_swipe_statement_guide" });
+    expect(result.runtime.searchAttempts.find((item) => item.questionId === result.runtime.questions
+      .find((question) => question.subjectCode === "application_fee_terminology")!.questionId)).toMatchObject({
+      status: "no_candidates", candidateIds: [], reasonCodes: ["no_eligible_discovery_candidates"],
+    });
+    expect(result.runtime.supports.map((item) => item.verificationStatus)).toEqual(["supported_candidate"]);
+    expect(result.runtime.supports[0]!.subjectCode).toBe("non_swiped_discount_terminology");
+    expect(result.runtime.supports[0]!.limitationCodes).toEqual(expect.arrayContaining([
+      "terminology_example_presentation_only", "public_scope_applicability_unproven", "ownership_control_and_savings_unresolved",
+    ]));
     expect(result.analysis).toMatchObject({ terminalStatus: "completed_with_unresolved", canonicalTruthPreserved: true });
     expect(result.analysis.supportedResearchFindings).toHaveLength(1);
-    expect(result.analysis.investigativeHypotheses).toHaveLength(1);
+    expect(result.analysis.supportedResearchFindings[0]!.proposedValue).toMatchObject({
+      kind: "term", termCode: "non_swiped_discount_terminology", termValue: "official_definition_found",
+    });
+    expect(result.analysis.investigativeHypotheses).toHaveLength(0);
     expect(result.analysis.unresolvedQuestions).toHaveLength(1);
+    expect(result.analysis.unresolvedQuestions[0]!.title).toMatch(/application fee/i);
     expect(result.analysis.recommendations.map((item) => item.kind)).toEqual(expect.arrayContaining([
-      "verification_action", "research_followup", "documentation_request",
+      "verification_action", "documentation_request",
     ]));
+    expect(result.analysis.recommendations).not.toContainEqual(expect.objectContaining({ kind: "research_followup" }));
     expect(result.analysis.recommendations).not.toContainEqual(expect.objectContaining({ kind: "supported_economic_action" }));
     expect(result.analysis.impact.map((item) => ({ state: item.state, amountMinor: item.amountMinor, annualized: item.annualized })))
       .toEqual([{ state: "observed_cost", amountMinor: 9_900, annualized: false },
@@ -62,13 +77,13 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     expect(result.analysis.canonicalBeforeHash).toBe(result.analysis.canonicalAfterHash);
     expect(result.rgAudit).toMatchObject({ executionMode: "injected_evaluation", externalNetworkCallCount: 0,
       canonicalTruthPreserved: true, budget: { profile: "RG-FREE-v1" } });
-    expect(result.rgAudit.budget.consumed).toMatchObject({ search_calls: 2, candidates: 3, retrieval_documents: 3,
-      investigative_ai_calls: 1, semantic_verification_calls: 1, semantic_support_items: 3, language_calls: 0,
+    expect(result.rgAudit.budget.consumed).toMatchObject({ search_calls: 2, candidates: 1, retrieval_documents: 1,
+      investigative_ai_calls: 1, semantic_verification_calls: 1, semantic_support_items: 1, language_calls: 0,
       model_output_tokens: 320 });
-    expect(result.rgAudit.providerOperationReceipts).toHaveLength(7);
+    expect(result.rgAudit.providerOperationReceipts).toHaveLength(5);
     expect(result.rgAudit.providerOperationReceipts.every((receipt) => receipt.actualSendCount === 0
       && receipt.sendState === "not_sent" && receipt.retryCount === 0)).toBe(true);
-    expect(injected.downloadedBuffers).toHaveLength(3);
+    expect(injected.downloadedBuffers).toHaveLength(1);
     expect(injected.downloadedBuffers.every((buffer) => buffer.every((byte) => byte === 0))).toBe(true);
     const providerPayload = injected.providerPayloads.join("\n");
     expect(providerPayload).not.toMatch(/tenant-private|account-private|SAMPLE_MERCHANT|\.pdf\b|\/Users\/|\$\s*\d|9900|4231/i);
@@ -81,7 +96,8 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     expect(validatePublicSourceEvidenceManifestV1(result.publicEvidence)).toEqual([]);
     expect(validateRgInternalAuditV1(result.rgAudit)).toEqual([]);
     const serializedInternal = `${await readFile(path.join(outputDirectory, "internal-analysis.json"), "utf8")}${await readFile(path.join(outputDirectory, "rg-audit.json"), "utf8")}${await readFile(path.join(outputDirectory, "public-source-evidence.json"), "utf8")}`;
-    expect(serializedInternal).not.toMatch(/raw prompt|raw response|chain.of.thought|SAMPLE_MERCHANT|\/Users\/|\.pdf\b/i);
+    const withoutApprovedPublicDocumentUrl = serializedInternal.replaceAll(FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_URL, "https://approved-public-source.invalid/document");
+    expect(withoutApprovedPublicDocumentUrl).not.toMatch(/raw prompt|raw response|chain.of.thought|SAMPLE_MERCHANT|\/Users\/|\.pdf\b/i);
     expect(JSON.parse(await readFile(path.join(outputDirectory, "public-source-evidence.json"), "utf8"))).toMatchObject({ downloadedBodiesPersisted: false });
     const projection = await readFile(path.join(outputDirectory, "rh-projection.json"));
     expect(createHash("sha256").update(projection).digest("hex"))

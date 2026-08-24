@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { mkdtemp, realpath, symlink } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, symlink } from "node:fs/promises";
 import https from "node:https";
 import os from "node:os";
 import path from "node:path";
@@ -11,7 +11,7 @@ import {
   createLiveOpenAiSemanticAdapter,
   createDestinationPermit, createNodeHttpsRetrievalPort, createPublicDocumentExtractionPort, createPublicSourceAuthorityAdmission,
   INVESTIGATIVE_RESPONSE_SCHEMA_HASH, OPENROUTER_SEARCH_IDENTITY_SCHEMA_HASH, type SearchRequest,
-  inspectProviderOutboundPacket, runInternalProviderPreflight,
+  inspectProviderOutboundPacket, runInternalProviderPreflight, sanitizePublicDocumentTextForProvider,
 } from "../../../../src/canonical/v2/index.js";
 import { unsafeProviderContext } from "./injectedStatement1Fixture.js";
 
@@ -21,10 +21,15 @@ const originalEnvironment = { openrouter: process.env.OPENROUTER_API_KEY, search
 afterEach(() => { globalThis.fetch = originalFetch; restore("OPENROUTER_API_KEY", originalEnvironment.openrouter); restore("OPENROUTER_SEARCH_MODEL", originalEnvironment.searchModel);
   restore("OPENAI_API_KEY", originalEnvironment.openai); restore("OPENAI_INTERNAL_ANALYSIS_MODEL", originalEnvironment.model); vi.useRealTimers(); vi.restoreAllMocks(); });
 
-const admission = () => createPublicSourceAuthorityAdmission({ admissionId: "live-test-admission", authority: "processor_publication", origin: "https://docs.example.test",
-  publicationFamilyCode: "official_processor_terminology", allowedClaimTypes: ["processor_term"], allowedEvidenceClasses: ["official_processor_terminology"],
+const admission = () => createPublicSourceAuthorityAdmission({ admissionId: "live-test-admission", admissionVersion: 1,
+  authority: "processor_publication", origin: "https://docs.example.test", publicationFamilyCode: "official_processor_terminology",
+  publicationMetadata: { title: "Official processor terminology", version: "v1", publicationDate: null, samplePeriodStart: null,
+    samplePeriodEnd: null, effectiveFrom: null, effectiveTo: null, periodApplicabilityPolicy: "period_not_applicable",
+    retrievalVerifiedOn: "2026-08-24", provenanceUrls: [] }, pathMatchMode: "path_family", maximumEvidentiaryScope: "claim_class_only",
+  allowedClaimTypes: ["processor_term"], allowedEvidenceClasses: ["official_processor_terminology"],
   allowedSourceTypeCodes: ["official_processor_terminology"], allowedSubjectCodes: ["application_fee_terminology"],
-  allowedProcessorPrograms: ["fiserv_first_data"], allowedPathPrefixes: ["/application-fee"] });
+  allowedProcessorPrograms: ["fiserv_first_data"], allowedGeographyCodes: ["us"], allowedPathPrefixes: ["/application-fee"],
+  approvedDocumentFingerprints: [] });
 
 async function capability(cancellationSignal?: AbortSignal) {
   process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000"; process.env.OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2";
@@ -132,6 +137,17 @@ describe("internal-analysis construction-bound provider seams", () => {
     const encoded = Buffer.from("/Users/private/merchant-statement.pdf").toString("base64");
     expect(inspectProviderOutboundPacket({ provider: "openai_responses_api", url: APPROVED_OPENAI_ENDPOINT, method: "POST", headerNames: ["Authorization"],
       body: JSON.stringify({ nested: [{ encoded }] }) })).toMatchObject({ valid: false });
+  });
+
+  it("masks public sample identifiers and amounts without weakening outbound privacy validation", () => {
+    const sanitized = sanitizePublicDocumentTextForProvider("Merchant Number 000000000000 MID; Non swiped discount $15.97 at .0285.");
+    expect(sanitized).toBe("public sample identifier [public_sample_number] public sample identifier; Non swiped discount [public_sample_amount] at .0285.");
+    expect(inspectProviderOutboundPacket({ provider: "openai_responses_api", url: APPROVED_OPENAI_ENDPOINT, method: "POST",
+      headerNames: ["Authorization"], body: JSON.stringify({ text: sanitized }) })).toMatchObject({ valid: true });
+    expect(inspectProviderOutboundPacket({ provider: "openrouter_web_search", url: APPROVED_OPENROUTER_ENDPOINT, method: "POST",
+      headerNames: ["Authorization"], body: JSON.stringify({ content: JSON.stringify({
+        providerRequestId: "provider-request-00000000-0000-4000-8000-000000000000",
+      }) }) })).toMatchObject({ valid: true });
   });
 
   it("fails malformed response identity and preserves unknown provider usage as possibly billable", async () => {
@@ -281,6 +297,16 @@ describe("internal-analysis construction-bound provider seams", () => {
       await expect(extraction.extract({ questionId: "q", candidateId: "c", documentId: "bad", mimeType: "application/pdf", content: value,
         maximumOutputBytes: 1_024, expectedDocumentFingerprint: createHash("sha256").update(value).digest("hex") })).resolves.toMatchObject({ text: null, locators: [] });
     }
+  });
+
+  it("completes valid PDF extraction when PDF.js detaches its private working buffer", async () => {
+    const content = new Uint8Array(await readFile(path.resolve(process.cwd(),
+      "test/fixtures/pdfs/SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf")));
+    const fingerprint = createHash("sha256").update(content).digest("hex");
+    const result = await createPublicDocumentExtractionPort().extract({ questionId: "q", candidateId: "c", documentId: "valid-pdf",
+      mimeType: "application/pdf", content, maximumOutputBytes: 1_048_576, expectedDocumentFingerprint: fingerprint });
+    expect(result).toMatchObject({ state: "retrieved_extracted", documentFingerprint: fingerprint });
+    expect(result.locators.length).toBeGreaterThan(0);
   });
 });
 

@@ -130,17 +130,47 @@ export type ProviderQuestionContextBindingV1 = {
   context: ProviderSafeQuestionContextV1;
 };
 
+export type PublicSourcePathMatchMode = "exact_document" | "path_family";
+
+export type PublicSourceEvidentiaryScope =
+  | "claim_class_only"
+  | "terminology_example_presentation_only";
+
+export type PublicSourcePeriodApplicabilityPolicy =
+  | "period_not_applicable"
+  | "documented_effective_period"
+  | "historical_example_only";
+
+export type PublicSourcePublicationMetadata = {
+  title: string;
+  version: string | null;
+  publicationDate: string | null;
+  samplePeriodStart: string | null;
+  samplePeriodEnd: string | null;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  periodApplicabilityPolicy: PublicSourcePeriodApplicabilityPolicy;
+  retrievalVerifiedOn: string;
+  provenanceUrls: string[];
+};
+
 export type PublicSourceAuthorityAdmission = {
   admissionId: string;
+  admissionVersion: number;
   authority: Extract<KnowledgeSourceAuthority, "official_network_publication" | "processor_publication">;
   origin: string;
   publicationFamilyCode: string;
+  publicationMetadata: PublicSourcePublicationMetadata;
+  pathMatchMode: PublicSourcePathMatchMode;
+  maximumEvidentiaryScope: PublicSourceEvidentiaryScope;
   allowedClaimTypes: KnowledgeClaimType[];
   allowedEvidenceClasses: string[];
   allowedSourceTypeCodes: string[];
   allowedSubjectCodes: string[];
   allowedProcessorPrograms: string[];
+  allowedGeographyCodes: string[];
   allowedPathPrefixes: string[];
+  approvedDocumentFingerprints: string[];
 };
 
 export type RuntimeResearchQuestion = {

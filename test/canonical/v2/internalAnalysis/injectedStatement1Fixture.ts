@@ -37,6 +37,9 @@ export function createInjectedStatement1Fixture() {
       providerConfigurationCode: operation === "search" ? "injected_openrouter_perplexity_v1" : null, safeReasonCode: "injected_response" });
   };
   const htmlByCandidate = new Map<string, string>();
+  const approvedNonSwipedPath = "/content/dam/firstdata/us/en/documents/pdf/How_to_Read_Your_statement_swipe_Non_swipe.pdf";
+  const approvedNonSwipedBody = "<!doctype html><html><body><h1>How to Read Your Statement - Swipe Non-Swipe</h1><p>Non swiped discount $15.97 at .0285 appears as a Service Charge. This sample demonstrates terminology and statement presentation only.</p></body></html>";
+  const approvedNonSwipedFingerprint = createHash("sha256").update(new TextEncoder().encode(approvedNonSwipedBody)).digest("hex");
   const extraction = createPublicDocumentExtractionPort();
   const ports: IntelligencePorts = {
     clock: new InjectedClock(),
@@ -46,23 +49,31 @@ export function createInjectedStatement1Fixture() {
         providerPayloads.push(JSON.stringify(request)); receipt("search", "injected_openrouter_search_contract", request.reservationId, request.attemptId);
         const application = request.queryTerms.some((term) => term.includes("application_fee"));
         const definitions = application ? [
-          { id: "application-definition", path: "application-fee", title: "Application Fee terminology", hint: "Application Fee",
-            body: "An application fee is described as a public product enrollment term. Account applicability depends on the applicable agreement." },
+          { id: "application-paysafe", url: "https://www.paysafe.com/us-en/merchant-welcome-portal/faqs/", title: "Paysafe Application Fee", hint: "Application Fee",
+            body: "A plausible official definition from the wrong processor program." },
+          { id: "application-stripe", url: "https://docs.stripe.com/api/application_fees", title: "Stripe Application Fees", hint: "Application Fee",
+            body: "A plausible official marketplace definition from the wrong product." },
+          { id: "application-sec", url: "https://www.sec.gov/Archives/edgar/data/896429/000162828020009890/a20200331-exx101.htm", title: "Account-specific First Data agreement", hint: "Application Fee",
+            body: "An account-specific contract is not an approved public terminology authority." },
         ] : [
-          { id: "non-swiped-definition", path: "non-swiped-discount", title: "Non Swiped Discount terminology", hint: "Non Swiped Discount",
-            body: "Non swiped discount is described as terminology for transactions without a card-present read. Exact calculation depends on program terms." },
-          { id: "non-swiped-scope", path: "non-swiped-scope", title: "Non Swiped Discount scope", hint: "Non Swiped Discount",
-            body: "Non swiped discount terminology appears in a different public program. This source does not establish account applicability." },
+          { id: "non-swiped-interchange-plus", url: "https://merchants.fiserv.com/content/dam/firstdata/us/en/documents/pdf/How_To_Read_Your_Statement_Interchange_Plus_Pricing.pdf",
+            title: "Interchange Plus statement guide", hint: "Discount", body: "Wrong publication family and pathname." },
+          { id: "non-swiped-canada", url: "https://merchants.fiserv.com/content/dam/firstdata/ca/en/pdf/CA-Merchant-Terms.pdf",
+            title: "Canada merchant terms", hint: "Discount", body: "Wrong geography and pathname." },
+          { id: "non-swiped-definition", url: `https://merchants.fiserv.com${approvedNonSwipedPath}`,
+            title: "How to Read Your Statement - Swipe Non-Swipe", hint: "Non swiped discount", body: approvedNonSwipedBody },
         ];
         const candidates = definitions.map((definition, index) => {
           const candidateId = `injected-${definition.id}`;
-          htmlByCandidate.set(candidateId, `<!doctype html><html><body><h1>${definition.hint}</h1><p>${definition.body}</p></body></html>`);
+          htmlByCandidate.set(candidateId, definition.body.startsWith("<!doctype") ? definition.body
+            : `<!doctype html><html><body><h1>${definition.hint}</h1><p>${definition.body}</p></body></html>`);
+          const sourceDomain = new URL(definition.url).hostname;
           return { candidateId, questionId: request.questionId, attemptId: request.attemptId,
-            url: `https://docs.example.test/${definition.path}`, title: definition.title, claimedAuthority: "processor_publication" as const,
+            url: definition.url, title: definition.title, claimedAuthority: "processor_publication" as const,
             sourceTypeCode: "official_processor_terminology", rank: index + 1, publicationDate: null,
             effectiveFrom: null, effectiveTo: null, locatorHint: null, selectionReasonCode: "injected_official_source",
             discoveryMetadata: { providerCode: "injected_openrouter_search_contract", configurationCode: "injected_openrouter_perplexity_v1",
-              sourceDomain: "docs.example.test", providerRank: index + 1, providerSnippetUsedAsEvidence: false as const } };
+              sourceDomain, providerRank: index + 1, providerSnippetUsedAsEvidence: false as const } };
         });
         return { attemptId: request.attemptId, questionId: request.questionId, candidates, suggestedAdaptiveReason: null,
           outputAccounting: "search_discovery_not_model_generation" as const };
@@ -96,11 +107,10 @@ export function createInjectedStatement1Fixture() {
             const locator = item.locators[0]!;
             const termCode = item.questionContext?.subjectCode ?? "application_fee_terminology";
             return { itemId: item.itemId, questionId: item.questionId, candidateId: item.candidateId, documentId: item.documentId,
-              locatorId: locator.locatorId, documentFingerprint: item.documentFingerprint, interpretationCode: "bounded_public_term_definition",
-              proposedValue: { kind: "term" as const, termCode, termValue: item.candidateId.includes("scope")
-                ? "scope_limited" : "official_definition_found" },
+            locatorId: locator.locatorId, documentFingerprint: item.documentFingerprint, interpretationCode: "bounded_public_term_definition",
+              proposedValue: { kind: "term" as const, termCode, termValue: "official_definition_found" },
               sourceAuthorityCandidate: "processor_publication" as const, effectiveFromCandidate: null, effectiveToCandidate: null,
-              limitationCodes: ["account_applicability_not_established"], financialMutationAllowed: false as const };
+              limitationCodes: ["terminology_example_presentation_only", "public_scope_applicability_unproven"], financialMutationAllowed: false as const };
           }) };
       },
     },
@@ -116,19 +126,23 @@ export function createInjectedStatement1Fixture() {
             documentFingerprint: item.locator.documentFingerprint, investigativeObservationId: item.itemId,
             sourceAuthority: "processor_publication", sourceEffectiveFrom: null, sourceEffectiveTo: null,
             applicabilityScope: { ...item.question.scope }, proposedValue: item.proposedValue,
-            assertionBasisCode: "claim_specific_public_definition", verificationStatus: item.candidate.candidateId.includes("application")
-              ? "supported_candidate" : item.candidate.candidateId.includes("scope") ? "wrong_scope" : "partially_supported",
-            limitationCodes: ["account_applicability_not_established"], admissionAuthority: "none", financialMutationAllowed: false,
+            assertionBasisCode: "claim_specific_public_definition", verificationStatus: "supported_candidate",
+            limitationCodes: ["terminology_example_presentation_only", "public_scope_applicability_unproven"], admissionAuthority: "none", financialMutationAllowed: false,
           })) };
       },
     },
   };
   const publicSourceAuthorityAdmissions = [createPublicSourceAuthorityAdmission({
-    admissionId: "statement-one-processor-publication", authority: "processor_publication", origin: "https://docs.example.test",
-    publicationFamilyCode: "official_processor_terminology", allowedClaimTypes: ["processor_term"],
+    admissionId: "injected_fiserv_first_data_us_swipe_non_swipe_statement_guide_v1", admissionVersion: 1,
+    authority: "processor_publication", origin: "https://merchants.fiserv.com",
+    publicationFamilyCode: "first_data_us_swipe_non_swipe_statement_guide",
+    publicationMetadata: { title: "How to Read Your Statement - Swipe Non-Swipe", version: null, publicationDate: null,
+      samplePeriodStart: "2018-05-01", samplePeriodEnd: "2018-05-31", effectiveFrom: null, effectiveTo: null,
+      periodApplicabilityPolicy: "historical_example_only", retrievalVerifiedOn: "2026-08-24", provenanceUrls: [] },
+    pathMatchMode: "exact_document", maximumEvidentiaryScope: "terminology_example_presentation_only", allowedClaimTypes: ["processor_term"],
     allowedEvidenceClasses: ["official_processor_terminology"], allowedSourceTypeCodes: ["official_processor_terminology"],
-    allowedSubjectCodes: ["application_fee_terminology", "non_swiped_discount_terminology"],
-    allowedProcessorPrograms: ["fiserv_first_data"], allowedPathPrefixes: ["/application-fee", "/non-swiped-discount", "/non-swiped-scope"],
+    allowedSubjectCodes: ["non_swiped_discount_terminology"], allowedProcessorPrograms: ["fiserv_first_data"],
+    allowedGeographyCodes: ["us"], allowedPathPrefixes: [approvedNonSwipedPath], approvedDocumentFingerprints: [approvedNonSwipedFingerprint],
   })];
   const providerPreflight = {
     schemaVersion: "internal_provider_preflight_input_v1" as const, runMode: "internal_live_evaluation" as const,

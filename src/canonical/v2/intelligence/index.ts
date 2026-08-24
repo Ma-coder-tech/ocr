@@ -3,6 +3,7 @@ export * from "./intelligenceVersionManifest.js";
 export * from "./budgetLedger.js";
 export * from "./questionPlanning.js";
 export * from "./sourceAuthority.js";
+export * from "./publicSourceAuthorityRegistry.js";
 export * from "./remoteConcurrency.js";
 export * from "./structuredBatching.js";
 export * from "./structuredMemberValidation.js";
