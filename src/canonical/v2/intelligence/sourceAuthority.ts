@@ -10,13 +10,19 @@ export function createPublicSourceAuthorityAdmission(admission: PublicSourceAuth
     allowedClaimTypes: Object.freeze([...admission.allowedClaimTypes]) as unknown as PublicSourceAuthorityAdmission["allowedClaimTypes"],
     allowedEvidenceClasses: Object.freeze([...admission.allowedEvidenceClasses]) as unknown as string[],
     allowedSourceTypeCodes: Object.freeze([...admission.allowedSourceTypeCodes]) as unknown as string[],
+    allowedSubjectCodes: Object.freeze([...admission.allowedSubjectCodes]) as unknown as string[],
+    allowedProcessorPrograms: Object.freeze([...admission.allowedProcessorPrograms]) as unknown as string[],
+    allowedPathPrefixes: Object.freeze([...admission.allowedPathPrefixes]) as unknown as string[],
   });
   if (normalized.origin !== admission.origin || !isSafeStructuredString(normalized.admissionId)
     || !["official_network_publication", "processor_publication"].includes(normalized.authority)
     || !isCanonicalCode(normalized.publicationFamilyCode) || normalized.allowedClaimTypes.length === 0
     || !normalized.allowedClaimTypes.every((claim) => KNOWLEDGE_CLAIM_TYPES.includes(claim))
     || normalized.allowedEvidenceClasses.length === 0 || !normalized.allowedEvidenceClasses.every(isCanonicalCode)
-    || normalized.allowedSourceTypeCodes.length === 0 || !normalized.allowedSourceTypeCodes.every(isCanonicalCode)) {
+    || normalized.allowedSourceTypeCodes.length === 0 || !normalized.allowedSourceTypeCodes.every(isCanonicalCode)
+    || normalized.allowedSubjectCodes.length === 0 || !normalized.allowedSubjectCodes.every(isCanonicalCode)
+    || normalized.allowedProcessorPrograms.length === 0 || !normalized.allowedProcessorPrograms.every(isSafeStructuredString)
+    || normalized.allowedPathPrefixes.length === 0 || !normalized.allowedPathPrefixes.every((prefix) => prefix.startsWith("/") && !prefix.includes("..") && !prefix.slice(0, -1).includes("*"))) {
     throw new Error("invalid_public_source_authority_admission");
   }
   return normalized;
@@ -36,17 +42,22 @@ export function authorityAdmissionForCandidate(params: {
   question: RuntimeResearchQuestion;
   admissions: readonly PublicSourceAuthorityAdmission[];
 }): PublicSourceAuthorityAdmission | null {
-  let origin: string;
+  let url: URL;
   try {
-    origin = new URL(normalizeSafeHttpsUrl(params.candidate.url)).origin;
+    url = new URL(normalizeSafeHttpsUrl(params.candidate.url));
   } catch {
     return null;
   }
-  return params.admissions.find((admission) => admission.origin === origin
+  const processorProgram = params.question.scope.processorProgram;
+  return params.admissions.find((admission) => admission.origin === url.origin
     && admission.authority === params.candidate.claimedAuthority
     && admission.allowedClaimTypes.includes(params.question.claimType)
     && params.question.requiredEvidenceClasses.every((code) => admission.allowedEvidenceClasses.includes(code))
-    && admission.allowedSourceTypeCodes.includes(params.candidate.sourceTypeCode)) ?? null;
+    && admission.allowedSourceTypeCodes.includes(params.candidate.sourceTypeCode)
+    && admission.allowedSubjectCodes.includes(params.question.subjectCode)
+    && typeof processorProgram === "string" && admission.allowedProcessorPrograms.includes(processorProgram)
+    && admission.allowedPathPrefixes.some((prefix) => prefix.endsWith("*") ? url.pathname.startsWith(prefix.slice(0, -1))
+      : url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))) ?? null;
 }
 
 export function deriveAdaptiveSearchReason(params: {

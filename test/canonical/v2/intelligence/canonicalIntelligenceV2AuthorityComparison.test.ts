@@ -16,7 +16,7 @@ describe("Canonical Intelligence V2 authority, comparison, and RA-RF invariance"
     expect(CANONICAL_INTELLIGENCE_V2_VERSION_MANIFEST).toMatchObject({
       authority: "shadow_non_authoritative",
       persistence: "none",
-      providerExecution: "injected_only",
+      providerExecution: "injected_evaluation",
       automaticProviderRetries: 0,
       schemaRepairRetries: 0,
       knowledgeAdmissionAuthority: "prohibited",

@@ -72,6 +72,8 @@ export const officialSourceAdmission = createPublicSourceAuthorityAdmission({
   admissionId: "public-source-admission-1", authority: "official_network_publication", origin: "https://example.com",
   publicationFamilyCode: "official_network_rules", allowedClaimTypes: ["notice_external_rule"],
   allowedEvidenceClasses: ["official_rule_publication"], allowedSourceTypeCodes: ["official_rule"],
+  allowedSubjectCodes: ["visa_future_rule"], allowedProcessorPrograms: ["program-a"],
+  allowedPathPrefixes: ["/rule*", "/official-rule", "/current", "/injection"],
 });
 
 export function admittedRule(overrides: Partial<KnowledgeEntry> = {}): KnowledgeEntry {

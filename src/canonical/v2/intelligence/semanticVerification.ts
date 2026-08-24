@@ -7,6 +7,7 @@ import {
   type KnowledgeScope,
 } from "../knowledge/knowledgeTypes.js";
 import { ingestKnowledgeCandidatePacket } from "../knowledge/knowledgeAdapters.js";
+import { providerSafeScope } from "./providerPrivacy.js";
 import type {
   CandidateClaimSupport,
   DiscoveryCandidate,
@@ -50,7 +51,7 @@ export function validateSemanticSupport(params: {
   const policy = KNOWLEDGE_CLAIM_POLICIES[question.claimType];
   if (!question.requiredSourceAuthorities.includes(support.sourceAuthority) || !policy.allowedSourceAuthorities.includes(support.sourceAuthority)
     || support.sourceAuthority !== candidate.claimedAuthority || candidate.authorityAdmissionRef === null) reasons.push("semantic_source_authority_mismatch");
-  const publicScope = Object.fromEntries(Object.entries(question.scope).filter(([key]) => key !== "tenantRef" && key !== "accountRef"));
+  const publicScope = providerSafeScope(question.scope);
   if (canonicalJson(support.applicabilityScope) !== canonicalJson(publicScope)) reasons.push("semantic_scope_mismatch");
   if ((support.sourceEffectiveFrom !== null && question.asOf < support.sourceEffectiveFrom)
     || (support.sourceEffectiveTo !== null && question.asOf >= support.sourceEffectiveTo)) reasons.push("semantic_period_mismatch");

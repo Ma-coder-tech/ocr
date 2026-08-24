@@ -18,6 +18,7 @@ import { asCandidateClaimSupport, asInvestigativeObservation, asThemeLanguageCan
 import { partitionStructuredItems, validateStructuredBatchResponse } from "./structuredBatching.js";
 import { deterministicThemeLanguageFallback, validateThemeLanguageCandidate, validateThemeLanguageInput } from "./themeLanguage.js";
 import { RG_SEMANTIC_AMENDMENT_IDS } from "./intelligenceTypes.js";
+import { assertProviderSafeQuestionContext, providerSafeScope } from "./providerPrivacy.js";
 import type {
   BoundedIntelligenceRuntimeInput,
   BoundedIntelligenceRuntimeResult,
@@ -121,12 +122,13 @@ function chooseCandidates(params: {
     seenResponseIds.add(candidate.candidateId);
     return candidate.questionId === params.question.questionId && candidate.attemptId === params.attemptId
       && isSafeStructuredString(candidate.candidateId) && isSafeStructuredString(candidate.sourceTypeCode)
+      && validDiscoveryMetadata(candidate)
       && !existingIds.has(candidate.candidateId);
   }).map((candidate): DiscoveryCandidate => {
-    const provisional: DiscoveryCandidate = { ...candidate, retrievalEligibility: "wrong_authority", authorityAdmissionRef: null };
+    const provisional: DiscoveryCandidate = { ...candidate, retrievalEligibility: "wrong_authority", authorityAdmissionRef: null, authorityPublicationFamilyCode: null };
     const admission = authorityAdmissionForCandidate({ candidate: provisional, question: params.question, admissions: params.admissions });
     return admission && params.question.requiredSourceAuthorities.includes(candidate.claimedAuthority)
-      ? { ...provisional, retrievalEligibility: "eligible", authorityAdmissionRef: admission.admissionId }
+      ? { ...provisional, retrievalEligibility: "eligible", authorityAdmissionRef: admission.admissionId, authorityPublicationFamilyCode: admission.publicationFamilyCode }
       : provisional;
   }).filter((candidate) => candidate.retrievalEligibility === "eligible").sort((left, right) => {
     return (AUTHORITY_RANK[left.claimedAuthority] ?? 99) - (AUTHORITY_RANK[right.claimedAuthority] ?? 99)
@@ -150,6 +152,14 @@ function chooseCandidates(params: {
     }
   }
   return selected;
+}
+
+function validDiscoveryMetadata(candidate: SearchResponse["candidates"][number]): boolean {
+  const metadata = candidate.discoveryMetadata;
+  if (!metadata || !isSafeStructuredString(metadata.providerCode) || !isSafeStructuredString(metadata.configurationCode)
+    || !isSafeStructuredString(metadata.sourceDomain) || metadata.providerSnippetUsedAsEvidence !== false
+    || metadata.providerRank !== candidate.rank || !Number.isSafeInteger(candidate.rank) || candidate.rank < 1) return false;
+  try { return new URL(candidate.url).hostname.toLowerCase() === metadata.sourceDomain; } catch { return false; }
 }
 
 async function performSearch(params: {
@@ -193,6 +203,7 @@ async function performSearch(params: {
     throw error;
   }
   const result = await runRemote({ guard: params.guard, operationId: attemptId, ports: params.ports, timeoutMs: boundedTimeout(params.ports, params.startedAtMs, profile.globalWallTimeMs, profile.searchTimeoutMs), operation: () => params.ports.search!.search({
+    reservationId: `${attemptId}:call`,
     attemptId,
     questionId: params.question.questionId,
     queryTerms,
@@ -290,6 +301,7 @@ async function retrieveCandidate(params: {
     });
     authorizedRedirectPermits.set(permit.permitId, permit);
     const response = await params.ports.retrieval!.retrieve({
+      reservationId: `${operation}:document`,
       questionId: params.candidate.questionId,
       candidateId: params.candidate.candidateId,
       documentId,
@@ -336,12 +348,17 @@ async function retrieveCandidate(params: {
     params.ledger.settle(`${operation}:document`, { state: "failed" });
     params.ledger.settle(`${operation}:bytes`, { state: "failed", usageKnown: response.byteLength >= 0, ...(response.byteLength >= 0 ? { actualAmount: Math.min(response.byteLength, profile.maxRetrievalBytesPerDocument) } : {}) });
     params.securityEvents.push(...issues.map((issue, index) => ({ eventId: `${operation}-security-${index + 1}`, category: "malformed_provider_output_rejected" as const, disposition: "rejected" as const, stage: "retrieval" })));
+    response.content?.fill(0);
     return { result: { ...base, state: response.status === "safety_blocked" || issues.length > 0 ? "safety_blocked" : "inaccessible", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: issues.length > 0 ? [...new Set(issues)] : [`retrieval_${response.status}`] }, internal: null };
   }
   params.ledger.settle(`${operation}:document`, { state: "completed", actualAmount: 1 });
   params.ledger.settle(`${operation}:bytes`, { state: "completed", actualAmount: response.byteLength });
-  if (!params.ports.extraction) return { result: { ...base, state: "unsupported_content_type", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: ["document_extractor_disabled"] }, internal: null };
+  if (!params.ports.extraction) {
+    response.content.fill(0);
+    return { result: { ...base, state: "unsupported_content_type", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: ["document_extractor_disabled"] }, internal: null };
+  }
   if (expired(params.ports, params.startedAtMs, profile.globalWallTimeMs)) {
+    response.content.fill(0);
     return { result: { ...base, state: "retrieval_timeout", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: ["global_wall_time_exhausted"] }, internal: null };
   }
   const extractionOperation = operationId(params.input.runId, "extraction", params.sequence);
@@ -349,7 +366,10 @@ async function retrieveCandidate(params: {
   try {
     params.ledger.reserve({ reservationId: `${extractionOperation}:call`, operationId: extractionOperation, dimension: "pdf_extractions", amount: 1 });
   } catch (error) {
-    if (error instanceof IntelligenceBudgetExceeded) return { result: { ...base, state: "extraction_failed", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: [`budget_exhausted:${error.dimension}`] }, internal: null };
+    if (error instanceof IntelligenceBudgetExceeded) {
+      response.content.fill(0);
+      return { result: { ...base, state: "extraction_failed", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: [`budget_exhausted:${error.dimension}`] }, internal: null };
+    }
     throw error;
   }
   const extracted = await runRemote({ guard: params.guard, operationId: extractionOperation, ports: params.ports,
@@ -366,11 +386,13 @@ async function retrieveCandidate(params: {
   });
   if (extracted.status !== "completed") {
     params.ledger.settle(`${extractionOperation}:call`, { state: extracted.status === "timeout" ? "timeout" : "failed", usageKnown: false });
+    response.content.fill(0);
     return { result: { ...base, state: extracted.status === "timeout" ? "retrieval_timeout" : "extraction_failed", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: [extracted.status === "timeout" ? "document_extraction_timeout" : safeReasonCode(extracted.reasonCode)] }, internal: null };
   }
   params.ledger.settle(`${extractionOperation}:call`, { state: "completed", actualAmount: 1 });
   const validatedExtraction = validateExtractionResponse({ extraction: extracted.value, questionId: params.candidate.questionId, candidateId: params.candidate.candidateId, documentId, documentFingerprint: contentFingerprint, maximumOutputBytes: 1_048_576 });
   if (validatedExtraction.issues.length > 0) {
+    response.content.fill(0);
     return { result: { ...base, state: "extraction_failed", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: validatedExtraction.issues }, internal: null };
   }
   const extraction = { ...extracted.value, locators: validatedExtraction.locators };
@@ -390,6 +412,7 @@ async function retrieveCandidate(params: {
     locatorIds: extraction.locators.map((item) => item.locatorId),
     reasonCodes: [locator ? "deterministic_locator_grounded" : "semantic_locator_investigation_required"],
   };
+  response.content.fill(0);
   return { result, internal: extraction.state === "retrieved_extracted" || extraction.state === "retrieved_locator_only" ? { candidate: params.candidate, extraction, contentFingerprint, locator } : null };
 }
 
@@ -469,6 +492,12 @@ async function runBoundedIntelligenceRuntimeInternal(
   const budgetIssues = validateRgFreeV1Budget(profile);
   if (budgetIssues.length > 0) throw new Error(budgetIssues.join(","));
   validatePublicSourceAuthorityAdmissions(input.publicSourceAuthorityAdmissions);
+  const contextBindings = input.providerQuestionContexts ?? [];
+  if (new Set(contextBindings.map((item) => item.unknownRef)).size !== contextBindings.length) throw new Error("duplicate_provider_question_context");
+  for (const binding of contextBindings) {
+    if (!input.unknownQueue.some((item) => item.id === binding.unknownRef)) throw new Error("provider_question_context_unknown_mismatch");
+    assertProviderSafeQuestionContext(binding.context);
+  }
   if (new Set(input.languageInputs.map((item) => item.itemId)).size !== input.languageInputs.length) throw new Error("duplicate_theme_language_item_identity");
   for (const languageInput of input.languageInputs) {
     const issues = validateThemeLanguageInput(languageInput, input.canonicalReferenceIds);
@@ -529,15 +558,25 @@ async function runBoundedIntelligenceRuntimeInternal(
   stage(statuses, "retrieval", internalDocuments.length > 0 ? "completed" : candidates.length === 0 ? "not_needed" : !ports.retrieval ? "disabled_no_provider" : "completed_no_support");
 
   const observations: InvestigativeObservation[] = [];
-  const investigativeItems = internalDocuments.slice(0, profile.maxSemanticSupportItems).map((document, index) => ({
-    itemId: operationId(input.runId, "investigative-item", index + 1),
-    questionId: document.candidate.questionId,
-    candidateId: document.candidate.candidateId,
-    documentId: document.extraction.documentId,
-    documentFingerprint: document.extraction.documentFingerprint,
-    text: (document.extraction.text ?? document.extraction.locators.map((item) => item.text).join("\n")).slice(0, 131_072),
-    locators: document.extraction.locators.map(({ locatorId, documentId, documentFingerprint, page, sectionCode, lineStart, lineEnd }) => ({ locatorId, documentId, documentFingerprint, page, sectionCode, lineStart, lineEnd })),
-  }));
+  const localObservationOriginByItem = new Map<string, { questionId: string; unknownRef: string; providerContextId: string | null }>();
+  const investigativeItems = internalDocuments.filter((document) => document.locator !== null).slice(0, profile.maxSemanticSupportItems).map((document, index) => {
+    const question = questions.find((item) => item.questionId === document.candidate.questionId)!;
+    const questionContext = contextBindings.find((item) => item.unknownRef === question.originatingUnknownRef)?.context;
+    if (questionContext) assertProviderSafeQuestionContext(questionContext);
+    const itemId = operationId(input.runId, "investigative-item", index + 1);
+    localObservationOriginByItem.set(itemId, { questionId: question.questionId, unknownRef: question.originatingUnknownRef,
+      providerContextId: questionContext?.providerContextId ?? null });
+    return {
+      itemId,
+      questionId: document.candidate.questionId,
+      candidateId: document.candidate.candidateId,
+      documentId: document.extraction.documentId,
+      documentFingerprint: document.extraction.documentFingerprint,
+      text: (document.extraction.text ?? document.extraction.locators.map((item) => item.text).join("\n")).slice(0, 131_072),
+      locators: [document.locator!].map(({ locatorId, documentId, documentFingerprint, page, sectionCode, lineStart, lineEnd }) => ({ locatorId, documentId, documentFingerprint, page, sectionCode, lineStart, lineEnd })),
+      ...(questionContext ? { questionContext } : {}),
+    };
+  });
   if (ports.investigative && investigativeItems.length > 0) {
     const batchCount = Math.ceil(investigativeItems.length / profile.maxStructuredItemsPerBatch);
     const reservationIds: string[] = [];
@@ -577,6 +616,7 @@ async function runBoundedIntelligenceRuntimeInternal(
       for (const [index, raw] of result.value.items.entries()) {
         const expected = batch.items[index];
         if (expected) issues.push(...validateInvestigativeMember(raw, { ...expected, claimType: questions.find((question) => question.questionId === expected.questionId)!.claimType,
+          subjectCode: questions.find((question) => question.questionId === expected.questionId)!.subjectCode,
           sourceAuthority: internalDocuments.find((document) => document.candidate.candidateId === expected.candidateId)!.candidate.claimedAuthority }));
       }
       if (issues.length > 0) {
@@ -595,7 +635,10 @@ async function runBoundedIntelligenceRuntimeInternal(
       for (const raw of result.value.items) {
         const observation = asInvestigativeObservation(raw);
         const document = internalDocuments.find((item) => item.candidate.questionId === observation.questionId && item.candidate.candidateId === observation.candidateId && item.extraction.documentId === observation.documentId);
-        if (document && bindInvestigativeLocator({ observation, extraction: document.extraction })) observations.push(observation);
+        const localOrigin = localObservationOriginByItem.get(observation.itemId);
+        if (document && localOrigin?.questionId === observation.questionId
+          && questions.find((item) => item.questionId === observation.questionId)?.originatingUnknownRef === localOrigin.unknownRef
+          && bindInvestigativeLocator({ observation, extraction: document.extraction, expectedLocatorId: document.locator?.locatorId ?? null })) observations.push(observation);
         else reasonCodes.push("investigative_locator_or_parent_identity_rejected");
       }
     }
@@ -603,11 +646,13 @@ async function runBoundedIntelligenceRuntimeInternal(
   } else {
     stage(statuses, "investigative_intelligence", investigativeItems.length === 0 ? "not_needed" : "disabled_no_provider");
   }
+  for (const item of investigativeItems) item.text = "";
+  for (const document of internalDocuments) document.extraction.text = null;
 
   const semanticInputs: SemanticVerificationInput[] = observations.map((observation) => {
     const question = questions.find((item) => item.questionId === observation.questionId)!;
     const document = internalDocuments.find((item) => item.candidate.candidateId === observation.candidateId && item.extraction.documentId === observation.documentId)!;
-    const locator = bindInvestigativeLocator({ observation, extraction: document.extraction })!;
+    const locator = bindInvestigativeLocator({ observation, extraction: document.extraction, expectedLocatorId: document.locator?.locatorId ?? null })!;
     return {
       itemId: observation.itemId,
       question: {
@@ -615,7 +660,7 @@ async function runBoundedIntelligenceRuntimeInternal(
         claimType: question.claimType,
         subjectCode: question.subjectCode,
         asOf: question.asOf,
-        scope: Object.fromEntries(Object.entries(question.scope).filter(([key]) => key !== "tenantRef" && key !== "accountRef")),
+        scope: providerSafeScope(question.scope),
         requiredSourceAuthorities: [...question.requiredSourceAuthorities],
         requiredEvidenceClasses: [...question.requiredEvidenceClasses],
         possibleAnswerCodes: [...question.possibleAnswerCodes],
@@ -695,7 +740,10 @@ async function runBoundedIntelligenceRuntimeInternal(
         const semanticInput = batch.items.find((item) => item.itemId === support.itemId);
         if (!semanticInput) { reasonCodes.push("semantic_support_parent_identity_rejected"); continue; }
         const fullQuestion = questions.find((question) => question.questionId === semanticInput.question.questionId);
-        if (!fullQuestion) { reasonCodes.push("semantic_question_identity_rejected"); continue; }
+        const localOrigin = localObservationOriginByItem.get(support.itemId);
+        if (!fullQuestion || !localOrigin || localOrigin.questionId !== fullQuestion.questionId || localOrigin.unknownRef !== fullQuestion.originatingUnknownRef) {
+          reasonCodes.push("semantic_observation_origin_identity_rejected"); continue;
+        }
         const validated = validateSemanticSupport({ question: fullQuestion, candidate: semanticInput.candidate, locator: semanticInput.locator, support, expectedObservationId: semanticInput.itemId, expectedProposedValue: semanticInput.proposedValue });
         supports.push({ ...support, verificationStatus: validated.status, limitationCodes: [...new Set([...support.limitationCodes, ...validated.reasonCodes])] });
       }
@@ -717,17 +765,20 @@ async function runBoundedIntelligenceRuntimeInternal(
       return [];
     }
   });
-  const privateReviewBundles: PrivateResearchReviewBundle[] = candidatePackets.flatMap((packet) => {
-    const support = supports.find((item) => packet.candidateId.endsWith(item.supportId.replace(/[^A-Za-z0-9_.:-]+/g, "-").slice(0, 96)));
-    const question = support ? questions.find((item) => item.questionId === support.questionId) : undefined;
-    const candidate = support ? candidates.find((item) => item.candidateId === support.candidateId) : undefined;
-    const document = support ? internalDocuments.find((item) => item.extraction.documentId === support.documentId) : undefined;
-    const locator = document && support ? document.extraction.locators.find((item) => item.locatorId === support.locatorId) : undefined;
-    if (!support || !question?.scope.tenantRef || !question.scope.accountRef || !candidate?.authorityAdmissionRef || !document || !locator) return [];
+  const privateReviewBundles: PrivateResearchReviewBundle[] = supports.flatMap((support) => {
+    const packet = candidatePackets.find((item) => item.candidateId.endsWith(support.supportId.replace(/[^A-Za-z0-9_.:-]+/g, "-").slice(0, 96)));
+    const question = questions.find((item) => item.questionId === support.questionId);
+    const candidate = candidates.find((item) => item.candidateId === support.candidateId);
+    const document = internalDocuments.find((item) => item.extraction.documentId === support.documentId);
+    const locator = document ? document.extraction.locators.find((item) => item.locatorId === support.locatorId) : undefined;
+    if (!question?.scope.tenantRef || !question.scope.accountRef || !candidate?.authorityAdmissionRef || !document || !locator) return [];
     return [{ privacy: "account_private_ephemeral", persistence: "none", tenantRef: question.scope.tenantRef, accountRef: question.scope.accountRef,
-      candidatePacketId: packet.candidateId, questionId: question.questionId, candidateId: candidate.candidateId, sourceUrl: candidate.url,
+      candidatePacketId: packet?.candidateId ?? null, questionId: question.questionId, candidateId: candidate.candidateId, sourceUrl: candidate.url,
+      sourceTitle: candidate.title?.slice(0, 200) || candidate.sourceTypeCode, sourceAuthority: candidate.claimedAuthority,
       sourceAuthorityAdmissionRef: candidate.authorityAdmissionRef, documentId: document.extraction.documentId,
-      documentFingerprint: document.extraction.documentFingerprint, locatorId: locator.locatorId, locatorTextExcerpt: locator.text.slice(0, 512),
+      documentFingerprint: document.extraction.documentFingerprint, locatorId: locator.locatorId, locatorPage: locator.page,
+      locatorSectionCode: locator.sectionCode, locatorLineStart: locator.lineStart, locatorLineEnd: locator.lineEnd,
+      locatorTextExcerpt: locator.text.slice(0, 512),
       supportId: support.supportId, semanticDecision: support.verificationStatus, limitationCodes: [...support.limitationCodes] }];
   });
   stage(statuses, "knowledge_candidate_output", candidatePackets.length > 0 ? "completed_with_candidates" : "completed_no_support");
@@ -838,7 +889,7 @@ async function runBoundedIntelligenceRuntimeInternal(
     profile: "RG-FREE-v1",
     authority: "shadow_non_authoritative",
     persistence: "none",
-    providerExecution: "injected_only",
+    providerExecution: input.providerExecution ?? (anyProvider ? "injected_evaluation" : "provider_disabled"),
     questions,
     searchAttempts,
     candidates: candidates.map(candidateWithoutUrl),
@@ -880,7 +931,7 @@ export async function runBoundedIntelligenceRuntime(
       profile: "RG-FREE-v1",
       authority: "shadow_non_authoritative",
       persistence: "none",
-      providerExecution: "injected_only",
+      providerExecution: input.providerExecution ?? "provider_disabled",
       questions: [], searchAttempts: [], candidates: [], documents: [], supports: [], candidatePackets: [], privateReviewBundles: [], semanticConflicts: [],
       securityEvents: [{ eventId: "rg-runtime-input-rejected", category: "malformed_provider_output_rejected", disposition: "rejected", stage: "runtime_boundary" }],
       languageCandidates: [],

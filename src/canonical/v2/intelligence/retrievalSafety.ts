@@ -111,7 +111,9 @@ export function validateRetrievalResponse(params: {
   if (params.response.candidateId !== params.candidate.candidateId || params.permit.candidateId !== params.candidate.candidateId) issues.push("retrieval_candidate_identity_mismatch");
   if (params.response.documentId !== params.documentId) issues.push("retrieval_document_identity_mismatch");
   if (params.permit.expiresAtMs <= params.nowMs) issues.push("retrieval_destination_permit_expired");
-  if (!params.permit.approvedAddresses.includes(params.response.connectedAddress)) issues.push("retrieval_dns_rebinding_or_unpinned_connection");
+  const lastRedirect = params.response.redirects.at(-1);
+  const terminalPermit = lastRedirect ? (params.authorizedRedirectPermits ?? new Map()).get(lastRedirect.permitId) : params.permit;
+  if (!terminalPermit || !terminalPermit.approvedAddresses.includes(params.response.connectedAddress)) issues.push("retrieval_dns_rebinding_or_unpinned_connection");
   if (params.response.redirects.length > (params.maximumRedirects ?? 3)) issues.push("retrieval_redirect_limit_exceeded");
   const normalizedChain = [params.permit.normalizedUrl, ...params.response.redirects.map((hop) => hop.normalizedUrl)];
   if (new Set(normalizedChain).size !== normalizedChain.length) issues.push("retrieval_redirect_loop_detected");
@@ -177,26 +179,35 @@ function normalizedText(value: string): string {
 }
 
 export function deterministicLocatorGrounding(
-  candidate: Pick<DiscoveryCandidate, "candidateId" | "questionId" | "locatorHint">,
+  candidate: Pick<DiscoveryCandidate, "candidateId" | "questionId" | "locatorHint" | "title">,
   extraction: DocumentExtractionResponse,
 ): ExtractedLocator | null {
   if (extraction.candidateId !== candidate.candidateId || extraction.questionId !== candidate.questionId) {
     throw new Error("locator_parent_identity_mismatch");
   }
-  if (!candidate.locatorHint) return null;
-  const hint = normalizedText(candidate.locatorHint);
-  if (!hint) return null;
-  return extraction.locators.find((locator) => normalizedText(locator.text).includes(hint)) ?? null;
+  if (candidate.locatorHint) {
+    const hint = normalizedText(candidate.locatorHint);
+    if (hint) return extraction.locators.find((locator) => normalizedText(locator.text).includes(hint)) ?? null;
+  }
+  const titleTokens = [...new Set(normalizedText(candidate.title ?? "").split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 3 && !["official", "public", "definition", "terminology", "scope"].includes(token)))];
+  if (titleTokens.length === 0) return null;
+  const ranked = extraction.locators.map((locator, index) => ({ locator, index,
+    score: titleTokens.reduce((sum, token) => sum + (normalizedText(locator.text).includes(token) ? 1 : 0), 0) }))
+    .filter((item) => item.score > 0).sort((left, right) => right.score - left.score || left.index - right.index);
+  return ranked[0]?.locator ?? null;
 }
 
 export function bindInvestigativeLocator(params: {
   observation: InvestigativeObservation;
   extraction: DocumentExtractionResponse;
+  expectedLocatorId?: string | null;
 }): ExtractedLocator | null {
   const { observation, extraction } = params;
   if (observation.questionId !== extraction.questionId || observation.candidateId !== extraction.candidateId
     || observation.documentId !== extraction.documentId || observation.documentFingerprint !== extraction.documentFingerprint
     || observation.financialMutationAllowed !== false) return null;
+  if (params.expectedLocatorId === null || (params.expectedLocatorId !== undefined && observation.locatorId !== params.expectedLocatorId)) return null;
   return extraction.locators.find((locator) => locator.locatorId === observation.locatorId
     && locator.documentFingerprint === observation.documentFingerprint) ?? null;
 }

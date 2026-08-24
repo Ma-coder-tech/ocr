@@ -10,7 +10,8 @@ export function validateBoundedIntelligenceRuntimeResult(
 ): string[] {
   const issues = validateRgFreeV1Budget(profile);
   if (result.schemaVersion !== "canonical_intelligence_v2_runtime_v1" || result.profile !== "RG-FREE-v1") issues.push("invalid_intelligence_manifest");
-  if (result.authority !== "shadow_non_authoritative" || result.persistence !== "none" || result.providerExecution !== "injected_only") issues.push("invalid_intelligence_authority_boundary");
+  if (result.authority !== "shadow_non_authoritative" || result.persistence !== "none"
+    || !["injected_evaluation", "internal_live_evaluation", "provider_disabled"].includes(result.providerExecution)) issues.push("invalid_intelligence_authority_boundary");
   if (!result.canonicalTruthPreserved) issues.push("canonical_truth_not_preserved");
   if (!result.rfConflictsPreserved) issues.push("rf_conflict_not_preserved");
   if (result.automaticAdmissionCount !== 0) issues.push("automatic_knowledge_admission_forbidden");

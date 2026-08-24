@@ -23,10 +23,22 @@ export type RunFiservOneStatementInput = {
   sourceProfile?: { statementCompleteness?: CanonicalEconomicsV2CompletenessStatus; humanReviewRequired?: boolean };
 };
 
+export type FiservDeterministicEvaluationContext = {
+  foundation: ReturnType<typeof buildCanonicalEconomicsV2FromFiserv>;
+  pricing: ReturnType<typeof buildObservationalCanonicalPricingV2FromFiserv>;
+  economic: ReturnType<typeof buildObservationalCanonicalEconomicsV2FromFiservPricing>;
+  synthesis: ReturnType<typeof observeFiservEconomicsInCanonicalSynthesisV2>;
+  projection: ReturnType<typeof composeCanonicalMerchantReportV2>["projection"];
+  readiness: ReturnType<typeof buildSourceReadinessEnvelope>;
+};
+
 const DRIVERS: ParserDriver[] = [fiservFirstDataProcessorStatementDriver, fiservFirstDataFullStatementDriver,
   fiservFirstDataShortStatementDriver, genericFiservStatementDriver];
 
-export async function runFiservOneStatementEvaluation(input: RunFiservOneStatementInput): Promise<{ audit: FiservEvaluationRunAudit }> {
+export async function runFiservOneStatementEvaluation(input: RunFiservOneStatementInput): Promise<{
+  audit: FiservEvaluationRunAudit;
+  deterministic: FiservDeterministicEvaluationContext;
+}> {
   if (input.statementPaths.length !== 1) throw new Error("FISERV_EVALUATION_REQUIRES_EXACTLY_ONE_PDF");
   if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(input.safeStatementId) || input.safeStatementId.length > 80) throw new Error("INVALID_SAFE_STATEMENT_ID");
   if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(input.runVersion) || input.runVersion.length > 80) throw new Error("INVALID_RUN_VERSION");
@@ -161,7 +173,7 @@ export async function runFiservOneStatementEvaluation(input: RunFiservOneStateme
     warnings: unique([...foundation.validation.warnings, ...pricing.validation.warnings,
       ...economic.validation.warnings, ...synthesis.validation.warnings, ...reportAudit.validation.warnings]),
   });
-  return { audit };
+  return { audit, deterministic: { foundation, pricing, economic, synthesis, projection, readiness } };
 }
 
 function withinFiservCustomerScope(driverId: string, visibleBrand: string, processorFamily: string): boolean {

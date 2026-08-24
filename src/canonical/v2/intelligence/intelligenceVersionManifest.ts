@@ -7,7 +7,7 @@ export const CANONICAL_INTELLIGENCE_V2_VERSION_MANIFEST = Object.freeze({
   budgetProfile: "RG-FREE-v1",
   authority: "shadow_non_authoritative",
   persistence: "none",
-  providerExecution: "injected_only",
+  providerExecution: "injected_evaluation",
   automaticProviderRetries: 0,
   schemaRepairRetries: 0,
   knowledgeAdmissionAuthority: "prohibited",

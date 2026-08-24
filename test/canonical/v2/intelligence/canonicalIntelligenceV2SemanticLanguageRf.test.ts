@@ -6,6 +6,7 @@ import {
   validateKnowledgeCandidatePacket,
   validateSemanticSupport,
   validateThemeLanguageCandidate,
+  providerSafeScope,
   type CandidateClaimSupport,
   type RuntimeResearchQuestion,
 } from "../../../../src/canonical/v2/index.js";
@@ -32,7 +33,7 @@ function support(overrides: Partial<CandidateClaimSupport> = {}): CandidateClaim
     sourceAuthority: "official_network_publication",
     sourceEffectiveFrom: "2026-01-01",
     sourceEffectiveTo: null,
-    applicabilityScope: Object.fromEntries(Object.entries(queryScope).filter(([key]) => key !== "tenantRef" && key !== "accountRef")),
+    applicabilityScope: providerSafeScope(queryScope),
     proposedValue: { kind: "rule", ruleCode: "visa_future_rule", outcomeCode: "applies" },
     assertionBasisCode: "claim_specific_semantic_verification",
     verificationStatus: "supported_candidate",

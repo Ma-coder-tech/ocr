@@ -41,3 +41,4 @@ export * from "./fiservSynthesisAdapter.js";
 export * from "./intelligence/index.js";
 export * from "./report/index.js";
 export * from "./evaluation/index.js";
+export * from "./internalAnalysis/index.js";

@@ -58,7 +58,7 @@ function successfulPorts(clock: FakeClock = new FakeClock(), extractedText = "Of
         outputAccounting: "search_discovery_not_model_generation", candidates: [{ candidateId: `${request.questionId}-candidate`, questionId: request.questionId,
           attemptId: request.attemptId, url: "https://example.com/rule", claimedAuthority: "official_network_publication", sourceTypeCode: "official_rule",
           rank: 1, publicationDate: "2026-01-01", effectiveFrom: "2026-01-01", effectiveTo: null, locatorHint: "official rule",
-          selectionReasonCode: "admitted_official_source" }] };
+          selectionReasonCode: "admitted_official_source", discoveryMetadata: discoveryMetadata(1) }] };
     } },
     destination: { async resolve(candidateId, normalizedUrl) { return { candidateId, normalizedUrl, addresses: ["93.184.216.34"], permitId: `permit-${candidateId}` }; } },
     retrieval: { async retrieve(request) {
@@ -185,7 +185,8 @@ describe("Canonical Intelligence V2 bounded RG corrections", () => {
     ports.search = { providerCode: "test", async search(request) { calls += 1; return { attemptId: request.attemptId, questionId: request.questionId,
       suggestedAdaptiveReason: "right_program_wrong_period", outputAccounting: "search_discovery_not_model_generation", candidates: [{ candidateId: "candidate",
         questionId: request.questionId, attemptId: request.attemptId, url: "https://example.com/current", claimedAuthority: "official_network_publication", sourceTypeCode: "official_rule", rank: 1,
-        publicationDate: null, effectiveFrom: "2026-01-01", effectiveTo: null, locatorHint: null, selectionReasonCode: "provider_suggestion" }] }; } };
+        publicationDate: null, effectiveFrom: "2026-01-01", effectiveTo: null, locatorHint: null, selectionReasonCode: "provider_suggestion",
+        discoveryMetadata: discoveryMetadata(1) }] }; } };
     await runBoundedIntelligenceRuntime(input(), ports); expect(calls).toBe(1);
   });
 
@@ -231,11 +232,13 @@ describe("Canonical Intelligence V2 bounded RG corrections", () => {
   });
 
   it("18 aborts streaming as soon as the byte ceiling is exceeded", async () => {
+    const rejectedBody = new TextEncoder().encode("must be cleared");
     const ports = successfulPorts(); ports.retrieval = { async retrieve(request) { const decision = request.recordReceivedBytes(request.maximumBytes + 1);
       expect(decision).toBe("abort"); expect(request.signal.aborted).toBe(true); return { questionId: request.questionId, candidateId: request.candidateId, documentId: request.documentId,
-        status: "safety_blocked", connectedAddress: "93.184.216.34", redirects: [], mimeType: null, content: null, byteLength: 0, streamedByteLength: 0,
+        status: "safety_blocked", connectedAddress: "93.184.216.34", redirects: [], mimeType: "text/plain", content: rejectedBody, byteLength: rejectedBody.byteLength, streamedByteLength: rejectedBody.byteLength,
         safetyContract: { streamingByteLimitEnforced: true, abortSignalObserved: true, destinationPermitEnforced: true } }; } };
     const result = await runBoundedIntelligenceRuntime(input(), ports); expect(result.documents[0]!.state).toBe("safety_blocked");
+    expect([...rejectedBody].every((byte) => byte === 0)).toBe(true);
   });
 
   it("19 rejects MIME/content signature mismatches", () => {
@@ -380,6 +383,11 @@ describe("Canonical Intelligence V2 bounded RG corrections", () => {
 
   it("40 acceptance with provider-disabled ports makes zero live calls", async () => {
     const result = await runBoundedIntelligenceRuntime(input({ unknownQueue: [], questionOrigins: [] }), disabledPorts());
-    expect(result.providerExecution).toBe("injected_only"); expect(result.budget.reservations).toEqual([]); expect(result.terminalStatus).toBe("disabled_no_provider");
+    expect(result.providerExecution).toBe("provider_disabled"); expect(result.budget.reservations).toEqual([]); expect(result.terminalStatus).toBe("disabled_no_provider");
   });
 });
+
+function discoveryMetadata(providerRank: number) {
+  return { providerCode: "test_search", configurationCode: "test_search_v1", sourceDomain: "example.com", providerRank,
+    providerSnippetUsedAsEvidence: false as const };
+}

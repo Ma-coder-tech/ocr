@@ -112,6 +112,24 @@ export type RuntimeQuestionOrigin = {
   publicResearchPlausible: boolean;
 };
 
+export type ProviderSafeQuestionContextV1 = {
+  schemaVersion: "provider_safe_question_context_v1";
+  providerContextId: string;
+  questionClass: "application_fee_public_definition" | "non_swiped_discount_public_definition";
+  claimType: "processor_term";
+  subjectCode: "application_fee_terminology" | "non_swiped_discount_terminology";
+  safeResearchLabel: "application fee" | "non swiped discount";
+  questionText: string;
+  processorProgram: string | null;
+  periodYear: string;
+  allowedContext: "public_product_terminology_only";
+};
+
+export type ProviderQuestionContextBindingV1 = {
+  unknownRef: string;
+  context: ProviderSafeQuestionContextV1;
+};
+
 export type PublicSourceAuthorityAdmission = {
   admissionId: string;
   authority: Extract<KnowledgeSourceAuthority, "official_network_publication" | "processor_publication">;
@@ -120,6 +138,9 @@ export type PublicSourceAuthorityAdmission = {
   allowedClaimTypes: KnowledgeClaimType[];
   allowedEvidenceClasses: string[];
   allowedSourceTypeCodes: string[];
+  allowedSubjectCodes: string[];
+  allowedProcessorPrograms: string[];
+  allowedPathPrefixes: string[];
 };
 
 export type RuntimeResearchQuestion = {
@@ -178,14 +199,24 @@ export type SearchDiscoveryCandidate = {
   effectiveTo: string | null;
   locatorHint: string | null;
   selectionReasonCode: string;
+  title?: string | null;
+  discoveryMetadata: {
+    providerCode: string;
+    configurationCode: string;
+    sourceDomain: string;
+    providerRank: number;
+    providerSnippetUsedAsEvidence: false;
+  };
 };
 
 export type DiscoveryCandidate = SearchDiscoveryCandidate & {
   retrievalEligibility: "eligible" | "wrong_authority" | "safety_blocked";
   authorityAdmissionRef: string | null;
+  authorityPublicationFamilyCode: string | null;
 };
 
 export type SearchRequest = {
+  reservationId: string;
   attemptId: string;
   questionId: string;
   queryTerms: string[];
@@ -227,6 +258,7 @@ export type RedirectHop = {
 };
 
 export type RetrievalRequest = {
+  reservationId: string;
   questionId: string;
   candidateId: string;
   documentId: string;
@@ -474,10 +506,12 @@ export type BoundedIntelligenceRuntimeInput = {
   admittedKnowledge: KnowledgeEntry[];
   unknownQueue: KnowledgeUnknownQueueItem[];
   questionOrigins: RuntimeQuestionOrigin[];
+  providerQuestionContexts?: ProviderQuestionContextBindingV1[];
   publicSourceAuthorityAdmissions: PublicSourceAuthorityAdmission[];
   deterministicNotApplicableUnknownRefs: string[];
   languageInputs: ThemeLanguageInput[];
   profile?: RgFreeV1BudgetProfile;
+  providerExecution?: "injected_evaluation" | "internal_live_evaluation" | "provider_disabled";
 };
 
 export type IntelligenceTimeoutResult<T> =
@@ -499,7 +533,7 @@ export type IntelligencePorts = {
   investigative?: {
     providerCode: string;
     modelCode: string;
-    investigate(request: StructuredBatchRequest<{ itemId: string; questionId: string; candidateId: string; documentId: string; documentFingerprint: string; text: string; locators: Array<Pick<ExtractedLocator, "locatorId" | "documentId" | "documentFingerprint" | "page" | "sectionCode" | "lineStart" | "lineEnd">> }>): Promise<StructuredBatchResponse<InvestigativeObservation>>;
+    investigate(request: StructuredBatchRequest<{ itemId: string; questionId: string; candidateId: string; documentId: string; documentFingerprint: string; text: string; locators: Array<Pick<ExtractedLocator, "locatorId" | "documentId" | "documentFingerprint" | "page" | "sectionCode" | "lineStart" | "lineEnd">>; questionContext?: ProviderSafeQuestionContextV1 }>): Promise<StructuredBatchResponse<InvestigativeObservation>>;
   };
   semantic?: {
     providerCode: string;
@@ -532,14 +566,20 @@ export type PrivateResearchReviewBundle = {
   persistence: "none";
   tenantRef: string;
   accountRef: string;
-  candidatePacketId: string;
+  candidatePacketId: string | null;
   questionId: string;
   candidateId: string;
   sourceUrl: string;
+  sourceTitle: string;
+  sourceAuthority: KnowledgeSourceAuthority;
   sourceAuthorityAdmissionRef: string;
   documentId: string;
   documentFingerprint: string;
   locatorId: string;
+  locatorPage: number | null;
+  locatorSectionCode: string | null;
+  locatorLineStart: number;
+  locatorLineEnd: number;
   locatorTextExcerpt: string;
   supportId: string;
   semanticDecision: SemanticVerificationStatus;
@@ -551,7 +591,7 @@ export type BoundedIntelligenceRuntimeResult = {
   profile: "RG-FREE-v1";
   authority: "shadow_non_authoritative";
   persistence: "none";
-  providerExecution: "injected_only";
+  providerExecution: "injected_evaluation" | "internal_live_evaluation" | "provider_disabled";
   questions: RuntimeResearchQuestion[];
   searchAttempts: SearchAttempt[];
   candidates: Array<Omit<DiscoveryCandidate, "url">>;
