@@ -211,12 +211,16 @@ describe("durable internal live runner", () => {
         return { schemaVersion: "provider_readiness_probe_result_v1", runId, statementAnalysisExecuted: false,
           privateStatementDataProviderBound: false, openRouter: { status: "passed", candidateCount: 1, toolExecutionState: "verified" },
           investigativeOpenAi: { status: "passed", structuredOutputValidation: "passed" },
-          semanticOpenAi: { status: "passed", structuredOutputValidation: "passed" }, receipts: providerAudit.snapshot() };
+          semanticOpenAi: { status: "passed", structuredOutputValidation: "passed" },
+          diagnostics: { schemaVersion: "provider_readiness_diagnostics_v1", semanticMemberValidationState: "passed",
+            semanticMemberIssues: [], semanticMismatchDimensions: [], safeSemanticMemberProjection: null },
+          receipts: providerAudit.snapshot() };
       },
     });
     expect(code).toBe(0); expect(statementExecutions).toBe(0); expect(probeExecutions).toBe(1);
     expect(lines).toEqual(expect.arrayContaining(["Provider sends: 0", "Provider sends: 3", "Statement analysis executed: no",
-      "Numbered Statement run created: no", "executionStatus: provider_readiness_passed", "researchOutcome: not_started"]));
+      "Numbered Statement run created: no", "executionStatus: provider_readiness_passed", "researchOutcome: not_started",
+      expect.stringContaining('Safe provider-readiness diagnostics: {"schemaVersion":"provider_readiness_diagnostics_v1"') ]));
     expect(await readdir(outputRoot)).toEqual([]);
   });
 

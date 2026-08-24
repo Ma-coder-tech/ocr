@@ -12,6 +12,7 @@ import {
   createInternalLiveExecutionCapability,
   createInternalLiveIntelligencePorts,
   PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS,
+  ProviderReadinessDiagnosticLog,
   ProviderOperationAuditLog,
   runProviderReadinessProbe,
   runFiservInternalAnalysisEvaluationV1,
@@ -70,6 +71,7 @@ export type InternalLiveRunnerDependencies = {
     runId: string;
     capability: InternalLiveExecutionCapabilityV1;
     providerAudit: ProviderOperationAuditLog;
+    readinessDiagnostics: ProviderReadinessDiagnosticLog;
   }): ReturnType<typeof runProviderReadinessProbe>;
   log(line: string): void;
 };
@@ -110,6 +112,7 @@ export async function runInternalLiveRunner(
   let openRouterKey = "";
   let openAiKey = "";
   const providerAudit = new ProviderOperationAuditLog();
+  const readinessDiagnostics = new ProviderReadinessDiagnosticLog();
   const observeCredentialState = overrides.observeCredentialState ?? (() => undefined);
   try {
     await (overrides.checkRepositoryState ?? assertRepositoryState)();
@@ -153,12 +156,14 @@ export async function runInternalLiveRunner(
       log("Retries: 0; fallback: disabled; adaptive search: disabled; language call: disabled");
       log("Provider sends: 0");
       try {
-        const probe = await (overrides.executeProviderReadiness ?? ((input) => runProviderReadinessProbe(input.runId, input.capability, input.providerAudit)))({
-          runId, capability, providerAudit,
+        const probe = await (overrides.executeProviderReadiness ?? ((input) => runProviderReadinessProbe(
+          input.runId, input.capability, input.providerAudit, input.readinessDiagnostics)))({
+          runId, capability, providerAudit, readinessDiagnostics,
         });
         log(`OpenRouter readiness: ${probe.openRouter.status}; tool execution: ${probe.openRouter.toolExecutionState}; candidates: ${probe.openRouter.candidateCount}`);
         log(`Investigative OpenAI readiness: ${probe.investigativeOpenAi.status}; structured output: ${probe.investigativeOpenAi.structuredOutputValidation}`);
         log(`Semantic OpenAI readiness: ${probe.semanticOpenAi.status}; structured output: ${probe.semanticOpenAi.structuredOutputValidation}`);
+        log(`Safe provider-readiness diagnostics: ${JSON.stringify(probe.diagnostics)}`);
         log(`Provider sends: ${sendCount(providerAudit)}`);
         log("Statement analysis executed: no");
         log("Numbered Statement run created: no");
@@ -167,6 +172,7 @@ export async function runInternalLiveRunner(
         log("researchOutcome: not_started");
         return 0;
       } catch (error) {
+        log(`Safe provider-readiness diagnostics: ${JSON.stringify(readinessDiagnostics.snapshot())}`);
         log(`Safe provider receipts: ${JSON.stringify(providerAudit.snapshot())}`);
         throw error;
       }

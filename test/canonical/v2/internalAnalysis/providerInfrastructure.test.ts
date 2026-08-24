@@ -11,7 +11,7 @@ import {
   createLiveOpenAiSemanticAdapter, createInternalLiveIntelligencePorts,
   createDestinationPermit, createNodeHttpsRetrievalPort, createPublicDocumentExtractionPort, createPublicSourceAuthorityAdmission,
   INVESTIGATIVE_RESPONSE_SCHEMA_HASH, INVESTIGATIVE_RESPONSE_SCHEMA_V1, OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH,
-  SEMANTIC_RESPONSE_SCHEMA_V1, type SearchRequest,
+  ProviderReadinessDiagnosticLog, SEMANTIC_RESPONSE_SCHEMA_V1, type SearchRequest,
   inspectProviderOutboundPacket, normalizeOpenRouterSearchResponse, runInternalProviderPreflight, runProviderReadinessProbe,
   sanitizePublicDocumentTextForProvider,
 } from "../../../../src/canonical/v2/index.js";
@@ -266,11 +266,55 @@ describe("internal-analysis construction-bound provider seams", () => {
     expect(result).toMatchObject({ statementAnalysisExecuted: false, privateStatementDataProviderBound: false,
       openRouter: { status: "passed", toolExecutionState: "verified" },
       investigativeOpenAi: { status: "passed", structuredOutputValidation: "passed" },
-      semanticOpenAi: { status: "passed", structuredOutputValidation: "passed" } });
+      semanticOpenAi: { status: "passed", structuredOutputValidation: "passed" },
+      diagnostics: { semanticMemberValidationState: "passed", semanticMemberIssues: [], semanticMismatchDimensions: [] } });
     expect(result.receipts.map((receipt) => [receipt.operation, receipt.actualSendCount, receipt.retryCount])).toEqual([
       ["search", 1, 0], ["investigative_model", 1, 0], ["semantic_model", 1, 0],
     ]);
     expect(outboundBodies.join("\n")).not.toMatch(/SAMPLE_MERCHANT|fsv-03-clover|merchant-private|account-private|statement-one-live-internal-evaluation/);
+  });
+
+  it("retains semantic issue codes and fails readiness closed without retaining provider prose", async () => {
+    const cap = await capability(); const audit = new ProviderOperationAuditLog(); const diagnostics = new ProviderReadinessDiagnosticLog(); let call = 0;
+    globalThis.fetch = vi.fn(async (_url, init) => {
+      call += 1;
+      if (call === 1) return { status: 200, headers: new Headers({ "x-request-id": "readiness-or-diagnostic" }), json: async () =>
+        openRouterResponse([{ url: "https://platform.openai.com/docs/api-reference/responses", title: "Responses API" }]) } as Response;
+      const body = JSON.parse(String(init?.body)); const request = JSON.parse(body.input[1].content[0].text);
+      if (call === 2) {
+        const item = request.items[0]; const locator = item.locators[0];
+        return { status: 200, headers: new Headers({ "x-request-id": "readiness-investigative-diagnostic" }), json: async () => ({
+          id: "resp-readiness-investigative-diagnostic", model: "approved-test-model", usage: { output_tokens: 91 },
+          output_text: JSON.stringify({ batchId: request.batchId, attemptId: request.attemptId, schemaVersion: request.schemaVersion,
+            items: [{ itemId: item.itemId, questionId: item.questionId, candidateId: item.candidateId, documentId: item.documentId,
+              locatorId: locator.locatorId, documentFingerprint: item.documentFingerprint, interpretationCode: "bounded_public_term_definition",
+              proposedValue: { kind: "term", termCode: "application_fee_terminology", termValue: "scope_limited" },
+              sourceAuthorityCandidate: "processor_publication", effectiveFromCandidate: null, effectiveToCandidate: null,
+              limitationCodes: ["synthetic_readiness_only"], financialMutationAllowed: false }] }),
+        }) } as Response;
+      }
+      const item = request.items[0];
+      return { status: 200, headers: new Headers({ "x-request-id": "readiness-semantic-diagnostic" }), json: async () => ({
+        id: "resp-readiness-semantic-diagnostic", model: "approved-test-model", usage: { output_tokens: 88 },
+        unsafe_provider_prose: "must never be retained",
+        output_text: JSON.stringify({ batchId: request.batchId, attemptId: request.attemptId, schemaVersion: request.schemaVersion,
+          items: [{ itemId: item.itemId, supportId: "readiness-support-diagnostic", questionId: item.question.questionId,
+            claimType: item.question.claimType, subjectCode: item.question.subjectCode, candidateId: item.candidate.candidateId,
+            documentId: item.documentId, locatorId: item.locator.locatorId, documentFingerprint: item.locator.documentFingerprint,
+            investigativeObservationId: item.itemId, sourceAuthority: "official_network_publication", sourceEffectiveFrom: null,
+            sourceEffectiveTo: null, applicabilityScope: item.question.scope, proposedValue: item.proposedValue,
+            assertionBasisCode: "claim_specific_public_definition", verificationStatus: "wrong_authority",
+            limitationCodes: ["synthetic_readiness_only"], admissionAuthority: "none", financialMutationAllowed: false }] }),
+      }) } as Response;
+    });
+    await expect(runProviderReadinessProbe("provider-readiness-diagnostic", cap, audit, diagnostics))
+      .rejects.toThrow("provider_readiness_semantic_contract_invalid");
+    expect(call).toBe(3);
+    expect(diagnostics.snapshot()).toMatchObject({ semanticMemberValidationState: "failed",
+      semanticMemberIssues: ["semantic_member_state_invalid"],
+      semanticMismatchDimensions: ["required_source_authority"] });
+    expect(JSON.stringify(diagnostics.snapshot())).not.toContain("must never be retained");
+    expect(audit.snapshot().every((receipt) => receipt.retryCount === 0)).toBe(true);
   });
 
   it("stops provider readiness after the first failed operation without retry or later sends", async () => {
