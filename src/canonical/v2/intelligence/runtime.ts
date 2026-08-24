@@ -238,12 +238,15 @@ async function performSearch(params: {
   params.ledger.settle(`${attemptId}:call`, { state: "completed", actualAmount: 1 });
   if (params.kind === "adaptive") params.ledger.settle(`${attemptId}:adaptive`, { state: "completed", actualAmount: 1 });
   const candidates = chooseCandidates({ response, question: params.question, attemptId, alreadyAccepted: params.existingCandidates, ledger: params.ledger, runId: params.input.runId, admissions: params.input.publicSourceAuthorityAdmissions });
+  const noCandidateReason = response.candidates.length === 0
+    ? "provider_search_completed_zero_candidates"
+    : "all_discovery_candidates_rejected_by_authority";
   return {
     attempt: {
       ...base,
       status: candidates.length > 0 ? "completed" : "no_candidates",
       candidateIds: candidates.map((candidate) => candidate.candidateId),
-      reasonCodes: candidates.length > 0 ? ["discovery_candidates_retained_by_authority"] : ["no_eligible_discovery_candidates"],
+      reasonCodes: candidates.length > 0 ? ["discovery_candidates_retained_by_authority"] : [noCandidateReason],
     },
     candidates,
     responseAdaptiveReason: deriveAdaptiveSearchReason({ suggested: response.suggestedAdaptiveReason, question: params.question, candidates }),

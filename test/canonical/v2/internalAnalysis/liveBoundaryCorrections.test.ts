@@ -79,7 +79,8 @@ describe("bounded live-boundary corrections", () => {
 });
 
 function baseAnalysis() { return { schemaVersion: "internal_statement_analysis_v1", audience: "internal_analyst_only", authority: "shadow_non_authoritative",
-  amendmentIds: ["E2E-AMEND-001-OBSERVATION-TO-INVESTIGATION"], safeStatementId: "safe", runId: "run", evaluatedAt: "2026-08-24T00:00:00.000Z",
+  amendmentIds: ["E2E-AMEND-001-OBSERVATION-TO-INVESTIGATION", "E2E-AMEND-002-LIVE-RESEARCH-OUTCOME"], safeStatementId: "safe", runId: "run", evaluatedAt: "2026-08-24T00:00:00.000Z",
+  executionStatus: "completed", researchOutcome: "research_completed", researchQuestionOutcomes: [],
   terminalStatus: "completed", canonicalBeforeHash: "a".repeat(64), canonicalAfterHash: "a".repeat(64), canonicalTruthPreserved: true, canonicalFacts: [], statementObservations: [],
   admittedKnowledge: [], supportedResearchFindings: [], investigativeHypotheses: [], contradictions: [], unresolvedQuestions: [], recommendations: [], impact: [], limitations: [] }; }
 function baseManifest() { return { schemaVersion: "public_source_evidence_manifest_v1", privacy: "internal_pre_uat_public_evidence", downloadedBodiesPersisted: false,
@@ -88,6 +89,7 @@ function baseManifest() { return { schemaVersion: "public_source_evidence_manife
     documentId: "document", documentFingerprint: "a".repeat(64), locator: { locatorId: "locator", page: 1, sectionCode: "rule", lineStart: 1, lineEnd: 1 },
     boundedSupportingExcerpt: "Public excerpt", semanticVerification: "supported_candidate", limitations: [] }] }; }
 function baseAudit() { return { schemaVersion: "rg_internal_analysis_audit_v1", runId: "run", executionMode: "injected_evaluation", externalNetworkCallCount: 0,
+  liveTimingPolicy: { amendmentId: "RG-AMEND-011-INTERNAL-LIVE-TIMING-V2", searchTimeoutMs: 40_000, globalWallTimeMs: 180_000 },
   providerOperationReceipts: [], questions: [], verificationOutcomes: [], budget: { profile: "RG-FREE-v1", limits: {}, consumed: {}, remaining: {}, reservations: [], exhaustedDimensions: [] },
   diagnostics: { schemaVersion: "canonical_intelligence_v2_diagnostics_v1", stageStatuses: {}, counts: {}, elapsedMs: {}, providerCodes: [], modelCodes: [], tokenUsage: 0, reasonCodes: [] },
   canonicalBeforeHash: "same", canonicalAfterHash: "same", canonicalTruthPreserved: true, rfSnapshotHash: "hash", rfEntryRefs: [], policyVersions: [] }; }

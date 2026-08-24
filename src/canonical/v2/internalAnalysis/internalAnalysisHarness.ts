@@ -2,11 +2,12 @@ import { createHash } from "node:crypto";
 import { canonicalJson } from "../knowledge/knowledgeSafety.js";
 import type { KnowledgeEntry } from "../knowledge/knowledgeTypes.js";
 import type { IntelligencePorts, PublicSourceAuthorityAdmission } from "../intelligence/intelligenceTypes.js";
+import { RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET } from "../intelligence/budgetLedger.js";
 import { runBoundedIntelligenceRuntime } from "../intelligence/runtime.js";
 import { assertInternalProviderPreflight, assertLivePortsBound, requireLiveCapabilityBinding } from "../intelligence/providerPreflight.js";
 import type { InternalProviderPreflightInputV1 } from "../intelligence/providerPreflight.js";
 import type { InternalLiveExecutionCapabilityV1 } from "../intelligence/providerPreflight.js";
-import { RG_SEMANTIC_AMENDMENT_IDS } from "../intelligence/intelligenceTypes.js";
+import { RG_INTERNAL_LIVE_TIMING_AMENDMENT_ID, RG_SEMANTIC_AMENDMENT_IDS } from "../intelligence/intelligenceTypes.js";
 import { ProviderOperationAuditLog } from "../intelligence/providerAdapters.js";
 import { runFiservOneStatementEvaluation } from "../evaluation/fiservEvaluationHarness.js";
 import type { RunFiservOneStatementInput } from "../evaluation/fiservEvaluationHarness.js";
@@ -71,6 +72,7 @@ export async function runFiservInternalAnalysisEvaluationV1(input: RunFiservInte
     questionOrigins: origins.runtimeOrigins,
     providerQuestionContexts: origins.origins.map((origin, index) => ({ unknownRef: origin.unknownRef, context: origins.providerContexts[index]! })),
     publicSourceAuthorityAdmissions: input.publicSourceAuthorityAdmissions,
+    profile: RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET,
     deterministicNotApplicableUnknownRefs: [],
     languageInputs: [],
     providerExecution: input.providerPreflight.executionMode === "external_provider" ? "internal_live_evaluation" : "injected_evaluation",
@@ -79,12 +81,17 @@ export async function runFiservInternalAnalysisEvaluationV1(input: RunFiservInte
   const publicEvidence = publicEvidenceManifest(runtime.privateReviewBundles, input.evaluatedAt);
   const analysis = buildInternalStatementAnalysisV1({ safeStatementId: input.safeStatementId, runId: input.internalRunId,
     evaluatedAt: input.evaluatedAt, foundation: deterministic.deterministic.foundation, origins: origins.origins,
-    admittedKnowledge: input.admittedKnowledge, runtime, publicEvidence, canonicalBeforeHash, canonicalAfterHash });
+    admittedKnowledge: input.admittedKnowledge, runtime, publicEvidence,
+    publicSourceAuthorityAdmissions: input.publicSourceAuthorityAdmissions, canonicalBeforeHash, canonicalAfterHash });
   const receipts = input.providerAudit.snapshot();
   const rgAudit: RgInternalAuditV1 = {
     schemaVersion: "rg_internal_analysis_audit_v1", runId: input.internalRunId,
     executionMode: input.providerPreflight.executionMode === "injected_evaluation" ? "injected_evaluation" : "internal_live_evaluation",
-    externalNetworkCallCount: receipts.reduce((sum, item) => sum + item.actualSendCount, 0), providerOperationReceipts: receipts,
+    externalNetworkCallCount: receipts.reduce((sum, item) => sum + item.actualSendCount, 0),
+    liveTimingPolicy: { amendmentId: RG_INTERNAL_LIVE_TIMING_AMENDMENT_ID,
+      searchTimeoutMs: RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET.searchTimeoutMs,
+      globalWallTimeMs: RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET.globalWallTimeMs },
+    providerOperationReceipts: receipts,
     questions: runtime.questions.map((question) => ({ questionId: question.questionId, subjectCode: question.subjectCode,
       originatingUnknownRef: question.originatingUnknownRef, eligibility: question.eligibility, selection: question.selection,
       reasonCodes: [...question.reasonCodes] })),
@@ -95,7 +102,7 @@ export async function runFiservInternalAnalysisEvaluationV1(input: RunFiservInte
     canonicalTruthPreserved: canonicalBeforeHash === canonicalAfterHash && runtime.canonicalTruthPreserved,
     rfSnapshotHash: hashCanonical(input.admittedKnowledge),
     rfEntryRefs: input.admittedKnowledge.map((entry) => entry.id).sort(),
-    policyVersions: [E2E_INTERNAL_ANALYSIS_AMENDMENT_ID, ...RG_SEMANTIC_AMENDMENT_IDS],
+    policyVersions: [E2E_INTERNAL_ANALYSIS_AMENDMENT_ID, RG_INTERNAL_LIVE_TIMING_AMENDMENT_ID, ...RG_SEMANTIC_AMENDMENT_IDS],
   };
   if (input.providerPreflight.executionMode === "injected_evaluation" && rgAudit.externalNetworkCallCount !== 0) {
     throw new Error("injected_evaluation_external_network_call_detected");

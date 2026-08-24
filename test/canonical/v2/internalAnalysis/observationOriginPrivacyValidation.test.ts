@@ -45,7 +45,8 @@ describe("internal-analysis origin, privacy, preflight, and projection boundarie
       prohibitedPresumptions: ["economic_category", "ownership_or_control", "removability", "pricing_architecture", "savings"] });
     expect(() => validateInvestigationQuestionOriginV1(invalidOrigin as never)).toThrow("unregistered_investigation_question_origin");
     const analysis = { schemaVersion: "internal_statement_analysis_v1", audience: "internal_analyst_only", authority: "shadow_non_authoritative",
-      amendmentIds: ["E2E-AMEND-001-OBSERVATION-TO-INVESTIGATION"], safeStatementId: "safe", runId: "safe", evaluatedAt: "2026-08-23T00:00:00Z",
+      amendmentIds: ["E2E-AMEND-001-OBSERVATION-TO-INVESTIGATION", "E2E-AMEND-002-LIVE-RESEARCH-OUTCOME"], safeStatementId: "safe", runId: "safe", evaluatedAt: "2026-08-23T00:00:00Z",
+      executionStatus: "completed", researchOutcome: "completed_with_unresolved_evidence", researchQuestionOutcomes: [],
       terminalStatus: "completed_with_unresolved", canonicalBeforeHash: "same", canonicalAfterHash: "same", canonicalTruthPreserved: true,
       canonicalFacts: [], statementObservations: [], admittedKnowledge: [], supportedResearchFindings: [], investigativeHypotheses: [], contradictions: [], unresolvedQuestions: [],
       recommendations: [{ recommendationId: "bad", kind: "supported_economic_action", title: "Remove it", findingRefs: ["missing"], evidenceRefs: [],

@@ -1,7 +1,8 @@
 import type { InternalStatementAnalysisV1, PublicSourceEvidenceManifestV1, RgInternalAuditV1 } from "./internalAnalysisTypes.js";
 import { hasExactKeys, isRecord, isSafeStructuredString } from "../knowledge/knowledgeSafety.js";
 
-const ANALYSIS_KEYS = ["schemaVersion", "audience", "authority", "amendmentIds", "safeStatementId", "runId", "evaluatedAt", "terminalStatus",
+const ANALYSIS_KEYS = ["schemaVersion", "audience", "authority", "amendmentIds", "safeStatementId", "runId", "evaluatedAt", "executionStatus",
+  "researchOutcome", "researchQuestionOutcomes", "terminalStatus",
   "canonicalBeforeHash", "canonicalAfterHash", "canonicalTruthPreserved", "canonicalFacts", "statementObservations", "admittedKnowledge",
   "supportedResearchFindings", "investigativeHypotheses", "contradictions", "unresolvedQuestions", "recommendations", "impact", "limitations"] as const;
 const FINDING_KEYS = ["findingId", "kind", "title", "displayValue", "statementEvidenceRefs", "knowledgeRefs", "researchEvidenceRefs", "questionOriginRefs",
@@ -9,6 +10,8 @@ const FINDING_KEYS = ["findingId", "kind", "title", "displayValue", "statementEv
 const OBSERVATION_KEYS = ["observationId", "questionClass", "label", "occurrenceRefs", "evidenceRefs", "observedAmountMinor", "currency", "authority", "limitations"] as const;
 const RECOMMENDATION_KEYS = ["recommendationId", "kind", "title", "findingRefs", "evidenceRefs", "actionabilityCeiling", "merchantControl", "limitations"] as const;
 const IMPACT_KEYS = ["impactId", "observationRef", "state", "amountMinor", "maximumAmountMinor", "currency", "annualized", "counterfactualRef", "limitations"] as const;
+const RESEARCH_QUESTION_OUTCOME_KEYS = ["questionId", "questionClass", "subjectCode", "outcome", "attempted", "operationalReasonCodes",
+  "retainedCandidateCount", "publicResearchStillPossible"] as const;
 const MANIFEST_KEYS = ["schemaVersion", "privacy", "downloadedBodiesPersisted", "entries"] as const;
 const EVIDENCE_KEYS = ["evidenceId", "supportId", "questionId", "candidateId", "sourceUrl", "sourceTitle", "sourceAuthority", "authorityAdmissionRef", "retrievedAt",
   "documentId", "documentFingerprint", "locator", "boundedSupportingExcerpt", "semanticVerification", "limitations"] as const;
@@ -16,7 +19,9 @@ const LOCATOR_KEYS = ["locatorId", "page", "sectionCode", "lineStart", "lineEnd"
 const RECEIPT_KEYS = ["receiptId", "reservationId", "operationId", "operation", "providerCode", "logicalAttempt", "actualSendCount", "retryCount",
   "sendState", "completionState", "elapsedMs", "usageState", "outputTokens", "providerRequestCount", "usageCostUsd", "providerConfigurationCode", "safeReasonCode"] as const;
 const FINDING_ARRAYS = ["canonicalFacts", "admittedKnowledge", "supportedResearchFindings", "investigativeHypotheses", "contradictions", "unresolvedQuestions"] as const;
-const ANALYSIS_ARRAYS = [...FINDING_ARRAYS, "amendmentIds", "statementObservations", "recommendations", "impact", "limitations"] as const;
+const ANALYSIS_ARRAYS = [...FINDING_ARRAYS, "amendmentIds", "researchQuestionOutcomes", "statementObservations", "recommendations", "impact", "limitations"] as const;
+const RESEARCH_OUTCOMES = ["research_completed", "completed_with_unresolved_evidence", "research_unavailable_due_to_timeout",
+  "no_eligible_public_evidence_found", "source_rejected_by_authority_policy", "provider_failure"] as const;
 const SUPPORT_STATUSES = ["supported_candidate", "partially_supported", "unsupported", "contradicted", "wrong_authority", "wrong_scope", "wrong_period",
   "locator_unproven", "malformed", "verification_unavailable", "not_applicable", "rf_resolved"] as const;
 
@@ -26,12 +31,30 @@ export function validateInternalStatementAnalysisV1(analysis: InternalStatementA
   if (ANALYSIS_ARRAYS.some((key) => !Array.isArray(analysis[key]))) return ["internal_analysis_array_shape_invalid"];
   if (analysis.schemaVersion !== "internal_statement_analysis_v1" || analysis.audience !== "internal_analyst_only"
     || analysis.authority !== "shadow_non_authoritative") issues.push("internal_analysis_identity_invalid");
-  if (analysis.amendmentIds.length !== 1 || analysis.amendmentIds[0] !== "E2E-AMEND-001-OBSERVATION-TO-INVESTIGATION"
+  if (analysis.amendmentIds.length !== 2 || analysis.amendmentIds[0] !== "E2E-AMEND-001-OBSERVATION-TO-INVESTIGATION"
+    || analysis.amendmentIds[1] !== "E2E-AMEND-002-LIVE-RESEARCH-OUTCOME"
     || !isSafeStructuredString(analysis.safeStatementId) || !isSafeStructuredString(analysis.runId) || !isValidIsoTimestamp(analysis.evaluatedAt)
     || !/^[a-f0-9]{64}$/.test(analysis.canonicalBeforeHash) || !/^[a-f0-9]{64}$/.test(analysis.canonicalAfterHash)
     || !safeStringArray(analysis.limitations)) issues.push("internal_analysis_metadata_invalid");
   if (!["completed", "completed_with_unresolved", "blocked_fatal_deterministic_failure", "provider_unavailable", "research_unavailable"]
     .includes(analysis.terminalStatus)) issues.push("internal_analysis_terminal_status_invalid");
+  if (analysis.executionStatus !== "completed" || !RESEARCH_OUTCOMES.includes(analysis.researchOutcome)) {
+    issues.push("internal_analysis_execution_or_research_outcome_invalid");
+  }
+  for (const outcome of analysis.researchQuestionOutcomes) {
+    if (!isRecord(outcome) || !hasExactKeys(outcome, RESEARCH_QUESTION_OUTCOME_KEYS)
+      || !isSafeStructuredString(outcome.questionId)
+      || !["application_fee_public_definition", "non_swiped_discount_public_definition"].includes(String(outcome.questionClass))
+      || !["application_fee_terminology", "non_swiped_discount_terminology"].includes(String(outcome.subjectCode))
+      || !RESEARCH_OUTCOMES.includes(outcome.outcome) || typeof outcome.attempted !== "boolean"
+      || !safeStringArray(outcome.operationalReasonCodes) || !Number.isSafeInteger(outcome.retainedCandidateCount)
+      || outcome.retainedCandidateCount < 0 || typeof outcome.publicResearchStillPossible !== "boolean") {
+      issues.push("internal_analysis_research_question_outcome_invalid");
+    }
+  }
+  if (new Set(analysis.researchQuestionOutcomes.map((item) => item.questionId)).size !== analysis.researchQuestionOutcomes.length) {
+    issues.push("internal_analysis_duplicate_research_question_outcome");
+  }
   if (!analysis.canonicalTruthPreserved || analysis.canonicalBeforeHash !== analysis.canonicalAfterHash) issues.push("internal_analysis_canonical_invariance_failed");
   const findings = [...analysis.canonicalFacts, ...analysis.admittedKnowledge, ...analysis.supportedResearchFindings,
     ...analysis.investigativeHypotheses, ...analysis.contradictions, ...analysis.unresolvedQuestions];
@@ -157,6 +180,11 @@ export function validateRgInternalAuditV1(audit: RgInternalAuditV1): string[] {
   if (!isRecord(audit) || !Array.isArray(audit.providerOperationReceipts) || !Array.isArray(audit.verificationOutcomes) || !Array.isArray(audit.rfEntryRefs)
     || !isRecord(audit.budget) || !Array.isArray(audit.budget.reservations)) return ["rg_internal_audit_shape_invalid"];
   if (audit.schemaVersion !== "rg_internal_analysis_audit_v1") issues.push("rg_internal_audit_identity_invalid");
+  if (!isRecord(audit.liveTimingPolicy) || !hasExactKeys(audit.liveTimingPolicy, ["amendmentId", "searchTimeoutMs", "globalWallTimeMs"])
+    || audit.liveTimingPolicy.amendmentId !== "RG-AMEND-011-INTERNAL-LIVE-TIMING-V2"
+    || audit.liveTimingPolicy.searchTimeoutMs !== 40_000 || audit.liveTimingPolicy.globalWallTimeMs !== 180_000) {
+    issues.push("rg_internal_audit_live_timing_policy_invalid");
+  }
   if (audit.canonicalBeforeHash !== audit.canonicalAfterHash || !audit.canonicalTruthPreserved) issues.push("rg_internal_audit_canonical_invariance_failed");
   if (audit.externalNetworkCallCount !== audit.providerOperationReceipts.reduce((sum, item) => sum + item.actualSendCount, 0)) issues.push("rg_internal_audit_external_call_count_mismatch");
   if (audit.providerOperationReceipts.some((item) => !isRecord(item) || !hasExactKeys(item, RECEIPT_KEYS)

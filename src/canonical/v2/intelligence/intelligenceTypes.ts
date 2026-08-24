@@ -22,6 +22,8 @@ export const RG_SEMANTIC_AMENDMENT_IDS = [
   "RG-AMEND-010-BOUNDED-THEME-LANGUAGE-CANDIDATE",
 ] as const;
 
+export const RG_INTERNAL_LIVE_TIMING_AMENDMENT_ID = "RG-AMEND-011-INTERNAL-LIVE-TIMING-V2" as const;
+
 export type RgSemanticAmendmentId = (typeof RG_SEMANTIC_AMENDMENT_IDS)[number];
 
 export type IntelligenceDifferenceClassification =
@@ -45,13 +47,13 @@ export type RgFreeV1BudgetProfile = {
   maxSemanticSupportItems: 8;
   maxLanguageCalls: 2;
   maxStructuredItemsPerBatch: 4;
-  searchTimeoutMs: 8_000;
+  searchTimeoutMs: 8_000 | 40_000;
   retrievalTimeoutMs: 12_000;
   pdfExtractionTimeoutMs: 10_000;
   investigativeAiTimeoutMs: 20_000;
   semanticVerificationTimeoutMs: 20_000;
   languageTimeoutMs: 15_000;
-  globalWallTimeMs: 90_000;
+  globalWallTimeMs: 90_000 | 180_000;
   maxInvestigativeOutputTokensPerCall: 1_200;
   maxSemanticOutputTokensPerCall: 1_200;
   maxLanguageOutputTokensPerCall: 800;

@@ -1,16 +1,17 @@
 import { createHash } from "node:crypto";
-import type { BoundedIntelligenceRuntimeResult, SemanticVerificationStatus } from "../intelligence/intelligenceTypes.js";
+import type { BoundedIntelligenceRuntimeResult, PublicSourceAuthorityAdmission, RuntimeResearchQuestion, SemanticVerificationStatus } from "../intelligence/intelligenceTypes.js";
 import type { KnowledgeEntry, KnowledgeClaimValue } from "../knowledge/knowledgeTypes.js";
 import type { CanonicalEconomicsV2Foundation, CanonicalEconomicsV2Fact } from "../types.js";
 import type {
   InternalFindingV1,
   InternalImpactV1,
   InternalRecommendationV1,
+  InternalResearchQuestionOutcomeV1,
   InternalStatementAnalysisV1,
   InvestigationQuestionOriginV1,
   PublicSourceEvidenceManifestV1,
 } from "./internalAnalysisTypes.js";
-import { E2E_INTERNAL_ANALYSIS_AMENDMENT_ID } from "./internalAnalysisTypes.js";
+import { E2E_INTERNAL_ANALYSIS_AMENDMENT_ID, E2E_LIVE_RESEARCH_OUTCOME_AMENDMENT_ID } from "./internalAnalysisTypes.js";
 
 export function buildInternalStatementAnalysisV1(input: {
   safeStatementId: string;
@@ -21,6 +22,7 @@ export function buildInternalStatementAnalysisV1(input: {
   admittedKnowledge: KnowledgeEntry[];
   runtime: BoundedIntelligenceRuntimeResult;
   publicEvidence: PublicSourceEvidenceManifestV1;
+  publicSourceAuthorityAdmissions: PublicSourceAuthorityAdmission[];
   canonicalBeforeHash: string;
   canonicalAfterHash: string;
 }): InternalStatementAnalysisV1 {
@@ -37,6 +39,8 @@ export function buildInternalStatementAnalysisV1(input: {
   const evidenceByQuestion = new Map(input.runtime.questions.map((question) => [question.questionId,
     input.publicEvidence.entries.filter((entry) => entry.questionId === question.questionId)]));
   const originByUnknown = new Map(input.origins.map((origin) => [origin.unknownRef, origin]));
+  const researchQuestionOutcomes = input.runtime.questions.filter((question) => question.selection === "selected").map((question) =>
+    researchQuestionOutcome(question, input.runtime, originByUnknown, input.publicSourceAuthorityAdmissions));
   const supportedResearchFindings: InternalFindingV1[] = [];
   const investigativeHypotheses: InternalFindingV1[] = [];
   const contradictions: InternalFindingV1[] = [];
@@ -74,15 +78,23 @@ export function buildInternalStatementAnalysisV1(input: {
       const origin = originByUnknown.get(question.originatingUnknownRef)!;
       const statuses = input.runtime.supports.filter((support) => support.questionId === question.questionId).map((support) => support.verificationStatus);
       const rfConflict = question.rfResolution.status === "unresolved_conflict";
+      const researchOutcome = researchQuestionOutcomes.find((outcome) => outcome.questionId === question.questionId);
+      const operationalLimitations = researchOutcome?.outcome === "research_unavailable_due_to_timeout"
+        ? ["public_research_attempted", "public_research_provider_timed_out", "no_conclusion_about_public_source_availability"]
+        : researchOutcome?.outcome === "no_eligible_public_evidence_found"
+          ? ["public_discovery_completed_without_candidates", "no_public_evidence_produced"]
+          : researchOutcome?.outcome === "source_rejected_by_authority_policy"
+            ? ["discovery_candidates_rejected_by_committed_authority_policy", "no_admissible_public_evidence_produced"]
+            : researchOutcome?.outcome === "provider_failure" ? ["public_research_provider_failed"] : [];
       return { findingId: `finding-unresolved-${digest(question.questionId)}`, kind: "unresolved_question",
         title: rfConflict ? `Admitted knowledge conflicts for ${origin.safeResearchLabel}; research was not permitted to choose a winner.` : origin.questionText,
         displayValue: null, statementEvidenceRefs: [...origin.evidenceRefs], knowledgeRefs: question.rfResolution.selectedEntryRefs,
         researchEvidenceRefs: (evidenceByQuestion.get(question.questionId) ?? []).map((entry) => entry.evidenceId), questionOriginRefs: [origin.originId],
         proposedValue: null, authority: "unresolved", supportStatus: strongestStatus(statuses), scopeAndPeriod: question.asOf,
-        limitations: [...new Set([...question.limitations, ...(rfConflict ? ["rf_conflict_preserved_no_ai_arbitration"] : []), "account_specific_documentation_required_if_public_evidence_is_insufficient"])], canonicalMutationAllowed: false };
+        limitations: [...new Set([...question.limitations, ...operationalLimitations, ...(rfConflict ? ["rf_conflict_preserved_no_ai_arbitration"] : []), "account_specific_documentation_required_if_public_evidence_is_insufficient"])], canonicalMutationAllowed: false };
     });
   const allFindings = [...canonicalFacts, ...admittedKnowledge, ...supportedResearchFindings, ...investigativeHypotheses, ...contradictions, ...unresolvedQuestions];
-  const recommendations = buildRecommendations(supportedResearchFindings, investigativeHypotheses, unresolvedQuestions);
+  const recommendations = buildRecommendations(supportedResearchFindings, investigativeHypotheses, unresolvedQuestions, researchQuestionOutcomes);
   const impact = input.origins.map((origin): InternalImpactV1 => ({ impactId: `impact-${digest(origin.originId)}`,
     observationRef: origin.originId, state: "observed_cost", amountMinor: origin.observedAmountMinor, maximumAmountMinor: null, currency: "USD",
     annualized: false, counterfactualRef: null, limitations: ["observed_statement_cost_not_savings", "recurrence_not_proven"] }));
@@ -90,7 +102,8 @@ export function buildInternalStatementAnalysisV1(input: {
   const unresolved = unresolvedQuestions.length > 0 || investigativeHypotheses.length > 0 || input.runtime.unresolvedOutcomeCodes.length > 0;
   return {
     schemaVersion: "internal_statement_analysis_v1", audience: "internal_analyst_only", authority: "shadow_non_authoritative",
-    amendmentIds: [E2E_INTERNAL_ANALYSIS_AMENDMENT_ID], safeStatementId: input.safeStatementId, runId: input.runId, evaluatedAt: input.evaluatedAt,
+    amendmentIds: [E2E_INTERNAL_ANALYSIS_AMENDMENT_ID, E2E_LIVE_RESEARCH_OUTCOME_AMENDMENT_ID], safeStatementId: input.safeStatementId, runId: input.runId, evaluatedAt: input.evaluatedAt,
+    executionStatus: "completed", researchOutcome: overallResearchOutcome(researchQuestionOutcomes), researchQuestionOutcomes,
     terminalStatus: internalAnalysisTerminalStatus(input.runtime, unresolved),
     canonicalBeforeHash: input.canonicalBeforeHash, canonicalAfterHash: input.canonicalAfterHash,
     canonicalTruthPreserved: input.canonicalBeforeHash === input.canonicalAfterHash && input.runtime.canonicalTruthPreserved,
@@ -134,7 +147,16 @@ function canonicalFindings(foundation: CanonicalEconomicsV2Foundation): Internal
   }));
 }
 
-function buildRecommendations(supported: InternalFindingV1[], hypotheses: InternalFindingV1[], unresolved: InternalFindingV1[]): InternalRecommendationV1[] {
+function buildRecommendations(supported: InternalFindingV1[], hypotheses: InternalFindingV1[], unresolved: InternalFindingV1[],
+  outcomes: InternalResearchQuestionOutcomeV1[]): InternalRecommendationV1[] {
+  const timedOutResearchFollowups = unresolved.flatMap((finding): InternalRecommendationV1[] => {
+    const outcome = outcomes.find((item) => finding.findingId === `finding-unresolved-${digest(item.questionId)}`);
+    if (!outcome || outcome.outcome !== "research_unavailable_due_to_timeout" || !outcome.publicResearchStillPossible) return [];
+    return [{ recommendationId: `recommendation-research-timeout-${digest(finding.findingId)}`, kind: "research_followup",
+      title: "Repeat bounded public-source discovery; the prior provider search timed out before source availability could be assessed.",
+      findingRefs: [finding.findingId], evidenceRefs: [...finding.researchEvidenceRefs], actionabilityCeiling: "verification_only",
+      merchantControl: "unresolved", limitations: ["prior_search_timeout_not_evidence_of_source_absence", "committed_authority_policy_remains_required"] }];
+  });
   return [
     ...supported.map((finding): InternalRecommendationV1 => ({ recommendationId: `recommendation-verify-${digest(finding.findingId)}`,
       kind: "verification_action", title: "Verify whether the public terminology applies to this merchant account and contract period.",
@@ -148,7 +170,39 @@ function buildRecommendations(supported: InternalFindingV1[], hypotheses: Intern
       kind: "documentation_request", title: "Request the applicable merchant agreement, fee schedule, or processor explanation.", findingRefs: [finding.findingId],
       evidenceRefs: [...finding.statementEvidenceRefs, ...finding.researchEvidenceRefs], actionabilityCeiling: "documentation_only", merchantControl: "unresolved",
       limitations: ["no_economic_action_until_account_specific_evidence_is_reviewed"] })),
+    ...timedOutResearchFollowups,
   ];
+}
+
+function researchQuestionOutcome(question: RuntimeResearchQuestion, runtime: BoundedIntelligenceRuntimeResult,
+  origins: Map<string, InvestigationQuestionOriginV1>, admissions: PublicSourceAuthorityAdmission[]): InternalResearchQuestionOutcomeV1 {
+  const origin = origins.get(question.originatingUnknownRef);
+  if (!origin) throw new Error("internal_analysis_question_origin_missing");
+  const attempts = runtime.searchAttempts.filter((attempt) => attempt.questionId === question.questionId);
+  const reasonCodes = [...new Set(attempts.flatMap((attempt) => attempt.reasonCodes))];
+  const supports = runtime.supports.filter((support) => support.questionId === question.questionId);
+  const retainedCandidateCount = runtime.candidates.filter((candidate) => candidate.questionId === question.questionId).length;
+  const publicResearchStillPossible = admissions.some((admission) => admission.allowedSubjectCodes.includes(question.subjectCode)
+    && (admission.allowedProcessorPrograms.length === 0 || (typeof question.scope.processorProgram === "string"
+      && admission.allowedProcessorPrograms.includes(question.scope.processorProgram))));
+  const outcome: InternalResearchQuestionOutcomeV1["outcome"] = supports.some((support) => support.verificationStatus === "supported_candidate")
+    ? "research_completed"
+    : attempts.some((attempt) => attempt.status === "timeout") ? "research_unavailable_due_to_timeout"
+      : attempts.some((attempt) => ["failed", "disabled", "budget_exhausted"].includes(attempt.status)) ? "provider_failure"
+        : reasonCodes.includes("all_discovery_candidates_rejected_by_authority") ? "source_rejected_by_authority_policy"
+          : reasonCodes.includes("provider_search_completed_zero_candidates") ? "no_eligible_public_evidence_found"
+            : "completed_with_unresolved_evidence";
+  return { questionId: question.questionId, questionClass: origin.questionClass, subjectCode: origin.subjectCode, outcome,
+    attempted: attempts.some((attempt) => attempt.status !== "disabled"), operationalReasonCodes: reasonCodes,
+    retainedCandidateCount, publicResearchStillPossible };
+}
+
+function overallResearchOutcome(outcomes: InternalResearchQuestionOutcomeV1[]): InternalStatementAnalysisV1["researchOutcome"] {
+  if (outcomes.length > 0 && outcomes.every((outcome) => outcome.outcome === "research_completed")) return "research_completed";
+  for (const outcome of ["research_unavailable_due_to_timeout", "provider_failure", "source_rejected_by_authority_policy", "no_eligible_public_evidence_found"] as const) {
+    if (outcomes.some((item) => item.outcome === outcome)) return outcome;
+  }
+  return "completed_with_unresolved_evidence";
 }
 
 function describeValue(value: KnowledgeClaimValue): string { return JSON.stringify(value); }

@@ -3,6 +3,7 @@ export type { ProviderSafeQuestionContextV1 } from "../intelligence/intelligence
 import type { KnowledgeClaimValue, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 
 export const E2E_INTERNAL_ANALYSIS_AMENDMENT_ID = "E2E-AMEND-001-OBSERVATION-TO-INVESTIGATION" as const;
+export const E2E_LIVE_RESEARCH_OUTCOME_AMENDMENT_ID = "E2E-AMEND-002-LIVE-RESEARCH-OUTCOME" as const;
 
 export type InvestigationQuestionClassV1 = "application_fee_public_definition" | "non_swiped_discount_public_definition";
 
@@ -112,6 +113,25 @@ export type InternalAnalysisTerminalStatusV1 =
   | "provider_unavailable"
   | "research_unavailable";
 
+export type InternalResearchOutcomeV1 =
+  | "research_completed"
+  | "completed_with_unresolved_evidence"
+  | "research_unavailable_due_to_timeout"
+  | "no_eligible_public_evidence_found"
+  | "source_rejected_by_authority_policy"
+  | "provider_failure";
+
+export type InternalResearchQuestionOutcomeV1 = {
+  questionId: string;
+  questionClass: InvestigationQuestionClassV1;
+  subjectCode: "application_fee_terminology" | "non_swiped_discount_terminology";
+  outcome: InternalResearchOutcomeV1;
+  attempted: boolean;
+  operationalReasonCodes: string[];
+  retainedCandidateCount: number;
+  publicResearchStillPossible: boolean;
+};
+
 export type PublicSourceEvidenceV1 = {
   evidenceId: string;
   supportId: string;
@@ -141,10 +161,13 @@ export type InternalStatementAnalysisV1 = {
   schemaVersion: "internal_statement_analysis_v1";
   audience: "internal_analyst_only";
   authority: "shadow_non_authoritative";
-  amendmentIds: [typeof E2E_INTERNAL_ANALYSIS_AMENDMENT_ID];
+  amendmentIds: [typeof E2E_INTERNAL_ANALYSIS_AMENDMENT_ID, typeof E2E_LIVE_RESEARCH_OUTCOME_AMENDMENT_ID];
   safeStatementId: string;
   runId: string;
   evaluatedAt: string;
+  executionStatus: "completed";
+  researchOutcome: InternalResearchOutcomeV1;
+  researchQuestionOutcomes: InternalResearchQuestionOutcomeV1[];
   terminalStatus: InternalAnalysisTerminalStatusV1;
   canonicalBeforeHash: string;
   canonicalAfterHash: string;
@@ -166,6 +189,11 @@ export type RgInternalAuditV1 = {
   runId: string;
   executionMode: "injected_evaluation" | "internal_live_evaluation";
   externalNetworkCallCount: number;
+  liveTimingPolicy: {
+    amendmentId: "RG-AMEND-011-INTERNAL-LIVE-TIMING-V2";
+    searchTimeoutMs: 40_000;
+    globalWallTimeMs: 180_000;
+  };
   providerOperationReceipts: ProviderOperationReceiptV1[];
   questions: Array<{
     questionId: string;

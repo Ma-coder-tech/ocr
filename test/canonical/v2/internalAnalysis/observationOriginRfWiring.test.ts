@@ -102,6 +102,7 @@ describe("Statement-observation origin eligibility and RF-first wiring", () => {
       admittedKnowledge: [termEntry("application-conflict-a", "application_fee_terminology", "definition_a"),
         termEntry("application-conflict-b", "application_fee_terminology", "definition_b")], runtime: conflict.result,
       publicEvidence: { schemaVersion: "public_source_evidence_manifest_v1", privacy: "internal_pre_uat_public_evidence", downloadedBodiesPersisted: false, entries: [] },
+      publicSourceAuthorityAdmissions: [],
       canonicalBeforeHash: "same", canonicalAfterHash: "same" });
     expect(analysis.unresolvedQuestions).toEqual(expect.arrayContaining([expect.objectContaining({
       title: expect.stringContaining("Admitted knowledge conflicts"), authority: "unresolved", limitations: expect.arrayContaining(["rf_conflict_preserved_no_ai_arbitration"]),

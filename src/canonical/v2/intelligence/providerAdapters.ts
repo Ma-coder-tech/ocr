@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { IntelligencePorts, InvestigativeObservation, SearchRequest, SearchResponse, SemanticVerificationInput,
   StructuredBatchRequest, StructuredBatchResponse, CandidateClaimSupport } from "./intelligenceTypes.js";
+import { RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET } from "./budgetLedger.js";
 import type { ProviderOperationReceiptV1 } from "../internalAnalysis/internalAnalysisTypes.js";
 import { assertProviderOutboundPacketSafe, assertProviderSafeQuestionContext } from "./providerPrivacy.js";
 import { APPROVED_OPENROUTER_ENDPOINT, APPROVED_OPENAI_ENDPOINT, OPENROUTER_SEARCH_CONFIGURATION_CODE, OPENROUTER_SEARCH_ENGINE,
@@ -67,7 +68,8 @@ export function createLiveOpenRouterSearchAdapter(capability: InternalLiveExecut
       assertProviderOutboundPacketSafe({ provider: "openrouter_web_search", url: APPROVED_OPENROUTER_ENDPOINT, method: "POST",
         headerNames: ["Authorization", "Content-Type", "X-OpenRouter-Metadata"], body });
       const response = await sendLiveJson({ url: APPROVED_OPENROUTER_ENDPOINT, method: "POST", headers: { Authorization: `Bearer ${binding.openRouterApiKey}`,
-        "Content-Type": "application/json", "X-OpenRouter-Metadata": "enabled" }, body, timeoutMs: 8_000, cancellationSignal: binding.cancellationSignal },
+        "Content-Type": "application/json", "X-OpenRouter-Metadata": "enabled" }, body,
+        timeoutMs: RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET.searchTimeoutMs, cancellationSignal: binding.cancellationSignal },
         () => audit.settle(receiptId, { actualSendCount: 1, sendState: "sent" }));
       if (response.status === 429) throw new LiveOperationTransportError("after_send", "openrouter_search_rate_limited");
       if (response.status < 200 || response.status >= 300) throw new LiveOperationTransportError("after_send", "openrouter_search_http_failure");

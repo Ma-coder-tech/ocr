@@ -50,14 +50,21 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
       authorityPublicationFamilyCode: "first_data_us_swipe_non_swipe_statement_guide" });
     expect(result.runtime.searchAttempts.find((item) => item.questionId === result.runtime.questions
       .find((question) => question.subjectCode === "application_fee_terminology")!.questionId)).toMatchObject({
-      status: "no_candidates", candidateIds: [], reasonCodes: ["no_eligible_discovery_candidates"],
+      status: "no_candidates", candidateIds: [], reasonCodes: ["all_discovery_candidates_rejected_by_authority"],
     });
     expect(result.runtime.supports.map((item) => item.verificationStatus)).toEqual(["supported_candidate"]);
     expect(result.runtime.supports[0]!.subjectCode).toBe("non_swiped_discount_terminology");
     expect(result.runtime.supports[0]!.limitationCodes).toEqual(expect.arrayContaining([
       "terminology_example_presentation_only", "public_scope_applicability_unproven", "ownership_control_and_savings_unresolved",
     ]));
-    expect(result.analysis).toMatchObject({ terminalStatus: "completed_with_unresolved", canonicalTruthPreserved: true });
+    expect(result.analysis).toMatchObject({ executionStatus: "completed", researchOutcome: "source_rejected_by_authority_policy",
+      terminalStatus: "completed_with_unresolved", canonicalTruthPreserved: true });
+    expect(result.analysis.researchQuestionOutcomes).toEqual([
+      expect.objectContaining({ questionClass: "application_fee_public_definition", outcome: "source_rejected_by_authority_policy",
+        retainedCandidateCount: 0, publicResearchStillPossible: false }),
+      expect.objectContaining({ questionClass: "non_swiped_discount_public_definition", outcome: "research_completed",
+        retainedCandidateCount: 1, publicResearchStillPossible: true }),
+    ]);
     expect(result.analysis.supportedResearchFindings).toHaveLength(1);
     expect(result.analysis.supportedResearchFindings[0]!.proposedValue).toMatchObject({
       kind: "term", termCode: "non_swiped_discount_terminology", termValue: "official_definition_found",
@@ -99,6 +106,13 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     const withoutApprovedPublicDocumentUrl = serializedInternal.replaceAll(FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_URL, "https://approved-public-source.invalid/document");
     expect(withoutApprovedPublicDocumentUrl).not.toMatch(/raw prompt|raw response|chain.of.thought|SAMPLE_MERCHANT|\/Users\/|\.pdf\b/i);
     expect(JSON.parse(await readFile(path.join(outputDirectory, "public-source-evidence.json"), "utf8"))).toMatchObject({ downloadedBodiesPersisted: false });
+    const deterministicReview = await readFile(path.join(outputDirectory, "review.md"), "utf8");
+    const internalReview = await readFile(path.join(outputDirectory, "internal-analysis.md"), "utf8");
+    expect(deterministicReview).toContain("RG: disabled_no_provider; live research/provider activity: none");
+    expect(internalReview).toContain("Provider-disabled markers in `review.md` and `run-audit.json` describe that deterministic phase only.");
+    expect(internalReview).toContain("The subsequent RG phase ran in `injected_evaluation` mode");
+    expect(internalReview).toContain("Execution status: **completed**");
+    expect(internalReview).toContain("Research outcome: **source_rejected_by_authority_policy**");
     const projection = await readFile(path.join(outputDirectory, "rh-projection.json"));
     expect(createHash("sha256").update(projection).digest("hex"))
       .toBe("5e2fc1e17eaaacb4e891be1986f43982b139d94ef6e3bb092b5bcfee407158ac");

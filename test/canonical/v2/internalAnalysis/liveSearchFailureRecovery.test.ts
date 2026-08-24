@@ -16,9 +16,12 @@ const statementOne = path.resolve(process.cwd(), "test/fixtures/pdfs/SAMPLE_MERC
 
 class TimeoutAwareInjectedClock implements RuntimeClock {
   private current = 0;
+  readonly requestedTimeouts: number[] = [];
+  constructor(private readonly elapsedByOperation: number[]) {}
   nowMs(): number { return this.current; }
-  async runWithTimeout<T>(_timeoutMs: number, operation: () => Promise<T>) {
-    this.current += 1;
+  async runWithTimeout<T>(timeoutMs: number, operation: () => Promise<T>) {
+    this.requestedTimeouts.push(timeoutMs);
+    this.current += this.elapsedByOperation.shift() ?? 1;
     try { return { status: "completed" as const, value: await operation() }; }
     catch (error) {
       return error instanceof LiveOperationTransportError && error.transportState === "timed_out"
@@ -30,19 +33,22 @@ class TimeoutAwareInjectedClock implements RuntimeClock {
 
 describe("Statement 1 live-search failure recovery", () => {
   it.each([
-    { firstOutcome: "timeout" as const, expectedAttemptStatus: "timeout", expectedReservationState: "timeout", expectedReason: "search_timeout" },
-    { firstOutcome: "malformed" as const, expectedAttemptStatus: "failed", expectedReservationState: "failed", expectedReason: "openrouter_search_response_malformed" },
-  ])("keeps mixed $firstOutcome/no-candidate research unresolved with a valid bundle", async ({ firstOutcome, expectedAttemptStatus, expectedReservationState, expectedReason }) => {
+    { firstOutcome: "timeout" as const, failureCall: 1, expectedAttemptStatus: "timeout", expectedReservationState: "timeout", expectedReason: "search_timeout" },
+    { firstOutcome: "timeout" as const, failureCall: 2, expectedAttemptStatus: "timeout", expectedReservationState: "timeout", expectedReason: "search_timeout" },
+    { firstOutcome: "malformed" as const, failureCall: 1, expectedAttemptStatus: "failed", expectedReservationState: "failed", expectedReason: "openrouter_search_response_malformed" },
+  ])("keeps mixed $firstOutcome/no-candidate research unresolved with a valid bundle", async ({ firstOutcome, failureCall, expectedAttemptStatus, expectedReservationState, expectedReason }) => {
     const outputDirectory = await mkdtemp(path.join(os.tmpdir(), `statement-one-${firstOutcome}-recovery-`));
     const injected = createInjectedStatement1Fixture();
-    injected.ports.clock = new TimeoutAwareInjectedClock();
+    const clock = new TimeoutAwareInjectedClock(firstOutcome === "timeout"
+      ? (failureCall === 1 ? [40_001, 1] : [1, 40_001]) : [1, 1]);
+    injected.ports.clock = clock;
     let calls = 0;
     injected.ports.search = {
       providerCode: "injected_openrouter_search_contract",
       async search(request: SearchRequest) {
         calls += 1;
-        const firstQuestion = calls === 1;
-        const completionState = firstQuestion ? (firstOutcome === "timeout" ? "timed_out" : "failed") : "completed";
+        const isFailure = calls === failureCall;
+        const completionState = isFailure ? (firstOutcome === "timeout" ? "timed_out" : "failed") : "completed";
         injected.providerAudit.record({
           receiptId: `mixed-search-receipt-${calls}`,
           reservationId: request.reservationId,
@@ -54,15 +60,15 @@ describe("Statement 1 live-search failure recovery", () => {
           retryCount: 0,
           sendState: "not_sent",
           completionState,
-          elapsedMs: 1,
+          elapsedMs: isFailure && firstOutcome === "timeout" ? 40_001 : 1,
           usageState: "known",
           outputTokens: null,
-          providerRequestCount: firstQuestion ? null : 0,
-          usageCostUsd: firstQuestion ? null : 0,
+          providerRequestCount: isFailure ? null : 0,
+          usageCostUsd: isFailure ? null : 0,
           providerConfigurationCode: "injected_openrouter_perplexity_v1",
-          safeReasonCode: firstQuestion ? (firstOutcome === "timeout" ? "provider_operation_failed" : "openrouter_search_response_malformed") : "search_completed_no_candidates",
+          safeReasonCode: isFailure ? (firstOutcome === "timeout" ? "provider_operation_failed" : "openrouter_search_response_malformed") : "search_completed_no_candidates",
         });
-        if (firstQuestion) {
+        if (isFailure) {
           if (firstOutcome === "timeout") throw new LiveOperationTransportError("timed_out", "provider_operation_failed");
           throw new Error("openrouter_search_response_malformed");
         }
@@ -83,12 +89,34 @@ describe("Statement 1 live-search failure recovery", () => {
     expect(calls).toBe(2);
     expect(result.investigationOrigins.origins).toHaveLength(2);
     expect(result.runtime.searchAttempts).toHaveLength(2);
-    expect(result.runtime.searchAttempts[0]).toMatchObject({ status: expectedAttemptStatus, candidateIds: [], reasonCodes: [expectedReason] });
-    expect(result.runtime.searchAttempts[1]).toMatchObject({ status: "no_candidates", candidateIds: [], reasonCodes: ["no_eligible_discovery_candidates"] });
+    expect(clock.requestedTimeouts).toEqual([40_000, 40_000]);
+    expect(result.runtime.searchAttempts[failureCall - 1]).toMatchObject({ status: expectedAttemptStatus, candidateIds: [], reasonCodes: [expectedReason] });
+    expect(result.runtime.searchAttempts[failureCall === 1 ? 1 : 0]).toMatchObject({ status: "no_candidates", candidateIds: [], reasonCodes: ["provider_search_completed_zero_candidates"] });
     expect(result.runtime.candidates).toEqual([]);
     expect(result.runtime.documents).toEqual([]);
     expect(result.runtime.supports).toEqual([]);
-    expect(result.analysis).toMatchObject({ terminalStatus: "research_unavailable", canonicalTruthPreserved: true });
+    expect(result.analysis).toMatchObject({ executionStatus: "completed",
+      researchOutcome: firstOutcome === "timeout" ? "research_unavailable_due_to_timeout" : "provider_failure",
+      terminalStatus: "research_unavailable", canonicalTruthPreserved: true });
+    expect(result.analysis.researchQuestionOutcomes.map((outcome) => outcome.outcome)).toEqual(firstOutcome === "timeout"
+      ? (failureCall === 1 ? ["research_unavailable_due_to_timeout", "no_eligible_public_evidence_found"]
+        : ["no_eligible_public_evidence_found", "research_unavailable_due_to_timeout"])
+      : ["provider_failure", "no_eligible_public_evidence_found"]);
+    const nonSwipedOutcome = result.analysis.researchQuestionOutcomes.find((outcome) => outcome.questionClass === "non_swiped_discount_public_definition")!;
+    const applicationOutcome = result.analysis.researchQuestionOutcomes.find((outcome) => outcome.questionClass === "application_fee_public_definition")!;
+    expect(nonSwipedOutcome.publicResearchStillPossible).toBe(true);
+    expect(applicationOutcome.publicResearchStillPossible).toBe(false);
+    expect(result.analysis.recommendations.some((recommendation) => recommendation.kind === "research_followup"))
+      .toBe(firstOutcome === "timeout" && failureCall === 2);
+    expect(result.analysis.recommendations.filter((recommendation) => recommendation.kind === "documentation_request")).toHaveLength(2);
+    if (firstOutcome === "timeout") {
+      const timedOutQuestion = result.analysis.researchQuestionOutcomes[failureCall - 1]!;
+      const timedOutFinding = result.analysis.unresolvedQuestions.find((finding) => finding.findingId.endsWith(createHash("sha256")
+        .update(timedOutQuestion.questionId).digest("hex").slice(0, 20)))!;
+      expect(timedOutFinding.limitations).toEqual(expect.arrayContaining([
+        "public_research_provider_timed_out", "no_conclusion_about_public_source_availability",
+      ]));
+    }
     expect(result.analysis.unresolvedQuestions).toHaveLength(2);
     expect(result.analysis.supportedResearchFindings).toEqual([]);
     expect(result.analysis.recommendations).not.toContainEqual(expect.objectContaining({ kind: "supported_economic_action" }));
@@ -96,10 +124,10 @@ describe("Statement 1 live-search failure recovery", () => {
     expect(result.rgAudit.externalNetworkCallCount).toBe(0);
     expect(result.rgAudit.providerOperationReceipts).toHaveLength(2);
     expect(result.rgAudit.providerOperationReceipts.every((receipt) => receipt.retryCount === 0 && receipt.actualSendCount === 0)).toBe(true);
-    const firstReceipt = result.rgAudit.providerOperationReceipts[0]!;
-    const firstReservation = result.rgAudit.budget.reservations.find((reservation) => reservation.reservationId === firstReceipt.reservationId);
-    expect(firstReceipt.completionState).toBe(firstOutcome === "timeout" ? "timed_out" : "failed");
-    expect(firstReservation?.state).toBe(expectedReservationState);
+    const failureReceipt = result.rgAudit.providerOperationReceipts[failureCall - 1]!;
+    const failureReservation = result.rgAudit.budget.reservations.find((reservation) => reservation.reservationId === failureReceipt.reservationId);
+    expect(failureReceipt.completionState).toBe(firstOutcome === "timeout" ? "timed_out" : "failed");
+    expect(failureReservation?.state).toBe(expectedReservationState);
     expect(validateRgInternalAuditV1(result.rgAudit)).toEqual([]);
     expect(result.analysis.canonicalBeforeHash).toBe(result.analysis.canonicalAfterHash);
     expect((await readdir(outputDirectory)).sort()).toEqual([

@@ -195,7 +195,7 @@ describe("internal-analysis construction-bound provider seams", () => {
     }); });
     const pending = createLiveOpenRouterSearchAdapter(cap, audit).search(searchRequest);
     const rejected = expect(pending).rejects.toThrow();
-    await vi.advanceTimersByTimeAsync(8_001);
+    await vi.advanceTimersByTimeAsync(40_001);
     await rejected; expect(calls).toBe(1);
     expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "timed_out", usageState: "unknown_possible_billable", retryCount: 0 });
   });
@@ -206,8 +206,8 @@ describe("internal-analysis construction-bound provider seams", () => {
       init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
     }); });
     const ports = createInternalLiveIntelligencePorts(cap, audit);
-    const pending = ports.clock.runWithTimeout(8_000, () => ports.search!.search(searchRequest));
-    await vi.advanceTimersByTimeAsync(8_001);
+    const pending = ports.clock.runWithTimeout(40_000, () => ports.search!.search(searchRequest));
+    await vi.advanceTimersByTimeAsync(40_001);
     await expect(pending).resolves.toEqual({ status: "timeout" });
     expect(calls).toBe(1);
     expect(audit.snapshot()[0]).toMatchObject({ completionState: "timed_out", actualSendCount: 1, retryCount: 0 });

@@ -36,6 +36,12 @@ export const RG_FREE_V1_BUDGET: RgFreeV1BudgetProfile = Object.freeze({
   maxRemoteConcurrency: 2,
 });
 
+export const RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET = Object.freeze({
+  ...RG_FREE_V1_BUDGET,
+  searchTimeoutMs: 40_000,
+  globalWallTimeMs: 180_000,
+}) satisfies RgFreeV1BudgetProfile;
+
 function limits(profile: RgFreeV1BudgetProfile): Record<BudgetDimension, number> {
   return {
     search_calls: profile.maxSearchCalls,
@@ -161,7 +167,10 @@ export class IntelligenceBudgetLedger {
 }
 
 export function validateRgFreeV1Budget(profile: RgFreeV1BudgetProfile): string[] {
-  const expected = RG_FREE_V1_BUDGET;
+  const allowed = [RG_FREE_V1_BUDGET, RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET];
+  if (allowed.some((expected) => (Object.keys(expected) as Array<keyof RgFreeV1BudgetProfile>).every((key) => profile[key] === expected[key]))) return [];
+  const expected = profile.searchTimeoutMs === 40_000 || profile.globalWallTimeMs === 180_000
+    ? RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET : RG_FREE_V1_BUDGET;
   return (Object.keys(expected) as Array<keyof RgFreeV1BudgetProfile>)
     .filter((key) => profile[key] !== expected[key])
     .map((key) => `rg_free_v1_budget_mismatch:${String(key)}`);
