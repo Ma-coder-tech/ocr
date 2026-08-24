@@ -26,6 +26,19 @@ const AUTHORIZATION_TOKEN = "product-owner-approved";
 const OPENAI_MODEL = "gpt-5.6-sol";
 const OPENROUTER_SERVICE = "RateReveal/OpenRouter";
 const OPENAI_SERVICE = "RateReveal/OpenAI";
+const REPOSITORY_BRANCH = "codex/e2e-internal-analysis-v1";
+export const KEYCHAIN_READ_TIMEOUT_MS = 120_000;
+
+type RunnerMode = "live" | "readiness";
+type KeychainService = typeof OPENROUTER_SERVICE | typeof OPENAI_SERVICE;
+type KeychainFailureCategory = "keychain_entry_missing" | "keychain_access_denied_or_cancelled"
+  | "keychain_locked" | "keychain_broker_timeout" | "keychain_read_failed";
+
+export class KeychainBrokerError extends Error {
+  constructor(public readonly service: KeychainService, public readonly category: KeychainFailureCategory) {
+    super(`internal_live_${category}_${serviceCode(service)}`);
+  }
+}
 
 export const STATEMENT_ONE_INTERNAL_LIVE_PROFILE = Object.freeze({
   profileCode: PROFILE_CODE,
@@ -41,7 +54,11 @@ export const STATEMENT_ONE_INTERNAL_LIVE_PROFILE = Object.freeze({
 });
 
 export type InternalLiveRunnerDependencies = {
-  readCredential(service: string): Promise<string>;
+  readCredential(service: KeychainService, signal: AbortSignal): Promise<string>;
+  keychainReadTimeoutMs: number;
+  checkRepositoryState(): Promise<void>;
+  checkNetworkProfile(): Promise<void>;
+  observeCredentialState(state: { openRouterPresent: boolean; openAiPresent: boolean }): void;
   execute(input: {
     runId: string;
     outputDirectory: string;
@@ -52,6 +69,7 @@ export type InternalLiveRunnerDependencies = {
 };
 
 export type InternalLiveRunnerArguments = {
+  mode?: RunnerMode;
   profile: string | null;
   authorization: string | null;
   runId: string | null;
@@ -78,26 +96,28 @@ export async function runInternalLiveRunner(
     return 2;
   }
 
-  const outputRoot = await assertOutputRoot(args.outputRoot);
-  const lockPath = path.join(outputRoot, `.${RUN_PREFIX}.lock`);
+  let outputRoot = "";
+  let lockPath = "";
   let lock: Awaited<ReturnType<typeof open>> | null = null;
   let runId = "unallocated";
   let outputDirectory = "";
+  let openRouterKey = "";
+  let openAiKey = "";
   const providerAudit = new ProviderOperationAuditLog();
+  const observeCredentialState = overrides.observeCredentialState ?? (() => undefined);
   try {
-    lock = await open(lockPath, "wx", 0o600).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === "EEXIST") throw new Error("internal_live_run_allocation_locked");
-      throw error;
-    });
-    runId = await allocateRunId(outputRoot, args.runId);
-    outputDirectory = path.join(outputRoot, runId);
-    await assertAbsent(outputDirectory);
-    await assertCommittedNetworkProfile();
+    await (overrides.checkRepositoryState ?? assertRepositoryState)();
+    await (overrides.checkNetworkProfile ?? assertCommittedNetworkProfile)();
+    outputRoot = await assertOutputRoot(args.outputRoot);
+    await assertRequestedRunIdAvailable(outputRoot, args.runId);
 
-    const readCredential = overrides.readCredential ?? readMacOsKeychainCredential;
-    const [openRouterKey, openAiKey] = await Promise.all([
-      readCredential(OPENROUTER_SERVICE), readCredential(OPENAI_SERVICE),
-    ]);
+    const credentials = await readCredentialsSerially(
+      overrides.readCredential ?? readMacOsKeychainCredential,
+      observeCredentialState,
+      overrides.keychainReadTimeoutMs ?? KEYCHAIN_READ_TIMEOUT_MS,
+    );
+    openRouterKey = credentials.openRouterKey;
+    openAiKey = credentials.openAiKey;
     assertCredential(openRouterKey, OPENROUTER_SERVICE);
     assertCredential(openAiKey, OPENAI_SERVICE);
     process.env.OPENROUTER_API_KEY = openRouterKey;
@@ -105,19 +125,28 @@ export async function runInternalLiveRunner(
     process.env.OPENROUTER_SEARCH_MODEL = STATEMENT_ONE_INTERNAL_LIVE_PROFILE.searchModel;
     process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = STATEMENT_ONE_INTERNAL_LIVE_PROFILE.openAiModel;
 
-    const contexts = statementOneProviderContexts();
-    const capability = await createInternalLiveExecutionCapability({
-      schemaVersion: "internal_live_preflight_input_v1",
-      runMode: "internal_live_evaluation",
-      runId,
+    await constructLiveCapability(
+      `internal-live-readiness-${randomUUID()}`,
       outputRoot,
-      productOwnerLiveCallAuthorization: true,
-      approvedOpenRouterSearchModel: STATEMENT_ONE_INTERNAL_LIVE_PROFILE.searchModel,
-      approvedOpenAiModel: STATEMENT_ONE_INTERNAL_LIVE_PROFILE.openAiModel,
-      sourceAuthorityAdmissions: [...PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS],
-      questionContexts: contexts,
-      languageCapability: "disabled",
+    );
+    if (args.mode === "readiness") {
+      log("executionStatus: readiness_passed");
+      log("researchOutcome: not_started");
+      log("Credential readiness: passed; serial Keychain reads completed");
+      log("Preflight: passed; zero external sends");
+      log("Provider sends: 0");
+      return 0;
+    }
+
+    lockPath = path.join(outputRoot, `.${RUN_PREFIX}.lock`);
+    lock = await open(lockPath, "wx", 0o600).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "EEXIST") throw new Error("internal_live_run_allocation_locked");
+      throw error;
     });
+    runId = await allocateRunId(outputRoot, args.runId);
+    outputDirectory = path.join(outputRoot, runId);
+    await assertAbsent(outputDirectory);
+    const capability = await constructLiveCapability(runId, outputRoot);
     log("Preflight: passed; zero external sends");
     log(`Run ID: ${runId}`);
     log(`Profile: ${PROFILE_CODE}`);
@@ -144,12 +173,15 @@ export async function runInternalLiveRunner(
       ? await preserveSafeFailureArtifact(outputDirectory, runId, safeCode, sends, providerAudit)
       : null;
     log("executionStatus: failed");
-    log("researchOutcome: research_unavailable");
+    log(`researchOutcome: ${outputDirectory ? "research_unavailable" : "not_started"}`);
     log(`Provider sends: ${sends}`);
     log(`Safe failure code: ${safeCode}`);
     if (failurePath) log(`Failure artifact: ${failurePath}`);
     return 1;
   } finally {
+    openRouterKey = "";
+    openAiKey = "";
+    observeCredentialState({ openRouterPresent: false, openAiPresent: false });
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.OPENAI_API_KEY;
     delete process.env.OPENROUTER_SEARCH_MODEL;
@@ -159,6 +191,21 @@ export async function runInternalLiveRunner(
       await unlink(lockPath).catch(() => undefined);
     }
   }
+}
+
+async function constructLiveCapability(runId: string, outputRoot: string): Promise<InternalLiveExecutionCapabilityV1> {
+  return createInternalLiveExecutionCapability({
+    schemaVersion: "internal_live_preflight_input_v1",
+    runMode: "internal_live_evaluation",
+    runId,
+    outputRoot,
+    productOwnerLiveCallAuthorization: true,
+    approvedOpenRouterSearchModel: STATEMENT_ONE_INTERNAL_LIVE_PROFILE.searchModel,
+    approvedOpenAiModel: STATEMENT_ONE_INTERNAL_LIVE_PROFILE.openAiModel,
+    sourceAuthorityAdmissions: [...PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS],
+    questionContexts: statementOneProviderContexts(),
+    languageCapability: "disabled",
+  });
 }
 
 async function executeStatementOne(input: {
@@ -223,15 +270,106 @@ function statementOneProviderContexts(): ProviderSafeQuestionContextV1[] {
   ];
 }
 
-async function readMacOsKeychainCredential(service: string): Promise<string> {
+async function readCredentialsSerially(
+  reader: InternalLiveRunnerDependencies["readCredential"],
+  observe: InternalLiveRunnerDependencies["observeCredentialState"],
+  timeoutMs: number,
+): Promise<{ openRouterKey: string; openAiKey: string }> {
+  let openRouterKey = "";
+  let openAiKey = "";
+  try {
+    openRouterKey = await readCredentialWithTimeout(reader, OPENROUTER_SERVICE, timeoutMs);
+    assertCredential(openRouterKey, OPENROUTER_SERVICE);
+    observe({ openRouterPresent: true, openAiPresent: false });
+    openAiKey = await readCredentialWithTimeout(reader, OPENAI_SERVICE, timeoutMs);
+    assertCredential(openAiKey, OPENAI_SERVICE);
+    observe({ openRouterPresent: true, openAiPresent: true });
+    return { openRouterKey, openAiKey };
+  } catch (error) {
+    openRouterKey = "";
+    openAiKey = "";
+    observe({ openRouterPresent: false, openAiPresent: false });
+    throw error;
+  }
+}
+
+async function readCredentialWithTimeout(
+  reader: InternalLiveRunnerDependencies["readCredential"],
+  service: KeychainService,
+  timeoutMs: number,
+): Promise<string> {
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1) throw new Error("internal_live_keychain_timeout_invalid");
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<string>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new KeychainBrokerError(service, "keychain_broker_timeout"));
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([reader(service, controller.signal), timeout]);
+  } catch (error) {
+    if (error instanceof KeychainBrokerError) throw error;
+    if (controller.signal.aborted) throw new KeychainBrokerError(service, "keychain_broker_timeout");
+    throw new KeychainBrokerError(service, "keychain_read_failed");
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function readMacOsKeychainCredential(service: KeychainService, signal: AbortSignal): Promise<string> {
   if (process.platform !== "darwin") throw new Error("internal_live_keychain_requires_macos");
   try {
     const { stdout } = await execFile("/usr/bin/security", ["find-generic-password", "-s", service, "-w"], {
-      encoding: "utf8", maxBuffer: 16_384,
+      encoding: "utf8", maxBuffer: 16_384, signal,
     });
     return stdout.replace(/[\r\n]+$/, "");
-  } catch {
-    throw new Error(`internal_live_keychain_entry_unavailable_${service.endsWith("OpenRouter") ? "openrouter" : "openai"}`);
+  } catch (error) {
+    throw classifyKeychainCommandFailure(error, service, signal.aborted);
+  }
+}
+
+export function classifyKeychainCommandFailure(
+  error: unknown,
+  service: KeychainService,
+  timedOut = false,
+): KeychainBrokerError {
+  if (timedOut) return new KeychainBrokerError(service, "keychain_broker_timeout");
+  const commandError = error as { code?: string | number; stderr?: string | Buffer };
+  const code = String(commandError?.code ?? "").toLowerCase();
+  const stderr = (typeof commandError?.stderr === "string" ? commandError.stderr
+    : Buffer.isBuffer(commandError?.stderr) ? commandError.stderr.toString("utf8") : "").toLowerCase();
+  if (code === "44" || /specified item could not be found|errsecitemnotfound/.test(stderr)) {
+    return new KeychainBrokerError(service, "keychain_entry_missing");
+  }
+  if (code === "128" || /user cancel(?:ed|led)|authorization (?:was )?denied|access denied/.test(stderr)) {
+    return new KeychainBrokerError(service, "keychain_access_denied_or_cancelled");
+  }
+  if (code === "36" || /keychain (?:is )?locked|interaction is not allowed|errsecinteractionnotallowed/.test(stderr)) {
+    return new KeychainBrokerError(service, "keychain_locked");
+  }
+  return new KeychainBrokerError(service, "keychain_read_failed");
+}
+
+function serviceCode(service: KeychainService): "openrouter" | "openai" {
+  return service === OPENROUTER_SERVICE ? "openrouter" : "openai";
+}
+
+async function assertRepositoryState(): Promise<void> {
+  try {
+    const [{ stdout: branch }, { stdout: status }, { stdout: head }, { stdout: remoteHead }] = await Promise.all([
+      execFile("git", ["branch", "--show-current"], { encoding: "utf8", maxBuffer: 16_384 }),
+      execFile("git", ["status", "--porcelain=v1"], { encoding: "utf8", maxBuffer: 1_048_576 }),
+      execFile("git", ["rev-parse", "HEAD"], { encoding: "utf8", maxBuffer: 16_384 }),
+      execFile("git", ["rev-parse", `origin/${REPOSITORY_BRANCH}`], { encoding: "utf8", maxBuffer: 16_384 }),
+    ]);
+    if (branch.trim() !== REPOSITORY_BRANCH) throw new Error("internal_live_repository_branch_invalid");
+    if (status !== "") throw new Error("internal_live_repository_worktree_dirty");
+    if (head.trim() !== remoteHead.trim()) throw new Error("internal_live_repository_remote_head_mismatch");
+  } catch (error) {
+    if (error instanceof Error && /^internal_live_repository_/.test(error.message)) throw error;
+    throw new Error("internal_live_repository_state_unavailable");
   }
 }
 
@@ -242,6 +380,12 @@ async function assertOutputRoot(outputRoot: string): Promise<string> {
   await mkdir(outputRoot, { recursive: true, mode: 0o700 });
   await access(outputRoot, fsConstants.R_OK | fsConstants.W_OK);
   return realpath(outputRoot);
+}
+
+async function assertRequestedRunIdAvailable(outputRoot: string, requested: string | null): Promise<void> {
+  if (!requested || requested === "auto") return;
+  if (!new RegExp(`^${RUN_PREFIX}-\\d{3}$`).test(requested)) throw new Error("internal_live_run_id_invalid");
+  await assertAbsent(path.join(outputRoot, requested));
 }
 
 async function assertCommittedNetworkProfile(): Promise<void> {
@@ -329,9 +473,11 @@ function parseArguments(argv: string[]): InternalLiveRunnerArguments {
     if (!key?.startsWith("--") || !value || value.startsWith("--")) throw new Error("internal_live_cli_arguments_invalid");
     values.set(key.slice(2), value);
   }
-  const allowed = new Set(["profile", "authorization", "run-id", "output-root"]);
+  const allowed = new Set(["mode", "profile", "authorization", "run-id", "output-root"]);
   if ([...values.keys()].some((key) => !allowed.has(key))) throw new Error("internal_live_cli_arguments_invalid");
-  return { profile: values.get("profile") ?? null, authorization: values.get("authorization") ?? null,
+  const mode = values.get("mode") ?? "live";
+  if (mode !== "live" && mode !== "readiness") throw new Error("internal_live_cli_mode_invalid");
+  return { mode, profile: values.get("profile") ?? null, authorization: values.get("authorization") ?? null,
     runId: values.get("run-id") ?? "auto", outputRoot: values.get("output-root") ?? DEFAULT_OUTPUT_ROOT };
 }
 

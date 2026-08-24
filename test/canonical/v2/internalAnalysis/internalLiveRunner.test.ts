@@ -1,11 +1,19 @@
 import { mkdtemp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  classifyKeychainCommandFailure,
+  KEYCHAIN_READ_TIMEOUT_MS,
+  KeychainBrokerError,
   runInternalLiveRunner,
   STATEMENT_ONE_INTERNAL_LIVE_PROFILE,
 } from "../../../../scripts/run-fiserv-internal-live-evaluation.js";
+
+const syntheticStaticChecks = {
+  checkRepositoryState: async () => undefined,
+  checkNetworkProfile: async () => undefined,
+};
 
 describe("durable internal live runner", () => {
   it("cancels with zero sends before output allocation or Keychain access", async () => {
@@ -48,19 +56,50 @@ describe("durable internal live runner", () => {
     await expect(readdir(outputRoot)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("fails static repository readiness before output allocation or Keychain access", async () => {
+    const parent = await mkdtemp(path.join(os.tmpdir(), "rr-live-runner-repository-state-"));
+    const outputRoot = path.join(parent, "runs");
+    const lines: string[] = [];
+    let credentialReads = 0;
+    const code = await runInternalLiveRunner({ mode: "readiness", profile: "statement-one",
+      authorization: "product-owner-approved", runId: "auto", outputRoot }, {
+      checkRepositoryState: async () => { throw new Error("internal_live_repository_worktree_dirty"); },
+      log: (line) => lines.push(line),
+      readCredential: async () => { credentialReads += 1; return "should-never-be-read"; },
+    });
+    expect(code).toBe(1);
+    expect(credentialReads).toBe(0);
+    expect(lines).toContain("Safe failure code: internal_live_repository_worktree_dirty");
+    expect(lines).toContain("Provider sends: 0");
+    await expect(readdir(outputRoot)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("reaches construction-bound preflight with injected credentials and retains no secret", async () => {
     const outputRoot = await mkdtemp(path.join(os.tmpdir(), "rr-live-runner-preflight-"));
     const lines: string[] = [];
     const secret = "synthetic-key-never-persist-123456789";
     let executed = 0;
+    const credentialServices: string[] = [];
+    const credentialStates: Array<{ openRouterPresent: boolean; openAiPresent: boolean }> = [];
     const code = await runInternalLiveRunner({ profile: "statement-one", authorization: "product-owner-approved",
       runId: "auto", outputRoot }, {
+      ...syntheticStaticChecks,
       log: (line) => lines.push(line),
-      readCredential: async () => secret,
+      readCredential: async (service) => { credentialServices.push(service); return secret; },
+      observeCredentialState: (state) => credentialStates.push(state),
       execute: async ({ runId, outputDirectory }) => {
         executed += 1;
         expect(runId).toBe("statement-one-live-internal-evaluation-001");
-        expect(STATEMENT_ONE_INTERNAL_LIVE_PROFILE.periodYear).toBe("2024");
+        expect(STATEMENT_ONE_INTERNAL_LIVE_PROFILE).toMatchObject({
+          profileCode: "statement-one",
+          safeStatementId: "fsv-03-clover-short-jun",
+          statementPath: "test/fixtures/pdfs/SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+          periodYear: "2024",
+          searchModel: "openai/gpt-5.2",
+          openAiModel: "gpt-5.6-sol",
+          automaticRetries: 0,
+          fallbackProvidersAllowed: false,
+        });
         await mkdir(outputDirectory, { mode: 0o700 });
         await writeFile(path.join(outputDirectory, "internal-analysis.json"), "{\"safe\":true}\n", { mode: 0o600 });
         return { executionStatus: "completed", researchOutcome: "research_completed",
@@ -69,6 +108,12 @@ describe("durable internal live runner", () => {
     });
     expect(code).toBe(0);
     expect(executed).toBe(1);
+    expect(credentialServices).toEqual(["RateReveal/OpenRouter", "RateReveal/OpenAI"]);
+    expect(credentialStates).toEqual(expect.arrayContaining([
+      { openRouterPresent: true, openAiPresent: false },
+      { openRouterPresent: true, openAiPresent: true },
+      { openRouterPresent: false, openAiPresent: false },
+    ]));
     expect(lines).toEqual(expect.arrayContaining([
       "Preflight: passed; zero external sends", "Provider sends: 0", "executionStatus: completed",
       "researchOutcome: research_completed",
@@ -90,12 +135,138 @@ describe("durable internal live runner", () => {
     let credentialReads = 0;
     const code = await runInternalLiveRunner({ profile: "statement-one", authorization: "product-owner-approved",
       runId, outputRoot }, { log: (line) => lines.push(line),
+      ...syntheticStaticChecks,
       readCredential: async () => { credentialReads += 1; return "not-readable-synthetic-secret"; } });
     expect(code).toBe(1);
     expect(credentialReads).toBe(0);
     expect(await readdir(existing)).toEqual(["preserved.txt"]);
     expect(await readFile(path.join(existing, "preserved.txt"), "utf8")).toBe("preserve-me\n");
     expect(lines).toContain("Provider sends: 0");
+  });
+
+  it("performs readiness with strictly serial Keychain reads, preflight, and zero sends", async () => {
+    const outputRoot = await mkdtemp(path.join(os.tmpdir(), "rr-live-runner-readiness-"));
+    const lines: string[] = [];
+    const services: string[] = [];
+    let resolveOpenRouter: ((value: string) => void) | undefined;
+    const openRouterPending = new Promise<string>((resolve) => { resolveOpenRouter = resolve; });
+    let openAiStarted = false;
+    let executed = 0;
+    const running = runInternalLiveRunner({ mode: "readiness", profile: "statement-one",
+      authorization: "product-owner-approved", runId: "auto", outputRoot }, {
+      ...syntheticStaticChecks,
+      log: (line) => lines.push(line),
+      readCredential: async (service) => {
+        services.push(service);
+        if (service === "RateReveal/OpenRouter") return openRouterPending;
+        openAiStarted = true;
+        return "synthetic-openai-readiness-key-123456789";
+      },
+      execute: async () => {
+        executed += 1;
+        throw new Error("readiness_must_not_execute_analysis");
+      },
+    });
+    await vi.waitFor(() => expect(services).toEqual(["RateReveal/OpenRouter"]));
+    expect(openAiStarted).toBe(false);
+    resolveOpenRouter!("synthetic-openrouter-readiness-key-123456789");
+    await vi.waitFor(() => expect(openAiStarted).toBe(true));
+    expect(await running).toBe(0);
+    expect(services).toEqual(["RateReveal/OpenRouter", "RateReveal/OpenAI"]);
+    expect(executed).toBe(0);
+    expect(lines).toEqual(expect.arrayContaining([
+      "executionStatus: readiness_passed",
+      "researchOutcome: not_started",
+      "Preflight: passed; zero external sends",
+      "Provider sends: 0",
+    ]));
+    expect(await readdir(outputRoot)).toEqual([]);
+  });
+
+  it("stops after a first-service failure and retains only a safe missing-entry classification", async () => {
+    const outputRoot = await mkdtemp(path.join(os.tmpdir(), "rr-live-runner-keychain-missing-"));
+    const lines: string[] = [];
+    const services: string[] = [];
+    const code = await runInternalLiveRunner({ mode: "readiness", profile: "statement-one",
+      authorization: "product-owner-approved", runId: "auto", outputRoot }, {
+      ...syntheticStaticChecks,
+      log: (line) => lines.push(line),
+      readCredential: async (service) => {
+        services.push(service);
+        throw new KeychainBrokerError(service, "keychain_entry_missing");
+      },
+    });
+    expect(code).toBe(1);
+    expect(services).toEqual(["RateReveal/OpenRouter"]);
+    expect(lines).toContain("Safe failure code: internal_live_keychain_entry_missing_openrouter");
+    expect(lines).toContain("Provider sends: 0");
+    expect(await readdir(outputRoot)).toEqual([]);
+  });
+
+  it("clears the first credential state when the second lookup is denied", async () => {
+    const outputRoot = await mkdtemp(path.join(os.tmpdir(), "rr-live-runner-keychain-second-failure-"));
+    const lines: string[] = [];
+    const secret = "synthetic-openrouter-cleared-after-failure-123456789";
+    const states: Array<{ openRouterPresent: boolean; openAiPresent: boolean }> = [];
+    const code = await runInternalLiveRunner({ mode: "readiness", profile: "statement-one",
+      authorization: "product-owner-approved", runId: "auto", outputRoot }, {
+      ...syntheticStaticChecks,
+      log: (line) => lines.push(line),
+      observeCredentialState: (state) => states.push(state),
+      readCredential: async (service) => {
+        if (service === "RateReveal/OpenRouter") return secret;
+        throw new KeychainBrokerError(service, "keychain_access_denied_or_cancelled");
+      },
+    });
+    expect(code).toBe(1);
+    expect(states).toEqual([
+      { openRouterPresent: true, openAiPresent: false },
+      { openRouterPresent: false, openAiPresent: false },
+      { openRouterPresent: false, openAiPresent: false },
+    ]);
+    expect(lines.join("\n")).not.toContain(secret);
+    expect(lines).toContain("Safe failure code: internal_live_keychain_access_denied_or_cancelled_openai");
+    expect(process.env.OPENROUTER_API_KEY).toBeUndefined();
+    expect(process.env.OPENAI_API_KEY).toBeUndefined();
+    expect(await readdir(outputRoot)).toEqual([]);
+  });
+
+  it("aborts a stalled lookup at the bounded broker timeout without starting the second lookup", async () => {
+    const outputRoot = await mkdtemp(path.join(os.tmpdir(), "rr-live-runner-keychain-timeout-"));
+    const lines: string[] = [];
+    const services: string[] = [];
+    let aborted = false;
+    const code = await runInternalLiveRunner({ mode: "readiness", profile: "statement-one",
+      authorization: "product-owner-approved", runId: "auto", outputRoot }, {
+      ...syntheticStaticChecks,
+      keychainReadTimeoutMs: 10,
+      log: (line) => lines.push(line),
+      readCredential: async (service, signal) => {
+        services.push(service);
+        signal.addEventListener("abort", () => { aborted = true; }, { once: true });
+        return new Promise<string>(() => undefined);
+      },
+    });
+    expect(code).toBe(1);
+    expect(aborted).toBe(true);
+    expect(services).toEqual(["RateReveal/OpenRouter"]);
+    expect(lines).toContain("Safe failure code: internal_live_keychain_broker_timeout_openrouter");
+    expect(lines).toContain("Provider sends: 0");
+    expect(await readdir(outputRoot)).toEqual([]);
+    expect(KEYCHAIN_READ_TIMEOUT_MS).toBe(120_000);
+  });
+
+  it("maps only deterministic Keychain command signals into safe categories", () => {
+    expect(classifyKeychainCommandFailure({ code: 44, stderr: "item missing" }, "RateReveal/OpenAI").message)
+      .toBe("internal_live_keychain_entry_missing_openai");
+    expect(classifyKeychainCommandFailure({ code: 128, stderr: "user canceled" }, "RateReveal/OpenAI").message)
+      .toBe("internal_live_keychain_access_denied_or_cancelled_openai");
+    expect(classifyKeychainCommandFailure({ code: 36, stderr: "interaction is not allowed" }, "RateReveal/OpenAI").message)
+      .toBe("internal_live_keychain_locked_openai");
+    expect(classifyKeychainCommandFailure({ code: 1, stderr: "unclassified failure detail" }, "RateReveal/OpenAI").message)
+      .toBe("internal_live_keychain_read_failed_openai");
+    expect(classifyKeychainCommandFailure(new Error("aborted"), "RateReveal/OpenAI", true).message)
+      .toBe("internal_live_keychain_broker_timeout_openai");
   });
 
   it("defines an exact least-privilege network allowlist", async () => {
