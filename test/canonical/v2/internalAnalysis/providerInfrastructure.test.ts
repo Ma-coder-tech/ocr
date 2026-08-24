@@ -316,7 +316,9 @@ describe("internal-analysis construction-bound provider seams", () => {
       openRouter: { status: "passed", toolExecutionState: "verified" },
       investigativeOpenAi: { status: "passed", structuredOutputValidation: "passed" },
       semanticOpenAi: { status: "passed", structuredOutputValidation: "passed" },
-      diagnostics: { semanticMemberValidationState: "passed", semanticMemberIssues: [], semanticMismatchDimensions: [] } });
+      diagnostics: { semanticMemberValidationState: "passed", semanticMemberIssues: [], semanticMismatchDimensions: [],
+        semanticSupportValidationState: "passed", semanticSupportStatus: "wrong_authority",
+        semanticSupportReasonCodes: expect.arrayContaining(["semantic_source_authority_mismatch"]) } });
     expect(result.receipts.map((receipt) => [receipt.operation, receipt.actualSendCount, receipt.retryCount])).toEqual([
       ["search", 1, 0], ["investigative_model", 1, 0], ["semantic_model", 1, 0],
     ]);
@@ -354,7 +356,8 @@ describe("internal-analysis construction-bound provider seams", () => {
       .rejects.toThrow("semantic_judgment_shape_invalid");
     expect(call).toBe(3);
     expect(diagnostics.snapshot()).toMatchObject({ semanticMemberValidationState: "not_reached",
-      semanticMemberIssues: [], semanticMismatchDimensions: [] });
+      semanticMemberIssues: [], semanticMismatchDimensions: [], semanticSupportValidationState: "not_reached",
+      semanticSupportStatus: null, semanticSupportReasonCodes: [] });
     expect(JSON.stringify(diagnostics.snapshot())).not.toContain("must never be retained");
     expect(audit.snapshot().at(-1)).toMatchObject({ operation: "semantic_model", actualSendCount: 1,
       completionState: "failed", structuredOutputValidation: "failed", retryCount: 0 });

@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertProviderReadinessSemanticSupport,
   inspectProviderReadinessSemanticMember,
   ProviderReadinessDiagnosticLog,
   validateSemanticMember,
+  validateSemanticSupport,
   type CandidateClaimSupport,
+  type ProviderReadinessSemanticSupportContextV1,
+  type RuntimeResearchQuestion,
   type SemanticVerificationInput,
 } from "../../../../src/canonical/v2/index.js";
 
@@ -25,7 +29,7 @@ function fixture(): { expected: SemanticVerificationInput; member: CandidateClai
       rank: 1, publicationDate: null, effectiveFrom: null, effectiveTo: null, locatorHint: null,
       selectionReasonCode: "synthetic_provider_readiness", discoveryMetadata: { providerCode: "provider_readiness_synthetic",
         configurationCode: "provider_readiness_v1", sourceDomain: "example.test", providerRank: 1, providerSnippetUsedAsEvidence: false },
-      retrievalEligibility: "eligible", authorityAdmissionRef: null, authorityPublicationFamilyCode: null,
+      retrievalEligibility: "eligible", authorityAdmissionRef: "readiness-admission-001", authorityPublicationFamilyCode: "readiness_publication",
     },
     documentId: "readiness-document-001",
     locator: { locatorId: "readiness-locator-001", documentId: "readiness-document-001", documentFingerprint: fingerprint,
@@ -44,12 +48,73 @@ function fixture(): { expected: SemanticVerificationInput; member: CandidateClai
   return { expected, member };
 }
 
+function supportContext(expected: SemanticVerificationInput): ProviderReadinessSemanticSupportContextV1 {
+  const scope = { tenantRef: null, accountRef: null, ...expected.question.scope };
+  const question: RuntimeResearchQuestion = {
+    ...expected.question, scope, originatingUnknownRef: "readiness-unknown-001", originatingDependencyRefs: [],
+    originatingThemeRefs: [], relatedCanonicalRefs: [], materiality: "contextual", blockingEffect: "informational",
+    priority: "material_repeated_unknown", reportDecisionCode: "synthetic_provider_readiness", publicResearchPlausible: true,
+    rfResolution: { status: "unresolved_no_admitted_knowledge", claimType: expected.question.claimType,
+      subjectCode: expected.question.subjectCode, value: null, selectedEntryRefs: [], corroboratingEntryRefs: [],
+      rejectedCounts: {}, conflictEntryCount: 0, asOf: expected.question.asOf, scope, sourceAuthorities: [] },
+    eligibility: "eligible", selection: "selected", reasonCodes: ["synthetic_provider_readiness"],
+  };
+  return { question, candidate: expected.candidate, locator: expected.locator,
+    expectedObservationId: expected.itemId, expectedProposedValue: expected.proposedValue };
+}
+
 describe("provider-readiness semantic diagnostics", () => {
   it("retains the unchanged production validator's complete empty issue array for a valid member", () => {
     const { expected, member } = fixture();
     const diagnostics = inspectProviderReadinessSemanticMember(member, expected);
     expect(diagnostics.semanticMemberIssues).toEqual(validateSemanticMember(member, expected));
     expect(diagnostics).toMatchObject({ semanticMemberValidationState: "passed", semanticMemberIssues: [], semanticMismatchDimensions: [] });
+  });
+
+  it("passes the same valid bound support through both unchanged production validators", () => {
+    const { expected, member } = fixture(); const context = supportContext(expected);
+    expect(validateSemanticMember(member, expected)).toEqual([]);
+    expect(validateSemanticSupport({ ...context, support: member })).toEqual({
+      status: "supported_candidate", reasonCodes: ["claim_specific_semantic_support_candidate"],
+    });
+    const diagnostics = new ProviderReadinessDiagnosticLog(); diagnostics.recordSemanticMember(member, expected);
+    expect(assertProviderReadinessSemanticSupport(member, context, diagnostics)).toMatchObject({
+      semanticMemberValidationState: "passed", semanticSupportValidationState: "passed",
+      semanticSupportStatus: "supported_candidate", semanticSupportReasonCodes: ["claim_specific_semantic_support_candidate"],
+    });
+  });
+
+  it.each([
+    ["observation", (context: ProviderReadinessSemanticSupportContextV1) => ({ ...context, expectedObservationId: "different-observation" }),
+      "semantic_candidate_document_locator_identity_mismatch"],
+    ["proposed value", (context: ProviderReadinessSemanticSupportContextV1) => ({ ...context,
+      expectedProposedValue: { kind: "term" as const, termCode: "application_fee_terminology", termValue: "unresolved" } }),
+      "semantic_proposed_value_substitution"],
+    ["locator provenance", (context: ProviderReadinessSemanticSupportContextV1) => ({ ...context,
+      locator: { ...context.locator, locatorId: "different-locator" } }), "semantic_candidate_document_locator_identity_mismatch"],
+  ])("fails closed when a member-valid support violates the production %s binding", (_name, mutate, expectedReason) => {
+    const { expected, member } = fixture(); const diagnostics = new ProviderReadinessDiagnosticLog();
+    expect(validateSemanticMember(member, expected)).toEqual([]); diagnostics.recordSemanticMember(member, expected);
+    expect(() => assertProviderReadinessSemanticSupport(member, mutate(supportContext(expected)), diagnostics))
+      .toThrow("provider_readiness_semantic_support_invalid");
+    expect(diagnostics.snapshot()).toMatchObject({ semanticMemberValidationState: "passed",
+      semanticSupportValidationState: "failed", semanticSupportStatus: "malformed" });
+    expect(diagnostics.snapshot().semanticSupportReasonCodes).toContain(expectedReason);
+  });
+
+  it("preserves production wrong-authority and wrong-scope classifications without promoting or rejecting them", () => {
+    const { expected, member } = fixture();
+    const authorityContext = supportContext({ ...expected, candidate: { ...expected.candidate, authorityAdmissionRef: null } });
+    const scopeMember = { ...member, applicabilityScope: { ...member.applicabilityScope, region: "ca" } };
+    expect(validateSemanticSupport({ ...authorityContext, support: member })).toMatchObject({ status: "wrong_authority",
+      reasonCodes: expect.arrayContaining(["semantic_source_authority_mismatch"]) });
+    expect(validateSemanticSupport({ ...supportContext(expected), support: scopeMember })).toMatchObject({ status: "wrong_scope",
+      reasonCodes: expect.arrayContaining(["semantic_scope_mismatch"]) });
+    const diagnostics = new ProviderReadinessDiagnosticLog(); diagnostics.recordSemanticMember(member, expected);
+    expect(assertProviderReadinessSemanticSupport(member, authorityContext, diagnostics)).toMatchObject({
+      semanticSupportValidationState: "passed", semanticSupportStatus: "wrong_authority",
+      semanticSupportReasonCodes: expect.arrayContaining(["semantic_source_authority_mismatch"]),
+    });
   });
 
   it.each([
@@ -106,7 +171,8 @@ describe("provider-readiness semantic diagnostics", () => {
     const recorded = log.recordSemanticMember({ ...member, candidateId: "different-candidate" }, expected);
     recorded.semanticMemberIssues.push("caller_mutation");
     expect(log.snapshot()).toMatchObject({ schemaVersion: "provider_readiness_diagnostics_v1", semanticMemberValidationState: "failed",
-      semanticMemberIssues: ["semantic_member_identity_mismatch"], semanticMismatchDimensions: ["candidate_id"] });
+      semanticMemberIssues: ["semantic_member_identity_mismatch"], semanticMismatchDimensions: ["candidate_id"],
+      semanticSupportValidationState: "not_reached", semanticSupportStatus: null, semanticSupportReasonCodes: [] });
     expect(JSON.stringify(log.snapshot())).not.toMatch(/InternalStatementAnalysis|canonicalTruth|findings|recommendations|impact|knowledge/);
   });
 });

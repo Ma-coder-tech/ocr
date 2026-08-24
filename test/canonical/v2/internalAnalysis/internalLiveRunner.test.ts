@@ -213,7 +213,9 @@ describe("durable internal live runner", () => {
           investigativeOpenAi: { status: "passed", structuredOutputValidation: "passed" },
           semanticOpenAi: { status: "passed", structuredOutputValidation: "passed" },
           diagnostics: { schemaVersion: "provider_readiness_diagnostics_v1", semanticMemberValidationState: "passed",
-            semanticMemberIssues: [], semanticMismatchDimensions: [], safeSemanticMemberProjection: null },
+            semanticMemberIssues: [], semanticMismatchDimensions: [], safeSemanticMemberProjection: null,
+            semanticSupportValidationState: "passed", semanticSupportStatus: "wrong_authority",
+            semanticSupportReasonCodes: ["semantic_source_authority_mismatch"] },
           receipts: providerAudit.snapshot() };
       },
     });

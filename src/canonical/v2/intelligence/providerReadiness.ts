@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import type { ProviderOperationReceiptV1 } from "../internalAnalysis/internalAnalysisTypes.js";
 import { isCanonicalCode, isRecord, isSafeStructuredString, isValidIsoDay } from "../knowledge/knowledgeSafety.js";
-import type { InvestigativeObservation, SearchRequest, SemanticVerificationInput,
-  StructuredBatchRequest } from "./intelligenceTypes.js";
+import type { CandidateClaimSupport, InvestigativeObservation, RuntimeResearchQuestion, SearchRequest,
+  SemanticVerificationInput, StructuredBatchRequest } from "./intelligenceTypes.js";
 import { createLiveOpenAiInvestigativeAdapter, createLiveOpenAiSemanticAdapter, createLiveOpenRouterSearchAdapter,
   ProviderOperationAuditLog } from "./providerAdapters.js";
 import type { InternalLiveExecutionCapabilityV1 } from "./providerPreflight.js";
+import { validateSemanticSupport } from "./semanticVerification.js";
 import { validateInvestigativeMember, validateSemanticMember } from "./structuredMemberValidation.js";
 
 const SEMANTIC_STATUSES = new Set([
@@ -52,13 +53,32 @@ export type ProviderReadinessDiagnosticsV1 = {
   semanticMemberIssues: string[];
   semanticMismatchDimensions: ProviderReadinessSemanticMismatchDimension[];
   safeSemanticMemberProjection: ProviderReadinessSafeSemanticMemberProjectionV1 | null;
+  semanticSupportValidationState: "not_reached" | "passed" | "failed";
+  semanticSupportStatus: CandidateClaimSupport["verificationStatus"] | null;
+  semanticSupportReasonCodes: string[];
 };
+
+export type ProviderReadinessSemanticSupportContextV1 = Omit<Parameters<typeof validateSemanticSupport>[0], "support">;
 
 export class ProviderReadinessDiagnosticLog {
   private semantic: ProviderReadinessDiagnosticsV1 = emptyReadinessDiagnostics();
 
   recordSemanticMember(value: unknown, expected: SemanticVerificationInput): ProviderReadinessDiagnosticsV1 {
     this.semantic = inspectProviderReadinessSemanticMember(value, expected);
+    return this.snapshot();
+  }
+
+  recordSemanticSupport(
+    support: CandidateClaimSupport,
+    expected: ProviderReadinessSemanticSupportContextV1,
+  ): ProviderReadinessDiagnosticsV1 {
+    const validation = validateSemanticSupport({ ...expected, support });
+    this.semantic = {
+      ...this.semantic,
+      semanticSupportValidationState: validation.status === "malformed" ? "failed" : "passed",
+      semanticSupportStatus: validation.status,
+      semanticSupportReasonCodes: [...validation.reasonCodes],
+    };
     return this.snapshot();
   }
 
@@ -117,6 +137,19 @@ export async function runProviderReadinessProbe(
   if (semanticDiagnostics.semanticMemberIssues.length > 0) {
     throw new Error("provider_readiness_semantic_contract_invalid");
   }
+  const runtimeQuestion = syntheticRuntimeQuestion(semanticInput);
+  const localObservationOrigin = { questionId: semanticInput.question.questionId, unknownRef: runtimeQuestion.originatingUnknownRef };
+  if (support.itemId !== semanticInput.itemId || localObservationOrigin.questionId !== runtimeQuestion.questionId
+    || localObservationOrigin.unknownRef !== runtimeQuestion.originatingUnknownRef) {
+    throw new Error("provider_readiness_semantic_observation_origin_invalid");
+  }
+  assertProviderReadinessSemanticSupport(support, {
+    question: runtimeQuestion,
+    candidate: semanticInput.candidate,
+    locator: semanticInput.locator,
+    expectedObservationId: semanticInput.itemId,
+    expectedProposedValue: semanticInput.proposedValue,
+  }, diagnostics);
 
   return {
     schemaVersion: "provider_readiness_probe_result_v1", runId,
@@ -138,6 +171,7 @@ export function inspectProviderReadinessSemanticMember(
   if (!member) return {
     schemaVersion: "provider_readiness_diagnostics_v1", semanticMemberValidationState: "failed", semanticMemberIssues,
     semanticMismatchDimensions: [...mismatch], safeSemanticMemberProjection: null,
+    semanticSupportValidationState: "not_reached", semanticSupportStatus: null, semanticSupportReasonCodes: [],
   };
   compare(member.itemId, expected.itemId, "item_id", mismatch);
   compare(member.questionId, expected.question.questionId, "question_id", mismatch);
@@ -169,12 +203,28 @@ export function inspectProviderReadinessSemanticMember(
     semanticMemberIssues: [...semanticMemberIssues],
     semanticMismatchDimensions: [...mismatch].sort(),
     safeSemanticMemberProjection: projectSafeSemanticMember(member),
+    semanticSupportValidationState: "not_reached",
+    semanticSupportStatus: null,
+    semanticSupportReasonCodes: [],
   };
+}
+
+export function assertProviderReadinessSemanticSupport(
+  support: CandidateClaimSupport,
+  expected: ProviderReadinessSemanticSupportContextV1,
+  diagnostics: ProviderReadinessDiagnosticLog,
+): ProviderReadinessDiagnosticsV1 {
+  const result = diagnostics.recordSemanticSupport(support, expected);
+  if (result.semanticSupportValidationState === "failed") {
+    throw new Error("provider_readiness_semantic_support_invalid");
+  }
+  return result;
 }
 
 function emptyReadinessDiagnostics(): ProviderReadinessDiagnosticsV1 {
   return { schemaVersion: "provider_readiness_diagnostics_v1", semanticMemberValidationState: "not_reached",
-    semanticMemberIssues: [], semanticMismatchDimensions: [], safeSemanticMemberProjection: null };
+    semanticMemberIssues: [], semanticMismatchDimensions: [], safeSemanticMemberProjection: null,
+    semanticSupportValidationState: "not_reached", semanticSupportStatus: null, semanticSupportReasonCodes: [] };
 }
 
 function compare(actual: unknown, expected: unknown, dimension: ProviderReadinessSemanticMismatchDimension,
@@ -268,5 +318,38 @@ function syntheticSemanticInput(synthetic: SyntheticEvidence, observation: Inves
     locator: { locatorId: synthetic.locatorId, documentId: synthetic.documentId, documentFingerprint: synthetic.documentFingerprint,
       page: null, sectionCode: "public_glossary", lineStart: 1, lineEnd: 1, text: synthetic.text },
     proposedValue: observation.proposedValue,
+  };
+}
+
+function syntheticRuntimeQuestion(input: SemanticVerificationInput): RuntimeResearchQuestion {
+  const scope = { tenantRef: null, accountRef: null, ...input.question.scope };
+  return {
+    ...input.question,
+    scope,
+    originatingUnknownRef: "readiness-unknown-001",
+    originatingDependencyRefs: [],
+    originatingThemeRefs: [],
+    relatedCanonicalRefs: [],
+    materiality: "contextual",
+    blockingEffect: "informational",
+    priority: "material_repeated_unknown",
+    reportDecisionCode: "synthetic_provider_readiness",
+    publicResearchPlausible: true,
+    rfResolution: {
+      status: "unresolved_no_admitted_knowledge",
+      claimType: input.question.claimType,
+      subjectCode: input.question.subjectCode,
+      value: null,
+      selectedEntryRefs: [],
+      corroboratingEntryRefs: [],
+      rejectedCounts: {},
+      conflictEntryCount: 0,
+      asOf: input.question.asOf,
+      scope,
+      sourceAuthorities: [],
+    },
+    eligibility: "eligible",
+    selection: "selected",
+    reasonCodes: ["synthetic_provider_readiness"],
   };
 }
