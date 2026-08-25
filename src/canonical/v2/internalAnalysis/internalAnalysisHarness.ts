@@ -14,6 +14,7 @@ import type { RunFiservOneStatementInput } from "../evaluation/fiservEvaluationH
 import { buildStatementObservationInvestigationOrigins } from "./observationOrigins.js";
 import { buildInternalStatementAnalysisV1 } from "./internalAnalysisProjection.js";
 import { writeInternalAnalysisBundle } from "./internalAnalysisBundle.js";
+import { projectRfAuditSummary } from "./internalAnalysisAuditProjection.js";
 import type { InternalStatementAnalysisV1, PublicSourceEvidenceManifestV1, RgInternalAuditV1 } from "./internalAnalysisTypes.js";
 import { E2E_INTERNAL_ANALYSIS_AMENDMENT_ID } from "./internalAnalysisTypes.js";
 
@@ -104,7 +105,8 @@ export async function runFiservInternalAnalysisEvaluationV1(input: RunFiservInte
     verificationOutcomes: runtime.supports.map((support) => ({ supportId: support.supportId, questionId: support.questionId,
       candidateId: support.candidateId, documentId: support.documentId, locatorId: support.locatorId,
       status: support.verificationStatus, reasonCodes: [...support.limitationCodes] })),
-    budget: runtime.budget, diagnostics: runtime.diagnostics, canonicalBeforeHash, canonicalAfterHash,
+    budget: runtime.budget, diagnostics: runtime.diagnostics,
+    rfProjection: projectRfAuditSummary(runtime), canonicalBeforeHash, canonicalAfterHash,
     canonicalTruthPreserved: canonicalBeforeHash === canonicalAfterHash && runtime.canonicalTruthPreserved,
     rfSnapshotHash: hashCanonical(input.admittedKnowledge),
     rfEntryRefs: input.admittedKnowledge.map((entry) => entry.id).sort(),

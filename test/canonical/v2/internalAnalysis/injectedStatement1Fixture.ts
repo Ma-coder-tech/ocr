@@ -129,7 +129,7 @@ export function createInjectedStatement1Fixture() {
         providerPayloads.push(JSON.stringify(request)); receipt("semantic_model", "injected_openai_responses_contract", request.reservationId, request.reservationId.slice(0, -":call".length));
         return { batchId: request.batchId, attemptId: request.attemptId, schemaVersion: request.schemaVersion,
           reportedOutputTokens: 140, items: request.items.map((item): CandidateClaimSupport => ({
-            itemId: item.itemId, supportId: `support-${createHash("sha256").update(item.candidate.candidateId).digest("hex").slice(0, 16)}`,
+            itemId: item.itemId, supportId: `semantic-support-${createHash("sha256").update(item.candidate.candidateId).digest("hex").slice(0, 24)}`,
             questionId: item.question.questionId, claimType: item.question.claimType, subjectCode: item.question.subjectCode,
             candidateId: item.candidate.candidateId, documentId: item.documentId, locatorId: item.locator.locatorId,
             documentFingerprint: item.locator.documentFingerprint, investigativeObservationId: item.itemId,

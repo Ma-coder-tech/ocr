@@ -16,6 +16,9 @@ const MANIFEST_KEYS = ["schemaVersion", "privacy", "downloadedBodiesPersisted", 
 const EVIDENCE_KEYS = ["evidenceId", "supportId", "questionId", "candidateId", "sourceUrl", "sourceTitle", "sourceAuthority", "authorityAdmissionRef", "retrievedAt",
   "documentId", "documentFingerprint", "locator", "boundedSupportingExcerpt", "semanticVerification", "limitations"] as const;
 const LOCATOR_KEYS = ["locatorId", "page", "sectionCode", "lineStart", "lineEnd"] as const;
+const RG_AUDIT_KEYS = ["schemaVersion", "runId", "executionMode", "externalNetworkCallCount", "liveTimingPolicy",
+  "providerOperationReceipts", "searchAttempts", "retrievalOutcomes", "questions", "verificationOutcomes", "budget", "diagnostics",
+  "rfProjection", "canonicalBeforeHash", "canonicalAfterHash", "canonicalTruthPreserved", "rfSnapshotHash", "rfEntryRefs", "policyVersions"] as const;
 const RECEIPT_KEYS = ["receiptId", "reservationId", "operationId", "operation", "providerCode", "logicalAttempt", "actualSendCount", "retryCount",
   "sendState", "completionState", "elapsedMs", "usageState", "outputTokens", "providerRequestCount", "usageCostUsd", "providerConfigurationCode",
   "httpStatus", "localRequestId", "providerRequestId", "providerResponseId", "requestedModelIdentifier", "returnedModelIdentifier", "finishReason",
@@ -23,6 +26,11 @@ const RECEIPT_KEYS = ["receiptId", "reservationId", "operationId", "operation", 
   "structuredOutputValidation", "safeReasonCode"] as const;
 const SEARCH_CANDIDATE_AUDIT_KEYS = ["consideredUrl", "normalizedUrl", "sourceDomain", "sourceOrigin", "candidateId", "rank",
   "sourceTypeCode", "claimedAuthority", "derivedAuthority", "authorityAdmissionRef", "authorityDecision", "reasonCodes", "retrievalAttempted"] as const;
+const RETRIEVAL_OUTCOME_KEYS = ["questionId", "candidateId", "documentId", "requestedUrl", "finalUrl", "documentFingerprint",
+  "authorityAdmissionRef", "fingerprintMatchState", "state", "mimeType", "byteLength", "locatorIds", "reasonCodes"] as const;
+const RF_PROJECTION_KEYS = ["projectedCandidateCount", "automaticAdmissionCount", "projectionStatus", "reasonCodes", "candidateSummaries"] as const;
+const RF_CANDIDATE_SUMMARY_KEYS = ["candidateRef", "lifecycle", "privacy", "proposedVisibility", "requiresHumanAdmission",
+  "provenanceAdapter", "provenanceCode", "projectionStatus", "reasonCodes"] as const;
 const KNOWLEDGE_SOURCE_AUTHORITIES = ["official_network_publication", "processor_publication", "merchant_contract", "account_statement_observation",
   "statement_observation", "verified_cross_statement_observation", "admitted_template_specification", "approved_internal_manual_mapping",
   "synthetic_test_fixture", "legacy_reference_candidate", "automated_retrieval", "ai_inference"] as const;
@@ -195,7 +203,8 @@ export function validateInternalAnalysisReferenceGraph(analysis: InternalStateme
 
 export function validateRgInternalAuditV1(audit: RgInternalAuditV1): string[] {
   const issues: string[] = [];
-  if (!isRecord(audit) || !Array.isArray(audit.providerOperationReceipts) || !Array.isArray(audit.searchAttempts)
+  if (!isRecord(audit) || !hasExactKeys(audit, RG_AUDIT_KEYS)
+    || !Array.isArray(audit.providerOperationReceipts) || !Array.isArray(audit.searchAttempts)
     || !Array.isArray(audit.retrievalOutcomes) || !Array.isArray(audit.verificationOutcomes) || !Array.isArray(audit.rfEntryRefs)
     || !isRecord(audit.budget) || !Array.isArray(audit.budget.reservations)) return ["rg_internal_audit_shape_invalid"];
   if (audit.schemaVersion !== "rg_internal_analysis_audit_v1") issues.push("rg_internal_audit_identity_invalid");
@@ -243,14 +252,53 @@ export function validateRgInternalAuditV1(audit: RgInternalAuditV1): string[] {
   })) {
     issues.push("rg_internal_audit_search_diagnostics_invalid");
   }
+  if (!isRecord(audit.rfProjection) || !hasExactKeys(audit.rfProjection, RF_PROJECTION_KEYS)
+    || !Number.isSafeInteger(audit.rfProjection.projectedCandidateCount) || audit.rfProjection.projectedCandidateCount < 0
+    || !Number.isSafeInteger(audit.rfProjection.automaticAdmissionCount) || audit.rfProjection.automaticAdmissionCount < 0
+    || !Array.isArray(audit.rfProjection.candidateSummaries)
+    || audit.rfProjection.projectedCandidateCount !== audit.rfProjection.candidateSummaries.length
+    || audit.rfProjection.projectionStatus !== (audit.rfProjection.projectedCandidateCount > 0 ? "completed_with_candidates" : "completed_no_candidates")
+    || !safeReasonCodeArray(audit.rfProjection.reasonCodes)
+    || !audit.rfProjection.reasonCodes.includes(audit.rfProjection.projectedCandidateCount > 0
+      ? "rf_candidates_projected_for_human_review" : "no_supported_rf_candidates_projected")
+    || !audit.rfProjection.reasonCodes.includes(audit.rfProjection.automaticAdmissionCount > 0
+      ? "automatic_knowledge_admission_reported" : "automatic_knowledge_admission_none")
+    || audit.rfProjection.candidateSummaries.some((candidate) => !isRecord(candidate)
+      || !hasExactKeys(candidate, RF_CANDIDATE_SUMMARY_KEYS)
+      || !/^rf-audit-candidate-[a-f0-9]{24}$/.test(String(candidate.candidateRef))
+      || candidate.lifecycle !== "candidate" || candidate.privacy !== "private_by_default"
+      || !["reusable", "tenant_private", "account_private"].includes(String(candidate.proposedVisibility))
+      || typeof candidate.requiresHumanAdmission !== "boolean"
+      || !["supplied", "reference_rate_catalog", "legacy_fiserv_fee_reference", "bounded_intelligence_runtime"].includes(String(candidate.provenanceAdapter))
+      || !isSafeStructuredString(candidate.provenanceCode) || /(?:tenant|account|merchant|credential|secret)/i.test(candidate.provenanceCode)
+      || candidate.projectionStatus !== "projected_for_human_review"
+      || !safeReasonCodeArray(candidate.reasonCodes)
+      || !candidate.reasonCodes.includes("private_by_default")
+      || !candidate.reasonCodes.includes("human_admission_required")
+      || !candidate.reasonCodes.includes("candidate_not_automatically_admitted"))) {
+    issues.push("rg_internal_audit_rf_projection_invalid");
+  }
   if (audit.retrievalOutcomes.some((document) => !isRecord(document)
+    || !hasExactKeys(document, RETRIEVAL_OUTCOME_KEYS)
     || ![document.questionId, document.candidateId, document.documentId].every(isSafeStructuredString)
+    || !safeHttpsUrl(document.requestedUrl) || (document.finalUrl !== null && !safeHttpsUrl(document.finalUrl))
+    || (document.documentFingerprint !== null && !/^[a-f0-9]{64}$/.test(String(document.documentFingerprint)))
+    || (document.authorityAdmissionRef !== null && !isSafeStructuredString(document.authorityAdmissionRef))
+    || !["matched_approved_fingerprint", "mismatched_approved_fingerprint", "not_required_by_admission", "not_evaluated"].includes(String(document.fingerprintMatchState))
+    || (document.fingerprintMatchState === "not_evaluated" && document.documentFingerprint !== null)
+    || (document.fingerprintMatchState !== "not_evaluated" && (document.documentFingerprint === null || document.finalUrl === null))
+    || (["matched_approved_fingerprint", "mismatched_approved_fingerprint"].includes(String(document.fingerprintMatchState))
+      && document.authorityAdmissionRef === null)
+    || (document.fingerprintMatchState === "mismatched_approved_fingerprint"
+      && (document.state !== "safety_blocked" || !document.reasonCodes.includes("source_authority_document_fingerprint_mismatch")))
+    || (["retrieved_extracted", "retrieved_locator_only"].includes(String(document.state))
+      && (document.finalUrl === null || document.documentFingerprint === null || document.fingerprintMatchState === "not_evaluated"))
     || !["retrieved_extracted", "retrieved_locator_only", "encrypted_pdf", "malformed_pdf", "unsupported_pdf", "unsupported_content_type",
       "oversized_document", "extraction_failed", "retrieval_timeout", "safety_blocked", "inaccessible"].includes(String(document.state))
-    || (document.mimeType !== null && (!safeDisplayText(document.mimeType, 200) || !/^[A-Za-z0-9!#$&^_.+-]+\/[A-Za-z0-9!#$&^_.+;-]+/.test(document.mimeType)))
+    || (document.mimeType !== null && (!safeDisplayText(document.mimeType, 200) || !/^[A-Za-z0-9!#$&^_.+-]+\/[A-Za-z0-9!#$&^_.+;-]+$/.test(document.mimeType)))
     || !Number.isSafeInteger(document.byteLength) || document.byteLength < 0
     || !Array.isArray(document.locatorIds) || !document.locatorIds.every(isSafeStructuredString)
-    || !Array.isArray(document.reasonCodes) || !document.reasonCodes.every(isSafeStructuredString))) {
+    || !safeReasonCodeArray(document.reasonCodes))) {
     issues.push("rg_internal_audit_retrieval_outcomes_invalid");
   }
   if (audit.providerOperationReceipts.some((item) => !isRecord(item) || !hasExactKeys(item, RECEIPT_KEYS)
@@ -296,6 +344,19 @@ export function validateRgInternalAuditV1(audit: RgInternalAuditV1): string[] {
 
 function containsPrivateProviderMaterial(value: string): boolean {
   return /(?:raw prompt|raw response|chain.of.thought|\/Users\/|[A-Za-z]:\\|\.pdf\b|\b(?:MID|merchant number|account number)\b)/i.test(value);
+}
+
+function safeHttpsUrl(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.username.length === 0 && url.password.length === 0;
+  } catch { return false; }
+}
+
+function safeReasonCodeArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((code) => typeof code === "string"
+    && /^[a-z][a-z0-9_]*(?::[a-z][a-z0-9_]*)?$/.test(code)) && new Set(value).size === value.length;
 }
 
 function arraysOfSafeIds(...values: unknown[]): boolean { return values.every((value) => Array.isArray(value) && value.every(isSafeStructuredString) && new Set(value).size === value.length); }

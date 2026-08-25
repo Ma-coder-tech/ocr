@@ -158,6 +158,26 @@ export type PublicSourceEvidenceManifestV1 = {
   entries: PublicSourceEvidenceV1[];
 };
 
+export type RfCandidateAuditSummaryV1 = {
+  candidateRef: string;
+  lifecycle: "candidate";
+  privacy: "private_by_default";
+  proposedVisibility: "reusable" | "tenant_private" | "account_private";
+  requiresHumanAdmission: boolean;
+  provenanceAdapter: "supplied" | "reference_rate_catalog" | "legacy_fiserv_fee_reference" | "bounded_intelligence_runtime";
+  provenanceCode: string;
+  projectionStatus: "projected_for_human_review";
+  reasonCodes: string[];
+};
+
+export type RfProjectionAuditSummaryV1 = {
+  projectedCandidateCount: number;
+  automaticAdmissionCount: number;
+  projectionStatus: "completed_no_candidates" | "completed_with_candidates";
+  reasonCodes: string[];
+  candidateSummaries: RfCandidateAuditSummaryV1[];
+};
+
 export type InternalStatementAnalysisV1 = {
   schemaVersion: "internal_statement_analysis_v1";
   audience: "internal_analyst_only";
@@ -217,6 +237,7 @@ export type RgInternalAuditV1 = {
   }>;
   budget: BudgetSnapshot;
   diagnostics: IntelligenceDiagnostic;
+  rfProjection: RfProjectionAuditSummaryV1;
   canonicalBeforeHash: string;
   canonicalAfterHash: string;
   canonicalTruthPreserved: boolean;

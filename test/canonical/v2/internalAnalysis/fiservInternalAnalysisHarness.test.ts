@@ -87,6 +87,7 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
       "terminology_example_presentation_only", "public_scope_applicability_unproven", "ownership_control_and_savings_unresolved",
     ]));
     expect(result.analysis.investigativeHypotheses).toHaveLength(0);
+    expect(result.analysis.contradictions).toHaveLength(0);
     expect(result.analysis.unresolvedQuestions).toHaveLength(1);
     expect(result.analysis.unresolvedQuestions[0]!.title).toMatch(/application fee/i);
     expect(result.analysis.recommendations.map((item) => item.kind)).toEqual(expect.arrayContaining([
@@ -94,6 +95,8 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     ]));
     expect(result.analysis.recommendations).not.toContainEqual(expect.objectContaining({ kind: "research_followup" }));
     expect(result.analysis.recommendations).not.toContainEqual(expect.objectContaining({ kind: "supported_economic_action" }));
+    expect(result.analysis.recommendations).toContainEqual(expect.objectContaining({ kind: "verification_action",
+      actionabilityCeiling: "verification_only" }));
     expect(result.analysis.recommendations).toContainEqual(expect.objectContaining({ kind: "documentation_request",
       actionabilityCeiling: "documentation_only", merchantControl: "unresolved",
       title: "Request the merchant agreement or fee schedule for the observed $99.00 Application Fee and document its contractual citation, calculation basis or fee formula, effective date or period, and applicability to this merchant account; obtain a processor explanation if those documents are insufficient." }));
@@ -104,6 +107,14 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     expect(result.analysis.canonicalBeforeHash).toBe(result.analysis.canonicalAfterHash);
     expect(result.rgAudit).toMatchObject({ executionMode: "injected_evaluation", externalNetworkCallCount: 0,
       canonicalTruthPreserved: true, budget: { profile: "RG-FREE-v1" } });
+    expect(result.rgAudit.rfProjection).toEqual({ projectedCandidateCount: 1, automaticAdmissionCount: 0,
+      projectionStatus: "completed_with_candidates",
+      reasonCodes: ["rf_candidates_projected_for_human_review", "automatic_knowledge_admission_none"],
+      candidateSummaries: [expect.objectContaining({ candidateRef: expect.stringMatching(/^rf-audit-candidate-[a-f0-9]{24}$/),
+        lifecycle: "candidate", privacy: "private_by_default", proposedVisibility: "account_private",
+        requiresHumanAdmission: true, provenanceAdapter: "bounded_intelligence_runtime",
+        provenanceCode: "canonical_intelligence_v2_runtime_v1", projectionStatus: "projected_for_human_review" })] });
+    expect(JSON.stringify(result.rgAudit.rfProjection)).not.toMatch(/tenant-private-fixture|account-private-fixture/);
     const applicationCandidateAudits = result.rgAudit.searchAttempts.flatMap((attempt) => attempt.candidateAudits);
     expect(applicationCandidateAudits).toHaveLength(6);
     expect(applicationCandidateAudits.every((candidate) => candidate.authorityDecision === "rejected_by_authority_policy"
@@ -114,7 +125,11 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     ]));
     expect(JSON.stringify(applicationCandidateAudits)).not.toMatch(/snippet|title|assistant|commentary|merchant-private|account-private/i);
     expect(result.rgAudit.retrievalOutcomes).toEqual([expect.objectContaining({ candidateId: result.runtime.candidates[0]!.candidateId,
-      state: "retrieved_extracted", mimeType: "text/html", byteLength: expect.any(Number) })]);
+      requestedUrl: FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_URL, finalUrl: FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_URL,
+      documentFingerprint: result.publicEvidence.entries[0]!.documentFingerprint,
+      authorityAdmissionRef: "injected_fiserv_first_data_us_swipe_non_swipe_statement_guide_v1",
+      fingerprintMatchState: "matched_approved_fingerprint", state: "retrieved_extracted", mimeType: "text/html",
+      byteLength: expect.any(Number), locatorIds: expect.arrayContaining([result.publicEvidence.entries[0]!.locator.locatorId]) })]);
     expect(result.rgAudit.budget.consumed).toMatchObject({ search_calls: 2, adaptive_searches: 1, candidates: 1, retrieval_documents: 1,
       investigative_ai_calls: 1, semantic_verification_calls: 1, semantic_support_items: 1, language_calls: 0,
       model_output_tokens: 320 });
@@ -164,7 +179,13 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
       providerPreflight: injected.providerPreflight, publicSourceAuthorityAdmissions: injected.publicSourceAuthorityAdmissions,
     });
     expect(result.runtime.documents).toEqual([expect.objectContaining({ state: "safety_blocked",
+      documentFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/), fingerprintMatchState: "mismatched_approved_fingerprint",
       reasonCodes: ["source_authority_document_fingerprint_mismatch"] })]);
+    expect(result.rgAudit.retrievalOutcomes).toEqual([expect.objectContaining({ state: "safety_blocked",
+      requestedUrl: FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_URL, finalUrl: FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_URL,
+      fingerprintMatchState: "mismatched_approved_fingerprint", locatorIds: [],
+      reasonCodes: ["source_authority_document_fingerprint_mismatch"] })]);
+    expect(validateRgInternalAuditV1(result.rgAudit)).toEqual([]);
     expect(result.runtime.supports).toEqual([]);
     expect(result.rgAudit.providerOperationReceipts.some((receipt) => receipt.operation === "investigative_model"
       || receipt.operation === "semantic_model")).toBe(false);

@@ -349,6 +349,11 @@ async function retrieveCandidate(params: {
     questionId: params.candidate.questionId,
     candidateId: params.candidate.candidateId,
     documentId,
+    requestedUrl: params.candidate.url,
+    finalUrl: null,
+    documentFingerprint: null,
+    authorityAdmissionRef: params.candidate.authorityAdmissionRef,
+    fingerprintMatchState: "not_evaluated",
     state: "inaccessible",
     mimeType: null,
     byteLength: 0,
@@ -425,6 +430,7 @@ async function retrieveCandidate(params: {
     return { result: { ...base, state: timed.status === "timeout" ? "retrieval_timeout" : "safety_blocked", reasonCodes: [timed.status === "timeout" ? "retrieval_timeout" : safeReasonCode(timed.reasonCode)] }, internal: null };
   }
   const { permit, response } = timed.value;
+  const finalUrl = response.redirects.at(-1)?.normalizedUrl ?? permit.normalizedUrl;
   const issues = validateRetrievalResponse({ candidate: params.candidate, documentId, permit, response, nowMs: params.ports.clock.nowMs(), maximumBytes: profile.maxRetrievalBytesPerDocument, authorizedRedirectPermits, observedStreamedBytes });
   if (response.status === "retrieved" && response.content && response.mimeType) issues.push(...validateContentSignature(response.mimeType, response.content));
   if (issues.length > 0 || response.status !== "retrieved" || !response.content || !response.mimeType) {
@@ -432,28 +438,35 @@ async function retrieveCandidate(params: {
     params.ledger.settle(`${operation}:bytes`, { state: "failed", usageKnown: response.byteLength >= 0, ...(response.byteLength >= 0 ? { actualAmount: Math.min(response.byteLength, profile.maxRetrievalBytesPerDocument) } : {}) });
     params.securityEvents.push(...issues.map((issue, index) => ({ eventId: `${operation}-security-${index + 1}`, category: "malformed_provider_output_rejected" as const, disposition: "rejected" as const, stage: "retrieval" })));
     response.content?.fill(0);
-    return { result: { ...base, state: response.status === "safety_blocked" || issues.length > 0 ? "safety_blocked" : "inaccessible", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: issues.length > 0 ? [...new Set(issues)] : [`retrieval_${response.status}`] }, internal: null };
+    return { result: { ...base, finalUrl, state: response.status === "safety_blocked" || issues.length > 0 ? "safety_blocked" : "inaccessible", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: issues.length > 0 ? [...new Set(issues)] : [`retrieval_${response.status}`] }, internal: null };
   }
   params.ledger.settle(`${operation}:document`, { state: "completed", actualAmount: 1 });
   params.ledger.settle(`${operation}:bytes`, { state: "completed", actualAmount: response.byteLength });
   if (!params.ports.extraction) {
     response.content.fill(0);
-    return { result: { ...base, state: "unsupported_content_type", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: ["document_extractor_disabled"] }, internal: null };
+    return { result: { ...base, finalUrl, state: "unsupported_content_type", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: ["document_extractor_disabled"] }, internal: null };
   }
   if (expired(params.ports, params.startedAtMs, profile.globalWallTimeMs)) {
     response.content.fill(0);
-    return { result: { ...base, state: "retrieval_timeout", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: ["global_wall_time_exhausted"] }, internal: null };
+    return { result: { ...base, finalUrl, state: "retrieval_timeout", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: ["global_wall_time_exhausted"] }, internal: null };
   }
   const extractionOperation = operationId(params.input.runId, "extraction", params.sequence);
   const contentFingerprint = createHash("sha256").update(response.content).digest("hex");
   const admission = params.input.publicSourceAuthorityAdmissions.find((item) => item.admissionId === params.candidate.authorityAdmissionRef);
-  const finalUrl = response.redirects.at(-1)?.normalizedUrl ?? permit.normalizedUrl;
+  const fingerprintMatchState: RuntimeDocumentResult["fingerprintMatchState"] = !admission
+    ? "not_evaluated"
+    : admission.approvedDocumentFingerprints.length === 0
+      ? "not_required_by_admission"
+      : admission.approvedDocumentFingerprints.includes(contentFingerprint)
+        ? "matched_approved_fingerprint"
+        : "mismatched_approved_fingerprint";
+  const retrievalProvenance = { finalUrl, documentFingerprint: contentFingerprint, fingerprintMatchState };
   const documentAuthority = admission ? verifyRetrievedDocumentAuthority({ admission, candidate: params.candidate,
     question: params.question, finalUrl, documentFingerprint: contentFingerprint })
     : { eligible: false, reasonCode: "source_authority_admission_missing_after_retrieval" };
   if (!documentAuthority.eligible) {
     response.content.fill(0);
-    return { result: { ...base, state: "safety_blocked", mimeType: response.mimeType, byteLength: response.byteLength,
+    return { result: { ...base, ...retrievalProvenance, state: "safety_blocked", mimeType: response.mimeType, byteLength: response.byteLength,
       reasonCodes: [documentAuthority.reasonCode] }, internal: null };
   }
   try {
@@ -461,7 +474,7 @@ async function retrieveCandidate(params: {
   } catch (error) {
     if (error instanceof IntelligenceBudgetExceeded) {
       response.content.fill(0);
-      return { result: { ...base, state: "extraction_failed", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: [`budget_exhausted:${error.dimension}`] }, internal: null };
+      return { result: { ...base, ...retrievalProvenance, state: "extraction_failed", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: [`budget_exhausted:${error.dimension}`] }, internal: null };
     }
     throw error;
   }
@@ -480,13 +493,13 @@ async function retrieveCandidate(params: {
   if (extracted.status !== "completed") {
     params.ledger.settle(`${extractionOperation}:call`, { state: extracted.status === "timeout" ? "timeout" : "failed", usageKnown: false });
     response.content.fill(0);
-    return { result: { ...base, state: extracted.status === "timeout" ? "retrieval_timeout" : "extraction_failed", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: [extracted.status === "timeout" ? "document_extraction_timeout" : safeReasonCode(extracted.reasonCode)] }, internal: null };
+    return { result: { ...base, ...retrievalProvenance, state: extracted.status === "timeout" ? "retrieval_timeout" : "extraction_failed", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: [extracted.status === "timeout" ? "document_extraction_timeout" : safeReasonCode(extracted.reasonCode)] }, internal: null };
   }
   params.ledger.settle(`${extractionOperation}:call`, { state: "completed", actualAmount: 1 });
   const validatedExtraction = validateExtractionResponse({ extraction: extracted.value, questionId: params.candidate.questionId, candidateId: params.candidate.candidateId, documentId, documentFingerprint: contentFingerprint, maximumOutputBytes: 1_048_576 });
   if (validatedExtraction.issues.length > 0) {
     response.content.fill(0);
-    return { result: { ...base, state: "extraction_failed", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: validatedExtraction.issues }, internal: null };
+    return { result: { ...base, ...retrievalProvenance, state: "extraction_failed", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: validatedExtraction.issues }, internal: null };
   }
   const extraction = { ...extracted.value, locators: validatedExtraction.locators };
   const untrustedText = `${extraction.text ?? ""}\n${extraction.locators.map((item) => item.text).join("\n")}`;
@@ -501,6 +514,7 @@ async function retrieveCandidate(params: {
   const locator = deterministicLocatorGrounding({ ...params.candidate, locatorHint: trustedLocatorHint }, extraction);
   const result: RuntimeDocumentResult = {
     ...base,
+    ...retrievalProvenance,
     state: extraction.state,
     mimeType: response.mimeType,
     byteLength: response.byteLength,

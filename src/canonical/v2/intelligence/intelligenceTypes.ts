@@ -405,6 +405,11 @@ export type RuntimeDocumentResult = {
   questionId: string;
   candidateId: string;
   documentId: string;
+  requestedUrl: string;
+  finalUrl: string | null;
+  documentFingerprint: string | null;
+  authorityAdmissionRef: string | null;
+  fingerprintMatchState: "matched_approved_fingerprint" | "mismatched_approved_fingerprint" | "not_required_by_admission" | "not_evaluated";
   state: DocumentState;
   mimeType: string | null;
   byteLength: number;

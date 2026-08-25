@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 import {
   authorityAdmissionForCandidate, createPublicSourceAuthorityAdmission, formatInternalAnalysisMarkdown,
   planRuntimeResearchQuestions, validateInvestigativeMember, validateInternalStatementAnalysisV1,
-  validatePublicSourceEvidenceManifestV1, writeInternalAnalysisBundle,
+  validatePublicSourceEvidenceManifestV1, validateRgInternalAuditV1, writeInternalAnalysisBundle,
+  projectRfAuditSummary,
   internalAnalysisTerminalStatus,
 } from "../../../../src/canonical/v2/index.js";
 import { officialSourceAdmission, questionOrigin, unknownItem } from "../intelligence/intelligenceFixtures.js";
@@ -67,6 +68,70 @@ describe("bounded live-boundary corrections", () => {
     await expect(writeInternalAnalysisBundle(output, baseAnalysis() as never, baseAudit() as never, { ...baseManifest(), entries: [] } as never)).rejects.toThrow("artifact_exists");
   });
 
+  it("projects bounded RF audit summaries without private candidate identities", () => {
+    const privatePacket = (suffix: string, tenantRef: string, accountRef: string, merchantPrivateValue: string) => ({
+      candidateId: `rg-candidate:semantic-support-${suffix.repeat(24)}`, lifecycle: "candidate", privacy: "private_by_default",
+      proposedVisibility: "account_private", requiresHumanAdmission: true, tenantRef, accountRef, merchantPrivateValue,
+      provenance: { adapter: "bounded_intelligence_runtime", sourceRecordRef: "rg-evidence:semantic-support-safe",
+        sourceVersion: "canonical_intelligence_v2_runtime_v1" } }) as never;
+    expect(projectRfAuditSummary({ candidatePackets: [], automaticAdmissionCount: 0 })).toEqual({
+      projectedCandidateCount: 0, automaticAdmissionCount: 0, projectionStatus: "completed_no_candidates",
+      reasonCodes: ["no_supported_rf_candidates_projected", "automatic_knowledge_admission_none"], candidateSummaries: [],
+    });
+    const firstPrivateContext = privatePacket("a", "tenant-private-123", "account-private-456", "merchant-private-one");
+    const changedPrivateContext = privatePacket("a", "different-tenant-private", "different-account-private", "different-merchant-private");
+    expect(projectRfAuditSummary({ candidatePackets: [firstPrivateContext], automaticAdmissionCount: 0 }))
+      .toEqual(projectRfAuditSummary({ candidatePackets: [changedPrivateContext], automaticAdmissionCount: 0 }));
+    const multiple = projectRfAuditSummary({ candidatePackets: [firstPrivateContext,
+      privatePacket("b", "tenant-private-789", "account-private-012", "merchant-private-two")],
+      automaticAdmissionCount: 3 });
+    expect(multiple).toMatchObject({ projectedCandidateCount: 2, automaticAdmissionCount: 3,
+      projectionStatus: "completed_with_candidates", reasonCodes: expect.arrayContaining(["automatic_knowledge_admission_reported"]),
+      candidateSummaries: [expect.objectContaining({ lifecycle: "candidate", privacy: "private_by_default",
+        proposedVisibility: "account_private", requiresHumanAdmission: true, provenanceAdapter: "bounded_intelligence_runtime",
+        projectionStatus: "projected_for_human_review" }), expect.any(Object)] });
+    expect(JSON.stringify(multiple)).not.toMatch(/merchant-private|tenant-private|account-private-456|source-record/i);
+    expect(() => projectRfAuditSummary({ candidatePackets: [{ ...firstPrivateContext,
+      candidateId: "merchant-private-candidate-id" } as never], automaticAdmissionCount: 0 }))
+      .toThrow("rf_audit_candidate_identity_unsafe");
+  });
+
+  it("validates exact-authority PDF retrieval provenance and fails malformed audit summaries closed", () => {
+    const fingerprint = "a".repeat(64);
+    const retrieval = { questionId: "question", candidateId: "candidate", documentId: "document",
+      requestedUrl: "https://example.com/approved.pdf", finalUrl: "https://cdn.example.com/approved.pdf",
+      documentFingerprint: fingerprint, authorityAdmissionRef: "approved-publication-v1",
+      fingerprintMatchState: "matched_approved_fingerprint", state: "retrieved_extracted", mimeType: "application/pdf",
+      byteLength: 12_345, locatorIds: ["locator-one"], reasonCodes: ["deterministic_locator_grounded"] };
+    const candidateSummary = { candidateRef: `rf-audit-candidate-${"b".repeat(24)}`, lifecycle: "candidate",
+      privacy: "private_by_default", proposedVisibility: "account_private", requiresHumanAdmission: true,
+      provenanceAdapter: "bounded_intelligence_runtime", provenanceCode: "canonical_intelligence_v2_runtime_v1",
+      projectionStatus: "projected_for_human_review",
+      reasonCodes: ["private_by_default", "human_admission_required", "candidate_not_automatically_admitted"] };
+    const audit = { ...baseAudit(), retrievalOutcomes: [retrieval], rfProjection: { projectedCandidateCount: 1,
+      automaticAdmissionCount: 0, projectionStatus: "completed_with_candidates",
+      reasonCodes: ["rf_candidates_projected_for_human_review", "automatic_knowledge_admission_none"],
+      candidateSummaries: [candidateSummary] } };
+    expect(validateRgInternalAuditV1(audit as never)).toEqual([]);
+    const automaticAdmissionReported = { ...audit, rfProjection: { ...audit.rfProjection, automaticAdmissionCount: 2,
+      reasonCodes: ["rf_candidates_projected_for_human_review", "automatic_knowledge_admission_reported"] } };
+    expect(validateRgInternalAuditV1(automaticAdmissionReported as never)).toEqual([]);
+    expect(automaticAdmissionReported.rfProjection.automaticAdmissionCount).toBe(2);
+    for (const malformed of [
+      { ...audit, rfProjection: { ...audit.rfProjection, candidateSummaries: [{ ...candidateSummary, lifecycle: "admitted" }] } },
+      { ...audit, rfProjection: { ...audit.rfProjection, candidateSummaries: [{ ...candidateSummary, privacy: "public" }] } },
+      { ...audit, rfProjection: { ...audit.rfProjection, candidateSummaries: [{ ...candidateSummary, proposedVisibility: "world_public" }] } },
+      { ...audit, rfProjection: { ...audit.rfProjection, projectedCandidateCount: 2 } },
+      { ...audit, rfProjection: { ...audit.rfProjection, candidateSummaries: [{ ...candidateSummary, candidateRef: "tenant-private-123" }] } },
+      { ...audit, merchantPrivatePayload: "must-not-be-accepted" },
+      { ...audit, retrievalOutcomes: [{ ...retrieval, finalUrl: "http://example.com/approved.pdf" }] },
+      { ...audit, retrievalOutcomes: [{ ...retrieval, documentFingerprint: "not-a-fingerprint" }] },
+      { ...audit, retrievalOutcomes: [{ ...retrieval, fingerprintMatchState: "looks_close" }] },
+      { ...audit, retrievalOutcomes: [{ ...retrieval, mimeType: "application/pdf; arbitrary=true" }] },
+      { ...audit, retrievalOutcomes: [{ ...retrieval, locatorIds: ["safe", "not safe"] }] },
+    ]) expect(validateRgInternalAuditV1(malformed as never)).not.toEqual([]);
+  });
+
   it("distinguishes deterministic fatal, provider unavailable, research unavailable, and legitimate unresolved completion", () => {
     const runtime = (overrides: Record<string, unknown>) => ({ canonicalTruthPreserved: true, terminalStatus: "completed", searchAttempts: [],
       diagnostics: { stageStatuses: {}, reasonCodes: [] }, ...overrides }) as never;
@@ -92,4 +157,6 @@ function baseAudit() { return { schemaVersion: "rg_internal_analysis_audit_v1", 
   liveTimingPolicy: { amendmentId: "RG-AMEND-011-INTERNAL-LIVE-TIMING-V2", searchTimeoutMs: 40_000, globalWallTimeMs: 180_000 },
   providerOperationReceipts: [], searchAttempts: [], retrievalOutcomes: [], questions: [], verificationOutcomes: [], budget: { profile: "RG-FREE-v1", limits: {}, consumed: {}, remaining: {}, reservations: [], exhaustedDimensions: [] },
   diagnostics: { schemaVersion: "canonical_intelligence_v2_diagnostics_v1", stageStatuses: {}, counts: {}, elapsedMs: {}, providerCodes: [], modelCodes: [], tokenUsage: 0, reasonCodes: [] },
+  rfProjection: { projectedCandidateCount: 0, automaticAdmissionCount: 0, projectionStatus: "completed_no_candidates",
+    reasonCodes: ["no_supported_rf_candidates_projected", "automatic_knowledge_admission_none"], candidateSummaries: [] },
   canonicalBeforeHash: "same", canonicalAfterHash: "same", canonicalTruthPreserved: true, rfSnapshotHash: "hash", rfEntryRefs: [], policyVersions: [] }; }
