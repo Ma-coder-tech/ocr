@@ -13,6 +13,7 @@ export * from "./semanticVerification.js";
 export * from "./themeLanguage.js";
 export * from "./runtime.js";
 export * from "./providerPrivacy.js";
+export * from "./processorPresentationCoverage.js";
 export { APPROVED_OPENROUTER_ENDPOINT, APPROVED_OPENAI_ENDPOINT, LIVE_OPENROUTER_KEY_ENV, LIVE_OPENROUTER_MODEL_ENV, LIVE_OPENAI_KEY_ENV, LIVE_OPENAI_MODEL_ENV,
   OPENROUTER_SEARCH_ENGINE, OPENROUTER_SEARCH_CONFIGURATION_CODE, APPROVED_OPENROUTER_SEARCH_MODEL,
   LiveOperationTransportError, createInternalLiveExecutionCapability, runInternalProviderPreflight, assertInternalProviderPreflight } from "./providerPreflight.js";

@@ -114,10 +114,10 @@ describe("reusable Fiserv / First Data full-layout admission", () => {
       normalizedObservationIdentityCount: 138, mappedSubjectCount: 4, suppressedObservationCount: 130,
       suppressedCountsByReason: { observation_control_total_not_research_subject: 4, observation_label_not_registered: 126 } });
     expect(planner.origins.map((item) => item.subjectCode)).toEqual([
-      "payment_network_assessment_fee_terminology",
-      "network_authorization_fee_terminology",
-      "discover_data_usage_fee_terminology",
-      "visa_transaction_integrity_fee_terminology",
+      "fiserv_multi_network_assessment_fee_historical_presentation",
+      "fiserv_discover_network_authorization_fee_historical_presentation",
+      "fiserv_discover_data_usage_fee_historical_presentation",
+      "fiserv_visa_transaction_integrity_fee_historical_presentation",
     ]);
     expect(planner.runtimeOrigins).toHaveLength(4);
     expect(planner.unknownQueue).toHaveLength(4);
@@ -131,7 +131,7 @@ describe("reusable Fiserv / First Data full-layout admission", () => {
       calculationSuffixKind: "transaction_count_at_rate" });
     expect(resolveObservationSubjectRule({ templateFamily: "fiserv_first_data_full_statement",
       sourceSection: "TRANSACTION FEES", normalized: authorization })?.subjectCode)
-      .toBe("network_authorization_fee_terminology");
+      .toBe("fiserv_discover_network_authorization_fee_historical_presentation");
     expect(resolveObservationSubjectRule({ templateFamily: "fiserv_first_data_full_statement",
       sourceSection: "ACCOUNT FEES", normalized: authorization })).toBeNull();
     expect(resolveObservationSubjectRule({ templateFamily: "fiserv_first_data_short_structural_mapping",
@@ -139,29 +139,46 @@ describe("reusable Fiserv / First Data full-layout admission", () => {
     expect(resolveObservationSubjectRule({ templateFamily: "fiserv_first_data_full_statement",
       sourceSection: "TRANSACTION FEES",
       normalized: normalizeObservationLabel("Network Authorization Fee Premium 99 Transactions at $0.10") })).toBeNull();
-    expect(registeredObservationSubjectIdentity({ questionClass: "observed_statement_term_public_definition",
+    expect(resolveObservationSubjectRule({ templateFamily: "fiserv_first_data_full_statement",
+      sourceSection: "TRANSACTION FEES",
+      normalized: normalizeObservationLabel("PayPal Network Authorization Fee 99 Transactions at $0.10") })).toBeNull();
+    expect(resolveObservationSubjectRule({ templateFamily: "fiserv_first_data_full_statement",
+      sourceSection: "TRANSACTION FEES",
+      normalized: normalizeObservationLabel("Mastercard Network Authorization Fee 99 Transactions at $0.10") })).toBeNull();
+    expect(registeredObservationSubjectIdentity({ questionClass: "observed_processor_term_historical_presentation",
       subjectCode: "arbitrary_fixture_term", safeResearchLabel: "arbitrary fixture term" })).toBe(false);
   });
 
   it("plans four bounded RF-first questions with exact multi-observation lineage and no amount ranking", () => {
     const first = buildAndPlan(full.foundation);
     expect(first.origins.planningInventory.subjects).toEqual([
-      expect.objectContaining({ subjectCode: "payment_network_assessment_fee_terminology", occurrenceCount: 5,
+      expect.objectContaining({ subjectCode: "fiserv_multi_network_assessment_fee_historical_presentation", occurrenceCount: 5,
         aggregateAmountMinor: 6887, priority: "material_operational_action" }),
-      expect.objectContaining({ subjectCode: "network_authorization_fee_terminology", occurrenceCount: 1,
+      expect.objectContaining({ subjectCode: "fiserv_discover_network_authorization_fee_historical_presentation", occurrenceCount: 1,
         aggregateAmountMinor: 55, priority: "material_operational_action" }),
-      expect.objectContaining({ subjectCode: "discover_data_usage_fee_terminology", occurrenceCount: 1,
+      expect.objectContaining({ subjectCode: "fiserv_discover_data_usage_fee_historical_presentation", occurrenceCount: 1,
         aggregateAmountMinor: 7, priority: "material_operational_action" }),
-      expect.objectContaining({ subjectCode: "visa_transaction_integrity_fee_terminology", occurrenceCount: 1,
+      expect.objectContaining({ subjectCode: "fiserv_visa_transaction_integrity_fee_historical_presentation", occurrenceCount: 1,
         aggregateAmountMinor: 50, priority: "material_operational_action" }),
     ]);
     expect(first.questions).toHaveLength(4);
     expect(first.questions.every((question) => question.eligibility === "eligible"
       && question.selection === "selected" && question.reasonCodes.includes("selected_by_deterministic_priority"))).toBe(true);
-    const assessment = first.origins.origins.find((item) => item.subjectCode === "payment_network_assessment_fee_terminology")!;
+    const assessment = first.origins.origins.find((item) => item.subjectCode === "fiserv_multi_network_assessment_fee_historical_presentation")!;
     expect(assessment.occurrenceRefs).toHaveLength(5);
     expect(assessment.evidenceRefs).toHaveLength(5);
     expect(first.questions.filter((item) => item.subjectCode === assessment.subjectCode)).toHaveLength(1);
+    const planningAudit = finalizeObservationPlanningAudit({ inventory: first.origins.planningInventory,
+      questions: first.questions, publicSourceAuthorityAdmissions: PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS });
+    expect(planningAudit.subjectDecisions.every((item) =>
+      item.sourceAuthorityAvailability === "existing_admitted_public_authority_available")).toBe(true);
+    expect(planningAudit.subjectDecisions.find((item) => item.subjectCode === assessment.subjectCode)?.reasonCodes)
+      .toEqual(expect.arrayContaining([
+        "requires_locator_coverage_visa_assessment_presentation",
+        "requires_locator_coverage_mastercard_assessment_presentation",
+        "requires_locator_coverage_discover_assessment_presentation",
+        "requires_locator_coverage_american_express_assessment_presentation",
+      ]));
 
     const changedAmounts = structuredClone(full.foundation);
     changedAmounts.sourceModel.occurrences.forEach((occurrence, index) => {
@@ -185,20 +202,20 @@ describe("reusable Fiserv / First Data full-layout admission", () => {
       suppressedCountsByReason: { observation_control_total_not_research_subject: 4,
         observation_label_not_registered: 96 } });
     expect(result.origins.planningInventory.subjects).toEqual([
-      expect.objectContaining({ subjectCode: "payment_network_assessment_fee_terminology", occurrenceCount: 5,
+      expect.objectContaining({ subjectCode: "fiserv_multi_network_assessment_fee_historical_presentation", occurrenceCount: 5,
         aggregateAmountMinor: 23998 }),
-      expect.objectContaining({ subjectCode: "network_authorization_fee_terminology", occurrenceCount: 1,
+      expect.objectContaining({ subjectCode: "fiserv_discover_network_authorization_fee_historical_presentation", occurrenceCount: 1,
         aggregateAmountMinor: 118 }),
-      expect.objectContaining({ subjectCode: "discover_data_usage_fee_terminology", occurrenceCount: 1,
+      expect.objectContaining({ subjectCode: "fiserv_discover_data_usage_fee_historical_presentation", occurrenceCount: 1,
         aggregateAmountMinor: 15 }),
-      expect.objectContaining({ subjectCode: "visa_transaction_integrity_fee_terminology", occurrenceCount: 1,
+      expect.objectContaining({ subjectCode: "fiserv_visa_transaction_integrity_fee_historical_presentation", occurrenceCount: 1,
         aggregateAmountMinor: 10 }),
     ]);
     expect(result.questions.map((item) => [item.subjectCode, item.selection])).toEqual([
-      ["discover_data_usage_fee_terminology", "selected"],
-      ["network_authorization_fee_terminology", "selected"],
-      ["payment_network_assessment_fee_terminology", "selected"],
-      ["visa_transaction_integrity_fee_terminology", "selected"],
+      ["fiserv_discover_data_usage_fee_historical_presentation", "selected"],
+      ["fiserv_discover_network_authorization_fee_historical_presentation", "selected"],
+      ["fiserv_multi_network_assessment_fee_historical_presentation", "selected"],
+      ["fiserv_visa_transaction_integrity_fee_historical_presentation", "selected"],
     ]);
     const statementTwoPatterns = new Set(statementTwo.origins.planningInventory.observations
       .map((item) => item.normalizedSubjectPatternRef));
@@ -211,21 +228,21 @@ describe("reusable Fiserv / First Data full-layout admission", () => {
       && item.sameNormalizedPatternCount === 1)).toBe(true);
   });
 
-  it("applies RF before research selection and records that no new public source is admitted", () => {
-    const knowledge = [admittedTerm("payment_network_assessment_fee_terminology")];
+  it("applies RF before research selection and reports the corrected exact public authority", () => {
+    const knowledge = [admittedTerm("fiserv_multi_network_assessment_fee_historical_presentation")];
     const result = buildAndPlan(full.foundation, knowledge);
-    expect(result.questions.find((item) => item.subjectCode === "payment_network_assessment_fee_terminology"))
+    expect(result.questions.find((item) => item.subjectCode === "fiserv_multi_network_assessment_fee_historical_presentation"))
       .toMatchObject({ rfResolution: { status: "resolved_single" }, eligibility: "rf_resolved", selection: "not_eligible" });
     expect(result.questions.filter((item) => item.selection === "selected")).toHaveLength(3);
     const audit = finalizeObservationPlanningAudit({ inventory: result.origins.planningInventory,
       questions: result.questions, publicSourceAuthorityAdmissions: PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS });
     expect(audit.eligibleSubjectCount).toBe(3);
     expect(audit.selectedQuestionCount).toBe(3);
-    expect(audit.subjectDecisions.find((item) => item.subjectCode === "payment_network_assessment_fee_terminology"))
+    expect(audit.subjectDecisions.find((item) => item.subjectCode === "fiserv_multi_network_assessment_fee_historical_presentation"))
       .toMatchObject({ rfResolutionStatus: "resolved_single", eligibility: "rf_resolved", selection: "not_eligible",
         sourceAuthorityAvailability: "dynamic_discovery_permitted_no_current_source_admission" });
     expect(audit.subjectDecisions.filter((item) => item.selection === "selected")
-      .every((item) => item.sourceAuthorityAvailability === "dynamic_discovery_permitted_no_current_source_admission")).toBe(true);
+      .every((item) => item.sourceAuthorityAvailability === "existing_admitted_public_authority_available")).toBe(true);
   });
 
   it("produces provider-safe controlled queries without fixture, merchant, amount, or lineage material", () => {

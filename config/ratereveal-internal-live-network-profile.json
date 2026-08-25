@@ -4,7 +4,8 @@
   "allowedHosts": [
     "openrouter.ai",
     "api.openai.com",
-    "merchants.fiserv.com"
+    "merchants.fiserv.com",
+    "support.cardpointe.com"
   ],
   "wildcardsAllowed": false,
   "registryOriginsAutoAllowed": false,

@@ -14,3 +14,4 @@ enabled = true
 "openrouter.ai" = "allow"
 "api.openai.com" = "allow"
 "merchants.fiserv.com" = "allow"
+"support.cardpointe.com" = "allow"

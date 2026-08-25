@@ -587,7 +587,7 @@ async function assertCommittedNetworkProfile(): Promise<void> {
   const profilePath = path.resolve(process.cwd(), "config/ratereveal-internal-live-network-profile.json");
   const parsed = JSON.parse(await readFile(profilePath, "utf8")) as Record<string, unknown>;
   const hosts = Array.isArray(parsed.allowedHosts) ? parsed.allowedHosts : [];
-  const expected = ["api.openai.com", "merchants.fiserv.com", "openrouter.ai"];
+  const expected = ["api.openai.com", "merchants.fiserv.com", "openrouter.ai", "support.cardpointe.com"];
   const requiredByRuntime = [new URL(APPROVED_OPENROUTER_ENDPOINT).hostname,
     new URL(APPROVED_OPENAI_ENDPOINT).hostname,
     ...PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS.map((admission) => new URL(admission.origin).hostname)];

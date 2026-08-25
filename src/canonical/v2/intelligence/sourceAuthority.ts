@@ -5,7 +5,7 @@ import type { DiscoveryCandidate, PublicSourceAuthorityAdmission, RuntimeResearc
 import { normalizeSafeHttpsUrl } from "./retrievalSafety.js";
 
 const PATH_MATCH_MODES = ["exact_document", "path_family"] as const;
-const EVIDENTIARY_SCOPES = ["claim_class_only", "terminology_example_presentation_only"] as const;
+const EVIDENTIARY_SCOPES = ["claim_class_only", "terminology_example_presentation_only", "historical_processor_presentation_only"] as const;
 const PERIOD_POLICIES = ["period_not_applicable", "documented_effective_period", "historical_example_only"] as const;
 
 function validPublicTitle(value: unknown): value is string {

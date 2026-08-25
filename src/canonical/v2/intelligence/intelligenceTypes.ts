@@ -118,7 +118,7 @@ export type RuntimeQuestionOrigin = {
 export type ProviderSafeQuestionContextV1 = {
   schemaVersion: "provider_safe_question_context_v1";
   providerContextId: string;
-  questionClass: "application_fee_public_definition" | "non_swiped_discount_public_definition" | "observed_statement_term_public_definition";
+  questionClass: "application_fee_public_definition" | "non_swiped_discount_public_definition" | "observed_processor_term_historical_presentation";
   claimType: "processor_term";
   subjectCode: string;
   safeResearchLabel: string;
@@ -137,7 +137,8 @@ export type PublicSourcePathMatchMode = "exact_document" | "path_family";
 
 export type PublicSourceEvidentiaryScope =
   | "claim_class_only"
-  | "terminology_example_presentation_only";
+  | "terminology_example_presentation_only"
+  | "historical_processor_presentation_only";
 
 export type PublicSourcePeriodApplicabilityPolicy =
   | "period_not_applicable"

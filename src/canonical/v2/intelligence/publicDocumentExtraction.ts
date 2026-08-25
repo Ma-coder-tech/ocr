@@ -23,7 +23,7 @@ export async function extractPublicDocument(request: DocumentExtractionRequest):
     const locators: ExtractedLocator[] = bounded.map((line, index) => ({
       locatorId: `locator-${createHash("sha256").update(`${request.documentId}\0${line.page ?? 0}\0${index + 1}\0${line.text}`).digest("hex").slice(0, 20)}`,
       documentId: request.documentId, documentFingerprint: fingerprint, page: line.page, sectionCode: line.sectionCode,
-      lineStart: index + 1, lineEnd: index + 1, text: line.text.slice(0, 512),
+      lineStart: index + 1, lineEnd: index + 1, text: line.text.slice(0, 4096),
     }));
     return { ...base, state: "retrieved_extracted", text: bounded.map((line) => line.text).join("\n"), locators };
   } catch (error) {

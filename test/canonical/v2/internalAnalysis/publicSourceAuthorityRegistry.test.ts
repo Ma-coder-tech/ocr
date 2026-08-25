@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_ADMISSION,
+  FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_SHA256,
+  FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_URL,
   FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_ADMISSION,
   FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_SHA256,
   FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_URL,
@@ -71,8 +74,11 @@ describe("production public-source authority registry", () => {
     expect(adaptive.queryText).not.toBe(initial.queryText);
   });
 
-  it("contains one exact-document Non-Swiped admission and no Application Fee admission", () => {
-    expect(PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS).toEqual([FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_ADMISSION]);
+  it("contains the unchanged Non-Swiped admission plus one narrowly bounded historical Fiserv presentation admission", () => {
+    expect(PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS).toEqual([
+      FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_ADMISSION,
+      FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_ADMISSION,
+    ]);
     expect(FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_ADMISSION).toMatchObject({
       admissionId: "fiserv_first_data_us_swipe_non_swipe_statement_guide_v1", admissionVersion: 1,
       origin: "https://merchants.fiserv.com", publicationFamilyCode: "first_data_us_swipe_non_swipe_statement_guide",
@@ -84,7 +90,69 @@ describe("production public-source authority registry", () => {
         samplePeriodStart: "2018-05-01", samplePeriodEnd: "2018-05-31", effectiveFrom: null, effectiveTo: null,
         periodApplicabilityPolicy: "historical_example_only", retrievalVerifiedOn: "2026-08-24" },
     });
+    expect(FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_ADMISSION).toMatchObject({
+      admissionId: "fiserv_cardpointe_card_organization_pass_through_fee_schedule_april_2022_v1",
+      admissionVersion: 1,
+      authority: "processor_publication",
+      origin: "https://support.cardpointe.com",
+      publicationFamilyCode: "fiserv_cardpointe_card_organization_pass_through_fee_schedule",
+      pathMatchMode: "exact_document",
+      maximumEvidentiaryScope: "historical_processor_presentation_only",
+      allowedClaimTypes: ["processor_term"],
+      allowedSubjectCodes: [
+        "fiserv_discover_data_usage_fee_historical_presentation",
+        "fiserv_discover_network_authorization_fee_historical_presentation",
+        "fiserv_multi_network_assessment_fee_historical_presentation",
+        "fiserv_visa_transaction_integrity_fee_historical_presentation",
+      ],
+      allowedProcessorPrograms: ["fiserv_first_data"],
+      allowedGeographyCodes: ["us"],
+      allowedPathPrefixes: [new URL(FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_URL).pathname],
+      approvedDocumentFingerprints: [FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_SHA256],
+      publicationMetadata: { title: "Card Organization Pass-Through Fee Schedule", version: null, publicationDate: null,
+        samplePeriodStart: "2022-04-01", samplePeriodEnd: "2022-04-30", effectiveFrom: null, effectiveTo: null,
+        periodApplicabilityPolicy: "historical_example_only", retrievalVerifiedOn: "2026-08-25",
+        provenanceUrls: [FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_URL] },
+    });
     expect(PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS.some((item) => item.allowedSubjectCodes.includes("application_fee_terminology"))).toBe(false);
+  });
+
+  it("generates the same exact known-authority document independently for each corrected processor-presentation subject", () => {
+    for (const subjectCode of FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_ADMISSION.allowedSubjectCodes) {
+      const known = knownExactDocumentCandidatesForQuestion({ question: question(subjectCode),
+        admissions: PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS });
+      expect(known).toHaveLength(1);
+      expect(known[0]).toMatchObject({ url: FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_URL,
+        authorityAdmissionRef: FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_ADMISSION.admissionId,
+        selectionReasonCode: "known_exact_authority_admission" });
+    }
+  });
+
+  it("fails the historical Fiserv admission closed for a changed final URL, fingerprint, subject, program, or geography", () => {
+    const subjectCode = "fiserv_discover_data_usage_fee_historical_presentation";
+    const historicalQuestion = question(subjectCode);
+    const historicalCandidate = candidate(FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_URL, {
+      questionId: historicalQuestion.questionId,
+      title: "Card Organization Pass-Through Fee Schedule",
+      authorityAdmissionRef: FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_ADMISSION.admissionId,
+      retrievalEligibility: "eligible",
+    });
+    expect(verifyRetrievedDocumentAuthority({ admission: FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_ADMISSION,
+      candidate: historicalCandidate, question: historicalQuestion,
+      finalUrl: FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_URL,
+      documentFingerprint: FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_SHA256 })).toEqual({
+      eligible: true, reasonCode: "source_authority_retrieved_document_verified",
+    });
+    for (const [changedQuestion, finalUrl, fingerprint] of [
+      [question("application_fee_terminology"), FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_URL, FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_SHA256],
+      [question(subjectCode, { scope: { ...historicalQuestion.scope, processorProgram: "clover" } }), FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_URL, FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_SHA256],
+      [question(subjectCode, { scope: { ...historicalQuestion.scope, region: "ca", jurisdiction: "ca" } }), FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_URL, FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_SHA256],
+      [historicalQuestion, `${FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_URL}/changed`, FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_SHA256],
+      [historicalQuestion, FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_URL, "0".repeat(64)],
+    ] as const) {
+      expect(verifyRetrievedDocumentAuthority({ admission: FISERV_CARDPOINTE_PASS_THROUGH_FEE_SCHEDULE_APRIL_2022_ADMISSION,
+        candidate: historicalCandidate, question: changedQuestion, finalUrl, documentFingerprint: fingerprint }).eligible).toBe(false);
+    }
   });
 
   it("admits only the exact US path, claim, subject, program, source type, and geography regardless of rank", () => {

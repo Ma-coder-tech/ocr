@@ -20,6 +20,8 @@ import { partitionStructuredItems, validateStructuredBatchResponse } from "./str
 import { deterministicThemeLanguageFallback, validateThemeLanguageCandidate, validateThemeLanguageInput } from "./themeLanguage.js";
 import { RG_SEMANTIC_AMENDMENT_IDS } from "./intelligenceTypes.js";
 import { assertProviderSafeQuestionContext, providerSafeScope, sanitizePublicDocumentTextForProvider } from "./providerPrivacy.js";
+import { processorPresentationLocatorTargets } from "./observationSubjectRegistry.js";
+import { enforceProcessorPresentationSemanticCoverage } from "./processorPresentationCoverage.js";
 import type {
   BoundedIntelligenceRuntimeInput,
   BoundedIntelligenceRuntimeResult,
@@ -51,11 +53,32 @@ const AUTHORITY_RANK: Partial<Record<KnowledgeSourceAuthority, number>> = {
   processor_publication: 2,
 };
 
+function authorityScopeLimitations(scope: BoundedIntelligenceRuntimeInput["publicSourceAuthorityAdmissions"][number]["maximumEvidentiaryScope"] | undefined): string[] {
+  if (scope === "historical_processor_presentation_only") return [
+    "historical_processor_presentation_only",
+    "fiserv_cardpointe_publication_scope_only",
+    "processor_publication_not_network_authority",
+    "october_2024_continuity_unproven",
+    "statement_account_and_clover_applicability_unproven",
+    "merchant_contract_applicability_unproven",
+    "ownership_margin_markup_and_pass_through_unresolved",
+    "merchant_control_negotiability_avoidability_and_removability_unresolved",
+    "statement_calculation_and_savings_unresolved",
+    "contract_or_bundling_terms_may_control",
+  ];
+  return scope === "terminology_example_presentation_only"
+    ? ["terminology_example_presentation_only", "public_scope_applicability_unproven", "ownership_control_and_savings_unresolved"]
+    : [];
+}
+
 type InternalDocument = {
   candidate: DiscoveryCandidate;
   extraction: DocumentExtractionResponse;
   contentFingerprint: string;
   locator: ExtractedLocator | null;
+  locatorTargets: Array<{ coverageCode: string | null; locator: ExtractedLocator }>;
+  requiredCoverageCodes: string[];
+  missingCoverageCodes: string[];
 };
 
 function operationId(runId: string, stage: string, sequence: number): string {
@@ -511,7 +534,12 @@ async function retrieveCandidate(params: {
   }
   const trustedLocatorHint = params.question.claimType === "processor_term"
     ? params.question.subjectCode.replace(/_terminology$/, "").replace(/_/g, " ") : params.candidate.locatorHint;
-  const locator = deterministicLocatorGrounding({ ...params.candidate, locatorHint: trustedLocatorHint }, extraction);
+  const defaultLocator = deterministicLocatorGrounding({ ...params.candidate, locatorHint: trustedLocatorHint }, extraction);
+  const coverage = processorPresentationLocatorTargets({ subjectCode: params.question.subjectCode, locators: extraction.locators });
+  const locatorTargets = coverage.requiredCoverageCodes.length > 0
+    ? coverage.targets
+    : defaultLocator ? [{ coverageCode: null, locator: defaultLocator }] : [];
+  const locator = locatorTargets[0]?.locator ?? null;
   const result: RuntimeDocumentResult = {
     ...base,
     ...retrievalProvenance,
@@ -519,10 +547,18 @@ async function retrieveCandidate(params: {
     mimeType: response.mimeType,
     byteLength: response.byteLength,
     locatorIds: extraction.locators.map((item) => item.locatorId),
-    reasonCodes: [locator ? "deterministic_locator_grounded" : "semantic_locator_investigation_required"],
+    reasonCodes: coverage.missingCoverageCodes.length > 0
+      ? ["processor_presentation_locator_coverage_incomplete"]
+      : [locator ? coverage.requiredCoverageCodes.length > 0
+        ? "processor_presentation_locator_coverage_grounded"
+        : "deterministic_locator_grounded"
+        : "semantic_locator_investigation_required"],
   };
   response.content.fill(0);
-  return { result, internal: extraction.state === "retrieved_extracted" || extraction.state === "retrieved_locator_only" ? { candidate: params.candidate, extraction, contentFingerprint, locator } : null };
+  return { result, internal: extraction.state === "retrieved_extracted" || extraction.state === "retrieved_locator_only"
+    ? { candidate: params.candidate, extraction, contentFingerprint, locator, locatorTargets,
+      requiredCoverageCodes: coverage.requiredCoverageCodes, missingCoverageCodes: coverage.missingCoverageCodes }
+    : null };
 }
 
 function wholeStatementValidation(params: {
@@ -693,14 +729,18 @@ async function runBoundedIntelligenceRuntimeInternal(
   stage(statuses, "retrieval", internalDocuments.length > 0 ? "completed" : candidates.length === 0 ? "not_needed" : !ports.retrieval ? "disabled_no_provider" : "completed_no_support");
 
   const observations: InvestigativeObservation[] = [];
-  const localObservationOriginByItem = new Map<string, { questionId: string; unknownRef: string; providerContextId: string | null }>();
-  const investigativeItems = internalDocuments.filter((document) => document.locator !== null).slice(0, profile.maxSemanticSupportItems).map((document, index) => {
+  const localObservationOriginByItem = new Map<string, { questionId: string; unknownRef: string; providerContextId: string | null;
+    locatorId: string; coverageCode: string | null }>();
+  const investigativeTargets = internalDocuments.flatMap((document) => document.locatorTargets.map((target) => ({ document, target })))
+    .slice(0, profile.maxSemanticSupportItems);
+  const investigativeItems = investigativeTargets.map(({ document, target }, index) => {
     const question = questions.find((item) => item.questionId === document.candidate.questionId)!;
     const questionContext = contextBindings.find((item) => item.unknownRef === question.originatingUnknownRef)?.context;
     if (questionContext) assertProviderSafeQuestionContext(questionContext);
     const itemId = operationId(input.runId, "investigative-item", index + 1);
     localObservationOriginByItem.set(itemId, { questionId: question.questionId, unknownRef: question.originatingUnknownRef,
-      providerContextId: questionContext?.providerContextId ?? null });
+      providerContextId: questionContext?.providerContextId ?? null, locatorId: target.locator.locatorId,
+      coverageCode: target.coverageCode });
     return {
       itemId,
       questionId: document.candidate.questionId,
@@ -709,7 +749,7 @@ async function runBoundedIntelligenceRuntimeInternal(
       documentFingerprint: document.extraction.documentFingerprint,
       text: sanitizePublicDocumentTextForProvider(document.extraction.text
         ?? document.extraction.locators.map((item) => item.text).join("\n")).slice(0, 131_072),
-      locators: [document.locator!].map(({ locatorId, documentId, documentFingerprint, page, sectionCode, lineStart, lineEnd }) => ({ locatorId, documentId, documentFingerprint, page, sectionCode, lineStart, lineEnd })),
+      locators: [target.locator].map(({ locatorId, documentId, documentFingerprint, page, sectionCode, lineStart, lineEnd }) => ({ locatorId, documentId, documentFingerprint, page, sectionCode, lineStart, lineEnd })),
       ...(questionContext ? { questionContext } : {}),
     };
   });
@@ -774,7 +814,7 @@ async function runBoundedIntelligenceRuntimeInternal(
         const localOrigin = localObservationOriginByItem.get(observation.itemId);
         if (document && localOrigin?.questionId === observation.questionId
           && questions.find((item) => item.questionId === observation.questionId)?.originatingUnknownRef === localOrigin.unknownRef
-          && bindInvestigativeLocator({ observation, extraction: document.extraction, expectedLocatorId: document.locator?.locatorId ?? null })) observations.push(observation);
+          && bindInvestigativeLocator({ observation, extraction: document.extraction, expectedLocatorId: localOrigin.locatorId })) observations.push(observation);
         else reasonCodes.push("investigative_locator_or_parent_identity_rejected");
       }
     }
@@ -788,10 +828,10 @@ async function runBoundedIntelligenceRuntimeInternal(
   const semanticInputs: SemanticVerificationInput[] = observations.map((observation) => {
     const question = questions.find((item) => item.questionId === observation.questionId)!;
     const document = internalDocuments.find((item) => item.candidate.candidateId === observation.candidateId && item.extraction.documentId === observation.documentId)!;
-    const locator = bindInvestigativeLocator({ observation, extraction: document.extraction, expectedLocatorId: document.locator?.locatorId ?? null })!;
+    const localOrigin = localObservationOriginByItem.get(observation.itemId)!;
+    const locator = bindInvestigativeLocator({ observation, extraction: document.extraction, expectedLocatorId: localOrigin.locatorId })!;
     const admission = input.publicSourceAuthorityAdmissions.find((item) => item.admissionId === document.candidate.authorityAdmissionRef);
-    const authorityLimitations = admission?.maximumEvidentiaryScope === "terminology_example_presentation_only"
-      ? ["terminology_example_presentation_only", "public_scope_applicability_unproven", "ownership_control_and_savings_unresolved"] : [];
+    const authorityLimitations = authorityScopeLimitations(admission?.maximumEvidentiaryScope);
     return {
       itemId: observation.itemId,
       question: {
@@ -811,7 +851,7 @@ async function runBoundedIntelligenceRuntimeInternal(
       proposedValue: observation.proposedValue,
     };
   }).slice(0, profile.maxSemanticSupportItems);
-  const supports: CandidateClaimSupport[] = [];
+  let supports: CandidateClaimSupport[] = [];
   const acceptedSupportIds = new Set<string>();
   if (ports.semantic && semanticInputs.length > 0) {
     const batchCount = Math.ceil(semanticInputs.length / profile.maxStructuredItemsPerBatch);
@@ -885,8 +925,7 @@ async function runBoundedIntelligenceRuntimeInternal(
         }
         const validated = validateSemanticSupport({ question: fullQuestion, candidate: semanticInput.candidate, locator: semanticInput.locator, support, expectedObservationId: semanticInput.itemId, expectedProposedValue: semanticInput.proposedValue });
         const admission = input.publicSourceAuthorityAdmissions.find((item) => item.admissionId === semanticInput.candidate.authorityAdmissionRef);
-        const authorityLimitations = admission?.maximumEvidentiaryScope === "terminology_example_presentation_only"
-          ? ["terminology_example_presentation_only", "public_scope_applicability_unproven", "ownership_control_and_savings_unresolved"] : [];
+        const authorityLimitations = authorityScopeLimitations(admission?.maximumEvidentiaryScope);
         supports.push({ ...support, verificationStatus: validated.status,
           limitationCodes: [...new Set([...support.limitationCodes, ...validated.reasonCodes, ...authorityLimitations])] });
       }
@@ -894,6 +933,16 @@ async function runBoundedIntelligenceRuntimeInternal(
     stage(statuses, "semantic_verification", supports.some((item) => item.verificationStatus === "supported_candidate") ? "completed_with_candidates" : "completed_no_support");
   } else {
     stage(statuses, "semantic_verification", semanticInputs.length === 0 ? "not_needed" : "disabled_no_provider");
+  }
+
+  const semanticCoverage = enforceProcessorPresentationSemanticCoverage({ questions, supports,
+    bindings: [...localObservationOriginByItem.entries()].map(([itemId, binding]) => ({ itemId,
+      questionId: binding.questionId, coverageCode: binding.coverageCode })) });
+  supports = semanticCoverage.supports;
+  if (semanticCoverage.incompleteQuestionIds.length > 0) reasonCodes.push("processor_presentation_locator_coverage_incomplete");
+  if (ports.semantic && semanticInputs.length > 0) {
+    stage(statuses, "semantic_verification", supports.some((item) => item.verificationStatus === "supported_candidate")
+      ? "completed_with_candidates" : "completed_no_support");
   }
 
   const semanticConflicts = detectSemanticConflicts(questions, supports);
@@ -908,16 +957,17 @@ async function runBoundedIntelligenceRuntimeInternal(
       return [];
     }
   });
-  const privateReviewBundles: PrivateResearchReviewBundle[] = internalDocuments.flatMap((document) => {
-    const locator = document.locator;
+  const privateReviewBundles: PrivateResearchReviewBundle[] = internalDocuments.flatMap((document) => document.locatorTargets.flatMap((target) => {
+    const locator = target.locator;
     const question = questions.find((item) => item.questionId === document.candidate.questionId);
     const candidate = candidates.find((item) => item.candidateId === document.candidate.candidateId);
     const support = supports.find((item) => item.questionId === document.candidate.questionId
       && item.candidateId === document.candidate.candidateId && item.documentId === document.extraction.documentId
-      && item.locatorId === locator?.locatorId);
-    const supportId = support?.supportId ?? `support-unverified-${createHash("sha256").update(`${document.candidate.candidateId}\0${document.extraction.documentId}\0${locator?.locatorId ?? "none"}`).digest("hex").slice(0, 20)}`;
+      && item.locatorId === locator.locatorId
+      && localObservationOriginByItem.get(item.itemId)?.coverageCode === target.coverageCode);
+    const supportId = support?.supportId ?? `support-unverified-${createHash("sha256").update(`${document.candidate.candidateId}\0${document.extraction.documentId}\0${locator.locatorId}\0${target.coverageCode ?? "default"}`).digest("hex").slice(0, 20)}`;
     const packet = support ? candidatePackets.find((item) => item.candidateId.endsWith(support.supportId.replace(/[^A-Za-z0-9_.:-]+/g, "-").slice(0, 96))) : undefined;
-    if (!question?.scope.tenantRef || !question.scope.accountRef || !candidate?.authorityAdmissionRef || !locator) return [];
+    if (!question?.scope.tenantRef || !question.scope.accountRef || !candidate?.authorityAdmissionRef) return [];
     const unverifiedLimitations = support ? [] : ["source_existence_and_provenance_established", "semantic_verification_not_completed",
       "not_supported_research_finding", "canonical_and_economic_authority_unchanged"];
     return [{ privacy: "account_private_ephemeral", persistence: "none", tenantRef: question.scope.tenantRef, accountRef: question.scope.accountRef,
@@ -929,7 +979,7 @@ async function runBoundedIntelligenceRuntimeInternal(
       locatorTextExcerpt: locator.text.slice(0, 512),
       supportId, semanticDecision: support?.verificationStatus ?? "verification_unavailable",
       limitationCodes: [...new Set([...(support?.limitationCodes ?? []), ...unverifiedLimitations])] }];
-  });
+  }));
   stage(statuses, "knowledge_candidate_output", candidatePackets.length > 0 ? "completed_with_candidates" : "completed_no_support");
 
   const fallbackById = new Map(input.languageInputs.map((item) => [item.itemId, deterministicThemeLanguageFallback(item)]));

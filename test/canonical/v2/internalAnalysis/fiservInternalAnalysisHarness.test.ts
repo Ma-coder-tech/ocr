@@ -108,7 +108,7 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     expect(result.rgAudit).toMatchObject({ executionMode: "injected_evaluation", externalNetworkCallCount: 0,
       canonicalTruthPreserved: true, budget: { profile: "RG-FREE-v1" } });
     expect(result.rgAudit.observationPlanning).toMatchObject({ schemaVersion: "observation_planning_audit_v1",
-      registryId: "fiserv_observation_subject_registry", registryVersion: "1.0.0",
+      registryId: "fiserv_observation_subject_registry", registryVersion: "2.0.0",
       rawNonzeroObservationCount: 6, normalizedObservationIdentityCount: 6, mappedSubjectCount: 2,
       suppressedObservationCount: 4, eligibleSubjectCount: 2, selectedQuestionCount: 2,
       subjects: [

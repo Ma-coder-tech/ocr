@@ -4,6 +4,7 @@ import type { CanonicalEconomicsV2Foundation, CanonicalEconomicsV2SourceOccurren
 import { createRuntimeQuestionOrigin } from "../intelligence/questionPlanning.js";
 import type { ProviderSafeQuestionContextV1, RuntimeQuestionOrigin } from "../intelligence/intelligenceTypes.js";
 import type { PublicSourceAuthorityAdmission, RuntimeResearchQuestion } from "../intelligence/intelligenceTypes.js";
+import { knownExactDocumentCandidatesForQuestion } from "../intelligence/sourceAuthority.js";
 import { inspectProviderSafeQuestionContext } from "../intelligence/providerPrivacy.js";
 import {
   FISERV_OBSERVATION_SUBJECT_REGISTRY_ID,
@@ -11,6 +12,7 @@ import {
   FISERV_OBSERVATION_SUBJECT_RULES,
   normalizeObservationLabel,
   registeredObservationSubjectIdentity,
+  registryRuleForSubject,
   resolveObservationSubjectRule,
   type ObservationCalculationSuffixKind,
   type ObservationSubjectRegistryRule,
@@ -287,12 +289,10 @@ export function finalizeObservationPlanningAudit(input: {
   const subjectDecisions = input.inventory.subjects.map((subject) => {
     const question = input.questions.find((item) => item.subjectCode === subject.subjectCode);
     if (!question) throw new Error(`observation_planning_question_missing:${subject.subjectCode}`);
-    const admittedAuthorityAvailable = input.publicSourceAuthorityAdmissions.some((admission) =>
-      admission.allowedSubjectCodes.includes(question.subjectCode)
-      && admission.allowedClaimTypes.includes(question.claimType)
-      && admission.allowedEvidenceClasses.some((item) => question.requiredEvidenceClasses.includes(item))
-      && (admission.allowedProcessorPrograms.length === 0 || (typeof question.scope.processorProgram === "string"
-        && admission.allowedProcessorPrograms.includes(question.scope.processorProgram))));
+    const admittedAuthorityAvailable = knownExactDocumentCandidatesForQuestion({ question,
+      admissions: input.publicSourceAuthorityAdmissions }).length > 0;
+    const coverageReasonCodes = registryRuleForSubject(subject.subjectCode)?.processorPresentationLocatorCoverage
+      .map((coverage) => `requires_locator_coverage_${coverage.coverageCode}`) ?? [];
     const sourceAuthorityAvailability = admittedAuthorityAvailable
       ? "existing_admitted_public_authority_available" as const
       : ["merchant_pricing_document_required", "processor_explanation_required", "unresolved_review_required"]
@@ -305,7 +305,7 @@ export function finalizeObservationPlanningAudit(input: {
       questionId: question.questionId, questionClass: subject.questionClass,
       rfResolutionStatus: question.rfResolution.status, eligibility: question.eligibility,
       selection: question.selection, materiality: question.materiality, priority: question.priority,
-      sourceAuthorityAvailability, reasonCodes: [...question.reasonCodes] };
+      sourceAuthorityAvailability, reasonCodes: [...new Set([...question.reasonCodes, ...coverageReasonCodes])] };
   });
   return {
     ...input.inventory,

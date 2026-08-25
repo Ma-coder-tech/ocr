@@ -1,21 +1,31 @@
-import type { RuntimeQuestionPriority } from "./intelligenceTypes.js";
+import type { ExtractedLocator, RuntimeQuestionPriority } from "./intelligenceTypes.js";
 import type { KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 
 export const FISERV_OBSERVATION_SUBJECT_REGISTRY_ID = "fiserv_observation_subject_registry" as const;
-export const FISERV_OBSERVATION_SUBJECT_REGISTRY_VERSION = "1.0.0" as const;
+export const FISERV_OBSERVATION_SUBJECT_REGISTRY_VERSION = "2.0.0" as const;
 
 export type ObservationResearchQuestionClass =
   | "application_fee_public_definition"
   | "non_swiped_discount_public_definition"
-  | "observed_statement_term_public_definition";
+  | "observed_processor_term_historical_presentation";
 
 export type RegisteredObservationSubjectCode =
   | "application_fee_terminology"
   | "non_swiped_discount_terminology"
-  | "payment_network_assessment_fee_terminology"
-  | "network_authorization_fee_terminology"
-  | "discover_data_usage_fee_terminology"
-  | "visa_transaction_integrity_fee_terminology";
+  | "fiserv_multi_network_assessment_fee_historical_presentation"
+  | "fiserv_discover_network_authorization_fee_historical_presentation"
+  | "fiserv_discover_data_usage_fee_historical_presentation"
+  | "fiserv_visa_transaction_integrity_fee_historical_presentation";
+
+export type ProcessorPresentationLocatorCoverageRequirement = {
+  coverageCode: string;
+  requiredNormalizedTerms: readonly string[];
+};
+
+export type ProcessorPresentationLocatorTarget = {
+  coverageCode: string;
+  locator: ExtractedLocator;
+};
 
 export type ObservationCalculationSuffixKind =
   | "none"
@@ -52,6 +62,7 @@ export type ObservationSubjectRegistryRule = {
   reasonCode: string;
   limitations: readonly string[];
   originIdentityCode: string;
+  processorPresentationLocatorCoverage: readonly ProcessorPresentationLocatorCoverageRequirement[];
 };
 
 const SHARED_LIMITATIONS = Object.freeze([
@@ -59,8 +70,27 @@ const SHARED_LIMITATIONS = Object.freeze([
   "no_economic_category_ownership_control_or_savings_inference",
 ]);
 
+const HISTORICAL_PROCESSOR_PRESENTATION_LIMITATIONS = Object.freeze([
+  "historical_processor_presentation_only",
+  "fiserv_cardpointe_publication_scope_only",
+  "processor_publication_not_network_authority",
+  "october_2024_continuity_unproven",
+  "statement_account_and_clover_applicability_unproven",
+  "merchant_contract_applicability_unproven",
+  "ownership_margin_markup_and_pass_through_unresolved",
+  "merchant_control_negotiability_avoidability_and_removability_unresolved",
+  "statement_calculation_and_savings_unresolved",
+  "contract_or_bundling_terms_may_control",
+]);
+
 function rule(value: ObservationSubjectRegistryRule): ObservationSubjectRegistryRule {
-  return Object.freeze(value);
+  return Object.freeze({
+    ...value,
+    processorPresentationLocatorCoverage: Object.freeze(value.processorPresentationLocatorCoverage.map((coverage) => Object.freeze({
+      ...coverage,
+      requiredNormalizedTerms: Object.freeze([...coverage.requiredNormalizedTerms]),
+    }))),
+  });
 }
 
 export const FISERV_OBSERVATION_SUBJECT_RULES = [
@@ -87,6 +117,7 @@ export const FISERV_OBSERVATION_SUBJECT_RULES = [
     reasonCode: "registered_short_application_fee_exact",
     limitations: SHARED_LIMITATIONS,
     originIdentityCode: "application_fee_public_definition",
+    processorPresentationLocatorCoverage: [],
   }),
   rule({
     ruleId: "fiserv_short_non_swiped_discount_prefix_v1",
@@ -111,9 +142,10 @@ export const FISERV_OBSERVATION_SUBJECT_RULES = [
     reasonCode: "registered_short_non_swiped_discount_prefix",
     limitations: SHARED_LIMITATIONS,
     originIdentityCode: "non_swiped_discount_public_definition",
+    processorPresentationLocatorCoverage: [],
   }),
   rule({
-    ruleId: "fiserv_full_assessment_fee_terms_v1",
+    ruleId: "fiserv_full_multi_network_assessment_historical_presentation_v2",
     registryVersion: FISERV_OBSERVATION_SUBJECT_REGISTRY_VERSION,
     eligibleTemplateFamilies: ["fiserv_first_data_full_statement"],
     eligibleSourceSections: ["TRANSACTION FEES"],
@@ -127,93 +159,108 @@ export const FISERV_OBSERVATION_SUBJECT_RULES = [
       "visa assessment fee db",
     ],
     permittedCalculationSuffixes: ["rate_times_amount"],
-    subjectCode: "payment_network_assessment_fee_terminology",
+    subjectCode: "fiserv_multi_network_assessment_fee_historical_presentation",
     claimType: "processor_term",
-    questionClass: "observed_statement_term_public_definition",
-    safeResearchLabel: "payment network assessment fee",
-    questionText: "Does an eligible authoritative public processor publication define or present payment network assessment fee terminology for the relevant public product context and period, and what scope limitations does it state?",
-    reportDecisionCode: "payment_network_assessment_fee_terminology_review",
+    questionClass: "observed_processor_term_historical_presentation",
+    safeResearchLabel: "Fiserv historical multi network assessment fee presentation",
+    questionText: "Does an eligible Fiserv processor publication historically present the complete Visa, Mastercard, Discover, and American Express assessment label set, and exactly what historical explanations and scope limitations does that processor publication state?",
+    reportDecisionCode: "fiserv_multi_network_assessment_fee_historical_presentation_review",
     requiredSourceAuthorities: ["processor_publication"],
     requiredEvidenceClass: "official_processor_terminology",
     priority: "material_operational_action",
     materiality: "material",
     blockingEffect: "limits_authority",
     publicResearchPlausible: true,
-    reasonCode: "registered_full_assessment_fee_term",
-    limitations: SHARED_LIMITATIONS,
-    originIdentityCode: "observed_statement_term_public_definition:payment_network_assessment_fee_terminology",
+    reasonCode: "registered_full_fiserv_multi_network_assessment_historical_presentation",
+    limitations: HISTORICAL_PROCESSOR_PRESENTATION_LIMITATIONS,
+    originIdentityCode: "observed_processor_term_historical_presentation:fiserv_multi_network_assessment_fee",
+    processorPresentationLocatorCoverage: [
+      { coverageCode: "visa_assessment_presentation", requiredNormalizedTerms: ["visa assessment fee db", "visa assessment fee cr"] },
+      { coverageCode: "mastercard_assessment_presentation", requiredNormalizedTerms: ["mastercard assessment fee"] },
+      { coverageCode: "discover_assessment_presentation", requiredNormalizedTerms: ["discover assessment fee"] },
+      { coverageCode: "american_express_assessment_presentation", requiredNormalizedTerms: ["american express assessment fee", "amex assessment fee"] },
+    ],
   }),
   rule({
-    ruleId: "fiserv_full_network_authorization_fee_exact_v1",
+    ruleId: "fiserv_full_discover_network_authorization_historical_presentation_v2",
     registryVersion: FISERV_OBSERVATION_SUBJECT_REGISTRY_VERSION,
     eligibleTemplateFamilies: ["fiserv_first_data_full_statement"],
     eligibleSourceSections: ["TRANSACTION FEES"],
     matchKind: "exact_calculation_free_label",
     normalizedPatterns: ["network authorization fee"],
     permittedCalculationSuffixes: ["transaction_count_at_rate"],
-    subjectCode: "network_authorization_fee_terminology",
+    subjectCode: "fiserv_discover_network_authorization_fee_historical_presentation",
     claimType: "processor_term",
-    questionClass: "observed_statement_term_public_definition",
-    safeResearchLabel: "network authorization fee",
-    questionText: "Does an eligible authoritative public processor publication define or present network authorization fee terminology for the relevant public product context and period, and what scope limitations does it state?",
-    reportDecisionCode: "network_authorization_fee_terminology_review",
+    questionClass: "observed_processor_term_historical_presentation",
+    safeResearchLabel: "Fiserv historical Discover Network Authorization Fee presentation",
+    questionText: "Does an eligible Fiserv processor publication historically present Discover Network Authorization Fee as Network Authorization Fee, and exactly what historical explanation, network context, contract or bundling caveat, and scope limitations does that processor publication state?",
+    reportDecisionCode: "fiserv_discover_network_authorization_fee_historical_presentation_review",
     requiredSourceAuthorities: ["processor_publication"],
     requiredEvidenceClass: "official_processor_terminology",
     priority: "material_operational_action",
     materiality: "material",
     blockingEffect: "limits_authority",
     publicResearchPlausible: true,
-    reasonCode: "registered_full_network_authorization_fee_exact",
-    limitations: SHARED_LIMITATIONS,
-    originIdentityCode: "observed_statement_term_public_definition:network_authorization_fee_terminology",
+    reasonCode: "registered_full_fiserv_discover_network_authorization_historical_presentation",
+    limitations: HISTORICAL_PROCESSOR_PRESENTATION_LIMITATIONS,
+    originIdentityCode: "observed_processor_term_historical_presentation:fiserv_discover_network_authorization_fee",
+    processorPresentationLocatorCoverage: [
+      { coverageCode: "discover_network_authorization_presentation", requiredNormalizedTerms: ["discover network authorization fee", "network authorization fee"] },
+    ],
   }),
   rule({
-    ruleId: "fiserv_full_discover_data_usage_fee_exact_v1",
+    ruleId: "fiserv_full_discover_data_usage_historical_presentation_v2",
     registryVersion: FISERV_OBSERVATION_SUBJECT_REGISTRY_VERSION,
     eligibleTemplateFamilies: ["fiserv_first_data_full_statement"],
     eligibleSourceSections: ["TRANSACTION FEES"],
     matchKind: "exact_calculation_free_label",
     normalizedPatterns: ["discover data usage fee"],
     permittedCalculationSuffixes: ["transaction_count_at_rate"],
-    subjectCode: "discover_data_usage_fee_terminology",
+    subjectCode: "fiserv_discover_data_usage_fee_historical_presentation",
     claimType: "processor_term",
-    questionClass: "observed_statement_term_public_definition",
-    safeResearchLabel: "discover data usage fee",
-    questionText: "Does an eligible authoritative public processor publication define or present Discover data usage fee terminology for the relevant public product context and period, and what scope limitations does it state?",
-    reportDecisionCode: "discover_data_usage_fee_terminology_review",
+    questionClass: "observed_processor_term_historical_presentation",
+    safeResearchLabel: "Fiserv historical Discover Data Usage Fee presentation",
+    questionText: "Does an eligible Fiserv processor publication historically present Discover Data Usage Fee, and exactly what historical explanation, network context, contract or bundling caveat, and scope limitations does that processor publication state?",
+    reportDecisionCode: "fiserv_discover_data_usage_fee_historical_presentation_review",
     requiredSourceAuthorities: ["processor_publication"],
     requiredEvidenceClass: "official_processor_terminology",
     priority: "material_operational_action",
     materiality: "material",
     blockingEffect: "limits_authority",
     publicResearchPlausible: true,
-    reasonCode: "registered_full_discover_data_usage_fee_exact",
-    limitations: SHARED_LIMITATIONS,
-    originIdentityCode: "observed_statement_term_public_definition:discover_data_usage_fee_terminology",
+    reasonCode: "registered_full_fiserv_discover_data_usage_historical_presentation",
+    limitations: HISTORICAL_PROCESSOR_PRESENTATION_LIMITATIONS,
+    originIdentityCode: "observed_processor_term_historical_presentation:fiserv_discover_data_usage_fee",
+    processorPresentationLocatorCoverage: [
+      { coverageCode: "discover_data_usage_presentation", requiredNormalizedTerms: ["discover data usage fee"] },
+    ],
   }),
   rule({
-    ruleId: "fiserv_full_visa_transaction_integrity_fee_exact_v1",
+    ruleId: "fiserv_full_visa_transaction_integrity_historical_presentation_v2",
     registryVersion: FISERV_OBSERVATION_SUBJECT_REGISTRY_VERSION,
     eligibleTemplateFamilies: ["fiserv_first_data_full_statement"],
     eligibleSourceSections: ["ACCOUNT FEES"],
     matchKind: "exact_calculation_free_label",
     normalizedPatterns: ["vi transaction integrity fee"],
     permittedCalculationSuffixes: ["transaction_count_at_rate"],
-    subjectCode: "visa_transaction_integrity_fee_terminology",
+    subjectCode: "fiserv_visa_transaction_integrity_fee_historical_presentation",
     claimType: "processor_term",
-    questionClass: "observed_statement_term_public_definition",
-    safeResearchLabel: "visa transaction integrity fee",
-    questionText: "Does an eligible authoritative public processor publication define or present Visa transaction integrity fee terminology for the relevant public product context and period, and what scope limitations does it state?",
-    reportDecisionCode: "visa_transaction_integrity_fee_terminology_review",
+    questionClass: "observed_processor_term_historical_presentation",
+    safeResearchLabel: "Fiserv historical Visa Transaction Integrity Fee presentation",
+    questionText: "Does an eligible Fiserv processor publication historically present VI Transaction Integrity Fee and an associated historical explanation, and exactly what processor-publication scope limitations remain without asserting Visa network-program authority?",
+    reportDecisionCode: "fiserv_visa_transaction_integrity_fee_historical_presentation_review",
     requiredSourceAuthorities: ["processor_publication"],
     requiredEvidenceClass: "official_processor_terminology",
     priority: "material_operational_action",
     materiality: "material",
     blockingEffect: "limits_authority",
     publicResearchPlausible: true,
-    reasonCode: "registered_full_visa_transaction_integrity_fee_exact",
-    limitations: SHARED_LIMITATIONS,
-    originIdentityCode: "observed_statement_term_public_definition:visa_transaction_integrity_fee_terminology",
+    reasonCode: "registered_full_fiserv_visa_transaction_integrity_historical_presentation",
+    limitations: HISTORICAL_PROCESSOR_PRESENTATION_LIMITATIONS,
+    originIdentityCode: "observed_processor_term_historical_presentation:fiserv_visa_transaction_integrity_fee",
+    processorPresentationLocatorCoverage: [
+      { coverageCode: "visa_transaction_integrity_presentation", requiredNormalizedTerms: ["visa credit debit integrity fee", "vi transaction integrity fee"] },
+    ],
   }),
 ] as const satisfies readonly ObservationSubjectRegistryRule[];
 
@@ -261,4 +308,27 @@ export function registeredObservationSubjectIdentity(input: {
 
 export function registryRuleForSubject(subjectCode: string): ObservationSubjectRegistryRule | null {
   return FISERV_OBSERVATION_SUBJECT_RULES.find((rule) => rule.subjectCode === subjectCode) ?? null;
+}
+
+function normalizePublicLocatorText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+export function processorPresentationLocatorTargets(input: {
+  subjectCode: string;
+  locators: readonly ExtractedLocator[];
+}): { requiredCoverageCodes: string[]; targets: ProcessorPresentationLocatorTarget[]; missingCoverageCodes: string[] } {
+  const requirements = registryRuleForSubject(input.subjectCode)?.processorPresentationLocatorCoverage ?? [];
+  const normalizedLocators = input.locators.map((locator) => ({ locator, text: normalizePublicLocatorText(locator.text) }));
+  const targets = requirements.flatMap((requirement): ProcessorPresentationLocatorTarget[] => {
+    const locator = normalizedLocators.find((candidate) => requirement.requiredNormalizedTerms
+      .every((term) => candidate.text.includes(term)))?.locator;
+    return locator ? [{ coverageCode: requirement.coverageCode, locator }] : [];
+  });
+  const covered = new Set(targets.map((target) => target.coverageCode));
+  return {
+    requiredCoverageCodes: requirements.map((requirement) => requirement.coverageCode),
+    targets,
+    missingCoverageCodes: requirements.map((requirement) => requirement.coverageCode).filter((code) => !covered.has(code)),
+  };
 }

@@ -7,7 +7,7 @@ export const E2E_INTERNAL_ANALYSIS_AMENDMENT_ID = "E2E-AMEND-001-OBSERVATION-TO-
 export const E2E_LIVE_RESEARCH_OUTCOME_AMENDMENT_ID = "E2E-AMEND-002-LIVE-RESEARCH-OUTCOME" as const;
 
 export type InvestigationQuestionClassV1 = "application_fee_public_definition" | "non_swiped_discount_public_definition"
-  | "observed_statement_term_public_definition";
+  | "observed_processor_term_historical_presentation";
 
 export type InvestigationQuestionOriginV1 = {
   schemaVersion: "investigation_question_origin_v1";

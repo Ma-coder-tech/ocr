@@ -356,14 +356,14 @@ describe("durable internal live runner", () => {
     const profile = JSON.parse(await readFile(path.resolve(process.cwd(),
       "config/ratereveal-internal-live-network-profile.json"), "utf8"));
     expect(profile).toMatchObject({ mode: "allowlist", wildcardsAllowed: false, registryOriginsAutoAllowed: false });
-    expect([...profile.allowedHosts].sort()).toEqual(["api.openai.com", "merchants.fiserv.com", "openrouter.ai"]);
+    expect([...profile.allowedHosts].sort()).toEqual(["api.openai.com", "merchants.fiserv.com", "openrouter.ai", "support.cardpointe.com"]);
     expect(profile.allowedHosts.some((host: string) => host.includes("*"))).toBe(false);
     const nativeProfile = await readFile(path.resolve(process.cwd(), ".codex/config.toml"), "utf8");
     expect(nativeProfile).toContain('default_permissions = "ratereveal-live"');
     expect(nativeProfile).toContain("network_proxy = true");
     expect(nativeProfile).toContain('extends = ":workspace"');
     const nativeHosts = [...nativeProfile.matchAll(/^"([^"]+)" = "allow"$/gm)].map((match) => match[1]).sort();
-    expect(nativeHosts).toEqual(["api.openai.com", "merchants.fiserv.com", "openrouter.ai"]);
+    expect(nativeHosts).toEqual(["api.openai.com", "merchants.fiserv.com", "openrouter.ai", "support.cardpointe.com"]);
     expect(nativeProfile).not.toMatch(/^".*\*.*" = "allow"$/m);
   });
 });
