@@ -8,6 +8,7 @@ import {
   KeychainBrokerError,
   runInternalLiveRunner,
   STATEMENT_ONE_INTERNAL_LIVE_PROFILE,
+  STATEMENT_TWO_DETERMINISTIC_FAMILY_PROFILE,
 } from "../../../../scripts/run-fiserv-internal-live-evaluation.js";
 
 const syntheticStaticChecks = {
@@ -31,29 +32,71 @@ describe("durable internal live runner", () => {
     await expect(readdir(outputRoot)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("isolates Statement 2 by rejecting its profile before output allocation or Keychain access", async () => {
+  it("admits the Statement-2 family profile in readiness without Keychain or provider construction", async () => {
     const parent = await mkdtemp(path.join(os.tmpdir(), "rr-live-runner-statement-two-"));
     const outputRoot = path.join(parent, "runs");
     const lines: string[] = [];
     let credentialReads = 0;
-    const code = await runInternalLiveRunner({
+    const code = await runInternalLiveRunner({ mode: "readiness",
       profile: "statement-two",
       authorization: "product-owner-approved",
       runId: "auto",
       outputRoot,
     }, {
+      ...syntheticStaticChecks,
       log: (line) => lines.push(line),
       readCredential: async () => { credentialReads += 1; return "should-never-be-read"; },
     });
-    expect(code).toBe(2);
+    expect(code).toBe(0);
     expect(credentialReads).toBe(0);
     expect(lines).toEqual(expect.arrayContaining([
-      "executionStatus: cancelled",
-      "researchOutcome: not_started",
+      "Admission preflight: fiserv_first_data_full_statement@1.0.0; passed",
+      "Family: fiserv_first_data_full_statement",
+      "Frozen planner questions: none",
+      "executionStatus: readiness_passed",
+      "researchOutcome: no_eligible_public_research_questions",
       "Provider sends: 0",
-      "Safe reason: authorized_profile_required",
+      "Keychain accesses: 0",
     ]));
-    await expect(readdir(outputRoot)).rejects.toMatchObject({ code: "ENOENT" });
+    expect(await readdir(outputRoot)).toEqual([]);
+    expect(STATEMENT_TWO_DETERMINISTIC_FAMILY_PROFILE).toMatchObject({
+      profileCode: "statement-two",
+      requiredFamily: "fiserv_first_data_full_statement",
+      requiredAdmissionMapping: "fiserv_first_data_full_statement",
+      providerExecution: "prohibited_no_frozen_planner_questions",
+    });
+  }, 30_000);
+
+  it("resolves profile to admission before a generic deterministic-family execution", async () => {
+    const outputRoot = await mkdtemp(path.join(os.tmpdir(), "rr-live-runner-full-family-"));
+    const lines: string[] = [];
+    let credentialReads = 0;
+    let executions = 0;
+    const code = await runInternalLiveRunner({ profile: "statement-two", authorization: "product-owner-approved",
+      runId: "auto", outputRoot }, {
+      ...syntheticStaticChecks,
+      log: (line) => lines.push(line),
+      readCredential: async () => { credentialReads += 1; return "must-not-read"; },
+      executeDeterministicFamily: async ({ runId, outputDirectory, profile }) => {
+        executions += 1;
+        expect(runId).toBe("statement-two-internal-evaluation-001");
+        expect(profile.requiredAdmissionMapping).toBe("fiserv_first_data_full_statement");
+        await mkdir(outputDirectory, { mode: 0o700 });
+        await writeFile(path.join(outputDirectory, "rh-projection.json"), "{\"safe\":true}\n", { mode: 0o600 });
+        return { executionStatus: "completed", researchOutcome: "no_eligible_public_research_questions",
+          artifactPath: path.join(outputDirectory, "rh-projection.json") };
+      },
+    });
+    expect(code).toBe(0);
+    expect(executions).toBe(1);
+    expect(credentialReads).toBe(0);
+    expect(lines).toEqual(expect.arrayContaining([
+      "Admission preflight: fiserv_first_data_full_statement@1.0.0; passed",
+      "Frozen planner questions: none",
+      "Provider sends: 0",
+      "Keychain accesses: 0",
+      "executionStatus: completed",
+    ]));
   });
 
   it("fails static repository readiness before output allocation or Keychain access", async () => {

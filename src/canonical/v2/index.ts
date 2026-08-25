@@ -5,6 +5,8 @@ export * from "./metrics.js";
 export * from "./sourceModel.js";
 export * from "./fiservAdapter.js";
 export * from "./fiservShortTemplateAdmission.js";
+export * from "./fiservFullTemplateAdmission.js";
+export * from "./fiservTemplateAdmission.js";
 export * from "./validate.js";
 export * from "./compareV1.js";
 export * from "./goldObservation.js";

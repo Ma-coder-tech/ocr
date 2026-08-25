@@ -14,6 +14,9 @@ import {
   PRODUCTION_PUBLIC_SOURCE_AUTHORITY_ADMISSIONS,
   ProviderReadinessDiagnosticLog,
   ProviderOperationAuditLog,
+  buildStatementObservationInvestigationOrigins,
+  inspectFiservOneStatementEvaluation,
+  runFiservOneStatementEvaluation,
   runProviderReadinessProbe,
   runFiservInternalAnalysisEvaluationV1,
   type InternalLiveExecutionCapabilityV1,
@@ -55,6 +58,23 @@ export const STATEMENT_ONE_INTERNAL_LIVE_PROFILE = Object.freeze({
   fallbackProvidersAllowed: false,
 });
 
+export const STATEMENT_TWO_DETERMINISTIC_FAMILY_PROFILE = Object.freeze({
+  profileCode: "statement-two",
+  safeStatementId: "fsv-01-clover-full-oct",
+  runVersion: "run-2-template-aware-review-corrected",
+  statementPath: "test/fixtures/pdfs/SAMPLE_MERCHANT4_CLOVER.pdf",
+  requiredFamily: "fiserv_first_data_full_statement",
+  requiredAdmissionMapping: "fiserv_first_data_full_statement",
+  runPrefix: "statement-two-internal-evaluation",
+  sourceCompleteness: "unknown" as const,
+  providerExecution: "prohibited_no_frozen_planner_questions" as const,
+});
+
+type DeterministicAdmittedFamilyProfile = typeof STATEMENT_TWO_DETERMINISTIC_FAMILY_PROFILE;
+const DETERMINISTIC_ADMITTED_FAMILY_PROFILES = new Map<string, DeterministicAdmittedFamilyProfile>([
+  [STATEMENT_TWO_DETERMINISTIC_FAMILY_PROFILE.profileCode, STATEMENT_TWO_DETERMINISTIC_FAMILY_PROFILE],
+]);
+
 export type InternalLiveRunnerDependencies = {
   readCredential(service: KeychainService, signal: AbortSignal): Promise<string>;
   keychainReadTimeoutMs: number;
@@ -73,6 +93,11 @@ export type InternalLiveRunnerDependencies = {
     providerAudit: ProviderOperationAuditLog;
     readinessDiagnostics: ProviderReadinessDiagnosticLog;
   }): ReturnType<typeof runProviderReadinessProbe>;
+  executeDeterministicFamily(input: {
+    runId: string;
+    outputDirectory: string;
+    profile: DeterministicAdmittedFamilyProfile;
+  }): Promise<{ executionStatus: string; researchOutcome: string; artifactPath: string }>;
   log(line: string): void;
 };
 
@@ -89,6 +114,10 @@ export async function runInternalLiveRunner(
   overrides: Partial<InternalLiveRunnerDependencies> = {},
 ): Promise<number> {
   const log = overrides.log ?? ((line: string) => process.stdout.write(`${line}\n`));
+  const deterministicFamilyProfile = args.profile ? DETERMINISTIC_ADMITTED_FAMILY_PROFILES.get(args.profile) : undefined;
+  if (deterministicFamilyProfile) {
+    return runDeterministicAdmittedFamilyProfile(args, deterministicFamilyProfile, overrides, log);
+  }
   if (args.profile !== PROFILE_CODE) {
     log("executionStatus: cancelled");
     log("researchOutcome: not_started");
@@ -231,6 +260,119 @@ export async function runInternalLiveRunner(
       await unlink(lockPath).catch(() => undefined);
     }
   }
+}
+
+async function runDeterministicAdmittedFamilyProfile(
+  args: InternalLiveRunnerArguments,
+  profile: DeterministicAdmittedFamilyProfile,
+  overrides: Partial<InternalLiveRunnerDependencies>,
+  log: (line: string) => void,
+): Promise<number> {
+  if (args.authorization !== AUTHORIZATION_TOKEN) {
+    log("executionStatus: cancelled");
+    log("researchOutcome: not_started");
+    log("Provider sends: 0");
+    log("Keychain accesses: 0");
+    log("Safe reason: exact_product_owner_authorization_required");
+    return 2;
+  }
+  if (args.mode === "provider-readiness") {
+    log("executionStatus: cancelled");
+    log("researchOutcome: not_started");
+    log("Provider sends: 0");
+    log("Keychain accesses: 0");
+    log("Safe reason: deterministic_family_profile_has_no_provider_questions");
+    return 2;
+  }
+
+  let lock: Awaited<ReturnType<typeof open>> | null = null;
+  let lockPath = "";
+  try {
+    await (overrides.checkRepositoryState ?? assertRepositoryState)();
+    await (overrides.checkNetworkProfile ?? assertCommittedNetworkProfile)();
+    const outputRoot = await assertOutputRoot(args.outputRoot);
+    await assertRequestedRunIdAvailableForPrefix(outputRoot, args.runId, profile.runPrefix);
+    const inspected = await inspectFiservOneStatementEvaluation({
+      statementPaths: [path.resolve(process.cwd(), profile.statementPath)],
+      safeStatementId: profile.safeStatementId,
+      sourceProfile: { statementCompleteness: profile.sourceCompleteness },
+    });
+    if (!inspected.admission || inspected.admission.mappingId !== profile.requiredAdmissionMapping
+      || inspected.identity.statementFamily !== profile.requiredFamily
+      || inspected.admissionEvaluation.fullFamilyDecision.matched !== true) {
+      throw new Error("internal_live_deterministic_family_admission_failed");
+    }
+    const planner = buildStatementObservationInvestigationOrigins({ foundation: inspected.foundation, admittedKnowledge: [],
+      tenantRef: "ratereveal-internal-live-evaluation", accountRef: "deterministic-family-profile" });
+    if (planner.origins.length !== 0 || planner.providerContexts.length !== 0) {
+      throw new Error("internal_live_deterministic_family_research_model_expansion_required");
+    }
+    log(`Admission preflight: ${inspected.admission.mappingId}@${inspected.admission.mappingVersion}; passed`);
+    log(`Family: ${String(inspected.identity.statementFamily)}`);
+    log(`Admission reasons: ${inspected.admissionEvaluation.fullFamilyDecision.reasonCodes.join(", ")}`);
+    log("Frozen planner questions: none");
+    log("Preflight: passed; zero external sends");
+    log("Provider sends: 0");
+    log("Keychain accesses: 0");
+    if (args.mode === "readiness") {
+      log("executionStatus: readiness_passed");
+      log("researchOutcome: no_eligible_public_research_questions");
+      return 0;
+    }
+
+    lockPath = path.join(outputRoot, `.${profile.runPrefix}.lock`);
+    lock = await open(lockPath, "wx", 0o600).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "EEXIST") throw new Error("internal_live_run_allocation_locked");
+      throw error;
+    });
+    const runId = await allocateRunIdForPrefix(outputRoot, args.runId, profile.runPrefix);
+    const outputDirectory = path.join(outputRoot, runId);
+    await assertAbsent(outputDirectory);
+    log(`Run ID: ${runId}`);
+    log(`Profile: ${profile.profileCode}`);
+    log(`Statement: ${profile.safeStatementId}`);
+    log("Execution scope: deterministic RB/RC/RD/RE/RH; provider execution prohibited by current frozen planner");
+    const execute = overrides.executeDeterministicFamily ?? executeDeterministicFamily;
+    const result = await execute({ runId, outputDirectory, profile });
+    log(`executionStatus: ${result.executionStatus}`);
+    log(`researchOutcome: ${result.researchOutcome}`);
+    log("Provider sends: 0");
+    log("Keychain accesses: 0");
+    log(`Artifact directory: ${outputDirectory}`);
+    log(`Summary artifact: ${result.artifactPath}`);
+    return result.executionStatus === "completed" ? 0 : 1;
+  } catch (error) {
+    log("executionStatus: failed");
+    log("researchOutcome: not_started");
+    log("Provider sends: 0");
+    log("Keychain accesses: 0");
+    log(`Safe failure code: ${safeFailureCode(error)}`);
+    return 1;
+  } finally {
+    if (lock) {
+      await lock.close().catch(() => undefined);
+      await unlink(lockPath).catch(() => undefined);
+    }
+  }
+}
+
+async function executeDeterministicFamily(input: {
+  runId: string;
+  outputDirectory: string;
+  profile: DeterministicAdmittedFamilyProfile;
+}): Promise<{ executionStatus: string; researchOutcome: string; artifactPath: string }> {
+  const result = await runFiservOneStatementEvaluation({
+    statementPaths: [path.resolve(process.cwd(), input.profile.statementPath)],
+    safeStatementId: input.profile.safeStatementId,
+    runVersion: input.profile.runVersion,
+    outputDirectory: input.outputDirectory,
+    sourceProfile: { statementCompleteness: input.profile.sourceCompleteness },
+  });
+  if (!result.audit.admission || result.audit.admission.mappingId !== input.profile.requiredAdmissionMapping) {
+    throw new Error("internal_live_deterministic_family_admission_changed_after_preflight");
+  }
+  return { executionStatus: "completed", researchOutcome: "no_eligible_public_research_questions",
+    artifactPath: path.join(input.outputDirectory, "rh-projection.json") };
 }
 
 async function constructLiveCapability(runId: string, outputRoot: string, questionContexts: ProviderSafeQuestionContextV1[]): Promise<InternalLiveExecutionCapabilityV1> {
@@ -435,6 +577,12 @@ async function assertRequestedRunIdAvailable(outputRoot: string, requested: stri
   await assertAbsent(path.join(outputRoot, requested));
 }
 
+async function assertRequestedRunIdAvailableForPrefix(outputRoot: string, requested: string | null, prefix: string): Promise<void> {
+  if (!requested || requested === "auto") return;
+  if (!new RegExp(`^${prefix}-\\d{3}$`).test(requested)) throw new Error("internal_live_run_id_invalid");
+  await assertAbsent(path.join(outputRoot, requested));
+}
+
 async function assertCommittedNetworkProfile(): Promise<void> {
   const profilePath = path.resolve(process.cwd(), "config/ratereveal-internal-live-network-profile.json");
   const parsed = JSON.parse(await readFile(profilePath, "utf8")) as Record<string, unknown>;
@@ -466,6 +614,22 @@ async function allocateRunId(outputRoot: string, requested: string | null): Prom
   }, 0);
   if (highest >= 999) throw new Error("internal_live_run_id_exhausted");
   return `${RUN_PREFIX}-${String(highest + 1).padStart(3, "0")}`;
+}
+
+async function allocateRunIdForPrefix(outputRoot: string, requested: string | null, prefix: string): Promise<string> {
+  if (requested && requested !== "auto") {
+    if (!new RegExp(`^${prefix}-\\d{3}$`).test(requested)) throw new Error("internal_live_run_id_invalid");
+    await assertAbsent(path.join(outputRoot, requested));
+    return requested;
+  }
+  const names = await readdir(outputRoot);
+  const expression = new RegExp(`^${prefix}-(\\d{3})$`);
+  const highest = names.reduce((maximum, name) => {
+    const match = expression.exec(name);
+    return match ? Math.max(maximum, Number(match[1])) : maximum;
+  }, 0);
+  if (highest >= 999) throw new Error("internal_live_run_id_exhausted");
+  return `${prefix}-${String(highest + 1).padStart(3, "0")}`;
 }
 
 async function assertAbsent(target: string): Promise<void> {

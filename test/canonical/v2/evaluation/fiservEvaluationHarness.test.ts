@@ -15,7 +15,7 @@ describe("one-statement Fiserv pre-UAT harness", () => {
       .rejects.toThrow("FISERV_EVALUATION_REQUIRES_EXACTLY_ONE_PDF");
   });
 
-  it("runs one repository-local Clover fixture offline and writes exactly the safe three-file bundle", async () => {
+  it("admits the reusable full-layout family and writes the safe deterministic bundle", async () => {
     const outputDirectory = await mkdtemp(path.join(os.tmpdir(), "rh-fiserv-harness-"));
     const result = await runFiservOneStatementEvaluation({ statementPaths: [fixture], safeStatementId: "fixture-clover-full",
       runVersion: "test-run", outputDirectory, sourceProfile: { statementCompleteness: "unknown" } });
@@ -23,31 +23,50 @@ describe("one-statement Fiserv pre-UAT harness", () => {
     expect(result.audit).toMatchObject({ rf: { state: "not_applicable_no_admitted_knowledge" }, rg: { state: "disabled_no_provider" },
       integrity: { suppliedDocumentStatus: "complete_supplied_document", statementCompleteness: "unknown" },
       stageValidation: { rb: "valid", rc: "valid", rd: "valid", re: "valid", rh: "valid" },
-      readiness: { source: { templateAdmission: "unknown" }, outcome: { analysisCompletionPermitted: false } },
-      admission: null,
-      reviewSummary: { detectedTemplate: "fiserv_first_data_full_statement", matchedAdmissionMappingId: null,
-        admissionLifecycle: null, evidenceAuthority: "observational", parserReportable: true, feeDetailCoverage: "unproven" } });
+      readiness: { source: { templateAdmission: "admitted" }, outcome: { analysisCompletionPermitted: false } },
+      admission: { mappingId: "fiserv_first_data_full_statement", mappingVersion: "1.0.0",
+        feeDetailCoverage: "complete_observed_occurrences" },
+      familyAdmissionDecision: { matched: true, reasonCodes: [
+        "full_admission_accepted_cross_section_structure",
+        "full_admission_accepted_deterministic_economics",
+        "full_admission_scope_limited_to_enumerated_capabilities",
+      ] },
+      reviewSummary: { detectedTemplate: "fiserv_first_data_full_statement",
+        matchedAdmissionMappingId: "fiserv_first_data_full_statement",
+        admissionLifecycle: "admitted_with_conditions", evidenceAuthority: "product_owner", parserReportable: true,
+        feeDetailCoverage: "complete_observed_occurrences" } });
     expect(result.audit.issueClassifications).not.toContainEqual(expect.objectContaining({ primaryType: "systemic canonical defect" }));
     expect(result.audit.templateAdmissionAudit).toEqual(expect.arrayContaining([
-      expect.objectContaining({ item: "gross sales", currentAuthority: "observational", admissionCandidate: "yes" }),
-      expect.objectContaining({ item: "gross-sale count", currentAuthority: "observational",
-        canonicalResult: "observed 1797; canonical headline unavailable" }),
+      expect.objectContaining({ item: "gross sales", currentAuthority: "admitted_with_conditions", admissionCandidate: "already_admitted" }),
+      expect.objectContaining({ item: "gross-sale count", currentAuthority: "admitted_with_conditions",
+        canonicalResult: "observed 1797; canonical headline 1797" }),
       expect.objectContaining({ item: "submitted count", currentAuthority: "observational",
         canonicalResult: "observed 1800; canonical headline unavailable" }),
-      expect.objectContaining({ item: "average ticket", currentAuthority: "unavailable", admissionCandidate: "conditional" }),
-      expect.objectContaining({ item: "fee-detail occurrences", currentAuthority: "observational",
-        canonicalResult: "134 observed occurrence(s); coverage unproven" }),
+      expect.objectContaining({ item: "average ticket", currentAuthority: "canonical_derived_from_admitted_inputs",
+        canonicalResult: "USD 29.21" }),
+      expect.objectContaining({ item: "fee-detail occurrences", currentAuthority: "admitted_with_conditions",
+        canonicalResult: "134 observed occurrence(s); coverage complete_observed_occurrences" }),
     ]));
+    expect(result.audit.economics).toMatchObject({ rdCompleteness: "financially_unreconciled", chargeCount: 137,
+      contributingChargeCount: 0, authoritativeFeeTotalMinor: 131_255, reconciliationDeltaMinor: 131_255,
+      ownershipControlProven: false, themeCount: 0 });
+    const projection = JSON.parse(await readFile(path.join(outputDirectory, "rh-projection.json"), "utf8"));
+    expect(projection.snapshot).toMatchObject({ processedSales: { moneyValue: { amountMinor: 5_246_055 } },
+      processingFees: { moneyValue: { amountMinor: 131_255 } }, transactionCount: { countValue: 1_797 },
+      averageTicket: { moneyValue: { amountMinor: 2_921 } } });
+    expect(projection.pricing).toMatchObject({ status: "not_confirmed", underlyingCost: { state: "unknown" },
+      schedule: { state: "unknown" }, scope: { state: "unresolved" } });
     const review = await readFile(path.join(outputDirectory, "review.md"), "utf8");
     const serialized = `${review}${await readFile(path.join(outputDirectory, "run-audit.json"), "utf8")}`;
     expect(serialized).not.toContain(fixture);
     expect(serialized).not.toMatch(/SAMPLE_MERCHANT4_CLOVER|merchantNumber|evidenceLine|\.pdf\b|https?:\/\//i);
-    expect(serialized).not.toMatch(/admitted short|short-layout|short-template|submitted count.{0,80}admitted|complete observed-row coverage/i);
-    expect(review).toContain("no claim-scoped admission mapping matched");
-    expect(review).toContain("134 observed occurrence(s); coverage unproven");
+    expect(serialized).not.toMatch(/submitted count.{0,80}admitted/i);
+    expect(review).toContain("fiserv_first_data_full_statement@1.0.0");
+    expect(review).toContain("full_admission_accepted_cross_section_structure");
+    expect(review).toContain("134 observed occurrence(s); coverage complete_observed_occurrences");
     expect(review).toContain("## Recognized/extracted");
-    expect(review).toContain("## Canonically admitted\n\n- none");
-    expect(review).toContain("## Candidate for admission");
+    expect(review).toContain("## Canonically admitted");
+    expect(review).toContain("## Refused/unresolved");
   }, 30_000);
 
   it("applies the claim-scoped short-layout admission while preserving unknown statement completeness", async () => {
@@ -55,8 +74,8 @@ describe("one-statement Fiserv pre-UAT harness", () => {
     const result = await runFiservOneStatementEvaluation({ statementPaths: [shortFixture], safeStatementId: "fixture-clover-short",
       runVersion: "run-three-test", outputDirectory, sourceProfile: { statementCompleteness: "unknown" } });
     expect(result.audit).toMatchObject({
-      schemaVersion: "fiserv_pre_uat_run_audit_v4",
-      harnessVersion: "fiserv_pre_uat_one_statement_v4",
+      schemaVersion: "fiserv_pre_uat_run_audit_v5",
+      harnessVersion: "fiserv_pre_uat_one_statement_v5",
       admission: { mappingId: "fiserv_first_data_short_structural_mapping", mappingVersion: "1.0.0", authorityClass: "product_owner" },
       readiness: { source: { templateAdmission: "admitted", statementCompleteness: "unknown" },
         outcome: { state: "statement_completeness_unknown", analysisCompletionPermitted: false,

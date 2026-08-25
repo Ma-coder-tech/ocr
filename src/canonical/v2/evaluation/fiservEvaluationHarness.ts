@@ -4,7 +4,7 @@ import type { ParserDecision, ParserDriver, ParserValidationState } from "../../
 import { fiservFirstDataFullStatementDriver, fiservFirstDataProcessorStatementDriver, fiservFirstDataShortStatementDriver } from "../../../fiservFirstDataParser.js";
 import { genericFiservStatementDriver } from "../../../genericFiservStatementParser.js";
 import { buildCanonicalEconomicsV2FromFiserv } from "../fiservAdapter.js";
-import { resolveFiservShortTemplateAdmission } from "../fiservShortTemplateAdmission.js";
+import { resolveFiservTemplateAdmission, type FiservTemplateAdmissionResolution } from "../fiservTemplateAdmission.js";
 import { buildObservationalCanonicalPricingV2FromFiserv } from "../fiservPricingAdapter.js";
 import { buildObservationalCanonicalEconomicsV2FromFiservPricing } from "../fiservEconomicAdapter.js";
 import { observeFiservEconomicsInCanonicalSynthesisV2 } from "../fiservSynthesisAdapter.js";
@@ -23,6 +23,8 @@ export type RunFiservOneStatementInput = {
   sourceProfile?: { statementCompleteness?: CanonicalEconomicsV2CompletenessStatus; humanReviewRequired?: boolean };
 };
 
+export type InspectFiservOneStatementInput = Omit<RunFiservOneStatementInput, "runVersion" | "outputDirectory">;
+
 export type FiservDeterministicEvaluationContext = {
   foundation: ReturnType<typeof buildCanonicalEconomicsV2FromFiserv>;
   pricing: ReturnType<typeof buildObservationalCanonicalPricingV2FromFiserv>;
@@ -35,13 +37,9 @@ export type FiservDeterministicEvaluationContext = {
 const DRIVERS: ParserDriver[] = [fiservFirstDataProcessorStatementDriver, fiservFirstDataFullStatementDriver,
   fiservFirstDataShortStatementDriver, genericFiservStatementDriver];
 
-export async function runFiservOneStatementEvaluation(input: RunFiservOneStatementInput): Promise<{
-  audit: FiservEvaluationRunAudit;
-  deterministic: FiservDeterministicEvaluationContext;
-}> {
+export async function inspectFiservOneStatementEvaluation(input: InspectFiservOneStatementInput) {
   if (input.statementPaths.length !== 1) throw new Error("FISERV_EVALUATION_REQUIRES_EXACTLY_ONE_PDF");
   if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(input.safeStatementId) || input.safeStatementId.length > 80) throw new Error("INVALID_SAFE_STATEMENT_ID");
-  if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(input.runVersion) || input.runVersion.length > 80) throw new Error("INVALID_RUN_VERSION");
   const statementPath = input.statementPaths[0]!;
   if (path.extname(statementPath).toLowerCase() !== ".pdf") throw new Error("FISERV_EVALUATION_REQUIRES_PDF");
   const document = await parsePdf(statementPath);
@@ -67,7 +65,8 @@ export async function runFiservOneStatementEvaluation(input: RunFiservOneStateme
   const observationalFoundation = buildCanonicalEconomicsV2FromFiserv({ document, parserOutput, sourceDocumentRef: input.safeStatementId,
     parserId: driver.id, provenanceStatus: provenance, templateAdmission: { admissionStatus: "unknown",
       completenessStatus: "unknown", identityStatus: "observed" }, documentIntegrity });
-  const admission = resolveFiservShortTemplateAdmission({ driverId: driver.id, parserOutput, observationalFoundation });
+  const admissionEvaluation = resolveFiservTemplateAdmission({ driverId: driver.id, parserOutput, observationalFoundation });
+  const admission = admissionEvaluation.resolution;
   const templateAdmission = admission ? "admitted" as const : "unknown" as const;
   const authority = "observational" as const;
   const readiness = buildSourceReadinessEnvelope({ parser: { driverId: driver.id, reportable: Boolean(decision.reportable),
@@ -83,6 +82,20 @@ export async function runFiservOneStatementEvaluation(input: RunFiservOneStateme
   const observed = observedFinancials(selected);
   const { projection, audit: reportAudit } = composeCanonicalMerchantReportV2({ synthesisAnalysis: synthesis, sourceReadiness: readiness });
   assertValidCanonicalMerchantReportProjectionV2(projection);
+  return { admission, admissionEvaluation, authority, decision, document, driver, foundation, identity, observationalFoundation,
+    observed, parserOutput, pricing, profile, projection, provenance, reportAudit, readiness, selected, statementCompleteness,
+    suppliedDocument, synthesis, economic, validationState };
+}
+
+export async function runFiservOneStatementEvaluation(input: RunFiservOneStatementInput): Promise<{
+  audit: FiservEvaluationRunAudit;
+  deterministic: FiservDeterministicEvaluationContext;
+}> {
+  if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(input.runVersion) || input.runVersion.length > 80) throw new Error("INVALID_RUN_VERSION");
+  const prepared = await inspectFiservOneStatementEvaluation(input);
+  const { admission, admissionEvaluation, authority, decision, driver, foundation, identity, observed, parserOutput, pricing,
+    profile, projection, reportAudit, readiness, selected, statementCompleteness, suppliedDocument, synthesis, economic,
+    validationState } = prepared;
   const rhPricingContradiction = [projection.pricing?.underlyingCost, projection.pricing?.schedule, projection.pricing?.scope]
     .some((axis) => axis?.state === "confirmed")
     && [pricing.pricingArchitecture.underlyingCostBillingMode, pricing.pricingArchitecture.merchantPriceScheduleShape,
@@ -91,7 +104,7 @@ export async function runFiservOneStatementEvaluation(input: RunFiservOneStateme
   const withheldSections = Object.entries(projection.permissions).filter(([, permission]) => permission.state === "denied")
     .map(([section, permission]) => ({ section, reasonCode: permission.reasonCode }));
   const audit = await writeFiservReviewBundle(input.outputDirectory, projection, {
-    schemaVersion: "fiserv_pre_uat_run_audit_v4", harnessVersion: "fiserv_pre_uat_one_statement_v4", safeStatementId: input.safeStatementId,
+    schemaVersion: "fiserv_pre_uat_run_audit_v5", harnessVersion: "fiserv_pre_uat_one_statement_v5", safeStatementId: input.safeStatementId,
     runVersion: input.runVersion,
     statement: { processorFamily: String(identity.processorFamily ?? "unknown"), visibleBrand: String(identity.visibleBrand ?? "unknown"),
       statementFamily: String(identity.statementFamily ?? "unknown"), periodStart: String(identity.statementPeriodStart ?? "unknown"),
@@ -102,6 +115,7 @@ export async function runFiservOneStatementEvaluation(input: RunFiservOneStateme
       scope: `${admission.templateAdmission.detectedTemplate}@${admission.templateAdmission.detectedVersion}`,
       supportedCapabilities: admission.templateAdmission.capabilities?.filter((item) => item.status === "supported").map((item) => item.capability) ?? [],
       feeDetailCoverage: admission.feeDetailCoverage } : null,
+    familyAdmissionDecision: admissionEvaluation.fullFamilyDecision,
     reviewSummary: { detectedTemplate: String(identity.statementFamily ?? "unknown"),
       matchedAdmissionMappingId: admission?.mappingId ?? null, admissionLifecycle: admission ? "admitted_with_conditions" : null,
       evidenceAuthority: admission ? admission.authorityClass : authority, parserReportable: Boolean(decision.reportable),
@@ -234,7 +248,7 @@ function minor(value: unknown): number | null { const amount = finite(value); re
 function templateAdmissionAudit(
   parserOutput: Record<string, unknown>,
   foundation: ReturnType<typeof buildCanonicalEconomicsV2FromFiserv>,
-  admission: ReturnType<typeof resolveFiservShortTemplateAdmission>,
+  admission: FiservTemplateAdmissionResolution | null,
   parserReportable: boolean,
   observed: ReturnType<typeof observedFinancials>,
   chargeCount: number,

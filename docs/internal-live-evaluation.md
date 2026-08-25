@@ -1,6 +1,9 @@
 # RateReveal internal live evaluation
 
-This interface is for Codex-owned, explicitly product-authorized internal evaluations. It is not a general statement runner. The initial committed profile supports only `statement-one` (`fsv-03-clover-short-jun`) with the 2024 public research context.
+This interface is for Codex-owned, explicitly product-authorized internal evaluations. It is not a general statement runner. The committed profiles are:
+
+- `statement-one` (`fsv-03-clover-short-jun`), a provider-backed short-layout evaluation with the 2024 public research context.
+- `statement-two` (`fsv-01-clover-full-oct`), a reusable full-layout deterministic profile. Its current frozen planner produces no eligible public-research questions, so this profile prohibits provider execution and never reads Keychain.
 
 ## One-time credential setup
 
@@ -26,6 +29,8 @@ Independent public retrieval uses Node HTTPS with an approved DNS resolution per
 When an admitted public document was successfully retrieved, fingerprinted, and grounded but a later investigative or semantic operation did not complete, the public-evidence manifest retains that provenance as `verification_unavailable`. Such an entry must carry `source_existence_and_provenance_established`, `semantic_verification_not_completed`, and `not_supported_research_finding`; it cannot support a research finding, recommendation, savings claim, or canonical/economic mutation.
 
 ## Codex interface
+
+### Provider-backed Statement 1 profile
 
 After separate, explicit product-owner authorization for one live evaluation, Codex runs:
 
@@ -56,5 +61,21 @@ The semantic provider returns only four judgment fields per occupied structural 
 When that completed synthetic semantic member reaches `validateSemanticMember(...)`, provider-readiness retains the complete deterministic `semanticMemberIssues` array, allowlisted `semanticMismatchDimensions`, and a bounded `safeSemanticMemberProjection`. It then supplies the exact synthetic runtime question, candidate, locator, investigative-observation identity, and proposed value to the unchanged production `validateSemanticSupport(...)`. The final bounded diagnostics retain `semanticSupportValidationState`, the production-classified `semanticSupportStatus`, and the exact deterministic `semanticSupportReasonCodes`; a malformed support classification fails closed with `provider_readiness_semantic_support_invalid`. Legitimate non-support classifications such as `wrong_authority`, `wrong_scope`, and `wrong_period` remain production-valid semantic outcomes and are not promoted to support. The projection contains only structured identity, authority, status, date, scope, neutral-term, limitation, admission, and financial-mutation fields from the synthetic member. It excludes response bodies, prompts, assistant prose, hidden reasoning, credentials, and headers. These diagnostics are printed only by provider-readiness, create no Statement artifact, and cannot enter internal analysis, canonical truth, RF knowledge, evidence, findings, recommendations, or impact. A non-empty member issue array still fails with `provider_readiness_semantic_contract_invalid`.
 
 For both readiness and live modes, the lifecycle before a numbered run is: authorization/profile validation → repository and network checks → serial bounded Keychain reads → zero-send capability preflight. Only a normal live mode that passes those stages acquires the allocation lock and finalizes a fresh run ID.
+
+### Deterministic admitted-family profile
+
+After separate, explicit product-owner authorization, Codex can verify the committed full-layout profile without Keychain access, provider-capability construction, or external sends:
+
+```sh
+npm run evaluate:fiserv-internal-live -- --mode readiness --profile statement-two --authorization product-owner-approved --run-id auto
+```
+
+A separately authorized normal execution uses the same profile and allocates a fresh `statement-two-internal-evaluation-NNN` directory only after structural admission and frozen-planner preflight pass:
+
+```sh
+npm run evaluate:fiserv-internal-live -- --profile statement-two --authorization product-owner-approved --run-id auto
+```
+
+The full-layout preflight requires `fiserv_first_data_full_statement@1.0.0` admission and zero investigation origins/provider contexts. It reports `Provider sends: 0` and `Keychain accesses: 0`. `provider-readiness` is deliberately rejected because there are no frozen planner questions. If later product-model work makes any question provider-eligible, the deterministic profile fails closed with `internal_live_deterministic_family_research_model_expansion_required`; provider execution then requires a separately designed, reviewed, and authorized package.
 
 The project Codex permission profile enables its managed network proxy and allows exactly `openrouter.ai`, `api.openai.com`, and `merchants.fiserv.com`. The runner separately verifies its committed host profile against the fixed provider endpoints and every production authority origin. Adding a registry origin without explicit network-profile review therefore fails preflight.
