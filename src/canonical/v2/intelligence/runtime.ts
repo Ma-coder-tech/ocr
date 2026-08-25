@@ -39,6 +39,7 @@ import type {
   RuntimeResearchQuestion,
   RuntimeStageStatus,
   SearchAttempt,
+  SearchCandidateAuditV1,
   SearchResponse,
   SemanticVerificationInput,
   StructuredBatchRequest,
@@ -113,47 +114,93 @@ function chooseCandidates(params: {
   ledger: IntelligenceBudgetLedger;
   runId: string;
   admissions: BoundedIntelligenceRuntimeInput["publicSourceAuthorityAdmissions"];
-}): DiscoveryCandidate[] {
+}): { candidates: DiscoveryCandidate[]; candidateAudits: SearchCandidateAuditV1[] } {
   const existingIds = new Set(params.alreadyAccepted.map((item) => item.candidateId));
   const existingUrls = new Set(params.alreadyAccepted.map((item) => {
     try { return new URL(item.url).toString(); } catch { return item.url; }
   }));
   const seenResponseIds = new Set<string>();
-  const valid = params.response.candidates.filter((candidate) => {
-    if (seenResponseIds.has(candidate.candidateId)) return false;
+  const candidateAudits: SearchCandidateAuditV1[] = [];
+  const eligible: Array<{ candidate: DiscoveryCandidate; auditIndex: number }> = [];
+  for (const candidate of params.response.candidates) {
+    let normalizedUrl: string;
+    let sourceOrigin: string;
+    try {
+      const parsed = new URL(candidate.url);
+      if (parsed.protocol !== "https:" || parsed.username || parsed.password) continue;
+      normalizedUrl = parsed.toString();
+      sourceOrigin = parsed.origin;
+    } catch { continue; }
+    if (!isSafeStructuredString(candidate.candidateId) || !isSafeStructuredString(candidate.sourceTypeCode)) continue;
+    const audit: SearchCandidateAuditV1 = {
+      consideredUrl: candidate.url,
+      normalizedUrl,
+      sourceDomain: new URL(normalizedUrl).hostname.toLowerCase(),
+      sourceOrigin,
+      candidateId: candidate.candidateId,
+      rank: candidate.rank,
+      sourceTypeCode: candidate.sourceTypeCode,
+      claimedAuthority: candidate.claimedAuthority,
+      derivedAuthority: null,
+      authorityAdmissionRef: null,
+      authorityDecision: "rejected_by_runtime_guard",
+      reasonCodes: [],
+      retrievalAttempted: false,
+    };
+    const auditIndex = candidateAudits.push(audit) - 1;
+    if (seenResponseIds.has(candidate.candidateId)) { audit.reasonCodes.push("duplicate_candidate_identity_rejected"); continue; }
     seenResponseIds.add(candidate.candidateId);
-    return candidate.questionId === params.question.questionId && candidate.attemptId === params.attemptId
-      && isSafeStructuredString(candidate.candidateId) && isSafeStructuredString(candidate.sourceTypeCode)
-      && validDiscoveryMetadata(candidate)
-      && !existingIds.has(candidate.candidateId);
-  }).map((candidate): DiscoveryCandidate => {
-    const provisional: DiscoveryCandidate = { ...candidate, retrievalEligibility: "wrong_authority", authorityAdmissionRef: null, authorityPublicationFamilyCode: null };
+    if (candidate.questionId !== params.question.questionId || candidate.attemptId !== params.attemptId) {
+      audit.reasonCodes.push("candidate_parent_identity_mismatch"); continue;
+    }
+    if (!validDiscoveryMetadata(candidate)) { audit.reasonCodes.push("candidate_discovery_metadata_invalid"); continue; }
+    if (existingIds.has(candidate.candidateId)) { audit.reasonCodes.push("candidate_identity_already_retained"); continue; }
+    const provisional: DiscoveryCandidate = { ...candidate, url: normalizedUrl, retrievalEligibility: "wrong_authority",
+      authorityAdmissionRef: null, authorityPublicationFamilyCode: null };
     const admission = authorityAdmissionForCandidate({ candidate: provisional, question: params.question, admissions: params.admissions });
-    return admission && params.question.requiredSourceAuthorities.includes(candidate.claimedAuthority)
-      ? { ...provisional, retrievalEligibility: "eligible", authorityAdmissionRef: admission.admissionId, authorityPublicationFamilyCode: admission.publicationFamilyCode }
-      : provisional;
-  }).filter((candidate) => candidate.retrievalEligibility === "eligible").sort((left, right) => {
-    return (AUTHORITY_RANK[left.claimedAuthority] ?? 99) - (AUTHORITY_RANK[right.claimedAuthority] ?? 99)
-      || left.rank - right.rank
-      || left.candidateId.localeCompare(right.candidateId);
+    if (!params.question.requiredSourceAuthorities.includes(candidate.claimedAuthority)) {
+      audit.authorityDecision = "rejected_by_authority_policy";
+      audit.reasonCodes.push("claimed_authority_not_required");
+      continue;
+    }
+    if (!admission) {
+      audit.authorityDecision = "rejected_by_authority_policy";
+      audit.reasonCodes.push("source_not_admitted_by_authority_registry");
+      continue;
+    }
+    audit.derivedAuthority = admission.authority;
+    audit.authorityAdmissionRef = admission.admissionId;
+    eligible.push({ candidate: { ...provisional, retrievalEligibility: "eligible", authorityAdmissionRef: admission.admissionId,
+      authorityPublicationFamilyCode: admission.publicationFamilyCode }, auditIndex });
+  }
+  eligible.sort((left, right) => {
+    return (AUTHORITY_RANK[left.candidate.claimedAuthority] ?? 99) - (AUTHORITY_RANK[right.candidate.claimedAuthority] ?? 99)
+      || left.candidate.rank - right.candidate.rank
+      || left.candidate.candidateId.localeCompare(right.candidate.candidateId);
   });
   const remainingQuestionCapacity = params.ledger.profile.maxCandidatesPerQuestion - params.alreadyAccepted.length;
   const selected: DiscoveryCandidate[] = [];
-  for (const candidate of valid.slice(0, Math.max(0, remainingQuestionCapacity))) {
-    let normalizedUrl: string;
-    try { normalizedUrl = new URL(candidate.url).toString(); } catch { continue; }
-    if (existingUrls.has(normalizedUrl)) continue;
+  let candidateBudgetExhausted = false;
+  for (const [index, item] of eligible.entries()) {
+    const { candidate, auditIndex } = item;
+    const audit = candidateAudits[auditIndex]!;
+    if (index >= Math.max(0, remainingQuestionCapacity)) { audit.reasonCodes.push("candidate_question_capacity_exhausted"); continue; }
+    if (candidateBudgetExhausted) { audit.reasonCodes.push("candidate_budget_exhausted"); continue; }
+    const normalizedUrl = candidate.url;
+    if (existingUrls.has(normalizedUrl)) { audit.reasonCodes.push("candidate_normalized_url_already_retained"); continue; }
     try {
       const reservationId = `${params.runId}:candidate:${candidate.candidateId}`;
       params.ledger.reserveAndComplete({ reservationId, operationId: params.attemptId, dimension: "candidates", amount: 1 });
       selected.push(candidate);
       existingUrls.add(normalizedUrl);
+      audit.authorityDecision = "retained_for_retrieval";
+      audit.reasonCodes.push("candidate_retained_by_authority_policy");
     } catch (error) {
-      if (error instanceof IntelligenceBudgetExceeded) break;
+      if (error instanceof IntelligenceBudgetExceeded) { audit.reasonCodes.push("candidate_budget_exhausted"); candidateBudgetExhausted = true; continue; }
       throw error;
     }
   }
-  return selected;
+  return { candidates: selected, candidateAudits };
 }
 
 function validDiscoveryMetadata(candidate: SearchResponse["candidates"][number]): boolean {
@@ -194,6 +241,7 @@ async function performSearch(params: {
     status: "failed",
     adaptiveReason: params.kind === "adaptive" ? params.adaptiveReason : null,
     candidateIds: [],
+    candidateAudits: [],
     reasonCodes: [],
     providerMetadata: null,
   };
@@ -263,7 +311,8 @@ async function performSearch(params: {
   }
   params.ledger.settle(`${attemptId}:call`, { state: "completed", actualAmount: 1 });
   if (params.kind === "adaptive") params.ledger.settle(`${attemptId}:adaptive`, { state: "completed", actualAmount: 1 });
-  const candidates = chooseCandidates({ response, question: params.question, attemptId, alreadyAccepted: params.existingCandidates, ledger: params.ledger, runId: params.input.runId, admissions: params.input.publicSourceAuthorityAdmissions });
+  const selection = chooseCandidates({ response, question: params.question, attemptId, alreadyAccepted: params.existingCandidates, ledger: params.ledger, runId: params.input.runId, admissions: params.input.publicSourceAuthorityAdmissions });
+  const candidates = selection.candidates;
   const noCandidateReason = response.candidates.length === 0
     ? "provider_search_completed_zero_candidates"
     : "all_discovery_candidates_rejected_by_authority";
@@ -272,6 +321,7 @@ async function performSearch(params: {
       ...base,
       status: candidates.length > 0 ? "completed" : "no_candidates",
       candidateIds: candidates.map((candidate) => candidate.candidateId),
+      candidateAudits: selection.candidateAudits,
       reasonCodes: candidates.length > 0 ? ["discovery_candidates_retained_by_authority"] : [noCandidateReason],
       providerMetadata: response.providerMetadata,
     },
@@ -967,6 +1017,11 @@ async function runBoundedIntelligenceRuntimeInternal(
   }))];
   if (!canonicalTruthPreserved) reasonCodes.push("unexpected_divergence:canonical_truth_mutated");
   if (!rfConflictsPreserved) reasonCodes.push("unexpected_divergence:rf_conflict_not_preserved");
+  const retrievalAttemptedCandidateIds = new Set(documents.map((document) => document.candidateId));
+  for (const attempt of searchAttempts) {
+    attempt.candidateAudits = attempt.candidateAudits.map((audit) => ({ ...audit,
+      retrievalAttempted: retrievalAttemptedCandidateIds.has(audit.candidateId) }));
+  }
   const diagnostics = safeDiagnostics({ statuses, questions, attempts: searchAttempts, candidates, documents, supports, packets: candidatePackets, startedAtMs, ports, tokenUsage, reasonCodes });
   const anyProvider = Boolean(ports.search || ports.retrieval || ports.investigative || ports.semantic || ports.language);
   return {

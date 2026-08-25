@@ -63,7 +63,14 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     expect(result.runtime.supports[0]!.subjectCode).toBe("non_swiped_discount_terminology");
     expect(result.runtime.supports[0]!.limitationCodes).toEqual(expect.arrayContaining([
       "terminology_example_presentation_only", "public_scope_applicability_unproven", "ownership_control_and_savings_unresolved",
+      "public_definition_does_not_establish_account_applicability",
     ]));
+    expect(result.runtime.candidatePackets).toHaveLength(1);
+    expect(result.runtime.candidatePackets[0]).toMatchObject({ lifecycle: "candidate", requiresHumanAdmission: true,
+      privacy: "private_by_default", proposedVisibility: "account_private", provenance: { adapter: "bounded_intelligence_runtime" },
+      limitations: expect.arrayContaining(["public_definition_does_not_establish_account_applicability"]) });
+    expect(result.runtime.automaticAdmissionCount).toBe(0);
+    expect(result.runtime.privateReviewBundles[0]!.candidatePacketId).toBe(result.runtime.candidatePackets[0]!.candidateId);
     expect(result.analysis).toMatchObject({ executionStatus: "completed", researchOutcome: "source_rejected_by_authority_policy",
       terminalStatus: "completed_with_unresolved", canonicalTruthPreserved: true });
     expect(result.analysis.researchQuestionOutcomes).toEqual([
@@ -76,6 +83,9 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     expect(result.analysis.supportedResearchFindings[0]!.proposedValue).toMatchObject({
       kind: "term", termCode: "non_swiped_discount_terminology", termValue: "official_definition_found",
     });
+    expect(result.publicEvidence.entries[0]!.limitations).toEqual(expect.arrayContaining([
+      "terminology_example_presentation_only", "public_scope_applicability_unproven", "ownership_control_and_savings_unresolved",
+    ]));
     expect(result.analysis.investigativeHypotheses).toHaveLength(0);
     expect(result.analysis.unresolvedQuestions).toHaveLength(1);
     expect(result.analysis.unresolvedQuestions[0]!.title).toMatch(/application fee/i);
@@ -84,6 +94,9 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     ]));
     expect(result.analysis.recommendations).not.toContainEqual(expect.objectContaining({ kind: "research_followup" }));
     expect(result.analysis.recommendations).not.toContainEqual(expect.objectContaining({ kind: "supported_economic_action" }));
+    expect(result.analysis.recommendations).toContainEqual(expect.objectContaining({ kind: "documentation_request",
+      actionabilityCeiling: "documentation_only", merchantControl: "unresolved",
+      title: "Request the merchant agreement or fee schedule for the observed $99.00 Application Fee and document its contractual citation, calculation basis or fee formula, effective date or period, and applicability to this merchant account; obtain a processor explanation if those documents are insufficient." }));
     expect(result.analysis.impact.map((item) => ({ state: item.state, amountMinor: item.amountMinor, annualized: item.annualized })))
       .toEqual([{ state: "observed_cost", amountMinor: 9_900, annualized: false },
         { state: "observed_cost", amountMinor: 4_231, annualized: false }]);
@@ -91,6 +104,17 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     expect(result.analysis.canonicalBeforeHash).toBe(result.analysis.canonicalAfterHash);
     expect(result.rgAudit).toMatchObject({ executionMode: "injected_evaluation", externalNetworkCallCount: 0,
       canonicalTruthPreserved: true, budget: { profile: "RG-FREE-v1" } });
+    const applicationCandidateAudits = result.rgAudit.searchAttempts.flatMap((attempt) => attempt.candidateAudits);
+    expect(applicationCandidateAudits).toHaveLength(6);
+    expect(applicationCandidateAudits.every((candidate) => candidate.authorityDecision === "rejected_by_authority_policy"
+      && candidate.reasonCodes.includes("source_not_admitted_by_authority_registry") && candidate.retrievalAttempted === false)).toBe(true);
+    expect(applicationCandidateAudits.map((candidate) => Object.keys(candidate).sort())).toEqual(Array.from({ length: 6 }, () => [
+      "authorityAdmissionRef", "authorityDecision", "candidateId", "claimedAuthority", "consideredUrl", "derivedAuthority", "normalizedUrl",
+      "rank", "reasonCodes", "retrievalAttempted", "sourceDomain", "sourceOrigin", "sourceTypeCode",
+    ]));
+    expect(JSON.stringify(applicationCandidateAudits)).not.toMatch(/snippet|title|assistant|commentary|merchant-private|account-private/i);
+    expect(result.rgAudit.retrievalOutcomes).toEqual([expect.objectContaining({ candidateId: result.runtime.candidates[0]!.candidateId,
+      state: "retrieved_extracted", mimeType: "text/html", byteLength: expect.any(Number) })]);
     expect(result.rgAudit.budget.consumed).toMatchObject({ search_calls: 2, adaptive_searches: 1, candidates: 1, retrieval_documents: 1,
       investigative_ai_calls: 1, semantic_verification_calls: 1, semantic_support_items: 1, language_calls: 0,
       model_output_tokens: 320 });

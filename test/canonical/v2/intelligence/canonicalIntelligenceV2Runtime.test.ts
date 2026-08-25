@@ -134,6 +134,12 @@ describe("Canonical Intelligence V2 bounded runtime", () => {
     });
     expect(result.questions.filter((item) => item.selection === "selected")).toHaveLength(1);
     expect(result.searchAttempts).toHaveLength(1);
+    expect(result.searchAttempts[0]!.candidateAudits).toEqual([expect.objectContaining({
+      consideredUrl: "https://example.com/official-rule", normalizedUrl: "https://example.com/official-rule",
+      sourceDomain: "example.com", sourceOrigin: "https://example.com", rank: 1,
+      claimedAuthority: "official_network_publication", derivedAuthority: "official_network_publication",
+      authorityDecision: "retained_for_retrieval", reasonCodes: ["candidate_retained_by_authority_policy"], retrievalAttempted: true,
+    })]);
     expect(result.candidates).toHaveLength(1);
     expect(result.documents[0]).toMatchObject({ state: "retrieved_extracted" });
     expect(result.supports[0]).toMatchObject({ verificationStatus: "supported_candidate", admissionAuthority: "none", financialMutationAllowed: false });

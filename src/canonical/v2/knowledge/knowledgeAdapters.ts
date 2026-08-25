@@ -9,7 +9,7 @@ import {
   type KnowledgeScope,
   type KnowledgeSourceAuthority,
 } from "./knowledgeTypes.js";
-import { containsPrivateLocatorOrPayload, hasExactKeys, isRecord, isSafeStructuredString, isValidIsoDay, validateScopeShape, validClosedOpenInterval } from "./knowledgeSafety.js";
+import { containsPrivateLocatorOrPayload, hasExactKeys, isCanonicalCode, isRecord, isSafeStructuredString, isValidIsoDay, validateScopeShape, validClosedOpenInterval } from "./knowledgeSafety.js";
 import { validateKnowledgeClaimValue } from "./knowledgeValidate.js";
 
 const PACKET_KEYS = [
@@ -22,6 +22,20 @@ const SOURCE_AUTHORITIES = new Set([
   "verified_cross_statement_observation", "admitted_template_specification", "approved_internal_manual_mapping", "synthetic_test_fixture",
   "legacy_reference_candidate", "automated_retrieval", "ai_inference",
 ]);
+const BOUNDED_INTELLIGENCE_LIMITATION_CODES = new Set([
+  "automated_research_candidate",
+  "claim_specific_semantic_support_candidate",
+  "human_review_required",
+  "narrow_scope_only",
+  "no_economic_category_or_savings_inference",
+  "ownership_control_and_savings_unresolved",
+  "public_definition_does_not_establish_account_applicability",
+  "public_scope_applicability_unproven",
+  "public_source_does_not_establish_account_applicability",
+  "terminology_example_presentation_only",
+  "verified_public_scope_must_be_preserved",
+]);
+const BOUNDED_INTELLIGENCE_CONFLICT_CODES = new Set(["conflicting_supported_candidates"]);
 const safeCode = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "unknown";
 
 function candidateScope(): KnowledgeScope {
@@ -135,17 +149,23 @@ export function validateKnowledgeCandidatePacket(packet: KnowledgeCandidatePacke
     if (raw.proposedVisibility !== "account_private" || raw.tenantRef === null || raw.accountRef === null) {
       issues.push("bounded_intelligence_candidate_requires_account_private_boundary");
     }
-    const strings = [
+    const identityAndReferenceStrings = [
       raw.candidateId,
       raw.provenance.sourceRecordRef,
       raw.provenance.sourceVersion,
       ...(Array.isArray(raw.provenance.sourceFieldRefs) ? raw.provenance.sourceFieldRefs : []),
       ...(Array.isArray(raw.evidence) ? raw.evidence.flatMap((item) => isRecord(item) ? [item.ref] : []) : []),
-      ...(Array.isArray(raw.limitations) ? raw.limitations : []),
-      ...(Array.isArray(raw.knownConflictCodes) ? raw.knownConflictCodes : []),
     ];
-    if (strings.some((item) => typeof item === "string" && containsPrivateLocatorOrPayload(item))) {
+    if (identityAndReferenceStrings.some((item) => typeof item === "string" && containsPrivateLocatorOrPayload(item))) {
       issues.push("bounded_intelligence_candidate_contains_private_payload");
+    }
+    if (!Array.isArray(raw.limitations) || raw.limitations.some((item) => typeof item !== "string"
+      || !isCanonicalCode(item) || !BOUNDED_INTELLIGENCE_LIMITATION_CODES.has(item))) {
+      issues.push("bounded_intelligence_candidate_limitation_code_unapproved");
+    }
+    if (!Array.isArray(raw.knownConflictCodes) || raw.knownConflictCodes.some((item) => typeof item !== "string"
+      || !BOUNDED_INTELLIGENCE_CONFLICT_CODES.has(item))) {
+      issues.push("bounded_intelligence_candidate_conflict_code_unapproved");
     }
   }
   return [...new Set(issues)];

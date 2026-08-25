@@ -96,7 +96,8 @@ export function buildInternalStatementAnalysisV1(input: {
         limitations: [...new Set([...question.limitations, ...operationalLimitations, ...(rfConflict ? ["rf_conflict_preserved_no_ai_arbitration"] : []), "account_specific_documentation_required_if_public_evidence_is_insufficient"])], canonicalMutationAllowed: false };
     });
   const allFindings = [...canonicalFacts, ...admittedKnowledge, ...supportedResearchFindings, ...investigativeHypotheses, ...contradictions, ...unresolvedQuestions];
-  const recommendations = buildRecommendations(supportedResearchFindings, investigativeHypotheses, unresolvedQuestions, researchQuestionOutcomes);
+  const recommendations = buildRecommendations(supportedResearchFindings, investigativeHypotheses, unresolvedQuestions,
+    researchQuestionOutcomes, new Map(input.origins.map((origin) => [origin.originId, origin])));
   const impact = input.origins.map((origin): InternalImpactV1 => ({ impactId: `impact-${digest(origin.originId)}`,
     observationRef: origin.originId, state: "observed_cost", amountMinor: origin.observedAmountMinor, maximumAmountMinor: null, currency: "USD",
     annualized: false, counterfactualRef: null, limitations: ["observed_statement_cost_not_savings", "recurrence_not_proven"] }));
@@ -150,7 +151,7 @@ function canonicalFindings(foundation: CanonicalEconomicsV2Foundation): Internal
 }
 
 function buildRecommendations(supported: InternalFindingV1[], hypotheses: InternalFindingV1[], unresolved: InternalFindingV1[],
-  outcomes: InternalResearchQuestionOutcomeV1[]): InternalRecommendationV1[] {
+  outcomes: InternalResearchQuestionOutcomeV1[], origins: Map<string, InvestigationQuestionOriginV1>): InternalRecommendationV1[] {
   const timedOutResearchFollowups = unresolved.flatMap((finding): InternalRecommendationV1[] => {
     const outcome = outcomes.find((item) => finding.findingId === `finding-unresolved-${digest(item.questionId)}`);
     if (!outcome || outcome.outcome !== "research_unavailable_due_to_timeout" || !outcome.publicResearchStillPossible) return [];
@@ -169,11 +170,23 @@ function buildRecommendations(supported: InternalFindingV1[], hypotheses: Intern
       evidenceRefs: [...finding.researchEvidenceRefs], actionabilityCeiling: "verification_only", merchantControl: "unresolved",
       limitations: ["partial_public_support_is_not_action_authority"] })),
     ...unresolved.map((finding): InternalRecommendationV1 => ({ recommendationId: `recommendation-document-${digest(finding.findingId)}`,
-      kind: "documentation_request", title: "Request the applicable merchant agreement, fee schedule, or processor explanation.", findingRefs: [finding.findingId],
+      kind: "documentation_request", title: documentationRequestTitle(finding, origins), findingRefs: [finding.findingId],
       evidenceRefs: [...finding.statementEvidenceRefs, ...finding.researchEvidenceRefs], actionabilityCeiling: "documentation_only", merchantControl: "unresolved",
       limitations: ["no_economic_action_until_account_specific_evidence_is_reviewed"] })),
     ...timedOutResearchFollowups,
   ];
+}
+
+function documentationRequestTitle(finding: InternalFindingV1, origins: Map<string, InvestigationQuestionOriginV1>): string {
+  const origin = finding.questionOriginRefs.map((ref) => origins.get(ref)).find((item) => item !== undefined);
+  if (!origin) return "Request the applicable merchant agreement, fee schedule, contractual citation, calculation basis, effective period, account applicability, and any needed processor explanation.";
+  const label = origin.safeResearchLabel.replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+  const observed = origin.observedAmountMinor === null ? label : `${formatUsd(origin.observedAmountMinor)} ${label}`;
+  return `Request the merchant agreement or fee schedule for the observed ${observed} and document its contractual citation, calculation basis or fee formula, effective date or period, and applicability to this merchant account; obtain a processor explanation if those documents are insufficient.`;
+}
+
+function formatUsd(amountMinor: number): string {
+  return `$${(amountMinor / 100).toFixed(2)}`;
 }
 
 function researchQuestionOutcome(question: RuntimeResearchQuestion, runtime: BoundedIntelligenceRuntimeResult,

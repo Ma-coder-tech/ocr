@@ -136,7 +136,8 @@ export function createInjectedStatement1Fixture() {
             sourceAuthority: "processor_publication", sourceEffectiveFrom: null, sourceEffectiveTo: null,
             applicabilityScope: { ...item.question.scope }, proposedValue: item.proposedValue,
             assertionBasisCode: "claim_specific_public_definition", verificationStatus: "supported_candidate",
-            limitationCodes: ["terminology_example_presentation_only", "public_scope_applicability_unproven"], admissionAuthority: "none", financialMutationAllowed: false,
+            limitationCodes: ["terminology_example_presentation_only", "public_scope_applicability_unproven",
+              "public_definition_does_not_establish_account_applicability"], admissionAuthority: "none", financialMutationAllowed: false,
           })) };
       },
     },

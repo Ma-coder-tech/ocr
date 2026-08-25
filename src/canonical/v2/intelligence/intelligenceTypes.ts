@@ -218,8 +218,25 @@ export type SearchAttempt = {
   status: "completed" | "no_candidates" | "failed" | "timeout" | "disabled" | "budget_exhausted";
   adaptiveReason: "right_program_wrong_period" | "official_subsection_missing" | "publication_version_missing" | "zero_candidates_safe_query_variant" | null;
   candidateIds: string[];
+  candidateAudits: SearchCandidateAuditV1[];
   reasonCodes: string[];
   providerMetadata: SearchProviderMetadataV1 | null;
+};
+
+export type SearchCandidateAuditV1 = {
+  consideredUrl: string;
+  normalizedUrl: string;
+  sourceDomain: string;
+  sourceOrigin: string;
+  candidateId: string;
+  rank: number;
+  sourceTypeCode: string;
+  claimedAuthority: KnowledgeSourceAuthority;
+  derivedAuthority: KnowledgeSourceAuthority | null;
+  authorityAdmissionRef: string | null;
+  authorityDecision: "retained_for_retrieval" | "rejected_by_authority_policy" | "rejected_by_runtime_guard";
+  reasonCodes: string[];
+  retrievalAttempted: boolean;
 };
 
 export type SearchToolExecutionState = "verified" | "unverified" | "not_executed";

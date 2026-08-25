@@ -112,5 +112,12 @@ describe("Statement-observation origin eligibility and RF-first wiring", () => {
     })]));
     expect(analysis.admittedKnowledge).toEqual([]);
     expect(analysis.recommendations).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "documentation_request" })]));
+    const documentationRequests = analysis.recommendations.filter((item) => item.kind === "documentation_request");
+    expect(documentationRequests.map((item) => item.title)).toEqual(expect.arrayContaining([
+      expect.stringContaining("observed $99.00 Application Fee"),
+      expect.stringContaining("observed $42.31 Non Swiped Discount"),
+    ]));
+    expect(documentationRequests.every((item) => item.actionabilityCeiling === "documentation_only"
+      && item.merchantControl === "unresolved")).toBe(true);
   });
 });

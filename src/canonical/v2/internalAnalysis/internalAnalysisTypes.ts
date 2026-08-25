@@ -1,4 +1,4 @@
-import type { BudgetSnapshot, IntelligenceDiagnostic, SearchAttempt, SemanticVerificationStatus } from "../intelligence/intelligenceTypes.js";
+import type { BudgetSnapshot, IntelligenceDiagnostic, RuntimeDocumentResult, SearchAttempt, SemanticVerificationStatus } from "../intelligence/intelligenceTypes.js";
 export type { ProviderSafeQuestionContextV1 } from "../intelligence/intelligenceTypes.js";
 import type { KnowledgeClaimValue, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 
@@ -197,6 +197,7 @@ export type RgInternalAuditV1 = {
   };
   providerOperationReceipts: ProviderOperationReceiptV1[];
   searchAttempts: SearchAttempt[];
+  retrievalOutcomes: RuntimeDocumentResult[];
   questions: Array<{
     questionId: string;
     subjectCode: string;

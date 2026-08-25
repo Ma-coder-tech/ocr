@@ -61,7 +61,12 @@ describe("Canonical Intelligence V2 semantic verification, RF ingress, and theme
   });
 
   it("creates only the approved account-private, human-admission-required RF candidate provenance", () => {
-    const packet = supportToKnowledgeCandidatePacket({ runId: "run-1", question: question(), support: support() });
+    const packet = supportToKnowledgeCandidatePacket({ runId: "run-1", question: question(), support: support({ limitationCodes: [
+      "public_definition_does_not_establish_account_applicability",
+      "public_scope_applicability_unproven",
+      "ownership_control_and_savings_unresolved",
+      "no_economic_category_or_savings_inference",
+    ] }) });
     expect(validateKnowledgeCandidatePacket(packet)).toEqual([]);
     expect(ingestKnowledgeCandidatePacket(packet)).toMatchObject({
       lifecycle: "candidate",
@@ -71,11 +76,24 @@ describe("Canonical Intelligence V2 semantic verification, RF ingress, and theme
       tenantRef: "tenant-a",
       accountRef: "account-a",
       provenance: { adapter: "bounded_intelligence_runtime" },
+      limitations: expect.arrayContaining([
+        "public_definition_does_not_establish_account_applicability",
+        "public_scope_applicability_unproven",
+        "ownership_control_and_savings_unresolved",
+      ]),
     });
     const weakened = { ...packet, proposedVisibility: "reusable" as const, tenantRef: null, accountRef: null };
     expect(validateKnowledgeCandidatePacket(weakened)).toContain("bounded_intelligence_candidate_requires_account_private_boundary");
     const raw = { ...packet, provenance: { ...packet.provenance, sourceRecordRef: "https://private.example/source.pdf" } };
     expect(validateKnowledgeCandidatePacket(raw)).toContain("bounded_intelligence_candidate_contains_private_payload");
+    const privateAccountReference = { ...packet, provenance: { ...packet.provenance, sourceRecordRef: "account_merchant_987654321" } };
+    expect(validateKnowledgeCandidatePacket(privateAccountReference)).toContain("bounded_intelligence_candidate_contains_private_payload");
+    const accountIdentifier = { ...packet, limitations: [...packet.limitations, "account_merchant_987654321"] };
+    expect(validateKnowledgeCandidatePacket(accountIdentifier)).toContain("bounded_intelligence_candidate_limitation_code_unapproved");
+    const statementText = { ...packet, limitations: [...packet.limitations, "Merchant Number 987654321 was charged $99.00"] };
+    expect(validateKnowledgeCandidatePacket(statementText)).toContain("bounded_intelligence_candidate_limitation_code_unapproved");
+    const arbitraryCanonicalCode = { ...packet, limitations: [...packet.limitations, "safe_looking_but_unregistered_code"] };
+    expect(validateKnowledgeCandidatePacket(arbitraryCanonicalCode)).toContain("bounded_intelligence_candidate_limitation_code_unapproved");
   });
 
   it("rejects strengthened merchant language and always returns a deterministic fallback", () => {

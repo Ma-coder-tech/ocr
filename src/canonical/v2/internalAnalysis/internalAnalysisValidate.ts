@@ -21,6 +21,11 @@ const RECEIPT_KEYS = ["receiptId", "reservationId", "operationId", "operation", 
   "httpStatus", "localRequestId", "providerRequestId", "providerResponseId", "requestedModelIdentifier", "returnedModelIdentifier", "finishReason",
   "toolExecutionState", "annotationCount", "normalizedCandidateCount", "providerErrorType", "providerErrorCode", "providerErrorParam",
   "structuredOutputValidation", "safeReasonCode"] as const;
+const SEARCH_CANDIDATE_AUDIT_KEYS = ["consideredUrl", "normalizedUrl", "sourceDomain", "sourceOrigin", "candidateId", "rank",
+  "sourceTypeCode", "claimedAuthority", "derivedAuthority", "authorityAdmissionRef", "authorityDecision", "reasonCodes", "retrievalAttempted"] as const;
+const KNOWLEDGE_SOURCE_AUTHORITIES = ["official_network_publication", "processor_publication", "merchant_contract", "account_statement_observation",
+  "statement_observation", "verified_cross_statement_observation", "admitted_template_specification", "approved_internal_manual_mapping",
+  "synthetic_test_fixture", "legacy_reference_candidate", "automated_retrieval", "ai_inference"] as const;
 const FINDING_ARRAYS = ["canonicalFacts", "admittedKnowledge", "supportedResearchFindings", "investigativeHypotheses", "contradictions", "unresolvedQuestions"] as const;
 const ANALYSIS_ARRAYS = [...FINDING_ARRAYS, "amendmentIds", "researchQuestionOutcomes", "statementObservations", "recommendations", "impact", "limitations"] as const;
 const RESEARCH_OUTCOMES = ["research_completed", "completed_with_unresolved_evidence", "research_unavailable_due_to_timeout",
@@ -191,7 +196,7 @@ export function validateInternalAnalysisReferenceGraph(analysis: InternalStateme
 export function validateRgInternalAuditV1(audit: RgInternalAuditV1): string[] {
   const issues: string[] = [];
   if (!isRecord(audit) || !Array.isArray(audit.providerOperationReceipts) || !Array.isArray(audit.searchAttempts)
-    || !Array.isArray(audit.verificationOutcomes) || !Array.isArray(audit.rfEntryRefs)
+    || !Array.isArray(audit.retrievalOutcomes) || !Array.isArray(audit.verificationOutcomes) || !Array.isArray(audit.rfEntryRefs)
     || !isRecord(audit.budget) || !Array.isArray(audit.budget.reservations)) return ["rg_internal_audit_shape_invalid"];
   if (audit.schemaVersion !== "rg_internal_analysis_audit_v1") issues.push("rg_internal_audit_identity_invalid");
   if (!isRecord(audit.liveTimingPolicy) || !hasExactKeys(audit.liveTimingPolicy, ["amendmentId", "searchTimeoutMs", "globalWallTimeMs"])
@@ -207,6 +212,23 @@ export function validateRgInternalAuditV1(audit: RgInternalAuditV1): string[] {
       || containsPrivateProviderMaterial(attempt.queryText) || !Array.isArray(attempt.queryTerms)
       || attempt.queryTerms.some((term) => !safeDisplayText(term, 300) || containsPrivateProviderMaterial(term))
       || !Array.isArray(attempt.candidateIds) || !attempt.candidateIds.every(isSafeStructuredString)
+      || !Array.isArray(attempt.candidateAudits) || attempt.candidateAudits.some((candidate) => {
+        if (!isRecord(candidate) || !hasExactKeys(candidate, SEARCH_CANDIDATE_AUDIT_KEYS)
+          || ![candidate.candidateId, candidate.sourceTypeCode].every(isSafeStructuredString)
+          || !Number.isSafeInteger(candidate.rank) || candidate.rank < 1
+          || !KNOWLEDGE_SOURCE_AUTHORITIES.includes(candidate.claimedAuthority as never)
+          || (candidate.derivedAuthority !== null && !["official_network_publication", "processor_publication"].includes(String(candidate.derivedAuthority)))
+          || (candidate.authorityAdmissionRef !== null && !isSafeStructuredString(candidate.authorityAdmissionRef))
+          || !["retained_for_retrieval", "rejected_by_authority_policy", "rejected_by_runtime_guard"].includes(String(candidate.authorityDecision))
+          || !Array.isArray(candidate.reasonCodes) || !candidate.reasonCodes.every(isSafeStructuredString)
+          || typeof candidate.retrievalAttempted !== "boolean") return true;
+        try {
+          const considered = new URL(String(candidate.consideredUrl)); const normalized = new URL(String(candidate.normalizedUrl));
+          return considered.protocol !== "https:" || considered.username.length > 0 || considered.password.length > 0
+            || normalized.toString() !== considered.toString() || normalized.hostname.toLowerCase() !== candidate.sourceDomain
+            || normalized.origin !== candidate.sourceOrigin;
+        } catch { return true; }
+      })
       || !Array.isArray(attempt.reasonCodes) || !attempt.reasonCodes.every(isSafeStructuredString)) return true;
     const metadata = attempt.providerMetadata;
     return metadata !== null && (!isRecord(metadata)
@@ -220,6 +242,16 @@ export function validateRgInternalAuditV1(audit: RgInternalAuditV1): string[] {
         && (!Number.isSafeInteger(metadata.webSearchRequestCount) || metadata.webSearchRequestCount < 0)));
   })) {
     issues.push("rg_internal_audit_search_diagnostics_invalid");
+  }
+  if (audit.retrievalOutcomes.some((document) => !isRecord(document)
+    || ![document.questionId, document.candidateId, document.documentId].every(isSafeStructuredString)
+    || !["retrieved_extracted", "retrieved_locator_only", "encrypted_pdf", "malformed_pdf", "unsupported_pdf", "unsupported_content_type",
+      "oversized_document", "extraction_failed", "retrieval_timeout", "safety_blocked", "inaccessible"].includes(String(document.state))
+    || (document.mimeType !== null && (!safeDisplayText(document.mimeType, 200) || !/^[A-Za-z0-9!#$&^_.+-]+\/[A-Za-z0-9!#$&^_.+;-]+/.test(document.mimeType)))
+    || !Number.isSafeInteger(document.byteLength) || document.byteLength < 0
+    || !Array.isArray(document.locatorIds) || !document.locatorIds.every(isSafeStructuredString)
+    || !Array.isArray(document.reasonCodes) || !document.reasonCodes.every(isSafeStructuredString))) {
+    issues.push("rg_internal_audit_retrieval_outcomes_invalid");
   }
   if (audit.providerOperationReceipts.some((item) => !isRecord(item) || !hasExactKeys(item, RECEIPT_KEYS)
     || ![item.receiptId, item.reservationId, item.operationId, item.providerCode, item.safeReasonCode].every(isSafeStructuredString)
