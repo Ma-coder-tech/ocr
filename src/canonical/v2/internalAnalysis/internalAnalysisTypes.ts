@@ -1,11 +1,13 @@
 import type { BudgetSnapshot, IntelligenceDiagnostic, RuntimeDocumentResult, SearchAttempt, SemanticVerificationStatus } from "../intelligence/intelligenceTypes.js";
 export type { ProviderSafeQuestionContextV1 } from "../intelligence/intelligenceTypes.js";
 import type { KnowledgeClaimValue, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
+import type { ObservationPlanningAuditV1 } from "./observationOrigins.js";
 
 export const E2E_INTERNAL_ANALYSIS_AMENDMENT_ID = "E2E-AMEND-001-OBSERVATION-TO-INVESTIGATION" as const;
 export const E2E_LIVE_RESEARCH_OUTCOME_AMENDMENT_ID = "E2E-AMEND-002-LIVE-RESEARCH-OUTCOME" as const;
 
-export type InvestigationQuestionClassV1 = "application_fee_public_definition" | "non_swiped_discount_public_definition";
+export type InvestigationQuestionClassV1 = "application_fee_public_definition" | "non_swiped_discount_public_definition"
+  | "observed_statement_term_public_definition";
 
 export type InvestigationQuestionOriginV1 = {
   schemaVersion: "investigation_question_origin_v1";
@@ -15,8 +17,8 @@ export type InvestigationQuestionOriginV1 = {
   originLane: "canonical_dependency" | "statement_observation";
   questionClass: InvestigationQuestionClassV1;
   claimType: "processor_term";
-  subjectCode: "application_fee_terminology" | "non_swiped_discount_terminology";
-  safeResearchLabel: "application fee" | "non swiped discount";
+  subjectCode: string;
+  safeResearchLabel: string;
   questionText: string;
   occurrenceRefs: string[];
   evidenceRefs: string[];
@@ -125,7 +127,7 @@ export type InternalResearchOutcomeV1 =
 export type InternalResearchQuestionOutcomeV1 = {
   questionId: string;
   questionClass: InvestigationQuestionClassV1;
-  subjectCode: "application_fee_terminology" | "non_swiped_discount_terminology";
+  subjectCode: string;
   outcome: InternalResearchOutcomeV1;
   attempted: boolean;
   operationalReasonCodes: string[];
@@ -206,7 +208,7 @@ export type InternalStatementAnalysisV1 = {
 };
 
 export type RgInternalAuditV1 = {
-  schemaVersion: "rg_internal_analysis_audit_v1";
+  schemaVersion: "rg_internal_analysis_audit_v2";
   runId: string;
   executionMode: "injected_evaluation" | "internal_live_evaluation";
   externalNetworkCallCount: number;
@@ -226,6 +228,7 @@ export type RgInternalAuditV1 = {
     selection: string;
     reasonCodes: string[];
   }>;
+  observationPlanning: ObservationPlanningAuditV1;
   verificationOutcomes: Array<{
     supportId: string;
     questionId: string;

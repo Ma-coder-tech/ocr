@@ -32,7 +32,7 @@ describe("durable internal live runner", () => {
     await expect(readdir(outputRoot)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("admits the Statement-2 family profile in readiness without Keychain or provider construction", async () => {
+  it("keeps the Statement-2 family profile fail-closed once registered questions exist", async () => {
     const parent = await mkdtemp(path.join(os.tmpdir(), "rr-live-runner-statement-two-"));
     const outputRoot = path.join(parent, "runs");
     const lines: string[] = [];
@@ -47,16 +47,14 @@ describe("durable internal live runner", () => {
       log: (line) => lines.push(line),
       readCredential: async () => { credentialReads += 1; return "should-never-be-read"; },
     });
-    expect(code).toBe(0);
+    expect(code).toBe(1);
     expect(credentialReads).toBe(0);
     expect(lines).toEqual(expect.arrayContaining([
-      "Admission preflight: fiserv_first_data_full_statement@1.0.0; passed",
-      "Family: fiserv_first_data_full_statement",
-      "Frozen planner questions: none",
-      "executionStatus: readiness_passed",
-      "researchOutcome: no_eligible_public_research_questions",
+      "executionStatus: failed",
+      "researchOutcome: not_started",
       "Provider sends: 0",
       "Keychain accesses: 0",
+      "Safe failure code: internal_live_deterministic_family_research_model_expansion_required",
     ]));
     expect(await readdir(outputRoot)).toEqual([]);
     expect(STATEMENT_TWO_DETERMINISTIC_FAMILY_PROFILE).toMatchObject({
@@ -67,7 +65,7 @@ describe("durable internal live runner", () => {
     });
   }, 30_000);
 
-  it("resolves profile to admission before a generic deterministic-family execution", async () => {
+  it("does not execute a deterministic-family run after the expanded planner creates questions", async () => {
     const outputRoot = await mkdtemp(path.join(os.tmpdir(), "rr-live-runner-full-family-"));
     const lines: string[] = [];
     let credentialReads = 0;
@@ -87,15 +85,14 @@ describe("durable internal live runner", () => {
           artifactPath: path.join(outputDirectory, "rh-projection.json") };
       },
     });
-    expect(code).toBe(0);
-    expect(executions).toBe(1);
+    expect(code).toBe(1);
+    expect(executions).toBe(0);
     expect(credentialReads).toBe(0);
     expect(lines).toEqual(expect.arrayContaining([
-      "Admission preflight: fiserv_first_data_full_statement@1.0.0; passed",
-      "Frozen planner questions: none",
       "Provider sends: 0",
       "Keychain accesses: 0",
-      "executionStatus: completed",
+      "executionStatus: failed",
+      "Safe failure code: internal_live_deterministic_family_research_model_expansion_required",
     ]));
   });
 

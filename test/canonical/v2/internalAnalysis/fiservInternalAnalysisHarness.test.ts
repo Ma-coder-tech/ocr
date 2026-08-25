@@ -107,6 +107,21 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     expect(result.analysis.canonicalBeforeHash).toBe(result.analysis.canonicalAfterHash);
     expect(result.rgAudit).toMatchObject({ executionMode: "injected_evaluation", externalNetworkCallCount: 0,
       canonicalTruthPreserved: true, budget: { profile: "RG-FREE-v1" } });
+    expect(result.rgAudit.observationPlanning).toMatchObject({ schemaVersion: "observation_planning_audit_v1",
+      registryId: "fiserv_observation_subject_registry", registryVersion: "1.0.0",
+      rawNonzeroObservationCount: 6, normalizedObservationIdentityCount: 6, mappedSubjectCount: 2,
+      suppressedObservationCount: 4, eligibleSubjectCount: 2, selectedQuestionCount: 2,
+      subjects: [
+        expect.objectContaining({ subjectCode: "application_fee_terminology", occurrenceCount: 1 }),
+        expect.objectContaining({ subjectCode: "non_swiped_discount_terminology", occurrenceCount: 1 }),
+      ],
+      subjectDecisions: [
+        expect.objectContaining({ subjectCode: "application_fee_terminology", selection: "selected",
+          sourceAuthorityAvailability: "dynamic_discovery_permitted_no_current_source_admission" }),
+        expect.objectContaining({ subjectCode: "non_swiped_discount_terminology", selection: "selected",
+          sourceAuthorityAvailability: "existing_admitted_public_authority_available" }),
+      ] });
+    expect(JSON.stringify(result.rgAudit.observationPlanning)).not.toMatch(/SAMPLE_MERCHANT|tenant-private|account-private|\.pdf\b/i);
     expect(result.rgAudit.rfProjection).toEqual({ projectedCandidateCount: 1, automaticAdmissionCount: 0,
       projectionStatus: "completed_with_candidates",
       reasonCodes: ["rf_candidates_projected_for_human_review", "automatic_knowledge_admission_none"],
@@ -148,6 +163,10 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     expect(validateInternalStatementAnalysisV1(result.analysis)).toEqual([]);
     expect(validatePublicSourceEvidenceManifestV1(result.publicEvidence)).toEqual([]);
     expect(validateRgInternalAuditV1(result.rgAudit)).toEqual([]);
+    const tamperedPlanningAudit = structuredClone(result.rgAudit);
+    tamperedPlanningAudit.observationPlanning.subjects[0]!.registryRuleId =
+      tamperedPlanningAudit.observationPlanning.subjects[1]!.registryRuleId;
+    expect(validateRgInternalAuditV1(tamperedPlanningAudit)).toContain("rg_internal_audit_observation_planning_invalid");
     const serializedInternal = `${await readFile(path.join(outputDirectory, "internal-analysis.json"), "utf8")}${await readFile(path.join(outputDirectory, "rg-audit.json"), "utf8")}${await readFile(path.join(outputDirectory, "public-source-evidence.json"), "utf8")}`;
     const withoutApprovedPublicDocumentUrl = serializedInternal.replaceAll(FISERV_FIRST_DATA_US_SWIPE_NON_SWIPE_URL, "https://approved-public-source.invalid/document");
     expect(withoutApprovedPublicDocumentUrl).not.toMatch(/raw prompt|raw response|chain.of.thought|SAMPLE_MERCHANT|\/Users\/|\.pdf\b/i);

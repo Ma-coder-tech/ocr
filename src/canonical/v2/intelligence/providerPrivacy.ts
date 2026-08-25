@@ -1,5 +1,6 @@
 import { isCanonicalCode, isSafeStructuredString } from "../knowledge/knowledgeSafety.js";
 import type { ProviderSafeQuestionContextV1 } from "./intelligenceTypes.js";
+import { registeredObservationSubjectIdentity } from "./observationSubjectRegistry.js";
 
 const FORBIDDEN_KEY = /(?:tenant|account|merchant|filename|file_path|source_path|private_locator|private_evidence|statement_total|transaction_amount|fee_inventory|originatingCanonicalRefs|occurrenceRefs|evidenceRefs|(?:^|_)mid(?:$|_))/i;
 const FORBIDDEN_STRING = /(?:\b(?:mid|merchant\s*(?:id|number)|account\s*(?:id|number))\b|(?:^|[\\/])(?:Users|home|private|tmp)[\\/]|[A-Za-z]:\\|\.pdf\b|\b\d{6,}\b|\$\s*\d)/i;
@@ -13,7 +14,7 @@ export function inspectProviderSafeQuestionContext(context: ProviderSafeQuestion
   }
   if (!isSafeStructuredString(context.providerContextId) || !/^provider-context-[0-9a-f-]{36}$/.test(context.providerContextId) || !isCanonicalCode(context.questionClass)
     || !isCanonicalCode(context.claimType) || !isCanonicalCode(context.subjectCode)) reasons.push("provider_context_identity_invalid");
-  if (!/^(?:application fee|non swiped discount)$/.test(context.safeResearchLabel)) reasons.push("provider_research_label_not_registered");
+  if (!registeredObservationSubjectIdentity(context)) reasons.push("provider_research_label_not_registered");
   if (!/^\d{4}$/.test(context.periodYear)) reasons.push("provider_period_invalid");
   if (context.processorProgram !== null && !isCanonicalCode(context.processorProgram)) reasons.push("provider_program_invalid");
   visit(context, reasons);

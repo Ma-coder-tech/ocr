@@ -11,12 +11,13 @@ import { RG_INTERNAL_LIVE_TIMING_AMENDMENT_ID, RG_SEMANTIC_AMENDMENT_IDS } from 
 import { ProviderOperationAuditLog } from "../intelligence/providerAdapters.js";
 import { runFiservOneStatementEvaluation } from "../evaluation/fiservEvaluationHarness.js";
 import type { RunFiservOneStatementInput } from "../evaluation/fiservEvaluationHarness.js";
-import { buildStatementObservationInvestigationOrigins } from "./observationOrigins.js";
+import { buildStatementObservationInvestigationOrigins, finalizeObservationPlanningAudit } from "./observationOrigins.js";
 import { buildInternalStatementAnalysisV1 } from "./internalAnalysisProjection.js";
 import { writeInternalAnalysisBundle } from "./internalAnalysisBundle.js";
 import { projectRfAuditSummary } from "./internalAnalysisAuditProjection.js";
 import type { InternalStatementAnalysisV1, PublicSourceEvidenceManifestV1, RgInternalAuditV1 } from "./internalAnalysisTypes.js";
 import { E2E_INTERNAL_ANALYSIS_AMENDMENT_ID } from "./internalAnalysisTypes.js";
+import { FISERV_OBSERVATION_SUBJECT_REGISTRY_ID, FISERV_OBSERVATION_SUBJECT_REGISTRY_VERSION } from "../intelligence/observationSubjectRegistry.js";
 
 export type RunFiservInternalAnalysisInputV1 = RunFiservOneStatementInput & {
   internalRunId: string;
@@ -45,6 +46,7 @@ export async function runFiservInternalAnalysisEvaluationV1(input: RunFiservInte
     deterministic.deterministic.synthesis].some((stage) => stage.validation.status !== "valid")) {
     throw new Error("internal_analysis_deterministic_stage_invalid");
   }
+  if (!deterministic.audit.admission) throw new Error("internal_analysis_template_admission_required");
   const origins = buildStatementObservationInvestigationOrigins({ foundation: deterministic.deterministic.foundation,
     admittedKnowledge: input.admittedKnowledge, tenantRef: input.tenantRef, accountRef: input.accountRef });
   if (input.providerPreflight.executionMode === "external_provider") {
@@ -85,8 +87,10 @@ export async function runFiservInternalAnalysisEvaluationV1(input: RunFiservInte
     admittedKnowledge: input.admittedKnowledge, runtime, publicEvidence,
     publicSourceAuthorityAdmissions: input.publicSourceAuthorityAdmissions, canonicalBeforeHash, canonicalAfterHash });
   const receipts = input.providerAudit.snapshot();
+  const observationPlanning = finalizeObservationPlanningAudit({ inventory: origins.planningInventory,
+    questions: runtime.questions, publicSourceAuthorityAdmissions: input.publicSourceAuthorityAdmissions });
   const rgAudit: RgInternalAuditV1 = {
-    schemaVersion: "rg_internal_analysis_audit_v1", runId: input.internalRunId,
+    schemaVersion: "rg_internal_analysis_audit_v2", runId: input.internalRunId,
     executionMode: input.providerPreflight.executionMode === "injected_evaluation" ? "injected_evaluation" : "internal_live_evaluation",
     externalNetworkCallCount: receipts.reduce((sum, item) => sum + item.actualSendCount, 0),
     liveTimingPolicy: { amendmentId: RG_INTERNAL_LIVE_TIMING_AMENDMENT_ID,
@@ -102,6 +106,7 @@ export async function runFiservInternalAnalysisEvaluationV1(input: RunFiservInte
     questions: runtime.questions.map((question) => ({ questionId: question.questionId, subjectCode: question.subjectCode,
       originatingUnknownRef: question.originatingUnknownRef, eligibility: question.eligibility, selection: question.selection,
       reasonCodes: [...question.reasonCodes] })),
+    observationPlanning,
     verificationOutcomes: runtime.supports.map((support) => ({ supportId: support.supportId, questionId: support.questionId,
       candidateId: support.candidateId, documentId: support.documentId, locatorId: support.locatorId,
       status: support.verificationStatus, reasonCodes: [...support.limitationCodes] })),
@@ -110,7 +115,9 @@ export async function runFiservInternalAnalysisEvaluationV1(input: RunFiservInte
     canonicalTruthPreserved: canonicalBeforeHash === canonicalAfterHash && runtime.canonicalTruthPreserved,
     rfSnapshotHash: hashCanonical(input.admittedKnowledge),
     rfEntryRefs: input.admittedKnowledge.map((entry) => entry.id).sort(),
-    policyVersions: [E2E_INTERNAL_ANALYSIS_AMENDMENT_ID, RG_INTERNAL_LIVE_TIMING_AMENDMENT_ID, ...RG_SEMANTIC_AMENDMENT_IDS],
+    policyVersions: [E2E_INTERNAL_ANALYSIS_AMENDMENT_ID,
+      `${FISERV_OBSERVATION_SUBJECT_REGISTRY_ID}@${FISERV_OBSERVATION_SUBJECT_REGISTRY_VERSION}`,
+      RG_INTERNAL_LIVE_TIMING_AMENDMENT_ID, ...RG_SEMANTIC_AMENDMENT_IDS],
   };
   if (input.providerPreflight.executionMode === "injected_evaluation" && rgAudit.externalNetworkCallCount !== 0) {
     throw new Error("injected_evaluation_external_network_call_detected");

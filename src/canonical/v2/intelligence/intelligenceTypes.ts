@@ -118,10 +118,10 @@ export type RuntimeQuestionOrigin = {
 export type ProviderSafeQuestionContextV1 = {
   schemaVersion: "provider_safe_question_context_v1";
   providerContextId: string;
-  questionClass: "application_fee_public_definition" | "non_swiped_discount_public_definition";
+  questionClass: "application_fee_public_definition" | "non_swiped_discount_public_definition" | "observed_statement_term_public_definition";
   claimType: "processor_term";
-  subjectCode: "application_fee_terminology" | "non_swiped_discount_terminology";
-  safeResearchLabel: "application fee" | "non swiped discount";
+  subjectCode: string;
+  safeResearchLabel: string;
   questionText: string;
   processorProgram: string | null;
   periodYear: string;

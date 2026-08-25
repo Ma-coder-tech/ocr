@@ -153,10 +153,14 @@ function baseManifest() { return { schemaVersion: "public_source_evidence_manife
     sourceTitle: "Public title", sourceAuthority: "official_network_publication", authorityAdmissionRef: "admission", retrievedAt: "2026-08-24T00:00:00.000Z",
     documentId: "document", documentFingerprint: "a".repeat(64), locator: { locatorId: "locator", page: 1, sectionCode: "rule", lineStart: 1, lineEnd: 1 },
     boundedSupportingExcerpt: "Public excerpt", semanticVerification: "supported_candidate", limitations: [] }] }; }
-function baseAudit() { return { schemaVersion: "rg_internal_analysis_audit_v1", runId: "run", executionMode: "injected_evaluation", externalNetworkCallCount: 0,
+function baseAudit() { return { schemaVersion: "rg_internal_analysis_audit_v2", runId: "run", executionMode: "injected_evaluation", externalNetworkCallCount: 0,
   liveTimingPolicy: { amendmentId: "RG-AMEND-011-INTERNAL-LIVE-TIMING-V2", searchTimeoutMs: 40_000, globalWallTimeMs: 180_000 },
   providerOperationReceipts: [], searchAttempts: [], retrievalOutcomes: [], questions: [], verificationOutcomes: [], budget: { profile: "RG-FREE-v1", limits: {}, consumed: {}, remaining: {}, reservations: [], exhaustedDimensions: [] },
   diagnostics: { schemaVersion: "canonical_intelligence_v2_diagnostics_v1", stageStatuses: {}, counts: {}, elapsedMs: {}, providerCodes: [], modelCodes: [], tokenUsage: 0, reasonCodes: [] },
+  observationPlanning: { schemaVersion: "observation_planning_audit_v1", registryId: "fiserv_observation_subject_registry",
+    registryVersion: "1.0.0", templateFamily: "fiserv_first_data_short_structural_mapping", rawNonzeroObservationCount: 0,
+    normalizedObservationIdentityCount: 0, mappedSubjectCount: 0, suppressedObservationCount: 0,
+    suppressedCountsByReason: {}, observations: [], subjects: [], eligibleSubjectCount: 0, selectedQuestionCount: 0, subjectDecisions: [] },
   rfProjection: { projectedCandidateCount: 0, automaticAdmissionCount: 0, projectionStatus: "completed_no_candidates",
     reasonCodes: ["no_supported_rf_candidates_projected", "automatic_knowledge_admission_none"], candidateSummaries: [] },
   canonicalBeforeHash: "same", canonicalAfterHash: "same", canonicalTruthPreserved: true, rfSnapshotHash: "hash", rfEntryRefs: [], policyVersions: [] }; }

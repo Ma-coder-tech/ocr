@@ -2,6 +2,7 @@ export * from "./intelligenceTypes.js";
 export * from "./intelligenceVersionManifest.js";
 export * from "./budgetLedger.js";
 export * from "./questionPlanning.js";
+export * from "./observationSubjectRegistry.js";
 export * from "./sourceAuthority.js";
 export * from "./publicSourceAuthorityRegistry.js";
 export * from "./remoteConcurrency.js";

@@ -1,5 +1,7 @@
 import type { InternalStatementAnalysisV1, PublicSourceEvidenceManifestV1, RgInternalAuditV1 } from "./internalAnalysisTypes.js";
 import { hasExactKeys, isRecord, isSafeStructuredString } from "../knowledge/knowledgeSafety.js";
+import { FISERV_OBSERVATION_SUBJECT_REGISTRY_ID, FISERV_OBSERVATION_SUBJECT_REGISTRY_VERSION,
+  registeredObservationSubjectIdentity, registryRuleForSubject } from "../intelligence/observationSubjectRegistry.js";
 
 const ANALYSIS_KEYS = ["schemaVersion", "audience", "authority", "amendmentIds", "safeStatementId", "runId", "evaluatedAt", "executionStatus",
   "researchOutcome", "researchQuestionOutcomes", "terminalStatus",
@@ -18,7 +20,19 @@ const EVIDENCE_KEYS = ["evidenceId", "supportId", "questionId", "candidateId", "
 const LOCATOR_KEYS = ["locatorId", "page", "sectionCode", "lineStart", "lineEnd"] as const;
 const RG_AUDIT_KEYS = ["schemaVersion", "runId", "executionMode", "externalNetworkCallCount", "liveTimingPolicy",
   "providerOperationReceipts", "searchAttempts", "retrievalOutcomes", "questions", "verificationOutcomes", "budget", "diagnostics",
-  "rfProjection", "canonicalBeforeHash", "canonicalAfterHash", "canonicalTruthPreserved", "rfSnapshotHash", "rfEntryRefs", "policyVersions"] as const;
+  "observationPlanning", "rfProjection", "canonicalBeforeHash", "canonicalAfterHash", "canonicalTruthPreserved", "rfSnapshotHash", "rfEntryRefs", "policyVersions"] as const;
+const OBSERVATION_PLANNING_KEYS = ["schemaVersion", "registryId", "registryVersion", "templateFamily", "rawNonzeroObservationCount",
+  "normalizedObservationIdentityCount", "mappedSubjectCount", "suppressedObservationCount", "suppressedCountsByReason",
+  "observations", "subjects", "eligibleSubjectCount", "selectedQuestionCount", "subjectDecisions"] as const;
+const PLANNED_OBSERVATION_KEYS = ["occurrenceRef", "evidenceRef", "sourceSection", "semanticRole", "normalizedObservationRef",
+  "normalizedSubjectPatternRef", "normalizedLabelFingerprint", "calculationSuffixKind", "sameNormalizedLabelCount",
+  "sameNormalizedPatternCount", "aggregateAmountMinor", "registryRuleId",
+  "subjectCode", "safeResearchLabel", "disposition", "reasonCode"] as const;
+const PLANNED_SUBJECT_KEYS = ["subjectCode", "questionClass", "safeResearchLabel", "registryRuleId", "registryReasonCode",
+  "occurrenceRefs", "evidenceRefs", "occurrenceCount", "aggregateAmountMinor", "materialityBasis", "priority",
+  "publicResearchPlausible"] as const;
+const SUBJECT_DECISION_KEYS = ["subjectCode", "registryRuleId", "questionId", "questionClass", "rfResolutionStatus", "eligibility",
+  "selection", "materiality", "priority", "sourceAuthorityAvailability", "reasonCodes"] as const;
 const RECEIPT_KEYS = ["receiptId", "reservationId", "operationId", "operation", "providerCode", "logicalAttempt", "actualSendCount", "retryCount",
   "sendState", "completionState", "elapsedMs", "usageState", "outputTokens", "providerRequestCount", "usageCostUsd", "providerConfigurationCode",
   "httpStatus", "localRequestId", "providerRequestId", "providerResponseId", "requestedModelIdentifier", "returnedModelIdentifier", "finishReason",
@@ -60,8 +74,7 @@ export function validateInternalStatementAnalysisV1(analysis: InternalStatementA
   for (const outcome of analysis.researchQuestionOutcomes) {
     if (!isRecord(outcome) || !hasExactKeys(outcome, RESEARCH_QUESTION_OUTCOME_KEYS)
       || !isSafeStructuredString(outcome.questionId)
-      || !["application_fee_public_definition", "non_swiped_discount_public_definition"].includes(String(outcome.questionClass))
-      || !["application_fee_terminology", "non_swiped_discount_terminology"].includes(String(outcome.subjectCode))
+      || !registeredObservationSubjectIdentity({ questionClass: String(outcome.questionClass), subjectCode: String(outcome.subjectCode) })
       || !RESEARCH_OUTCOMES.includes(outcome.outcome) || typeof outcome.attempted !== "boolean"
       || !safeStringArray(outcome.operationalReasonCodes) || !Number.isSafeInteger(outcome.retainedCandidateCount)
       || outcome.retainedCandidateCount < 0 || typeof outcome.publicResearchStillPossible !== "boolean") {
@@ -99,7 +112,7 @@ export function validateInternalStatementAnalysisV1(analysis: InternalStatementA
     if (!isRecord(observation) || !hasExactKeys(observation, OBSERVATION_KEYS) || !isSafeStructuredString(observation.observationId)
       || observation.authority !== "statement_observation" || observation.currency !== "USD" || typeof observation.observedAmountMinor !== "number"
       || !Number.isSafeInteger(observation.observedAmountMinor) || observation.observedAmountMinor <= 0
-      || !["application_fee_public_definition", "non_swiped_discount_public_definition"].includes(String(observation.questionClass))
+      || !registeredObservationSubjectIdentity({ questionClass: String(observation.questionClass), safeResearchLabel: String(observation.label) })
       || !safeDisplayText(observation.label, 200) || !arraysOfSafeIds(observation.occurrenceRefs, observation.evidenceRefs)
       || !safeStringArray(observation.limitations)) issues.push("internal_analysis_observation_shape_invalid");
   }
@@ -207,7 +220,8 @@ export function validateRgInternalAuditV1(audit: RgInternalAuditV1): string[] {
     || !Array.isArray(audit.providerOperationReceipts) || !Array.isArray(audit.searchAttempts)
     || !Array.isArray(audit.retrievalOutcomes) || !Array.isArray(audit.verificationOutcomes) || !Array.isArray(audit.rfEntryRefs)
     || !isRecord(audit.budget) || !Array.isArray(audit.budget.reservations)) return ["rg_internal_audit_shape_invalid"];
-  if (audit.schemaVersion !== "rg_internal_analysis_audit_v1") issues.push("rg_internal_audit_identity_invalid");
+  if (audit.schemaVersion !== "rg_internal_analysis_audit_v2") issues.push("rg_internal_audit_identity_invalid");
+  if (!validObservationPlanningAudit(audit.observationPlanning)) issues.push("rg_internal_audit_observation_planning_invalid");
   if (!isRecord(audit.liveTimingPolicy) || !hasExactKeys(audit.liveTimingPolicy, ["amendmentId", "searchTimeoutMs", "globalWallTimeMs"])
     || audit.liveTimingPolicy.amendmentId !== "RG-AMEND-011-INTERNAL-LIVE-TIMING-V2"
     || audit.liveTimingPolicy.searchTimeoutMs !== 40_000 || audit.liveTimingPolicy.globalWallTimeMs !== 180_000) {
@@ -344,6 +358,114 @@ export function validateRgInternalAuditV1(audit: RgInternalAuditV1): string[] {
 
 function containsPrivateProviderMaterial(value: string): boolean {
   return /(?:raw prompt|raw response|chain.of.thought|\/Users\/|[A-Za-z]:\\|\.pdf\b|\b(?:MID|merchant number|account number)\b)/i.test(value);
+}
+
+function validObservationPlanningAudit(value: unknown): boolean {
+  if (!isRecord(value) || !hasExactKeys(value, OBSERVATION_PLANNING_KEYS)
+    || value.schemaVersion !== "observation_planning_audit_v1"
+    || value.registryId !== FISERV_OBSERVATION_SUBJECT_REGISTRY_ID
+    || value.registryVersion !== FISERV_OBSERVATION_SUBJECT_REGISTRY_VERSION
+    || !isSafeStructuredString(value.templateFamily)
+    || !Array.isArray(value.observations) || !Array.isArray(value.subjects) || !Array.isArray(value.subjectDecisions)
+    || ![value.rawNonzeroObservationCount, value.normalizedObservationIdentityCount, value.mappedSubjectCount,
+      value.suppressedObservationCount, value.eligibleSubjectCount, value.selectedQuestionCount]
+      .every((item) => Number.isSafeInteger(item) && Number(item) >= 0)
+    || value.rawNonzeroObservationCount !== value.observations.length
+    || new Set(value.observations.filter(isRecord).map((item) => item.occurrenceRef)).size !== value.observations.length
+    || new Set(value.observations.filter(isRecord).map((item) => item.normalizedObservationRef)).size !== value.normalizedObservationIdentityCount
+    || value.mappedSubjectCount !== value.subjects.length
+    || value.suppressedObservationCount !== value.observations.filter((item) => isRecord(item) && item.disposition === "suppressed").length
+    || !isRecord(value.suppressedCountsByReason)
+    || Object.entries(value.suppressedCountsByReason).some(([reason, count]) => !/^[a-z][a-z0-9_]*$/.test(reason)
+      || !Number.isSafeInteger(count) || Number(count) < 1)
+    || Object.values(value.suppressedCountsByReason).map(Number).reduce((sum, item) => sum + item, 0) !== value.suppressedObservationCount) return false;
+  const observations = value.observations as Array<Record<string, unknown>>;
+  const subjects = value.subjects as Array<Record<string, unknown>>;
+  const subjectDecisions = value.subjectDecisions as Array<Record<string, unknown>>;
+  if (observations.some((item) => !isRecord(item) || !hasExactKeys(item, PLANNED_OBSERVATION_KEYS)
+    || !isSafeStructuredString(item.occurrenceRef) || (item.evidenceRef !== null && !isSafeStructuredString(item.evidenceRef))
+    || !safeDisplayText(item.sourceSection, 100) || item.semanticRole !== "fee_charge"
+    || !/^normalized-observation-[a-f0-9]{20}$/.test(String(item.normalizedObservationRef))
+    || !/^normalized-pattern-[a-f0-9]{20}$/.test(String(item.normalizedSubjectPatternRef))
+    || !/^[a-f0-9]{64}$/.test(String(item.normalizedLabelFingerprint))
+    || !["none", "transaction_count_at_rate", "rate_times_amount", "transaction_count_totaling_amount"].includes(String(item.calculationSuffixKind))
+    || !Number.isSafeInteger(item.sameNormalizedLabelCount) || Number(item.sameNormalizedLabelCount) < 1
+    || !Number.isSafeInteger(item.sameNormalizedPatternCount) || Number(item.sameNormalizedPatternCount) < Number(item.sameNormalizedLabelCount)
+    || !Number.isSafeInteger(item.aggregateAmountMinor) || Number(item.aggregateAmountMinor) <= 0
+    || !["mapped_to_registered_subject", "suppressed"].includes(String(item.disposition))
+    || !isSafeStructuredString(item.reasonCode)
+    || (item.disposition === "mapped_to_registered_subject"
+      ? !validMappedObservationAudit(item, String(value.templateFamily))
+      : item.registryRuleId !== null || item.subjectCode !== null || item.safeResearchLabel !== null))) return false;
+  if (subjects.some((item) => !isRecord(item) || !hasExactKeys(item, PLANNED_SUBJECT_KEYS)
+    || !registeredObservationSubjectIdentity({ questionClass: String(item.questionClass), subjectCode: String(item.subjectCode),
+      safeResearchLabel: String(item.safeResearchLabel) })
+    || ![item.registryRuleId, item.registryReasonCode].every(isSafeStructuredString)
+    || !Array.isArray(item.occurrenceRefs) || !Array.isArray(item.evidenceRefs)
+    || !arraysOfSafeIds(item.occurrenceRefs, item.evidenceRefs)
+    || !Number.isSafeInteger(item.occurrenceCount) || Number(item.occurrenceCount) < 1 || item.occurrenceCount !== item.occurrenceRefs.length
+    || !Number.isSafeInteger(item.aggregateAmountMinor) || Number(item.aggregateAmountMinor) <= 0
+    || item.materialityBasis !== "observed_nonzero_charge"
+    || typeof item.publicResearchPlausible !== "boolean"
+    || !["material_control_cost_stack", "material_network_rule", "material_operational_action", "material_repeated_unknown", "material_benchmark_rule"]
+      .includes(String(item.priority))
+    || !validPlannedSubjectRegistryBinding(item, String(value.templateFamily)))) return false;
+  if (subjects.some((subject) => {
+    if (!isRecord(subject)) return true;
+    const mapped = observations.filter((observation) => isRecord(observation)
+      && observation.disposition === "mapped_to_registered_subject" && observation.subjectCode === subject.subjectCode);
+    const occurrenceRefs = mapped.map((item) => String(item.occurrenceRef)).sort();
+    const evidenceRefs = [...new Set(mapped.map((item) => item.evidenceRef).filter((item): item is string => typeof item === "string"))].sort();
+    return JSON.stringify(occurrenceRefs) !== JSON.stringify([...(subject.occurrenceRefs as unknown[])].map(String).sort())
+      || JSON.stringify(evidenceRefs) !== JSON.stringify([...(subject.evidenceRefs as unknown[])].map(String).sort());
+  })) return false;
+  if (subjectDecisions.length !== subjects.length || subjectDecisions.some((item) => !isRecord(item)
+    || !hasExactKeys(item, SUBJECT_DECISION_KEYS)
+    || !registeredObservationSubjectIdentity({ questionClass: String(item.questionClass), subjectCode: String(item.subjectCode) })
+    || ![item.registryRuleId, item.questionId].every(isSafeStructuredString)
+    || !["resolved_single", "resolved_corroborated", "unresolved_no_admitted_knowledge", "unresolved_conflict",
+      "unresolved_visibility_boundary", "unresolved_scope_or_period", "unresolved_policy_rejection"].includes(String(item.rfResolutionStatus))
+    || !["eligible", "rf_resolved", "deterministically_not_applicable", "merchant_pricing_document_required",
+      "additional_statement_history_required", "processor_explanation_required", "public_evidence_unavailable", "unresolved_review_required"]
+      .includes(String(item.eligibility))
+    || !["selected", "not_selected", "not_eligible"].includes(String(item.selection))
+    || !["material", "contextual", "unresolved"].includes(String(item.materiality))
+    || !["material_control_cost_stack", "material_network_rule", "material_operational_action", "material_repeated_unknown", "material_benchmark_rule"]
+      .includes(String(item.priority))
+    || !["existing_admitted_public_authority_available", "dynamic_discovery_permitted_no_current_source_admission",
+      "account_document_resolution_likely_required", "public_research_inappropriate"].includes(String(item.sourceAuthorityAvailability))
+    || !safeReasonCodeArray(item.reasonCodes)
+    || !validSubjectDecisionRegistryBinding(item))) return false;
+  const calculatedSuppressions = Object.fromEntries([...new Set(observations.filter(isRecord)
+    .filter((item) => item.disposition === "suppressed").map((item) => String(item.reasonCode)))].sort()
+    .map((reason) => [reason, observations.filter((item) => isRecord(item)
+      && item.disposition === "suppressed" && item.reasonCode === reason).length]));
+  return value.eligibleSubjectCount === subjectDecisions.filter((item) => isRecord(item) && item.eligibility === "eligible").length
+    && value.selectedQuestionCount === subjectDecisions.filter((item) => isRecord(item) && item.selection === "selected").length
+    && new Set(subjectDecisions.filter(isRecord).map((item) => item.questionId)).size === subjectDecisions.length
+    && JSON.stringify(value.suppressedCountsByReason) === JSON.stringify(calculatedSuppressions)
+    && !containsPrivateProviderMaterial(JSON.stringify(value));
+}
+
+function validMappedObservationAudit(item: Record<string, unknown>, templateFamily: string): boolean {
+  const rule = registryRuleForSubject(String(item.subjectCode));
+  return rule !== null && rule.ruleId === item.registryRuleId && rule.safeResearchLabel === item.safeResearchLabel
+    && rule.reasonCode === item.reasonCode && rule.eligibleTemplateFamilies.includes(templateFamily)
+    && rule.eligibleSourceSections.includes(String(item.sourceSection));
+}
+
+function validPlannedSubjectRegistryBinding(item: Record<string, unknown>, templateFamily: string): boolean {
+  const rule = registryRuleForSubject(String(item.subjectCode));
+  return rule !== null && rule.ruleId === item.registryRuleId && rule.questionClass === item.questionClass
+    && rule.safeResearchLabel === item.safeResearchLabel && rule.reasonCode === item.registryReasonCode
+    && rule.priority === item.priority && rule.publicResearchPlausible === item.publicResearchPlausible
+    && rule.eligibleTemplateFamilies.includes(templateFamily);
+}
+
+function validSubjectDecisionRegistryBinding(item: Record<string, unknown>): boolean {
+  const rule = registryRuleForSubject(String(item.subjectCode));
+  return rule !== null && rule.ruleId === item.registryRuleId && rule.questionClass === item.questionClass
+    && rule.priority === item.priority;
 }
 
 function safeHttpsUrl(value: unknown): boolean {
