@@ -276,6 +276,7 @@ function artifactsFromStages(stages: PersistedAnalysisRunStage[]): CanonicalAnal
     rc: artifact("rc") as CanonicalAnalysisArtifacts["rc"],
     rd: artifact("rd") as CanonicalAnalysisArtifacts["rd"],
     re: artifact("re") as CanonicalAnalysisArtifacts["re"],
+    unresolvedClaims: artifact("claim_inventory") as CanonicalAnalysisArtifacts["unresolvedClaims"],
     rh: artifact("rh") as CanonicalAnalysisArtifacts["rh"],
   };
 }

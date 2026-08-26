@@ -13,10 +13,11 @@ import { buildCanonicalEconomicsV2FromFiserv } from "../fiservAdapter.js";
 import { resolveFiservTemplateAdmission } from "../fiservTemplateAdmission.js";
 import { resolveFiservRuntimeCapabilityAdmission } from "../fiservRuntimeCapabilityAdmission.js";
 import { buildObservationalCanonicalPricingV2FromFiserv } from "../fiservPricingAdapter.js";
-import { buildObservationalCanonicalEconomicsV2FromFiservPricing } from "../fiservEconomicAdapter.js";
+import { buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing } from "../fiservEconomicAdapter.js";
 import { observeFiservEconomicsInCanonicalSynthesisV2 } from "../fiservSynthesisAdapter.js";
 import { composeCanonicalMerchantReportV2 } from "../report/reportHarness.js";
 import { buildSourceReadinessEnvelope } from "../evaluation/sourceReadiness.js";
+import { buildCanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
 import type { CanonicalEconomicsV2CompletenessStatus } from "../types.js";
 import {
   ANALYSIS_RUN_IMPLEMENTATION_VERSION,
@@ -40,15 +41,17 @@ const DRIVERS: ParserDriver[] = [
 
 type StageBuilders = {
   pricing: typeof buildObservationalCanonicalPricingV2FromFiserv;
-  economic: typeof buildObservationalCanonicalEconomicsV2FromFiservPricing;
+  economic: typeof buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing;
   synthesis: typeof observeFiservEconomicsInCanonicalSynthesisV2;
+  claims: typeof buildCanonicalUnresolvedClaimInventory;
   report: typeof composeCanonicalMerchantReportV2;
 };
 
 const DEFAULT_BUILDERS: StageBuilders = {
   pricing: buildObservationalCanonicalPricingV2FromFiserv,
-  economic: buildObservationalCanonicalEconomicsV2FromFiservPricing,
+  economic: buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing,
   synthesis: observeFiservEconomicsInCanonicalSynthesisV2,
+  claims: buildCanonicalUnresolvedClaimInventory,
   report: composeCanonicalMerchantReportV2,
 };
 
@@ -79,7 +82,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
     throw new Error("INVALID_ANALYSIS_RUN_EXECUTION_CONTEXT");
   }
   const stageOutcomes = emptyStageOutcomes();
-  const artifacts: CanonicalAnalysisArtifacts = { rb: null, rc: null, rd: null, re: null, rh: null };
+  const artifacts: CanonicalAnalysisArtifacts = { rb: null, rc: null, rd: null, re: null, unresolvedClaims: null, rh: null };
   const profile = input.sourceProfile ?? {};
   const statementCompleteness = profile.statementCompleteness ?? "unknown";
   if (!(["complete", "incomplete", "unknown", "unavailable"] as const).includes(statementCompleteness)) {
@@ -99,7 +102,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   if (driverCandidates.length === 0) {
     const limitation = "No supported Fiserv-family parser could be selected from source evidence.";
     finishStage(input.observer, stageOutcomes, "capability_admission", "unsupported", null, [], [], [limitation]);
-    for (const stage of ["rb", "rc", "rd", "re", "rh"] as const) {
+    for (const stage of ["rb", "rc", "rd", "re", "claim_inventory", "rh"] as const) {
       finishStage(input.observer, stageOutcomes, stage, "unresolved", null, [], [], ["Upstream Fiserv-family admission is unsupported."]);
     }
     return {
@@ -127,7 +130,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   if (!driver || !parserOutput) {
     const limitation = `Deterministic Fiserv parsers failed: ${parserFailures.join("; ") || "unknown_error"}`;
     finishStage(input.observer, stageOutcomes, "capability_admission", "failed", null, [limitation], [], [limitation]);
-    for (const stage of ["rb", "rc", "rd", "re", "rh"] as const) {
+    for (const stage of ["rb", "rc", "rd", "re", "claim_inventory", "rh"] as const) {
       finishStage(input.observer, stageOutcomes, stage, "unresolved", null, [], [], ["Parser failure withheld this dependent stage."]);
     }
     return {
@@ -263,6 +266,14 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
     } catch (error) { failStage(input.observer, stageOutcomes, "re", error); }
   } else dependencyWithheld(input.observer, stageOutcomes, "re", "RD");
 
+  try {
+    artifacts.unresolvedClaims = builders.claims({ pricing: artifacts.rc, economic: artifacts.rd, synthesis: artifacts.re });
+    finishValidatedStage(input.observer, stageOutcomes, "claim_inventory", artifacts.unresolvedClaims,
+      artifacts.unresolvedClaims.validation);
+  } catch (error) {
+    failStage(input.observer, stageOutcomes, "claim_inventory", error);
+  }
+
   if (artifacts.re && (artifacts.re.validation.status === "valid" || input.evaluationContinueInvalidStages) && readiness) {
     try {
       artifacts.rh = builders.report({ synthesisAnalysis: artifacts.re, sourceReadiness: readiness });
@@ -332,6 +343,9 @@ function terminalRun(input: {
       providerExecution: "disabled",
       publicResearch: "disabled",
       rfProductionKnowledge: "disabled",
+      benchmarkExecution: "disabled",
+      savingsExecution: "disabled",
+      businessContextAuthority: "excluded_from_canonical_economics",
       goldRuntimeAuthority: "prohibited_oracle_only",
     },
     runId: input.input.runId,
@@ -444,6 +458,7 @@ function stageClaimRef(stage: AnalysisRunStageId) {
     rc: { claimRef: "rc.pricing_architecture", evidenceObjective: "Preserve observed pricing components without importing unsupported semantics.", expectedDecisionEffect: "Resolve or withhold each pricing axis." },
     rd: { claimRef: "rd.economic_ledger", evidenceObjective: "Build the direction-preserving economic ledger and unresolved cost stack.", expectedDecisionEffect: "Preserve charges while withholding unsupported category and ownership claims." },
     re: { claimRef: "re.economic_synthesis", evidenceObjective: "Build only evidence-permitted drivers, counterfactuals, levers, and themes.", expectedDecisionEffect: "Resolve or withhold synthesis claims independently." },
+    claim_inventory: { claimRef: "runtime.unresolved_claim_inventory", evidenceObjective: "Project typed unresolved dependencies from validated canonical stages without executing knowledge or research.", expectedDecisionEffect: "Provide the future RF/RG input while preserving every current authority ceiling." },
     rh: { claimRef: "rh.report_projection", evidenceObjective: "Project a limitation-accurate internal RH artifact from validated upstream stages.", expectedDecisionEffect: "Expose exactly what is proven and withheld without changing Report V1." },
   };
   return values[stage];

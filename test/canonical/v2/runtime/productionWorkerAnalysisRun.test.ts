@@ -43,6 +43,11 @@ describe("production worker canonical AnalysisRun integration", () => {
     expect(completed?.summary).not.toHaveProperty("canonicalAnalysisRun");
     expect(canonical).toMatchObject({ jobId: job.id, status: "completed_with_limitations", familyStatus: "proven" });
     expect(canonical?.result?.artifacts.rh).not.toBeNull();
-    expect(canonical?.stages).toHaveLength(7);
+    expect(canonical?.result?.artifacts.unresolvedClaims).toMatchObject({
+      businessContextAuthority: "excluded_from_canonical_economics",
+      benchmarkExecution: "disabled",
+    });
+    expect(JSON.stringify(canonical?.result?.artifacts)).not.toContain('"businessType"');
+    expect(canonical?.stages).toHaveLength(8);
   }, 30_000);
 });

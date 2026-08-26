@@ -41,7 +41,7 @@ describe("durable canonical AnalysisRun persistence", () => {
     });
     expect(persisted.stages.map((stage) => [stage.stage, stage.status])).toEqual([
       ["source_ingress", "valid"], ["capability_admission", "valid"], ["rb", "valid"], ["rc", "valid"],
-      ["rd", "valid"], ["re", "valid"], ["rh", "valid"],
+      ["rd", "valid"], ["re", "valid"], ["claim_inventory", "valid"], ["rh", "valid"],
     ]);
     expect(persisted.stages.every((stage) => stage.claimRef && stage.evidenceObjective && stage.expectedDecisionEffect)).toBe(true);
     expect(persisted.stages.every((stage) => stage.artifactHash && stage.resource.execution === "deterministic_local"
@@ -55,12 +55,25 @@ describe("durable canonical AnalysisRun persistence", () => {
     expect(afterSecond.attemptCount).toBe(1);
     expect(afterSecond.stages.map((stage) => stage.artifactHash)).toEqual(hashes);
     expect(loadedDb.db.prepare(`SELECT COUNT(*) AS count FROM canonical_analysis_runs WHERE job_id = ?`).get(job.id)).toEqual({ count: 1 });
-    expect(loadedDb.db.prepare(`SELECT COUNT(*) AS count FROM canonical_analysis_run_stages WHERE run_id = ?`).get(first.runId)).toEqual({ count: 7 });
+    expect(loadedDb.db.prepare(`SELECT COUNT(*) AS count FROM canonical_analysis_run_stages WHERE run_id = ?`).get(first.runId)).toEqual({ count: 8 });
 
     const changedDocument = structuredClone(document);
     changedDocument.rows[0] = { ...changedDocument.rows[0], content: `${String(changedDocument.rows[0]?.content ?? "")} changed` };
     expect(() => runStore.executeDurableCanonicalAnalysisRun({ jobId: job.id, document: changedDocument }))
       .toThrow("ANALYSIS_RUN_SOURCE_FINGERPRINT_MISMATCH");
+
+    loadedDb.db.prepare(`UPDATE canonical_analysis_runs SET implementation_version = ? WHERE job_id = ?`)
+      .run("prior_accepted_implementation", job.id);
+    const upgraded = runStore.executeDurableCanonicalAnalysisRun({ jobId: job.id, document });
+    const afterUpgrade = runStore.getPersistedAnalysisRunForJob(job.id)!;
+    expect(upgraded.runId).toBe(first.runId);
+    expect(afterUpgrade).toMatchObject({
+      attemptCount: 2,
+      schemaVersion: "canonical_analysis_run_v2",
+      implementationVersion: "capability_bound_economic_ledger_v1",
+    });
+    expect(afterUpgrade.stages).toHaveLength(8);
+    expect(afterUpgrade.stages.every((stage) => stage.status === "valid" && stage.artifact !== null)).toBe(true);
 
     const serialized = JSON.stringify(persisted);
     expect(serialized).not.toContain(fixture);

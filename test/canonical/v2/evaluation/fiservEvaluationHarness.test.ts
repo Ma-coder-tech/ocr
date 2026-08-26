@@ -47,8 +47,8 @@ describe("one-statement Fiserv pre-UAT harness", () => {
       expect.objectContaining({ item: "fee-detail occurrences", currentAuthority: "admitted_with_conditions",
         canonicalResult: "134 observed occurrence(s); coverage complete_observed_occurrences" }),
     ]));
-    expect(result.audit.economics).toMatchObject({ rdCompleteness: "financially_unreconciled", chargeCount: 137,
-      contributingChargeCount: 0, authoritativeFeeTotalMinor: 131_255, reconciliationDeltaMinor: 131_255,
+    expect(result.audit.economics).toMatchObject({ rdCompleteness: "partial_but_financially_reconciled", chargeCount: 134,
+      contributingChargeCount: 134, authoritativeFeeTotalMinor: 131_255, reconciliationDeltaMinor: 0,
       ownershipControlProven: false, themeCount: 0 });
     const projection = JSON.parse(await readFile(path.join(outputDirectory, "rh-projection.json"), "utf8"));
     expect(projection.snapshot).toMatchObject({ processedSales: { moneyValue: { amountMinor: 5_246_055 } },

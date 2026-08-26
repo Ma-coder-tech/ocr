@@ -76,7 +76,11 @@ export type CanonicalEconomicDependencyKind =
 
 export type CanonicalEconomicDependencyStatus = "required" | "satisfied_by_admitted_evidence" | "conflicting" | "unavailable";
 
-export type CanonicalEconomicAdmissionSource = "approved_synthetic" | "versioned_template" | "observational";
+export type CanonicalEconomicAdmissionSource =
+  | "approved_synthetic"
+  | "versioned_template"
+  | "runtime_capability"
+  | "observational";
 export type CanonicalEconomicFeeDetailCoverage = "complete" | "incomplete" | "unknown" | "unavailable";
 
 export type CanonicalEconomicParticipant = {

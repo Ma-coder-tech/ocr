@@ -9,10 +9,13 @@ import type { CanonicalEconomicsV2SynthesisAnalysis } from "./synthesisTypes.js"
 export function observeFiservEconomicsInCanonicalSynthesisV2(
   economicAnalysis: CanonicalEconomicsV2EconomicAnalysis,
 ): CanonicalEconomicsV2SynthesisAnalysis {
+  const capabilityBound = economicAnalysis.economicLayer.admissionProfile.source === "runtime_capability";
   return buildCanonicalEconomicsV2SynthesisAnalysis({
     economicAnalysis,
     limitations: [
-      "Fiserv RE observation remains empty and non-authoritative until versioned source/template admissions establish synthesis semantics.",
+      capabilityBound
+        ? "Capability-bound RD cost is preserved, but RE creates no category, ownership, control, actionability, counterfactual, benchmark, or savings semantics without separately admitted evidence."
+        : "Fiserv RE observation remains empty and non-authoritative until versioned source/template admissions establish synthesis semantics.",
     ],
   });
 }

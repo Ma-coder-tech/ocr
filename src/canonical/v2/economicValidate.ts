@@ -1,5 +1,6 @@
 import type { CanonicalEconomicCharge, CanonicalEconomicCostBucketKind, CanonicalEconomicsV2EconomicAnalysis } from "./economicTypes.js";
 import { RD_SEMANTIC_AMENDMENT_IDS } from "./economicVersionManifest.js";
+import { FISERV_FEE_LEDGER_OCCURRENCE_MARKER } from "./fiservAdapter.js";
 
 const EXPECTED_BUCKETS = [
   "issuer_interchange_cost",
@@ -227,6 +228,55 @@ function validateAdmission(
   }
   if (profile.source === "approved_synthetic" && analysis.pricingAnalysis.foundation.identity.provenanceStatus !== "approved_synthetic") {
     errors.push("Approved-synthetic RD admission requires approved-synthetic RB provenance.");
+  }
+  if (profile.source === "runtime_capability") {
+    const foundation = analysis.pricingAnalysis.foundation;
+    const feeTotal = foundation.templateCapability.capabilities.find((item) => item.capability === "fee_total");
+    const feeDetail = foundation.templateCapability.capabilities.find((item) => item.capability === "fee_detail");
+    const statementPeriod = foundation.templateCapability.capabilities.find((item) => item.capability === "statement_period");
+    if (foundation.templateCapability.identityStatus !== "proven" ||
+        foundation.templateCapability.admissionStatus !== "admitted" ||
+        foundation.templateCapability.admissionAuthority === null ||
+        feeTotal?.status !== "supported" || feeTotal.proofEvidenceRefs.length === 0) {
+      errors.push("Capability-bound RD admission requires proven Fiserv identity and supported fee-total capability.");
+    }
+    const contributing = analysis.economicLayer.charges.filter((charge) => charge.contributionStatus.startsWith("contributes_"));
+    if (contributing.length > 0 && (feeDetail?.status !== "supported" || feeDetail.proofEvidenceRefs.length === 0)) {
+      errors.push("Capability-bound contributing charges require supported fee-detail capability.");
+    }
+    if (contributing.length > 0 && !profile.statementPeriodApplicabilityProven) {
+      errors.push("Capability-bound contributing charges require proven statement-period applicability.");
+    }
+    if (profile.statementPeriodApplicabilityProven &&
+        (statementPeriod?.status !== "supported" || statementPeriod.proofEvidenceRefs.length === 0 || foundation.identity.statementPeriod === null)) {
+      errors.push("Capability-bound statement-period applicability exceeds the supported statement-period capability.");
+    }
+    if (profile.feeDetailCoverage === "complete" &&
+        (feeDetail?.status !== "supported" || feeDetail.proofEvidenceRefs.length === 0 || !profile.statementPeriodApplicabilityProven)) {
+      errors.push("Complete capability-bound fee-detail coverage requires supported detail and period applicability.");
+    }
+    if (contributing.some((charge) => charge.contributionStatus !== "contributes_unresolved" ||
+      charge.categoryResolution !== "unresolved" || charge.category !== "unresolved_unclassified")) {
+      errors.push("Capability-bound fee occurrence authority cannot establish economic category semantics.");
+    }
+    if (analysis.economicLayer.participants.length > 0 || analysis.economicLayer.roleClaims.length > 0 ||
+        analysis.economicLayer.dependencies.length > 0 || contributing.some((charge) =>
+          charge.pricingComponentRefs.length > 0 || charge.pricingPopulationRefs.length > 0 || charge.dependencyRefs.length > 0 ||
+          charge.roleClaimRefs.length > 0)) {
+      errors.push("Capability-bound fee occurrence authority is ledger-only and cannot create pricing, participant, ownership, control, or dependency semantics.");
+    }
+    for (const charge of contributing) {
+      const occurrence = foundation.sourceModel.occurrences.find((item) => item.id === charge.contributingOccurrenceRef);
+      if (!occurrence || occurrence.contributionRole !== "supporting_detail" ||
+          !occurrence.limitations.includes(FISERV_FEE_LEDGER_OCCURRENCE_MARKER) ||
+          !feeDetail?.proofEvidenceRefs.includes(occurrence.evidenceRef) ||
+          !charge.supportingDetailAdmissionEvidenceRefs.includes(occurrence.evidenceRef)) {
+        errors.push(`Capability-bound charge ${charge.id} lacks claim-scoped fee-detail proof.`);
+      }
+    }
+    if (profile.feeDetailCoverage === "complete" && analysis.economicLayer.costStack.completeness === "financially_unreconciled") {
+      errors.push("Complete capability-bound fee detail must reconcile to the authoritative statement fee total.");
+    }
   }
   if (profile.source === "observational") {
     if (profile.feeDetailCoverage === "complete" || profile.feeDetailCoverage === "incomplete" || profile.statementPeriodApplicabilityProven) {

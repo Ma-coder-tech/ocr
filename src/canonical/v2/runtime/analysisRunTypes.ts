@@ -3,7 +3,7 @@ import type { ParsedDocument } from "../../../parser.js";
 import type { ReturnTypeOrNull } from "./typeUtilities.js";
 import type { buildCanonicalEconomicsV2FromFiserv } from "../fiservAdapter.js";
 import type { buildObservationalCanonicalPricingV2FromFiserv } from "../fiservPricingAdapter.js";
-import type { buildObservationalCanonicalEconomicsV2FromFiservPricing } from "../fiservEconomicAdapter.js";
+import type { buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing } from "../fiservEconomicAdapter.js";
 import type { observeFiservEconomicsInCanonicalSynthesisV2 } from "../fiservSynthesisAdapter.js";
 import type { composeCanonicalMerchantReportV2 } from "../report/reportHarness.js";
 import type { buildSourceReadinessEnvelope } from "../evaluation/sourceReadiness.js";
@@ -13,9 +13,10 @@ import type {
   FiservRuntimeCapabilityAdmissionResolution,
   FiservRuntimeCapabilityProof,
 } from "../fiservRuntimeCapabilityAdmission.js";
+import type { CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
 
-export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v1";
-export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "production_deterministic_ingress_v1";
+export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v2";
+export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "capability_bound_economic_ledger_v1";
 export const ANALYSIS_RUN_POLICY_VERSION = "frozen_product_model_runtime_policy_v0_2";
 
 export const ANALYSIS_RUN_STAGE_IDS = [
@@ -25,6 +26,7 @@ export const ANALYSIS_RUN_STAGE_IDS = [
   "rc",
   "rd",
   "re",
+  "claim_inventory",
   "rh",
 ] as const;
 
@@ -51,14 +53,18 @@ export type AnalysisRunManifest = {
   providerExecution: "disabled";
   publicResearch: "disabled";
   rfProductionKnowledge: "disabled";
+  benchmarkExecution: "disabled";
+  savingsExecution: "disabled";
+  businessContextAuthority: "excluded_from_canonical_economics";
   goldRuntimeAuthority: "prohibited_oracle_only";
 };
 
 export type CanonicalAnalysisArtifacts = {
   rb: ReturnTypeOrNull<typeof buildCanonicalEconomicsV2FromFiserv>;
   rc: ReturnTypeOrNull<typeof buildObservationalCanonicalPricingV2FromFiserv>;
-  rd: ReturnTypeOrNull<typeof buildObservationalCanonicalEconomicsV2FromFiservPricing>;
+  rd: ReturnTypeOrNull<typeof buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing>;
   re: ReturnTypeOrNull<typeof observeFiservEconomicsInCanonicalSynthesisV2>;
+  unresolvedClaims: CanonicalUnresolvedClaimInventory | null;
   rh: ReturnTypeOrNull<typeof composeCanonicalMerchantReportV2>;
 };
 

@@ -180,7 +180,7 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     expect(internalReview).toContain("Research outcome: **source_rejected_by_authority_policy**");
     const projection = await readFile(path.join(outputDirectory, "rh-projection.json"));
     expect(createHash("sha256").update(projection).digest("hex"))
-      .toBe("5e2fc1e17eaaacb4e891be1986f43982b139d94ef6e3bb092b5bcfee407158ac");
+      .toBe("aca1c2d06383ef42bf93c2dca91ad4e6819cd6ddfb2ad1bd91079333aea9a92c");
   }, 30_000);
 
   it("fails a changed known-source fingerprint closed before investigation", async () => {

@@ -85,6 +85,21 @@ export type BuildCanonicalEconomicsV2FromFiservInput = {
   includeGrossBasedRateDiagnostic?: boolean;
 };
 
+export const FISERV_FEE_LEDGER_OCCURRENCE_MARKER =
+  "Fee occurrence contribution is governed by authoritative fee controls, not by its label alone." as const;
+
+/**
+ * Returns only occurrences constructed from the parser's reconciled fee ledger.
+ * Source labels are deliberately not used as identity or economic semantics.
+ */
+export function fiservFeeLedgerOccurrences(
+  foundation: CanonicalEconomicsV2Foundation,
+): CanonicalEconomicsV2Foundation["sourceModel"]["occurrences"] {
+  return foundation.sourceModel.occurrences.filter((occurrence) =>
+    occurrence.limitations.includes(FISERV_FEE_LEDGER_OCCURRENCE_MARKER),
+  );
+}
+
 export function buildCanonicalEconomicsV2FromFiserv(
   input: BuildCanonicalEconomicsV2FromFiservInput,
 ): CanonicalEconomicsV2Foundation {
@@ -312,7 +327,7 @@ function buildOccurrenceInputs(input: {
       contributionRole: "supporting_detail",
       confidence: confidence(row.confidence),
       limitations: unique([
-        "Fee occurrence contribution is governed by authoritative fee controls, not by its label alone.",
+        FISERV_FEE_LEDGER_OCCURRENCE_MARKER,
         ...(/chargeback/i.test(description) && !input.admittedChargebackFeeRowIndexes.has(index)
           ? ["The label is only a chargeback-fee candidate; no admitted fee-row semantics established canonical chargeback-fee truth."]
           : []),

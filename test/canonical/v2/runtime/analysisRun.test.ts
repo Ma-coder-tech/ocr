@@ -39,6 +39,9 @@ describe("production canonical AnalysisRun core", () => {
         providerExecution: "disabled",
         publicResearch: "disabled",
         rfProductionKnowledge: "disabled",
+        benchmarkExecution: "disabled",
+        savingsExecution: "disabled",
+        businessContextAuthority: "excluded_from_canonical_economics",
         goldRuntimeAuthority: "prohibited_oracle_only",
       },
       admission: {
@@ -89,12 +92,14 @@ describe("production canonical AnalysisRun core", () => {
       rc: { status: "valid" },
       rd: { status: "valid" },
       re: { status: "failed", errors: [expect.stringContaining("injected_re_failure")] },
+      claim_inventory: { status: "valid" },
       rh: { status: "unresolved", limitations: [expect.stringContaining("previously proven upstream facts remain preserved")] },
     });
     expect(partial.artifacts.rb).toEqual(baseline.artifacts.rb);
     expect(partial.artifacts.rc).toEqual(baseline.artifacts.rc);
     expect(partial.artifacts.rd).toEqual(baseline.artifacts.rd);
     expect(partial.artifacts.re).toBeNull();
+    expect(partial.artifacts.unresolvedClaims).toEqual(baseline.artifacts.unresolvedClaims);
     expect(partial.artifacts.rh).toBeNull();
     expect(partial.canonicalTruthHash).not.toBeNull();
     expect(partial.canonicalTruthPreserved).toBe(true);
@@ -114,6 +119,62 @@ describe("production canonical AnalysisRun core", () => {
     });
     expect(run.capabilityProof?.capabilities.some((capability) => capability.status === "supported")).toBe(true);
     expect(run.stageOutcomes.rb.status).toBe("valid");
+    const contributing = run.artifacts.rd?.economicLayer.charges.filter((charge) =>
+      charge.contributionStatus === "contributes_unresolved",
+    ) ?? [];
+    const signedNet = contributing.reduce((sum, charge) => sum +
+      (charge.financialDirection === "credit" ? -1 : 1) * (charge.observedAmount?.amountMinor ?? 0), 0);
+    expect(run.artifacts.rd?.economicLayer.admissionProfile.source).toBe("runtime_capability");
+    expect(contributing.length).toBeGreaterThan(0);
+    expect(signedNet).toBe(run.artifacts.rb?.financialPopulations.totalStatementProcessingFees.value?.amountMinor);
+    expect(run.artifacts.rd?.economicLayer.costStack).toMatchObject({
+      completeness: "partial_but_financially_reconciled",
+      reconciliationDeltaMinor: 0,
+    });
+    expect(contributing.every((charge) => charge.category === "unresolved_unclassified" &&
+      charge.categoryResolution === "unresolved" && charge.roleClaimRefs.length === 0)).toBe(true);
+    expect(run.artifacts.unresolvedClaims).toMatchObject({
+      authority: "canonical_dependency_inventory_only",
+      productionExecution: "disabled",
+      rfResolution: "disabled",
+      rgResearch: "disabled",
+      benchmarkExecution: "disabled",
+      businessContextAuthority: "excluded_from_canonical_economics",
+      validation: { status: "valid" },
+    });
+  });
+
+  it("retains the authoritative fee total and types the coverage gap when fee detail is unproven", () => {
+    const { run } = executeDeterministicCanonicalAnalysisRun({
+      runId: "fee-total-with-unproven-detail",
+      sourceDocumentRef: "fee-total-with-unproven-detail-source",
+      document: processorDocument,
+    });
+
+    const feeDetail = run.capabilityProof?.capabilities.find((item) => item.capability === "fee_detail");
+    expect(feeDetail?.status).toBe("unknown");
+    expect(run.artifacts.rb?.financialPopulations.totalStatementProcessingFees).toMatchObject({
+      status: "available",
+      provenanceStatus: "authoritative",
+    });
+    expect(run.artifacts.rd?.economicLayer).toMatchObject({
+      admissionProfile: { source: "runtime_capability", feeDetailCoverage: "incomplete" },
+      charges: [],
+      costStack: {
+        completeness: "partial_but_financially_reconciled",
+        reconciliationDeltaMinor: 0,
+      },
+    });
+    expect(run.artifacts.rd?.economicLayer.costStack.unresolvedRemainder)
+      .toEqual(run.artifacts.rb?.financialPopulations.totalStatementProcessingFees.value);
+    expect(run.artifacts.unresolvedClaims?.claims).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        claimClass: "fee_detail_coverage",
+        state: "unresolved",
+        requiredEvidenceClass: "admitted_fee_detail_evidence",
+        blockingEffect: "limits_authority",
+      }),
+    ]));
   });
 
   it("fails closed as unsupported without fabricating canonical stages for a non-Fiserv document", () => {
@@ -133,7 +194,7 @@ describe("production canonical AnalysisRun core", () => {
     });
 
     expect(run).toMatchObject({ status: "unsupported", familyStatus: "unsupported", parser: { matched: false } });
-    expect(run.artifacts).toEqual({ rb: null, rc: null, rd: null, re: null, rh: null });
+    expect(run.artifacts).toEqual({ rb: null, rc: null, rd: null, re: null, unresolvedClaims: null, rh: null });
     expect(run.stageOutcomes.capability_admission.status).toBe("unsupported");
     expect(run.stageOutcomes.rb.status).toBe("unresolved");
   });

@@ -6,6 +6,7 @@ import type {
   CanonicalEconomicsV2PopulationSemantic,
   CanonicalEconomicsV2SourceOccurrence,
 } from "./types.js";
+import { fiservFeeLedgerOccurrences } from "./fiservAdapter.js";
 
 export const FISERV_RUNTIME_CAPABILITY_POLICY_ID = "fiserv_family_deterministic_capability_policy";
 export const FISERV_RUNTIME_CAPABILITY_POLICY_VERSION = "1.0.0";
@@ -166,7 +167,7 @@ export function resolveFiservRuntimeCapabilityAdmission(input: {
     funding_batches: refsForRole("funded_amount"),
     settlement_adjustments: refsForRole("settlement_adjustment"),
     chargeback_financial_populations: unique([...refsForRole("chargeback_principal_debit"), ...refsForRole("chargeback_representment")]),
-    fee_detail: unique([...refsForRole("fee_charge"), ...refsForRole("fee_credit")]),
+    fee_detail: unique(fiservFeeLedgerOccurrences(foundation).map((occurrence) => occurrence.evidenceRef)),
     non_fee_financial_flow_exclusions: unique([
       ...refsForRole("refund"),
       ...refsForRole("settlement_adjustment"),

@@ -166,7 +166,11 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
       ? foundation.identity.provenanceStatus === "authoritative" &&
         foundation.templateCapability.identityStatus === "proven" &&
         foundation.templateCapability.admissionStatus === "admitted"
-      : false;
+      : input.admissionProfile.source === "runtime_capability"
+        ? foundation.templateCapability.identityStatus === "proven" &&
+          foundation.templateCapability.admissionStatus === "admitted" &&
+          foundation.templateCapability.admissionAuthority !== null
+        : false;
   const occurrenceById = new Map(foundation.sourceModel.occurrences.map((item) => [item.id, item]));
   const evidenceIds = new Set(foundation.sourceModel.evidence.map((item) => item.id));
 
