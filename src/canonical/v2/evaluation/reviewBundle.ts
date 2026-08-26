@@ -14,7 +14,7 @@ export type FiservEvaluationRunAudit = {
   statement: { processorFamily: string; visibleBrand: string; statementFamily: string; periodStart: string; periodEnd: string };
   parser: { matched: true; driverId: string; reportable: boolean; decisionStatus: string; validationState: string };
   readiness: SourceReadinessEnvelope;
-  admission: { mappingId: string; mappingVersion: string; authorityClass: "product_owner"; authorityRef: string;
+  admission: { mappingId: string; mappingVersion: string; authorityClass: "product_owner" | "deterministic_capability_policy"; authorityRef: string;
     lifecycle: "admitted" | "admitted_with_conditions"; scope: string; supportedCapabilities: string[]; feeDetailCoverage: string } | null;
   familyAdmissionDecision: FiservFullTemplateAdmissionDecision;
   reviewSummary: { detectedTemplate: string; matchedAdmissionMappingId: string | null;

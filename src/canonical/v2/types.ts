@@ -87,7 +87,7 @@ export type CanonicalEconomicsV2TemplateProfile = {
   admissionStatus: CanonicalEconomicsV2TemplateAdmissionStatus;
   admissionAuthority: {
     lifecycle: "admitted" | "admitted_with_conditions";
-    authorityClass: "product_owner" | "authorized_domain_reviewer" | "data_steward";
+    authorityClass: "product_owner" | "authorized_domain_reviewer" | "data_steward" | "deterministic_capability_policy";
     authorityRef: string;
     admittedAt: string;
     admissionVersion: string;

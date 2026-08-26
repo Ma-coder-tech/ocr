@@ -1,7 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { createOrReplaceComparison, getStatementsForMerchant, persistStatementFromSummary } from "./accountStore.js";
 import type { AnalysisSummary } from "./types.js";
-import type { ParsedDocument } from "./parser.js";
 import { detectPreflightFailure } from "./preflight.js";
 import {
   failJob,
@@ -105,7 +104,7 @@ async function tick(): Promise<void> {
   }
 }
 
-async function processJob(jobId: string): Promise<void> {
+export async function processJob(jobId: string): Promise<void> {
   const queuedJob = getJob(jobId);
   if (!queuedJob || queuedJob.status === "completed" || queuedJob.status === "failed") return;
   const stageDelayMs = Number(process.env.STAGE_DELAY_MS ?? 0);
@@ -146,6 +145,23 @@ async function processJob(jobId: string): Promise<void> {
 
     stageUpdate(jobId, "identifying_processor", 28, "Identifying your processor");
     if (stageDelayMs > 0) await delay(stageDelayMs);
+
+    const { executeDurableCanonicalAnalysisRun } = await import("./canonical/v2/runtime/analysisRunStore.js");
+    const canonicalRun = executeDurableCanonicalAnalysisRun({
+      jobId: job.id,
+      sourceDocumentRef: `job_${job.id}`,
+      document: parsed,
+      sourceProfile: { statementCompleteness: "unknown" },
+    });
+    console.log(`[job:${jobId}] canonical-analysis-run`, {
+      runId: canonicalRun.runId,
+      status: canonicalRun.status,
+      familyStatus: canonicalRun.familyStatus,
+      driverId: canonicalRun.parser.driverId,
+      supportedCapabilityCount: canonicalRun.capabilityProof?.capabilities
+        .filter((capability) => capability.status === "supported").length ?? 0,
+      stageStatus: Object.fromEntries(Object.entries(canonicalRun.stageOutcomes).map(([stage, outcome]) => [stage, outcome.status])),
+    });
 
     stageUpdate(jobId, "extracting_fee_line_items", 48, "Extracting fee line items");
     if (stageDelayMs > 0) await delay(stageDelayMs);
@@ -217,13 +233,6 @@ async function processJob(jobId: string): Promise<void> {
         ],
       };
     }
-
-    await maybeRunCanonicalRuntimeShadow({
-      jobId: job.id,
-      parsed,
-      summary,
-      businessType: job.businessType,
-    });
 
     stageUpdate(jobId, "comparing_to_benchmark", 90, "Comparing to your business benchmark");
     if (stageDelayMs > 0) await delay(stageDelayMs);
@@ -299,25 +308,5 @@ async function runAiRefinement(summary: AnalysisSummary) {
   } catch (error) {
     console.error("[ai-refinement-skip]", error instanceof Error ? error.message : error);
     return summary;
-  }
-}
-
-export async function maybeRunCanonicalRuntimeShadow(input: {
-  jobId: string;
-  parsed: ParsedDocument;
-  summary: AnalysisSummary;
-  businessType: AnalysisSummary["businessType"];
-}): Promise<void> {
-  if (process.env.RATEREVEAL_CANONICAL_SHADOW_ENABLED !== "true") return;
-  try {
-    const { runCanonicalRuntimeShadow } = await import("./canonical/runtimeShadow.js");
-    await runCanonicalRuntimeShadow({
-      document: input.parsed,
-      summary: input.summary,
-      businessType: input.businessType,
-      runtimeDocumentRef: `job_${input.jobId}`,
-    });
-  } catch {
-    return;
   }
 }

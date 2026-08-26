@@ -434,15 +434,21 @@ function buildFinancialPopulations(input: {
 }): CanonicalEconomicsV2FinancialPopulations {
   const occurrenceRefs = (role: CanonicalEconomicsV2OccurrenceRole) => input.refs.get(role)?.occurrenceRefs ?? [];
   const evidenceRefs = (role: CanonicalEconomicsV2OccurrenceRole) => input.refs.get(role)?.evidenceRefs ?? [];
-  const selectedWithOccurrence = (field: string, role: CanonicalEconomicsV2OccurrenceRole) =>
-    occurrenceRefs(role).length > 0 ? numberOrNull(input.selected[field]) : null;
+  const selectedWithOccurrence = (field: string, role: CanonicalEconomicsV2OccurrenceRole,
+    capability: CanonicalEconomicsV2CapabilityId) =>
+    capabilityValueAllowed(input.templateAdmission, capability) && occurrenceRefs(role).length > 0
+      ? numberOrNull(input.selected[field]) : null;
   const selectedTransaction = record(input.selected.transactionCount);
   const supportingCounts = records(selectedTransaction.supportingTransactionCounts);
   const observedGrossCount = uniqueSupportingCount(supportingCounts, ["gross_sale_items", "gross_sale_transactions"]);
   const grossCountPopulationProven = input.provenanceStatus === "approved_synthetic" || hasAdmittedGrossSaleCountCapability(input.templateAdmission);
   const grossCount = grossCountPopulationProven ? observedGrossCount : { state: "unavailable", value: null } as const;
-  const refundCount = uniqueSupportingCount(supportingCounts, ["refunds", "refund_count", "refund_transactions"]);
-  const submittedCount = uniqueSupportingCount(supportingCounts, ["submitted_transactions"]);
+  const refundCount = capabilityValueAllowed(input.templateAdmission, "refund_transaction_count")
+    ? uniqueSupportingCount(supportingCounts, ["refunds", "refund_count", "refund_transactions"])
+    : { state: "unavailable", value: null } as const;
+  const submittedCount = capabilityValueAllowed(input.templateAdmission, "submitted_transaction_count")
+    ? uniqueSupportingCount(supportingCounts, ["submitted_transactions"])
+    : { state: "unavailable", value: null } as const;
   const settledCount = uniqueSupportingCount(supportingCounts, ["settled_transactions"]);
   const authorizationCount = uniqueSupportingCount(supportingCounts, ["authorizations", "authorization_count"]);
   const fundingSeparated = ["reconciled", "reconciled_with_warnings"].includes(stringOrNull(input.fundingLedger.status) ?? "") && input.fundingRows.length > 0;
@@ -476,7 +482,7 @@ function buildFinancialPopulations(input: {
     grossSaleVolume: moneyFactFromNumber({
       id: "fact_v2_gross_sale_volume",
       population: "gross_sale_volume",
-      value: selectedWithOccurrence("grossSales", "gross_sale"),
+      value: selectedWithOccurrence("grossSales", "gross_sale", "gross_sale_volume"),
       provenanceStatus: provenanceForCapability(input.templateAdmission, "gross_sale_volume", input.provenanceStatus),
       evidenceRefs: evidenceRefs("gross_sale"),
       occurrenceRefs: occurrenceRefs("gross_sale"),
@@ -485,7 +491,7 @@ function buildFinancialPopulations(input: {
     refundVolume: moneyFactFromNumber({
       id: "fact_v2_refund_volume",
       population: "refund_volume",
-      value: selectedWithOccurrence("refunds", "refund"),
+      value: selectedWithOccurrence("refunds", "refund", "refund_volume"),
       provenanceStatus: provenanceForCapability(input.templateAdmission, "refund_volume", input.provenanceStatus),
       evidenceRefs: evidenceRefs("refund"),
       occurrenceRefs: occurrenceRefs("refund"),
@@ -494,7 +500,7 @@ function buildFinancialPopulations(input: {
     canonicalNetSubmittedCardVolume: moneyFactFromNumber({
       id: "fact_v2_canonical_net_submitted_card_volume",
       population: "canonical_net_submitted_card_volume",
-      value: selectedWithOccurrence("totalVolume", "net_submitted"),
+      value: selectedWithOccurrence("totalVolume", "net_submitted", "canonical_net_submitted_card_volume"),
       provenanceStatus: provenanceForCapability(input.templateAdmission, "canonical_net_submitted_card_volume", input.provenanceStatus),
       evidenceRefs: evidenceRefs("net_submitted"),
       occurrenceRefs: occurrenceRefs("net_submitted"),
@@ -503,7 +509,7 @@ function buildFinancialPopulations(input: {
     thirdPartyTransactionVolume: moneyFactFromNumber({
       id: "fact_v2_third_party_transaction_volume",
       population: "third_party_transaction_volume",
-      value: selectedWithOccurrence("thirdPartyTransactions", "third_party_funding"),
+      value: selectedWithOccurrence("thirdPartyTransactions", "third_party_funding", "funding_batches"),
       provenanceStatus: input.provenanceStatus,
       evidenceRefs: evidenceRefs("third_party_funding"),
       occurrenceRefs: occurrenceRefs("third_party_funding"),
@@ -512,7 +518,7 @@ function buildFinancialPopulations(input: {
     totalStatementProcessingFees: moneyFactFromNumber({
       id: "fact_v2_total_statement_processing_fees",
       population: "total_statement_processing_fees",
-      value: selectedWithOccurrence("totalFees", "fee_charge"),
+      value: selectedWithOccurrence("totalFees", "fee_charge", "fee_total"),
       provenanceStatus: provenanceForCapability(input.templateAdmission, "fee_total", input.provenanceStatus),
       evidenceRefs: evidenceRefs("fee_charge"),
       occurrenceRefs: occurrenceRefs("fee_charge"),
@@ -521,7 +527,8 @@ function buildFinancialPopulations(input: {
     feeCreditAmount: moneyFactFromNumber({
       id: "fact_v2_fee_credit_amount",
       population: "fee_credit_amount",
-      value: feeCreditValues.length > 0 ? Math.abs(sum(feeCreditValues)) : null,
+      value: capabilityValueAllowed(input.templateAdmission, "fee_detail") && feeCreditValues.length > 0
+        ? Math.abs(sum(feeCreditValues)) : null,
       provenanceStatus: input.provenanceStatus,
       evidenceRefs: evidenceRefs("fee_credit"),
       occurrenceRefs: occurrenceRefs("fee_credit"),
@@ -530,7 +537,8 @@ function buildFinancialPopulations(input: {
     settlementAdjustmentAmount: moneyFactFromNumber({
       id: "fact_v2_settlement_adjustment_amount",
       population: "settlement_adjustment_amount",
-      value: adjustmentPopulationProven ? sum(adjustmentValues) : null,
+      value: capabilityValueAllowed(input.templateAdmission, "settlement_adjustments") && adjustmentPopulationProven
+        ? sum(adjustmentValues) : null,
       provenanceStatus: provenanceForCapability(input.templateAdmission, "settlement_adjustments", input.provenanceStatus),
       evidenceRefs: evidenceRefs("settlement_adjustment"),
       occurrenceRefs: occurrenceRefs("settlement_adjustment"),
@@ -539,7 +547,8 @@ function buildFinancialPopulations(input: {
     chargebackPrincipalDebitAmount: moneyFactFromNumber({
       id: "fact_v2_chargeback_principal_debit_amount",
       population: "chargeback_principal_debit_amount",
-      value: chargebackPopulationProven ? Math.abs(sum(chargebackDebits)) : null,
+      value: capabilityValueAllowed(input.templateAdmission, "chargeback_financial_populations") && chargebackPopulationProven
+        ? Math.abs(sum(chargebackDebits)) : null,
       provenanceStatus: input.provenanceStatus,
       evidenceRefs: chargebackEvidenceRefs,
       occurrenceRefs: chargebackOccurrenceRefs,
@@ -548,7 +557,8 @@ function buildFinancialPopulations(input: {
     chargebackRepresentmentAmount: moneyFactFromNumber({
       id: "fact_v2_chargeback_representment_amount",
       population: "chargeback_representment_amount",
-      value: chargebackPopulationProven ? sum(chargebackRepresentments) : null,
+      value: capabilityValueAllowed(input.templateAdmission, "chargeback_financial_populations") && chargebackPopulationProven
+        ? sum(chargebackRepresentments) : null,
       provenanceStatus: input.provenanceStatus,
       evidenceRefs: chargebackEvidenceRefs,
       occurrenceRefs: chargebackOccurrenceRefs,
@@ -557,7 +567,8 @@ function buildFinancialPopulations(input: {
     chargebackFeeAmount: moneyFactFromNumber({
       id: "fact_v2_chargeback_fee_amount",
       population: "chargeback_fee_amount",
-      value: chargebackFeeValues.length > 0 ? sum(chargebackFeeValues) : null,
+      value: capabilityValueAllowed(input.templateAdmission, "fee_detail") && chargebackFeeValues.length > 0
+        ? sum(chargebackFeeValues) : null,
       provenanceStatus: input.provenanceStatus,
       evidenceRefs: evidenceRefs("chargeback_fee"),
       occurrenceRefs: occurrenceRefs("chargeback_fee"),
@@ -566,13 +577,14 @@ function buildFinancialPopulations(input: {
     netFundedAmount: moneyFactFromNumber({
       id: "fact_v2_net_funded_amount",
       population: "net_funded_amount",
-      value: selectedWithOccurrence("amountFunded", "funded_amount"),
+      value: selectedWithOccurrence("amountFunded", "funded_amount", "funding_batches"),
       provenanceStatus: input.provenanceStatus,
       evidenceRefs: evidenceRefs("funded_amount"),
       occurrenceRefs: occurrenceRefs("funded_amount"),
       limitationsIfUnavailable: ["Net funded amount is unavailable."],
     }),
-    unresolvedAdjustmentChargebackAmount: fundingSeparated || combined === null || occurrenceRefs("unresolved_adjustment_or_chargeback").length === 0
+    unresolvedAdjustmentChargebackAmount: isDeterministicCapabilityPolicyAdmission(input.templateAdmission)
+      || fundingSeparated || combined === null || occurrenceRefs("unresolved_adjustment_or_chargeback").length === 0
       ? unavailableV2Fact({
           id: "fact_v2_unresolved_adjustment_chargeback_amount",
           population: "unresolved_adjustment_chargeback_amount",
@@ -649,7 +661,7 @@ function buildFinancialPopulations(input: {
     fundingBatchCount: countFactFromNumber({
       id: "fact_v2_funding_batch_count",
       population: "funding_batch_count",
-      value: batchCount,
+      value: capabilityValueAllowed(input.templateAdmission, "funding_batches") ? batchCount : null,
       provenanceStatus: input.provenanceStatus,
       occurrenceRefs: input.occurrenceInputs
         .filter((occurrence) => occurrence.key.endsWith(":submitted"))
@@ -866,6 +878,20 @@ function provenanceForCapability(
     && (input.admissionProofEvidenceRefs?.length ?? 0) > 0
     && capability?.status === "supported" && (capability.proofEvidenceRefs?.length ?? 0) > 0;
   return admitted ? "authoritative" : fallback;
+}
+
+function capabilityValueAllowed(
+  input: CanonicalEconomicsV2TemplateAdmissionInput,
+  capabilityId: CanonicalEconomicsV2CapabilityId,
+): boolean {
+  if (!isDeterministicCapabilityPolicyAdmission(input)) return true;
+  const capability = input.capabilities?.find((item) => item.capability === capabilityId);
+  return capability?.status === "supported" && (capability.proofEvidenceRefs?.length ?? 0) > 0;
+}
+
+function isDeterministicCapabilityPolicyAdmission(input: CanonicalEconomicsV2TemplateAdmissionInput): boolean {
+  return input.admissionStatus === "admitted"
+    && input.admissionAuthority?.authorityClass === "deterministic_capability_policy";
 }
 
 function admittedChargebackFeeRows(input: {

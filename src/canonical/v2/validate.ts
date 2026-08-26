@@ -215,7 +215,7 @@ function validateTemplateCapability(
   const profile = foundation.templateCapability;
   if (profile.admissionStatus === "admitted") {
     const authority = profile.admissionAuthority;
-    if (!authority || !["product_owner", "authorized_domain_reviewer", "data_steward"].includes(authority.authorityClass)
+    if (!authority || !["product_owner", "authorized_domain_reviewer", "data_steward", "deterministic_capability_policy"].includes(authority.authorityClass)
       || !authority.authorityRef || !authority.admissionVersion || Number.isNaN(Date.parse(authority.admittedAt))) {
       errors.push("Admitted template capability requires versioned approved human admission authority metadata.");
     }

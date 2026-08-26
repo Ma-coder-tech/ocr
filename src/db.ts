@@ -95,6 +95,47 @@ function migrate(): void {
       message TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS canonical_analysis_runs (
+      id TEXT PRIMARY KEY,
+      job_id TEXT NOT NULL UNIQUE REFERENCES analysis_jobs(id) ON DELETE CASCADE,
+      source_document_ref TEXT NOT NULL,
+      source_fingerprint TEXT NOT NULL,
+      schema_version TEXT NOT NULL,
+      implementation_version TEXT NOT NULL,
+      policy_version TEXT NOT NULL,
+      status TEXT NOT NULL,
+      family_status TEXT NOT NULL,
+      parser_driver_id TEXT,
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      canonical_truth_hash TEXT,
+      limitations_json TEXT NOT NULL DEFAULT '[]',
+      result_json TEXT,
+      created_at TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      completed_at TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_run_stages (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      stage TEXT NOT NULL,
+      status TEXT NOT NULL,
+      claim_ref TEXT NOT NULL,
+      evidence_objective TEXT NOT NULL,
+      expected_decision_effect TEXT NOT NULL,
+      artifact_json TEXT,
+      artifact_hash TEXT,
+      errors_json TEXT NOT NULL DEFAULT '[]',
+      warnings_json TEXT NOT NULL DEFAULT '[]',
+      limitations_json TEXT NOT NULL DEFAULT '[]',
+      resource_json TEXT NOT NULL,
+      started_at TEXT,
+      completed_at TEXT,
+      elapsed_ms INTEGER,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, stage)
+    );
+
     CREATE TABLE IF NOT EXISTS statement_uploads (
       id TEXT PRIMARY KEY,
       merchant_id INTEGER NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
@@ -247,6 +288,9 @@ function migrate(): void {
     CREATE INDEX IF NOT EXISTS idx_jobs_status_updated ON analysis_jobs(status, updated_at);
     CREATE INDEX IF NOT EXISTS idx_uploads_merchant ON statement_uploads(merchant_id);
     CREATE INDEX IF NOT EXISTS idx_job_events_job ON analysis_job_events(job_id);
+    CREATE INDEX IF NOT EXISTS idx_canonical_runs_job ON canonical_analysis_runs(job_id);
+    CREATE INDEX IF NOT EXISTS idx_canonical_runs_status ON canonical_analysis_runs(status, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_canonical_run_stages_status ON canonical_analysis_run_stages(run_id, status);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_statements_merchant_period ON statements(merchant_id, period_key);
     CREATE INDEX IF NOT EXISTS idx_multi_jobs_merchant ON multi_statement_jobs(merchant_id);
     CREATE INDEX IF NOT EXISTS idx_multi_jobs_status ON multi_statement_jobs(status);

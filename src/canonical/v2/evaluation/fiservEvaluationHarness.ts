@@ -1,10 +1,8 @@
 import path from "node:path";
 import { parsePdf } from "../../../parser.js";
-import type { ParserDecision, ParserDriver, ParserValidationState } from "../../../parserFoundation.js";
-import { fiservFirstDataFullStatementDriver, fiservFirstDataProcessorStatementDriver, fiservFirstDataShortStatementDriver } from "../../../fiservFirstDataParser.js";
-import { genericFiservStatementDriver } from "../../../genericFiservStatementParser.js";
 import { buildCanonicalEconomicsV2FromFiserv } from "../fiservAdapter.js";
-import { resolveFiservTemplateAdmission, type FiservTemplateAdmissionResolution } from "../fiservTemplateAdmission.js";
+import type { FiservTemplateAdmissionResolution } from "../fiservTemplateAdmission.js";
+import type { FiservRuntimeCapabilityAdmissionResolution } from "../fiservRuntimeCapabilityAdmission.js";
 import { buildObservationalCanonicalPricingV2FromFiserv } from "../fiservPricingAdapter.js";
 import { buildObservationalCanonicalEconomicsV2FromFiservPricing } from "../fiservEconomicAdapter.js";
 import { observeFiservEconomicsInCanonicalSynthesisV2 } from "../fiservSynthesisAdapter.js";
@@ -14,6 +12,7 @@ import type { CanonicalEconomicsV2CompletenessStatus } from "../types.js";
 import { buildSourceReadinessEnvelope } from "./sourceReadiness.js";
 import { writeFiservReviewBundle, type FiservEvaluationRunAudit } from "./reviewBundle.js";
 import { reviewFeeDetailCoverage, reviewFieldAuthority, type ReviewAdmissionMetadata } from "./reviewAuthority.js";
+import { executeDeterministicCanonicalAnalysisRun } from "../runtime/analysisRun.js";
 
 export type RunFiservOneStatementInput = {
   statementPaths: readonly string[];
@@ -34,55 +33,42 @@ export type FiservDeterministicEvaluationContext = {
   readiness: ReturnType<typeof buildSourceReadinessEnvelope>;
 };
 
-const DRIVERS: ParserDriver[] = [fiservFirstDataProcessorStatementDriver, fiservFirstDataFullStatementDriver,
-  fiservFirstDataShortStatementDriver, genericFiservStatementDriver];
-
 export async function inspectFiservOneStatementEvaluation(input: InspectFiservOneStatementInput) {
   if (input.statementPaths.length !== 1) throw new Error("FISERV_EVALUATION_REQUIRES_EXACTLY_ONE_PDF");
   if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(input.safeStatementId) || input.safeStatementId.length > 80) throw new Error("INVALID_SAFE_STATEMENT_ID");
   const statementPath = input.statementPaths[0]!;
   if (path.extname(statementPath).toLowerCase() !== ".pdf") throw new Error("FISERV_EVALUATION_REQUIRES_PDF");
   const document = await parsePdf(statementPath);
-  const driver = DRIVERS.find((candidate) => candidate.supports(document));
-  if (!driver) throw new Error("FISERV_EVALUATION_UNSUPPORTED_PARSER");
-  const parserOutput = driver.parse(document) as Record<string, unknown>;
-  const identity = record(parserOutput.statementIdentity);
-  if (!withinFiservCustomerScope(driver.id, String(identity.visibleBrand ?? ""), String(identity.processorFamily ?? ""))) {
-    throw new Error("FISERV_EVALUATION_OUTSIDE_APPROVED_CUSTOMER_SCOPE");
-  }
-  const decision = record(parserOutput.decision) as ParserDecision & Record<string, unknown>;
-  const selected = record(parserOutput.selectedFinancials);
-  const validationState = normalizeParserValidation(decision.validationState);
-  const profile = input.sourceProfile ?? {};
-  if (profile.statementCompleteness && !["complete", "incomplete", "unknown", "unavailable"].includes(profile.statementCompleteness)) throw new Error("INVALID_STATEMENT_COMPLETENESS");
-  const provenance = "observational" as const;
-  const statementCompleteness = profile.statementCompleteness ?? "unknown";
-  const suppliedDocument = suppliedDocumentIntegrity(document);
-  const documentIntegrity = { suppliedDocumentStatus: suppliedDocument.status,
-    observedPageCount: suppliedDocument.enumeratedPageCount, processedPageCount: suppliedDocument.processedPageCount,
-    fatalPageErrorCount: suppliedDocument.fatalPageErrorCount, extractionLineageComplete: suppliedDocument.extractionLineageComplete,
-    localIngestionTruncated: suppliedDocument.localIngestionTruncated, completenessStatus: statementCompleteness };
-  const observationalFoundation = buildCanonicalEconomicsV2FromFiserv({ document, parserOutput, sourceDocumentRef: input.safeStatementId,
-    parserId: driver.id, provenanceStatus: provenance, templateAdmission: { admissionStatus: "unknown",
-      completenessStatus: "unknown", identityStatus: "observed" }, documentIntegrity });
-  const admissionEvaluation = resolveFiservTemplateAdmission({ driverId: driver.id, parserOutput, observationalFoundation });
-  const admission = admissionEvaluation.resolution;
-  const templateAdmission = admission ? "admitted" as const : "unknown" as const;
-  const authority = "observational" as const;
-  const readiness = buildSourceReadinessEnvelope({ parser: { driverId: driver.id, reportable: Boolean(decision.reportable),
-    decisionStatus: parserDecisionStatus(decision.status), validationState }, source: { provenance, templateAdmission,
-    suppliedDocumentIntegrity: suppliedDocument.status, statementCompleteness, authority,
-    humanReviewRequired: profile.humanReviewRequired ?? false } });
-  const foundation = admission ? buildCanonicalEconomicsV2FromFiserv({ document, parserOutput, sourceDocumentRef: input.safeStatementId,
-    parserId: driver.id, provenanceStatus: provenance, templateAdmission: admission.templateAdmission,
-    sectionAdmissions: admission.sectionAdmissions, documentIntegrity }) : observationalFoundation;
-  const pricing = buildObservationalCanonicalPricingV2FromFiserv(foundation);
-  const economic = buildObservationalCanonicalEconomicsV2FromFiservPricing(pricing);
-  const synthesis = observeFiservEconomicsInCanonicalSynthesisV2(economic);
-  const observed = observedFinancials(selected);
-  const { projection, audit: reportAudit } = composeCanonicalMerchantReportV2({ synthesisAnalysis: synthesis, sourceReadiness: readiness });
+  const execution = executeDeterministicCanonicalAnalysisRun({ runId: `evaluation_${input.safeStatementId}`,
+    sourceDocumentRef: input.safeStatementId, document, sourceProfile: input.sourceProfile,
+    executionContext: "evaluation_compatibility", evaluationContinueInvalidStages: true });
+  const { run, diagnostics } = execution;
+  if (!diagnostics.driver) throw new Error("FISERV_EVALUATION_UNSUPPORTED_PARSER");
+  if (run.familyStatus === "unsupported") throw new Error("FISERV_EVALUATION_OUTSIDE_APPROVED_CUSTOMER_SCOPE");
+  const { rb: foundation, rc: pricing, rd: economic, re: synthesis, rh } = run.artifacts;
+  if (!foundation || !pricing || !economic || !synthesis || !rh || !run.readiness || !diagnostics.parserOutput || !diagnostics.decision
+    || !diagnostics.observationalFoundation) throw new Error("FISERV_EVALUATION_DETERMINISTIC_STAGE_INCOMPLETE");
+  const admission = run.admission;
+  const admissionEvaluation = { resolution: run.knownLayoutAdmission, fullFamilyDecision: run.fullFamilyDecision };
+  if (!admissionEvaluation.fullFamilyDecision) throw new Error("FISERV_EVALUATION_FULL_FAMILY_DECISION_MISSING");
+  const authority = diagnostics.authority;
+  const decision = diagnostics.decision;
+  const driver = diagnostics.driver;
+  const identity = diagnostics.identity;
+  const observed = diagnostics.observed;
+  const parserOutput = diagnostics.parserOutput;
+  const profile = diagnostics.profile;
+  const projection = rh.projection;
+  const reportAudit = rh.audit;
+  const readiness = run.readiness;
+  const selected = diagnostics.selected;
+  const statementCompleteness = diagnostics.statementCompleteness;
+  const suppliedDocument = diagnostics.suppliedDocument;
+  const provenance = diagnostics.provenance;
+  const validationState = run.parser.validationState;
   assertValidCanonicalMerchantReportProjectionV2(projection);
-  return { admission, admissionEvaluation, authority, decision, document, driver, foundation, identity, observationalFoundation,
+  return { admission, admissionEvaluation, authority, decision, document, driver, foundation, identity,
+    observationalFoundation: diagnostics.observationalFoundation,
     observed, parserOutput, pricing, profile, projection, provenance, reportAudit, readiness, selected, statementCompleteness,
     suppliedDocument, synthesis, economic, validationState };
 }
@@ -115,7 +101,7 @@ export async function runFiservOneStatementEvaluation(input: RunFiservOneStateme
       scope: `${admission.templateAdmission.detectedTemplate}@${admission.templateAdmission.detectedVersion}`,
       supportedCapabilities: admission.templateAdmission.capabilities?.filter((item) => item.status === "supported").map((item) => item.capability) ?? [],
       feeDetailCoverage: admission.feeDetailCoverage } : null,
-    familyAdmissionDecision: admissionEvaluation.fullFamilyDecision,
+    familyAdmissionDecision: admissionEvaluation.fullFamilyDecision!,
     reviewSummary: { detectedTemplate: String(identity.statementFamily ?? "unknown"),
       matchedAdmissionMappingId: admission?.mappingId ?? null, admissionLifecycle: admission ? "admitted_with_conditions" : null,
       evidenceAuthority: admission ? admission.authorityClass : authority, parserReportable: Boolean(decision.reportable),
@@ -190,32 +176,6 @@ export async function runFiservOneStatementEvaluation(input: RunFiservOneStateme
   return { audit, deterministic: { foundation, pricing, economic, synthesis, projection, readiness } };
 }
 
-function withinFiservCustomerScope(driverId: string, visibleBrand: string, processorFamily: string): boolean {
-  void processorFamily;
-  return ["fiserv_first_data_full_statement", "fiserv_first_data_short_statement", "fiserv_first_data_processor_statement", "generic_fiserv_family_statement"].includes(driverId)
-    && /^(?:FISERV|FIRST DATA|CLOVER|WELLS FARGO)(?:\b|\s*\/)/i.test(visibleBrand.trim());
-}
-function suppliedDocumentIntegrity(document: Awaited<ReturnType<typeof parsePdf>>) {
-  const diagnostics = document.suppliedDocumentIntegrity;
-  if (!diagnostics) return { status: "unknown" as const, openedSuccessfully: false, enumeratedPageCount: 0,
-    processedPageCount: 0, fatalPageErrorCount: 0, extractionLineageComplete: false, localIngestionTruncated: false };
-  const complete = diagnostics.openedSuccessfully && diagnostics.enumeratedPageCount === diagnostics.processedPageCount
-    && diagnostics.fatalPageErrorCount === 0 && diagnostics.extractionLineageComplete && !diagnostics.localIngestionTruncated;
-  const failed = !diagnostics.openedSuccessfully || diagnostics.fatalPageErrorCount > 0
-    || diagnostics.processedPageCount !== diagnostics.enumeratedPageCount || !diagnostics.extractionLineageComplete
-    || diagnostics.localIngestionTruncated;
-  return { status: complete ? "complete_supplied_document" as const
-    : failed ? "incomplete_or_corrupt_supplied_document" as const : "unknown" as const, ...diagnostics };
-}
-function parserDecisionStatus(value: unknown): "accepted" | "accepted_with_warnings" | "needs_review" | "unsupported" | "failed" {
-  return ["accepted", "accepted_with_warnings", "needs_review", "unsupported", "failed"].includes(String(value)) ? value as any : "failed";
-}
-function normalizeParserValidation(value: ParserValidationState | undefined): "validated" | "validated_with_warnings" | "failed" | "missing" {
-  if (!value) return "missing";
-  if (!value.customerFacingTotalsAllowed || value.topLevelTotals === "failed") return "failed";
-  return value.warningReasons.length > 0 || value.topLevelTotals === "warning" || value.topLevelTotals === "validated_with_rounding"
-    ? "validated_with_warnings" : "validated";
-}
 function record(value: unknown): Record<string, any> { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {}; }
 function unique(values: string[]): string[] { return [...new Set(values)]; }
 
@@ -248,7 +208,7 @@ function minor(value: unknown): number | null { const amount = finite(value); re
 function templateAdmissionAudit(
   parserOutput: Record<string, unknown>,
   foundation: ReturnType<typeof buildCanonicalEconomicsV2FromFiserv>,
-  admission: FiservTemplateAdmissionResolution | null,
+  admission: FiservTemplateAdmissionResolution | FiservRuntimeCapabilityAdmissionResolution | null,
   parserReportable: boolean,
   observed: ReturnType<typeof observedFinancials>,
   chargeCount: number,

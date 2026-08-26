@@ -6,6 +6,9 @@ import type {
   KnowledgeScopeDimensionName,
   KnowledgeVisibility,
 } from "./knowledgeTypes.js";
+import { canonicalJson } from "../canonicalJson.js";
+
+export { canonicalJson } from "../canonicalJson.js";
 
 export const KNOWLEDGE_SCOPE_DIMENSIONS: readonly KnowledgeScopeDimensionName[] = [
   "processor", "acquirer", "isoReseller", "processorProgram", "network", "region", "channel", "cardProduct",
@@ -160,13 +163,4 @@ export function containsPrivateLocatorOrPayload(value: string): boolean {
     || /@/.test(value)
     || /(?:^|_)(?:merchant|account|tenant|private|raw|contract)_[a-z0-9]/i.test(value)
     || /(?:api[_-]?key|secret|credential|password)/i.test(value);
-}
-
-export function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value !== null && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
 }
