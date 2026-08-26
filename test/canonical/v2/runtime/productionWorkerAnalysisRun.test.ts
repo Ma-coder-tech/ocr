@@ -48,6 +48,6 @@ describe("production worker canonical AnalysisRun integration", () => {
       benchmarkExecution: "disabled",
     });
     expect(JSON.stringify(canonical?.result?.artifacts)).not.toContain('"businessType"');
-    expect(canonical?.stages).toHaveLength(8);
+    expect(canonical?.stages).toHaveLength(9);
   }, 30_000);
 });

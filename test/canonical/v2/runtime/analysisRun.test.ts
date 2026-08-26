@@ -5,7 +5,10 @@ import { parsePdf, type ParsedDocument } from "../../../../src/parser.js";
 import {
   executeDeterministicCanonicalAnalysisRun,
   FISERV_RUNTIME_CAPABILITY_POLICY_ID,
+  categorySubjectCode,
+  unboundedKnowledgeScope,
 } from "../../../../src/canonical/v2/index.js";
+import { admittedKnowledge } from "../knowledge/knowledgeFixtures.js";
 
 const fullFixture = path.resolve(process.cwd(), "test/fixtures/pdfs/SAMPLE_MERCHANT4_CLOVER.pdf");
 const processorFixture = path.resolve(process.cwd(), "test/fixtures/pdfs/fiserv_ABDUL_BASHER_Aug_2025.pdf");
@@ -38,7 +41,7 @@ describe("production canonical AnalysisRun core", () => {
         customerReportAuthority: "legacy_report_unchanged",
         providerExecution: "disabled",
         publicResearch: "disabled",
-        rfProductionKnowledge: "disabled",
+        rfProductionKnowledge: "claim_specific_admitted_resolution_enabled",
         benchmarkExecution: "disabled",
         savingsExecution: "disabled",
         businessContextAuthority: "excluded_from_canonical_economics",
@@ -135,8 +138,8 @@ describe("production canonical AnalysisRun core", () => {
       charge.categoryResolution === "unresolved" && charge.roleClaimRefs.length === 0)).toBe(true);
     expect(run.artifacts.unresolvedClaims).toMatchObject({
       authority: "canonical_dependency_inventory_only",
-      productionExecution: "disabled",
-      rfResolution: "disabled",
+      productionExecution: "rf_claim_resolution_enabled",
+      rfResolution: "claim_specific_admitted_resolution_enabled",
       rgResearch: "disabled",
       benchmarkExecution: "disabled",
       businessContextAuthority: "excluded_from_canonical_economics",
@@ -177,6 +180,119 @@ describe("production canonical AnalysisRun core", () => {
     ]));
   });
 
+  it("runs admitted RF category resolution inside the shared AnalysisRun and preserves adjacent claims", () => {
+    const baseline = executeDeterministicCanonicalAnalysisRun({
+      runId: "rf-baseline",
+      sourceDocumentRef: "rf-source",
+      document: genericDocument,
+    }).run;
+    const targetCharge = baseline.artifacts.rd!.economicLayer.charges.find((charge) =>
+      charge.contributionStatus === "contributes_unresolved",
+    )!;
+    const occurrence = baseline.artifacts.rb!.sourceModel.occurrences.find((item) =>
+      item.id === targetCharge.contributingOccurrenceRef,
+    )!;
+    const subjectCode = categorySubjectCode(occurrence.sourceLabel);
+    const entry = admittedKnowledge({
+      id: "runtime-admitted-category",
+      claimType: "stable_facet_mapping",
+      subjectCode,
+      value: { kind: "mapping", canonicalCode: "processor_service_administrative_cost", sourceCode: subjectCode },
+      scope: unboundedKnowledgeScope(),
+      effectiveFrom: "2019-01-01",
+      evidence: [{ ref: "runtime-reviewed-category", sourceAuthority: "approved_internal_manual_mapping", private: false }],
+    });
+    const resolved = executeDeterministicCanonicalAnalysisRun({
+      runId: "rf-resolved",
+      sourceDocumentRef: "rf-source",
+      document: genericDocument,
+      rfKnowledge: { entries: [entry], tenantRef: "tenant-a", accountRef: "account-a" },
+    }).run;
+    const finalCharge = resolved.artifacts.rd!.economicLayer.charges.find((charge) => charge.id === targetCharge.id)!;
+    const remainingForCharge = resolved.artifacts.unresolvedClaims!.claims.filter((claim) =>
+      claim.canonicalRefs.includes(finalCharge.id),
+    );
+
+    expect(resolved.stageOutcomes.rf_resolution.status).toBe("valid");
+    expect(resolved.artifacts.rfResolution).toMatchObject({
+      authority: "claim_specific_admitted_knowledge_only",
+      automaticPromotion: "prohibited",
+      rgExecution: "disabled",
+      providerExecution: "disabled",
+      categoryApplications: [expect.objectContaining({ selectedEntryRefs: [entry.id] })],
+    });
+    expect(finalCharge).toMatchObject({
+      category: "processor_service_administrative_cost",
+      categoryResolution: "proven",
+      contributionStatus: "contributes_classified",
+      observedAmount: targetCharge.observedAmount,
+      financialDirection: targetCharge.financialDirection,
+      contributingOccurrenceRef: targetCharge.contributingOccurrenceRef,
+    });
+    expect(remainingForCharge.map((claim) => claim.claimClass)).toEqual(expect.arrayContaining([
+      "economic_ownership", "economic_control", "merchant_actionability",
+    ]));
+    expect(remainingForCharge.some((claim) => claim.claimClass === "economic_category")).toBe(false);
+    expect(resolved.artifacts.rb!.financialPopulations).toEqual(baseline.artifacts.rb!.financialPopulations);
+    expect(resolved.artifacts.rb!.metrics.headlineEffectiveRate).toEqual(baseline.artifacts.rb!.metrics.headlineEffectiveRate);
+    expect(resolved.artifacts.rd!.economicLayer.costStack.totalStatementProcessingCost)
+      .toEqual(baseline.artifacts.rd!.economicLayer.costStack.totalStatementProcessingCost);
+  });
+
+  it("rejects an unauthorized RF mapping claim while preserving the complete deterministic result", () => {
+    const baseline = executeDeterministicCanonicalAnalysisRun({
+      runId: "rf-invalid-baseline",
+      sourceDocumentRef: "rf-invalid-source",
+      document: genericDocument,
+    }).run;
+    const target = baseline.artifacts.rd!.economicLayer.charges.find((charge) =>
+      charge.contributionStatus === "contributes_unresolved",
+    )!;
+    const occurrence = baseline.artifacts.rb!.sourceModel.occurrences.find((item) => item.id === target.contributingOccurrenceRef)!;
+    const subjectCode = categorySubjectCode(occurrence.sourceLabel);
+    const invalidEntry = admittedKnowledge({
+      id: "runtime-invalid-category",
+      claimType: "stable_facet_mapping",
+      subjectCode,
+      value: { kind: "mapping", canonicalCode: "invented_category", sourceCode: subjectCode },
+      scope: unboundedKnowledgeScope(),
+      effectiveFrom: "2019-01-01",
+      evidence: [{ ref: "runtime-invalid-reviewed-category", sourceAuthority: "approved_internal_manual_mapping", private: false }],
+    });
+    const result = executeDeterministicCanonicalAnalysisRun({
+      runId: "rf-invalid",
+      sourceDocumentRef: "rf-invalid-source",
+      document: genericDocument,
+      rfKnowledge: { entries: [invalidEntry], tenantRef: "tenant-a", accountRef: "account-a" },
+    }).run;
+
+    expect(result.status).toBe("completed_with_limitations");
+    expect(result.stageOutcomes.rf_resolution).toMatchObject({
+      status: "valid",
+      warnings: [expect.stringContaining("rf_category_value_rejected")],
+    });
+    expect(result.artifacts.rfResolution!.categoryApplications).toEqual([]);
+    expect(result.artifacts.rfResolution!.decisions.some((item) => item.disposition === "unresolved_policy_rejection")).toBe(true);
+    expect(result.stageOutcomes.rd.status).toBe("valid");
+    expect(result.stageOutcomes.re.status).toBe("valid");
+    expect(result.stageOutcomes.rh.status).toBe("valid");
+    expect(result.artifacts.rd).toEqual(baseline.artifacts.rd);
+    expect(result.artifacts.unresolvedClaims).toEqual(baseline.artifacts.unresolvedClaims);
+    expect(result.artifacts.rb!.financialPopulations).toEqual(baseline.artifacts.rb!.financialPopulations);
+
+    const invalidSnapshot = executeDeterministicCanonicalAnalysisRun({
+      runId: "rf-invalid-snapshot",
+      sourceDocumentRef: "rf-invalid-source",
+      document: genericDocument,
+      rfKnowledge: { entries: [invalidEntry, invalidEntry], tenantRef: "tenant-a", accountRef: "account-a" },
+    }).run;
+    expect(invalidSnapshot.stageOutcomes.rf_resolution.status).toBe("invalid");
+    expect(invalidSnapshot.stageOutcomes.rd.status).toBe("valid");
+    expect(invalidSnapshot.stageOutcomes.re.status).toBe("valid");
+    expect(invalidSnapshot.stageOutcomes.rh.status).toBe("valid");
+    expect(invalidSnapshot.artifacts.rd).toEqual(baseline.artifacts.rd);
+  });
+
   it("fails closed as unsupported without fabricating canonical stages for a non-Fiserv document", () => {
     const document: ParsedDocument = {
       sourceType: "pdf",
@@ -194,7 +310,7 @@ describe("production canonical AnalysisRun core", () => {
     });
 
     expect(run).toMatchObject({ status: "unsupported", familyStatus: "unsupported", parser: { matched: false } });
-    expect(run.artifacts).toEqual({ rb: null, rc: null, rd: null, re: null, unresolvedClaims: null, rh: null });
+    expect(run.artifacts).toEqual({ rb: null, rc: null, rfResolution: null, rd: null, re: null, unresolvedClaims: null, rh: null });
     expect(run.stageOutcomes.capability_admission.status).toBe("unsupported");
     expect(run.stageOutcomes.rb.status).toBe("unresolved");
   });

@@ -3,12 +3,17 @@ import { describe, expect, it } from "vitest";
 import {
   buildCanonicalEconomicsV2FromFiserv,
   buildCanonicalUnresolvedClaimInventory,
+  buildCanonicalRfClaimResolution,
   buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing,
+  categorySubjectCode,
   buildObservationalCanonicalPricingV2FromFiserv,
   fiservFeeLedgerOccurrences,
+  unboundedKnowledgeScope,
+  validateCanonicalRfSemanticConvergence,
   validateCanonicalEconomicsV2EconomicAnalysis,
 } from "../../../../src/canonical/v2/index.js";
 import { v2SyntheticStatement } from "../fixtures.js";
+import { admittedKnowledge } from "../knowledge/knowledgeFixtures.js";
 
 describe("capability-bound economic ledger", () => {
   it("admits debit and credit fee rows as unresolved cost without inventing economic semantics", () => {
@@ -55,7 +60,7 @@ describe("capability-bound economic ledger", () => {
     overclaimed.economicLayer.charges[0]!.categoryResolution = "proven";
     overclaimed.economicLayer.charges[0]!.contributionStatus = "contributes_classified";
     expect(validateCanonicalEconomicsV2EconomicAnalysis(overclaimed).validation.errors)
-      .toContain("Capability-bound fee occurrence authority cannot establish economic category semantics.");
+      .toContain("Capability-bound category semantics require exactly one admitted RF knowledge application.");
 
     const detachedProof = structuredClone(economic);
     detachedProof.economicLayer.charges[0]!.supportingDetailAdmissionEvidenceRefs = [];
@@ -89,6 +94,147 @@ describe("capability-bound economic ledger", () => {
       }),
     ]));
     expect(inventory.claims.some((item) => item.claimClass === "economic_category")).toBe(false);
+  });
+
+  it("applies one exact admitted category mapping without resolving ownership, control, actionability, or financial truth", () => {
+    const pricing = admittedSyntheticPricing(true);
+    const base = buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(pricing);
+    const baseInventory = buildCanonicalUnresolvedClaimInventory({ pricing, economic: base, synthesis: null });
+    const firstCharge = base.economicLayer.charges[0]!;
+    const occurrence = pricing.foundation.sourceModel.occurrences.find((item) =>
+      item.id === firstCharge.contributingOccurrenceRef,
+    )!;
+    const subjectCode = categorySubjectCode(occurrence.sourceLabel);
+    const entry = admittedKnowledge({
+      id: "admitted-category-map",
+      claimType: "stable_facet_mapping",
+      subjectCode,
+      value: { kind: "mapping", canonicalCode: "network_card_brand_economics", sourceCode: subjectCode },
+      scope: unboundedKnowledgeScope(),
+      effectiveFrom: "2026-01-01",
+      evidence: [{ ref: "reviewed-category-map", sourceAuthority: "approved_internal_manual_mapping", private: false }],
+    });
+    const rf = buildCanonicalRfClaimResolution({ inventory: baseInventory, economic: base, entries: [entry],
+      tenantRef: "tenant-a", accountRef: "account-a" });
+    const resolved = buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(pricing, rf.categoryApplications);
+    const finalInventory = buildCanonicalUnresolvedClaimInventory({ pricing, economic: resolved, synthesis: null });
+
+    expect(rf.validation.status).toBe("valid");
+    expect(rf.categoryApplications).toHaveLength(1);
+    expect(rf.decisions.find((item) => item.applicationKey)?.disposition).toBe("resolved_by_admitted_knowledge");
+    expect(resolved.validation.status).toBe("valid");
+    expect(resolved.economicLayer.charges[0]).toMatchObject({
+      category: "network_card_brand_economics",
+      categoryResolution: "proven",
+      contributionStatus: "contributes_classified",
+      observedAmount: firstCharge.observedAmount,
+      financialDirection: firstCharge.financialDirection,
+      contributingOccurrenceRef: firstCharge.contributingOccurrenceRef,
+      reconciliationRefs: firstCharge.reconciliationRefs,
+      knowledgeApplicationRefs: ["economic_knowledge_application_001"],
+      roleClaimRefs: [],
+    });
+    expect(resolved.economicLayer.charges.slice(1).every((item) =>
+      item.categoryResolution === "unresolved" && item.contributionStatus === "contributes_unresolved",
+    )).toBe(true);
+    expect(resolved.economicLayer.costStack.totalStatementProcessingCost)
+      .toEqual(base.economicLayer.costStack.totalStatementProcessingCost);
+    const financiallyTampered = structuredClone(resolved);
+    financiallyTampered.economicLayer.charges[0]!.observedAmount!.amountMinor += 1;
+    expect(validateCanonicalRfSemanticConvergence({ base, resolved: financiallyTampered, rf }))
+      .toContain(`rf_semantic_application_changed_charge_truth:${firstCharge.id}`);
+    const lineageTampered = structuredClone(resolved);
+    lineageTampered.economicLayer.knowledgeApplications[0]!.selectedEntryRefs = [];
+    expect(validateCanonicalEconomicsV2EconomicAnalysis(lineageTampered).validation.errors)
+      .toContain("Knowledge application economic_knowledge_application_001 lacks admitted RF entry provenance.");
+    expect(finalInventory.countsByClass).toMatchObject({
+      economic_category: 2,
+      economic_ownership: 3,
+      economic_control: 3,
+      merchant_actionability: 3,
+    });
+    const remainingClasses = finalInventory.claims.filter((item) => item.canonicalRefs[0] === firstCharge.id)
+      .map((item) => item.claimClass);
+    expect(remainingClasses).toHaveLength(3);
+    expect(remainingClasses).toEqual(expect.arrayContaining([
+      "economic_control", "economic_ownership", "merchant_actionability",
+    ]));
+  });
+
+  it("refuses non-admitted, wrong-period, conflicting, and malformed category knowledge", () => {
+    const pricing = admittedSyntheticPricing(true);
+    const economic = buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(pricing);
+    const inventory = buildCanonicalUnresolvedClaimInventory({ pricing, economic, synthesis: null });
+    const occurrence = pricing.foundation.sourceModel.occurrences.find((item) =>
+      item.id === economic.economicLayer.charges[0]!.contributingOccurrenceRef,
+    )!;
+    const subjectCode = categorySubjectCode(occurrence.sourceLabel);
+    const baseEntry = admittedKnowledge({
+      id: "category-map",
+      claimType: "stable_facet_mapping",
+      subjectCode,
+      value: { kind: "mapping", canonicalCode: "network_card_brand_economics", sourceCode: subjectCode },
+      scope: unboundedKnowledgeScope(),
+      effectiveFrom: "2026-01-01",
+      evidence: [{ ref: "reviewed-category-map", sourceAuthority: "approved_internal_manual_mapping", private: false }],
+    });
+    const resolve = (entries: Parameters<typeof buildCanonicalRfClaimResolution>[0]["entries"]) =>
+      buildCanonicalRfClaimResolution({ inventory, economic, entries, tenantRef: "tenant-a", accountRef: "account-a" });
+
+    const candidate = resolve([{ ...baseEntry, admission: { lifecycle: "candidate", authorityClass: null,
+      authorityRef: null, admittedAt: null, conditions: [] } }]);
+    expect(candidate.categoryApplications).toEqual([]);
+    expect(candidate.decisions.find((item) => item.query?.subjectCode === subjectCode)?.disposition)
+      .toBe("unresolved_no_admitted_knowledge");
+
+    const wrongPeriod = resolve([{ ...baseEntry, effectiveFrom: "2027-01-01" }]);
+    expect(wrongPeriod.categoryApplications).toEqual([]);
+    expect(wrongPeriod.decisions.find((item) => item.query?.subjectCode === subjectCode)?.disposition)
+      .toBe("unresolved_scope_or_period");
+
+    const conflict = resolve([baseEntry, { ...baseEntry, id: "category-map-conflict",
+      value: { kind: "mapping", canonicalCode: "processor_acquirer_pricing", sourceCode: subjectCode } }]);
+    expect(conflict.categoryApplications).toEqual([]);
+    expect(conflict.decisions.find((item) => item.query?.subjectCode === subjectCode)?.disposition)
+      .toBe("unresolved_conflict");
+
+    const privateEntry = { ...baseEntry, id: "private-category-map", visibility: "account_private" as const,
+      tenantRef: "tenant-a", accountRef: "account-a",
+      evidence: [{ ref: "private-reviewed-map", sourceAuthority: "approved_internal_manual_mapping" as const, private: true }] };
+    const wrongBoundary = buildCanonicalRfClaimResolution({ inventory, economic, entries: [privateEntry],
+      tenantRef: "tenant-b", accountRef: "account-b" });
+    expect(wrongBoundary.categoryApplications).toEqual([]);
+    expect(wrongBoundary.decisions.find((item) => item.query?.subjectCode === subjectCode)?.disposition)
+      .toBe("unresolved_visibility_boundary");
+
+    const malformed = resolve([{ ...baseEntry,
+      value: { kind: "mapping", canonicalCode: "not_a_canonical_category", sourceCode: subjectCode } }]);
+    expect(malformed.validation).toMatchObject({
+      status: "valid",
+      warnings: [expect.stringContaining("rf_category_value_rejected")],
+    });
+    expect(malformed.categoryApplications).toEqual([]);
+    expect(malformed.decisions.find((item) => item.query?.subjectCode === subjectCode)?.disposition)
+      .toBe("unresolved_policy_rejection");
+
+    const secondOccurrence = pricing.foundation.sourceModel.occurrences.find((item) =>
+      item.id === economic.economicLayer.charges[1]!.contributingOccurrenceRef,
+    )!;
+    const secondSubjectCode = categorySubjectCode(secondOccurrence.sourceLabel);
+    const independentValidEntry = admittedKnowledge({
+      ...baseEntry,
+      id: "independent-valid-category-map",
+      subjectCode: secondSubjectCode,
+      value: { kind: "mapping", canonicalCode: "other_source_grounded_fee", sourceCode: secondSubjectCode },
+    });
+    const mixed = resolve([{ ...baseEntry,
+      value: { kind: "mapping", canonicalCode: "not_a_canonical_category", sourceCode: subjectCode } }, independentValidEntry]);
+    expect(mixed.validation.status).toBe("valid");
+    expect(mixed.categoryApplications).toEqual([
+      expect.objectContaining({ chargeRef: economic.economicLayer.charges[1]!.id, category: "other_source_grounded_fee" }),
+    ]);
+    expect(subjectCode).toMatch(/^economic_category_[a-f0-9]{32}$/);
+    expect(subjectCode).not.toContain(occurrence.sourceLabel.toLowerCase().replace(/\s+/g, "_"));
   });
 });
 

@@ -14,9 +14,10 @@ import type {
   FiservRuntimeCapabilityProof,
 } from "../fiservRuntimeCapabilityAdmission.js";
 import type { CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
+import type { CanonicalRfClaimResolution } from "./rfClaimResolution.js";
 
-export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v2";
-export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "capability_bound_economic_ledger_v1";
+export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v3";
+export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "rf_first_claim_resolution_v1";
 export const ANALYSIS_RUN_POLICY_VERSION = "frozen_product_model_runtime_policy_v0_2";
 
 export const ANALYSIS_RUN_STAGE_IDS = [
@@ -24,6 +25,7 @@ export const ANALYSIS_RUN_STAGE_IDS = [
   "capability_admission",
   "rb",
   "rc",
+  "rf_resolution",
   "rd",
   "re",
   "claim_inventory",
@@ -52,7 +54,7 @@ export type AnalysisRunManifest = {
   persistence: "durable_versioned_stage_snapshots" | "none";
   providerExecution: "disabled";
   publicResearch: "disabled";
-  rfProductionKnowledge: "disabled";
+  rfProductionKnowledge: "claim_specific_admitted_resolution_enabled";
   benchmarkExecution: "disabled";
   savingsExecution: "disabled";
   businessContextAuthority: "excluded_from_canonical_economics";
@@ -62,6 +64,7 @@ export type AnalysisRunManifest = {
 export type CanonicalAnalysisArtifacts = {
   rb: ReturnTypeOrNull<typeof buildCanonicalEconomicsV2FromFiserv>;
   rc: ReturnTypeOrNull<typeof buildObservationalCanonicalPricingV2FromFiserv>;
+  rfResolution: CanonicalRfClaimResolution | null;
   rd: ReturnTypeOrNull<typeof buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing>;
   re: ReturnTypeOrNull<typeof observeFiservEconomicsInCanonicalSynthesisV2>;
   unresolvedClaims: CanonicalUnresolvedClaimInventory | null;

@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import type { ParsedDocument } from "../../../parser.js";
 import { db, nowIso } from "../../../db.js";
 import type { CanonicalEconomicsV2CompletenessStatus } from "../types.js";
+import type { KnowledgeEntry } from "../knowledge/knowledgeTypes.js";
+import { canonicalRfExecutionContextHash, canonicalRfKnowledgeSnapshot } from "./rfClaimResolution.js";
 import { executeDeterministicCanonicalAnalysisRun, sourceFingerprintForAnalysisRun } from "./analysisRun.js";
 import {
   ANALYSIS_RUN_IMPLEMENTATION_VERSION,
@@ -55,6 +57,8 @@ export type PersistedAnalysisRunRecord = {
   parserDriverId: string | null;
   attemptCount: number;
   canonicalTruthHash: string | null;
+  rfSnapshotHash: string;
+  rfContextHash: string;
   limitations: string[];
   createdAt: string;
   startedAt: string;
@@ -80,23 +84,32 @@ export function executeDurableCanonicalAnalysisRun(input: {
   document: ParsedDocument;
   sourceProfile?: { statementCompleteness?: CanonicalEconomicsV2CompletenessStatus; humanReviewRequired?: boolean };
   stageBuilders?: Parameters<typeof executeDeterministicCanonicalAnalysisRun>[0]["stageBuilders"];
+  rfKnowledge?: { entries: readonly KnowledgeEntry[]; tenantRef: string; accountRef: string };
 }): CanonicalAnalysisRun {
   const fingerprint = sourceFingerprintForAnalysisRun(input.document);
   const existing = getPersistedAnalysisRunForJob(input.jobId);
   if (existing && existing.sourceFingerprint !== fingerprint) {
     throw new Error("ANALYSIS_RUN_SOURCE_FINGERPRINT_MISMATCH");
   }
+  const runId = existing?.id ?? randomUUID();
+  const rfKnowledge = input.rfKnowledge ?? {
+    entries: [], tenantRef: `analysis_run_${runId}`, accountRef: `analysis_run_${runId}`,
+  };
+  const rfSnapshotHash = canonicalRfKnowledgeSnapshot(rfKnowledge.entries).snapshotHash;
+  const rfContextHash = canonicalRfExecutionContextHash(rfKnowledge);
   if (existing?.result
     && existing.schemaVersion === ANALYSIS_RUN_SCHEMA_VERSION
     && existing.implementationVersion === ANALYSIS_RUN_IMPLEMENTATION_VERSION
     && existing.policyVersion === ANALYSIS_RUN_POLICY_VERSION
+    && existing.rfContextHash === rfContextHash
     && ["completed", "completed_with_limitations", "unsupported"].includes(existing.status)) {
     return existing.result;
   }
 
   const sourceDocumentRef = existing?.sourceDocumentRef ?? input.sourceDocumentRef ?? `job_${input.jobId}`;
-  const runId = existing?.id ?? randomUUID();
-  beginRun({ runId, jobId: input.jobId, sourceDocumentRef, fingerprint, existingAttemptCount: existing?.attemptCount ?? 0 });
+  beginRun({ runId, jobId: input.jobId, sourceDocumentRef, fingerprint, rfSnapshotHash,
+    rfContextHash,
+    existingAttemptCount: existing?.attemptCount ?? 0 });
   const stageStartedAt = new Map<AnalysisRunStageId, number>();
   try {
     const execution = executeDeterministicCanonicalAnalysisRun({
@@ -107,6 +120,7 @@ export function executeDurableCanonicalAnalysisRun(input: {
       executionContext: "production",
       privacySafePersistence: true,
       stageBuilders: input.stageBuilders,
+      rfKnowledge,
       observer: {
         stageStarted(stage, work) {
           stageStartedAt.set(stage, Date.now());
@@ -131,6 +145,8 @@ function beginRun(input: {
   jobId: string;
   sourceDocumentRef: string;
   fingerprint: string;
+  rfSnapshotHash: string;
+  rfContextHash: string;
   existingAttemptCount: number;
 }) {
   const now = nowIso();
@@ -138,9 +154,9 @@ function beginRun(input: {
     db.prepare(`
       INSERT INTO canonical_analysis_runs (
         id, job_id, source_document_ref, source_fingerprint, schema_version, implementation_version, policy_version,
-        status, family_status, parser_driver_id, attempt_count, canonical_truth_hash, limitations_json, result_json,
+        status, family_status, parser_driver_id, attempt_count, canonical_truth_hash, rf_snapshot_hash, rf_context_hash, limitations_json, result_json,
         created_at, started_at, completed_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'running', 'unresolved', NULL, ?, NULL, '[]', NULL, ?, ?, NULL, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'running', 'unresolved', NULL, ?, NULL, ?, ?, '[]', NULL, ?, ?, NULL, ?)
       ON CONFLICT(job_id) DO UPDATE SET
         source_document_ref = excluded.source_document_ref,
         schema_version = excluded.schema_version,
@@ -151,6 +167,8 @@ function beginRun(input: {
         parser_driver_id = NULL,
         attempt_count = excluded.attempt_count,
         canonical_truth_hash = NULL,
+        rf_snapshot_hash = excluded.rf_snapshot_hash,
+        rf_context_hash = excluded.rf_context_hash,
         limitations_json = '[]',
         result_json = NULL,
         started_at = excluded.started_at,
@@ -158,7 +176,7 @@ function beginRun(input: {
         updated_at = excluded.updated_at
     `).run(input.runId, input.jobId, input.sourceDocumentRef, input.fingerprint,
       ANALYSIS_RUN_SCHEMA_VERSION, ANALYSIS_RUN_IMPLEMENTATION_VERSION, ANALYSIS_RUN_POLICY_VERSION,
-      input.existingAttemptCount + 1, now, now, now);
+      input.existingAttemptCount + 1, input.rfSnapshotHash, input.rfContextHash, now, now, now);
     const insertStage = db.prepare(`
       INSERT OR IGNORE INTO canonical_analysis_run_stages (
         run_id, stage, status, claim_ref, evidence_objective, expected_decision_effect, artifact_json, artifact_hash,
@@ -240,6 +258,8 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
     parserDriverId: row.parser_driver_id ? String(row.parser_driver_id) : null,
     attemptCount: Number(row.attempt_count),
     canonicalTruthHash: row.canonical_truth_hash ? String(row.canonical_truth_hash) : null,
+    rfSnapshotHash: String(row.rf_snapshot_hash ?? ""),
+    rfContextHash: String(row.rf_context_hash ?? ""),
     limitations: parseJson<string[]>(row.limitations_json, []),
     createdAt: String(row.created_at),
     startedAt: String(row.started_at),
@@ -274,6 +294,7 @@ function artifactsFromStages(stages: PersistedAnalysisRunStage[]): CanonicalAnal
   return {
     rb: artifact("rb") as CanonicalAnalysisArtifacts["rb"],
     rc: artifact("rc") as CanonicalAnalysisArtifacts["rc"],
+    rfResolution: artifact("rf_resolution") as CanonicalAnalysisArtifacts["rfResolution"],
     rd: artifact("rd") as CanonicalAnalysisArtifacts["rd"],
     re: artifact("re") as CanonicalAnalysisArtifacts["re"],
     unresolvedClaims: artifact("claim_inventory") as CanonicalAnalysisArtifacts["unresolvedClaims"],

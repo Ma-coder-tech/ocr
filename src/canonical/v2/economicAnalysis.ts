@@ -14,6 +14,7 @@ import type {
   CanonicalEconomicEvidenceDependency,
   CanonicalEconomicFinancialDirection,
   CanonicalEconomicIdentityStatus,
+  CanonicalEconomicKnowledgeApplication,
   CanonicalEconomicNonFeeExclusion,
   CanonicalEconomicNonFeeExclusionReason,
   CanonicalEconomicParticipant,
@@ -101,11 +102,19 @@ export type CanonicalEconomicChargeAdmission = {
   effectiveTo?: string | null;
   roleClaimKeys?: string[];
   dependencyKeys?: string[];
+  knowledgeApplicationKeys?: string[];
   reconciliationRefs?: string[];
   derivabilityTier: CanonicalPricingDerivabilityTier;
   assertionBasis: CanonicalPricingAssertionBasis;
   confidence?: CanonicalPricingConfidence;
   limitations?: string[];
+};
+
+export type CanonicalEconomicKnowledgeApplicationAdmission = Omit<
+  CanonicalEconomicKnowledgeApplication,
+  "id"
+> & {
+  key: string;
 };
 
 export type CanonicalEconomicNonFeeAdmission = {
@@ -124,6 +133,7 @@ export type BuildCanonicalEconomicsV2EconomicInput = {
   dependencies?: CanonicalEconomicDependencyAdmission[];
   charges?: CanonicalEconomicChargeAdmission[];
   roleClaims?: CanonicalEconomicRoleClaimAdmission[];
+  knowledgeApplications?: CanonicalEconomicKnowledgeApplicationAdmission[];
   nonFeeAdmissions?: CanonicalEconomicNonFeeAdmission[];
   documentedRoundingReconciliationRef?: string | null;
   limitations?: string[];
@@ -239,6 +249,28 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
   }));
   const dependencyById = new Map(dependencies.map((item) => [item.id, item]));
 
+  const knowledgeApplicationAdmissions = input.knowledgeApplications ?? [];
+  const knowledgeApplicationIdByKey = new Map(knowledgeApplicationAdmissions.map((item, index) => [
+    item.key,
+    `economic_knowledge_application_${pad(index + 1)}`,
+  ]));
+  const knowledgeApplications = knowledgeApplicationAdmissions.map((item): CanonicalEconomicKnowledgeApplication => ({
+    id: knowledgeApplicationIdByKey.get(item.key)!,
+    claimRef: item.claimRef,
+    claimClass: item.claimClass,
+    chargeRef: item.chargeRef,
+    occurrenceRef: item.occurrenceRef,
+    category: item.category,
+    knowledgeClaimType: item.knowledgeClaimType,
+    knowledgeSubjectCode: item.knowledgeSubjectCode,
+    knowledgeSnapshotHash: item.knowledgeSnapshotHash,
+    selectedEntryRefs: unique(item.selectedEntryRefs),
+    sourceAuthorities: unique(item.sourceAuthorities),
+    asOf: item.asOf,
+    scopeFingerprint: item.scopeFingerprint,
+    limitations: unique(item.limitations),
+  }));
+
   const roleClaims = claimAdmissions.map((item): CanonicalEconomicControlRoleClaim => {
     const positiveEvidenceAllowed = admissionAuthorityAllowed && !sourceUnavailable && PROVING_BASES.has(item.assertionBasis) && PROVING_TIERS.has(item.derivabilityTier) &&
       item.assertionBasis !== "ai_hypothesis" && validRefs(item.evidenceRefs ?? [], evidenceIds).length > 0;
@@ -296,6 +328,8 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
     pricingAnalysis: input.pricingAnalysis,
     roleClaimRefs: (item.roleClaimKeys ?? []).map((key) => claimIdByKey.get(key)).filter(isString),
     dependencyRefs: (item.dependencyKeys ?? []).map((key) => dependencyIdByKey.get(key)).filter(isString),
+    knowledgeApplicationRefs: (item.knowledgeApplicationKeys ?? []).map((key) => knowledgeApplicationIdByKey.get(key)).filter(isString),
+    knowledgeApplicationById: new Map(knowledgeApplications.map((application) => [application.id, application])),
     dependencyById,
     observational,
     admissionAuthorityAllowed,
@@ -352,6 +386,7 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
     charges,
     roleClaims,
     dependencies,
+    knowledgeApplications,
     nonFeeExclusions,
     costStack,
     semanticAmendments: Object.entries(RD_SEMANTIC_AMENDMENT_REASONS).map(([id, reason]) => ({
@@ -382,6 +417,8 @@ function chargeFromAdmission(input: {
   pricingAnalysis: CanonicalEconomicsV2PricingAnalysis;
   roleClaimRefs: string[];
   dependencyRefs: string[];
+  knowledgeApplicationRefs: string[];
+  knowledgeApplicationById: Map<string, CanonicalEconomicKnowledgeApplication>;
   dependencyById: Map<string, CanonicalEconomicEvidenceDependency>;
   observational: boolean;
   admissionAuthorityAllowed: boolean;
@@ -422,13 +459,22 @@ function chargeFromAdmission(input: {
     : item.categoryResolution === "proven" && !positiveAdmission
       ? "unresolved"
       : item.categoryResolution;
+  const categoryKnowledgeApplication = input.knowledgeApplicationRefs
+    .map((ref) => input.knowledgeApplicationById.get(ref))
+    .find((application) => application?.claimClass === "economic_category" &&
+      application.occurrenceRef === contributingOccurrence?.id && application.category === item.category);
+  const knowledgePermitsCategory = categoryResolution !== "proven" || input.profile.source !== "runtime_capability" ||
+    item.category === "unresolved_unclassified" || Boolean(categoryKnowledgeApplication);
+  const admittedCategoryResolution = categoryResolution === "proven" && !knowledgePermitsCategory
+    ? "unresolved" as const
+    : categoryResolution;
   const contributionStatus = nonFee
     ? "excluded_non_fee" as const
     : !representationValid || !identityProven
       ? "blocked_representation" as const
       : !directionProven || item.financialDirection === "unresolved"
         ? "blocked_direction" as const
-        : canContribute && categoryResolution === "proven" && item.category !== "unresolved_unclassified"
+        : canContribute && admittedCategoryResolution === "proven" && item.category !== "unresolved_unclassified"
           ? "contributes_classified" as const
           : canContribute
             ? "contributes_unresolved" as const
@@ -438,7 +484,7 @@ function chargeFromAdmission(input: {
     : nonFee
       ? "excluded_non_fee" as const
       : canContribute
-        ? categoryResolution === "conflicting" ? "conflicting" as const : categoryResolution === "proven" ? "admitted" as const : "unresolved" as const
+        ? admittedCategoryResolution === "conflicting" ? "conflicting" as const : admittedCategoryResolution === "proven" ? "admitted" as const : "unresolved" as const
         : "unresolved" as const;
   const pricingComponentIds = new Set(input.pricingAnalysis.pricingArchitecture.observedPricingComponents.map((component) => component.id));
   const pricingPopulationIds = new Set(input.pricingAnalysis.pricingArchitecture.pricingPopulations.map((population) => population.id));
@@ -461,8 +507,8 @@ function chargeFromAdmission(input: {
     pricingPopulationRefs: unique((item.pricingPopulationRefs ?? []).filter((ref) => pricingPopulationIds.has(ref))),
     observedAmount: amount === null ? null : { ...amount, amountMinor: Math.abs(amount.amountMinor) },
     financialDirection: directionProven ? item.financialDirection : "unresolved",
-    category: categoryResolution === "proven" ? item.category : "unresolved_unclassified",
-    categoryResolution,
+    category: admittedCategoryResolution === "proven" ? item.category : "unresolved_unclassified",
+    categoryResolution: admittedCategoryResolution,
     subtype: item.subtype ?? "unresolved",
     contributionStatus,
     statementPeriodApplicability: input.sourceUnavailable ? "unproven" : applicable,
@@ -470,6 +516,9 @@ function chargeFromAdmission(input: {
     effectiveTo: item.effectiveTo ?? null,
     roleClaimRefs: unique(input.roleClaimRefs),
     dependencyRefs: unique(input.dependencyRefs),
+    knowledgeApplicationRefs: admittedCategoryResolution === "proven" && categoryKnowledgeApplication
+      ? [categoryKnowledgeApplication.id]
+      : [],
     evidenceRefs: validRefs(occurrences.map((occurrence) => occurrence.evidenceRef), input.evidenceIds),
     reconciliationRefs: unique(item.reconciliationRefs ?? []),
     derivabilityTier: input.sourceUnavailable ? "not_derivable_from_this_document_class" : canContribute ? item.derivabilityTier : unresolvedTier(item.derivabilityTier),
@@ -482,6 +531,9 @@ function chargeFromAdmission(input: {
       ...(!directionProven ? ["Fee direction is not proven."] : []),
       ...(applicable !== "applicable" ? ["Statement-period applicability is not proven."] : []),
       ...(!dependenciesSatisfied ? ["A required economic-charge dependency is not satisfied by admitted evidence."] : []),
+      ...(categoryResolution === "proven" && !knowledgePermitsCategory
+        ? ["The requested category lacked an exact admitted RF knowledge application."]
+        : []),
       ...(input.observational ? ["Observational evidence cannot self-promote into authoritative economic charge truth."] : []),
     ]),
   };

@@ -1,6 +1,7 @@
 import {
   buildCanonicalEconomicsV2EconomicAnalysis,
   type CanonicalEconomicChargeAdmission,
+  type CanonicalEconomicKnowledgeApplicationAdmission,
 } from "./economicAnalysis.js";
 import type { CanonicalEconomicsV2EconomicAnalysis } from "./economicTypes.js";
 import type { CanonicalEconomicsV2PricingAnalysis } from "./pricingTypes.js";
@@ -15,6 +16,7 @@ const CAPABILITY_BOUND_LEDGER_ADMISSION_ID = "fiserv_runtime_fee_ledger_capabili
  */
 export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
   pricingAnalysis: CanonicalEconomicsV2PricingAnalysis,
+  knowledgeApplications: readonly CanonicalEconomicKnowledgeApplicationAdmission[] = [],
 ): CanonicalEconomicsV2EconomicAnalysis {
   const foundation = pricingAnalysis.foundation;
   const feeTotal = capability(foundation, "fee_total");
@@ -38,33 +40,43 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
       feeDetail.proofEvidenceRefs.includes(occurrence.evidenceRef),
     )
     : [];
-  const charges = feeOccurrences.map((occurrence, index): CanonicalEconomicChargeAdmission => ({
-    key: `capability_bound_charge_${index + 1}`,
-    sourceOccurrenceRefs: [occurrence.id],
-    contributingOccurrenceRef: occurrence.id,
-    category: "unresolved_unclassified",
-    categoryResolution: "unresolved",
-    subtype: occurrence.semanticRole === "fee_credit" ? "fee_credit"
-      : occurrence.semanticRole === "chargeback_fee" ? "chargeback_fee" : "unresolved",
-    financialDirection: occurrence.semanticRole === "fee_credit" ? "credit" : "debit",
-    uniqueEconomicOccurrenceProven: true,
-    feeOccurrenceProven: true,
-    directionProven: true,
-    supportingDetailAdmission: {
-      admissionId: `${CAPABILITY_BOUND_LEDGER_ADMISSION_ID}:${index + 1}`,
-      evidenceRefs: [occurrence.evidenceRef],
+  const charges = feeOccurrences.map((occurrence, index): CanonicalEconomicChargeAdmission => {
+    const key = `capability_bound_charge_${index + 1}`;
+    const chargeRef = `economic_charge_${String(index + 1).padStart(3, "0")}`;
+    const categoryApplication = knowledgeApplications.find((application) =>
+      application.chargeRef === chargeRef && application.occurrenceRef === occurrence.id && application.claimClass === "economic_category",
+    );
+    return {
+      key,
+      sourceOccurrenceRefs: [occurrence.id],
+      contributingOccurrenceRef: occurrence.id,
+      category: categoryApplication?.category ?? "unresolved_unclassified",
+      categoryResolution: categoryApplication ? "proven" : "unresolved",
+      subtype: occurrence.semanticRole === "fee_credit" ? "fee_credit"
+        : occurrence.semanticRole === "chargeback_fee" ? "chargeback_fee" : "unresolved",
+      financialDirection: occurrence.semanticRole === "fee_credit" ? "credit" : "debit",
+      uniqueEconomicOccurrenceProven: true,
+      feeOccurrenceProven: true,
+      directionProven: true,
+      supportingDetailAdmission: {
+        admissionId: `${CAPABILITY_BOUND_LEDGER_ADMISSION_ID}:${index + 1}`,
+        evidenceRefs: [occurrence.evidenceRef],
+        assertionBasis: "source_fact",
+      },
+      periodApplicability: "applicable",
+      reconciliationRefs: occurrence.reconciliationRefs,
+      derivabilityTier: "stated_on_statement",
       assertionBasis: "source_fact",
-    },
-    periodApplicability: "applicable",
-    reconciliationRefs: occurrence.reconciliationRefs,
-    derivabilityTier: "stated_on_statement",
-    assertionBasis: "source_fact",
-    confidence: "unavailable",
-    limitations: [
-      "This admitted fee occurrence contributes to statement processing cost only.",
-      "Economic category, ownership, control, actionability, pricing architecture, benchmark position, and savings remain unresolved.",
-    ],
-  }));
+      confidence: "unavailable",
+      knowledgeApplicationKeys: categoryApplication ? [categoryApplication.key] : [],
+      limitations: [
+        "This admitted fee occurrence contributes to statement processing cost only.",
+        ...(categoryApplication
+          ? ["Admitted RF knowledge resolves only this charge's economic category; ownership, control, and actionability remain unresolved."]
+          : ["Economic category, ownership, control, actionability, pricing architecture, benchmark position, and savings remain unresolved."]),
+      ],
+    };
+  });
 
   return buildCanonicalEconomicsV2EconomicAnalysis({
     pricingAnalysis,
@@ -84,6 +96,7 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
       ],
     },
     charges,
+    knowledgeApplications: [...knowledgeApplications],
     limitations: [
       "The capability-bound ledger proves statement-observed processing cost, not total acceptance cost.",
       "No fee category, participant, ownership, control, actionability, pricing, benchmark, or savings rule was introduced.",

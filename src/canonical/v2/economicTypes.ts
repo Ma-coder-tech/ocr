@@ -83,6 +83,23 @@ export type CanonicalEconomicAdmissionSource =
   | "observational";
 export type CanonicalEconomicFeeDetailCoverage = "complete" | "incomplete" | "unknown" | "unavailable";
 
+export type CanonicalEconomicKnowledgeApplication = {
+  id: string;
+  claimRef: string;
+  claimClass: "economic_category";
+  chargeRef: string;
+  occurrenceRef: string;
+  category: Exclude<CanonicalEconomicCategory, "unresolved_unclassified">;
+  knowledgeClaimType: "stable_facet_mapping";
+  knowledgeSubjectCode: string;
+  knowledgeSnapshotHash: string;
+  selectedEntryRefs: string[];
+  sourceAuthorities: string[];
+  asOf: string;
+  scopeFingerprint: string;
+  limitations: string[];
+};
+
 export type CanonicalEconomicParticipant = {
   id: string;
   identity: string | null;
@@ -151,6 +168,7 @@ export type CanonicalEconomicCharge = {
   effectiveTo: string | null;
   roleClaimRefs: string[];
   dependencyRefs: string[];
+  knowledgeApplicationRefs: string[];
   evidenceRefs: string[];
   reconciliationRefs: string[];
   derivabilityTier: CanonicalPricingDerivabilityTier;
@@ -262,6 +280,7 @@ export type CanonicalEconomicsV2EconomicLayer = {
   charges: CanonicalEconomicCharge[];
   roleClaims: CanonicalEconomicControlRoleClaim[];
   dependencies: CanonicalEconomicEvidenceDependency[];
+  knowledgeApplications: CanonicalEconomicKnowledgeApplication[];
   nonFeeExclusions: CanonicalEconomicNonFeeExclusion[];
   costStack: CanonicalEconomicCostStack;
   semanticAmendments: CanonicalEconomicSemanticAmendment[];

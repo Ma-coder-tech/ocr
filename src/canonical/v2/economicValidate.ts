@@ -73,8 +73,35 @@ export function validateCanonicalEconomicsV2EconomicAnalysis(
   const dependencyIds = uniqueIds(layer.dependencies, "dependency", errors);
   const dependencyById = new Map(layer.dependencies.map((item) => [item.id, item]));
   const participantById = new Map(layer.participants.map((item) => [item.id, item]));
+  const knowledgeApplicationIds = uniqueIds(layer.knowledgeApplications, "knowledge application", errors);
+  const knowledgeApplicationById = new Map(layer.knowledgeApplications.map((item) => [item.id, item]));
 
   validateAdmission(analysis, evidenceIds, errors, warnings);
+  for (const application of layer.knowledgeApplications) {
+    const charge = layer.charges.find((item) => item.id === application.chargeRef);
+    if (!charge) errors.push(`Knowledge application ${application.id} has a broken charge ref.`);
+    if (!occurrenceIds.has(application.occurrenceRef)) errors.push(`Knowledge application ${application.id} has a broken occurrence ref.`);
+    if (application.claimClass !== "economic_category" || application.knowledgeClaimType !== "stable_facet_mapping") {
+      errors.push(`Knowledge application ${application.id} exceeds the authorized economic-category mapping.`);
+    }
+    if (application.selectedEntryRefs.length === 0 || application.sourceAuthorities.length === 0) {
+      errors.push(`Knowledge application ${application.id} lacks admitted RF entry provenance.`);
+    }
+    if (!/^[a-f0-9]{64}$/.test(application.knowledgeSnapshotHash) || !/^[a-f0-9]{64}$/.test(application.scopeFingerprint)) {
+      errors.push(`Knowledge application ${application.id} lacks stable snapshot or scope identity.`);
+    }
+    if (!/^[a-z][a-z0-9_]{0,127}$/.test(application.knowledgeSubjectCode)) {
+      errors.push(`Knowledge application ${application.id} has an invalid RF subject code.`);
+    }
+    if (foundation.identity.statementPeriod?.end !== application.asOf) {
+      errors.push(`Knowledge application ${application.id} is not bound to the statement period.`);
+    }
+    if (charge && (!charge.sourceOccurrenceRefs.includes(application.occurrenceRef) ||
+      charge.category !== application.category || charge.categoryResolution !== "proven" ||
+      !charge.knowledgeApplicationRefs.includes(application.id))) {
+      errors.push(`Knowledge application ${application.id} is not exactly bound to its resolved charge claim.`);
+    }
+  }
   for (const participant of layer.participants) {
     for (const ref of participant.evidenceRefs) if (!evidenceIds.has(ref)) errors.push(`Participant ${participant.id} has broken evidence ref ${ref}.`);
     if (participant.roles.length === 0) errors.push(`Participant ${participant.id} requires at least one economic role.`);
@@ -150,6 +177,8 @@ export function validateCanonicalEconomicsV2EconomicAnalysis(
       roleClaimIds,
       dependencyIds,
       dependencyById,
+      knowledgeApplicationIds,
+      knowledgeApplicationById,
       errors,
     });
     if (charge.contributingOccurrenceRef) {
@@ -255,9 +284,15 @@ function validateAdmission(
         (feeDetail?.status !== "supported" || feeDetail.proofEvidenceRefs.length === 0 || !profile.statementPeriodApplicabilityProven)) {
       errors.push("Complete capability-bound fee-detail coverage requires supported detail and period applicability.");
     }
-    if (contributing.some((charge) => charge.contributionStatus !== "contributes_unresolved" ||
-      charge.categoryResolution !== "unresolved" || charge.category !== "unresolved_unclassified")) {
-      errors.push("Capability-bound fee occurrence authority cannot establish economic category semantics.");
+    if (contributing.some((charge) => charge.categoryResolution === "proven" &&
+      (charge.contributionStatus !== "contributes_classified" || charge.category === "unresolved_unclassified" ||
+        charge.knowledgeApplicationRefs.length !== 1))) {
+      errors.push("Capability-bound category semantics require exactly one admitted RF knowledge application.");
+    }
+    if (contributing.some((charge) => charge.categoryResolution !== "proven" &&
+      (charge.contributionStatus !== "contributes_unresolved" || charge.category !== "unresolved_unclassified" ||
+        charge.knowledgeApplicationRefs.length > 0))) {
+      errors.push("Unresolved capability-bound categories cannot carry RF semantic authority.");
     }
     if (analysis.economicLayer.participants.length > 0 || analysis.economicLayer.roleClaims.length > 0 ||
         analysis.economicLayer.dependencies.length > 0 || contributing.some((charge) =>
@@ -288,6 +323,9 @@ function validateAdmission(
     if (analysis.economicLayer.roleClaims.some((claim) => claim.resolution === "proven")) errors.push("Observational RD admission cannot prove participant/control roles.");
     warnings.push("RD observations remain non-authoritative pending source/template admission.");
   }
+  if (analysis.economicLayer.knowledgeApplications.length > 0 && profile.source !== "runtime_capability") {
+    errors.push("RF knowledge applications are authorized only for the capability-bound production ledger.");
+  }
   const unavailable = analysis.pricingAnalysis.foundation.identity.provenanceStatus === "source_unavailable" ||
     analysis.pricingAnalysis.foundation.identity.provenanceStatus === "corpus_integrity_hold";
   if (unavailable && analysis.economicLayer.charges.some((charge) => charge.contributionStatus.startsWith("contributes_"))) {
@@ -307,6 +345,8 @@ function validateCharge(input: {
   roleClaimIds: Set<string>;
   dependencyIds: Set<string>;
   dependencyById: Map<string, CanonicalEconomicsV2EconomicAnalysis["economicLayer"]["dependencies"][number]>;
+  knowledgeApplicationIds: Set<string>;
+  knowledgeApplicationById: Map<string, CanonicalEconomicsV2EconomicAnalysis["economicLayer"]["knowledgeApplications"][number]>;
   errors: string[];
 }): void {
   const { charge, errors } = input;
@@ -318,6 +358,10 @@ function validateCharge(input: {
   for (const ref of charge.pricingPopulationRefs) if (!input.pricingPopulationIds.has(ref)) errors.push(`Charge ${charge.id} has broken RC population ref ${ref}.`);
   for (const ref of charge.roleClaimRefs) if (!input.roleClaimIds.has(ref)) errors.push(`Charge ${charge.id} has broken role-claim ref ${ref}.`);
   for (const ref of charge.dependencyRefs) if (!input.dependencyIds.has(ref)) errors.push(`Charge ${charge.id} has broken dependency ref ${ref}.`);
+  for (const ref of charge.knowledgeApplicationRefs) {
+    if (!input.knowledgeApplicationIds.has(ref)) errors.push(`Charge ${charge.id} has broken knowledge-application ref ${ref}.`);
+    else if (input.knowledgeApplicationById.get(ref)?.chargeRef !== charge.id) errors.push(`Charge ${charge.id} has a nonreciprocal knowledge-application ref ${ref}.`);
+  }
   const contributing = charge.contributionStatus === "contributes_classified" || charge.contributionStatus === "contributes_unresolved";
   if (contributing) {
     if (!charge.contributingOccurrenceRef || !charge.sourceOccurrenceRefs.includes(charge.contributingOccurrenceRef)) errors.push(`Contributing charge ${charge.id} lacks its authoritative occurrence.`);

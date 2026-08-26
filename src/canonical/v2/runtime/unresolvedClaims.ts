@@ -5,7 +5,7 @@ import type { CanonicalEconomicsV2PricingAnalysis } from "../pricingTypes.js";
 import type { CanonicalEconomicsV2SynthesisAnalysis } from "../synthesisTypes.js";
 import { canonicalJson } from "../canonicalJson.js";
 
-export const UNRESOLVED_CLAIM_INVENTORY_SCHEMA_VERSION = "canonical_unresolved_claim_inventory_v1" as const;
+export const UNRESOLVED_CLAIM_INVENTORY_SCHEMA_VERSION = "canonical_unresolved_claim_inventory_v2" as const;
 
 export type CanonicalUnresolvedClaimClass =
   | "pricing_underlying_cost"
@@ -55,8 +55,8 @@ export type CanonicalUnresolvedClaim = {
 export type CanonicalUnresolvedClaimInventory = {
   schemaVersion: typeof UNRESOLVED_CLAIM_INVENTORY_SCHEMA_VERSION;
   authority: "canonical_dependency_inventory_only";
-  productionExecution: "disabled";
-  rfResolution: "disabled";
+  productionExecution: "rf_claim_resolution_enabled";
+  rfResolution: "claim_specific_admitted_resolution_enabled";
   rgResearch: "disabled";
   benchmarkExecution: "disabled";
   businessContextAuthority: "excluded_from_canonical_economics";
@@ -79,8 +79,8 @@ export function buildCanonicalUnresolvedClaimInventory(input: {
   const inventory: CanonicalUnresolvedClaimInventory = {
     schemaVersion: UNRESOLVED_CLAIM_INVENTORY_SCHEMA_VERSION,
     authority: "canonical_dependency_inventory_only",
-    productionExecution: "disabled",
-    rfResolution: "disabled",
+    productionExecution: "rf_claim_resolution_enabled",
+    rfResolution: "claim_specific_admitted_resolution_enabled",
     rgResearch: "disabled",
     benchmarkExecution: "disabled",
     businessContextAuthority: "excluded_from_canonical_economics",
@@ -135,7 +135,7 @@ function economicClaims(economic: CanonicalEconomicsV2EconomicAnalysis): Canonic
     }));
   }
   for (const charge of economic.economicLayer.charges) {
-    if (charge.contributionStatus !== "contributes_unresolved" || !charge.observedAmount ||
+    if (!["contributes_unresolved", "contributes_classified"].includes(charge.contributionStatus) || !charge.observedAmount ||
         (charge.financialDirection !== "debit" && charge.financialDirection !== "credit")) continue;
     const amountUnderReview = {
       amountMinor: charge.observedAmount.amountMinor,
@@ -143,14 +143,18 @@ function economicClaims(economic: CanonicalEconomicsV2EconomicAnalysis): Canonic
       direction: charge.financialDirection,
     };
     const common = {
-      state: charge.categoryResolution === "conflicting" ? "conflicting" as const : "unresolved" as const,
+      state: "unresolved" as const,
       canonicalRefs: [charge.id], occurrenceRefs: charge.sourceOccurrenceRefs,
       evidenceRefs: charge.evidenceRefs, amountUnderReview,
     };
-    output.push(
-      claim({ ...common, claimClass: "economic_category", requiredEvidenceClass: "admitted_category_mapping",
+    if (charge.categoryResolution !== "proven") {
+      output.push(claim({ ...common,
+        state: charge.categoryResolution === "conflicting" ? "conflicting" : "unresolved",
+        claimClass: "economic_category", requiredEvidenceClass: "admitted_category_mapping",
         possibleDecisionEffects: ["economic_interpretation", "composition_permission", "merchant_attention"],
-        limitations: ["The charge contributes to statement cost, but its economic category is unresolved."] }),
+        limitations: ["The charge contributes to statement cost, but its economic category is unresolved."] }));
+    }
+    output.push(
       claim({ ...common, claimClass: "economic_ownership", requiredEvidenceClass: "positive_period_applicable_ownership_evidence",
         possibleDecisionEffects: ["economic_interpretation", "composition_permission", "merchant_attention"],
         limitations: ["The observed charge does not by itself prove its economic owner."] }),

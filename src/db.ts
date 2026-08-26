@@ -108,6 +108,8 @@ function migrate(): void {
       parser_driver_id TEXT,
       attempt_count INTEGER NOT NULL DEFAULT 0,
       canonical_truth_hash TEXT,
+      rf_snapshot_hash TEXT NOT NULL DEFAULT '',
+      rf_context_hash TEXT NOT NULL DEFAULT '',
       limitations_json TEXT NOT NULL DEFAULT '[]',
       result_json TEXT,
       created_at TEXT NOT NULL,
@@ -326,6 +328,8 @@ function migrate(): void {
   ensureColumn("analysis_jobs", "attempt_count", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("analysis_jobs", "max_attempts", "INTEGER NOT NULL DEFAULT 3");
   ensureColumn("analysis_jobs", "next_run_at", "TEXT");
+  ensureColumn("canonical_analysis_runs", "rf_snapshot_hash", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn("canonical_analysis_runs", "rf_context_hash", "TEXT NOT NULL DEFAULT ''");
   ensureColumn("statements", "analysis_status", "TEXT NOT NULL DEFAULT 'completed'");
   ensureColumn("statements", "processor_markup_bps", "REAL");
   ensureColumn("comparisons", "processor_markup_bps_delta", "REAL");
