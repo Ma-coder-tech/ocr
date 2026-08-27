@@ -36,7 +36,7 @@ When the exact claim has no monetary amount, its economic tier is unavailable an
 - `D1 — interpretation-relevant`: resolving it improves economic understanding, but other independent prerequisites presently prevent that decision or permission change.
 - `D0 — no reachable decision delta`: resolving it cannot presently change an allowed merchant-facing interpretation or permission.
 
-Decision evaluation must record the presently reachable effects, independent blocking claim classes, and the materially different admissible outcomes used for D2. Resolution of one facet never implicitly resolves an adjacent facet.
+Decision evaluation must record the exact atomic facet, presently reachable effects, independent blocking atomic facets or prerequisites, and the materially different admissible outcome classes used for D2. A D2 outcome record must identify concrete answer classes and different resulting merchant-facing states; generic positive/negative placeholders are insufficient. Resolution of one facet never implicitly resolves an adjacent facet.
 
 ## 4. Combination matrix
 

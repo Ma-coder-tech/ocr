@@ -334,6 +334,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
       artifacts.rgWorkLedger = builders.rgPlanning({
         inventory: artifacts.unresolvedClaims,
         economic: artifacts.rd,
+        synthesis: artifacts.re,
         rfResolution: artifacts.rfResolution,
       });
       finishValidatedStage(input.observer, stageOutcomes, "rg_planning", artifacts.rgWorkLedger,

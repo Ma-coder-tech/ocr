@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 
 import { canonicalJson } from "../canonicalJson.js";
-import type { CanonicalEconomicsV2EconomicAnalysis } from "../economicTypes.js";
+import type {
+  CanonicalEconomicControlDimension,
+  CanonicalEconomicsV2EconomicAnalysis,
+} from "../economicTypes.js";
+import type { CanonicalEconomicsV2SynthesisAnalysis } from "../synthesisTypes.js";
 import type { KnowledgeClaimType, KnowledgeQuery, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 import { KNOWLEDGE_CLAIM_POLICIES } from "../knowledge/knowledgePolicy.js";
 import type { CanonicalRfClaimDecision, CanonicalRfClaimResolution } from "./rfClaimResolution.js";
@@ -52,9 +56,15 @@ export type CanonicalRgClaimAdmission = {
   decisionTier: DecisionMaterialityTier;
   decisionReasonCodes: string[];
   decisionBasis: {
+    atomicFacet: CanonicalAtomicClaimFacet;
     presentlyReachableEffects: CanonicalUnresolvedClaim["possibleDecisionEffects"];
-    independentBlockingClaimClasses: CanonicalUnresolvedClaimClass[];
-    admissibleOutcomeCodes: string[];
+    independentBlockingFacets: CanonicalAtomicClaimFacet[];
+    independentBlockingPrerequisiteCodes: string[];
+    admissibleOutcomes: Array<{
+      outcomeClass: string;
+      resultingEffect: CanonicalUnresolvedClaim["possibleDecisionEffects"][number];
+      merchantFacingStateCode: string;
+    }>;
   };
   materiality: CanonicalClaimMateriality;
   researchAdmission:
@@ -147,9 +157,16 @@ type AtomSeed = {
   knowledgeQuery: KnowledgeQuery | null;
 };
 
+export type CanonicalAtomicDecisionEvaluation = {
+  tier: DecisionMaterialityTier;
+  reasonCodes: string[];
+  basis: CanonicalRgClaimAdmission["decisionBasis"];
+};
+
 export function buildCanonicalRgWorkLedger(input: {
   inventory: CanonicalUnresolvedClaimInventory;
   economic: CanonicalEconomicsV2EconomicAnalysis | null;
+  synthesis: CanonicalEconomicsV2SynthesisAnalysis | null;
   rfResolution: CanonicalRfClaimResolution | null;
 }): CanonicalRgWorkLedger {
   const errors: string[] = [];
@@ -163,7 +180,7 @@ export function buildCanonicalRgWorkLedger(input: {
   const seeds = input.inventory.claims.flatMap((claim) => atomSeeds(claim, categoryDecisionByCharge));
   const groups = groupSeeds(seeds, period);
   const admissions = [...groups.values()].map((group) => admissionForGroup({
-    group, allSeeds: seeds, authoritativeCost, period, rfAvailability,
+    group, authoritativeCost, period, rfAvailability, economic: input.economic, synthesis: input.synthesis,
   })).sort((left, right) => left.atomicClaimId.localeCompare(right.atomicClaimId));
   const workItems = admissions.flatMap((admission) => admission.researchAdmission === "admitted_to_rg_work_ledger"
     && admission.knowledgeQuery ? [workItem(admission)] : [])
@@ -290,10 +307,11 @@ function groupSeeds(seeds: AtomSeed[], statementPeriod: { start: string; end: st
 
 function admissionForGroup(input: {
   group: AtomSeed[];
-  allSeeds: AtomSeed[];
   authoritativeCost: number | null;
   period: { start: string; end: string } | null;
   rfAvailability: "available" | "unavailable";
+  economic: CanonicalEconomicsV2EconomicAnalysis | null;
+  synthesis: CanonicalEconomicsV2SynthesisAnalysis | null;
 }): CanonicalRgClaimAdmission {
   const first = input.group[0]!;
   const parentClaimIds = unique(input.group.map((seed) => seed.parent.claimId));
@@ -303,7 +321,7 @@ function admissionForGroup(input: {
   const direction = first.parent.amountUnderReview?.direction ?? "not_monetary";
   const amountMinor = groupMagnitude(input.group);
   const magnitude = evaluateEconomicMateriality({ amountMinor, authoritativeStatementCostMinor: input.authoritativeCost });
-  const decision = decisionTier(first, input.allSeeds);
+  const decision = decisionTier(first, input.economic, input.synthesis);
   const materiality = combineMaterialityAxes(magnitude.tier, decision.tier);
   const research = researchRoute(first, materiality, input.rfAvailability);
   const atomicClaimId = `atomic-claim-${digest({ claimClass: first.parent.claimClass, facet: first.facet,
@@ -370,46 +388,171 @@ export function aggregateAtomicClaimMagnitude(entries: readonly {
   return [...amountByCanonicalSubject.values()].reduce((sum, value) => sum + value, 0);
 }
 
-function decisionTier(seed: AtomSeed, allSeeds: AtomSeed[]): {
-  tier: DecisionMaterialityTier;
-  reasonCodes: string[];
-  basis: CanonicalRgClaimAdmission["decisionBasis"];
-} {
-  const related = allSeeds.filter((candidate) => candidate.parent.canonicalRefs.some((ref) => seed.parent.canonicalRefs.includes(ref)));
-  const hasClass = (claimClass: CanonicalUnresolvedClaimClass) => related.some((item) => item.parent.claimClass === claimClass);
-  const basis = (blocking: CanonicalUnresolvedClaimClass[] = [], decisive = false) => ({
-    presentlyReachableEffects: decisive ? [...seed.parent.possibleDecisionEffects] : [],
-    independentBlockingClaimClasses: unique(blocking),
-    admissibleOutcomeCodes: decisive ? ["facet_answer_changes_interpretation_or_permission", "alternate_admissible_answer_withholds_or_changes_it"] : [],
+function decisionTier(
+  seed: AtomSeed,
+  economic: CanonicalEconomicsV2EconomicAnalysis | null,
+  synthesis: CanonicalEconomicsV2SynthesisAnalysis | null,
+): CanonicalAtomicDecisionEvaluation {
+  const direct = directFacetDecision(seed.facet);
+  if (direct) return direct;
+
+  const leverRoute = exactLeverDecision(seed, economic, synthesis);
+  if (leverRoute) return leverRoute;
+
+  const basis = emptyDecisionBasis(seed.facet);
+  if (seed.facet === "merchant_lever") {
+    return { tier: "D0", reasonCodes: ["no_presently_reachable_exact_charge_scoped_lever_delta"], basis };
+  }
+  return {
+    tier: "D1",
+    reasonCodes: ["facet_improves_understanding_but_no_exact_charge_scoped_permission_route_is_reachable"],
+    basis: {
+      ...basis,
+      independentBlockingPrerequisiteCodes: ["no_reachable_re_synthesis_route_for_exact_facet"],
+    },
+  };
+}
+
+function directFacetDecision(facet: CanonicalAtomicClaimFacet): CanonicalAtomicDecisionEvaluation | null {
+  const decisive = (
+    effect: CanonicalUnresolvedClaim["possibleDecisionEffects"][number],
+    outcomes: Array<{ outcomeClass: string; merchantFacingStateCode: string }>,
+  ): CanonicalAtomicDecisionEvaluation => ({
+    tier: "D2",
+    reasonCodes: ["exact_atomic_facet_has_presently_reachable_materially_different_interpretations"],
+    basis: {
+      atomicFacet: facet,
+      presentlyReachableEffects: [effect],
+      independentBlockingFacets: [],
+      independentBlockingPrerequisiteCodes: [],
+      admissibleOutcomes: outcomes.map((outcome) => ({ ...outcome, resultingEffect: effect })),
+    },
   });
-  if (["pricing_underlying_cost", "pricing_schedule", "pricing_scope", "fee_detail_coverage"].includes(seed.parent.claimClass)) {
-    return { tier: "D2", reasonCodes: ["atomic_claim_can_change_its_presently_reachable_interpretation"], basis: basis([], true) };
+  switch (facet) {
+    case "underlying_cost_billing_mode":
+      return decisive("pricing_interpretation", [
+        { outcomeClass: "underlying_cost_separately_billed", merchantFacingStateCode: "pricing_underlying_cost_separate" },
+        { outcomeClass: "underlying_cost_included_or_mixed", merchantFacingStateCode: "pricing_underlying_cost_included_or_scoped" },
+      ]);
+    case "merchant_price_schedule_shape":
+      return decisive("pricing_interpretation", [
+        { outcomeClass: "merchant_schedule_flat_or_bundled", merchantFacingStateCode: "pricing_schedule_bundled" },
+        { outcomeClass: "merchant_schedule_differential_or_pass_through", merchantFacingStateCode: "pricing_schedule_differential" },
+      ]);
+    case "pricing_scope_uniformity":
+      return decisive("pricing_interpretation", [
+        { outcomeClass: "pricing_uniform_across_scope", merchantFacingStateCode: "pricing_scope_uniform" },
+        { outcomeClass: "pricing_varies_by_scope", merchantFacingStateCode: "pricing_scope_mixed" },
+      ]);
+    case "fee_detail_coverage":
+      return decisive("cost_stack_completeness", [
+        { outcomeClass: "fee_detail_complete", merchantFacingStateCode: "cost_stack_detail_complete" },
+        { outcomeClass: "fee_detail_incomplete", merchantFacingStateCode: "cost_stack_detail_partial" },
+      ]);
+    case "economic_category":
+      return decisive("composition_permission", [
+        { outcomeClass: "processor_or_service_category", merchantFacingStateCode: "composition_processor_or_service" },
+        { outcomeClass: "network_or_issuer_category", merchantFacingStateCode: "composition_network_or_issuer" },
+      ]);
+    case "economic_beneficiary":
+      return decisive("economic_interpretation", [
+        { outcomeClass: "processor_or_acquirer_beneficiary", merchantFacingStateCode: "beneficiary_processor_or_acquirer" },
+        { outcomeClass: "network_issuer_or_third_party_beneficiary", merchantFacingStateCode: "beneficiary_network_issuer_or_third_party" },
+      ]);
+    case "economic_owner":
+      return decisive("economic_interpretation", [
+        { outcomeClass: "processor_or_acquirer_owner", merchantFacingStateCode: "owner_processor_or_acquirer" },
+        { outcomeClass: "network_issuer_or_third_party_owner", merchantFacingStateCode: "owner_network_issuer_or_third_party" },
+      ]);
+    default:
+      return null;
   }
-  if (seed.parent.claimClass === "economic_category") {
-    return hasClass("economic_ownership")
-      ? { tier: "D1", reasonCodes: ["ownership_is_an_independent_permission_prerequisite"], basis: basis(["economic_ownership"]) }
-      : { tier: "D2", reasonCodes: ["category_is_the_remaining_reachable_interpretation_prerequisite"], basis: basis([], true) };
+}
+
+function exactLeverDecision(
+  seed: AtomSeed,
+  economic: CanonicalEconomicsV2EconomicAnalysis | null,
+  synthesis: CanonicalEconomicsV2SynthesisAnalysis | null,
+): CanonicalAtomicDecisionEvaluation | null {
+  if (!economic || !synthesis || economic.validation.status !== "valid" || synthesis.validation.status !== "valid") return null;
+  const chargeRefs = new Set(seed.parent.canonicalRefs);
+  const counterfactualById = new Map(synthesis.synthesisLayer.counterfactuals.map((item) => [item.id, item]));
+  const roles = economic.economicLayer.roleClaims;
+  const relevantLevers = synthesis.synthesisLayer.merchantLevers.filter((lever) =>
+    lever.chargeRefs.some((ref) => chargeRefs.has(ref)) &&
+    (lever.state === "candidate_requires_verification" || lever.state === "unresolved"));
+  const dimension = controlDimension(seed.facet);
+  for (const lever of relevantLevers) {
+    const counterfactual = lever.counterfactualRef ? counterfactualById.get(lever.counterfactualRef) : null;
+    const impactReady = counterfactual?.resultState === "exact_deterministic_delta"
+      || counterfactual?.resultState === "bounded_conditional_delta";
+    const provenDimensions = new Set(roles.filter((role) => chargeRefs.has(role.chargeRef)
+      && role.resolution === "proven" && role.periodApplicability === "applicable").map((role) => role.dimension));
+    const otherDimensionsReady = lever.requiredControlDimensions.every((required) => required === dimension
+      || provenDimensions.has(required));
+    if (dimension && !provenDimensions.has(dimension) && lever.requiredControlDimensions.includes(dimension)
+      && impactReady && otherDimensionsReady) {
+      return permissionDecision(seed.facet, "merchant_lever", `lever:${lever.id}`, [
+        { outcomeClass: `${dimension}_proven_applicable`, merchantFacingStateCode: `lever_${lever.id}_permission_reachable` },
+        { outcomeClass: `${dimension}_proven_not_applicable_or_different_authority`, merchantFacingStateCode: `lever_${lever.id}_permission_withheld` },
+      ]);
+    }
+    if (seed.facet === "counterfactual" && !impactReady && allRequiredDimensionsProven(lever.requiredControlDimensions, provenDimensions)) {
+      return permissionDecision(seed.facet, "impact_permission", `lever:${lever.id}`, [
+        { outcomeClass: "exact_or_bounded_counterfactual", merchantFacingStateCode: `lever_${lever.id}_impact_permission_reachable` },
+        { outcomeClass: "verification_only_or_not_derivable_counterfactual", merchantFacingStateCode: `lever_${lever.id}_impact_permission_withheld` },
+      ]);
+    }
+    if (seed.facet === "merchant_lever" && impactReady && allRequiredDimensionsProven(lever.requiredControlDimensions, provenDimensions)) {
+      return permissionDecision(seed.facet, "merchant_lever", `lever:${lever.id}`, [
+        { outcomeClass: "eligible_supported_merchant_lever", merchantFacingStateCode: `lever_${lever.id}_action_permission_reachable` },
+        { outcomeClass: "documentation_monitoring_or_not_available_lever", merchantFacingStateCode: `lever_${lever.id}_action_permission_withheld` },
+      ]);
+    }
   }
-  if (seed.parent.claimClass === "economic_ownership") {
-    return hasClass("economic_category")
-      ? { tier: "D1", reasonCodes: ["category_is_an_independent_permission_prerequisite"], basis: basis(["economic_category"]) }
-      : { tier: "D2", reasonCodes: ["ownership_facet_can_change_reachable_interpretation"], basis: basis([], true) };
-  }
-  if (seed.parent.claimClass === "economic_control") {
-    return hasClass("economic_category") || hasClass("economic_ownership")
-      ? { tier: "D1", reasonCodes: ["control_improves_understanding_but_upstream_semantics_block_permission"],
-        basis: basis([...(hasClass("economic_category") ? ["economic_category" as const] : []),
-          ...(hasClass("economic_ownership") ? ["economic_ownership" as const] : [])]) }
-      : { tier: "D2", reasonCodes: ["control_facet_can_change_reachable_merchant_permission"], basis: basis([], true) };
-  }
-  if (seed.facet === "merchant_lever" && (hasClass("economic_category") || hasClass("economic_ownership") || hasClass("economic_control"))) {
-    return { tier: "D0", reasonCodes: ["upstream_semantics_prevent_a_presently_reachable_lever_permission"],
-      basis: basis((["economic_category", "economic_ownership", "economic_control"] as CanonicalUnresolvedClaimClass[]).filter(hasClass)) };
-  }
-  return hasClass("economic_category") || hasClass("economic_ownership") || hasClass("economic_control")
-    ? { tier: "D1", reasonCodes: ["claim_improves_understanding_but_independent_prerequisites_block_permission"],
-      basis: basis((["economic_category", "economic_ownership", "economic_control"] as CanonicalUnresolvedClaimClass[]).filter(hasClass)) }
-    : { tier: "D2", reasonCodes: ["actionability_facet_can_change_reachable_merchant_permission"], basis: basis([], true) };
+  return null;
+}
+
+function permissionDecision(
+  facet: CanonicalAtomicClaimFacet,
+  effect: CanonicalUnresolvedClaim["possibleDecisionEffects"][number],
+  routeCode: string,
+  outcomes: Array<{ outcomeClass: string; merchantFacingStateCode: string }>,
+): CanonicalAtomicDecisionEvaluation {
+  return {
+    tier: "D2",
+    reasonCodes: ["exact_atomic_facet_is_remaining_prerequisite_for_reachable_permission", routeCode],
+    basis: {
+      atomicFacet: facet,
+      presentlyReachableEffects: [effect],
+      independentBlockingFacets: [],
+      independentBlockingPrerequisiteCodes: [],
+      admissibleOutcomes: outcomes.map((outcome) => ({ ...outcome, resultingEffect: effect })),
+    },
+  };
+}
+
+function emptyDecisionBasis(facet: CanonicalAtomicClaimFacet): CanonicalRgClaimAdmission["decisionBasis"] {
+  return {
+    atomicFacet: facet,
+    presentlyReachableEffects: [],
+    independentBlockingFacets: [],
+    independentBlockingPrerequisiteCodes: [],
+    admissibleOutcomes: [],
+  };
+}
+
+function controlDimension(facet: CanonicalAtomicClaimFacet): CanonicalEconomicControlDimension | null {
+  return ["collector", "billing_intermediary", "economic_beneficiary", "economic_owner", "rule_setter", "price_setter",
+    "negotiator_change_authority", "contractual_controller", "constraint"].includes(facet)
+    ? facet as CanonicalEconomicControlDimension : null;
+}
+
+function allRequiredDimensionsProven(
+  required: readonly CanonicalEconomicControlDimension[],
+  proven: ReadonlySet<CanonicalEconomicControlDimension>,
+): boolean {
+  return required.every((dimension) => proven.has(dimension));
 }
 
 function researchRoute(seed: AtomSeed, materiality: CanonicalClaimMateriality, rfAvailability: "available" | "unavailable") {
@@ -487,15 +630,14 @@ function validateAdmissions(admissions: CanonicalRgClaimAdmission[], workItems: 
   if (new Set(workItems.map((item) => item.workItemId)).size !== workItems.length) errors.push("rg_duplicate_work_item_id");
   const admissionIds = new Set(admissions.map((item) => item.atomicClaimId));
   for (const admission of admissions) {
-    if (admission.decisionTier === "D2" && (admission.decisionBasis.presentlyReachableEffects.length === 0
-      || admission.decisionBasis.admissibleOutcomeCodes.length < 2)) {
-      errors.push(`rg_d2_missing_reachable_decision_basis:${admission.atomicClaimId}`);
-    }
-    if (admission.decisionTier === "D1" && admission.decisionBasis.independentBlockingClaimClasses.length === 0) {
-      errors.push(`rg_d1_missing_independent_blocker:${admission.atomicClaimId}`);
-    }
-    if (admission.decisionTier === "D0" && admission.decisionBasis.presentlyReachableEffects.length > 0) {
-      errors.push(`rg_d0_has_reachable_decision_effect:${admission.atomicClaimId}`);
+    errors.push(...validateAtomicDecisionEvaluation({
+      facet: admission.facet,
+      tier: admission.decisionTier,
+      basis: admission.decisionBasis,
+    }).map((error) => `${error}:${admission.atomicClaimId}`));
+    if (admission.decisionBasis.presentlyReachableEffects.some((effect) =>
+      !admission.expectedDecisionEffects.includes(effect))) {
+      errors.push(`rg_decision_effect_outside_parent_claim_authority:${admission.atomicClaimId}`);
     }
     if (admission.researchAdmission === "contextual_opportunistic_only" && admission.materiality !== "contextual") {
       errors.push(`rg_contextual_admission_materiality_mismatch:${admission.atomicClaimId}`);
@@ -511,6 +653,38 @@ function validateAdmissions(admissions: CanonicalRgClaimAdmission[], workItems: 
       errors.push(`rg_disabled_execution_has_resource_activity:${item.workItemId}`);
     }
   }
+}
+
+export function validateAtomicDecisionEvaluation(input: {
+  facet: CanonicalAtomicClaimFacet;
+  tier: DecisionMaterialityTier;
+  basis: CanonicalRgClaimAdmission["decisionBasis"];
+}): string[] {
+  const errors: string[] = [];
+  const basis = input.basis;
+  if (basis.atomicFacet !== input.facet) errors.push("rg_decision_basis_atomic_facet_mismatch");
+  const effects = new Set(basis.presentlyReachableEffects);
+  const outcomeClasses = new Set(basis.admissibleOutcomes.map((outcome) => outcome.outcomeClass));
+  const states = new Set(basis.admissibleOutcomes.map((outcome) => outcome.merchantFacingStateCode));
+  if (basis.admissibleOutcomes.some((outcome) => !effects.has(outcome.resultingEffect))) {
+    errors.push("rg_decision_outcome_effect_is_not_presently_reachable");
+  }
+  if (basis.admissibleOutcomes.some((outcome) => outcome.outcomeClass.includes("facet_answer_changes")
+    || outcome.outcomeClass.includes("alternate_admissible_answer"))) {
+    errors.push("rg_decision_outcome_uses_generic_placeholder");
+  }
+  if (input.tier === "D2" && (effects.size === 0 || basis.admissibleOutcomes.length < 2
+    || outcomeClasses.size < 2 || states.size < 2)) {
+    errors.push("rg_d2_missing_reachable_materially_different_admissible_outcomes");
+  }
+  if (input.tier === "D1" && basis.independentBlockingFacets.length === 0
+    && basis.independentBlockingPrerequisiteCodes.length === 0) {
+    errors.push("rg_d1_missing_independent_blocker");
+  }
+  if (input.tier === "D0" && (effects.size > 0 || basis.admissibleOutcomes.length > 0)) {
+    errors.push("rg_d0_has_reachable_decision_effect");
+  }
+  return unique(errors);
 }
 
 function authoritativeStatementCost(economic: CanonicalEconomicsV2EconomicAnalysis | null): number | null {

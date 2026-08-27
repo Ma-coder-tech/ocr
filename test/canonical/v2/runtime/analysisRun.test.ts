@@ -108,6 +108,44 @@ describe("production canonical AnalysisRun core", () => {
     expect(partial.canonicalTruthPreserved).toBe(true);
   });
 
+  it("keeps corrected RG planning provider-disabled and outside canonical truth hashing", () => {
+    const baseline = executeDeterministicCanonicalAnalysisRun({
+      runId: "rg-hash-baseline",
+      sourceDocumentRef: "rg-hash-source",
+      document: genericDocument,
+    }).run;
+    const planningFailure = executeDeterministicCanonicalAnalysisRun({
+      runId: "rg-hash-planning-failure",
+      sourceDocumentRef: "rg-hash-source",
+      document: genericDocument,
+      stageBuilders: {
+        rgPlanning: () => { throw new Error("injected_rg_planning_failure"); },
+      },
+    }).run;
+
+    expect(baseline.artifacts.rgWorkLedger).toMatchObject({
+      providerExecution: "disabled",
+      searchExecution: "disabled",
+      retrievalExecution: "disabled",
+      aiExecution: "disabled",
+      operations: [],
+      validation: { status: "valid" },
+    });
+    expect(baseline.artifacts.rgWorkLedger?.workItems.every((item) =>
+      item.executionState === "planned_provider_execution_disabled")).toBe(true);
+    expect(planningFailure.stageOutcomes.rg_planning).toMatchObject({
+      status: "failed",
+      errors: [expect.stringContaining("injected_rg_planning_failure")],
+    });
+    expect(planningFailure.artifacts.rgWorkLedger).toBeNull();
+    expect(planningFailure.artifacts.rb).toEqual(baseline.artifacts.rb);
+    expect(planningFailure.artifacts.rc).toEqual(baseline.artifacts.rc);
+    expect(planningFailure.artifacts.rd).toEqual(baseline.artifacts.rd);
+    expect(planningFailure.artifacts.re).toEqual(baseline.artifacts.re);
+    expect(planningFailure.canonicalTruthHash).toBe(baseline.canonicalTruthHash);
+    expect(planningFailure.canonicalTruthPreserved).toBe(true);
+  });
+
   it("falls through a false-positive exact parser to the reusable generic Fiserv-family parser", () => {
     const { run } = executeDeterministicCanonicalAnalysisRun({
       runId: "generic-family-fallback",
