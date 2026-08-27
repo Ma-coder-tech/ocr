@@ -112,6 +112,9 @@ function migrate(): void {
       semantic_hash TEXT,
       canonical_state_hash TEXT,
       semantic_revision INTEGER NOT NULL DEFAULT 0,
+      continuation_revision INTEGER NOT NULL DEFAULT 0,
+      continuation_lifecycle TEXT NOT NULL DEFAULT 'awaiting_first_pass_outcome',
+      continuation_state_hash TEXT,
       rf_snapshot_hash TEXT NOT NULL DEFAULT '',
       rf_context_hash TEXT NOT NULL DEFAULT '',
       rf_catalog_status TEXT NOT NULL DEFAULT 'unbound',
@@ -256,6 +259,37 @@ function migrate(): void {
       created_at TEXT NOT NULL,
       PRIMARY KEY (run_id, revision, stage),
       FOREIGN KEY (run_id, revision) REFERENCES canonical_analysis_semantic_revisions(run_id, revision) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_continuation_revisions (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      controller_revision INTEGER NOT NULL,
+      semantic_revision INTEGER NOT NULL,
+      semantic_hash TEXT,
+      canonical_state_hash TEXT,
+      plan_hash TEXT,
+      rf_snapshot_hash TEXT NOT NULL,
+      lifecycle TEXT NOT NULL,
+      state_hash TEXT NOT NULL,
+      state_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, controller_revision),
+      UNIQUE (run_id, state_hash)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_continuation_decisions (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      controller_revision INTEGER NOT NULL,
+      decision_id TEXT NOT NULL,
+      atomic_claim_id TEXT NOT NULL,
+      disposition TEXT NOT NULL,
+      work_contract_fingerprint TEXT,
+      decision_json TEXT NOT NULL,
+      decision_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, controller_revision, decision_id),
+      FOREIGN KEY (run_id, controller_revision)
+        REFERENCES canonical_analysis_continuation_revisions(run_id, controller_revision) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS canonical_rf_knowledge_audit_events (
@@ -456,6 +490,8 @@ function migrate(): void {
     CREATE INDEX IF NOT EXISTS idx_canonical_rg_execution_events ON canonical_rg_execution_events(run_id, work_item_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_canonical_external_evidence_plan ON canonical_analysis_external_evidence(run_id, source_plan_hash);
     CREATE INDEX IF NOT EXISTS idx_canonical_semantic_revision_hash ON canonical_analysis_semantic_revisions(run_id, semantic_hash);
+    CREATE INDEX IF NOT EXISTS idx_canonical_continuation_state ON canonical_analysis_continuation_revisions(run_id, lifecycle, controller_revision);
+    CREATE INDEX IF NOT EXISTS idx_canonical_continuation_claim ON canonical_analysis_continuation_decisions(run_id, atomic_claim_id, controller_revision);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_claim ON canonical_rf_knowledge_entries(claim_type, subject_code, lifecycle);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_visibility ON canonical_rf_knowledge_entries(visibility, tenant_ref, account_ref);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_effective_period ON canonical_rf_knowledge_entries(effective_from, effective_to);
@@ -503,6 +539,9 @@ function migrate(): void {
   ensureColumn("canonical_analysis_runs", "semantic_hash", "TEXT");
   ensureColumn("canonical_analysis_runs", "canonical_state_hash", "TEXT");
   ensureColumn("canonical_analysis_runs", "semantic_revision", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("canonical_analysis_runs", "continuation_revision", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("canonical_analysis_runs", "continuation_lifecycle", "TEXT NOT NULL DEFAULT 'awaiting_first_pass_outcome'");
+  ensureColumn("canonical_analysis_runs", "continuation_state_hash", "TEXT");
   ensureColumn("statements", "analysis_status", "TEXT NOT NULL DEFAULT 'completed'");
   ensureColumn("statements", "processor_markup_bps", "REAL");
   ensureColumn("comparisons", "processor_markup_bps_delta", "REAL");
@@ -530,6 +569,15 @@ function migrate(): void {
     CREATE TRIGGER IF NOT EXISTS canonical_analysis_stage_revisions_no_update
       BEFORE UPDATE ON canonical_analysis_stage_revisions
       BEGIN SELECT RAISE(ABORT, 'canonical_semantic_revision_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_continuation_revisions_no_update
+      BEFORE UPDATE ON canonical_analysis_continuation_revisions
+      BEGIN SELECT RAISE(ABORT, 'canonical_continuation_revision_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_continuation_decisions_no_update
+      BEFORE UPDATE ON canonical_analysis_continuation_decisions
+      BEGIN SELECT RAISE(ABORT, 'canonical_continuation_revision_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_rg_execution_events_no_update
+      BEFORE UPDATE ON canonical_rg_execution_events
+      BEGIN SELECT RAISE(ABORT, 'canonical_rg_execution_history_is_immutable'); END;
   `);
 }
 

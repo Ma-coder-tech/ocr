@@ -16,9 +16,10 @@ import type {
 import type { CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
 import type { CanonicalRfClaimResolution } from "./rfClaimResolution.js";
 import type { CanonicalRgWorkLedger } from "./rgWorkLedger.js";
+import type { CanonicalAnalysisRunAutonomousLifecycle } from "./adaptiveContinuationTypes.js";
 
-export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v7";
-export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "current_run_semantic_convergence_v1_1";
+export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v8";
+export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "adaptive_continuation_controller_v1";
 export const ANALYSIS_RUN_POLICY_VERSION = "frozen_product_model_runtime_policy_v0_2";
 
 export const ANALYSIS_RUN_STAGE_IDS = [
@@ -59,6 +60,7 @@ export type AnalysisRunManifest = {
   rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled";
   rgPlanning: "durable_claim_scoped_execution_eligible";
   semanticConvergence: "current_run_exact_claim_revisioned";
+  adaptiveContinuation: "durable_deterministic_delta_admission";
   regeneratedPlanExecution: "disabled";
   benchmarkExecution: "disabled";
   savingsExecution: "disabled";
@@ -103,6 +105,7 @@ export type CanonicalAnalysisRun = {
   semanticHash: string | null;
   canonicalStateHash: string | null;
   semanticRevision: number;
+  autonomousLifecycle: CanonicalAnalysisRunAutonomousLifecycle;
   canonicalTruthPreserved: true;
   limitations: string[];
 };

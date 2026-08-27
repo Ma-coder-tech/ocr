@@ -42,6 +42,7 @@ import {
   type CanonicalAnalysisRun,
   type CanonicalAnalysisRunExecution,
 } from "./analysisRunTypes.js";
+import { initialAutonomousLifecycle } from "./adaptiveContinuationTypes.js";
 
 const DRIVERS: ParserDriver[] = [
   fiservFirstDataProcessorStatementDriver,
@@ -427,6 +428,7 @@ function terminalRun(input: {
       rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled",
       rgPlanning: "durable_claim_scoped_execution_eligible",
       semanticConvergence: "current_run_exact_claim_revisioned",
+      adaptiveContinuation: "durable_deterministic_delta_admission",
       regeneratedPlanExecution: "disabled",
       benchmarkExecution: "disabled",
       savingsExecution: "disabled",
@@ -451,6 +453,7 @@ function terminalRun(input: {
     semanticHash: input.semanticHash ?? null,
     canonicalStateHash: input.canonicalStateHash ?? null,
     semanticRevision: 0,
+    autonomousLifecycle: initialAutonomousLifecycle(),
     canonicalTruthPreserved: true,
     limitations: unique(input.limitations),
   };

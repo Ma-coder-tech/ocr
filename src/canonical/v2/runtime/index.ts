@@ -11,3 +11,5 @@ export * from "./atomicClaims.js";
 export * from "./integrityHashes.js";
 export * from "./semanticConvergenceTypes.js";
 export * from "./semanticTail.js";
+export * from "./adaptiveContinuationTypes.js";
+export * from "./adaptiveContinuation.js";

@@ -163,9 +163,11 @@ export async function processJob(jobId: string): Promise<void> {
       stageStatus: Object.fromEntries(Object.entries(canonicalRun.stageOutcomes).map(([stage, outcome]) => [stage, outcome.status])),
     });
     try {
-      const [{ executeDurableCanonicalRgEvidence }, { createProductionRgEvidencePortsFromEnvironment }] = await Promise.all([
+      const [{ executeDurableCanonicalRgEvidence }, { createProductionRgEvidencePortsFromEnvironment },
+        { adjudicateDurableCanonicalContinuation }] = await Promise.all([
         import("./canonical/v2/runtime/rgEvidenceExecution.js"),
         import("./canonical/v2/runtime/rgLiveEvidencePorts.js"),
+        import("./canonical/v2/runtime/adaptiveContinuation.js"),
       ]);
       const rgExecution = await executeDurableCanonicalRgEvidence({ runId: canonicalRun.runId,
         ports: createProductionRgEvidencePortsFromEnvironment(canonicalRun.runId) });
@@ -177,7 +179,11 @@ export async function processJob(jobId: string): Promise<void> {
         degraded: rgExecution.workItemsDegraded,
         canonicalTruthPreserved: rgExecution.canonicalTruthPreserved,
       });
-      if (rgExecution.verifiedEvidence.length > 0) {
+      let continuation = adjudicateDurableCanonicalContinuation({ runId: canonicalRun.runId,
+        expectedSemanticRevision: canonicalRun.semanticRevision,
+        expectedSemanticHash: canonicalRun.semanticHash,
+        expectedPlanHash: canonicalRun.artifacts.rgWorkLedger?.planHash ?? null });
+      if (continuation.lifecycle === "convergence_required") {
         const { convergeDurableCanonicalAnalysisRun } = await import("./canonical/v2/runtime/semanticConvergence.js");
         const convergence = convergeDurableCanonicalAnalysisRun({ runId: canonicalRun.runId });
         console.log(`[job:${jobId}] canonical-semantic-convergence`, {
@@ -189,7 +195,19 @@ export async function processJob(jobId: string): Promise<void> {
           nextPlanPersisted: convergence.revision.nextPlanHash !== null,
           providerCalls: convergence.providerCalls,
         });
+        continuation = adjudicateDurableCanonicalContinuation({ runId: canonicalRun.runId,
+          expectedSemanticRevision: convergence.run.semanticRevision,
+          expectedSemanticHash: convergence.run.semanticHash,
+          expectedPlanHash: convergence.run.artifacts.rgWorkLedger?.planHash ?? null });
       }
+      console.log(`[job:${jobId}] canonical-adaptive-continuation`, {
+        runId: canonicalRun.runId,
+        controllerRevision: continuation.controllerRevision,
+        lifecycle: continuation.lifecycle,
+        continuationReadyCount: continuation.continuationReadyAtomicClaimIds.length,
+        regeneratedProviderExecution: continuation.providerExecution,
+        secondPassProviderCalls: continuation.secondPassProviderCalls,
+      });
     } catch (error) {
       console.error(`[job:${jobId}] canonical-rg-evidence-degraded`, error instanceof Error ? error.message : error);
     }

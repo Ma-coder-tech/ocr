@@ -72,6 +72,18 @@ describe("production worker canonical AnalysisRun integration", () => {
     expect(canonical?.rgWorkItems.every((item) => item.executionState === "degraded_provider_unavailable"
       && item.stopReason?.includes("missing"))).toBe(true);
     expect(canonical?.rgOperations).toEqual([]);
+    expect(canonical?.continuationRevisions).toHaveLength(1);
+    expect(canonical?.result?.autonomousLifecycle).toMatchObject({
+      controllerRevision: 1,
+      state: "operational_degradation_blocks_judgment",
+      providerExecution: "regenerated_plan_disabled",
+      secondPassProviderCalls: 0,
+    });
+    const degradedDecisions = canonical?.continuationRevisions[0]?.decisions.filter((item) =>
+      item.disposition === "operationally_degraded_retry_eligible") ?? [];
+    expect(degradedDecisions).toHaveLength(canonical?.rgWorkItems.length ?? 0);
+    expect(degradedDecisions.every((item) => item.degradation?.subtype === "provider_unavailable_before_send"
+      && item.degradation.continuationPermission === "bounded_retry_eligible")).toBe(true);
     expect(canonical?.stages).toHaveLength(10);
   }, 30_000);
 });

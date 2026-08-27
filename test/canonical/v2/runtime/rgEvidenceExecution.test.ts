@@ -310,6 +310,243 @@ describe("production durable claim-bound RG evidence execution", () => {
     dbModule = indeterminateSetup.db;
   }, 30_000);
 
+  it("records convergence-required and deterministic post-convergence lifecycle states without executing a second provider pass", async () => {
+    const setup = await runWithOneWorkItem();
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(() => controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId,
+      expectedSemanticRevision: before.semanticRevision,
+      expectedPlanHash: "stale-plan-generation" }))
+      .toThrow("adaptive_continuation_stale_plan_generation");
+    const first = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId,
+      expectedSemanticRevision: before.semanticRevision, expectedSemanticHash: before.semanticHash,
+      expectedPlanHash: before.result!.artifacts.rgWorkLedger!.planHash });
+
+    expect(first).toMatchObject({ lifecycle: "convergence_required", providerExecution: "regenerated_plan_disabled",
+      secondPassProviderCalls: 0 });
+    expect(first.decisions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ disposition: "convergence_required" }),
+    ]));
+    await expect(setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports }))
+      .rejects.toThrow("rg_evidence_regenerated_or_readjudicated_plan_execution_disabled");
+    const semantic = await import("../../../../src/canonical/v2/runtime/semanticConvergence.js");
+    const convergence = semantic.convergeDurableCanonicalAnalysisRun({ runId: setup.run.runId });
+    const second = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId,
+      expectedSemanticRevision: convergence.run.semanticRevision, expectedSemanticHash: convergence.run.semanticHash,
+      expectedPlanHash: convergence.run.artifacts.rgWorkLedger!.planHash });
+
+    expect(second.controllerRevision).toBe(2);
+    expect(second.decisions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ disposition: "already_resolved", regeneratedProviderExecution: "disabled" }),
+    ]));
+    expect(second.secondPassProviderCalls).toBe(0);
+    expect(second.cumulativeResource).toMatchObject({ providerCalls: 4, searchCalls: 1, aiCalls: 2,
+      retrievalDocuments: 1, operationReservations: 4 });
+    expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(persisted.rgExecutionEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventType: "superseded_plan_snapshot", workItemId: expect.stringMatching(/^claim:/),
+        event: expect.objectContaining({ claimAdmission: expect.objectContaining({ atomicClaimId: expect.any(String) }) }) }),
+    ]));
+    expect(persisted.result!.autonomousLifecycle).toMatchObject({ controllerRevision: 2,
+      state: second.lifecycle, providerExecution: "regenerated_plan_disabled", secondPassProviderCalls: 0 });
+    expect(persisted.financialFoundationHash).toBe(setup.run.financialFoundationHash);
+  }, 30_000);
+
+  it("does not treat one no-candidate search as safe analytical exhaustion or authorize an identical retry", async () => {
+    const setup = await runWithOneWorkItem();
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    ports.search = async (_input, onSend) => {
+      calls.push("search-no-candidates"); onSend();
+      return { value: [], receipt: receipt("synthetic_public_search", 1, 0, 7) };
+    };
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    const state = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    const decision = state.decisions[0]!;
+
+    expect(state.lifecycle).toBe("continuation_judgment_unresolved");
+    expect(decision).toMatchObject({ disposition: "continuation_uncertain_not_authorized",
+      nextOperationDelta: null, degradation: null });
+    expect(decision.reasonCodes).toEqual(expect.arrayContaining([
+      "single_weak_outcome_is_not_analytical_exhaustion", "no_concrete_refinement_delta",
+    ]));
+    expect(decision.disposition).not.toBe("safely_unresolved");
+    await expect(setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports }))
+      .rejects.toThrow("rg_evidence_regenerated_or_readjudicated_plan_execution_disabled");
+    expect(calls).toEqual(["search-no-candidates"]);
+  }, 30_000);
+
+  it("admits a disabled justified refinement only for locally bound authority with a concrete period gap and changed objective", async () => {
+    const setup = await runWithOneWorkItem();
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const investigate = ports.investigate;
+    ports.investigate = async (input, onSend) => {
+      const result = await investigate(input, onSend);
+      return { ...result, value: { ...result.value, effectiveFrom: "2099-01-01" } };
+    };
+    const verify = ports.verify;
+    ports.verify = async (input, onSend) => {
+      const result = await verify(input, onSend);
+      return { ...result, value: { ...result.value, periodStatus: "wrong_period" as const,
+        effectiveFrom: input.frozenCandidate.effectiveFrom } };
+    };
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    const state = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    const decision = state.decisions[0]!;
+
+    expect(state.lifecycle).toBe("continuation_ready_provider_execution_disabled");
+    expect(decision).toMatchObject({ disposition: "justified_refinement",
+      progress: [expect.objectContaining({ kind: "correct_authority_wrong_period",
+        authorityBindingId: "fiserv_public_web_origins_v1" })],
+      nextOperationDelta: expect.objectContaining({ kind: "period_refinement",
+        requiredGap: "correct_authority_wrong_period", providerExecution: "disabled_for_this_slice" }) });
+    expect(decision.nextOperationDelta!.nextEvidenceObjective).not.toBe(decision.nextOperationDelta!.priorEvidenceObjective);
+    expect(decision.nextOperationDelta!.nextWorkContractFingerprint)
+      .not.toBe(decision.nextOperationDelta!.priorWorkContractFingerprint);
+    expect(state.secondPassProviderCalls).toBe(0);
+    expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
+  }, 30_000);
+
+  it("keeps indeterminate-after-send reconciliation-required and never categorizes it as blindly retriable", async () => {
+    const setup = await runWithOneWorkItem();
+    let sends = 0;
+    const ports = successfulPorts([]);
+    ports.search = async (_input, onSend) => {
+      onSend(); sends += 1;
+      throw new setup.executor.RgEvidenceTransportError("after_send", "synthetic_after_send_failure");
+    };
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    const state = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    const decision = state.decisions[0]!;
+
+    expect(state.lifecycle).toBe("indeterminate_reconciliation_required");
+    expect(decision).toMatchObject({ disposition: "operationally_degraded_reconciliation_required",
+      degradation: { subtype: "indeterminate_after_send", continuationPermission: "reconciliation_required" } });
+    expect(decision.degradation!.reasonCodes).toContain("blind_retry_prohibited");
+    expect(decision.degradation!.continuationPermission).not.toBe("bounded_retry_eligible");
+    await expect(setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports }))
+      .rejects.toThrow("rg_evidence_regenerated_or_readjudicated_plan_execution_disabled");
+    expect(sends).toBe(1);
+  }, 30_000);
+
+  it("returns the same persisted continuation judgment after restart", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "ratereveal-continuation-restart-"));
+    temporaryDirectories.push(directory);
+    const databasePath = path.join(directory, "continuation.sqlite");
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const setup = await runWithOneWorkItem();
+    const ports = successfulPorts([]);
+    ports.search = async (_input, onSend) => {
+      onSend(); return { value: [], receipt: receipt("synthetic_public_search", 1, 0, 5) };
+    };
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    const before = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    setup.db.db.close();
+
+    vi.resetModules();
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const [reloadedController, reloadedStore, reloadedDb] = await Promise.all([
+      import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js"),
+      import("../../../../src/canonical/v2/runtime/analysisRunStore.js"),
+      import("../../../../src/db.js"),
+    ]);
+    dbModule = reloadedDb;
+    const after = reloadedController.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    const persisted = reloadedStore.getPersistedAnalysisRun(setup.run.runId)!;
+
+    expect(after).toEqual(before);
+    expect(persisted.continuationRevisions).toHaveLength(1);
+    expect(persisted.continuationStateHash).toBe(before.stateHash);
+    expect(persisted.result!.autonomousLifecycle.secondPassProviderCalls).toBe(0);
+  }, 30_000);
+
+  it("carries an unchanged weakly unresolved exact work contract across a changed plan instead of making it fresh work", async () => {
+    const setup = await runWithOneWorkItem(undefined, 1);
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const secondaryWorkId = setup.retainedWorkItemIds.find((item) => item !== setup.targetWorkItemId)!;
+    const secondaryAtomicClaimId = before.rgWorkItems.find((item) => item.workItemId === secondaryWorkId)!.atomicClaimId;
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const search = ports.search;
+    ports.search = async (input, onSend) => input.intent.workItemId === secondaryWorkId
+      ? (calls.push("secondary-no-candidates"), onSend(),
+        { value: [], receipt: receipt("synthetic_public_search", 1, 0, 3) })
+      : search(input, onSend);
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    const first = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    expect(first.decisions.find((item) => item.atomicClaimId === secondaryAtomicClaimId)?.disposition)
+      .toBe("continuation_uncertain_not_authorized");
+    const semantic = await import("../../../../src/canonical/v2/runtime/semanticConvergence.js");
+    const convergence = semantic.convergeDurableCanonicalAnalysisRun({ runId: setup.run.runId });
+    const second = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId,
+      expectedSemanticRevision: convergence.run.semanticRevision, expectedSemanticHash: convergence.run.semanticHash,
+      expectedPlanHash: convergence.run.artifacts.rgWorkLedger!.planHash });
+    const carried = second.decisions.find((item) => item.atomicClaimId === secondaryAtomicClaimId)!;
+
+    expect(carried).toMatchObject({ disposition: "continuation_uncertain_not_authorized",
+      currentWorkContractFingerprint: expect.any(String), nextOperationDelta: null });
+    expect(carried.reasonCodes).toContain("unchanged_work_contract_after_weak_unresolved_outcome");
+    expect(carried.priorWorkContractFingerprints).toContain(carried.currentWorkContractFingerprint);
+    expect(carried.cumulativeResource.searchCalls).toBe(1);
+    expect(carried.disposition).not.toBe("newly_eligible");
+    expect(second.secondPassProviderCalls).toBe(0);
+  }, 30_000);
+
+  it("preserves resolved, safely unresolved, continuation-ready, and operationally degraded claim states in one mixed run", async () => {
+    const setup = await runWithOneWorkItem();
+    const calls: string[] = [];
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports: successfulPorts(calls) });
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    const semantic = await import("../../../../src/canonical/v2/runtime/semanticConvergence.js");
+    semantic.convergeDurableCanonicalAnalysisRun({ runId: setup.run.runId });
+    const converged = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const degraded = converged.rgWorkItems[0]!;
+    const degradedValue = { ...degraded, state: "terminal" as const, executionState: "degraded_provider_unavailable" as const,
+      reservation: null, progress: { ...degraded.progress, state: "degraded" as const },
+      stopReason: "synthetic_provider_unavailable_after_convergence" };
+    setup.db.db.prepare(`UPDATE canonical_rg_work_items SET state = ?, execution_state = ?, work_item_json = ?
+      WHERE run_id = ? AND work_item_id = ?`).run(degradedValue.state, degradedValue.executionState,
+      JSON.stringify(degradedValue), setup.run.runId, degraded.workItemId);
+    const emergency = converged.rgWorkItems[1]!;
+    const emergencyValue = { ...emergency, state: "terminal" as const,
+      executionState: "degraded_emergency_circuit_breaker" as const, reservation: null,
+      progress: { ...emergency.progress, state: "degraded" as const },
+      stopReason: "synthetic_resource_ceiling_reached_without_analytical_completion" };
+    setup.db.db.prepare(`UPDATE canonical_rg_work_items SET state = ?, execution_state = ?, work_item_json = ?
+      WHERE run_id = ? AND work_item_id = ?`).run(emergencyValue.state, emergencyValue.executionState,
+      JSON.stringify(emergencyValue), setup.run.runId, emergency.workItemId);
+
+    const state = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    const dispositions = new Set(state.decisions.map((item) => item.disposition));
+
+    expect(state.lifecycle).toBe("operational_degradation_blocks_judgment");
+    expect(dispositions).toContain("already_resolved");
+    expect(dispositions).toContain("safely_unresolved");
+    expect(dispositions).toContain("newly_eligible");
+    expect(dispositions).toContain("operationally_degraded_retry_eligible");
+    expect(dispositions).toContain("operationally_degraded_withheld");
+    expect(state.decisions.find((item) => item.disposition === "operationally_degraded_retry_eligible")!.degradation)
+      .toMatchObject({ subtype: "provider_unavailable_before_send", continuationPermission: "bounded_retry_eligible" });
+    expect(state.decisions.find((item) => item.currentWorkItemId === emergency.workItemId)).toMatchObject({
+      disposition: "operationally_degraded_withheld",
+      degradation: { subtype: "resource_or_runtime_exhaustion", continuationPermission: "withheld_operationally" },
+    });
+    expect(state.continuationReadyAtomicClaimIds.length).toBeGreaterThan(0);
+    expect(state.secondPassProviderCalls).toBe(0);
+    expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
+  }, 30_000);
+
   it("leases one exact work item to one worker and prevents concurrent duplicate provider work", async () => {
     const setup = await runWithOneWorkItem();
     const calls: string[] = [];
@@ -609,7 +846,7 @@ describe("production durable claim-bound RG evidence execution", () => {
       .some((item) => item.facet === "price_setter"))).toBe(true);
   }, 30_000);
 
-  async function runWithOneWorkItem(facet?: string) {
+  async function runWithOneWorkItem(facet?: string, additionalWorkItems = 0) {
     const [{ parsePdf }, store, runStore, executor, loadedDb] = await Promise.all([
       import("../../../../src/parser.js"),
       import("../../../../src/store.js"),
@@ -622,7 +859,7 @@ describe("production durable claim-bound RG evidence execution", () => {
     const job = store.createJob({ fileName: "statement.pdf", filePath: fixture, fileType: "pdf", businessType: "retail" });
     const run = runStore.executeDurableCanonicalAnalysisRun({ jobId: job.id, document });
     const persisted = runStore.getPersistedAnalysisRun(run.runId)!;
-    const target = persisted.rgWorkItems.find((item) => {
+    const eligible = persisted.rgWorkItems.filter((item) => {
       const admission = persisted.rgClaimAdmissions.find((claim) => claim.atomicClaimId === item.atomicClaimId)!;
       const scope = item.knowledgeQuery.scope;
       const labels = persisted.result!.artifacts.rb!.sourceModel.occurrences
@@ -633,10 +870,21 @@ describe("production durable claim-bound RG evidence execution", () => {
         && labels.some((label) => /^[A-Za-z][A-Za-z ]{2,80}$/.test(label))
         && admission.researchAdmission === "admitted_to_rg_work_ledger";
     });
+    const target = eligible[0];
     if (!target) throw new Error("test_requires_processor_scoped_rg_work_item");
-    loadedDb.db.prepare(`DELETE FROM canonical_rg_work_items WHERE run_id = ? AND work_item_id <> ?`).run(run.runId, target.workItemId);
-    loadedDb.db.prepare(`DELETE FROM canonical_rg_claim_admissions WHERE run_id = ? AND atomic_claim_id <> ?`).run(run.runId, target.atomicClaimId);
-    return { run, store: runStore, executor, db: loadedDb, document, job };
+    const retained = [target, ...eligible.slice(1, additionalWorkItems + 1)];
+    if (retained.length !== additionalWorkItems + 1) throw new Error("test_requires_additional_rg_work_items");
+    const retainedWorkIds = new Set(retained.map((item) => item.workItemId));
+    const retainedClaimIds = new Set(retained.map((item) => item.atomicClaimId));
+    for (const item of persisted.rgWorkItems) if (!retainedWorkIds.has(item.workItemId)) {
+      loadedDb.db.prepare(`DELETE FROM canonical_rg_work_items WHERE run_id = ? AND work_item_id = ?`).run(run.runId, item.workItemId);
+    }
+    for (const admission of persisted.rgClaimAdmissions) if (!retainedClaimIds.has(admission.atomicClaimId)) {
+      loadedDb.db.prepare(`DELETE FROM canonical_rg_claim_admissions WHERE run_id = ? AND atomic_claim_id = ?`)
+        .run(run.runId, admission.atomicClaimId);
+    }
+    return { run, store: runStore, executor, db: loadedDb, document, job,
+      targetWorkItemId: target.workItemId, retainedWorkItemIds: retained.map((item) => item.workItemId) };
   }
 });
 

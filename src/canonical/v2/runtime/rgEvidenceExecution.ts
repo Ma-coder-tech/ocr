@@ -207,6 +207,9 @@ export async function executeDurableCanonicalRgEvidence(input: {
 }): Promise<CanonicalRgEvidenceExecutionResult> {
   const persisted = getPersistedAnalysisRun(input.runId);
   if (!persisted?.result) throw new Error("rg_evidence_analysis_run_unavailable");
+  if (persisted.continuationRevision > 0 || persisted.semanticRevision > 0) {
+    throw new Error("rg_evidence_regenerated_or_readjudicated_plan_execution_disabled");
+  }
   const ledger = persisted.result.artifacts.rgWorkLedger;
   if (!ledger || ledger.validation.status !== "valid") throw new Error("rg_evidence_valid_work_ledger_required");
   if (persisted.canonicalTruthHash !== persisted.result.canonicalTruthHash) throw new Error("rg_evidence_canonical_truth_binding_mismatch");
