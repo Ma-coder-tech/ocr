@@ -5,7 +5,7 @@ import { RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET } from "./budgetLedger.js";
 import type { ProviderOperationReceiptV1 } from "../internalAnalysis/internalAnalysisTypes.js";
 import { assertProviderOutboundPacketSafe, assertProviderSafeQuestionContext } from "./providerPrivacy.js";
 import { APPROVED_OPENROUTER_ENDPOINT, APPROVED_OPENAI_ENDPOINT, OPENROUTER_SEARCH_CONFIGURATION_CODE, OPENROUTER_SEARCH_ENGINE,
-  type InternalLiveExecutionCapabilityV1, LiveOperationTransportError, requireLiveCapabilityBinding } from "./providerPreflight.js";
+  type LiveExecutionCapabilityV1, LiveOperationTransportError, requireLiveCapabilityBinding } from "./providerPreflight.js";
 import { INVESTIGATIVE_RESPONSE_SCHEMA_ID, INVESTIGATIVE_RESPONSE_SCHEMA_V1,
   SEMANTIC_RESPONSE_SCHEMA_ID, SEMANTIC_RESPONSE_SCHEMA_V1 } from "./providerSchemas.js";
 import { asSemanticModelJudgment, validateSemanticModelJudgment } from "./structuredMemberValidation.js";
@@ -48,7 +48,7 @@ async function sendLiveJson(request: LiveJsonRequest, onSend: () => void, onResp
   } finally { clearTimeout(timer); request.cancellationSignal?.removeEventListener("abort", cancel); }
 }
 
-export function createLiveOpenRouterSearchAdapter(capability: InternalLiveExecutionCapabilityV1, audit: ProviderOperationAuditLog): NonNullable<IntelligencePorts["search"]> {
+export function createLiveOpenRouterSearchAdapter(capability: LiveExecutionCapabilityV1, audit: ProviderOperationAuditLog): NonNullable<IntelligencePorts["search"]> {
   const binding = requireLiveCapabilityBinding(capability);
   return { providerCode: "openrouter_web_search", async search(request: SearchRequest): Promise<SearchResponse> {
     if (request.logicalAttempt !== 1) throw new Error("openrouter_search_logical_attempt_invalid");
@@ -166,7 +166,7 @@ export function normalizeOpenRouterSearchResponse(body: unknown, context: { requ
       providerCompletionState: "completed", toolExecutionState } };
 }
 
-export function createLiveOpenAiInvestigativeAdapter(capability: InternalLiveExecutionCapabilityV1, audit: ProviderOperationAuditLog): NonNullable<IntelligencePorts["investigative"]> {
+export function createLiveOpenAiInvestigativeAdapter(capability: LiveExecutionCapabilityV1, audit: ProviderOperationAuditLog): NonNullable<IntelligencePorts["investigative"]> {
   requireLiveCapabilityBinding(capability);
   return { providerCode: "openai_responses_api", modelCode: capability.modelCode, async investigate(request) {
     request.items.forEach((item) => { if (item.questionContext) assertProviderSafeQuestionContext(item.questionContext); });
@@ -176,7 +176,7 @@ export function createLiveOpenAiInvestigativeAdapter(capability: InternalLiveExe
   } };
 }
 
-export function createLiveOpenAiSemanticAdapter(capability: InternalLiveExecutionCapabilityV1, audit: ProviderOperationAuditLog): NonNullable<IntelligencePorts["semantic"]> {
+export function createLiveOpenAiSemanticAdapter(capability: LiveExecutionCapabilityV1, audit: ProviderOperationAuditLog): NonNullable<IntelligencePorts["semantic"]> {
   requireLiveCapabilityBinding(capability);
   return { providerCode: "openai_responses_api", modelCode: capability.modelCode, async verify(request) {
     const immutableRequest = structuredClone(request);
@@ -190,7 +190,7 @@ export function createLiveOpenAiSemanticAdapter(capability: InternalLiveExecutio
 }
 
 async function sendOpenAiStructured<TRequest extends { batchId: string; attemptId: string; reservationId: string; maximumOutputTokens: number; logicalAttempt: 1; expectedItemIds: string[] }, TOutput>(
-  capability: InternalLiveExecutionCapabilityV1, audit: ProviderOperationAuditLog, request: TRequest,
+  capability: LiveExecutionCapabilityV1, audit: ProviderOperationAuditLog, request: TRequest,
   operation: "investigative_model" | "semantic_model", schemaName: string, schema: object, systemText: string,
   providerInput: unknown = request,
   projectResponse?: (parsed: Record<string, unknown>) => StructuredBatchResponse<TOutput>,

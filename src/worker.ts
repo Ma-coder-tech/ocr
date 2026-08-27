@@ -162,6 +162,24 @@ export async function processJob(jobId: string): Promise<void> {
         .filter((capability) => capability.status === "supported").length ?? 0,
       stageStatus: Object.fromEntries(Object.entries(canonicalRun.stageOutcomes).map(([stage, outcome]) => [stage, outcome.status])),
     });
+    try {
+      const [{ executeDurableCanonicalRgEvidence }, { createProductionRgEvidencePortsFromEnvironment }] = await Promise.all([
+        import("./canonical/v2/runtime/rgEvidenceExecution.js"),
+        import("./canonical/v2/runtime/rgLiveEvidencePorts.js"),
+      ]);
+      const rgExecution = await executeDurableCanonicalRgEvidence({ runId: canonicalRun.runId,
+        ports: createProductionRgEvidencePortsFromEnvironment(canonicalRun.runId) });
+      console.log(`[job:${jobId}] canonical-rg-evidence`, {
+        runId: canonicalRun.runId,
+        workItemsConsidered: rgExecution.workItemsConsidered,
+        completedWithEvidence: rgExecution.workItemsCompletedWithEvidence,
+        completedUnresolved: rgExecution.workItemsCompletedUnresolved,
+        degraded: rgExecution.workItemsDegraded,
+        canonicalTruthPreserved: rgExecution.canonicalTruthPreserved,
+      });
+    } catch (error) {
+      console.error(`[job:${jobId}] canonical-rg-evidence-degraded`, error instanceof Error ? error.message : error);
+    }
 
     stageUpdate(jobId, "extracting_fee_line_items", 48, "Extracting fee line items");
     if (stageDelayMs > 0) await delay(stageDelayMs);

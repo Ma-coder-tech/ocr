@@ -92,8 +92,15 @@ export type CanonicalRgClaimAdmission = {
 export type CanonicalRgWorkItem = {
   workItemId: string;
   atomicClaimId: string;
-  state: "planned";
-  executionState: "planned_provider_execution_disabled";
+  state: "planned" | "executing" | "terminal";
+  executionState:
+    | "planned_for_durable_execution"
+    | "executing"
+    | "completed_verified_evidence"
+    | "completed_unresolved"
+    | "degraded_provider_unavailable"
+    | "degraded_emergency_circuit_breaker"
+    | "indeterminate_after_send";
   requestedOperation: "claim_scoped_public_research";
   materialityContractVersion: typeof MATERIALITY_CONTRACT_V1.version;
   evidenceObjective: string;
@@ -101,28 +108,51 @@ export type CanonicalRgWorkItem = {
   knowledgeQuery: KnowledgeQuery;
   expectedKnowledgeValueConstraint: NonNullable<CanonicalRgClaimAdmission["expectedKnowledgeValueConstraint"]>;
   requiredSourceAuthorities: KnowledgeSourceAuthority[];
-  reservation: null;
-  progress: { state: "not_started"; operationsAttempted: 0; evidenceItemsObserved: 0 };
-  extensionDecisions: [];
-  retryDecisions: [];
-  resourceConsumption: { providerCalls: 0; searchCalls: 0; retrievalBytes: 0; aiCalls: 0; tokens: null };
-  stopReason: null;
+  reservation: null | { reservationId: string; workerId: string; reservedAt: string; expiresAt: string };
+  progress: { state: "not_started" | "in_progress" | "verified_evidence" | "unresolved" | "degraded";
+    operationsAttempted: number; evidenceItemsObserved: number };
+  extensionDecisions: Array<{ decisionId: string; decision: "extended" | "stopped"; reasonCode: string; createdAt: string }>;
+  retryDecisions: Array<{ decisionId: string; operationId: string; decision: "retry" | "no_retry"; reasonCode: string; createdAt: string }>;
+  resourceConsumption: { providerCalls: number; searchCalls: number; retrievalBytes: number; aiCalls: number; tokens: number | null };
+  stopReason: null | string;
+  verifiedEvidenceRefs: string[];
 };
 
 export type CanonicalRgOperation = {
   operationId: string;
   workItemId: string;
-  state: "not_created";
+  atomicClaimId: string;
+  planHash: string;
+  kind: "public_search" | "public_retrieval" | "investigation" | "independent_verification";
+  attempt: number;
+  candidateId: string | null;
+  state: "reserved" | "sent" | "completed" | "failed_before_send" | "indeterminate_after_send";
+  reservation: { reservationId: string; workerId: string; reservedAt: string; expiresAt: string };
+  receipt: {
+    sendState: "not_sent" | "sent";
+    completionState: "reserved" | "completed" | "failed" | "indeterminate";
+    providerCode: string;
+    providerRequestId: string | null;
+    calls: number;
+    tokens: number | null;
+    retrievalBytes: number;
+    reasonCode: string;
+  };
+  input: unknown;
+  inputHash: string;
+  result: unknown | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type CanonicalRgWorkLedger = {
   schemaVersion: typeof RG_WORK_LEDGER_SCHEMA_VERSION;
   authority: "claim_admission_and_planning_only";
   materialityContract: typeof MATERIALITY_CONTRACT_V1;
-  providerExecution: "disabled";
-  searchExecution: "disabled";
-  retrievalExecution: "disabled";
-  aiExecution: "disabled";
+  providerExecution: "durable_claim_bound_executor_after_planning";
+  searchExecution: "typed_privacy_safe_search_intent_only";
+  retrievalExecution: "independent_https_retrieval_required";
+  aiExecution: "separate_investigation_and_verification_only";
   automaticKnowledgePromotion: "prohibited";
   contextualResearchDefault: "opportunistic_only_no_independent_initiation";
   businessContextAuthority: "excluded_from_canonical_materiality";
@@ -201,10 +231,10 @@ export function buildCanonicalRgWorkLedger(input: {
     schemaVersion: RG_WORK_LEDGER_SCHEMA_VERSION,
     authority: "claim_admission_and_planning_only",
     materialityContract: MATERIALITY_CONTRACT_V1,
-    providerExecution: "disabled",
-    searchExecution: "disabled",
-    retrievalExecution: "disabled",
-    aiExecution: "disabled",
+    providerExecution: "durable_claim_bound_executor_after_planning",
+    searchExecution: "typed_privacy_safe_search_intent_only",
+    retrievalExecution: "independent_https_retrieval_required",
+    aiExecution: "separate_investigation_and_verification_only",
     automaticKnowledgePromotion: "prohibited",
     contextualResearchDefault: "opportunistic_only_no_independent_initiation",
     businessContextAuthority: "excluded_from_canonical_materiality",
@@ -608,7 +638,7 @@ function workItem(admission: CanonicalRgClaimAdmission): CanonicalRgWorkItem {
       objective: admission.evidenceObjective })}`,
     atomicClaimId: admission.atomicClaimId,
     state: "planned",
-    executionState: "planned_provider_execution_disabled",
+    executionState: "planned_for_durable_execution",
     requestedOperation: "claim_scoped_public_research",
     materialityContractVersion: MATERIALITY_CONTRACT_V1.version,
     evidenceObjective: admission.evidenceObjective,
@@ -620,8 +650,9 @@ function workItem(admission: CanonicalRgClaimAdmission): CanonicalRgWorkItem {
     progress: { state: "not_started", operationsAttempted: 0, evidenceItemsObserved: 0 },
     extensionDecisions: [],
     retryDecisions: [],
-    resourceConsumption: { providerCalls: 0, searchCalls: 0, retrievalBytes: 0, aiCalls: 0, tokens: null },
+    resourceConsumption: { providerCalls: 0, searchCalls: 0, retrievalBytes: 0, aiCalls: 0, tokens: 0 },
     stopReason: null,
+    verifiedEvidenceRefs: [],
   };
 }
 

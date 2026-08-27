@@ -48,6 +48,25 @@ export function assertProviderOutboundPacketSafe(packet: ProviderOutboundPacketV
   if (!result.valid) throw new Error(`provider_private_payload_blocked:${result.reasonCodes.join(",")}`);
 }
 
+export function assertApprovedAiOutboundPacketSafe(packet: ProviderOutboundPacketV1): void {
+  const reasons: string[] = [];
+  let url: URL;
+  try { url = new URL(packet.url); } catch { throw new Error("approved_ai_packet_url_invalid"); }
+  if (url.protocol !== "https:" || url.username || url.password || packet.method !== "POST") reasons.push("approved_ai_packet_transport_unsafe");
+  if (packet.headerNames.some((name) => !/^[A-Za-z][A-Za-z0-9-]{0,63}$/.test(name))) reasons.push("approved_ai_packet_header_invalid");
+  if (packet.body === null || Buffer.byteLength(packet.body, "utf8") > 2_500_000) reasons.push("approved_ai_packet_body_invalid");
+  if (packet.body !== null) {
+    try {
+      const parsed = JSON.parse(packet.body) as unknown;
+      const serialized = JSON.stringify(parsed);
+      if (/(?:api[_-]?key|authorization|bearer\s+[a-z0-9]|password|secret[_-]?key)/i.test(serialized)) {
+        reasons.push("approved_ai_packet_secret_material_forbidden");
+      }
+    } catch { reasons.push("approved_ai_packet_body_invalid"); }
+  }
+  if (reasons.length > 0) throw new Error(`approved_ai_payload_blocked:${[...new Set(reasons)].sort().join(",")}`);
+}
+
 export function assertProviderSafeQuestionContext(context: ProviderSafeQuestionContextV1): void {
   const result = inspectProviderSafeQuestionContext(context);
   if (!result.valid) throw new Error(`provider_private_payload_blocked:${result.reasonCodes.join(",")}`);

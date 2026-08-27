@@ -17,8 +17,8 @@ import type { CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
 import type { CanonicalRfClaimResolution } from "./rfClaimResolution.js";
 import type { CanonicalRgWorkLedger } from "./rgWorkLedger.js";
 
-export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v5";
-export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "materiality_rg_work_ledger_v1_1";
+export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v6";
+export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "claim_bound_rg_evidence_execution_v1";
 export const ANALYSIS_RUN_POLICY_VERSION = "frozen_product_model_runtime_policy_v0_2";
 
 export const ANALYSIS_RUN_STAGE_IDS = [
@@ -54,10 +54,10 @@ export type AnalysisRunManifest = {
   executionAuthority: "production_internal_canonical" | "evaluation_non_authoritative";
   customerReportAuthority: "legacy_report_unchanged";
   persistence: "durable_versioned_stage_snapshots" | "none";
-  providerExecution: "disabled";
-  publicResearch: "disabled";
+  providerExecution: "durable_claim_bound_evidence_execution";
+  publicResearch: "typed_search_intent_dynamic_authority_validation";
   rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled";
-  rgPlanning: "durable_claim_scoped_provider_disabled";
+  rgPlanning: "durable_claim_scoped_execution_eligible";
   benchmarkExecution: "disabled";
   savingsExecution: "disabled";
   businessContextAuthority: "excluded_from_canonical_economics";

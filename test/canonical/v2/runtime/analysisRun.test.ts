@@ -39,8 +39,8 @@ describe("production canonical AnalysisRun core", () => {
       manifest: {
         executionAuthority: "production_internal_canonical",
         customerReportAuthority: "legacy_report_unchanged",
-        providerExecution: "disabled",
-        publicResearch: "disabled",
+        providerExecution: "durable_claim_bound_evidence_execution",
+        publicResearch: "typed_search_intent_dynamic_authority_validation",
         rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled",
         benchmarkExecution: "disabled",
         savingsExecution: "disabled",
@@ -108,7 +108,7 @@ describe("production canonical AnalysisRun core", () => {
     expect(partial.canonicalTruthPreserved).toBe(true);
   });
 
-  it("keeps corrected RG planning provider-disabled and outside canonical truth hashing", () => {
+  it("keeps claim-bound RG execution outside deterministic planning and canonical truth hashing", () => {
     const baseline = executeDeterministicCanonicalAnalysisRun({
       runId: "rg-hash-baseline",
       sourceDocumentRef: "rg-hash-source",
@@ -124,15 +124,15 @@ describe("production canonical AnalysisRun core", () => {
     }).run;
 
     expect(baseline.artifacts.rgWorkLedger).toMatchObject({
-      providerExecution: "disabled",
-      searchExecution: "disabled",
-      retrievalExecution: "disabled",
-      aiExecution: "disabled",
+      providerExecution: "durable_claim_bound_executor_after_planning",
+      searchExecution: "typed_privacy_safe_search_intent_only",
+      retrievalExecution: "independent_https_retrieval_required",
+      aiExecution: "separate_investigation_and_verification_only",
       operations: [],
       validation: { status: "valid" },
     });
     expect(baseline.artifacts.rgWorkLedger?.workItems.every((item) =>
-      item.executionState === "planned_provider_execution_disabled")).toBe(true);
+      item.executionState === "planned_for_durable_execution")).toBe(true);
     expect(planningFailure.stageOutcomes.rg_planning).toMatchObject({
       status: "failed",
       errors: [expect.stringContaining("injected_rg_planning_failure")],
@@ -187,7 +187,10 @@ describe("production canonical AnalysisRun core", () => {
     expect(ledger).toMatchObject({
       schemaVersion: "canonical_rg_work_ledger_v1",
       authority: "claim_admission_and_planning_only",
-      providerExecution: "disabled", searchExecution: "disabled", retrievalExecution: "disabled", aiExecution: "disabled",
+      providerExecution: "durable_claim_bound_executor_after_planning",
+      searchExecution: "typed_privacy_safe_search_intent_only",
+      retrievalExecution: "independent_https_retrieval_required",
+      aiExecution: "separate_investigation_and_verification_only",
       automaticKnowledgePromotion: "prohibited",
       contextualResearchDefault: "opportunistic_only_no_independent_initiation",
       businessContextAuthority: "excluded_from_canonical_materiality",
@@ -197,7 +200,7 @@ describe("production canonical AnalysisRun core", () => {
     expect(ledger.authoritativeStatementCostMinor)
       .toBe(run.artifacts.rd!.economicLayer.costStack.authoritativeStatementFeeTotal!.amountMinor);
     expect(ledger.workItems.length).toBeGreaterThan(0);
-    expect(ledger.workItems.every((item) => item.executionState === "planned_provider_execution_disabled"
+    expect(ledger.workItems.every((item) => item.executionState === "planned_for_durable_execution"
       && item.reservation === null && item.progress.operationsAttempted === 0
       && item.resourceConsumption.providerCalls === 0 && item.resourceConsumption.searchCalls === 0
       && item.resourceConsumption.retrievalBytes === 0 && item.resourceConsumption.aiCalls === 0)).toBe(true);

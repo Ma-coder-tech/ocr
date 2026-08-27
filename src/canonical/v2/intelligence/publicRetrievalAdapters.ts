@@ -4,9 +4,9 @@ import https from "node:https";
 import { isIP } from "node:net";
 import type { DestinationResolution, IntelligencePorts, RetrievalRequest, RetrievalResponse } from "./intelligenceTypes.js";
 import { ProviderOperationAuditLog } from "./providerAdapters.js";
-import { type InternalLiveExecutionCapabilityV1, LiveOperationTransportError, requireLiveCapabilityBinding } from "./providerPreflight.js";
+import { type LiveExecutionCapabilityV1, LiveOperationTransportError, requireLiveCapabilityBinding } from "./providerPreflight.js";
 
-export function createNodeDestinationResolutionPort(capability: InternalLiveExecutionCapabilityV1): NonNullable<IntelligencePorts["destination"]> {
+export function createNodeDestinationResolutionPort(capability: LiveExecutionCapabilityV1): NonNullable<IntelligencePorts["destination"]> {
   requireLiveCapabilityBinding(capability);
   return { async resolve(candidateId, normalizedUrl): Promise<DestinationResolution> {
     try {
@@ -19,7 +19,7 @@ export function createNodeDestinationResolutionPort(capability: InternalLiveExec
   } };
 }
 
-export function createNodeHttpsRetrievalPort(capability: InternalLiveExecutionCapabilityV1, config: { audit: ProviderOperationAuditLog; userAgent?: string }): NonNullable<IntelligencePorts["retrieval"]> {
+export function createNodeHttpsRetrievalPort(capability: LiveExecutionCapabilityV1, config: { audit: ProviderOperationAuditLog; userAgent?: string }): NonNullable<IntelligencePorts["retrieval"]> {
   const binding = requireLiveCapabilityBinding(capability);
   return { async retrieve(request): Promise<RetrievalResponse> {
     if (!request.reservationId.endsWith(":document")) throw new Error("retrieval_reservation_identity_invalid");

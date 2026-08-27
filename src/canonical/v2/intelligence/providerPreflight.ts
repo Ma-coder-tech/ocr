@@ -36,6 +36,25 @@ export type InternalLiveExecutionCapabilityV1 = Readonly<{
   languageCapability: "disabled";
 }>;
 
+export type ProductionRgExecutionCapabilityV1 = Readonly<{
+  schemaVersion: "production_rg_execution_capability_v1";
+  capabilityId: string;
+  runId: string;
+  openRouterEndpoint: typeof APPROVED_OPENROUTER_ENDPOINT;
+  openRouterSearchEngine: typeof OPENROUTER_SEARCH_ENGINE;
+  openRouterSearchConfigurationCode: typeof OPENROUTER_SEARCH_CONFIGURATION_CODE;
+  openAiEndpoint: typeof APPROVED_OPENAI_ENDPOINT;
+  searchModelCode: string;
+  modelCode: string;
+  searchResponseContractHash: string;
+  investigativeSchemaHash: string;
+  semanticSchemaHash: string;
+  authorityRegistryHash: string;
+  languageCapability: "disabled";
+}>;
+
+export type LiveExecutionCapabilityV1 = InternalLiveExecutionCapabilityV1 | ProductionRgExecutionCapabilityV1;
+
 type LiveBinding = { openRouterApiKey: string; openRouterSearchModel: string; openAiApiKey: string; model: string; clock: RuntimeClock; cancellationSignal: AbortSignal | null };
 const liveBindings = new WeakMap<object, LiveBinding>();
 const livePorts = new WeakMap<object, object>();
@@ -95,23 +114,62 @@ export async function createInternalLiveExecutionCapability(input: InternalLiveP
   return capability;
 }
 
-export function requireLiveCapabilityBinding(capability: InternalLiveExecutionCapabilityV1): LiveBinding {
+export function createProductionRgExecutionCapability(input: {
+  runId: string;
+  investigativeSchemaHash: string;
+  semanticSchemaHash: string;
+  cancellationSignal?: AbortSignal;
+}): ProductionRgExecutionCapabilityV1 {
+  if (!isSafeStructuredString(input.runId)
+    || !/^[a-f0-9]{64}$/.test(input.investigativeSchemaHash) || !/^[a-f0-9]{64}$/.test(input.semanticSchemaHash)
+    || (input.cancellationSignal !== undefined && !(input.cancellationSignal instanceof AbortSignal))) {
+    throw new Error("production_rg_preflight_identity_invalid");
+  }
+  const openRouterApiKey = requiredEnvironmentSecret(LIVE_OPENROUTER_KEY_ENV);
+  const openAiApiKey = requiredEnvironmentSecret(LIVE_OPENAI_KEY_ENV);
+  const openRouterSearchModel = requiredEnvironmentModel(LIVE_OPENROUTER_MODEL_ENV);
+  const model = requiredEnvironmentModel(LIVE_OPENAI_MODEL_ENV);
+  if (openRouterSearchModel !== APPROVED_OPENROUTER_SEARCH_MODEL) throw new Error("production_rg_search_model_not_approved");
+  const capability = Object.freeze({
+    schemaVersion: "production_rg_execution_capability_v1" as const,
+    capabilityId: `production-rg-capability-${randomUUID()}`,
+    runId: input.runId,
+    openRouterEndpoint: APPROVED_OPENROUTER_ENDPOINT,
+    openRouterSearchEngine: OPENROUTER_SEARCH_ENGINE,
+    openRouterSearchConfigurationCode: OPENROUTER_SEARCH_CONFIGURATION_CODE,
+    openAiEndpoint: APPROVED_OPENAI_ENDPOINT,
+    searchModelCode: safeModelCode(openRouterSearchModel),
+    modelCode: safeModelCode(model),
+    searchResponseContractHash: OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH,
+    investigativeSchemaHash: input.investigativeSchemaHash,
+    semanticSchemaHash: input.semanticSchemaHash,
+    authorityRegistryHash: createHash("sha256").update("dynamic_source_authority_validation_v1").digest("hex"),
+    languageCapability: "disabled" as const,
+  });
+  liveBindings.set(capability, { openRouterApiKey, openRouterSearchModel, openAiApiKey, model,
+    clock: createSystemRuntimeClock(), cancellationSignal: input.cancellationSignal ?? null });
+  return capability;
+}
+
+export function requireLiveCapabilityBinding(capability: LiveExecutionCapabilityV1): LiveBinding {
   const binding = liveBindings.get(capability);
   if (!binding || capability.openRouterEndpoint !== APPROVED_OPENROUTER_ENDPOINT || capability.openRouterSearchEngine !== OPENROUTER_SEARCH_ENGINE
     || capability.openRouterSearchConfigurationCode !== OPENROUTER_SEARCH_CONFIGURATION_CODE || capability.openAiEndpoint !== APPROVED_OPENAI_ENDPOINT
     || capability.searchModelCode !== safeModelCode(binding.openRouterSearchModel) || capability.modelCode !== safeModelCode(binding.model)
     || capability.searchResponseContractHash !== OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH
-    || capability.investigativeSchemaHash !== INVESTIGATIVE_RESPONSE_SCHEMA_HASH || capability.semanticSchemaHash !== SEMANTIC_RESPONSE_SCHEMA_HASH) {
+    || (capability.schemaVersion === "internal_live_execution_capability_v1"
+      ? capability.investigativeSchemaHash !== INVESTIGATIVE_RESPONSE_SCHEMA_HASH || capability.semanticSchemaHash !== SEMANTIC_RESPONSE_SCHEMA_HASH
+      : !/^[a-f0-9]{64}$/.test(capability.investigativeSchemaHash) || !/^[a-f0-9]{64}$/.test(capability.semanticSchemaHash))) {
     throw new Error("internal_live_execution_capability_invalid");
   }
   return binding;
 }
 
-export function bindLivePorts(capability: InternalLiveExecutionCapabilityV1, ports: IntelligencePorts): void {
+export function bindLivePorts(capability: LiveExecutionCapabilityV1, ports: IntelligencePorts): void {
   requireLiveCapabilityBinding(capability); livePorts.set(ports, capability);
 }
 
-export function assertLivePortsBound(capability: InternalLiveExecutionCapabilityV1, ports: IntelligencePorts): void {
+export function assertLivePortsBound(capability: LiveExecutionCapabilityV1, ports: IntelligencePorts): void {
   requireLiveCapabilityBinding(capability);
   if (livePorts.get(ports) !== capability || ports.clock !== requireLiveCapabilityBinding(capability).clock) throw new Error("internal_live_ports_not_capability_bound");
 }

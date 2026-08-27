@@ -60,12 +60,17 @@ describe("production worker canonical AnalysisRun integration", () => {
     expect(JSON.stringify(canonical?.result?.artifacts)).not.toContain('"businessType"');
     expect(canonical?.result?.artifacts.rgWorkLedger).toMatchObject({
       authority: "claim_admission_and_planning_only",
-      providerExecution: "disabled", searchExecution: "disabled", retrievalExecution: "disabled", aiExecution: "disabled",
+      providerExecution: "durable_claim_bound_executor_after_planning",
+      searchExecution: "typed_privacy_safe_search_intent_only",
+      retrievalExecution: "independent_https_retrieval_required",
+      aiExecution: "separate_investigation_and_verification_only",
       materialityContract: { version: "canonical_materiality_contract_v1", businessTypeAuthority: "excluded" },
       operations: [], validation: { status: "valid" },
     });
     expect(canonical?.rgClaimAdmissions.length).toBeGreaterThan(0);
     expect(canonical?.rgWorkItems.length).toBe(canonical?.result?.artifacts.rgWorkLedger!.workItems.length);
+    expect(canonical?.rgWorkItems.every((item) => item.executionState === "degraded_provider_unavailable"
+      && item.stopReason?.includes("missing"))).toBe(true);
     expect(canonical?.rgOperations).toEqual([]);
     expect(canonical?.stages).toHaveLength(10);
   }, 30_000);

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import type { ParsedDocument } from "../../../parser.js";
 import { db, nowIso } from "../../../db.js";
@@ -76,6 +76,15 @@ export type PersistedAnalysisRunRecord = {
   rgClaimAdmissions: CanonicalRgClaimAdmission[];
   rgWorkItems: CanonicalRgWorkItem[];
   rgOperations: CanonicalRgOperation[];
+  rgExecutionEvents: Array<{
+    eventId: string;
+    workItemId: string;
+    operationId: string | null;
+    eventType: string;
+    event: unknown;
+    eventHash: string;
+    createdAt: string;
+  }>;
   result: CanonicalAnalysisRun | null;
 };
 
@@ -219,9 +228,6 @@ function beginRun(input: {
           resource_json = ?, started_at = NULL, completed_at = NULL, elapsed_ms = NULL, updated_at = ?
       WHERE run_id = ?
     `).run(JSON.stringify(emptyResource(null)), now, input.runId);
-    db.prepare(`DELETE FROM canonical_rg_operations WHERE run_id = ?`).run(input.runId);
-    db.prepare(`DELETE FROM canonical_rg_work_items WHERE run_id = ?`).run(input.runId);
-    db.prepare(`DELETE FROM canonical_rg_claim_admissions WHERE run_id = ?`).run(input.runId);
   });
   transaction();
 }
@@ -256,15 +262,38 @@ function finishPersistedStage(runId: string, outcome: AnalysisRunStageOutcome, a
 }
 
 function persistRgWorkLedger(runId: string, ledger: CanonicalRgWorkLedger, now: string) {
-  db.prepare(`DELETE FROM canonical_rg_operations WHERE run_id = ?`).run(runId);
-  db.prepare(`DELETE FROM canonical_rg_work_items WHERE run_id = ?`).run(runId);
-  db.prepare(`DELETE FROM canonical_rg_claim_admissions WHERE run_id = ?`).run(runId);
+  const existingPlans = new Set((db.prepare(`SELECT DISTINCT plan_hash FROM canonical_rg_work_items WHERE run_id = ?`)
+    .all(runId) as Array<{ plan_hash: string }>).map((row) => row.plan_hash));
+  const samePlan = existingPlans.size === 0 || (existingPlans.size === 1 && existingPlans.has(ledger.planHash));
+  if (!samePlan) {
+    archiveSupersededRgExecution(runId, ledger.planHash, now);
+    db.prepare(`DELETE FROM canonical_rg_operations WHERE run_id = ?`).run(runId);
+    db.prepare(`DELETE FROM canonical_rg_work_items WHERE run_id = ?`).run(runId);
+    db.prepare(`DELETE FROM canonical_rg_claim_admissions WHERE run_id = ?`).run(runId);
+  }
   const insertClaim = db.prepare(`
     INSERT INTO canonical_rg_claim_admissions (
       run_id, atomic_claim_id, parent_claim_ids_json, claim_class, facet, opaque_subject_code, scope_fingerprint,
       statement_period_json, direction, amount_minor, authoritative_statement_cost_minor, economic_tier, decision_tier,
       materiality, research_admission, admission_json, plan_hash, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(run_id, atomic_claim_id) DO UPDATE SET
+      parent_claim_ids_json = excluded.parent_claim_ids_json,
+      claim_class = excluded.claim_class,
+      facet = excluded.facet,
+      opaque_subject_code = excluded.opaque_subject_code,
+      scope_fingerprint = excluded.scope_fingerprint,
+      statement_period_json = excluded.statement_period_json,
+      direction = excluded.direction,
+      amount_minor = excluded.amount_minor,
+      authoritative_statement_cost_minor = excluded.authoritative_statement_cost_minor,
+      economic_tier = excluded.economic_tier,
+      decision_tier = excluded.decision_tier,
+      materiality = excluded.materiality,
+      research_admission = excluded.research_admission,
+      admission_json = excluded.admission_json,
+      plan_hash = excluded.plan_hash,
+      updated_at = excluded.updated_at
   `);
   for (const claim of ledger.claimAdmissions) {
     insertClaim.run(runId, claim.atomicClaimId, JSON.stringify(claim.parentClaimIds), claim.claimClass, claim.facet,
@@ -278,6 +307,11 @@ function persistRgWorkLedger(runId: string, ledger: CanonicalRgWorkLedger, now: 
       run_id, work_item_id, atomic_claim_id, state, execution_state, requested_operation, work_item_json,
       plan_hash, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(run_id, work_item_id) DO UPDATE SET
+      atomic_claim_id = excluded.atomic_claim_id,
+      requested_operation = excluded.requested_operation,
+      plan_hash = excluded.plan_hash,
+      updated_at = excluded.updated_at
   `);
   for (const item of ledger.workItems) {
     insertWork.run(runId, item.workItemId, item.atomicClaimId, item.state, item.executionState,
@@ -291,6 +325,26 @@ function persistRgWorkLedger(runId: string, ledger: CanonicalRgWorkLedger, now: 
   for (const operation of ledger.operations) {
     insertOperation.run(runId, operation.operationId, operation.workItemId, operation.state,
       JSON.stringify(operation), ledger.planHash, now, now);
+  }
+}
+
+function archiveSupersededRgExecution(runId: string, replacementPlanHash: string, now: string) {
+  const workItems = db.prepare(`SELECT work_item_id, work_item_json, plan_hash FROM canonical_rg_work_items WHERE run_id = ?`)
+    .all(runId) as Array<{ work_item_id: string; work_item_json: string; plan_hash: string }>;
+  const operations = db.prepare(`SELECT operation_id, work_item_id, operation_json, plan_hash FROM canonical_rg_operations WHERE run_id = ?`)
+    .all(runId) as Array<{ operation_id: string; work_item_id: string; operation_json: string; plan_hash: string }>;
+  const insert = db.prepare(`INSERT INTO canonical_rg_execution_events
+    (event_id, run_id, work_item_id, operation_id, event_type, event_json, event_hash, created_at)
+    VALUES (?, ?, ?, ?, 'superseded_plan_snapshot', ?, ?, ?)`);
+  for (const item of workItems) {
+    const event = { priorPlanHash: item.plan_hash, replacementPlanHash, workItem: JSON.parse(item.work_item_json) };
+    const eventHash = createHash("sha256").update(JSON.stringify(event)).digest("hex");
+    insert.run(`rg-event-${randomUUID()}`, runId, item.work_item_id, null, JSON.stringify(event), eventHash, now);
+  }
+  for (const operation of operations) {
+    const event = { priorPlanHash: operation.plan_hash, replacementPlanHash, operation: JSON.parse(operation.operation_json) };
+    const eventHash = createHash("sha256").update(JSON.stringify(event)).digest("hex");
+    insert.run(`rg-event-${randomUUID()}`, runId, operation.work_item_id, operation.operation_id, JSON.stringify(event), eventHash, now);
   }
 }
 
@@ -323,6 +377,7 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
   const rgClaimAdmissions = mapRgClaims(runId);
   const rgWorkItems = mapRgWorkItems(runId);
   const rgOperations = mapRgOperations(runId);
+  const rgExecutionEvents = mapRgExecutionEvents(runId);
   const result = summary ? ({ ...summary, artifacts } as unknown as CanonicalAnalysisRun) : null;
   return {
     id: runId,
@@ -350,6 +405,7 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
     rgClaimAdmissions,
     rgWorkItems,
     rgOperations,
+    rgExecutionEvents,
     result,
   };
 }
@@ -400,6 +456,20 @@ function mapRgWorkItems(runId: string): CanonicalRgWorkItem[] {
 function mapRgOperations(runId: string): CanonicalRgOperation[] {
   const rows = db.prepare(`SELECT operation_json FROM canonical_rg_operations WHERE run_id = ? ORDER BY operation_id`).all(runId) as Array<{ operation_json: string }>;
   return rows.map((row) => parseJson<CanonicalRgOperation>(row.operation_json, null as never));
+}
+
+function mapRgExecutionEvents(runId: string): PersistedAnalysisRunRecord["rgExecutionEvents"] {
+  const rows = db.prepare(`SELECT * FROM canonical_rg_execution_events WHERE run_id = ? ORDER BY created_at, event_id`)
+    .all(runId) as Record<string, unknown>[];
+  return rows.map((row) => ({
+    eventId: String(row.event_id),
+    workItemId: String(row.work_item_id),
+    operationId: row.operation_id ? String(row.operation_id) : null,
+    eventType: String(row.event_type),
+    event: parseJson(row.event_json, null),
+    eventHash: String(row.event_hash),
+    createdAt: String(row.created_at),
+  }));
 }
 
 function emptyResource(elapsedMs: number | null): PersistedAnalysisRunStage["resource"] {

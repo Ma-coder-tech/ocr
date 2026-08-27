@@ -191,6 +191,17 @@ function migrate(): void {
       FOREIGN KEY (run_id, work_item_id) REFERENCES canonical_rg_work_items(run_id, work_item_id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS canonical_rg_execution_events (
+      event_id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      work_item_id TEXT NOT NULL,
+      operation_id TEXT,
+      event_type TEXT NOT NULL,
+      event_json TEXT NOT NULL,
+      event_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS canonical_rf_knowledge_audit_events (
       event_id TEXT PRIMARY KEY,
       entry_ref TEXT NOT NULL,
@@ -386,6 +397,7 @@ function migrate(): void {
     CREATE INDEX IF NOT EXISTS idx_canonical_rg_claim_semantics ON canonical_rg_claim_admissions(run_id, claim_class, facet, opaque_subject_code, scope_fingerprint);
     CREATE INDEX IF NOT EXISTS idx_canonical_rg_work_state ON canonical_rg_work_items(run_id, state, execution_state);
     CREATE INDEX IF NOT EXISTS idx_canonical_rg_operation_state ON canonical_rg_operations(run_id, state);
+    CREATE INDEX IF NOT EXISTS idx_canonical_rg_execution_events ON canonical_rg_execution_events(run_id, work_item_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_claim ON canonical_rf_knowledge_entries(claim_type, subject_code, lifecycle);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_visibility ON canonical_rf_knowledge_entries(visibility, tenant_ref, account_ref);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_effective_period ON canonical_rf_knowledge_entries(effective_from, effective_to);
