@@ -56,6 +56,14 @@ describe("Canonical Economics V2 RD participants and independent control roles",
     const proven = buildCanonicalEconomicsV2EconomicAnalysis(provenInput);
 
     expect(proven.validation.status).toBe("valid");
+    expect(proven.economicLayer.roleClaims.find((claim) => claim.dimension === "price_setter")).toMatchObject({
+      resolution: "proven", derivabilityTier: "stated_on_statement", assertionBasis: "source_fact",
+      evidenceRefs: [evidenceRef], externalEvidenceRefs: [], semanticApplicationRef: null,
+    });
+    expect(proven.economicLayer.participants.find((participant) => participant.id === "economic_participant_001")).toMatchObject({
+      roleResolution: "proven", derivabilityTier: "stated_on_statement", assertionBasis: "source_fact",
+      evidenceRefs: [evidenceRef], externalEvidenceRefs: [], semanticApplicationRef: null,
+    });
     expect(bucket(proven, "processor_controlled_pricing").netAmount.amountMinor).toBe(3100);
     expect(bucket(proven, "unresolved_cost").netAmount.amountMinor).toBe(0);
     expect(proven.economicLayer.costStack.completeness).toBe("complete");

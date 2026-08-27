@@ -303,7 +303,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   if (artifacts.rc && (artifacts.rc.validation.status === "valid" || input.evaluationContinueInvalidStages)) {
     try {
       const applications = artifacts.rfResolution?.validation.status === "valid"
-        ? artifacts.rfResolution.categoryApplications
+        ? artifacts.rfResolution.semanticApplications
         : [];
       const resolvedRd = applications.length === 0 && provisionalRd ? provisionalRd
         : buildSemanticTailRd({ pricing: artifacts.rc, applications, builder: builders.economic });
@@ -546,7 +546,7 @@ function stageClaimRef(stage: AnalysisRunStageId) {
     rb: { claimRef: "rb.financial_truth", evidenceObjective: "Build and validate source-grounded financial populations and reconciliation.", expectedDecisionEffect: "Admit only independently proven financial facts." },
     rc: { claimRef: "rc.pricing_architecture", evidenceObjective: "Preserve observed pricing components without importing unsupported semantics.", expectedDecisionEffect: "Resolve or withhold each pricing axis." },
     rf_resolution: { claimRef: "rf.claim_specific_resolution", evidenceObjective: "Resolve exact canonical semantic dependencies against an immutable, scoped, effective-dated admitted-knowledge snapshot.", expectedDecisionEffect: "Apply only independently admitted category mappings and preserve every adjacent unresolved claim." },
-    rd: { claimRef: "rd.economic_ledger", evidenceObjective: "Build the direction-preserving economic ledger and apply only exact admitted RF category applications.", expectedDecisionEffect: "Preserve charges while resolving or withholding category independently from ownership, control, and actionability." },
+    rd: { claimRef: "rd.economic_ledger", evidenceObjective: "Build the direction-preserving economic ledger and apply only exact losslessly representable admitted RF semantic applications.", expectedDecisionEffect: "Preserve charges while resolving or withholding each category, ownership, and control facet independently." },
     re: { claimRef: "re.economic_synthesis", evidenceObjective: "Build only evidence-permitted drivers, counterfactuals, levers, and themes.", expectedDecisionEffect: "Resolve or withhold synthesis claims independently." },
     claim_inventory: { claimRef: "runtime.unresolved_claim_inventory", evidenceObjective: "Project the final typed unresolved dependencies after RF without executing RG, providers, or research.", expectedDecisionEffect: "Provide the later RG input while preserving every remaining claim-specific authority ceiling." },
     rg_planning: { claimRef: "rg.claim_admission_and_work_ledger", evidenceObjective: "Evaluate versioned claim-atomic materiality and durably plan only admitted material work against the bound RF context.", expectedDecisionEffect: "Admit bounded claim-specific RG work without executing providers, search, retrieval, AI, or changing canonical truth." },

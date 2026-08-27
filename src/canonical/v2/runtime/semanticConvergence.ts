@@ -1,9 +1,4 @@
 import { canonicalJson } from "../canonicalJson.js";
-import type {
-  CanonicalEconomicCategory,
-  CanonicalEconomicControlDimension,
-  CanonicalEconomicParticipantRole,
-} from "../economicTypes.js";
 import type { CanonicalEconomicSemanticApplicationAdmission } from "../economicAnalysis.js";
 import { resolveKnowledge } from "../knowledge/knowledgeResolver.js";
 import type { KnowledgeClaimValue, KnowledgeEntry } from "../knowledge/knowledgeTypes.js";
@@ -34,21 +29,7 @@ import {
   type CanonicalSemanticApplicationDisposition,
   type CanonicalSemanticConvergenceRevision,
 } from "./semanticConvergenceTypes.js";
-
-const APPROVED_CATEGORIES = new Set<Exclude<CanonicalEconomicCategory, "unresolved_unclassified">>([
-  "issuer_interchange_economics", "network_card_brand_economics", "processor_acquirer_pricing",
-  "processor_service_administrative_cost", "third_party_service_equipment",
-  "operational_exception_penalty_fee", "processing_fee_tax", "other_source_grounded_fee",
-]);
-const APPROVED_PARTICIPANT_ROLES = new Set<CanonicalEconomicParticipantRole>([
-  "merchant", "processor_platform", "acquirer", "iso_reseller_agent", "gateway", "network_card_brand",
-  "issuer_interchange_system", "debit_network", "service_provider", "equipment_lessor", "funding_provider",
-  "rule_regulatory_authority",
-]);
-const SUPPORTED_ROLE_FACETS = new Set<Exclude<CanonicalEconomicControlDimension, "constraint">>([
-  "economic_beneficiary", "economic_owner", "collector", "billing_intermediary", "rule_setter", "price_setter",
-  "negotiator_change_authority", "contractual_controller",
-]);
+import { canonicalSemanticValueApplicable, LOSSLESS_ROLE_FACETS } from "./atomicClaims.js";
 
 export type CanonicalSemanticConvergenceResult = {
   run: CanonicalAnalysisRun;
@@ -248,9 +229,11 @@ function resolveApplications(input: {
   const applications: CanonicalEconomicSemanticApplicationAdmission[] = [];
   const decisions: CanonicalSemanticApplicationDisposition[] = [];
   const run = input.persisted.result!;
+  const claimsRequiringReevaluation = new Set(input.persisted.rgClaimAdmissions.map((item) => item.atomicClaimId));
   const priorDecisionByClaim = new Map(input.persisted.semanticRevisions.at(-1)?.applications
     .map((item) => [item.atomicClaimId, item] as const) ?? []);
   for (const existing of run.artifacts.rd?.economicLayer.semanticApplications ?? []) {
+    if (claimsRequiringReevaluation.has(existing.atomicClaimId)) continue;
     const admission = { ...structuredClone(existing), key: existing.id };
     delete (admission as { id?: string }).id;
     applications.push(admission);
@@ -353,18 +336,13 @@ function applicationsFor(admission: CanonicalRgClaimAdmission, run: CanonicalAna
 }
 
 function valueApplicable(value: KnowledgeClaimValue | null, admission: CanonicalRgClaimAdmission): value is KnowledgeClaimValue {
-  if (!value) return false;
-  if (admission.facet === "economic_category") return value.kind === "mapping" &&
-    value.sourceCode === admission.knowledgeQuery?.subjectCode && APPROVED_CATEGORIES.has(value.canonicalCode as never);
-  if (!SUPPORTED_ROLE_FACETS.has(admission.facet as never) || value.kind !== "role" ||
-    value.controlDimension !== admission.facet) return false;
-  return value.state === "proven" ? value.participantRole !== null && APPROVED_PARTICIPANT_ROLES.has(value.participantRole)
-    : value.state === "not_applicable" && value.participantRole === null;
+  return canonicalSemanticValueApplicable({ facet: admission.facet,
+    subjectCode: admission.knowledgeQuery?.subjectCode ?? "", value });
 }
 
 function representabilityReason(admission: CanonicalRgClaimAdmission): string | null {
   if (!admission.knowledgeQuery && (admission.facet === "economic_category" ||
-    SUPPORTED_ROLE_FACETS.has(admission.facet as never))) return "exact_knowledge_scope_unavailable";
+    LOSSLESS_ROLE_FACETS.has(admission.facet))) return "exact_knowledge_scope_unavailable";
   if (admission.facet === "constraint") return "constraint_requires_canonical_constraint_payload";
   if (admission.facet === "merchant_lever") return "boolean_lever_does_not_define_action_or_prerequisites";
   if (["underlying_cost_billing_mode", "merchant_price_schedule_shape", "pricing_scope_uniformity"].includes(admission.facet)) {

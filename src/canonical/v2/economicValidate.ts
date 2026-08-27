@@ -1,6 +1,7 @@
 import type { CanonicalEconomicCharge, CanonicalEconomicCostBucketKind, CanonicalEconomicsV2EconomicAnalysis } from "./economicTypes.js";
 import { RD_SEMANTIC_AMENDMENT_IDS } from "./economicVersionManifest.js";
 import { FISERV_FEE_LEDGER_OCCURRENCE_MARKER } from "./fiservAdapter.js";
+import { canonicalRoleProofRouteSatisfied } from "./economicProofRoutes.js";
 
 const EXPECTED_BUCKETS = [
   "issuer_interchange_cost",
@@ -125,7 +126,11 @@ export function validateCanonicalEconomicsV2EconomicAnalysis(
       }
       if (participant.periodApplicability !== "applicable") errors.push(`Proven participant roles ${participant.id} must be period-applicable.`);
       if (!POSITIVE_BASES.has(participant.assertionBasis) || participant.assertionBasis === "ai_hypothesis") errors.push(`Participant ${participant.id} roles use a non-proving assertion basis.`);
-      if (!POSITIVE_TIERS.has(participant.derivabilityTier)) errors.push(`Proven participant roles ${participant.id} use an unresolved derivability tier.`);
+      if (!canonicalRoleProofRouteSatisfied({ derivabilityTier: participant.derivabilityTier,
+        assertionBasis: participant.assertionBasis, sourceEvidenceRefs: participant.evidenceRefs,
+        externalEvidenceRefs: participant.externalEvidenceRefs, semanticApplication: application })) {
+        errors.push(`Proven participant roles ${participant.id} have inconsistent derivability and evidence provenance.`);
+      }
     }
     if (participant.identityStatus === "proven" && (participant.identity === null || participant.evidenceRefs.length === 0)) {
       errors.push(`Proven participant ${participant.id} requires identity and evidence.`);
@@ -180,7 +185,11 @@ export function validateCanonicalEconomicsV2EconomicAnalysis(
       if (claim.periodApplicability !== "applicable") errors.push(`Proven role claim ${claim.id} must be period-applicable.`);
       if (!POSITIVE_BASES.has(claim.assertionBasis)) errors.push(`Proven role claim ${claim.id} uses a non-proving assertion basis.`);
       if (claim.assertionBasis === "ai_hypothesis") errors.push(`AI cannot prove role claim ${claim.id}.`);
-      if (!POSITIVE_TIERS.has(claim.derivabilityTier)) errors.push(`Proven role claim ${claim.id} uses an unresolved derivability tier.`);
+      if (!canonicalRoleProofRouteSatisfied({ derivabilityTier: claim.derivabilityTier,
+        assertionBasis: claim.assertionBasis, sourceEvidenceRefs: claim.evidenceRefs,
+        externalEvidenceRefs: claim.externalEvidenceRefs, semanticApplication: application })) {
+        errors.push(`Proven role claim ${claim.id} has inconsistent derivability and evidence provenance.`);
+      }
       if (claim.participantRef && participantById.get(claim.participantRef)?.roleResolution !== "proven") {
         errors.push(`Proven role claim ${claim.id} requires positively evidenced participant roles.`);
       }

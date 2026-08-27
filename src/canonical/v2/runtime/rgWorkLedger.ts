@@ -19,10 +19,10 @@ import {
   type EconomicMaterialityEvaluation,
 } from "./materialityContract.js";
 import {
+  atomicClaimIdForSeed,
   canonicalAtomicClaimGroupingKey,
-  canonicalAtomicClaimId,
-  canonicalFacetSubjectCode,
-  facetsForUnresolvedClaimClass,
+  compileCanonicalAtomicClaimSeeds,
+  type CanonicalAtomicClaimSeed,
   type CanonicalAtomicClaimFacet,
 } from "./atomicClaims.js";
 
@@ -169,14 +169,6 @@ export type CanonicalRgWorkLedger = {
   validation: { status: "valid" | "invalid"; errors: string[]; warnings: string[] };
 };
 
-type AtomSeed = {
-  parent: CanonicalUnresolvedClaim;
-  facet: CanonicalAtomicClaimFacet;
-  opaqueSubjectCode: string;
-  scopeFingerprint: string;
-  knowledgeQuery: KnowledgeQuery | null;
-};
-
 export type CanonicalAtomicDecisionEvaluation = {
   tier: DecisionMaterialityTier;
   reasonCodes: string[];
@@ -197,7 +189,10 @@ export function buildCanonicalRgWorkLedger(input: {
   const rfAvailability = input.rfResolution?.knowledgeBinding.availability ?? "unavailable";
   const rfDecisions = input.rfResolution?.decisions ?? [];
   const categoryDecisionByCharge = categoryDecisionIndex(rfDecisions);
-  const seeds = input.inventory.claims.flatMap((claim) => atomSeeds(claim, categoryDecisionByCharge));
+  const seeds = input.inventory.claims.flatMap((claim) => compileCanonicalAtomicClaimSeeds({
+    claim,
+    categoryQuery: claim.canonicalRefs.map((ref) => categoryDecisionByCharge.get(ref)?.query ?? null).find(Boolean) ?? null,
+  }));
   const groups = groupSeeds(seeds, period);
   const admissions = [...groups.values()].map((group) => admissionForGroup({
     group, authoritativeCost, period, rfAvailability, economic: input.economic, synthesis: input.synthesis,
@@ -244,47 +239,6 @@ export function buildCanonicalRgWorkLedger(input: {
   };
 }
 
-function atomSeeds(
-  claim: CanonicalUnresolvedClaim,
-  categoryDecisionByCharge: Map<string, CanonicalRfClaimDecision>,
-): AtomSeed[] {
-  const withheld = new Set((claim.researchWithheldFacets ?? []).map((item) => item.facet));
-  const facets = (claim.unresolvedFacets?.length > 0 ? claim.unresolvedFacets : facetsForUnresolvedClaimClass(claim.claimClass))
-    .filter((facet) => !withheld.has(facet));
-  const categoryDecision = claim.canonicalRefs.map((ref) => categoryDecisionByCharge.get(ref)).find(Boolean);
-  const categoryQuery = categoryDecision?.query ?? null;
-  const baseSubject = categoryQuery?.subjectCode.replace(/^economic_category_/, "economic_charge_")
-    ?? `canonical_subject_${digest({ claimClass: claim.claimClass, canonicalRefs: claim.canonicalRefs,
-      occurrenceRefs: claim.occurrenceRefs }).slice(0, 32)}`;
-  const scopeFingerprint = (categoryQuery ? digest(categoryQuery.scope) : digest({
-    boundary: "canonical_claim_lineage_only", canonicalRefs: claim.canonicalRefs, occurrenceRefs: claim.occurrenceRefs,
-  })).slice(0, 32);
-  return facets.map((facet) => ({
-    parent: claim,
-    facet,
-    opaqueSubjectCode: canonicalFacetSubjectCode(baseSubject, facet),
-    scopeFingerprint,
-    knowledgeQuery: queryForFacet(facet, baseSubject, categoryQuery),
-  }));
-}
-
-function queryForFacet(
-  facet: CanonicalAtomicClaimFacet,
-  baseSubject: string,
-  categoryQuery: KnowledgeQuery | null,
-): KnowledgeQuery | null {
-  if (!categoryQuery) return null;
-  if (facet === "economic_category") return categoryQuery;
-  if (["economic_beneficiary", "economic_owner", "collector", "billing_intermediary", "rule_setter", "price_setter",
-    "negotiator_change_authority", "contractual_controller", "constraint"].includes(facet)) {
-    return { ...categoryQuery, claimType: "participant_control_role", subjectCode: canonicalFacetSubjectCode(baseSubject, facet) };
-  }
-  if (facet === "merchant_lever") {
-    return { ...categoryQuery, claimType: "merchant_lever_availability", subjectCode: canonicalFacetSubjectCode(baseSubject, facet) };
-  }
-  return null;
-}
-
 function categoryDecisionIndex(decisions: readonly CanonicalRfClaimDecision[]): Map<string, CanonicalRfClaimDecision> {
   const output = new Map<string, CanonicalRfClaimDecision>();
   for (const decision of decisions) {
@@ -294,8 +248,8 @@ function categoryDecisionIndex(decisions: readonly CanonicalRfClaimDecision[]): 
   return output;
 }
 
-function groupSeeds(seeds: AtomSeed[], statementPeriod: { start: string; end: string } | null): Map<string, AtomSeed[]> {
-  const groups = new Map<string, AtomSeed[]>();
+function groupSeeds(seeds: CanonicalAtomicClaimSeed[], statementPeriod: { start: string; end: string } | null): Map<string, CanonicalAtomicClaimSeed[]> {
+  const groups = new Map<string, CanonicalAtomicClaimSeed[]>();
   for (const seed of seeds) {
     const direction = seed.parent.amountUnderReview?.direction ?? "not_monetary";
     const period = canonicalJson(statementPeriod);
@@ -309,7 +263,7 @@ function groupSeeds(seeds: AtomSeed[], statementPeriod: { start: string; end: st
 }
 
 function admissionForGroup(input: {
-  group: AtomSeed[];
+  group: CanonicalAtomicClaimSeed[];
   authoritativeCost: number | null;
   period: { start: string; end: string } | null;
   rfAvailability: "available" | "unavailable";
@@ -327,10 +281,7 @@ function admissionForGroup(input: {
   const decision = decisionTier(first, input.economic, input.synthesis);
   const materiality = combineMaterialityAxes(magnitude.tier, decision.tier);
   const research = researchRoute(first, materiality, input.rfAvailability);
-  const atomicClaimId = canonicalAtomicClaimId({ groupingKey: canonicalAtomicClaimGroupingKey({
-    claimClass: first.parent.claimClass, facet: first.facet, opaqueSubjectCode: first.opaqueSubjectCode,
-    scopeFingerprint: first.scopeFingerprint, period: canonicalJson(input.period), direction,
-  }) });
+  const atomicClaimId = atomicClaimIdForSeed(first, input.period);
   return {
     atomicClaimId,
     parentClaimIds,
@@ -358,7 +309,7 @@ function admissionForGroup(input: {
   };
 }
 
-function groupMagnitude(group: AtomSeed[]): number | null {
+function groupMagnitude(group: CanonicalAtomicClaimSeed[]): number | null {
   if (group.some((seed) => seed.parent.amountUnderReview === null)) return null;
   return aggregateAtomicClaimMagnitude(group.map((seed) => ({
     canonicalSubjectRefs: seed.parent.canonicalRefs,
@@ -383,7 +334,7 @@ export function aggregateAtomicClaimMagnitude(entries: readonly {
 }
 
 function decisionTier(
-  seed: AtomSeed,
+  seed: CanonicalAtomicClaimSeed,
   economic: CanonicalEconomicsV2EconomicAnalysis | null,
   synthesis: CanonicalEconomicsV2SynthesisAnalysis | null,
 ): CanonicalAtomicDecisionEvaluation {
@@ -464,7 +415,7 @@ function directFacetDecision(facet: CanonicalAtomicClaimFacet): CanonicalAtomicD
 }
 
 function exactLeverDecision(
-  seed: AtomSeed,
+  seed: CanonicalAtomicClaimSeed,
   economic: CanonicalEconomicsV2EconomicAnalysis | null,
   synthesis: CanonicalEconomicsV2SynthesisAnalysis | null,
 ): CanonicalAtomicDecisionEvaluation | null {
@@ -549,7 +500,7 @@ function allRequiredDimensionsProven(
   return required.every((dimension) => proven.has(dimension));
 }
 
-function researchRoute(seed: AtomSeed, materiality: CanonicalClaimMateriality, rfAvailability: "available" | "unavailable") {
+function researchRoute(seed: CanonicalAtomicClaimSeed, materiality: CanonicalClaimMateriality, rfAvailability: "available" | "unavailable") {
   const query = seed.knowledgeQuery;
   if (rfAvailability === "unavailable") return route("withheld_rf_catalog_unavailable", null, []);
   if (materiality === "contextual") return route("contextual_opportunistic_only", query, authoritiesFor(query?.claimType));

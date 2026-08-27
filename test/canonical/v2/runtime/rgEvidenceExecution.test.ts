@@ -5,7 +5,8 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { unboundedKnowledgeScope, type KnowledgeAuditEvent, type KnowledgeEntry } from "../../../../src/canonical/v2/index.js";
+import { unboundedKnowledgeScope, validateCanonicalEconomicsV2EconomicAnalysis,
+  type KnowledgeAuditEvent, type KnowledgeEntry } from "../../../../src/canonical/v2/index.js";
 import { admittedKnowledge } from "../knowledge/knowledgeFixtures.js";
 
 import type {
@@ -397,6 +398,9 @@ describe("production durable claim-bound RG evidence execution", () => {
     });
     expect(application.value).toMatchObject({ kind: "mapping", canonicalCode: "other_source_grounded_fee" });
     expect(charge).toMatchObject({ category: "other_source_grounded_fee", categoryResolution: "proven" });
+    expect(charge.limitations.join(" ")).toContain("Verified current-run external evidence resolves only this charge's economic category");
+    expect(charge.limitations.join(" ")).not.toContain("Admitted RF knowledge");
+    expect(application.limitations.join(" ")).not.toContain("Admitted RF knowledge");
     expect(convergence.run.artifacts.rb!.sourceModel.evidence.map((item) => item.id))
       .not.toContain(execution.verifiedEvidence[0]!.evidenceId);
     expect(convergence.run.financialFoundationHash).toBe(beforeFinancial);
@@ -433,8 +437,20 @@ describe("production durable claim-bound RG evidence execution", () => {
 
     expect(convergence.run.artifacts.rd!.validation).toMatchObject({ status: "valid", errors: [] });
     expect(roleClaim).toMatchObject({ dimension: "price_setter", resolution: "proven",
-      externalEvidenceRefs: [evidence.verifiedEvidence[0]!.evidenceId] });
-    expect(participant).toMatchObject({ identity: null, identityStatus: "unresolved", roles: ["processor_platform"] });
+      derivabilityTier: "requires_external_rule_or_schedule", assertionBasis: "external_verified",
+      externalEvidenceRefs: [evidence.verifiedEvidence[0]!.evidenceId], semanticApplicationRef: expect.any(String) });
+    expect(participant).toMatchObject({ identity: null, identityStatus: "unresolved", roles: ["processor_platform"],
+      roleResolution: "proven", derivabilityTier: "requires_external_rule_or_schedule", assertionBasis: "external_verified",
+      externalEvidenceRefs: [evidence.verifiedEvidence[0]!.evidenceId], semanticApplicationRef: roleClaim.semanticApplicationRef });
+    expect(layer.semanticApplications.find((item) => item.id === roleClaim.semanticApplicationRef)).toMatchObject({
+      sourceKind: "current_run_verified_rg_evidence", externalEvidenceRefs: [evidence.verifiedEvidence[0]!.evidenceId],
+      selectedEntryRefs: [], knowledgeSnapshotHash: null,
+    });
+    const falselyStatementDerived = structuredClone(convergence.run.artifacts.rd!);
+    falselyStatementDerived.economicLayer.roleClaims.find((item) => item.id === roleClaim.id)!.derivabilityTier =
+      "inferable_from_statement_with_qualification";
+    expect(validateCanonicalEconomicsV2EconomicAnalysis(falselyStatementDerived).validation.errors)
+      .toContain(`Proven role claim ${roleClaim.id} has inconsistent derivability and evidence provenance.`);
     expect(layer.participants).toHaveLength(1);
     const remainingFacets = unresolvedForCharge.flatMap((item) => item.unresolvedFacets);
     expect(remainingFacets).not.toContain("price_setter");
@@ -486,9 +502,11 @@ describe("production durable claim-bound RG evidence execution", () => {
       WHERE run_id = ?`).run(setup.run.runId)).toThrow("canonical_semantic_revision_is_immutable");
   }, 30_000);
 
-  it("withholds an exact role claim when verified current-run evidence contradicts the immutable bound RF answer", async () => {
+  it("exhausts an exact bound-RF role before RG while withholding deliberately replayed contradictory evidence", async () => {
     const discovery = await runWithOneWorkItem("price_setter");
-    const discovered = discovery.store.getPersistedAnalysisRun(discovery.run.runId)!.rgClaimAdmissions[0]!;
+    const discoveredRun = discovery.store.getPersistedAnalysisRun(discovery.run.runId)!;
+    const discovered = discoveredRun.rgClaimAdmissions[0]!;
+    const discoveredWork = discoveredRun.rgWorkItems[0]!;
     const query = discovered.knowledgeQuery!;
     const catalog = await import("../../../../src/canonical/v2/runtime/rfKnowledgeCatalog.js");
     const admitted = admittedKnowledge({
@@ -513,9 +531,61 @@ describe("production durable claim-bound RG evidence execution", () => {
       fileType: "pdf", businessType: "retail" });
     const secondRun = discovery.store.executeDurableCanonicalAnalysisRun({ jobId: secondJob.id, document: discovery.document });
     const secondPersisted = discovery.store.getPersistedAnalysisRun(secondRun.runId)!;
-    const target = secondPersisted.rgClaimAdmissions.find((item) => item.facet === "price_setter" &&
-      item.knowledgeQuery?.subjectCode === query.subjectCode)!;
-    const targetWork = secondPersisted.rgWorkItems.find((item) => item.atomicClaimId === target.atomicClaimId)!;
+    const rfApplication = secondPersisted.result!.artifacts.rfResolution!.roleApplications.find((item) =>
+      item.facet === "price_setter" && item.knowledgeSubjectCode === query.subjectCode)!;
+    const rfDecision = secondPersisted.result!.artifacts.rfResolution!.atomicDecisions.find((item) =>
+      item.atomicClaimId === rfApplication.atomicClaimId)!;
+    const rfRole = secondPersisted.result!.artifacts.rd!.economicLayer.roleClaims.find((item) =>
+      item.chargeRef === rfApplication.chargeRef && item.dimension === "price_setter")!;
+
+    expect(rfDecision.disposition).toBe("resolved_by_admitted_knowledge");
+    expect(secondPersisted.rgClaimAdmissions.some((item) => item.atomicClaimId === rfApplication.atomicClaimId)).toBe(false);
+    expect(secondPersisted.rgWorkItems.some((item) => item.atomicClaimId === rfApplication.atomicClaimId)).toBe(false);
+    expect(secondPersisted.rgOperations.some((item) => item.atomicClaimId === rfApplication.atomicClaimId)).toBe(false);
+    expect(secondPersisted.rgClaimAdmissions.some((item) => item.canonicalRefs.includes(rfApplication.chargeRef) &&
+      item.facet !== "price_setter")).toBe(true);
+    expect(secondPersisted.rgWorkItems.some((item) => secondPersisted.rgClaimAdmissions.some((admission) =>
+      admission.atomicClaimId === item.atomicClaimId && admission.canonicalRefs.includes(rfApplication.chargeRef) &&
+      admission.facet !== "price_setter"))).toBe(true);
+    expect(rfRole).toMatchObject({ resolution: "proven", derivabilityTier: "requires_external_rule_or_schedule",
+      assertionBasis: "rule_application", externalEvidenceRefs: [], semanticApplicationRef: expect.any(String) });
+    expect(secondPersisted.result!.artifacts.rd!.economicLayer.semanticApplications.find((item) =>
+      item.id === rfRole.semanticApplicationRef)).toMatchObject({
+      sourceKind: "governed_rf_snapshot", selectedEntryRefs: [admitted.id],
+      sourceAuthorities: ["processor_publication"], externalEvidenceRefs: [],
+      atomicClaimId: rfApplication.atomicClaimId, facet: "price_setter",
+    });
+
+    const target = {
+      ...discovered,
+      atomicClaimId: rfApplication.atomicClaimId,
+      parentClaimIds: rfDecision.parentClaimIds,
+      facet: "price_setter" as const,
+      opaqueSubjectCode: rfApplication.knowledgeSubjectCode,
+      scopeFingerprint: rfApplication.scopeFingerprint,
+      statementPeriod: secondPersisted.result!.artifacts.rb!.identity.statementPeriod,
+      canonicalRefs: rfDecision.canonicalRefs,
+      occurrenceRefs: rfDecision.occurrenceRefs,
+      knowledgeQuery: rfDecision.query,
+      expectedKnowledgeValueConstraint: { kind: "role" as const, controlDimension: "price_setter" as const },
+    };
+    const targetWork = {
+      ...discoveredWork,
+      workItemId: `legacy-${discoveredWork.workItemId}`,
+      atomicClaimId: target.atomicClaimId,
+      knowledgeQuery: target.knowledgeQuery!,
+      expectedKnowledgeValueConstraint: target.expectedKnowledgeValueConstraint,
+      reservation: null,
+      progress: { state: "not_started" as const, operationsAttempted: 0, evidenceItemsObserved: 0 },
+      extensionDecisions: [], retryDecisions: [],
+      resourceConsumption: { providerCalls: 0, searchCalls: 0, retrievalBytes: 0, aiCalls: 0, tokens: null },
+      stopReason: null, verifiedEvidenceRefs: [],
+    };
+    discovery.store.persistRgWorkLedger(secondRun.runId, {
+      ...secondPersisted.result!.artifacts.rgWorkLedger!,
+      claimAdmissions: [target],
+      workItems: [targetWork],
+    }, "2026-08-27T00:00:00.000Z");
     discovery.db.db.prepare(`DELETE FROM canonical_rg_work_items WHERE run_id = ? AND work_item_id <> ?`)
       .run(secondRun.runId, targetWork.workItemId);
     discovery.db.db.prepare(`DELETE FROM canonical_rg_claim_admissions WHERE run_id = ? AND atomic_claim_id <> ?`)

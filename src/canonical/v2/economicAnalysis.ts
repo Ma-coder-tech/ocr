@@ -32,6 +32,7 @@ import type {
 } from "./pricingTypes.js";
 import type { CanonicalEconomicsV2SourceOccurrence } from "./types.js";
 import { validateCanonicalEconomicsV2EconomicAnalysis } from "./economicValidate.js";
+import { canonicalRoleProofRouteSatisfied } from "./economicProofRoutes.js";
 
 export type CanonicalEconomicParticipantAdmission = {
   key: string;
@@ -212,8 +213,9 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
     const sourceEvidenceRefs = validRefs(item.evidenceRefs ?? [], evidenceIds);
     const externalEvidenceRefs = validRefs(item.externalEvidenceRefs ?? [], externalEvidenceIds);
     const semanticApplication = item.semanticApplicationKey ? semanticApplicationAdmissionByKey.get(item.semanticApplicationKey) : null;
-    const roleEvidenceAllowed = provenIdentityAllowed && PROVING_TIERS.has(item.derivabilityTier) && participantPeriodApplicability === "applicable" &&
-      (sourceEvidenceRefs.length + externalEvidenceRefs.length > 0 || semanticApplication?.sourceKind === "governed_rf_snapshot");
+    const roleEvidenceAllowed = provenIdentityAllowed && participantPeriodApplicability === "applicable" &&
+      canonicalRoleProofRouteSatisfied({ derivabilityTier: item.derivabilityTier, assertionBasis: item.assertionBasis,
+        sourceEvidenceRefs, externalEvidenceRefs, semanticApplication });
     const roleResolution = sourceUnavailable
       ? "unavailable"
       : (item.roleResolution ?? "unresolved") === "proven" && !roleEvidenceAllowed
@@ -293,9 +295,9 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
     const sourceEvidenceRefs = validRefs(item.evidenceRefs ?? [], evidenceIds);
     const externalEvidenceRefs = validRefs(item.externalEvidenceRefs ?? [], externalEvidenceIds);
     const semanticApplication = item.semanticApplicationKey ? semanticApplicationAdmissionByKey.get(item.semanticApplicationKey) : null;
-    const positiveEvidenceAllowed = admissionAuthorityAllowed && !sourceUnavailable && PROVING_BASES.has(item.assertionBasis) && PROVING_TIERS.has(item.derivabilityTier) &&
-      item.assertionBasis !== "ai_hypothesis" &&
-      (sourceEvidenceRefs.length + externalEvidenceRefs.length > 0 || semanticApplication?.sourceKind === "governed_rf_snapshot");
+    const positiveEvidenceAllowed = admissionAuthorityAllowed && !sourceUnavailable && item.assertionBasis !== "ai_hypothesis" &&
+      canonicalRoleProofRouteSatisfied({ derivabilityTier: item.derivabilityTier, assertionBasis: item.assertionBasis,
+        sourceEvidenceRefs, externalEvidenceRefs, semanticApplication });
     const claimPeriodApplicability = item.effectiveFrom || item.effectiveTo
       ? periodApplicability(
           foundation.identity.statementPeriod,
@@ -557,7 +559,7 @@ function chargeFromAdmission(input: {
       ...(applicable !== "applicable" ? ["Statement-period applicability is not proven."] : []),
       ...(!dependenciesSatisfied ? ["A required economic-charge dependency is not satisfied by admitted evidence."] : []),
       ...(categoryResolution === "proven" && !semanticApplicationPermitsCategory
-        ? ["The requested category lacked an exact admitted RF knowledge application."]
+        ? ["The requested category lacked an exact admitted canonical semantic application."]
         : []),
       ...(input.observational ? ["Observational evidence cannot self-promote into authoritative economic charge truth."] : []),
     ]),

@@ -6,6 +6,7 @@ import type { CanonicalEconomicSemanticApplicationAdmission } from "../economicA
 import type { CanonicalEconomicsV2EconomicAnalysis } from "../economicTypes.js";
 import { resolveKnowledge } from "../knowledge/knowledgeResolver.js";
 import type {
+  KnowledgeClaimValue,
   KnowledgeEntry,
   KnowledgeQuery,
   KnowledgeQueryScope,
@@ -14,10 +15,19 @@ import type {
 } from "../knowledge/knowledgeTypes.js";
 import { validateKnowledgeLibrary } from "../knowledge/knowledgeValidate.js";
 import { normalizeObservationLabel } from "../sourceLabelIdentity.js";
-import { canonicalAtomicClaimGroupingKey, canonicalAtomicClaimId } from "./atomicClaims.js";
+import {
+  atomicClaimIdForSeed,
+  canonicalAtomicClaimGroupingKey,
+  canonicalAtomicClaimId,
+  canonicalSemanticValueApplicable,
+  compileCanonicalAtomicClaimSeeds,
+  LOSSLESS_ROLE_FACETS,
+  type CanonicalAtomicClaimFacet,
+  type CanonicalAtomicClaimSeed,
+} from "./atomicClaims.js";
 import type { CanonicalUnresolvedClaim, CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
 
-export const CANONICAL_RF_RESOLUTION_SCHEMA_VERSION = "canonical_rf_claim_resolution_v2" as const;
+export const CANONICAL_RF_RESOLUTION_SCHEMA_VERSION = "canonical_rf_claim_resolution_v3" as const;
 
 const APPLICABLE_CATEGORIES = new Set<CanonicalEconomicCategory>([
   "issuer_interchange_economics",
@@ -75,7 +85,7 @@ export type CanonicalRfClaimDecision = {
 export type CanonicalRfClaimResolution = {
   schemaVersion: typeof CANONICAL_RF_RESOLUTION_SCHEMA_VERSION;
   authority: "claim_specific_admitted_knowledge_only";
-  canonicalMutationAuthority: "economic_category_only";
+  canonicalMutationAuthority: "lossless_category_and_nonconstraint_role_facets";
   automaticPromotion: "prohibited";
   rgExecution: "disabled";
   providerExecution: "disabled";
@@ -86,7 +96,23 @@ export type CanonicalRfClaimResolution = {
   snapshot: CanonicalRfKnowledgeSnapshot;
   decisions: CanonicalRfClaimDecision[];
   categoryApplications: CanonicalEconomicSemanticApplicationAdmission[];
+  roleApplications: CanonicalEconomicSemanticApplicationAdmission[];
+  semanticApplications: CanonicalEconomicSemanticApplicationAdmission[];
+  atomicDecisions: CanonicalRfAtomicDecision[];
   validation: { status: "valid" | "invalid"; errors: string[]; warnings: string[] };
+};
+
+export type CanonicalRfAtomicDecision = {
+  atomicClaimId: string;
+  parentClaimIds: string[];
+  facet: CanonicalAtomicClaimFacet;
+  canonicalRefs: string[];
+  occurrenceRefs: string[];
+  disposition: CanonicalRfClaimDecision["disposition"];
+  query: KnowledgeQuery | null;
+  resolution: KnowledgeResolution | null;
+  applicationKeys: string[];
+  limitations: string[];
 };
 
 export function canonicalRfKnowledgeSnapshot(entries: readonly KnowledgeEntry[]): CanonicalRfKnowledgeSnapshot {
@@ -145,6 +171,8 @@ export function buildCanonicalRfClaimResolution(input: {
 
   const decisions: CanonicalRfClaimDecision[] = [];
   const categoryApplications: CanonicalEconomicSemanticApplicationAdmission[] = [];
+  const roleApplications: CanonicalEconomicSemanticApplicationAdmission[] = [];
+  const atomicDecisions: CanonicalRfAtomicDecision[] = [];
   if (errors.length === 0) {
     const chargeById = new Map(input.economic.economicLayer.charges.map((charge) => [charge.id, charge]));
     const occurrenceById = new Map(input.economic.pricingAnalysis.foundation.sourceModel.occurrences.map((item) => [item.id, item]));
@@ -152,7 +180,6 @@ export function buildCanonicalRfClaimResolution(input: {
     const statementPeriod = input.economic.pricingAnalysis.foundation.identity.statementPeriod;
     for (const claim of input.inventory.claims) {
       if (claim.claimClass !== "economic_category") {
-        decisions.push(noAuthorizedMapping(claim));
         continue;
       }
       const charge = claim.canonicalRefs.length === 1 ? chargeById.get(claim.canonicalRefs[0]!) : undefined;
@@ -233,14 +260,27 @@ export function buildCanonicalRfClaimResolution(input: {
         canonicalRefs: [...claim.canonicalRefs], occurrenceRefs: [...claim.occurrenceRefs], disposition, query, resolution,
         applicationKey, limitations: ["The admitted mapping is restricted to the economic-category claim."] });
     }
+    const roleResolution = resolveRfRoleFacets({
+      inventory: input.inventory,
+      economic: input.economic,
+      entries: input.entries,
+      snapshotHash: snapshot.snapshotHash,
+      categoryDecisions: decisions,
+    });
+    roleApplications.push(...roleResolution.applications);
+    atomicDecisions.push(...roleResolution.decisions);
+    errors.push(...roleResolution.errors);
+    warnings.push(...roleResolution.warnings);
   }
 
   const duplicateApplicationClaims = duplicates(categoryApplications.map((item) => item.claimRef));
   for (const claimRef of duplicateApplicationClaims) errors.push(`rf_duplicate_category_application:${claimRef}`);
+  const semanticApplications = [...categoryApplications, ...roleApplications]
+    .sort((left, right) => left.atomicClaimId.localeCompare(right.atomicClaimId) || left.chargeRef.localeCompare(right.chargeRef));
   return {
     schemaVersion: CANONICAL_RF_RESOLUTION_SCHEMA_VERSION,
     authority: "claim_specific_admitted_knowledge_only",
-    canonicalMutationAuthority: "economic_category_only",
+    canonicalMutationAuthority: "lossless_category_and_nonconstraint_role_facets",
     automaticPromotion: "prohibited",
     rgExecution: "disabled",
     providerExecution: "disabled",
@@ -251,8 +291,115 @@ export function buildCanonicalRfClaimResolution(input: {
     snapshot,
     decisions: decisions.sort((left, right) => left.claimId.localeCompare(right.claimId)),
     categoryApplications: categoryApplications.sort((left, right) => left.claimRef.localeCompare(right.claimRef)),
+    roleApplications: roleApplications.sort((left, right) => left.atomicClaimId.localeCompare(right.atomicClaimId)
+      || left.chargeRef.localeCompare(right.chargeRef)),
+    semanticApplications,
+    atomicDecisions: atomicDecisions.sort((left, right) => left.atomicClaimId.localeCompare(right.atomicClaimId)),
     validation: { status: errors.length === 0 ? "valid" : "invalid", errors: unique(errors), warnings: unique(warnings) },
   };
+}
+
+function resolveRfRoleFacets(input: {
+  inventory: CanonicalUnresolvedClaimInventory;
+  economic: CanonicalEconomicsV2EconomicAnalysis;
+  entries: readonly KnowledgeEntry[];
+  snapshotHash: string;
+  categoryDecisions: readonly CanonicalRfClaimDecision[];
+}): {
+  applications: CanonicalEconomicSemanticApplicationAdmission[];
+  decisions: CanonicalRfAtomicDecision[];
+  errors: string[];
+  warnings: string[];
+} {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const applications: CanonicalEconomicSemanticApplicationAdmission[] = [];
+  const decisions: CanonicalRfAtomicDecision[] = [];
+  const statementPeriod = input.economic.pricingAnalysis.foundation.identity.statementPeriod;
+  const categoryByCharge = new Map(input.categoryDecisions.filter((item) => item.claimClass === "economic_category" &&
+    item.canonicalRefs.length === 1 && item.query).map((item) => [item.canonicalRefs[0]!, item] as const));
+  const seeds = input.inventory.claims.flatMap((claim) => compileCanonicalAtomicClaimSeeds({
+    claim,
+    categoryQuery: claim.canonicalRefs.map((ref) => categoryByCharge.get(ref)?.query ?? null).find(Boolean) ?? null,
+  })).filter((seed) => LOSSLESS_ROLE_FACETS.has(seed.facet));
+  const groups = new Map<string, CanonicalAtomicClaimSeed[]>();
+  for (const seed of seeds) {
+    const atomicClaimId = atomicClaimIdForSeed(seed, statementPeriod);
+    groups.set(atomicClaimId, [...(groups.get(atomicClaimId) ?? []), seed]);
+  }
+  const chargeById = new Map(input.economic.economicLayer.charges.map((charge) => [charge.id, charge]));
+  const entryById = new Map(input.entries.map((entry) => [entry.id, entry]));
+  for (const [atomicClaimId, group] of groups) {
+    const first = group[0]!;
+    const canonicalRefs = unique(group.flatMap((seed) => seed.parent.canonicalRefs));
+    const occurrenceRefs = unique(group.flatMap((seed) => seed.parent.occurrenceRefs));
+    const parentClaimIds = unique(group.map((seed) => seed.parent.claimId));
+    const query = first.knowledgeQuery;
+    if (!query) {
+      decisions.push({ atomicClaimId, parentClaimIds, facet: first.facet, canonicalRefs, occurrenceRefs,
+        disposition: "unresolved_policy_rejection", query: null, resolution: null, applicationKeys: [],
+        limitations: ["The exact atomic role facet lacked an authorized RF query scope."] });
+      continue;
+    }
+    const resolution = resolveKnowledge(input.entries, query);
+    const disposition = resolutionDisposition(resolution);
+    if (disposition !== "resolved_by_admitted_knowledge") {
+      decisions.push({ atomicClaimId, parentClaimIds, facet: first.facet, canonicalRefs, occurrenceRefs,
+        disposition, query, resolution, applicationKeys: [],
+        limitations: ["The exact atomic role facet remains unresolved by the bound RF snapshot."] });
+      continue;
+    }
+    if (!canonicalSemanticValueApplicable({ facet: first.facet, subjectCode: first.opaqueSubjectCode,
+      value: resolution.value })) {
+      warnings.push(`rf_role_value_rejected:${atomicClaimId}`);
+      decisions.push({ atomicClaimId, parentClaimIds, facet: first.facet, canonicalRefs, occurrenceRefs,
+        disposition: "unresolved_policy_rejection", query, resolution, applicationKeys: [],
+        limitations: ["Resolved RF knowledge did not contain an exact losslessly applicable role value."] });
+      continue;
+    }
+    const selectedEntries = resolution.selectedEntryRefs.map((ref) => entryById.get(ref)).filter(isKnowledgeEntry);
+    const claimApplications = canonicalRefs.flatMap((chargeRef) => {
+      const charge = chargeById.get(chargeRef);
+      const occurrenceRef = charge?.contributingOccurrenceRef;
+      const parent = group.find((seed) => seed.parent.canonicalRefs.includes(chargeRef))?.parent;
+      if (!charge || !occurrenceRef || !occurrenceRefs.includes(occurrenceRef) || !parent) return [];
+      return [{
+        key: `rf_role_${digest({ atomicClaimId, chargeRef }).slice(0, 20)}`,
+        chargeRef,
+        claimRef: parent.claimId,
+        atomicClaimId,
+        facet: first.facet as CanonicalEconomicSemanticApplicationAdmission["facet"],
+        claimClass: "participant_control_role" as const,
+        occurrenceRef,
+        value: structuredClone(resolution.value) as KnowledgeClaimValue,
+        sourceKind: "governed_rf_snapshot" as const,
+        knowledgeClaimType: "participant_control_role" as const,
+        knowledgeSubjectCode: first.opaqueSubjectCode,
+        knowledgeSnapshotHash: input.snapshotHash,
+        selectedEntryRefs: [...resolution.selectedEntryRefs],
+        sourceAuthorities: [...resolution.sourceAuthorities],
+        externalEvidenceRefs: [],
+        asOf: query.asOf,
+        effectiveFrom: commonNullable(selectedEntries.map((entry) => entry.effectiveFrom)),
+        effectiveTo: commonNullable(selectedEntries.map((entry) => entry.effectiveTo)),
+        scopeFingerprint: first.scopeFingerprint,
+        limitations: ["The immutable run-bound RF snapshot resolves only this exact participant/control-role facet."],
+      }];
+    });
+    if (claimApplications.length !== canonicalRefs.length) {
+      errors.push(`rf_role_claim_lineage_invalid:${atomicClaimId}`);
+      decisions.push({ atomicClaimId, parentClaimIds, facet: first.facet, canonicalRefs, occurrenceRefs,
+        disposition: "unresolved_policy_rejection", query, resolution, applicationKeys: [],
+        limitations: ["The RF role answer lacked complete exact charge/occurrence lineage."] });
+      continue;
+    }
+    applications.push(...claimApplications);
+    decisions.push({ atomicClaimId, parentClaimIds, facet: first.facet, canonicalRefs, occurrenceRefs,
+      disposition: "resolved_by_admitted_knowledge", query, resolution,
+      applicationKeys: claimApplications.map((item) => item.key),
+      limitations: ["The admitted RF answer is restricted to this exact atomic participant/control-role facet."] });
+  }
+  return { applications, decisions, errors: unique(errors), warnings: unique(warnings) };
 }
 
 function normalizedBinding(
@@ -290,7 +437,7 @@ export function validateCanonicalRfSemanticConvergence(input: {
   const baseById = new Map(input.base.economicLayer.charges.map((charge) => [charge.id, charge]));
   const resolvedById = new Map(input.resolved.economicLayer.charges.map((charge) => [charge.id, charge]));
   if (baseById.size !== resolvedById.size) errors.push("rf_semantic_application_changed_charge_population");
-  const applicationsByClaim = new Map(input.rf.categoryApplications.map((application) => [application.claimRef, application]));
+  const applicationsByClaim = new Map(input.rf.semanticApplications.map((application) => [application.claimRef, application]));
   for (const [chargeId, baseCharge] of baseById) {
     const resolvedCharge = resolvedById.get(chargeId);
     if (!resolvedCharge) continue;
@@ -312,7 +459,7 @@ export function validateCanonicalRfSemanticConvergence(input: {
       errors.push(`rf_unresolved_charge_has_application:${chargeId}`);
     }
   }
-  if (input.resolved.economicLayer.semanticApplications.length !== input.rf.categoryApplications.length) {
+  if (input.resolved.economicLayer.semanticApplications.length !== input.rf.semanticApplications.length) {
     errors.push("rf_semantic_application_population_mismatch");
   }
   const baseStack = input.base.economicLayer.costStack;
@@ -437,6 +584,15 @@ function applicationProjection(application: CanonicalEconomicSemanticApplication
 
 function duplicates(values: string[]): string[] {
   return [...new Set(values.filter((value, index) => values.indexOf(value) !== index))].sort();
+}
+
+function commonNullable(values: Array<string | null>): string | null {
+  const distinct = [...new Set(values)];
+  return distinct.length === 1 ? distinct[0]! : null;
+}
+
+function isKnowledgeEntry(value: KnowledgeEntry | undefined): value is KnowledgeEntry {
+  return value !== undefined;
 }
 
 function digest(value: unknown): string {

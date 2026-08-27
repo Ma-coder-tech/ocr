@@ -50,13 +50,15 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
     if (application.value.kind !== "role" || application.value.controlDimension === "constraint") continue;
     const participantKey = `claim_scoped_participant_${application.key}`;
     const roleKey = `claim_scoped_role_${application.key}`;
+    const derivabilityTier = semanticRoleDerivability(application);
+    const assertionBasis = application.sourceKind === "governed_rf_snapshot" ? "rule_application" : "external_verified";
     if (application.value.state === "proven" && application.value.participantRole) {
       participants.push({
         key: participantKey, identity: null, identityStatus: "unresolved", roles: [application.value.participantRole],
         roleResolution: "proven", effectiveFrom: application.effectiveFrom, effectiveTo: application.effectiveTo,
-        externalEvidenceRefs: application.externalEvidenceRefs, derivabilityTier: "inferable_from_statement_with_qualification",
+        externalEvidenceRefs: application.externalEvidenceRefs, derivabilityTier,
         semanticApplicationKey: application.key,
-        assertionBasis: "external_verified", confidence: "unavailable",
+        assertionBasis, confidence: "unavailable",
         limitations: ["This participant is claim-scoped by proven role class; no participant identity was inferred."],
       });
     }
@@ -72,8 +74,8 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
       effectiveTo: application.effectiveTo,
       externalEvidenceRefs: application.externalEvidenceRefs,
       semanticApplicationKey: application.key,
-      derivabilityTier: "inferable_from_statement_with_qualification",
-      assertionBasis: "external_verified",
+      derivabilityTier,
+      assertionBasis,
       confidence: "unavailable",
       limitations: ["Only this independently evidenced control-role facet is resolved."],
     });
@@ -114,7 +116,7 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
       limitations: [
         "This admitted fee occurrence contributes to statement processing cost only.",
         ...(categoryApplication
-          ? ["Admitted RF knowledge resolves only this charge's economic category; ownership, control, and actionability remain unresolved."]
+          ? [categoryResolutionLimitation(categoryApplication)]
           : ["Economic category, ownership, control, actionability, pricing architecture, benchmark position, and savings remain unresolved."]),
       ],
     };
@@ -152,6 +154,20 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
 function chargeKeyForRef(chargeRef: string): string {
   const match = /^economic_charge_(\d+)$/.exec(chargeRef);
   return match ? `capability_bound_charge_${Number(match[1])}` : `missing_${chargeRef}`;
+}
+
+function semanticRoleDerivability(
+  application: CanonicalEconomicSemanticApplicationAdmission,
+): CanonicalEconomicParticipantAdmission["derivabilityTier"] {
+  return application.sourceAuthorities.includes("merchant_contract")
+    ? "requires_merchant_pricing_document"
+    : "requires_external_rule_or_schedule";
+}
+
+function categoryResolutionLimitation(application: CanonicalEconomicSemanticApplicationAdmission): string {
+  return application.sourceKind === "governed_rf_snapshot"
+    ? "Admitted RF knowledge resolves only this charge's economic category; ownership, control, and actionability remain independent."
+    : "Verified current-run external evidence resolves only this charge's economic category; ownership, control, and actionability remain independent.";
 }
 
 export function buildObservationalCanonicalEconomicsV2FromFiservPricing(
