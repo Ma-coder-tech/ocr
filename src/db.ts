@@ -112,6 +112,8 @@ function migrate(): void {
       semantic_hash TEXT,
       canonical_state_hash TEXT,
       semantic_revision INTEGER NOT NULL DEFAULT 0,
+      rg_plan_hash TEXT,
+      rg_plan_generation INTEGER NOT NULL DEFAULT 0,
       continuation_revision INTEGER NOT NULL DEFAULT 0,
       continuation_lifecycle TEXT NOT NULL DEFAULT 'awaiting_first_pass_outcome',
       continuation_state_hash TEXT,
@@ -268,6 +270,7 @@ function migrate(): void {
       semantic_hash TEXT,
       canonical_state_hash TEXT,
       plan_hash TEXT,
+      plan_generation INTEGER NOT NULL DEFAULT 0,
       rf_snapshot_hash TEXT NOT NULL,
       lifecycle TEXT NOT NULL,
       state_hash TEXT NOT NULL,
@@ -539,9 +542,12 @@ function migrate(): void {
   ensureColumn("canonical_analysis_runs", "semantic_hash", "TEXT");
   ensureColumn("canonical_analysis_runs", "canonical_state_hash", "TEXT");
   ensureColumn("canonical_analysis_runs", "semantic_revision", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("canonical_analysis_runs", "rg_plan_hash", "TEXT");
+  ensureColumn("canonical_analysis_runs", "rg_plan_generation", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("canonical_analysis_runs", "continuation_revision", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("canonical_analysis_runs", "continuation_lifecycle", "TEXT NOT NULL DEFAULT 'awaiting_first_pass_outcome'");
   ensureColumn("canonical_analysis_runs", "continuation_state_hash", "TEXT");
+  ensureColumn("canonical_analysis_continuation_revisions", "plan_generation", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("statements", "analysis_status", "TEXT NOT NULL DEFAULT 'completed'");
   ensureColumn("statements", "processor_markup_bps", "REAL");
   ensureColumn("comparisons", "processor_markup_bps_delta", "REAL");

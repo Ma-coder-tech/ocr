@@ -73,6 +73,8 @@ export type PersistedAnalysisRunRecord = {
   semanticHash: string | null;
   canonicalStateHash: string | null;
   semanticRevision: number;
+  rgPlanHash: string | null;
+  rgPlanGeneration: number;
   continuationRevision: number;
   continuationLifecycle: CanonicalAnalysisRun["autonomousLifecycle"]["state"];
   continuationStateHash: string | null;
@@ -91,6 +93,7 @@ export type PersistedAnalysisRunRecord = {
   rgOperations: CanonicalRgOperation[];
   rgExecutionEvents: Array<{
     eventId: string;
+    eventSequence: number;
     workItemId: string;
     operationId: string | null;
     eventType: string;
@@ -205,11 +208,12 @@ function beginRun(input: {
       INSERT INTO canonical_analysis_runs (
         id, job_id, source_document_ref, source_fingerprint, schema_version, implementation_version, policy_version,
         status, family_status, parser_driver_id, attempt_count, canonical_truth_hash, financial_foundation_hash,
-        semantic_hash, canonical_state_hash, semantic_revision, continuation_revision, continuation_lifecycle,
+        semantic_hash, canonical_state_hash, semantic_revision, rg_plan_hash, rg_plan_generation,
+        continuation_revision, continuation_lifecycle,
         continuation_state_hash, rf_snapshot_hash, rf_context_hash,
         rf_catalog_status, rf_catalog_binding_json, limitations_json, result_json,
         created_at, started_at, completed_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'running', 'unresolved', NULL, ?, NULL, NULL, NULL, NULL, 0, 0,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'running', 'unresolved', NULL, ?, NULL, NULL, NULL, NULL, 0, NULL, 0, 0,
         'awaiting_first_pass_outcome', NULL, ?, ?, ?, ?, '[]', NULL, ?, ?, NULL, ?)
       ON CONFLICT(job_id) DO UPDATE SET
         source_document_ref = excluded.source_document_ref,
@@ -225,6 +229,8 @@ function beginRun(input: {
         semantic_hash = NULL,
         canonical_state_hash = NULL,
         semantic_revision = 0,
+        rg_plan_hash = NULL,
+        rg_plan_generation = 0,
         continuation_revision = 0,
         continuation_lifecycle = 'awaiting_first_pass_outcome',
         continuation_state_hash = NULL,
@@ -291,16 +297,29 @@ function finishPersistedStage(runId: string, outcome: AnalysisRunStageOutcome, a
 }
 
 export function persistRgWorkLedger(runId: string, ledger: CanonicalRgWorkLedger, now: string) {
+  const runPlan = db.prepare(`SELECT rg_plan_hash, rg_plan_generation FROM canonical_analysis_runs WHERE id = ?`)
+    .get(runId) as { rg_plan_hash: string | null; rg_plan_generation: number } | undefined;
+  if (!runPlan) throw new Error("canonical_analysis_run_missing_for_rg_plan");
   const existingPlans = new Set((db.prepare(`SELECT plan_hash FROM canonical_rg_claim_admissions WHERE run_id = ?
-      UNION SELECT plan_hash FROM canonical_rg_work_items WHERE run_id = ?`)
-    .all(runId, runId) as Array<{ plan_hash: string }>).map((row) => row.plan_hash));
-  const samePlan = existingPlans.size === 0 || (existingPlans.size === 1 && existingPlans.has(ledger.planHash));
-  if (!samePlan) {
-    archiveSupersededRgExecution(runId, ledger.planHash, now);
+      UNION SELECT plan_hash FROM canonical_rg_work_items WHERE run_id = ?
+      UNION SELECT plan_hash FROM canonical_rg_operations WHERE run_id = ?`)
+    .all(runId, runId, runId) as Array<{ plan_hash: string }>).map((row) => row.plan_hash));
+  if (existingPlans.size > 1) throw new Error("canonical_rg_active_plan_binding_conflict");
+  const persistedPlanHash = runPlan.rg_plan_hash ?? [...existingPlans][0] ?? null;
+  const priorGeneration = Math.max(Number(runPlan.rg_plan_generation ?? 0), inferRgPlanGeneration(runId));
+  if (persistedPlanHash !== null && existingPlans.size === 1 && !existingPlans.has(persistedPlanHash)) {
+    throw new Error("canonical_rg_active_plan_binding_conflict");
+  }
+  let activeGeneration = priorGeneration;
+  if (persistedPlanHash !== null && persistedPlanHash !== ledger.planHash) {
+    activeGeneration = priorGeneration + 1;
+    archiveSupersededRgExecution(runId, persistedPlanHash, ledger.planHash, priorGeneration, activeGeneration, now);
     db.prepare(`DELETE FROM canonical_rg_operations WHERE run_id = ?`).run(runId);
     db.prepare(`DELETE FROM canonical_rg_work_items WHERE run_id = ?`).run(runId);
     db.prepare(`DELETE FROM canonical_rg_claim_admissions WHERE run_id = ?`).run(runId);
   }
+  db.prepare(`UPDATE canonical_analysis_runs SET rg_plan_hash = ?, rg_plan_generation = ?, updated_at = ? WHERE id = ?`)
+    .run(ledger.planHash, activeGeneration, now, runId);
   const insertClaim = db.prepare(`
     INSERT INTO canonical_rg_claim_admissions (
       run_id, atomic_claim_id, parent_claim_ids_json, claim_class, facet, opaque_subject_code, scope_fingerprint,
@@ -358,7 +377,32 @@ export function persistRgWorkLedger(runId: string, ledger: CanonicalRgWorkLedger
   }
 }
 
-function archiveSupersededRgExecution(runId: string, replacementPlanHash: string, now: string) {
+function inferRgPlanGeneration(runId: string): number {
+  const rows = db.prepare(`SELECT event_type, event_json, created_at FROM canonical_rg_execution_events
+    WHERE run_id = ? AND event_type IN ('superseded_plan_transition', 'superseded_plan_snapshot') ORDER BY rowid`)
+    .all(runId) as Array<{ event_type: string; event_json: string; created_at: string }>;
+  let generation = 0;
+  let legacyGroup: string | null = null;
+  for (const row of rows) {
+    const event = parseJson<Record<string, unknown>>(row.event_json, {});
+    const explicit = Number(event.replacementPlanGeneration);
+    if (Number.isSafeInteger(explicit) && explicit >= 0) {
+      generation = Math.max(generation, explicit);
+      legacyGroup = null;
+      continue;
+    }
+    if (row.event_type !== "superseded_plan_snapshot") continue;
+    const group = `${row.created_at}:${String(event.priorPlanHash ?? "")}:${String(event.replacementPlanHash ?? "")}`;
+    if (group !== legacyGroup) {
+      generation += 1;
+      legacyGroup = group;
+    }
+  }
+  return generation;
+}
+
+function archiveSupersededRgExecution(runId: string, priorPlanHash: string, replacementPlanHash: string,
+  priorPlanGeneration: number, replacementPlanGeneration: number, now: string) {
   const claims = db.prepare(`SELECT atomic_claim_id, admission_json, plan_hash FROM canonical_rg_claim_admissions WHERE run_id = ?`)
     .all(runId) as Array<{ atomic_claim_id: string; admission_json: string; plan_hash: string }>;
   const workItems = db.prepare(`SELECT work_item_id, work_item_json, plan_hash FROM canonical_rg_work_items WHERE run_id = ?`)
@@ -368,18 +412,28 @@ function archiveSupersededRgExecution(runId: string, replacementPlanHash: string
   const insert = db.prepare(`INSERT INTO canonical_rg_execution_events
     (event_id, run_id, work_item_id, operation_id, event_type, event_json, event_hash, created_at)
     VALUES (?, ?, ?, ?, 'superseded_plan_snapshot', ?, ?, ?)`);
+  const transition = { priorPlanHash, replacementPlanHash, priorPlanGeneration, replacementPlanGeneration };
+  const transitionHash = digestCanonical(transition);
+  db.prepare(`INSERT INTO canonical_rg_execution_events
+    (event_id, run_id, work_item_id, operation_id, event_type, event_json, event_hash, created_at)
+    VALUES (?, ?, ?, NULL, 'superseded_plan_transition', ?, ?, ?)`)
+    .run(`rg-event-${randomUUID()}`, runId, `plan-generation:${priorPlanGeneration}`, JSON.stringify(transition),
+      transitionHash, now);
   for (const claim of claims) {
-    const event = { priorPlanHash: claim.plan_hash, replacementPlanHash, claimAdmission: JSON.parse(claim.admission_json) };
+    const event = { priorPlanHash, replacementPlanHash, priorPlanGeneration, replacementPlanGeneration,
+      claimAdmission: JSON.parse(claim.admission_json) };
     const eventHash = digestCanonical(event);
     insert.run(`rg-event-${randomUUID()}`, runId, `claim:${claim.atomic_claim_id}`, null, JSON.stringify(event), eventHash, now);
   }
   for (const item of workItems) {
-    const event = { priorPlanHash: item.plan_hash, replacementPlanHash, workItem: JSON.parse(item.work_item_json) };
+    const event = { priorPlanHash, replacementPlanHash, priorPlanGeneration, replacementPlanGeneration,
+      workItem: JSON.parse(item.work_item_json) };
     const eventHash = digestCanonical(event);
     insert.run(`rg-event-${randomUUID()}`, runId, item.work_item_id, null, JSON.stringify(event), eventHash, now);
   }
   for (const operation of operations) {
-    const event = { priorPlanHash: operation.plan_hash, replacementPlanHash, operation: JSON.parse(operation.operation_json) };
+    const event = { priorPlanHash, replacementPlanHash, priorPlanGeneration, replacementPlanGeneration,
+      operation: JSON.parse(operation.operation_json) };
     const eventHash = digestCanonical(event);
     insert.run(`rg-event-${randomUUID()}`, runId, operation.work_item_id, operation.operation_id, JSON.stringify(event), eventHash, now);
   }
@@ -420,6 +474,16 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
   const externalEvidence = mapExternalEvidence(runId);
   const semanticRevisions = mapSemanticRevisions(runId);
   const continuationRevisions = mapContinuationRevisions(runId);
+  const stagedPlanHash = artifacts.rgWorkLedger?.planHash ?? null;
+  const inferredPlanGeneration = inferRgPlanGeneration(runId);
+  if ((!row.rg_plan_hash && stagedPlanHash) || Number(row.rg_plan_generation ?? 0) < inferredPlanGeneration) {
+    const repairedPlanHash = row.rg_plan_hash ? String(row.rg_plan_hash) : stagedPlanHash;
+    const repairedPlanGeneration = Math.max(Number(row.rg_plan_generation ?? 0), inferredPlanGeneration);
+    db.prepare(`UPDATE canonical_analysis_runs SET rg_plan_hash = ?, rg_plan_generation = ? WHERE id = ?`)
+      .run(repairedPlanHash, repairedPlanGeneration, runId);
+    row.rg_plan_hash = repairedPlanHash;
+    row.rg_plan_generation = repairedPlanGeneration;
+  }
   const result = summary ? ({ ...summary, artifacts } as unknown as CanonicalAnalysisRun) : null;
   return {
     id: runId,
@@ -438,6 +502,8 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
     semanticHash: row.semantic_hash ? String(row.semantic_hash) : null,
     canonicalStateHash: row.canonical_state_hash ? String(row.canonical_state_hash) : null,
     semanticRevision: Number(row.semantic_revision ?? 0),
+    rgPlanHash: row.rg_plan_hash ? String(row.rg_plan_hash) : null,
+    rgPlanGeneration: Number(row.rg_plan_generation ?? 0),
     continuationRevision: Number(row.continuation_revision ?? 0),
     continuationLifecycle: String(row.continuation_lifecycle ?? "awaiting_first_pass_outcome") as PersistedAnalysisRunRecord["continuationLifecycle"],
     continuationStateHash: row.continuation_state_hash ? String(row.continuation_state_hash) : null,
@@ -566,15 +632,18 @@ function mapRgWorkItems(runId: string): CanonicalRgWorkItem[] {
 }
 
 function mapRgOperations(runId: string): CanonicalRgOperation[] {
-  const rows = db.prepare(`SELECT operation_json FROM canonical_rg_operations WHERE run_id = ? ORDER BY operation_id`).all(runId) as Array<{ operation_json: string }>;
+  const rows = db.prepare(`SELECT operation_json FROM canonical_rg_operations WHERE run_id = ? ORDER BY created_at, rowid`)
+    .all(runId) as Array<{ operation_json: string }>;
   return rows.map((row) => parseJson<CanonicalRgOperation>(row.operation_json, null as never));
 }
 
 function mapRgExecutionEvents(runId: string): PersistedAnalysisRunRecord["rgExecutionEvents"] {
-  const rows = db.prepare(`SELECT * FROM canonical_rg_execution_events WHERE run_id = ? ORDER BY created_at, event_id`)
+  const rows = db.prepare(`SELECT rowid AS event_sequence, * FROM canonical_rg_execution_events
+    WHERE run_id = ? ORDER BY rowid`)
     .all(runId) as Record<string, unknown>[];
   return rows.map((row) => ({
     eventId: String(row.event_id),
+    eventSequence: Number(row.event_sequence),
     workItemId: String(row.work_item_id),
     operationId: row.operation_id ? String(row.operation_id) : null,
     eventType: String(row.event_type),

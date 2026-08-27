@@ -18,6 +18,7 @@ import {
 
 type WorkAttempt = {
   planHash: string;
+  planGeneration: number;
   work: CanonicalRgWorkItem;
   admission: CanonicalRgClaimAdmission | null;
   operations: CanonicalRgOperation[];
@@ -44,6 +45,7 @@ export function adjudicateDurableCanonicalContinuation(input: {
   expectedSemanticRevision?: number;
   expectedSemanticHash?: string | null;
   expectedPlanHash?: string | null;
+  expectedPlanGeneration?: number;
 }): CanonicalAdaptiveContinuationState {
   const persisted = getPersistedAnalysisRun(input.runId);
   if (!persisted?.result) throw new Error("adaptive_continuation_analysis_run_unavailable");
@@ -55,6 +57,9 @@ export function adjudicateDurableCanonicalContinuation(input: {
     throw new Error("adaptive_continuation_stale_semantic_hash");
   }
   if (input.expectedPlanHash !== undefined && input.expectedPlanHash !== planHash) {
+    throw new Error("adaptive_continuation_stale_plan_generation");
+  }
+  if (input.expectedPlanGeneration !== undefined && input.expectedPlanGeneration !== persisted.rgPlanGeneration) {
     throw new Error("adaptive_continuation_stale_plan_generation");
   }
 
@@ -94,7 +99,8 @@ export function buildAdaptiveContinuationState(
     const currentWork = currentWorkByClaim.get(atomicClaimId) ?? null;
     const attempts = history.filter((item) => item.work.atomicClaimId === atomicClaimId);
     const semanticDisposition = semanticDispositionByClaim.get(atomicClaimId);
-    decisions.push(decideClaim({ persisted, planHash: planHash ?? "", admission, currentWork, attempts,
+    decisions.push(decideClaim({ persisted, planHash: planHash ?? "", planGeneration: persisted.rgPlanGeneration,
+      admission, currentWork, attempts,
       priorDecision: priorDecisionByClaim.get(atomicClaimId) ?? null,
       semanticDisposition, resolved: resolvedAtoms.has(atomicClaimId) }));
   }
@@ -110,6 +116,7 @@ export function buildAdaptiveContinuationState(
     semanticHash: persisted.semanticHash,
     canonicalStateHash: persisted.canonicalStateHash,
     planHash,
+    planGeneration: persisted.rgPlanGeneration,
     rfSnapshotHash: persisted.rfSnapshotHash,
   };
   const stateHash = digest({ schemaVersion: ADAPTIVE_CONTINUATION_SCHEMA_VERSION, runId: persisted.id, binding,
@@ -135,6 +142,7 @@ export function buildAdaptiveContinuationState(
 function decideClaim(input: {
   persisted: PersistedAnalysisRunRecord;
   planHash: string;
+  planGeneration: number;
   admission: CanonicalRgClaimAdmission;
   currentWork: CanonicalRgWorkItem | null;
   attempts: WorkAttempt[];
@@ -143,7 +151,8 @@ function decideClaim(input: {
   resolved: boolean;
 }): CanonicalClaimContinuationDecision {
   const currentFingerprint = input.currentWork ? workContractFingerprint(input.admission, input.currentWork) : null;
-  const priorFingerprints = unique(input.attempts.filter((item) => item.planHash !== input.planHash).map((item) => item.admission
+  const priorAttempts = input.attempts.filter((item) => item.planGeneration !== input.planGeneration);
+  const priorFingerprints = unique(priorAttempts.map((item) => item.admission
     ? workContractFingerprint(item.admission, item.work)
     : digest(workProjection(item.work))));
   const evidenceRefs = unique([
@@ -157,9 +166,11 @@ function decideClaim(input: {
     claimClass: input.admission.claimClass,
     facet: input.admission.facet,
     currentPlanHash: input.planHash,
+    currentPlanGeneration: input.planGeneration,
     currentWorkItemId: input.currentWork?.workItemId ?? null,
     currentWorkContractFingerprint: currentFingerprint,
     priorWorkContractFingerprints: priorFingerprints,
+    priorPlanGenerations: uniqueNumbers(priorAttempts.map((item) => item.planGeneration)),
     materiality: input.admission.materiality,
     decisionTier: input.admission.decisionTier,
     evidenceRefs,
@@ -210,22 +221,19 @@ function decideClaim(input: {
     return make("not_eligible", [input.admission.researchAdmission, `materiality_${input.admission.materiality}`]);
   }
   if (input.currentWork.executionState === "planned_for_durable_execution") {
-    const priorSameContract = input.attempts.filter((item) => item.planHash !== input.planHash && item.admission &&
+    const priorSameContract = input.attempts.filter((item) => item.planGeneration !== input.planGeneration && item.admission &&
       workContractFingerprint(item.admission, item.work) === currentFingerprint);
     const refinable = latestProgressDelta(priorSameContract, currentFingerprint!, input.currentWork.evidenceObjective);
     if (refinable) return make("justified_refinement", ["concrete_prior_progress_and_changed_next_evidence_objective"], null, refinable);
     if (priorSameContract.some((item) => item.work.executionState === "completed_unresolved")) {
-      if (repeatedNonImprovingAttempts(priorSameContract)) {
-        return make("safely_unresolved", ["cumulative_repeated_non_improving_attempts", "diminishing_returns_established"]);
-      }
       return make("continuation_uncertain_not_authorized", ["unchanged_work_contract_after_weak_unresolved_outcome",
-        "no_concrete_refinement_delta"]);
+        "no_concrete_refinement_delta", "attempt_count_never_establishes_analytical_completion"]);
     }
     if (input.priorDecision && input.priorDecision.disposition === "not_eligible") {
       return make("newly_eligible", ["previously_noneligible_claim_now_has_material_research_authority",
         "work_contract_authority_changed"]);
     }
-    if (input.attempts.some((item) => item.planHash !== input.planHash)) {
+    if (input.attempts.some((item) => item.planGeneration !== input.planGeneration)) {
       return make("newly_eligible", ["work_contract_materiality_scope_or_permission_basis_changed"]);
     }
     return make("newly_eligible", ["first_admitted_material_work_contract"]);
@@ -233,44 +241,67 @@ function decideClaim(input: {
   if (input.currentWork.executionState === "completed_unresolved") {
     const refinable = latestProgressDelta([latestAttempt!], currentFingerprint!, input.currentWork.evidenceObjective);
     if (refinable) return make("justified_refinement", ["concrete_progress_exposes_legitimately_resolvable_gap"], null, refinable);
-    const unresolvedAttempts = input.attempts.filter((item) => item.work.executionState === "completed_unresolved");
-    if (repeatedNonImprovingAttempts(unresolvedAttempts)) {
-      return make("safely_unresolved", ["cumulative_repeated_non_improving_attempts", "diminishing_returns_established"]);
-    }
     return make("continuation_uncertain_not_authorized", [input.currentWork.stopReason ?? "research_outcome_unresolved",
-      "single_weak_outcome_is_not_analytical_exhaustion", "no_concrete_refinement_delta"]);
+      "single_weak_outcome_is_not_analytical_exhaustion", "weak_outcomes_are_not_analytical_exhaustion",
+      "no_concrete_refinement_delta",
+      "attempt_count_never_establishes_analytical_completion"]);
   }
   return make("continuation_uncertain_not_authorized", ["work_state_not_admissible_for_continuation"]);
 }
 
 function collectAttempts(persisted: PersistedAnalysisRunRecord, currentPlanHash: string | null): WorkAttempt[] {
   const archivedClaims = new Map<string, CanonicalRgClaimAdmission>();
-  const archivedWorks = new Map<string, { planHash: string; work: CanonicalRgWorkItem }>();
-  const archivedOperations = new Map<string, CanonicalRgOperation>();
-  for (const event of persisted.rgExecutionEvents.filter((item) => item.eventType === "superseded_plan_snapshot")) {
+  const archivedWorks = new Map<string, { planHash: string; planGeneration: number; work: CanonicalRgWorkItem }>();
+  const archivedOperations = new Map<string, { planGeneration: number; operation: CanonicalRgOperation }>();
+  const chronologicalEvents = [...persisted.rgExecutionEvents].sort((left, right) =>
+    left.eventSequence - right.eventSequence);
+  let inferredPriorGeneration = 0;
+  let legacyGroupKey: string | null = null;
+  let legacyGroupPriorGeneration = 0;
+  for (const event of chronologicalEvents.filter((item) => item.eventType === "superseded_plan_snapshot")) {
     const value = record(event.event);
     const planHash = string(value.priorPlanHash);
     if (!planHash) continue;
+    let planGeneration = nonnegativeInteger(value.priorPlanGeneration);
+    if (planGeneration === null) {
+      const groupKey = `${event.createdAt}:${planHash}:${string(value.replacementPlanHash)}`;
+      if (legacyGroupKey !== groupKey) {
+        legacyGroupKey = groupKey;
+        legacyGroupPriorGeneration = inferredPriorGeneration;
+        inferredPriorGeneration += 1;
+      }
+      planGeneration = legacyGroupPriorGeneration;
+    } else {
+      inferredPriorGeneration = Math.max(inferredPriorGeneration,
+        nonnegativeInteger(value.replacementPlanGeneration) ?? planGeneration + 1);
+      legacyGroupKey = null;
+    }
+    const prefix = `${planGeneration}:${planHash}`;
     const admission = value.claimAdmission as CanonicalRgClaimAdmission | undefined;
     const work = value.workItem as CanonicalRgWorkItem | undefined;
     const operation = value.operation as CanonicalRgOperation | undefined;
-    if (admission?.atomicClaimId) archivedClaims.set(`${planHash}:${admission.atomicClaimId}`, admission);
-    if (work?.workItemId) archivedWorks.set(`${planHash}:${work.workItemId}`, { planHash, work });
-    if (operation?.operationId) archivedOperations.set(`${planHash}:${operation.operationId}`, operation);
+    if (admission?.atomicClaimId) archivedClaims.set(`${prefix}:${admission.atomicClaimId}`, admission);
+    if (work?.workItemId) archivedWorks.set(`${prefix}:${work.workItemId}`, { planHash, planGeneration, work });
+    if (operation?.operationId) archivedOperations.set(`${prefix}:${operation.operationId}`, { planGeneration, operation });
   }
   const attempts: WorkAttempt[] = [];
-  for (const { planHash, work } of archivedWorks.values()) {
-    attempts.push({ planHash, work, admission: archivedClaims.get(`${planHash}:${work.atomicClaimId}`) ?? null,
-      operations: [...archivedOperations.values()].filter((item) => item.planHash === planHash && item.workItemId === work.workItemId) });
+  for (const { planHash, planGeneration, work } of archivedWorks.values()) {
+    const prefix = `${planGeneration}:${planHash}`;
+    attempts.push({ planHash, planGeneration, work,
+      admission: archivedClaims.get(`${prefix}:${work.atomicClaimId}`) ?? null,
+      operations: [...archivedOperations.values()].filter((item) => item.planGeneration === planGeneration &&
+        item.operation.planHash === planHash && item.operation.workItemId === work.workItemId)
+        .map((item) => item.operation).sort(compareOperations) });
   }
   if (currentPlanHash) {
     for (const work of persisted.rgWorkItems) {
-      attempts.push({ planHash: currentPlanHash, work,
+      attempts.push({ planHash: currentPlanHash, planGeneration: persisted.rgPlanGeneration, work,
         admission: persisted.rgClaimAdmissions.find((item) => item.atomicClaimId === work.atomicClaimId) ?? null,
-        operations: persisted.rgOperations.filter((item) => item.workItemId === work.workItemId && item.planHash === currentPlanHash) });
+        operations: persisted.rgOperations.filter((item) => item.workItemId === work.workItemId &&
+          item.planHash === currentPlanHash).sort(compareOperations) });
     }
   }
-  return attempts.sort((left, right) => left.planHash.localeCompare(right.planHash) ||
+  return attempts.sort((left, right) => left.planGeneration - right.planGeneration ||
     left.work.workItemId.localeCompare(right.work.workItemId));
 }
 
@@ -297,7 +328,8 @@ function progressForAttempt(attempt: WorkAttempt): CanonicalContinuationProgress
       publicScope });
     const documentFingerprint = string(document.documentFingerprint);
     if (!proof || !documentFingerprint) continue;
-    const common = { sourcePlanHash: attempt.planHash, workItemId: attempt.work.workItemId,
+    const common = { sourcePlanHash: attempt.planHash, sourcePlanGeneration: attempt.planGeneration,
+      workItemId: attempt.work.workItemId,
       operationId: verification.operationId, candidateId: verification.candidateId, documentFingerprint,
       authorityBindingId: proof.bindingId };
     if (judgment.periodStatus === "wrong_period" && !periodApplies(attempt.work.knowledgeQuery.asOf,
@@ -345,13 +377,6 @@ function degradationFor(work: CanonicalRgWorkItem): CanonicalContinuationDegrada
   return null;
 }
 
-function repeatedNonImprovingAttempts(attempts: WorkAttempt[]): boolean {
-  const terminal = attempts.filter((item): item is WorkAttempt & { admission: CanonicalRgClaimAdmission } =>
-    item.work.executionState === "completed_unresolved" && item.admission !== null);
-  return terminal.length >= 2 && terminal.every((item) => progressForAttempt(item).length === 0) &&
-    new Set(terminal.map((item) => workContractFingerprint(item.admission, item.work))).size === 1;
-}
-
 function workContractFingerprint(admission: CanonicalRgClaimAdmission, work: CanonicalRgWorkItem): string {
   return digest({
     atomicClaimId: admission.atomicClaimId,
@@ -380,8 +405,12 @@ function aggregateResources(attempts: WorkAttempt[], events: PersistedAnalysisRu
   const workItemIds = new Set<string>();
   for (const attempt of attempts) {
     workItemIds.add(attempt.work.workItemId);
-    for (const operation of attempt.operations) operations.set(`${operation.planHash}:${operation.operationId}`, operation);
-    for (const retry of attempt.work.retryDecisions) retryDecisions.add(retry.decisionId);
+    for (const operation of attempt.operations) {
+      operations.set(`${attempt.planGeneration}:${operation.planHash}:${operation.operationId}`, operation);
+    }
+    for (const retry of attempt.work.retryDecisions) {
+      retryDecisions.add(`${attempt.planGeneration}:${retry.decisionId}`);
+    }
     if (attempt.work.stopReason) terminalReasons.add(attempt.work.stopReason);
   }
   const output = structuredClone(EMPTY_RESOURCE);
@@ -434,13 +463,18 @@ function lifecycleReasons(lifecycle: CanonicalAdaptiveContinuationState["lifecyc
 function persistContinuationState(persisted: PersistedAnalysisRunRecord,
   state: CanonicalAdaptiveContinuationState): CanonicalAdaptiveContinuationState {
   const transaction = db.transaction(() => {
-    const row = db.prepare(`SELECT semantic_revision, semantic_hash, canonical_state_hash, continuation_revision,
-      continuation_state_hash, rf_snapshot_hash, result_json FROM canonical_analysis_runs WHERE id = ?`)
+    const row = db.prepare(`SELECT semantic_revision, semantic_hash, canonical_state_hash, rg_plan_hash,
+      rg_plan_generation, continuation_revision, continuation_state_hash, rf_snapshot_hash, result_json
+      FROM canonical_analysis_runs WHERE id = ?`)
       .get(persisted.id) as Record<string, unknown> | undefined;
     if (!row) throw new Error("adaptive_continuation_analysis_run_unavailable");
     if (Number(row.semantic_revision) !== state.binding.semanticRevision || nullable(row.semantic_hash) !== state.binding.semanticHash ||
       nullable(row.canonical_state_hash) !== state.binding.canonicalStateHash || String(row.rf_snapshot_hash) !== state.binding.rfSnapshotHash) {
       throw new Error("adaptive_continuation_stale_semantic_binding");
+    }
+    if (nullable(row.rg_plan_hash) !== state.binding.planHash ||
+      Number(row.rg_plan_generation ?? 0) !== state.binding.planGeneration) {
+      throw new Error("adaptive_continuation_stale_plan_generation");
     }
     const planRow = db.prepare(`SELECT artifact_json FROM canonical_analysis_run_stages WHERE run_id = ? AND stage = 'rg_planning'`)
       .get(persisted.id) as { artifact_json: string | null } | undefined;
@@ -455,10 +489,11 @@ function persistContinuationState(persisted: PersistedAnalysisRunRecord,
     const createdAt = state.createdAt;
     const stored = { ...state, controllerRevision: revision };
     db.prepare(`INSERT INTO canonical_analysis_continuation_revisions
-      (run_id, controller_revision, semantic_revision, semantic_hash, canonical_state_hash, plan_hash,
-       rf_snapshot_hash, lifecycle, state_hash, state_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      (run_id, controller_revision, semantic_revision, semantic_hash, canonical_state_hash, plan_hash, plan_generation,
+       rf_snapshot_hash, lifecycle, state_hash, state_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(persisted.id, revision, stored.binding.semanticRevision, stored.binding.semanticHash,
-        stored.binding.canonicalStateHash, stored.binding.planHash, stored.binding.rfSnapshotHash, stored.lifecycle,
+        stored.binding.canonicalStateHash, stored.binding.planHash, stored.binding.planGeneration,
+        stored.binding.rfSnapshotHash, stored.lifecycle,
         stored.stateHash, JSON.stringify(stored), createdAt);
     const insertDecision = db.prepare(`INSERT INTO canonical_analysis_continuation_decisions
       (run_id, controller_revision, decision_id, atomic_claim_id, disposition, work_contract_fingerprint,
@@ -474,6 +509,7 @@ function persistContinuationState(persisted: PersistedAnalysisRunRecord,
       boundSemanticRevision: stored.binding.semanticRevision,
       boundSemanticHash: stored.binding.semanticHash,
       boundPlanHash: stored.binding.planHash,
+      boundPlanGeneration: stored.binding.planGeneration,
       continuationReadyCount: stored.continuationReadyAtomicClaimIds.length,
       providerExecution: "regenerated_plan_disabled",
       secondPassProviderCalls: 0,
@@ -530,6 +566,24 @@ function uniqueProgress(values: CanonicalContinuationProgress[]): CanonicalConti
 
 function unique<T extends string>(values: Iterable<T>): T[] {
   return [...new Set(values)].sort();
+}
+
+function uniqueNumbers(values: Iterable<number>): number[] {
+  return [...new Set(values)].sort((left, right) => left - right);
+}
+
+function nonnegativeInteger(value: unknown): number | null {
+  return Number.isSafeInteger(value) && Number(value) >= 0 ? Number(value) : null;
+}
+
+function compareOperations(left: CanonicalRgOperation, right: CanonicalRgOperation): number {
+  const created = left.createdAt.localeCompare(right.createdAt);
+  if (created !== 0) return created;
+  if (left.attempt !== right.attempt) return left.attempt - right.attempt;
+  const kindOrder: Record<CanonicalRgOperation["kind"], number> = {
+    public_search: 0, public_retrieval: 1, investigation: 2, independent_verification: 3,
+  };
+  return kindOrder[left.kind] - kindOrder[right.kind] || left.operationId.localeCompare(right.operationId);
 }
 
 function record(value: unknown): Record<string, any> {

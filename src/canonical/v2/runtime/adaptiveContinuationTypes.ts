@@ -1,7 +1,7 @@
 import type { CanonicalAtomicClaimFacet } from "./atomicClaims.js";
 import type { CanonicalUnresolvedClaimClass } from "./unresolvedClaims.js";
 
-export const ADAPTIVE_CONTINUATION_SCHEMA_VERSION = "canonical_adaptive_continuation_v1" as const;
+export const ADAPTIVE_CONTINUATION_SCHEMA_VERSION = "canonical_adaptive_continuation_v1_1" as const;
 
 export type CanonicalAutonomousResearchLifecycle =
   | "awaiting_first_pass_outcome"
@@ -32,6 +32,7 @@ export type CanonicalContinuationProgress = {
     | "official_document_insufficient_locator_or_subsection"
     | "refinable_scope_mismatch";
   sourcePlanHash: string;
+  sourcePlanGeneration: number;
   workItemId: string;
   operationId: string;
   candidateId: string;
@@ -85,9 +86,11 @@ export type CanonicalClaimContinuationDecision = {
   claimClass: CanonicalUnresolvedClaimClass;
   facet: CanonicalAtomicClaimFacet;
   currentPlanHash: string;
+  currentPlanGeneration: number;
   currentWorkItemId: string | null;
   currentWorkContractFingerprint: string | null;
   priorWorkContractFingerprints: string[];
+  priorPlanGenerations: number[];
   disposition: CanonicalContinuationDisposition;
   materiality: "material" | "contextual" | "immaterial" | "unresolved";
   decisionTier: "D0" | "D1" | "D2";
@@ -109,6 +112,7 @@ export type CanonicalAdaptiveContinuationState = {
     semanticHash: string | null;
     canonicalStateHash: string | null;
     planHash: string | null;
+    planGeneration: number;
     rfSnapshotHash: string;
   };
   lifecycle: CanonicalAutonomousResearchLifecycle;
@@ -129,6 +133,7 @@ export type CanonicalAnalysisRunAutonomousLifecycle = {
   boundSemanticRevision: number;
   boundSemanticHash: string | null;
   boundPlanHash: string | null;
+  boundPlanGeneration: number;
   continuationReadyCount: number;
   providerExecution: "regenerated_plan_disabled";
   secondPassProviderCalls: 0;
@@ -144,6 +149,7 @@ export function initialAutonomousLifecycle(): CanonicalAnalysisRunAutonomousLife
     boundSemanticRevision: 0,
     boundSemanticHash: null,
     boundPlanHash: null,
+    boundPlanGeneration: 0,
     continuationReadyCount: 0,
     providerExecution: "regenerated_plan_disabled",
     secondPassProviderCalls: 0,

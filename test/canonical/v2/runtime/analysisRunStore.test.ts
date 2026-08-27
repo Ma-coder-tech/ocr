@@ -76,6 +76,8 @@ describe("durable canonical AnalysisRun persistence", () => {
     expect(loadedDb.db.prepare(`SELECT COUNT(*) AS count FROM canonical_analysis_run_stages WHERE run_id = ?`).get(first.runId)).toEqual({ count: 10 });
     expect(persisted.rgClaimAdmissions).toEqual(first.artifacts.rgWorkLedger!.claimAdmissions);
     expect(persisted.rgWorkItems).toEqual(first.artifacts.rgWorkLedger!.workItems);
+    expect(persisted.rgPlanHash).toBe(first.artifacts.rgWorkLedger!.planHash);
+    expect(persisted.rgPlanGeneration).toBe(0);
     expect(persisted.rgOperations).toEqual([]);
     expect(loadedDb.db.prepare(`SELECT COUNT(*) AS count FROM canonical_rg_operations WHERE run_id = ?`).get(first.runId))
       .toEqual({ count: 0 });

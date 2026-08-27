@@ -16,6 +16,8 @@ import type {
   CanonicalRgRetrievedDocument,
   CanonicalRgVerificationJudgment,
 } from "../../../../src/canonical/v2/runtime/rgEvidenceExecution.js";
+import type { CanonicalRgClaimAdmission, CanonicalRgWorkItem, CanonicalRgWorkLedger,
+} from "../../../../src/canonical/v2/runtime/rgWorkLedger.js";
 
 const fixture = path.resolve(process.cwd(), "test/fixtures/pdfs/SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf");
 
@@ -311,12 +313,13 @@ describe("production durable claim-bound RG evidence execution", () => {
   }, 30_000);
 
   it("records convergence-required and deterministic post-convergence lifecycle states without executing a second provider pass", async () => {
-    const setup = await runWithOneWorkItem();
+    const setup = await runWithOneWorkItem("economic_category");
     const calls: string[] = [];
     const ports = successfulPorts(calls);
     await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
     const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
     const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(before.rgPlanGeneration).toBe(0);
     expect(() => controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId,
       expectedSemanticRevision: before.semanticRevision,
       expectedPlanHash: "stale-plan-generation" }))
@@ -339,6 +342,7 @@ describe("production durable claim-bound RG evidence execution", () => {
       expectedPlanHash: convergence.run.artifacts.rgWorkLedger!.planHash });
 
     expect(second.controllerRevision).toBe(2);
+    expect(second.binding.planGeneration).toBe(1);
     expect(second.decisions).toEqual(expect.arrayContaining([
       expect.objectContaining({ disposition: "already_resolved", regeneratedProviderExecution: "disabled" }),
     ]));
@@ -347,6 +351,7 @@ describe("production durable claim-bound RG evidence execution", () => {
       retrievalDocuments: 1, operationReservations: 4 });
     expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
     const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(persisted.rgPlanGeneration).toBe(1);
     expect(persisted.rgExecutionEvents).toEqual(expect.arrayContaining([
       expect.objectContaining({ eventType: "superseded_plan_snapshot", workItemId: expect.stringMatching(/^claim:/),
         event: expect.objectContaining({ claimAdmission: expect.objectContaining({ atomicClaimId: expect.any(String) }) }) }),
@@ -545,6 +550,89 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(state.continuationReadyAtomicClaimIds.length).toBeGreaterThan(0);
     expect(state.secondPassProviderCalls).toBe(0);
     expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
+  }, 30_000);
+
+  it("never converts a fixed count of identical no-progress attempts into analytical completion", async () => {
+    const setup = await runWithOneWorkItem();
+    const initial = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const baseLedger = initial.result!.artifacts.rgWorkLedger!;
+    const admission = initial.rgClaimAdmissions[0]!;
+    const baseWork = initial.rgWorkItems[0]!;
+    const unresolved = syntheticWorkState(baseWork, "completed_unresolved", "synthetic_identical_no_progress");
+    replaceActiveWork(setup.db.db, setup.run.runId, unresolved);
+
+    installSyntheticPlan(setup, baseLedger, "zzzz-older-generation", [admission], [unresolved]);
+    installSyntheticPlan(setup, baseLedger, "aaaa-middle-generation", [admission], [unresolved]);
+    const privateAdmission: CanonicalRgClaimAdmission = {
+      ...structuredClone(admission), atomicClaimId: `${admission.atomicClaimId}-private-evidence`, parentClaimIds: [],
+      researchAdmission: "withheld_non_public_evidence_required", knowledgeQuery: null,
+      expectedKnowledgeValueConstraint: null, requiredSourceAuthorities: [],
+      evidenceObjective: "Obtain the private agreement required for this exact claim.",
+    };
+    const planned = syntheticWorkState(baseWork, "planned_for_durable_execution", null);
+    installSyntheticPlan(setup, baseLedger, "mmmm-current-generation", [admission, privateAdmission], [planned]);
+
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    const state = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    const repeated = state.decisions.find((item) => item.atomicClaimId === admission.atomicClaimId)!;
+    const genuinelyNonImprovable = state.decisions.find((item) => item.atomicClaimId === privateAdmission.atomicClaimId)!;
+
+    expect(repeated).toMatchObject({ disposition: "continuation_uncertain_not_authorized",
+      currentPlanGeneration: 3, priorPlanGenerations: [0, 1, 2], nextOperationDelta: null });
+    expect(repeated.reasonCodes).toContain("attempt_count_never_establishes_analytical_completion");
+    expect(repeated.disposition).not.toBe("safely_unresolved");
+    expect(genuinelyNonImprovable).toMatchObject({ disposition: "safely_unresolved",
+      reasonCodes: expect.arrayContaining(["withheld_non_public_evidence_required",
+        "evidence_objective_not_resolvable_through_authorized_public_channel"]) });
+    expect(state.secondPassProviderCalls).toBe(0);
+  }, 30_000);
+
+  it("uses durable generation chronology rather than lexical plan hashes and replays identically after restart", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "ratereveal-plan-chronology-"));
+    temporaryDirectories.push(directory);
+    const databasePath = path.join(directory, "chronology.sqlite");
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const setup = await runWithOneWorkItem();
+    const initial = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const baseLedger = initial.result!.artifacts.rgWorkLedger!;
+    const admission = initial.rgClaimAdmissions[0]!;
+    const baseWork = initial.rgWorkItems[0]!;
+    const unresolved = syntheticWorkState(baseWork, "completed_unresolved", "synthetic_older_unresolved");
+    replaceActiveWork(setup.db.db, setup.run.runId, unresolved);
+
+    installSyntheticPlan(setup, baseLedger, "zzzz-lexically-last-but-generation-one", [admission], [unresolved]);
+    const indeterminate = syntheticWorkState(baseWork, "indeterminate_after_send", "synthetic_latest_after_send");
+    installSyntheticPlan(setup, baseLedger, "aaaa-lexically-first-but-generation-two", [admission], [indeterminate]);
+    installSyntheticPlan(setup, baseLedger, "mmmm-current-generation-three", [admission], []);
+
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    const beforeRestart = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId,
+      expectedPlanHash: "mmmm-current-generation-three", expectedPlanGeneration: 3 });
+    const chronological = beforeRestart.decisions.find((item) => item.atomicClaimId === admission.atomicClaimId)!;
+    expect(chronological).toMatchObject({ disposition: "operationally_degraded_reconciliation_required",
+      currentPlanGeneration: 3, priorPlanGenerations: [0, 1, 2],
+      degradation: { subtype: "indeterminate_after_send", continuationPermission: "reconciliation_required" } });
+    expect(chronological.reasonCodes).toContain("synthetic_latest_after_send");
+    expect(chronological.reasonCodes).not.toContain("synthetic_older_unresolved");
+    const persistedBefore = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(persistedBefore.rgPlanGeneration).toBe(3);
+    expect(persistedBefore.rgExecutionEvents.filter((item) => item.eventType === "superseded_plan_transition")
+      .map((item) => (item.event as { replacementPlanGeneration: number }).replacementPlanGeneration)).toEqual([1, 2, 3]);
+    setup.db.db.close();
+
+    vi.resetModules();
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const [reloadedController, reloadedStore, reloadedDb] = await Promise.all([
+      import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js"),
+      import("../../../../src/canonical/v2/runtime/analysisRunStore.js"),
+      import("../../../../src/db.js"),
+    ]);
+    dbModule = reloadedDb;
+    const afterRestart = reloadedController.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId,
+      expectedPlanHash: "mmmm-current-generation-three", expectedPlanGeneration: 3 });
+    expect(afterRestart).toEqual(beforeRestart);
+    expect(reloadedStore.getPersistedAnalysisRun(setup.run.runId)!.continuationRevisions).toHaveLength(1);
+    expect(afterRestart.secondPassProviderCalls).toBe(0);
   }, 30_000);
 
   it("leases one exact work item to one worker and prevents concurrent duplicate provider work", async () => {
@@ -885,6 +973,33 @@ describe("production durable claim-bound RG evidence execution", () => {
     }
     return { run, store: runStore, executor, db: loadedDb, document, job,
       targetWorkItemId: target.workItemId, retainedWorkItemIds: retained.map((item) => item.workItemId) };
+  }
+
+  function installSyntheticPlan(setup: Awaited<ReturnType<typeof runWithOneWorkItem>>, base: CanonicalRgWorkLedger,
+    planHash: string, claims: CanonicalRgClaimAdmission[], workItems: CanonicalRgWorkItem[]): void {
+    const ledger: CanonicalRgWorkLedger = {
+      ...structuredClone(base), planHash, claimAdmissions: structuredClone(claims), workItems: structuredClone(workItems),
+      operations: [], summary: { ...base.summary, atomicClaimCount: claims.length,
+        plannedWorkItemCount: workItems.length, operationCount: 0 },
+    };
+    setup.store.persistRgWorkLedger(setup.run.runId, ledger, new Date().toISOString());
+    setup.db.db.prepare(`UPDATE canonical_analysis_run_stages SET artifact_json = ?, artifact_hash = NULL
+      WHERE run_id = ? AND stage = 'rg_planning'`).run(JSON.stringify(ledger), setup.run.runId);
+  }
+
+  function syntheticWorkState(work: CanonicalRgWorkItem, executionState: CanonicalRgWorkItem["executionState"],
+    stopReason: string | null): CanonicalRgWorkItem {
+    const terminal = executionState !== "planned_for_durable_execution";
+    return { ...structuredClone(work), state: terminal ? "terminal" : "planned", executionState, reservation: null,
+      progress: { state: terminal ? executionState === "indeterminate_after_send" ? "degraded" : "unresolved" : "not_started",
+        operationsAttempted: 0, evidenceItemsObserved: 0 }, extensionDecisions: [], retryDecisions: [],
+      resourceConsumption: { providerCalls: 0, searchCalls: 0, retrievalBytes: 0, aiCalls: 0, tokens: null },
+      stopReason, verifiedEvidenceRefs: [] };
+  }
+
+  function replaceActiveWork(database: typeof dbModule.db, runId: string, work: CanonicalRgWorkItem): void {
+    database.prepare(`UPDATE canonical_rg_work_items SET state = ?, execution_state = ?, work_item_json = ?
+      WHERE run_id = ? AND work_item_id = ?`).run(work.state, work.executionState, JSON.stringify(work), runId, work.workItemId);
   }
 });
 
