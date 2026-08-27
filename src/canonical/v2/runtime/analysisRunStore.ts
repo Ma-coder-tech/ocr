@@ -4,6 +4,11 @@ import type { ParsedDocument } from "../../../parser.js";
 import { db, nowIso } from "../../../db.js";
 import type { CanonicalEconomicsV2CompletenessStatus } from "../types.js";
 import type { CanonicalRgClaimAdmission, CanonicalRgOperation, CanonicalRgWorkItem, CanonicalRgWorkLedger } from "./rgWorkLedger.js";
+import { digestCanonical } from "./integrityHashes.js";
+import type {
+  CanonicalCurrentRunExternalEvidenceRegistry,
+  CanonicalSemanticConvergenceRevision,
+} from "./semanticConvergenceTypes.js";
 import { canonicalRfExecutionContextHash } from "./rfClaimResolution.js";
 import {
   governedRfKnowledgeInput,
@@ -63,6 +68,10 @@ export type PersistedAnalysisRunRecord = {
   parserDriverId: string | null;
   attemptCount: number;
   canonicalTruthHash: string | null;
+  financialFoundationHash: string | null;
+  semanticHash: string | null;
+  canonicalStateHash: string | null;
+  semanticRevision: number;
   rfSnapshotHash: string;
   rfContextHash: string;
   rfCatalogStatus: "available" | "unavailable" | "unbound";
@@ -85,6 +94,9 @@ export type PersistedAnalysisRunRecord = {
     eventHash: string;
     createdAt: string;
   }>;
+  externalEvidenceRegistry: CanonicalCurrentRunExternalEvidenceRegistry["evidence"];
+  externalEvidenceRegistryErrors: string[];
+  semanticRevisions: CanonicalSemanticConvergenceRevision[];
   result: CanonicalAnalysisRun | null;
 };
 
@@ -187,10 +199,11 @@ function beginRun(input: {
     db.prepare(`
       INSERT INTO canonical_analysis_runs (
         id, job_id, source_document_ref, source_fingerprint, schema_version, implementation_version, policy_version,
-        status, family_status, parser_driver_id, attempt_count, canonical_truth_hash, rf_snapshot_hash, rf_context_hash,
+        status, family_status, parser_driver_id, attempt_count, canonical_truth_hash, financial_foundation_hash,
+        semantic_hash, canonical_state_hash, semantic_revision, rf_snapshot_hash, rf_context_hash,
         rf_catalog_status, rf_catalog_binding_json, limitations_json, result_json,
         created_at, started_at, completed_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'running', 'unresolved', NULL, ?, NULL, ?, ?, ?, ?, '[]', NULL, ?, ?, NULL, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'running', 'unresolved', NULL, ?, NULL, NULL, NULL, NULL, 0, ?, ?, ?, ?, '[]', NULL, ?, ?, NULL, ?)
       ON CONFLICT(job_id) DO UPDATE SET
         source_document_ref = excluded.source_document_ref,
         schema_version = excluded.schema_version,
@@ -201,6 +214,10 @@ function beginRun(input: {
         parser_driver_id = NULL,
         attempt_count = excluded.attempt_count,
         canonical_truth_hash = NULL,
+        financial_foundation_hash = NULL,
+        semantic_hash = NULL,
+        canonical_state_hash = NULL,
+        semantic_revision = 0,
         rf_snapshot_hash = excluded.rf_snapshot_hash,
         rf_context_hash = excluded.rf_context_hash,
         rf_catalog_status = excluded.rf_catalog_status,
@@ -261,7 +278,7 @@ function finishPersistedStage(runId: string, outcome: AnalysisRunStageOutcome, a
   transaction();
 }
 
-function persistRgWorkLedger(runId: string, ledger: CanonicalRgWorkLedger, now: string) {
+export function persistRgWorkLedger(runId: string, ledger: CanonicalRgWorkLedger, now: string) {
   const existingPlans = new Set((db.prepare(`SELECT DISTINCT plan_hash FROM canonical_rg_work_items WHERE run_id = ?`)
     .all(runId) as Array<{ plan_hash: string }>).map((row) => row.plan_hash));
   const samePlan = existingPlans.size === 0 || (existingPlans.size === 1 && existingPlans.has(ledger.planHash));
@@ -353,10 +370,12 @@ function finishRun(run: CanonicalAnalysisRun) {
   const resultWithoutArtifacts = { ...run, artifacts: undefined };
   db.prepare(`
     UPDATE canonical_analysis_runs
-    SET status = ?, family_status = ?, parser_driver_id = ?, canonical_truth_hash = ?, limitations_json = ?,
+    SET status = ?, family_status = ?, parser_driver_id = ?, canonical_truth_hash = ?, financial_foundation_hash = ?,
+        semantic_hash = ?, canonical_state_hash = ?, semantic_revision = ?, limitations_json = ?,
         result_json = ?, completed_at = ?, updated_at = ?
     WHERE id = ?
-  `).run(run.status, run.familyStatus, run.parser.driverId, run.canonicalTruthHash, JSON.stringify(run.limitations),
+  `).run(run.status, run.familyStatus, run.parser.driverId, run.canonicalTruthHash, run.financialFoundationHash,
+    run.semanticHash, run.canonicalStateHash, run.semanticRevision, JSON.stringify(run.limitations),
     JSON.stringify(resultWithoutArtifacts), now, now, run.runId);
 }
 
@@ -378,6 +397,8 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
   const rgWorkItems = mapRgWorkItems(runId);
   const rgOperations = mapRgOperations(runId);
   const rgExecutionEvents = mapRgExecutionEvents(runId);
+  const externalEvidence = mapExternalEvidence(runId);
+  const semanticRevisions = mapSemanticRevisions(runId);
   const result = summary ? ({ ...summary, artifacts } as unknown as CanonicalAnalysisRun) : null;
   return {
     id: runId,
@@ -392,6 +413,10 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
     parserDriverId: row.parser_driver_id ? String(row.parser_driver_id) : null,
     attemptCount: Number(row.attempt_count),
     canonicalTruthHash: row.canonical_truth_hash ? String(row.canonical_truth_hash) : null,
+    financialFoundationHash: row.financial_foundation_hash ? String(row.financial_foundation_hash) : null,
+    semanticHash: row.semantic_hash ? String(row.semantic_hash) : null,
+    canonicalStateHash: row.canonical_state_hash ? String(row.canonical_state_hash) : null,
+    semanticRevision: Number(row.semantic_revision ?? 0),
     rfSnapshotHash: String(row.rf_snapshot_hash ?? ""),
     rfContextHash: String(row.rf_context_hash ?? ""),
     rfCatalogStatus: String(row.rf_catalog_status ?? "unbound") as PersistedAnalysisRunRecord["rfCatalogStatus"],
@@ -406,8 +431,70 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
     rgWorkItems,
     rgOperations,
     rgExecutionEvents,
+    externalEvidenceRegistry: externalEvidence.evidence,
+    externalEvidenceRegistryErrors: externalEvidence.errors,
+    semanticRevisions,
     result,
   };
+}
+
+export function persistCanonicalSemanticConvergence(input: {
+  run: CanonicalAnalysisRun;
+  revision: CanonicalSemanticConvergenceRevision;
+  registry: CanonicalCurrentRunExternalEvidenceRegistry;
+}): void {
+  const existing = db.prepare(`SELECT revision_json FROM canonical_analysis_semantic_revisions
+    WHERE run_id = ? AND semantic_hash = ?`).get(input.run.runId, input.revision.semanticHash) as { revision_json: string } | undefined;
+  if (existing) return;
+  const now = input.revision.createdAt;
+  const transaction = db.transaction(() => {
+    const insertEvidence = db.prepare(`INSERT OR IGNORE INTO canonical_analysis_external_evidence
+      (run_id, evidence_id, evidence_json, evidence_hash, source_plan_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)`);
+    for (const evidence of input.registry.evidence) {
+      const json = JSON.stringify(evidence);
+      insertEvidence.run(input.run.runId, evidence.evidenceId, json, digestCanonical(evidence), evidence.planHash, now);
+      const stored = db.prepare(`SELECT evidence_hash FROM canonical_analysis_external_evidence WHERE run_id = ? AND evidence_id = ?`)
+        .get(input.run.runId, evidence.evidenceId) as { evidence_hash: string };
+      if (stored.evidence_hash !== digestCanonical(evidence)) throw new Error("semantic_convergence_external_evidence_immutable_conflict");
+    }
+    db.prepare(`INSERT INTO canonical_analysis_semantic_revisions
+      (run_id, revision, parent_semantic_hash, financial_foundation_hash, semantic_hash, canonical_state_hash,
+       evidence_registry_hash, prior_plan_hash, next_plan_hash, revision_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(input.run.runId, input.revision.revision,
+      input.revision.parentSemanticHash, input.revision.financialFoundationHash, input.revision.semanticHash,
+      input.revision.canonicalStateHash, input.revision.evidenceRegistryHash, input.revision.priorPlanHash,
+      input.revision.nextPlanHash, JSON.stringify(input.revision), now);
+    const insertApplication = db.prepare(`INSERT INTO canonical_analysis_semantic_applications
+      (run_id, revision, application_id, atomic_claim_id, facet, source_kind, disposition,
+       application_json, application_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const application of input.revision.applications) {
+      insertApplication.run(input.run.runId, input.revision.revision, application.applicationId,
+        application.atomicClaimId, application.facet, application.sourceKind, application.disposition,
+        JSON.stringify(application), digestCanonical(application), now);
+    }
+    const insertStageRevision = db.prepare(`INSERT INTO canonical_analysis_stage_revisions
+      (run_id, revision, stage, artifact_json, artifact_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)`);
+    const stages: Array<[AnalysisRunStageId, unknown]> = [
+      ["rd", input.run.artifacts.rd], ["re", input.run.artifacts.re],
+      ["claim_inventory", input.run.artifacts.unresolvedClaims], ["rg_planning", input.run.artifacts.rgWorkLedger],
+      ["rh", input.run.artifacts.rh],
+    ];
+    for (const [stage, artifact] of stages) {
+      const artifactJson = artifact === null ? null : JSON.stringify(artifact);
+      const artifactHash = artifact === null ? null : digestCanonical(artifact);
+      insertStageRevision.run(input.run.runId, input.revision.revision, stage, artifactJson, artifactHash, now);
+      db.prepare(`UPDATE canonical_analysis_run_stages SET artifact_json = ?, artifact_hash = ?, updated_at = ?
+        WHERE run_id = ? AND stage = ?`).run(artifactJson, artifactHash, now, input.run.runId, stage);
+    }
+    if (input.run.artifacts.rgWorkLedger) persistRgWorkLedger(input.run.runId, input.run.artifacts.rgWorkLedger, now);
+    const resultWithoutArtifacts = { ...input.run, artifacts: undefined };
+    db.prepare(`UPDATE canonical_analysis_runs SET canonical_truth_hash = ?, financial_foundation_hash = ?, semantic_hash = ?,
+      canonical_state_hash = ?, semantic_revision = ?, limitations_json = ?, result_json = ?, updated_at = ? WHERE id = ?`)
+      .run(input.run.canonicalTruthHash, input.run.financialFoundationHash, input.run.semanticHash,
+        input.run.canonicalStateHash, input.run.semanticRevision, JSON.stringify(input.run.limitations),
+        JSON.stringify(resultWithoutArtifacts), now, input.run.runId);
+  });
+  transaction();
 }
 
 function mapStages(runId: string): PersistedAnalysisRunStage[] {
@@ -470,6 +557,33 @@ function mapRgExecutionEvents(runId: string): PersistedAnalysisRunRecord["rgExec
     eventHash: String(row.event_hash),
     createdAt: String(row.created_at),
   }));
+}
+
+function mapExternalEvidence(runId: string): {
+  evidence: CanonicalCurrentRunExternalEvidenceRegistry["evidence"];
+  errors: string[];
+} {
+  const rows = db.prepare(`SELECT evidence_id, evidence_json, evidence_hash FROM canonical_analysis_external_evidence
+    WHERE run_id = ? ORDER BY evidence_id`).all(runId) as Array<{
+      evidence_id: string; evidence_json: string; evidence_hash: string;
+    }>;
+  const evidence: CanonicalCurrentRunExternalEvidenceRegistry["evidence"] = [];
+  const errors: string[] = [];
+  for (const row of rows) {
+    const value = parseJson<CanonicalCurrentRunExternalEvidenceRegistry["evidence"][number] | null>(row.evidence_json, null);
+    if (!value || value.evidenceId !== row.evidence_id || digestCanonical(value) !== row.evidence_hash) {
+      errors.push(`external_evidence_persisted_hash_invalid:${row.evidence_id}`);
+    } else {
+      evidence.push(value);
+    }
+  }
+  return { evidence, errors };
+}
+
+function mapSemanticRevisions(runId: string): CanonicalSemanticConvergenceRevision[] {
+  const rows = db.prepare(`SELECT revision_json FROM canonical_analysis_semantic_revisions WHERE run_id = ? ORDER BY revision`)
+    .all(runId) as Array<{ revision_json: string }>;
+  return rows.map((row) => parseJson(row.revision_json, null as never));
 }
 
 function emptyResource(elapsedMs: number | null): PersistedAnalysisRunStage["resource"] {

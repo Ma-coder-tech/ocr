@@ -4,6 +4,7 @@ import {
   buildCanonicalEconomicsV2FromFiserv,
   buildCanonicalUnresolvedClaimInventory,
   buildCanonicalRfClaimResolution,
+  buildCanonicalRgWorkLedger,
   buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing,
   categorySubjectCode,
   buildObservationalCanonicalPricingV2FromFiserv,
@@ -60,7 +61,7 @@ describe("capability-bound economic ledger", () => {
     overclaimed.economicLayer.charges[0]!.categoryResolution = "proven";
     overclaimed.economicLayer.charges[0]!.contributionStatus = "contributes_classified";
     expect(validateCanonicalEconomicsV2EconomicAnalysis(overclaimed).validation.errors)
-      .toContain("Capability-bound category semantics require exactly one admitted RF knowledge application.");
+      .toContain("Capability-bound category semantics require exactly one admitted canonical semantic application.");
 
     const detachedProof = structuredClone(economic);
     detachedProof.economicLayer.charges[0]!.supportingDetailAdmissionEvidenceRefs = [];
@@ -121,6 +122,10 @@ describe("capability-bound economic ledger", () => {
 
     expect(rf.validation.status).toBe("valid");
     expect(rf.categoryApplications).toHaveLength(1);
+    const compilerProof = buildCanonicalRgWorkLedger({ inventory: baseInventory, economic: base, synthesis: null,
+      rfResolution: rf }).claimAdmissions.find((item) => item.facet === "economic_category" &&
+        item.canonicalRefs.includes(firstCharge.id));
+    expect(compilerProof?.atomicClaimId).toBe(rf.categoryApplications[0]!.atomicClaimId);
     expect(rf.decisions.find((item) => item.applicationKey)?.disposition).toBe("resolved_by_admitted_knowledge");
     expect(resolved.validation.status).toBe("valid");
     expect(resolved.economicLayer.charges[0]).toMatchObject({
@@ -131,7 +136,7 @@ describe("capability-bound economic ledger", () => {
       financialDirection: firstCharge.financialDirection,
       contributingOccurrenceRef: firstCharge.contributingOccurrenceRef,
       reconciliationRefs: firstCharge.reconciliationRefs,
-      knowledgeApplicationRefs: ["economic_knowledge_application_001"],
+      semanticApplicationRefs: ["economic_semantic_application_001"],
       roleClaimRefs: [],
     });
     expect(resolved.economicLayer.charges.slice(1).every((item) =>
@@ -144,9 +149,9 @@ describe("capability-bound economic ledger", () => {
     expect(validateCanonicalRfSemanticConvergence({ base, resolved: financiallyTampered, rf }))
       .toContain(`rf_semantic_application_changed_charge_truth:${firstCharge.id}`);
     const lineageTampered = structuredClone(resolved);
-    lineageTampered.economicLayer.knowledgeApplications[0]!.selectedEntryRefs = [];
+    lineageTampered.economicLayer.semanticApplications[0]!.selectedEntryRefs = [];
     expect(validateCanonicalEconomicsV2EconomicAnalysis(lineageTampered).validation.errors)
-      .toContain("Knowledge application economic_knowledge_application_001 lacks admitted RF entry provenance.");
+      .toContain("Semantic application economic_semantic_application_001 lacks admitted RF snapshot provenance.");
     expect(finalInventory.countsByClass).toMatchObject({
       economic_category: 2,
       economic_ownership: 3,
@@ -159,6 +164,27 @@ describe("capability-bound economic ledger", () => {
     expect(remainingClasses).toEqual(expect.arrayContaining([
       "economic_control", "economic_ownership", "merchant_actionability",
     ]));
+
+    const selfAssertedExternal = {
+      ...rf.categoryApplications[0]!,
+      sourceKind: "current_run_verified_rg_evidence" as const,
+      knowledgeSnapshotHash: null,
+      selectedEntryRefs: [],
+      sourceAuthorities: ["processor_publication" as const],
+      externalEvidenceRefs: ["rg-evidence-not-admitted"],
+    };
+    const rejectedExternal = buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(pricing, [selfAssertedExternal]);
+    expect(rejectedExternal.validation.status).toBe("invalid");
+    expect(rejectedExternal.validation.errors).toContain(
+      "Semantic application economic_semantic_application_001 lacks verified current-run external evidence provenance.",
+    );
+    const missingAuthority = buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(pricing, [{
+      ...selfAssertedExternal,
+      sourceAuthorities: [],
+    }], ["rg-evidence-not-admitted"]);
+    expect(missingAuthority.validation.errors).toContain(
+      "Semantic application economic_semantic_application_001 lacks verified current-run external evidence provenance.",
+    );
   });
 
   it("refuses non-admitted, wrong-period, conflicting, and malformed category knowledge", () => {
@@ -231,7 +257,10 @@ describe("capability-bound economic ledger", () => {
       value: { kind: "mapping", canonicalCode: "not_a_canonical_category", sourceCode: subjectCode } }, independentValidEntry]);
     expect(mixed.validation.status).toBe("valid");
     expect(mixed.categoryApplications).toEqual([
-      expect.objectContaining({ chargeRef: economic.economicLayer.charges[1]!.id, category: "other_source_grounded_fee" }),
+      expect.objectContaining({
+        chargeRef: economic.economicLayer.charges[1]!.id,
+        value: expect.objectContaining({ kind: "mapping", canonicalCode: "other_source_grounded_fee" }),
+      }),
     ]);
     expect(subjectCode).toMatch(/^economic_category_[a-f0-9]{32}$/);
     expect(subjectCode).not.toContain(occurrence.sourceLabel.toLowerCase().replace(/\s+/g, "_"));

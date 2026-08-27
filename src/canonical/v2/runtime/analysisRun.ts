@@ -24,9 +24,12 @@ import {
   validateCanonicalRfSemanticConvergence,
   type CanonicalRfKnowledgeInput,
 } from "./rfClaimResolution.js";
-import type { CanonicalEconomicKnowledgeApplicationAdmission } from "../economicAnalysis.js";
+import type { CanonicalEconomicSemanticApplicationAdmission } from "../economicAnalysis.js";
 import { buildCanonicalRgWorkLedger } from "./rgWorkLedger.js";
 import type { CanonicalEconomicsV2CompletenessStatus } from "../types.js";
+import { canonicalStateHash as buildCanonicalStateHash, financialFoundationHash, semanticStateHash } from "./integrityHashes.js";
+import { buildSemanticTailPlan, buildSemanticTailRd, buildSemanticTailRe, buildSemanticTailRh,
+  buildSemanticTailUnresolved } from "./semanticTail.js";
 import {
   ANALYSIS_RUN_IMPLEMENTATION_VERSION,
   ANALYSIS_RUN_POLICY_VERSION,
@@ -51,7 +54,7 @@ type StageBuilders = {
   pricing: typeof buildObservationalCanonicalPricingV2FromFiserv;
   economic: (
     pricing: Parameters<typeof buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing>[0],
-    applications?: readonly CanonicalEconomicKnowledgeApplicationAdmission[],
+    applications?: readonly CanonicalEconomicSemanticApplicationAdmission[],
   ) => ReturnType<typeof buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing>;
   synthesis: typeof observeFiservEconomicsInCanonicalSynthesisV2;
   claims: typeof buildCanonicalUnresolvedClaimInventory;
@@ -271,8 +274,8 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   let provisionalRd: CanonicalAnalysisArtifacts["rd"] = null;
   if (artifacts.rc && (artifacts.rc.validation.status === "valid" || input.evaluationContinueInvalidStages)) {
     try {
-      provisionalRd = builders.economic(artifacts.rc, []);
-      const provisionalClaims = builders.claims({ pricing: artifacts.rc, economic: provisionalRd, synthesis: null });
+      provisionalRd = buildSemanticTailRd({ pricing: artifacts.rc, applications: [], builder: builders.economic });
+      const provisionalClaims = buildSemanticTailUnresolved({ pricing: artifacts.rc, economic: provisionalRd, synthesis: null }, builders.claims);
       const rfKnowledge = input.rfKnowledge ?? {
         entries: [], tenantRef: `analysis_run_${input.runId}`, accountRef: `analysis_run_${input.runId}`,
         binding: {
@@ -302,7 +305,8 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
       const applications = artifacts.rfResolution?.validation.status === "valid"
         ? artifacts.rfResolution.categoryApplications
         : [];
-      const resolvedRd = applications.length === 0 && provisionalRd ? provisionalRd : builders.economic(artifacts.rc, applications);
+      const resolvedRd = applications.length === 0 && provisionalRd ? provisionalRd
+        : buildSemanticTailRd({ pricing: artifacts.rc, applications, builder: builders.economic });
       if (provisionalRd && artifacts.rfResolution?.validation.status === "valid") {
         const convergenceErrors = validateCanonicalRfSemanticConvergence({
           base: provisionalRd, resolved: resolvedRd, rf: artifacts.rfResolution,
@@ -316,13 +320,13 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
 
   if (artifacts.rd && (artifacts.rd.validation.status === "valid" || input.evaluationContinueInvalidStages)) {
     try {
-      artifacts.re = builders.synthesis(artifacts.rd);
+      artifacts.re = buildSemanticTailRe({ economic: artifacts.rd, builder: builders.synthesis });
       finishValidatedStage(input.observer, stageOutcomes, "re", artifacts.re, artifacts.re.validation);
     } catch (error) { failStage(input.observer, stageOutcomes, "re", error); }
   } else dependencyWithheld(input.observer, stageOutcomes, "re", "RD");
 
   try {
-    artifacts.unresolvedClaims = builders.claims({ pricing: artifacts.rc, economic: artifacts.rd, synthesis: artifacts.re });
+    artifacts.unresolvedClaims = buildSemanticTailUnresolved({ pricing: artifacts.rc, economic: artifacts.rd, synthesis: artifacts.re }, builders.claims);
     finishValidatedStage(input.observer, stageOutcomes, "claim_inventory", artifacts.unresolvedClaims,
       artifacts.unresolvedClaims.validation);
   } catch (error) {
@@ -331,12 +335,12 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
 
   if (artifacts.unresolvedClaims && artifacts.unresolvedClaims.validation.status === "valid") {
     try {
-      artifacts.rgWorkLedger = builders.rgPlanning({
+      artifacts.rgWorkLedger = buildSemanticTailPlan({
         inventory: artifacts.unresolvedClaims,
         economic: artifacts.rd,
         synthesis: artifacts.re,
         rfResolution: artifacts.rfResolution,
-      });
+      }, builders.rgPlanning);
       finishValidatedStage(input.observer, stageOutcomes, "rg_planning", artifacts.rgWorkLedger,
         artifacts.rgWorkLedger.validation);
     } catch (error) { failStage(input.observer, stageOutcomes, "rg_planning", error); }
@@ -344,7 +348,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
 
   if (artifacts.re && (artifacts.re.validation.status === "valid" || input.evaluationContinueInvalidStages) && readiness) {
     try {
-      artifacts.rh = builders.report({ synthesisAnalysis: artifacts.re, sourceReadiness: readiness });
+      artifacts.rh = buildSemanticTailRh({ synthesisAnalysis: artifacts.re, sourceReadiness: readiness }, builders.report);
       finishValidatedStage(input.observer, stageOutcomes, "rh", artifacts.rh, artifacts.rh.audit.validation);
     } catch (error) { failStage(input.observer, stageOutcomes, "rh", error); }
   } else dependencyWithheld(input.observer, stageOutcomes, "rh", "RE");
@@ -363,10 +367,15 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   const canonicalTruthHash = artifacts.rb
     ? hashCanonical({ rb: artifacts.rb, rc: artifacts.rc, rd: artifacts.rd, re: artifacts.re })
     : null;
+  const financialHash = financialFoundationHash({ sourceFingerprint: fingerprint, capabilityProof, artifacts });
+  const semanticHash = artifacts.rb ? semanticStateHash(artifacts) : null;
+  const canonicalStateHash = semanticHash ? buildCanonicalStateHash({ financialFoundationHash: financialHash,
+    semanticHash, rfSnapshotHash: artifacts.rfResolution?.snapshot.snapshotHash ?? "" }) : null;
   return {
     run: terminalRun({ input, fingerprint, status, parser: parserState,
       familyStatus: capabilityProof?.family.status ?? "unresolved", capabilityProof, admission, knownLayoutAdmission,
-      fullFamilyDecision, readiness, artifacts, stageOutcomes, canonicalTruthHash, limitations }),
+      fullFamilyDecision, readiness, artifacts, stageOutcomes, canonicalTruthHash, financialFoundationHash: financialHash,
+      semanticHash, canonicalStateHash, limitations }),
     diagnostics: {
       document: input.document,
       driver,
@@ -400,6 +409,9 @@ function terminalRun(input: {
   stageOutcomes: CanonicalAnalysisRun["stageOutcomes"];
   limitations: string[];
   canonicalTruthHash?: string | null;
+  financialFoundationHash?: string | null;
+  semanticHash?: string | null;
+  canonicalStateHash?: string | null;
 }): CanonicalAnalysisRun {
   return {
     manifest: {
@@ -414,6 +426,8 @@ function terminalRun(input: {
       publicResearch: "typed_search_intent_dynamic_authority_validation",
       rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled",
       rgPlanning: "durable_claim_scoped_execution_eligible",
+      semanticConvergence: "current_run_exact_claim_revisioned",
+      regeneratedPlanExecution: "disabled",
       benchmarkExecution: "disabled",
       savingsExecution: "disabled",
       businessContextAuthority: "excluded_from_canonical_economics",
@@ -433,6 +447,10 @@ function terminalRun(input: {
     artifacts: input.artifacts,
     stageOutcomes: input.stageOutcomes,
     canonicalTruthHash: input.canonicalTruthHash ?? null,
+    financialFoundationHash: input.financialFoundationHash ?? null,
+    semanticHash: input.semanticHash ?? null,
+    canonicalStateHash: input.canonicalStateHash ?? null,
+    semanticRevision: 0,
     canonicalTruthPreserved: true,
     limitations: unique(input.limitations),
   };

@@ -5,6 +5,9 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { unboundedKnowledgeScope, type KnowledgeAuditEvent, type KnowledgeEntry } from "../../../../src/canonical/v2/index.js";
+import { admittedKnowledge } from "../knowledge/knowledgeFixtures.js";
+
 import type {
   CanonicalRgDiscoveryCandidate,
   CanonicalRgEvidenceExecutionPorts,
@@ -369,7 +372,174 @@ describe("production durable claim-bound RG evidence execution", () => {
     }
   });
 
-  async function runWithOneWorkItem() {
+  it("applies exact current-run category evidence through revisioned convergence without changing financial truth", async () => {
+    const setup = await runWithOneWorkItem("economic_category");
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const beforeFinancial = before.financialFoundationHash;
+    const beforeTruth = before.canonicalTruthHash;
+    const admission = before.rgClaimAdmissions[0]!;
+    const execution = await setup.executor.executeDurableCanonicalRgEvidence({
+      runId: setup.run.runId, ports: successfulPorts([]), workerId: "semantic-category-worker",
+    });
+    const semantic = await import("../../../../src/canonical/v2/runtime/semanticConvergence.js");
+
+    const convergence = semantic.convergeDurableCanonicalAnalysisRun({ runId: setup.run.runId });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const application = convergence.run.artifacts.rd!.economicLayer.semanticApplications
+      .find((item) => item.atomicClaimId === admission.atomicClaimId)!;
+    const charge = convergence.run.artifacts.rd!.economicLayer.charges.find((item) => item.id === admission.canonicalRefs[0])!;
+
+    expect(execution.verifiedEvidence).toHaveLength(1);
+    expect(convergence).toMatchObject({ appliedCount: 1, providerCalls: 0 });
+    expect(application).toMatchObject({
+      facet: "economic_category", sourceKind: "current_run_verified_rg_evidence",
+      externalEvidenceRefs: [execution.verifiedEvidence[0]!.evidenceId], selectedEntryRefs: [], knowledgeSnapshotHash: null,
+    });
+    expect(application.value).toMatchObject({ kind: "mapping", canonicalCode: "other_source_grounded_fee" });
+    expect(charge).toMatchObject({ category: "other_source_grounded_fee", categoryResolution: "proven" });
+    expect(convergence.run.artifacts.rb!.sourceModel.evidence.map((item) => item.id))
+      .not.toContain(execution.verifiedEvidence[0]!.evidenceId);
+    expect(convergence.run.financialFoundationHash).toBe(beforeFinancial);
+    expect(persisted.financialFoundationHash).toBe(beforeFinancial);
+    expect(convergence.run.canonicalTruthHash).not.toBe(beforeTruth);
+    expect(convergence.run.semanticHash).not.toBe(before.semanticHash);
+    expect(convergence.run.canonicalStateHash).not.toBe(before.canonicalStateHash);
+    expect(convergence.run.semanticRevision).toBe(1);
+    expect(persisted.externalEvidenceRegistry).toEqual(execution.verifiedEvidence);
+    expect(persisted.semanticRevisions).toHaveLength(1);
+    expect(persisted.rgClaimAdmissions.some((item) => item.atomicClaimId === admission.atomicClaimId)).toBe(false);
+    expect(persisted.rgExecutionEvents.some((event) => event.eventType === "superseded_plan_snapshot")).toBe(true);
+    const archivedVerification = persisted.rgExecutionEvents.find((event) => event.eventType === "superseded_plan_snapshot" &&
+      (event.event as { operation?: { kind?: string } }).operation?.kind === "independent_verification");
+    expect(archivedVerification?.event).toMatchObject({ operation: { receipt: { calls: 1, completionState: "completed" } } });
+    expect(convergence.run.artifacts.rh).not.toBeNull();
+  }, 30_000);
+
+  it("applies one non-constraint role facet to a claim-scoped anonymous participant while leaving adjacent facets independent", async () => {
+    const setup = await runWithOneWorkItem("price_setter");
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const admission = before.rgClaimAdmissions[0]!;
+    const evidence = await setup.executor.executeDurableCanonicalRgEvidence({
+      runId: setup.run.runId, ports: successfulPorts([]), workerId: "semantic-role-worker",
+    });
+    const semantic = await import("../../../../src/canonical/v2/runtime/semanticConvergence.js");
+    const convergence = semantic.convergeDurableCanonicalAnalysisRun({ runId: setup.run.runId });
+    const layer = convergence.run.artifacts.rd!.economicLayer;
+    const roleClaim = layer.roleClaims.find((item) => item.semanticApplicationRef !== null &&
+      item.dimension === "price_setter" && item.chargeRef === admission.canonicalRefs[0])!;
+    const participant = layer.participants.find((item) => item.id === roleClaim.participantRef)!;
+    const unresolvedForCharge = convergence.run.artifacts.unresolvedClaims!.claims
+      .filter((item) => item.canonicalRefs.includes(admission.canonicalRefs[0]!));
+
+    expect(convergence.run.artifacts.rd!.validation).toMatchObject({ status: "valid", errors: [] });
+    expect(roleClaim).toMatchObject({ dimension: "price_setter", resolution: "proven",
+      externalEvidenceRefs: [evidence.verifiedEvidence[0]!.evidenceId] });
+    expect(participant).toMatchObject({ identity: null, identityStatus: "unresolved", roles: ["processor_platform"] });
+    expect(layer.participants).toHaveLength(1);
+    const remainingFacets = unresolvedForCharge.flatMap((item) => item.unresolvedFacets);
+    expect(remainingFacets).not.toContain("price_setter");
+    expect(remainingFacets).toEqual(expect.arrayContaining(["collector", "economic_owner"]));
+    expect(convergence.run.financialFoundationHash).toBe(before.financialFoundationHash);
+  }, 30_000);
+
+  it("retains representable-but-insufficient constraint evidence as typed unapplied evidence and does not regenerate futile work", async () => {
+    const setup = await runWithOneWorkItem("constraint");
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const admission = before.rgClaimAdmissions[0]!;
+    const execution = await setup.executor.executeDurableCanonicalRgEvidence({
+      runId: setup.run.runId, ports: successfulPorts([]), workerId: "semantic-constraint-worker",
+    });
+    const semantic = await import("../../../../src/canonical/v2/runtime/semanticConvergence.js");
+    const convergence = semantic.convergeDurableCanonicalAnalysisRun({ runId: setup.run.runId });
+    const decision = convergence.revision.applications.find((item) => item.atomicClaimId === admission.atomicClaimId)!;
+
+    expect(execution.verifiedEvidence).toHaveLength(1);
+    expect(decision).toMatchObject({
+      facet: "constraint", disposition: "verified_but_unapplied_contract_insufficient", semanticApplication: null,
+      evidenceRefs: [execution.verifiedEvidence[0]!.evidenceId], reasonCodes: ["constraint_requires_canonical_constraint_payload"],
+    });
+    expect(convergence.run.artifacts.rd!.economicLayer.semanticApplications).toEqual([]);
+    expect(convergence.run.artifacts.unresolvedClaims!.claims.some((claim) => claim.researchWithheldFacets
+      .some((item) => item.facet === "constraint" && item.reasonCode === "constraint_requires_canonical_constraint_payload"))).toBe(true);
+    expect(convergence.run.artifacts.rgWorkLedger!.workItems.some((item) => item.atomicClaimId === admission.atomicClaimId)).toBe(false);
+    expect(convergence.run.financialFoundationHash).toBe(before.financialFoundationHash);
+  }, 30_000);
+
+  it("replays semantic convergence idempotently from immutable evidence and revision lineage", async () => {
+    const setup = await runWithOneWorkItem("economic_category");
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports: successfulPorts([]) });
+    const semantic = await import("../../../../src/canonical/v2/runtime/semanticConvergence.js");
+    const first = semantic.convergeDurableCanonicalAnalysisRun({ runId: setup.run.runId });
+    const eventCount = setup.store.getPersistedAnalysisRun(setup.run.runId)!.rgExecutionEvents.length;
+    const replay = semantic.convergeDurableCanonicalAnalysisRun({ runId: setup.run.runId });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+    expect(replay.revision).toEqual(first.revision);
+    expect(replay.run).toEqual(first.run);
+    expect(persisted.semanticRevision).toBe(1);
+    expect(persisted.semanticRevisions).toHaveLength(1);
+    expect(persisted.externalEvidenceRegistry).toHaveLength(1);
+    expect(persisted.rgExecutionEvents).toHaveLength(eventCount);
+    expect(() => setup.db.db.prepare(`UPDATE canonical_analysis_external_evidence SET evidence_hash = 'tampered'
+      WHERE run_id = ?`).run(setup.run.runId)).toThrow("canonical_external_evidence_is_immutable");
+    expect(() => setup.db.db.prepare(`UPDATE canonical_analysis_semantic_revisions SET semantic_hash = 'tampered'
+      WHERE run_id = ?`).run(setup.run.runId)).toThrow("canonical_semantic_revision_is_immutable");
+  }, 30_000);
+
+  it("withholds an exact role claim when verified current-run evidence contradicts the immutable bound RF answer", async () => {
+    const discovery = await runWithOneWorkItem("price_setter");
+    const discovered = discovery.store.getPersistedAnalysisRun(discovery.run.runId)!.rgClaimAdmissions[0]!;
+    const query = discovered.knowledgeQuery!;
+    const catalog = await import("../../../../src/canonical/v2/runtime/rfKnowledgeCatalog.js");
+    const admitted = admittedKnowledge({
+      id: "semantic-role-rf-admitted", version: 2, claimType: "participant_control_role",
+      subjectCode: query.subjectCode,
+      value: { kind: "role", participantRole: "network_card_brand", controlDimension: "price_setter", state: "proven" },
+      scope: unboundedKnowledgeScope(), effectiveFrom: "2020-01-01",
+      evidence: [{ ref: "governed-role-review", sourceAuthority: "processor_publication", private: false }],
+    });
+    const candidate: KnowledgeEntry = {
+      ...admitted, id: "semantic-role-rf-candidate", version: 1,
+      admission: { lifecycle: "candidate", authorityClass: null, authorityRef: null, admittedAt: null, conditions: [] },
+      confidence: "unresolved",
+    };
+    catalog.appendGovernedRfKnowledgeVersion({ entry: candidate,
+      auditEvent: knowledgeCreatedEvent(candidate, "semantic-role-rf-created") });
+    catalog.appendGovernedRfKnowledgeVersion({ entry: admitted,
+      auditEvent: knowledgeAdmissionEvent(candidate, admitted, "semantic-role-rf-admitted-event") });
+
+    const sourceStore = await import("../../../../src/store.js");
+    const secondJob = sourceStore.createJob({ fileName: "second-statement.pdf", filePath: fixture,
+      fileType: "pdf", businessType: "retail" });
+    const secondRun = discovery.store.executeDurableCanonicalAnalysisRun({ jobId: secondJob.id, document: discovery.document });
+    const secondPersisted = discovery.store.getPersistedAnalysisRun(secondRun.runId)!;
+    const target = secondPersisted.rgClaimAdmissions.find((item) => item.facet === "price_setter" &&
+      item.knowledgeQuery?.subjectCode === query.subjectCode)!;
+    const targetWork = secondPersisted.rgWorkItems.find((item) => item.atomicClaimId === target.atomicClaimId)!;
+    discovery.db.db.prepare(`DELETE FROM canonical_rg_work_items WHERE run_id = ? AND work_item_id <> ?`)
+      .run(secondRun.runId, targetWork.workItemId);
+    discovery.db.db.prepare(`DELETE FROM canonical_rg_claim_admissions WHERE run_id = ? AND atomic_claim_id <> ?`)
+      .run(secondRun.runId, target.atomicClaimId);
+    await discovery.executor.executeDurableCanonicalRgEvidence({
+      runId: secondRun.runId, ports: successfulPorts([]), workerId: "semantic-conflict-worker",
+    });
+    const semantic = await import("../../../../src/canonical/v2/runtime/semanticConvergence.js");
+    const convergence = semantic.convergeDurableCanonicalAnalysisRun({ runId: secondRun.runId });
+    const decision = convergence.revision.applications.find((item) => item.atomicClaimId === target.atomicClaimId)!;
+
+    expect(decision).toMatchObject({
+      sourceKind: "governed_rf_snapshot", disposition: "withheld_conflicting_rf_and_rg", semanticApplication: null,
+      rfEntryRefs: [admitted.id], reasonCodes: ["exact_current_run_evidence_contradicts_bound_rf"],
+    });
+    expect(decision.evidenceRefs).toHaveLength(1);
+    expect(convergence.run.artifacts.rd!.economicLayer.roleClaims
+      .some((item) => item.chargeRef === target.canonicalRefs[0] && item.dimension === "price_setter")).toBe(false);
+    expect(convergence.run.financialFoundationHash).toBe(secondPersisted.financialFoundationHash);
+    expect(convergence.run.artifacts.unresolvedClaims!.claims.some((claim) => claim.researchWithheldFacets
+      .some((item) => item.facet === "price_setter"))).toBe(true);
+  }, 30_000);
+
+  async function runWithOneWorkItem(facet?: string) {
     const [{ parsePdf }, store, runStore, executor, loadedDb] = await Promise.all([
       import("../../../../src/parser.js"),
       import("../../../../src/store.js"),
@@ -387,7 +557,8 @@ describe("production durable claim-bound RG evidence execution", () => {
       const scope = item.knowledgeQuery.scope;
       const labels = persisted.result!.artifacts.rb!.sourceModel.occurrences
         .filter((occurrence) => admission.occurrenceRefs.includes(occurrence.id)).map((occurrence) => occurrence.sourceLabel);
-      return item.requiredSourceAuthorities.includes("processor_publication")
+      return (!facet || admission.facet === facet)
+        && item.requiredSourceAuthorities.includes("processor_publication")
         && typeof (scope.processor ?? scope.processorProgram ?? scope.acquirer ?? scope.isoReseller) === "string"
         && labels.some((label) => /^[A-Za-z][A-Za-z ]{2,80}$/.test(label))
         && admission.researchAdmission === "admitted_to_rg_work_ledger";
@@ -473,4 +644,25 @@ function successfulPorts(calls: string[]): CanonicalRgEvidenceExecutionPorts {
 
 function receipt(providerCode: string, calls: number, retrievalBytes: number, tokens: number | null) {
   return { providerCode, providerRequestId: null, calls, retrievalBytes, tokens };
+}
+
+function knowledgeCreatedEvent(entry: KnowledgeEntry, eventId: string): KnowledgeAuditEvent {
+  return {
+    eventId, entryRef: entry.id, previousEntryRef: null, eventType: "created",
+    authorityClass: null, authorityRef: null, occurredAt: "2026-01-01T00:00:00Z",
+    priorVersion: null, nextVersion: entry.version, priorState: null, nextState: "candidate",
+    priorVisibility: null, nextVisibility: entry.visibility, reasonCodes: ["created_candidate"],
+    policyVersion: "payments_knowledge_library_v0_2",
+  };
+}
+
+function knowledgeAdmissionEvent(previous: KnowledgeEntry, next: KnowledgeEntry, eventId: string): KnowledgeAuditEvent {
+  return {
+    eventId, entryRef: next.id, previousEntryRef: previous.id, eventType: "admitted",
+    authorityClass: next.admission.authorityClass, authorityRef: next.admission.authorityRef,
+    occurredAt: next.admission.admittedAt!, priorVersion: previous.version, nextVersion: next.version,
+    priorState: previous.admission.lifecycle, nextState: next.admission.lifecycle,
+    priorVisibility: previous.visibility, nextVisibility: next.visibility,
+    reasonCodes: ["claim_evidence_verified"], policyVersion: "payments_knowledge_library_v0_2",
+  };
 }

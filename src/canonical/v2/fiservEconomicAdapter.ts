@@ -1,7 +1,9 @@
 import {
   buildCanonicalEconomicsV2EconomicAnalysis,
   type CanonicalEconomicChargeAdmission,
-  type CanonicalEconomicKnowledgeApplicationAdmission,
+  type CanonicalEconomicParticipantAdmission,
+  type CanonicalEconomicRoleClaimAdmission,
+  type CanonicalEconomicSemanticApplicationAdmission,
 } from "./economicAnalysis.js";
 import type { CanonicalEconomicsV2EconomicAnalysis } from "./economicTypes.js";
 import type { CanonicalEconomicsV2PricingAnalysis } from "./pricingTypes.js";
@@ -16,7 +18,8 @@ const CAPABILITY_BOUND_LEDGER_ADMISSION_ID = "fiserv_runtime_fee_ledger_capabili
  */
 export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
   pricingAnalysis: CanonicalEconomicsV2PricingAnalysis,
-  knowledgeApplications: readonly CanonicalEconomicKnowledgeApplicationAdmission[] = [],
+  semanticApplications: readonly CanonicalEconomicSemanticApplicationAdmission[] = [],
+  admittedExternalEvidenceRefs: readonly string[] = [],
 ): CanonicalEconomicsV2EconomicAnalysis {
   const foundation = pricingAnalysis.foundation;
   const feeTotal = capability(foundation, "fee_total");
@@ -40,17 +43,55 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
       feeDetail.proofEvidenceRefs.includes(occurrence.evidenceRef),
     )
     : [];
+  const participants: CanonicalEconomicParticipantAdmission[] = [];
+  const roleClaims: CanonicalEconomicRoleClaimAdmission[] = [];
+  const chargeRoleKeys = new Map<string, string[]>();
+  for (const application of semanticApplications.filter((item) => item.claimClass === "participant_control_role")) {
+    if (application.value.kind !== "role" || application.value.controlDimension === "constraint") continue;
+    const participantKey = `claim_scoped_participant_${application.key}`;
+    const roleKey = `claim_scoped_role_${application.key}`;
+    if (application.value.state === "proven" && application.value.participantRole) {
+      participants.push({
+        key: participantKey, identity: null, identityStatus: "unresolved", roles: [application.value.participantRole],
+        roleResolution: "proven", effectiveFrom: application.effectiveFrom, effectiveTo: application.effectiveTo,
+        externalEvidenceRefs: application.externalEvidenceRefs, derivabilityTier: "inferable_from_statement_with_qualification",
+        semanticApplicationKey: application.key,
+        assertionBasis: "external_verified", confidence: "unavailable",
+        limitations: ["This participant is claim-scoped by proven role class; no participant identity was inferred."],
+      });
+    }
+    if (application.value.state !== "proven" && application.value.state !== "not_applicable") continue;
+    roleClaims.push({
+      key: roleKey,
+      chargeKey: chargeKeyForRef(application.chargeRef),
+      dimension: application.value.controlDimension,
+      participantKey: application.value.state === "proven" ? participantKey : null,
+      resolution: application.value.state,
+      periodApplicability: "applicable",
+      effectiveFrom: application.effectiveFrom,
+      effectiveTo: application.effectiveTo,
+      externalEvidenceRefs: application.externalEvidenceRefs,
+      semanticApplicationKey: application.key,
+      derivabilityTier: "inferable_from_statement_with_qualification",
+      assertionBasis: "external_verified",
+      confidence: "unavailable",
+      limitations: ["Only this independently evidenced control-role facet is resolved."],
+    });
+    chargeRoleKeys.set(application.chargeRef, [...(chargeRoleKeys.get(application.chargeRef) ?? []), roleKey]);
+  }
   const charges = feeOccurrences.map((occurrence, index): CanonicalEconomicChargeAdmission => {
     const key = `capability_bound_charge_${index + 1}`;
     const chargeRef = `economic_charge_${String(index + 1).padStart(3, "0")}`;
-    const categoryApplication = knowledgeApplications.find((application) =>
+    const categoryApplication = semanticApplications.find((application) =>
       application.chargeRef === chargeRef && application.occurrenceRef === occurrence.id && application.claimClass === "economic_category",
     );
     return {
       key,
       sourceOccurrenceRefs: [occurrence.id],
       contributingOccurrenceRef: occurrence.id,
-      category: categoryApplication?.category ?? "unresolved_unclassified",
+      category: categoryApplication?.value.kind === "mapping"
+        ? categoryApplication.value.canonicalCode as CanonicalEconomicChargeAdmission["category"]
+        : "unresolved_unclassified",
       categoryResolution: categoryApplication ? "proven" : "unresolved",
       subtype: occurrence.semanticRole === "fee_credit" ? "fee_credit"
         : occurrence.semanticRole === "chargeback_fee" ? "chargeback_fee" : "unresolved",
@@ -68,7 +109,8 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
       derivabilityTier: "stated_on_statement",
       assertionBasis: "source_fact",
       confidence: "unavailable",
-      knowledgeApplicationKeys: categoryApplication ? [categoryApplication.key] : [],
+      semanticApplicationKeys: categoryApplication ? [categoryApplication.key] : [],
+      roleClaimKeys: chargeRoleKeys.get(chargeRef) ?? [],
       limitations: [
         "This admitted fee occurrence contributes to statement processing cost only.",
         ...(categoryApplication
@@ -96,12 +138,20 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
       ],
     },
     charges,
-    knowledgeApplications: [...knowledgeApplications],
+    participants,
+    roleClaims,
+    semanticApplications: [...semanticApplications],
+    externalEvidenceRefs: unique([...admittedExternalEvidenceRefs]),
     limitations: [
       "The capability-bound ledger proves statement-observed processing cost, not total acceptance cost.",
       "No fee category, participant, ownership, control, actionability, pricing, benchmark, or savings rule was introduced.",
     ],
   });
+}
+
+function chargeKeyForRef(chargeRef: string): string {
+  const match = /^economic_charge_(\d+)$/.exec(chargeRef);
+  return match ? `capability_bound_charge_${Number(match[1])}` : `missing_${chargeRef}`;
 }
 
 export function buildObservationalCanonicalEconomicsV2FromFiservPricing(

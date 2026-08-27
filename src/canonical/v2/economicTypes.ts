@@ -6,6 +6,7 @@ import type {
   CanonicalEconomicsV2PricingAnalysis,
 } from "./pricingTypes.js";
 import type { CanonicalEconomicsV2DifferenceClassification, CanonicalEconomicsV2SourceProvenance } from "./types.js";
+import type { KnowledgeClaimValue, KnowledgeSourceAuthority } from "./knowledge/knowledgeTypes.js";
 
 export type CanonicalEconomicParticipantRole =
   | "merchant"
@@ -83,22 +84,31 @@ export type CanonicalEconomicAdmissionSource =
   | "observational";
 export type CanonicalEconomicFeeDetailCoverage = "complete" | "incomplete" | "unknown" | "unavailable";
 
-export type CanonicalEconomicKnowledgeApplication = {
+export type CanonicalEconomicSemanticApplication = {
   id: string;
   claimRef: string;
-  claimClass: "economic_category";
+  atomicClaimId: string;
+  facet: "economic_category" | Exclude<CanonicalEconomicControlDimension, "constraint">;
+  claimClass: "economic_category" | "participant_control_role";
   chargeRef: string;
   occurrenceRef: string;
-  category: Exclude<CanonicalEconomicCategory, "unresolved_unclassified">;
-  knowledgeClaimType: "stable_facet_mapping";
+  value: KnowledgeClaimValue;
+  sourceKind: "governed_rf_snapshot" | "current_run_verified_rg_evidence";
+  knowledgeClaimType: "stable_facet_mapping" | "participant_control_role";
   knowledgeSubjectCode: string;
-  knowledgeSnapshotHash: string;
+  knowledgeSnapshotHash: string | null;
   selectedEntryRefs: string[];
-  sourceAuthorities: string[];
+  sourceAuthorities: KnowledgeSourceAuthority[];
+  externalEvidenceRefs: string[];
   asOf: string;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
   scopeFingerprint: string;
   limitations: string[];
 };
+
+/** @deprecated Use CanonicalEconomicSemanticApplication. */
+export type CanonicalEconomicKnowledgeApplication = CanonicalEconomicSemanticApplication;
 
 export type CanonicalEconomicParticipant = {
   id: string;
@@ -111,6 +121,8 @@ export type CanonicalEconomicParticipant = {
   effectiveFrom: string | null;
   effectiveTo: string | null;
   evidenceRefs: string[];
+  externalEvidenceRefs: string[];
+  semanticApplicationRef: string | null;
   derivabilityTier: CanonicalPricingDerivabilityTier;
   assertionBasis: CanonicalPricingAssertionBasis;
   confidence: CanonicalPricingConfidence;
@@ -139,6 +151,8 @@ export type CanonicalEconomicControlRoleClaim = {
   effectiveFrom: string | null;
   effectiveTo: string | null;
   evidenceRefs: string[];
+  externalEvidenceRefs: string[];
+  semanticApplicationRef: string | null;
   dependencyRefs: string[];
   derivabilityTier: CanonicalPricingDerivabilityTier;
   assertionBasis: CanonicalPricingAssertionBasis;
@@ -168,7 +182,7 @@ export type CanonicalEconomicCharge = {
   effectiveTo: string | null;
   roleClaimRefs: string[];
   dependencyRefs: string[];
-  knowledgeApplicationRefs: string[];
+  semanticApplicationRefs: string[];
   evidenceRefs: string[];
   reconciliationRefs: string[];
   derivabilityTier: CanonicalPricingDerivabilityTier;
@@ -280,7 +294,8 @@ export type CanonicalEconomicsV2EconomicLayer = {
   charges: CanonicalEconomicCharge[];
   roleClaims: CanonicalEconomicControlRoleClaim[];
   dependencies: CanonicalEconomicEvidenceDependency[];
-  knowledgeApplications: CanonicalEconomicKnowledgeApplication[];
+  externalEvidenceRefs: string[];
+  semanticApplications: CanonicalEconomicSemanticApplication[];
   nonFeeExclusions: CanonicalEconomicNonFeeExclusion[];
   costStack: CanonicalEconomicCostStack;
   semanticAmendments: CanonicalEconomicSemanticAmendment[];

@@ -866,7 +866,7 @@ function verifiedEvidenceFromOperations(runId: string, workItemId: string): Cano
     });
 }
 
-function persistedVerifiedEvidenceIntegrityValid(value: unknown): value is CanonicalRgVerifiedEvidence {
+export function persistedVerifiedEvidenceIntegrityValid(value: unknown): value is CanonicalRgVerifiedEvidence {
   if (!value || typeof value !== "object") return false;
   const evidence = value as CanonicalRgVerifiedEvidence;
   if (evidence.schemaVersion !== "canonical_rg_verified_evidence_v1_1"

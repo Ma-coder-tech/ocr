@@ -4,6 +4,7 @@ import type { CanonicalEconomicsV2EconomicAnalysis } from "../economicTypes.js";
 import type { CanonicalEconomicsV2PricingAnalysis } from "../pricingTypes.js";
 import type { CanonicalEconomicsV2SynthesisAnalysis } from "../synthesisTypes.js";
 import { canonicalJson } from "../canonicalJson.js";
+import { facetsForUnresolvedClaimClass, type CanonicalAtomicClaimFacet } from "./atomicClaims.js";
 
 export const UNRESOLVED_CLAIM_INVENTORY_SCHEMA_VERSION = "canonical_unresolved_claim_inventory_v2" as const;
 
@@ -49,6 +50,8 @@ export type CanonicalUnresolvedClaim = {
   blockingEffect: "limits_authority";
   materialityState: "not_evaluated";
   researchEligibility: "not_evaluated";
+  unresolvedFacets: CanonicalAtomicClaimFacet[];
+  researchWithheldFacets: Array<{ facet: CanonicalAtomicClaimFacet; reasonCode: string }>;
   limitations: string[];
 };
 
@@ -69,10 +72,16 @@ export function buildCanonicalUnresolvedClaimInventory(input: {
   pricing: CanonicalEconomicsV2PricingAnalysis | null;
   economic: CanonicalEconomicsV2EconomicAnalysis | null;
   synthesis: CanonicalEconomicsV2SynthesisAnalysis | null;
+  facetDispositions?: Array<{
+    chargeRef: string;
+    facet: CanonicalAtomicClaimFacet;
+    disposition: "resolved" | "conflicting" | "verified_but_unapplied";
+    reasonCode: string;
+  }>;
 }): CanonicalUnresolvedClaimInventory {
   const claims: CanonicalUnresolvedClaim[] = [];
   if (input.pricing?.validation.status === "valid") claims.push(...pricingClaims(input.pricing));
-  if (input.economic?.validation.status === "valid") claims.push(...economicClaims(input.economic));
+  if (input.economic?.validation.status === "valid") claims.push(...economicClaims(input.economic, input.facetDispositions ?? []));
   const sorted = claims.sort((left, right) => left.claimId.localeCompare(right.claimId));
   const countsByClass: CanonicalUnresolvedClaimInventory["countsByClass"] = {};
   for (const claim of sorted) countsByClass[claim.claimClass] = (countsByClass[claim.claimClass] ?? 0) + 1;
@@ -115,7 +124,10 @@ function pricingClaims(pricing: CanonicalEconomicsV2PricingAnalysis): CanonicalU
   });
 }
 
-function economicClaims(economic: CanonicalEconomicsV2EconomicAnalysis): CanonicalUnresolvedClaim[] {
+function economicClaims(
+  economic: CanonicalEconomicsV2EconomicAnalysis,
+  facetDispositions: NonNullable<Parameters<typeof buildCanonicalUnresolvedClaimInventory>[0]["facetDispositions"]>,
+): CanonicalUnresolvedClaim[] {
   const foundation = economic.pricingAnalysis.foundation;
   const output: CanonicalUnresolvedClaim[] = [];
   if (economic.economicLayer.admissionProfile.feeDetailCoverage !== "complete") {
@@ -154,22 +166,38 @@ function economicClaims(economic: CanonicalEconomicsV2EconomicAnalysis): Canonic
         possibleDecisionEffects: ["economic_interpretation", "composition_permission", "merchant_attention"],
         limitations: ["The charge contributes to statement cost, but its economic category is unresolved."] }));
     }
-    output.push(
-      claim({ ...common, claimClass: "economic_ownership", requiredEvidenceClass: "positive_period_applicable_ownership_evidence",
+    const resolvedDimensions = new Set(economic.economicLayer.roleClaims.filter((item) => item.chargeRef === charge.id &&
+      (item.resolution === "proven" || item.resolution === "not_applicable")).map((item) => item.dimension));
+    const externalResolved = new Set(facetDispositions.filter((item) => item.chargeRef === charge.id && item.disposition === "resolved")
+      .map((item) => item.facet));
+    const withheld = facetDispositions.filter((item) => item.chargeRef === charge.id && item.disposition === "verified_but_unapplied")
+      .map((item) => ({ facet: item.facet, reasonCode: item.reasonCode }));
+    const remaining = (claimClass: CanonicalUnresolvedClaimClass) => facetsForUnresolvedClaimClass(claimClass)
+      .filter((facet) => !resolvedDimensions.has(facet as never) && !externalResolved.has(facet));
+    const ownershipFacets = remaining("economic_ownership");
+    const controlFacets = remaining("economic_control");
+    const actionabilityFacets = remaining("merchant_actionability");
+    if (ownershipFacets.length > 0) output.push(
+      claim({ ...common, claimClass: "economic_ownership", unresolvedFacets: ownershipFacets,
+        researchWithheldFacets: withheld.filter((item) => ownershipFacets.includes(item.facet)), requiredEvidenceClass: "positive_period_applicable_ownership_evidence",
         possibleDecisionEffects: ["economic_interpretation", "composition_permission", "merchant_attention"],
-        limitations: ["The observed charge does not by itself prove its economic owner."] }),
-      claim({ ...common, claimClass: "economic_control", requiredEvidenceClass: "positive_period_applicable_control_evidence",
+        limitations: ["The observed charge does not by itself prove its economic owner."] }));
+    if (controlFacets.length > 0) output.push(
+      claim({ ...common, claimClass: "economic_control", unresolvedFacets: controlFacets,
+        researchWithheldFacets: withheld.filter((item) => controlFacets.includes(item.facet)), requiredEvidenceClass: "positive_period_applicable_control_evidence",
         possibleDecisionEffects: ["merchant_lever", "recommendation_permission"],
-        limitations: ["The observed charge does not by itself prove who can change or negotiate it."] }),
-      claim({ ...common, claimClass: "merchant_actionability", requiredEvidenceClass: "proven_control_recurrence_and_counterfactual_evidence",
+        limitations: ["The observed charge does not by itself prove who can change or negotiate it."] }));
+    if (actionabilityFacets.length > 0) output.push(
+      claim({ ...common, claimClass: "merchant_actionability", unresolvedFacets: actionabilityFacets,
+        researchWithheldFacets: withheld.filter((item) => actionabilityFacets.includes(item.facet)), requiredEvidenceClass: "proven_control_recurrence_and_counterfactual_evidence",
         possibleDecisionEffects: ["merchant_attention", "merchant_lever", "recommendation_permission", "impact_permission"],
-        limitations: ["Cost contribution alone cannot establish actionability, recurrence, a counterfactual, or savings."] }),
-    );
+        limitations: ["Cost contribution alone cannot establish actionability, recurrence, a counterfactual, or savings."] }));
   }
   return output;
 }
 
-function claim(input: Omit<CanonicalUnresolvedClaim, "claimId" | "blockingEffect" | "materialityState" | "researchEligibility">): CanonicalUnresolvedClaim {
+function claim(input: Omit<CanonicalUnresolvedClaim, "claimId" | "blockingEffect" | "materialityState" | "researchEligibility" |
+  "unresolvedFacets" | "researchWithheldFacets"> & Partial<Pick<CanonicalUnresolvedClaim, "unresolvedFacets" | "researchWithheldFacets">>): CanonicalUnresolvedClaim {
   const canonicalRefs = unique(input.canonicalRefs);
   const occurrenceRefs = unique(input.occurrenceRefs);
   const evidenceRefs = unique(input.evidenceRefs);
@@ -183,6 +211,9 @@ function claim(input: Omit<CanonicalUnresolvedClaim, "claimId" | "blockingEffect
     blockingEffect: "limits_authority",
     materialityState: "not_evaluated",
     researchEligibility: "not_evaluated",
+    unresolvedFacets: unique(input.unresolvedFacets ?? facetsForUnresolvedClaimClass(input.claimClass)),
+    researchWithheldFacets: [...(input.researchWithheldFacets ?? [])]
+      .sort((left, right) => left.facet.localeCompare(right.facet) || left.reasonCode.localeCompare(right.reasonCode)),
     limitations: unique(input.limitations),
   };
 }
@@ -202,6 +233,7 @@ function validateInventory(inventory: CanonicalUnresolvedClaimInventory, input: 
     if (item.occurrenceRefs.some((ref) => !occurrenceIds.has(ref))) errors.push(`unresolved_claim_broken_occurrence_ref:${item.claimId}`);
     if (item.evidenceRefs.some((ref) => !evidenceIds.has(ref))) errors.push(`unresolved_claim_broken_evidence_ref:${item.claimId}`);
     if (item.amountUnderReview && item.amountUnderReview.amountMinor < 0) errors.push(`unresolved_claim_negative_magnitude:${item.claimId}`);
+    if (item.unresolvedFacets.length === 0) errors.push(`unresolved_claim_missing_atomic_facet:${item.claimId}`);
   }
   return unique(errors);
 }

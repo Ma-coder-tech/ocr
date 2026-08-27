@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { canonicalJson } from "../canonicalJson.js";
 import type { CanonicalEconomicCategory } from "../economicTypes.js";
-import type { CanonicalEconomicKnowledgeApplicationAdmission } from "../economicAnalysis.js";
+import type { CanonicalEconomicSemanticApplicationAdmission } from "../economicAnalysis.js";
 import type { CanonicalEconomicsV2EconomicAnalysis } from "../economicTypes.js";
 import { resolveKnowledge } from "../knowledge/knowledgeResolver.js";
 import type {
@@ -14,6 +14,7 @@ import type {
 } from "../knowledge/knowledgeTypes.js";
 import { validateKnowledgeLibrary } from "../knowledge/knowledgeValidate.js";
 import { normalizeObservationLabel } from "../sourceLabelIdentity.js";
+import { canonicalAtomicClaimGroupingKey, canonicalAtomicClaimId } from "./atomicClaims.js";
 import type { CanonicalUnresolvedClaim, CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
 
 export const CANONICAL_RF_RESOLUTION_SCHEMA_VERSION = "canonical_rf_claim_resolution_v2" as const;
@@ -84,7 +85,7 @@ export type CanonicalRfClaimResolution = {
   knowledgeBinding: CanonicalRfKnowledgeBinding;
   snapshot: CanonicalRfKnowledgeSnapshot;
   decisions: CanonicalRfClaimDecision[];
-  categoryApplications: CanonicalEconomicKnowledgeApplicationAdmission[];
+  categoryApplications: CanonicalEconomicSemanticApplicationAdmission[];
   validation: { status: "valid" | "invalid"; errors: string[]; warnings: string[] };
 };
 
@@ -143,7 +144,7 @@ export function buildCanonicalRfClaimResolution(input: {
   if (!safeBoundary(input.tenantRef) || !safeBoundary(input.accountRef)) errors.push("rf_invalid_tenant_or_account_boundary");
 
   const decisions: CanonicalRfClaimDecision[] = [];
-  const categoryApplications: CanonicalEconomicKnowledgeApplicationAdmission[] = [];
+  const categoryApplications: CanonicalEconomicSemanticApplicationAdmission[] = [];
   if (errors.length === 0) {
     const chargeById = new Map(input.economic.economicLayer.charges.map((charge) => [charge.id, charge]));
     const occurrenceById = new Map(input.economic.pricingAnalysis.foundation.sourceModel.occurrences.map((item) => [item.id, item]));
@@ -194,20 +195,35 @@ export function buildCanonicalRfClaimResolution(input: {
         continue;
       }
       const applicationKey = `rf_category_${digest({ claimId: claim.claimId, subjectCode }).slice(0, 20)}`;
+      const scopeFingerprint = digest(query.scope).slice(0, 32);
+      const groupingKey = canonicalAtomicClaimGroupingKey({
+        claimClass: claim.claimClass,
+        facet: "economic_category",
+        opaqueSubjectCode: subjectCode,
+        scopeFingerprint,
+        period: canonicalJson(statementPeriod),
+        direction: claim.amountUnderReview?.direction ?? "not_monetary",
+      });
       categoryApplications.push({
         key: applicationKey,
         chargeRef: charge.id,
         claimRef: claim.claimId,
+        atomicClaimId: canonicalAtomicClaimId({ groupingKey }),
+        facet: "economic_category",
         claimClass: "economic_category",
         occurrenceRef: occurrence.id,
-        category,
+        value: { kind: "mapping", canonicalCode: category, sourceCode: subjectCode },
+        sourceKind: "governed_rf_snapshot",
         knowledgeClaimType: "stable_facet_mapping",
         knowledgeSubjectCode: subjectCode,
         knowledgeSnapshotHash: snapshot.snapshotHash,
         selectedEntryRefs: [...resolution.selectedEntryRefs],
         sourceAuthorities: [...resolution.sourceAuthorities],
+        externalEvidenceRefs: [],
         asOf: query.asOf,
-        scopeFingerprint: digest(query.scope),
+        effectiveFrom: null,
+        effectiveTo: null,
+        scopeFingerprint,
         limitations: [
           "Admitted RF knowledge resolves only this charge's economic category.",
           "Ownership, control, actionability, pricing, benchmark position, and savings remain independent claims.",
@@ -284,19 +300,19 @@ export function validateCanonicalRfSemanticConvergence(input: {
       errors.push(`rf_semantic_application_changed_charge_truth:${chargeId}`);
     }
     if (resolvedCharge.categoryResolution === "proven") {
-      if (resolvedCharge.knowledgeApplicationRefs.length !== 1) errors.push(`rf_resolved_charge_application_count_invalid:${chargeId}`);
-      const applied = input.resolved.economicLayer.knowledgeApplications.find((item) =>
-        item.id === resolvedCharge.knowledgeApplicationRefs[0],
+      if (resolvedCharge.semanticApplicationRefs.length !== 1) errors.push(`rf_resolved_charge_application_count_invalid:${chargeId}`);
+      const applied = input.resolved.economicLayer.semanticApplications.find((item) =>
+        item.id === resolvedCharge.semanticApplicationRefs[0],
       );
       const rfApplication = applied ? applicationsByClaim.get(applied.claimRef) : undefined;
       if (!applied || !rfApplication || canonicalJson(applicationProjection(applied)) !== canonicalJson(applicationProjection(rfApplication))) {
         errors.push(`rf_resolved_charge_application_lineage_invalid:${chargeId}`);
       }
-    } else if (resolvedCharge.knowledgeApplicationRefs.length > 0) {
+    } else if (resolvedCharge.semanticApplicationRefs.length > 0) {
       errors.push(`rf_unresolved_charge_has_application:${chargeId}`);
     }
   }
-  if (input.resolved.economicLayer.knowledgeApplications.length !== input.rf.categoryApplications.length) {
+  if (input.resolved.economicLayer.semanticApplications.length !== input.rf.categoryApplications.length) {
     errors.push("rf_semantic_application_population_mismatch");
   }
   const baseStack = input.base.economicLayer.costStack;
@@ -414,8 +430,8 @@ function financialChargeProjection(charge: CanonicalEconomicsV2EconomicAnalysis[
   };
 }
 
-function applicationProjection(application: CanonicalEconomicKnowledgeApplicationAdmission | CanonicalEconomicsV2EconomicAnalysis["economicLayer"]["knowledgeApplications"][number]) {
-  const { id: _id, key: _key, ...projection } = application as CanonicalEconomicKnowledgeApplicationAdmission & { id?: string };
+function applicationProjection(application: CanonicalEconomicSemanticApplicationAdmission | CanonicalEconomicsV2EconomicAnalysis["economicLayer"]["semanticApplications"][number]) {
+  const { id: _id, key: _key, ...projection } = application as CanonicalEconomicSemanticApplicationAdmission & { id?: string };
   return projection;
 }
 

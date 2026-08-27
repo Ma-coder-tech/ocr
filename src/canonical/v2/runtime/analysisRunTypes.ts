@@ -17,8 +17,8 @@ import type { CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
 import type { CanonicalRfClaimResolution } from "./rfClaimResolution.js";
 import type { CanonicalRgWorkLedger } from "./rgWorkLedger.js";
 
-export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v6";
-export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "claim_bound_rg_evidence_execution_v1_1";
+export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v7";
+export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "current_run_semantic_convergence_v1";
 export const ANALYSIS_RUN_POLICY_VERSION = "frozen_product_model_runtime_policy_v0_2";
 
 export const ANALYSIS_RUN_STAGE_IDS = [
@@ -58,6 +58,8 @@ export type AnalysisRunManifest = {
   publicResearch: "typed_search_intent_dynamic_authority_validation";
   rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled";
   rgPlanning: "durable_claim_scoped_execution_eligible";
+  semanticConvergence: "current_run_exact_claim_revisioned";
+  regeneratedPlanExecution: "disabled";
   benchmarkExecution: "disabled";
   savingsExecution: "disabled";
   businessContextAuthority: "excluded_from_canonical_economics";
@@ -97,6 +99,10 @@ export type CanonicalAnalysisRun = {
   artifacts: CanonicalAnalysisArtifacts;
   stageOutcomes: Record<AnalysisRunStageId, AnalysisRunStageOutcome>;
   canonicalTruthHash: string | null;
+  financialFoundationHash: string | null;
+  semanticHash: string | null;
+  canonicalStateHash: string | null;
+  semanticRevision: number;
   canonicalTruthPreserved: true;
   limitations: string[];
 };

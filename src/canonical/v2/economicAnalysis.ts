@@ -14,7 +14,7 @@ import type {
   CanonicalEconomicEvidenceDependency,
   CanonicalEconomicFinancialDirection,
   CanonicalEconomicIdentityStatus,
-  CanonicalEconomicKnowledgeApplication,
+  CanonicalEconomicSemanticApplication,
   CanonicalEconomicNonFeeExclusion,
   CanonicalEconomicNonFeeExclusionReason,
   CanonicalEconomicParticipant,
@@ -43,6 +43,8 @@ export type CanonicalEconomicParticipantAdmission = {
   effectiveFrom?: string | null;
   effectiveTo?: string | null;
   evidenceRefs?: string[];
+  externalEvidenceRefs?: string[];
+  semanticApplicationKey?: string | null;
   derivabilityTier: CanonicalPricingDerivabilityTier;
   assertionBasis: CanonicalPricingAssertionBasis;
   confidence?: CanonicalPricingConfidence;
@@ -71,6 +73,8 @@ export type CanonicalEconomicRoleClaimAdmission = {
   effectiveFrom?: string | null;
   effectiveTo?: string | null;
   evidenceRefs?: string[];
+  externalEvidenceRefs?: string[];
+  semanticApplicationKey?: string | null;
   dependencyKeys?: string[];
   derivabilityTier: CanonicalPricingDerivabilityTier;
   assertionBasis: CanonicalPricingAssertionBasis;
@@ -102,7 +106,7 @@ export type CanonicalEconomicChargeAdmission = {
   effectiveTo?: string | null;
   roleClaimKeys?: string[];
   dependencyKeys?: string[];
-  knowledgeApplicationKeys?: string[];
+  semanticApplicationKeys?: string[];
   reconciliationRefs?: string[];
   derivabilityTier: CanonicalPricingDerivabilityTier;
   assertionBasis: CanonicalPricingAssertionBasis;
@@ -110,8 +114,8 @@ export type CanonicalEconomicChargeAdmission = {
   limitations?: string[];
 };
 
-export type CanonicalEconomicKnowledgeApplicationAdmission = Omit<
-  CanonicalEconomicKnowledgeApplication,
+export type CanonicalEconomicSemanticApplicationAdmission = Omit<
+  CanonicalEconomicSemanticApplication,
   "id"
 > & {
   key: string;
@@ -133,7 +137,8 @@ export type BuildCanonicalEconomicsV2EconomicInput = {
   dependencies?: CanonicalEconomicDependencyAdmission[];
   charges?: CanonicalEconomicChargeAdmission[];
   roleClaims?: CanonicalEconomicRoleClaimAdmission[];
-  knowledgeApplications?: CanonicalEconomicKnowledgeApplicationAdmission[];
+  semanticApplications?: CanonicalEconomicSemanticApplicationAdmission[];
+  externalEvidenceRefs?: string[];
   nonFeeAdmissions?: CanonicalEconomicNonFeeAdmission[];
   documentedRoundingReconciliationRef?: string | null;
   limitations?: string[];
@@ -183,6 +188,13 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
         : false;
   const occurrenceById = new Map(foundation.sourceModel.occurrences.map((item) => [item.id, item]));
   const evidenceIds = new Set(foundation.sourceModel.evidence.map((item) => item.id));
+  const externalEvidenceIds = new Set(input.externalEvidenceRefs ?? []);
+  const semanticApplicationAdmissions = input.semanticApplications ?? [];
+  const semanticApplicationIdByKey = new Map(semanticApplicationAdmissions.map((item, index) => [
+    item.key,
+    `economic_semantic_application_${pad(index + 1)}`,
+  ]));
+  const semanticApplicationAdmissionByKey = new Map(semanticApplicationAdmissions.map((item) => [item.key, item]));
 
   const participantAdmissions = input.participants ?? [];
   const participantIdByKey = new Map(participantAdmissions.map((item, index) => [item.key, `economic_participant_${pad(index + 1)}`]));
@@ -197,8 +209,11 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
     const identityStatus = item.identityStatus === "proven" && (!provenIdentityAllowed || participantPeriodApplicability !== "applicable")
       ? "observed_only"
       : item.identityStatus;
+    const sourceEvidenceRefs = validRefs(item.evidenceRefs ?? [], evidenceIds);
+    const externalEvidenceRefs = validRefs(item.externalEvidenceRefs ?? [], externalEvidenceIds);
+    const semanticApplication = item.semanticApplicationKey ? semanticApplicationAdmissionByKey.get(item.semanticApplicationKey) : null;
     const roleEvidenceAllowed = provenIdentityAllowed && PROVING_TIERS.has(item.derivabilityTier) && participantPeriodApplicability === "applicable" &&
-      validRefs(item.evidenceRefs ?? [], evidenceIds).length > 0;
+      (sourceEvidenceRefs.length + externalEvidenceRefs.length > 0 || semanticApplication?.sourceKind === "governed_rf_snapshot");
     const roleResolution = sourceUnavailable
       ? "unavailable"
       : (item.roleResolution ?? "unresolved") === "proven" && !roleEvidenceAllowed
@@ -214,7 +229,9 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
       periodApplicability: sourceUnavailable ? "unproven" : participantPeriodApplicability,
       effectiveFrom: item.effectiveFrom ?? null,
       effectiveTo: item.effectiveTo ?? null,
-      evidenceRefs: validRefs(item.evidenceRefs ?? [], evidenceIds),
+      evidenceRefs: sourceEvidenceRefs,
+      externalEvidenceRefs,
+      semanticApplicationRef: item.semanticApplicationKey ? semanticApplicationIdByKey.get(item.semanticApplicationKey) ?? null : null,
       derivabilityTier: sourceUnavailable ? "not_derivable_from_this_document_class" : item.derivabilityTier,
       assertionBasis: item.assertionBasis,
       confidence: sourceUnavailable ? "unavailable" : item.confidence ?? "unavailable",
@@ -249,31 +266,36 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
   }));
   const dependencyById = new Map(dependencies.map((item) => [item.id, item]));
 
-  const knowledgeApplicationAdmissions = input.knowledgeApplications ?? [];
-  const knowledgeApplicationIdByKey = new Map(knowledgeApplicationAdmissions.map((item, index) => [
-    item.key,
-    `economic_knowledge_application_${pad(index + 1)}`,
-  ]));
-  const knowledgeApplications = knowledgeApplicationAdmissions.map((item): CanonicalEconomicKnowledgeApplication => ({
-    id: knowledgeApplicationIdByKey.get(item.key)!,
+  const semanticApplications = semanticApplicationAdmissions.map((item): CanonicalEconomicSemanticApplication => ({
+    id: semanticApplicationIdByKey.get(item.key)!,
     claimRef: item.claimRef,
+    atomicClaimId: item.atomicClaimId,
+    facet: item.facet,
     claimClass: item.claimClass,
     chargeRef: item.chargeRef,
     occurrenceRef: item.occurrenceRef,
-    category: item.category,
+    value: structuredClone(item.value),
+    sourceKind: item.sourceKind,
     knowledgeClaimType: item.knowledgeClaimType,
     knowledgeSubjectCode: item.knowledgeSubjectCode,
     knowledgeSnapshotHash: item.knowledgeSnapshotHash,
     selectedEntryRefs: unique(item.selectedEntryRefs),
     sourceAuthorities: unique(item.sourceAuthorities),
+    externalEvidenceRefs: validRefs(item.externalEvidenceRefs, externalEvidenceIds),
     asOf: item.asOf,
+    effectiveFrom: item.effectiveFrom,
+    effectiveTo: item.effectiveTo,
     scopeFingerprint: item.scopeFingerprint,
     limitations: unique(item.limitations),
   }));
 
   const roleClaims = claimAdmissions.map((item): CanonicalEconomicControlRoleClaim => {
+    const sourceEvidenceRefs = validRefs(item.evidenceRefs ?? [], evidenceIds);
+    const externalEvidenceRefs = validRefs(item.externalEvidenceRefs ?? [], externalEvidenceIds);
+    const semanticApplication = item.semanticApplicationKey ? semanticApplicationAdmissionByKey.get(item.semanticApplicationKey) : null;
     const positiveEvidenceAllowed = admissionAuthorityAllowed && !sourceUnavailable && PROVING_BASES.has(item.assertionBasis) && PROVING_TIERS.has(item.derivabilityTier) &&
-      item.assertionBasis !== "ai_hypothesis" && validRefs(item.evidenceRefs ?? [], evidenceIds).length > 0;
+      item.assertionBasis !== "ai_hypothesis" &&
+      (sourceEvidenceRefs.length + externalEvidenceRefs.length > 0 || semanticApplication?.sourceKind === "governed_rf_snapshot");
     const claimPeriodApplicability = item.effectiveFrom || item.effectiveTo
       ? periodApplicability(
           foundation.identity.statementPeriod,
@@ -306,7 +328,9 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
       periodApplicability: sourceUnavailable ? "unproven" : claimPeriodApplicability,
       effectiveFrom: item.effectiveFrom ?? null,
       effectiveTo: item.effectiveTo ?? null,
-      evidenceRefs: validRefs(item.evidenceRefs ?? [], evidenceIds),
+      evidenceRefs: sourceEvidenceRefs,
+      externalEvidenceRefs,
+      semanticApplicationRef: item.semanticApplicationKey ? semanticApplicationIdByKey.get(item.semanticApplicationKey) ?? null : null,
       dependencyRefs,
       derivabilityTier: sourceUnavailable ? "not_derivable_from_this_document_class" : resolution === "proven" ? item.derivabilityTier : unresolvedTier(item.derivabilityTier),
       assertionBasis: item.assertionBasis,
@@ -328,8 +352,8 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
     pricingAnalysis: input.pricingAnalysis,
     roleClaimRefs: (item.roleClaimKeys ?? []).map((key) => claimIdByKey.get(key)).filter(isString),
     dependencyRefs: (item.dependencyKeys ?? []).map((key) => dependencyIdByKey.get(key)).filter(isString),
-    knowledgeApplicationRefs: (item.knowledgeApplicationKeys ?? []).map((key) => knowledgeApplicationIdByKey.get(key)).filter(isString),
-    knowledgeApplicationById: new Map(knowledgeApplications.map((application) => [application.id, application])),
+    semanticApplicationRefs: (item.semanticApplicationKeys ?? []).map((key) => semanticApplicationIdByKey.get(key)).filter(isString),
+    semanticApplicationById: new Map(semanticApplications.map((application) => [application.id, application])),
     dependencyById,
     observational,
     admissionAuthorityAllowed,
@@ -386,7 +410,8 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
     charges,
     roleClaims,
     dependencies,
-    knowledgeApplications,
+    semanticApplications,
+    externalEvidenceRefs: unique([...externalEvidenceIds]),
     nonFeeExclusions,
     costStack,
     semanticAmendments: Object.entries(RD_SEMANTIC_AMENDMENT_REASONS).map(([id, reason]) => ({
@@ -417,8 +442,8 @@ function chargeFromAdmission(input: {
   pricingAnalysis: CanonicalEconomicsV2PricingAnalysis;
   roleClaimRefs: string[];
   dependencyRefs: string[];
-  knowledgeApplicationRefs: string[];
-  knowledgeApplicationById: Map<string, CanonicalEconomicKnowledgeApplication>;
+  semanticApplicationRefs: string[];
+  semanticApplicationById: Map<string, CanonicalEconomicSemanticApplication>;
   dependencyById: Map<string, CanonicalEconomicEvidenceDependency>;
   observational: boolean;
   admissionAuthorityAllowed: boolean;
@@ -459,13 +484,13 @@ function chargeFromAdmission(input: {
     : item.categoryResolution === "proven" && !positiveAdmission
       ? "unresolved"
       : item.categoryResolution;
-  const categoryKnowledgeApplication = input.knowledgeApplicationRefs
-    .map((ref) => input.knowledgeApplicationById.get(ref))
-    .find((application) => application?.claimClass === "economic_category" &&
-      application.occurrenceRef === contributingOccurrence?.id && application.category === item.category);
-  const knowledgePermitsCategory = categoryResolution !== "proven" || input.profile.source !== "runtime_capability" ||
-    item.category === "unresolved_unclassified" || Boolean(categoryKnowledgeApplication);
-  const admittedCategoryResolution = categoryResolution === "proven" && !knowledgePermitsCategory
+  const categorySemanticApplication = input.semanticApplicationRefs
+    .map((ref) => input.semanticApplicationById.get(ref))
+    .find((application) => application?.claimClass === "economic_category" && application.value.kind === "mapping" &&
+      application.occurrenceRef === contributingOccurrence?.id && application.value.canonicalCode === item.category);
+  const semanticApplicationPermitsCategory = categoryResolution !== "proven" || input.profile.source !== "runtime_capability" ||
+    item.category === "unresolved_unclassified" || Boolean(categorySemanticApplication);
+  const admittedCategoryResolution = categoryResolution === "proven" && !semanticApplicationPermitsCategory
     ? "unresolved" as const
     : categoryResolution;
   const contributionStatus = nonFee
@@ -516,8 +541,8 @@ function chargeFromAdmission(input: {
     effectiveTo: item.effectiveTo ?? null,
     roleClaimRefs: unique(input.roleClaimRefs),
     dependencyRefs: unique(input.dependencyRefs),
-    knowledgeApplicationRefs: admittedCategoryResolution === "proven" && categoryKnowledgeApplication
-      ? [categoryKnowledgeApplication.id]
+    semanticApplicationRefs: admittedCategoryResolution === "proven" && categorySemanticApplication
+      ? [categorySemanticApplication.id]
       : [],
     evidenceRefs: validRefs(occurrences.map((occurrence) => occurrence.evidenceRef), input.evidenceIds),
     reconciliationRefs: unique(item.reconciliationRefs ?? []),
@@ -531,7 +556,7 @@ function chargeFromAdmission(input: {
       ...(!directionProven ? ["Fee direction is not proven."] : []),
       ...(applicable !== "applicable" ? ["Statement-period applicability is not proven."] : []),
       ...(!dependenciesSatisfied ? ["A required economic-charge dependency is not satisfied by admitted evidence."] : []),
-      ...(categoryResolution === "proven" && !knowledgePermitsCategory
+      ...(categoryResolution === "proven" && !semanticApplicationPermitsCategory
         ? ["The requested category lacked an exact admitted RF knowledge application."]
         : []),
       ...(input.observational ? ["Observational evidence cannot self-promote into authoritative economic charge truth."] : []),

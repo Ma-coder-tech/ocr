@@ -108,6 +108,10 @@ function migrate(): void {
       parser_driver_id TEXT,
       attempt_count INTEGER NOT NULL DEFAULT 0,
       canonical_truth_hash TEXT,
+      financial_foundation_hash TEXT,
+      semantic_hash TEXT,
+      canonical_state_hash TEXT,
+      semantic_revision INTEGER NOT NULL DEFAULT 0,
       rf_snapshot_hash TEXT NOT NULL DEFAULT '',
       rf_context_hash TEXT NOT NULL DEFAULT '',
       rf_catalog_status TEXT NOT NULL DEFAULT 'unbound',
@@ -200,6 +204,58 @@ function migrate(): void {
       event_json TEXT NOT NULL,
       event_hash TEXT NOT NULL,
       created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_external_evidence (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      evidence_id TEXT NOT NULL,
+      evidence_json TEXT NOT NULL,
+      evidence_hash TEXT NOT NULL,
+      source_plan_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, evidence_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_semantic_revisions (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL,
+      parent_semantic_hash TEXT,
+      financial_foundation_hash TEXT NOT NULL,
+      semantic_hash TEXT NOT NULL,
+      canonical_state_hash TEXT NOT NULL,
+      evidence_registry_hash TEXT NOT NULL,
+      prior_plan_hash TEXT,
+      next_plan_hash TEXT,
+      revision_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, revision),
+      UNIQUE (run_id, semantic_hash)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_semantic_applications (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL,
+      application_id TEXT NOT NULL,
+      atomic_claim_id TEXT NOT NULL,
+      facet TEXT NOT NULL,
+      source_kind TEXT,
+      disposition TEXT NOT NULL,
+      application_json TEXT NOT NULL,
+      application_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, revision, application_id),
+      FOREIGN KEY (run_id, revision) REFERENCES canonical_analysis_semantic_revisions(run_id, revision) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_stage_revisions (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL,
+      stage TEXT NOT NULL,
+      artifact_json TEXT,
+      artifact_hash TEXT,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, revision, stage),
+      FOREIGN KEY (run_id, revision) REFERENCES canonical_analysis_semantic_revisions(run_id, revision) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS canonical_rf_knowledge_audit_events (
@@ -398,6 +454,8 @@ function migrate(): void {
     CREATE INDEX IF NOT EXISTS idx_canonical_rg_work_state ON canonical_rg_work_items(run_id, state, execution_state);
     CREATE INDEX IF NOT EXISTS idx_canonical_rg_operation_state ON canonical_rg_operations(run_id, state);
     CREATE INDEX IF NOT EXISTS idx_canonical_rg_execution_events ON canonical_rg_execution_events(run_id, work_item_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_canonical_external_evidence_plan ON canonical_analysis_external_evidence(run_id, source_plan_hash);
+    CREATE INDEX IF NOT EXISTS idx_canonical_semantic_revision_hash ON canonical_analysis_semantic_revisions(run_id, semantic_hash);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_claim ON canonical_rf_knowledge_entries(claim_type, subject_code, lifecycle);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_visibility ON canonical_rf_knowledge_entries(visibility, tenant_ref, account_ref);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_effective_period ON canonical_rf_knowledge_entries(effective_from, effective_to);
@@ -441,6 +499,10 @@ function migrate(): void {
   ensureColumn("canonical_analysis_runs", "rf_context_hash", "TEXT NOT NULL DEFAULT ''");
   ensureColumn("canonical_analysis_runs", "rf_catalog_status", "TEXT NOT NULL DEFAULT 'unbound'");
   ensureColumn("canonical_analysis_runs", "rf_catalog_binding_json", "TEXT");
+  ensureColumn("canonical_analysis_runs", "financial_foundation_hash", "TEXT");
+  ensureColumn("canonical_analysis_runs", "semantic_hash", "TEXT");
+  ensureColumn("canonical_analysis_runs", "canonical_state_hash", "TEXT");
+  ensureColumn("canonical_analysis_runs", "semantic_revision", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("statements", "analysis_status", "TEXT NOT NULL DEFAULT 'completed'");
   ensureColumn("statements", "processor_markup_bps", "REAL");
   ensureColumn("comparisons", "processor_markup_bps_delta", "REAL");
@@ -456,6 +518,18 @@ function migrate(): void {
       BEFORE UPDATE ON canonical_rf_knowledge_audit_events BEGIN SELECT RAISE(ABORT, 'canonical_rf_catalog_is_append_only'); END;
     CREATE TRIGGER IF NOT EXISTS canonical_rf_knowledge_audit_no_delete
       BEFORE DELETE ON canonical_rf_knowledge_audit_events BEGIN SELECT RAISE(ABORT, 'canonical_rf_catalog_is_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_external_evidence_no_update
+      BEFORE UPDATE ON canonical_analysis_external_evidence
+      BEGIN SELECT RAISE(ABORT, 'canonical_external_evidence_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_semantic_revisions_no_update
+      BEFORE UPDATE ON canonical_analysis_semantic_revisions
+      BEGIN SELECT RAISE(ABORT, 'canonical_semantic_revision_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_semantic_applications_no_update
+      BEFORE UPDATE ON canonical_analysis_semantic_applications
+      BEGIN SELECT RAISE(ABORT, 'canonical_semantic_revision_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_stage_revisions_no_update
+      BEFORE UPDATE ON canonical_analysis_stage_revisions
+      BEGIN SELECT RAISE(ABORT, 'canonical_semantic_revision_is_immutable'); END;
   `);
 }
 

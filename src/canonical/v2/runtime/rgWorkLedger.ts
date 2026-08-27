@@ -18,27 +18,17 @@ import {
   type DecisionMaterialityTier,
   type EconomicMaterialityEvaluation,
 } from "./materialityContract.js";
+import {
+  canonicalAtomicClaimGroupingKey,
+  canonicalAtomicClaimId,
+  canonicalFacetSubjectCode,
+  facetsForUnresolvedClaimClass,
+  type CanonicalAtomicClaimFacet,
+} from "./atomicClaims.js";
 
 export const RG_WORK_LEDGER_SCHEMA_VERSION = "canonical_rg_work_ledger_v1" as const;
 
-export type CanonicalAtomicClaimFacet =
-  | "underlying_cost_billing_mode"
-  | "merchant_price_schedule_shape"
-  | "pricing_scope_uniformity"
-  | "fee_detail_coverage"
-  | "economic_category"
-  | "economic_beneficiary"
-  | "economic_owner"
-  | "collector"
-  | "billing_intermediary"
-  | "rule_setter"
-  | "price_setter"
-  | "negotiator_change_authority"
-  | "contractual_controller"
-  | "constraint"
-  | "recurrence"
-  | "counterfactual"
-  | "merchant_lever";
+export type { CanonicalAtomicClaimFacet } from "./atomicClaims.js";
 
 export type CanonicalRgClaimAdmission = {
   atomicClaimId: string;
@@ -258,36 +248,24 @@ function atomSeeds(
   claim: CanonicalUnresolvedClaim,
   categoryDecisionByCharge: Map<string, CanonicalRfClaimDecision>,
 ): AtomSeed[] {
-  const facets = facetsForClass(claim.claimClass);
+  const withheld = new Set((claim.researchWithheldFacets ?? []).map((item) => item.facet));
+  const facets = (claim.unresolvedFacets?.length > 0 ? claim.unresolvedFacets : facetsForUnresolvedClaimClass(claim.claimClass))
+    .filter((facet) => !withheld.has(facet));
   const categoryDecision = claim.canonicalRefs.map((ref) => categoryDecisionByCharge.get(ref)).find(Boolean);
   const categoryQuery = categoryDecision?.query ?? null;
   const baseSubject = categoryQuery?.subjectCode.replace(/^economic_category_/, "economic_charge_")
     ?? `canonical_subject_${digest({ claimClass: claim.claimClass, canonicalRefs: claim.canonicalRefs,
       occurrenceRefs: claim.occurrenceRefs }).slice(0, 32)}`;
-  const scopeFingerprint = categoryQuery ? digest(categoryQuery.scope) : digest({
+  const scopeFingerprint = (categoryQuery ? digest(categoryQuery.scope) : digest({
     boundary: "canonical_claim_lineage_only", canonicalRefs: claim.canonicalRefs, occurrenceRefs: claim.occurrenceRefs,
-  });
+  })).slice(0, 32);
   return facets.map((facet) => ({
     parent: claim,
     facet,
-    opaqueSubjectCode: subjectForFacet(baseSubject, facet),
+    opaqueSubjectCode: canonicalFacetSubjectCode(baseSubject, facet),
     scopeFingerprint,
     knowledgeQuery: queryForFacet(facet, baseSubject, categoryQuery),
   }));
-}
-
-function facetsForClass(claimClass: CanonicalUnresolvedClaimClass): CanonicalAtomicClaimFacet[] {
-  switch (claimClass) {
-    case "pricing_underlying_cost": return ["underlying_cost_billing_mode"];
-    case "pricing_schedule": return ["merchant_price_schedule_shape"];
-    case "pricing_scope": return ["pricing_scope_uniformity"];
-    case "fee_detail_coverage": return ["fee_detail_coverage"];
-    case "economic_category": return ["economic_category"];
-    case "economic_ownership": return ["economic_beneficiary", "economic_owner"];
-    case "economic_control": return ["collector", "billing_intermediary", "rule_setter", "price_setter",
-      "negotiator_change_authority", "contractual_controller", "constraint"];
-    case "merchant_actionability": return ["recurrence", "counterfactual", "merchant_lever"];
-  }
 }
 
 function queryForFacet(
@@ -299,17 +277,12 @@ function queryForFacet(
   if (facet === "economic_category") return categoryQuery;
   if (["economic_beneficiary", "economic_owner", "collector", "billing_intermediary", "rule_setter", "price_setter",
     "negotiator_change_authority", "contractual_controller", "constraint"].includes(facet)) {
-    return { ...categoryQuery, claimType: "participant_control_role", subjectCode: subjectForFacet(baseSubject, facet) };
+    return { ...categoryQuery, claimType: "participant_control_role", subjectCode: canonicalFacetSubjectCode(baseSubject, facet) };
   }
   if (facet === "merchant_lever") {
-    return { ...categoryQuery, claimType: "merchant_lever_availability", subjectCode: subjectForFacet(baseSubject, facet) };
+    return { ...categoryQuery, claimType: "merchant_lever_availability", subjectCode: canonicalFacetSubjectCode(baseSubject, facet) };
   }
   return null;
-}
-
-function subjectForFacet(baseSubject: string, facet: CanonicalAtomicClaimFacet): string {
-  if (facet === "economic_category") return baseSubject.replace(/^economic_charge_/, "economic_category_");
-  return `${facet}_${digest({ baseSubject, facet }).slice(0, 32)}`;
 }
 
 function categoryDecisionIndex(decisions: readonly CanonicalRfClaimDecision[]): Map<string, CanonicalRfClaimDecision> {
@@ -354,9 +327,10 @@ function admissionForGroup(input: {
   const decision = decisionTier(first, input.economic, input.synthesis);
   const materiality = combineMaterialityAxes(magnitude.tier, decision.tier);
   const research = researchRoute(first, materiality, input.rfAvailability);
-  const atomicClaimId = `atomic-claim-${digest({ claimClass: first.parent.claimClass, facet: first.facet,
-    opaqueSubjectCode: first.opaqueSubjectCode, scopeFingerprint: first.scopeFingerprint,
-    period: input.period, direction })}`;
+  const atomicClaimId = canonicalAtomicClaimId({ groupingKey: canonicalAtomicClaimGroupingKey({
+    claimClass: first.parent.claimClass, facet: first.facet, opaqueSubjectCode: first.opaqueSubjectCode,
+    scopeFingerprint: first.scopeFingerprint, period: canonicalJson(input.period), direction,
+  }) });
   return {
     atomicClaimId,
     parentClaimIds,
@@ -392,17 +366,7 @@ function groupMagnitude(group: AtomSeed[]): number | null {
   })));
 }
 
-export function canonicalAtomicClaimGroupingKey(input: {
-  claimClass: CanonicalUnresolvedClaimClass;
-  facet: CanonicalAtomicClaimFacet;
-  opaqueSubjectCode: string;
-  scopeFingerprint: string;
-  period: string;
-  direction: "debit" | "credit" | "not_monetary";
-}): string {
-  return canonicalJson(input);
-}
-
+export { canonicalAtomicClaimGroupingKey } from "./atomicClaims.js";
 export function aggregateAtomicClaimMagnitude(entries: readonly {
   canonicalSubjectRefs: readonly string[];
   amountMinor: number;

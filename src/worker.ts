@@ -177,6 +177,19 @@ export async function processJob(jobId: string): Promise<void> {
         degraded: rgExecution.workItemsDegraded,
         canonicalTruthPreserved: rgExecution.canonicalTruthPreserved,
       });
+      if (rgExecution.verifiedEvidence.length > 0) {
+        const { convergeDurableCanonicalAnalysisRun } = await import("./canonical/v2/runtime/semanticConvergence.js");
+        const convergence = convergeDurableCanonicalAnalysisRun({ runId: canonicalRun.runId });
+        console.log(`[job:${jobId}] canonical-semantic-convergence`, {
+          runId: canonicalRun.runId,
+          revision: convergence.revision.revision,
+          applied: convergence.appliedCount,
+          withheld: convergence.withheldCount,
+          financialFoundationPreserved: convergence.revision.financialFoundationPreserved,
+          nextPlanPersisted: convergence.revision.nextPlanHash !== null,
+          providerCalls: convergence.providerCalls,
+        });
+      }
     } catch (error) {
       console.error(`[job:${jobId}] canonical-rg-evidence-degraded`, error instanceof Error ? error.message : error);
     }
