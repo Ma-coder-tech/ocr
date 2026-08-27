@@ -16,8 +16,8 @@ import type {
 import type { CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
 import type { CanonicalRfClaimResolution } from "./rfClaimResolution.js";
 
-export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v3";
-export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "rf_first_claim_resolution_v1";
+export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v4";
+export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "governed_rf_catalog_snapshot_v1";
 export const ANALYSIS_RUN_POLICY_VERSION = "frozen_product_model_runtime_policy_v0_2";
 
 export const ANALYSIS_RUN_STAGE_IDS = [
@@ -54,7 +54,7 @@ export type AnalysisRunManifest = {
   persistence: "durable_versioned_stage_snapshots" | "none";
   providerExecution: "disabled";
   publicResearch: "disabled";
-  rfProductionKnowledge: "claim_specific_admitted_resolution_enabled";
+  rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled";
   benchmarkExecution: "disabled";
   savingsExecution: "disabled";
   businessContextAuthority: "excluded_from_canonical_economics";

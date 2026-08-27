@@ -110,6 +110,8 @@ function migrate(): void {
       canonical_truth_hash TEXT,
       rf_snapshot_hash TEXT NOT NULL DEFAULT '',
       rf_context_hash TEXT NOT NULL DEFAULT '',
+      rf_catalog_status TEXT NOT NULL DEFAULT 'unbound',
+      rf_catalog_binding_json TEXT,
       limitations_json TEXT NOT NULL DEFAULT '[]',
       result_json TEXT,
       created_at TEXT NOT NULL,
@@ -136,6 +138,42 @@ function migrate(): void {
       elapsed_ms INTEGER,
       updated_at TEXT NOT NULL,
       PRIMARY KEY (run_id, stage)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_rf_knowledge_audit_events (
+      event_id TEXT PRIMARY KEY,
+      entry_ref TEXT NOT NULL,
+      previous_entry_ref TEXT,
+      event_type TEXT NOT NULL,
+      prior_version INTEGER,
+      next_version INTEGER NOT NULL,
+      prior_state TEXT,
+      next_state TEXT NOT NULL,
+      prior_visibility TEXT,
+      next_visibility TEXT NOT NULL,
+      event_json TEXT NOT NULL,
+      event_hash TEXT NOT NULL,
+      occurred_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE(entry_ref, next_version)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_rf_knowledge_entries (
+      entry_ref TEXT PRIMARY KEY,
+      entry_version INTEGER NOT NULL,
+      claim_type TEXT NOT NULL,
+      subject_code TEXT NOT NULL,
+      lifecycle TEXT NOT NULL,
+      visibility TEXT NOT NULL,
+      tenant_ref TEXT,
+      account_ref TEXT,
+      effective_from TEXT,
+      effective_to TEXT,
+      entry_json TEXT NOT NULL,
+      entry_hash TEXT NOT NULL,
+      audit_event_id TEXT NOT NULL UNIQUE REFERENCES canonical_rf_knowledge_audit_events(event_id),
+      created_at TEXT NOT NULL,
+      UNIQUE(entry_ref, entry_version)
     );
 
     CREATE TABLE IF NOT EXISTS statement_uploads (
@@ -293,6 +331,10 @@ function migrate(): void {
     CREATE INDEX IF NOT EXISTS idx_canonical_runs_job ON canonical_analysis_runs(job_id);
     CREATE INDEX IF NOT EXISTS idx_canonical_runs_status ON canonical_analysis_runs(status, updated_at);
     CREATE INDEX IF NOT EXISTS idx_canonical_run_stages_status ON canonical_analysis_run_stages(run_id, status);
+    CREATE INDEX IF NOT EXISTS idx_rf_catalog_claim ON canonical_rf_knowledge_entries(claim_type, subject_code, lifecycle);
+    CREATE INDEX IF NOT EXISTS idx_rf_catalog_visibility ON canonical_rf_knowledge_entries(visibility, tenant_ref, account_ref);
+    CREATE INDEX IF NOT EXISTS idx_rf_catalog_effective_period ON canonical_rf_knowledge_entries(effective_from, effective_to);
+    CREATE INDEX IF NOT EXISTS idx_rf_catalog_audit_previous ON canonical_rf_knowledge_audit_events(previous_entry_ref, prior_version);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_statements_merchant_period ON statements(merchant_id, period_key);
     CREATE INDEX IF NOT EXISTS idx_multi_jobs_merchant ON multi_statement_jobs(merchant_id);
     CREATE INDEX IF NOT EXISTS idx_multi_jobs_status ON multi_statement_jobs(status);
@@ -330,6 +372,8 @@ function migrate(): void {
   ensureColumn("analysis_jobs", "next_run_at", "TEXT");
   ensureColumn("canonical_analysis_runs", "rf_snapshot_hash", "TEXT NOT NULL DEFAULT ''");
   ensureColumn("canonical_analysis_runs", "rf_context_hash", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn("canonical_analysis_runs", "rf_catalog_status", "TEXT NOT NULL DEFAULT 'unbound'");
+  ensureColumn("canonical_analysis_runs", "rf_catalog_binding_json", "TEXT");
   ensureColumn("statements", "analysis_status", "TEXT NOT NULL DEFAULT 'completed'");
   ensureColumn("statements", "processor_markup_bps", "REAL");
   ensureColumn("comparisons", "processor_markup_bps_delta", "REAL");
@@ -337,6 +381,14 @@ function migrate(): void {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_jobs_due ON analysis_jobs(status, next_run_at, created_at);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_upload_id ON analysis_jobs(upload_id) WHERE upload_id IS NOT NULL;
+    CREATE TRIGGER IF NOT EXISTS canonical_rf_knowledge_entries_no_update
+      BEFORE UPDATE ON canonical_rf_knowledge_entries BEGIN SELECT RAISE(ABORT, 'canonical_rf_catalog_is_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_rf_knowledge_entries_no_delete
+      BEFORE DELETE ON canonical_rf_knowledge_entries BEGIN SELECT RAISE(ABORT, 'canonical_rf_catalog_is_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_rf_knowledge_audit_no_update
+      BEFORE UPDATE ON canonical_rf_knowledge_audit_events BEGIN SELECT RAISE(ABORT, 'canonical_rf_catalog_is_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_rf_knowledge_audit_no_delete
+      BEFORE DELETE ON canonical_rf_knowledge_audit_events BEGIN SELECT RAISE(ABORT, 'canonical_rf_catalog_is_append_only'); END;
   `);
 }
 

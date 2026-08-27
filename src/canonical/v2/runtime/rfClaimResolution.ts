@@ -16,7 +16,7 @@ import { validateKnowledgeLibrary } from "../knowledge/knowledgeValidate.js";
 import { normalizeObservationLabel } from "../sourceLabelIdentity.js";
 import type { CanonicalUnresolvedClaim, CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
 
-export const CANONICAL_RF_RESOLUTION_SCHEMA_VERSION = "canonical_rf_claim_resolution_v1" as const;
+export const CANONICAL_RF_RESOLUTION_SCHEMA_VERSION = "canonical_rf_claim_resolution_v2" as const;
 
 const APPLICABLE_CATEGORIES = new Set<CanonicalEconomicCategory>([
   "issuer_interchange_economics",
@@ -35,6 +35,22 @@ export type CanonicalRfKnowledgeSnapshot = {
   entryRefs: string[];
   validation: { status: "valid" | "invalid"; errors: string[] };
 };
+
+export type CanonicalRfKnowledgeInput = {
+  entries: readonly KnowledgeEntry[];
+  tenantRef: string;
+  accountRef: string;
+  binding?: {
+    source: "governed_catalog" | "supplied_evaluation" | "run_isolated_empty";
+    availability: "available" | "unavailable";
+    expectedSnapshotHash: string | null;
+    visibilityMode: "merchant_account" | "anonymous_run" | "supplied_evaluation";
+    tenantPrivateKnowledge: "disabled" | "caller_evaluation_boundary";
+    limitationCodes: string[];
+  };
+};
+
+export type CanonicalRfKnowledgeBinding = NonNullable<CanonicalRfKnowledgeInput["binding"]>;
 
 export type CanonicalRfClaimDecision = {
   claimId: string;
@@ -63,6 +79,7 @@ export type CanonicalRfClaimResolution = {
   publicResearch: "disabled";
   benchmarkExecution: "disabled";
   businessContextAuthority: "excluded_from_canonical_economics";
+  knowledgeBinding: CanonicalRfKnowledgeBinding;
   snapshot: CanonicalRfKnowledgeSnapshot;
   decisions: CanonicalRfClaimDecision[];
   categoryApplications: CanonicalEconomicKnowledgeApplicationAdmission[];
@@ -87,12 +104,18 @@ export function canonicalRfExecutionContextHash(input: {
   entries: readonly KnowledgeEntry[];
   tenantRef: string;
   accountRef: string;
+  binding?: CanonicalRfKnowledgeInput["binding"];
 }): string {
+  const snapshot = canonicalRfKnowledgeSnapshot(input.entries);
+  const binding = normalizedBinding(input.binding, snapshot.snapshotHash);
   return digest({
     schemaVersion: CANONICAL_RF_RESOLUTION_SCHEMA_VERSION,
-    knowledgeSnapshotHash: canonicalRfKnowledgeSnapshot(input.entries).snapshotHash,
+    knowledgeSnapshotHash: binding.availability === "available"
+      ? binding.expectedSnapshotHash ?? snapshot.snapshotHash
+      : snapshot.snapshotHash,
     tenantRef: input.tenantRef,
     accountRef: input.accountRef,
+    binding,
   });
 }
 
@@ -102,10 +125,17 @@ export function buildCanonicalRfClaimResolution(input: {
   entries: readonly KnowledgeEntry[];
   tenantRef: string;
   accountRef: string;
+  binding?: CanonicalRfKnowledgeInput["binding"];
 }): CanonicalRfClaimResolution {
   const snapshot = canonicalRfKnowledgeSnapshot(input.entries);
+  const knowledgeBinding = normalizedBinding(input.binding, snapshot.snapshotHash);
   const errors: string[] = [...snapshot.validation.errors];
   const warnings: string[] = [];
+  if (knowledgeBinding.availability === "unavailable") {
+    errors.push("rf_knowledge_catalog_unavailable", ...knowledgeBinding.limitationCodes);
+  }
+  if (knowledgeBinding.availability === "available"
+    && knowledgeBinding.expectedSnapshotHash !== snapshot.snapshotHash) errors.push("rf_knowledge_snapshot_binding_mismatch");
   if (input.inventory.validation.status !== "valid") errors.push("rf_requires_valid_unresolved_claim_inventory");
   if (input.economic.validation.status !== "valid") errors.push("rf_requires_valid_capability_bound_economics");
   if (!safeBoundary(input.tenantRef) || !safeBoundary(input.accountRef)) errors.push("rf_invalid_tenant_or_account_boundary");
@@ -196,10 +226,28 @@ export function buildCanonicalRfClaimResolution(input: {
     publicResearch: "disabled",
     benchmarkExecution: "disabled",
     businessContextAuthority: "excluded_from_canonical_economics",
+    knowledgeBinding,
     snapshot,
     decisions: decisions.sort((left, right) => left.claimId.localeCompare(right.claimId)),
     categoryApplications: categoryApplications.sort((left, right) => left.claimRef.localeCompare(right.claimRef)),
     validation: { status: errors.length === 0 ? "valid" : "invalid", errors: unique(errors), warnings: unique(warnings) },
+  };
+}
+
+function normalizedBinding(
+  binding: CanonicalRfKnowledgeInput["binding"],
+  snapshotHash: string,
+): CanonicalRfKnowledgeBinding {
+  return binding ? {
+    ...binding,
+    limitationCodes: unique(binding.limitationCodes),
+  } : {
+    source: "supplied_evaluation",
+    availability: "available",
+    expectedSnapshotHash: snapshotHash,
+    visibilityMode: "supplied_evaluation",
+    tenantPrivateKnowledge: "caller_evaluation_boundary",
+    limitationCodes: [],
   };
 }
 

@@ -14,8 +14,8 @@ export const CANONICAL_KNOWLEDGE_V2_AMENDMENTS = [
 export const canonicalKnowledgeV2VersionManifest = {
   schemaVersion: CANONICAL_KNOWLEDGE_V2_SCHEMA_VERSION,
   authority: "shadow_non_authoritative",
-  persistence: "none_in_memory_supplied_entries_only",
-  runtimeConnection: "none",
+  persistence: "durable_append_only_governed_catalog",
+  runtimeConnection: "production_analysis_run_immutable_snapshot",
   customerVisibility: "none",
   aiAuthority: "prohibited",
   realSeedAdmission: "prohibited",

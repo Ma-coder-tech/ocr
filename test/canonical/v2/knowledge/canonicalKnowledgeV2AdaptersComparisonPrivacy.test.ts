@@ -87,7 +87,7 @@ describe("Payments Knowledge Library v0.2 candidates, comparison, and privacy", 
     expect(CANONICAL_KNOWLEDGE_V2_AMENDMENTS).toHaveLength(8);
     expect(canonicalKnowledgeV2VersionManifest).toMatchObject({
       schemaVersion: "payments_knowledge_library_v0_2", authority: "shadow_non_authoritative",
-      persistence: "none_in_memory_supplied_entries_only", runtimeConnection: "none", aiAuthority: "prohibited", realSeedAdmission: "prohibited",
+      persistence: "durable_append_only_governed_catalog", runtimeConnection: "production_analysis_run_immutable_snapshot", aiAuthority: "prohibited", realSeedAdmission: "prohibited",
     });
   });
 });

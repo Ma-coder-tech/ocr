@@ -3,8 +3,13 @@ import { randomUUID } from "node:crypto";
 import type { ParsedDocument } from "../../../parser.js";
 import { db, nowIso } from "../../../db.js";
 import type { CanonicalEconomicsV2CompletenessStatus } from "../types.js";
-import type { KnowledgeEntry } from "../knowledge/knowledgeTypes.js";
-import { canonicalRfExecutionContextHash, canonicalRfKnowledgeSnapshot } from "./rfClaimResolution.js";
+import { canonicalRfExecutionContextHash } from "./rfClaimResolution.js";
+import {
+  governedRfKnowledgeInput,
+  loadGovernedRfCatalogSnapshot,
+  reloadGovernedRfCatalogBinding,
+  type GovernedRfCatalogBinding,
+} from "./rfKnowledgeCatalog.js";
 import { executeDeterministicCanonicalAnalysisRun, sourceFingerprintForAnalysisRun } from "./analysisRun.js";
 import {
   ANALYSIS_RUN_IMPLEMENTATION_VERSION,
@@ -59,6 +64,8 @@ export type PersistedAnalysisRunRecord = {
   canonicalTruthHash: string | null;
   rfSnapshotHash: string;
   rfContextHash: string;
+  rfCatalogStatus: "available" | "unavailable" | "unbound";
+  rfCatalogBinding: GovernedRfCatalogBinding | null;
   limitations: string[];
   createdAt: string;
   startedAt: string;
@@ -84,7 +91,6 @@ export function executeDurableCanonicalAnalysisRun(input: {
   document: ParsedDocument;
   sourceProfile?: { statementCompleteness?: CanonicalEconomicsV2CompletenessStatus; humanReviewRequired?: boolean };
   stageBuilders?: Parameters<typeof executeDeterministicCanonicalAnalysisRun>[0]["stageBuilders"];
-  rfKnowledge?: { entries: readonly KnowledgeEntry[]; tenantRef: string; accountRef: string };
 }): CanonicalAnalysisRun {
   const fingerprint = sourceFingerprintForAnalysisRun(input.document);
   const existing = getPersistedAnalysisRunForJob(input.jobId);
@@ -92,23 +98,35 @@ export function executeDurableCanonicalAnalysisRun(input: {
     throw new Error("ANALYSIS_RUN_SOURCE_FINGERPRINT_MISMATCH");
   }
   const runId = existing?.id ?? randomUUID();
-  const rfKnowledge = input.rfKnowledge ?? {
-    entries: [], tenantRef: `analysis_run_${runId}`, accountRef: `analysis_run_${runId}`,
+  const priorBinding = existing?.rfCatalogBinding?.availability === "available" ? existing.rfCatalogBinding : null;
+  const catalogSnapshot = priorBinding
+    ? reloadGovernedRfCatalogBinding(priorBinding)
+    : loadGovernedRfCatalogSnapshot({ jobId: input.jobId, runId });
+  const rfKnowledge = governedRfKnowledgeInput(catalogSnapshot);
+  const bindingToPersist: GovernedRfCatalogBinding = priorBinding ?? {
+    schemaVersion: catalogSnapshot.schemaVersion,
+    source: catalogSnapshot.source,
+    availability: catalogSnapshot.availability,
+    snapshotHash: catalogSnapshot.snapshotHash,
+    entryRefs: [...catalogSnapshot.entryRefs],
+    visibility: { ...catalogSnapshot.visibility },
+    limitationCodes: [...catalogSnapshot.limitationCodes],
   };
-  const rfSnapshotHash = canonicalRfKnowledgeSnapshot(rfKnowledge.entries).snapshotHash;
+  const rfSnapshotHash = bindingToPersist.snapshotHash ?? "";
   const rfContextHash = canonicalRfExecutionContextHash(rfKnowledge);
   if (existing?.result
     && existing.schemaVersion === ANALYSIS_RUN_SCHEMA_VERSION
     && existing.implementationVersion === ANALYSIS_RUN_IMPLEMENTATION_VERSION
     && existing.policyVersion === ANALYSIS_RUN_POLICY_VERSION
     && existing.rfContextHash === rfContextHash
+    && catalogSnapshot.availability === "available"
     && ["completed", "completed_with_limitations", "unsupported"].includes(existing.status)) {
     return existing.result;
   }
 
   const sourceDocumentRef = existing?.sourceDocumentRef ?? input.sourceDocumentRef ?? `job_${input.jobId}`;
   beginRun({ runId, jobId: input.jobId, sourceDocumentRef, fingerprint, rfSnapshotHash,
-    rfContextHash,
+    rfContextHash, rfCatalogBinding: bindingToPersist, rfCatalogExecutionStatus: catalogSnapshot.availability,
     existingAttemptCount: existing?.attemptCount ?? 0 });
   const stageStartedAt = new Map<AnalysisRunStageId, number>();
   try {
@@ -147,6 +165,8 @@ function beginRun(input: {
   fingerprint: string;
   rfSnapshotHash: string;
   rfContextHash: string;
+  rfCatalogBinding: GovernedRfCatalogBinding;
+  rfCatalogExecutionStatus: "available" | "unavailable";
   existingAttemptCount: number;
 }) {
   const now = nowIso();
@@ -154,9 +174,10 @@ function beginRun(input: {
     db.prepare(`
       INSERT INTO canonical_analysis_runs (
         id, job_id, source_document_ref, source_fingerprint, schema_version, implementation_version, policy_version,
-        status, family_status, parser_driver_id, attempt_count, canonical_truth_hash, rf_snapshot_hash, rf_context_hash, limitations_json, result_json,
+        status, family_status, parser_driver_id, attempt_count, canonical_truth_hash, rf_snapshot_hash, rf_context_hash,
+        rf_catalog_status, rf_catalog_binding_json, limitations_json, result_json,
         created_at, started_at, completed_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'running', 'unresolved', NULL, ?, NULL, ?, ?, '[]', NULL, ?, ?, NULL, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'running', 'unresolved', NULL, ?, NULL, ?, ?, ?, ?, '[]', NULL, ?, ?, NULL, ?)
       ON CONFLICT(job_id) DO UPDATE SET
         source_document_ref = excluded.source_document_ref,
         schema_version = excluded.schema_version,
@@ -169,6 +190,8 @@ function beginRun(input: {
         canonical_truth_hash = NULL,
         rf_snapshot_hash = excluded.rf_snapshot_hash,
         rf_context_hash = excluded.rf_context_hash,
+        rf_catalog_status = excluded.rf_catalog_status,
+        rf_catalog_binding_json = excluded.rf_catalog_binding_json,
         limitations_json = '[]',
         result_json = NULL,
         started_at = excluded.started_at,
@@ -176,7 +199,8 @@ function beginRun(input: {
         updated_at = excluded.updated_at
     `).run(input.runId, input.jobId, input.sourceDocumentRef, input.fingerprint,
       ANALYSIS_RUN_SCHEMA_VERSION, ANALYSIS_RUN_IMPLEMENTATION_VERSION, ANALYSIS_RUN_POLICY_VERSION,
-      input.existingAttemptCount + 1, input.rfSnapshotHash, input.rfContextHash, now, now, now);
+      input.existingAttemptCount + 1, input.rfSnapshotHash, input.rfContextHash,
+      input.rfCatalogExecutionStatus, JSON.stringify(input.rfCatalogBinding), now, now, now);
     const insertStage = db.prepare(`
       INSERT OR IGNORE INTO canonical_analysis_run_stages (
         run_id, stage, status, claim_ref, evidence_objective, expected_decision_effect, artifact_json, artifact_hash,
@@ -260,6 +284,8 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
     canonicalTruthHash: row.canonical_truth_hash ? String(row.canonical_truth_hash) : null,
     rfSnapshotHash: String(row.rf_snapshot_hash ?? ""),
     rfContextHash: String(row.rf_context_hash ?? ""),
+    rfCatalogStatus: String(row.rf_catalog_status ?? "unbound") as PersistedAnalysisRunRecord["rfCatalogStatus"],
+    rfCatalogBinding: parseJson<GovernedRfCatalogBinding | null>(row.rf_catalog_binding_json, null),
     limitations: parseJson<string[]>(row.limitations_json, []),
     createdAt: String(row.created_at),
     startedAt: String(row.started_at),

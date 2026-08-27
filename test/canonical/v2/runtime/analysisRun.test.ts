@@ -41,7 +41,7 @@ describe("production canonical AnalysisRun core", () => {
         customerReportAuthority: "legacy_report_unchanged",
         providerExecution: "disabled",
         publicResearch: "disabled",
-        rfProductionKnowledge: "claim_specific_admitted_resolution_enabled",
+        rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled",
         benchmarkExecution: "disabled",
         savingsExecution: "disabled",
         businessContextAuthority: "excluded_from_canonical_economics",

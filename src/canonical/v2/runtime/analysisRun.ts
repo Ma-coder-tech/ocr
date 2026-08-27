@@ -18,8 +18,12 @@ import { observeFiservEconomicsInCanonicalSynthesisV2 } from "../fiservSynthesis
 import { composeCanonicalMerchantReportV2 } from "../report/reportHarness.js";
 import { buildSourceReadinessEnvelope } from "../evaluation/sourceReadiness.js";
 import { buildCanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
-import { buildCanonicalRfClaimResolution, validateCanonicalRfSemanticConvergence } from "./rfClaimResolution.js";
-import type { KnowledgeEntry } from "../knowledge/knowledgeTypes.js";
+import {
+  buildCanonicalRfClaimResolution,
+  canonicalRfKnowledgeSnapshot,
+  validateCanonicalRfSemanticConvergence,
+  type CanonicalRfKnowledgeInput,
+} from "./rfClaimResolution.js";
 import type { CanonicalEconomicKnowledgeApplicationAdmission } from "../economicAnalysis.js";
 import type { CanonicalEconomicsV2CompletenessStatus } from "../types.js";
 import {
@@ -81,7 +85,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   evaluationContinueInvalidStages?: boolean;
   observer?: AnalysisRunStageObserver;
   stageBuilders?: Partial<StageBuilders>;
-  rfKnowledge?: { entries: readonly KnowledgeEntry[]; tenantRef: string; accountRef: string };
+  rfKnowledge?: CanonicalRfKnowledgeInput;
 }): CanonicalAnalysisRunExecution {
   const fingerprint = sourceFingerprintForAnalysisRun(input.document);
   const executionContext = input.executionContext ?? "production";
@@ -268,6 +272,14 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
       const provisionalClaims = builders.claims({ pricing: artifacts.rc, economic: provisionalRd, synthesis: null });
       const rfKnowledge = input.rfKnowledge ?? {
         entries: [], tenantRef: `analysis_run_${input.runId}`, accountRef: `analysis_run_${input.runId}`,
+        binding: {
+          source: "run_isolated_empty" as const,
+          availability: "available" as const,
+          expectedSnapshotHash: canonicalRfKnowledgeSnapshot([]).snapshotHash,
+          visibilityMode: "anonymous_run" as const,
+          tenantPrivateKnowledge: "disabled" as const,
+          limitationCodes: [],
+        },
       };
       artifacts.rfResolution = buildCanonicalRfClaimResolution({
         inventory: provisionalClaims,
@@ -275,6 +287,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
         entries: rfKnowledge.entries,
         tenantRef: rfKnowledge.tenantRef,
         accountRef: rfKnowledge.accountRef,
+        binding: rfKnowledge.binding,
       });
       finishValidatedStage(input.observer, stageOutcomes, "rf_resolution", artifacts.rfResolution,
         artifacts.rfResolution.validation);
@@ -383,7 +396,7 @@ function terminalRun(input: {
       persistence: input.input.executionContext === "evaluation_compatibility" ? "none" : "durable_versioned_stage_snapshots",
       providerExecution: "disabled",
       publicResearch: "disabled",
-      rfProductionKnowledge: "claim_specific_admitted_resolution_enabled",
+      rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled",
       benchmarkExecution: "disabled",
       savingsExecution: "disabled",
       businessContextAuthority: "excluded_from_canonical_economics",

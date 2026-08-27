@@ -41,7 +41,17 @@ describe("production worker canonical AnalysisRun integration", () => {
     const canonical = runStore.getPersistedAnalysisRunForJob(job.id);
     expect(completed).toMatchObject({ status: "completed", progress: 100, summary: { businessType: "retail" } });
     expect(completed?.summary).not.toHaveProperty("canonicalAnalysisRun");
-    expect(canonical).toMatchObject({ jobId: job.id, status: "completed_with_limitations", familyStatus: "proven" });
+    expect(canonical).toMatchObject({
+      jobId: job.id, status: "completed_with_limitations", familyStatus: "proven", rfCatalogStatus: "available",
+      rfCatalogBinding: {
+        source: "governed_catalog", availability: "available", entryRefs: [],
+        visibility: { mode: "anonymous_run", accountPrivateKnowledge: "excluded", tenantPrivateKnowledge: "disabled" },
+      },
+    });
+    expect(canonical?.result?.artifacts.rfResolution).toMatchObject({
+      knowledgeBinding: { source: "governed_catalog", availability: "available" },
+      snapshot: { entryCount: 0 }, validation: { status: "valid" },
+    });
     expect(canonical?.result?.artifacts.rh).not.toBeNull();
     expect(canonical?.result?.artifacts.unresolvedClaims).toMatchObject({
       businessContextAuthority: "excluded_from_canonical_economics",
