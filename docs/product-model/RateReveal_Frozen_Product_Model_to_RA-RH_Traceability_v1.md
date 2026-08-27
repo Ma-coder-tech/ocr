@@ -3,7 +3,7 @@
 **Status:** Maintained normative-to-implementation traceability record.
 **Frozen package identity:** `docs/product-model/frozen/v0.1/frozen-product-model.lock.json`.
 **Accepted implementation baseline:** `codex/e2e-internal-analysis-v1` at `38bd5e8036c8329fda8ad7224961bc25ca23da25`.
-**Current scope:** Accepted RA–RH implementation plus accepted internal-analysis integration through the baseline above, the accepted deterministic-ingress, capability-ledger, RF-resolution, governed RF catalog, Materiality Contract/work-ledger, and `claim_bound_rg_evidence_execution_v1` packages. Together they authorize normal-upload ingress, a durable production-internal AnalysisRun, deterministic Fiserv-family/capability proof, claim-scoped economics, governed RF snapshot resolution, exact-facet RG admission, and durable claim-bound search/retrieval/investigation/verification. They do not authorize real RF seed entries, automatic RF promotion, canonical RG semantic application, customer-report cutover, benchmarks, or savings.
+**Current scope:** Accepted RA–RH implementation plus accepted internal-analysis integration through the baseline above, the accepted deterministic-ingress, capability-ledger, RF-resolution, governed RF catalog, Materiality Contract/work-ledger, and corrected `claim_bound_rg_evidence_execution_v1_1` packages. Together they authorize normal-upload ingress, a durable production-internal AnalysisRun, deterministic Fiserv-family/capability proof, claim-scoped economics, governed RF snapshot resolution, exact-facet RG admission, and durable claim-bound search/retrieval/investigation/verification. They do not authorize real RF seed entries, automatic RF promotion, canonical RG semantic application, customer-report cutover, benchmarks, or savings.
 
 ## 1. How to maintain this crosswalk
 
@@ -30,7 +30,7 @@ Gold fixtures and tests are correctness oracles. Production code must not import
 | RD | Economic charges, participant/control claims, statement-observed cost ledger and cost stack | `f447b9f` plus `production_deterministic_ingress_v1`, `capability_bound_economic_ledger_v1`, and `rf_first_claim_resolution_v1` | Fully implemented for accepted shadow V2 economic contract, claim-scoped production-internal fee contribution, and bounded RF category application | Dynamically proven fee occurrences contribute to the AnalysisRun cost ledger; an exact admitted RF category claim may classify only that category while ownership, control, actionability, benchmark, and savings remain independently unresolved |
 | RE | Drivers, counterfactuals, levers, special economics, signals, notices, themes, and impact gates | `4dc012f` plus `production_deterministic_ingress_v1` | Fully implemented for accepted shadow V2 synthesis contract | Deterministically executed and snapshotted when RD is valid; unavailable counterfactuals remain unresolved |
 | RF | Effective-dated, scoped, evidence-bound knowledge resolution, conflicts, candidates, and unknowns | `82e5b8e` plus `rf_first_claim_resolution_v1` and `governed_rf_catalog_snapshot_v1` | Fully implemented for the accepted library, append-only catalog governance, and bounded production-internal claim resolution | The AnalysisRun loads the governed catalog, binds one validated visibility-scoped snapshot, and applies only exact admitted applicable mappings; no real entries are seeded |
-| RG | Bounded research graph, retrieval, investigation, verification, safety, and candidate projection | `7a0c5a7` plus accepted integration through `38bd5e8`, `materiality_rg_work_ledger_v1_1`, and `claim_bound_rg_evidence_execution_v1` | Production claim admission, durable execution, and current-run verified-evidence persistence are implemented; canonical semantic application remains deferred | Exact-facet work items execute through typed public SearchIntent, independent retrieval, separate investigation/verification, and dynamic source validation inside the durable AnalysisRun ledger |
+| RG | Bounded research graph, retrieval, investigation, verification, safety, and candidate projection | `7a0c5a7` plus accepted integration through `38bd5e8`, `materiality_rg_work_ledger_v1_1`, and `claim_bound_rg_evidence_execution_v1_1` | Production claim admission, durable execution, and current-run verified-evidence persistence are implemented; canonical semantic application remains deferred | Exact-facet work items execute through typed public SearchIntent, independent retrieval, separate investigation/verification, publisher-domain authority binding, and exact verified support-locator persistence inside the durable AnalysisRun ledger |
 | RH | Evidence-bounded Report V2 projection and customer permission ceilings | `d8d3816` plus `production_deterministic_ingress_v1` | Fully implemented for accepted shadow backend contract | Deterministically executed and snapshotted as an internal artifact; Report V1 authority/routing remains unchanged |
 
 Accepted chain order:
@@ -51,7 +51,7 @@ RA 3f9328b
 → RF-first canonical claim resolution rf_first_claim_resolution_v1
 → governed RF catalog and snapshot binding governed_rf_catalog_snapshot_v1
 → Materiality Contract and exact-facet durable RG planning materiality_rg_work_ledger_v1_1
-→ claim-bound durable RG evidence execution claim_bound_rg_evidence_execution_v1
+→ claim-bound durable RG evidence execution claim_bound_rg_evidence_execution_v1_1
 ```
 
 ## 3. RA — executable Gold correctness oracle
@@ -167,7 +167,7 @@ Accepted RH semantic amendment registry: `src/canonical/v2/report/reportVersionM
 
 ## 11. Bounded production deterministic ingress and AnalysisRun connection
 
-This connection is versioned as `canonical_analysis_run_v6` / `claim_bound_rg_evidence_execution_v1`, succeeding `canonical_analysis_run_v5` / `materiality_rg_work_ledger_v1_1` and earlier accepted versions, under `frozen_product_model_runtime_policy_v0_2` and `canonical_materiality_contract_v1`. The executor consumes the accepted exact-facet plan without changing materiality or becoming a second planner. Its current-run verified evidence does not yet rewrite RF/RD/RE/RH or make the legacy customer report consume V2 output.
+This connection is versioned as `canonical_analysis_run_v6` / `claim_bound_rg_evidence_execution_v1_1`, succeeding `canonical_analysis_run_v5` / `materiality_rg_work_ledger_v1_1` and earlier accepted versions, under `frozen_product_model_runtime_policy_v0_2` and `canonical_materiality_contract_v1`. Revision v1.1 corrects evidence integrity by persisting the verifier-accepted support locator separately from the authority and investigator locators, and by requiring a deterministic publisher-domain trust-anchor match in addition to AI authority judgment. The executor consumes the accepted exact-facet plan without changing materiality or becoming a second planner. Its current-run verified evidence does not yet rewrite RF/RD/RE/RH or make the legacy customer report consume V2 output.
 
 | Approved production rule | Owning provision | Implementation location | Completion/status | Verification |
 |---|---|---|---|---|

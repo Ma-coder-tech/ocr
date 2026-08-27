@@ -30,6 +30,7 @@ import type {
   RgEvidencePortReceipt,
 } from "./rgEvidenceExecution.js";
 import { RgEvidenceTransportError } from "./rgEvidenceExecution.js";
+import { RG_PUBLISHER_ORIGIN_BINDING_CATALOG_HASH } from "./rgPublisherOriginAuthority.js";
 
 const MAX_AI_OUTPUT_TOKENS = 1_500;
 const AI_TIMEOUT_MS = 30_000;
@@ -41,7 +42,8 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
   try {
     capability = createProductionRgExecutionCapability({ runId,
       investigativeSchemaHash: PRODUCTION_INVESTIGATION_SCHEMA_HASH,
-      semanticSchemaHash: PRODUCTION_VERIFICATION_SCHEMA_HASH });
+      semanticSchemaHash: PRODUCTION_VERIFICATION_SCHEMA_HASH,
+      authorityBindingCatalogHash: RG_PUBLISHER_ORIGIN_BINDING_CATALOG_HASH });
   } catch (error) {
     return unavailablePorts(safeReason(error));
   }

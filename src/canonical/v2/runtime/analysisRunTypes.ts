@@ -18,7 +18,7 @@ import type { CanonicalRfClaimResolution } from "./rfClaimResolution.js";
 import type { CanonicalRgWorkLedger } from "./rgWorkLedger.js";
 
 export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v6";
-export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "claim_bound_rg_evidence_execution_v1";
+export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "claim_bound_rg_evidence_execution_v1_1";
 export const ANALYSIS_RUN_POLICY_VERSION = "frozen_product_model_runtime_policy_v0_2";
 
 export const ANALYSIS_RUN_STAGE_IDS = [

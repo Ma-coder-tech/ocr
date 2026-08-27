@@ -118,10 +118,12 @@ export function createProductionRgExecutionCapability(input: {
   runId: string;
   investigativeSchemaHash: string;
   semanticSchemaHash: string;
+  authorityBindingCatalogHash: string;
   cancellationSignal?: AbortSignal;
 }): ProductionRgExecutionCapabilityV1 {
   if (!isSafeStructuredString(input.runId)
     || !/^[a-f0-9]{64}$/.test(input.investigativeSchemaHash) || !/^[a-f0-9]{64}$/.test(input.semanticSchemaHash)
+    || !/^[a-f0-9]{64}$/.test(input.authorityBindingCatalogHash)
     || (input.cancellationSignal !== undefined && !(input.cancellationSignal instanceof AbortSignal))) {
     throw new Error("production_rg_preflight_identity_invalid");
   }
@@ -143,7 +145,7 @@ export function createProductionRgExecutionCapability(input: {
     searchResponseContractHash: OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH,
     investigativeSchemaHash: input.investigativeSchemaHash,
     semanticSchemaHash: input.semanticSchemaHash,
-    authorityRegistryHash: createHash("sha256").update("dynamic_source_authority_validation_v1").digest("hex"),
+    authorityRegistryHash: input.authorityBindingCatalogHash,
     languageCapability: "disabled" as const,
   });
   liveBindings.set(capability, { openRouterApiKey, openRouterSearchModel, openAiApiKey, model,
@@ -159,7 +161,8 @@ export function requireLiveCapabilityBinding(capability: LiveExecutionCapability
     || capability.searchResponseContractHash !== OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH
     || (capability.schemaVersion === "internal_live_execution_capability_v1"
       ? capability.investigativeSchemaHash !== INVESTIGATIVE_RESPONSE_SCHEMA_HASH || capability.semanticSchemaHash !== SEMANTIC_RESPONSE_SCHEMA_HASH
-      : !/^[a-f0-9]{64}$/.test(capability.investigativeSchemaHash) || !/^[a-f0-9]{64}$/.test(capability.semanticSchemaHash))) {
+      : !/^[a-f0-9]{64}$/.test(capability.investigativeSchemaHash) || !/^[a-f0-9]{64}$/.test(capability.semanticSchemaHash)
+        || !/^[a-f0-9]{64}$/.test(capability.authorityRegistryHash))) {
     throw new Error("internal_live_execution_capability_invalid");
   }
   return binding;

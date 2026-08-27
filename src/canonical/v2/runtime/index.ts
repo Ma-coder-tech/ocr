@@ -6,3 +6,4 @@ export * from "./materialityContract.js";
 export * from "./rgWorkLedger.js";
 export * from "./rgEvidenceExecution.js";
 export * from "./rgLiveEvidencePorts.js";
+export * from "./rgPublisherOriginAuthority.js";

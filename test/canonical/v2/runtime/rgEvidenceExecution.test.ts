@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,15 +17,17 @@ const fixture = path.resolve(process.cwd(), "test/fixtures/pdfs/SAMPLE_MERCHANT_
 
 describe("production durable claim-bound RG evidence execution", () => {
   let dbModule: typeof import("../../../../src/db.js");
+  const temporaryDirectories: string[] = [];
 
   beforeEach(() => {
     vi.resetModules();
     process.env.FEECLEAR_DB_PATH = ":memory:";
   });
 
-  afterEach(() => {
-    dbModule?.db.close();
+  afterEach(async () => {
+    try { dbModule?.db.close(); } catch { /* already closed by restart coverage */ }
     delete process.env.FEECLEAR_DB_PATH;
+    await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
   });
 
   it("executes only an admitted persisted work item through a privacy-safe intent and dynamically verified new official source", async () => {
@@ -54,6 +58,13 @@ describe("production durable claim-bound RG evidence execution", () => {
     ]);
     expect(result.verifiedEvidence[0]).toMatchObject({
       sourceUrl: expect.stringContaining("newly-discovered-official-document"),
+      sourceOrigin: "https://merchants.fiserv.com",
+      originPublisherProof: {
+        bindingId: "fiserv_public_web_origins_v1",
+        matchedOrganizationalDomain: "fiserv.com",
+        publisherIdentityCode: "fiserv_first_data",
+        authorityClass: "processor_publication",
+      },
       currentRunSupport: "verified_claim_scoped_candidate_support",
       reusableKnowledgeState: "candidate_not_promoted", rfAdmissionAuthority: "none",
       automaticKnowledgePromotion: false, canonicalFinancialMutationAllowed: false,
@@ -75,6 +86,121 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(afterDeterministicReplay.rgWorkItems.find((candidate) => candidate.workItemId === item.workItemId))
       .toMatchObject({ executionState: "completed_verified_evidence" });
     expect(afterDeterministicReplay.rgOperations).toHaveLength(4);
+  }, 30_000);
+
+  it("persists the verifier-accepted support locator rather than the investigator locator", async () => {
+    const setup = await runWithOneWorkItem();
+    const ports = successfulPorts([]);
+    const originalVerify = ports.verify;
+    ports.verify = async (input, onSend) => {
+      const result = await originalVerify(input, onSend);
+      return { ...result, value: { ...result.value,
+        authorityLocatorId: input.document.locators[0]!.locatorId,
+        supportLocatorId: input.document.locators[1]!.locatorId } };
+    };
+
+    const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const evidence = result.verifiedEvidence[0]!;
+
+    expect(evidence.investigatorLocatorId).toBe(persisted.rgOperations
+      .find((operation) => operation.kind === "investigation")!.result.locatorId);
+    expect(evidence).toMatchObject({
+      authorityLocatorId: expect.stringMatching(/^authority-/),
+      authorityLocatorExcerpt: "Official Fiserv publisher identity.",
+      supportLocatorId: expect.stringMatching(/^support-/),
+      supportLocatorExcerpt: "Exact claim-scoped semantic support.",
+    });
+    expect(evidence.supportLocatorId).not.toBe(evidence.investigatorLocatorId);
+    const durable = persisted.rgOperations.find((operation) => operation.kind === "independent_verification")!.result;
+    expect(durable.verifiedEvidence).toEqual(evidence);
+  }, 30_000);
+
+  it("rejects a spoofed third-party origin even when both AI stages label it as the expected official publisher", async () => {
+    const setup = await runWithOneWorkItem();
+    const ports = successfulPorts([]);
+    const originalSearch = ports.search;
+    ports.search = async (input, onSend) => {
+      const result = await originalSearch(input, onSend);
+      return { ...result, value: result.value.map((candidate) => ({ ...candidate,
+        url: `https://fiserv.com.evil.example/spoofed-official-document/${input.intent.intentId}` })) };
+    };
+
+    const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const verification = persisted.rgOperations.find((operation) => operation.kind === "independent_verification")!;
+
+    expect(result).toMatchObject({ workItemsCompletedWithEvidence: 0, workItemsCompletedUnresolved: 1,
+      canonicalTruthPreserved: true });
+    expect(verification.result).toMatchObject({ sourceAuthorityStatus: "verified",
+      semanticSupportStatus: "supported", publisherIdentityCode: "fiserv_first_data" });
+    expect(verification.result).not.toHaveProperty("verifiedEvidence");
+    expect(persisted.rgWorkItems[0]).toMatchObject({ executionState: "completed_unresolved", verifiedEvidenceRefs: [] });
+    expect(persisted.canonicalTruthHash).toBe(setup.run.canonicalTruthHash);
+    expect(persisted.result?.artifacts.rb).toEqual(setup.run.artifacts.rb);
+    expect(persisted.result?.artifacts.rc).toEqual(setup.run.artifacts.rc);
+    expect(persisted.result?.artifacts.rd).toEqual(setup.run.artifacts.rd);
+    expect(persisted.result?.artifacts.re).toEqual(setup.run.artifacts.re);
+    expect(persisted.result?.artifacts.rh).toEqual(setup.run.artifacts.rh);
+  }, 30_000);
+
+  it("preserves publisher, origin, fingerprint, locator, scope, and period lineage across persistence restart", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "ratereveal-rg-lineage-"));
+    temporaryDirectories.push(directory);
+    const databasePath = path.join(directory, "lineage.sqlite");
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const setup = await runWithOneWorkItem();
+    const ports = successfulPorts([]);
+    const originalVerify = ports.verify;
+    ports.verify = async (input, onSend) => {
+      const result = await originalVerify(input, onSend);
+      return { ...result, value: { ...result.value,
+        authorityLocatorId: input.document.locators[0]!.locatorId,
+        supportLocatorId: input.document.locators[1]!.locatorId } };
+    };
+    const before = setup.run.canonicalTruthHash;
+    const completed = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
+    const expected = structuredClone(completed.verifiedEvidence[0]!);
+    const expectedPeriod = setup.store.getPersistedAnalysisRun(setup.run.runId)!.rgClaimAdmissions[0]!.statementPeriod;
+    setup.db.db.close();
+
+    vi.resetModules();
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const [reloadedStore, reloadedExecutor, reloadedDb] = await Promise.all([
+      import("../../../../src/canonical/v2/runtime/analysisRunStore.js"),
+      import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js"),
+      import("../../../../src/db.js"),
+    ]);
+    dbModule = reloadedDb;
+    const afterRestart = reloadedStore.getPersistedAnalysisRun(setup.run.runId)!;
+    const replayCalls: string[] = [];
+    const replay = await reloadedExecutor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId,
+      ports: successfulPorts(replayCalls), workerId: "restart-worker" });
+
+    expect(replayCalls).toEqual([]);
+    expect(replay.verifiedEvidence).toEqual([expected]);
+    expect(expected).toMatchObject({
+      documentFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+      investigatorLocatorId: expect.stringMatching(/^authority-/),
+      authorityLocatorId: expect.stringMatching(/^authority-/),
+      supportLocatorId: expect.stringMatching(/^support-/),
+      applicabilityScope: { processor: "fiserv_first_data" },
+      statementPeriod: expectedPeriod,
+      effectiveFrom: null,
+      effectiveTo: null,
+      originPublisherProof: {
+        sourceOrigin: "https://merchants.fiserv.com",
+        matchedOrganizationalDomain: "fiserv.com",
+        publisherIdentityCode: "fiserv_first_data",
+        applicableScopeIdentityCode: "fiserv_first_data",
+      },
+    });
+    expect(afterRestart.canonicalTruthHash).toBe(before);
+    expect(afterRestart.result?.artifacts.rb).toEqual(setup.run.artifacts.rb);
+    expect(afterRestart.result?.artifacts.rc).toEqual(setup.run.artifacts.rc);
+    expect(afterRestart.result?.artifacts.rd).toEqual(setup.run.artifacts.rd);
+    expect(afterRestart.result?.artifacts.re).toEqual(setup.run.artifacts.re);
+    expect(afterRestart.result?.artifacts.rh).toEqual(setup.run.artifacts.rh);
   }, 30_000);
 
   it("blocks private or injected statement text before public search", async () => {
@@ -282,7 +408,7 @@ function successfulPorts(calls: string[]): CanonicalRgEvidenceExecutionPorts {
         ? "processor_publication" as const : "official_network_publication" as const;
       const candidate: CanonicalRgDiscoveryCandidate = {
         candidateId: `candidate-${intent.intentId}`,
-        url: `https://official.example/newly-discovered-official-document/${intent.intentId}`,
+        url: `https://merchants.fiserv.com/newly-discovered-official-document/${intent.intentId}`,
         title: "Newly discovered official publication", claimedAuthority: authority,
         publicationDate: "2024-01-01", effectiveFrom: null, effectiveTo: null,
       };
@@ -295,8 +421,12 @@ function successfulPorts(calls: string[]): CanonicalRgEvidenceExecutionPorts {
         candidateId: candidate.candidateId, requestedUrl: candidate.url, finalUrl: candidate.url,
         sourceOrigin: new URL(candidate.url).origin, documentId: `document-${fingerprint.slice(0, 24)}`,
         documentFingerprint: fingerprint, mimeType: "text/html", byteLength: 512, independentlyRetrieved: true,
-        locators: [{ locatorId: `locator-${fingerprint.slice(0, 24)}`, page: null, sectionCode: "official_publication",
-          lineStart: 1, lineEnd: 2, textExcerpt: "Official publisher identity and exact claim-scoped semantic support." }],
+        locators: [
+          { locatorId: `authority-${fingerprint.slice(0, 24)}`, page: null, sectionCode: "publisher_identity",
+            lineStart: 1, lineEnd: 2, textExcerpt: "Official Fiserv publisher identity." },
+          { locatorId: `support-${fingerprint.slice(0, 24)}`, page: null, sectionCode: "claim_support",
+            lineStart: 10, lineEnd: 12, textExcerpt: "Exact claim-scoped semantic support." },
+        ],
       };
       return { value: document, receipt: receipt("synthetic_independent_retrieval", 1, 512, 0) };
     },

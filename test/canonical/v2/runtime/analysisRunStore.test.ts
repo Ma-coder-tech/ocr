@@ -93,7 +93,7 @@ describe("durable canonical AnalysisRun persistence", () => {
     expect(afterUpgrade).toMatchObject({
       attemptCount: 2,
       schemaVersion: "canonical_analysis_run_v6",
-      implementationVersion: "claim_bound_rg_evidence_execution_v1",
+      implementationVersion: "claim_bound_rg_evidence_execution_v1_1",
     });
     expect(afterUpgrade.stages).toHaveLength(10);
     expect(afterUpgrade.stages.every((stage) => stage.status === "valid" && stage.artifact !== null)).toBe(true);

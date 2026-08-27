@@ -5,13 +5,14 @@ import { canonicalJson } from "../canonicalJson.js";
 import type { KnowledgeClaimValue, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 import { normalizeSafeHttpsUrl } from "../intelligence/retrievalSafety.js";
 import { getPersistedAnalysisRun } from "./analysisRunStore.js";
+import { dynamicallyBindPublisherOrigin, type CanonicalRgPublisherOriginProof } from "./rgPublisherOriginAuthority.js";
 import type {
   CanonicalRgClaimAdmission,
   CanonicalRgOperation,
   CanonicalRgWorkItem,
 } from "./rgWorkLedger.js";
 
-export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1" as const;
+export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1_1" as const;
 
 const MAX_CANDIDATES_PER_WORK_ITEM = 2;
 const MAX_BEFORE_SEND_ATTEMPTS = 2;
@@ -109,7 +110,7 @@ export type CanonicalRgVerificationJudgment = {
 };
 
 export type CanonicalRgVerifiedEvidence = {
-  schemaVersion: "canonical_rg_verified_evidence_v1";
+  schemaVersion: "canonical_rg_verified_evidence_v1_1";
   evidenceId: string;
   runId: string;
   planHash: string;
@@ -126,8 +127,12 @@ export type CanonicalRgVerifiedEvidence = {
   publicationVersion: string | null;
   documentId: string;
   documentFingerprint: string;
-  locatorId: string;
-  locatorExcerpt: string;
+  investigatorLocatorId: string;
+  authorityLocatorId: string;
+  authorityLocatorExcerpt: string;
+  supportLocatorId: string;
+  supportLocatorExcerpt: string;
+  originPublisherProof: CanonicalRgPublisherOriginProof;
   proposedValue: KnowledgeClaimValue;
   effectiveFrom: string | null;
   effectiveTo: string | null;
@@ -709,15 +714,19 @@ function validateRetrievedDocument(document: CanonicalRgRetrievedDocument,
   try {
     const requested = normalizeSafeHttpsUrl(document.requestedUrl);
     const final = normalizeSafeHttpsUrl(document.finalUrl);
-    if (document.candidateId !== candidate.candidateId || requested !== candidate.url || document.independentlyRetrieved !== true
+    if (document.candidateId !== candidate.candidateId || requested !== candidate.url || final !== requested
+      || document.independentlyRetrieved !== true
       || document.sourceOrigin !== new URL(final).origin || !isSafeId(document.documentId)
       || !/^[a-f0-9]{64}$/.test(document.documentFingerprint) || !safePublicText(document.mimeType, 100)
       || !Number.isSafeInteger(document.byteLength) || document.byteLength < 1 || document.byteLength > 5_242_880
       || !Array.isArray(document.locators) || document.locators.length === 0 || document.locators.length > 200) return null;
+    const locatorIds = new Set<string>();
     for (const locator of document.locators) {
       if (!isSafeId(locator.locatorId) || !Number.isSafeInteger(locator.lineStart) || !Number.isSafeInteger(locator.lineEnd)
         || locator.lineStart < 1 || locator.lineEnd < locator.lineStart || !safePublicText(locator.textExcerpt, 4096)
-        || (locator.page !== null && (!Number.isSafeInteger(locator.page) || locator.page < 1))) return null;
+        || (locator.page !== null && (!Number.isSafeInteger(locator.page) || locator.page < 1))
+        || locatorIds.has(locator.locatorId)) return null;
+      locatorIds.add(locator.locatorId);
     }
     return structuredClone(document);
   } catch { return null; }
@@ -758,14 +767,25 @@ function validateVerification(input: {
     || !validNullableDay(judgment.effectiveFrom) || !validNullableDay(judgment.effectiveTo)
     || judgment.effectiveFrom !== frozenCandidate.effectiveFrom || judgment.effectiveTo !== frozenCandidate.effectiveTo
     || !periodApplicable(workItem.knowledgeQuery.asOf, judgment.effectiveFrom, judgment.effectiveTo)) return null;
-  const locator = document.locators.find((item) => item.locatorId === frozenCandidate.locatorId);
-  if (!locator) return null;
+  const investigatorLocator = document.locators.find((item) => item.locatorId === frozenCandidate.locatorId);
+  const authorityLocator = document.locators.find((item) => item.locatorId === judgment.authorityLocatorId);
+  const supportLocator = document.locators.find((item) => item.locatorId === judgment.supportLocatorId);
+  const originPublisherProof = dynamicallyBindPublisherOrigin({
+    sourceOrigin: document.sourceOrigin,
+    finalUrl: document.finalUrl,
+    publisherIdentityCode: judgment.publisherIdentityCode,
+    authorityClass: frozenCandidate.sourceAuthorityCandidate,
+    publicScope: input.intent.publicScope,
+  });
+  if (!investigatorLocator || !authorityLocator || !supportLocator || !originPublisherProof) return null;
   const evidenceBase = { runId: input.runId, planHash: input.planHash, workItemId: workItem.workItemId,
     atomicClaimId: admission.atomicClaimId, facet: admission.facet, intentId: input.intent.intentId,
     candidateId: input.candidate.candidateId, documentFingerprint: document.documentFingerprint,
-    locatorId: locator.locatorId, frozenCandidateHash: frozenCandidate.frozenCandidateHash };
+    investigatorLocatorId: investigatorLocator.locatorId, authorityLocatorId: authorityLocator.locatorId,
+    supportLocatorId: supportLocator.locatorId, frozenCandidateHash: frozenCandidate.frozenCandidateHash,
+    originPublisherBindingId: originPublisherProof.bindingId };
   return {
-    schemaVersion: "canonical_rg_verified_evidence_v1",
+    schemaVersion: "canonical_rg_verified_evidence_v1_1",
     evidenceId: `rg-evidence-${digest(evidenceBase).slice(0, 32)}`,
     ...evidenceBase,
     sourceUrl: document.finalUrl,
@@ -775,7 +795,9 @@ function validateVerification(input: {
     publicationTitle: frozenCandidate.publicationTitle,
     publicationVersion: frozenCandidate.publicationVersion,
     documentId: document.documentId,
-    locatorExcerpt: locator.textExcerpt,
+    authorityLocatorExcerpt: authorityLocator.textExcerpt,
+    supportLocatorExcerpt: supportLocator.textExcerpt,
+    originPublisherProof,
     proposedValue: structuredClone(frozenCandidate.proposedValue),
     effectiveFrom: judgment.effectiveFrom,
     effectiveTo: judgment.effectiveTo,
@@ -839,8 +861,46 @@ function verifiedEvidenceFromOperations(runId: string, workItemId: string): Cano
     .filter((operation) => operation.kind === "independent_verification")
     .flatMap((operation) => {
       const result = operation.result as { judgment?: CanonicalRgVerificationJudgment; verifiedEvidence?: CanonicalRgVerifiedEvidence } | null;
-      return result?.judgment?.semanticSupportStatus === "supported" && result.verifiedEvidence ? [result.verifiedEvidence] : [];
+      return result?.judgment?.semanticSupportStatus === "supported"
+        && persistedVerifiedEvidenceIntegrityValid(result.verifiedEvidence) ? [result.verifiedEvidence] : [];
     });
+}
+
+function persistedVerifiedEvidenceIntegrityValid(value: unknown): value is CanonicalRgVerifiedEvidence {
+  if (!value || typeof value !== "object") return false;
+  const evidence = value as CanonicalRgVerifiedEvidence;
+  if (evidence.schemaVersion !== "canonical_rg_verified_evidence_v1_1"
+    || !isSafeId(evidence.evidenceId) || !isSafeId(evidence.runId) || !/^[a-f0-9]{32}$/.test(evidence.planHash)
+    || !isSafeId(evidence.workItemId) || !isSafeId(evidence.atomicClaimId) || !isSafeId(evidence.intentId)
+    || !isSafeId(evidence.candidateId) || !isSafeId(evidence.documentId)
+    || !/^[a-f0-9]{64}$/.test(evidence.documentFingerprint) || !/^[a-f0-9]{64}$/.test(evidence.frozenCandidateHash)) return false;
+  if (!isSafeId(evidence.investigatorLocatorId) || !isSafeId(evidence.authorityLocatorId) || !isSafeId(evidence.supportLocatorId)
+    || !safePublicText(evidence.authorityLocatorExcerpt, 4096) || !safePublicText(evidence.supportLocatorExcerpt, 4096)) return false;
+  if (evidence.currentRunSupport !== "verified_claim_scoped_candidate_support"
+    || evidence.reusableKnowledgeState !== "candidate_not_promoted" || evidence.rfAdmissionAuthority !== "none"
+    || evidence.automaticKnowledgePromotion !== false || evidence.canonicalFinancialMutationAllowed !== false) return false;
+  if (!validNullableDay(evidence.effectiveFrom) || !validNullableDay(evidence.effectiveTo)
+    || !validStatementPeriod(evidence.statementPeriod)) return false;
+  const identity = { runId: evidence.runId, planHash: evidence.planHash, workItemId: evidence.workItemId,
+    atomicClaimId: evidence.atomicClaimId, facet: evidence.facet, intentId: evidence.intentId,
+    candidateId: evidence.candidateId, documentFingerprint: evidence.documentFingerprint,
+    investigatorLocatorId: evidence.investigatorLocatorId, authorityLocatorId: evidence.authorityLocatorId,
+    supportLocatorId: evidence.supportLocatorId, frozenCandidateHash: evidence.frozenCandidateHash,
+    originPublisherBindingId: evidence.originPublisherProof?.bindingId };
+  if (evidence.evidenceId !== `rg-evidence-${digest(identity).slice(0, 32)}`) return false;
+  const rebound = dynamicallyBindPublisherOrigin({ sourceOrigin: evidence.sourceOrigin, finalUrl: evidence.sourceUrl,
+    publisherIdentityCode: evidence.publisherIdentityCode, authorityClass: evidence.sourceAuthority,
+    publicScope: evidence.applicabilityScope });
+  return rebound !== null && digest(rebound) === digest(evidence.originPublisherProof);
+}
+
+function validStatementPeriod(value: unknown): boolean {
+  if (value === null) return true;
+  if (!value || typeof value !== "object") return false;
+  const period = value as { start?: unknown; end?: unknown };
+  return typeof period.start === "string" && typeof period.end === "string"
+    && /^\d{4}-\d{2}-\d{2}$/.test(period.start) && /^\d{4}-\d{2}-\d{2}$/.test(period.end)
+    && period.start <= period.end;
 }
 
 function attachVerifiedEvidence(runId: string, operation: CanonicalRgOperation, evidence: CanonicalRgVerifiedEvidence): void {
@@ -851,6 +911,8 @@ function attachVerifiedEvidence(runId: string, operation: CanonicalRgOperation, 
   updateOperation(runId, updated);
   appendEvent(runId, current.workItemId, current.operationId, "verified_evidence_persisted", {
     evidenceId: evidence.evidenceId, evidenceHash: digest(evidence), atomicClaimId: evidence.atomicClaimId,
+    documentFingerprint: evidence.documentFingerprint, authorityLocatorId: evidence.authorityLocatorId,
+    supportLocatorId: evidence.supportLocatorId, originPublisherBindingId: evidence.originPublisherProof.bindingId,
     automaticKnowledgePromotion: false, canonicalFinancialMutationAllowed: false,
   });
 }
