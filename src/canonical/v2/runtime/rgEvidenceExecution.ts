@@ -4,22 +4,24 @@ import { db, nowIso } from "../../../db.js";
 import { canonicalJson } from "../canonicalJson.js";
 import type { KnowledgeClaimValue, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 import { normalizeSafeHttpsUrl } from "../intelligence/retrievalSafety.js";
-import { getPersistedAnalysisRun } from "./analysisRunStore.js";
+import { getPersistedAnalysisRun, type PersistedAnalysisRunRecord } from "./analysisRunStore.js";
+import type { CanonicalContinuationExecutionGrant } from "./adaptiveExecutionTypes.js";
 import { dynamicallyBindPublisherOrigin, type CanonicalRgPublisherOriginProof } from "./rgPublisherOriginAuthority.js";
-import type {
-  CanonicalRgClaimAdmission,
-  CanonicalRgOperation,
-  CanonicalRgWorkItem,
+import {
+  canonicalRgWorkContractFingerprint,
+  type CanonicalRgClaimAdmission,
+  type CanonicalRgOperation,
+  type CanonicalRgWorkItem,
 } from "./rgWorkLedger.js";
 
-export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1_1" as const;
+export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1_2" as const;
 
 const MAX_CANDIDATES_PER_WORK_ITEM = 2;
 const MAX_BEFORE_SEND_ATTEMPTS = 2;
 const WORK_RESERVATION_MS = 5 * 60_000;
 
 export type CanonicalRgSearchIntent = {
-  schemaVersion: "canonical_rg_search_intent_v1";
+  schemaVersion: "canonical_rg_search_intent_v1_1";
   intentId: string;
   runId: string;
   planHash: string;
@@ -39,6 +41,14 @@ export type CanonicalRgSearchIntent = {
     status: "validated_public_concepts_only";
     forbiddenPrivateValuesObserved: 0;
     compiler: "deterministic_claim_lineage_v1";
+  };
+  continuation: null | {
+    executionGrantId: string;
+    executionGeneration: number;
+    kind: NonNullable<CanonicalRgWorkItem["continuationContract"]>["kind"] | "newly_eligible";
+    requiredGap: NonNullable<CanonicalRgWorkItem["continuationContract"]>["requiredGap"] | null;
+    excludedDocumentFingerprints: string[];
+    publicRefinementTerms: string[];
   };
 };
 
@@ -110,10 +120,12 @@ export type CanonicalRgVerificationJudgment = {
 };
 
 export type CanonicalRgVerifiedEvidence = {
-  schemaVersion: "canonical_rg_verified_evidence_v1_1";
+  schemaVersion: "canonical_rg_verified_evidence_v1_1" | "canonical_rg_verified_evidence_v1_2";
   evidenceId: string;
   runId: string;
   planHash: string;
+  executionGrantId: string | null;
+  executionGeneration: number;
   workItemId: string;
   atomicClaimId: string;
   facet: CanonicalRgClaimAdmission["facet"];
@@ -204,12 +216,18 @@ export async function executeDurableCanonicalRgEvidence(input: {
   runId: string;
   ports: CanonicalRgEvidenceExecutionPorts;
   workerId?: string;
+  cycleOwnerId?: string;
+  executionGrantId?: string;
 }): Promise<CanonicalRgEvidenceExecutionResult> {
   const persisted = getPersistedAnalysisRun(input.runId);
   if (!persisted?.result) throw new Error("rg_evidence_analysis_run_unavailable");
-  if (persisted.continuationRevision > 0 || persisted.semanticRevision > 0) {
+  const executionGrant = input.executionGrantId
+    ? persisted.continuationExecutionGrants.find((item) => item.grantId === input.executionGrantId) ?? null
+    : null;
+  if ((persisted.continuationRevision > 0 || persisted.semanticRevision > 0) && !executionGrant) {
     throw new Error("rg_evidence_regenerated_or_readjudicated_plan_execution_disabled");
   }
+  if (executionGrant) validateExecutionGrantBinding(persisted, executionGrant, input.cycleOwnerId);
   const ledger = persisted.result.artifacts.rgWorkLedger;
   if (!ledger || ledger.validation.status !== "valid") throw new Error("rg_evidence_valid_work_ledger_required");
   if (persisted.canonicalTruthHash !== persisted.result.canonicalTruthHash) throw new Error("rg_evidence_canonical_truth_binding_mismatch");
@@ -219,14 +237,17 @@ export async function executeDurableCanonicalRgEvidence(input: {
   let completedUnresolved = 0;
   let degraded = 0;
 
-  for (const planned of persisted.rgWorkItems) {
+  const selectedWork = executionGrant
+    ? persisted.rgWorkItems.filter((item) => item.workItemId === executionGrant.baseWorkItemId)
+    : persisted.rgWorkItems;
+  for (const planned of selectedWork) {
     const admission = persisted.rgClaimAdmissions.find((item) => item.atomicClaimId === planned.atomicClaimId);
     if (!admission || admission.researchAdmission !== "admitted_to_rg_work_ledger" || admission.materiality !== "material") continue;
     if (planHashForWork(input.runId, planned.workItemId) !== ledger.planHash) throw new Error("rg_evidence_stale_work_item_plan_binding");
     const latest = workItemFromDb(input.runId, planned.workItemId);
     if (!latest) throw new Error("rg_evidence_persisted_work_item_missing");
     if (latest.executionState === "completed_verified_evidence") {
-      const retained = verifiedEvidenceFromOperations(input.runId, latest.workItemId);
+      const retained = verifiedEvidenceFromOperations(input.runId, latest.workItemId, executionGrant?.grantId ?? null);
       if (retained.length === 0 || retained.some((item) => !latest.verifiedEvidenceRefs.includes(item.evidenceId))) {
         throw new Error("rg_verified_evidence_persistence_invalid");
       }
@@ -246,7 +267,7 @@ export async function executeDurableCanonicalRgEvidence(input: {
     const reservation = reserveWork(input.runId, latest, workerId);
     if (!reservation) continue;
     const result = await executeWorkItem({ runId: input.runId, planHash: ledger.planHash, workItem: reservation,
-      admission, ports: input.ports, workerId, currentRunContext: persisted.result });
+      admission, ports: input.ports, workerId, currentRunContext: persisted.result, executionGrant });
     if (result.state === "verified") verifiedEvidence.push(...result.evidence);
     else if (result.state === "unresolved") completedUnresolved += 1;
     else degraded += 1;
@@ -260,7 +281,7 @@ export async function executeDurableCanonicalRgEvidence(input: {
     schemaVersion: RG_EVIDENCE_EXECUTION_SCHEMA_VERSION,
     runId: input.runId,
     planHash: ledger.planHash,
-    workItemsConsidered: persisted.rgWorkItems.length,
+    workItemsConsidered: selectedWork.length,
     workItemsCompletedWithEvidence: new Set(verifiedEvidence.map((item) => item.workItemId)).size,
     workItemsCompletedUnresolved: completedUnresolved,
     workItemsDegraded: degraded,
@@ -279,6 +300,7 @@ async function executeWorkItem(input: {
   ports: CanonicalRgEvidenceExecutionPorts;
   workerId: string;
   currentRunContext: unknown;
+  executionGrant: CanonicalContinuationExecutionGrant | null;
 }): Promise<{ state: "verified"; evidence: CanonicalRgVerifiedEvidence[] } | { state: "unresolved" | "degraded"; evidence: [] }> {
   let intent: CanonicalRgSearchIntent;
   try {
@@ -311,6 +333,11 @@ async function executeWorkItem(input: {
     }
     const document = validateRetrievedDocument(retrieval.value as CanonicalRgRetrievedDocument, candidate);
     if (!document) continue;
+    if (intent.continuation?.excludedDocumentFingerprints.includes(document.documentFingerprint)) {
+      appendExtensionDecision(input.runId, input.workItem.workItemId, "stopped",
+        "continuation_excluded_previously_insufficient_document");
+      continue;
+    }
     const investigation = await runExternalOperation({ ...input, kind: "investigation", candidateId: candidate.candidateId,
       providerCode: "approved_ai_investigation", operationInput: { intent, candidate, documentFingerprint: document.documentFingerprint },
       projectResult: sanitizeInvestigatedCandidate,
@@ -405,21 +432,38 @@ export function compileCanonicalRgSearchIntent(
     : workItem.expectedKnowledgeValueConstraint.kind === "boolean" ? "merchant availability"
       : "fee category";
   const periodYear = workItem.knowledgeQuery.asOf.slice(0, 4);
-  const queryTerms = [processorConcept.replaceAll("_", " "), publicSubjectConcept, facetConcept, "official publication", periodYear];
+  const publicRefinementTerms = refinementTerms(workItem.continuationContract?.kind ?? null);
+  const queryTerms = [processorConcept.replaceAll("_", " "), publicSubjectConcept, facetConcept, "official publication", periodYear,
+    ...publicRefinementTerms];
   const queryText = queryTerms.map((term, index) => index === 1 ? `"${term}"` : term).join(" ");
   validatePublicQuery(queryText, { runId, planHash, workItem, admission });
   const base = { runId, planHash, workItemId: workItem.workItemId, atomicClaimId: admission.atomicClaimId,
     facet: admission.facet, claimType: workItem.knowledgeQuery.claimType, publicSubjectConcept, publicScope,
     asOf: workItem.knowledgeQuery.asOf, statementPeriod: admission.statementPeriod,
     requiredSourceAuthorities: [...workItem.requiredSourceAuthorities].sort(), evidenceObjective: workItem.evidenceObjective,
-    queryTerms, queryText };
+    queryTerms, queryText,
+    continuation: workItem.executionAuthorization ? {
+      executionGrantId: workItem.executionAuthorization.grantId,
+      executionGeneration: workItem.executionAuthorization.executionGeneration,
+      kind: workItem.continuationContract?.kind ?? "newly_eligible" as const,
+      requiredGap: workItem.continuationContract?.requiredGap ?? null,
+      excludedDocumentFingerprints: [...(workItem.continuationContract?.excludedDocumentFingerprints ?? [])].sort(),
+      publicRefinementTerms,
+    } : null };
   return {
-    schemaVersion: "canonical_rg_search_intent_v1",
+    schemaVersion: "canonical_rg_search_intent_v1_1",
     intentId: `rg-intent-${digest(base).slice(0, 32)}`,
     ...base,
     privacy: { status: "validated_public_concepts_only", forbiddenPrivateValuesObserved: 0,
       compiler: "deterministic_claim_lineage_v1" },
   };
+}
+
+function refinementTerms(kind: NonNullable<CanonicalRgWorkItem["continuationContract"]>["kind"] | null): string[] {
+  if (kind === "period_refinement") return ["effective date"];
+  if (kind === "scope_refinement") return ["applicability scope"];
+  if (kind === "locator_subsection_refinement") return ["schedule section"];
+  return [];
 }
 
 function safePublicSubjectConcept(value: string): string | null {
@@ -458,10 +502,25 @@ async function runExternalOperation<T>(input: {
   operationInput: unknown;
   projectResult(value: T): unknown;
   call(onSend: () => void): Promise<RgEvidencePortResult<T>>;
+  executionGrant: CanonicalContinuationExecutionGrant | null;
 }): Promise<OperationCallResult> {
   const inputHash = digest(input.operationInput);
+  const ceilingReason = operationalCeilingReason(input.runId, input.executionGrant);
+  if (ceilingReason) {
+    const operationId = `rg-op-${digest({ runId: input.runId, planHash: input.planHash,
+      executionGrantId: input.executionGrant?.grantId ?? null, workItemId: input.workItem.workItemId,
+      kind: input.kind, candidateId: input.candidateId, attempt: 1, inputHash }).slice(0, 32)}`;
+    const existing = operationFromDb(input.runId, operationId);
+    const reserved = existing ?? reserveOperation({ ...input, operationId, attempt: 1, inputHash });
+    const failed = existing?.state === "failed_before_send" ? existing
+      : settleOperation(input.runId, reserved, "failed_before_send", null, null, ceilingReason);
+    appendRetryDecision(input.runId, input.workItem.workItemId, operationId, "no_retry",
+      "emergency_operational_ceiling_not_analytical_completion");
+    return { state: "failed", value: null, operation: failed };
+  }
   for (let attempt = 1; attempt <= MAX_BEFORE_SEND_ATTEMPTS; attempt += 1) {
-    const operationId = `rg-op-${digest({ runId: input.runId, planHash: input.planHash, workItemId: input.workItem.workItemId,
+    const operationId = `rg-op-${digest({ runId: input.runId, planHash: input.planHash,
+      executionGrantId: input.executionGrant?.grantId ?? null, workItemId: input.workItem.workItemId,
       kind: input.kind, candidateId: input.candidateId, attempt, inputHash }).slice(0, 32)}`;
     const existing = operationFromDb(input.runId, operationId);
     if (existing?.state === "completed") return { state: "completed", value: existing.result, operation: existing };
@@ -521,13 +580,16 @@ function reserveOperation(input: {
   runId: string; planHash: string; workItem: CanonicalRgWorkItem; admission: CanonicalRgClaimAdmission;
   workerId: string; kind: CanonicalRgOperation["kind"]; candidateId: string | null; providerCode: string;
   operationInput: unknown; operationId: string; attempt: number; inputHash: string;
+  executionGrant: CanonicalContinuationExecutionGrant | null;
 }): CanonicalRgOperation {
   const now = nowIso();
   const reservation = { reservationId: `rg-operation-reservation-${randomUUID()}`, workerId: input.workerId,
     reservedAt: now, expiresAt: new Date(Date.now() + WORK_RESERVATION_MS).toISOString() };
   const operation: CanonicalRgOperation = {
     operationId: input.operationId, workItemId: input.workItem.workItemId, atomicClaimId: input.admission.atomicClaimId,
-    planHash: input.planHash, kind: input.kind, attempt: input.attempt, candidateId: input.candidateId,
+    planHash: input.planHash, executionGrantId: input.executionGrant?.grantId ?? null,
+    executionGeneration: input.executionGrant?.executionGeneration ?? 0,
+    kind: input.kind, attempt: input.attempt, candidateId: input.candidateId,
     state: "reserved", reservation,
     receipt: { sendState: "not_sent", completionState: "reserved", providerCode: input.providerCode,
       providerRequestId: null, calls: 0, tokens: null, retrievalBytes: 0, reasonCode: "rg_operation_reserved" },
@@ -781,14 +843,17 @@ function validateVerification(input: {
     publicScope: input.intent.publicScope,
   });
   if (!investigatorLocator || !authorityLocator || !supportLocator || !originPublisherProof) return null;
-  const evidenceBase = { runId: input.runId, planHash: input.planHash, workItemId: workItem.workItemId,
+  const evidenceBase = { runId: input.runId, planHash: input.planHash,
+    executionGrantId: workItem.executionAuthorization?.grantId ?? null,
+    executionGeneration: workItem.executionAuthorization?.executionGeneration ?? 0,
+    workItemId: workItem.workItemId,
     atomicClaimId: admission.atomicClaimId, facet: admission.facet, intentId: input.intent.intentId,
     candidateId: input.candidate.candidateId, documentFingerprint: document.documentFingerprint,
     investigatorLocatorId: investigatorLocator.locatorId, authorityLocatorId: authorityLocator.locatorId,
     supportLocatorId: supportLocator.locatorId, frozenCandidateHash: frozenCandidate.frozenCandidateHash,
     originPublisherBindingId: originPublisherProof.bindingId };
   return {
-    schemaVersion: "canonical_rg_verified_evidence_v1_1",
+    schemaVersion: "canonical_rg_verified_evidence_v1_2",
     evidenceId: `rg-evidence-${digest(evidenceBase).slice(0, 32)}`,
     ...evidenceBase,
     sourceUrl: document.finalUrl,
@@ -857,11 +922,58 @@ function planHashForWork(runId: string, workItemId: string): string {
   return row?.plan_hash ?? "";
 }
 
-function verifiedEvidenceFromOperations(runId: string, workItemId: string): CanonicalRgVerifiedEvidence[] {
+function validateExecutionGrantBinding(persisted: PersistedAnalysisRunRecord,
+  grant: CanonicalContinuationExecutionGrant, cycleOwnerId: string | undefined): void {
+  if (!cycleOwnerId) throw new Error("rg_evidence_continuation_cycle_owner_required");
+  const lease = db.prepare(`SELECT adaptive_cycle_owner, adaptive_cycle_lease_expires_at FROM canonical_analysis_runs WHERE id = ?`)
+    .get(persisted.id) as { adaptive_cycle_owner: string | null; adaptive_cycle_lease_expires_at: string | null } | undefined;
+  if (!lease || lease.adaptive_cycle_owner !== cycleOwnerId || !lease.adaptive_cycle_lease_expires_at
+    || lease.adaptive_cycle_lease_expires_at <= new Date().toISOString()) throw new Error("rg_evidence_continuation_cycle_lease_invalid");
+  const work = persisted.rgWorkItems.find((item) => item.workItemId === grant.baseWorkItemId);
+  const admission = persisted.rgClaimAdmissions.find((item) => item.atomicClaimId === grant.atomicClaimId);
+  if (grant.runId !== persisted.id || grant.executionGeneration !== persisted.rgExecutionGeneration
+    || grant.controllerRevision !== persisted.continuationRevision
+    || grant.continuationStateHash !== persisted.continuationStateHash
+    || grant.binding.semanticRevision !== persisted.semanticRevision || grant.binding.semanticHash !== persisted.semanticHash
+    || grant.binding.canonicalStateHash !== persisted.canonicalStateHash || grant.binding.planHash !== persisted.rgPlanHash
+    || grant.binding.planGeneration !== persisted.rgPlanGeneration || grant.binding.rfSnapshotHash !== persisted.rfSnapshotHash
+    || !work || !admission || work.atomicClaimId !== grant.atomicClaimId
+    || work.executionAuthorization?.grantId !== grant.grantId
+    || work.executionAuthorization.effectiveWorkContractFingerprint !== grant.effectiveWorkContractFingerprint
+    || canonicalRgWorkContractFingerprint(admission, work) !== grant.effectiveWorkContractFingerprint) {
+    throw new Error("rg_evidence_continuation_grant_binding_invalid");
+  }
+}
+
+function operationalCeilingReason(runId: string,
+  grant: CanonicalContinuationExecutionGrant | null): string | null {
+  if (!grant) return null;
+  const rows = db.prepare(`SELECT operation_json FROM canonical_rg_operations WHERE run_id = ?`)
+    .all(runId) as Array<{ operation_json: string }>;
+  const operations = rows.map((row) => JSON.parse(row.operation_json) as CanonicalRgOperation)
+    .filter((item) => (item.executionGrantId ?? null) === grant.grantId);
+  const currentCalls = operations.reduce((sum, item) => sum + item.receipt.calls, 0);
+  const currentBytes = operations.reduce((sum, item) => sum + item.receipt.retrievalBytes, 0);
+  const elapsed = Math.max(0, Date.now() - Date.parse(grant.createdAt));
+  if (grant.resourceBaseline.providerCalls + currentCalls >= grant.operationalPolicy.maximumCumulativeProviderCalls) {
+    return "rg_emergency_cumulative_provider_call_ceiling_reached_not_analytical_completion";
+  }
+  if (grant.resourceBaseline.retrievalBytes + currentBytes >= grant.operationalPolicy.maximumCumulativeRetrievalBytes) {
+    return "rg_emergency_cumulative_retrieval_byte_ceiling_reached_not_analytical_completion";
+  }
+  if (grant.resourceBaseline.elapsedMsObserved + elapsed >= grant.operationalPolicy.maximumCumulativeElapsedMs) {
+    return "rg_emergency_cumulative_elapsed_ceiling_reached_not_analytical_completion";
+  }
+  return null;
+}
+
+function verifiedEvidenceFromOperations(runId: string, workItemId: string,
+  executionGrantId: string | null): CanonicalRgVerifiedEvidence[] {
   const rows = db.prepare(`SELECT operation_json FROM canonical_rg_operations
     WHERE run_id = ? AND work_item_id = ? AND state = 'completed' ORDER BY operation_id`).all(runId, workItemId) as Array<{ operation_json: string }>;
   return rows.map((row) => JSON.parse(row.operation_json) as CanonicalRgOperation)
-    .filter((operation) => operation.kind === "independent_verification")
+    .filter((operation) => operation.kind === "independent_verification"
+      && (operation.executionGrantId ?? null) === executionGrantId)
     .flatMap((operation) => {
       const result = operation.result as { judgment?: CanonicalRgVerificationJudgment; verifiedEvidence?: CanonicalRgVerifiedEvidence } | null;
       return result?.judgment?.semanticSupportStatus === "supported"
@@ -872,7 +984,7 @@ function verifiedEvidenceFromOperations(runId: string, workItemId: string): Cano
 export function persistedVerifiedEvidenceIntegrityValid(value: unknown): value is CanonicalRgVerifiedEvidence {
   if (!value || typeof value !== "object") return false;
   const evidence = value as CanonicalRgVerifiedEvidence;
-  if (evidence.schemaVersion !== "canonical_rg_verified_evidence_v1_1"
+  if (!["canonical_rg_verified_evidence_v1_1", "canonical_rg_verified_evidence_v1_2"].includes(evidence.schemaVersion)
     || !isSafeId(evidence.evidenceId) || !isSafeId(evidence.runId) || !/^[a-f0-9]{32}$/.test(evidence.planHash)
     || !isSafeId(evidence.workItemId) || !isSafeId(evidence.atomicClaimId) || !isSafeId(evidence.intentId)
     || !isSafeId(evidence.candidateId) || !isSafeId(evidence.documentId)
@@ -884,7 +996,11 @@ export function persistedVerifiedEvidenceIntegrityValid(value: unknown): value i
     || evidence.automaticKnowledgePromotion !== false || evidence.canonicalFinancialMutationAllowed !== false) return false;
   if (!validNullableDay(evidence.effectiveFrom) || !validNullableDay(evidence.effectiveTo)
     || !validStatementPeriod(evidence.statementPeriod)) return false;
-  const identity = { runId: evidence.runId, planHash: evidence.planHash, workItemId: evidence.workItemId,
+  const identity = { runId: evidence.runId, planHash: evidence.planHash,
+    ...(evidence.schemaVersion === "canonical_rg_verified_evidence_v1_2" ? {
+      executionGrantId: evidence.executionGrantId ?? null,
+      executionGeneration: evidence.executionGeneration ?? 0,
+    } : {}), workItemId: evidence.workItemId,
     atomicClaimId: evidence.atomicClaimId, facet: evidence.facet, intentId: evidence.intentId,
     candidateId: evidence.candidateId, documentFingerprint: evidence.documentFingerprint,
     investigatorLocatorId: evidence.investigatorLocatorId, authorityLocatorId: evidence.authorityLocatorId,

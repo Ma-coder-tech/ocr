@@ -10,6 +10,7 @@ import type {
   CanonicalSemanticConvergenceRevision,
 } from "./semanticConvergenceTypes.js";
 import type { CanonicalAdaptiveContinuationState } from "./adaptiveContinuationTypes.js";
+import type { CanonicalContinuationExecutionGrant } from "./adaptiveExecutionTypes.js";
 import { canonicalRfExecutionContextHash } from "./rfClaimResolution.js";
 import {
   governedRfKnowledgeInput,
@@ -75,6 +76,7 @@ export type PersistedAnalysisRunRecord = {
   semanticRevision: number;
   rgPlanHash: string | null;
   rgPlanGeneration: number;
+  rgExecutionGeneration: number;
   continuationRevision: number;
   continuationLifecycle: CanonicalAnalysisRun["autonomousLifecycle"]["state"];
   continuationStateHash: string | null;
@@ -105,6 +107,7 @@ export type PersistedAnalysisRunRecord = {
   externalEvidenceRegistryErrors: string[];
   semanticRevisions: CanonicalSemanticConvergenceRevision[];
   continuationRevisions: CanonicalAdaptiveContinuationState[];
+  continuationExecutionGrants: CanonicalContinuationExecutionGrant[];
   result: CanonicalAnalysisRun | null;
 };
 
@@ -312,6 +315,11 @@ export function persistRgWorkLedger(runId: string, ledger: CanonicalRgWorkLedger
   }
   let activeGeneration = priorGeneration;
   if (persistedPlanHash !== null && persistedPlanHash !== ledger.planHash) {
+    const activeWork = db.prepare(`SELECT 1 FROM canonical_rg_work_items WHERE run_id = ?
+      AND (state = 'executing' OR execution_state = 'executing') LIMIT 1`).get(runId);
+    const activeOperation = db.prepare(`SELECT 1 FROM canonical_rg_operations WHERE run_id = ?
+      AND state IN ('reserved', 'sent') LIMIT 1`).get(runId);
+    if (activeWork || activeOperation) throw new Error("canonical_rg_plan_replacement_execution_active");
     activeGeneration = priorGeneration + 1;
     archiveSupersededRgExecution(runId, persistedPlanHash, ledger.planHash, priorGeneration, activeGeneration, now);
     db.prepare(`DELETE FROM canonical_rg_operations WHERE run_id = ?`).run(runId);
@@ -474,6 +482,7 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
   const externalEvidence = mapExternalEvidence(runId);
   const semanticRevisions = mapSemanticRevisions(runId);
   const continuationRevisions = mapContinuationRevisions(runId);
+  const continuationExecutionGrants = mapContinuationExecutionGrants(runId);
   const stagedPlanHash = artifacts.rgWorkLedger?.planHash ?? null;
   const inferredPlanGeneration = inferRgPlanGeneration(runId);
   if ((!row.rg_plan_hash && stagedPlanHash) || Number(row.rg_plan_generation ?? 0) < inferredPlanGeneration) {
@@ -504,6 +513,7 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
     semanticRevision: Number(row.semantic_revision ?? 0),
     rgPlanHash: row.rg_plan_hash ? String(row.rg_plan_hash) : null,
     rgPlanGeneration: Number(row.rg_plan_generation ?? 0),
+    rgExecutionGeneration: Number(row.rg_execution_generation ?? 0),
     continuationRevision: Number(row.continuation_revision ?? 0),
     continuationLifecycle: String(row.continuation_lifecycle ?? "awaiting_first_pass_outcome") as PersistedAnalysisRunRecord["continuationLifecycle"],
     continuationStateHash: row.continuation_state_hash ? String(row.continuation_state_hash) : null,
@@ -525,6 +535,7 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
     externalEvidenceRegistryErrors: externalEvidence.errors,
     semanticRevisions,
     continuationRevisions,
+    continuationExecutionGrants,
     result,
   };
 }
@@ -684,6 +695,12 @@ function mapContinuationRevisions(runId: string): CanonicalAdaptiveContinuationS
   const rows = db.prepare(`SELECT state_json FROM canonical_analysis_continuation_revisions
     WHERE run_id = ? ORDER BY controller_revision`).all(runId) as Array<{ state_json: string }>;
   return rows.map((row) => parseJson(row.state_json, null as never));
+}
+
+function mapContinuationExecutionGrants(runId: string): CanonicalContinuationExecutionGrant[] {
+  const rows = db.prepare(`SELECT grant_json FROM canonical_analysis_continuation_execution_grants
+    WHERE run_id = ? ORDER BY execution_generation`).all(runId) as Array<{ grant_json: string }>;
+  return rows.map((row) => parseJson(row.grant_json, null as never));
 }
 
 function emptyResource(elapsedMs: number | null): PersistedAnalysisRunStage["resource"] {

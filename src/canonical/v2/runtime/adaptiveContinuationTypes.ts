@@ -1,12 +1,13 @@
 import type { CanonicalAtomicClaimFacet } from "./atomicClaims.js";
 import type { CanonicalUnresolvedClaimClass } from "./unresolvedClaims.js";
 
-export const ADAPTIVE_CONTINUATION_SCHEMA_VERSION = "canonical_adaptive_continuation_v1_1" as const;
+export const ADAPTIVE_CONTINUATION_SCHEMA_VERSION = "canonical_adaptive_continuation_v1_2" as const;
 
 export type CanonicalAutonomousResearchLifecycle =
   | "awaiting_first_pass_outcome"
   | "convergence_required"
   | "continuation_ready_provider_execution_disabled"
+  | "continuation_ready_provider_execution_authorized"
   | "trustworthy_completion_no_further_material_work"
   | "trustworthy_completion_with_safely_unresolved"
   | "continuation_judgment_unresolved"
@@ -49,7 +50,7 @@ export type CanonicalContinuationOperationDelta = {
   nextEvidenceObjective: string;
   requiredGap: CanonicalContinuationProgress["kind"];
   excludedDocumentFingerprints: string[];
-  providerExecution: "disabled_for_this_slice";
+  providerExecution: "requires_immutable_execution_grant";
 };
 
 export type CanonicalContinuationDegradation = {
@@ -100,7 +101,7 @@ export type CanonicalClaimContinuationDecision = {
   degradation: CanonicalContinuationDegradation | null;
   cumulativeResource: CanonicalContinuationResourceAccounting;
   reasonCodes: string[];
-  regeneratedProviderExecution: "disabled";
+  regeneratedProviderExecution: "disabled" | "authorized_exact_claim_delta" | "executed_exact_claim_delta";
 };
 
 export type CanonicalAdaptiveContinuationState = {
@@ -119,8 +120,8 @@ export type CanonicalAdaptiveContinuationState = {
   decisions: CanonicalClaimContinuationDecision[];
   cumulativeResource: CanonicalContinuationResourceAccounting;
   continuationReadyAtomicClaimIds: string[];
-  providerExecution: "regenerated_plan_disabled";
-  secondPassProviderCalls: 0;
+  providerExecution: "continuation_authorized_existing_executor";
+  secondPassProviderCalls: number;
   stateHash: string;
   reasonCodes: string[];
   createdAt: string;
@@ -135,8 +136,8 @@ export type CanonicalAnalysisRunAutonomousLifecycle = {
   boundPlanHash: string | null;
   boundPlanGeneration: number;
   continuationReadyCount: number;
-  providerExecution: "regenerated_plan_disabled";
-  secondPassProviderCalls: 0;
+  providerExecution: "continuation_authorized_existing_executor";
+  secondPassProviderCalls: number;
   stateHash: string | null;
   reasonCodes: string[];
 };
@@ -151,7 +152,7 @@ export function initialAutonomousLifecycle(): CanonicalAnalysisRunAutonomousLife
     boundPlanHash: null,
     boundPlanGeneration: 0,
     continuationReadyCount: 0,
-    providerExecution: "regenerated_plan_disabled",
+    providerExecution: "continuation_authorized_existing_executor",
     secondPassProviderCalls: 0,
     stateHash: null,
     reasonCodes: ["first_pass_rg_outcome_not_yet_adjudicated"],

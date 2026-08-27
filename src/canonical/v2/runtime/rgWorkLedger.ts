@@ -98,6 +98,22 @@ export type CanonicalRgWorkItem = {
   knowledgeQuery: KnowledgeQuery;
   expectedKnowledgeValueConstraint: NonNullable<CanonicalRgClaimAdmission["expectedKnowledgeValueConstraint"]>;
   requiredSourceAuthorities: KnowledgeSourceAuthority[];
+  continuationContract: null | {
+    kind: "period_refinement" | "locator_subsection_refinement" | "scope_refinement";
+    requiredGap:
+      | "correct_authority_wrong_period"
+      | "official_document_insufficient_locator_or_subsection"
+      | "refinable_scope_mismatch";
+    priorWorkContractFingerprint: string;
+    excludedDocumentFingerprints: string[];
+  };
+  executionAuthorization: null | {
+    grantId: string;
+    executionGeneration: number;
+    controllerRevision: number;
+    decisionId: string;
+    effectiveWorkContractFingerprint: string;
+  };
   reservation: null | { reservationId: string; workerId: string; reservedAt: string; expiresAt: string };
   progress: { state: "not_started" | "in_progress" | "verified_evidence" | "unresolved" | "degraded";
     operationsAttempted: number; evidenceItemsObserved: number };
@@ -113,6 +129,8 @@ export type CanonicalRgOperation = {
   workItemId: string;
   atomicClaimId: string;
   planHash: string;
+  executionGrantId: string | null;
+  executionGeneration: number;
   kind: "public_search" | "public_retrieval" | "investigation" | "independent_verification";
   attempt: number;
   candidateId: string | null;
@@ -561,6 +579,8 @@ function workItem(admission: CanonicalRgClaimAdmission): CanonicalRgWorkItem {
     knowledgeQuery: admission.knowledgeQuery!,
     expectedKnowledgeValueConstraint: admission.expectedKnowledgeValueConstraint!,
     requiredSourceAuthorities: admission.requiredSourceAuthorities,
+    continuationContract: null,
+    executionAuthorization: null,
     reservation: null,
     progress: { state: "not_started", operationsAttempted: 0, evidenceItemsObserved: 0 },
     extensionDecisions: [],
@@ -569,6 +589,31 @@ function workItem(admission: CanonicalRgClaimAdmission): CanonicalRgWorkItem {
     stopReason: null,
     verifiedEvidenceRefs: [],
   };
+}
+
+export function canonicalRgWorkContractFingerprint(
+  admission: CanonicalRgClaimAdmission,
+  work: CanonicalRgWorkItem,
+): string {
+  return digest({
+    atomicClaimId: admission.atomicClaimId,
+    claimClass: admission.claimClass,
+    facet: admission.facet,
+    parentClaimIds: admission.parentClaimIds,
+    opaqueSubjectCode: admission.opaqueSubjectCode,
+    scopeFingerprint: admission.scopeFingerprint,
+    statementPeriod: admission.statementPeriod,
+    direction: admission.direction,
+    knowledgeQuery: work.knowledgeQuery,
+    evidenceObjective: work.evidenceObjective,
+    expectedKnowledgeValueConstraint: work.expectedKnowledgeValueConstraint,
+    requiredSourceAuthorities: work.requiredSourceAuthorities,
+    materiality: admission.materiality,
+    decisionTier: admission.decisionTier,
+    decisionBasis: admission.decisionBasis,
+    expectedDecisionEffects: work.expectedDecisionEffects,
+    continuationContract: work.continuationContract ?? null,
+  });
 }
 
 function validateAdmissions(admissions: CanonicalRgClaimAdmission[], workItems: CanonicalRgWorkItem[], errors: string[]) {

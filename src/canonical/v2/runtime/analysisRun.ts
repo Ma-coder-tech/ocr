@@ -429,7 +429,7 @@ function terminalRun(input: {
       rgPlanning: "durable_claim_scoped_execution_eligible",
       semanticConvergence: "current_run_exact_claim_revisioned",
       adaptiveContinuation: "durable_deterministic_delta_admission",
-      regeneratedPlanExecution: "disabled",
+      regeneratedPlanExecution: "continuation_authorized_existing_executor",
       benchmarkExecution: "disabled",
       savingsExecution: "disabled",
       businessContextAuthority: "excluded_from_canonical_economics",

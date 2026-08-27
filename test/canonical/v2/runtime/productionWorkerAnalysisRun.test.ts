@@ -76,7 +76,7 @@ describe("production worker canonical AnalysisRun integration", () => {
     expect(canonical?.result?.autonomousLifecycle).toMatchObject({
       controllerRevision: 1,
       state: "operational_degradation_blocks_judgment",
-      providerExecution: "regenerated_plan_disabled",
+      providerExecution: "continuation_authorized_existing_executor",
       secondPassProviderCalls: 0,
     });
     const degradedDecisions = canonical?.continuationRevisions[0]?.decisions.filter((item) =>

@@ -18,8 +18,8 @@ import type { CanonicalRfClaimResolution } from "./rfClaimResolution.js";
 import type { CanonicalRgWorkLedger } from "./rgWorkLedger.js";
 import type { CanonicalAnalysisRunAutonomousLifecycle } from "./adaptiveContinuationTypes.js";
 
-export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v8";
-export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "adaptive_continuation_controller_v1";
+export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v9";
+export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "adaptive_continuation_execution_loop_v1";
 export const ANALYSIS_RUN_POLICY_VERSION = "frozen_product_model_runtime_policy_v0_2";
 
 export const ANALYSIS_RUN_STAGE_IDS = [
@@ -61,7 +61,7 @@ export type AnalysisRunManifest = {
   rgPlanning: "durable_claim_scoped_execution_eligible";
   semanticConvergence: "current_run_exact_claim_revisioned";
   adaptiveContinuation: "durable_deterministic_delta_admission";
-  regeneratedPlanExecution: "disabled";
+  regeneratedPlanExecution: "continuation_authorized_existing_executor";
   benchmarkExecution: "disabled";
   savingsExecution: "disabled";
   businessContextAuthority: "excluded_from_canonical_economics";

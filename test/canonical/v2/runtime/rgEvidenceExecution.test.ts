@@ -328,7 +328,8 @@ describe("production durable claim-bound RG evidence execution", () => {
       expectedSemanticRevision: before.semanticRevision, expectedSemanticHash: before.semanticHash,
       expectedPlanHash: before.result!.artifacts.rgWorkLedger!.planHash });
 
-    expect(first).toMatchObject({ lifecycle: "convergence_required", providerExecution: "regenerated_plan_disabled",
+    expect(first).toMatchObject({ lifecycle: "convergence_required",
+      providerExecution: "continuation_authorized_existing_executor",
       secondPassProviderCalls: 0 });
     expect(first.decisions).toEqual(expect.arrayContaining([
       expect.objectContaining({ disposition: "convergence_required" }),
@@ -357,7 +358,8 @@ describe("production durable claim-bound RG evidence execution", () => {
         event: expect.objectContaining({ claimAdmission: expect.objectContaining({ atomicClaimId: expect.any(String) }) }) }),
     ]));
     expect(persisted.result!.autonomousLifecycle).toMatchObject({ controllerRevision: 2,
-      state: second.lifecycle, providerExecution: "regenerated_plan_disabled", secondPassProviderCalls: 0 });
+      state: second.lifecycle, providerExecution: "continuation_authorized_existing_executor",
+      secondPassProviderCalls: 0 });
     expect(persisted.financialFoundationHash).toBe(setup.run.financialFoundationHash);
   }, 30_000);
 
@@ -386,7 +388,7 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(calls).toEqual(["search-no-candidates"]);
   }, 30_000);
 
-  it("admits a disabled justified refinement only for locally bound authority with a concrete period gap and changed objective", async () => {
+  it("admits a grant-required justified refinement only for locally bound authority with a concrete period gap and changed objective", async () => {
     const setup = await runWithOneWorkItem();
     const calls: string[] = [];
     const ports = successfulPorts(calls);
@@ -406,12 +408,12 @@ describe("production durable claim-bound RG evidence execution", () => {
     const state = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
     const decision = state.decisions[0]!;
 
-    expect(state.lifecycle).toBe("continuation_ready_provider_execution_disabled");
+    expect(state.lifecycle).toBe("continuation_ready_provider_execution_authorized");
     expect(decision).toMatchObject({ disposition: "justified_refinement",
       progress: [expect.objectContaining({ kind: "correct_authority_wrong_period",
         authorityBindingId: "fiserv_public_web_origins_v1" })],
       nextOperationDelta: expect.objectContaining({ kind: "period_refinement",
-        requiredGap: "correct_authority_wrong_period", providerExecution: "disabled_for_this_slice" }) });
+        requiredGap: "correct_authority_wrong_period", providerExecution: "requires_immutable_execution_grant" }) });
     expect(decision.nextOperationDelta!.nextEvidenceObjective).not.toBe(decision.nextOperationDelta!.priorEvidenceObjective);
     expect(decision.nextOperationDelta!.nextWorkContractFingerprint)
       .not.toBe(decision.nextOperationDelta!.priorWorkContractFingerprint);

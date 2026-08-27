@@ -1,4 +1,5 @@
 import { canonicalJson } from "../canonicalJson.js";
+import { db } from "../../../db.js";
 import type { CanonicalEconomicSemanticApplicationAdmission } from "../economicAnalysis.js";
 import { resolveKnowledge } from "../knowledge/knowledgeResolver.js";
 import type { KnowledgeClaimValue, KnowledgeEntry } from "../knowledge/knowledgeTypes.js";
@@ -40,7 +41,8 @@ export type CanonicalSemanticConvergenceResult = {
   providerCalls: 0;
 };
 
-export function convergeDurableCanonicalAnalysisRun(input: { runId: string }): CanonicalSemanticConvergenceResult {
+export function convergeDurableCanonicalAnalysisRun(input: { runId: string; cycleOwnerId?: string }): CanonicalSemanticConvergenceResult {
+  assertSemanticTransitionSafe(input.runId, input.cycleOwnerId);
   const persisted = getPersistedAnalysisRun(input.runId);
   if (!persisted?.result) throw new Error("semantic_convergence_analysis_run_unavailable");
   const current = persisted.result;
@@ -150,11 +152,26 @@ export function convergeDurableCanonicalAnalysisRun(input: { runId: string }): C
     semanticRevision: revisionNumber,
     limitations: unique([...current.limitations, ...registry.validation.errors.map((item) => `RG evidence withheld: ${item}`)]),
   };
+  assertSemanticTransitionSafe(input.runId, input.cycleOwnerId);
   persistCanonicalSemanticConvergence({ run, revision, registry });
   return { run, revision, registry,
     appliedCount: resolution.decisions.filter((item) => item.disposition === "applied" || item.disposition === "already_resolved_by_rf").length,
     withheldCount: resolution.decisions.filter((item) => item.disposition.includes("withheld") || item.disposition.includes("unapplied")).length,
     providerCalls: 0 };
+}
+
+function assertSemanticTransitionSafe(runId: string, cycleOwnerId?: string): void {
+  const run = db.prepare(`SELECT adaptive_cycle_owner, adaptive_cycle_lease_expires_at FROM canonical_analysis_runs WHERE id = ?`)
+    .get(runId) as { adaptive_cycle_owner: string | null; adaptive_cycle_lease_expires_at: string | null } | undefined;
+  if (!run) throw new Error("semantic_convergence_analysis_run_unavailable");
+  const activeOwner = run.adaptive_cycle_owner && run.adaptive_cycle_lease_expires_at
+    && run.adaptive_cycle_lease_expires_at > new Date().toISOString() ? run.adaptive_cycle_owner : null;
+  if (activeOwner && activeOwner !== cycleOwnerId) throw new Error("semantic_convergence_adaptive_cycle_active");
+  const activeWork = db.prepare(`SELECT 1 FROM canonical_rg_work_items WHERE run_id = ?
+    AND (state = 'executing' OR execution_state = 'executing') LIMIT 1`).get(runId);
+  const activeOperation = db.prepare(`SELECT 1 FROM canonical_rg_operations WHERE run_id = ?
+    AND state IN ('reserved', 'sent') LIMIT 1`).get(runId);
+  if (activeWork || activeOperation) throw new Error("semantic_convergence_rg_execution_active");
 }
 
 export function buildCurrentRunExternalEvidenceRegistry(
@@ -191,7 +208,16 @@ function validateFullEvidenceChain(evidence: CanonicalRgVerifiedEvidence, verifi
   const admission = persisted.rgClaimAdmissions.find((item) => item.atomicClaimId === evidence.atomicClaimId);
   const work = persisted.rgWorkItems.find((item) => item.workItemId === evidence.workItemId);
   if (!admission || !work || work.atomicClaimId !== evidence.atomicClaimId || verification.atomicClaimId !== evidence.atomicClaimId ||
-    verification.workItemId !== evidence.workItemId || verification.planHash !== evidence.planHash) errors.push("rg_evidence_claim_plan_binding_invalid");
+    verification.workItemId !== evidence.workItemId || verification.planHash !== evidence.planHash
+    || (verification.executionGrantId ?? null) !== (evidence.executionGrantId ?? null)
+    || (verification.executionGeneration ?? 0) !== (evidence.executionGeneration ?? 0)) errors.push("rg_evidence_claim_plan_binding_invalid");
+  if (evidence.executionGrantId) {
+    const grant = persisted.continuationExecutionGrants.find((item) => item.grantId === evidence.executionGrantId);
+    if (!grant || grant.executionGeneration !== evidence.executionGeneration || grant.atomicClaimId !== evidence.atomicClaimId
+      || grant.baseWorkItemId !== evidence.workItemId || grant.binding.planHash !== evidence.planHash) {
+      errors.push("rg_evidence_continuation_grant_lineage_invalid");
+    }
+  }
   const verificationResult = verification.result as { judgment?: Record<string, unknown>; verifiedEvidence?: unknown } | null;
   if (!verificationResult || digestCanonical(verificationResult.verifiedEvidence) !== digestCanonical(evidence) ||
     verificationResult.judgment?.frozenCandidateHash !== evidence.frozenCandidateHash ||
@@ -218,7 +244,8 @@ function validateFullEvidenceChain(evidence: CanonicalRgVerifiedEvidence, verifi
 function operationFor(operations: CanonicalRgOperation[], evidence: CanonicalRgVerifiedEvidence,
   kind: CanonicalRgOperation["kind"]): CanonicalRgOperation | undefined {
   return operations.find((item) => item.kind === kind && item.workItemId === evidence.workItemId &&
-    item.planHash === evidence.planHash && item.candidateId === evidence.candidateId && item.state === "completed");
+    item.planHash === evidence.planHash && (item.executionGrantId ?? null) === (evidence.executionGrantId ?? null)
+    && item.candidateId === evidence.candidateId && item.state === "completed");
 }
 
 function resolveApplications(input: {

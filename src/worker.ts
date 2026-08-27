@@ -163,50 +163,22 @@ export async function processJob(jobId: string): Promise<void> {
       stageStatus: Object.fromEntries(Object.entries(canonicalRun.stageOutcomes).map(([stage, outcome]) => [stage, outcome.status])),
     });
     try {
-      const [{ executeDurableCanonicalRgEvidence }, { createProductionRgEvidencePortsFromEnvironment },
-        { adjudicateDurableCanonicalContinuation }] = await Promise.all([
-        import("./canonical/v2/runtime/rgEvidenceExecution.js"),
+      const [{ executeDurableCanonicalAdaptiveLoop }, { createProductionRgEvidencePortsFromEnvironment }] = await Promise.all([
+        import("./canonical/v2/runtime/adaptiveExecution.js"),
         import("./canonical/v2/runtime/rgLiveEvidencePorts.js"),
-        import("./canonical/v2/runtime/adaptiveContinuation.js"),
       ]);
-      const rgExecution = await executeDurableCanonicalRgEvidence({ runId: canonicalRun.runId,
+      const adaptive = await executeDurableCanonicalAdaptiveLoop({ runId: canonicalRun.runId,
         ports: createProductionRgEvidencePortsFromEnvironment(canonicalRun.runId) });
-      console.log(`[job:${jobId}] canonical-rg-evidence`, {
+      console.log(`[job:${jobId}] canonical-adaptive-analysis`, {
         runId: canonicalRun.runId,
-        workItemsConsidered: rgExecution.workItemsConsidered,
-        completedWithEvidence: rgExecution.workItemsCompletedWithEvidence,
-        completedUnresolved: rgExecution.workItemsCompletedUnresolved,
-        degraded: rgExecution.workItemsDegraded,
-        canonicalTruthPreserved: rgExecution.canonicalTruthPreserved,
-      });
-      let continuation = adjudicateDurableCanonicalContinuation({ runId: canonicalRun.runId,
-        expectedSemanticRevision: canonicalRun.semanticRevision,
-        expectedSemanticHash: canonicalRun.semanticHash,
-        expectedPlanHash: canonicalRun.artifacts.rgWorkLedger?.planHash ?? null });
-      if (continuation.lifecycle === "convergence_required") {
-        const { convergeDurableCanonicalAnalysisRun } = await import("./canonical/v2/runtime/semanticConvergence.js");
-        const convergence = convergeDurableCanonicalAnalysisRun({ runId: canonicalRun.runId });
-        console.log(`[job:${jobId}] canonical-semantic-convergence`, {
-          runId: canonicalRun.runId,
-          revision: convergence.revision.revision,
-          applied: convergence.appliedCount,
-          withheld: convergence.withheldCount,
-          financialFoundationPreserved: convergence.revision.financialFoundationPreserved,
-          nextPlanPersisted: convergence.revision.nextPlanHash !== null,
-          providerCalls: convergence.providerCalls,
-        });
-        continuation = adjudicateDurableCanonicalContinuation({ runId: canonicalRun.runId,
-          expectedSemanticRevision: convergence.run.semanticRevision,
-          expectedSemanticHash: convergence.run.semanticHash,
-          expectedPlanHash: convergence.run.artifacts.rgWorkLedger?.planHash ?? null });
-      }
-      console.log(`[job:${jobId}] canonical-adaptive-continuation`, {
-        runId: canonicalRun.runId,
-        controllerRevision: continuation.controllerRevision,
-        lifecycle: continuation.lifecycle,
-        continuationReadyCount: continuation.continuationReadyAtomicClaimIds.length,
-        regeneratedProviderExecution: continuation.providerExecution,
-        secondPassProviderCalls: continuation.secondPassProviderCalls,
+        lifecycle: adaptive.lifecycle,
+        completion: adaptive.completion,
+        controllerRevision: adaptive.controllerRevision,
+        executionGeneration: adaptive.executionGeneration,
+        continuationGrantCount: adaptive.executedGrantIds.length,
+        providerCallsObserved: adaptive.providerCallsObserved,
+        semanticRevision: adaptive.semanticRevision,
+        financialFoundationPreserved: adaptive.financialFoundationPreserved,
       });
     } catch (error) {
       console.error(`[job:${jobId}] canonical-rg-evidence-degraded`, error instanceof Error ? error.message : error);

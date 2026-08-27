@@ -4,7 +4,12 @@ import { db, nowIso } from "../../../db.js";
 import { canonicalJson } from "../canonicalJson.js";
 import { dynamicallyBindPublisherOrigin } from "./rgPublisherOriginAuthority.js";
 import type { CanonicalRgVerificationJudgment } from "./rgEvidenceExecution.js";
-import type { CanonicalRgClaimAdmission, CanonicalRgOperation, CanonicalRgWorkItem } from "./rgWorkLedger.js";
+import {
+  canonicalRgWorkContractFingerprint,
+  type CanonicalRgClaimAdmission,
+  type CanonicalRgOperation,
+  type CanonicalRgWorkItem,
+} from "./rgWorkLedger.js";
 import { getPersistedAnalysisRun, type PersistedAnalysisRunRecord } from "./analysisRunStore.js";
 import {
   ADAPTIVE_CONTINUATION_SCHEMA_VERSION,
@@ -111,6 +116,7 @@ export function buildAdaptiveContinuationState(
     .map((item) => item.atomicClaimId).sort();
   const reasonCodes = lifecycleReasons(lifecycle, decisions);
   const cumulativeResource = aggregateResources(history, persisted.rgExecutionEvents);
+  const secondPassProviderCalls = continuationProviderCalls(persisted);
   const binding = {
     semanticRevision: persisted.semanticRevision,
     semanticHash: persisted.semanticHash,
@@ -121,7 +127,7 @@ export function buildAdaptiveContinuationState(
   };
   const stateHash = digest({ schemaVersion: ADAPTIVE_CONTINUATION_SCHEMA_VERSION, runId: persisted.id, binding,
     lifecycle, decisions, cumulativeResource, continuationReadyAtomicClaimIds,
-    providerExecution: "regenerated_plan_disabled", secondPassProviderCalls: 0, reasonCodes });
+    providerExecution: "continuation_authorized_existing_executor", secondPassProviderCalls, reasonCodes });
   return {
     schemaVersion: ADAPTIVE_CONTINUATION_SCHEMA_VERSION,
     runId: persisted.id,
@@ -131,8 +137,8 @@ export function buildAdaptiveContinuationState(
     decisions,
     cumulativeResource,
     continuationReadyAtomicClaimIds,
-    providerExecution: "regenerated_plan_disabled",
-    secondPassProviderCalls: 0,
+    providerExecution: "continuation_authorized_existing_executor",
+    secondPassProviderCalls,
     stateHash,
     reasonCodes,
     createdAt: nowIso(),
@@ -176,13 +182,21 @@ function decideClaim(input: {
     evidenceRefs,
     progress,
     cumulativeResource,
-    regeneratedProviderExecution: "disabled" as const,
   };
   const make = (disposition: CanonicalClaimContinuationDecision["disposition"], reasonCodes: string[],
     degradation: CanonicalContinuationDegradation | null = null,
     nextOperationDelta: CanonicalContinuationOperationDelta | null = null): CanonicalClaimContinuationDecision => {
-    const decisionId = `continuation-${digest({ ...base, disposition, reasonCodes, degradation, nextOperationDelta }).slice(0, 32)}`;
-    return { decisionId, ...base, disposition, nextOperationDelta, degradation, reasonCodes: unique(reasonCodes) };
+    const grantIds = new Set(input.persisted.continuationExecutionGrants
+      .filter((item) => item.atomicClaimId === input.admission.atomicClaimId).map((item) => item.grantId));
+    const regeneratedProviderExecution = input.persisted.rgOperations.some((item) =>
+      item.executionGrantId !== null && grantIds.has(item.executionGrantId))
+      ? "executed_exact_claim_delta" as const
+      : disposition === "newly_eligible" || disposition === "justified_refinement"
+        ? "authorized_exact_claim_delta" as const : "disabled" as const;
+    const decisionId = `continuation-${digest({ ...base, disposition, reasonCodes, degradation, nextOperationDelta,
+      regeneratedProviderExecution }).slice(0, 32)}`;
+    return { decisionId, ...base, disposition, nextOperationDelta, degradation,
+      regeneratedProviderExecution, reasonCodes: unique(reasonCodes) };
   };
 
   if (input.resolved || input.semanticDisposition?.disposition === "applied" ||
@@ -223,7 +237,7 @@ function decideClaim(input: {
   if (input.currentWork.executionState === "planned_for_durable_execution") {
     const priorSameContract = input.attempts.filter((item) => item.planGeneration !== input.planGeneration && item.admission &&
       workContractFingerprint(item.admission, item.work) === currentFingerprint);
-    const refinable = latestProgressDelta(priorSameContract, currentFingerprint!, input.currentWork.evidenceObjective);
+    const refinable = latestProgressDelta(priorSameContract, currentFingerprint!, input.admission, input.currentWork);
     if (refinable) return make("justified_refinement", ["concrete_prior_progress_and_changed_next_evidence_objective"], null, refinable);
     if (priorSameContract.some((item) => item.work.executionState === "completed_unresolved")) {
       return make("continuation_uncertain_not_authorized", ["unchanged_work_contract_after_weak_unresolved_outcome",
@@ -239,7 +253,7 @@ function decideClaim(input: {
     return make("newly_eligible", ["first_admitted_material_work_contract"]);
   }
   if (input.currentWork.executionState === "completed_unresolved") {
-    const refinable = latestProgressDelta([latestAttempt!], currentFingerprint!, input.currentWork.evidenceObjective);
+    const refinable = latestProgressDelta([latestAttempt!], currentFingerprint!, input.admission, input.currentWork);
     if (refinable) return make("justified_refinement", ["concrete_progress_exposes_legitimately_resolvable_gap"], null, refinable);
     return make("continuation_uncertain_not_authorized", [input.currentWork.stopReason ?? "research_outcome_unresolved",
       "single_weak_outcome_is_not_analytical_exhaustion", "weak_outcomes_are_not_analytical_exhaustion",
@@ -348,18 +362,26 @@ function progressForAttempt(attempt: WorkAttempt): CanonicalContinuationProgress
 }
 
 function latestProgressDelta(attempts: WorkAttempt[], currentFingerprint: string,
-  evidenceObjective: string): CanonicalContinuationOperationDelta | null {
-  const progress = attempts.flatMap(progressForAttempt).at(-1);
+  admission: CanonicalRgClaimAdmission, work: CanonicalRgWorkItem): CanonicalContinuationOperationDelta | null {
+  const consumedFingerprints = new Set(work.continuationContract?.excludedDocumentFingerprints ?? []);
+  const progress = attempts.flatMap(progressForAttempt)
+    .filter((item) => !consumedFingerprints.has(item.documentFingerprint)).at(-1);
   if (!progress) return null;
   const kind = progress.kind === "correct_authority_wrong_period" ? "period_refinement"
     : progress.kind === "refinable_scope_mismatch" ? "scope_refinement" : "locator_subsection_refinement";
-  const nextEvidenceObjective = `${evidenceObjective} Refinement gap: ${progress.remainingGap}. Exclude previously insufficient document fingerprints.`;
-  const nextWorkContractFingerprint = digest({ priorWorkContractFingerprint: currentFingerprint, kind,
-    remainingGap: progress.remainingGap, nextEvidenceObjective, excludedDocumentFingerprints: [progress.documentFingerprint] });
-  if (nextWorkContractFingerprint === currentFingerprint || nextEvidenceObjective === evidenceObjective) return null;
+  const excludedDocumentFingerprints = unique([
+    ...(work.continuationContract?.excludedDocumentFingerprints ?? []),
+    progress.documentFingerprint,
+  ]);
+  const nextEvidenceObjective = `${work.evidenceObjective} Refinement gap: ${progress.remainingGap}. Exclude previously insufficient document fingerprints.`;
+  const effectiveWork: CanonicalRgWorkItem = { ...structuredClone(work), evidenceObjective: nextEvidenceObjective,
+    continuationContract: { kind, requiredGap: progress.kind, priorWorkContractFingerprint: currentFingerprint,
+      excludedDocumentFingerprints }, executionAuthorization: null };
+  const nextWorkContractFingerprint = canonicalRgWorkContractFingerprint(admission, effectiveWork);
+  if (nextWorkContractFingerprint === currentFingerprint || nextEvidenceObjective === work.evidenceObjective) return null;
   return { kind, priorWorkContractFingerprint: currentFingerprint, nextWorkContractFingerprint,
-    priorEvidenceObjective: evidenceObjective, nextEvidenceObjective, requiredGap: progress.kind,
-    excludedDocumentFingerprints: [progress.documentFingerprint], providerExecution: "disabled_for_this_slice" };
+    priorEvidenceObjective: work.evidenceObjective, nextEvidenceObjective, requiredGap: progress.kind,
+    excludedDocumentFingerprints, providerExecution: "requires_immutable_execution_grant" };
 }
 
 function degradationFor(work: CanonicalRgWorkItem): CanonicalContinuationDegradation | null {
@@ -378,24 +400,7 @@ function degradationFor(work: CanonicalRgWorkItem): CanonicalContinuationDegrada
 }
 
 function workContractFingerprint(admission: CanonicalRgClaimAdmission, work: CanonicalRgWorkItem): string {
-  return digest({
-    atomicClaimId: admission.atomicClaimId,
-    claimClass: admission.claimClass,
-    facet: admission.facet,
-    parentClaimIds: admission.parentClaimIds,
-    opaqueSubjectCode: admission.opaqueSubjectCode,
-    scopeFingerprint: admission.scopeFingerprint,
-    statementPeriod: admission.statementPeriod,
-    direction: admission.direction,
-    knowledgeQuery: work.knowledgeQuery,
-    evidenceObjective: work.evidenceObjective,
-    expectedKnowledgeValueConstraint: work.expectedKnowledgeValueConstraint,
-    requiredSourceAuthorities: work.requiredSourceAuthorities,
-    materiality: admission.materiality,
-    decisionTier: admission.decisionTier,
-    decisionBasis: admission.decisionBasis,
-    expectedDecisionEffects: work.expectedDecisionEffects,
-  });
+  return canonicalRgWorkContractFingerprint(admission, work);
 }
 
 function aggregateResources(attempts: WorkAttempt[], events: PersistedAnalysisRunRecord["rgExecutionEvents"]): CanonicalContinuationResourceAccounting {
@@ -437,6 +442,19 @@ function aggregateResources(attempts: WorkAttempt[], events: PersistedAnalysisRu
   return output;
 }
 
+function continuationProviderCalls(persisted: PersistedAnalysisRunRecord): number {
+  const operations = new Map<string, CanonicalRgOperation>();
+  for (const operation of persisted.rgOperations) {
+    if (operation.executionGrantId) operations.set(`${operation.planHash}:${operation.operationId}`, operation);
+  }
+  for (const event of persisted.rgExecutionEvents.filter((item) => item.eventType === "superseded_plan_snapshot")) {
+    const value = record(event.event);
+    const operation = value.operation as CanonicalRgOperation | undefined;
+    if (operation?.executionGrantId) operations.set(`${operation.planHash}:${operation.operationId}`, operation);
+  }
+  return [...operations.values()].reduce((sum, operation) => sum + operation.receipt.calls, 0);
+}
+
 function lifecycleFor(decisions: CanonicalClaimContinuationDecision[]): CanonicalAdaptiveContinuationState["lifecycle"] {
   if (decisions.some((item) => item.disposition === "convergence_required")) return "convergence_required";
   if (decisions.some((item) => item.disposition === "operationally_degraded_reconciliation_required")) {
@@ -445,7 +463,7 @@ function lifecycleFor(decisions: CanonicalClaimContinuationDecision[]): Canonica
   if (decisions.some((item) => item.disposition === "operationally_degraded_retry_eligible" ||
     item.disposition === "operationally_degraded_withheld")) return "operational_degradation_blocks_judgment";
   if (decisions.some((item) => item.disposition === "newly_eligible" || item.disposition === "justified_refinement")) {
-    return "continuation_ready_provider_execution_disabled";
+    return "continuation_ready_provider_execution_authorized";
   }
   if (decisions.some((item) => item.disposition === "continuation_uncertain_not_authorized")) {
     return "continuation_judgment_unresolved";
@@ -511,8 +529,8 @@ function persistContinuationState(persisted: PersistedAnalysisRunRecord,
       boundPlanHash: stored.binding.planHash,
       boundPlanGeneration: stored.binding.planGeneration,
       continuationReadyCount: stored.continuationReadyAtomicClaimIds.length,
-      providerExecution: "regenerated_plan_disabled",
-      secondPassProviderCalls: 0,
+      providerExecution: "continuation_authorized_existing_executor",
+      secondPassProviderCalls: stored.secondPassProviderCalls,
       stateHash: stored.stateHash,
       reasonCodes: stored.reasonCodes,
     };
