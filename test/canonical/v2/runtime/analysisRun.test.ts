@@ -145,6 +145,36 @@ describe("production canonical AnalysisRun core", () => {
       businessContextAuthority: "excluded_from_canonical_economics",
       validation: { status: "valid" },
     });
+    const ledger = run.artifacts.rgWorkLedger!;
+    expect(ledger).toMatchObject({
+      schemaVersion: "canonical_rg_work_ledger_v1",
+      authority: "claim_admission_and_planning_only",
+      providerExecution: "disabled", searchExecution: "disabled", retrievalExecution: "disabled", aiExecution: "disabled",
+      automaticKnowledgePromotion: "prohibited",
+      contextualResearchDefault: "opportunistic_only_no_independent_initiation",
+      businessContextAuthority: "excluded_from_canonical_materiality",
+      benchmarkAuthority: "excluded_from_canonical_materiality",
+      operations: [], validation: { status: "valid" },
+    });
+    expect(ledger.authoritativeStatementCostMinor)
+      .toBe(run.artifacts.rd!.economicLayer.costStack.authoritativeStatementFeeTotal!.amountMinor);
+    expect(ledger.workItems.length).toBeGreaterThan(0);
+    expect(ledger.workItems.every((item) => item.executionState === "planned_provider_execution_disabled"
+      && item.reservation === null && item.progress.operationsAttempted === 0
+      && item.resourceConsumption.providerCalls === 0 && item.resourceConsumption.searchCalls === 0
+      && item.resourceConsumption.retrievalBytes === 0 && item.resourceConsumption.aiCalls === 0)).toBe(true);
+    expect(ledger.workItems.every((item) => ledger.claimAdmissions.find((claim) =>
+      claim.atomicClaimId === item.atomicClaimId)?.materiality === "material")).toBe(true);
+    const targetRef = contributing[0]!.id;
+    const targetFacets = ledger.claimAdmissions.filter((claim) => claim.canonicalRefs.includes(targetRef));
+    expect(targetFacets.map((claim) => claim.facet)).toEqual(expect.arrayContaining([
+      "economic_category", "economic_beneficiary", "economic_owner", "collector", "price_setter", "merchant_lever",
+    ]));
+    expect(new Set(targetFacets.map((claim) => claim.atomicClaimId)).size).toBe(targetFacets.length);
+    expect(targetFacets.find((claim) => claim.facet === "economic_category")?.expectedKnowledgeValueConstraint)
+      .toMatchObject({ kind: "mapping" });
+    expect(targetFacets.find((claim) => claim.facet === "economic_owner")?.expectedKnowledgeValueConstraint)
+      .toEqual({ kind: "role", controlDimension: "economic_owner" });
   });
 
   it("retains the authoritative fee total and types the coverage gap when fee detail is unproven", () => {
@@ -310,7 +340,8 @@ describe("production canonical AnalysisRun core", () => {
     });
 
     expect(run).toMatchObject({ status: "unsupported", familyStatus: "unsupported", parser: { matched: false } });
-    expect(run.artifacts).toEqual({ rb: null, rc: null, rfResolution: null, rd: null, re: null, unresolvedClaims: null, rh: null });
+    expect(run.artifacts).toEqual({ rb: null, rc: null, rfResolution: null, rd: null, re: null,
+      unresolvedClaims: null, rgWorkLedger: null, rh: null });
     expect(run.stageOutcomes.capability_admission.status).toBe("unsupported");
     expect(run.stageOutcomes.rb.status).toBe("unresolved");
   });

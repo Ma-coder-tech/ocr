@@ -58,6 +58,15 @@ describe("production worker canonical AnalysisRun integration", () => {
       benchmarkExecution: "disabled",
     });
     expect(JSON.stringify(canonical?.result?.artifacts)).not.toContain('"businessType"');
-    expect(canonical?.stages).toHaveLength(9);
+    expect(canonical?.result?.artifacts.rgWorkLedger).toMatchObject({
+      authority: "claim_admission_and_planning_only",
+      providerExecution: "disabled", searchExecution: "disabled", retrievalExecution: "disabled", aiExecution: "disabled",
+      materialityContract: { version: "canonical_materiality_contract_v1", businessTypeAuthority: "excluded" },
+      operations: [], validation: { status: "valid" },
+    });
+    expect(canonical?.rgClaimAdmissions.length).toBeGreaterThan(0);
+    expect(canonical?.rgWorkItems.length).toBe(canonical?.result?.artifacts.rgWorkLedger!.workItems.length);
+    expect(canonical?.rgOperations).toEqual([]);
+    expect(canonical?.stages).toHaveLength(10);
   }, 30_000);
 });

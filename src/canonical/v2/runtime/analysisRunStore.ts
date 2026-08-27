@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { ParsedDocument } from "../../../parser.js";
 import { db, nowIso } from "../../../db.js";
 import type { CanonicalEconomicsV2CompletenessStatus } from "../types.js";
+import type { CanonicalRgClaimAdmission, CanonicalRgOperation, CanonicalRgWorkItem, CanonicalRgWorkLedger } from "./rgWorkLedger.js";
 import { canonicalRfExecutionContextHash } from "./rfClaimResolution.js";
 import {
   governedRfKnowledgeInput,
@@ -72,6 +73,9 @@ export type PersistedAnalysisRunRecord = {
   completedAt: string | null;
   updatedAt: string;
   stages: PersistedAnalysisRunStage[];
+  rgClaimAdmissions: CanonicalRgClaimAdmission[];
+  rgWorkItems: CanonicalRgWorkItem[];
+  rgOperations: CanonicalRgOperation[];
   result: CanonicalAnalysisRun | null;
 };
 
@@ -215,6 +219,9 @@ function beginRun(input: {
           resource_json = ?, started_at = NULL, completed_at = NULL, elapsed_ms = NULL, updated_at = ?
       WHERE run_id = ?
     `).run(JSON.stringify(emptyResource(null)), now, input.runId);
+    db.prepare(`DELETE FROM canonical_rg_operations WHERE run_id = ?`).run(input.runId);
+    db.prepare(`DELETE FROM canonical_rg_work_items WHERE run_id = ?`).run(input.runId);
+    db.prepare(`DELETE FROM canonical_rg_claim_admissions WHERE run_id = ?`).run(input.runId);
   });
   transaction();
 }
@@ -232,14 +239,59 @@ function markStageStarted(runId: string, stage: AnalysisRunStageId,
 
 function finishPersistedStage(runId: string, outcome: AnalysisRunStageOutcome, artifact: unknown, elapsedMs: number | null) {
   const now = nowIso();
-  db.prepare(`
-    UPDATE canonical_analysis_run_stages
-    SET status = ?, artifact_json = ?, artifact_hash = ?, errors_json = ?, warnings_json = ?, limitations_json = ?,
-        resource_json = ?, completed_at = ?, elapsed_ms = ?, updated_at = ?
-    WHERE run_id = ? AND stage = ?
-  `).run(outcome.status, artifact === null || artifact === undefined ? null : JSON.stringify(artifact), outcome.artifactHash,
-    JSON.stringify(outcome.errors), JSON.stringify(outcome.warnings), JSON.stringify(outcome.limitations),
-    JSON.stringify(emptyResource(elapsedMs)), now, elapsedMs, now, runId, outcome.stage);
+  const transaction = db.transaction(() => {
+    db.prepare(`
+      UPDATE canonical_analysis_run_stages
+      SET status = ?, artifact_json = ?, artifact_hash = ?, errors_json = ?, warnings_json = ?, limitations_json = ?,
+          resource_json = ?, completed_at = ?, elapsed_ms = ?, updated_at = ?
+      WHERE run_id = ? AND stage = ?
+    `).run(outcome.status, artifact === null || artifact === undefined ? null : JSON.stringify(artifact), outcome.artifactHash,
+      JSON.stringify(outcome.errors), JSON.stringify(outcome.warnings), JSON.stringify(outcome.limitations),
+      JSON.stringify(emptyResource(elapsedMs)), now, elapsedMs, now, runId, outcome.stage);
+    if (outcome.stage === "rg_planning" && outcome.status === "valid" && artifact) {
+      persistRgWorkLedger(runId, artifact as CanonicalRgWorkLedger, now);
+    }
+  });
+  transaction();
+}
+
+function persistRgWorkLedger(runId: string, ledger: CanonicalRgWorkLedger, now: string) {
+  db.prepare(`DELETE FROM canonical_rg_operations WHERE run_id = ?`).run(runId);
+  db.prepare(`DELETE FROM canonical_rg_work_items WHERE run_id = ?`).run(runId);
+  db.prepare(`DELETE FROM canonical_rg_claim_admissions WHERE run_id = ?`).run(runId);
+  const insertClaim = db.prepare(`
+    INSERT INTO canonical_rg_claim_admissions (
+      run_id, atomic_claim_id, parent_claim_ids_json, claim_class, facet, opaque_subject_code, scope_fingerprint,
+      statement_period_json, direction, amount_minor, authoritative_statement_cost_minor, economic_tier, decision_tier,
+      materiality, research_admission, admission_json, plan_hash, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const claim of ledger.claimAdmissions) {
+    insertClaim.run(runId, claim.atomicClaimId, JSON.stringify(claim.parentClaimIds), claim.claimClass, claim.facet,
+      claim.opaqueSubjectCode, claim.scopeFingerprint, claim.statementPeriod ? JSON.stringify(claim.statementPeriod) : null,
+      claim.direction, claim.magnitude.amountMinor, claim.magnitude.authoritativeStatementCostMinor,
+      claim.magnitude.tier, claim.decisionTier, claim.materiality, claim.researchAdmission,
+      JSON.stringify(claim), ledger.planHash, now, now);
+  }
+  const insertWork = db.prepare(`
+    INSERT INTO canonical_rg_work_items (
+      run_id, work_item_id, atomic_claim_id, state, execution_state, requested_operation, work_item_json,
+      plan_hash, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const item of ledger.workItems) {
+    insertWork.run(runId, item.workItemId, item.atomicClaimId, item.state, item.executionState,
+      item.requestedOperation, JSON.stringify(item), ledger.planHash, now, now);
+  }
+  const insertOperation = db.prepare(`
+    INSERT INTO canonical_rg_operations (
+      run_id, operation_id, work_item_id, state, operation_json, plan_hash, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const operation of ledger.operations) {
+    insertOperation.run(runId, operation.operationId, operation.workItemId, operation.state,
+      JSON.stringify(operation), ledger.planHash, now, now);
+  }
 }
 
 function finishRun(run: CanonicalAnalysisRun) {
@@ -268,6 +320,9 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
   const stages = mapStages(runId);
   const summary = parseJson<Record<string, unknown> | null>(row.result_json, null);
   const artifacts = artifactsFromStages(stages);
+  const rgClaimAdmissions = mapRgClaims(runId);
+  const rgWorkItems = mapRgWorkItems(runId);
+  const rgOperations = mapRgOperations(runId);
   const result = summary ? ({ ...summary, artifacts } as unknown as CanonicalAnalysisRun) : null;
   return {
     id: runId,
@@ -292,6 +347,9 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
     completedAt: row.completed_at ? String(row.completed_at) : null,
     updatedAt: String(row.updated_at),
     stages,
+    rgClaimAdmissions,
+    rgWorkItems,
+    rgOperations,
     result,
   };
 }
@@ -324,8 +382,24 @@ function artifactsFromStages(stages: PersistedAnalysisRunStage[]): CanonicalAnal
     rd: artifact("rd") as CanonicalAnalysisArtifacts["rd"],
     re: artifact("re") as CanonicalAnalysisArtifacts["re"],
     unresolvedClaims: artifact("claim_inventory") as CanonicalAnalysisArtifacts["unresolvedClaims"],
+    rgWorkLedger: artifact("rg_planning") as CanonicalAnalysisArtifacts["rgWorkLedger"],
     rh: artifact("rh") as CanonicalAnalysisArtifacts["rh"],
   };
+}
+
+function mapRgClaims(runId: string): CanonicalRgClaimAdmission[] {
+  const rows = db.prepare(`SELECT admission_json FROM canonical_rg_claim_admissions WHERE run_id = ? ORDER BY atomic_claim_id`).all(runId) as Array<{ admission_json: string }>;
+  return rows.map((row) => parseJson<CanonicalRgClaimAdmission>(row.admission_json, null as never));
+}
+
+function mapRgWorkItems(runId: string): CanonicalRgWorkItem[] {
+  const rows = db.prepare(`SELECT work_item_json FROM canonical_rg_work_items WHERE run_id = ? ORDER BY work_item_id`).all(runId) as Array<{ work_item_json: string }>;
+  return rows.map((row) => parseJson<CanonicalRgWorkItem>(row.work_item_json, null as never));
+}
+
+function mapRgOperations(runId: string): CanonicalRgOperation[] {
+  const rows = db.prepare(`SELECT operation_json FROM canonical_rg_operations WHERE run_id = ? ORDER BY operation_id`).all(runId) as Array<{ operation_json: string }>;
+  return rows.map((row) => parseJson<CanonicalRgOperation>(row.operation_json, null as never));
 }
 
 function emptyResource(elapsedMs: number | null): PersistedAnalysisRunStage["resource"] {

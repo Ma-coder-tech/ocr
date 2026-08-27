@@ -55,6 +55,8 @@ export type CanonicalRfKnowledgeBinding = NonNullable<CanonicalRfKnowledgeInput[
 export type CanonicalRfClaimDecision = {
   claimId: string;
   claimClass: CanonicalUnresolvedClaim["claimClass"];
+  canonicalRefs: string[];
+  occurrenceRefs: string[];
   disposition:
     | "resolved_by_admitted_knowledge"
     | "unresolved_no_admitted_knowledge"
@@ -177,14 +179,16 @@ export function buildCanonicalRfClaimResolution(input: {
       const resolution = resolveKnowledge(input.entries, query);
       const disposition = resolutionDisposition(resolution);
       if (disposition !== "resolved_by_admitted_knowledge") {
-        decisions.push({ claimId: claim.claimId, claimClass: claim.claimClass, disposition, query, resolution,
+        decisions.push({ claimId: claim.claimId, claimClass: claim.claimClass,
+          canonicalRefs: [...claim.canonicalRefs], occurrenceRefs: [...claim.occurrenceRefs], disposition, query, resolution,
           applicationKey: null, limitations: ["The category remains unresolved because applicable admitted RF knowledge did not resolve it."] });
         continue;
       }
       const category = resolvedCategory(resolution, subjectCode);
       if (!category) {
         warnings.push(`rf_category_value_rejected:${claim.claimId}`);
-        decisions.push({ claimId: claim.claimId, claimClass: claim.claimClass, disposition: "unresolved_policy_rejection",
+        decisions.push({ claimId: claim.claimId, claimClass: claim.claimClass,
+          canonicalRefs: [...claim.canonicalRefs], occurrenceRefs: [...claim.occurrenceRefs], disposition: "unresolved_policy_rejection",
           query, resolution, applicationKey: null,
           limitations: ["Resolved RF knowledge did not contain an exact authorized category mapping value."] });
         continue;
@@ -209,7 +213,8 @@ export function buildCanonicalRfClaimResolution(input: {
           "Ownership, control, actionability, pricing, benchmark position, and savings remain independent claims.",
         ],
       });
-      decisions.push({ claimId: claim.claimId, claimClass: claim.claimClass, disposition, query, resolution,
+      decisions.push({ claimId: claim.claimId, claimClass: claim.claimClass,
+        canonicalRefs: [...claim.canonicalRefs], occurrenceRefs: [...claim.occurrenceRefs], disposition, query, resolution,
         applicationKey, limitations: ["The admitted mapping is restricted to the economic-category claim."] });
     }
   }
@@ -359,6 +364,8 @@ function noAuthorizedMapping(claim: CanonicalUnresolvedClaim): CanonicalRfClaimD
   return {
     claimId: claim.claimId,
     claimClass: claim.claimClass,
+    canonicalRefs: [...claim.canonicalRefs],
+    occurrenceRefs: [...claim.occurrenceRefs],
     disposition: "not_applied_no_authorized_rf_mapping",
     query: null,
     resolution: null,

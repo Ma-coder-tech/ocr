@@ -58,7 +58,8 @@ describe("durable canonical AnalysisRun persistence", () => {
     });
     expect(persisted.stages.map((stage) => [stage.stage, stage.status])).toEqual([
       ["source_ingress", "valid"], ["capability_admission", "valid"], ["rb", "valid"], ["rc", "valid"],
-      ["rf_resolution", "valid"], ["rd", "valid"], ["re", "valid"], ["claim_inventory", "valid"], ["rh", "valid"],
+      ["rf_resolution", "valid"], ["rd", "valid"], ["re", "valid"], ["claim_inventory", "valid"],
+      ["rg_planning", "valid"], ["rh", "valid"],
     ]);
     expect(persisted.stages.every((stage) => stage.claimRef && stage.evidenceObjective && stage.expectedDecisionEffect)).toBe(true);
     expect(persisted.stages.every((stage) => stage.artifactHash && stage.resource.execution === "deterministic_local"
@@ -72,7 +73,12 @@ describe("durable canonical AnalysisRun persistence", () => {
     expect(afterSecond.attemptCount).toBe(1);
     expect(afterSecond.stages.map((stage) => stage.artifactHash)).toEqual(hashes);
     expect(loadedDb.db.prepare(`SELECT COUNT(*) AS count FROM canonical_analysis_runs WHERE job_id = ?`).get(job.id)).toEqual({ count: 1 });
-    expect(loadedDb.db.prepare(`SELECT COUNT(*) AS count FROM canonical_analysis_run_stages WHERE run_id = ?`).get(first.runId)).toEqual({ count: 9 });
+    expect(loadedDb.db.prepare(`SELECT COUNT(*) AS count FROM canonical_analysis_run_stages WHERE run_id = ?`).get(first.runId)).toEqual({ count: 10 });
+    expect(persisted.rgClaimAdmissions).toEqual(first.artifacts.rgWorkLedger!.claimAdmissions);
+    expect(persisted.rgWorkItems).toEqual(first.artifacts.rgWorkLedger!.workItems);
+    expect(persisted.rgOperations).toEqual([]);
+    expect(loadedDb.db.prepare(`SELECT COUNT(*) AS count FROM canonical_rg_operations WHERE run_id = ?`).get(first.runId))
+      .toEqual({ count: 0 });
 
     const changedDocument = structuredClone(document);
     changedDocument.rows[0] = { ...changedDocument.rows[0], content: `${String(changedDocument.rows[0]?.content ?? "")} changed` };
@@ -86,10 +92,10 @@ describe("durable canonical AnalysisRun persistence", () => {
     expect(upgraded.runId).toBe(first.runId);
     expect(afterUpgrade).toMatchObject({
       attemptCount: 2,
-      schemaVersion: "canonical_analysis_run_v4",
-      implementationVersion: "governed_rf_catalog_snapshot_v1",
+      schemaVersion: "canonical_analysis_run_v5",
+      implementationVersion: "materiality_rg_work_ledger_v1",
     });
-    expect(afterUpgrade.stages).toHaveLength(9);
+    expect(afterUpgrade.stages).toHaveLength(10);
     expect(afterUpgrade.stages.every((stage) => stage.status === "valid" && stage.artifact !== null)).toBe(true);
 
     const serialized = JSON.stringify(persisted);
@@ -224,6 +230,13 @@ describe("durable canonical AnalysisRun persistence", () => {
     expect(run.stageOutcomes.rb.status).toBe("valid");
     expect(run.stageOutcomes.rd.status).toBe("valid");
     expect(run.stageOutcomes.claim_inventory.status).toBe("valid");
+    expect(run.stageOutcomes.rg_planning.status).toBe("valid");
+    expect(run.artifacts.rgWorkLedger).toMatchObject({
+      rfBinding: { availability: "unavailable" },
+      workItems: [], operations: [], validation: { status: "valid" },
+    });
+    expect(run.artifacts.rgWorkLedger!.claimAdmissions.every((claim) =>
+      claim.researchAdmission === "withheld_rf_catalog_unavailable")).toBe(true);
     expect(run.artifacts.rd!.economicLayer.charges.length).toBeGreaterThan(0);
     expect(run.canonicalTruthHash).toMatch(/^[a-f0-9]{64}$/);
     expect(persisted).toMatchObject({ rfCatalogStatus: "unavailable", rfSnapshotHash: "" });

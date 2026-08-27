@@ -2,3 +2,5 @@ export * from "./analysisRunTypes.js";
 export * from "./analysisRun.js";
 export * from "./unresolvedClaims.js";
 export * from "./rfClaimResolution.js";
+export * from "./materialityContract.js";
+export * from "./rgWorkLedger.js";

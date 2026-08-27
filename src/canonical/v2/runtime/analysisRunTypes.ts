@@ -15,9 +15,10 @@ import type {
 } from "../fiservRuntimeCapabilityAdmission.js";
 import type { CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
 import type { CanonicalRfClaimResolution } from "./rfClaimResolution.js";
+import type { CanonicalRgWorkLedger } from "./rgWorkLedger.js";
 
-export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v4";
-export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "governed_rf_catalog_snapshot_v1";
+export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v5";
+export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "materiality_rg_work_ledger_v1";
 export const ANALYSIS_RUN_POLICY_VERSION = "frozen_product_model_runtime_policy_v0_2";
 
 export const ANALYSIS_RUN_STAGE_IDS = [
@@ -29,6 +30,7 @@ export const ANALYSIS_RUN_STAGE_IDS = [
   "rd",
   "re",
   "claim_inventory",
+  "rg_planning",
   "rh",
 ] as const;
 
@@ -55,6 +57,7 @@ export type AnalysisRunManifest = {
   providerExecution: "disabled";
   publicResearch: "disabled";
   rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled";
+  rgPlanning: "durable_claim_scoped_provider_disabled";
   benchmarkExecution: "disabled";
   savingsExecution: "disabled";
   businessContextAuthority: "excluded_from_canonical_economics";
@@ -68,6 +71,7 @@ export type CanonicalAnalysisArtifacts = {
   rd: ReturnTypeOrNull<typeof buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing>;
   re: ReturnTypeOrNull<typeof observeFiservEconomicsInCanonicalSynthesisV2>;
   unresolvedClaims: CanonicalUnresolvedClaimInventory | null;
+  rgWorkLedger: CanonicalRgWorkLedger | null;
   rh: ReturnTypeOrNull<typeof composeCanonicalMerchantReportV2>;
 };
 

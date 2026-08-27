@@ -140,6 +140,57 @@ function migrate(): void {
       PRIMARY KEY (run_id, stage)
     );
 
+    CREATE TABLE IF NOT EXISTS canonical_rg_claim_admissions (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      atomic_claim_id TEXT NOT NULL,
+      parent_claim_ids_json TEXT NOT NULL,
+      claim_class TEXT NOT NULL,
+      facet TEXT NOT NULL,
+      opaque_subject_code TEXT NOT NULL,
+      scope_fingerprint TEXT NOT NULL,
+      statement_period_json TEXT,
+      direction TEXT NOT NULL,
+      amount_minor INTEGER,
+      authoritative_statement_cost_minor INTEGER,
+      economic_tier TEXT NOT NULL,
+      decision_tier TEXT NOT NULL,
+      materiality TEXT NOT NULL,
+      research_admission TEXT NOT NULL,
+      admission_json TEXT NOT NULL,
+      plan_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, atomic_claim_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_rg_work_items (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      work_item_id TEXT NOT NULL,
+      atomic_claim_id TEXT NOT NULL,
+      state TEXT NOT NULL,
+      execution_state TEXT NOT NULL,
+      requested_operation TEXT NOT NULL,
+      work_item_json TEXT NOT NULL,
+      plan_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, work_item_id),
+      FOREIGN KEY (run_id, atomic_claim_id) REFERENCES canonical_rg_claim_admissions(run_id, atomic_claim_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_rg_operations (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      operation_id TEXT NOT NULL,
+      work_item_id TEXT NOT NULL,
+      state TEXT NOT NULL,
+      operation_json TEXT NOT NULL,
+      plan_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, operation_id),
+      FOREIGN KEY (run_id, work_item_id) REFERENCES canonical_rg_work_items(run_id, work_item_id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS canonical_rf_knowledge_audit_events (
       event_id TEXT PRIMARY KEY,
       entry_ref TEXT NOT NULL,
@@ -331,6 +382,10 @@ function migrate(): void {
     CREATE INDEX IF NOT EXISTS idx_canonical_runs_job ON canonical_analysis_runs(job_id);
     CREATE INDEX IF NOT EXISTS idx_canonical_runs_status ON canonical_analysis_runs(status, updated_at);
     CREATE INDEX IF NOT EXISTS idx_canonical_run_stages_status ON canonical_analysis_run_stages(run_id, status);
+    CREATE INDEX IF NOT EXISTS idx_canonical_rg_claim_materiality ON canonical_rg_claim_admissions(run_id, materiality, research_admission);
+    CREATE INDEX IF NOT EXISTS idx_canonical_rg_claim_semantics ON canonical_rg_claim_admissions(run_id, claim_class, facet, opaque_subject_code, scope_fingerprint);
+    CREATE INDEX IF NOT EXISTS idx_canonical_rg_work_state ON canonical_rg_work_items(run_id, state, execution_state);
+    CREATE INDEX IF NOT EXISTS idx_canonical_rg_operation_state ON canonical_rg_operations(run_id, state);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_claim ON canonical_rf_knowledge_entries(claim_type, subject_code, lifecycle);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_visibility ON canonical_rf_knowledge_entries(visibility, tenant_ref, account_ref);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_effective_period ON canonical_rf_knowledge_entries(effective_from, effective_to);
