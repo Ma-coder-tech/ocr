@@ -155,9 +155,28 @@ function persistCanonicalAutonomousOutcomeCheckpoint(input: {
     const run = db.prepare(`SELECT source_fingerprint, rf_snapshot_hash, rf_context_hash,
       financial_foundation_hash, semantic_hash, canonical_state_hash, semantic_revision,
       rg_plan_hash, rg_plan_generation, rg_execution_generation, continuation_revision,
-      continuation_lifecycle, continuation_state_hash, autonomous_outcome_revision
+      continuation_lifecycle, continuation_state_hash, autonomous_outcome_revision, autonomous_outcome_hash
       FROM canonical_analysis_runs WHERE id = ?`).get(input.runId) as Record<string, unknown> | undefined;
     if (!run) throw new Error("canonical_autonomous_outcome_analysis_run_unavailable");
+    const history = readAutonomousOutcomeHistory(input.runId);
+    if (history.errors.length > 0) throw new Error("canonical_autonomous_outcome_history_invalid");
+    const historyHead = history.outcomes.at(-1) ?? null;
+    let storedRevision = Number(run.autonomous_outcome_revision ?? 0);
+    let storedHash = nullableString(run.autonomous_outcome_hash);
+    if (historyHead && storedHash !== null && storedRevision < historyHead.checkpointRevision) {
+      const pointed = history.outcomes.find((checkpoint) => checkpoint.checkpointRevision === storedRevision
+        && checkpoint.checkpointHash === storedHash);
+      if (!pointed) throw new Error("canonical_autonomous_outcome_active_pointer_invalid");
+      activateAutonomousOutcomeHead(input.runId, historyHead, storedRevision);
+      storedRevision = historyHead.checkpointRevision;
+      storedHash = historyHead.checkpointHash;
+    }
+    if (storedRevision !== (historyHead?.checkpointRevision ?? 0)) {
+      throw new Error("canonical_autonomous_outcome_lineage_head_mismatch");
+    }
+    if (storedHash !== null && storedHash !== historyHead?.checkpointHash) {
+      throw new Error("canonical_autonomous_outcome_active_pointer_not_lineage_head");
+    }
     const continuationRevision = Number(run.continuation_revision ?? 0);
     const continuationRow = continuationRevision > 0
       ? db.prepare(`SELECT state_json FROM canonical_analysis_continuation_revisions
@@ -187,7 +206,7 @@ function persistCanonicalAutonomousOutcomeCheckpoint(input: {
     const completion = input.checkpointKind === "settled"
       ? canonicalAutonomousCompletionForLifecycle(lifecycle)
       : null;
-    const payload = {
+    const logicalPayload = {
       schemaVersion: AUTONOMOUS_OUTCOME_CHECKPOINT_SCHEMA_VERSION,
       runId: input.runId,
       authority: "production_internal_canonical" as const,
@@ -226,23 +245,26 @@ function persistCanonicalAutonomousOutcomeCheckpoint(input: {
       analysisRunStatusCompatibility: "pre_adaptive_status_meaning_unchanged" as const,
       customerReportAuthority: "legacy_report_unchanged" as const,
     };
-    const outcomeHash = digestCanonical(payload);
-    const existing = db.prepare(`SELECT outcome_json FROM canonical_analysis_autonomous_outcome_revisions
-      WHERE run_id = ? AND outcome_hash = ?`).get(input.runId, outcomeHash) as { outcome_json: string } | undefined;
-    if (existing) {
-      const checkpoint = parseJson<CanonicalAutonomousOutcomeCheckpoint | null>(existing.outcome_json, null);
-      if (!checkpoint || canonicalAutonomousOutcomeCheckpointHash(checkpoint) !== outcomeHash) {
-        throw new Error("canonical_autonomous_outcome_immutable_conflict");
-      }
-      db.prepare(`UPDATE canonical_analysis_runs SET autonomous_outcome_revision = ?, autonomous_outcome_hash = ?,
-        updated_at = ? WHERE id = ?`).run(checkpoint.checkpointRevision, checkpoint.checkpointHash, nowIso(), input.runId);
-      return checkpoint;
+    if (historyHead && canonicalAutonomousOutcomeLogicalHash(historyHead) === digestCanonical(logicalPayload)) {
+      if (storedHash === null) activateAutonomousOutcomeHead(input.runId, historyHead, storedRevision);
+      return historyHead;
     }
-    const maximum = db.prepare(`SELECT COALESCE(MAX(outcome_revision), 0) AS revision
-      FROM canonical_analysis_autonomous_outcome_revisions WHERE run_id = ?`).get(input.runId) as { revision: number };
+    if (historyHead && input.checkpointKind === "execution_interrupted" && historyHead.checkpointKind === "settled"
+      && logicalPayload.financialFoundationIntegrity.preserved
+      && digestCanonical(historyHead.binding) === digestCanonical(logicalPayload.binding)) {
+      return historyHead;
+    }
+    const payload = {
+      ...logicalPayload,
+      parentCheckpoint: historyHead ? {
+        checkpointRevision: historyHead.checkpointRevision,
+        checkpointHash: historyHead.checkpointHash,
+      } : null,
+    };
+    const outcomeHash = digestCanonical(payload);
     const checkpoint: CanonicalAutonomousOutcomeCheckpoint = {
       ...payload,
-      checkpointRevision: Number(maximum.revision) + 1,
+      checkpointRevision: (historyHead?.checkpointRevision ?? 0) + 1,
       checkpointHash: outcomeHash,
       createdAt: nowIso(),
     };
@@ -250,11 +272,7 @@ function persistCanonicalAutonomousOutcomeCheckpoint(input: {
       (run_id, outcome_revision, checkpoint_kind, lifecycle, completion, outcome_hash, outcome_json, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(input.runId, checkpoint.checkpointRevision, checkpoint.checkpointKind,
       checkpoint.lifecycle, checkpoint.completion, checkpoint.checkpointHash, JSON.stringify(checkpoint), checkpoint.createdAt);
-    const updated = db.prepare(`UPDATE canonical_analysis_runs SET autonomous_outcome_revision = ?,
-      autonomous_outcome_hash = ?, updated_at = ? WHERE id = ? AND autonomous_outcome_revision = ?`)
-      .run(checkpoint.checkpointRevision, checkpoint.checkpointHash, checkpoint.createdAt, input.runId,
-        Number(run.autonomous_outcome_revision ?? 0));
-    if (updated.changes !== 1) throw new Error("canonical_autonomous_outcome_concurrent_revision_conflict");
+    activateAutonomousOutcomeHead(input.runId, checkpoint, storedRevision);
     return checkpoint;
   });
   return transaction();
@@ -864,11 +882,20 @@ function mapAutonomousOutcomeRevisions(runId: string): {
   outcomes: CanonicalAutonomousOutcomeCheckpoint[];
   errors: string[];
 } {
+  return readAutonomousOutcomeHistory(runId);
+}
+
+function readAutonomousOutcomeHistory(runId: string): {
+  outcomes: CanonicalAutonomousOutcomeCheckpoint[];
+  errors: string[];
+} {
   const rows = db.prepare(`SELECT outcome_revision, outcome_hash, outcome_json
     FROM canonical_analysis_autonomous_outcome_revisions WHERE run_id = ? ORDER BY outcome_revision`)
     .all(runId) as Array<{ outcome_revision: number; outcome_hash: string; outcome_json: string }>;
   const outcomes: CanonicalAutonomousOutcomeCheckpoint[] = [];
   const errors: string[] = [];
+  let prior: CanonicalAutonomousOutcomeCheckpoint | null = null;
+  let linkedHistoryStarted = false;
   for (const row of rows) {
     const checkpoint = parseJson<CanonicalAutonomousOutcomeCheckpoint | null>(row.outcome_json, null);
     if (!checkpoint || checkpoint.runId !== runId || checkpoint.checkpointRevision !== Number(row.outcome_revision)
@@ -877,7 +904,25 @@ function mapAutonomousOutcomeRevisions(runId: string): {
       errors.push(`autonomous_outcome_persisted_hash_invalid:${row.outcome_revision}`);
       continue;
     }
+    const expectedRevision = (prior?.checkpointRevision ?? 0) + 1;
+    if (checkpoint.checkpointRevision !== expectedRevision) {
+      errors.push(`autonomous_outcome_revision_gap:${expectedRevision}:${checkpoint.checkpointRevision}`);
+    }
+    if (prior === null) {
+      if (checkpoint.parentCheckpoint !== null && checkpoint.parentCheckpoint !== undefined) {
+        errors.push(`autonomous_outcome_root_parent_invalid:${checkpoint.checkpointRevision}`);
+      }
+    } else if (checkpoint.parentCheckpoint === undefined) {
+      if (linkedHistoryStarted) errors.push(`autonomous_outcome_parent_missing:${checkpoint.checkpointRevision}`);
+    } else if (checkpoint.parentCheckpoint === null
+      || checkpoint.parentCheckpoint.checkpointRevision !== prior.checkpointRevision
+      || checkpoint.parentCheckpoint.checkpointHash !== prior.checkpointHash) {
+      errors.push(`autonomous_outcome_parent_mismatch:${checkpoint.checkpointRevision}`);
+    } else {
+      linkedHistoryStarted = true;
+    }
     outcomes.push(checkpoint);
+    prior = checkpoint;
   }
   return { outcomes, errors };
 }
@@ -901,6 +946,11 @@ function selectCurrentAutonomousOutcome(input: {
     && item.checkpointHash === input.autonomousOutcomeHash) ?? null;
   if (!outcome) {
     return { outcome: null, integrity: { status: "invalid", reasonCodes: ["autonomous_outcome_pointer_invalid"] } };
+  }
+  const historyHead = input.outcomes.at(-1)!;
+  if (outcome.checkpointRevision !== historyHead.checkpointRevision
+    || outcome.checkpointHash !== historyHead.checkpointHash) {
+    return { outcome: null, integrity: { status: "invalid", reasonCodes: ["autonomous_outcome_pointer_not_lineage_head"] } };
   }
   const latestContinuation = input.continuationRevisions.at(-1) ?? null;
   const boundContinuation = input.continuationRevisions.find((item) =>
@@ -975,6 +1025,28 @@ function selectCurrentAutonomousOutcome(input: {
 function canonicalAutonomousOutcomeCheckpointHash(checkpoint: CanonicalAutonomousOutcomeCheckpoint): string {
   const { checkpointRevision: _revision, checkpointHash: _hash, createdAt: _createdAt, ...payload } = checkpoint;
   return digestCanonical(payload);
+}
+
+function canonicalAutonomousOutcomeLogicalHash(checkpoint: CanonicalAutonomousOutcomeCheckpoint): string {
+  const {
+    checkpointRevision: _revision,
+    checkpointHash: _hash,
+    createdAt: _createdAt,
+    parentCheckpoint: _parent,
+    ...payload
+  } = checkpoint;
+  return digestCanonical(payload);
+}
+
+function activateAutonomousOutcomeHead(
+  runId: string,
+  checkpoint: CanonicalAutonomousOutcomeCheckpoint,
+  expectedPriorRevision: number,
+): void {
+  const updated = db.prepare(`UPDATE canonical_analysis_runs SET autonomous_outcome_revision = ?,
+    autonomous_outcome_hash = ?, updated_at = ? WHERE id = ? AND autonomous_outcome_revision = ?`)
+    .run(checkpoint.checkpointRevision, checkpoint.checkpointHash, nowIso(), runId, expectedPriorRevision);
+  if (updated.changes !== 1) throw new Error("canonical_autonomous_outcome_concurrent_revision_conflict");
 }
 
 function assertContinuationCurrentForOutcome(

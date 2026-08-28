@@ -144,6 +144,71 @@ describe("durable AnalysisRun autonomous-outcome checkpoint", () => {
     expect(outcomeCount(setup.db.db, setup.runId)).toBe(2);
   });
 
+  it("never regresses the active pointer when an older interrupted state is replayed after settlement", async () => {
+    const setup = await syntheticRun("continuation_judgment_unresolved");
+    const interrupted = setup.store.persistInterruptedCanonicalAutonomousOutcomeCheckpoint({
+      runId: setup.runId, financialFoundationHashAtCycleStart: "financial-1",
+    });
+    const settled = setup.store.persistSettledCanonicalAutonomousOutcomeCheckpoint({
+      runId: setup.runId, financialFoundationHashAtCycleStart: "financial-1",
+    });
+    const replayedInterruption = setup.store.persistInterruptedCanonicalAutonomousOutcomeCheckpoint({
+      runId: setup.runId, financialFoundationHashAtCycleStart: "financial-1",
+    });
+    let persisted = setup.store.getPersistedAnalysisRun(setup.runId)!;
+
+    expect(interrupted).toMatchObject({ checkpointRevision: 1, checkpointKind: "execution_interrupted" });
+    expect(settled).toMatchObject({
+      checkpointRevision: 2,
+      checkpointKind: "settled",
+      parentCheckpoint: { checkpointRevision: 1, checkpointHash: interrupted.checkpointHash },
+    });
+    expect(replayedInterruption).toEqual(settled);
+    expect(persisted.autonomousOutcomeRevision).toBe(2);
+    expect(persisted.autonomousOutcomeHash).toBe(settled.checkpointHash);
+    expect(persisted.autonomousOutcome).toEqual(settled);
+    expect(persisted.autonomousOutcomeIntegrity).toEqual({ status: "current", reasonCodes: [] });
+    expect(outcomeCount(setup.db.db, setup.runId)).toBe(2);
+
+    setup.db.db.prepare(`UPDATE canonical_analysis_runs SET autonomous_outcome_revision = 1,
+      autonomous_outcome_hash = ? WHERE id = ?`).run(interrupted.checkpointHash, setup.runId);
+    expect(setup.store.getPersistedAnalysisRun(setup.runId)!.autonomousOutcomeIntegrity).toEqual({
+      status: "invalid", reasonCodes: ["autonomous_outcome_pointer_not_lineage_head"],
+    });
+    const healedReplay = setup.store.persistInterruptedCanonicalAutonomousOutcomeCheckpoint({
+      runId: setup.runId, financialFoundationHashAtCycleStart: "financial-1",
+    });
+    persisted = setup.store.getPersistedAnalysisRun(setup.runId)!;
+    expect(healedReplay).toEqual(settled);
+    expect(persisted.autonomousOutcomeRevision).toBe(2);
+    expect(persisted.autonomousOutcomeHash).toBe(settled.checkpointHash);
+    expect(persisted.autonomousOutcomeIntegrity).toEqual({ status: "current", reasonCodes: [] });
+  });
+
+  it("detects deletion of an older non-current checkpoint and refuses to extend truncated lineage", async () => {
+    const setup = await syntheticRun("continuation_judgment_unresolved");
+    setup.store.persistInterruptedCanonicalAutonomousOutcomeCheckpoint({
+      runId: setup.runId, financialFoundationHashAtCycleStart: "financial-1",
+    });
+    setup.store.persistSettledCanonicalAutonomousOutcomeCheckpoint({
+      runId: setup.runId, financialFoundationHashAtCycleStart: "financial-1",
+    });
+
+    setup.db.db.prepare(`DELETE FROM canonical_analysis_autonomous_outcome_revisions
+      WHERE run_id = ? AND outcome_revision = 1`).run(setup.runId);
+    const truncated = setup.store.getPersistedAnalysisRun(setup.runId)!;
+
+    expect(truncated.autonomousOutcome).toBeNull();
+    expect(truncated.autonomousOutcomeIntegrity).toMatchObject({ status: "invalid" });
+    expect(truncated.autonomousOutcomeIntegrity.reasonCodes).toEqual(expect.arrayContaining([
+      expect.stringMatching(/^autonomous_outcome_revision_gap:/),
+      expect.stringMatching(/^autonomous_outcome_root_parent_invalid:/),
+    ]));
+    expect(() => setup.store.persistSettledCanonicalAutonomousOutcomeCheckpoint({
+      runId: setup.runId, financialFoundationHashAtCycleStart: "financial-1",
+    })).toThrow("canonical_autonomous_outcome_history_invalid");
+  });
+
   it("truthfully records an interruption between semantic convergence and continuation readjudication", async () => {
     const setup = await syntheticRun("continuation_ready_provider_execution_authorized");
     setup.db.db.prepare(`UPDATE canonical_analysis_runs SET semantic_revision = 2, semantic_hash = 'semantic-2',

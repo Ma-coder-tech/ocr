@@ -14,6 +14,7 @@ export type CanonicalAutonomousOutcomeCheckpoint = {
   schemaVersion: typeof AUTONOMOUS_OUTCOME_CHECKPOINT_SCHEMA_VERSION;
   checkpointRevision: number;
   checkpointHash: string;
+  parentCheckpoint?: { checkpointRevision: number; checkpointHash: string } | null;
   runId: string;
   authority: "production_internal_canonical";
   checkpointKind: "settled" | "execution_interrupted";
