@@ -9,8 +9,14 @@ import type {
   CanonicalCurrentRunExternalEvidenceRegistry,
   CanonicalSemanticConvergenceRevision,
 } from "./semanticConvergenceTypes.js";
-import type { CanonicalAdaptiveContinuationState } from "./adaptiveContinuationTypes.js";
-import type { CanonicalContinuationExecutionGrant } from "./adaptiveExecutionTypes.js";
+import type { CanonicalAdaptiveContinuationState, CanonicalContinuationResourceAccounting } from "./adaptiveContinuationTypes.js";
+import {
+  AUTONOMOUS_OUTCOME_CHECKPOINT_SCHEMA_VERSION,
+  canonicalAutonomousCompletionForLifecycle,
+  type CanonicalAutonomousOutcomeCheckpoint,
+  type CanonicalAutonomousOutcomeIntegrity,
+  type CanonicalContinuationExecutionGrant,
+} from "./adaptiveExecutionTypes.js";
 import { canonicalRfExecutionContextHash } from "./rfClaimResolution.js";
 import {
   governedRfKnowledgeInput,
@@ -80,6 +86,11 @@ export type PersistedAnalysisRunRecord = {
   continuationRevision: number;
   continuationLifecycle: CanonicalAnalysisRun["autonomousLifecycle"]["state"];
   continuationStateHash: string | null;
+  autonomousOutcomeRevision: number;
+  autonomousOutcomeHash: string | null;
+  autonomousOutcome: CanonicalAutonomousOutcomeCheckpoint | null;
+  autonomousOutcomeIntegrity: CanonicalAutonomousOutcomeIntegrity;
+  autonomousOutcomeRevisions: CanonicalAutonomousOutcomeCheckpoint[];
   rfSnapshotHash: string;
   rfContextHash: string;
   rfCatalogStatus: "available" | "unavailable" | "unbound";
@@ -119,6 +130,134 @@ export function getPersistedAnalysisRunForJob(jobId: string): PersistedAnalysisR
 export function getPersistedAnalysisRun(runId: string): PersistedAnalysisRunRecord | undefined {
   const row = db.prepare(`SELECT * FROM canonical_analysis_runs WHERE id = ?`).get(runId) as Record<string, unknown> | undefined;
   return row ? mapRun(row) : undefined;
+}
+
+export function persistSettledCanonicalAutonomousOutcomeCheckpoint(input: {
+  runId: string;
+  financialFoundationHashAtCycleStart: string | null;
+}): CanonicalAutonomousOutcomeCheckpoint {
+  return persistCanonicalAutonomousOutcomeCheckpoint({ ...input, checkpointKind: "settled" });
+}
+
+export function persistInterruptedCanonicalAutonomousOutcomeCheckpoint(input: {
+  runId: string;
+  financialFoundationHashAtCycleStart: string | null;
+}): CanonicalAutonomousOutcomeCheckpoint {
+  return persistCanonicalAutonomousOutcomeCheckpoint({ ...input, checkpointKind: "execution_interrupted" });
+}
+
+function persistCanonicalAutonomousOutcomeCheckpoint(input: {
+  runId: string;
+  financialFoundationHashAtCycleStart: string | null;
+  checkpointKind: CanonicalAutonomousOutcomeCheckpoint["checkpointKind"];
+}): CanonicalAutonomousOutcomeCheckpoint {
+  const transaction = db.transaction(() => {
+    const run = db.prepare(`SELECT source_fingerprint, rf_snapshot_hash, rf_context_hash,
+      financial_foundation_hash, semantic_hash, canonical_state_hash, semantic_revision,
+      rg_plan_hash, rg_plan_generation, rg_execution_generation, continuation_revision,
+      continuation_lifecycle, continuation_state_hash, autonomous_outcome_revision
+      FROM canonical_analysis_runs WHERE id = ?`).get(input.runId) as Record<string, unknown> | undefined;
+    if (!run) throw new Error("canonical_autonomous_outcome_analysis_run_unavailable");
+    const continuationRevision = Number(run.continuation_revision ?? 0);
+    const continuationRow = continuationRevision > 0
+      ? db.prepare(`SELECT state_json FROM canonical_analysis_continuation_revisions
+          WHERE run_id = ? AND controller_revision = ?`).get(input.runId, continuationRevision) as { state_json: string } | undefined
+      : undefined;
+    const continuation = continuationRow
+      ? parseJson<CanonicalAdaptiveContinuationState | null>(continuationRow.state_json, null)
+      : null;
+    const lifecycle = String(run.continuation_lifecycle ?? "awaiting_first_pass_outcome") as
+      CanonicalAnalysisRun["autonomousLifecycle"]["state"];
+    if (input.checkpointKind === "settled") {
+      if (!continuation || continuation.lifecycle !== lifecycle
+        || continuation.stateHash !== nullableString(run.continuation_state_hash)
+        || continuation.controllerRevision !== continuationRevision) {
+        throw new Error("canonical_autonomous_outcome_continuation_binding_invalid");
+      }
+      assertContinuationCurrentForOutcome(run, continuation);
+      assertContinuationSettledForOutcome(continuation);
+    }
+    const rh = db.prepare(`SELECT artifact_hash FROM canonical_analysis_run_stages WHERE run_id = ? AND stage = 'rh'`)
+      .get(input.runId) as { artifact_hash: string | null } | undefined;
+    const financialFoundationAtCheckpoint = nullableString(run.financial_foundation_hash);
+    const financialFoundationPreserved = input.financialFoundationHashAtCycleStart === financialFoundationAtCheckpoint;
+    if (input.checkpointKind === "settled" && !financialFoundationPreserved) {
+      throw new Error("canonical_autonomous_outcome_financial_foundation_mutation");
+    }
+    const completion = input.checkpointKind === "settled"
+      ? canonicalAutonomousCompletionForLifecycle(lifecycle)
+      : null;
+    const payload = {
+      schemaVersion: AUTONOMOUS_OUTCOME_CHECKPOINT_SCHEMA_VERSION,
+      runId: input.runId,
+      authority: "production_internal_canonical" as const,
+      checkpointKind: input.checkpointKind,
+      lifecycle,
+      completion,
+      binding: {
+        sourceFingerprint: String(run.source_fingerprint),
+        rfSnapshotHash: String(run.rf_snapshot_hash ?? ""),
+        rfContextHash: String(run.rf_context_hash ?? ""),
+        financialFoundationHash: financialFoundationAtCheckpoint,
+        semanticHash: nullableString(run.semantic_hash),
+        canonicalStateHash: nullableString(run.canonical_state_hash),
+        semanticRevision: Number(run.semantic_revision ?? 0),
+        planHash: nullableString(run.rg_plan_hash),
+        planGeneration: Number(run.rg_plan_generation ?? 0),
+        executionGeneration: Number(run.rg_execution_generation ?? 0),
+        continuationRevision,
+        continuationStateHash: nullableString(run.continuation_state_hash),
+        rhArtifactHash: rh?.artifact_hash ?? null,
+      },
+      continuationReasonCodes: continuation ? [...continuation.reasonCodes] : [],
+      cumulativeResource: continuation ? { ...continuation.cumulativeResource } : emptyContinuationResource(),
+      continuationBindingStatus: continuation
+        ? continuationCurrentForOutcome(run, continuation) ? "current" as const : "stale_at_interruption" as const
+        : "unavailable_at_interruption" as const,
+      interruption: input.checkpointKind === "execution_interrupted" ? {
+        phase: "adaptive_execution" as const,
+        reasonCode: "adaptive_execution_interrupted_before_outcome_settlement" as const,
+      } : null,
+      financialFoundationIntegrity: {
+        cycleStartHash: input.financialFoundationHashAtCycleStart,
+        cycleEndHash: financialFoundationAtCheckpoint,
+        preserved: financialFoundationPreserved,
+      },
+      analysisRunStatusCompatibility: "pre_adaptive_status_meaning_unchanged" as const,
+      customerReportAuthority: "legacy_report_unchanged" as const,
+    };
+    const outcomeHash = digestCanonical(payload);
+    const existing = db.prepare(`SELECT outcome_json FROM canonical_analysis_autonomous_outcome_revisions
+      WHERE run_id = ? AND outcome_hash = ?`).get(input.runId, outcomeHash) as { outcome_json: string } | undefined;
+    if (existing) {
+      const checkpoint = parseJson<CanonicalAutonomousOutcomeCheckpoint | null>(existing.outcome_json, null);
+      if (!checkpoint || canonicalAutonomousOutcomeCheckpointHash(checkpoint) !== outcomeHash) {
+        throw new Error("canonical_autonomous_outcome_immutable_conflict");
+      }
+      db.prepare(`UPDATE canonical_analysis_runs SET autonomous_outcome_revision = ?, autonomous_outcome_hash = ?,
+        updated_at = ? WHERE id = ?`).run(checkpoint.checkpointRevision, checkpoint.checkpointHash, nowIso(), input.runId);
+      return checkpoint;
+    }
+    const maximum = db.prepare(`SELECT COALESCE(MAX(outcome_revision), 0) AS revision
+      FROM canonical_analysis_autonomous_outcome_revisions WHERE run_id = ?`).get(input.runId) as { revision: number };
+    const checkpoint: CanonicalAutonomousOutcomeCheckpoint = {
+      ...payload,
+      checkpointRevision: Number(maximum.revision) + 1,
+      checkpointHash: outcomeHash,
+      createdAt: nowIso(),
+    };
+    db.prepare(`INSERT INTO canonical_analysis_autonomous_outcome_revisions
+      (run_id, outcome_revision, checkpoint_kind, lifecycle, completion, outcome_hash, outcome_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(input.runId, checkpoint.checkpointRevision, checkpoint.checkpointKind,
+      checkpoint.lifecycle, checkpoint.completion, checkpoint.checkpointHash, JSON.stringify(checkpoint), checkpoint.createdAt);
+    const updated = db.prepare(`UPDATE canonical_analysis_runs SET autonomous_outcome_revision = ?,
+      autonomous_outcome_hash = ?, updated_at = ? WHERE id = ? AND autonomous_outcome_revision = ?`)
+      .run(checkpoint.checkpointRevision, checkpoint.checkpointHash, checkpoint.createdAt, input.runId,
+        Number(run.autonomous_outcome_revision ?? 0));
+    if (updated.changes !== 1) throw new Error("canonical_autonomous_outcome_concurrent_revision_conflict");
+    return checkpoint;
+  });
+  return transaction();
 }
 
 export function executeDurableCanonicalAnalysisRun(input: {
@@ -237,6 +376,7 @@ function beginRun(input: {
         continuation_revision = 0,
         continuation_lifecycle = 'awaiting_first_pass_outcome',
         continuation_state_hash = NULL,
+        autonomous_outcome_hash = NULL,
         rf_snapshot_hash = excluded.rf_snapshot_hash,
         rf_context_hash = excluded.rf_context_hash,
         rf_catalog_status = excluded.rf_catalog_status,
@@ -483,6 +623,7 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
   const semanticRevisions = mapSemanticRevisions(runId);
   const continuationRevisions = mapContinuationRevisions(runId);
   const continuationExecutionGrants = mapContinuationExecutionGrants(runId);
+  const autonomousOutcomes = mapAutonomousOutcomeRevisions(runId);
   const stagedPlanHash = artifacts.rgWorkLedger?.planHash ?? null;
   const inferredPlanGeneration = inferRgPlanGeneration(runId);
   if ((!row.rg_plan_hash && stagedPlanHash) || Number(row.rg_plan_generation ?? 0) < inferredPlanGeneration) {
@@ -493,6 +634,17 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
     row.rg_plan_hash = repairedPlanHash;
     row.rg_plan_generation = repairedPlanGeneration;
   }
+  const autonomousOutcomeRevision = Number(row.autonomous_outcome_revision ?? 0);
+  const autonomousOutcomeHash = nullableString(row.autonomous_outcome_hash);
+  const autonomousOutcomeSelection = selectCurrentAutonomousOutcome({
+    row,
+    stages,
+    continuationRevisions,
+    outcomes: autonomousOutcomes.outcomes,
+    outcomeErrors: autonomousOutcomes.errors,
+    autonomousOutcomeRevision,
+    autonomousOutcomeHash,
+  });
   const result = summary ? ({ ...summary, artifacts } as unknown as CanonicalAnalysisRun) : null;
   return {
     id: runId,
@@ -517,6 +669,11 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
     continuationRevision: Number(row.continuation_revision ?? 0),
     continuationLifecycle: String(row.continuation_lifecycle ?? "awaiting_first_pass_outcome") as PersistedAnalysisRunRecord["continuationLifecycle"],
     continuationStateHash: row.continuation_state_hash ? String(row.continuation_state_hash) : null,
+    autonomousOutcomeRevision,
+    autonomousOutcomeHash,
+    autonomousOutcome: autonomousOutcomeSelection.outcome,
+    autonomousOutcomeIntegrity: autonomousOutcomeSelection.integrity,
+    autonomousOutcomeRevisions: autonomousOutcomes.outcomes,
     rfSnapshotHash: String(row.rf_snapshot_hash ?? ""),
     rfContextHash: String(row.rf_context_hash ?? ""),
     rfCatalogStatus: String(row.rf_catalog_status ?? "unbound") as PersistedAnalysisRunRecord["rfCatalogStatus"],
@@ -701,6 +858,190 @@ function mapContinuationExecutionGrants(runId: string): CanonicalContinuationExe
   const rows = db.prepare(`SELECT grant_json FROM canonical_analysis_continuation_execution_grants
     WHERE run_id = ? ORDER BY execution_generation`).all(runId) as Array<{ grant_json: string }>;
   return rows.map((row) => parseJson(row.grant_json, null as never));
+}
+
+function mapAutonomousOutcomeRevisions(runId: string): {
+  outcomes: CanonicalAutonomousOutcomeCheckpoint[];
+  errors: string[];
+} {
+  const rows = db.prepare(`SELECT outcome_revision, outcome_hash, outcome_json
+    FROM canonical_analysis_autonomous_outcome_revisions WHERE run_id = ? ORDER BY outcome_revision`)
+    .all(runId) as Array<{ outcome_revision: number; outcome_hash: string; outcome_json: string }>;
+  const outcomes: CanonicalAutonomousOutcomeCheckpoint[] = [];
+  const errors: string[] = [];
+  for (const row of rows) {
+    const checkpoint = parseJson<CanonicalAutonomousOutcomeCheckpoint | null>(row.outcome_json, null);
+    if (!checkpoint || checkpoint.runId !== runId || checkpoint.checkpointRevision !== Number(row.outcome_revision)
+      || checkpoint.checkpointHash !== row.outcome_hash
+      || canonicalAutonomousOutcomeCheckpointHash(checkpoint) !== row.outcome_hash) {
+      errors.push(`autonomous_outcome_persisted_hash_invalid:${row.outcome_revision}`);
+      continue;
+    }
+    outcomes.push(checkpoint);
+  }
+  return { outcomes, errors };
+}
+
+function selectCurrentAutonomousOutcome(input: {
+  row: Record<string, unknown>;
+  stages: PersistedAnalysisRunStage[];
+  continuationRevisions: CanonicalAdaptiveContinuationState[];
+  outcomes: CanonicalAutonomousOutcomeCheckpoint[];
+  outcomeErrors: string[];
+  autonomousOutcomeRevision: number;
+  autonomousOutcomeHash: string | null;
+}): { outcome: CanonicalAutonomousOutcomeCheckpoint | null; integrity: CanonicalAutonomousOutcomeIntegrity } {
+  if (input.outcomeErrors.length > 0) {
+    return { outcome: null, integrity: { status: "invalid", reasonCodes: [...input.outcomeErrors] } };
+  }
+  if (!input.autonomousOutcomeHash || input.autonomousOutcomeRevision === 0) {
+    return { outcome: null, integrity: { status: "not_checkpointed", reasonCodes: ["autonomous_outcome_not_checkpointed"] } };
+  }
+  const outcome = input.outcomes.find((item) => item.checkpointRevision === input.autonomousOutcomeRevision
+    && item.checkpointHash === input.autonomousOutcomeHash) ?? null;
+  if (!outcome) {
+    return { outcome: null, integrity: { status: "invalid", reasonCodes: ["autonomous_outcome_pointer_invalid"] } };
+  }
+  const latestContinuation = input.continuationRevisions.at(-1) ?? null;
+  const boundContinuation = input.continuationRevisions.find((item) =>
+    item.controllerRevision === outcome.binding.continuationRevision
+    && item.stateHash === outcome.binding.continuationStateHash) ?? null;
+  const rhArtifactHash = input.stages.find((stage) => stage.stage === "rh")?.artifactHash ?? null;
+  const expected = {
+    sourceFingerprint: String(input.row.source_fingerprint),
+    rfSnapshotHash: String(input.row.rf_snapshot_hash ?? ""),
+    rfContextHash: String(input.row.rf_context_hash ?? ""),
+    financialFoundationHash: nullableString(input.row.financial_foundation_hash),
+    semanticHash: nullableString(input.row.semantic_hash),
+    canonicalStateHash: nullableString(input.row.canonical_state_hash),
+    semanticRevision: Number(input.row.semantic_revision ?? 0),
+    planHash: nullableString(input.row.rg_plan_hash),
+    planGeneration: Number(input.row.rg_plan_generation ?? 0),
+    executionGeneration: Number(input.row.rg_execution_generation ?? 0),
+    continuationRevision: Number(input.row.continuation_revision ?? 0),
+    continuationStateHash: nullableString(input.row.continuation_state_hash),
+    rhArtifactHash,
+  };
+  const staleReasons: string[] = [];
+  for (const key of Object.keys(expected) as Array<keyof typeof expected>) {
+    if (outcome.binding[key] !== expected[key]) staleReasons.push(`autonomous_outcome_stale_binding:${key}`);
+  }
+  if (latestContinuation && (latestContinuation.controllerRevision !== expected.continuationRevision
+    || latestContinuation.stateHash !== expected.continuationStateHash)) {
+    staleReasons.push("autonomous_outcome_stale_continuation_lineage");
+  }
+  if (boundContinuation && (digestCanonical(outcome.continuationReasonCodes) !== digestCanonical(boundContinuation.reasonCodes)
+    || digestCanonical(outcome.cumulativeResource) !== digestCanonical(boundContinuation.cumulativeResource))) {
+    return { outcome: null, integrity: { status: "invalid", reasonCodes: ["autonomous_outcome_continuation_projection_invalid"] } };
+  }
+  const expectedContinuationBindingStatus = boundContinuation
+    ? continuationMatchesOutcomeBinding(outcome, boundContinuation) ? "current" : "stale_at_interruption"
+    : "unavailable_at_interruption";
+  if (outcome.continuationBindingStatus !== expectedContinuationBindingStatus
+    || (outcome.checkpointKind === "settled" && outcome.continuationBindingStatus !== "current")) {
+    return { outcome: null, integrity: { status: "invalid", reasonCodes: ["autonomous_outcome_continuation_binding_status_invalid"] } };
+  }
+  if (outcome.lifecycle !== String(input.row.continuation_lifecycle ?? "awaiting_first_pass_outcome")) {
+    staleReasons.push("autonomous_outcome_stale_lifecycle");
+  }
+  if (outcome.checkpointKind === "settled"
+    && outcome.completion !== canonicalAutonomousCompletionForLifecycle(outcome.lifecycle)) {
+    return { outcome: null, integrity: { status: "invalid", reasonCodes: ["autonomous_outcome_completion_mapping_invalid"] } };
+  }
+  if (outcome.checkpointKind === "settled" && boundContinuation
+    && !continuationIsSettledForOutcome(boundContinuation)) {
+    return { outcome: null, integrity: { status: "invalid", reasonCodes: ["autonomous_outcome_lifecycle_not_settled"] } };
+  }
+  if (outcome.checkpointKind === "execution_interrupted" && outcome.completion !== null) {
+    return { outcome: null, integrity: { status: "invalid", reasonCodes: ["autonomous_outcome_interruption_claims_completion"] } };
+  }
+  const foundationPreserved = outcome.financialFoundationIntegrity.cycleStartHash
+    === outcome.financialFoundationIntegrity.cycleEndHash;
+  if (outcome.financialFoundationIntegrity.preserved !== foundationPreserved
+    || outcome.financialFoundationIntegrity.cycleEndHash !== outcome.binding.financialFoundationHash
+    || (outcome.checkpointKind === "settled" && !foundationPreserved)) {
+    return { outcome: null, integrity: { status: "invalid", reasonCodes: ["autonomous_outcome_financial_foundation_integrity_invalid"] } };
+  }
+  if (outcome.authority !== "production_internal_canonical"
+    || outcome.customerReportAuthority !== "legacy_report_unchanged"
+    || outcome.analysisRunStatusCompatibility !== "pre_adaptive_status_meaning_unchanged") {
+    return { outcome: null, integrity: { status: "invalid", reasonCodes: ["autonomous_outcome_authority_boundary_invalid"] } };
+  }
+  return staleReasons.length > 0
+    ? { outcome, integrity: { status: "stale", reasonCodes: staleReasons } }
+    : { outcome, integrity: { status: "current", reasonCodes: [] } };
+}
+
+function canonicalAutonomousOutcomeCheckpointHash(checkpoint: CanonicalAutonomousOutcomeCheckpoint): string {
+  const { checkpointRevision: _revision, checkpointHash: _hash, createdAt: _createdAt, ...payload } = checkpoint;
+  return digestCanonical(payload);
+}
+
+function assertContinuationCurrentForOutcome(
+  run: Record<string, unknown>,
+  continuation: CanonicalAdaptiveContinuationState,
+): void {
+  if (!continuationCurrentForOutcome(run, continuation)) {
+    throw new Error("canonical_autonomous_outcome_stale_continuation_binding");
+  }
+}
+
+function continuationCurrentForOutcome(
+  run: Record<string, unknown>,
+  continuation: CanonicalAdaptiveContinuationState,
+): boolean {
+  return continuation.binding.semanticRevision === Number(run.semantic_revision ?? 0)
+    && continuation.binding.semanticHash === nullableString(run.semantic_hash)
+    && continuation.binding.canonicalStateHash === nullableString(run.canonical_state_hash)
+    && continuation.binding.planHash === nullableString(run.rg_plan_hash)
+    && continuation.binding.planGeneration === Number(run.rg_plan_generation ?? 0)
+    && continuation.binding.rfSnapshotHash === String(run.rf_snapshot_hash ?? "");
+}
+
+function continuationMatchesOutcomeBinding(
+  outcome: CanonicalAutonomousOutcomeCheckpoint,
+  continuation: CanonicalAdaptiveContinuationState,
+): boolean {
+  return continuation.binding.semanticRevision === outcome.binding.semanticRevision
+    && continuation.binding.semanticHash === outcome.binding.semanticHash
+    && continuation.binding.canonicalStateHash === outcome.binding.canonicalStateHash
+    && continuation.binding.planHash === outcome.binding.planHash
+    && continuation.binding.planGeneration === outcome.binding.planGeneration
+    && continuation.binding.rfSnapshotHash === outcome.binding.rfSnapshotHash;
+}
+
+function assertContinuationSettledForOutcome(continuation: CanonicalAdaptiveContinuationState): void {
+  if (!continuationIsSettledForOutcome(continuation)) {
+    throw new Error("canonical_autonomous_outcome_lifecycle_not_settled");
+  }
+}
+
+function continuationIsSettledForOutcome(continuation: CanonicalAdaptiveContinuationState): boolean {
+  if (continuation.lifecycle === "indeterminate_reconciliation_required") return true;
+  if (continuation.lifecycle === "awaiting_first_pass_outcome" || continuation.lifecycle === "convergence_required") return false;
+  return continuation.continuationReadyAtomicClaimIds.length === 0;
+}
+
+function emptyContinuationResource(): CanonicalContinuationResourceAccounting {
+  return {
+    providerCalls: 0,
+    searchCalls: 0,
+    aiCalls: 0,
+    tokensObserved: 0,
+    tokenAccountingComplete: true,
+    retrievalBytes: 0,
+    retrievalDocuments: 0,
+    retries: 0,
+    operationReservations: 0,
+    workReservations: 0,
+    elapsedMsObserved: 0,
+    providerCodes: [],
+    terminalReasons: [],
+  };
+}
+
+function nullableString(value: unknown): string | null {
+  return value === null || value === undefined || value === "" ? null : String(value);
 }
 
 function emptyResource(elapsedMs: number | null): PersistedAnalysisRunStage["resource"] {

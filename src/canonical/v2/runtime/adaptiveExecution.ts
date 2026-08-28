@@ -6,13 +6,18 @@ import { adjudicateDurableCanonicalContinuation } from "./adaptiveContinuation.j
 import type { CanonicalClaimContinuationDecision } from "./adaptiveContinuationTypes.js";
 import {
   ADAPTIVE_EXECUTION_SCHEMA_VERSION,
+  canonicalAutonomousCompletionForLifecycle,
   type CanonicalAdaptiveExecutionResult,
   type CanonicalAdaptiveOperationalPolicy,
   type CanonicalContinuationExecutionGrant,
 } from "./adaptiveExecutionTypes.js";
 import { executeDurableCanonicalRgEvidence, type CanonicalRgEvidenceExecutionPorts } from "./rgEvidenceExecution.js";
 import { canonicalRgWorkContractFingerprint, type CanonicalRgWorkItem } from "./rgWorkLedger.js";
-import { getPersistedAnalysisRun } from "./analysisRunStore.js";
+import {
+  getPersistedAnalysisRun,
+  persistInterruptedCanonicalAutonomousOutcomeCheckpoint,
+  persistSettledCanonicalAutonomousOutcomeCheckpoint,
+} from "./analysisRunStore.js";
 import { convergeDurableCanonicalAnalysisRun } from "./semanticConvergence.js";
 
 const CYCLE_LEASE_MS = 10 * 60_000;
@@ -103,6 +108,10 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
     if (after.financialFoundationHash !== financialFoundationHashBefore) {
       throw new Error("adaptive_execution_financial_foundation_mutation");
     }
+    const outcomeCheckpoint = persistSettledCanonicalAutonomousOutcomeCheckpoint({
+      runId: input.runId,
+      financialFoundationHashAtCycleStart: financialFoundationHashBefore,
+    });
     return {
       schemaVersion: ADAPTIVE_EXECUTION_SCHEMA_VERSION,
       runId: input.runId,
@@ -116,8 +125,20 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
       financialFoundationHashAfter: after.financialFoundationHash,
       financialFoundationPreserved: true,
       customerReportAuthority: "legacy_report_unchanged",
-      completion: completionFor(finalState.lifecycle),
+      completion: canonicalAutonomousCompletionForLifecycle(finalState.lifecycle),
+      outcomeCheckpointRevision: outcomeCheckpoint.checkpointRevision,
+      outcomeCheckpointHash: outcomeCheckpoint.checkpointHash,
     };
+  } catch (error) {
+    try {
+      persistInterruptedCanonicalAutonomousOutcomeCheckpoint({
+        runId: input.runId,
+        financialFoundationHashAtCycleStart: financialFoundationHashBefore,
+      });
+    } catch {
+      // Preserve the original adaptive failure; a missing checkpoint remains fail-closed on read.
+    }
+    throw error;
   } finally {
     clearInterval(heartbeat);
     releaseCycleLease(input.runId, workerId);
@@ -312,14 +333,6 @@ function assertHeartbeatHealthy(failure: Error | null): void {
 function positiveOperationalInteger(name: string, fallback: number): number {
   const parsed = Number(process.env[name]);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function completionFor(lifecycle: CanonicalAdaptiveExecutionResult["lifecycle"]): CanonicalAdaptiveExecutionResult["completion"] {
-  if (lifecycle === "trustworthy_completion_no_further_material_work"
-    || lifecycle === "trustworthy_completion_with_safely_unresolved") return "trustworthy_complete";
-  if (lifecycle === "indeterminate_reconciliation_required") return "reconciliation_required";
-  if (lifecycle === "operational_degradation_blocks_judgment") return "stopped_operationally";
-  return "stopped_unresolved";
 }
 
 function appendExecutionEvent(runId: string, workItemId: string, eventType: string, event: unknown): void {

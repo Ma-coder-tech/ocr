@@ -79,6 +79,28 @@ describe("production worker canonical AnalysisRun integration", () => {
       providerExecution: "continuation_authorized_existing_executor",
       secondPassProviderCalls: 0,
     });
+    expect(canonical?.autonomousOutcomeIntegrity).toEqual({ status: "current", reasonCodes: [] });
+    expect(canonical?.autonomousOutcome).toMatchObject({
+      checkpointKind: "settled",
+      lifecycle: "operational_degradation_blocks_judgment",
+      completion: "stopped_operationally",
+      authority: "production_internal_canonical",
+      customerReportAuthority: "legacy_report_unchanged",
+      analysisRunStatusCompatibility: "pre_adaptive_status_meaning_unchanged",
+    });
+    expect(canonical?.autonomousOutcome?.binding).toMatchObject({
+      sourceFingerprint: canonical?.sourceFingerprint,
+      financialFoundationHash: canonical?.financialFoundationHash,
+      semanticHash: canonical?.semanticHash,
+      canonicalStateHash: canonical?.canonicalStateHash,
+      semanticRevision: canonical?.semanticRevision,
+      planHash: canonical?.rgPlanHash,
+      planGeneration: canonical?.rgPlanGeneration,
+      executionGeneration: canonical?.rgExecutionGeneration,
+      continuationRevision: canonical?.continuationRevision,
+      continuationStateHash: canonical?.continuationStateHash,
+      rhArtifactHash: canonical?.stages.find((stage) => stage.stage === "rh")?.artifactHash,
+    });
     const degradedDecisions = canonical?.continuationRevisions[0]?.decisions.filter((item) =>
       item.disposition === "operationally_degraded_retry_eligible") ?? [];
     expect(degradedDecisions).toHaveLength(canonical?.rgWorkItems.length ?? 0);

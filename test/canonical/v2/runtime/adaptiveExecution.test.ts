@@ -65,6 +65,17 @@ describe("durable continuation-authorized adaptive execution", () => {
     expect(result).toMatchObject({ lifecycle: "continuation_judgment_unresolved",
       completion: "stopped_unresolved", financialFoundationPreserved: true,
       customerReportAuthority: "legacy_report_unchanged" });
+    expect(result).toMatchObject({
+      outcomeCheckpointRevision: persisted.autonomousOutcomeRevision,
+      outcomeCheckpointHash: persisted.autonomousOutcomeHash,
+    });
+    expect(persisted.autonomousOutcomeIntegrity).toEqual({ status: "current", reasonCodes: [] });
+    expect(persisted.autonomousOutcome).toMatchObject({
+      checkpointKind: "settled",
+      lifecycle: result.lifecycle,
+      completion: result.completion,
+      binding: { semanticRevision: persisted.semanticRevision, executionGeneration: persisted.rgExecutionGeneration },
+    });
     expect(result.executedGrantIds).toEqual(expect.arrayContaining([periodGrant!.grantId, scopeGrant!.grantId]));
     const operationGrantIds = new Set([
       ...persisted.rgOperations.map((item) => item.executionGrantId),
@@ -102,6 +113,7 @@ describe("durable continuation-authorized adaptive execution", () => {
     expect(result).toMatchObject({ executionGeneration: 1, completion: "stopped_unresolved" });
     expect(calls).toEqual(["continuation-search"]);
     expect(setup.store.getPersistedAnalysisRun(setup.run.runId)!.continuationExecutionGrants).toHaveLength(1);
+    expect(setup.store.getPersistedAnalysisRun(setup.run.runId)!.autonomousOutcomeRevisions).toHaveLength(1);
   }, 30_000);
 
   it("treats cumulative operational exhaustion as degradation without a provider send or analytical completion", async () => {
@@ -122,6 +134,30 @@ describe("durable continuation-authorized adaptive execution", () => {
       degradation: { subtype: "resource_or_runtime_exhaustion", continuationPermission: "withheld_operationally" },
     });
     expect(persisted.continuationRevisions.at(-1)!.decisions[0]!.disposition).not.toBe("safely_unresolved");
+  }, 30_000);
+
+  it("durably records an unexpected adaptive interruption without asserting completion", async () => {
+    const setup = await setupReadyRefinement();
+    const calls: string[] = [];
+    const ports = unresolvedPorts(calls, async () => {
+      setup.db.db.prepare(`UPDATE canonical_analysis_runs SET financial_foundation_hash = 'mutated-foundation'
+        WHERE id = ?`).run(setup.run.runId);
+    });
+
+    await expect(setup.adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId, ports,
+      workerId: "integrity-failure-worker", operationalPolicy: operationalPolicy(1_000) }))
+      .rejects.toThrow("adaptive_execution_financial_foundation_mutation");
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+    expect(calls).toEqual(["continuation-search"]);
+    expect(persisted.autonomousOutcomeIntegrity).toEqual({ status: "current", reasonCodes: [] });
+    expect(persisted.autonomousOutcome).toMatchObject({
+      checkpointKind: "execution_interrupted",
+      completion: null,
+      interruption: { reasonCode: "adaptive_execution_interrupted_before_outcome_settlement" },
+      financialFoundationIntegrity: { preserved: false, cycleEndHash: "mutated-foundation" },
+      customerReportAuthority: "legacy_report_unchanged",
+    });
   }, 30_000);
 
   it("reuses one durable unconsumed grant after restart and does not duplicate the provider send", async () => {
@@ -159,6 +195,8 @@ describe("durable continuation-authorized adaptive execution", () => {
     expect(persisted.continuationExecutionGrants).toHaveLength(1);
     expect(persisted.rgExecutionGeneration).toBe(1);
     expect(persisted.rgOperations.filter((item) => item.executionGrantId === grant.grantId)).toHaveLength(1);
+    expect(persisted.autonomousOutcomeIntegrity).toEqual({ status: "current", reasonCodes: [] });
+    expect(persisted.autonomousOutcome?.checkpointHash).toBe(result.outcomeCheckpointHash);
     expect(() => loadedDb.db.prepare(`UPDATE canonical_analysis_continuation_execution_grants
       SET grant_hash = 'tampered' WHERE run_id = ? AND grant_id = ?`).run(setup.run.runId, grant.grantId))
       .toThrow("canonical_continuation_execution_grant_is_immutable");

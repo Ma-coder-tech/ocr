@@ -118,6 +118,8 @@ function migrate(): void {
       continuation_revision INTEGER NOT NULL DEFAULT 0,
       continuation_lifecycle TEXT NOT NULL DEFAULT 'awaiting_first_pass_outcome',
       continuation_state_hash TEXT,
+      autonomous_outcome_revision INTEGER NOT NULL DEFAULT 0,
+      autonomous_outcome_hash TEXT,
       adaptive_cycle_owner TEXT,
       adaptive_cycle_lease_expires_at TEXT,
       rf_snapshot_hash TEXT NOT NULL DEFAULT '',
@@ -317,6 +319,19 @@ function migrate(): void {
       UNIQUE (run_id, controller_revision, decision_id),
       FOREIGN KEY (run_id, controller_revision, decision_id)
         REFERENCES canonical_analysis_continuation_decisions(run_id, controller_revision, decision_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_autonomous_outcome_revisions (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      outcome_revision INTEGER NOT NULL,
+      checkpoint_kind TEXT NOT NULL,
+      lifecycle TEXT NOT NULL,
+      completion TEXT,
+      outcome_hash TEXT NOT NULL,
+      outcome_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, outcome_revision),
+      UNIQUE (run_id, outcome_hash)
     );
 
     CREATE TABLE IF NOT EXISTS canonical_rf_knowledge_audit_events (
@@ -519,6 +534,8 @@ function migrate(): void {
     CREATE INDEX IF NOT EXISTS idx_canonical_semantic_revision_hash ON canonical_analysis_semantic_revisions(run_id, semantic_hash);
     CREATE INDEX IF NOT EXISTS idx_canonical_continuation_state ON canonical_analysis_continuation_revisions(run_id, lifecycle, controller_revision);
     CREATE INDEX IF NOT EXISTS idx_canonical_continuation_claim ON canonical_analysis_continuation_decisions(run_id, atomic_claim_id, controller_revision);
+    CREATE INDEX IF NOT EXISTS idx_canonical_autonomous_outcome
+      ON canonical_analysis_autonomous_outcome_revisions(run_id, outcome_revision, checkpoint_kind);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_claim ON canonical_rf_knowledge_entries(claim_type, subject_code, lifecycle);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_visibility ON canonical_rf_knowledge_entries(visibility, tenant_ref, account_ref);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_effective_period ON canonical_rf_knowledge_entries(effective_from, effective_to);
@@ -572,6 +589,8 @@ function migrate(): void {
   ensureColumn("canonical_analysis_runs", "continuation_revision", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("canonical_analysis_runs", "continuation_lifecycle", "TEXT NOT NULL DEFAULT 'awaiting_first_pass_outcome'");
   ensureColumn("canonical_analysis_runs", "continuation_state_hash", "TEXT");
+  ensureColumn("canonical_analysis_runs", "autonomous_outcome_revision", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("canonical_analysis_runs", "autonomous_outcome_hash", "TEXT");
   ensureColumn("canonical_analysis_runs", "adaptive_cycle_owner", "TEXT");
   ensureColumn("canonical_analysis_runs", "adaptive_cycle_lease_expires_at", "TEXT");
   ensureColumn("canonical_analysis_continuation_revisions", "plan_generation", "INTEGER NOT NULL DEFAULT 0");
@@ -613,6 +632,9 @@ function migrate(): void {
     CREATE TRIGGER IF NOT EXISTS canonical_analysis_continuation_execution_grants_no_update
       BEFORE UPDATE ON canonical_analysis_continuation_execution_grants
       BEGIN SELECT RAISE(ABORT, 'canonical_continuation_execution_grant_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_autonomous_outcome_revisions_no_update
+      BEFORE UPDATE ON canonical_analysis_autonomous_outcome_revisions
+      BEGIN SELECT RAISE(ABORT, 'canonical_autonomous_outcome_checkpoint_is_immutable'); END;
     CREATE TRIGGER IF NOT EXISTS canonical_rg_execution_events_no_update
       BEFORE UPDATE ON canonical_rg_execution_events
       BEGIN SELECT RAISE(ABORT, 'canonical_rg_execution_history_is_immutable'); END;
