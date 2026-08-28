@@ -169,6 +169,8 @@ export async function processJob(jobId: string): Promise<void> {
       ]);
       const adaptive = await executeDurableCanonicalAdaptiveLoop({ runId: canonicalRun.runId,
         ports: createProductionRgEvidencePortsFromEnvironment(canonicalRun.runId) });
+      const { enqueueCanonicalAnalysisRecovery } = await import("./canonical/v2/runtime/adaptiveRecoveryWorker.js");
+      enqueueCanonicalAnalysisRecovery(canonicalRun.runId);
       console.log(`[job:${jobId}] canonical-adaptive-analysis`, {
         runId: canonicalRun.runId,
         lifecycle: adaptive.lifecycle,

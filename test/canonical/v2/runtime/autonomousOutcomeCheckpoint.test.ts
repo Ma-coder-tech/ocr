@@ -42,6 +42,7 @@ describe("durable AnalysisRun autonomous-outcome checkpoint", () => {
       financialFoundationHashAtCycleStart: "financial-1",
     });
     const persisted = setup.store.getPersistedAnalysisRun(setup.runId)!;
+    const recovery = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryStore.js");
     const after = setup.db.db.prepare(`SELECT status, completed_at FROM canonical_analysis_runs WHERE id = ?`)
       .get(setup.runId);
 
@@ -72,6 +73,8 @@ describe("durable AnalysisRun autonomous-outcome checkpoint", () => {
     });
     expect(persisted.autonomousOutcomeIntegrity).toEqual({ status: "current", reasonCodes: [] });
     expect(persisted.autonomousOutcome?.checkpointHash).toBe(checkpoint.checkpointHash);
+    expect(recovery.ensureCanonicalAnalysisRecoveryIntent(setup.runId)).toBeNull();
+    expect(recovery.listCanonicalAnalysisRecoveryIntents(setup.runId)).toEqual([]);
     expect(after).toEqual(before);
   });
 

@@ -27,6 +27,8 @@ describe("durable continuation-authorized adaptive execution", () => {
   afterEach(async () => {
     try { dbModule?.db.close(); } catch { /* restart tests may already close it */ }
     delete process.env.FEECLEAR_DB_PATH;
+    delete process.env.CANONICAL_RECOVERY_BASE_DELAY_MS;
+    delete process.env.CANONICAL_RECOVERY_LEASE_MS;
     await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
   });
 
@@ -200,6 +202,179 @@ describe("durable continuation-authorized adaptive execution", () => {
     expect(() => loadedDb.db.prepare(`UPDATE canonical_analysis_continuation_execution_grants
       SET grant_hash = 'tampered' WHERE run_id = ? AND grant_id = ?`).run(setup.run.runId, grant.grantId))
       .toThrow("canonical_continuation_execution_grant_is_immutable");
+  }, 30_000);
+
+  it("durably resumes only the exact retry-eligible claim and leaves the legacy job payload untouched", async () => {
+    process.env.CANONICAL_RECOVERY_BASE_DELAY_MS = "0";
+    const setup = await setupReadyRefinement();
+    const legacyBefore = setup.db.db.prepare(`SELECT status, progress, summary_json FROM analysis_jobs WHERE id = ?`)
+      .get(setup.job.id);
+    const first = await setup.adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId,
+      ports: { ...unresolvedPorts([]), availability: "unavailable",
+        unavailabilityReasonCodes: ["synthetic_provider_unavailable"] },
+      workerId: "initial-degraded-worker", operationalPolicy: operationalPolicy(1_000) });
+    const recoveryStore = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryStore.js");
+    const recoveryWorker = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryWorker.js");
+    const [intent] = recoveryStore.listCanonicalAnalysisRecoveryIntents(setup.run.runId);
+    const calls: string[] = [];
+
+    expect(first).toMatchObject({ completion: "stopped_operationally",
+      lifecycle: "operational_degradation_blocks_judgment" });
+    expect(intent).toMatchObject({ state: "scheduled", dispatchCount: 0,
+      intent: { authorization: { disposition: "operationally_degraded_retry_eligible",
+        continuationPermission: "bounded_retry_eligible" }, analyticalCompletionEffect: "none",
+        customerReportAuthority: "legacy_report_unchanged" } });
+    const ordinaryCalls: string[] = [];
+    const ordinaryReplay = await setup.adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId,
+      ports: unresolvedPorts(ordinaryCalls), workerId: "ordinary-adaptive-replay",
+      operationalPolicy: operationalPolicy(1_000) });
+    expect(ordinaryReplay.executedGrantIds).toEqual([]);
+    expect(ordinaryCalls).toEqual([]);
+    expect(ordinaryReplay.outcomeCheckpointRevision).toBe(first.outcomeCheckpointRevision);
+    const recovered = await recoveryWorker.processCanonicalAnalysisRecoveryIntent({ intentId: intent!.intent.intentId,
+      workerId: "recovery-worker", ports: unresolvedPorts(calls) });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const retryGrant = persisted.continuationExecutionGrants.find((item) =>
+      item.disposition === "operationally_degraded_retry_eligible");
+
+    expect(recovered).toMatchObject({ completion: "stopped_unresolved", executedGrantIds: [retryGrant!.grantId] });
+    expect(retryGrant).toMatchObject({ providerExecution: "authorized_exact_claim_operational_retry",
+      analyticalCompletionEffect: "none", atomicClaimId: intent!.intent.authorization.atomicClaimId });
+    expect(calls).toEqual(["continuation-search"]);
+    expect(recoveryStore.getCanonicalAnalysisRecoveryIntent(intent!.intent.intentId)).toMatchObject({
+      state: "completed", dispatchCount: 1, leaseOwner: null, leaseExpiresAt: null,
+    });
+    expect(persisted.autonomousOutcomeRevision).toBe(first.outcomeCheckpointRevision + 1);
+    expect(persisted.autonomousOutcomeIntegrity).toEqual({ status: "current", reasonCodes: [] });
+    expect(persisted.financialFoundationHash).toBe(setup.run.financialFoundationHash);
+    expect(setup.db.db.prepare(`SELECT status, progress, summary_json FROM analysis_jobs WHERE id = ?`)
+      .get(setup.job.id)).toEqual(legacyBefore);
+    expect(() => setup.db.db.prepare(`UPDATE canonical_analysis_recovery_intents SET intent_hash = 'tampered'
+      WHERE intent_id = ?`).run(intent!.intent.intentId)).toThrow("canonical_analysis_recovery_intent_binding_is_immutable");
+    setup.db.db.prepare(`DELETE FROM canonical_analysis_recovery_events WHERE intent_id = ? AND event_sequence = 1`)
+      .run(intent!.intent.intentId);
+    expect(() => recoveryStore.getCanonicalAnalysisRecoveryIntent(intent!.intent.intentId))
+      .toThrow("canonical_recovery_event_lineage_invalid");
+  }, 30_000);
+
+  it("recovers an expired intent and persisted retry grant after restart without a duplicate send", async () => {
+    process.env.CANONICAL_RECOVERY_BASE_DELAY_MS = "0";
+    process.env.CANONICAL_RECOVERY_LEASE_MS = "60000";
+    const directory = await mkdtemp(path.join(os.tmpdir(), "ratereveal-recovery-restart-"));
+    temporaryDirectories.push(directory);
+    const databasePath = path.join(directory, "recovery.sqlite");
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const setup = await setupReadyRefinement();
+    await setup.adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId,
+      ports: { ...unresolvedPorts([]), availability: "unavailable",
+        unavailabilityReasonCodes: ["synthetic_provider_unavailable"] },
+      workerId: "initial-degraded-worker", operationalPolicy: operationalPolicy(1_000) });
+    const recoveryStore = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryStore.js");
+    const [intent] = recoveryStore.listCanonicalAnalysisRecoveryIntents(setup.run.runId);
+    const claimed = recoveryStore.claimCanonicalAnalysisRecoveryIntent(intent!.intent.intentId, "crashed-recovery-worker")!;
+    setup.db.db.prepare(`UPDATE canonical_analysis_runs SET adaptive_cycle_owner = ?, adaptive_cycle_lease_expires_at = ?
+      WHERE id = ?`).run("crashed-recovery-worker", new Date(Date.now() + 60_000).toISOString(), setup.run.runId);
+    const state = setup.store.getPersistedAnalysisRun(setup.run.runId)!.continuationRevisions.at(-1)!;
+    const grant = setup.adaptive.authorizeNextDurableCanonicalContinuationExecution({ runId: setup.run.runId,
+      controllerRevision: state.controllerRevision, continuationStateHash: state.stateHash,
+      operationalPolicy: operationalPolicy(1_000), cycleOwnerId: "crashed-recovery-worker",
+      recoveryIntentId: claimed.intent.intentId, recoveryDecisionId: claimed.intent.authorization.decisionId });
+    setup.db.db.prepare(`UPDATE canonical_analysis_runs SET adaptive_cycle_lease_expires_at = ? WHERE id = ?`)
+      .run("2000-01-01T00:00:00.000Z", setup.run.runId);
+    const outcomeRevisionBeforeOrdinaryReplay = setup.store.getPersistedAnalysisRun(setup.run.runId)!
+      .autonomousOutcomeRevision;
+    const ordinaryCalls: string[] = [];
+    await expect(setup.adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId,
+      ports: unresolvedPorts(ordinaryCalls), workerId: "ordinary-restart-worker",
+      operationalPolicy: operationalPolicy(1_000) }))
+      .rejects.toThrow("adaptive_execution_claimed_recovery_intent_required");
+    expect(ordinaryCalls).toEqual([]);
+    expect(setup.store.getPersistedAnalysisRun(setup.run.runId)!.autonomousOutcomeRevision)
+      .toBe(outcomeRevisionBeforeOrdinaryReplay);
+    setup.db.db.prepare(`UPDATE canonical_analysis_recovery_intents SET lease_expires_at = ? WHERE intent_id = ?`)
+      .run("2000-01-01T00:00:00.000Z", intent!.intent.intentId);
+    setup.db.db.close();
+
+    vi.resetModules();
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const [recoveryWorker, recoveryStoreAfter, runStore, loadedDb] = await Promise.all([
+      import("../../../../src/canonical/v2/runtime/adaptiveRecoveryWorker.js"),
+      import("../../../../src/canonical/v2/runtime/adaptiveRecoveryStore.js"),
+      import("../../../../src/canonical/v2/runtime/analysisRunStore.js"),
+      import("../../../../src/db.js"),
+    ]);
+    dbModule = loadedDb;
+    const calls: string[] = [];
+    const result = await recoveryWorker.processCanonicalAnalysisRecoveryIntent({ intentId: intent!.intent.intentId,
+      workerId: "restart-recovery-worker", ports: unresolvedPorts(calls) });
+    const persisted = runStore.getPersistedAnalysisRun(setup.run.runId)!;
+
+    expect(result?.executedGrantIds).toEqual([grant.grantId]);
+    expect(calls).toEqual(["continuation-search"]);
+    expect(persisted.continuationExecutionGrants.filter((item) =>
+      item.disposition === "operationally_degraded_retry_eligible")).toHaveLength(1);
+    expect(persisted.rgOperations.filter((item) => item.executionGrantId === grant.grantId)).toHaveLength(1);
+    expect(recoveryStoreAfter.getCanonicalAnalysisRecoveryIntent(intent!.intent.intentId)).toMatchObject({
+      state: "completed", dispatchCount: 2,
+    });
+  }, 30_000);
+
+  it("permits one recovery claimant and never schedules withheld or reconciliation-required outcomes", async () => {
+    process.env.CANONICAL_RECOVERY_BASE_DELAY_MS = "0";
+    const setup = await setupReadyRefinement();
+    await setup.adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId,
+      ports: { ...unresolvedPorts([]), availability: "unavailable",
+        unavailabilityReasonCodes: ["synthetic_provider_unavailable"] },
+      workerId: "initial-degraded-worker", operationalPolicy: operationalPolicy(1_000) });
+    const recoveryStore = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryStore.js");
+    const [intent] = recoveryStore.listCanonicalAnalysisRecoveryIntents(setup.run.runId);
+    expect(recoveryStore.claimCanonicalAnalysisRecoveryIntent(intent!.intent.intentId, "claimant-a")).not.toBeNull();
+    expect(recoveryStore.claimCanonicalAnalysisRecoveryIntent(intent!.intent.intentId, "claimant-b")).toBeNull();
+
+    const withheld = await setupReadyRefinement();
+    const baseline = withheld.store.getPersistedAnalysisRun(withheld.run.runId)!.continuationRevisions.at(-1)!
+      .cumulativeResource.providerCalls;
+    await withheld.adaptive.executeDurableCanonicalAdaptiveLoop({ runId: withheld.run.runId,
+      ports: unresolvedPorts([]), workerId: "withheld-worker", operationalPolicy: operationalPolicy(baseline) });
+    expect(recoveryStore.ensureCanonicalAnalysisRecoveryIntent(withheld.run.runId)).toBeNull();
+    expect(recoveryStore.listCanonicalAnalysisRecoveryIntents(withheld.run.runId)).toEqual([]);
+
+    const reconciliation = await setupReadyRefinement();
+    const transport = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
+    const afterSendPorts = unresolvedPorts([]);
+    afterSendPorts.search = async (_input, onSend) => {
+      onSend();
+      throw new transport.RgEvidenceTransportError("after_send", "synthetic_after_send_ambiguity");
+    };
+    const result = await reconciliation.adaptive.executeDurableCanonicalAdaptiveLoop({ runId: reconciliation.run.runId,
+      ports: afterSendPorts, workerId: "indeterminate-worker", operationalPolicy: operationalPolicy(1_000) });
+    expect(result.completion).toBe("reconciliation_required");
+    expect(recoveryStore.ensureCanonicalAnalysisRecoveryIntent(reconciliation.run.runId)).toBeNull();
+    expect(recoveryStore.listCanonicalAnalysisRecoveryIntents(reconciliation.run.runId)).toEqual([]);
+  }, 30_000);
+
+  it("supersedes a stale recovery binding without a grant or provider send", async () => {
+    process.env.CANONICAL_RECOVERY_BASE_DELAY_MS = "0";
+    const setup = await setupReadyRefinement();
+    await setup.adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId,
+      ports: { ...unresolvedPorts([]), availability: "unavailable",
+        unavailabilityReasonCodes: ["synthetic_provider_unavailable"] },
+      workerId: "initial-degraded-worker", operationalPolicy: operationalPolicy(1_000) });
+    const recoveryStore = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryStore.js");
+    const recoveryWorker = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryWorker.js");
+    const [intent] = recoveryStore.listCanonicalAnalysisRecoveryIntents(setup.run.runId);
+    setup.db.db.prepare(`UPDATE canonical_analysis_runs SET semantic_hash = 'stale-semantic-binding' WHERE id = ?`)
+      .run(setup.run.runId);
+    const calls: string[] = [];
+
+    expect(await recoveryWorker.processCanonicalAnalysisRecoveryIntent({ intentId: intent!.intent.intentId,
+      workerId: "stale-binding-worker", ports: unresolvedPorts(calls) })).toBeNull();
+    expect(calls).toEqual([]);
+    expect(recoveryStore.getCanonicalAnalysisRecoveryIntent(intent!.intent.intentId)).toMatchObject({
+      state: "superseded", dispatchCount: 0,
+    });
+    expect(setup.store.getPersistedAnalysisRun(setup.run.runId)!.continuationExecutionGrants
+      .filter((item) => item.disposition === "operationally_degraded_retry_eligible")).toEqual([]);
   }, 30_000);
 
   async function setupOneWorkItem() {

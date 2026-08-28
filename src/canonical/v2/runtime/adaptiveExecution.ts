@@ -14,6 +14,10 @@ import {
 import { executeDurableCanonicalRgEvidence, type CanonicalRgEvidenceExecutionPorts } from "./rgEvidenceExecution.js";
 import { canonicalRgWorkContractFingerprint, type CanonicalRgWorkItem } from "./rgWorkLedger.js";
 import {
+  assertClaimedCanonicalAnalysisRecoveryIntent,
+  ensureCanonicalAnalysisRecoveryIntent,
+} from "./adaptiveRecoveryStore.js";
+import {
   getPersistedAnalysisRun,
   persistInterruptedCanonicalAutonomousOutcomeCheckpoint,
   persistSettledCanonicalAutonomousOutcomeCheckpoint,
@@ -39,6 +43,7 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
   ports: CanonicalRgEvidenceExecutionPorts;
   workerId?: string;
   operationalPolicy?: CanonicalAdaptiveOperationalPolicy;
+  recoveryIntentId?: string;
 }): Promise<CanonicalAdaptiveExecutionResult> {
   const workerId = input.workerId ?? `adaptive-worker-${randomUUID()}`;
   const policy = input.operationalPolicy ?? productionAdaptiveOperationalPolicy();
@@ -56,9 +61,20 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
     releaseCycleLease(input.runId, workerId);
     throw new Error("adaptive_execution_analysis_run_unavailable");
   }
+  if (!input.recoveryIntentId && hasCurrentOperationalRecoveryGrant(before)) {
+    clearInterval(heartbeat);
+    releaseCycleLease(input.runId, workerId);
+    throw new Error("adaptive_execution_claimed_recovery_intent_required");
+  }
   const financialFoundationHashBefore = before.financialFoundationHash;
   const executedGrantIds: string[] = [];
+  let recovery: ReturnType<typeof assertClaimedCanonicalAnalysisRecoveryIntent> | null = null;
+  let recoveryGrantExecuted = false;
   try {
+    recovery = input.recoveryIntentId
+      ? assertClaimedCanonicalAnalysisRecoveryIntent(input.recoveryIntentId, workerId)
+      : null;
+    if (recovery && recovery.intent.runId !== input.runId) throw new Error("adaptive_execution_recovery_run_mismatch");
     let persisted = before;
     if (persisted.continuationRevision === 0) {
       assertHeartbeatHealthy(leaseFailure);
@@ -86,16 +102,23 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
           expectedPlanHash: converged.result!.artifacts.rgWorkLedger?.planHash ?? null,
           expectedPlanGeneration: converged.rgPlanGeneration });
       }
+      if (recoveryGrantExecuted) break;
       if (state.lifecycle === "indeterminate_reconciliation_required") break;
-      if (state.continuationReadyAtomicClaimIds.length === 0) break;
+      const recoveryDecisionId = recovery?.intent.authorization.decisionId ?? null;
+      const recoveryDecisionAvailable = recoveryDecisionId !== null && state.decisions.some((item) =>
+        item.decisionId === recoveryDecisionId && item.disposition === "operationally_degraded_retry_eligible");
+      if (recovery && !recoveryDecisionAvailable) throw new Error("adaptive_execution_recovery_decision_stale");
+      if (!recoveryDecisionAvailable && state.continuationReadyAtomicClaimIds.length === 0) break;
       const grant = authorizeNextDurableCanonicalContinuationExecution({ runId: input.runId,
         controllerRevision: state.controllerRevision, continuationStateHash: state.stateHash,
-        operationalPolicy: policy, cycleOwnerId: workerId });
+        operationalPolicy: policy, cycleOwnerId: workerId,
+        recoveryIntentId: recovery?.intent.intentId, recoveryDecisionId: recoveryDecisionId ?? undefined });
       renewCycleLease(input.runId, workerId);
       await executeDurableCanonicalRgEvidence({ runId: input.runId, ports: input.ports, workerId,
         cycleOwnerId: workerId, executionGrantId: grant.grantId });
       assertHeartbeatHealthy(leaseFailure);
       executedGrantIds.push(grant.grantId);
+      if (grant.disposition === "operationally_degraded_retry_eligible") recoveryGrantExecuted = true;
       const executed = getPersistedAnalysisRun(input.runId)!;
       adjudicateDurableCanonicalContinuation({ runId: input.runId,
         expectedSemanticRevision: executed.semanticRevision, expectedSemanticHash: executed.semanticHash,
@@ -112,6 +135,12 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
       runId: input.runId,
       financialFoundationHashAtCycleStart: financialFoundationHashBefore,
     });
+    if (!recovery) {
+      try { ensureCanonicalAnalysisRecoveryIntent(input.runId); }
+      catch (error) {
+        console.error("[canonical-recovery-intent-degraded]", error instanceof Error ? error.message : error);
+      }
+    }
     return {
       schemaVersion: ADAPTIVE_EXECUTION_SCHEMA_VERSION,
       runId: input.runId,
@@ -151,6 +180,8 @@ export function authorizeNextDurableCanonicalContinuationExecution(input: {
   continuationStateHash: string;
   operationalPolicy: CanonicalAdaptiveOperationalPolicy;
   cycleOwnerId: string;
+  recoveryIntentId?: string;
+  recoveryDecisionId?: string;
 }): CanonicalContinuationExecutionGrant {
   validateOperationalPolicy(input.operationalPolicy);
   assertCycleLease(input.runId, input.cycleOwnerId);
@@ -163,8 +194,21 @@ export function authorizeNextDurableCanonicalContinuationExecution(input: {
   if (state.lifecycle === "indeterminate_reconciliation_required") {
     throw new Error("adaptive_execution_indeterminate_reconciliation_required");
   }
-  const decision = nextAuthorizedDecision(state.decisions);
-  if (!decision || !state.continuationReadyAtomicClaimIds.includes(decision.atomicClaimId)) {
+  const recovery = input.recoveryIntentId
+    ? assertClaimedCanonicalAnalysisRecoveryIntent(input.recoveryIntentId, input.cycleOwnerId)
+    : null;
+  if ((input.recoveryIntentId === undefined) !== (input.recoveryDecisionId === undefined)
+    || (recovery && (recovery.intent.runId !== input.runId
+      || recovery.intent.authorization.decisionId !== input.recoveryDecisionId))) {
+    throw new Error("adaptive_execution_recovery_authorization_invalid");
+  }
+  const decision = nextAuthorizedDecision(state.decisions, input.recoveryDecisionId ?? null);
+  const normalContinuation = decision && state.continuationReadyAtomicClaimIds.includes(decision.atomicClaimId)
+    && (decision.disposition === "newly_eligible" || decision.disposition === "justified_refinement");
+  const recoveryContinuation = decision?.disposition === "operationally_degraded_retry_eligible"
+    && recovery?.intent.authorization.atomicClaimId === decision.atomicClaimId
+    && decision.degradation?.continuationPermission === "bounded_retry_eligible";
+  if (!decision || (!normalContinuation && !recoveryContinuation)) {
     throw new Error("adaptive_execution_no_continuation_authorized_work");
   }
   const existing = persisted.continuationExecutionGrants.find((item) => item.controllerRevision === state.controllerRevision
@@ -189,7 +233,7 @@ export function authorizeNextDurableCanonicalContinuationExecution(input: {
   const grantBase = {
     runId: persisted.id, executionGeneration, controllerRevision: state.controllerRevision,
     continuationStateHash: state.stateHash, decisionId: decision.decisionId,
-    disposition: decision.disposition as "newly_eligible" | "justified_refinement",
+    disposition: decision.disposition as CanonicalContinuationExecutionGrant["disposition"],
     atomicClaimId: decision.atomicClaimId, facet: decision.facet,
     binding: { semanticRevision: state.binding.semanticRevision, semanticHash: state.binding.semanticHash,
       canonicalStateHash: state.binding.canonicalStateHash, planHash: state.binding.planHash!,
@@ -198,7 +242,9 @@ export function authorizeNextDurableCanonicalContinuationExecution(input: {
     effectiveWorkContractFingerprint: effectiveFingerprint,
     excludedDocumentFingerprints: decision.nextOperationDelta?.excludedDocumentFingerprints ?? [],
     resourceBaseline: state.cumulativeResource, operationalPolicy: input.operationalPolicy,
-    providerExecution: "authorized_exact_claim_delta" as const, analyticalCompletionEffect: "none" as const,
+    providerExecution: decision.disposition === "operationally_degraded_retry_eligible"
+      ? "authorized_exact_claim_operational_retry" as const : "authorized_exact_claim_delta" as const,
+    analyticalCompletionEffect: "none" as const,
     createdAt,
   };
   const grantId = `continuation-grant-${digest(grantBase).slice(0, 32)}`;
@@ -264,6 +310,14 @@ function materializeEffectiveWork(work: CanonicalRgWorkItem,
       reservation: null, progress: { ...base.progress, state: "not_started" }, stopReason: null,
       executionAuthorization: null };
   }
+  if (decision.disposition === "operationally_degraded_retry_eligible") {
+    if (decision.nextOperationDelta || decision.degradation?.continuationPermission !== "bounded_retry_eligible") {
+      throw new Error("adaptive_execution_invalid_operational_retry");
+    }
+    return { ...structuredClone(base), state: "planned", executionState: "planned_for_durable_execution",
+      reservation: null, progress: { ...base.progress, state: "not_started" }, stopReason: null,
+      executionAuthorization: null };
+  }
   const delta = decision.nextOperationDelta;
   if (decision.disposition !== "justified_refinement" || !delta
     || delta.priorWorkContractFingerprint !== decision.currentWorkContractFingerprint) {
@@ -282,9 +336,26 @@ function normalizedWork(work: CanonicalRgWorkItem): CanonicalRgWorkItem {
     executionAuthorization: work.executionAuthorization ?? null };
 }
 
-function nextAuthorizedDecision(decisions: CanonicalClaimContinuationDecision[]): CanonicalClaimContinuationDecision | null {
+function nextAuthorizedDecision(decisions: CanonicalClaimContinuationDecision[], recoveryDecisionId: string | null): CanonicalClaimContinuationDecision | null {
+  if (recoveryDecisionId) {
+    return decisions.find((item) => item.decisionId === recoveryDecisionId
+      && item.disposition === "operationally_degraded_retry_eligible") ?? null;
+  }
   return decisions.filter((item) => item.disposition === "newly_eligible" || item.disposition === "justified_refinement")
     .sort((left, right) => left.atomicClaimId.localeCompare(right.atomicClaimId))[0] ?? null;
+}
+
+function hasCurrentOperationalRecoveryGrant(persisted: NonNullable<ReturnType<typeof getPersistedAnalysisRun>>): boolean {
+  const state = persisted.continuationRevisions.at(-1);
+  if (!state) return false;
+  return persisted.continuationExecutionGrants.some((grant) =>
+    grant.disposition === "operationally_degraded_retry_eligible"
+    && grant.controllerRevision === state.controllerRevision
+    && grant.continuationStateHash === state.stateHash
+    && grant.executionGeneration === persisted.rgExecutionGeneration
+    && state.decisions.some((decision) => decision.decisionId === grant.decisionId
+      && decision.atomicClaimId === grant.atomicClaimId
+      && decision.disposition === "operationally_degraded_retry_eligible"));
 }
 
 function acquireCycleLease(runId: string, workerId: string): void {

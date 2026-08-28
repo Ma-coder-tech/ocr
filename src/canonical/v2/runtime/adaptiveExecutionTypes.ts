@@ -1,7 +1,7 @@
 import type { CanonicalAutonomousResearchLifecycle, CanonicalContinuationResourceAccounting } from "./adaptiveContinuationTypes.js";
 import type { CanonicalRgWorkItem } from "./rgWorkLedger.js";
 
-export const ADAPTIVE_EXECUTION_SCHEMA_VERSION = "canonical_adaptive_execution_v1" as const;
+export const ADAPTIVE_EXECUTION_SCHEMA_VERSION = "canonical_adaptive_execution_v1_1" as const;
 export const AUTONOMOUS_OUTCOME_CHECKPOINT_SCHEMA_VERSION = "canonical_analysis_autonomous_outcome_checkpoint_v1" as const;
 
 export type CanonicalAutonomousOutcomeCompletion =
@@ -74,7 +74,7 @@ export type CanonicalContinuationExecutionGrant = {
   controllerRevision: number;
   continuationStateHash: string;
   decisionId: string;
-  disposition: "newly_eligible" | "justified_refinement";
+  disposition: "newly_eligible" | "justified_refinement" | "operationally_degraded_retry_eligible";
   atomicClaimId: string;
   facet: string;
   binding: {
@@ -92,7 +92,7 @@ export type CanonicalContinuationExecutionGrant = {
   excludedDocumentFingerprints: string[];
   resourceBaseline: CanonicalContinuationResourceAccounting;
   operationalPolicy: CanonicalAdaptiveOperationalPolicy;
-  providerExecution: "authorized_exact_claim_delta";
+  providerExecution: "authorized_exact_claim_delta" | "authorized_exact_claim_operational_retry";
   analyticalCompletionEffect: "none";
   createdAt: string;
 };

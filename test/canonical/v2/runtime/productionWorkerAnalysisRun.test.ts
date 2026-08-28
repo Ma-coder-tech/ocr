@@ -25,10 +25,11 @@ describe("production worker canonical AnalysisRun integration", () => {
   });
 
   it("creates the durable V2 run on the normal job path without changing the legacy summary contract", async () => {
-    const [store, worker, runStore, loadedDb] = await Promise.all([
+    const [store, worker, runStore, recoveryStore, loadedDb] = await Promise.all([
       import("../../../../src/store.js"),
       import("../../../../src/worker.js"),
       import("../../../../src/canonical/v2/runtime/analysisRunStore.js"),
+      import("../../../../src/canonical/v2/runtime/adaptiveRecoveryStore.js"),
       import("../../../../src/db.js"),
     ]);
     dbModule = loadedDb;
@@ -106,6 +107,20 @@ describe("production worker canonical AnalysisRun integration", () => {
     expect(degradedDecisions).toHaveLength(canonical?.rgWorkItems.length ?? 0);
     expect(degradedDecisions.every((item) => item.degradation?.subtype === "provider_unavailable_before_send"
       && item.degradation.continuationPermission === "bounded_retry_eligible")).toBe(true);
+    expect(recoveryStore.listCanonicalAnalysisRecoveryIntents(canonical!.id)).toEqual([
+      expect.objectContaining({ state: "scheduled", dispatchCount: 0,
+        intent: expect.objectContaining({
+          runId: canonical!.id,
+          authorization: expect.objectContaining({
+            atomicClaimId: [...degradedDecisions].sort((left, right) =>
+              left.atomicClaimId.localeCompare(right.atomicClaimId))[0]!.atomicClaimId,
+            disposition: "operationally_degraded_retry_eligible",
+            continuationPermission: "bounded_retry_eligible",
+          }),
+          customerReportAuthority: "legacy_report_unchanged",
+          analyticalCompletionEffect: "none",
+        }) }),
+    ]);
     expect(canonical?.stages).toHaveLength(10);
   }, 30_000);
 });

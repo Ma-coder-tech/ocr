@@ -61,6 +61,7 @@ import type { SingleStatementReportV1 } from "./reporting/v1/index.js";
 import { renderMultiStatementGlobalReportMarkdown } from "./reporting/buildMultiStatement.js";
 import { createJob, getJob, getJobByUploadId, listEvents, listStatementJobsForMerchant, pruneJobs, updateJob } from "./store.js";
 import { enqueueJob, hydrateQueuedJobs } from "./worker.js";
+import { hydrateCanonicalAnalysisRecoveryIntents } from "./canonical/v2/runtime/adaptiveRecoveryWorker.js";
 import { createMultiStatementAnalysisJob } from "./multiStatementOrchestrator.js";
 import {
   getLatestMultiStatementAnalysisForJob,
@@ -1951,6 +1952,7 @@ async function start(): Promise<void> {
   await fs.mkdir(uploadDir, { recursive: true });
   await cleanupOldFiles(uploadDir, fileRetentionHours);
   hydrateQueuedJobs();
+  hydrateCanonicalAnalysisRecoveryIntents();
   hydrateRunnableMultiStatementJobs();
   deleteExpiredSessions();
   pruneJobs();
