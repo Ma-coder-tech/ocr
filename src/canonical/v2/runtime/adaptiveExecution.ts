@@ -81,6 +81,7 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
           expectedPlanHash: converged.result!.artifacts.rgWorkLedger?.planHash ?? null,
           expectedPlanGeneration: converged.rgPlanGeneration });
       }
+      if (state.lifecycle === "indeterminate_reconciliation_required") break;
       if (state.continuationReadyAtomicClaimIds.length === 0) break;
       const grant = authorizeNextDurableCanonicalContinuationExecution({ runId: input.runId,
         controllerRevision: state.controllerRevision, continuationStateHash: state.stateHash,
@@ -137,6 +138,9 @@ export function authorizeNextDurableCanonicalContinuationExecution(input: {
   const state = persisted.continuationRevisions.find((item) => item.controllerRevision === input.controllerRevision);
   if (!state || state.stateHash !== input.continuationStateHash || state.controllerRevision !== persisted.continuationRevision) {
     throw new Error("adaptive_execution_stale_continuation_binding");
+  }
+  if (state.lifecycle === "indeterminate_reconciliation_required") {
+    throw new Error("adaptive_execution_indeterminate_reconciliation_required");
   }
   const decision = nextAuthorizedDecision(state.decisions);
   if (!decision || !state.continuationReadyAtomicClaimIds.includes(decision.atomicClaimId)) {

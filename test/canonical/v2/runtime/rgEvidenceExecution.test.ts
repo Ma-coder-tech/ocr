@@ -549,6 +549,82 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(after.result!.artifacts.rh).toEqual(before.result!.artifacts.rh);
   }, 30_000);
 
+  it("treats one indeterminate send as a run-wide barrier to otherwise continuation-ready delta work", async () => {
+    const setup = await runWithOneWorkItem(undefined, 1);
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const continuationWorkId = setup.targetWorkItemId;
+    const continuationAtomicClaimId = before.rgWorkItems
+      .find((item) => item.workItemId === continuationWorkId)!.atomicClaimId;
+    const indeterminateWorkId = setup.retainedWorkItemIds.find((item) => item !== continuationWorkId)!;
+    const indeterminateAtomicClaimId = before.rgWorkItems
+      .find((item) => item.workItemId === indeterminateWorkId)!.atomicClaimId;
+    const initialCalls: string[] = [];
+    const initialPorts = successfulPorts(initialCalls);
+    const search = initialPorts.search;
+    initialPorts.search = async (input, onSend) => {
+      if (input.intent.atomicClaimId !== indeterminateAtomicClaimId) return search(input, onSend);
+      initialCalls.push("indeterminate-search"); onSend();
+      throw new setup.executor.RgEvidenceTransportError("after_send", "synthetic_run_wide_barrier_after_send");
+    };
+    const investigate = initialPorts.investigate;
+    initialPorts.investigate = async (input, onSend) => {
+      const result = await investigate(input, onSend);
+      return input.intent.atomicClaimId === continuationAtomicClaimId
+        ? { ...result, value: { ...result.value, effectiveFrom: "2099-01-01" } }
+        : result;
+    };
+    const verify = initialPorts.verify;
+    initialPorts.verify = async (input, onSend) => {
+      const result = await verify(input, onSend);
+      return input.intent.atomicClaimId === continuationAtomicClaimId
+        ? { ...result, value: { ...result.value, periodStatus: "wrong_period" as const,
+          effectiveFrom: input.frozenCandidate.effectiveFrom } }
+        : result;
+    };
+
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports: initialPorts,
+      workerId: "barrier-initial-worker" });
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    const state = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    const continuationDecision = state.decisions.find((item) => item.atomicClaimId === continuationAtomicClaimId)!;
+    const indeterminateDecision = state.decisions.find((item) => item.atomicClaimId === indeterminateAtomicClaimId)!;
+    const adaptive = await import("../../../../src/canonical/v2/runtime/adaptiveExecution.js");
+    const continuationCalls: string[] = [];
+
+    expect(state.lifecycle).toBe("indeterminate_reconciliation_required");
+    expect(continuationDecision).toMatchObject({ disposition: "justified_refinement",
+      nextOperationDelta: expect.objectContaining({ kind: "period_refinement" }) });
+    expect(indeterminateDecision).toMatchObject({ disposition: "operationally_degraded_reconciliation_required" });
+    expect(state.continuationReadyAtomicClaimIds).toContain(continuationAtomicClaimId);
+
+    const result = await adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId,
+      ports: successfulPorts(continuationCalls), workerId: "barrier-coordinator-worker" });
+    const afterCoordinator = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(result).toMatchObject({ lifecycle: "indeterminate_reconciliation_required",
+      completion: "reconciliation_required", executedGrantIds: [] });
+    expect(continuationCalls).toEqual([]);
+    expect(afterCoordinator.continuationExecutionGrants).toEqual([]);
+    expect(afterCoordinator.rgExecutionGeneration).toBe(0);
+
+    const grantOwner = "barrier-direct-grant-worker";
+    setup.db.db.prepare(`UPDATE canonical_analysis_runs SET adaptive_cycle_owner = ?,
+      adaptive_cycle_lease_expires_at = ? WHERE id = ?`).run(grantOwner,
+      new Date(Date.now() + 60_000).toISOString(), setup.run.runId);
+    expect(() => adaptive.authorizeNextDurableCanonicalContinuationExecution({ runId: setup.run.runId,
+      controllerRevision: state.controllerRevision, continuationStateHash: state.stateHash,
+      operationalPolicy: adaptive.productionAdaptiveOperationalPolicy(), cycleOwnerId: grantOwner }))
+      .toThrow("adaptive_execution_indeterminate_reconciliation_required");
+
+    const afterGrantAttempt = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(afterGrantAttempt.continuationExecutionGrants).toEqual([]);
+    expect(afterGrantAttempt.rgExecutionGeneration).toBe(0);
+    expect(afterGrantAttempt.rgOperations.filter((operation) => operation.executionGrantId !== null)).toEqual([]);
+    expect(afterGrantAttempt.rgOperations.some((operation) => operation.state === "indeterminate_after_send")).toBe(true);
+    expect(afterGrantAttempt.canonicalTruthHash).toBe(before.canonicalTruthHash);
+    expect(afterGrantAttempt.financialFoundationHash).toBe(before.financialFoundationHash);
+    expect(afterGrantAttempt.result!.artifacts.rh).toEqual(before.result!.artifacts.rh);
+  }, 30_000);
+
   it("returns the same persisted continuation judgment after restart", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "ratereveal-continuation-restart-"));
     temporaryDirectories.push(directory);
