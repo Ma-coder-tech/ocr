@@ -351,13 +351,19 @@ async function executeWorkItem(input: {
     const investigated = validateInvestigatedCandidate(investigation.value as CanonicalRgInvestigatedCandidate,
       input.workItem, input.admission, candidate, document);
     if (!investigated) continue;
-    const frozenCandidate = freezeCandidate(investigated);
-    const verification = await runExternalOperation({ ...input, kind: "independent_verification", candidateId: candidate.candidateId,
-      providerCode: "approved_ai_independent_verification", operationInput: { intent, candidate,
-        documentFingerprint: document.documentFingerprint, frozenCandidate },
-      projectResult: sanitizeVerificationJudgment,
-      call: (onSend) => input.ports.verify({ intent, admission: input.admission,
-        expectedValueConstraint: input.workItem.expectedKnowledgeValueConstraint, candidate, document, frozenCandidate }, onSend) });
+    const frozenCandidate = freezeCandidate(investigated, investigation.operation.updatedAt);
+    const durableVerification = priorVerificationOperationForCandidate({ runId: input.runId, planHash: input.planHash,
+      workItem: input.workItem, candidateId: candidate.candidateId,
+      documentFingerprint: document.documentFingerprint, frozenCandidateHash: frozenCandidate.frozenCandidateHash,
+      executionGrant: input.executionGrant });
+    const verification = durableVerification
+      ? replayDurableVerificationOperation(input.runId, durableVerification)
+      : await runExternalOperation({ ...input, kind: "independent_verification", candidateId: candidate.candidateId,
+        providerCode: "approved_ai_independent_verification", operationInput: { intent, candidate,
+          documentFingerprint: document.documentFingerprint, frozenCandidate },
+        projectResult: sanitizeVerificationJudgment,
+        call: (onSend) => input.ports.verify({ intent, admission: input.admission,
+          expectedValueConstraint: input.workItem.expectedKnowledgeValueConstraint, candidate, document, frozenCandidate }, onSend) });
     if (verification.state !== "completed") {
       if (verification.operation.state === "indeterminate_after_send") return finishFailedOperation(input, verification.operation);
       continue;
@@ -523,7 +529,8 @@ async function runExternalOperation<T>(input: {
       executionGrantId: input.executionGrant?.grantId ?? null, workItemId: input.workItem.workItemId,
       kind: input.kind, candidateId: input.candidateId, attempt, inputHash }).slice(0, 32)}`;
     const existing = operationFromDb(input.runId, operationId);
-    if (existing?.state === "completed") return { state: "completed", value: existing.result, operation: existing };
+    if (existing?.state === "completed") return { state: "completed",
+      value: replayableCompletedOperationResult(existing), operation: existing };
     if (existing?.state === "failed_before_send") {
       if (attempt < MAX_BEFORE_SEND_ATTEMPTS) continue;
       return { state: "failed", value: null, operation: existing };
@@ -558,6 +565,60 @@ async function runExternalOperation<T>(input: {
     }
   }
   throw new Error("rg_operation_retry_state_invalid");
+}
+
+function replayableCompletedOperationResult(operation: CanonicalRgOperation): unknown {
+  if (operation.kind !== "independent_verification") return operation.result;
+  return verificationEnvelopeFromResult(operation.result)?.judgment ?? operation.result;
+}
+
+function priorVerificationOperationForCandidate(input: {
+  runId: string;
+  planHash: string;
+  workItem: CanonicalRgWorkItem;
+  candidateId: string;
+  documentFingerprint: string;
+  frozenCandidateHash: string;
+  executionGrant: CanonicalContinuationExecutionGrant | null;
+}): CanonicalRgOperation | null {
+  const rows = db.prepare(`SELECT operation_json FROM canonical_rg_operations
+    WHERE run_id = ? AND work_item_id = ? AND plan_hash = ? ORDER BY updated_at DESC, operation_id DESC`)
+    .all(input.runId, input.workItem.workItemId, input.planHash) as Array<{ operation_json: string }>;
+  const operations = rows.map((row) => JSON.parse(row.operation_json) as CanonicalRgOperation)
+    .filter((operation) => operation.kind === "independent_verification"
+      && operation.candidateId === input.candidateId
+      && (operation.executionGrantId ?? null) === (input.executionGrant?.grantId ?? null)
+      && (operation.input as { documentFingerprint?: unknown }).documentFingerprint === input.documentFingerprint
+      && (operation.input as { frozenCandidate?: { frozenCandidateHash?: unknown } }).frozenCandidate?.frozenCandidateHash
+        === input.frozenCandidateHash);
+  const ambiguous = operations.find((operation) => operation.state === "sent"
+    || operation.state === "indeterminate_after_send");
+  return ambiguous ?? operations.find((operation) => operation.state === "completed") ?? null;
+}
+
+function replayDurableVerificationOperation(runId: string, operation: CanonicalRgOperation): OperationCallResult {
+  if (operation.state === "completed") return { state: "completed",
+    value: replayableCompletedOperationResult(operation), operation };
+  const indeterminate = operation.state === "indeterminate_after_send" ? operation
+    : settleOperation(runId, operation, "indeterminate_after_send", null, null,
+      "rg_operation_prior_send_completion_unknown");
+  return { state: "failed", value: null, operation: indeterminate };
+}
+
+function verificationEnvelopeFromResult(value: unknown): {
+  judgment: CanonicalRgVerificationJudgment;
+  verifiedEvidence: CanonicalRgVerifiedEvidence;
+} | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const hasEnvelopeField = Object.hasOwn(record, "judgment") || Object.hasOwn(record, "verifiedEvidence");
+  if (!hasEnvelopeField) return null;
+  if (!record.judgment || typeof record.judgment !== "object"
+    || !record.verifiedEvidence || typeof record.verifiedEvidence !== "object") {
+    throw new Error("rg_verified_evidence_persisted_envelope_invalid");
+  }
+  return { judgment: record.judgment as CanonicalRgVerificationJudgment,
+    verifiedEvidence: record.verifiedEvidence as CanonicalRgVerifiedEvidence };
 }
 
 function reserveWork(runId: string, workItem: CanonicalRgWorkItem, workerId: string): CanonicalRgWorkItem | null {
@@ -809,8 +870,7 @@ function validateInvestigatedCandidate(value: CanonicalRgInvestigatedCandidate, 
   return structuredClone(value);
 }
 
-function freezeCandidate(value: CanonicalRgInvestigatedCandidate): CanonicalRgFrozenCandidate {
-  const frozenAt = nowIso();
+function freezeCandidate(value: CanonicalRgInvestigatedCandidate, frozenAt: string): CanonicalRgFrozenCandidate {
   return Object.freeze({ ...structuredClone(value), frozenCandidateHash: digest(value), frozenAt });
 }
 
@@ -1025,6 +1085,14 @@ function validStatementPeriod(value: unknown): boolean {
 function attachVerifiedEvidence(runId: string, operation: CanonicalRgOperation, evidence: CanonicalRgVerifiedEvidence): void {
   const current = operationFromDb(runId, operation.operationId);
   if (!current || current.state !== "completed") throw new Error("rg_verified_evidence_operation_not_completed");
+  const existingEnvelope = verificationEnvelopeFromResult(current.result);
+  if (existingEnvelope) {
+    if (!persistedVerifiedEvidenceIntegrityValid(existingEnvelope.verifiedEvidence)
+      || digest(existingEnvelope.verifiedEvidence) !== digest(evidence)) {
+      throw new Error("rg_verified_evidence_replay_mismatch");
+    }
+    return;
+  }
   const judgment = current.result as CanonicalRgVerificationJudgment;
   const updated = { ...current, result: { judgment, verifiedEvidence: evidence }, updatedAt: nowIso() };
   updateOperation(runId, updated);

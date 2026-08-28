@@ -94,6 +94,58 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(afterDeterministicReplay.rgOperations).toHaveLength(4);
   }, 30_000);
 
+  it("replays a persisted verification envelope after a crash before work terminalization without another provider send", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "ratereveal-verification-envelope-restart-"));
+    temporaryDirectories.push(directory);
+    const databasePath = path.join(directory, "verification-restart.sqlite");
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const setup = await runWithOneWorkItem();
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const first = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+      workerId: "pre-crash-worker" });
+    const beforeCrash = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const completedWork = beforeCrash.rgWorkItems[0]!;
+    const verificationBefore = structuredClone(beforeCrash.rgOperations
+      .find((operation) => operation.kind === "independent_verification")!);
+    const evidenceBefore = structuredClone(first.verifiedEvidence[0]!);
+    const verifiedPersistenceEventsBefore = beforeCrash.rgExecutionEvents
+      .filter((event) => event.eventType === "verified_evidence_persisted").length;
+    const interruptedWork: CanonicalRgWorkItem = { ...structuredClone(completedWork), state: "executing",
+      executionState: "executing", reservation: null,
+      progress: { ...completedWork.progress, state: "in_progress", evidenceItemsObserved: 0 },
+      stopReason: null, verifiedEvidenceRefs: [] };
+    replaceActiveWork(setup.db.db, setup.run.runId, interruptedWork);
+    setup.db.db.close();
+
+    vi.resetModules();
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const [reloadedExecutor, reloadedStore, reloadedDb] = await Promise.all([
+      import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js"),
+      import("../../../../src/canonical/v2/runtime/analysisRunStore.js"),
+      import("../../../../src/db.js"),
+    ]);
+    dbModule = reloadedDb;
+
+    const replay = await reloadedExecutor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+      workerId: "restart-worker" });
+    const afterRestart = reloadedStore.getPersistedAnalysisRun(setup.run.runId)!;
+    const verificationAfter = afterRestart.rgOperations
+      .find((operation) => operation.kind === "independent_verification")!;
+
+    expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
+    expect(replay.verifiedEvidence).toEqual([evidenceBefore]);
+    expect(verificationAfter.result).toEqual(verificationBefore.result);
+    expect(afterRestart.rgWorkItems[0]).toMatchObject({ state: "terminal",
+      executionState: "completed_verified_evidence", verifiedEvidenceRefs: [evidenceBefore.evidenceId],
+      resourceConsumption: completedWork.resourceConsumption });
+    expect(afterRestart.rgExecutionEvents.filter((event) => event.eventType === "verified_evidence_persisted"))
+      .toHaveLength(verifiedPersistenceEventsBefore);
+    expect(afterRestart.canonicalTruthHash).toBe(setup.run.canonicalTruthHash);
+    expect(afterRestart.financialFoundationHash).toBe(setup.run.financialFoundationHash);
+    expect(afterRestart.result!.artifacts.rh).toEqual(setup.run.artifacts.rh);
+  }, 30_000);
+
   it("persists the verifier-accepted support locator rather than the investigator locator", async () => {
     const setup = await runWithOneWorkItem();
     const ports = successfulPorts([]);
@@ -444,6 +496,59 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(sends).toBe(1);
   }, 30_000);
 
+  it("blocks convergence and plan replacement when verified evidence and an indeterminate send coexist", async () => {
+    const setup = await runWithOneWorkItem(undefined, 1);
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const secondWorkItemId = setup.retainedWorkItemIds[1]!;
+    const secondAtomicClaimId = before.rgWorkItems.find((item) => item.workItemId === secondWorkItemId)!.atomicClaimId;
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const normalSearch = ports.search;
+    let ambiguousSends = 0;
+    ports.search = async (input, onSend) => {
+      if (input.intent.atomicClaimId !== secondAtomicClaimId) return normalSearch(input, onSend);
+      calls.push("indeterminate-search"); onSend(); ambiguousSends += 1;
+      throw new setup.executor.RgEvidenceTransportError("after_send", "synthetic_mixed_after_send_failure");
+    };
+
+    const execution = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+      workerId: "mixed-outcome-worker" });
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    const state = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const verifiedDecision = state.decisions.find((item) => item.disposition === "convergence_required")!;
+    const ambiguousDecision = state.decisions.find((item) => item.atomicClaimId === secondAtomicClaimId)!;
+    const semantic = await import("../../../../src/canonical/v2/runtime/semanticConvergence.js");
+
+    expect(execution).toMatchObject({ workItemsCompletedWithEvidence: 1, workItemsDegraded: 1 });
+    expect(state.lifecycle).toBe("indeterminate_reconciliation_required");
+    expect(verifiedDecision).toMatchObject({ disposition: "convergence_required",
+      evidenceRefs: [execution.verifiedEvidence[0]!.evidenceId] });
+    expect(ambiguousDecision).toMatchObject({ disposition: "operationally_degraded_reconciliation_required",
+      degradation: { subtype: "indeterminate_after_send", continuationPermission: "reconciliation_required" } });
+    expect(() => semantic.convergeDurableCanonicalAnalysisRun({ runId: setup.run.runId }))
+      .toThrow("semantic_convergence_rg_execution_active");
+    const replacement = { ...structuredClone(persisted.result!.artifacts.rgWorkLedger!), planHash: "f".repeat(32) };
+    expect(() => setup.store.persistRgWorkLedger(setup.run.runId, replacement, new Date().toISOString()))
+      .toThrow("canonical_rg_plan_replacement_execution_active");
+
+    const adaptive = await import("../../../../src/canonical/v2/runtime/adaptiveExecution.js");
+    const adaptiveResult = await adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId, ports,
+      workerId: "mixed-outcome-adaptive-worker" });
+    const after = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(adaptiveResult).toMatchObject({ lifecycle: "indeterminate_reconciliation_required",
+      completion: "reconciliation_required", executedGrantIds: [] });
+    expect(ambiguousSends).toBe(1);
+    expect(after.rgPlanHash).toBe(persisted.rgPlanHash);
+    expect(after.rgPlanGeneration).toBe(persisted.rgPlanGeneration);
+    expect(after.rgOperations.some((operation) => operation.state === "indeterminate_after_send")).toBe(true);
+    expect(after.rgOperations.some((operation) => operation.kind === "independent_verification"
+      && (operation.result as { verifiedEvidence?: unknown }).verifiedEvidence)).toBe(true);
+    expect(after.canonicalTruthHash).toBe(before.canonicalTruthHash);
+    expect(after.financialFoundationHash).toBe(before.financialFoundationHash);
+    expect(after.result!.artifacts.rh).toEqual(before.result!.artifacts.rh);
+  }, 30_000);
+
   it("returns the same persisted continuation judgment after restart", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "ratereveal-continuation-restart-"));
     temporaryDirectories.push(directory);
@@ -603,18 +708,18 @@ describe("production durable claim-bound RG evidence execution", () => {
     replaceActiveWork(setup.db.db, setup.run.runId, unresolved);
 
     installSyntheticPlan(setup, baseLedger, "zzzz-lexically-last-but-generation-one", [admission], [unresolved]);
-    const indeterminate = syntheticWorkState(baseWork, "indeterminate_after_send", "synthetic_latest_after_send");
-    installSyntheticPlan(setup, baseLedger, "aaaa-lexically-first-but-generation-two", [admission], [indeterminate]);
+    const degraded = syntheticWorkState(baseWork, "degraded_provider_unavailable", "synthetic_latest_provider_unavailable");
+    installSyntheticPlan(setup, baseLedger, "aaaa-lexically-first-but-generation-two", [admission], [degraded]);
     installSyntheticPlan(setup, baseLedger, "mmmm-current-generation-three", [admission], []);
 
     const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
     const beforeRestart = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId,
       expectedPlanHash: "mmmm-current-generation-three", expectedPlanGeneration: 3 });
     const chronological = beforeRestart.decisions.find((item) => item.atomicClaimId === admission.atomicClaimId)!;
-    expect(chronological).toMatchObject({ disposition: "operationally_degraded_reconciliation_required",
+    expect(chronological).toMatchObject({ disposition: "operationally_degraded_retry_eligible",
       currentPlanGeneration: 3, priorPlanGenerations: [0, 1, 2],
-      degradation: { subtype: "indeterminate_after_send", continuationPermission: "reconciliation_required" } });
-    expect(chronological.reasonCodes).toContain("synthetic_latest_after_send");
+      degradation: { subtype: "provider_unavailable_before_send", continuationPermission: "bounded_retry_eligible" } });
+    expect(chronological.reasonCodes).toContain("synthetic_latest_provider_unavailable");
     expect(chronological.reasonCodes).not.toContain("synthetic_older_unresolved");
     const persistedBefore = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
     expect(persistedBefore.rgPlanGeneration).toBe(3);

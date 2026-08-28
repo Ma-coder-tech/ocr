@@ -316,9 +316,9 @@ export function persistRgWorkLedger(runId: string, ledger: CanonicalRgWorkLedger
   let activeGeneration = priorGeneration;
   if (persistedPlanHash !== null && persistedPlanHash !== ledger.planHash) {
     const activeWork = db.prepare(`SELECT 1 FROM canonical_rg_work_items WHERE run_id = ?
-      AND (state = 'executing' OR execution_state = 'executing') LIMIT 1`).get(runId);
+      AND (state = 'executing' OR execution_state IN ('executing', 'indeterminate_after_send')) LIMIT 1`).get(runId);
     const activeOperation = db.prepare(`SELECT 1 FROM canonical_rg_operations WHERE run_id = ?
-      AND state IN ('reserved', 'sent') LIMIT 1`).get(runId);
+      AND state IN ('reserved', 'sent', 'indeterminate_after_send') LIMIT 1`).get(runId);
     if (activeWork || activeOperation) throw new Error("canonical_rg_plan_replacement_execution_active");
     activeGeneration = priorGeneration + 1;
     archiveSupersededRgExecution(runId, persistedPlanHash, ledger.planHash, priorGeneration, activeGeneration, now);

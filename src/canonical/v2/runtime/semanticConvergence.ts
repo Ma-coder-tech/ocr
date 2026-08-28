@@ -168,9 +168,9 @@ function assertSemanticTransitionSafe(runId: string, cycleOwnerId?: string): voi
     && run.adaptive_cycle_lease_expires_at > new Date().toISOString() ? run.adaptive_cycle_owner : null;
   if (activeOwner && activeOwner !== cycleOwnerId) throw new Error("semantic_convergence_adaptive_cycle_active");
   const activeWork = db.prepare(`SELECT 1 FROM canonical_rg_work_items WHERE run_id = ?
-    AND (state = 'executing' OR execution_state = 'executing') LIMIT 1`).get(runId);
+    AND (state = 'executing' OR execution_state IN ('executing', 'indeterminate_after_send')) LIMIT 1`).get(runId);
   const activeOperation = db.prepare(`SELECT 1 FROM canonical_rg_operations WHERE run_id = ?
-    AND state IN ('reserved', 'sent') LIMIT 1`).get(runId);
+    AND state IN ('reserved', 'sent', 'indeterminate_after_send') LIMIT 1`).get(runId);
   if (activeWork || activeOperation) throw new Error("semantic_convergence_rg_execution_active");
 }
 

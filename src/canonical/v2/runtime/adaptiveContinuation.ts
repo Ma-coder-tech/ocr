@@ -456,10 +456,10 @@ function continuationProviderCalls(persisted: PersistedAnalysisRunRecord): numbe
 }
 
 function lifecycleFor(decisions: CanonicalClaimContinuationDecision[]): CanonicalAdaptiveContinuationState["lifecycle"] {
-  if (decisions.some((item) => item.disposition === "convergence_required")) return "convergence_required";
   if (decisions.some((item) => item.disposition === "operationally_degraded_reconciliation_required")) {
     return "indeterminate_reconciliation_required";
   }
+  if (decisions.some((item) => item.disposition === "convergence_required")) return "convergence_required";
   if (decisions.some((item) => item.disposition === "operationally_degraded_retry_eligible" ||
     item.disposition === "operationally_degraded_withheld")) return "operational_degradation_blocks_judgment";
   if (decisions.some((item) => item.disposition === "newly_eligible" || item.disposition === "justified_refinement")) {
