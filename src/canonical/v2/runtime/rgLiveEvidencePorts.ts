@@ -6,6 +6,7 @@ import {
   ProviderOperationAuditLog,
 } from "../intelligence/providerAdapters.js";
 import {
+  APPROVED_OPENROUTER_ENDPOINT,
   APPROVED_OPENAI_ENDPOINT,
   LiveOperationTransportError,
   createProductionRgExecutionCapability,
@@ -24,6 +25,7 @@ import type { SearchRequest } from "../intelligence/intelligenceTypes.js";
 import type {
   CanonicalRgDiscoveryCandidate,
   CanonicalRgEvidenceExecutionPorts,
+  CanonicalRgRuntimeReadiness,
   CanonicalRgInvestigatedCandidate,
   CanonicalRgRetrievedDocument,
   CanonicalRgVerificationJudgment,
@@ -56,6 +58,7 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
     return unavailablePorts(safeReason(error));
   }
   const binding = requireLiveCapabilityBinding(capability);
+  const runtimeReadiness = availableRuntimeReadiness(capability);
   const audit = new ProviderOperationAuditLog();
   const searchPort = createLiveOpenRouterSearchAdapter(capability, audit);
   const destinationPort = createNodeDestinationResolutionPort(capability);
@@ -64,6 +67,7 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
   return {
     availability: "available",
     unavailabilityReasonCodes: [],
+    runtimeReadiness,
     reconciliationCapability: productionRgReconciliationCapability(),
     async search({ intent, maximumCandidates }, onSend) {
       const candidates: CanonicalRgDiscoveryCandidate[] = [];
@@ -177,8 +181,66 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
 
 function unavailablePorts(reasonCode: string): CanonicalRgEvidenceExecutionPorts {
   const unavailable = async (): Promise<never> => { throw new RgEvidenceTransportError("before_send", reasonCode); };
-  return { availability: "unavailable", unavailabilityReasonCodes: [reasonCode], search: unavailable,
+  return { availability: "unavailable", unavailabilityReasonCodes: [reasonCode],
+    runtimeReadiness: unavailableRuntimeReadiness(reasonCode), search: unavailable,
     retrieve: unavailable, investigate: unavailable, verify: unavailable };
+}
+
+function availableRuntimeReadiness(
+  capability: ReturnType<typeof createProductionRgExecutionCapability>,
+): CanonicalRgRuntimeReadiness {
+  const configuration = {
+    searchModelCode: capability.searchModelCode,
+    analysisModelCode: capability.modelCode,
+    searchResponseContractHash: capability.searchResponseContractHash,
+    investigativeSchemaHash: capability.investigativeSchemaHash,
+    semanticSchemaHash: capability.semanticSchemaHash,
+    authorityRegistryHash: capability.authorityRegistryHash,
+    searchConfigurationCode: capability.openRouterSearchConfigurationCode,
+  };
+  const base = {
+    schemaVersion: "canonical_rg_runtime_readiness_v1" as const,
+    availability: "available" as const,
+    authorization: "standing_provider_authorization" as const,
+    bindingSource: "production_process_environment" as const,
+    providerBindings: [
+      { operation: "public_search" as const, providerCode: "openrouter_web_search",
+        modelCode: capability.searchModelCode, endpointOrigin: new URL(APPROVED_OPENROUTER_ENDPOINT).origin },
+      { operation: "investigation" as const, providerCode: "openai_responses_api",
+        modelCode: capability.modelCode, endpointOrigin: new URL(APPROVED_OPENAI_ENDPOINT).origin },
+      { operation: "independent_verification" as const, providerCode: "openai_responses_api",
+        modelCode: capability.modelCode, endpointOrigin: new URL(APPROVED_OPENAI_ENDPOINT).origin },
+    ],
+    privacy: {
+      publicSearch: "validated_public_concepts_only" as const,
+      approvedAiContext: "complete_analysis_run_permitted" as const,
+      providerStorage: "disabled" as const,
+      secretPersistence: "prohibited" as const,
+    },
+    reasonCodes: ["production_rg_provider_model_bindings_validated"],
+    configurationHash: digest(configuration),
+  };
+  return { ...base, readinessHash: digest(base) };
+}
+
+function unavailableRuntimeReadiness(reasonCode: string): CanonicalRgRuntimeReadiness {
+  const base = {
+    schemaVersion: "canonical_rg_runtime_readiness_v1" as const,
+    availability: "unavailable" as const,
+    authorization: "standing_provider_authorization" as const,
+    bindingSource: "production_process_environment" as const,
+    providerBindings: [],
+    privacy: {
+      publicSearch: "validated_public_concepts_only" as const,
+      approvedAiContext: "complete_analysis_run_permitted" as const,
+      providerStorage: "disabled" as const,
+      secretPersistence: "prohibited" as const,
+    },
+    reasonCodes: [reasonCode],
+    configurationHash: digest({ bindingSource: "production_process_environment", availability: "unavailable",
+      reasonCode }),
+  };
+  return { ...base, readinessHash: digest(base) };
 }
 
 export function productionRgReconciliationCapability(): CanonicalRgReconciliationCapability {

@@ -868,6 +868,34 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(persisted.result?.artifacts.rh).toEqual(setup.run.artifacts.rh);
   }, 30_000);
 
+  it("stops remaining generation-zero work at an operational ceiling without analytical completion", async () => {
+    const setup = await runWithOneWorkItem(undefined, 1);
+    const calls: string[] = [];
+    const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId,
+      ports: successfulPorts(calls), workerId: "generation-zero-multi-work-worker", operationalPolicy: {
+        authority: "deployment_emergency_circuit_breaker_only", analyticalCompletionAuthority: "none",
+        maximumCumulativeProviderCalls: 1, maximumCumulativeRetrievalBytes: 100_000_000,
+        maximumCumulativeElapsedMs: 60_000_000, maximumConcurrentWork: 1,
+      } });
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    const state = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+    expect(calls).toEqual(["search"]);
+    expect(result).toMatchObject({ workItemsConsidered: 2, workItemsDegraded: 2,
+      workItemsCompletedWithEvidence: 0, workItemsCompletedUnresolved: 0, canonicalTruthPreserved: true });
+    expect(persisted.rgWorkItems.every((work) => work.executionState === "degraded_emergency_circuit_breaker"
+      && work.stopReason === "rg_generation_zero_emergency_cumulative_provider_call_ceiling_reached_not_analytical_completion"))
+      .toBe(true);
+    expect(persisted.rgOperations.filter((operation) => operation.receipt.sendState === "sent")).toHaveLength(1);
+    expect(state.lifecycle).toBe("operational_degradation_blocks_judgment");
+    expect(state.decisions.every((decision) => decision.disposition === "operationally_degraded_retry_eligible"
+      && decision.degradation?.continuationPermission === "bounded_retry_eligible")).toBe(true);
+    expect(state.decisions.some((decision) => decision.disposition === "safely_unresolved")).toBe(false);
+    expect(persisted.canonicalTruthHash).toBe(setup.run.canonicalTruthHash);
+    expect(persisted.result!.artifacts.rh).toEqual(setup.run.artifacts.rh);
+  }, 30_000);
+
   it("uses standing production authorization when approved provider configuration is present", async () => {
     const names = ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "OPENROUTER_SEARCH_MODEL", "OPENAI_INTERNAL_ANALYSIS_MODEL"] as const;
     const prior = Object.fromEntries(names.map((name) => [name, process.env[name]]));
@@ -879,6 +907,26 @@ describe("production durable claim-bound RG evidence execution", () => {
       const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
       const ports = live.createProductionRgEvidencePortsFromEnvironment("standing-authorization-run");
       expect(ports).toMatchObject({ availability: "available", unavailabilityReasonCodes: [],
+        runtimeReadiness: {
+          schemaVersion: "canonical_rg_runtime_readiness_v1",
+          availability: "available",
+          authorization: "standing_provider_authorization",
+          bindingSource: "production_process_environment",
+          providerBindings: [
+            { operation: "public_search", providerCode: "openrouter_web_search",
+              modelCode: "openai_gpt_5_2", endpointOrigin: "https://openrouter.ai" },
+            { operation: "investigation", providerCode: "openai_responses_api",
+              modelCode: "gpt_5_2", endpointOrigin: "https://api.openai.com" },
+            { operation: "independent_verification", providerCode: "openai_responses_api",
+              modelCode: "gpt_5_2", endpointOrigin: "https://api.openai.com" },
+          ],
+          privacy: { publicSearch: "validated_public_concepts_only",
+            approvedAiContext: "complete_analysis_run_permitted", providerStorage: "disabled",
+            secretPersistence: "prohibited" },
+          reasonCodes: ["production_rg_provider_model_bindings_validated"],
+          configurationHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+          readinessHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        },
         reconciliationCapability: {
           mode: "unsupported", originalOperationResend: "prohibited",
           merchantPrivateContextTransmission: "none", lookupRepeatability: "side_effect_free_status_lookup_only",
@@ -888,6 +936,8 @@ describe("production durable claim-bound RG evidence execution", () => {
         },
       });
       expect(ports.reconciliation).toBeUndefined();
+      expect(JSON.stringify(ports.runtimeReadiness)).not.toContain("x".repeat(16));
+      expect(JSON.stringify(ports.runtimeReadiness)).not.toContain("y".repeat(16));
     } finally {
       for (const name of names) {
         const value = prior[name];
@@ -895,6 +945,50 @@ describe("production durable claim-bound RG evidence execution", () => {
       }
     }
   });
+
+  it("durably records unavailable standing runtime readiness without persisting secrets or inventing completion", async () => {
+    const setup = await runWithOneWorkItem();
+    const names = ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "OPENROUTER_SEARCH_MODEL",
+      "OPENAI_INTERNAL_ANALYSIS_MODEL"] as const;
+    const prior = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+    try {
+      for (const name of names) delete process.env[name];
+      const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
+      const ports = live.createProductionRgEvidencePortsFromEnvironment(setup.run.runId);
+      const result = await setup.executor.executeDurableCanonicalRgEvidence({
+        runId: setup.run.runId, ports, workerId: "runtime-readiness-worker",
+      });
+      const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+      const readinessEvent = persisted.rgExecutionEvents.find((event) =>
+        event.eventType === "production_rg_runtime_readiness_observed")!;
+
+      expect(ports).toMatchObject({ availability: "unavailable", runtimeReadiness: {
+        availability: "unavailable", authorization: "standing_provider_authorization",
+        bindingSource: "production_process_environment", providerBindings: [],
+        privacy: { publicSearch: "validated_public_concepts_only",
+          approvedAiContext: "complete_analysis_run_permitted", providerStorage: "disabled",
+          secretPersistence: "prohibited" },
+        configurationHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        readinessHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      } });
+      expect(result).toMatchObject({ workItemsDegraded: 1, workItemsCompletedWithEvidence: 0,
+        canonicalTruthPreserved: true });
+      expect(readinessEvent.event).toMatchObject({ readiness: ports.runtimeReadiness,
+        analyticalCompletionEffect: "none", secretMaterialPersisted: false });
+      expect(JSON.stringify(readinessEvent.event)).not.toMatch(/bearer|your_openai_api_key|your_openrouter_api_key/i);
+      expect(persisted.rgOperations).toEqual([]);
+      expect(persisted.canonicalTruthHash).toBe(setup.run.canonicalTruthHash);
+      expect(persisted.result!.artifacts.rh).toEqual(setup.run.artifacts.rh);
+      await expect(setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports: {
+        ...ports, runtimeReadiness: { ...ports.runtimeReadiness!, readinessHash: "0".repeat(64) },
+      } })).rejects.toThrow("rg_runtime_readiness_binding_invalid");
+    } finally {
+      for (const name of names) {
+        const value = prior[name];
+        if (value === undefined) delete process.env[name]; else process.env[name] = value;
+      }
+    }
+  }, 30_000);
 
   it("applies exact current-run category evidence through revisioned convergence without changing financial truth", async () => {
     const setup = await runWithOneWorkItem("economic_category");

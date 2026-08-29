@@ -138,6 +138,66 @@ describe("durable continuation-authorized adaptive execution", () => {
     expect(persisted.continuationRevisions.at(-1)!.decisions[0]!.disposition).not.toBe("safely_unresolved");
   }, 30_000);
 
+  it("pauses generation-zero work at an operational ceiling without analytical completion and durably resumes the exact claim", async () => {
+    process.env.CANONICAL_RECOVERY_BASE_DELAY_MS = "0";
+    const setup = await setupOneWorkItem();
+    const initialCalls: string[] = [];
+    const observations = { calls: initialCalls, maximumExcludedFingerprintsObserved: 0,
+      targetAtomicClaimId: setup.persisted.rgWorkItems[0]!.atomicClaimId };
+    const financialFoundationHash = setup.run.financialFoundationHash;
+    const canonicalTruthHash = setup.run.canonicalTruthHash;
+
+    const paused = await setup.adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId,
+      ports: adaptivePorts(observations), workerId: "generation-zero-ceiling-worker",
+      operationalPolicy: operationalPolicy(1) });
+    const afterPause = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const decision = afterPause.continuationRevisions.at(-1)!.decisions[0]!;
+    const recoveryStore = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryStore.js");
+    const recoveryWorker = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryWorker.js");
+    const [intent] = recoveryStore.listCanonicalAnalysisRecoveryIntents(setup.run.runId);
+
+    expect(initialCalls).toEqual(["target-initial-search"]);
+    expect(paused).toMatchObject({ lifecycle: "operational_degradation_blocks_judgment",
+      completion: "stopped_operationally", financialFoundationPreserved: true });
+    expect(decision).toMatchObject({ disposition: "operationally_degraded_retry_eligible",
+      degradation: { subtype: "resource_or_runtime_exhaustion", continuationPermission: "bounded_retry_eligible",
+        reasonCodes: expect.arrayContaining([
+          "rg_generation_zero_emergency_cumulative_provider_call_ceiling_reached_not_analytical_completion",
+          "operational_degradation_is_not_analytical_completion",
+        ]) } });
+    expect(decision.disposition).not.toBe("safely_unresolved");
+    expect(afterPause.rgWorkItems[0]).toMatchObject({ executionState: "degraded_emergency_circuit_breaker",
+      stopReason: "rg_generation_zero_emergency_cumulative_provider_call_ceiling_reached_not_analytical_completion" });
+    expect(afterPause.financialFoundationHash).toBe(financialFoundationHash);
+    expect(afterPause.canonicalTruthHash).toBe(canonicalTruthHash);
+    expect(intent).toMatchObject({ state: "scheduled", intent: { authorization: {
+      atomicClaimId: decision.atomicClaimId, degradationSubtype: "resource_or_runtime_exhaustion",
+      continuationPermission: "bounded_retry_eligible" }, analyticalCompletionEffect: "none" } });
+
+    const stillPausedCalls: string[] = [];
+    expect(await recoveryWorker.processCanonicalAnalysisRecoveryIntent({
+      intentId: intent!.intent.intentId, workerId: "generation-zero-still-paused-worker",
+      ports: unresolvedPorts(stillPausedCalls), operationalPolicy: operationalPolicy(1),
+    })).toBeNull();
+    expect(stillPausedCalls).toEqual([]);
+    expect(setup.store.getPersistedAnalysisRun(setup.run.runId)!.continuationExecutionGrants).toEqual([]);
+    expect(recoveryStore.getCanonicalAnalysisRecoveryIntent(intent!.intent.intentId)).toMatchObject({ state: "scheduled" });
+
+    const resumedCalls: string[] = [];
+    const resumed = await recoveryWorker.processCanonicalAnalysisRecoveryIntent({
+      intentId: intent!.intent.intentId, workerId: "generation-zero-recovery-worker",
+      ports: unresolvedPorts(resumedCalls), operationalPolicy: operationalPolicy(1_000),
+    });
+    const afterResume = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(resumedCalls).toEqual(["continuation-search"]);
+    expect(resumed).toMatchObject({ completion: "stopped_unresolved", financialFoundationPreserved: true });
+    expect(afterResume.continuationExecutionGrants.filter((grant) =>
+      grant.disposition === "operationally_degraded_retry_eligible")).toHaveLength(1);
+    expect(afterResume.financialFoundationHash).toBe(financialFoundationHash);
+    expect(afterResume.canonicalTruthHash).toBe(canonicalTruthHash);
+    expect(recoveryStore.getCanonicalAnalysisRecoveryIntent(intent!.intent.intentId)).toMatchObject({ state: "completed" });
+  }, 30_000);
+
   it("durably records an unexpected adaptive interruption without asserting completion", async () => {
     const setup = await setupReadyRefinement();
     const calls: string[] = [];

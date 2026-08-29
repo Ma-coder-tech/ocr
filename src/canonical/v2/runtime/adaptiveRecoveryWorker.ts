@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { executeDurableCanonicalAdaptiveLoop } from "./adaptiveExecution.js";
-import type { CanonicalAdaptiveExecutionResult } from "./adaptiveExecutionTypes.js";
+import { executeDurableCanonicalAdaptiveLoop, productionAdaptiveOperationalPolicy } from "./adaptiveExecution.js";
+import type { CanonicalAdaptiveExecutionResult, CanonicalAdaptiveOperationalPolicy } from "./adaptiveExecutionTypes.js";
 import type { CanonicalRgEvidenceExecutionPorts } from "./rgEvidenceExecution.js";
 import { createProductionRgEvidencePortsFromEnvironment } from "./rgLiveEvidencePorts.js";
+import { getPersistedAnalysisRun } from "./analysisRunStore.js";
 import {
   claimCanonicalAnalysisRecoveryIntent,
   settleCanonicalAnalysisRecoveryIntentAfterCycle,
@@ -37,16 +38,24 @@ export async function processCanonicalAnalysisRecoveryIntent(input: {
   intentId: string;
   workerId?: string;
   ports?: CanonicalRgEvidenceExecutionPorts;
+  operationalPolicy?: CanonicalAdaptiveOperationalPolicy;
 }): Promise<CanonicalAdaptiveExecutionResult | null> {
   const workerId = input.workerId ?? `canonical-recovery-worker-${randomUUID()}`;
   const claimed = claimCanonicalAnalysisRecoveryIntent(input.intentId, workerId);
   if (!claimed) return null;
   try {
+    const operationalPolicy = input.operationalPolicy ?? productionAdaptiveOperationalPolicy();
+    if (claimed.intent.authorization.degradationSubtype === "resource_or_runtime_exhaustion"
+      && !operationalPolicyAdmitsRecovery(claimed.intent.runId, operationalPolicy)) {
+      settleCanonicalAnalysisRecoveryIntentAfterCycle(claimed.intent.intentId, workerId);
+      return null;
+    }
     const result = await executeDurableCanonicalAdaptiveLoop({
       runId: claimed.intent.runId,
       workerId,
       ports: input.ports ?? createProductionRgEvidencePortsFromEnvironment(claimed.intent.runId),
       recoveryIntentId: claimed.intent.intentId,
+      operationalPolicy,
     });
     settleCanonicalAnalysisRecoveryIntentAfterCycle(claimed.intent.intentId, workerId);
     ensureCanonicalAnalysisRecoveryIntent(claimed.intent.runId);
@@ -58,6 +67,15 @@ export async function processCanonicalAnalysisRecoveryIntent(input: {
     releaseCanonicalAnalysisRecoveryIntentAfterFailure(claimed.intent.intentId, workerId, safeReason(error));
     throw error;
   }
+}
+
+function operationalPolicyAdmitsRecovery(runId: string, policy: CanonicalAdaptiveOperationalPolicy): boolean {
+  const state = getPersistedAnalysisRun(runId)?.continuationRevisions.at(-1);
+  if (!state || policy.authority !== "deployment_emergency_circuit_breaker_only"
+    || policy.analyticalCompletionAuthority !== "none" || policy.maximumConcurrentWork !== 1) return false;
+  return state.cumulativeResource.providerCalls < policy.maximumCumulativeProviderCalls
+    && state.cumulativeResource.retrievalBytes < policy.maximumCumulativeRetrievalBytes
+    && state.cumulativeResource.elapsedMsObserved < policy.maximumCumulativeElapsedMs;
 }
 
 async function tick(): Promise<void> {

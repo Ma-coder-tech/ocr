@@ -5,7 +5,10 @@ import { canonicalJson } from "../canonicalJson.js";
 import type { KnowledgeClaimValue, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 import { normalizeSafeHttpsUrl } from "../intelligence/retrievalSafety.js";
 import { getPersistedAnalysisRun, type PersistedAnalysisRunRecord } from "./analysisRunStore.js";
-import type { CanonicalContinuationExecutionGrant } from "./adaptiveExecutionTypes.js";
+import type {
+  CanonicalAdaptiveOperationalPolicy,
+  CanonicalContinuationExecutionGrant,
+} from "./adaptiveExecutionTypes.js";
 import type { CanonicalRgOperationReconciliationPort, CanonicalRgReconciliationCapability } from "./rgOperationReconciliationTypes.js";
 import { assertClaimedCanonicalRgReconciliationIntent } from "./rgOperationReconciliationStore.js";
 import { dynamicallyBindPublisherOrigin, type CanonicalRgPublisherOriginProof } from "./rgPublisherOriginAuthority.js";
@@ -171,9 +174,32 @@ export type RgEvidencePortReceipt = {
 
 export type RgEvidencePortResult<T> = { value: T; receipt: RgEvidencePortReceipt };
 
+export type CanonicalRgRuntimeReadiness = {
+  schemaVersion: "canonical_rg_runtime_readiness_v1";
+  availability: "available" | "unavailable";
+  authorization: "standing_provider_authorization";
+  bindingSource: "production_process_environment";
+  providerBindings: Array<{
+    operation: "public_search" | "investigation" | "independent_verification";
+    providerCode: string;
+    modelCode: string;
+    endpointOrigin: string;
+  }>;
+  privacy: {
+    publicSearch: "validated_public_concepts_only";
+    approvedAiContext: "complete_analysis_run_permitted";
+    providerStorage: "disabled";
+    secretPersistence: "prohibited";
+  };
+  reasonCodes: string[];
+  configurationHash: string;
+  readinessHash: string;
+};
+
 export type CanonicalRgEvidenceExecutionPorts = {
   availability: "available" | "unavailable";
   unavailabilityReasonCodes: string[];
+  runtimeReadiness?: CanonicalRgRuntimeReadiness;
   reconciliationCapability?: CanonicalRgReconciliationCapability;
   reconciliation?: CanonicalRgOperationReconciliationPort;
   search(input: { intent: CanonicalRgSearchIntent; maximumCandidates: number }, onSend: () => void): Promise<RgEvidencePortResult<CanonicalRgDiscoveryCandidate[]>>;
@@ -217,6 +243,14 @@ export type CanonicalRgEvidenceExecutionResult = {
   canonicalTruthPreserved: true;
 };
 
+type GenerationZeroOperationalScope = {
+  policy: CanonicalAdaptiveOperationalPolicy;
+  planHash: string;
+  cycleStartedAtMs: number;
+  baseline: { providerCalls: number; retrievalBytes: number; elapsedMsObserved: number };
+  existingOperationIds: Set<string>;
+};
+
 export async function executeDurableCanonicalRgEvidence(input: {
   runId: string;
   ports: CanonicalRgEvidenceExecutionPorts;
@@ -224,9 +258,11 @@ export async function executeDurableCanonicalRgEvidence(input: {
   cycleOwnerId?: string;
   executionGrantId?: string;
   reconciliationResume?: { intentId: string; workItemId: string };
+  operationalPolicy?: CanonicalAdaptiveOperationalPolicy;
 }): Promise<CanonicalRgEvidenceExecutionResult> {
   const persisted = getPersistedAnalysisRun(input.runId);
   if (!persisted?.result) throw new Error("rg_evidence_analysis_run_unavailable");
+  validateRuntimeReadiness(input.ports);
   const reconciliation = input.reconciliationResume
     ? assertClaimedCanonicalRgReconciliationIntent(input.reconciliationResume.intentId, input.cycleOwnerId ?? "")
     : null;
@@ -263,6 +299,18 @@ export async function executeDurableCanonicalRgEvidence(input: {
     : executionGrant
     ? persisted.rgWorkItems.filter((item) => item.workItemId === executionGrant.baseWorkItemId)
     : persisted.rgWorkItems;
+  const generationZeroOperationalScope = !reconciliation && !executionGrant
+    && persisted.continuationRevision === 0 && persisted.semanticRevision === 0 && input.operationalPolicy
+    ? createGenerationZeroOperationalScope(input.runId, ledger.planHash, input.operationalPolicy)
+    : null;
+  if (selectedWork[0] && input.ports.runtimeReadiness) {
+    appendEvent(input.runId, selectedWork[0].workItemId, null, "production_rg_runtime_readiness_observed", {
+      readiness: input.ports.runtimeReadiness,
+      operationalPolicy: generationZeroOperationalScope?.policy ?? null,
+      analyticalCompletionEffect: "none",
+      secretMaterialPersisted: false,
+    });
+  }
   for (const planned of selectedWork) {
     const admission = persisted.rgClaimAdmissions.find((item) => item.atomicClaimId === planned.atomicClaimId);
     if (!admission || admission.researchAdmission !== "admitted_to_rg_work_ledger" || admission.materiality !== "material") continue;
@@ -281,6 +329,13 @@ export async function executeDurableCanonicalRgEvidence(input: {
       if (latest.executionState === "completed_unresolved") completedUnresolved += 1; else degraded += 1;
       continue;
     }
+    const generationZeroCeiling = operationalCeilingReason(input.runId, null, generationZeroOperationalScope);
+    if (generationZeroCeiling) {
+      terminalizeWork(input.runId, latest, "degraded_emergency_circuit_breaker", "degraded",
+        generationZeroCeiling, [], workerId);
+      degraded += 1;
+      continue;
+    }
     if (input.ports.availability !== "available") {
       terminalizeWork(input.runId, latest, "degraded_provider_unavailable", "degraded",
         input.ports.unavailabilityReasonCodes[0] ?? "rg_provider_unavailable", [], workerId);
@@ -290,10 +345,15 @@ export async function executeDurableCanonicalRgEvidence(input: {
     const reservation = reserveWork(input.runId, latest, workerId);
     if (!reservation) continue;
     const result = await executeWorkItem({ runId: input.runId, planHash: ledger.planHash, workItem: reservation,
-      admission, ports: input.ports, workerId, currentRunContext: persisted.result, executionGrant });
+      admission, ports: input.ports, workerId, currentRunContext: persisted.result, executionGrant,
+      generationZeroOperationalScope });
     if (result.state === "verified") verifiedEvidence.push(...result.evidence);
     else if (result.state === "unresolved") completedUnresolved += 1;
-    else degraded += 1;
+    else {
+      degraded += 1;
+      const current = workItemFromDb(input.runId, planned.workItemId);
+      if (current?.executionState === "indeterminate_after_send") break;
+    }
   }
 
   const after = getPersistedAnalysisRun(input.runId);
@@ -324,6 +384,7 @@ async function executeWorkItem(input: {
   workerId: string;
   currentRunContext: unknown;
   executionGrant: CanonicalContinuationExecutionGrant | null;
+  generationZeroOperationalScope: GenerationZeroOperationalScope | null;
 }): Promise<{ state: "verified"; evidence: CanonicalRgVerifiedEvidence[] } | { state: "unresolved" | "degraded"; evidence: [] }> {
   let intent: CanonicalRgSearchIntent;
   try {
@@ -351,7 +412,9 @@ async function executeWorkItem(input: {
       projectResult: sanitizeRetrievedDocument,
       call: (onSend) => input.ports.retrieve({ intent, candidate, maximumBytes: 5_242_880 }, onSend) });
     if (retrieval.state !== "completed") {
-      if (retrieval.operation.state === "indeterminate_after_send") return finishFailedOperation(input, retrieval.operation);
+      if (retrieval.operation.state === "indeterminate_after_send" || operationStoppedByCircuitBreaker(retrieval.operation)) {
+        return finishFailedOperation(input, retrieval.operation);
+      }
       continue;
     }
     const document = validateRetrievedDocument(retrieval.value as CanonicalRgRetrievedDocument, candidate);
@@ -368,7 +431,9 @@ async function executeWorkItem(input: {
         expectedValueConstraint: input.workItem.expectedKnowledgeValueConstraint, candidate, document,
         currentRunContext: input.currentRunContext }, onSend) });
     if (investigation.state !== "completed") {
-      if (investigation.operation.state === "indeterminate_after_send") return finishFailedOperation(input, investigation.operation);
+      if (investigation.operation.state === "indeterminate_after_send" || operationStoppedByCircuitBreaker(investigation.operation)) {
+        return finishFailedOperation(input, investigation.operation);
+      }
       continue;
     }
     const investigated = validateInvestigatedCandidate(investigation.value as CanonicalRgInvestigatedCandidate,
@@ -388,7 +453,9 @@ async function executeWorkItem(input: {
         call: (onSend) => input.ports.verify({ intent, admission: input.admission,
           expectedValueConstraint: input.workItem.expectedKnowledgeValueConstraint, candidate, document, frozenCandidate }, onSend) });
     if (verification.state !== "completed") {
-      if (verification.operation.state === "indeterminate_after_send") return finishFailedOperation(input, verification.operation);
+      if (verification.operation.state === "indeterminate_after_send" || operationStoppedByCircuitBreaker(verification.operation)) {
+        return finishFailedOperation(input, verification.operation);
+      }
       continue;
     }
     const verified = validateVerification({ runId: input.runId, planHash: input.planHash, intent,
@@ -425,6 +492,11 @@ function finishFailedOperation(
   terminalizeWork(input.runId, input.workItem, indeterminate ? "indeterminate_after_send" : "degraded_emergency_circuit_breaker",
     "degraded", operation.receipt.reasonCode, [], input.workerId);
   return { state: "degraded", evidence: [] };
+}
+
+function operationStoppedByCircuitBreaker(operation: CanonicalRgOperation): boolean {
+  return operation.state === "failed_before_send"
+    && operation.receipt.reasonCode.endsWith("_not_analytical_completion");
 }
 
 export function compileCanonicalRgSearchIntent(
@@ -532,9 +604,11 @@ async function runExternalOperation<T>(input: {
   projectResult(value: T): unknown;
   call(onSend: () => void): Promise<RgEvidencePortResult<T>>;
   executionGrant: CanonicalContinuationExecutionGrant | null;
+  generationZeroOperationalScope: GenerationZeroOperationalScope | null;
 }): Promise<OperationCallResult> {
   const inputHash = digest(input.operationInput);
-  const ceilingReason = operationalCeilingReason(input.runId, input.executionGrant);
+  const ceilingReason = operationalCeilingReason(input.runId, input.executionGrant,
+    input.generationZeroOperationalScope);
   if (ceilingReason) {
     const operationId = `rg-op-${digest({ runId: input.runId, planHash: input.planHash,
       executionGrantId: input.executionGrant?.grantId ?? null, workItemId: input.workItem.workItemId,
@@ -1043,25 +1117,106 @@ function validateExecutionGrantBinding(persisted: PersistedAnalysisRunRecord,
 }
 
 function operationalCeilingReason(runId: string,
-  grant: CanonicalContinuationExecutionGrant | null): string | null {
-  if (!grant) return null;
+  grant: CanonicalContinuationExecutionGrant | null,
+  generationZero: GenerationZeroOperationalScope | null = null): string | null {
+  if (!grant && !generationZero) return null;
   const rows = db.prepare(`SELECT operation_json FROM canonical_rg_operations WHERE run_id = ?`)
     .all(runId) as Array<{ operation_json: string }>;
-  const operations = rows.map((row) => JSON.parse(row.operation_json) as CanonicalRgOperation)
-    .filter((item) => (item.executionGrantId ?? null) === grant.grantId);
+  const allOperations = rows.map((row) => JSON.parse(row.operation_json) as CanonicalRgOperation);
+  if (generationZero) {
+    const currentOperations = allOperations.filter((item) => item.planHash === generationZero.planHash
+      && (item.executionGrantId ?? null) === null && !generationZero.existingOperationIds.has(item.operationId));
+    const providerCalls = generationZero.baseline.providerCalls
+      + currentOperations.reduce((sum, item) => sum + item.receipt.calls, 0);
+    const retrievalBytes = generationZero.baseline.retrievalBytes
+      + currentOperations.reduce((sum, item) => sum + item.receipt.retrievalBytes, 0);
+    const elapsedMs = generationZero.baseline.elapsedMsObserved
+      + Math.max(0, Date.now() - generationZero.cycleStartedAtMs);
+    if (providerCalls >= generationZero.policy.maximumCumulativeProviderCalls) {
+      return "rg_generation_zero_emergency_cumulative_provider_call_ceiling_reached_not_analytical_completion";
+    }
+    if (retrievalBytes >= generationZero.policy.maximumCumulativeRetrievalBytes) {
+      return "rg_generation_zero_emergency_cumulative_retrieval_byte_ceiling_reached_not_analytical_completion";
+    }
+    if (elapsedMs >= generationZero.policy.maximumCumulativeElapsedMs) {
+      return "rg_generation_zero_emergency_cumulative_elapsed_ceiling_reached_not_analytical_completion";
+    }
+    return null;
+  }
+  const operations = allOperations.filter((item) => (item.executionGrantId ?? null) === grant!.grantId);
   const currentCalls = operations.reduce((sum, item) => sum + item.receipt.calls, 0);
   const currentBytes = operations.reduce((sum, item) => sum + item.receipt.retrievalBytes, 0);
-  const elapsed = Math.max(0, Date.now() - Date.parse(grant.createdAt));
-  if (grant.resourceBaseline.providerCalls + currentCalls >= grant.operationalPolicy.maximumCumulativeProviderCalls) {
+  const elapsed = Math.max(0, Date.now() - Date.parse(grant!.createdAt));
+  if (grant!.resourceBaseline.providerCalls + currentCalls >= grant!.operationalPolicy.maximumCumulativeProviderCalls) {
     return "rg_emergency_cumulative_provider_call_ceiling_reached_not_analytical_completion";
   }
-  if (grant.resourceBaseline.retrievalBytes + currentBytes >= grant.operationalPolicy.maximumCumulativeRetrievalBytes) {
+  if (grant!.resourceBaseline.retrievalBytes + currentBytes >= grant!.operationalPolicy.maximumCumulativeRetrievalBytes) {
     return "rg_emergency_cumulative_retrieval_byte_ceiling_reached_not_analytical_completion";
   }
-  if (grant.resourceBaseline.elapsedMsObserved + elapsed >= grant.operationalPolicy.maximumCumulativeElapsedMs) {
+  if (grant!.resourceBaseline.elapsedMsObserved + elapsed >= grant!.operationalPolicy.maximumCumulativeElapsedMs) {
     return "rg_emergency_cumulative_elapsed_ceiling_reached_not_analytical_completion";
   }
   return null;
+}
+
+function createGenerationZeroOperationalScope(
+  runId: string,
+  planHash: string,
+  policy: CanonicalAdaptiveOperationalPolicy,
+): GenerationZeroOperationalScope {
+  validateGenerationZeroOperationalPolicy(policy);
+  const rows = db.prepare(`SELECT operation_json FROM canonical_rg_operations WHERE run_id = ?`)
+    .all(runId) as Array<{ operation_json: string }>;
+  const existing = rows.map((row) => JSON.parse(row.operation_json) as CanonicalRgOperation)
+    .filter((item) => item.planHash === planHash && (item.executionGrantId ?? null) === null);
+  return {
+    policy: structuredClone(policy),
+    planHash,
+    cycleStartedAtMs: Date.now(),
+    baseline: {
+      providerCalls: existing.reduce((sum, item) => sum + item.receipt.calls, 0),
+      retrievalBytes: existing.reduce((sum, item) => sum + item.receipt.retrievalBytes, 0),
+      elapsedMsObserved: existing.reduce((sum, item) => sum
+        + Math.max(0, Date.parse(item.updatedAt) - Date.parse(item.createdAt)), 0),
+    },
+    existingOperationIds: new Set(existing.map((item) => item.operationId)),
+  };
+}
+
+function validateGenerationZeroOperationalPolicy(policy: CanonicalAdaptiveOperationalPolicy): void {
+  if (policy.authority !== "deployment_emergency_circuit_breaker_only"
+    || policy.analyticalCompletionAuthority !== "none" || policy.maximumConcurrentWork !== 1
+    || !Number.isSafeInteger(policy.maximumCumulativeProviderCalls) || policy.maximumCumulativeProviderCalls < 1
+    || !Number.isSafeInteger(policy.maximumCumulativeRetrievalBytes) || policy.maximumCumulativeRetrievalBytes < 1
+    || !Number.isSafeInteger(policy.maximumCumulativeElapsedMs) || policy.maximumCumulativeElapsedMs < 1) {
+    throw new Error("rg_generation_zero_operational_policy_invalid");
+  }
+}
+
+function validateRuntimeReadiness(ports: CanonicalRgEvidenceExecutionPorts): void {
+  const readiness = ports.runtimeReadiness;
+  if (!readiness) return;
+  const { readinessHash, ...base } = readiness;
+  const validBindings = readiness.providerBindings.every((binding) =>
+    ["public_search", "investigation", "independent_verification"].includes(binding.operation)
+    && /^[a-z][a-z0-9_]{0,95}$/.test(binding.providerCode)
+    && /^[a-z0-9][a-z0-9_]{0,95}$/.test(binding.modelCode)
+    && ["https://openrouter.ai", "https://api.openai.com"].includes(binding.endpointOrigin));
+  if (readiness.schemaVersion !== "canonical_rg_runtime_readiness_v1"
+    || readiness.authorization !== "standing_provider_authorization"
+    || readiness.bindingSource !== "production_process_environment"
+    || readiness.availability !== ports.availability
+    || readiness.privacy.publicSearch !== "validated_public_concepts_only"
+    || readiness.privacy.approvedAiContext !== "complete_analysis_run_permitted"
+    || readiness.privacy.providerStorage !== "disabled"
+    || readiness.privacy.secretPersistence !== "prohibited"
+    || !/^[a-f0-9]{64}$/.test(readiness.configurationHash)
+    || readinessHash !== digest(base) || !validBindings
+    || (readiness.availability === "available" && readiness.providerBindings.length !== 3)
+    || (readiness.availability === "unavailable" && (readiness.providerBindings.length !== 0
+      || readiness.reasonCodes.join("\0") !== ports.unavailabilityReasonCodes.join("\0")))) {
+    throw new Error("rg_runtime_readiness_binding_invalid");
+  }
 }
 
 function verifiedEvidenceFromOperations(runId: string, workItemId: string,

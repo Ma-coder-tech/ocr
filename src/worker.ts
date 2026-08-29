@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { setTimeout as delay } from "node:timers/promises";
 import { createOrReplaceComparison, getStatementsForMerchant, persistStatementFromSummary } from "./accountStore.js";
 import type { AnalysisSummary } from "./types.js";
@@ -168,6 +169,10 @@ export async function processJob(jobId: string): Promise<void> {
         import("./canonical/v2/runtime/rgLiveEvidencePorts.js"),
       ]);
       const rgPorts = createProductionRgEvidencePortsFromEnvironment(canonicalRun.runId);
+      console.log(`[job:${jobId}] canonical-rg-runtime-readiness`, rgPorts.runtimeReadiness ?? {
+        availability: rgPorts.availability,
+        reasonCodes: rgPorts.unavailabilityReasonCodes,
+      });
       const adaptive = await executeDurableCanonicalAdaptiveLoop({ runId: canonicalRun.runId, ports: rgPorts });
       const { enqueueCanonicalAnalysisRecovery } = await import("./canonical/v2/runtime/adaptiveRecoveryWorker.js");
       enqueueCanonicalAnalysisRecovery(canonicalRun.runId);

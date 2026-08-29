@@ -392,8 +392,10 @@ function degradationFor(work: CanonicalRgWorkItem): CanonicalContinuationDegrada
     continuationPermission: "bounded_retry_eligible", reasonCodes: [reason, "existing_bounded_retry_policy_applies"] };
   if (work.executionState === "degraded_emergency_circuit_breaker") {
     const resource = /(?:resource|time|token|cost|budget|ceiling)/i.test(reason);
+    const generationZeroOperationalPause = reason.startsWith("rg_generation_zero_emergency_")
+      && reason.endsWith("_not_analytical_completion");
     return { subtype: resource ? "resource_or_runtime_exhaustion" : "emergency_circuit_breaker",
-      continuationPermission: "withheld_operationally",
+      continuationPermission: generationZeroOperationalPause ? "bounded_retry_eligible" : "withheld_operationally",
       reasonCodes: [reason, "operational_degradation_is_not_analytical_completion"] };
   }
   return null;

@@ -117,7 +117,8 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
           renewCanonicalRgReconciliationIntentLease(reconciliation.intent.intentId, workerId);
           await executeDurableCanonicalRgEvidence({ runId: input.runId, ports: input.ports, workerId,
             cycleOwnerId: workerId,
-            reconciliationResume: { intentId: reconciliation.intent.intentId, workItemId } });
+            reconciliationResume: { intentId: reconciliation.intent.intentId, workItemId },
+            operationalPolicy: policy });
         }
         const resumed = getPersistedAnalysisRun(input.runId)!;
         adjudicateDurableCanonicalContinuation({ runId: input.runId,
@@ -132,7 +133,7 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
       assertHeartbeatHealthy(leaseFailure);
       renewCycleLease(input.runId, workerId);
       await executeDurableCanonicalRgEvidence({ runId: input.runId, ports: input.ports,
-        workerId, cycleOwnerId: workerId });
+        workerId, cycleOwnerId: workerId, operationalPolicy: policy });
       persisted = getPersistedAnalysisRun(input.runId)!;
       adjudicateDurableCanonicalContinuation({ runId: input.runId,
         expectedSemanticRevision: persisted.semanticRevision, expectedSemanticHash: persisted.semanticHash,
