@@ -15,7 +15,9 @@ import { executeDurableCanonicalRgEvidence, type CanonicalRgEvidenceExecutionPor
 import { canonicalRgWorkContractFingerprint, type CanonicalRgWorkItem } from "./rgWorkLedger.js";
 import {
   assertClaimedCanonicalAnalysisRecoveryIntent,
+  canonicalAnalysisRecoveryHeartbeatMs,
   ensureCanonicalAnalysisRecoveryIntent,
+  renewCanonicalAnalysisRecoveryIntentLease,
 } from "./adaptiveRecoveryStore.js";
 import {
   getPersistedAnalysisRun,
@@ -53,7 +55,11 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
   const heartbeat = setInterval(() => {
     try { renewCycleLease(input.runId, workerId); }
     catch (error) { leaseFailure = error instanceof Error ? error : new Error("adaptive_execution_cycle_lease_lost"); }
-  }, CYCLE_HEARTBEAT_MS);
+    if (input.recoveryIntentId) {
+      try { renewCanonicalAnalysisRecoveryIntentLease(input.recoveryIntentId, workerId); }
+      catch (error) { leaseFailure = error instanceof Error ? error : new Error("adaptive_execution_recovery_lease_lost"); }
+    }
+  }, input.recoveryIntentId ? Math.min(CYCLE_HEARTBEAT_MS, canonicalAnalysisRecoveryHeartbeatMs()) : CYCLE_HEARTBEAT_MS);
   heartbeat.unref();
   const before = getPersistedAnalysisRun(input.runId);
   if (!before?.result) {
@@ -75,6 +81,7 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
       ? assertClaimedCanonicalAnalysisRecoveryIntent(input.recoveryIntentId, workerId)
       : null;
     if (recovery && recovery.intent.runId !== input.runId) throw new Error("adaptive_execution_recovery_run_mismatch");
+    if (recovery) renewCanonicalAnalysisRecoveryIntentLease(recovery.intent.intentId, workerId);
     let persisted = before;
     if (persisted.continuationRevision === 0) {
       assertHeartbeatHealthy(leaseFailure);
@@ -170,6 +177,10 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
     throw error;
   } finally {
     clearInterval(heartbeat);
+    if (input.recoveryIntentId) {
+      try { renewCanonicalAnalysisRecoveryIntentLease(input.recoveryIntentId, workerId); }
+      catch { /* The recovery worker will fail closed if ownership was already lost. */ }
+    }
     releaseCycleLease(input.runId, workerId);
   }
 }

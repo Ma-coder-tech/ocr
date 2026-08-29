@@ -6,7 +6,7 @@ import type { CanonicalRgEvidenceExecutionPorts } from "./rgEvidenceExecution.js
 import { createProductionRgEvidencePortsFromEnvironment } from "./rgLiveEvidencePorts.js";
 import {
   claimCanonicalAnalysisRecoveryIntent,
-  completeCanonicalAnalysisRecoveryIntent,
+  settleCanonicalAnalysisRecoveryIntentAfterCycle,
   ensureCanonicalAnalysisRecoveryIntent,
   getCanonicalAnalysisRecoveryIntent,
   getNextCanonicalAnalysisRecoveryDelayMs,
@@ -48,7 +48,7 @@ export async function processCanonicalAnalysisRecoveryIntent(input: {
       ports: input.ports ?? createProductionRgEvidencePortsFromEnvironment(claimed.intent.runId),
       recoveryIntentId: claimed.intent.intentId,
     });
-    completeCanonicalAnalysisRecoveryIntent(claimed.intent.intentId, workerId);
+    settleCanonicalAnalysisRecoveryIntentAfterCycle(claimed.intent.intentId, workerId);
     ensureCanonicalAnalysisRecoveryIntent(claimed.intent.runId);
     return result;
   } catch (error) {

@@ -53,7 +53,8 @@ export type CanonicalAnalysisRecoveryEvent = {
   intentId: string;
   eventSequence: number;
   parentEventHash: string | null;
-  eventType: "scheduled" | "leased" | "lease_recovered" | "completed" | "superseded" | "released_after_failure";
+  eventType: "scheduled" | "leased" | "lease_recovered" | "lease_renewed" | "rescheduled_retry_eligible"
+    | "completed" | "superseded" | "released_after_failure";
   fromState: CanonicalAnalysisRecoveryIntentState | null;
   toState: CanonicalAnalysisRecoveryIntentState;
   workerId: string | null;

@@ -131,6 +131,8 @@ export function listDueCanonicalAnalysisRecoveryIntents(): CanonicalAnalysisReco
   const due: CanonicalAnalysisRecoveryRecord[] = [];
   for (const row of rows) {
     const record = mapRecoveryRecord(row);
+    if (record.state === "leased" && record.leaseOwner
+      && activeAdaptiveCycleLease(record.intent.runId, record.leaseOwner, now)) continue;
     if (recoveryIntentMatchesCurrent(record.intent, getPersistedAnalysisRun(record.intent.runId))) due.push(record);
     else supersedeRecoveryIntent(record.intent.intentId, null, "recovery_binding_no_longer_current");
   }
@@ -138,12 +140,17 @@ export function listDueCanonicalAnalysisRecoveryIntents(): CanonicalAnalysisReco
 }
 
 export function getNextCanonicalAnalysisRecoveryDelayMs(): number | null {
-  const row = db.prepare(`SELECT CASE WHEN state = 'leased' THEN lease_expires_at ELSE next_run_at END AS wake_at
-    FROM canonical_analysis_recovery_intents
+  const rows = db.prepare(`SELECT * FROM canonical_analysis_recovery_intents
     WHERE state = 'scheduled' OR (state = 'leased' AND lease_expires_at IS NOT NULL)
-    ORDER BY wake_at, created_at LIMIT 1`).get() as { wake_at: string } | undefined;
-  if (!row) return null;
-  return Math.max(0, Date.parse(row.wake_at) - Date.now());
+    ORDER BY created_at, intent_id`).all() as Array<Record<string, unknown>>;
+  const wakeTimes = rows.map(mapRecoveryRecord).map((record) => {
+    if (record.state === "scheduled") return Date.parse(record.nextRunAt);
+    const activeCycleExpiry = record.leaseOwner
+      ? activeAdaptiveCycleLease(record.intent.runId, record.leaseOwner, nowIso()) : null;
+    return Math.max(Date.parse(record.leaseExpiresAt!), activeCycleExpiry ? Date.parse(activeCycleExpiry) : 0);
+  });
+  if (wakeTimes.length === 0) return null;
+  return Math.max(0, Math.min(...wakeTimes) - Date.now());
 }
 
 export function claimCanonicalAnalysisRecoveryIntent(intentId: string, workerId: string): CanonicalAnalysisRecoveryRecord | null {
@@ -155,6 +162,8 @@ export function claimCanonicalAnalysisRecoveryIntent(intentId: string, workerId:
   const now = new Date();
   if (existing.state === "scheduled" && Date.parse(existing.nextRunAt) > now.getTime()) return null;
   if (existing.state === "leased" && existing.leaseExpiresAt && Date.parse(existing.leaseExpiresAt) > now.getTime()) return null;
+  if (existing.state === "leased" && existing.leaseOwner
+    && activeAdaptiveCycleLease(existing.intent.runId, existing.leaseOwner, now.toISOString())) return null;
   if (!["scheduled", "leased"].includes(existing.state)) return null;
   const eventType = existing.state === "leased" ? "lease_recovered" : "leased";
   const leaseExpiresAt = new Date(now.getTime() + recoveryLeaseMs()).toISOString();
@@ -180,9 +189,51 @@ export function claimCanonicalAnalysisRecoveryIntent(intentId: string, workerId:
   return getCanonicalAnalysisRecoveryIntent(intentId);
 }
 
-export function completeCanonicalAnalysisRecoveryIntent(intentId: string, workerId: string): void {
+export function settleCanonicalAnalysisRecoveryIntentAfterCycle(
+  intentId: string,
+  workerId: string,
+): "completed" | "scheduled" {
+  const record = getCanonicalAnalysisRecoveryIntent(intentId);
+  if (!record || record.state !== "leased" || record.leaseOwner !== workerId) {
+    throw new Error("canonical_recovery_intent_lease_mismatch");
+  }
+  if (recoveryIntentMatchesCurrent(record.intent, getPersistedAnalysisRun(record.intent.runId))) {
+    const nextRunAt = new Date(Date.now() + recoveryDelayMs(record.intent.runId,
+      record.intent.authorization.atomicClaimId)).toISOString();
+    transitionLeasedRecoveryIntent(intentId, workerId, "rescheduled_retry_eligible", "scheduled",
+      "exact_claim_remains_bounded_retry_eligible", nextRunAt);
+    return "scheduled";
+  }
   transitionLeasedRecoveryIntent(intentId, workerId, "completed", "completed",
     "recovery_cycle_produced_successor_outcome");
+  return "completed";
+}
+
+export function renewCanonicalAnalysisRecoveryIntentLease(intentId: string, workerId: string): void {
+  const record = getCanonicalAnalysisRecoveryIntent(intentId);
+  if (!record || record.state !== "leased" || record.leaseOwner !== workerId
+    || !activeAdaptiveCycleLease(record.intent.runId, workerId, nowIso())) {
+    throw new Error("canonical_recovery_intent_lease_renewal_invalid");
+  }
+  const occurredAt = nowIso();
+  const leaseExpiresAt = new Date(Date.now() + recoveryLeaseMs()).toISOString();
+  const event = recoveryEvent({ intentId, eventSequence: record.latestEventSequence + 1,
+    parentEventHash: record.latestEventHash, eventType: "lease_renewed", fromState: "leased", toState: "leased",
+    workerId, reasonCode: "active_adaptive_cycle_recovery_lease_renewed", occurredAt });
+  const transaction = db.transaction(() => {
+    const updated = db.prepare(`UPDATE canonical_analysis_recovery_intents SET lease_expires_at = ?,
+      latest_event_sequence = ?, latest_event_hash = ?, updated_at = ?
+      WHERE intent_id = ? AND latest_event_sequence = ? AND state = 'leased' AND lease_owner = ?`)
+      .run(leaseExpiresAt, event.eventSequence, event.eventHash, occurredAt, intentId,
+        record.latestEventSequence, workerId);
+    if (updated.changes !== 1) throw new Error("canonical_recovery_intent_concurrent_lease_renewal");
+    insertRecoveryEvent(event);
+  });
+  transaction();
+}
+
+export function canonicalAnalysisRecoveryHeartbeatMs(): number {
+  return Math.max(1, Math.min(60_000, Math.floor(recoveryLeaseMs() / 3)));
 }
 
 export function releaseCanonicalAnalysisRecoveryIntentAfterFailure(
@@ -248,7 +299,7 @@ function supersedeRecoveryIntent(intentId: string, workerId: string | null, reas
 function transitionLeasedRecoveryIntent(
   intentId: string,
   workerId: string,
-  eventType: "completed" | "superseded" | "released_after_failure",
+  eventType: "completed" | "superseded" | "released_after_failure" | "rescheduled_retry_eligible",
   toState: "completed" | "superseded" | "scheduled",
   reasonCode: string,
   nextRunAt?: string,
@@ -387,6 +438,14 @@ function recoveryDelayMs(runId: string, atomicClaimId: string): number {
 
 function recoveryLeaseMs(): number {
   return positiveOperationalInteger("CANONICAL_RECOVERY_LEASE_MS", DEFAULT_LEASE_MS);
+}
+
+function activeAdaptiveCycleLease(runId: string, workerId: string, at: string): string | null {
+  const row = db.prepare(`SELECT adaptive_cycle_owner, adaptive_cycle_lease_expires_at
+    FROM canonical_analysis_runs WHERE id = ?`).get(runId) as
+    { adaptive_cycle_owner: string | null; adaptive_cycle_lease_expires_at: string | null } | undefined;
+  return row?.adaptive_cycle_owner === workerId && row.adaptive_cycle_lease_expires_at
+    && row.adaptive_cycle_lease_expires_at > at ? row.adaptive_cycle_lease_expires_at : null;
 }
 
 function positiveOperationalInteger(name: string, fallback: number): number {

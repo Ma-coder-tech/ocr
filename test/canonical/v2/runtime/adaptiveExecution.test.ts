@@ -257,6 +257,97 @@ describe("durable continuation-authorized adaptive execution", () => {
       .toThrow("canonical_recovery_event_lineage_invalid");
   }, 30_000);
 
+  it("keeps an exact retry-eligible claim durably scheduled across a prolonged provider outage", async () => {
+    process.env.CANONICAL_RECOVERY_BASE_DELAY_MS = "0";
+    const setup = await setupReadyRefinement();
+    const unavailablePorts = { ...unresolvedPorts([]), availability: "unavailable" as const,
+      unavailabilityReasonCodes: ["synthetic_prolonged_provider_outage"] };
+    await setup.adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId,
+      ports: unavailablePorts, workerId: "initial-outage-worker", operationalPolicy: operationalPolicy(1_000) });
+    const recoveryStore = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryStore.js");
+    const recoveryWorker = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryWorker.js");
+    const scheduledIntentIds: string[] = [];
+
+    for (let cycle = 0; cycle < 4; cycle += 1) {
+      const scheduled = recoveryStore.listCanonicalAnalysisRecoveryIntents(setup.run.runId)
+        .filter((item) => item.state === "scheduled");
+      expect(scheduled).toHaveLength(1);
+      scheduledIntentIds.push(scheduled[0]!.intent.intentId);
+      const result = await recoveryWorker.processCanonicalAnalysisRecoveryIntent({
+        intentId: scheduled[0]!.intent.intentId,
+        workerId: `prolonged-outage-worker-${cycle}`,
+        ports: unavailablePorts,
+      });
+      const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+      expect(result).toMatchObject({ lifecycle: "operational_degradation_blocks_judgment",
+        completion: "stopped_operationally" });
+      expect(persisted.continuationRevisions.at(-1)!.decisions.some((item) =>
+        item.atomicClaimId === scheduled[0]!.intent.authorization.atomicClaimId
+        && item.disposition === "operationally_degraded_retry_eligible"
+        && item.degradation?.continuationPermission === "bounded_retry_eligible")).toBe(true);
+      expect(recoveryStore.listCanonicalAnalysisRecoveryIntents(setup.run.runId)
+        .filter((item) => item.state === "scheduled")).toHaveLength(1);
+    }
+
+    expect(new Set(scheduledIntentIds).size).toBeLessThan(scheduledIntentIds.length);
+    expect(recoveryStore.listCanonicalAnalysisRecoveryIntents(setup.run.runId)
+      .reduce((sum, item) => sum + item.dispatchCount, 0)).toBe(4);
+  }, 30_000);
+
+  it("renews a live recovery lease and rejects a competing claimant during a long adaptive cycle", async () => {
+    process.env.CANONICAL_RECOVERY_BASE_DELAY_MS = "0";
+    process.env.CANONICAL_RECOVERY_LEASE_MS = "45";
+    const setup = await setupReadyRefinement();
+    await setup.adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId,
+      ports: { ...unresolvedPorts([]), availability: "unavailable",
+        unavailabilityReasonCodes: ["synthetic_provider_unavailable"] },
+      workerId: "initial-degraded-worker", operationalPolicy: operationalPolicy(1_000) });
+    const recoveryStore = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryStore.js");
+    const recoveryWorker = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryWorker.js");
+    const [intent] = recoveryStore.listCanonicalAnalysisRecoveryIntents(setup.run.runId);
+    const calls: string[] = [];
+    const competingCalls: string[] = [];
+    let releaseSearch!: () => void;
+    let markSearchStarted!: () => void;
+    const searchStarted = new Promise<void>((resolve) => { markSearchStarted = resolve; });
+    const searchRelease = new Promise<void>((resolve) => { releaseSearch = resolve; });
+    const liveRecovery = recoveryWorker.processCanonicalAnalysisRecoveryIntent({
+      intentId: intent!.intent.intentId,
+      workerId: "long-running-recovery-worker",
+      ports: unresolvedPorts(calls, async () => { markSearchStarted(); await searchRelease; }),
+    });
+
+    await searchStarted;
+    await new Promise((resolve) => setTimeout(resolve, 140));
+    const during = recoveryStore.getCanonicalAnalysisRecoveryIntent(intent!.intent.intentId)!;
+    expect(during).toMatchObject({ state: "leased", leaseOwner: "long-running-recovery-worker" });
+    expect(Date.parse(during.leaseExpiresAt!)).toBeGreaterThan(Date.now());
+    expect(Number((setup.db.db.prepare(`SELECT COUNT(*) AS count FROM canonical_analysis_recovery_events
+      WHERE intent_id = ? AND event_type = 'lease_renewed'`).get(intent!.intent.intentId) as { count: number }).count))
+      .toBeGreaterThan(0);
+    setup.db.db.prepare(`UPDATE canonical_analysis_recovery_intents SET lease_expires_at = ? WHERE intent_id = ?`)
+      .run("2000-01-01T00:00:00.000Z", intent!.intent.intentId);
+    expect(await recoveryWorker.processCanonicalAnalysisRecoveryIntent({
+      intentId: intent!.intent.intentId,
+      workerId: "competing-recovery-worker",
+      ports: unresolvedPorts(competingCalls),
+    })).toBeNull();
+    expect(competingCalls).toEqual([]);
+
+    releaseSearch();
+    const result = await liveRecovery;
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const retryGrant = persisted.continuationExecutionGrants.find((item) =>
+      item.disposition === "operationally_degraded_retry_eligible")!;
+    expect(result).toMatchObject({ completion: "stopped_unresolved" });
+    expect(calls).toEqual(["continuation-search"]);
+    expect(persisted.rgOperations.filter((item) => item.kind === "public_search"
+      && item.executionGrantId === retryGrant.grantId)).toHaveLength(1);
+    expect(recoveryStore.getCanonicalAnalysisRecoveryIntent(intent!.intent.intentId)).toMatchObject({
+      state: "completed", dispatchCount: 1, leaseOwner: null,
+    });
+  }, 30_000);
+
   it("recovers an expired intent and persisted retry grant after restart without a duplicate send", async () => {
     process.env.CANONICAL_RECOVERY_BASE_DELAY_MS = "0";
     process.env.CANONICAL_RECOVERY_LEASE_MS = "60000";
