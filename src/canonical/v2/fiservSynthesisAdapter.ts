@@ -8,10 +8,12 @@ import type { CanonicalEconomicsV2SynthesisAnalysis } from "./synthesisTypes.js"
  */
 export function observeFiservEconomicsInCanonicalSynthesisV2(
   economicAnalysis: CanonicalEconomicsV2EconomicAnalysis,
+  contractV1?: NonNullable<Parameters<typeof buildCanonicalEconomicsV2SynthesisAnalysis>[0]["contractV1"]>,
 ): CanonicalEconomicsV2SynthesisAnalysis {
   const capabilityBound = economicAnalysis.economicLayer.admissionProfile.source === "runtime_capability";
   return buildCanonicalEconomicsV2SynthesisAnalysis({
     economicAnalysis,
+    contractV1,
     limitations: [
       capabilityBound
         ? "Capability-bound RD cost is preserved, but RE creates no category, ownership, control, actionability, counterfactual, benchmark, or savings semantics without separately admitted evidence."

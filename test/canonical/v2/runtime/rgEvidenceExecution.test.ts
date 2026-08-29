@@ -1075,27 +1075,38 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(convergence.run.financialFoundationHash).toBe(before.financialFoundationHash);
   }, 30_000);
 
-  it("retains representable-but-insufficient constraint evidence as typed unapplied evidence and does not regenerate futile work", async () => {
+  it("admits exact constraint identity without inventing any action effect or economic permission", async () => {
     const setup = await runWithOneWorkItem("constraint");
     const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
     const admission = before.rgClaimAdmissions[0]!;
+    const calls: string[] = [];
     const execution = await setup.executor.executeDurableCanonicalRgEvidence({
-      runId: setup.run.runId, ports: successfulPorts([]), workerId: "semantic-constraint-worker",
+      runId: setup.run.runId, ports: successfulPorts(calls), workerId: "semantic-constraint-worker",
     });
     const semantic = await import("../../../../src/canonical/v2/runtime/semanticConvergence.js");
     const convergence = semantic.convergeDurableCanonicalAnalysisRun({ runId: setup.run.runId });
     const decision = convergence.revision.applications.find((item) => item.atomicClaimId === admission.atomicClaimId)!;
 
     expect(execution.verifiedEvidence).toHaveLength(1);
+    expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
     expect(decision).toMatchObject({
-      facet: "constraint", disposition: "verified_but_unapplied_contract_insufficient", semanticApplication: null,
-      evidenceRefs: [execution.verifiedEvidence[0]!.evidenceId], reasonCodes: ["constraint_requires_canonical_constraint_payload"],
+      facet: "constraint", disposition: "applied", semanticApplication: null,
+      evidenceRefs: [execution.verifiedEvidence[0]!.evidenceId], reasonCodes: ["verified_exact_facet_contract_v1_synthesis_support"],
     });
     expect(convergence.run.artifacts.rd!.economicLayer.semanticApplications).toEqual([]);
-    expect(convergence.run.artifacts.unresolvedClaims!.claims.some((claim) => claim.researchWithheldFacets
-      .some((item) => item.facet === "constraint" && item.reasonCode === "constraint_requires_canonical_constraint_payload"))).toBe(true);
+    expect(convergence.run.artifacts.re!.synthesisLayer.contractV1).toMatchObject({
+      contractId: "canonical_synthesis_admission_contract_v1",
+      constraints: [expect.objectContaining({ applicability: "applicable", governingAuthorityCode: "fiserv_first_data" })],
+      constraintActionEffects: [], actions: [],
+    });
+    expect(convergence.run.artifacts.re!.synthesisLayer.merchantLevers).toEqual([]);
+    expect(convergence.providerCalls).toBe(0);
+    expect(semantic.convergeDurableCanonicalAnalysisRun({ runId: setup.run.runId }).revision)
+      .toEqual(convergence.revision);
     expect(convergence.run.artifacts.rgWorkLedger!.workItems.some((item) => item.atomicClaimId === admission.atomicClaimId)).toBe(false);
     expect(convergence.run.financialFoundationHash).toBe(before.financialFoundationHash);
+    expect(convergence.run.artifacts.rb).toEqual(before.result!.artifacts.rb);
+    expect(convergence.run.artifacts.rc).toEqual(before.result!.artifacts.rc);
   }, 30_000);
 
   it("replays semantic convergence idempotently from immutable evidence and revision lineage", async () => {
@@ -1740,7 +1751,27 @@ function successfulPorts(calls: string[]): CanonicalRgEvidenceExecutionPorts {
         : constraint.kind === "role"
           ? { kind: "role" as const, participantRole: "processor_platform" as const,
             controlDimension: constraint.controlDimension, state: "proven" as const }
-          : { kind: "boolean" as const, value: true };
+          : constraint.kind === "synthesis_constraint_identity"
+            ? { kind: "synthesis_constraint_identity" as const, applicability: "applicable" as const,
+              governingAuthorityCode: "fiserv_first_data" }
+            : constraint.kind === "synthesis_economic_driver"
+              ? { kind: "synthesis_economic_driver" as const, driverType: "fixed_fee_burden" as const,
+                populationPredicateCode: "fixed_fee_population" }
+              : constraint.kind === "synthesis_recurrence"
+                ? { kind: "synthesis_recurrence" as const, recurrenceBasis: "verified_schedule" as const,
+                  occurrencesPerYear: 12 }
+                : constraint.kind === "synthesis_counterfactual"
+                  ? { kind: "synthesis_counterfactual" as const,
+                    safeActionCode: "request_pricing_term_review" as const, resultState: "verification_only" as const,
+                    alternativeAmountMinor: null, currency: "USD" as const, assumptionCodes: [],
+                    implementationDependencyCodes: [], grossOrNet: "gross" as const }
+                  : constraint.kind === "synthesis_safe_action"
+                    ? { kind: "synthesis_safe_action" as const, safeActionCode: "request_governing_documentation" as const,
+                      requiredInfluence: "none" as const, mechanismCode: "request_exact_governing_document",
+                      verificationRequirementCode: "exact_governing_document",
+                      requestTargetCode: "processor_document_holder",
+                      implementationDependencyCodes: [] }
+                    : { kind: "boolean" as const, value: true };
       const value: CanonicalRgInvestigatedCandidate = {
         investigationId: `investigation-${input.candidate.candidateId}`,
         candidateId: input.candidate.candidateId, documentId: input.document.documentId,

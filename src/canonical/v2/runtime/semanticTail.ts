@@ -33,9 +33,10 @@ export function buildSemanticTailRd(input: {
 
 export function buildSemanticTailRe(input: {
   economic: Parameters<CanonicalSemanticTailBuilders["synthesis"]>[0];
+  contractV1?: Parameters<CanonicalSemanticTailBuilders["synthesis"]>[1];
   builder?: CanonicalSemanticTailBuilders["synthesis"];
 }) {
-  return (input.builder ?? DEFAULT_CANONICAL_SEMANTIC_TAIL_BUILDERS.synthesis)(input.economic);
+  return (input.builder ?? DEFAULT_CANONICAL_SEMANTIC_TAIL_BUILDERS.synthesis)(input.economic, input.contractV1);
 }
 
 export function buildSemanticTailUnresolved(input: Parameters<CanonicalSemanticTailBuilders["claims"]>[0],

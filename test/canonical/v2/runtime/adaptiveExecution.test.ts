@@ -647,7 +647,25 @@ function investigation(input: Parameters<CanonicalRgEvidenceExecutionPorts["inve
     : constraint.kind === "role"
       ? { kind: "role" as const, participantRole: "processor_platform" as const,
         controlDimension: constraint.controlDimension, state: "proven" as const }
-      : { kind: "boolean" as const, value: true };
+      : constraint.kind === "synthesis_constraint_identity"
+        ? { kind: "synthesis_constraint_identity" as const, applicability: "applicable" as const,
+          governingAuthorityCode: "fiserv_first_data" }
+        : constraint.kind === "synthesis_economic_driver"
+          ? { kind: "synthesis_economic_driver" as const, driverType: "fixed_fee_burden" as const,
+            populationPredicateCode: "fixed_fee_population" }
+          : constraint.kind === "synthesis_recurrence"
+            ? { kind: "synthesis_recurrence" as const, recurrenceBasis: "verified_schedule" as const,
+              occurrencesPerYear: 12 }
+            : constraint.kind === "synthesis_counterfactual"
+              ? { kind: "synthesis_counterfactual" as const, safeActionCode: "request_pricing_term_review" as const,
+                resultState: "verification_only" as const, alternativeAmountMinor: null, currency: "USD" as const,
+                assumptionCodes: [], implementationDependencyCodes: [], grossOrNet: "gross" as const }
+              : constraint.kind === "synthesis_safe_action"
+                ? { kind: "synthesis_safe_action" as const, safeActionCode: "request_governing_documentation" as const,
+                  requiredInfluence: "none" as const, mechanismCode: "request_exact_governing_document",
+                  verificationRequirementCode: "exact_governing_document",
+                  requestTargetCode: "processor_document_holder", implementationDependencyCodes: [] }
+                : { kind: "boolean" as const, value: true };
   const publisher = input.intent.publicScope.processor ?? input.intent.publicScope.processorProgram;
   if (!publisher) throw new Error("adaptive_test_publisher_missing");
   return { investigationId: `investigation-${input.candidate.candidateId}`, candidateId: input.candidate.candidateId,

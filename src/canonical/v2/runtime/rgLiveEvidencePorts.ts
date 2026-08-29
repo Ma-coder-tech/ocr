@@ -323,6 +323,9 @@ function verificationSchema(): object {
 }
 
 function knowledgeValueSchema(): object {
+  const actionCode = { type: "string", enum: ["request_governing_documentation", "verify_account_capability_or_configuration",
+    "request_pricing_term_review", "review_supported_configuration_change", "review_supported_operational_process_change",
+    "establish_monitoring_baseline"] };
   return { anyOf: [
     { type: "object", additionalProperties: false, required: ["kind", "canonicalCode", "sourceCode"], properties: {
       kind: { type: "string", const: "mapping" }, canonicalCode: canonicalCodeSchema(), sourceCode: canonicalCodeSchema() } },
@@ -332,6 +335,24 @@ function knowledgeValueSchema(): object {
       state: { type: "string", enum: ["proven", "unresolved", "conflicting", "unavailable", "not_applicable"] } } },
     { type: "object", additionalProperties: false, required: ["kind", "value"], properties: {
       kind: { type: "string", const: "boolean" }, value: { type: "boolean" } } },
+    { type: "object", additionalProperties: false, required: ["kind", "applicability", "governingAuthorityCode"], properties: {
+      kind: { type: "string", const: "synthesis_constraint_identity" }, applicability: { type: "string", enum: ["applicable", "not_applicable"] },
+      governingAuthorityCode: canonicalCodeSchema() } },
+    { type: "object", additionalProperties: false, required: ["kind", "driverType", "populationPredicateCode"], properties: {
+      kind: { type: "string", const: "synthesis_economic_driver" }, driverType: { type: "string", enum: ["premium_rewards_mix", "regulated_debit", "keyed_card_not_present", "qualification_downgrade", "international_cross_border", "commercial_travel_entertainment", "fixed_fee_burden", "minimum_fee_burden", "authorization_per_item_burden", "refund_activity", "dispute_activity", "small_ticket", "high_average_ticket", "other_source_supported"] }, populationPredicateCode: canonicalCodeSchema() } },
+    { type: "object", additionalProperties: false, required: ["kind", "recurrenceBasis", "occurrencesPerYear"], properties: {
+      kind: { type: "string", const: "synthesis_recurrence" }, recurrenceBasis: { type: "string", enum: ["multi_statement", "merchant_contract", "verified_schedule"] }, occurrencesPerYear: { type: "number", exclusiveMinimum: 0, maximum: 366 } } },
+    { type: "object", additionalProperties: false, required: ["kind", "safeActionCode", "resultState", "alternativeAmountMinor", "currency", "assumptionCodes", "implementationDependencyCodes", "grossOrNet"], properties: {
+      kind: { type: "string", const: "synthesis_counterfactual" }, safeActionCode: actionCode,
+      resultState: { type: "string", enum: ["verification_only", "exact_deterministic_delta"] },
+      alternativeAmountMinor: { anyOf: [{ type: "integer", minimum: 0 }, { type: "null" }] }, currency: { type: "string", const: "USD" },
+      assumptionCodes: codeArraySchema(), implementationDependencyCodes: codeArraySchema(), grossOrNet: { type: "string", enum: ["gross", "net"] } } },
+    { type: "object", additionalProperties: false, required: ["kind", "safeActionCode", "requiredInfluence", "mechanismCode",
+      "verificationRequirementCode", "requestTargetCode", "implementationDependencyCodes"], properties: {
+      kind: { type: "string", const: "synthesis_safe_action" }, safeActionCode: actionCode,
+      requiredInfluence: { type: "string", enum: ["none", "merchant_change_right", "merchant_operational_controllability", "both"] },
+      mechanismCode: canonicalCodeSchema(), verificationRequirementCode: { anyOf: [canonicalCodeSchema(), { type: "null" }] },
+      requestTargetCode: { anyOf: [canonicalCodeSchema(), { type: "null" }] }, implementationDependencyCodes: codeArraySchema() } },
   ] };
 }
 

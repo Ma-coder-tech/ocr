@@ -22,9 +22,14 @@ export type CanonicalAtomicClaimFacet =
   | "negotiator_change_authority"
   | "contractual_controller"
   | "constraint"
+  | "economic_driver"
   | "recurrence"
   | "counterfactual"
-  | "merchant_lever";
+  | "merchant_lever"
+  | "merchant_change_right"
+  | "merchant_operational_controllability"
+  | "constraint_action_effect"
+  | "constraint_condition";
 
 export type CanonicalAtomicClaimSeed = {
   parent: CanonicalUnresolvedClaim;
@@ -59,7 +64,7 @@ export function facetsForUnresolvedClaimClass(claimClass: CanonicalUnresolvedCla
     case "economic_ownership": return ["economic_beneficiary", "economic_owner"];
     case "economic_control": return ["collector", "billing_intermediary", "rule_setter", "price_setter",
       "negotiator_change_authority", "contractual_controller", "constraint"];
-    case "merchant_actionability": return ["recurrence", "counterfactual", "merchant_lever"];
+    case "merchant_actionability": return ["economic_driver", "recurrence", "counterfactual", "merchant_lever"];
   }
 }
 
@@ -151,6 +156,10 @@ function queryForFacet(
   }
   if (facet === "merchant_lever") {
     return { ...categoryQuery, claimType: "merchant_lever_availability",
+      subjectCode: canonicalFacetSubjectCode(baseSubject, facet) };
+  }
+  if (facet === "economic_driver" || facet === "recurrence" || facet === "counterfactual") {
+    return { ...categoryQuery, claimType: "processor_term",
       subjectCode: canonicalFacetSubjectCode(baseSubject, facet) };
   }
   return null;

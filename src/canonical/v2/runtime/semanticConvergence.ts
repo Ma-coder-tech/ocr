@@ -3,6 +3,8 @@ import { db } from "../../../db.js";
 import type { CanonicalEconomicSemanticApplicationAdmission } from "../economicAnalysis.js";
 import { resolveKnowledge } from "../knowledge/knowledgeResolver.js";
 import type { KnowledgeClaimValue, KnowledgeEntry } from "../knowledge/knowledgeTypes.js";
+import type { CanonicalRgClaimValue, CanonicalSynthesisKnowledgeValue } from "../knowledge/knowledgeTypes.js";
+import type { CanonicalSynthesisContractV1Application } from "../synthesisContractV1Types.js";
 import { reloadGovernedRfCatalogBinding } from "./rfKnowledgeCatalog.js";
 import type { CanonicalRgClaimAdmission, CanonicalRgOperation } from "./rgWorkLedger.js";
 import { buildSemanticTailPlan, buildSemanticTailRd, buildSemanticTailRe, buildSemanticTailRh,
@@ -68,12 +70,25 @@ export function convergeDurableCanonicalAnalysisRun(input: { runId: string; cycl
   }
 
   const resolution = resolveApplications({ persisted, registry, rfEntries: rfSnapshot?.entries ?? [] });
+  const existingContractState = current.artifacts.re?.synthesisLayer.contractV1;
+  if (registry.validation.status !== "valid" &&
+    ((existingContractState?.applications.length ?? 0) > 0 || resolution.synthesisApplications.length > 0)) {
+    // A corrupt or stale registry must not replace a previously valid Contract-v1 semantic state with an
+    // apparently empty result. Fail this revision before rebuilding RD/RE so the last durable truth remains active.
+    throw new Error("semantic_convergence_contract_v1_evidence_registry_invalid");
+  }
   const rd = buildSemanticTailRd({ pricing: current.artifacts.rc, applications: resolution.applications,
     externalEvidenceRefs: registry.evidence.map((item) => item.evidenceId) });
   if (rd.validation.status !== "valid") {
     throw new Error(`semantic_convergence_invalid_rd:${rd.validation.errors.join("|")}`);
   }
-  const re = buildSemanticTailRe({ economic: rd });
+  const re = buildSemanticTailRe({ economic: rd, contractV1: {
+    applications: resolution.synthesisApplications,
+    applicationHash: digestCanonical(resolution.synthesisApplications),
+    rfPrecedenceChecked: true,
+    boundRfSnapshotHash: persisted.rfSnapshotHash,
+    evidenceRegistry: registry,
+  } });
   if (re.validation.status !== "valid") {
     throw new Error(`semantic_convergence_invalid_re:${re.validation.errors.join("|")}`);
   }
@@ -252,8 +267,10 @@ function resolveApplications(input: {
   persisted: PersistedAnalysisRunRecord;
   registry: CanonicalCurrentRunExternalEvidenceRegistry;
   rfEntries: readonly KnowledgeEntry[];
-}): { applications: CanonicalEconomicSemanticApplicationAdmission[]; decisions: CanonicalSemanticApplicationDisposition[] } {
+}): { applications: CanonicalEconomicSemanticApplicationAdmission[];
+  synthesisApplications: CanonicalSynthesisContractV1Application[]; decisions: CanonicalSemanticApplicationDisposition[] } {
   const applications: CanonicalEconomicSemanticApplicationAdmission[] = [];
+  const synthesisApplications: CanonicalSynthesisContractV1Application[] = [];
   const decisions: CanonicalSemanticApplicationDisposition[] = [];
   const run = input.persisted.result!;
   const claimsRequiringReevaluation = new Set(input.persisted.rgClaimAdmissions.map((item) => item.atomicClaimId));
@@ -272,12 +289,44 @@ function resolveApplications(input: {
         ? "bound_rf_exact_atomic_resolution_preserved"
         : "verified_current_run_exact_atomic_resolution_preserved"]));
   }
+  for (const existing of run.artifacts.re?.synthesisLayer.contractV1?.applications ?? []) {
+    if (claimsRequiringReevaluation.has(existing.atomicClaimId)) continue;
+    synthesisApplications.push(structuredClone(existing));
+    const priorDecision = priorDecisionByClaim.get(existing.atomicClaimId);
+    decisions.push(priorDecision ?? disposition(existing.atomicClaimId, existing.chargeRefs, existing.facet,
+      existing.sourceKind, existing.sourceKind === "governed_rf_snapshot" ? "already_resolved_by_rf" : "applied",
+      [], existing.evidenceRefs, existing.rfEntryRefs,
+      [existing.sourceKind === "governed_rf_snapshot"
+        ? "bound_rf_contract_v1_exact_atomic_resolution_preserved"
+        : "verified_current_run_contract_v1_exact_atomic_resolution_preserved"], [existing]));
+  }
   const evidenceByClaim = new Map<string, CanonicalRgVerifiedEvidence[]>();
   for (const evidence of input.registry.evidence) evidenceByClaim.set(evidence.atomicClaimId,
     [...(evidenceByClaim.get(evidence.atomicClaimId) ?? []), evidence]);
   for (const admission of input.persisted.rgClaimAdmissions) {
     if (applications.some((item) => item.atomicClaimId === admission.atomicClaimId)) continue;
     const rgEvidence = evidenceByClaim.get(admission.atomicClaimId) ?? [];
+    if (synthesisFacet(admission.facet)) {
+      const rgEvidence = evidenceByClaim.get(admission.atomicClaimId) ?? [];
+      const applicable = rgEvidence.filter((item) => synthesisValueApplicable(item.proposedValue, admission)
+        && item.scopeFingerprint === admission.scopeFingerprint);
+      const values = uniqueRgValues(applicable);
+      if (values.length > 1) {
+        decisions.push(dispositionForAdmission(admission, "current_run_verified_rg_evidence",
+          "withheld_conflicting_current_run_evidence", rgEvidence.map((item) => item.evidenceId), [],
+          ["conflicting_verified_current_run_synthesis_values"]));
+      } else if (values.length === 1 && admission.statementPeriod) {
+        const supporting = applicable.filter((item) => canonicalJson(item.proposedValue) === canonicalJson(values[0]));
+        const application = synthesisApplicationFor(admission, values[0]!, supporting);
+        synthesisApplications.push(application);
+        decisions.push(dispositionForAdmission(admission, "current_run_verified_rg_evidence", "applied",
+          supporting.map((item) => item.evidenceId), [], ["verified_exact_facet_contract_v1_synthesis_support"], [], [application]));
+      } else if (rgEvidence.length > 0) {
+        decisions.push(dispositionForAdmission(admission, null, "rejected_integrity_or_applicability",
+          rgEvidence.map((item) => item.evidenceId), [], ["contract_v1_synthesis_value_or_scope_not_losslessly_applicable"]));
+      }
+      continue;
+    }
     const representability = representabilityReason(admission);
     if (representability) {
       if (rgEvidence.length > 0) decisions.push(dispositionForAdmission(admission, null,
@@ -330,7 +379,8 @@ function resolveApplications(input: {
     if (rgEvidence.length > 0) decisions.push(dispositionForAdmission(admission, null, "rejected_integrity_or_applicability",
       rgEvidence.map((item) => item.evidenceId), [], ["verified_value_not_losslessly_applicable"]));
   }
-  return { applications: dedupeApplications(applications), decisions: dedupeDecisions(decisions) };
+  return { applications: dedupeApplications(applications), synthesisApplications: dedupeSynthesisApplications(synthesisApplications),
+    decisions: dedupeDecisions(decisions) };
 }
 
 function applicationsFor(admission: CanonicalRgClaimAdmission, run: CanonicalAnalysisRun, value: KnowledgeClaimValue,
@@ -362,9 +412,51 @@ function applicationsFor(admission: CanonicalRgClaimAdmission, run: CanonicalAna
   });
 }
 
-function valueApplicable(value: KnowledgeClaimValue | null, admission: CanonicalRgClaimAdmission): value is KnowledgeClaimValue {
-  return canonicalSemanticValueApplicable({ facet: admission.facet,
-    subjectCode: admission.knowledgeQuery?.subjectCode ?? "", value });
+function valueApplicable(value: CanonicalRgClaimValue | null, admission: CanonicalRgClaimAdmission): value is KnowledgeClaimValue {
+  return Boolean(value && !value.kind.startsWith("synthesis_") && canonicalSemanticValueApplicable({ facet: admission.facet,
+    subjectCode: admission.knowledgeQuery?.subjectCode ?? "", value: value as KnowledgeClaimValue }));
+}
+
+function synthesisFacet(facet: CanonicalRgClaimAdmission["facet"]): boolean {
+  return ["constraint", "economic_driver", "recurrence", "counterfactual", "merchant_lever",
+    "merchant_change_right", "merchant_operational_controllability", "constraint_action_effect", "constraint_condition"].includes(facet);
+}
+
+function synthesisValueApplicable(value: CanonicalRgClaimValue, admission: CanonicalRgClaimAdmission): value is CanonicalSynthesisKnowledgeValue {
+  const expected = admission.expectedKnowledgeValueConstraint;
+  if (!expected || expected.kind !== value.kind) return false;
+  if (admission.facet === "constraint") return value.kind === "synthesis_constraint_identity";
+  if (admission.facet === "economic_driver") return value.kind === "synthesis_economic_driver";
+  if (admission.facet === "recurrence") return value.kind === "synthesis_recurrence";
+  if (admission.facet === "counterfactual") return value.kind === "synthesis_counterfactual";
+  if (admission.facet === "merchant_lever") return value.kind === "synthesis_safe_action";
+  if (admission.facet === "merchant_change_right" || admission.facet === "merchant_operational_controllability") {
+    return value.kind === "synthesis_merchant_influence" && expected.kind === value.kind
+      && value.influenceKind === admission.facet && value.influenceKind === expected.influenceKind
+      && value.safeActionCode === expected.safeActionCode;
+  }
+  if (admission.facet === "constraint_action_effect") return value.kind === "synthesis_constraint_action_effect"
+    && expected.kind === value.kind && value.safeActionCode === expected.safeActionCode
+    && value.constraintAtomicClaimId === expected.constraintAtomicClaimId;
+  return admission.facet === "constraint_condition" && value.kind === "synthesis_condition_state"
+    && expected.kind === value.kind && value.safeActionCode === expected.safeActionCode
+    && value.constraintAtomicClaimId === expected.constraintAtomicClaimId && value.conditionCode === expected.conditionCode;
+}
+
+function synthesisApplicationFor(admission: CanonicalRgClaimAdmission, value: CanonicalSynthesisKnowledgeValue,
+  evidence: CanonicalRgVerifiedEvidence[]): CanonicalSynthesisContractV1Application {
+  if (!admission.statementPeriod || evidence.length === 0) throw new Error("contract_v1_synthesis_application_missing_period_or_evidence");
+  return {
+    applicationId: `synthesis-contract-v1-application-${digestCanonical({ atomicClaimId: admission.atomicClaimId, value }).slice(0, 32)}`,
+    atomicClaimId: admission.atomicClaimId, facet: admission.facet, chargeRefs: unique(admission.canonicalRefs),
+    occurrenceRefs: unique(admission.occurrenceRefs), scopeFingerprint: admission.scopeFingerprint,
+    statementPeriod: admission.statementPeriod, sourceKind: "current_run_verified_rg_evidence", value: structuredClone(value),
+    evidenceRefs: unique(evidence.map((item) => item.evidenceId)), rfEntryRefs: [],
+    derivabilityTier: "requires_external_rule_or_schedule", evidenceClass: "public_documentation_verified",
+    assertionBasis: "external_verified", effectiveFrom: commonNullable(evidence.map((item) => item.effectiveFrom)),
+    effectiveTo: commonNullable(evidence.map((item) => item.effectiveTo)), scopeFingerprintVerified: true,
+    exactFacetVerified: true, materiality: admission.materiality,
+  };
 }
 
 function representabilityReason(admission: CanonicalRgClaimAdmission): string | null {
@@ -421,24 +513,36 @@ function revisedStageOutcomes(outcomes: CanonicalAnalysisRun["stageOutcomes"], a
 function dispositionForAdmission(admission: CanonicalRgClaimAdmission,
   sourceKind: CanonicalSemanticApplicationDisposition["sourceKind"],
   dispositionValue: CanonicalSemanticApplicationDisposition["disposition"], evidenceRefs: string[], rfEntryRefs: string[],
-  reasonCodes: string[], applications: CanonicalEconomicSemanticApplicationAdmission[] = []): CanonicalSemanticApplicationDisposition {
+  reasonCodes: string[], applications: CanonicalEconomicSemanticApplicationAdmission[] = [],
+  synthesisApplications: CanonicalSynthesisContractV1Application[] = []): CanonicalSemanticApplicationDisposition {
   return disposition(admission.atomicClaimId, admission.canonicalRefs, admission.facet, sourceKind,
-    dispositionValue, applications, evidenceRefs, rfEntryRefs, reasonCodes);
+    dispositionValue, applications, evidenceRefs, rfEntryRefs, reasonCodes, synthesisApplications);
 }
 
 function disposition(atomicClaimId: string, chargeRefs: string[], facet: CanonicalSemanticApplicationDisposition["facet"],
   sourceKind: CanonicalSemanticApplicationDisposition["sourceKind"], dispositionValue: CanonicalSemanticApplicationDisposition["disposition"],
   applications: CanonicalEconomicSemanticApplicationAdmission[], evidenceRefs: string[], rfEntryRefs: string[],
-  reasonCodes: string[]): CanonicalSemanticApplicationDisposition {
+  reasonCodes: string[], synthesisApplications: CanonicalSynthesisContractV1Application[] = []): CanonicalSemanticApplicationDisposition {
   return { applicationId: `semantic-decision-${digestCanonical({ atomicClaimId, sourceKind, dispositionValue }).slice(0, 32)}`,
     atomicClaimId, chargeRef: chargeRefs[0]!, chargeRefs: unique(chargeRefs), facet, sourceKind, disposition: dispositionValue,
     semanticApplication: applications[0] ?? null, semanticApplications: [...applications],
+    synthesisApplication: synthesisApplications[0] ?? null, synthesisApplications: [...synthesisApplications],
     evidenceRefs: unique(evidenceRefs), rfEntryRefs: unique(rfEntryRefs), reasonCodes: unique(reasonCodes) };
 }
 
 function uniqueValues(evidence: CanonicalRgVerifiedEvidence[]): KnowledgeClaimValue[] {
   const values = new Map<string, KnowledgeClaimValue>();
-  for (const item of evidence) values.set(canonicalJson(item.proposedValue), item.proposedValue);
+  for (const item of evidence) if (!item.proposedValue.kind.startsWith("synthesis_")) {
+    values.set(canonicalJson(item.proposedValue), item.proposedValue as KnowledgeClaimValue);
+  }
+  return [...values.values()];
+}
+
+function uniqueRgValues(evidence: CanonicalRgVerifiedEvidence[]): CanonicalSynthesisKnowledgeValue[] {
+  const values = new Map<string, CanonicalSynthesisKnowledgeValue>();
+  for (const item of evidence) if (item.proposedValue.kind.startsWith("synthesis_")) {
+    values.set(canonicalJson(item.proposedValue), item.proposedValue as CanonicalSynthesisKnowledgeValue);
+  }
   return [...values.values()];
 }
 
@@ -447,6 +551,12 @@ function dedupeApplications(values: CanonicalEconomicSemanticApplicationAdmissio
   for (const value of values) byClaim.set(`${value.atomicClaimId}:${value.chargeRef}:${value.facet}`, value);
   return [...byClaim.values()].sort((left, right) => left.atomicClaimId.localeCompare(right.atomicClaimId)
     || left.chargeRef.localeCompare(right.chargeRef));
+}
+
+function dedupeSynthesisApplications(values: CanonicalSynthesisContractV1Application[]): CanonicalSynthesisContractV1Application[] {
+  const byClaim = new Map<string, CanonicalSynthesisContractV1Application>();
+  for (const value of values) byClaim.set(value.atomicClaimId, value);
+  return [...byClaim.values()].sort((left, right) => left.atomicClaimId.localeCompare(right.atomicClaimId));
 }
 
 function dedupeDecisions(values: CanonicalSemanticApplicationDisposition[]): CanonicalSemanticApplicationDisposition[] {

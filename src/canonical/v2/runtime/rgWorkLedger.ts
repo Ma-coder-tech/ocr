@@ -6,7 +6,7 @@ import type {
   CanonicalEconomicsV2EconomicAnalysis,
 } from "../economicTypes.js";
 import type { CanonicalEconomicsV2SynthesisAnalysis } from "../synthesisTypes.js";
-import type { KnowledgeClaimType, KnowledgeQuery, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
+import type { ContractV1SafeActionCode, KnowledgeClaimType, KnowledgeQuery, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 import { KNOWLEDGE_CLAIM_POLICIES } from "../knowledge/knowledgePolicy.js";
 import type { CanonicalRfClaimDecision, CanonicalRfClaimResolution } from "./rfClaimResolution.js";
 import type { CanonicalUnresolvedClaim, CanonicalUnresolvedClaimClass, CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
@@ -70,8 +70,19 @@ export type CanonicalRgClaimAdmission = {
     | { kind: "mapping"; sourceCode: string }
     | { kind: "role"; controlDimension: Extract<CanonicalAtomicClaimFacet,
       "economic_beneficiary" | "economic_owner" | "collector" | "billing_intermediary" | "rule_setter" | "price_setter"
-      | "negotiator_change_authority" | "contractual_controller" | "constraint"> }
+      | "negotiator_change_authority" | "contractual_controller"> }
     | { kind: "boolean" }
+    | { kind: "synthesis_constraint_identity" }
+    | { kind: "synthesis_economic_driver" }
+    | { kind: "synthesis_recurrence" }
+    | { kind: "synthesis_counterfactual" }
+    | { kind: "synthesis_safe_action" }
+    | { kind: "synthesis_merchant_influence"; safeActionCode: ContractV1SafeActionCode;
+      influenceKind: "merchant_change_right" | "merchant_operational_controllability" }
+    | { kind: "synthesis_constraint_action_effect"; safeActionCode: ContractV1SafeActionCode;
+      constraintAtomicClaimId: string }
+    | { kind: "synthesis_condition_state"; safeActionCode: ContractV1SafeActionCode;
+      constraintAtomicClaimId: string; conditionCode: string }
     | null;
   requiredSourceAuthorities: KnowledgeSourceAuthority[];
   evidenceObjective: string;
@@ -556,12 +567,16 @@ function expectedKnowledgeValueConstraint(
   if (!query) return null;
   if (facet === "economic_category") return { kind: "mapping", sourceCode: query.subjectCode };
   if (["economic_beneficiary", "economic_owner", "collector", "billing_intermediary", "rule_setter", "price_setter",
-    "negotiator_change_authority", "contractual_controller", "constraint"].includes(facet)) {
+    "negotiator_change_authority", "contractual_controller"].includes(facet)) {
     return { kind: "role", controlDimension: facet as Extract<CanonicalAtomicClaimFacet,
       "economic_beneficiary" | "economic_owner" | "collector" | "billing_intermediary" | "rule_setter" | "price_setter"
-      | "negotiator_change_authority" | "contractual_controller" | "constraint"> };
+      | "negotiator_change_authority" | "contractual_controller"> };
   }
-  if (facet === "merchant_lever") return { kind: "boolean" };
+  if (facet === "constraint") return { kind: "synthesis_constraint_identity" };
+  if (facet === "economic_driver") return { kind: "synthesis_economic_driver" };
+  if (facet === "recurrence") return { kind: "synthesis_recurrence" };
+  if (facet === "counterfactual") return { kind: "synthesis_counterfactual" };
+  if (facet === "merchant_lever") return { kind: "synthesis_safe_action" };
   return null;
 }
 

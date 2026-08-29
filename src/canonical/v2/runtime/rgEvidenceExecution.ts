@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { db, nowIso } from "../../../db.js";
 import { canonicalJson } from "../canonicalJson.js";
-import type { KnowledgeClaimValue, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
+import type { CanonicalRgClaimValue, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 import { normalizeSafeHttpsUrl } from "../intelligence/retrievalSafety.js";
 import { getPersistedAnalysisRun, type PersistedAnalysisRunRecord } from "./analysisRunStore.js";
 import type {
@@ -12,6 +12,8 @@ import type {
 import type { CanonicalRgOperationReconciliationPort, CanonicalRgReconciliationCapability } from "./rgOperationReconciliationTypes.js";
 import { assertClaimedCanonicalRgReconciliationIntent } from "./rgOperationReconciliationStore.js";
 import { dynamicallyBindPublisherOrigin, type CanonicalRgPublisherOriginProof } from "./rgPublisherOriginAuthority.js";
+import { persistedVerifiedEvidenceIntegrityValid } from "./rgEvidenceIntegrity.js";
+export { persistedVerifiedEvidenceIntegrityValid } from "./rgEvidenceIntegrity.js";
 import {
   canonicalRgWorkContractFingerprint,
   type CanonicalRgClaimAdmission,
@@ -93,7 +95,7 @@ export type CanonicalRgInvestigatedCandidate = {
   documentId: string;
   documentFingerprint: string;
   locatorId: string;
-  proposedValue: KnowledgeClaimValue;
+  proposedValue: CanonicalRgClaimValue;
   sourceAuthorityCandidate: Extract<KnowledgeSourceAuthority, "official_network_publication" | "processor_publication">;
   publisherIdentityCode: string;
   publicationTitle: string;
@@ -125,7 +127,7 @@ export type CanonicalRgVerificationJudgment = {
 };
 
 export type CanonicalRgVerifiedEvidence = {
-  schemaVersion: "canonical_rg_verified_evidence_v1_1" | "canonical_rg_verified_evidence_v1_2";
+  schemaVersion: "canonical_rg_verified_evidence_v1_1" | "canonical_rg_verified_evidence_v1_2" | "canonical_rg_verified_evidence_v1_3";
   evidenceId: string;
   runId: string;
   planHash: string;
@@ -150,10 +152,11 @@ export type CanonicalRgVerifiedEvidence = {
   supportLocatorId: string;
   supportLocatorExcerpt: string;
   originPublisherProof: CanonicalRgPublisherOriginProof;
-  proposedValue: KnowledgeClaimValue;
+  proposedValue: CanonicalRgClaimValue;
   effectiveFrom: string | null;
   effectiveTo: string | null;
   applicabilityScope: Record<string, string>;
+  scopeFingerprint?: string;
   statementPeriod: CanonicalRgClaimAdmission["statementPeriod"];
   frozenCandidateHash: string;
   currentRunSupport: "verified_claim_scoped_candidate_support";
@@ -1022,9 +1025,9 @@ function validateVerification(input: {
     candidateId: input.candidate.candidateId, documentFingerprint: document.documentFingerprint,
     investigatorLocatorId: investigatorLocator.locatorId, authorityLocatorId: authorityLocator.locatorId,
     supportLocatorId: supportLocator.locatorId, frozenCandidateHash: frozenCandidate.frozenCandidateHash,
-    originPublisherBindingId: originPublisherProof.bindingId };
+    originPublisherBindingId: originPublisherProof.bindingId, scopeFingerprint: admission.scopeFingerprint };
   return {
-    schemaVersion: "canonical_rg_verified_evidence_v1_2",
+    schemaVersion: "canonical_rg_verified_evidence_v1_3",
     evidenceId: `rg-evidence-${digest(evidenceBase).slice(0, 32)}`,
     ...evidenceBase,
     sourceUrl: document.finalUrl,
@@ -1041,6 +1044,7 @@ function validateVerification(input: {
     effectiveFrom: judgment.effectiveFrom,
     effectiveTo: judgment.effectiveTo,
     applicabilityScope: structuredClone(input.intent.publicScope),
+    scopeFingerprint: admission.scopeFingerprint,
     statementPeriod: admission.statementPeriod,
     currentRunSupport: "verified_claim_scoped_candidate_support",
     reusableKnowledgeState: "candidate_not_promoted",
@@ -1059,7 +1063,7 @@ function publisherIdentityApplicable(publisherIdentityCode: string, publicScope:
   return identities.includes(publisherIdentityCode);
 }
 
-function valueMatchesConstraint(value: KnowledgeClaimValue, constraint: CanonicalRgWorkItem["expectedKnowledgeValueConstraint"],
+function valueMatchesConstraint(value: CanonicalRgClaimValue, constraint: CanonicalRgWorkItem["expectedKnowledgeValueConstraint"],
   admission: CanonicalRgClaimAdmission): boolean {
   if (!value || typeof value !== "object") return false;
   if (constraint.kind === "mapping") return value.kind === "mapping" && value.sourceCode === constraint.sourceCode
@@ -1067,8 +1071,35 @@ function valueMatchesConstraint(value: KnowledgeClaimValue, constraint: Canonica
   if (constraint.kind === "role") return value.kind === "role" && value.controlDimension === constraint.controlDimension
     && ["proven", "unresolved", "conflicting", "unavailable", "not_applicable"].includes(value.state)
     && (value.participantRole === null || isSafeCode(value.participantRole));
-  return constraint.kind === "boolean" && value.kind === "boolean" && typeof value.value === "boolean"
+  if (constraint.kind === "boolean") return value.kind === "boolean" && typeof value.value === "boolean"
     && admission.facet === "merchant_lever";
+  if (constraint.kind === "synthesis_constraint_identity") return value.kind === constraint.kind
+    && ["applicable", "not_applicable"].includes(value.applicability) && isSafeCode(value.governingAuthorityCode);
+  if (constraint.kind === "synthesis_economic_driver") return value.kind === constraint.kind
+    && isSafeCode(value.driverType) && isSafeCode(value.populationPredicateCode);
+  if (constraint.kind === "synthesis_recurrence") return value.kind === constraint.kind
+    && ["multi_statement", "merchant_contract", "verified_schedule"].includes(value.recurrenceBasis)
+    && Number.isFinite(value.occurrencesPerYear) && value.occurrencesPerYear > 0 && value.occurrencesPerYear <= 366;
+  if (constraint.kind === "synthesis_counterfactual") return value.kind === constraint.kind
+    && ["verification_only", "exact_deterministic_delta"].includes(value.resultState)
+    && value.currency === "USD" && (value.alternativeAmountMinor === null
+      || Number.isSafeInteger(value.alternativeAmountMinor) && value.alternativeAmountMinor >= 0)
+    && (value.resultState === "verification_only" ? value.alternativeAmountMinor === null : value.alternativeAmountMinor !== null)
+    && Array.isArray(value.assumptionCodes) && value.assumptionCodes.every(isSafeCode)
+    && Array.isArray(value.implementationDependencyCodes) && value.implementationDependencyCodes.every(isSafeCode);
+  if (constraint.kind === "synthesis_safe_action") return value.kind === constraint.kind
+    && isSafeCode(value.safeActionCode) && isSafeCode(value.mechanismCode)
+    && (value.verificationRequirementCode === null || isSafeCode(value.verificationRequirementCode))
+    && (value.requestTargetCode === null || isSafeCode(value.requestTargetCode))
+    && Array.isArray(value.implementationDependencyCodes) && value.implementationDependencyCodes.every(isSafeCode)
+    && (!["request_governing_documentation", "verify_account_capability_or_configuration"].includes(value.safeActionCode)
+      || value.verificationRequirementCode !== null);
+  if (constraint.kind === "synthesis_merchant_influence") return value.kind === constraint.kind
+    && value.safeActionCode === constraint.safeActionCode && value.influenceKind === constraint.influenceKind;
+  if (constraint.kind === "synthesis_constraint_action_effect") return value.kind === constraint.kind
+    && value.safeActionCode === constraint.safeActionCode && value.constraintAtomicClaimId === constraint.constraintAtomicClaimId;
+  return value.kind === "synthesis_condition_state" && value.safeActionCode === constraint.safeActionCode
+    && value.constraintAtomicClaimId === constraint.constraintAtomicClaimId && value.conditionCode === constraint.conditionCode;
 }
 
 function periodApplicable(asOf: string, effectiveFrom: string | null, effectiveTo: string | null): boolean {
@@ -1233,46 +1264,6 @@ function verifiedEvidenceFromOperations(runId: string, workItemId: string,
     });
 }
 
-export function persistedVerifiedEvidenceIntegrityValid(value: unknown): value is CanonicalRgVerifiedEvidence {
-  if (!value || typeof value !== "object") return false;
-  const evidence = value as CanonicalRgVerifiedEvidence;
-  if (!["canonical_rg_verified_evidence_v1_1", "canonical_rg_verified_evidence_v1_2"].includes(evidence.schemaVersion)
-    || !isSafeId(evidence.evidenceId) || !isSafeId(evidence.runId) || !/^[a-f0-9]{32}$/.test(evidence.planHash)
-    || !isSafeId(evidence.workItemId) || !isSafeId(evidence.atomicClaimId) || !isSafeId(evidence.intentId)
-    || !isSafeId(evidence.candidateId) || !isSafeId(evidence.documentId)
-    || !/^[a-f0-9]{64}$/.test(evidence.documentFingerprint) || !/^[a-f0-9]{64}$/.test(evidence.frozenCandidateHash)) return false;
-  if (!isSafeId(evidence.investigatorLocatorId) || !isSafeId(evidence.authorityLocatorId) || !isSafeId(evidence.supportLocatorId)
-    || !safePublicText(evidence.authorityLocatorExcerpt, 4096) || !safePublicText(evidence.supportLocatorExcerpt, 4096)) return false;
-  if (evidence.currentRunSupport !== "verified_claim_scoped_candidate_support"
-    || evidence.reusableKnowledgeState !== "candidate_not_promoted" || evidence.rfAdmissionAuthority !== "none"
-    || evidence.automaticKnowledgePromotion !== false || evidence.canonicalFinancialMutationAllowed !== false) return false;
-  if (!validNullableDay(evidence.effectiveFrom) || !validNullableDay(evidence.effectiveTo)
-    || !validStatementPeriod(evidence.statementPeriod)) return false;
-  const identity = { runId: evidence.runId, planHash: evidence.planHash,
-    ...(evidence.schemaVersion === "canonical_rg_verified_evidence_v1_2" ? {
-      executionGrantId: evidence.executionGrantId ?? null,
-      executionGeneration: evidence.executionGeneration ?? 0,
-    } : {}), workItemId: evidence.workItemId,
-    atomicClaimId: evidence.atomicClaimId, facet: evidence.facet, intentId: evidence.intentId,
-    candidateId: evidence.candidateId, documentFingerprint: evidence.documentFingerprint,
-    investigatorLocatorId: evidence.investigatorLocatorId, authorityLocatorId: evidence.authorityLocatorId,
-    supportLocatorId: evidence.supportLocatorId, frozenCandidateHash: evidence.frozenCandidateHash,
-    originPublisherBindingId: evidence.originPublisherProof?.bindingId };
-  if (evidence.evidenceId !== `rg-evidence-${digest(identity).slice(0, 32)}`) return false;
-  const rebound = dynamicallyBindPublisherOrigin({ sourceOrigin: evidence.sourceOrigin, finalUrl: evidence.sourceUrl,
-    publisherIdentityCode: evidence.publisherIdentityCode, authorityClass: evidence.sourceAuthority,
-    publicScope: evidence.applicabilityScope });
-  return rebound !== null && digest(rebound) === digest(evidence.originPublisherProof);
-}
-
-function validStatementPeriod(value: unknown): boolean {
-  if (value === null) return true;
-  if (!value || typeof value !== "object") return false;
-  const period = value as { start?: unknown; end?: unknown };
-  return typeof period.start === "string" && typeof period.end === "string"
-    && /^\d{4}-\d{2}-\d{2}$/.test(period.start) && /^\d{4}-\d{2}-\d{2}$/.test(period.end)
-    && period.start <= period.end;
-}
 
 function attachVerifiedEvidence(runId: string, operation: CanonicalRgOperation, evidence: CanonicalRgVerifiedEvidence): void {
   const current = operationFromDb(runId, operation.operationId);

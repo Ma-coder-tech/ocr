@@ -33,6 +33,8 @@ export * from "./economicDiagnostics.js";
 export * from "./economicGoldObservation.js";
 export * from "./fiservEconomicAdapter.js";
 export * from "./synthesisTypes.js";
+export * from "./synthesisContractV1Types.js";
+export * from "./synthesisContractV1.js";
 export * from "./synthesisVersionManifest.js";
 export * from "./knowledge/index.js";
 export * from "./sourceLabelIdentity.js";

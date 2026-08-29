@@ -69,6 +69,7 @@ type Context = {
   auditEntries: RhProjectionAuditEntry[];
   evidenceOrdinals: Map<string, number>;
   readiness: SourceReadinessEnvelope;
+  questionTargetByTheme: Map<string, string>;
 };
 
 const zeroMoney = (): MoneyAmount => ({ currency: "USD", amountMinor: 0 });
@@ -106,6 +107,7 @@ export function buildCanonicalMerchantReportProjectionV2(
     auditEntries: [],
     evidenceOrdinals: new Map(),
     readiness,
+    questionTargetByTheme: new Map(),
   };
 
   const questions = foundationalUnsafe ? [] : buildQuestions(context);
@@ -450,7 +452,7 @@ function buildInventory(context: Context): CanonicalMerchantReportProjectionV2["
 
 function buildAttention(context: Context): RhAttentionItem[] {
   return context.synthesis.synthesisLayer.themes
-    .filter((theme) => theme.materiality !== "unresolved")
+    .filter((theme) => context.synthesis.synthesisLayer.contractV1 ? theme.materiality === "material" : theme.materiality !== "unresolved")
     .map((theme, index) => {
       const copies = themeCopies(theme);
       const item: RhAttentionItem = {
@@ -484,7 +486,9 @@ function buildQuestions(context: Context): RhQuestionItem[] {
       nextStep: rhCopy(codes[1]), amountUnderReview: null });
   }
   for (const theme of context.synthesis.synthesisLayer.themes.filter((item) => item.materiality === "unresolved")) {
-    items.push({ itemId: `question-${items.length + 1}`, known: rhCopy("question_known"), uncertain: rhCopy("question_processor_explanation"),
+    const itemId = `question-${items.length + 1}`;
+    context.questionTargetByTheme.set(theme.id, itemId);
+    items.push({ itemId, known: rhCopy("question_known"), uncertain: rhCopy("question_processor_explanation"),
       nextStep: rhCopy("question_next_step_review"), amountUnderReview: impactForTheme(context, theme, true) });
   }
   for (const conflict of context.input.knowledgeConflicts ?? []) {
@@ -504,14 +508,20 @@ function buildQuestions(context: Context): RhQuestionItem[] {
 }
 
 function buildActions(context: Context, attention: RhAttentionItem[]): RhActionItem[] {
-  const themes = context.synthesis.synthesisLayer.themes.filter((theme) => theme.materiality !== "unresolved");
+  const contractActive = Boolean(context.synthesis.synthesisLayer.contractV1);
+  const themes = context.synthesis.synthesisLayer.themes.filter((theme) => contractActive
+    ? theme.materiality !== "contextual" : theme.materiality !== "unresolved");
   const actions: RhActionItem[] = [];
   for (const theme of themes) {
     for (const leverRef of theme.leverRefs) {
       const lever = context.synthesis.synthesisLayer.merchantLevers.find((item) => item.id === leverRef);
       if (!lever || lever.state === "not_available" || lever.state === "unresolved") continue;
+      if (theme.materiality === "unresolved" && (!contractActive
+        || !["request_governing_documentation", "verify_account_capability_or_configuration"].includes(lever.safeActionCode)
+        || !["documentation_or_monitoring_only", "candidate_requires_verification"].includes(lever.state))) continue;
       const copies = actionCopies(lever);
-      const target = attention.find((_item, index) => themes[index]?.id === theme.id)?.itemId;
+      const target = theme.materiality === "unresolved" ? context.questionTargetByTheme.get(theme.id)
+        : attention.find((_item, index) => (contractActive ? themes.filter((item) => item.materiality !== "unresolved") : themes)[index]?.id === theme.id)?.itemId;
       if (!target) continue;
       actions.push({ itemId: `action-${actions.length + 1}`, kind: actionKind(lever), title: rhCopy(copies[0]), callQuestion: rhCopy(copies[1]), targetId: target });
       context.auditEntries.push({ reportItemRef: `action-${actions.length}`, canonicalRefs: [theme.id, lever.id], permission: "actions",
@@ -543,7 +553,7 @@ function impactForTheme(context: Context, theme: CanonicalEconomicTheme, verific
     if (counterfactual.resultState === "exact_deterministic_delta" && counterfactual.exactDelta) {
       return { kind: "potential_reduction", label: rhCopy("potential_reduction"), amount: counterfactual.exactDelta, annual };
     }
-    if (counterfactual.resultState === "bounded_conditional_delta" && counterfactual.lowerBound && counterfactual.upperBound) {
+    if (!context.synthesis.synthesisLayer.contractV1 && counterfactual.resultState === "bounded_conditional_delta" && counterfactual.lowerBound && counterfactual.upperBound) {
       return { kind: "potential_reduction_range", label: rhCopy("potential_reduction_range"),
         lowerAmount: counterfactual.lowerBound, upperAmount: counterfactual.upperBound, annual };
     }

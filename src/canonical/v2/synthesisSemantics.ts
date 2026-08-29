@@ -57,6 +57,7 @@ export type SynthesisSemanticRegistryContext = {
   dependencyIdByKey: Map<string, string>;
   dependencies: CanonicalSynthesisDependency[];
   authorityAllowed: boolean;
+  contractV1Active?: boolean;
 };
 
 export type SynthesisSemanticRegistry = {
@@ -105,7 +106,7 @@ export function buildSynthesisSemanticRegistry(
     const subjectRef = context.subjectIdByKey.get(item.subjectKey) ?? "";
     const semanticValid = claimSemanticsValid(item, {
       populationRefs, occurrenceRefs, chargeRefs, pricingComponentRefs, roleClaimRefs, participantRefs, bucketByKind,
-      analysis: context.analysis,
+      analysis: context.analysis, contractV1Active: context.contractV1Active === true,
     });
     const supported = context.authorityAllowed && requestedRefsValid && Boolean(subjectRef) && periodValid &&
       proofPositive(proof, dependencyById) && semanticValid;
@@ -163,7 +164,7 @@ function claimSemanticsValid(
     populationRefs: string[]; occurrenceRefs: string[]; chargeRefs: string[]; pricingComponentRefs: string[];
     roleClaimRefs: string[]; participantRefs: string[];
     bucketByKind: Map<CanonicalEconomicCostBucketKind, CanonicalEconomicsV2EconomicAnalysis["economicLayer"]["costStack"]["buckets"][number]>;
-    analysis: CanonicalEconomicsV2EconomicAnalysis;
+    analysis: CanonicalEconomicsV2EconomicAnalysis; contractV1Active: boolean;
   },
 ): boolean {
   const anchored = refs.occurrenceRefs.length + refs.chargeRefs.length + refs.pricingComponentRefs.length > 0;
@@ -183,8 +184,11 @@ function claimSemanticsValid(
       ["multi_statement_supported", "merchant_document_supported", "public_documentation_verified"].includes(item.proof.evidenceClass),
     );
     case "merchant_change_right": {
-      if (refs.roleClaimRefs.length === 0 || refs.participantRefs.length === 0) return false;
-      return refs.participantRefs.every((ref) => refs.analysis.economicLayer.participants.find((p) => p.id === ref)?.roles.includes("merchant")) &&
+      if (refs.participantRefs.length === 0 || !anchored) return false;
+      const merchantBound = refs.participantRefs.every((ref) => refs.analysis.economicLayer.participants.find((p) => p.id === ref)?.roles.includes("merchant"));
+      if (refs.contractV1Active) return merchantBound && ["merchant_document_supported", "public_documentation_verified",
+        "approved_knowledge_supported"].includes(item.proof.evidenceClass);
+      return refs.roleClaimRefs.length > 0 && merchantBound &&
         refs.roleClaimRefs.every((ref) => {
           const role = refs.analysis.economicLayer.roleClaims.find((claim) => claim.id === ref);
           return role?.participantRef && refs.participantRefs.includes(role.participantRef) && role.resolution === "proven" &&
@@ -270,8 +274,15 @@ function normalizeProof(
 }
 
 function proofPositive(proof: CanonicalSynthesisProof, dependencyById: Map<string, CanonicalSynthesisDependency>): boolean {
+  const truthfulExternalRoute = proof.assertionBasis === "external_verified" && (
+    proof.evidenceClass === "public_documentation_verified" && proof.derivabilityTier === "requires_external_rule_or_schedule"
+    || proof.evidenceClass === "merchant_document_supported" && proof.derivabilityTier === "requires_merchant_pricing_document"
+    || proof.evidenceClass === "multi_statement_supported" && proof.derivabilityTier === "requires_additional_statement_history"
+    || proof.evidenceClass === "approved_knowledge_supported" && ["requires_external_rule_or_schedule",
+      "requires_merchant_pricing_document", "requires_additional_statement_history", "requires_processor_explanation"].includes(proof.derivabilityTier));
   return ["source_fact", "deterministic_math", "rule_application", "external_verified"].includes(proof.assertionBasis) &&
-    ["stated_on_statement", "deterministically_derivable_from_statement", "inferable_from_statement_with_qualification"].includes(proof.derivabilityTier) &&
+    (["stated_on_statement", "deterministically_derivable_from_statement", "inferable_from_statement_with_qualification"].includes(proof.derivabilityTier)
+      || truthfulExternalRoute) &&
     ["statement_confirmed", "deterministically_derived", "approved_knowledge_supported", "public_documentation_verified", "merchant_document_supported", "multi_statement_supported"].includes(proof.evidenceClass) &&
     proof.evidenceRefs.length > 0 && proof.dependencyRefs.every((ref) => dependencyById.get(ref)?.status === "satisfied_by_admitted_evidence");
 }

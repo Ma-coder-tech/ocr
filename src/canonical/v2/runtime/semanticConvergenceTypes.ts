@@ -1,6 +1,7 @@
 import type { CanonicalEconomicSemanticApplicationAdmission } from "../economicAnalysis.js";
 import type { CanonicalRgVerifiedEvidence } from "./rgEvidenceExecution.js";
 import type { CanonicalAtomicClaimFacet } from "./atomicClaims.js";
+import type { CanonicalSynthesisContractV1Application } from "../synthesisContractV1Types.js";
 
 export const CURRENT_RUN_EVIDENCE_REGISTRY_SCHEMA_VERSION = "canonical_current_run_external_evidence_registry_v1" as const;
 export const SEMANTIC_CONVERGENCE_SCHEMA_VERSION = "canonical_analysis_semantic_convergence_v1" as const;
@@ -30,6 +31,8 @@ export type CanonicalSemanticApplicationDisposition = {
     | "unresolved_no_evidence";
   semanticApplication: CanonicalEconomicSemanticApplicationAdmission | null;
   semanticApplications: CanonicalEconomicSemanticApplicationAdmission[];
+  synthesisApplication: CanonicalSynthesisContractV1Application | null;
+  synthesisApplications: CanonicalSynthesisContractV1Application[];
   evidenceRefs: string[];
   rfEntryRefs: string[];
   reasonCodes: string[];

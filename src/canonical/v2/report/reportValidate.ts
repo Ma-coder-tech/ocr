@@ -220,7 +220,8 @@ function validateProjectionStructure(
       publicId(item.itemId, `${path}.itemId`); publicId(item.targetId, `${path}.targetId`, false);
       oneOf(item.kind, ["pricing_review", "configuration_review", "service_review", "documentation", "process_review", "monitoring"], `${path}.kind`);
       copy(item.title, `${path}.title`); copy(item.callQuestion, `${path}.callQuestion`);
-      if (!projection.attention?.items.some((attention) => attention.itemId === item.targetId)) errors.push(`${path}:missing_target`);
+      if (!projection.attention?.items.some((attention) => attention.itemId === item.targetId)
+        && !projection.questions?.items.some((question) => question.itemId === item.targetId)) errors.push(`${path}:missing_target`);
     });
   }
   if (projection.continuation) {

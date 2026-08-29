@@ -50,8 +50,13 @@ export function validateCanonicalEconomicsV2SynthesisAnalysis(
   if (manifest.counterfactualPolicyVersion !== "canonical_economic_counterfactual_v2_v1") errors.push("Unsupported RE counterfactual policy.");
   if (manifest.leverPolicyVersion !== "canonical_merchant_lever_v2_v1") errors.push("Unsupported RE merchant-lever policy.");
   if (manifest.themePolicyVersion !== "canonical_economic_theme_v2_v1") errors.push("Unsupported RE theme policy.");
-  if (manifest.authority !== "shadow_non_authoritative") errors.push("RE must remain shadow and non-authoritative.");
-  if (manifest.persistence !== "none") errors.push("RE must not introduce persistence.");
+  const contractActive = layer.contractV1?.contractId === "canonical_synthesis_admission_contract_v1";
+  if (contractActive ? manifest.authority !== "internal_canonical_analysis_run" : manifest.authority !== "shadow_non_authoritative") {
+    errors.push("RE authority does not match its Contract-v1 activation state.");
+  }
+  if (contractActive ? manifest.persistence !== "analysis_run_semantic_revision" : manifest.persistence !== "none") {
+    errors.push("RE persistence does not match its Contract-v1 activation state.");
+  }
   if (manifest.customerExposure !== "none") errors.push("RE must not become customer-visible.");
   if (manifest.aiResearchAuthority !== "prohibited") errors.push("AI/research authority over RE must be prohibited.");
   if (manifest.reportAuthority !== "prohibited") errors.push("RE must not have report authority.");
@@ -60,7 +65,8 @@ export function validateCanonicalEconomicsV2SynthesisAnalysis(
   if (economic.validation.status !== "valid" || economic.economicLayer.validation.status !== "valid") errors.push("RE requires a valid RD economic analysis.");
   if (layer.economicSchemaVersion !== economic.versionManifest.schemaVersion) errors.push("RE references the wrong RD schema version.");
 
-  const evidenceIds = new Set(foundation.sourceModel.evidence.map((item) => item.id));
+  const evidenceIds = new Set([...foundation.sourceModel.evidence.map((item) => item.id),
+    ...(layer.contractV1?.applications.flatMap((item) => item.evidenceRefs) ?? [])]);
   const occurrenceIds = new Set(foundation.sourceModel.occurrences.map((item) => item.id));
   const factIds = new Set(Object.values(foundation.financialPopulations).map((item) => item.id));
   const populationIds = new Set(economic.pricingAnalysis.pricingArchitecture.pricingPopulations.map((item) => item.id));
@@ -224,18 +230,23 @@ export function validateCanonicalEconomicsV2SynthesisAnalysis(
     if (lever.state !== "eligible_supported" && carriesImpact) errors.push(`Non-eligible lever ${lever.id} cannot carry calculated impact.`);
     if (lever.state === "eligible_supported") {
       if (!proofIsPositive(lever, dependencyById)) errors.push(`Eligible lever ${lever.id} lacks positive evidence.`);
-      if (!counterfactual || !["exact_deterministic_delta", "bounded_conditional_delta"].includes(counterfactual.resultState)) errors.push(`Eligible lever ${lever.id} lacks quantified counterfactual.`);
+      const contractAction = layer.contractV1?.actions.find((action) => action.safeActionCode === lever.safeActionCode
+        && sameSet(action.chargeRefs, lever.chargeRefs));
+      if (!contractAction && (!counterfactual || !["exact_deterministic_delta", "bounded_conditional_delta"].includes(counterfactual.resultState))) {
+        errors.push(`Eligible lever ${lever.id} lacks quantified counterfactual.`);
+      }
       const rolesProven = lever.requiredControlDimensions.length > 0 && lever.requiredControlDimensions.every((dimension) =>
         lever.controlRoleRefs.some((ref) => {
           const claim = economic.economicLayer.roleClaims.find((item) => item.id === ref);
           return claim?.dimension === dimension && claim.resolution === "proven" && claim.periodApplicability === "applicable";
         }),
       );
-      if (!rolesProven && lever.operationalControllabilityEvidenceRefs.length === 0) errors.push(`Eligible lever ${lever.id} lacks supported merchant control.`);
+      if (!contractAction && !rolesProven && lever.operationalControllabilityEvidenceRefs.length === 0) errors.push(`Eligible lever ${lever.id} lacks supported merchant control.`);
       const influence = lever.merchantInfluenceClaimRef ? claimById.get(lever.merchantInfluenceClaimRef) : null;
-      if (!influence || influence.status !== "supported" || influence.subjectRef !== lever.id || !["merchant_change_right", "merchant_operational_controllability"].includes(influence.kind)) {
+      if (!contractAction && (!influence || influence.status !== "supported" || influence.subjectRef !== lever.id || !["merchant_change_right", "merchant_operational_controllability"].includes(influence.kind))) {
         errors.push(`Eligible lever ${lever.id} lacks a merchant-specific influence claim.`);
       }
+      if (contractAction && contractAction.state !== "eligible_supported") errors.push(`Eligible lever ${lever.id} exceeds its Contract-v1 action state.`);
     }
   }
 
@@ -265,7 +276,8 @@ export function validateCanonicalEconomicsV2SynthesisAnalysis(
   const themeKeys = new Set<string>();
   for (const theme of layer.themes) {
     validateProof(theme, theme.id, evidenceIds, dependencyIds, dependencyById, errors);
-    const key = `${theme.economicQuestionCode}\u0000${theme.actionBoundaryCode}`;
+    const key = `${theme.economicQuestionCode}\u0000${theme.canonicalQuestionScopeFingerprint}\u0000${theme.actionBoundaryCode}`
+      + `\u0000${theme.statementPeriod ? `${theme.statementPeriod.start}/${theme.statementPeriod.end}` : "unavailable"}`;
     if (themeKeys.has(key)) errors.push(`Theme ${theme.id} duplicates an economic question and action boundary.`);
     themeKeys.add(key);
     for (const ref of theme.factRefs) if (!factIds.has(ref)) errors.push(`Theme ${theme.id} has broken fact ref ${ref}.`);
@@ -281,6 +293,88 @@ export function validateCanonicalEconomicsV2SynthesisAnalysis(
     if (theme.factRefs.length + theme.chargeRefs.length + theme.driverRefs.length + theme.signalRefs.length + theme.leverRefs.length + theme.unresolvedDependencyRefs.length === 0 &&
       theme.contributions.length === 0) {
       errors.push(`Theme ${theme.id} is filler without canonical support.`);
+    }
+  }
+
+  if (layer.contractV1) {
+    if (layer.contractV1.contractId !== "canonical_synthesis_admission_contract_v1"
+      || layer.contractV1.authority !== "internal_canonical_analysis_run_only"
+      || layer.contractV1.customerReportAuthority !== "unchanged"
+      || layer.contractV1.providerExecution !== "not_executed_during_convergence"
+      || layer.contractV1.specializedFamilies !== "inactive"
+      || layer.contractV1.validation.status !== "valid") errors.push("Contract-v1 RE state is not valid and internally bounded.");
+    if (layer.refundEconomics.status !== "unavailable" || layer.amexEconomics.status !== "unavailable"
+      || layer.accountServices.length > 0 || layer.merchantPricingPrograms.length > 0 || layer.offStatementExposures.length > 0
+      || layer.notices.length > 0 || layer.operationalSignals.length > 0) errors.push("Contract-v1 activated a specialized RE family.");
+    if (layer.counterfactuals.some((item) => item.resultState === "bounded_conditional_delta")) errors.push("Contract-v1 cannot admit bounded counterfactuals.");
+    if (layer.themes.some((item) => item.economicQuestionCode === "pricing_structure" || item.themeType === "pricing_structure")) {
+      errors.push("Contract-v1 cannot add a pricing-structure theme.");
+    }
+    const allowedActions = new Set(["request_governing_documentation", "verify_account_capability_or_configuration",
+      "request_pricing_term_review", "review_supported_configuration_change", "review_supported_operational_process_change",
+      "establish_monitoring_baseline"]);
+    for (const action of layer.contractV1.actions) {
+      if (!allowedActions.has(action.safeActionCode)) errors.push(`Contract-v1 action ${action.actionId} is not cataloged.`);
+      if (["request_governing_documentation", "verify_account_capability_or_configuration"].includes(action.safeActionCode)
+        && action.verificationRequirementCode === null) {
+        errors.push(`Contract-v1 verification action ${action.actionId} lacks an exact verification requirement.`);
+      }
+      if (["request_governing_documentation", "verify_account_capability_or_configuration", "establish_monitoring_baseline"]
+        .includes(action.safeActionCode) && action.requiredInfluence !== "none") {
+        errors.push(`Contract-v1 action ${action.actionId} invents an influence prerequisite.`);
+      }
+      if (action.safeActionCode === "request_pricing_term_review" && action.requiredInfluence !== "merchant_change_right") {
+        errors.push(`Contract-v1 pricing review ${action.actionId} lacks exact merchant change-right.`);
+      }
+      if (action.safeActionCode === "review_supported_operational_process_change"
+        && !["merchant_operational_controllability", "both"].includes(action.requiredInfluence)) {
+        errors.push(`Contract-v1 operational action ${action.actionId} lacks operational controllability.`);
+      }
+      if (action.permissionCeiling.includes("impact") && (!action.counterfactualApplicationRef || action.state !== "eligible_supported")) {
+        errors.push(`Contract-v1 action ${action.actionId} exceeds its independent impact prerequisites.`);
+      }
+      if (action.permissionCeiling === "supported_action_with_annual_impact" && !action.recurrenceApplicationRef) {
+        errors.push(`Contract-v1 action ${action.actionId} annualizes without recurrence.`);
+      }
+      if (action.class === "candidate_verification" && !["documentation_or_monitoring_only", "candidate_requires_verification"].includes(action.state)) {
+        errors.push(`Contract-v1 verification action ${action.actionId} exceeds its catalog class.`);
+      }
+    }
+    for (const effect of layer.contractV1.constraintActionEffects) {
+      const constraint = layer.contractV1.constraints.find((item) => item.constraintId === effect.constraintRef);
+      if (!constraint || constraint.scopeFingerprint !== effect.scopeFingerprint
+        || constraint.statementPeriod.start !== effect.statementPeriod.start
+        || constraint.statementPeriod.end !== effect.statementPeriod.end
+        || effect.effectResolutionState !== "proven"
+        || !allowedActions.has(effect.safeActionCode)) errors.push(`Contract-v1 constraint effect ${effect.effectId} has an invalid exact binding.`);
+    }
+    for (const constraint of layer.contractV1.constraints) {
+      if (constraint.identityResolutionState !== "proven" || constraint.applicabilityResolutionState !== "proven"
+        || constraint.governingSourceRefs.length === 0) {
+        errors.push(`Contract-v1 constraint ${constraint.constraintId} lacks explicit identity/applicability/source proof.`);
+      }
+    }
+    for (const theme of layer.themes) {
+      if (!["observed_cost_driver", "cost_control_and_merchant_action"].includes(theme.economicQuestionCode)) {
+        errors.push(`Contract-v1 theme ${theme.id} uses an unapproved economic question.`);
+      }
+      if (!["explanation_only", "verification_or_document_request", "supported_action_no_quantified_impact",
+        "supported_action_with_statement_period_impact", "supported_action_with_annual_impact"].includes(theme.actionBoundaryCode)) {
+        errors.push(`Contract-v1 theme ${theme.id} uses an unapproved action boundary.`);
+      }
+      if (theme.materiality === "contextual" && theme.priorityClass !== "context") errors.push(`Contextual Contract-v1 theme ${theme.id} has invalid priority.`);
+      if (theme.materiality === "unresolved" && (theme.driverRefs.length > 0 || theme.actionBoundaryCode.includes("impact"))) {
+        errors.push(`Unresolved Contract-v1 theme ${theme.id} carries an affirmative driver or impact.`);
+      }
+      if (theme.actionBoundaryCode === "explanation_only" && theme.leverRefs.length > 0) errors.push(`Explanation-only theme ${theme.id} carries action permission.`);
+      const themeLevers = theme.leverRefs.map((ref) => layer.merchantLevers.find((item) => item.id === ref)).filter(Boolean);
+      if (theme.actionBoundaryCode === "verification_or_document_request" && themeLevers.some((lever) =>
+        !lever || !["request_governing_documentation", "verify_account_capability_or_configuration"].includes(lever.safeActionCode))) {
+        errors.push(`Verification-only theme ${theme.id} carries an economic-change action.`);
+      }
+      if (theme.actionBoundaryCode.startsWith("supported_action") && themeLevers.some((lever) => lever?.state !== "eligible_supported")) {
+        errors.push(`Supported-action theme ${theme.id} contains an unsupported action.`);
+      }
     }
   }
 
@@ -433,7 +527,13 @@ function validateProof(
 }
 
 function proofIsPositive(proof: CanonicalSynthesisProof, dependencyById: Map<string, { status: string }>): boolean {
-  return POSITIVE_BASES.has(proof.assertionBasis) && POSITIVE_TIERS.has(proof.derivabilityTier) && POSITIVE_EVIDENCE.has(proof.evidenceClass) &&
+  const truthfulExternalRoute = proof.assertionBasis === "external_verified" && (
+    proof.evidenceClass === "public_documentation_verified" && proof.derivabilityTier === "requires_external_rule_or_schedule"
+    || proof.evidenceClass === "merchant_document_supported" && proof.derivabilityTier === "requires_merchant_pricing_document"
+    || proof.evidenceClass === "multi_statement_supported" && proof.derivabilityTier === "requires_additional_statement_history"
+    || proof.evidenceClass === "approved_knowledge_supported" && ["requires_external_rule_or_schedule",
+      "requires_merchant_pricing_document", "requires_additional_statement_history", "requires_processor_explanation"].includes(proof.derivabilityTier));
+  return POSITIVE_BASES.has(proof.assertionBasis) && (POSITIVE_TIERS.has(proof.derivabilityTier) || truthfulExternalRoute) && POSITIVE_EVIDENCE.has(proof.evidenceClass) &&
     proof.evidenceRefs.length > 0 && proof.dependencyRefs.every((ref) => dependencyById.get(ref)?.status === "satisfied_by_admitted_evidence");
 }
 
@@ -449,4 +549,8 @@ function uniqueIds(items: Array<{ id: string }>, label: string, errors: string[]
 
 function unique(values: string[]): string[] {
   return [...new Set(values)].sort();
+}
+
+function sameSet(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value) => right.includes(value));
 }

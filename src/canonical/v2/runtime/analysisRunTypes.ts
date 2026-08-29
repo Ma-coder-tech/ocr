@@ -60,6 +60,7 @@ export type AnalysisRunManifest = {
   rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled";
   rgPlanning: "durable_claim_scoped_execution_eligible";
   semanticConvergence: "current_run_exact_claim_revisioned";
+  synthesisAdmissionContract: "canonical_synthesis_admission_contract_v1";
   adaptiveContinuation: "durable_deterministic_delta_admission";
   regeneratedPlanExecution: "continuation_authorized_existing_executor";
   benchmarkExecution: "disabled";

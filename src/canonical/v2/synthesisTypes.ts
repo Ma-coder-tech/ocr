@@ -10,6 +10,7 @@ import type {
   CanonicalPricingDerivabilityTier,
 } from "./pricingTypes.js";
 import type { CanonicalEconomicsV2DifferenceClassification } from "./types.js";
+import type { CanonicalSynthesisContractV1State } from "./synthesisContractV1Types.js";
 
 export type CanonicalSynthesisEvidenceClass =
   | "statement_confirmed"
@@ -454,6 +455,8 @@ export type CanonicalEconomicTheme = CanonicalSynthesisProof & {
   id: string;
   economicQuestionCode: string;
   actionBoundaryCode: string;
+  canonicalQuestionScopeFingerprint: string;
+  statementPeriod: { start: string; end: string } | null;
   themeType: CanonicalEconomicThemeType;
   factRefs: string[];
   chargeRefs: string[];
@@ -492,8 +495,8 @@ export type CanonicalEconomicsV2SynthesisVersionManifest = {
   counterfactualPolicyVersion: "canonical_economic_counterfactual_v2_v1";
   leverPolicyVersion: "canonical_merchant_lever_v2_v1";
   themePolicyVersion: "canonical_economic_theme_v2_v1";
-  authority: "shadow_non_authoritative";
-  persistence: "none";
+  authority: "shadow_non_authoritative" | "internal_canonical_analysis_run";
+  persistence: "none" | "analysis_run_semantic_revision";
   customerExposure: "none";
   aiResearchAuthority: "prohibited";
   reportAuthority: "prohibited";
@@ -520,6 +523,7 @@ export type CanonicalEconomicsV2SynthesisLayer = {
   accountRisk: CanonicalAccountRiskStatus;
   themes: CanonicalEconomicTheme[];
   semanticAmendments: CanonicalSynthesisSemanticAmendment[];
+  contractV1: CanonicalSynthesisContractV1State | null;
   limitations: string[];
   validation: { status: "valid" | "invalid"; errors: string[]; warnings: string[] };
 };

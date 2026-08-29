@@ -46,6 +46,8 @@ import {
   RE_SEMANTIC_AMENDMENT_REASONS,
 } from "./synthesisVersionManifest.js";
 import { validateCanonicalEconomicsV2SynthesisAnalysis } from "./synthesisValidate.js";
+import { compileCanonicalSynthesisContractV1 } from "./synthesisContractV1.js";
+import { validateCanonicalSynthesisContractV1Envelope } from "./synthesisContractV1Admission.js";
 
 export type CanonicalSynthesisProofAdmission = {
   derivabilityTier: CanonicalPricingDerivabilityTier;
@@ -222,6 +224,8 @@ export type CanonicalEconomicThemeAdmission = {
   claimKey?: string | null;
   economicQuestionCode: string;
   actionBoundaryCode: string;
+  canonicalQuestionScopeFingerprint?: string;
+  statementPeriod?: { start: string; end: string } | null;
   themeType: CanonicalEconomicThemeType;
   factRefs?: string[];
   chargeRefs?: string[];
@@ -255,6 +259,17 @@ export type BuildCanonicalEconomicsV2SynthesisInput = {
   accountRisk?: CanonicalAccountRiskAdmission;
   demonstratedAmendments?: Array<{ id: CanonicalSynthesisSemanticAmendmentId; synthesisKeys: string[] }>;
   themes?: CanonicalEconomicThemeAdmission[];
+  contractV1?: {
+    applications: import("./synthesisContractV1Types.js").CanonicalSynthesisContractV1Application[];
+    applicationHash: string;
+    rfPrecedenceChecked: true;
+    boundRfSnapshotHash: string;
+    evidenceRegistry: {
+      registryHash: string;
+      validation: { status: "valid" | "invalid"; errors: string[] };
+      evidence: import("./runtime/rgEvidenceExecution.js").CanonicalRgVerifiedEvidence[];
+    };
+  };
   limitations?: string[];
 };
 
@@ -270,8 +285,14 @@ export function buildCanonicalEconomicsV2SynthesisAnalysis(
   input: BuildCanonicalEconomicsV2SynthesisInput,
 ): CanonicalEconomicsV2SynthesisAnalysis {
   const economic = input.economicAnalysis;
-  const evidenceIds = new Set(economic.pricingAnalysis.foundation.sourceModel.evidence.map((item) => item.id));
-  const dependencyAdmissions = input.dependencies ?? [];
+  const contractErrors = input.contractV1 ? validateCanonicalSynthesisContractV1Envelope(input.contractV1) : [];
+  const compiledContract = input.contractV1 && contractErrors.length === 0
+    ? compileCanonicalSynthesisContractV1({ economic, applications: input.contractV1.applications }) : null;
+  if (compiledContract?.state.validation.status === "invalid") contractErrors.push(...compiledContract.state.validation.errors);
+  const contract = compiledContract?.state.validation.status === "valid" ? compiledContract : null;
+  const evidenceIds = new Set([...economic.pricingAnalysis.foundation.sourceModel.evidence.map((item) => item.id),
+    ...(contract ? input.contractV1!.evidenceRegistry.evidence.map((item) => item.evidenceId) : [])]);
+  const dependencyAdmissions = [...(input.dependencies ?? []), ...(contract?.dependencies ?? [])];
   const dependencyIdByKey = idMap(dependencyAdmissions, "synthesis_dependency");
   const dependencies = dependencyAdmissions.map((item): CanonicalSynthesisDependency => ({
     id: dependencyIdByKey.get(item.key)!,
@@ -281,7 +302,7 @@ export function buildCanonicalEconomicsV2SynthesisAnalysis(
     limitations: unique(item.limitations ?? []),
   }));
   const authorityAllowed = economic.validation.status === "valid" &&
-    (economic.economicLayer.admissionProfile.source === "approved_synthetic" || economic.economicLayer.admissionProfile.source === "versioned_template") &&
+    (contract !== null || economic.economicLayer.admissionProfile.source === "approved_synthetic" || economic.economicLayer.admissionProfile.source === "versioned_template") &&
     !["source_unavailable", "corpus_integrity_hold", "requires_human_review"].includes(economic.economicLayer.sourceProvenance);
   const context: BuildContext = {
     analysis: economic,
@@ -291,16 +312,16 @@ export function buildCanonicalEconomicsV2SynthesisAnalysis(
     authorityAllowed,
   };
 
-  const driverAdmissions = input.drivers ?? [];
+  const driverAdmissions = [...(input.drivers ?? []), ...(contract?.drivers ?? [])];
   const relationshipAdmissions = input.attributionRelationships ?? [];
-  const counterfactualAdmissions = input.counterfactuals ?? [];
-  const leverAdmissions = input.merchantLevers ?? [];
+  const counterfactualAdmissions = [...(input.counterfactuals ?? []), ...(contract?.counterfactuals ?? [])];
+  const leverAdmissions = [...(input.merchantLevers ?? []), ...(contract?.merchantLevers ?? [])];
   const signalAdmissions = input.operationalSignals ?? [];
   const serviceAdmissions = input.accountServices ?? [];
   const programAdmissions = input.merchantPricingPrograms ?? [];
   const exposureAdmissions = input.offStatementExposures ?? [];
   const noticeAdmissions = input.notices ?? [];
-  const themeAdmissions = input.themes ?? [];
+  const themeAdmissions = [...(input.themes ?? []), ...(contract?.themes ?? [])];
   const driverIdByKey = idMap(driverAdmissions, "synthesis_driver");
   const relationshipIdByKey = idMap(relationshipAdmissions, "synthesis_attribution");
   const counterfactualIdByKey = idMap(counterfactualAdmissions, "synthesis_counterfactual");
@@ -316,8 +337,10 @@ export function buildCanonicalEconomicsV2SynthesisAnalysis(
     ...serviceIdByKey, ...programIdByKey, ...exposureIdByKey, ...noticeIdByKey, ...themeContributionIdByKey,
     ["refund", "synthesis_refund"], ["amex", "synthesis_amex"], ["risk", "synthesis_risk"],
   ]);
-  const registry = buildSynthesisSemanticRegistry(input.claims ?? [], input.calculations ?? [], {
+  const registry = buildSynthesisSemanticRegistry([...(input.claims ?? []), ...(contract?.claims ?? [])],
+    [...(input.calculations ?? []), ...(contract?.calculations ?? [])], {
     analysis: economic, subjectIdByKey, driverIdByKey, dependencyIdByKey, dependencies, authorityAllowed,
+    contractV1Active: contract !== null,
   });
   const claim = (key: string | null | undefined, kind: Parameters<typeof supportedClaim>[2], subjectRef: string) =>
     supportedClaim(key, registry, kind, subjectRef);
@@ -472,7 +495,10 @@ export function buildCanonicalEconomicsV2SynthesisAnalysis(
       (sameSet(influence.roleClaimRefs, requestedRoles) && requiredDimensions.every((dimension) =>
         influence.roleClaimRefs.some((ref) => roleById.get(ref)?.dimension === dimension)))));
     const impactReady = counterfactual?.resultState === "exact_deterministic_delta" || counterfactual?.resultState === "bounded_conditional_delta";
-    const eligible = item.requestedState === "eligible_supported" && provesCanonical(proof, context) && influenceSafe && impactReady;
+    const contractAction = contract?.state.actions.find((action) => action.safeActionCode === item.safeActionCode
+      && sameSet(action.chargeRefs, item.chargeRefs ?? []));
+    const eligible = item.requestedState === "eligible_supported" && provesCanonical(proof, context)
+      && (contractAction ? contractAction.state === "eligible_supported" : influenceSafe && impactReady);
     const state = eligible ? "eligible_supported" as const : item.requestedState === "not_available" ? "not_available" as const :
       item.requestedState === "documentation_or_monitoring_only" ? "documentation_or_monitoring_only" as const :
       context.authorityAllowed ? "candidate_requires_verification" as const : "unresolved" as const;
@@ -481,12 +507,15 @@ export function buildCanonicalEconomicsV2SynthesisAnalysis(
       driverRefs: unique((item.driverKeys ?? []).map((key) => driverIdByKey.get(key)).filter(isString)), chargeRefs: unique(item.chargeRefs ?? []),
       counterfactualRef, controlRoleRefs: influence?.roleClaimRefs ?? [], requiredControlDimensions: requiredDimensions,
       operationalControllabilityEvidenceRefs: influenceKind === "merchant_operational_controllability" ? influence?.evidenceRefs ?? [] : [],
-      calculatedImpactState: eligible ? counterfactual!.resultState : null, calculatedImpact: eligible ? counterfactual!.exactDelta : null,
-      calculatedImpactLowerBound: eligible ? counterfactual!.lowerBound : null, calculatedImpactUpperBound: eligible ? counterfactual!.upperBound : null,
+      calculatedImpactState: eligible && impactReady ? counterfactual!.resultState : null,
+      calculatedImpact: eligible && impactReady ? counterfactual!.exactDelta : null,
+      calculatedImpactLowerBound: eligible && impactReady ? counterfactual!.lowerBound : null,
+      calculatedImpactUpperBound: eligible && impactReady ? counterfactual!.upperBound : null,
       safeActionCode: item.safeActionCode, prohibitedClaimCodes: unique(item.prohibitedClaimCodes ?? []), merchantInfluenceClaimRef: influence?.id ?? null,
       ...proof,
       limitations: unique([...proof.limitations, ...(item.requestedState === "eligible_supported" && !eligible
-        ? ["Eligible lever status and calculated impact were refused because merchant influence or counterfactual proof was incomplete."] : [])]),
+        ? [contractAction ? "Eligible action status was refused because an exact Contract-v1 prerequisite remained incomplete."
+          : "Eligible lever status and calculated impact were refused because merchant influence or counterfactual proof was incomplete."] : [])]),
     };
   });
 
@@ -599,7 +628,8 @@ export function buildCanonicalEconomicsV2SynthesisAnalysis(
   }));
 
   const draft: CanonicalEconomicsV2SynthesisAnalysis = {
-    versionManifest: CANONICAL_ECONOMICS_V2_SYNTHESIS_VERSION_MANIFEST,
+    versionManifest: contract ? { ...CANONICAL_ECONOMICS_V2_SYNTHESIS_VERSION_MANIFEST,
+      authority: "internal_canonical_analysis_run", persistence: "analysis_run_semantic_revision" } : CANONICAL_ECONOMICS_V2_SYNTHESIS_VERSION_MANIFEST,
     economicAnalysis: economic,
     synthesisLayer: {
       economicSchemaVersion: economic.versionManifest.schemaVersion,
@@ -620,8 +650,11 @@ export function buildCanonicalEconomicsV2SynthesisAnalysis(
       accountRisk,
       themes,
       semanticAmendments,
+      contractV1: contract?.state ?? null,
       limitations: unique([
         ...(input.limitations ?? []),
+        ...contractErrors.map((item) => `Contract-v1 synthesis admission withheld: ${item}.`),
+        ...(contract?.state.validation.warnings ?? []).map((item) => `Contract-v1 exact application withheld: ${item}.`),
         "RE is a deterministic shadow-only synthesis library and has no runtime, persistence, report, customer-language, knowledge-resolution, or account-savings authority.",
       ]),
       validation: { status: "valid", errors: [], warnings: [] },
@@ -749,7 +782,8 @@ function buildThemes(
 ): CanonicalEconomicTheme[] {
   const grouped = new Map<string, CanonicalEconomicThemeAdmission[]>();
   for (const item of admissions) {
-    const groupKey = `${item.economicQuestionCode}\u0000${item.actionBoundaryCode}`;
+    const groupKey = `${item.economicQuestionCode}\u0000${item.canonicalQuestionScopeFingerprint ?? "legacy_unspecified_scope"}`
+      + `\u0000${item.actionBoundaryCode}\u0000${item.statementPeriod ? `${item.statementPeriod.start}/${item.statementPeriod.end}` : "legacy_unspecified_period"}`;
     grouped.set(groupKey, [...(grouped.get(groupKey) ?? []), item]);
   }
   return [...grouped.values()].map((items, index): CanonicalEconomicTheme => {
@@ -785,6 +819,8 @@ function buildThemes(
       id: stableId("synthesis_theme", index),
       economicQuestionCode: first.economicQuestionCode,
       actionBoundaryCode: first.actionBoundaryCode,
+      canonicalQuestionScopeFingerprint: first.canonicalQuestionScopeFingerprint ?? "legacy_unspecified_scope",
+      statementPeriod: first.statementPeriod ?? context.analysis.pricingAnalysis.foundation.identity.statementPeriod,
       themeType: first.themeType,
       factRefs: unique(supported.flatMap((item) => item.factRefs)), chargeRefs: unique(supported.flatMap((item) => item.chargeRefs)),
       driverRefs: unique(supported.flatMap((item) => item.driverRefs)), signalRefs: unique(supported.flatMap((item) => item.signalRefs)),
@@ -867,7 +903,13 @@ function provesCanonical(proof: CanonicalSynthesisProof, context: BuildContext):
     "statement_confirmed", "deterministically_derived", "approved_knowledge_supported", "public_documentation_verified",
     "merchant_document_supported", "multi_statement_supported",
   ]);
-  return context.authorityAllowed && positiveBases.has(proof.assertionBasis) && positiveTiers.has(proof.derivabilityTier) &&
+  const truthfulExternalRoute = proof.assertionBasis === "external_verified" && (
+    proof.evidenceClass === "public_documentation_verified" && proof.derivabilityTier === "requires_external_rule_or_schedule"
+    || proof.evidenceClass === "merchant_document_supported" && proof.derivabilityTier === "requires_merchant_pricing_document"
+    || proof.evidenceClass === "multi_statement_supported" && proof.derivabilityTier === "requires_additional_statement_history"
+    || proof.evidenceClass === "approved_knowledge_supported" && ["requires_external_rule_or_schedule",
+      "requires_merchant_pricing_document", "requires_additional_statement_history", "requires_processor_explanation"].includes(proof.derivabilityTier));
+  return context.authorityAllowed && positiveBases.has(proof.assertionBasis) && (positiveTiers.has(proof.derivabilityTier) || truthfulExternalRoute) &&
     positiveEvidence.has(proof.evidenceClass) && proof.evidenceRefs.length > 0 &&
     proof.dependencyRefs.every((ref) => context.dependencyById.get(ref)?.status === "satisfied_by_admitted_evidence");
 }

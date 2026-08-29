@@ -78,6 +78,46 @@ export type KnowledgeClaimValue =
   }
   | { kind: "boolean"; value: boolean };
 
+export const CONTRACT_V1_SAFE_ACTION_CODES = [
+  "request_governing_documentation",
+  "verify_account_capability_or_configuration",
+  "request_pricing_term_review",
+  "review_supported_configuration_change",
+  "review_supported_operational_process_change",
+  "establish_monitoring_baseline",
+] as const;
+export type ContractV1SafeActionCode = (typeof CONTRACT_V1_SAFE_ACTION_CODES)[number];
+
+export type CanonicalSynthesisKnowledgeValue =
+  | { kind: "synthesis_constraint_identity"; applicability: "applicable" | "not_applicable";
+    governingAuthorityCode: string }
+  | { kind: "synthesis_constraint_action_effect"; constraintAtomicClaimId: string;
+    safeActionCode: ContractV1SafeActionCode;
+    effectState: "blocks_action" | "conditions_action" | "does_not_restrict_this_action";
+    conditionAtomicClaimIds: string[]; dependencyCodes: string[] }
+  | { kind: "synthesis_condition_state"; constraintAtomicClaimId: string;
+    safeActionCode: ContractV1SafeActionCode; conditionCode: string; state: "satisfied" | "not_satisfied" }
+  | { kind: "synthesis_economic_driver";
+    driverType: "premium_rewards_mix" | "regulated_debit" | "keyed_card_not_present" | "qualification_downgrade"
+      | "international_cross_border" | "commercial_travel_entertainment" | "fixed_fee_burden"
+      | "minimum_fee_burden" | "authorization_per_item_burden" | "refund_activity" | "dispute_activity"
+      | "small_ticket" | "high_average_ticket" | "other_source_supported";
+    populationPredicateCode: string }
+  | { kind: "synthesis_recurrence"; recurrenceBasis: "multi_statement" | "merchant_contract" | "verified_schedule";
+    occurrencesPerYear: number }
+  | { kind: "synthesis_counterfactual"; safeActionCode: ContractV1SafeActionCode;
+    resultState: "verification_only" | "exact_deterministic_delta"; alternativeAmountMinor: number | null;
+    currency: "USD"; assumptionCodes: string[]; implementationDependencyCodes: string[]; grossOrNet: "gross" | "net" }
+  | { kind: "synthesis_safe_action"; safeActionCode: ContractV1SafeActionCode;
+    requiredInfluence: "none" | "merchant_change_right" | "merchant_operational_controllability" | "both";
+    mechanismCode: string; verificationRequirementCode: string | null; requestTargetCode: string | null;
+    implementationDependencyCodes: string[] }
+  | { kind: "synthesis_merchant_influence"; safeActionCode: ContractV1SafeActionCode;
+    influenceKind: "merchant_change_right" | "merchant_operational_controllability";
+    state: "proven" | "not_applicable"; authorityRelationshipCode: string };
+
+export type CanonicalRgClaimValue = KnowledgeClaimValue | CanonicalSynthesisKnowledgeValue;
+
 export type KnowledgeScopeDimension =
   | { kind: "exact"; value: string }
   | { kind: "unbounded" }
