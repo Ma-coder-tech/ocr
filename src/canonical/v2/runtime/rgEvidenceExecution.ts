@@ -1094,11 +1094,13 @@ function valueMatchesConstraint(value: CanonicalRgClaimValue, constraint: Canoni
     && Array.isArray(value.assumptionCodes) && value.assumptionCodes.every(isSafeCode)
     && Array.isArray(value.implementationDependencyCodes) && value.implementationDependencyCodes.every(isSafeCode);
   if (constraint.kind === "synthesis_safe_action") return value.kind === constraint.kind
+    && constraint.allowedSafeActionCodes.includes(value.safeActionCode)
     && isSafeCode(value.safeActionCode) && isSafeCode(value.mechanismCode)
     && (value.verificationRequirementCode === null || isSafeCode(value.verificationRequirementCode))
     && (value.requestTargetCode === null || isSafeCode(value.requestTargetCode))
     && Array.isArray(value.implementationDependencyCodes) && value.implementationDependencyCodes.every(isSafeCode)
-    && (!["request_governing_documentation", "verify_account_capability_or_configuration"].includes(value.safeActionCode)
+    && (!["request_governing_documentation", "verify_account_capability_or_configuration",
+      "request_pricing_application_review"].includes(value.safeActionCode)
       || value.verificationRequirementCode !== null);
   if (constraint.kind === "synthesis_merchant_influence") return value.kind === constraint.kind
     && value.safeActionCode === constraint.safeActionCode && value.influenceKind === constraint.influenceKind;

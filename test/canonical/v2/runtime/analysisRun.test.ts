@@ -185,7 +185,7 @@ describe("production canonical AnalysisRun core", () => {
     });
     const ledger = run.artifacts.rgWorkLedger!;
     expect(ledger).toMatchObject({
-      schemaVersion: "canonical_rg_work_ledger_v1",
+      schemaVersion: "canonical_rg_work_ledger_v2",
       authority: "claim_admission_and_planning_only",
       providerExecution: "durable_claim_bound_executor_after_planning",
       searchExecution: "typed_privacy_safe_search_intent_only",

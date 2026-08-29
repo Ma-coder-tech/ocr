@@ -86,7 +86,16 @@ export const CONTRACT_V1_SAFE_ACTION_CODES = [
   "review_supported_operational_process_change",
   "establish_monitoring_baseline",
 ] as const;
-export type ContractV1SafeActionCode = (typeof CONTRACT_V1_SAFE_ACTION_CODES)[number];
+export const CONTRACT_V1_1_SAFE_ACTION_CODES = [
+  "request_governing_documentation",
+  "verify_account_capability_or_configuration",
+  "request_pricing_application_review",
+  "review_supported_configuration_change",
+  "review_supported_operational_process_change",
+  "establish_monitoring_baseline",
+] as const;
+export type ContractV1SafeActionCode = (typeof CONTRACT_V1_SAFE_ACTION_CODES)[number]
+  | (typeof CONTRACT_V1_1_SAFE_ACTION_CODES)[number];
 
 export type CanonicalSynthesisKnowledgeValue =
   | { kind: "synthesis_constraint_identity"; applicability: "applicable" | "not_applicable";

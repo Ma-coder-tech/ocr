@@ -260,6 +260,7 @@ export type BuildCanonicalEconomicsV2SynthesisInput = {
   demonstratedAmendments?: Array<{ id: CanonicalSynthesisSemanticAmendmentId; synthesisKeys: string[] }>;
   themes?: CanonicalEconomicThemeAdmission[];
   contractV1?: {
+    contractId?: import("./synthesisContractV1Types.js").CanonicalSynthesisAdmissionContractId;
     applications: import("./synthesisContractV1Types.js").CanonicalSynthesisContractV1Application[];
     applicationHash: string;
     rfPrecedenceChecked: true;
@@ -287,7 +288,9 @@ export function buildCanonicalEconomicsV2SynthesisAnalysis(
   const economic = input.economicAnalysis;
   const contractErrors = input.contractV1 ? validateCanonicalSynthesisContractV1Envelope(input.contractV1) : [];
   const compiledContract = input.contractV1 && contractErrors.length === 0
-    ? compileCanonicalSynthesisContractV1({ economic, applications: input.contractV1.applications }) : null;
+    ? compileCanonicalSynthesisContractV1({ economic,
+      contractId: input.contractV1.contractId ?? "canonical_synthesis_admission_contract_v1",
+      applications: input.contractV1.applications }) : null;
   if (compiledContract?.state.validation.status === "invalid") contractErrors.push(...compiledContract.state.validation.errors);
   const contract = compiledContract?.state.validation.status === "valid" ? compiledContract : null;
   const evidenceIds = new Set([...economic.pricingAnalysis.foundation.sourceModel.evidence.map((item) => item.id),

@@ -223,7 +223,9 @@ function decideClaim(input: {
     return make(disposition, degradation.reasonCodes, degradation);
   }
   if (!input.currentWork) {
-    if (["withheld_non_public_evidence_required", "withheld_no_authorized_research_mapping"].includes(input.admission.researchAdmission)) {
+    if (["withheld_non_public_evidence_required", "withheld_no_authorized_research_mapping",
+      "withheld_merchant_document_evidence_required", "withheld_additional_statement_history_required",
+      "withheld_evidence_route_unresolved"].includes(input.admission.researchAdmission)) {
       return make("safely_unresolved", [input.admission.researchAdmission,
         "evidence_objective_not_resolvable_through_authorized_public_channel"]);
     }

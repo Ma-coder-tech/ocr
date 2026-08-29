@@ -324,7 +324,7 @@ function verificationSchema(): object {
 
 function knowledgeValueSchema(): object {
   const actionCode = { type: "string", enum: ["request_governing_documentation", "verify_account_capability_or_configuration",
-    "request_pricing_term_review", "review_supported_configuration_change", "review_supported_operational_process_change",
+    "request_pricing_term_review", "request_pricing_application_review", "review_supported_configuration_change", "review_supported_operational_process_change",
     "establish_monitoring_baseline"] };
   return { anyOf: [
     { type: "object", additionalProperties: false, required: ["kind", "canonicalCode", "sourceCode"], properties: {

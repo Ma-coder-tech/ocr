@@ -43,6 +43,8 @@ import {
   type CanonicalAnalysisRunExecution,
 } from "./analysisRunTypes.js";
 import { initialAutonomousLifecycle } from "./adaptiveContinuationTypes.js";
+import { CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1,
+  type CanonicalSynthesisAdmissionContractId } from "../synthesisContractV1Types.js";
 
 const DRIVERS: ParserDriver[] = [
   fiservFirstDataProcessorStatementDriver,
@@ -93,6 +95,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   observer?: AnalysisRunStageObserver;
   stageBuilders?: Partial<StageBuilders>;
   rfKnowledge?: CanonicalRfKnowledgeInput;
+  synthesisAdmissionContract?: CanonicalSynthesisAdmissionContractId;
 }): CanonicalAnalysisRunExecution {
   const fingerprint = sourceFingerprintForAnalysisRun(input.document);
   const executionContext = input.executionContext ?? "production";
@@ -321,7 +324,12 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
 
   if (artifacts.rd && (artifacts.rd.validation.status === "valid" || input.evaluationContinueInvalidStages)) {
     try {
-      artifacts.re = buildSemanticTailRe({ economic: artifacts.rd, builder: builders.synthesis });
+      artifacts.re = buildSemanticTailRe({ economic: artifacts.rd, builder: builders.synthesis, contractV1: {
+        contractId: input.synthesisAdmissionContract ?? CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1,
+        applications: [], applicationHash: hashCanonical([]), rfPrecedenceChecked: true,
+        boundRfSnapshotHash: artifacts.rfResolution?.snapshot.snapshotHash ?? "",
+        evidenceRegistry: { registryHash: hashCanonical([]), validation: { status: "valid", errors: [] }, evidence: [] },
+      } });
       finishValidatedStage(input.observer, stageOutcomes, "re", artifacts.re, artifacts.re.validation);
     } catch (error) { failStage(input.observer, stageOutcomes, "re", error); }
   } else dependencyWithheld(input.observer, stageOutcomes, "re", "RD");
@@ -428,7 +436,7 @@ function terminalRun(input: {
       rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled",
       rgPlanning: "durable_claim_scoped_execution_eligible",
       semanticConvergence: "current_run_exact_claim_revisioned",
-      synthesisAdmissionContract: "canonical_synthesis_admission_contract_v1",
+      synthesisAdmissionContract: input.input.synthesisAdmissionContract ?? CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1,
       adaptiveContinuation: "durable_deterministic_delta_admission",
       regeneratedPlanExecution: "continuation_authorized_existing_executor",
       benchmarkExecution: "disabled",

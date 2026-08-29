@@ -1144,7 +1144,7 @@ describe("production durable claim-bound RG evidence execution", () => {
     });
     expect(convergence.run.artifacts.rd!.economicLayer.semanticApplications).toEqual([]);
     expect(convergence.run.artifacts.re!.synthesisLayer.contractV1).toMatchObject({
-      contractId: "canonical_synthesis_admission_contract_v1",
+      contractId: "canonical_synthesis_admission_contract_v1_1",
       constraints: [expect.objectContaining({ applicability: "applicable", governingAuthorityCode: "fiserv_first_data" })],
       constraintActionEffects: [], actions: [],
     });
