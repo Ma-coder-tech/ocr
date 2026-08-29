@@ -3,7 +3,8 @@
 **Status:** Maintained normative-to-implementation traceability record.
 **Frozen package identity:** `docs/product-model/frozen/v0.1/frozen-product-model.lock.json`.
 **Accepted implementation baseline:** `codex/e2e-internal-analysis-v1` at `38bd5e8036c8329fda8ad7224961bc25ca23da25`.
-**Current scope:** Accepted RA–RH implementation plus accepted internal-analysis integration through the baseline above, the accepted deterministic-ingress, capability-ledger, RF-resolution, governed RF catalog, Materiality Contract/work-ledger, and corrected `claim_bound_rg_evidence_execution_v1_1` packages. Together they authorize normal-upload ingress, a durable production-internal AnalysisRun, deterministic Fiserv-family/capability proof, claim-scoped economics, governed RF snapshot resolution, exact-facet RG admission, and durable claim-bound search/retrieval/investigation/verification. They do not authorize real RF seed entries, automatic RF promotion, canonical RG semantic application, customer-report cutover, benchmarks, or savings.
+**Current accepted implementation head:** `codex/current-run-semantic-convergence-v1` at `5e0b23d2bb094d4e790d4901d9ec9b432837b2cc`.
+**Current scope:** Accepted RA–RH implementation plus the durable production-internal AnalysisRun path through governed RF, exact-facet RG planning/execution, bounded current-run category/role application, adaptive continuation, outcome checkpointing, recovery, indeterminate-operation reconciliation, and production RG runtime readiness. Canonical Synthesis Admission Contract v1 is now frozen as a normative overlay but is not implemented. The accepted runtime does not yet have Contract-v1 authority for constraints, change-right/controllability, recurrence, counterfactuals, safe actions, or narrow theme/RH synthesis. Real RF seed admission, automatic RF promotion, customer-report cutover, benchmarks, and savings remain unauthorized.
 
 ## 1. How to maintain this crosswalk
 
@@ -20,6 +21,14 @@ These labels are independent. For example, a package can be fully implemented fo
 
 Gold fixtures and tests are correctness oracles. Production code must not import Gold expected answers, fixture identities, tolerances, statement-specific mappings, or test source admissions as runtime configuration.
 
+Normative overlays are maintained separately from the immutable frozen originals:
+
+| Overlay | Identity | Status | Implementation authority |
+|---|---|---|---|
+| Runtime Intelligence Policy Amendment v0.2 | `docs/product-model/amendments/RateReveal_Runtime_Intelligence_Policy_Amendment_v0_2.md` | Approved normative amendment | Only through separately accepted implementation packages |
+| Materiality Contract v1 | `canonical_materiality_contract_v1` | Product-owner-approved production semantics | Connected to exact-facet RG planning |
+| Canonical Synthesis Admission Contract v1 | `docs/product-model/amendments/canonical-synthesis-admission-contract-v1.lock.json`; artifact SHA-256 `da79028cc231ad28e2daa186e4c9b23091c1185ee863b13afbb51c891f9316ec` | Frozen product-owner-approved production semantics | None until a separate RE convergence package is authorized and accepted |
+
 ## 2. Chain summary
 
 | Package | Frozen product responsibility | Accepted commit | Accepted status | Production connection |
@@ -28,9 +37,9 @@ Gold fixtures and tests are correctness oracles. Production code must not import
 | RB | Source identity, canonical financial populations, headline math, direction, and reconciliation | `93635ba` plus `production_deterministic_ingress_v1` | Fully implemented for accepted V2 foundation and claim-scoped deterministic admission | Executed and snapshotted inside the production-internal AnalysisRun; RB's component manifest and customer authority remain unchanged |
 | RC | Independent pricing axes, population-scoped formulas, evidence and pricing states | `2c55cea` plus `production_deterministic_ingress_v1` | Fully implemented for accepted shadow V2 pricing contract | Deterministically executed and snapshotted inside the production-internal AnalysisRun; unresolved axes stay unresolved |
 | RD | Economic charges, participant/control claims, statement-observed cost ledger and cost stack | `f447b9f` plus `production_deterministic_ingress_v1`, `capability_bound_economic_ledger_v1`, and `rf_first_claim_resolution_v1` | Fully implemented for accepted shadow V2 economic contract, claim-scoped production-internal fee contribution, and bounded exact-facet RF/current-run semantic application | Dynamically proven fee occurrences contribute to the AnalysisRun cost ledger; an exact admitted category or non-constraint participant/control-role answer may resolve only that facet while adjacent facets, actionability, benchmark, and savings remain independently unresolved |
-| RE | Drivers, counterfactuals, levers, special economics, signals, notices, themes, and impact gates | `4dc012f` plus `production_deterministic_ingress_v1` | Fully implemented for accepted shadow V2 synthesis contract | Deterministically executed and snapshotted when RD is valid; unavailable counterfactuals remain unresolved |
+| RE | Drivers, counterfactuals, levers, special economics, signals, notices, themes, and impact gates | `4dc012f` plus `production_deterministic_ingress_v1` | Fully implemented for accepted shadow V2 synthesis contract; Canonical Synthesis Admission Contract v1 is frozen but not implemented | Existing deterministic RE is snapshotted when RD is valid; Contract-v1 constraint/action/recurrence/counterfactual/theme admission has no production authority yet |
 | RF | Effective-dated, scoped, evidence-bound knowledge resolution, conflicts, candidates, and unknowns | `82e5b8e` plus `rf_first_claim_resolution_v1` and `governed_rf_catalog_snapshot_v1` | Fully implemented for the accepted library, append-only catalog governance, and bounded production-internal claim resolution | The AnalysisRun loads the governed catalog, binds one validated visibility-scoped snapshot, and exhausts exact admitted applicable category and losslessly representable non-constraint role answers before RG planning; no real entries are seeded |
-| RG | Bounded research graph, retrieval, investigation, verification, safety, and candidate projection | `7a0c5a7` plus accepted integration through `38bd5e8`, `materiality_rg_work_ledger_v1_1`, and `claim_bound_rg_evidence_execution_v1_1` | Production claim admission, durable execution, and current-run verified-evidence persistence are implemented; canonical semantic application remains deferred | Exact-facet work items execute through typed public SearchIntent, independent retrieval, separate investigation/verification, publisher-domain authority binding, and exact verified support-locator persistence inside the durable AnalysisRun ledger |
+| RG | Bounded research graph, retrieval, investigation, verification, safety, and candidate projection | `7a0c5a7` plus the accepted durable AnalysisRun packages through `canonical_rg_runtime_readiness_v1` | Production claim admission, durable execution, bounded category/role application, adaptive continuation, recovery/reconciliation, and standing-provider runtime readiness are implemented | Exact-facet work executes through the single durable ledger/executor; Contract-v1 synthesis families remain verified-but-unapplied until separately implemented |
 | RH | Evidence-bounded Report V2 projection and customer permission ceilings | `d8d3816` plus `production_deterministic_ingress_v1` | Fully implemented for accepted shadow backend contract | Deterministically executed and snapshotted as an internal artifact; Report V1 authority/routing remains unchanged |
 
 Accepted chain order:
@@ -58,6 +67,8 @@ RA 3f9328b
 → durable autonomous-outcome checkpoint canonical_analysis_autonomous_outcome_checkpoint_v1
 → outcome-driven operational recovery canonical_analysis_recovery_v1 / canonical_adaptive_execution_v1_1
 → provider-capability-bound indeterminate-operation reconciliation canonical_rg_operation_reconciliation_v1
+→ reconciliation exact-resume restart safety accd72f
+→ production RG standing-provider runtime readiness canonical_rg_runtime_readiness_v1
 ```
 
 ## 3. RA — executable Gold correctness oracle
@@ -116,8 +127,9 @@ Accepted RD semantic amendment registry: `src/canonical/v2/economicVersionManife
 | Merchant levers, recommendations, and savings require proven control or operational influence, recurrence where applicable, and actionability permission | Schema v0.7 §§53–58; Procedures Y–AB; Gold must-not-say/global negatives | `synthesisAnalysis.ts`; `synthesisSemantics.ts`; `synthesisValidate.ts` | Fully implemented as upstream shadow permission state; no customer/report authority | Driver/counterfactual/lever and special-economics/risk/theme tests | `RE-AMEND-004-CONTROL-GATED-MERCHANT-LEVER` |
 | Refunds, Amex, services, pricing programs, off-statement exposure, signals, disputes, notices, and future rules remain separately evidenced and noncausal unless proven | Schema v0.7 §§43–52; Procedures Q–V | `synthesisAnalysis.ts`; `synthesisValidate.ts` | Fully implemented for accepted RE contract; unresolved states preserved | `canonicalSynthesisV2SpecialEconomicsRiskAndThemes.test.ts`; adversarial tests | `RE-AMEND-005-SEPARATE-SPECIAL-ECONOMIC-FLOWS`; `RE-AMEND-006-TEMPORAL-NOTICE-ISOLATION`; `RE-AMEND-007-SIGNAL-RISK-NONCAUSALITY` |
 | Themes group one economic question, deduplicate evidence, preserve permissions, and do not manufacture prose | Schema v0.7 §§54–58; Procedures AA–AB; Freeze Review §3.12 | `synthesisAnalysis.ts`; `synthesisSemantics.ts`; `synthesisValidate.ts` | Fully implemented; shadow/evaluation-only | Special-economics/risk/themes and Gold/comparison/privacy tests | `RE-AMEND-008-SEMANTIC-THEME-SYNTHESIS` |
+| Narrow-v1 production synthesis admits independently proven constraint effects, change-right/controllability, drivers, recurrence, exact counterfactuals, six safe actions, and two economic-question/five-action-boundary theme mappings without adjacent-claim bleed | Schema v0.7 §§19–20, 42, 53–58, 62–69; Procedures K–L, O–P, W–X, Y–AB; Knowledge Library v0.2 claim-specific admission rules | No implementation location yet; normative artifact `docs/product-model/amendments/RateReveal_Canonical_Synthesis_Admission_Contract_v1.md` | Frozen contract only; not production-connected. Current unsupported synthesis evidence remains verified-but-unapplied | Future package must add exact-facet, constraint aggregation, action-catalog, theme mapping, RH-ceiling, invariance, restart, and adversarial tests | `canonical_synthesis_admission_contract_v1`; integrity lock `docs/product-model/amendments/canonical-synthesis-admission-contract-v1.lock.json` |
 
-Accepted RE semantic amendment registry: `src/canonical/v2/synthesisVersionManifest.ts`. RE has no persistence, runtime, customer, report, knowledge-resolution, or savings authority.
+Accepted RE semantic amendment registry: `src/canonical/v2/synthesisVersionManifest.ts`. Its existing authority remains `shadow_non_authoritative`, persistence remains `none`, and customer/report/knowledge-resolution/savings authority remains prohibited. Canonical Synthesis Admission Contract v1 freezes the requirements for a later versioned production-internal activation; this documentation-only freeze does not change that manifest or grant authority by itself.
 
 ## 8. RF — Payments Knowledge Library
 
@@ -209,6 +221,13 @@ A future implementation package must fail review if it:
 9. treats two same-model calls as two sources or as higher authority;
 10. treats an emergency wall-time/resource ceiling as proof of analytical completeness;
 11. lets RH exceed upstream evidence/actionability/report permissions or alters Report V1 without explicit authorization;
-12. hides unresolved material work after degradation.
+12. hides unresolved material work after degradation;
+13. lets constraint identity imply an action effect, unavoidability, non-negotiability, change-right, controllability, or impact;
+14. treats missing evidence as proof of `not_available`, or fails to keep constraint/action/condition scope and period exact;
+15. creates a synthesis action outside the six-entry Contract-v1 catalog or bypasses that action's independent prerequisites;
+16. lets explanation imply actionability, actionability imply impact, or impact imply actionability;
+17. annualizes without independently proven recurrence/cadence;
+18. groups rows instead of an approved economic question, projects contextual themes into RH, or adds a Contract-v1 `pricing_structure` theme; or
+19. treats the frozen Canonical Synthesis Admission Contract v1 as implementation or customer-report authority before a separate package is authorized and accepted.
 
 Any approved exception must identify the exact frozen provision, the superseding versioned amendment, the affected implementation and tests, and the new production-connection status in this crosswalk.
