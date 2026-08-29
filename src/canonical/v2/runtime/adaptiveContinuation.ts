@@ -438,6 +438,16 @@ function aggregateResources(attempts: WorkAttempt[], events: PersistedAnalysisRu
     const started = Date.parse(operation.createdAt); const ended = Date.parse(operation.updatedAt);
     if (Number.isFinite(started) && Number.isFinite(ended) && ended >= started) output.elapsedMsObserved += ended - started;
   }
+  for (const reconciliation of events.filter((item) => item.eventType === "operation_reconciliation_lookup_accounted")) {
+    const receipt = record(record(reconciliation.event).lookupReceipt);
+    const calls = nonnegativeInteger(receipt.calls) ?? 0;
+    output.providerCalls += calls;
+    const tokens = nonnegativeInteger(receipt.tokens);
+    if (receipt.tokens === null) output.tokenAccountingComplete = false;
+    else if (tokens !== null) output.tokensObserved += tokens;
+    const providerCode = string(receipt.providerCode);
+    if (providerCode) providerCodes.add(providerCode);
+  }
   output.providerCodes = [...providerCodes].sort();
   return output;
 }

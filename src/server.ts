@@ -62,6 +62,7 @@ import { renderMultiStatementGlobalReportMarkdown } from "./reporting/buildMulti
 import { createJob, getJob, getJobByUploadId, listEvents, listStatementJobsForMerchant, pruneJobs, updateJob } from "./store.js";
 import { enqueueJob, hydrateQueuedJobs } from "./worker.js";
 import { hydrateCanonicalAnalysisRecoveryIntents } from "./canonical/v2/runtime/adaptiveRecoveryWorker.js";
+import { hydrateCanonicalRgOperationReconciliationIntents } from "./canonical/v2/runtime/rgOperationReconciliationWorker.js";
 import { createMultiStatementAnalysisJob } from "./multiStatementOrchestrator.js";
 import {
   getLatestMultiStatementAnalysisForJob,
@@ -1953,6 +1954,7 @@ async function start(): Promise<void> {
   await cleanupOldFiles(uploadDir, fileRetentionHours);
   hydrateQueuedJobs();
   hydrateCanonicalAnalysisRecoveryIntents();
+  hydrateCanonicalRgOperationReconciliationIntents();
   hydrateRunnableMultiStatementJobs();
   deleteExpiredSessions();
   pruneJobs();

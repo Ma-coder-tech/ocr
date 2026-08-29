@@ -31,11 +31,19 @@ import type {
 } from "./rgEvidenceExecution.js";
 import { RgEvidenceTransportError } from "./rgEvidenceExecution.js";
 import { RG_PUBLISHER_ORIGIN_BINDING_CATALOG_HASH } from "./rgPublisherOriginAuthority.js";
+import type { CanonicalRgReconciliationCapability } from "./rgOperationReconciliationTypes.js";
 
 const MAX_AI_OUTPUT_TOKENS = 1_500;
 const AI_TIMEOUT_MS = 30_000;
 const PRODUCTION_INVESTIGATION_SCHEMA_HASH = createHash("sha256").update(canonicalJson(investigationSchema())).digest("hex");
 const PRODUCTION_VERIFICATION_SCHEMA_HASH = createHash("sha256").update(canonicalJson(verificationSchema())).digest("hex");
+const UNSUPPORTED_PRODUCTION_RECONCILIATION: CanonicalRgReconciliationCapability = {
+  mode: "unsupported",
+  reasonCodes: ["production_transports_do_not_support_authenticated_original_operation_lookup_under_current_no_store_contract"],
+  originalOperationResend: "prohibited",
+  merchantPrivateContextTransmission: "none",
+  lookupRepeatability: "side_effect_free_status_lookup_only",
+};
 
 export function createProductionRgEvidencePortsFromEnvironment(runId: string): CanonicalRgEvidenceExecutionPorts {
   let capability: ReturnType<typeof createProductionRgExecutionCapability>;
@@ -56,6 +64,7 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
   return {
     availability: "available",
     unavailabilityReasonCodes: [],
+    reconciliationCapability: productionRgReconciliationCapability(),
     async search({ intent, maximumCandidates }, onSend) {
       const candidates: CanonicalRgDiscoveryCandidate[] = [];
       let tokens: number | null = 0;
@@ -172,6 +181,10 @@ function unavailablePorts(reasonCode: string): CanonicalRgEvidenceExecutionPorts
     retrieve: unavailable, investigate: unavailable, verify: unavailable };
 }
 
+export function productionRgReconciliationCapability(): CanonicalRgReconciliationCapability {
+  return structuredClone(UNSUPPORTED_PRODUCTION_RECONCILIATION);
+}
+
 async function sendStructured(
   binding: ReturnType<typeof requireLiveCapabilityBinding>,
   schemaName: string,
@@ -189,12 +202,15 @@ async function sendStructured(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
   let sent = false;
+  let providerRequestId: string | null = null;
   try {
     onSend(); sent = true;
     const response = await fetch(APPROVED_OPENAI_ENDPOINT, { method: "POST", headers: {
       Authorization: `Bearer ${binding.openAiApiKey}`, "Content-Type": "application/json" }, body, signal: controller.signal });
-    const providerRequestId = safeId(response.headers.get("x-request-id"));
-    if (!response.ok) throw new RgEvidenceTransportError("after_send", "rg_openai_http_failure");
+    providerRequestId = safeId(response.headers.get("x-request-id"));
+    if (!response.ok) throw new RgEvidenceTransportError("after_send", "rg_openai_http_failure", {
+      providerCode: "openai_responses_api", providerRequestId, calls: 1, tokens: null, retrievalBytes: 0,
+    });
     const envelope = record(await response.json());
     const outputText = typeof envelope.output_text === "string" ? envelope.output_text : extractOutputText(envelope);
     const parsed = JSON.parse(outputText) as unknown;
@@ -203,7 +219,9 @@ async function sendStructured(
       calls: 1, tokens: outputTokens, retrievalBytes: 0 } };
   } catch (error) {
     if (error instanceof RgEvidenceTransportError) throw error;
-    throw new RgEvidenceTransportError(sent ? (controller.signal.aborted ? "timed_out" : "after_send") : "before_send", safeReason(error));
+    throw new RgEvidenceTransportError(sent ? (controller.signal.aborted ? "timed_out" : "after_send") : "before_send",
+      safeReason(error), sent ? { providerCode: "openai_responses_api", providerRequestId,
+        calls: 1, tokens: null, retrievalBytes: 0 } : null);
   } finally { clearTimeout(timeout); }
 }
 

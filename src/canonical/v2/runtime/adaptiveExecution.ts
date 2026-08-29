@@ -25,6 +25,13 @@ import {
   persistSettledCanonicalAutonomousOutcomeCheckpoint,
 } from "./analysisRunStore.js";
 import { convergeDurableCanonicalAnalysisRun } from "./semanticConvergence.js";
+import { reconcileClaimedCanonicalRgOperations } from "./rgOperationReconciliation.js";
+import {
+  assertClaimedCanonicalRgReconciliationIntent,
+  canonicalRgReconciliationHeartbeatMs,
+  ensureCanonicalRgReconciliationIntent,
+  renewCanonicalRgReconciliationIntentLease,
+} from "./rgOperationReconciliationStore.js";
 
 const CYCLE_LEASE_MS = 10 * 60_000;
 const CYCLE_HEARTBEAT_MS = 60_000;
@@ -46,7 +53,11 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
   workerId?: string;
   operationalPolicy?: CanonicalAdaptiveOperationalPolicy;
   recoveryIntentId?: string;
+  reconciliationIntentId?: string;
 }): Promise<CanonicalAdaptiveExecutionResult> {
+  if (input.recoveryIntentId && input.reconciliationIntentId) {
+    throw new Error("adaptive_execution_operational_intents_mutually_exclusive");
+  }
   const workerId = input.workerId ?? `adaptive-worker-${randomUUID()}`;
   const policy = input.operationalPolicy ?? productionAdaptiveOperationalPolicy();
   validateOperationalPolicy(policy);
@@ -59,7 +70,13 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
       try { renewCanonicalAnalysisRecoveryIntentLease(input.recoveryIntentId, workerId); }
       catch (error) { leaseFailure = error instanceof Error ? error : new Error("adaptive_execution_recovery_lease_lost"); }
     }
-  }, input.recoveryIntentId ? Math.min(CYCLE_HEARTBEAT_MS, canonicalAnalysisRecoveryHeartbeatMs()) : CYCLE_HEARTBEAT_MS);
+    if (input.reconciliationIntentId) {
+      try { renewCanonicalRgReconciliationIntentLease(input.reconciliationIntentId, workerId); }
+      catch (error) { leaseFailure = error instanceof Error ? error : new Error("adaptive_execution_reconciliation_lease_lost"); }
+    }
+  }, input.recoveryIntentId ? Math.min(CYCLE_HEARTBEAT_MS, canonicalAnalysisRecoveryHeartbeatMs())
+    : input.reconciliationIntentId ? Math.min(CYCLE_HEARTBEAT_MS, canonicalRgReconciliationHeartbeatMs())
+      : CYCLE_HEARTBEAT_MS);
   heartbeat.unref();
   const before = getPersistedAnalysisRun(input.runId);
   if (!before?.result) {
@@ -75,6 +92,7 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
   const financialFoundationHashBefore = before.financialFoundationHash;
   const executedGrantIds: string[] = [];
   let recovery: ReturnType<typeof assertClaimedCanonicalAnalysisRecoveryIntent> | null = null;
+  let reconciliation: ReturnType<typeof assertClaimedCanonicalRgReconciliationIntent> | null = null;
   let recoveryGrantExecuted = false;
   try {
     recovery = input.recoveryIntentId
@@ -82,7 +100,34 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
       : null;
     if (recovery && recovery.intent.runId !== input.runId) throw new Error("adaptive_execution_recovery_run_mismatch");
     if (recovery) renewCanonicalAnalysisRecoveryIntentLease(recovery.intent.intentId, workerId);
+    reconciliation = input.reconciliationIntentId
+      ? assertClaimedCanonicalRgReconciliationIntent(input.reconciliationIntentId, workerId)
+      : null;
+    if (reconciliation && reconciliation.intent.runId !== input.runId) {
+      throw new Error("adaptive_execution_reconciliation_run_mismatch");
+    }
+    if (reconciliation) {
+      renewCanonicalRgReconciliationIntentLease(reconciliation.intent.intentId, workerId);
+      const reconciled = await reconcileClaimedCanonicalRgOperations({ runId: input.runId,
+        intentId: reconciliation.intent.intentId, workerId, ports: input.ports });
+      if (reconciled.status === "resolved_all") {
+        for (const workItemId of reconciled.resumedWorkItemIds) {
+          assertHeartbeatHealthy(leaseFailure);
+          renewCycleLease(input.runId, workerId);
+          renewCanonicalRgReconciliationIntentLease(reconciliation.intent.intentId, workerId);
+          await executeDurableCanonicalRgEvidence({ runId: input.runId, ports: input.ports, workerId,
+            cycleOwnerId: workerId,
+            reconciliationResume: { intentId: reconciliation.intent.intentId, workItemId } });
+        }
+        const resumed = getPersistedAnalysisRun(input.runId)!;
+        adjudicateDurableCanonicalContinuation({ runId: input.runId,
+          expectedSemanticRevision: resumed.semanticRevision, expectedSemanticHash: resumed.semanticHash,
+          expectedPlanHash: resumed.result!.artifacts.rgWorkLedger?.planHash ?? null,
+          expectedPlanGeneration: resumed.rgPlanGeneration });
+      }
+    }
     let persisted = before;
+    persisted = getPersistedAnalysisRun(input.runId)!;
     if (persisted.continuationRevision === 0) {
       assertHeartbeatHealthy(leaseFailure);
       renewCycleLease(input.runId, workerId);
@@ -148,6 +193,12 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
         console.error("[canonical-recovery-intent-degraded]", error instanceof Error ? error.message : error);
       }
     }
+    if (!input.reconciliationIntentId) {
+      try { ensureCanonicalRgReconciliationIntent(input.runId, input.ports); }
+      catch (error) {
+        console.error("[canonical-rg-reconciliation-intent-degraded]", error instanceof Error ? error.message : error);
+      }
+    }
     return {
       schemaVersion: ADAPTIVE_EXECUTION_SCHEMA_VERSION,
       runId: input.runId,
@@ -180,6 +231,10 @@ export async function executeDurableCanonicalAdaptiveLoop(input: {
     if (input.recoveryIntentId) {
       try { renewCanonicalAnalysisRecoveryIntentLease(input.recoveryIntentId, workerId); }
       catch { /* The recovery worker will fail closed if ownership was already lost. */ }
+    }
+    if (input.reconciliationIntentId) {
+      try { renewCanonicalRgReconciliationIntentLease(input.reconciliationIntentId, workerId); }
+      catch { /* The reconciliation worker will fail closed if ownership was already lost. */ }
     }
     releaseCycleLease(input.runId, workerId);
   }

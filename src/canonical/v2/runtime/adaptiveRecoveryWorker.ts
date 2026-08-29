@@ -50,6 +50,9 @@ export async function processCanonicalAnalysisRecoveryIntent(input: {
     });
     settleCanonicalAnalysisRecoveryIntentAfterCycle(claimed.intent.intentId, workerId);
     ensureCanonicalAnalysisRecoveryIntent(claimed.intent.runId);
+    const { enqueueCanonicalRgOperationReconciliation } = await import("./rgOperationReconciliationWorker.js");
+    enqueueCanonicalRgOperationReconciliation(claimed.intent.runId,
+      input.ports ?? createProductionRgEvidencePortsFromEnvironment(claimed.intent.runId));
     return result;
   } catch (error) {
     releaseCanonicalAnalysisRecoveryIntentAfterFailure(claimed.intent.intentId, workerId, safeReason(error));

@@ -372,6 +372,40 @@ function migrate(): void {
       UNIQUE (intent_id, event_sequence)
     );
 
+    CREATE TABLE IF NOT EXISTS canonical_rg_reconciliation_intents (
+      intent_id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      outcome_revision INTEGER NOT NULL,
+      outcome_hash TEXT NOT NULL,
+      controller_revision INTEGER NOT NULL,
+      state TEXT NOT NULL,
+      next_run_at TEXT NOT NULL,
+      lease_owner TEXT,
+      lease_expires_at TEXT,
+      dispatch_count INTEGER NOT NULL DEFAULT 0,
+      latest_event_sequence INTEGER NOT NULL,
+      latest_event_hash TEXT NOT NULL,
+      intent_json TEXT NOT NULL,
+      intent_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (run_id, outcome_revision),
+      FOREIGN KEY (run_id, outcome_revision)
+        REFERENCES canonical_analysis_autonomous_outcome_revisions(run_id, outcome_revision) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_rg_reconciliation_events (
+      event_id TEXT PRIMARY KEY,
+      intent_id TEXT NOT NULL REFERENCES canonical_rg_reconciliation_intents(intent_id) ON DELETE CASCADE,
+      event_sequence INTEGER NOT NULL,
+      parent_event_hash TEXT,
+      event_type TEXT NOT NULL,
+      event_json TEXT NOT NULL,
+      event_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE (intent_id, event_sequence)
+    );
+
     CREATE TABLE IF NOT EXISTS canonical_rf_knowledge_audit_events (
       event_id TEXT PRIMARY KEY,
       entry_ref TEXT NOT NULL,
@@ -578,6 +612,10 @@ function migrate(): void {
       ON canonical_analysis_recovery_intents(state, next_run_at, lease_expires_at);
     CREATE INDEX IF NOT EXISTS idx_canonical_recovery_run
       ON canonical_analysis_recovery_intents(run_id, outcome_revision, atomic_claim_id);
+    CREATE INDEX IF NOT EXISTS idx_canonical_rg_reconciliation_due
+      ON canonical_rg_reconciliation_intents(state, next_run_at, lease_expires_at);
+    CREATE INDEX IF NOT EXISTS idx_canonical_rg_reconciliation_run
+      ON canonical_rg_reconciliation_intents(run_id, outcome_revision);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_claim ON canonical_rf_knowledge_entries(claim_type, subject_code, lifecycle);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_visibility ON canonical_rf_knowledge_entries(visibility, tenant_ref, account_ref);
     CREATE INDEX IF NOT EXISTS idx_rf_catalog_effective_period ON canonical_rf_knowledge_entries(effective_from, effective_to);
@@ -684,6 +722,13 @@ function migrate(): void {
     CREATE TRIGGER IF NOT EXISTS canonical_analysis_recovery_events_no_update
       BEFORE UPDATE ON canonical_analysis_recovery_events
       BEGIN SELECT RAISE(ABORT, 'canonical_analysis_recovery_event_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_rg_reconciliation_intent_binding_no_update
+      BEFORE UPDATE OF run_id, outcome_revision, outcome_hash, controller_revision,
+        intent_json, intent_hash, created_at ON canonical_rg_reconciliation_intents
+      BEGIN SELECT RAISE(ABORT, 'canonical_rg_reconciliation_intent_binding_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_rg_reconciliation_events_no_update
+      BEFORE UPDATE ON canonical_rg_reconciliation_events
+      BEGIN SELECT RAISE(ABORT, 'canonical_rg_reconciliation_event_is_immutable'); END;
     CREATE TRIGGER IF NOT EXISTS canonical_rg_execution_events_no_update
       BEFORE UPDATE ON canonical_rg_execution_events
       BEGIN SELECT RAISE(ABORT, 'canonical_rg_execution_history_is_immutable'); END;

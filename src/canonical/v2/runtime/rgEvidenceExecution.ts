@@ -6,6 +6,8 @@ import type { KnowledgeClaimValue, KnowledgeSourceAuthority } from "../knowledge
 import { normalizeSafeHttpsUrl } from "../intelligence/retrievalSafety.js";
 import { getPersistedAnalysisRun, type PersistedAnalysisRunRecord } from "./analysisRunStore.js";
 import type { CanonicalContinuationExecutionGrant } from "./adaptiveExecutionTypes.js";
+import type { CanonicalRgOperationReconciliationPort, CanonicalRgReconciliationCapability } from "./rgOperationReconciliationTypes.js";
+import { assertClaimedCanonicalRgReconciliationIntent } from "./rgOperationReconciliationStore.js";
 import { dynamicallyBindPublisherOrigin, type CanonicalRgPublisherOriginProof } from "./rgPublisherOriginAuthority.js";
 import {
   canonicalRgWorkContractFingerprint,
@@ -172,6 +174,8 @@ export type RgEvidencePortResult<T> = { value: T; receipt: RgEvidencePortReceipt
 export type CanonicalRgEvidenceExecutionPorts = {
   availability: "available" | "unavailable";
   unavailabilityReasonCodes: string[];
+  reconciliationCapability?: CanonicalRgReconciliationCapability;
+  reconciliation?: CanonicalRgOperationReconciliationPort;
   search(input: { intent: CanonicalRgSearchIntent; maximumCandidates: number }, onSend: () => void): Promise<RgEvidencePortResult<CanonicalRgDiscoveryCandidate[]>>;
   retrieve(input: { intent: CanonicalRgSearchIntent; candidate: CanonicalRgDiscoveryCandidate; maximumBytes: number }, onSend: () => void): Promise<RgEvidencePortResult<CanonicalRgRetrievedDocument>>;
   investigate(input: {
@@ -193,7 +197,8 @@ export type CanonicalRgEvidenceExecutionPorts = {
 };
 
 export class RgEvidenceTransportError extends Error {
-  constructor(public readonly transportState: "before_send" | "after_send" | "timed_out" | "cancelled", reasonCode: string) {
+  constructor(public readonly transportState: "before_send" | "after_send" | "timed_out" | "cancelled", reasonCode: string,
+    public readonly receipt: RgEvidencePortReceipt | null = null) {
     super(reasonCode);
   }
 }
@@ -218,13 +223,29 @@ export async function executeDurableCanonicalRgEvidence(input: {
   workerId?: string;
   cycleOwnerId?: string;
   executionGrantId?: string;
+  reconciliationResume?: { intentId: string; workItemId: string };
 }): Promise<CanonicalRgEvidenceExecutionResult> {
   const persisted = getPersistedAnalysisRun(input.runId);
   if (!persisted?.result) throw new Error("rg_evidence_analysis_run_unavailable");
-  const executionGrant = input.executionGrantId
-    ? persisted.continuationExecutionGrants.find((item) => item.grantId === input.executionGrantId) ?? null
+  const reconciliation = input.reconciliationResume
+    ? assertClaimedCanonicalRgReconciliationIntent(input.reconciliationResume.intentId, input.cycleOwnerId ?? "")
     : null;
-  if ((persisted.continuationRevision > 0 || persisted.semanticRevision > 0) && !executionGrant) {
+  if (reconciliation && (reconciliation.intent.runId !== input.runId
+    || !reconciliation.intent.operations.some((item) => item.workItemId === input.reconciliationResume!.workItemId)
+    || persisted.rgOperations.some((operation) => operation.state === "indeterminate_after_send"))) {
+    throw new Error("rg_evidence_reconciliation_resume_binding_invalid");
+  }
+  const resumedWork = reconciliation
+    ? persisted.rgWorkItems.find((item) => item.workItemId === input.reconciliationResume!.workItemId) ?? null
+    : null;
+  if (reconciliation && (!resumedWork || resumedWork.executionState !== "planned_for_durable_execution")) {
+    throw new Error("rg_evidence_reconciliation_resume_work_unavailable");
+  }
+  const effectiveGrantId = input.executionGrantId ?? resumedWork?.executionAuthorization?.grantId;
+  const executionGrant = effectiveGrantId
+    ? persisted.continuationExecutionGrants.find((item) => item.grantId === effectiveGrantId) ?? null
+    : null;
+  if ((persisted.continuationRevision > 0 || persisted.semanticRevision > 0) && !executionGrant && !reconciliation) {
     throw new Error("rg_evidence_regenerated_or_readjudicated_plan_execution_disabled");
   }
   if (executionGrant) validateExecutionGrantBinding(persisted, executionGrant, input.cycleOwnerId);
@@ -237,7 +258,9 @@ export async function executeDurableCanonicalRgEvidence(input: {
   let completedUnresolved = 0;
   let degraded = 0;
 
-  const selectedWork = executionGrant
+  const selectedWork = reconciliation
+    ? persisted.rgWorkItems.filter((item) => item.workItemId === input.reconciliationResume!.workItemId)
+    : executionGrant
     ? persisted.rgWorkItems.filter((item) => item.workItemId === executionGrant.baseWorkItemId)
     : persisted.rgWorkItems;
   for (const planned of selectedWork) {
@@ -552,10 +575,14 @@ async function runExternalOperation<T>(input: {
     } catch (error) {
       const afterSend = sent || (error instanceof RgEvidenceTransportError && error.transportState !== "before_send");
       const reason = safeReason(error);
+      const errorReceipt = error instanceof RgEvidenceTransportError ? error.receipt : null;
       const settled = settleOperation(input.runId, operation, afterSend ? "indeterminate_after_send" : "failed_before_send",
-        null, null, reason);
+        null, errorReceipt, reason);
       if (afterSend) incrementResource(input.runId, input.workItem.workItemId, input.kind, {
-        providerCode: input.providerCode, providerRequestId: null, calls: 1, tokens: null, retrievalBytes: 0,
+        providerCode: errorReceipt?.providerCode ?? input.providerCode,
+        providerRequestId: errorReceipt?.providerRequestId ?? null,
+        calls: errorReceipt?.calls ?? 1, tokens: errorReceipt?.tokens ?? null,
+        retrievalBytes: errorReceipt?.retrievalBytes ?? 0,
       });
       appendRetryDecision(input.runId, input.workItem.workItemId, operation.operationId,
         !afterSend && attempt < MAX_BEFORE_SEND_ATTEMPTS ? "retry" : "no_retry",
@@ -816,6 +843,16 @@ function sanitizeVerificationJudgment(value: CanonicalRgVerificationJudgment): C
     effectiveFrom: value?.effectiveFrom, effectiveTo: value?.effectiveTo,
     limitationCodes: Array.isArray(value?.limitationCodes) ? value.limitationCodes.slice(0, 50) : [],
   };
+}
+
+export function projectCanonicalRgReconciledOperationResult(
+  kind: CanonicalRgOperation["kind"],
+  value: unknown,
+): unknown {
+  if (kind === "public_search") return sanitizeSearchResult(value as CanonicalRgDiscoveryCandidate[]);
+  if (kind === "public_retrieval") return sanitizeRetrievedDocument(value as CanonicalRgRetrievedDocument);
+  if (kind === "investigation") return sanitizeInvestigatedCandidate(value as CanonicalRgInvestigatedCandidate);
+  return sanitizeVerificationJudgment(value as CanonicalRgVerificationJudgment);
 }
 
 function validateSearchCandidates(values: CanonicalRgDiscoveryCandidate[], intent: CanonicalRgSearchIntent): CanonicalRgDiscoveryCandidate[] {
@@ -1112,6 +1149,16 @@ function appendEvent(runId: string, workItemId: string, operationId: string | nu
     (event_id, run_id, work_item_id, operation_id, event_type, event_json, event_hash, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(eventId, runId, workItemId, operationId, eventType,
     JSON.stringify(event), eventHash, createdAt);
+}
+
+export function appendCanonicalRgExecutionEvent(
+  runId: string,
+  workItemId: string,
+  operationId: string | null,
+  eventType: string,
+  event: unknown,
+): void {
+  appendEvent(runId, workItemId, operationId, eventType, event);
 }
 
 function isSafeId(value: unknown): value is string {

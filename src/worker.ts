@@ -167,10 +167,12 @@ export async function processJob(jobId: string): Promise<void> {
         import("./canonical/v2/runtime/adaptiveExecution.js"),
         import("./canonical/v2/runtime/rgLiveEvidencePorts.js"),
       ]);
-      const adaptive = await executeDurableCanonicalAdaptiveLoop({ runId: canonicalRun.runId,
-        ports: createProductionRgEvidencePortsFromEnvironment(canonicalRun.runId) });
+      const rgPorts = createProductionRgEvidencePortsFromEnvironment(canonicalRun.runId);
+      const adaptive = await executeDurableCanonicalAdaptiveLoop({ runId: canonicalRun.runId, ports: rgPorts });
       const { enqueueCanonicalAnalysisRecovery } = await import("./canonical/v2/runtime/adaptiveRecoveryWorker.js");
       enqueueCanonicalAnalysisRecovery(canonicalRun.runId);
+      const { enqueueCanonicalRgOperationReconciliation } = await import("./canonical/v2/runtime/rgOperationReconciliationWorker.js");
+      enqueueCanonicalRgOperationReconciliation(canonicalRun.runId, rgPorts);
       console.log(`[job:${jobId}] canonical-adaptive-analysis`, {
         runId: canonicalRun.runId,
         lifecycle: adaptive.lifecycle,

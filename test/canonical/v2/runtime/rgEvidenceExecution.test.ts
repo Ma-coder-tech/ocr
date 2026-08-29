@@ -18,6 +18,10 @@ import type {
 } from "../../../../src/canonical/v2/runtime/rgEvidenceExecution.js";
 import type { CanonicalRgClaimAdmission, CanonicalRgWorkItem, CanonicalRgWorkLedger,
 } from "../../../../src/canonical/v2/runtime/rgWorkLedger.js";
+import type {
+  CanonicalRgReconciliationCapability,
+  CanonicalRgReconciliationProof,
+} from "../../../../src/canonical/v2/runtime/rgOperationReconciliationTypes.js";
 
 const fixture = path.resolve(process.cwd(), "test/fixtures/pdfs/SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf");
 
@@ -33,6 +37,8 @@ describe("production durable claim-bound RG evidence execution", () => {
   afterEach(async () => {
     try { dbModule?.db.close(); } catch { /* already closed by restart coverage */ }
     delete process.env.FEECLEAR_DB_PATH;
+    delete process.env.CANONICAL_RG_RECONCILIATION_BASE_DELAY_MS;
+    delete process.env.CANONICAL_RG_RECONCILIATION_LEASE_MS;
     await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
   });
 
@@ -872,7 +878,16 @@ describe("production durable claim-bound RG evidence execution", () => {
       process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = "gpt-5.2";
       const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
       const ports = live.createProductionRgEvidencePortsFromEnvironment("standing-authorization-run");
-      expect(ports).toMatchObject({ availability: "available", unavailabilityReasonCodes: [] });
+      expect(ports).toMatchObject({ availability: "available", unavailabilityReasonCodes: [],
+        reconciliationCapability: {
+          mode: "unsupported", originalOperationResend: "prohibited",
+          merchantPrivateContextTransmission: "none", lookupRepeatability: "side_effect_free_status_lookup_only",
+          reasonCodes: [
+            "production_transports_do_not_support_authenticated_original_operation_lookup_under_current_no_store_contract",
+          ],
+        },
+      });
+      expect(ports.reconciliation).toBeUndefined();
     } finally {
       for (const name of names) {
         const value = prior[name];
@@ -1117,6 +1132,291 @@ describe("production durable claim-bound RG evidence execution", () => {
       .some((item) => item.facet === "price_setter"))).toBe(true);
   }, 30_000);
 
+  it("recovers the exact original provider result after restart and resumes without a duplicate research send", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "ratereveal-rg-reconciliation-restart-"));
+    temporaryDirectories.push(directory);
+    const databasePath = path.join(directory, "reconciliation.sqlite");
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    process.env.CANONICAL_RG_RECONCILIATION_BASE_DELAY_MS = "0";
+    const setup = await runWithOneWorkItem();
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const legacyBefore = setup.db.db.prepare(`SELECT status, progress, summary_json FROM analysis_jobs WHERE id = ?`)
+      .get(setup.job.id);
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const normalSearch = ports.search;
+    let originalSearchSends = 0;
+    let lookupCalls = 0;
+    const sentSearchIntentIds: string[] = [];
+    let originalSearchIntentId: string | null = null;
+    let recoveredCandidates: CanonicalRgDiscoveryCandidate[] = [];
+    ports.search = async (input, onSend) => {
+      if (originalSearchIntentId === null) {
+        const recovered = await normalSearch(input, () => {});
+        recoveredCandidates = recovered.value;
+        originalSearchIntentId = input.intent.intentId;
+        onSend(); originalSearchSends += 1; sentSearchIntentIds.push(input.intent.intentId);
+        throw new setup.executor.RgEvidenceTransportError("after_send", "synthetic_response_lost_after_send",
+          { providerCode: "synthetic_public_search", providerRequestId: "provider-request-original-search",
+            calls: 1, retrievalBytes: 0, tokens: null });
+      }
+      return normalSearch(input, () => { onSend(); sentSearchIntentIds.push(input.intent.intentId); });
+    };
+    const reconciliation = await import("../../../../src/canonical/v2/runtime/rgOperationReconciliation.js");
+    const capability = supportedReconciliationCapability();
+    ports.reconciliationCapability = capability;
+    ports.reconciliation = {
+      capability,
+      async reconcileOriginalOperation(operation) {
+        lookupCalls += 1;
+        const proof = reconciliationProof(reconciliation.canonicalRgReconciliationProofFingerprint, operation,
+          "completed");
+        return { status: "completed", proof, result: recoveredCandidates,
+          originalReceipt: { providerCode: operation.providerCode, providerRequestId: operation.providerRequestId,
+            calls: 1, tokens: 17, retrievalBytes: 0 },
+          lookupReceipt: { providerCode: "synthetic_authenticated_operation_lookup", calls: 1, tokens: 0 } };
+      },
+    };
+
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+      workerId: "pre-reconciliation-worker" });
+    const adaptive = await import("../../../../src/canonical/v2/runtime/adaptiveExecution.js");
+    const barrier = await adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId, ports,
+      workerId: "barrier-checkpoint-worker" });
+    const reconciliationStore = await import("../../../../src/canonical/v2/runtime/rgOperationReconciliationStore.js");
+    const [intent] = reconciliationStore.listCanonicalRgReconciliationIntents(setup.run.runId);
+    expect(barrier).toMatchObject({ lifecycle: "indeterminate_reconciliation_required",
+      completion: "reconciliation_required" });
+    expect(intent).toMatchObject({ state: "scheduled",
+      intent: { originalOperationResend: "prohibited", authorization: "reconcile_original_operations_only" } });
+    expect(intent!.intent.operations).toEqual([expect.objectContaining({
+      providerRequestId: "provider-request-original-search", inputHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+    })]);
+
+    setup.db.db.close();
+    vi.resetModules();
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const [workerAfterRestart, storeAfterRestart, runStoreAfterRestart, dbAfterRestart] = await Promise.all([
+      import("../../../../src/canonical/v2/runtime/rgOperationReconciliationWorker.js"),
+      import("../../../../src/canonical/v2/runtime/rgOperationReconciliationStore.js"),
+      import("../../../../src/canonical/v2/runtime/analysisRunStore.js"),
+      import("../../../../src/db.js"),
+    ]);
+    dbModule = dbAfterRestart;
+    const resumed = await workerAfterRestart.processCanonicalRgOperationReconciliationIntent({
+      intentId: intent!.intent.intentId, workerId: "post-restart-reconciliation-worker", ports,
+    });
+    const after = runStoreAfterRestart.getPersistedAnalysisRun(setup.run.runId)!;
+    const settledIntent = storeAfterRestart.getCanonicalRgReconciliationIntent(intent!.intent.intentId)!;
+
+    expect(resumed?.completion).not.toBe("reconciliation_required");
+    expect(originalSearchSends).toBe(1);
+    expect(lookupCalls).toBe(1);
+    expect(sentSearchIntentIds.filter((intentId) => intentId === originalSearchIntentId)).toHaveLength(1);
+    expect(calls).toEqual(expect.arrayContaining(["search", "retrieve", "investigate", "verify"]));
+    expect(settledIntent.state).toBe("completed");
+    const reconciledOperation = (after.rgExecutionEvents.find((event) =>
+      event.eventType === "superseded_plan_snapshot"
+      && event.operationId === intent!.intent.operations[0]!.operationId)?.event as {
+        operation?: { state?: string; receipt?: Record<string, unknown> };
+      } | undefined)?.operation;
+    expect(reconciledOperation).toMatchObject({
+      state: "completed", receipt: { providerRequestId: "provider-request-original-search",
+        reasonCode: "rg_operation_completed_by_trusted_reconciliation" },
+    });
+    expect(after.rgExecutionEvents.map((event) => event.eventType)).toEqual(expect.arrayContaining([
+      "operation_reconciliation_lookup_accounted", "operation_reconciled_completed",
+      "work_reopened_after_operation_reconciliation",
+    ]));
+    expect(after.continuationRevisions.at(-1)!.cumulativeResource.providerCalls)
+      .toBeGreaterThan(barrier.providerCallsObserved);
+    expect(after.financialFoundationHash).toBe(before.financialFoundationHash);
+    expect(after.result!.artifacts.rb).toEqual(before.result!.artifacts.rb);
+    expect(after.result!.artifacts.rc).toEqual(before.result!.artifacts.rc);
+    expect(dbAfterRestart.db.prepare(`SELECT status, progress, summary_json FROM analysis_jobs WHERE id = ?`)
+      .get(setup.job.id)).toEqual(legacyBefore);
+    delete process.env.CANONICAL_RG_RECONCILIATION_BASE_DELAY_MS;
+  }, 30_000);
+
+  it("keeps the run-wide barrier when any original operation is unsupported or its proof is invalid", async () => {
+    const setup = await runWithOneWorkItem(undefined, 1);
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const normalSearch = ports.search;
+    const recovered = new Map<string, CanonicalRgDiscoveryCandidate[]>();
+    let originalSends = 0;
+    ports.search = async (input, onSend) => {
+      recovered.set(input.intent.atomicClaimId, (await normalSearch(input, () => {})).value);
+      onSend(); originalSends += 1;
+      throw new setup.executor.RgEvidenceTransportError("after_send", "synthetic_mixed_response_loss",
+        { providerCode: "synthetic_public_search",
+          providerRequestId: `provider-request-${input.intent.atomicClaimId.slice(-24)}`,
+          calls: 1, retrievalBytes: 0, tokens: null });
+    };
+    const reconciliation = await import("../../../../src/canonical/v2/runtime/rgOperationReconciliation.js");
+    const capability = supportedReconciliationCapability();
+    let lookups = 0;
+    ports.reconciliationCapability = capability;
+    ports.reconciliation = { capability, async reconcileOriginalOperation(operation) {
+      lookups += 1;
+      if (lookups === 2) return { status: "unsupported", reasonCode: "synthetic_operation_lookup_unsupported" };
+      const proof = reconciliationProof(reconciliation.canonicalRgReconciliationProofFingerprint, operation,
+        "completed");
+      return { status: "completed", proof: { ...proof, inputHash: "0".repeat(64) },
+        result: recovered.get(operation.atomicClaimId),
+        originalReceipt: { providerCode: operation.providerCode, providerRequestId: operation.providerRequestId,
+          calls: 1, tokens: 17, retrievalBytes: 0 },
+        lookupReceipt: { providerCode: "synthetic_authenticated_operation_lookup", calls: 1, tokens: 0 } };
+    } };
+
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+      workerId: "mixed-reconciliation-initial-worker" });
+    const adaptive = await import("../../../../src/canonical/v2/runtime/adaptiveExecution.js");
+    await adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId, ports,
+      workerId: "mixed-reconciliation-checkpoint-worker" });
+    const reconciliationStore = await import("../../../../src/canonical/v2/runtime/rgOperationReconciliationStore.js");
+    const reconciliationWorker = await import("../../../../src/canonical/v2/runtime/rgOperationReconciliationWorker.js");
+    const [intent] = reconciliationStore.listCanonicalRgReconciliationIntents(setup.run.runId);
+    const result = await reconciliationWorker.processCanonicalRgOperationReconciliationIntent({
+      intentId: intent!.intent.intentId, workerId: "mixed-reconciliation-worker", ports,
+    });
+    const after = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+    expect(result).toMatchObject({ lifecycle: "indeterminate_reconciliation_required",
+      completion: "reconciliation_required", executedGrantIds: [] });
+    expect(originalSends).toBe(2);
+    expect(calls).toEqual(["search", "search"]);
+    expect(after.rgOperations.filter((operation) => operation.state === "indeterminate_after_send")).toHaveLength(2);
+    expect(after.rgWorkItems.every((work) => work.executionState === "indeterminate_after_send")).toBe(true);
+    expect(after.continuationExecutionGrants).toEqual([]);
+    expect(after.semanticRevision).toBe(before.semanticRevision);
+    expect(after.rgPlanHash).toBe(before.rgPlanHash);
+    expect(after.financialFoundationHash).toBe(before.financialFoundationHash);
+    expect(after.result!.artifacts.rh).toEqual(before.result!.artifacts.rh);
+    expect(reconciliationStore.getCanonicalRgReconciliationIntent(intent!.intent.intentId)).toMatchObject({
+      state: "unsupported",
+    });
+  }, 30_000);
+
+  it("permits an exact retry only after authenticated proof that the original operation was not executed", async () => {
+    const setup = await runWithOneWorkItem();
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const normalSearch = ports.search;
+    let sends = 0;
+    let originalIntentId: string | null = null;
+    ports.search = async (input, onSend) => {
+      sends += 1;
+      if (sends === 1) {
+        originalIntentId = input.intent.intentId;
+        onSend();
+        throw new setup.executor.RgEvidenceTransportError("after_send", "synthetic_original_status_unknown", {
+          providerCode: "synthetic_public_search", providerRequestId: "provider-request-proven-not-executed",
+          calls: 1, retrievalBytes: 0, tokens: null,
+        });
+      }
+      return normalSearch(input, onSend);
+    };
+    const reconciliation = await import("../../../../src/canonical/v2/runtime/rgOperationReconciliation.js");
+    const capability = supportedReconciliationCapability();
+    let lookups = 0;
+    ports.reconciliationCapability = capability;
+    ports.reconciliation = { capability, async reconcileOriginalOperation(operation) {
+      lookups += 1;
+      return { status: "not_executed",
+        proof: reconciliationProof(reconciliation.canonicalRgReconciliationProofFingerprint, operation, "not_executed"),
+        lookupReceipt: { providerCode: "synthetic_authenticated_operation_lookup", calls: 1, tokens: 0 } };
+    } };
+
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+      workerId: "not-executed-initial-worker" });
+    const adaptive = await import("../../../../src/canonical/v2/runtime/adaptiveExecution.js");
+    await adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId, ports,
+      workerId: "not-executed-checkpoint-worker" });
+    const reconciliationStore = await import("../../../../src/canonical/v2/runtime/rgOperationReconciliationStore.js");
+    const reconciliationWorker = await import("../../../../src/canonical/v2/runtime/rgOperationReconciliationWorker.js");
+    const [intent] = reconciliationStore.listCanonicalRgReconciliationIntents(setup.run.runId);
+    const result = await reconciliationWorker.processCanonicalRgOperationReconciliationIntent({
+      intentId: intent!.intent.intentId, workerId: "not-executed-reconciliation-worker", ports,
+    });
+    const after = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const originalSnapshot = after.rgExecutionEvents.find((event) => event.eventType === "superseded_plan_snapshot"
+      && event.operationId === intent!.intent.operations[0]!.operationId)?.event as {
+        operation?: { state?: string; receipt?: Record<string, unknown>; input?: { intent?: { intentId?: string } } };
+      } | undefined;
+
+    expect(result?.completion).not.toBe("reconciliation_required");
+    expect(lookups).toBe(1);
+    expect(sends).toBeGreaterThanOrEqual(2);
+    expect(originalSnapshot?.operation).toMatchObject({ state: "failed_before_send",
+      input: { intent: { intentId: originalIntentId } }, receipt: {
+        providerRequestId: "provider-request-proven-not-executed",
+        reasonCode: "rg_operation_reconciled_not_executed_retry_permitted",
+      } });
+    expect(after.rgExecutionEvents.map((event) => event.eventType)).toEqual(expect.arrayContaining([
+      "operation_reconciled_not_executed", "work_reopened_after_operation_reconciliation",
+    ]));
+    expect(after.financialFoundationHash).toBe(before.financialFoundationHash);
+    expect(after.result!.artifacts.rb).toEqual(before.result!.artifacts.rb);
+    expect(after.result!.artifacts.rc).toEqual(before.result!.artifacts.rc);
+  }, 30_000);
+
+  it("keeps authenticated-pending original work durably scheduled without any resend or convergence", async () => {
+    const setup = await runWithOneWorkItem();
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    let originalSends = 0;
+    ports.search = async (_input, onSend) => {
+      onSend(); originalSends += 1;
+      throw new setup.executor.RgEvidenceTransportError("after_send", "synthetic_original_still_pending", {
+        providerCode: "synthetic_public_search", providerRequestId: "provider-request-still-pending",
+        calls: 1, retrievalBytes: 0, tokens: null,
+      });
+    };
+    const reconciliation = await import("../../../../src/canonical/v2/runtime/rgOperationReconciliation.js");
+    const capability = supportedReconciliationCapability();
+    let lookups = 0;
+    ports.reconciliationCapability = capability;
+    ports.reconciliation = { capability, async reconcileOriginalOperation(operation) {
+      lookups += 1;
+      return { status: "pending",
+        proof: reconciliationProof(reconciliation.canonicalRgReconciliationProofFingerprint, operation, "pending"),
+        lookupReceipt: { providerCode: "synthetic_authenticated_operation_lookup", calls: 1, tokens: 0 } };
+    } };
+
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+      workerId: "pending-initial-worker" });
+    const adaptive = await import("../../../../src/canonical/v2/runtime/adaptiveExecution.js");
+    await adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId, ports,
+      workerId: "pending-checkpoint-worker" });
+    const reconciliationStore = await import("../../../../src/canonical/v2/runtime/rgOperationReconciliationStore.js");
+    const reconciliationWorker = await import("../../../../src/canonical/v2/runtime/rgOperationReconciliationWorker.js");
+    const [intent] = reconciliationStore.listCanonicalRgReconciliationIntents(setup.run.runId);
+    const result = await reconciliationWorker.processCanonicalRgOperationReconciliationIntent({
+      intentId: intent!.intent.intentId, workerId: "pending-reconciliation-worker", ports,
+    });
+    const after = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const rescheduled = reconciliationStore.getCanonicalRgReconciliationIntent(intent!.intent.intentId)!;
+
+    expect(result).toMatchObject({ lifecycle: "indeterminate_reconciliation_required",
+      completion: "reconciliation_required", executedGrantIds: [] });
+    expect(rescheduled).toMatchObject({ state: "scheduled", leaseOwner: null, leaseExpiresAt: null });
+    expect(Date.parse(rescheduled.nextRunAt)).toBeGreaterThan(Date.parse(rescheduled.updatedAt));
+    expect(originalSends).toBe(1);
+    expect(lookups).toBe(1);
+    expect(calls).toEqual([]);
+    expect(after.rgOperations).toEqual([expect.objectContaining({ state: "indeterminate_after_send" })]);
+    expect(after.rgExecutionEvents.map((event) => event.eventType)).toContain("operation_reconciliation_pending");
+    expect(after.continuationExecutionGrants).toEqual([]);
+    expect(after.semanticRevision).toBe(before.semanticRevision);
+    expect(after.rgPlanHash).toBe(before.rgPlanHash);
+    expect(after.financialFoundationHash).toBe(before.financialFoundationHash);
+    expect(after.result!.artifacts.rh).toEqual(before.result!.artifacts.rh);
+  }, 30_000);
+
   async function runWithOneWorkItem(facet?: string, additionalWorkItems = 0) {
     const [{ parsePdf }, store, runStore, executor, loadedDb] = await Promise.all([
       import("../../../../src/parser.js"),
@@ -1260,6 +1560,37 @@ function successfulPorts(calls: string[]): CanonicalRgEvidenceExecutionPorts {
 
 function receipt(providerCode: string, calls: number, retrievalBytes: number, tokens: number | null) {
   return { providerCode, providerRequestId: null, calls, retrievalBytes, tokens };
+}
+
+function supportedReconciliationCapability(): CanonicalRgReconciliationCapability {
+  return {
+    mode: "provider_authenticated_original_operation_lookup",
+    reasonCodes: [],
+    originalOperationResend: "prohibited",
+    merchantPrivateContextTransmission: "none",
+    lookupRepeatability: "side_effect_free_status_lookup_only",
+  };
+}
+
+function reconciliationProof(
+  fingerprint: (proof: Omit<CanonicalRgReconciliationProof, "proofFingerprint">) => string,
+  operation: { operationId: string; inputHash: string; providerCode: string; providerRequestId: string },
+  status: CanonicalRgReconciliationProof["originalOperationStatus"],
+): CanonicalRgReconciliationProof {
+  const base = {
+    schemaVersion: "canonical_rg_operation_reconciliation_v1" as const,
+    proofId: `proof-${operation.operationId}`,
+    operationId: operation.operationId,
+    inputHash: operation.inputHash,
+    providerCode: operation.providerCode,
+    providerRequestId: operation.providerRequestId,
+    observedAt: new Date().toISOString(),
+    authority: "provider_authenticated_original_operation_lookup" as const,
+    originalOperationStatus: status,
+    originalOperationResent: false as const,
+    merchantPrivateContextTransmitted: false as const,
+  };
+  return { ...base, proofFingerprint: fingerprint(base) };
 }
 
 function knowledgeCreatedEvent(entry: KnowledgeEntry, eventId: string): KnowledgeAuditEvent {
