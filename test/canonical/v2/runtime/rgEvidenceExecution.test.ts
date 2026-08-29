@@ -100,6 +100,55 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(afterDeterministicReplay.rgOperations).toHaveLength(4);
   }, 30_000);
 
+  it("fails closed when public RG proposes merchant-contract or multi-statement recurrence", async () => {
+    for (const recurrenceBasis of ["merchant_contract", "multi_statement"] as const) {
+      const setup = await runWithOneWorkItem("recurrence");
+      const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+      const admission = before.rgClaimAdmissions[0]!;
+      const work = before.rgWorkItems[0]!;
+      expect(admission.expectedKnowledgeValueConstraint).toEqual({ kind: "synthesis_recurrence",
+        recurrenceBasis: "verified_schedule" });
+      expect(work.expectedKnowledgeValueConstraint).toEqual(admission.expectedKnowledgeValueConstraint);
+      const calls: string[] = [];
+      const ports = successfulPorts(calls);
+      const investigate = ports.investigate;
+      ports.investigate = async (input, onSend) => {
+        const result = await investigate(input, onSend);
+        return { ...result, value: { ...result.value, proposedValue: {
+          kind: "synthesis_recurrence", recurrenceBasis, occurrencesPerYear: 12,
+        } } };
+      };
+
+      const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+        workerId: `route-integrity-${recurrenceBasis}` });
+      const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+      expect(result).toMatchObject({ workItemsCompletedWithEvidence: 0, workItemsCompletedUnresolved: 1,
+        canonicalTruthPreserved: true });
+      expect(result.verifiedEvidence).toEqual([]);
+      expect(calls).toEqual(["search", "retrieve", "investigate"]);
+      expect(persisted.rgWorkItems[0]).toMatchObject({ executionState: "completed_unresolved",
+        verifiedEvidenceRefs: [] });
+      expect(persisted.result!.artifacts.re!.synthesisLayer.contractV1?.applications ?? []).toEqual([]);
+      expect(persisted.financialFoundationHash).toBe(before.financialFoundationHash);
+    }
+
+    const scheduleSetup = await runWithOneWorkItem("recurrence");
+    const scheduleBefore = scheduleSetup.store.getPersistedAnalysisRun(scheduleSetup.run.runId)!;
+    const scheduleExecution = await scheduleSetup.executor.executeDurableCanonicalRgEvidence({
+      runId: scheduleSetup.run.runId, ports: successfulPorts([]), workerId: "verified-schedule-route",
+    });
+    expect(scheduleExecution.workItemsCompletedWithEvidence).toBe(1);
+    const semantic = await import("../../../../src/canonical/v2/runtime/semanticConvergence.js");
+    const converged = semantic.convergeDurableCanonicalAnalysisRun({ runId: scheduleSetup.run.runId });
+    expect(converged.run.artifacts.re!.synthesisLayer.contractV1?.applications).toEqual([
+      expect.objectContaining({ value: { kind: "synthesis_recurrence", recurrenceBasis: "verified_schedule",
+        occurrencesPerYear: 12 }, derivabilityTier: "requires_external_rule_or_schedule",
+      evidenceClass: "public_documentation_verified", assertionBasis: "external_verified" }),
+    ]);
+    expect(converged.providerCalls).toBe(0);
+    expect(converged.run.financialFoundationHash).toBe(scheduleBefore.financialFoundationHash);
+  }, 30_000);
+
   it("replays a persisted verification envelope after a crash before work terminalization without another provider send", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "ratereveal-verification-envelope-restart-"));
     temporaryDirectories.push(directory);

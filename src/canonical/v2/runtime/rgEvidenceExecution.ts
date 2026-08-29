@@ -320,6 +320,12 @@ export async function executeDurableCanonicalRgEvidence(input: {
     if (planHashForWork(input.runId, planned.workItemId) !== ledger.planHash) throw new Error("rg_evidence_stale_work_item_plan_binding");
     const latest = workItemFromDb(input.runId, planned.workItemId);
     if (!latest) throw new Error("rg_evidence_persisted_work_item_missing");
+    if (admission.facet === "recurrence" && (admission.expectedKnowledgeValueConstraint?.kind !== "synthesis_recurrence"
+      || admission.expectedKnowledgeValueConstraint.recurrenceBasis !== "verified_schedule"
+      || latest.expectedKnowledgeValueConstraint.kind !== "synthesis_recurrence"
+      || latest.expectedKnowledgeValueConstraint.recurrenceBasis !== "verified_schedule")) {
+      throw new Error("rg_recurrence_public_evidence_route_binding_invalid");
+    }
     if (latest.executionState === "completed_verified_evidence") {
       const retained = verifiedEvidenceFromOperations(input.runId, latest.workItemId, executionGrant?.grantId ?? null);
       if (retained.length === 0 || retained.some((item) => !latest.verifiedEvidenceRefs.includes(item.evidenceId))) {
@@ -1078,7 +1084,7 @@ function valueMatchesConstraint(value: CanonicalRgClaimValue, constraint: Canoni
   if (constraint.kind === "synthesis_economic_driver") return value.kind === constraint.kind
     && isSafeCode(value.driverType) && isSafeCode(value.populationPredicateCode);
   if (constraint.kind === "synthesis_recurrence") return value.kind === constraint.kind
-    && ["multi_statement", "merchant_contract", "verified_schedule"].includes(value.recurrenceBasis)
+    && value.recurrenceBasis === constraint.recurrenceBasis
     && Number.isFinite(value.occurrencesPerYear) && value.occurrencesPerYear > 0 && value.occurrencesPerYear <= 366;
   if (constraint.kind === "synthesis_counterfactual") return value.kind === constraint.kind
     && ["verification_only", "exact_deterministic_delta"].includes(value.resultState)

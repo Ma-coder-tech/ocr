@@ -43,6 +43,16 @@ export function validateCanonicalSynthesisContractV1Envelope(envelope: Canonical
           errors.push(`contract_v1_exact_evidence_binding_invalid:${application.applicationId}:${ref}`);
         }
       }
+      if (application.value.kind === "synthesis_recurrence") {
+        const recurrenceEvidence = application.evidenceRefs.map((ref) => evidenceById.get(ref)).filter(Boolean);
+        if (application.value.recurrenceBasis !== "verified_schedule"
+          || recurrenceEvidence.some((item) => !item
+            || !["official_network_publication", "processor_publication"].includes(item.sourceAuthority))
+          || application.derivabilityTier !== "requires_external_rule_or_schedule"
+          || application.evidenceClass !== "public_documentation_verified") {
+          errors.push(`contract_v1_recurrence_evidence_route_mismatch:${application.applicationId}`);
+        }
+      }
     } else {
       // Contract-v1 structured values are intentionally not registered as reusable RF value kinds in this slice.
       // Existing RF category/role authority remains first in RD; a future governed RF schema version must add

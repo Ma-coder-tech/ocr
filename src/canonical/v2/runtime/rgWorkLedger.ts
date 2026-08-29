@@ -74,7 +74,7 @@ export type CanonicalRgClaimAdmission = {
     | { kind: "boolean" }
     | { kind: "synthesis_constraint_identity" }
     | { kind: "synthesis_economic_driver" }
-    | { kind: "synthesis_recurrence" }
+    | { kind: "synthesis_recurrence"; recurrenceBasis: "verified_schedule" }
     | { kind: "synthesis_counterfactual" }
     | { kind: "synthesis_safe_action" }
     | { kind: "synthesis_merchant_influence"; safeActionCode: ContractV1SafeActionCode;
@@ -574,7 +574,10 @@ function expectedKnowledgeValueConstraint(
   }
   if (facet === "constraint") return { kind: "synthesis_constraint_identity" };
   if (facet === "economic_driver") return { kind: "synthesis_economic_driver" };
-  if (facet === "recurrence") return { kind: "synthesis_recurrence" };
+  // Generation-zero RG is a public-document route. It can prove only the verified-schedule
+  // recurrence basis; merchant-contract and multi-statement recurrence require their own
+  // compatible private/document-history evidence routes and must never be provider-selected here.
+  if (facet === "recurrence") return { kind: "synthesis_recurrence", recurrenceBasis: "verified_schedule" };
   if (facet === "counterfactual") return { kind: "synthesis_counterfactual" };
   if (facet === "merchant_lever") return { kind: "synthesis_safe_action" };
   return null;
@@ -648,12 +651,21 @@ function validateAdmissions(admissions: CanonicalRgClaimAdmission[], workItems: 
     if (admission.researchAdmission === "contextual_opportunistic_only" && admission.materiality !== "contextual") {
       errors.push(`rg_contextual_admission_materiality_mismatch:${admission.atomicClaimId}`);
     }
+    if (admission.facet === "recurrence" && admission.knowledgeQuery
+      && (admission.expectedKnowledgeValueConstraint?.kind !== "synthesis_recurrence"
+        || admission.expectedKnowledgeValueConstraint.recurrenceBasis !== "verified_schedule")) {
+      errors.push(`rg_recurrence_public_evidence_route_binding_invalid:${admission.atomicClaimId}`);
+    }
   }
   for (const item of workItems) {
     if (!admissionIds.has(item.atomicClaimId)) errors.push(`rg_work_item_missing_claim:${item.workItemId}`);
     const admission = admissions.find((candidate) => candidate.atomicClaimId === item.atomicClaimId);
     if (admission?.materiality !== "material") errors.push(`rg_nonmaterial_independent_work:${item.workItemId}`);
     if (!admission?.expectedKnowledgeValueConstraint) errors.push(`rg_work_item_missing_value_constraint:${item.workItemId}`);
+    if (admission?.facet === "recurrence" && (item.expectedKnowledgeValueConstraint.kind !== "synthesis_recurrence"
+      || item.expectedKnowledgeValueConstraint.recurrenceBasis !== "verified_schedule")) {
+      errors.push(`rg_recurrence_work_public_evidence_route_binding_invalid:${item.workItemId}`);
+    }
     if (item.reservation !== null || item.resourceConsumption.providerCalls !== 0 || item.resourceConsumption.searchCalls !== 0
       || item.resourceConsumption.retrievalBytes !== 0 || item.resourceConsumption.aiCalls !== 0) {
       errors.push(`rg_disabled_execution_has_resource_activity:${item.workItemId}`);

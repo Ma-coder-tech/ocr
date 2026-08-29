@@ -44,6 +44,9 @@ export function compileCanonicalSynthesisContractV1(input: {
     if (app.occurrenceRefs.length === 0 || app.occurrenceRefs.some((ref) => !validOccurrenceIds.has(ref))) errors.push(`contract_v1_broken_occurrence_ref:${app.atomicClaimId}`);
     if (!app.exactFacetVerified || !app.scopeFingerprintVerified || app.evidenceRefs.length === 0) errors.push(`contract_v1_unverified_application:${app.atomicClaimId}`);
     if (app.sourceKind === "current_run_verified_rg_evidence" && app.assertionBasis !== "external_verified") errors.push(`contract_v1_external_basis_mismatch:${app.atomicClaimId}`);
+    if (app.value.kind === "synthesis_recurrence" && !recurrenceProofRouteMatches(app)) {
+      errors.push(`contract_v1_recurrence_evidence_route_mismatch:${app.atomicClaimId}`);
+    }
   }
 
   const constraints = apps.flatMap((app): CanonicalContractV1Constraint[] => app.value.kind === "synthesis_constraint_identity" ? [{
@@ -110,7 +113,7 @@ export function compileCanonicalSynthesisContractV1(input: {
         sourceOccurrenceRefs: charge.sourceOccurrenceRefs, economicChargeRefs: [chargeRef], pricingComponentRefs: charge.pricingComponentRefs,
         observedCost: { ...charge.observedAmount, amountMinor: Math.abs(charge.observedAmount.amountMinor) }, attributionMethod: "exclusive_partition",
         relevantCostPoolRef: bucket?.kind ?? null, populationClaimKey, costPoolClaimKey: bucket ? costClaimKey : null, proof: proof(app) });
-      if (app.materiality !== "immaterial") themes.push(themeAdmission({ key: `${key}_theme`, app,
+      if (app.materiality !== "immaterial") themes.push(themeAdmission({ key: `${key}_theme`, app, economic: input.economic,
         question: "observed_cost_driver", boundary: "explanation_only", type: "major_economic_driver",
         driverKeys: [key], actionability: "not_applicable", coverage: [value.driverType] }));
     }
@@ -264,7 +267,8 @@ export function compileCanonicalSynthesisContractV1(input: {
     const boundary = permissionCeiling === "none" ? "verification_or_document_request" : permissionCeiling;
     const themeLeverKeys = state === "eligible_supported" || state === "documentation_or_monitoring_only"
       ? [leverKey] : [];
-    if (app.materiality !== "immaterial") themes.push(themeAdmission({ key: `${leverKey}_theme`, app, question, boundary,
+    if (app.materiality !== "immaterial") themes.push(themeAdmission({ key: `${leverKey}_theme`, app, economic: input.economic,
+      question, boundary,
       type: candidate || state === "candidate_requires_verification" ? "unresolved_cost_control" : "other_supported_question",
       leverKeys: themeLeverKeys, actionability: state, coverage: [actionCode] }));
   }
@@ -295,12 +299,14 @@ function proof(app: CanonicalSynthesisContractV1Application): CanonicalSynthesis
     limitations: [app.sourceKind === "governed_rf_snapshot" ? "Supported by the immutable run-bound RF snapshot."
       : "Supported only for this AnalysisRun by integrity-checked verified external evidence."] };
 }
-function themeAdmission(input: { key: string; app: CanonicalSynthesisContractV1Application; question: string; boundary: string;
+function themeAdmission(input: { key: string; app: CanonicalSynthesisContractV1Application;
+  economic: CanonicalEconomicsV2EconomicAnalysis; question: string; boundary: string;
   type: CanonicalEconomicThemeAdmission["themeType"]; driverKeys?: string[]; leverKeys?: string[];
   actionability: CanonicalEconomicThemeAdmission["actionabilityState"]; coverage: string[] }): CanonicalEconomicThemeAdmission {
   const claimKey = `${input.key}_claim`;
   return { key: input.key, claimKey, economicQuestionCode: input.question, actionBoundaryCode: input.boundary,
-    canonicalQuestionScopeFingerprint: input.app.scopeFingerprint, statementPeriod: input.app.statementPeriod,
+    canonicalQuestionScopeFingerprint: canonicalContractV1QuestionScopeFingerprint(input.economic, input.app),
+    statementPeriod: input.app.statementPeriod,
     themeType: input.type, chargeRefs: input.app.chargeRefs, driverKeys: input.driverKeys, leverKeys: input.leverKeys,
     materiality: input.type === "unresolved_cost_control" && input.app.materiality === "material" ? "unresolved"
       : input.app.materiality === "material" ? "material" : input.app.materiality === "contextual" ? "contextual" : "unresolved",
@@ -309,6 +315,38 @@ function themeAdmission(input: { key: string; app: CanonicalSynthesisContractV1A
       : input.app.materiality === "material" ? "material_economics"
       : input.app.materiality === "contextual" ? "context" : "unresolved", semanticCoverageCodes: input.coverage, proof: proof(input.app),
     __contractThemeClaim: { key: claimKey, app: input.app, coverage: input.coverage } } as CanonicalEconomicThemeAdmission;
+}
+
+export function canonicalContractV1QuestionScopeFingerprint(
+  economic: CanonicalEconomicsV2EconomicAnalysis,
+  application: CanonicalSynthesisContractV1Application,
+): string {
+  const charges = new Map(economic.economicLayer.charges.map((charge) => [charge.id, charge]));
+  const chargeLineage = unique(application.chargeRefs).map((chargeRef) => {
+    const charge = charges.get(chargeRef);
+    return { chargeRef, direction: charge?.financialDirection ?? "unavailable",
+      populationRefs: unique(charge?.pricingPopulationRefs ?? []),
+      occurrenceRefs: unique(charge?.sourceOccurrenceRefs ?? []) };
+  });
+  return createHash("sha256").update(canonicalJson({
+    identityVersion: "canonical_contract_v1_question_scope_v1",
+    atomicSubjectIdentity: application.atomicClaimId,
+    facet: application.facet,
+    applicationOccurrenceRefs: unique(application.occurrenceRefs),
+    chargeLineage,
+    scopeFingerprint: application.scopeFingerprint,
+    statementPeriod: application.statementPeriod,
+  })).digest("hex");
+}
+
+function recurrenceProofRouteMatches(app: CanonicalSynthesisContractV1Application): boolean {
+  if (app.value.kind !== "synthesis_recurrence" || app.assertionBasis !== "external_verified") return false;
+  if (app.value.recurrenceBasis === "verified_schedule") return app.derivabilityTier === "requires_external_rule_or_schedule"
+    && app.evidenceClass === "public_documentation_verified";
+  if (app.value.recurrenceBasis === "merchant_contract") return app.derivabilityTier === "requires_merchant_pricing_document"
+    && app.evidenceClass === "merchant_document_supported";
+  return app.derivabilityTier === "requires_additional_statement_history"
+    && app.evidenceClass === "multi_statement_supported";
 }
 function indexApps(apps: CanonicalSynthesisContractV1Application[], kind: "synthesis_recurrence") {
   const map = new Map<string, CanonicalSynthesisContractV1Application[]>();

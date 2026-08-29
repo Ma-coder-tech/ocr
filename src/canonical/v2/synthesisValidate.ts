@@ -313,6 +313,20 @@ export function validateCanonicalEconomicsV2SynthesisAnalysis(
     const allowedActions = new Set(["request_governing_documentation", "verify_account_capability_or_configuration",
       "request_pricing_term_review", "review_supported_configuration_change", "review_supported_operational_process_change",
       "establish_monitoring_baseline"]);
+    for (const application of layer.contractV1.applications) {
+      if (application.value.kind !== "synthesis_recurrence") continue;
+      const truthfulRoute = application.assertionBasis === "external_verified" && (
+        application.value.recurrenceBasis === "verified_schedule"
+          && application.derivabilityTier === "requires_external_rule_or_schedule"
+          && application.evidenceClass === "public_documentation_verified"
+        || application.value.recurrenceBasis === "merchant_contract"
+          && application.derivabilityTier === "requires_merchant_pricing_document"
+          && application.evidenceClass === "merchant_document_supported"
+        || application.value.recurrenceBasis === "multi_statement"
+          && application.derivabilityTier === "requires_additional_statement_history"
+          && application.evidenceClass === "multi_statement_supported");
+      if (!truthfulRoute) errors.push(`Contract-v1 recurrence ${application.applicationId} misstates its evidence route.`);
+    }
     for (const action of layer.contractV1.actions) {
       if (!allowedActions.has(action.safeActionCode)) errors.push(`Contract-v1 action ${action.actionId} is not cataloged.`);
       if (["request_governing_documentation", "verify_account_capability_or_configuration"].includes(action.safeActionCode)
@@ -355,6 +369,9 @@ export function validateCanonicalEconomicsV2SynthesisAnalysis(
       }
     }
     for (const theme of layer.themes) {
+      if (!/^[a-f0-9]{64}$/.test(theme.canonicalQuestionScopeFingerprint)) {
+        errors.push(`Contract-v1 theme ${theme.id} lacks a canonical exact-lineage question-scope fingerprint.`);
+      }
       if (!["observed_cost_driver", "cost_control_and_merchant_action"].includes(theme.economicQuestionCode)) {
         errors.push(`Contract-v1 theme ${theme.id} uses an unapproved economic question.`);
       }

@@ -308,7 +308,7 @@ function resolveApplications(input: {
     const rgEvidence = evidenceByClaim.get(admission.atomicClaimId) ?? [];
     if (synthesisFacet(admission.facet)) {
       const rgEvidence = evidenceByClaim.get(admission.atomicClaimId) ?? [];
-      const applicable = rgEvidence.filter((item) => synthesisValueApplicable(item.proposedValue, admission)
+      const applicable = rgEvidence.filter((item) => synthesisValueApplicable(item.proposedValue, admission, item)
         && item.scopeFingerprint === admission.scopeFingerprint);
       const values = uniqueRgValues(applicable);
       if (values.length > 1) {
@@ -422,12 +422,16 @@ function synthesisFacet(facet: CanonicalRgClaimAdmission["facet"]): boolean {
     "merchant_change_right", "merchant_operational_controllability", "constraint_action_effect", "constraint_condition"].includes(facet);
 }
 
-function synthesisValueApplicable(value: CanonicalRgClaimValue, admission: CanonicalRgClaimAdmission): value is CanonicalSynthesisKnowledgeValue {
+function synthesisValueApplicable(value: CanonicalRgClaimValue, admission: CanonicalRgClaimAdmission,
+  evidence: CanonicalRgVerifiedEvidence): value is CanonicalSynthesisKnowledgeValue {
   const expected = admission.expectedKnowledgeValueConstraint;
   if (!expected || expected.kind !== value.kind) return false;
   if (admission.facet === "constraint") return value.kind === "synthesis_constraint_identity";
   if (admission.facet === "economic_driver") return value.kind === "synthesis_economic_driver";
-  if (admission.facet === "recurrence") return value.kind === "synthesis_recurrence";
+  if (admission.facet === "recurrence") return value.kind === "synthesis_recurrence"
+    && expected.kind === "synthesis_recurrence" && value.recurrenceBasis === expected.recurrenceBasis
+    && value.recurrenceBasis === "verified_schedule"
+    && ["official_network_publication", "processor_publication"].includes(evidence.sourceAuthority);
   if (admission.facet === "counterfactual") return value.kind === "synthesis_counterfactual";
   if (admission.facet === "merchant_lever") return value.kind === "synthesis_safe_action";
   if (admission.facet === "merchant_change_right" || admission.facet === "merchant_operational_controllability") {

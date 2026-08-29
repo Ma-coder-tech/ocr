@@ -341,7 +341,9 @@ function knowledgeValueSchema(): object {
     { type: "object", additionalProperties: false, required: ["kind", "driverType", "populationPredicateCode"], properties: {
       kind: { type: "string", const: "synthesis_economic_driver" }, driverType: { type: "string", enum: ["premium_rewards_mix", "regulated_debit", "keyed_card_not_present", "qualification_downgrade", "international_cross_border", "commercial_travel_entertainment", "fixed_fee_burden", "minimum_fee_burden", "authorization_per_item_burden", "refund_activity", "dispute_activity", "small_ticket", "high_average_ticket", "other_source_supported"] }, populationPredicateCode: canonicalCodeSchema() } },
     { type: "object", additionalProperties: false, required: ["kind", "recurrenceBasis", "occurrencesPerYear"], properties: {
-      kind: { type: "string", const: "synthesis_recurrence" }, recurrenceBasis: { type: "string", enum: ["multi_statement", "merchant_contract", "verified_schedule"] }, occurrencesPerYear: { type: "number", exclusiveMinimum: 0, maximum: 366 } } },
+      kind: { type: "string", const: "synthesis_recurrence" }, recurrenceBasis: { type: "string",
+        enum: ["verified_schedule"] },
+      occurrencesPerYear: { type: "number", exclusiveMinimum: 0, maximum: 366 } } },
     { type: "object", additionalProperties: false, required: ["kind", "safeActionCode", "resultState", "alternativeAmountMinor", "currency", "assumptionCodes", "implementationDependencyCodes", "grossOrNet"], properties: {
       kind: { type: "string", const: "synthesis_counterfactual" }, safeActionCode: actionCode,
       resultState: { type: "string", enum: ["verification_only", "exact_deterministic_delta"] },
