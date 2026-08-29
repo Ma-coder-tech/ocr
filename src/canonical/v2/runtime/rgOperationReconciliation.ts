@@ -58,7 +58,7 @@ export async function reconcileClaimedCanonicalRgOperations(input: {
     const operation = operationFromDb(input.runId, bound.operationId);
     if (!operation) throw new Error("canonical_rg_reconciliation_bound_operation_missing");
     if (operation.state !== "indeterminate_after_send") {
-      if (!reconciliationResolutionEventValid(input.runId, operation)) {
+      if (!reconciliationResolutionEventValid(input.runId, operation, input.intentId)) {
         throw new Error("canonical_rg_reconciliation_resolution_lineage_missing");
       }
       resolvedOperationIds.push(operation.operationId);
@@ -139,8 +139,8 @@ export async function reconcileClaimedCanonicalRgOperations(input: {
     operationFromDb(input.runId, bound.operationId)?.state === "indeterminate_after_send");
   if (remaining.length > 0) return result(input, unsupported ? "unsupported" : "pending",
     resolvedOperationIds, [], lookupCalls);
-  const resumedWorkItemIds = reopenResolvedWorkItems(input.runId, record.intent.operations.map((item) => item.workItemId),
-    input.intentId);
+  const resumedWorkItemIds = reopenOrRecoverResolvedWorkItems(input.runId,
+    record.intent.operations.map((item) => item.workItemId), input.intentId);
   return result(input, "resolved_all", resolvedOperationIds, resumedWorkItemIds, lookupCalls);
 }
 
@@ -188,14 +188,26 @@ function resolveOperation(
   })();
 }
 
-function reopenResolvedWorkItems(runId: string, workItemIds: string[], intentId: string): string[] {
-  const reopened: string[] = [];
+function reopenOrRecoverResolvedWorkItems(runId: string, workItemIds: string[], intentId: string): string[] {
+  const resumable: string[] = [];
   for (const workItemId of [...new Set(workItemIds)].sort()) {
     const current = workItemFromDb(runId, workItemId);
-    if (!current || current.executionState !== "indeterminate_after_send") continue;
+    if (!current) continue;
     const indeterminate = db.prepare(`SELECT 1 FROM canonical_rg_operations
       WHERE run_id = ? AND work_item_id = ? AND state = 'indeterminate_after_send' LIMIT 1`).get(runId, workItemId);
     if (indeterminate) continue;
+    if (current.executionState === "planned_for_durable_execution") {
+      if (current.state !== "planned" || current.reservation !== null
+        || current.progress.state !== "not_started" || current.stopReason !== null) {
+        throw new Error("canonical_rg_reconciliation_reopened_work_state_invalid");
+      }
+      if (!reconciliationWorkReopenEventValid(runId, workItemId, intentId)) {
+        throw new Error("canonical_rg_reconciliation_work_reopen_lineage_missing");
+      }
+      resumable.push(workItemId);
+      continue;
+    }
+    if (current.executionState !== "indeterminate_after_send") continue;
     const updated: CanonicalRgWorkItem = { ...current, state: "planned",
       executionState: "planned_for_durable_execution", reservation: null,
       progress: { ...current.progress, state: "not_started" }, stopReason: null };
@@ -209,9 +221,9 @@ function reopenResolvedWorkItems(runId: string, workItemIds: string[], intentId:
         intentId, operationIds: operationIdsForWork(runId, workItemId), originalOperationResent: false,
       });
     })();
-    reopened.push(workItemId);
+    resumable.push(workItemId);
   }
-  return reopened;
+  return resumable;
 }
 
 function validProof(
@@ -247,15 +259,35 @@ function validLookupReceipt(receipt: unknown): receipt is CanonicalRgReconciliat
     && (value.tokens === null || (Number.isSafeInteger(value.tokens) && Number(value.tokens) >= 0));
 }
 
-function reconciliationResolutionEventValid(runId: string, operation: CanonicalRgOperation): boolean {
+function reconciliationResolutionEventValid(runId: string, operation: CanonicalRgOperation, intentId: string): boolean {
   const row = db.prepare(`SELECT event_type, event_json, event_hash FROM canonical_rg_execution_events
     WHERE run_id = ? AND operation_id = ? AND event_type IN
       ('operation_reconciled_completed', 'operation_reconciled_not_executed') ORDER BY rowid DESC LIMIT 1`)
     .get(runId, operation.operationId) as { event_type: string; event_json: string; event_hash: string } | undefined;
   if (!row) return false;
-  const event = JSON.parse(row.event_json) as unknown;
-  return row.event_hash === digest({ runId, workItemId: operation.workItemId,
+  const event = JSON.parse(row.event_json) as { intentId?: unknown; originalOperationResent?: unknown };
+  return event.intentId === intentId && event.originalOperationResent === false
+    && row.event_hash === digest({ runId, workItemId: operation.workItemId,
     operationId: operation.operationId, eventType: row.event_type, event });
+}
+
+function reconciliationWorkReopenEventValid(runId: string, workItemId: string, intentId: string): boolean {
+  const row = db.prepare(`SELECT event_json, event_hash FROM canonical_rg_execution_events
+    WHERE run_id = ? AND work_item_id = ? AND operation_id IS NULL
+      AND event_type = 'work_reopened_after_operation_reconciliation' ORDER BY rowid DESC LIMIT 1`)
+    .get(runId, workItemId) as { event_json: string; event_hash: string } | undefined;
+  if (!row) return false;
+  const event = JSON.parse(row.event_json) as {
+    intentId?: unknown;
+    operationIds?: unknown;
+    originalOperationResent?: unknown;
+  };
+  const operationIds = operationIdsForWork(runId, workItemId);
+  return event.intentId === intentId && event.originalOperationResent === false
+    && Array.isArray(event.operationIds)
+    && canonicalJson(event.operationIds) === canonicalJson(operationIds)
+    && row.event_hash === digest({ runId, workItemId, operationId: null,
+      eventType: "work_reopened_after_operation_reconciliation", event });
 }
 
 function safeProofProjection(proof: CanonicalRgReconciliationProof): CanonicalRgReconciliationProof {

@@ -1238,6 +1238,122 @@ describe("production durable claim-bound RG evidence execution", () => {
     delete process.env.CANONICAL_RG_RECONCILIATION_BASE_DELAY_MS;
   }, 30_000);
 
+  it("recovers durably reopened exact work after a crash before coordinator resume without a new grant or send", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "ratereveal-rg-reconciliation-reopen-restart-"));
+    temporaryDirectories.push(directory);
+    const databasePath = path.join(directory, "reconciliation-reopen-restart.sqlite");
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    process.env.CANONICAL_RG_RECONCILIATION_BASE_DELAY_MS = "0";
+    const setup = await runWithOneWorkItem();
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const normalSearch = ports.search;
+    let originalSearchIntentId: string | null = null;
+    const sentSearchIntentIds: string[] = [];
+    let reconciliationLookups = 0;
+    let recoveredCandidates: CanonicalRgDiscoveryCandidate[] = [];
+    ports.search = async (input, onSend) => {
+      if (originalSearchIntentId === null) {
+        recoveredCandidates = (await normalSearch(input, () => {})).value;
+        originalSearchIntentId = input.intent.intentId;
+        onSend();
+        sentSearchIntentIds.push(input.intent.intentId);
+        throw new setup.executor.RgEvidenceTransportError("after_send", "synthetic_crash_window_response_lost", {
+          providerCode: "synthetic_public_search",
+          providerRequestId: "provider-request-reopen-crash-window",
+          calls: 1,
+          retrievalBytes: 0,
+          tokens: null,
+        });
+      }
+      return normalSearch(input, () => { onSend(); sentSearchIntentIds.push(input.intent.intentId); });
+    };
+    const reconciliation = await import("../../../../src/canonical/v2/runtime/rgOperationReconciliation.js");
+    const capability = supportedReconciliationCapability();
+    ports.reconciliationCapability = capability;
+    ports.reconciliation = { capability, async reconcileOriginalOperation(operation) {
+      reconciliationLookups += 1;
+      return {
+        status: "completed",
+        proof: reconciliationProof(reconciliation.canonicalRgReconciliationProofFingerprint, operation, "completed"),
+        result: recoveredCandidates,
+        originalReceipt: {
+          providerCode: operation.providerCode,
+          providerRequestId: operation.providerRequestId,
+          calls: 1,
+          tokens: 17,
+          retrievalBytes: 0,
+        },
+        lookupReceipt: { providerCode: "synthetic_authenticated_operation_lookup", calls: 1, tokens: 0 },
+      };
+    } };
+
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+      workerId: "reopen-crash-initial-worker" });
+    const adaptive = await import("../../../../src/canonical/v2/runtime/adaptiveExecution.js");
+    await adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId, ports,
+      workerId: "reopen-crash-checkpoint-worker" });
+    const reconciliationStore = await import("../../../../src/canonical/v2/runtime/rgOperationReconciliationStore.js");
+    const [intent] = reconciliationStore.listCanonicalRgReconciliationIntents(setup.run.runId);
+    const claimed = reconciliationStore.claimCanonicalRgReconciliationIntent(
+      intent!.intent.intentId, "reopen-crash-reconciliation-worker");
+    expect(claimed).not.toBeNull();
+
+    const reconciledBeforeCrash = await reconciliation.reconcileClaimedCanonicalRgOperations({
+      runId: setup.run.runId,
+      intentId: intent!.intent.intentId,
+      workerId: "reopen-crash-reconciliation-worker",
+      ports,
+    });
+    const durableCrashPoint = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(reconciledBeforeCrash).toMatchObject({ status: "resolved_all",
+      resumedWorkItemIds: [intent!.intent.operations[0]!.workItemId], originalProviderSends: 0 });
+    expect(durableCrashPoint.rgWorkItems.find((item) =>
+      item.workItemId === intent!.intent.operations[0]!.workItemId)).toMatchObject({
+      executionState: "planned_for_durable_execution", progress: { state: "not_started" },
+    });
+    expect(durableCrashPoint.rgExecutionEvents.filter((event) =>
+      event.eventType === "work_reopened_after_operation_reconciliation")).toHaveLength(1);
+
+    // Model process death followed by lease expiry before the coordinator receives resumedWorkItemIds.
+    setup.db.db.prepare(`UPDATE canonical_rg_reconciliation_intents SET lease_expires_at = ? WHERE intent_id = ?`)
+      .run("2000-01-01T00:00:00.000Z", intent!.intent.intentId);
+    setup.db.db.close();
+    vi.resetModules();
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const [workerAfterRestart, storeAfterRestart, runStoreAfterRestart, dbAfterRestart] = await Promise.all([
+      import("../../../../src/canonical/v2/runtime/rgOperationReconciliationWorker.js"),
+      import("../../../../src/canonical/v2/runtime/rgOperationReconciliationStore.js"),
+      import("../../../../src/canonical/v2/runtime/analysisRunStore.js"),
+      import("../../../../src/db.js"),
+    ]);
+    dbModule = dbAfterRestart;
+
+    const resumed = await workerAfterRestart.processCanonicalRgOperationReconciliationIntent({
+      intentId: intent!.intent.intentId,
+      workerId: "reopen-crash-restart-worker",
+      ports,
+    });
+    const after = runStoreAfterRestart.getPersistedAnalysisRun(setup.run.runId)!;
+    const settledIntent = storeAfterRestart.getCanonicalRgReconciliationIntent(intent!.intent.intentId)!;
+    const targetClaimId = intent!.intent.operations[0]!.atomicClaimId;
+
+    expect(resumed?.completion).not.toBe("reconciliation_required");
+    expect(settledIntent.state).toBe("completed");
+    expect(sentSearchIntentIds.filter((intentId) => intentId === originalSearchIntentId)).toHaveLength(1);
+    expect(reconciliationLookups).toBe(1);
+    expect(calls).toEqual(expect.arrayContaining(["search", "retrieve", "investigate", "verify"]));
+    expect(after.rgExecutionEvents.filter((event) =>
+      event.eventType === "work_reopened_after_operation_reconciliation")).toHaveLength(1);
+    expect(after.rgExecutionEvents.filter((event) => event.eventType === "continuation_execution_authorized"
+      && (event.event as { atomicClaimId?: string }).atomicClaimId === targetClaimId)).toHaveLength(0);
+    expect(after.continuationExecutionGrants.filter((grant) => grant.atomicClaimId === targetClaimId)).toHaveLength(0);
+    expect(after.financialFoundationHash).toBe(before.financialFoundationHash);
+    expect(after.result!.artifacts.rb).toEqual(before.result!.artifacts.rb);
+    expect(after.result!.artifacts.rc).toEqual(before.result!.artifacts.rc);
+  }, 30_000);
+
   it("keeps the run-wide barrier when any original operation is unsupported or its proof is invalid", async () => {
     const setup = await runWithOneWorkItem(undefined, 1);
     const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
