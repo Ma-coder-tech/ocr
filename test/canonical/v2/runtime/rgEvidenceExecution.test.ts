@@ -912,6 +912,143 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(afterRestart.result!.artifacts.rh).toEqual(setup.run.artifacts.rh);
   }, 30_000);
 
+  it("rechecks durable inapplicability at the final send boundary when concurrent claims started earlier", async () => {
+    const setup = await runWithOneWorkItem("collector");
+    const initial = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const firstAdmission = initial.rgClaimAdmissions[0]!;
+    const firstWork = initial.rgWorkItems[0]!;
+    const related = relatedParticipantFacet(firstAdmission, firstWork,
+      "concurrent-billing-intermediary", "billing_intermediary");
+    installSyntheticPlan(setup, initial.result!.artifacts.rgWorkLedger!, "concurrent-applicability-plan",
+      [firstAdmission, related.admission], [firstWork, related.work]);
+    const firstWorkId = [firstWork.workItemId, related.work.workItemId].sort()[0]!;
+    const primaryFacet = firstWorkId === firstWork.workItemId ? firstAdmission.facet : related.admission.facet;
+    const secondaryFacet = primaryFacet === firstAdmission.facet ? related.admission.facet : firstAdmission.facet;
+    const secondaryWork = secondaryFacet === related.admission.facet ? related.work : firstWork;
+    const secondaryAdmission = secondaryFacet === related.admission.facet ? related.admission : firstAdmission;
+
+    const sharedUrl = "https://merchants.fiserv.com/concurrent-official-but-wrong-scope";
+    const calls: string[] = [];
+    const sends: string[] = [];
+    const ports = successfulPorts(calls);
+    const search = ports.search;
+    const retrieve = ports.retrieve;
+    const verify = ports.verify;
+    let signalFirstSearch!: () => void;
+    let signalSecondSearch!: () => void;
+    let releaseSecondRetrieval!: () => void;
+    let signalSecondRetrieval!: () => void;
+    const firstSearchEntered = new Promise<void>((resolve) => { signalFirstSearch = resolve; });
+    const secondSearchEntered = new Promise<void>((resolve) => { signalSecondSearch = resolve; });
+    const secondRetrievalMaySend = new Promise<void>((resolve) => { releaseSecondRetrieval = resolve; });
+    const secondRetrievalAwaitingSend = new Promise<void>((resolve) => { signalSecondRetrieval = resolve; });
+    ports.search = async (input, onSend) => {
+      const result = await search(input, () => { onSend(); sends.push(`search:${input.intent.facet}`); });
+      if (input.intent.facet === primaryFacet) { signalFirstSearch(); await secondSearchEntered; }
+      else signalSecondSearch();
+      return { ...result, value: [{ ...result.value[0]!, url: sharedUrl }] };
+    };
+    ports.retrieve = async (input, onSend) => {
+      if (input.intent.facet === secondaryFacet) {
+        signalSecondRetrieval();
+        await secondRetrievalMaySend;
+      }
+      return retrieve(input, () => { onSend(); sends.push(`retrieve:${input.intent.facet}`); });
+    };
+    ports.verify = async (input, onSend) => {
+      const result = await verify(input, () => { onSend(); sends.push(`verify:${input.intent.facet}`); });
+      return { ...result, value: { ...result.value, scopeStatus: "wrong_scope" as const,
+        semanticSupportStatus: "unsupported" as const, exactAtomicClaimSupport: false,
+        limitationCodes: ["document_geography_not_applicable"] } };
+    };
+    const investigate = ports.investigate;
+    ports.investigate = (input, onSend) => investigate(input,
+      () => { onSend(); sends.push(`investigate:${input.intent.facet}`); });
+
+    const firstExecution = setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId,
+      ports, workerId: "concurrent-worker-a" });
+    await firstSearchEntered;
+    const secondExecution = setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId,
+      ports, workerId: "concurrent-worker-b" });
+    await secondRetrievalAwaitingSend;
+    const firstResult = await firstExecution;
+    releaseSecondRetrieval();
+    const secondResult = await secondExecution;
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+    expect(firstResult.canonicalTruthPreserved).toBe(true);
+    expect(secondResult.canonicalTruthPreserved).toBe(true);
+    expect(sends.filter((value) => value.startsWith("retrieve:"))).toEqual([`retrieve:${primaryFacet}`]);
+    expect(sends).toEqual(expect.arrayContaining([
+      `search:${primaryFacet}`, `search:${secondaryFacet}`, `investigate:${primaryFacet}`, `verify:${primaryFacet}`,
+    ]));
+    expect(sends).not.toContain(`retrieve:${secondaryFacet}`);
+    expect(calls.filter((value) => value === "investigate")).toHaveLength(1);
+    expect(calls.filter((value) => value === "verify")).toHaveLength(1);
+    const excludedWork = persisted.rgWorkItems.find((item) => item.atomicClaimId === secondaryAdmission.atomicClaimId)!;
+    expect(excludedWork).toMatchObject({ executionState: "completed_unresolved",
+      stopReason: "rg_search_batch_completed_wrong_scope", verifiedEvidenceRefs: [] });
+    expect(persisted.rgOperations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ workItemId: secondaryWork.workItemId, kind: "public_retrieval",
+        state: "failed_before_send", receipt: expect.objectContaining({ calls: 0,
+          reasonCode: "rg_candidate_retrieval_excluded_known_inapplicable_before_send" }) }),
+    ]));
+    expect(persisted.rgExecutionEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ workItemId: secondaryWork.workItemId,
+        eventType: "candidate_retrieval_skipped_known_inapplicable", event: expect.objectContaining({
+          outcomeClass: "wrong_scope", semanticReuse: "prohibited", analyticalCompletionEffect: "none",
+        }) }),
+    ]));
+    expect(persisted.externalEvidenceRegistry).toEqual([]);
+    expect(persisted.canonicalTruthHash).toBe(initial.canonicalTruthHash);
+    expect(persisted.financialFoundationHash).toBe(initial.financialFoundationHash);
+    expect(persisted.result!.artifacts.rh).toEqual(initial.result!.artifacts.rh);
+  }, 30_000);
+
+  it("permits a fresh retrieval for the same document under a genuinely different proven discovery scope", async () => {
+    const setup = await runWithOneWorkItem("collector");
+    const sharedUrl = "https://merchants.fiserv.com/official-document-with-scope-specific-applicability";
+    const firstPorts = successfulPorts([]);
+    const firstSearch = firstPorts.search;
+    firstPorts.search = async (input, onSend) => {
+      const result = await firstSearch(input, onSend);
+      return { ...result, value: [{ ...result.value[0]!, url: sharedUrl }] };
+    };
+    const firstVerify = firstPorts.verify;
+    firstPorts.verify = async (input, onSend) => {
+      const result = await firstVerify(input, onSend);
+      return { ...result, value: { ...result.value, scopeStatus: "wrong_scope" as const,
+        semanticSupportStatus: "unsupported" as const, exactAtomicClaimSupport: false } };
+    };
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports: firstPorts });
+    const afterFirst = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const related = relatedParticipantFacet(afterFirst.rgClaimAdmissions[0]!, afterFirst.rgWorkItems[0]!,
+      "proven-program-billing-intermediary", "billing_intermediary", { processorProgram: "proven_us_program" });
+    installSyntheticPlan(setup, afterFirst.result!.artifacts.rgWorkLedger!, "different-applicability-scope-plan",
+      [related.admission], [related.work]);
+    const calls: string[] = [];
+    const secondPorts = successfulPorts(calls);
+    const secondSearch = secondPorts.search;
+    secondPorts.search = async (input, onSend) => {
+      const result = await secondSearch(input, onSend);
+      return { ...result, value: [{ ...result.value[0]!, url: sharedUrl }] };
+    };
+
+    const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId,
+      ports: secondPorts });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
+    expect(result).toMatchObject({ workItemsCompletedWithEvidence: 1, canonicalTruthPreserved: true });
+    expect(result.verifiedEvidence).toHaveLength(1);
+    expect(persisted.rgWorkItems[0]).toMatchObject({ executionState: "completed_verified_evidence",
+      verifiedEvidenceRefs: [result.verifiedEvidence[0]!.evidenceId] });
+    expect(persisted.rgExecutionEvents.filter((event) => event.workItemId === related.work.workItemId
+      && event.eventType === "candidate_retrieval_skipped_known_inapplicable")).toEqual([]);
+    expect(persisted.canonicalTruthHash).toBe(afterFirst.canonicalTruthHash);
+    expect(persisted.financialFoundationHash).toBe(afterFirst.financialFoundationHash);
+    expect(persisted.result!.artifacts.rh).toEqual(afterFirst.result!.artifacts.rh);
+  }, 30_000);
+
   it("fails closed before another provider send when durable candidate applicability history is corrupt", async () => {
     const setup = await runWithOneWorkItem("collector");
     const ports = successfulPorts([]);
@@ -2284,6 +2421,33 @@ describe("production durable claim-bound RG evidence execution", () => {
     setup.store.persistRgWorkLedger(setup.run.runId, ledger, new Date().toISOString());
     setup.db.db.prepare(`UPDATE canonical_analysis_run_stages SET artifact_json = ?, artifact_hash = NULL
       WHERE run_id = ? AND stage = 'rg_planning'`).run(JSON.stringify(ledger), setup.run.runId);
+  }
+
+  function relatedParticipantFacet(
+    baseAdmission: CanonicalRgClaimAdmission,
+    baseWork: CanonicalRgWorkItem,
+    seed: string,
+    facet: "billing_intermediary" | "collector",
+    scopePatch: Record<string, string | null> = {},
+  ): { admission: CanonicalRgClaimAdmission; work: CanonicalRgWorkItem } {
+    const atomicClaimId = `atomic-claim-${createHash("sha256").update(`${seed}:claim`).digest("hex")}`;
+    const admission: CanonicalRgClaimAdmission = { ...structuredClone(baseAdmission), atomicClaimId, facet,
+      decisionBasis: { ...structuredClone(baseAdmission.decisionBasis), atomicFacet: facet },
+      expectedKnowledgeValueConstraint: { kind: "role", controlDimension: facet },
+      evidenceObjective: `Resolve only the ${facet} facet for the exact subject and discovery scope.` };
+    const work: CanonicalRgWorkItem = { ...structuredClone(baseWork),
+      workItemId: `rg-work-${createHash("sha256").update(`${seed}:work`).digest("hex")}`,
+      atomicClaimId, state: "planned", executionState: "planned_for_durable_execution",
+      evidenceObjective: admission.evidenceObjective,
+      knowledgeQuery: { ...structuredClone(baseWork.knowledgeQuery),
+        scope: { ...structuredClone(baseWork.knowledgeQuery.scope), ...scopePatch } },
+      expectedKnowledgeValueConstraint: { kind: "role", controlDimension: facet },
+      continuationContract: null, executionAuthorization: null, reservation: null,
+      progress: { state: "not_started", operationsAttempted: 0, evidenceItemsObserved: 0 },
+      extensionDecisions: [], retryDecisions: [],
+      resourceConsumption: { providerCalls: 0, searchCalls: 0, retrievalBytes: 0, aiCalls: 0, tokens: 0 },
+      stopReason: null, verifiedEvidenceRefs: [] };
+    return { admission, work };
   }
 
   function syntheticWorkState(work: CanonicalRgWorkItem, executionState: CanonicalRgWorkItem["executionState"],

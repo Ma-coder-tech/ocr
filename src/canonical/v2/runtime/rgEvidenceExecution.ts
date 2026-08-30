@@ -118,6 +118,15 @@ type CanonicalRgCandidateResearchOutcome = {
   analyticalCompletionEffect: "none";
 };
 
+type ReusableCandidateInapplicability = Pick<CanonicalRgCandidateResearchOutcome,
+  "documentFingerprint" | "verificationOperationId" | "outcomeClass">;
+
+class CandidateRetrievalExcludedBeforeSend extends Error {
+  constructor(public readonly inapplicability: ReusableCandidateInapplicability) {
+    super("rg_candidate_retrieval_excluded_known_inapplicable_before_send");
+  }
+}
+
 export type CanonicalRgDiscoveryCandidate = {
   candidateId: string;
   url: string;
@@ -491,7 +500,9 @@ async function executeWorkItem(input: {
       safeReason(error), [], input.workerId);
     return { state: "degraded", evidence: [] };
   }
-  const knownInapplicableDocuments = knownInapplicableDocumentsForIntent(input.runId, intent);
+  // Validate the complete durable history before any provider operation. A second lookup is
+  // deliberately performed for each candidate and again at the send boundary below.
+  knownInapplicableDocumentsForIntent(input.runId, intent);
   const search = await runExternalOperation({ ...input, kind: "public_search", candidateId: null,
     providerCode: "public_search", operationInput: { intent, maximumCandidates: MAX_CANDIDATES_PER_WORK_ITEM },
     projectResult: sanitizeSearchResult,
@@ -509,26 +520,24 @@ async function executeWorkItem(input: {
   let investigationAttempted = false;
   for (const [index, candidate] of candidates.entries()) {
     if (index > 0) appendExtensionDecision(input.runId, input.workItem.workItemId, "extended", "prior_candidate_did_not_produce_verified_support");
-    const priorInapplicable = knownInapplicableDocuments.get(candidate.url);
+    const priorInapplicable = knownInapplicableDocumentsForIntent(input.runId, intent).get(candidate.url);
     if (priorInapplicable) {
       candidateOutcomes.push(priorInapplicable.outcomeClass);
-      appendEvent(input.runId, input.workItem.workItemId, null, "candidate_retrieval_skipped_known_inapplicable", {
-        schemaVersion: "canonical_rg_candidate_retrieval_skip_v1",
-        candidateId: candidate.candidateId,
-        sourceUrl: candidate.url,
-        documentFingerprint: priorInapplicable.documentFingerprint,
-        discoveryApplicabilityFingerprint: intent.discoveryScope.applicabilityFingerprint,
-        priorVerificationOperationId: priorInapplicable.verificationOperationId,
-        outcomeClass: priorInapplicable.outcomeClass,
-        semanticReuse: "prohibited",
-        analyticalCompletionEffect: "none",
-      });
+      appendKnownInapplicableCandidateSkip(input.runId, input.workItem.workItemId, intent, candidate,
+        priorInapplicable, null);
       continue;
     }
     const retrieval = await runExternalOperation({ ...input, kind: "public_retrieval", candidateId: candidate.candidateId,
       providerCode: "independent_https_retrieval", operationInput: { intentId: intent.intentId, candidate },
       projectResult: sanitizeRetrievedDocument,
+      beforeSend: () => knownInapplicableDocumentsForIntent(input.runId, intent).get(candidate.url) ?? null,
       call: (onSend) => input.ports.retrieve({ intent, candidate, maximumBytes: 5_242_880 }, onSend) });
+    if (retrieval.state === "excluded_known_inapplicable") {
+      candidateOutcomes.push(retrieval.inapplicability.outcomeClass);
+      appendKnownInapplicableCandidateSkip(input.runId, input.workItem.workItemId, intent, candidate,
+        retrieval.inapplicability, retrieval.operation.operationId);
+      continue;
+    }
     if (retrieval.state !== "completed") {
       if (retrieval.operation.state === "indeterminate_after_send" || operationStoppedByCircuitBreaker(retrieval.operation)) {
         return finishFailedOperation(input, retrieval.operation);
@@ -786,7 +795,9 @@ function validatePublicQuery(query: string, binding: { runId: string; planHash: 
 
 type OperationCallResult =
   | { state: "completed"; value: unknown; operation: CanonicalRgOperation }
-  | { state: "failed"; value: null; operation: CanonicalRgOperation };
+  | { state: "failed"; value: null; operation: CanonicalRgOperation }
+  | { state: "excluded_known_inapplicable"; value: null; operation: CanonicalRgOperation;
+    inapplicability: ReusableCandidateInapplicability };
 
 async function runExternalOperation<T>(input: {
   runId: string;
@@ -800,6 +811,7 @@ async function runExternalOperation<T>(input: {
   operationInput: unknown;
   projectResult(value: T): unknown;
   call(onSend: () => void): Promise<RgEvidencePortResult<T>>;
+  beforeSend?: () => ReusableCandidateInapplicability | null;
   executionGrant: CanonicalContinuationExecutionGrant | null;
   generationZeroOperationalScope: GenerationZeroOperationalScope | null;
 }): Promise<OperationCallResult> {
@@ -840,12 +852,33 @@ async function runExternalOperation<T>(input: {
       : reserveOperation({ ...input, operationId, attempt, inputHash });
     let sent = false;
     try {
-      const result = await input.call(() => { markOperationSent(input.runId, operation.operationId, input.workerId); sent = true; });
+      const result = await input.call(() => {
+        const inapplicability = input.beforeSend?.() ?? null;
+        if (inapplicability) throw new CandidateRetrievalExcludedBeforeSend(inapplicability);
+        markOperationSent(input.runId, operation.operationId, input.workerId); sent = true;
+      });
       const projected = input.projectResult(result.value);
       const settled = settleOperation(input.runId, operation, "completed", projected, result.receipt, "rg_operation_completed");
       incrementResource(input.runId, input.workItem.workItemId, input.kind, result.receipt);
       return { state: "completed", value: projected, operation: settled };
     } catch (error) {
+      if (error instanceof CandidateRetrievalExcludedBeforeSend) {
+        if (sent || input.kind !== "public_retrieval") {
+          throw new Error("rg_candidate_retrieval_exclusion_send_state_invalid");
+        }
+        const settled = settleOperation(input.runId, operation, "failed_before_send", null, null,
+          error.message);
+        appendRetryDecision(input.runId, input.workItem.workItemId, operation.operationId,
+          "no_retry", "known_inapplicable_document_excluded_before_send");
+        return { state: "excluded_known_inapplicable", value: null, operation: settled,
+          inapplicability: error.inapplicability };
+      }
+      if (!sent && error instanceof Error && error.message === "rg_candidate_research_outcome_integrity_invalid") {
+        settleOperation(input.runId, operation, "failed_before_send", null, null, error.message);
+        appendRetryDecision(input.runId, input.workItem.workItemId, operation.operationId,
+          "no_retry", "corrupt_inapplicability_history_fail_closed");
+        throw error;
+      }
       if (error instanceof RgEvidenceCompletedUnusableError) {
         if (input.kind !== "public_retrieval" || !sent) {
           throw new Error("rg_completed_unusable_outcome_invalid");
@@ -1505,16 +1538,36 @@ function appendCandidateResearchOutcome(runId: string, outcome: CanonicalRgCandi
   appendEvent(runId, outcome.workItemId, outcome.verificationOperationId, "candidate_research_outcome", outcome);
 }
 
+function appendKnownInapplicableCandidateSkip(
+  runId: string,
+  workItemId: string,
+  intent: CanonicalRgSearchIntent,
+  candidate: CanonicalRgDiscoveryCandidate,
+  prior: ReusableCandidateInapplicability,
+  operationId: string | null,
+): void {
+  appendEvent(runId, workItemId, operationId, "candidate_retrieval_skipped_known_inapplicable", {
+    schemaVersion: "canonical_rg_candidate_retrieval_skip_v1",
+    candidateId: candidate.candidateId,
+    sourceUrl: candidate.url,
+    documentFingerprint: prior.documentFingerprint,
+    discoveryApplicabilityFingerprint: intent.discoveryScope.applicabilityFingerprint,
+    priorVerificationOperationId: prior.verificationOperationId,
+    outcomeClass: prior.outcomeClass,
+    semanticReuse: "prohibited",
+    analyticalCompletionEffect: "none",
+  });
+}
+
 function knownInapplicableDocumentsForIntent(
   runId: string,
   intent: CanonicalRgSearchIntent,
-): Map<string, Pick<CanonicalRgCandidateResearchOutcome, "documentFingerprint" | "verificationOperationId" | "outcomeClass">> {
+): Map<string, ReusableCandidateInapplicability> {
   const rows = db.prepare(`SELECT work_item_id, operation_id, event_type, event_json, event_hash FROM canonical_rg_execution_events
     WHERE run_id = ? AND event_type = 'candidate_research_outcome' ORDER BY rowid`).all(runId) as Array<{
       work_item_id: string; operation_id: string; event_type: string; event_json: string; event_hash: string;
     }>;
-  const output = new Map<string, Pick<CanonicalRgCandidateResearchOutcome,
-    "documentFingerprint" | "verificationOperationId" | "outcomeClass">>();
+  const output = new Map<string, ReusableCandidateInapplicability>();
   for (const row of rows) {
     let value: Partial<CanonicalRgCandidateResearchOutcome>;
     try {
