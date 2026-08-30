@@ -26,6 +26,11 @@ import {
   type CanonicalRgCurrentRunContext,
 } from "./rgApprovedAiContext.js";
 import {
+  assertCanonicalProductionApplicabilityScope,
+  CANONICAL_PRODUCTION_APPLICABILITY_SCOPE_VERSION,
+  CANONICAL_PRODUCTION_COUNTRY_CODE,
+} from "./productionApplicabilityScope.js";
+import {
   canonicalRgWorkContractFingerprint,
   type CanonicalRgClaimAdmission,
   type CanonicalRgOperation,
@@ -33,14 +38,14 @@ import {
   type CanonicalRgWorkItem,
 } from "./rgWorkLedger.js";
 
-export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1_3" as const;
+export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1_4" as const;
 
 const MAX_CANDIDATES_PER_WORK_ITEM = 2;
 const MAX_BEFORE_SEND_ATTEMPTS = 2;
 const WORK_RESERVATION_MS = 5 * 60_000;
 
 export type CanonicalRgSearchIntent = {
-  schemaVersion: "canonical_rg_search_intent_v1_2";
+  schemaVersion: "canonical_rg_search_intent_v1_3";
   intentId: string;
   runId: string;
   planHash: string;
@@ -51,6 +56,8 @@ export type CanonicalRgSearchIntent = {
   publicSubjectConcept: string;
   publicScope: Record<string, string>;
   discoveryScope: {
+    productionScopeVersion: typeof CANONICAL_PRODUCTION_APPLICABILITY_SCOPE_VERSION;
+    countryCode: typeof CANONICAL_PRODUCTION_COUNTRY_CODE;
     processorFamily: string | null;
     processorProgram: string | null;
     exactPublicDimensions: Record<string, string>;
@@ -66,7 +73,7 @@ export type CanonicalRgSearchIntent = {
   privacy: {
     status: "validated_public_concepts_only";
     forbiddenPrivateValuesObserved: 0;
-    compiler: "deterministic_claim_lineage_v2";
+    compiler: "deterministic_claim_lineage_v3_us_scope";
   };
   continuation: null | {
     executionGrantId: string;
@@ -656,6 +663,7 @@ export function compileCanonicalRgSearchIntent(
     .map((occurrence) => safePublicSubjectConcept(occurrence.sourceLabel)).filter((value): value is string => value !== null);
   const publicSubjectConcept = [...new Set(labels)].sort((left, right) => left.length - right.length || left.localeCompare(right))[0];
   if (!publicSubjectConcept) throw new Error("rg_search_intent_public_subject_unavailable");
+  assertCanonicalProductionApplicabilityScope(workItem.knowledgeQuery.scope);
   const publicScope = Object.fromEntries(Object.entries(workItem.knowledgeQuery.scope)
     .filter(([key, value]) => key !== "tenantRef" && key !== "accountRef" && typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,95}$/.test(value))
     .map(([key, value]) => [key, String(value)]));
@@ -665,6 +673,8 @@ export function compileCanonicalRgSearchIntent(
   const unknownPublicDimensions = Object.entries(providerSafe)
     .filter(([, value]) => value === null).map(([key]) => key).sort();
   const discoveryApplicabilityBase = {
+    productionScopeVersion: CANONICAL_PRODUCTION_APPLICABILITY_SCOPE_VERSION,
+    countryCode: CANONICAL_PRODUCTION_COUNTRY_CODE,
     publicSubjectConcept,
     claimType: workItem.knowledgeQuery.claimType,
     exactPublicDimensions,
@@ -673,6 +683,8 @@ export function compileCanonicalRgSearchIntent(
     requiredSourceAuthorities: [...workItem.requiredSourceAuthorities].sort(),
   };
   const discoveryScope = {
+    productionScopeVersion: CANONICAL_PRODUCTION_APPLICABILITY_SCOPE_VERSION,
+    countryCode: CANONICAL_PRODUCTION_COUNTRY_CODE,
     processorFamily: providerSafe.processor,
     processorProgram: providerSafe.processorProgram,
     exactPublicDimensions,
@@ -702,11 +714,11 @@ export function compileCanonicalRgSearchIntent(
       publicRefinementTerms,
     } : null };
   return {
-    schemaVersion: "canonical_rg_search_intent_v1_2",
+    schemaVersion: "canonical_rg_search_intent_v1_3",
     intentId: `rg-intent-${digest(base).slice(0, 32)}`,
     ...base,
     privacy: { status: "validated_public_concepts_only", forbiddenPrivateValuesObserved: 0,
-      compiler: "deterministic_claim_lineage_v2" },
+      compiler: "deterministic_claim_lineage_v3_us_scope" },
   };
 }
 
@@ -720,6 +732,8 @@ function discoveryScopeQueryTerms(exactPublicDimensions: Record<string, string>)
   ] as const;
   return labeled.flatMap(([dimension, label]) => {
     const value = exactPublicDimensions[dimension];
+    if (value === "us" && dimension === "region") return ["United States merchants"];
+    if (value === "us" && dimension === "jurisdiction") return ["United States applicability"];
     return value ? [`${value.replaceAll("_", " ")} ${label}`] : [];
   });
 }

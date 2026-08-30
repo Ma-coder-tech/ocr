@@ -25,9 +25,10 @@ import {
   type CanonicalAtomicClaimFacet,
   type CanonicalAtomicClaimSeed,
 } from "./atomicClaims.js";
+import { bindCanonicalProductionApplicabilityScope } from "./productionApplicabilityScope.js";
 import type { CanonicalUnresolvedClaim, CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
 
-export const CANONICAL_RF_RESOLUTION_SCHEMA_VERSION = "canonical_rf_claim_resolution_v3" as const;
+export const CANONICAL_RF_RESOLUTION_SCHEMA_VERSION = "canonical_rf_claim_resolution_v4" as const;
 
 const APPLICABLE_CATEGORIES = new Set<CanonicalEconomicCategory>([
   "issuer_interchange_economics",
@@ -489,7 +490,7 @@ function queryScope(input: {
   accountRef: string;
 }): KnowledgeQueryScope {
   const foundation = input.economic.pricingAnalysis.foundation;
-  return {
+  return bindCanonicalProductionApplicabilityScope({
     tenantRef: input.tenantRef,
     accountRef: input.accountRef,
     processor: canonicalCodeOrNull(foundation.identity.processorFamily),
@@ -507,7 +508,7 @@ function queryScope(input: {
     sourceSection: canonicalCodeOrNull(input.sectionKind),
     population: "statement_processing_fee_occurrence",
     jurisdiction: null,
-  };
+  });
 }
 
 function resolvedCategory(resolution: KnowledgeResolution, subjectCode: string): Exclude<CanonicalEconomicCategory, "unresolved_unclassified"> | null {

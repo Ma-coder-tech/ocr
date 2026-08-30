@@ -60,6 +60,9 @@ describe("production durable claim-bound RG evidence execution", () => {
       workItemsCompletedUnresolved: 0, workItemsDegraded: 0,
       canonicalTruthHashBefore: before, canonicalTruthHashAfter: before, canonicalTruthPreserved: true });
     expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
+    expect(item.knowledgeQuery.scope).toMatchObject({ region: "us", jurisdiction: "us", processorProgram: null });
+    expect(item.knowledgeQuery.scope).not.toHaveProperty("state");
+    expect(item.knowledgeQuery.scope).not.toHaveProperty("locality");
     expect(claimContexts).toHaveLength(2);
     expect(claimContexts[0]).toEqual(claimContexts[1]);
     expect(claimContexts[0]).toMatchObject({
@@ -105,6 +108,7 @@ describe("production durable claim-bound RG evidence execution", () => {
         authorityClass: "processor_publication",
       },
       currentRunSupport: "verified_claim_scoped_candidate_support",
+      applicabilityScope: expect.objectContaining({ region: "us", jurisdiction: "us" }),
       reusableKnowledgeState: "candidate_not_promoted", rfAdmissionAuthority: "none",
       automaticKnowledgePromotion: false, canonicalFinancialMutationAllowed: false,
       atomicClaimId: persisted.rgClaimAdmissions[0]!.atomicClaimId,
@@ -265,7 +269,7 @@ describe("production durable claim-bound RG evidence execution", () => {
       authorityLocatorId: expect.stringMatching(/^authority-/),
       authorityLocatorExcerpt: "Official Fiserv publisher identity.",
       supportLocatorId: expect.stringMatching(/^support-/),
-      supportLocatorExcerpt: "Exact claim-scoped semantic support.",
+      supportLocatorExcerpt: "Exact claim-scoped semantic support explicitly applicable to United States merchants.",
     });
     expect(evidence.supportLocatorId).not.toBe(evidence.investigatorLocatorId);
     const durable = persisted.rgOperations.find((operation) => operation.kind === "independent_verification")!.result;
@@ -430,26 +434,48 @@ describe("production durable claim-bound RG evidence execution", () => {
     const intent = setup.executor.compileCanonicalRgSearchIntent(setup.run.runId,
       persisted.result!.artifacts.rgWorkLedger!.planHash, scoped, admission);
 
-    expect(intent.schemaVersion).toBe("canonical_rg_search_intent_v1_2");
-    expect(intent.discoveryScope).toMatchObject({ processorFamily: "fiserv_first_data",
+    expect(intent.schemaVersion).toBe("canonical_rg_search_intent_v1_3");
+    expect(intent.discoveryScope).toMatchObject({
+      productionScopeVersion: "canonical_production_applicability_scope_us_v1", countryCode: "us",
+      processorFamily: "fiserv_first_data",
       processorProgram: "north_america_frontend", exactPublicDimensions: {
         processor: "fiserv_first_data", processorProgram: "north_america_frontend", network: "visa",
         region: "us", jurisdiction: "us",
       }, unknownPublicDimensions: [] });
     expect(intent.queryTerms).toEqual(expect.arrayContaining([
       "fiserv first data processor family", "north america frontend processor program", "visa network",
-      "us region", "us jurisdiction",
+      "United States merchants", "United States applicability",
     ]));
     expect(intent.queryText).not.toContain(admission.opaqueSubjectCode);
     expect(intent.queryText).not.toContain(base.knowledgeQuery.scope.accountRef!);
 
     const defaultIntent = setup.executor.compileCanonicalRgSearchIntent(setup.run.runId,
       persisted.result!.artifacts.rgWorkLedger!.planHash, base, admission);
-    expect(defaultIntent.discoveryScope).toMatchObject({ processorFamily: "fiserv_first_data", processorProgram: null });
+    expect(defaultIntent.discoveryScope).toMatchObject({ productionScopeVersion: "canonical_production_applicability_scope_us_v1",
+      countryCode: "us", processorFamily: "fiserv_first_data", processorProgram: null,
+      exactPublicDimensions: { processor: "fiserv_first_data", region: "us", jurisdiction: "us" } });
     expect(defaultIntent.discoveryScope.unknownPublicDimensions).toEqual(expect.arrayContaining([
-      "processorProgram", "network", "region", "jurisdiction",
+      "processorProgram", "network",
     ]));
-    expect(defaultIntent.queryText).not.toMatch(/north america|visa network|us region|us jurisdiction|united states/i);
+    expect(defaultIntent.discoveryScope.unknownPublicDimensions).not.toEqual(expect.arrayContaining(["region", "jurisdiction"]));
+    expect(defaultIntent.queryText).toMatch(/United States merchants.*United States applicability/);
+    expect(defaultIntent.queryText).not.toMatch(/north america|visa network|california|new york|state_code|locality/i);
+    expect(defaultIntent.publicScope).not.toHaveProperty("merchantCategory");
+  }, 30_000);
+
+  it("fails closed rather than silently rewriting historical work without the versioned US production scope", async () => {
+    const setup = await runWithOneWorkItem();
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const admission = persisted.rgClaimAdmissions[0]!;
+    const historicalWork = structuredClone(persisted.rgWorkItems[0]!);
+    historicalWork.knowledgeQuery.scope.region = null;
+    historicalWork.knowledgeQuery.scope.jurisdiction = null;
+
+    expect(() => setup.executor.compileCanonicalRgSearchIntent(setup.run.runId,
+      persisted.result!.artifacts.rgWorkLedger!.planHash, historicalWork, admission))
+      .toThrow("canonical_production_us_applicability_scope_unbound");
+    expect(setup.store.getPersistedAnalysisRun(setup.run.runId)!.rgWorkItems[0]!.knowledgeQuery.scope)
+      .toMatchObject({ region: "us", jurisdiction: "us" });
   }, 30_000);
 
   it("keeps source authority distinct from semantic support", async () => {
@@ -473,8 +499,10 @@ describe("production durable claim-bound RG evidence execution", () => {
 
   it("never admits exact support with wrong geography, processor-program scope, or period", async () => {
     const cases = [
-      { name: "geography", scopeStatus: "wrong_scope" as const, periodStatus: "applicable" as const,
-        limitationCode: "document_geography_not_applicable", outcomeClass: "wrong_scope" },
+      { name: "non-US-only geography", scopeStatus: "wrong_scope" as const, periodStatus: "applicable" as const,
+        limitationCode: "document_non_us_only", outcomeClass: "wrong_scope" },
+      { name: "geography unresolved", scopeStatus: "unresolved" as const, periodStatus: "applicable" as const,
+        limitationCode: "document_us_applicability_unresolved", outcomeClass: "exact_semantic_support_insufficient" },
       { name: "processor program", scopeStatus: "wrong_scope" as const, periodStatus: "applicable" as const,
         limitationCode: "document_processor_program_not_applicable", outcomeClass: "wrong_scope" },
       { name: "period", scopeStatus: "applicable" as const, periodStatus: "wrong_period" as const,
@@ -504,6 +532,8 @@ describe("production durable claim-bound RG evidence execution", () => {
       ]));
       expect(after.canonicalTruthHash, scenario.name).toBe(before.canonicalTruthHash);
       expect(after.financialFoundationHash, scenario.name).toBe(before.financialFoundationHash);
+      expect(after.rgWorkItems[0]!.knowledgeQuery.scope, scenario.name)
+        .toMatchObject({ region: "us", jurisdiction: "us", processorProgram: null });
     }
   }, 30_000);
 
@@ -2291,7 +2321,8 @@ function successfulPorts(calls: string[], claimContexts?: CanonicalRgApprovedAiC
       calls.push("retrieve"); onSend();
       const fingerprint = createHash("sha256").update(candidate.url).digest("hex");
       const authorityText = normalizedLocator("Official Fiserv publisher identity.", "text/html", 0);
-      const supportText = normalizedLocator("Exact claim-scoped semantic support.", "text/html", 1);
+      const supportText = normalizedLocator(
+        "Exact claim-scoped semantic support explicitly applicable to United States merchants.", "text/html", 1);
       const document: CanonicalRgRetrievedDocument = {
         candidateId: candidate.candidateId, requestedUrl: candidate.url, finalUrl: candidate.url,
         sourceOrigin: new URL(candidate.url).origin, documentId: `document-${fingerprint.slice(0, 24)}`,

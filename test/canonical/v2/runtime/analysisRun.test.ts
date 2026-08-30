@@ -6,6 +6,8 @@ import {
   executeDeterministicCanonicalAnalysisRun,
   FISERV_RUNTIME_CAPABILITY_POLICY_ID,
   categorySubjectCode,
+  knowledgeExact,
+  resolveKnowledge,
   unboundedKnowledgeScope,
 } from "../../../../src/canonical/v2/index.js";
 import { admittedKnowledge } from "../knowledge/knowledgeFixtures.js";
@@ -308,6 +310,39 @@ describe("production canonical AnalysisRun core", () => {
     expect(resolved.artifacts.rb!.metrics.headlineEffectiveRate).toEqual(baseline.artifacts.rb!.metrics.headlineEffectiveRate);
     expect(resolved.artifacts.rd!.economicLayer.costStack.totalStatementProcessingCost)
       .toEqual(baseline.artifacts.rd!.economicLayer.costStack.totalStatementProcessingCost);
+    expect(resolved.artifacts.rfResolution!.decisions.filter((decision) => decision.query !== null)
+      .every((decision) => decision.query!.scope.region === "us"
+        && decision.query!.scope.jurisdiction === "us"
+        && decision.query!.scope.processorProgram === null)).toBe(true);
+  });
+
+  it("binds RF applicability to US merchants and rejects admitted non-US-only knowledge without changing financial truth", () => {
+    const baseline = executeDeterministicCanonicalAnalysisRun({
+      runId: "rf-us-scope-baseline",
+      sourceDocumentRef: "rf-us-scope-source",
+      document: genericDocument,
+    }).run;
+    const productionDecision = baseline.artifacts.rfResolution!.decisions.find((item) =>
+      item.claimClass === "economic_category" && item.query !== null)!;
+    const subjectCode = productionDecision.query!.subjectCode;
+    const nonUsEntry = admittedKnowledge({
+      id: "runtime-non-us-only-category",
+      claimType: "stable_facet_mapping",
+      subjectCode,
+      value: { kind: "mapping", canonicalCode: "processor_service_administrative_cost", sourceCode: subjectCode },
+      scope: { ...unboundedKnowledgeScope(), region: knowledgeExact("ca"), jurisdiction: knowledgeExact("ca") },
+      effectiveFrom: "2019-01-01",
+      evidence: [{ ref: "runtime-reviewed-non-us-category",
+        sourceAuthority: "approved_internal_manual_mapping", private: false }],
+    });
+    const resolution = resolveKnowledge([nonUsEntry], productionDecision.query!);
+
+    expect(productionDecision.query!.scope).toMatchObject({ region: "us", jurisdiction: "us", processorProgram: null });
+    expect(resolution).toMatchObject({ status: "unresolved_scope_or_period", value: null,
+      selectedEntryRefs: [], rejectedCounts: { scope_mismatch_or_unknown: 1 } });
+    expect(baseline.artifacts.rfResolution!.categoryApplications).toEqual([]);
+    expect(baseline.stageOutcomes.rb.status).toBe("valid");
+    expect(baseline.stageOutcomes.rd.status).toBe("valid");
   });
 
   it("rejects an unauthorized RF mapping claim while preserving the complete deterministic result", () => {
