@@ -436,7 +436,10 @@ function aggregateResources(attempts: WorkAttempt[], events: PersistedAnalysisRu
     if (operation.kind === "public_search") output.searchCalls += operation.receipt.calls;
     if (["investigation", "independent_verification"].includes(operation.kind)) output.aiCalls += operation.receipt.calls;
     output.retrievalBytes += operation.receipt.retrievalBytes;
-    if (operation.kind === "public_retrieval" && operation.state === "completed") output.retrievalDocuments += 1;
+    if (operation.kind === "public_retrieval" && operation.state === "completed"
+      && operation.receipt.providerCode !== "durable_analysis_run_public_document_replay") {
+      output.retrievalDocuments += 1;
+    }
     if (operation.receipt.tokens === null) output.tokenAccountingComplete = false;
     else output.tokensObserved += operation.receipt.tokens;
     if (operation.receipt.providerCode) providerCodes.add(operation.receipt.providerCode);

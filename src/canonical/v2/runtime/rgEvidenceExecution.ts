@@ -43,11 +43,16 @@ import {
   type CanonicalRgWorkItem,
 } from "./rgWorkLedger.js";
 
-export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1_4" as const;
+export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1_5" as const;
 
 const MAX_CANDIDATES_PER_WORK_ITEM = 2;
 const MAX_BEFORE_SEND_ATTEMPTS = 2;
 const WORK_RESERVATION_MS = 5 * 60_000;
+const PUBLIC_DOCUMENT_RETRIEVAL_REPLAY_CONTRACT_VERSION =
+  "canonical_rg_public_document_retrieval_replay_contract_v1" as const;
+const PUBLIC_DOCUMENT_RETRIEVAL_ARTIFACT_VERSION =
+  "canonical_rg_public_document_retrieval_artifact_v1" as const;
+const PUBLIC_DOCUMENT_RETRIEVAL_MAXIMUM_BYTES = 5_242_880;
 
 export type CanonicalRgSearchIntent = {
   schemaVersion: "canonical_rg_search_intent_v1_3";
@@ -194,6 +199,83 @@ type ReusableCandidateInapplicability = {
 class CandidateRetrievalExcludedBeforeSend extends Error {
   constructor(public readonly inapplicability: ReusableCandidateInapplicability) {
     super("rg_candidate_retrieval_excluded_known_inapplicable_before_send");
+  }
+}
+
+type CanonicalRgPublicDocumentRetrievalReplayContract = {
+  schemaVersion: typeof PUBLIC_DOCUMENT_RETRIEVAL_REPLAY_CONTRACT_VERSION;
+  normalizedRequestedUrl: string;
+  claimedAuthority: CanonicalRgDiscoveryCandidate["claimedAuthority"];
+  candidateTemporalIdentity: {
+    publicationDate: string | null;
+    effectiveFrom: string | null;
+    effectiveTo: string | null;
+  };
+  freshnessRequirement: {
+    asOf: string;
+    statementPeriod: CanonicalRgClaimAdmission["statementPeriod"];
+    excludedDocumentFingerprints: string[];
+  };
+  productionScope: {
+    version: typeof CANONICAL_PRODUCTION_APPLICABILITY_SCOPE_VERSION;
+    countryCode: typeof CANONICAL_PRODUCTION_COUNTRY_CODE;
+  };
+  applicabilityRequirements: {
+    exactPublicDimensions: Record<string, string>;
+    unknownPublicDimensions: string[];
+  };
+  transport: {
+    maximumBytes: number;
+    httpsOnly: true;
+    redirectsRequireFreshAuthorization: true;
+    independentRetrievalRequired: true;
+    contentFormats: "all_supported_public_content_formats";
+  };
+  admission: {
+    normalizationVersion: "public_document_text_normalization_v1";
+    contractVersion: "canonical_rg_retrieved_document_admission_v1";
+  };
+};
+
+type CanonicalRgPublicDocumentRetrievalArtifact = {
+  schemaVersion: typeof PUBLIC_DOCUMENT_RETRIEVAL_ARTIFACT_VERSION;
+  artifactId: string;
+  runId: string;
+  replayIdentity: string;
+  replayContract: CanonicalRgPublicDocumentRetrievalReplayContract;
+  source: {
+    planHash: string;
+    workItemId: string;
+    operationId: string;
+    candidateId: string;
+    operationInputHash: string;
+    operationResultHash: string;
+  };
+  outcome: {
+    kind: "admitted_document";
+    admissionReasonCode: "rg_retrieved_document_admitted";
+    document: CanonicalRgRetrievedDocument;
+    documentProjectionHash: string;
+    immutableByteIdentity: {
+      fingerprintAlgorithm: "sha256";
+      documentFingerprint: string;
+      byteLength: number;
+    };
+  } | {
+    kind: "deterministic_unusable";
+    admissionReasonCode: string;
+    documentFingerprint: string | null;
+  };
+  reuseAuthority: "same_analysis_run_transport_and_document_admission_only";
+  semanticReuse: "prohibited";
+  evidenceAdmissionEffect: "none";
+  analyticalCompletionEffect: "none";
+  canonicalMutationAllowed: false;
+};
+
+class PublicDocumentRetrievalReplayBeforeSend extends Error {
+  constructor(public readonly artifact: CanonicalRgPublicDocumentRetrievalArtifact) {
+    super("rg_public_document_retrieval_replay_available_before_send");
   }
 }
 
@@ -599,12 +681,16 @@ async function executeWorkItem(input: {
         priorInapplicable, null);
       continue;
     }
+    const replayContract = publicDocumentRetrievalReplayContract(intent, candidate,
+      PUBLIC_DOCUMENT_RETRIEVAL_MAXIMUM_BYTES);
     const retrieval = await runExternalOperation({ ...input, kind: "public_retrieval", candidateId: candidate.candidateId,
       providerCode: "independent_https_retrieval", operationInput: { intentId: intent.intentId, candidate },
       projectResult: sanitizeRetrievedDocument,
       beforeSend: () => knownInapplicableCandidate(
         knownInapplicableDocumentsForIntent(input.runId, intent), candidate),
-      call: (onSend) => input.ports.retrieve({ intent, candidate, maximumBytes: 5_242_880 }, onSend) });
+      publicDocumentReplay: { contract: replayContract, candidate },
+      call: (onSend) => input.ports.retrieve({ intent, candidate,
+        maximumBytes: PUBLIC_DOCUMENT_RETRIEVAL_MAXIMUM_BYTES }, onSend) });
     if (retrieval.state === "excluded_known_inapplicable") {
       candidateOutcomes.push(retrieval.inapplicability.outcomeClass);
       appendKnownInapplicableCandidateSkip(input.runId, input.workItem.workItemId, intent, candidate,
@@ -616,6 +702,14 @@ async function executeWorkItem(input: {
         return finishFailedOperation(input, retrieval.operation);
       }
       if (isCompletedUnusableResult(retrieval.operation.result)) {
+        if (!retrieval.replayArtifact && !isPublicDocumentReplayOperation(retrieval.operation)) {
+          appendPublicDocumentRetrievalArtifact({
+            runId: input.runId, planHash: input.planHash, workItemId: input.workItem.workItemId,
+            operation: retrieval.operation, candidate, replayContract,
+            admission: { state: "rejected", reasonCode: retrieval.operation.result.reasonCode,
+              documentFingerprint: null },
+          });
+        }
         documentAdmissionFailures.push(retrieval.operation.result.reasonCode);
         continue;
       }
@@ -625,6 +719,12 @@ async function executeWorkItem(input: {
       retrieval.value as CanonicalRgRetrievedDocument, candidate);
     appendDocumentAdmissionDecision(input.runId, input.workItem.workItemId, retrieval.operation.operationId,
       candidate.candidateId, documentAdmission);
+    if (!retrieval.replayArtifact && !isPublicDocumentReplayOperation(retrieval.operation)) {
+      appendPublicDocumentRetrievalArtifact({
+        runId: input.runId, planHash: input.planHash, workItemId: input.workItem.workItemId,
+        operation: retrieval.operation, candidate, replayContract, admission: documentAdmission,
+      });
+    }
     if (documentAdmission.state === "rejected") {
       documentAdmissionFailures.push(documentAdmission.reasonCode);
       continue;
@@ -879,8 +979,10 @@ function validatePublicQuery(query: string, binding: { runId: string; planHash: 
 }
 
 type OperationCallResult =
-  | { state: "completed"; value: unknown; operation: CanonicalRgOperation }
-  | { state: "failed"; value: null; operation: CanonicalRgOperation }
+  | { state: "completed"; value: unknown; operation: CanonicalRgOperation;
+    replayArtifact?: CanonicalRgPublicDocumentRetrievalArtifact }
+  | { state: "failed"; value: null; operation: CanonicalRgOperation;
+    replayArtifact?: CanonicalRgPublicDocumentRetrievalArtifact }
   | { state: "excluded_known_inapplicable"; value: null; operation: CanonicalRgOperation;
     inapplicability: ReusableCandidateInapplicability };
 
@@ -897,6 +999,10 @@ async function runExternalOperation<T>(input: {
   projectResult(value: T): unknown;
   call(onSend: () => void): Promise<RgEvidencePortResult<T>>;
   beforeSend?: () => ReusableCandidateInapplicability | null;
+  publicDocumentReplay?: {
+    contract: CanonicalRgPublicDocumentRetrievalReplayContract;
+    candidate: CanonicalRgDiscoveryCandidate;
+  };
   executionGrant: CanonicalContinuationExecutionGrant | null;
   generationZeroOperationalScope: GenerationZeroOperationalScope | null;
 }): Promise<OperationCallResult> {
@@ -937,9 +1043,15 @@ async function runExternalOperation<T>(input: {
       : reserveOperation({ ...input, operationId, attempt, inputHash });
     let sent = false;
     try {
+      const replayBeforeCall = input.publicDocumentReplay
+        ? publicDocumentRetrievalArtifactForReplay(input.runId, input.publicDocumentReplay.contract) : null;
+      if (replayBeforeCall) return settlePublicDocumentRetrievalReplay(input, operation, replayBeforeCall);
       const result = await input.call(() => {
         const inapplicability = input.beforeSend?.() ?? null;
         if (inapplicability) throw new CandidateRetrievalExcludedBeforeSend(inapplicability);
+        const replayBeforeSend = input.publicDocumentReplay
+          ? publicDocumentRetrievalArtifactForReplay(input.runId, input.publicDocumentReplay.contract) : null;
+        if (replayBeforeSend) throw new PublicDocumentRetrievalReplayBeforeSend(replayBeforeSend);
         markOperationSent(input.runId, operation.operationId, input.workerId); sent = true;
       });
       const projected = input.projectResult(result.value);
@@ -947,6 +1059,12 @@ async function runExternalOperation<T>(input: {
       incrementResource(input.runId, input.workItem.workItemId, input.kind, result.receipt);
       return { state: "completed", value: projected, operation: settled };
     } catch (error) {
+      if (error instanceof PublicDocumentRetrievalReplayBeforeSend) {
+        if (sent || input.kind !== "public_retrieval" || !input.publicDocumentReplay) {
+          throw new Error("rg_public_document_retrieval_replay_send_state_invalid");
+        }
+        return settlePublicDocumentRetrievalReplay(input, operation, error.artifact);
+      }
       if (error instanceof CandidateRetrievalExcludedBeforeSend) {
         if (sent || input.kind !== "public_retrieval") {
           throw new Error("rg_candidate_retrieval_exclusion_send_state_invalid");
@@ -962,6 +1080,13 @@ async function runExternalOperation<T>(input: {
         settleOperation(input.runId, operation, "failed_before_send", null, null, error.message);
         appendRetryDecision(input.runId, input.workItem.workItemId, operation.operationId,
           "no_retry", "corrupt_inapplicability_history_fail_closed");
+        throw error;
+      }
+      if (!sent && error instanceof Error
+        && error.message === "rg_public_document_retrieval_artifact_integrity_invalid") {
+        settleOperation(input.runId, operation, "failed_before_send", null, null, error.message);
+        appendRetryDecision(input.runId, input.workItem.workItemId, operation.operationId,
+          "no_retry", "corrupt_public_document_replay_history_fail_closed");
         throw error;
       }
       if (error instanceof RgEvidenceCompletedUnusableError) {
@@ -1005,6 +1130,128 @@ async function runExternalOperation<T>(input: {
     }
   }
   throw new Error("rg_operation_retry_state_invalid");
+}
+
+function settlePublicDocumentRetrievalReplay<T>(input: {
+  runId: string;
+  workItem: CanonicalRgWorkItem;
+  kind: CanonicalRgOperation["kind"];
+  candidateId: string | null;
+  projectResult(value: T): unknown;
+  publicDocumentReplay?: {
+    contract: CanonicalRgPublicDocumentRetrievalReplayContract;
+    candidate: CanonicalRgDiscoveryCandidate;
+  };
+}, operation: CanonicalRgOperation,
+artifact: CanonicalRgPublicDocumentRetrievalArtifact): OperationCallResult {
+  if (input.kind !== "public_retrieval" || !input.publicDocumentReplay || operation.state !== "reserved"
+    || artifact.runId !== input.runId
+    || artifact.replayIdentity !== digest(input.publicDocumentReplay.contract)) {
+    throw new Error("rg_public_document_retrieval_replay_binding_invalid");
+  }
+  const replayReceipt: RgEvidencePortReceipt = {
+    providerCode: "durable_analysis_run_public_document_replay",
+    providerRequestId: null,
+    calls: 0,
+    tokens: 0,
+    retrievalBytes: 0,
+  };
+  const projected = artifact.outcome.kind === "admitted_document"
+    ? input.projectResult(rebindReplayedPublicDocument(artifact.outcome.document,
+      input.publicDocumentReplay.candidate) as T)
+    : {
+      schemaVersion: "canonical_rg_completed_unusable_result_v1",
+      outcome: "completed_unusable",
+      reasonCode: artifact.outcome.admissionReasonCode,
+    } satisfies CanonicalRgCompletedUnusableResult;
+  const settled = settleOperation(input.runId, operation, "completed", projected, replayReceipt,
+    artifact.outcome.kind === "admitted_document"
+      ? "rg_public_document_retrieval_admission_replayed"
+      : artifact.outcome.admissionReasonCode);
+  appendEvent(input.runId, input.workItem.workItemId, settled.operationId,
+    "public_document_retrieval_admission_replayed", {
+      schemaVersion: "canonical_rg_public_document_retrieval_replay_v1",
+      replayIdentity: artifact.replayIdentity,
+      artifactId: artifact.artifactId,
+      sourceOperationId: artifact.source.operationId,
+      currentCandidateId: input.publicDocumentReplay.candidate.candidateId,
+      outcomeKind: artifact.outcome.kind,
+      providerCalls: 0,
+      retrievalBytes: 0,
+      claimNeutralTransportReuseOnly: true,
+      investigationAndVerificationRequiredPerExactClaim:
+        artifact.outcome.kind === "admitted_document",
+      semanticReuse: "prohibited",
+      evidenceAdmissionEffect: "none",
+      analyticalCompletionEffect: "none",
+      canonicalMutationAllowed: false,
+    });
+  if (artifact.outcome.kind === "deterministic_unusable") {
+    appendDocumentAdmissionDecision(input.runId, input.workItem.workItemId, settled.operationId,
+      input.candidateId, { state: "rejected", reasonCode: artifact.outcome.admissionReasonCode,
+        documentFingerprint: artifact.outcome.documentFingerprint });
+    appendRetryDecision(input.runId, input.workItem.workItemId, settled.operationId,
+      "no_retry", "deterministic_unusable_public_document_replayed_no_retry");
+    return { state: "failed", value: null, operation: settled, replayArtifact: artifact };
+  }
+  return { state: "completed", value: projected, operation: settled, replayArtifact: artifact };
+}
+
+function publicDocumentRetrievalReplayContract(
+  intent: CanonicalRgSearchIntent,
+  candidate: CanonicalRgDiscoveryCandidate,
+  maximumBytes: number,
+): CanonicalRgPublicDocumentRetrievalReplayContract {
+  // Deliberately omit atomic claim/facet identity: this contract describes only whether the
+  // exact public transport and deterministic document-admission work can be replayed. Keep
+  // authority, temporal, applicability, and freshness requirements because changing any of
+  // those can legitimately require observing the URL again.
+  return {
+    schemaVersion: PUBLIC_DOCUMENT_RETRIEVAL_REPLAY_CONTRACT_VERSION,
+    normalizedRequestedUrl: normalizeSafeHttpsUrl(candidate.url),
+    claimedAuthority: candidate.claimedAuthority,
+    candidateTemporalIdentity: {
+      publicationDate: candidate.publicationDate,
+      effectiveFrom: candidate.effectiveFrom,
+      effectiveTo: candidate.effectiveTo,
+    },
+    freshnessRequirement: {
+      asOf: intent.asOf,
+      statementPeriod: structuredClone(intent.statementPeriod),
+      excludedDocumentFingerprints: [...new Set(intent.continuation?.excludedDocumentFingerprints ?? [])].sort(),
+    },
+    productionScope: {
+      version: CANONICAL_PRODUCTION_APPLICABILITY_SCOPE_VERSION,
+      countryCode: CANONICAL_PRODUCTION_COUNTRY_CODE,
+    },
+    applicabilityRequirements: {
+      exactPublicDimensions: Object.fromEntries(Object.entries(intent.discoveryScope.exactPublicDimensions)
+        .sort(([left], [right]) => left.localeCompare(right))),
+      unknownPublicDimensions: [...intent.discoveryScope.unknownPublicDimensions].sort(),
+    },
+    transport: {
+      maximumBytes,
+      httpsOnly: true,
+      redirectsRequireFreshAuthorization: true,
+      independentRetrievalRequired: true,
+      contentFormats: "all_supported_public_content_formats",
+    },
+    admission: {
+      normalizationVersion: "public_document_text_normalization_v1",
+      contractVersion: "canonical_rg_retrieved_document_admission_v1",
+    },
+  };
+}
+
+function rebindReplayedPublicDocument(
+  document: CanonicalRgRetrievedDocument,
+  candidate: CanonicalRgDiscoveryCandidate,
+): CanonicalRgRetrievedDocument {
+  return {
+    ...structuredClone(document),
+    candidateId: candidate.candidateId,
+    requestedUrl: candidate.url,
+  };
 }
 
 function isCompletedUnusableResult(value: unknown): value is CanonicalRgCompletedUnusableResult {
@@ -1244,6 +1491,265 @@ function appendDocumentAdmissionDecision(runId: string, workItemId: string, oper
   });
 }
 
+function appendPublicDocumentRetrievalArtifact(input: {
+  runId: string;
+  planHash: string;
+  workItemId: string;
+  operation: CanonicalRgOperation;
+  candidate: CanonicalRgDiscoveryCandidate;
+  replayContract: CanonicalRgPublicDocumentRetrievalReplayContract;
+  admission: CanonicalRgRetrievedDocumentAdmission;
+}): void {
+  const durableOperation = operationFromDb(input.runId, input.operation.operationId);
+  if (!durableOperation || durableOperation.kind !== "public_retrieval" || durableOperation.state !== "completed"
+    || durableOperation.candidateId !== input.candidate.candidateId
+    || durableOperation.inputHash !== digest(durableOperation.input)
+    || isPublicDocumentReplayOperation(durableOperation)) {
+    throw new Error("rg_public_document_retrieval_artifact_source_invalid");
+  }
+  const replayIdentity = digest(input.replayContract);
+  const outcome: CanonicalRgPublicDocumentRetrievalArtifact["outcome"] = input.admission.state === "admitted"
+    ? {
+      kind: "admitted_document",
+      admissionReasonCode: input.admission.reasonCode,
+      document: persistableClone(input.admission.document),
+      documentProjectionHash: digest(persistableClone(input.admission.document)),
+      immutableByteIdentity: {
+        // The live retrieval port zeroizes raw response buffers. The immutable source-byte
+        // authority is therefore carried by its validated SHA-256 identity and byte length;
+        // the admitted extracted text separately carries deterministic normalization lineage.
+        fingerprintAlgorithm: "sha256",
+        documentFingerprint: input.admission.document.documentFingerprint,
+        byteLength: input.admission.document.byteLength,
+      },
+    }
+    : {
+      kind: "deterministic_unusable",
+      admissionReasonCode: input.admission.reasonCode,
+      documentFingerprint: input.admission.documentFingerprint,
+    };
+  const artifactWithoutId = {
+    schemaVersion: PUBLIC_DOCUMENT_RETRIEVAL_ARTIFACT_VERSION,
+    runId: input.runId,
+    replayIdentity,
+    replayContract: structuredClone(input.replayContract),
+    source: {
+      planHash: input.planHash,
+      workItemId: input.workItemId,
+      operationId: durableOperation.operationId,
+      candidateId: input.candidate.candidateId,
+      operationInputHash: durableOperation.inputHash,
+      operationResultHash: digest(durableOperation.result),
+    },
+    outcome,
+    reuseAuthority: "same_analysis_run_transport_and_document_admission_only",
+    semanticReuse: "prohibited",
+    evidenceAdmissionEffect: "none",
+    analyticalCompletionEffect: "none",
+    canonicalMutationAllowed: false as const,
+  } satisfies Omit<CanonicalRgPublicDocumentRetrievalArtifact, "artifactId">;
+  const artifact: CanonicalRgPublicDocumentRetrievalArtifact = {
+    ...artifactWithoutId,
+    artifactId: `rg-document-artifact-${digest(artifactWithoutId).slice(0, 32)}`,
+  };
+  const existing = publicDocumentRetrievalArtifactForReplay(input.runId, input.replayContract);
+  if (existing) {
+    if (!equivalentPublicDocumentArtifactOutcome(existing.outcome, artifact.outcome)) {
+      throw new Error("rg_public_document_retrieval_artifact_conflict");
+    }
+    return;
+  }
+  if (!validPublicDocumentRetrievalArtifact(artifact, input.runId)) {
+    throw new Error("rg_public_document_retrieval_artifact_integrity_invalid");
+  }
+  appendEvent(input.runId, input.workItemId, durableOperation.operationId,
+    "public_document_retrieval_artifact", artifact);
+}
+
+function publicDocumentRetrievalArtifactForReplay(
+  runId: string,
+  contract: CanonicalRgPublicDocumentRetrievalReplayContract,
+): CanonicalRgPublicDocumentRetrievalArtifact | null {
+  const replayIdentity = digest(contract);
+  const rows = db.prepare(`SELECT work_item_id, operation_id, event_type, event_json, event_hash
+    FROM canonical_rg_execution_events WHERE run_id = ?
+    AND event_type = 'public_document_retrieval_artifact' ORDER BY rowid`).all(runId) as Array<{
+      work_item_id: string;
+      operation_id: string;
+      event_type: string;
+      event_json: string;
+      event_hash: string;
+    }>;
+  let matching: CanonicalRgPublicDocumentRetrievalArtifact | null = null;
+  for (const row of rows) {
+    let artifact: CanonicalRgPublicDocumentRetrievalArtifact;
+    try {
+      artifact = JSON.parse(row.event_json) as CanonicalRgPublicDocumentRetrievalArtifact;
+      if (row.event_hash !== digest({ runId, workItemId: row.work_item_id,
+        operationId: row.operation_id, eventType: row.event_type, event: artifact })
+        || row.operation_id !== artifact.source.operationId
+        || row.work_item_id !== artifact.source.workItemId
+        || !validPublicDocumentRetrievalArtifact(artifact, runId)) {
+        throw new Error("rg_public_document_retrieval_artifact_integrity_invalid");
+      }
+    } catch {
+      throw new Error("rg_public_document_retrieval_artifact_integrity_invalid");
+    }
+    if (artifact.replayIdentity !== replayIdentity) continue;
+    if (canonicalJson(artifact.replayContract) !== canonicalJson(contract)) {
+      throw new Error("rg_public_document_retrieval_artifact_integrity_invalid");
+    }
+    if (matching && !equivalentPublicDocumentArtifactOutcome(matching.outcome, artifact.outcome)) {
+      throw new Error("rg_public_document_retrieval_artifact_integrity_invalid");
+    }
+    matching ??= artifact;
+  }
+  return matching;
+}
+
+function validPublicDocumentRetrievalArtifact(
+  artifact: CanonicalRgPublicDocumentRetrievalArtifact,
+  runId: string,
+): boolean {
+  if (!artifact || artifact.schemaVersion !== PUBLIC_DOCUMENT_RETRIEVAL_ARTIFACT_VERSION
+    || artifact.runId !== runId || !isSafeId(artifact.artifactId)
+    || artifact.replayIdentity !== digest(artifact.replayContract)
+    || artifact.artifactId !== `rg-document-artifact-${digest({
+      schemaVersion: artifact.schemaVersion,
+      runId: artifact.runId,
+      replayIdentity: artifact.replayIdentity,
+      replayContract: artifact.replayContract,
+      source: artifact.source,
+      outcome: artifact.outcome,
+      reuseAuthority: artifact.reuseAuthority,
+      semanticReuse: artifact.semanticReuse,
+      evidenceAdmissionEffect: artifact.evidenceAdmissionEffect,
+      analyticalCompletionEffect: artifact.analyticalCompletionEffect,
+      canonicalMutationAllowed: artifact.canonicalMutationAllowed,
+    }).slice(0, 32)}`
+    || !validPublicDocumentRetrievalReplayContract(artifact.replayContract)
+    || artifact.reuseAuthority !== "same_analysis_run_transport_and_document_admission_only"
+    || artifact.semanticReuse !== "prohibited" || artifact.evidenceAdmissionEffect !== "none"
+    || artifact.analyticalCompletionEffect !== "none" || artifact.canonicalMutationAllowed !== false
+    || !isSafeId(artifact.source.operationId) || !isSafeId(artifact.source.workItemId)
+    || !isSafeId(artifact.source.candidateId) || !/^[a-f0-9]{64}$/.test(artifact.source.operationInputHash)
+    || !/^[a-f0-9]{64}$/.test(artifact.source.operationResultHash)) return false;
+  const operation = operationFromDb(runId, artifact.source.operationId)
+    ?? supersededOperationFromHistory(runId, artifact.source.operationId);
+  if (!operation || operation.kind !== "public_retrieval" || operation.state !== "completed"
+    || operation.planHash !== artifact.source.planHash || operation.workItemId !== artifact.source.workItemId
+    || operation.candidateId !== artifact.source.candidateId
+    || operation.inputHash !== artifact.source.operationInputHash
+    || digest(operation.input) !== operation.inputHash
+    || digest(operation.result) !== artifact.source.operationResultHash
+    || isPublicDocumentReplayOperation(operation)) return false;
+  const operationCandidate = (operation.input as { candidate?: CanonicalRgDiscoveryCandidate } | null)?.candidate;
+  if (!operationCandidate || !validCandidateForReplayContract(operationCandidate, artifact.replayContract)) return false;
+  if (artifact.outcome.kind === "admitted_document") {
+    if (isCompletedUnusableResult(operation.result)
+      || artifact.outcome.admissionReasonCode !== "rg_retrieved_document_admitted"
+      || artifact.outcome.documentProjectionHash !== digest(artifact.outcome.document)
+      || artifact.outcome.immutableByteIdentity.fingerprintAlgorithm !== "sha256"
+      || artifact.outcome.immutableByteIdentity.documentFingerprint
+        !== artifact.outcome.document.documentFingerprint
+      || artifact.outcome.immutableByteIdentity.byteLength !== artifact.outcome.document.byteLength) return false;
+    const admission = admitCanonicalRgRetrievedDocument(
+      sanitizeRetrievedDocument(operation.result as CanonicalRgRetrievedDocument), operationCandidate);
+    return admission.state === "admitted"
+      && canonicalJson(persistableClone(admission.document)) === canonicalJson(artifact.outcome.document);
+  }
+  if (!safeReasonCode(artifact.outcome.admissionReasonCode)
+    || (artifact.outcome.documentFingerprint !== null
+      && !/^[a-f0-9]{64}$/.test(artifact.outcome.documentFingerprint))) return false;
+  if (isCompletedUnusableResult(operation.result)) {
+    return artifact.outcome.admissionReasonCode === operation.result.reasonCode
+      && artifact.outcome.documentFingerprint === null;
+  }
+  const admission = admitCanonicalRgRetrievedDocument(
+    sanitizeRetrievedDocument(operation.result as CanonicalRgRetrievedDocument), operationCandidate);
+  return admission.state === "rejected"
+    && admission.reasonCode === artifact.outcome.admissionReasonCode
+    && admission.documentFingerprint === artifact.outcome.documentFingerprint;
+}
+
+function validPublicDocumentRetrievalReplayContract(
+  contract: CanonicalRgPublicDocumentRetrievalReplayContract,
+): boolean {
+  if (!contract || contract.schemaVersion !== PUBLIC_DOCUMENT_RETRIEVAL_REPLAY_CONTRACT_VERSION
+    || contract.normalizedRequestedUrl !== normalizeSafeHttpsUrl(contract.normalizedRequestedUrl)
+    || !["official_network_publication", "processor_publication"].includes(contract.claimedAuthority)
+    || !validNullableDay(contract.candidateTemporalIdentity.publicationDate)
+    || !validNullableDay(contract.candidateTemporalIdentity.effectiveFrom)
+    || !validNullableDay(contract.candidateTemporalIdentity.effectiveTo)
+    || !validNullableDay(contract.freshnessRequirement.asOf)
+    || !Array.isArray(contract.freshnessRequirement.excludedDocumentFingerprints)
+    || canonicalJson(contract.freshnessRequirement.excludedDocumentFingerprints)
+      !== canonicalJson([...new Set(contract.freshnessRequirement.excludedDocumentFingerprints)].sort())
+    || !contract.freshnessRequirement.excludedDocumentFingerprints.every((value) => /^[a-f0-9]{64}$/.test(value))
+    || contract.productionScope.version !== CANONICAL_PRODUCTION_APPLICABILITY_SCOPE_VERSION
+    || contract.productionScope.countryCode !== CANONICAL_PRODUCTION_COUNTRY_CODE
+    || !validReplayApplicabilityRequirements(contract.applicabilityRequirements)
+    || contract.transport.maximumBytes !== PUBLIC_DOCUMENT_RETRIEVAL_MAXIMUM_BYTES
+    || contract.transport.httpsOnly !== true || contract.transport.redirectsRequireFreshAuthorization !== true
+    || contract.transport.independentRetrievalRequired !== true
+    || contract.transport.contentFormats !== "all_supported_public_content_formats"
+    || contract.admission.normalizationVersion !== "public_document_text_normalization_v1"
+    || contract.admission.contractVersion !== "canonical_rg_retrieved_document_admission_v1") return false;
+  const period = contract.freshnessRequirement.statementPeriod;
+  return period === null || (validNullableDay(period.start) && validNullableDay(period.end));
+}
+
+function validReplayApplicabilityRequirements(
+  value: CanonicalRgPublicDocumentRetrievalReplayContract["applicabilityRequirements"],
+): boolean {
+  if (!value || !value.exactPublicDimensions || !Array.isArray(value.unknownPublicDimensions)) return false;
+  const exactEntries = Object.entries(value.exactPublicDimensions);
+  return canonicalJson(value.exactPublicDimensions) === canonicalJson(Object.fromEntries(
+    [...exactEntries].sort(([left], [right]) => left.localeCompare(right))))
+    && exactEntries.every(([key, dimension]) => /^[a-z][A-Za-z0-9]{0,63}$/.test(key)
+      && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,95}$/.test(dimension))
+    && canonicalJson(value.unknownPublicDimensions)
+      === canonicalJson([...new Set(value.unknownPublicDimensions)].sort())
+    && value.unknownPublicDimensions.every((key) => /^[a-z][A-Za-z0-9]{0,63}$/.test(key))
+    && !exactEntries.some(([key]) => value.unknownPublicDimensions.includes(key));
+}
+
+function validCandidateForReplayContract(
+  candidate: CanonicalRgDiscoveryCandidate,
+  contract: CanonicalRgPublicDocumentRetrievalReplayContract,
+): boolean {
+  try {
+    return normalizeSafeHttpsUrl(candidate.url) === contract.normalizedRequestedUrl
+      && candidate.claimedAuthority === contract.claimedAuthority
+      && candidate.publicationDate === contract.candidateTemporalIdentity.publicationDate
+      && candidate.effectiveFrom === contract.candidateTemporalIdentity.effectiveFrom
+      && candidate.effectiveTo === contract.candidateTemporalIdentity.effectiveTo;
+  } catch { return false; }
+}
+
+function equivalentPublicDocumentArtifactOutcome(
+  left: CanonicalRgPublicDocumentRetrievalArtifact["outcome"],
+  right: CanonicalRgPublicDocumentRetrievalArtifact["outcome"],
+): boolean {
+  if (left.kind !== right.kind) return false;
+  if (left.kind === "deterministic_unusable" && right.kind === "deterministic_unusable") {
+    return left.admissionReasonCode === right.admissionReasonCode
+      && left.documentFingerprint === right.documentFingerprint;
+  }
+  if (left.kind !== "admitted_document" || right.kind !== "admitted_document") return false;
+  const claimNeutral = (document: CanonicalRgRetrievedDocument) => ({ ...document, candidateId: "claim-neutral" });
+  return canonicalJson(claimNeutral(left.document)) === canonicalJson(claimNeutral(right.document));
+}
+
+function isPublicDocumentReplayOperation(operation: CanonicalRgOperation): boolean {
+  return operation.kind === "public_retrieval"
+    && operation.receipt.providerCode === "durable_analysis_run_public_document_replay";
+}
+
+function safeReasonCode(value: unknown): value is string {
+  return typeof value === "string" && /^[a-z][a-z0-9_:.-]{0,191}$/.test(value);
+}
+
 function exactDocumentAdmissionStopReason(reasonCodes: string[]): string {
   const exact = [...new Set(reasonCodes)].sort()[0] ?? "document_admission_reason_unavailable";
   return `rg_document_admission_failed:${exact}`.slice(0, 192);
@@ -1270,14 +1776,14 @@ function sanitizeSearchResult(value: CanonicalRgDiscoveryCandidate[]): Canonical
 
 function sanitizeRetrievedDocument(value: CanonicalRgRetrievedDocument): CanonicalRgRetrievedDocument {
   const locators = Array.isArray(value?.locators) ? value.locators : [];
-  const projectionReasonCode = locators.length > 200
+  const projectionReasonCode = value?.admissionProjectionReasonCode ?? (locators.length > 200
     ? "rg_document_admission_locator_collection_limit_exceeded_complete_lineage_required"
     : locators.some((locator) => typeof locator?.textExcerpt === "string" && locator.textExcerpt.length > 4_096)
       ? "rg_document_admission_locator_text_limit_exceeded_complete_lineage_required"
       : locators.some((locator) => locator?.textDerivation && Array.isArray(locator.textDerivation.transformations)
         && locator.textDerivation.transformations.length > 3)
         ? "rg_document_admission_locator_derivation_transformations_limit_exceeded"
-        : undefined;
+        : undefined);
   return {
     candidateId: value?.candidateId, requestedUrl: value?.requestedUrl, finalUrl: value?.finalUrl,
     sourceOrigin: value?.sourceOrigin, documentId: value?.documentId, documentFingerprint: value?.documentFingerprint,
@@ -2250,6 +2756,9 @@ function validNullableDay(value: unknown): value is string | null {
 function safeReason(error: unknown): string {
   const value = error instanceof Error ? error.message : "rg_operation_failed";
   return /^[a-z][a-z0-9_:.-]{0,191}$/.test(value) ? value : "rg_operation_failed";
+}
+function persistableClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 function digest(value: unknown): string {
   return createHash("sha256").update(typeof value === "string" ? value : canonicalJson(value)).digest("hex");

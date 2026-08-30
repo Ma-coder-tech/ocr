@@ -424,7 +424,7 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(persisted.result?.artifacts.rh).toEqual(setup.run.artifacts.rh);
   }, 30_000);
 
-  it("never reuses exact semantic insufficiency as an adjacent-facet retrieval exclusion", async () => {
+  it("reuses only the admitted document transport while keeping adjacent-facet semantic support independent", async () => {
     const setup = await runWithOneWorkItem("collector");
     const sharedUrl = "https://merchants.fiserv.com/facet-specific-semantic-support";
     const firstPorts = successfulPorts([]);
@@ -454,12 +454,334 @@ describe("production durable claim-bound RG evidence execution", () => {
     };
 
     const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports: secondPorts });
-    expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
+    expect(calls).toEqual(["search", "investigate", "verify"]);
     expect(result.verifiedEvidence).toEqual([
       expect.objectContaining({ atomicClaimId: adjacent.admission.atomicClaimId, facet: "billing_intermediary" }),
     ]);
     expect(setup.store.getPersistedAnalysisRun(setup.run.runId)!.rgExecutionEvents.filter((event) =>
       event.eventType === "candidate_retrieval_skipped_known_inapplicable")).toEqual([]);
+    expect(setup.store.getPersistedAnalysisRun(setup.run.runId)!.rgExecutionEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ workItemId: adjacent.work.workItemId,
+        eventType: "public_document_retrieval_admission_replayed", event: expect.objectContaining({
+          providerCalls: 0, retrievalBytes: 0, claimNeutralTransportReuseOnly: true,
+          investigationAndVerificationRequiredPerExactClaim: true, semanticReuse: "prohibited",
+          evidenceAdmissionEffect: "none", analyticalCompletionEffect: "none", canonicalMutationAllowed: false,
+        }) }),
+    ]));
+  }, 30_000);
+
+  it("replays a deterministic unusable public-document outcome without another send or completion effect", async () => {
+    const setup = await runWithOneWorkItem("collector");
+    const sharedUrl = "https://merchants.fiserv.com/deterministically-unusable-public-content";
+    const firstCalls: string[] = [];
+    const firstPorts = successfulPorts(firstCalls);
+    const firstSearch = firstPorts.search;
+    firstPorts.search = async (input, onSend) => {
+      const result = await firstSearch(input, onSend);
+      return { ...result, value: [{ ...result.value[0]!, url: sharedUrl }] };
+    };
+    firstPorts.retrieve = async (_input, onSend) => {
+      firstCalls.push("retrieve"); onSend();
+      throw new setup.executor.RgEvidenceCompletedUnusableError("rg_retrieval_html_signature_mismatch",
+        receipt("synthetic_independent_retrieval", 1, 384, 0));
+    };
+    const foundation = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const first = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId,
+      ports: firstPorts, workerId: "unusable-source-worker" });
+    const afterFirst = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(first).toMatchObject({ workItemsCompletedUnresolved: 1, workItemsDegraded: 0,
+      canonicalTruthPreserved: true });
+    expect(firstCalls).toEqual(["search", "retrieve"]);
+    expect(afterFirst.rgExecutionEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventType: "public_document_retrieval_artifact", event: expect.objectContaining({
+        schemaVersion: "canonical_rg_public_document_retrieval_artifact_v1",
+        outcome: { kind: "deterministic_unusable",
+          admissionReasonCode: "rg_retrieval_html_signature_mismatch", documentFingerprint: null },
+        semanticReuse: "prohibited", evidenceAdmissionEffect: "none",
+        analyticalCompletionEffect: "none", canonicalMutationAllowed: false,
+      }) }),
+    ]));
+
+    const adjacent = relatedParticipantFacet(afterFirst.rgClaimAdmissions[0]!, afterFirst.rgWorkItems[0]!,
+      "unusable-replay-adjacent", "billing_intermediary");
+    installSyntheticPlan(setup, afterFirst.result!.artifacts.rgWorkLedger!, "unusable-replay-plan",
+      [adjacent.admission], [adjacent.work]);
+    const replayCalls: string[] = [];
+    const replayPorts = successfulPorts(replayCalls);
+    const replaySearch = replayPorts.search;
+    replayPorts.search = async (input, onSend) => {
+      const result = await replaySearch(input, onSend);
+      return { ...result, value: [{ ...result.value[0]!, url: sharedUrl }] };
+    };
+    const replay = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId,
+      ports: replayPorts, workerId: "unusable-replay-worker" });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+    expect(replayCalls).toEqual(["search"]);
+    expect(replay).toMatchObject({ workItemsCompletedUnresolved: 1, workItemsDegraded: 0,
+      workItemsCompletedWithEvidence: 0, canonicalTruthPreserved: true });
+    expect(persisted.rgWorkItems[0]).toMatchObject({ executionState: "completed_unresolved",
+      stopReason: "rg_document_admission_failed:rg_retrieval_html_signature_mismatch",
+      verifiedEvidenceRefs: [] });
+    expect(persisted.rgOperations.find((operation) => operation.kind === "public_retrieval")).toMatchObject({
+      state: "completed", receipt: { sendState: "not_sent", calls: 0, retrievalBytes: 0,
+        providerCode: "durable_analysis_run_public_document_replay" },
+    });
+    expect(persisted.rgExecutionEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventType: "public_document_retrieval_admission_replayed",
+        event: expect.objectContaining({ outcomeKind: "deterministic_unusable", providerCalls: 0,
+          investigationAndVerificationRequiredPerExactClaim: false, analyticalCompletionEffect: "none" }) }),
+    ]));
+    expect(persisted.externalEvidenceRegistry).toEqual([]);
+    expect(persisted.canonicalTruthHash).toBe(foundation.canonicalTruthHash);
+    expect(persisted.financialFoundationHash).toBe(foundation.financialFoundationHash);
+    expect(persisted.result!.artifacts.rh).toEqual(foundation.result!.artifacts.rh);
+  }, 30_000);
+
+  it("preserves format-neutral document replay across restart while keeping each exact claim independently evaluated", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "rg-document-replay-restart-"));
+    temporaryDirectories.push(directory);
+    process.env.FEECLEAR_DB_PATH = path.join(directory, "runtime.sqlite");
+    const setup = await runWithOneWorkItem("collector");
+    const sharedUrl = "https://merchants.fiserv.com/official-public-bulletin.pdf";
+    const firstCalls: string[] = [];
+    const firstPorts = successfulPorts(firstCalls);
+    const firstSearch = firstPorts.search;
+    firstPorts.search = async (input, onSend) => {
+      const result = await firstSearch(input, onSend);
+      return { ...result, value: [{ ...result.value[0]!, url: sharedUrl,
+        title: "Official public bulletin" }] };
+    };
+    const firstRetrieve = firstPorts.retrieve;
+    firstPorts.retrieve = async (input, onSend) => {
+      const result = await firstRetrieve(input, onSend);
+      return { ...result, value: { ...result.value, mimeType: "application/pdf",
+        locators: result.value.locators.map((locator, index) => {
+          const normalized = normalizedLocator(locator.textExcerpt, "application/pdf", index);
+          return { ...locator, textExcerpt: normalized.text, textDerivation: normalized.derivation };
+        }) } };
+    };
+    const foundation = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const first = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId,
+      ports: firstPorts, workerId: "html-source-worker" });
+    const afterFirst = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(firstCalls).toEqual(["search", "retrieve", "investigate", "verify"]);
+    expect(first.verifiedEvidence).toEqual([
+      expect.objectContaining({ atomicClaimId: afterFirst.rgClaimAdmissions[0]!.atomicClaimId }),
+    ]);
+    expect(afterFirst.rgExecutionEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventType: "public_document_retrieval_artifact", event: expect.objectContaining({
+        replayContract: expect.objectContaining({ transport: expect.objectContaining({
+          contentFormats: "all_supported_public_content_formats" }),
+          admission: { normalizationVersion: "public_document_text_normalization_v1",
+            contractVersion: "canonical_rg_retrieved_document_admission_v1" },
+        }),
+        outcome: expect.objectContaining({ kind: "admitted_document",
+          immutableByteIdentity: { fingerprintAlgorithm: "sha256",
+            documentFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/), byteLength: 512 } }),
+      }) }),
+    ]));
+    const adjacent = relatedParticipantFacet(afterFirst.rgClaimAdmissions[0]!, afterFirst.rgWorkItems[0]!,
+      "restart-replay-billing-intermediary", "billing_intermediary");
+    installSyntheticPlan(setup, afterFirst.result!.artifacts.rgWorkLedger!, "restart-document-replay-plan",
+      [adjacent.admission], [adjacent.work]);
+    setup.db.db.close();
+
+    vi.resetModules();
+    const [reloadedExecutor, reloadedStore, reloadedDb] = await Promise.all([
+      import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js"),
+      import("../../../../src/canonical/v2/runtime/analysisRunStore.js"),
+      import("../../../../src/db.js"),
+    ]);
+    dbModule = reloadedDb;
+    const replayCalls: string[] = [];
+    const replayPorts = successfulPorts(replayCalls);
+    const replaySearch = replayPorts.search;
+    replayPorts.search = async (input, onSend) => {
+      const result = await replaySearch(input, onSend);
+      return { ...result, value: [{ ...result.value[0]!, url: sharedUrl,
+        title: "Official public bulletin" }] };
+    };
+    const replay = await reloadedExecutor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId,
+      ports: replayPorts, workerId: "restart-document-replay-worker" });
+    const persisted = reloadedStore.getPersistedAnalysisRun(setup.run.runId)!;
+
+    expect(replayCalls).toEqual(["search", "investigate", "verify"]);
+    expect(replay.verifiedEvidence).toEqual([
+      expect.objectContaining({ atomicClaimId: adjacent.admission.atomicClaimId,
+        facet: "billing_intermediary" }),
+    ]);
+    expect(replay.verifiedEvidence[0]!.evidenceId).not.toBe(first.verifiedEvidence[0]!.evidenceId);
+    expect(persisted.rgOperations.find((operation) => operation.kind === "public_retrieval")).toMatchObject({
+      receipt: { sendState: "not_sent", calls: 0, retrievalBytes: 0,
+        providerCode: "durable_analysis_run_public_document_replay" },
+    });
+    expect(persisted.canonicalTruthHash).toBe(foundation.canonicalTruthHash);
+    expect(persisted.financialFoundationHash).toBe(foundation.financialFoundationHash);
+    expect(persisted.result!.artifacts.rh).toEqual(foundation.result!.artifacts.rh);
+  }, 30_000);
+
+  it("fails closed before retrieval when a matching durable replay artifact is corrupt", async () => {
+    const setup = await runWithOneWorkItem("collector");
+    const sharedUrl = "https://merchants.fiserv.com/corrupt-document-replay";
+    const firstPorts = successfulPorts([]);
+    const firstSearch = firstPorts.search;
+    firstPorts.search = async (input, onSend) => {
+      const result = await firstSearch(input, onSend);
+      return { ...result, value: [{ ...result.value[0]!, url: sharedUrl }] };
+    };
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports: firstPorts });
+    const afterFirst = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const adjacent = relatedParticipantFacet(afterFirst.rgClaimAdmissions[0]!, afterFirst.rgWorkItems[0]!,
+      "corrupt-replay-adjacent", "billing_intermediary");
+    installSyntheticPlan(setup, afterFirst.result!.artifacts.rgWorkLedger!, "corrupt-document-replay-plan",
+      [adjacent.admission], [adjacent.work]);
+    setup.db.db.exec("DROP TRIGGER canonical_rg_execution_events_no_update");
+    setup.db.db.prepare(`UPDATE canonical_rg_execution_events
+      SET event_json = json_set(event_json, '$.outcome.documentProjectionHash', ?)
+      WHERE run_id = ? AND event_type = 'public_document_retrieval_artifact'`)
+      .run("0".repeat(64), setup.run.runId);
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const search = ports.search;
+    ports.search = async (input, onSend) => {
+      const result = await search(input, onSend);
+      return { ...result, value: [{ ...result.value[0]!, url: sharedUrl }] };
+    };
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+    await expect(setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+      workerId: "corrupt-document-replay-worker" }))
+      .rejects.toThrow("rg_public_document_retrieval_artifact_integrity_invalid");
+    const after = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(calls).toEqual(["search"]);
+    expect(after.externalEvidenceRegistry).toEqual(before.externalEvidenceRegistry);
+    expect(after.canonicalTruthHash).toBe(before.canonicalTruthHash);
+    expect(after.financialFoundationHash).toBe(before.financialFoundationHash);
+    expect(after.result!.artifacts.rh).toEqual(before.result!.artifacts.rh);
+  }, 30_000);
+
+  it("rechecks replay at the final send boundary so concurrent claims do not duplicate a durable transport", async () => {
+    const setup = await runWithOneWorkItem("collector");
+    const initial = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const firstAdmission = initial.rgClaimAdmissions[0]!;
+    const firstWork = initial.rgWorkItems[0]!;
+    const adjacent = relatedParticipantFacet(firstAdmission, firstWork,
+      "concurrent-document-replay", "billing_intermediary");
+    installSyntheticPlan(setup, initial.result!.artifacts.rgWorkLedger!, "concurrent-document-replay-plan",
+      [firstAdmission, adjacent.admission], [firstWork, adjacent.work]);
+    const primaryWorkId = [firstWork.workItemId, adjacent.work.workItemId].sort()[0]!;
+    const primaryFacet = primaryWorkId === firstWork.workItemId ? firstAdmission.facet : adjacent.admission.facet;
+    const secondaryFacet = primaryFacet === firstAdmission.facet ? adjacent.admission.facet : firstAdmission.facet;
+    const sharedUrl = "https://merchants.fiserv.com/concurrent-replayable-official-article";
+    const calls: string[] = [];
+    const sends: string[] = [];
+    const ports = successfulPorts(calls);
+    const search = ports.search;
+    const retrieve = ports.retrieve;
+    const investigate = ports.investigate;
+    const verify = ports.verify;
+    let signalPrimarySearch!: () => void;
+    let signalSecondarySearch!: () => void;
+    let signalSecondaryRetrieval!: () => void;
+    let signalArtifactDurable!: () => void;
+    let releaseSecondaryRetrieval!: () => void;
+    const primarySearchEntered = new Promise<void>((resolve) => { signalPrimarySearch = resolve; });
+    const secondarySearchEntered = new Promise<void>((resolve) => { signalSecondarySearch = resolve; });
+    const secondaryRetrievalEntered = new Promise<void>((resolve) => { signalSecondaryRetrieval = resolve; });
+    const artifactIsDurable = new Promise<void>((resolve) => { signalArtifactDurable = resolve; });
+    const secondaryMaySend = new Promise<void>((resolve) => { releaseSecondaryRetrieval = resolve; });
+    ports.search = async (input, onSend) => {
+      const result = await search(input, () => { onSend(); sends.push(`search:${input.intent.facet}`); });
+      if (input.intent.facet === primaryFacet) { signalPrimarySearch(); await secondarySearchEntered; }
+      else signalSecondarySearch();
+      return { ...result, value: [{ ...result.value[0]!, url: sharedUrl }] };
+    };
+    ports.retrieve = async (input, onSend) => {
+      if (input.intent.facet === secondaryFacet) {
+        signalSecondaryRetrieval();
+        await secondaryMaySend;
+      }
+      return retrieve(input, () => { onSend(); sends.push(`retrieve:${input.intent.facet}`); });
+    };
+    ports.investigate = async (input, onSend) => investigate(input, () => {
+      onSend(); sends.push(`investigate:${input.intent.facet}`);
+      if (input.intent.facet === primaryFacet) signalArtifactDurable();
+    });
+    ports.verify = async (input, onSend) => verify(input,
+      () => { onSend(); sends.push(`verify:${input.intent.facet}`); });
+
+    const firstExecution = setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId,
+      ports, workerId: "concurrent-document-worker-a" });
+    await primarySearchEntered;
+    const secondExecution = setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId,
+      ports, workerId: "concurrent-document-worker-b" });
+    await secondaryRetrievalEntered;
+    await artifactIsDurable;
+    releaseSecondaryRetrieval();
+    const [firstResult, secondResult] = await Promise.all([firstExecution, secondExecution]);
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+    expect(firstResult.canonicalTruthPreserved).toBe(true);
+    expect(secondResult.canonicalTruthPreserved).toBe(true);
+    expect(sends.filter((value) => value.startsWith("retrieve:"))).toEqual([`retrieve:${primaryFacet}`]);
+    expect(sends.filter((value) => value.startsWith("investigate:"))).toHaveLength(2);
+    expect(sends.filter((value) => value.startsWith("verify:"))).toHaveLength(2);
+    expect(persisted.rgExecutionEvents.filter((event) =>
+      event.eventType === "public_document_retrieval_artifact")).toHaveLength(1);
+    expect(persisted.rgExecutionEvents.filter((event) =>
+      event.eventType === "public_document_retrieval_admission_replayed")).toHaveLength(1);
+    const verifications = persisted.rgOperations.filter((operation) => operation.kind === "independent_verification");
+    expect(verifications).toHaveLength(2);
+    expect(new Set(verifications.map((operation) => operation.atomicClaimId))).toEqual(
+      new Set([firstAdmission.atomicClaimId, adjacent.admission.atomicClaimId]));
+    expect(persisted.rgOperations.filter((operation) => operation.kind === "public_retrieval")
+      .map((operation) => operation.receipt.calls).sort()).toEqual([0, 1]);
+    const continuation = (await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js"))
+      .adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    expect(continuation.cumulativeResource).toMatchObject({ providerCalls: 7, searchCalls: 2,
+      retrievalDocuments: 1, aiCalls: 4 });
+    expect(persisted.canonicalTruthHash).toBe(initial.canonicalTruthHash);
+    expect(persisted.financialFoundationHash).toBe(initial.financialFoundationHash);
+    expect(persisted.result!.artifacts.rh).toEqual(initial.result!.artifacts.rh);
+  }, 30_000);
+
+  it("performs a fresh retrieval when the same URL carries a genuinely changed document-version requirement", async () => {
+    const setup = await runWithOneWorkItem("collector");
+    const sharedUrl = "https://merchants.fiserv.com/versioned-official-schedule";
+    const firstPorts = successfulPorts([]);
+    const firstSearch = firstPorts.search;
+    firstPorts.search = async (input, onSend) => {
+      const result = await firstSearch(input, onSend);
+      return { ...result, value: [{ ...result.value[0]!, url: sharedUrl,
+        publicationDate: "2024-01-01", effectiveFrom: "2024-01-01", effectiveTo: "2024-12-31" }] };
+    };
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports: firstPorts });
+    const afterFirst = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const adjacent = relatedParticipantFacet(afterFirst.rgClaimAdmissions[0]!, afterFirst.rgWorkItems[0]!,
+      "changed-version-adjacent", "billing_intermediary");
+    installSyntheticPlan(setup, afterFirst.result!.artifacts.rgWorkLedger!, "changed-document-version-plan",
+      [adjacent.admission], [adjacent.work]);
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const search = ports.search;
+    ports.search = async (input, onSend) => {
+      const result = await search(input, onSend);
+      return { ...result, value: [{ ...result.value[0]!, url: sharedUrl,
+        publicationDate: "2025-01-01", effectiveFrom: "2025-01-01", effectiveTo: null }] };
+    };
+    const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+    expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
+    expect(result.canonicalTruthPreserved).toBe(true);
+    expect(persisted.rgExecutionEvents.filter((event) =>
+      event.eventType === "public_document_retrieval_artifact")).toHaveLength(2);
+    expect(persisted.rgExecutionEvents.filter((event) =>
+      event.eventType === "public_document_retrieval_admission_replayed")).toHaveLength(0);
+    expect(persisted.canonicalTruthHash).toBe(afterFirst.canonicalTruthHash);
+    expect(persisted.financialFoundationHash).toBe(afterFirst.financialFoundationHash);
+    expect(persisted.result!.artifacts.rh).toEqual(afterFirst.result!.artifacts.rh);
   }, 30_000);
 
   it("preserves every proven public discovery dimension while leaving missing scope explicitly unknown", async () => {
@@ -998,7 +1320,7 @@ describe("production durable claim-bound RG evidence execution", () => {
       return { ...result, value: [{ ...result.value[0]!, url: sharedUrl }] };
     };
     await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports: differentPorts });
-    expect(differentCalls).toEqual(["search", "retrieve", "investigate", "verify"]);
+    expect(differentCalls).toEqual(["search", "investigate", "verify"]);
   }, 30_000);
 
   it("rechecks a typed country-scope proof across claim types at the final send boundary", async () => {
@@ -1200,7 +1522,7 @@ describe("production durable claim-bound RG evidence execution", () => {
       return { ...result, value: [{ ...result.value[0]!, url: sharedUrl }] };
     };
     const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports: secondPorts });
-    expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
+    expect(calls).toEqual(["search", "investigate", "verify"]);
     expect(result.workItemsCompletedWithEvidence).toBe(1);
     expect(result.verifiedEvidence).toEqual([
       expect.objectContaining({ atomicClaimId: related.admission.atomicClaimId, facet: "billing_intermediary" }),
