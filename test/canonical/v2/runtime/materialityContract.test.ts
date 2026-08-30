@@ -88,25 +88,46 @@ describe("Materiality Contract v1", () => {
     ])).toThrow("rg_canonical_subject_magnitude_conflict:charge-a");
   });
 
-  it("assigns independent D0, D1, and D2 tiers to exact facets of the same charge", () => {
+  it("does not use a generic category interpretation as a permission-decisive route", () => {
     const synthesis = buildSynthesis();
     const economic = synthesis.economicAnalysis;
     const charge = economic.economicLayer.charges.find((item) => item.subtype === "service_admin")!;
     const ledger = buildCanonicalRgWorkLedger({
-      inventory: inventoryFor(charge.id, charge.sourceOccurrenceRefs, ["economic_category", "economic_control", "merchant_actionability"]),
+      inventory: inventoryFor(charge.id, charge.sourceOccurrenceRefs,
+        ["economic_category", "economic_ownership", "economic_control", "merchant_actionability"]),
       economic,
       synthesis: { ...synthesis, synthesisLayer: { ...synthesis.synthesisLayer, merchantLevers: [] } },
       rfResolution: null,
     });
     const facets = new Map(ledger.claimAdmissions.map((admission) => [admission.facet, admission]));
 
-    expect(facets.get("economic_category")?.decisionTier).toBe("D2");
-    expect(facets.get("economic_category")?.decisionBasis.admissibleOutcomes.map((item) => item.outcomeClass))
-      .toEqual(["processor_or_service_category", "network_or_issuer_category"]);
+    expect(facets.get("economic_category")).toMatchObject({ decisionTier: "D1", materiality: "contextual",
+      decisionBasis: { presentlyReachableEffects: [], admissibleOutcomes: [] } });
+    expect(facets.get("economic_beneficiary")).toMatchObject({ decisionTier: "D1", materiality: "contextual",
+      decisionBasis: { presentlyReachableEffects: [], admissibleOutcomes: [] } });
+    expect(facets.get("economic_owner")).toMatchObject({ decisionTier: "D1", materiality: "contextual",
+      decisionBasis: { presentlyReachableEffects: [], admissibleOutcomes: [] } });
     expect(facets.get("collector")?.decisionTier).toBe("D1");
     expect(facets.get("billing_intermediary")?.decisionTier).toBe("D1");
     expect(facets.get("merchant_lever")?.decisionTier).toBe("D0");
     expect(ledger.validation).toMatchObject({ status: "valid", errors: [] });
+  });
+
+  it("keeps economically material category and ownership work material through E2 without falsely asserting D2", () => {
+    const synthesis = buildSynthesis();
+    const economic = synthesis.economicAnalysis;
+    const charge = economic.economicLayer.charges.find((item) => item.subtype === "service_admin")!;
+    const ledger = buildCanonicalRgWorkLedger({
+      inventory: inventoryFor(charge.id, charge.sourceOccurrenceRefs, ["economic_category", "economic_ownership"], 50_000),
+      economic,
+      synthesis,
+      rfResolution: null,
+    });
+    for (const facet of ["economic_category", "economic_beneficiary", "economic_owner"] as const) {
+      expect(ledger.claimAdmissions.find((item) => item.facet === facet)).toMatchObject({
+        magnitude: { tier: "E2" }, decisionTier: "D1", materiality: "material",
+      });
+    }
   });
 
   it("does not make a small collector or intermediary material when a different exact control facet unlocks a lever", () => {
@@ -191,6 +212,7 @@ function inventoryFor(
   chargeRef: string,
   occurrenceRefs: string[],
   classes: CanonicalUnresolvedClaim["claimClass"][],
+  amountMinor = 1,
 ): CanonicalUnresolvedClaimInventory {
   const effects: Record<CanonicalUnresolvedClaim["claimClass"], CanonicalUnresolvedClaim["possibleDecisionEffects"]> = {
     pricing_underlying_cost: ["pricing_interpretation"],
@@ -219,7 +241,7 @@ function inventoryFor(
     canonicalRefs: [chargeRef],
     occurrenceRefs,
     evidenceRefs: [],
-    amountUnderReview: { amountMinor: 1, currency: "USD", direction: "debit" },
+    amountUnderReview: { amountMinor, currency: "USD", direction: "debit" },
     requiredEvidenceClass: required[claimClass],
     possibleDecisionEffects: effects[claimClass],
     blockingEffect: "limits_authority",

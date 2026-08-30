@@ -59,7 +59,7 @@ type LiveBinding = { openRouterApiKey: string; openRouterSearchModel: string; op
 const liveBindings = new WeakMap<object, LiveBinding>();
 const livePorts = new WeakMap<object, object>();
 
-export type LiveOperationTransportState = "before_send" | "after_send" | "timed_out" | "cancelled";
+export type LiveOperationTransportState = "before_send" | "provider_rejected" | "after_send" | "timed_out" | "cancelled";
 export class LiveOperationTransportError extends Error {
   constructor(public readonly transportState: LiveOperationTransportState, reason: string) { super(reason); }
 }

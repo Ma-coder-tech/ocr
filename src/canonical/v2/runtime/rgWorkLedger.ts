@@ -134,23 +134,42 @@ export type CanonicalRgOperation = {
   kind: "public_search" | "public_retrieval" | "investigation" | "independent_verification";
   attempt: number;
   candidateId: string | null;
-  state: "reserved" | "sent" | "completed" | "failed_before_send" | "indeterminate_after_send";
+  state: "reserved" | "sent" | "completed" | "failed_before_send" | "provider_rejected" | "indeterminate_after_send";
   reservation: { reservationId: string; workerId: string; reservedAt: string; expiresAt: string };
   receipt: {
     sendState: "not_sent" | "sent";
-    completionState: "reserved" | "completed" | "failed" | "indeterminate";
+    completionState: "reserved" | "completed" | "failed" | "provider_rejected" | "indeterminate";
     providerCode: string;
     providerRequestId: string | null;
     calls: number;
     tokens: number | null;
     retrievalBytes: number;
     reasonCode: string;
+    providerDiagnostics?: CanonicalRgProviderDiagnostics | null;
   };
   input: unknown;
   inputHash: string;
   result: unknown | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type CanonicalRgProviderDiagnostics = {
+  schemaVersion: "canonical_rg_provider_diagnostics_v1";
+  responseDisposition: "completed" | "known_provider_rejection" | "indeterminate_after_send";
+  httpStatus: number | null;
+  localRequestId: string | null;
+  providerRequestId: string | null;
+  providerResponseId: string | null;
+  requestedModelIdentifier: string | null;
+  returnedModelIdentifier: string | null;
+  providerErrorType: string | null;
+  providerErrorCode: string | null;
+  providerErrorParam: string | null;
+  usageState: "known" | "unknown_possible_billable";
+  outputTokens: number | null;
+  providerRequestCount: number | null;
+  usageCostUsd: number | null;
 };
 
 export type CanonicalRgWorkLedger = {
@@ -432,21 +451,6 @@ function directFacetDecision(facet: CanonicalAtomicClaimFacet): CanonicalAtomicD
       return decisive("cost_stack_completeness", [
         { outcomeClass: "fee_detail_complete", merchantFacingStateCode: "cost_stack_detail_complete" },
         { outcomeClass: "fee_detail_incomplete", merchantFacingStateCode: "cost_stack_detail_partial" },
-      ]);
-    case "economic_category":
-      return decisive("composition_permission", [
-        { outcomeClass: "processor_or_service_category", merchantFacingStateCode: "composition_processor_or_service" },
-        { outcomeClass: "network_or_issuer_category", merchantFacingStateCode: "composition_network_or_issuer" },
-      ]);
-    case "economic_beneficiary":
-      return decisive("economic_interpretation", [
-        { outcomeClass: "processor_or_acquirer_beneficiary", merchantFacingStateCode: "beneficiary_processor_or_acquirer" },
-        { outcomeClass: "network_issuer_or_third_party_beneficiary", merchantFacingStateCode: "beneficiary_network_issuer_or_third_party" },
-      ]);
-    case "economic_owner":
-      return decisive("economic_interpretation", [
-        { outcomeClass: "processor_or_acquirer_owner", merchantFacingStateCode: "owner_processor_or_acquirer" },
-        { outcomeClass: "network_issuer_or_third_party_owner", merchantFacingStateCode: "owner_network_issuer_or_third_party" },
       ]);
     default:
       return null;

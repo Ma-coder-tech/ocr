@@ -332,6 +332,22 @@ describe("production durable claim-bound RG evidence execution", () => {
       .toThrow("rg_search_intent_public_subject_unavailable");
   }, 30_000);
 
+  it("compiles synthesis constraints as exact constraint research rather than fee-category research", async () => {
+    const setup = await runWithOneWorkItem("constraint");
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const work = persisted.rgWorkItems[0]!;
+    const admission = persisted.rgClaimAdmissions[0]!;
+    const intent = setup.executor.compileCanonicalRgSearchIntent(setup.run.runId,
+      persisted.result!.artifacts.rgWorkLedger!.planHash, work, admission);
+
+    expect(work.expectedKnowledgeValueConstraint).toEqual({ kind: "synthesis_constraint_identity" });
+    expect(intent.facet).toBe("constraint");
+    expect(intent.queryTerms).toContain("constraint rule or requirement identity");
+    expect(intent.queryText).not.toContain("fee category");
+    expect(intent.privacy).toMatchObject({ status: "validated_public_concepts_only",
+      forbiddenPrivateValuesObserved: 0 });
+  }, 30_000);
+
   it("fails closed when verification does not support the exact atomic facet", async () => {
     const setup = await runWithOneWorkItem();
     const calls: string[] = [];
@@ -994,6 +1010,67 @@ describe("production durable claim-bound RG evidence execution", () => {
       }
     }
   });
+
+  it("durably distinguishes a known OpenRouter rejection from possible-send ambiguity without persisting secrets", async () => {
+    const setup = await runWithOneWorkItem();
+    const names = ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "OPENROUTER_SEARCH_MODEL", "OPENAI_INTERNAL_ANALYSIS_MODEL"] as const;
+    const prior = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+    const priorFetch = globalThis.fetch;
+    const openRouterSecret = "openrouter-rejection-test-secret-000000";
+    const openAiSecret = "openai-rejection-test-secret-000000";
+    try {
+      process.env.OPENROUTER_API_KEY = openRouterSecret;
+      process.env.OPENAI_API_KEY = openAiSecret;
+      process.env.OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2";
+      process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = "gpt-5.2";
+      globalThis.fetch = vi.fn(async () => ({ status: 401,
+        headers: new Headers({ "x-request-id": "or-auth-request-001" }),
+        json: async () => ({ error: { code: 401, message: "provider prose must not persist" } }),
+      } as Response));
+      const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
+      const ports = live.createProductionRgEvidencePortsFromEnvironment(setup.run.runId);
+      const result = await setup.executor.executeDurableCanonicalRgEvidence({
+        runId: setup.run.runId, ports, workerId: "provider-rejection-worker",
+      });
+      const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+      const operation = persisted.rgOperations[0]!;
+
+      expect(result).toMatchObject({ workItemsDegraded: 1, canonicalTruthPreserved: true });
+      expect(operation).toMatchObject({ state: "provider_rejected", receipt: {
+        completionState: "provider_rejected", providerRequestId: "or-auth-request-001", calls: 1,
+        reasonCode: "openrouter_search_authentication_rejected",
+        providerDiagnostics: {
+          schemaVersion: "canonical_rg_provider_diagnostics_v1",
+          responseDisposition: "known_provider_rejection", httpStatus: 401,
+          providerRequestId: "or-auth-request-001", requestedModelIdentifier: "openai/gpt-5.2",
+          providerErrorCode: "401", usageState: "known", outputTokens: 0, providerRequestCount: 0, usageCostUsd: 0,
+        },
+      } });
+      expect(operation.receipt.providerDiagnostics?.localRequestId).toMatch(/^provider-request-[0-9a-f-]{36}$/);
+      expect(persisted.rgWorkItems[0]).toMatchObject({ executionState: "degraded_provider_unavailable",
+        stopReason: "openrouter_search_authentication_rejected" });
+      expect(persisted.rgWorkItems[0]!.retryDecisions).toContainEqual(expect.objectContaining({
+        decision: "no_retry", reasonCode: "known_provider_rejection_no_immediate_retry",
+      }));
+      const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+      const continuation = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+      expect(continuation.decisions[0]).toMatchObject({ disposition: "operationally_degraded_retry_eligible",
+        degradation: { subtype: "provider_rejection", continuationPermission: "bounded_retry_eligible" } });
+      expect(continuation.decisions[0]!.disposition).not.toBe("safely_unresolved");
+      const durable = JSON.stringify({ operation, events: persisted.rgExecutionEvents });
+      expect(durable).not.toContain(openRouterSecret);
+      expect(durable).not.toContain(openAiSecret);
+      expect(durable).not.toContain("provider prose must not persist");
+      expect(persisted.canonicalTruthHash).toBe(setup.run.canonicalTruthHash);
+      expect(persisted.result!.artifacts.rh).toEqual(setup.run.artifacts.rh);
+    } finally {
+      globalThis.fetch = priorFetch;
+      for (const name of names) {
+        const value = prior[name];
+        if (value === undefined) delete process.env[name]; else process.env[name] = value;
+      }
+    }
+  }, 30_000);
 
   it("durably records unavailable standing runtime readiness without persisting secrets or inventing completion", async () => {
     const setup = await runWithOneWorkItem();

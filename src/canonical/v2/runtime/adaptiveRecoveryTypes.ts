@@ -26,7 +26,7 @@ export type CanonicalAnalysisRecoveryIntent = {
     facet: string;
     disposition: "operationally_degraded_retry_eligible";
     continuationPermission: "bounded_retry_eligible";
-    degradationSubtype: "provider_unavailable_before_send" | "before_send_failure_retry_eligible"
+    degradationSubtype: "provider_unavailable_before_send" | "provider_rejection" | "before_send_failure_retry_eligible"
       | "resource_or_runtime_exhaustion";
   };
   analyticalCompletionEffect: "none";

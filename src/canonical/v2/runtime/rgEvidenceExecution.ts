@@ -18,6 +18,7 @@ import {
   canonicalRgWorkContractFingerprint,
   type CanonicalRgClaimAdmission,
   type CanonicalRgOperation,
+  type CanonicalRgProviderDiagnostics,
   type CanonicalRgWorkItem,
 } from "./rgWorkLedger.js";
 
@@ -173,6 +174,7 @@ export type RgEvidencePortReceipt = {
   calls: number;
   tokens: number | null;
   retrievalBytes: number;
+  providerDiagnostics?: CanonicalRgProviderDiagnostics | null;
 };
 
 export type RgEvidencePortResult<T> = { value: T; receipt: RgEvidencePortReceipt };
@@ -226,7 +228,7 @@ export type CanonicalRgEvidenceExecutionPorts = {
 };
 
 export class RgEvidenceTransportError extends Error {
-  constructor(public readonly transportState: "before_send" | "after_send" | "timed_out" | "cancelled", reasonCode: string,
+  constructor(public readonly transportState: "before_send" | "provider_rejected" | "after_send" | "timed_out" | "cancelled", reasonCode: string,
     public readonly receipt: RgEvidencePortReceipt | null = null) {
     super(reasonCode);
   }
@@ -498,7 +500,9 @@ function finishFailedOperation(
   operation: CanonicalRgOperation,
 ): { state: "degraded"; evidence: [] } {
   const indeterminate = operation.state === "indeterminate_after_send";
-  terminalizeWork(input.runId, input.workItem, indeterminate ? "indeterminate_after_send" : "degraded_emergency_circuit_breaker",
+  const providerRejected = operation.state === "provider_rejected";
+  terminalizeWork(input.runId, input.workItem, indeterminate ? "indeterminate_after_send"
+    : providerRejected ? "degraded_provider_unavailable" : "degraded_emergency_circuit_breaker",
     "degraded", operation.receipt.reasonCode, [], input.workerId);
   return { state: "degraded", evidence: [] };
 }
@@ -537,10 +541,7 @@ export function compileCanonicalRgSearchIntent(
     .filter(([key, value]) => key !== "tenantRef" && key !== "accountRef" && typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,95}$/.test(value))
     .map(([key, value]) => [key, String(value)]));
   const processorConcept = publicScope.processor ?? publicScope.processorProgram ?? publicScope.network ?? "payment processing";
-  const facetConcept = workItem.expectedKnowledgeValueConstraint.kind === "role"
-    ? workItem.expectedKnowledgeValueConstraint.controlDimension.replaceAll("_", " ")
-    : workItem.expectedKnowledgeValueConstraint.kind === "boolean" ? "merchant availability"
-      : "fee category";
+  const facetConcept = publicSearchFacetConcept(workItem.expectedKnowledgeValueConstraint, admission.facet);
   const periodYear = workItem.knowledgeQuery.asOf.slice(0, 4);
   const publicRefinementTerms = refinementTerms(workItem.continuationContract?.kind ?? null);
   const queryTerms = [processorConcept.replaceAll("_", " "), publicSubjectConcept, facetConcept, "official publication", periodYear,
@@ -567,6 +568,25 @@ export function compileCanonicalRgSearchIntent(
     privacy: { status: "validated_public_concepts_only", forbiddenPrivateValuesObserved: 0,
       compiler: "deterministic_claim_lineage_v1" },
   };
+}
+
+function publicSearchFacetConcept(
+  constraint: CanonicalRgWorkItem["expectedKnowledgeValueConstraint"],
+  facet: CanonicalRgClaimAdmission["facet"],
+): string {
+  switch (constraint.kind) {
+    case "mapping": return facet === "economic_category" ? "economic category classification" : `${facet.replaceAll("_", " ")} mapping`;
+    case "role": return `${constraint.controlDimension.replaceAll("_", " ")} participant role`;
+    case "boolean": return `${facet.replaceAll("_", " ")} merchant availability`;
+    case "synthesis_constraint_identity": return "constraint rule or requirement identity";
+    case "synthesis_constraint_action_effect": return `constraint effect on ${constraint.safeActionCode.replaceAll("_", " ")}`;
+    case "synthesis_condition_state": return `${constraint.conditionCode.replaceAll("_", " ")} condition for ${constraint.safeActionCode.replaceAll("_", " ")}`;
+    case "synthesis_economic_driver": return "economic cost driver";
+    case "synthesis_recurrence": return "verified fee schedule cadence recurrence";
+    case "synthesis_counterfactual": return "statement period economic counterfactual";
+    case "synthesis_safe_action": return `supported merchant action ${constraint.allowedSafeActionCodes.join(" or ").replaceAll("_", " ")}`;
+    case "synthesis_merchant_influence": return `${constraint.influenceKind.replaceAll("_", " ")} for ${constraint.safeActionCode.replaceAll("_", " ")}`;
+  }
 }
 
 function refinementTerms(kind: NonNullable<CanonicalRgWorkItem["continuationContract"]>["kind"] | null): string[] {
@@ -637,6 +657,7 @@ async function runExternalOperation<T>(input: {
     const existing = operationFromDb(input.runId, operationId);
     if (existing?.state === "completed") return { state: "completed",
       value: replayableCompletedOperationResult(existing), operation: existing };
+    if (existing?.state === "provider_rejected") return { state: "failed", value: null, operation: existing };
     if (existing?.state === "failed_before_send") {
       if (attempt < MAX_BEFORE_SEND_ATTEMPTS) continue;
       return { state: "failed", value: null, operation: existing };
@@ -656,22 +677,26 @@ async function runExternalOperation<T>(input: {
       incrementResource(input.runId, input.workItem.workItemId, input.kind, result.receipt);
       return { state: "completed", value: projected, operation: settled };
     } catch (error) {
-      const afterSend = sent || (error instanceof RgEvidenceTransportError && error.transportState !== "before_send");
+      const providerRejected = error instanceof RgEvidenceTransportError && error.transportState === "provider_rejected";
+      const afterSend = !providerRejected && (sent || (error instanceof RgEvidenceTransportError && error.transportState !== "before_send"));
       const reason = safeReason(error);
       const errorReceipt = error instanceof RgEvidenceTransportError ? error.receipt : null;
-      const settled = settleOperation(input.runId, operation, afterSend ? "indeterminate_after_send" : "failed_before_send",
+      const settled = settleOperation(input.runId, operation,
+        providerRejected ? "provider_rejected" : afterSend ? "indeterminate_after_send" : "failed_before_send",
         null, errorReceipt, reason);
-      if (afterSend) incrementResource(input.runId, input.workItem.workItemId, input.kind, {
+      if (afterSend || providerRejected) incrementResource(input.runId, input.workItem.workItemId, input.kind, {
         providerCode: errorReceipt?.providerCode ?? input.providerCode,
         providerRequestId: errorReceipt?.providerRequestId ?? null,
         calls: errorReceipt?.calls ?? 1, tokens: errorReceipt?.tokens ?? null,
         retrievalBytes: errorReceipt?.retrievalBytes ?? 0,
+        providerDiagnostics: errorReceipt?.providerDiagnostics ?? null,
       });
       appendRetryDecision(input.runId, input.workItem.workItemId, operation.operationId,
-        !afterSend && attempt < MAX_BEFORE_SEND_ATTEMPTS ? "retry" : "no_retry",
-        afterSend ? "indeterminate_after_send_no_blind_retry" : attempt < MAX_BEFORE_SEND_ATTEMPTS
+        !afterSend && !providerRejected && attempt < MAX_BEFORE_SEND_ATTEMPTS ? "retry" : "no_retry",
+        providerRejected ? "known_provider_rejection_no_immediate_retry"
+          : afterSend ? "indeterminate_after_send_no_blind_retry" : attempt < MAX_BEFORE_SEND_ATTEMPTS
           ? "before_send_failure_bounded_retry" : "before_send_retry_limit_reached");
-      if (afterSend || attempt === MAX_BEFORE_SEND_ATTEMPTS) return { state: "failed", value: null, operation: settled };
+      if (afterSend || providerRejected || attempt === MAX_BEFORE_SEND_ATTEMPTS) return { state: "failed", value: null, operation: settled };
     }
   }
   throw new Error("rg_operation_retry_state_invalid");
@@ -763,7 +788,8 @@ function reserveOperation(input: {
     kind: input.kind, attempt: input.attempt, candidateId: input.candidateId,
     state: "reserved", reservation,
     receipt: { sendState: "not_sent", completionState: "reserved", providerCode: input.providerCode,
-      providerRequestId: null, calls: 0, tokens: null, retrievalBytes: 0, reasonCode: "rg_operation_reserved" },
+      providerRequestId: null, calls: 0, tokens: null, retrievalBytes: 0, reasonCode: "rg_operation_reserved",
+      providerDiagnostics: null },
     input: structuredClone(input.operationInput), inputHash: input.inputHash, result: null, createdAt: now, updatedAt: now,
   };
   db.prepare(`INSERT INTO canonical_rg_operations
@@ -803,19 +829,21 @@ function markOperationSent(runId: string, operationId: string, workerId: string)
 }
 
 function settleOperation(runId: string, operation: CanonicalRgOperation,
-  state: Extract<CanonicalRgOperation["state"], "completed" | "failed_before_send" | "indeterminate_after_send">,
+  state: Extract<CanonicalRgOperation["state"], "completed" | "failed_before_send" | "provider_rejected" | "indeterminate_after_send">,
   result: unknown | null, receipt: RgEvidencePortReceipt | null, reasonCode: string): CanonicalRgOperation {
   const latest = operationFromDb(runId, operation.operationId) ?? operation;
   const updated: CanonicalRgOperation = { ...latest, state, result,
     receipt: { ...latest.receipt,
       sendState: latest.receipt.sendState,
-      completionState: state === "completed" ? "completed" : state === "indeterminate_after_send" ? "indeterminate" : "failed",
+      completionState: state === "completed" ? "completed" : state === "provider_rejected" ? "provider_rejected"
+        : state === "indeterminate_after_send" ? "indeterminate" : "failed",
       providerCode: receipt?.providerCode ?? latest.receipt.providerCode,
       providerRequestId: receipt?.providerRequestId ?? latest.receipt.providerRequestId,
       calls: receipt?.calls ?? latest.receipt.calls,
       tokens: receipt?.tokens ?? latest.receipt.tokens,
       retrievalBytes: receipt?.retrievalBytes ?? latest.receipt.retrievalBytes,
       reasonCode,
+      providerDiagnostics: receipt?.providerDiagnostics ?? latest.receipt.providerDiagnostics ?? null,
     }, updatedAt: nowIso() };
   updateOperation(runId, updated);
   appendEvent(runId, updated.workItemId, updated.operationId, `operation_${state}`, {

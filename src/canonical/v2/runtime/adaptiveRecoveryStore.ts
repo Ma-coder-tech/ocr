@@ -29,7 +29,7 @@ export function ensureCanonicalAnalysisRecoveryIntent(runId: string): CanonicalA
     || state.lifecycle === "indeterminate_reconciliation_required") return null;
   const decision = state.decisions.filter((item) => item.disposition === "operationally_degraded_retry_eligible"
     && item.degradation?.continuationPermission === "bounded_retry_eligible"
-    && (["provider_unavailable_before_send", "before_send_failure_retry_eligible"].includes(item.degradation.subtype)
+    && (["provider_unavailable_before_send", "provider_rejection", "before_send_failure_retry_eligible"].includes(item.degradation.subtype)
       || (item.degradation.subtype === "resource_or_runtime_exhaustion"
         && item.degradation.reasonCodes.some((reason) => reason.startsWith("rg_generation_zero_emergency_")
           && reason.endsWith("_not_analytical_completion")))))
@@ -69,7 +69,7 @@ export function ensureCanonicalAnalysisRecoveryIntent(runId: string): CanonicalA
       disposition: "operationally_degraded_retry_eligible" as const,
       continuationPermission: "bounded_retry_eligible" as const,
       degradationSubtype: decision.degradation!.subtype as
-        "provider_unavailable_before_send" | "before_send_failure_retry_eligible" | "resource_or_runtime_exhaustion",
+        "provider_unavailable_before_send" | "provider_rejection" | "before_send_failure_retry_eligible" | "resource_or_runtime_exhaustion",
     },
     analyticalCompletionEffect: "none" as const,
     customerReportAuthority: "legacy_report_unchanged" as const,

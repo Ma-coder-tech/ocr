@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { canonicalJson } from "../canonicalJson.js";
 import {
@@ -22,6 +22,7 @@ import {
   validateRetrievalResponse,
 } from "../intelligence/retrievalSafety.js";
 import type { SearchRequest } from "../intelligence/intelligenceTypes.js";
+import type { ProviderOperationReceiptV1 } from "../internalAnalysis/internalAnalysisTypes.js";
 import type {
   CanonicalRgDiscoveryCandidate,
   CanonicalRgEvidenceExecutionPorts,
@@ -87,7 +88,17 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
           untrustedContentPolicy: "data_only_no_instructions",
         };
         onSend();
-        const response = await searchPort.search(request);
+        let response: Awaited<ReturnType<typeof searchPort.search>>;
+        try {
+          response = await searchPort.search(request);
+        } catch (error) {
+          const receipt = audit.snapshot().find((item) => item.operationId === attemptId);
+          if (error instanceof LiveOperationTransportError) {
+            throw new RgEvidenceTransportError(error.transportState, safeReason(error),
+              receipt ? rgSearchReceipt(receipt) : null);
+          }
+          throw error;
+        }
         const receipt = audit.snapshot().find((item) => item.operationId === attemptId);
         tokens = receipt?.outputTokens === null || tokens === null ? null : tokens + (receipt?.outputTokens ?? 0);
         for (const candidate of response.candidates) {
@@ -97,8 +108,9 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
             publicationDate: candidate.publicationDate, effectiveFrom: candidate.effectiveFrom, effectiveTo: candidate.effectiveTo });
         }
       }
-      return { value: candidates.slice(0, maximumCandidates), receipt: { providerCode: searchPort.providerCode,
-        providerRequestId: null, calls: 1, tokens, retrievalBytes: 0 } };
+      const receipt = audit.snapshot().find((item) => item.operationId === `${intent.intentId}-search-1`);
+      return { value: candidates.slice(0, maximumCandidates), receipt: receipt ? rgSearchReceipt(receipt) : {
+        providerCode: searchPort.providerCode, providerRequestId: null, calls: 1, tokens, retrievalBytes: 0 } };
     },
     async retrieve({ intent, candidate, maximumBytes }, onSend) {
       onSend();
@@ -265,26 +277,80 @@ async function sendStructured(
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
   let sent = false;
   let providerRequestId: string | null = null;
+  const localRequestId = `provider-request-${randomUUID()}`;
   try {
     onSend(); sent = true;
     const response = await fetch(APPROVED_OPENAI_ENDPOINT, { method: "POST", headers: {
       Authorization: `Bearer ${binding.openAiApiKey}`, "Content-Type": "application/json" }, body, signal: controller.signal });
     providerRequestId = safeId(response.headers.get("x-request-id"));
-    if (!response.ok) throw new RgEvidenceTransportError("after_send", "rg_openai_http_failure", {
-      providerCode: "openai_responses_api", providerRequestId, calls: 1, tokens: null, retrievalBytes: 0,
-    });
-    const envelope = record(await response.json());
+    let envelope: Record<string, unknown>;
+    try { envelope = record(await response.json()); }
+    catch (error) {
+      if (response.ok) throw error;
+      envelope = {};
+    }
+    if (!response.ok) {
+      const rejected = knownRejectedHttpStatus(response.status);
+      const receipt = structuredReceipt({ localRequestId, providerRequestId, requestedModel: binding.model,
+        response, envelope, disposition: rejected ? "known_provider_rejection" : "indeterminate_after_send" });
+      throw new RgEvidenceTransportError(rejected ? "provider_rejected" : "after_send",
+        rejected ? openAiRejectionReason(response.status) : "rg_openai_http_failure", receipt);
+    }
     const outputText = typeof envelope.output_text === "string" ? envelope.output_text : extractOutputText(envelope);
     const parsed = JSON.parse(outputText) as unknown;
     const outputTokens = Number.isSafeInteger(record(envelope.usage).output_tokens) ? Number(record(envelope.usage).output_tokens) : null;
     return { value: parsed, receipt: { providerCode: "openai_responses_api", providerRequestId,
-      calls: 1, tokens: outputTokens, retrievalBytes: 0 } };
+      calls: 1, tokens: outputTokens, retrievalBytes: 0,
+      providerDiagnostics: structuredDiagnostics({ localRequestId, providerRequestId, requestedModel: binding.model,
+        response, envelope, disposition: "completed" }) } };
   } catch (error) {
     if (error instanceof RgEvidenceTransportError) throw error;
     throw new RgEvidenceTransportError(sent ? (controller.signal.aborted ? "timed_out" : "after_send") : "before_send",
       safeReason(error), sent ? { providerCode: "openai_responses_api", providerRequestId,
-        calls: 1, tokens: null, retrievalBytes: 0 } : null);
+        calls: 1, tokens: null, retrievalBytes: 0, providerDiagnostics: {
+          schemaVersion: "canonical_rg_provider_diagnostics_v1", responseDisposition: "indeterminate_after_send",
+          httpStatus: null, localRequestId, providerRequestId, providerResponseId: null,
+          requestedModelIdentifier: binding.model, returnedModelIdentifier: null,
+          providerErrorType: null, providerErrorCode: null, providerErrorParam: null,
+          usageState: "unknown_possible_billable", outputTokens: null, providerRequestCount: null, usageCostUsd: null,
+        } } : null);
   } finally { clearTimeout(timeout); }
+}
+
+function structuredReceipt(input: Parameters<typeof structuredDiagnostics>[0]): RgEvidencePortReceipt {
+  const diagnostics = structuredDiagnostics(input);
+  return { providerCode: "openai_responses_api", providerRequestId: input.providerRequestId, calls: 1,
+    tokens: diagnostics.outputTokens, retrievalBytes: 0, providerDiagnostics: diagnostics };
+}
+
+function structuredDiagnostics(input: {
+  localRequestId: string; providerRequestId: string | null; requestedModel: string; response: Response;
+  envelope: Record<string, unknown>; disposition: "completed" | "known_provider_rejection" | "indeterminate_after_send";
+}): NonNullable<RgEvidencePortReceipt["providerDiagnostics"]> {
+  const error = record(input.envelope.error);
+  const usage = record(input.envelope.usage);
+  const rejected = input.disposition === "known_provider_rejection";
+  const outputTokens = rejected ? 0 : Number.isSafeInteger(usage.output_tokens) ? Number(usage.output_tokens) : null;
+  return {
+    schemaVersion: "canonical_rg_provider_diagnostics_v1", responseDisposition: input.disposition,
+    httpStatus: input.response.status, localRequestId: input.localRequestId,
+    providerRequestId: input.providerRequestId, providerResponseId: safeId(input.envelope.id),
+    requestedModelIdentifier: input.requestedModel, returnedModelIdentifier: safeModel(input.envelope.model),
+    providerErrorType: safeDiagnostic(error.type), providerErrorCode: safeDiagnostic(error.code),
+    providerErrorParam: safeDiagnostic(error.param),
+    usageState: rejected || outputTokens !== null ? "known" : "unknown_possible_billable",
+    outputTokens, providerRequestCount: rejected ? 0 : 1,
+    usageCostUsd: rejected ? 0 : Number.isFinite(usage.cost) && Number(usage.cost) >= 0 ? Number(usage.cost) : null,
+  };
+}
+
+function openAiRejectionReason(status: number): string {
+  if (status === 401) return "rg_openai_authentication_rejected";
+  if (status === 402) return "rg_openai_account_rejected";
+  if (status === 403) return "rg_openai_authorization_rejected";
+  if (status === 404) return "rg_openai_model_or_endpoint_rejected";
+  if (status === 429) return "rg_openai_rate_limited";
+  return "rg_openai_request_rejected";
 }
 
 function investigationSchema(): object {
@@ -375,6 +441,44 @@ function extractOutputText(envelope: Record<string, any>): string {
 }
 function record(value: unknown): Record<string, any> { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {}; }
 function safeId(value: unknown): string | null { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(value) ? value : null; }
+function safeModel(value: unknown): string | null { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:\/-]{0,255}$/.test(value) ? value : null; }
+function safeDiagnostic(value: unknown): string | null {
+  const text = typeof value === "number" && Number.isSafeInteger(value) ? String(value) : typeof value === "string" ? value : "";
+  return /^[A-Za-z0-9][A-Za-z0-9_.:\[\]-]{0,127}$/.test(text) ? text : null;
+}
 function safeReason(error: unknown): string { const value = error instanceof Error ? error.message : "rg_provider_unavailable";
   return /^[a-z][a-z0-9_:.-]{0,191}$/.test(value) ? value : "rg_provider_unavailable"; }
+
+function rgSearchReceipt(receipt: ProviderOperationReceiptV1): RgEvidencePortReceipt {
+  return {
+    providerCode: receipt.providerCode,
+    providerRequestId: receipt.providerRequestId,
+    calls: receipt.actualSendCount,
+    tokens: receipt.outputTokens,
+    retrievalBytes: 0,
+    providerDiagnostics: {
+      schemaVersion: "canonical_rg_provider_diagnostics_v1",
+      responseDisposition: receipt.completionState === "completed" ? "completed"
+        : receipt.httpStatus !== null && knownRejectedHttpStatus(receipt.httpStatus)
+          ? "known_provider_rejection" : "indeterminate_after_send",
+      httpStatus: receipt.httpStatus,
+      localRequestId: receipt.localRequestId,
+      providerRequestId: receipt.providerRequestId,
+      providerResponseId: receipt.providerResponseId,
+      requestedModelIdentifier: receipt.requestedModelIdentifier,
+      returnedModelIdentifier: receipt.returnedModelIdentifier,
+      providerErrorType: receipt.providerErrorType,
+      providerErrorCode: receipt.providerErrorCode,
+      providerErrorParam: receipt.providerErrorParam,
+      usageState: receipt.usageState,
+      outputTokens: receipt.outputTokens,
+      providerRequestCount: receipt.providerRequestCount,
+      usageCostUsd: receipt.usageCostUsd,
+    },
+  };
+}
+
+function knownRejectedHttpStatus(status: number): boolean {
+  return [400, 401, 402, 403, 404, 405, 406, 415, 422, 429].includes(status);
+}
 function digest(value: unknown): string { return createHash("sha256").update(canonicalJson(value)).digest("hex"); }

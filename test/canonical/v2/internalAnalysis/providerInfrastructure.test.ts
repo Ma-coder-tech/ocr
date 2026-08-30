@@ -11,6 +11,7 @@ import {
   createLiveOpenAiSemanticAdapter, createInternalLiveIntelligencePorts,
   createDestinationPermit, createNodeHttpsRetrievalPort, createPublicDocumentExtractionPort, createPublicSourceAuthorityAdmission,
   INVESTIGATIVE_RESPONSE_SCHEMA_HASH, INVESTIGATIVE_RESPONSE_SCHEMA_V1, OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH,
+  LiveOperationTransportError,
   ProviderReadinessDiagnosticLog, SEMANTIC_RESPONSE_SCHEMA_V1, type SearchRequest, type SemanticVerificationInput,
   inspectProviderOutboundPacket, normalizeOpenRouterSearchResponse, runInternalProviderPreflight, runProviderReadinessProbe,
   sanitizePublicDocumentTextForProvider, validateSemanticMember,
@@ -167,9 +168,45 @@ describe("internal-analysis construction-bound provider seams", () => {
     globalThis.fetch = vi.fn(async () => { rateSends += 1; return { status: 429, headers: new Headers({ "x-request-id": "or-rate-request-001" }),
       json: async () => ({ error: { type: "rate_limit_error", code: 429, param: "web_search", message: "unsafe provider prose" } }) } as Response; });
     await expect(createLiveOpenRouterSearchAdapter(rateCap, rateAudit).search(searchRequest)).rejects.toThrow("rate_limited");
-    expect(rateSends).toBe(1); expect(rateAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, retryCount: 0, completionState: "failed", usageState: "unknown_possible_billable",
+    expect(rateSends).toBe(1); expect(rateAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, retryCount: 0, completionState: "failed", usageState: "known",
+      outputTokens: 0, providerRequestCount: 0, usageCostUsd: 0,
       httpStatus: 429, providerRequestId: "or-rate-request-001", providerErrorType: "rate_limit_error", providerErrorCode: "429", providerErrorParam: "web_search" });
     expect(JSON.stringify(rateAudit.snapshot())).not.toContain("unsafe provider prose");
+  });
+
+  it("classifies definitive OpenRouter request rejection separately from ambiguous upstream failure", async () => {
+    const rejectedCap = await capability();
+    const rejectedAudit = new ProviderOperationAuditLog();
+    globalThis.fetch = vi.fn(async () => ({ status: 401, headers: new Headers({ "x-request-id": "or-auth-001" }),
+      json: async () => ({ error: { code: 401, message: "unsafe provider prose" } }) } as Response));
+    const rejected = await createLiveOpenRouterSearchAdapter(rejectedCap, rejectedAudit).search(searchRequest)
+      .then(() => null, (error) => error);
+    expect(rejected).toBeInstanceOf(LiveOperationTransportError);
+    expect(rejected).toMatchObject({ transportState: "provider_rejected", message: "openrouter_search_authentication_rejected" });
+    expect(rejectedAudit.snapshot()[0]).toMatchObject({ httpStatus: 401, providerRequestId: "or-auth-001",
+      providerErrorCode: "401", completionState: "failed" });
+    expect(JSON.stringify(rejectedAudit.snapshot())).not.toContain("unsafe provider prose");
+
+    const ambiguousCap = await capability();
+    const ambiguousAudit = new ProviderOperationAuditLog();
+    globalThis.fetch = vi.fn(async () => ({ status: 502, headers: new Headers({ "x-request-id": "or-upstream-001" }),
+      json: async () => ({ error: { type: "upstream_error", code: "bad_gateway" } }) } as Response));
+    const ambiguous = await createLiveOpenRouterSearchAdapter(ambiguousCap, ambiguousAudit).search(searchRequest)
+      .then(() => null, (error) => error);
+    expect(ambiguous).toBeInstanceOf(LiveOperationTransportError);
+    expect(ambiguous).toMatchObject({ transportState: "after_send", message: "openrouter_search_http_failure" });
+    expect(ambiguousAudit.snapshot()[0]).toMatchObject({ httpStatus: 502, providerRequestId: "or-upstream-001",
+      providerErrorType: "upstream_error", providerErrorCode: "bad_gateway", completionState: "failed" });
+
+    const bodylessCap = await capability();
+    const bodylessAudit = new ProviderOperationAuditLog();
+    globalThis.fetch = vi.fn(async () => ({ status: 403, headers: new Headers({ "x-request-id": "or-forbidden-001" }),
+      json: async () => { throw new SyntaxError("non-json rejection body"); } } as Response));
+    const bodyless = await createLiveOpenRouterSearchAdapter(bodylessCap, bodylessAudit).search(searchRequest)
+      .then(() => null, (error) => error);
+    expect(bodyless).toMatchObject({ transportState: "provider_rejected", message: "openrouter_search_authorization_rejected" });
+    expect(bodylessAudit.snapshot()[0]).toMatchObject({ httpStatus: 403, providerRequestId: "or-forbidden-001",
+      providerErrorType: null, providerErrorCode: null, completionState: "failed" });
   });
 
   it("rejects unsupported OpenRouter engine/loop/fallback preflight configurations", () => {

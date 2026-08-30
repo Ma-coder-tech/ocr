@@ -390,7 +390,8 @@ function degradationFor(work: CanonicalRgWorkItem): CanonicalContinuationDegrada
   const reason = work.stopReason ?? "operational_degradation_reason_unavailable";
   if (work.executionState === "indeterminate_after_send") return { subtype: "indeterminate_after_send",
     continuationPermission: "reconciliation_required", reasonCodes: [reason, "blind_retry_prohibited"] };
-  if (work.executionState === "degraded_provider_unavailable") return { subtype: "provider_unavailable_before_send",
+  if (work.executionState === "degraded_provider_unavailable") return { subtype: /(?:rejected|rate_limited)$/.test(reason)
+    ? "provider_rejection" : "provider_unavailable_before_send",
     continuationPermission: "bounded_retry_eligible", reasonCodes: [reason, "existing_bounded_retry_policy_applies"] };
   if (work.executionState === "degraded_emergency_circuit_breaker") {
     const resource = /(?:resource|time|token|cost|budget|ceiling)/i.test(reason);

@@ -42,7 +42,13 @@ async function sendLiveJson(request: LiveJsonRequest, onSend: () => void, onResp
     const response = await fetch(request.url, { method: request.method, headers: request.headers, body: request.body, redirect: "error", signal: controller.signal });
     const providerRequestId = safeIdentifier(response.headers?.get?.("x-request-id"));
     onResponse({ status: response.status, providerRequestId });
-    return { status: response.status, body: await response.json() as unknown, providerRequestId };
+    let responseBody: unknown;
+    try { responseBody = await response.json() as unknown; }
+    catch (error) {
+      if (response.status >= 200 && response.status < 300) throw error;
+      responseBody = {};
+    }
+    return { status: response.status, body: responseBody, providerRequestId };
   } catch (error) {
     throw new LiveOperationTransportError(timedOut ? "timed_out" : externallyCancelled ? "cancelled" : sent ? "after_send" : "before_send", safeError(error));
   } finally { clearTimeout(timer); request.cancellationSignal?.removeEventListener("abort", cancel); }
@@ -83,7 +89,9 @@ export function createLiveOpenRouterSearchAdapter(capability: LiveExecutionCapab
         (metadata) => audit.settle(receiptId, { httpStatus: metadata.status, providerRequestId: metadata.providerRequestId }));
       if (response.status < 200 || response.status >= 300) {
         audit.settle(receiptId, safeProviderError(response.body));
-        if (response.status === 429) throw new LiveOperationTransportError("after_send", "openrouter_search_rate_limited");
+        if (response.status === 429) throw new LiveOperationTransportError("provider_rejected", "openrouter_search_rate_limited");
+        const rejection = knownOpenRouterRejection(response.status);
+        if (rejection) throw new LiveOperationTransportError("provider_rejected", rejection);
         throw new LiveOperationTransportError("after_send", "openrouter_search_http_failure");
       }
       audit.settle(receiptId, openRouterEnvelopeDiagnostics(response.body));
@@ -318,7 +326,10 @@ function settleFailure(audit: ProviderOperationAuditLog, receiptId: string, erro
   const state = error instanceof LiveOperationTransportError ? error.transportState : "before_send";
   const sent = audit.snapshot().find((item) => item.receiptId === receiptId)?.actualSendCount === 1;
   const completionState = !sent ? "not_sent" : state === "timed_out" ? "timed_out" : state === "cancelled" ? "cancelled" : "failed";
-  audit.settle(receiptId, { completionState, elapsedMs, usageState: sent ? "unknown_possible_billable" : "known", safeReasonCode: safeError(error) });
+  const rejected = state === "provider_rejected";
+  audit.settle(receiptId, { completionState, elapsedMs, usageState: sent && !rejected ? "unknown_possible_billable" : "known",
+    ...(rejected ? { outputTokens: 0, providerRequestCount: 0, usageCostUsd: 0 } : {}),
+    safeReasonCode: safeError(error) });
 }
 function openRouterEnvelopeDiagnostics(body: unknown): Partial<ProviderOperationReceiptV1> {
   const envelope = record(body); const choices = asArray(envelope.choices); const choice = record(choices[0]); const message = record(choice.message);
@@ -335,6 +346,15 @@ function openRouterEnvelopeDiagnostics(body: unknown): Partial<ProviderOperation
 function safeProviderError(body: unknown): Pick<ProviderOperationReceiptV1, "providerErrorType" | "providerErrorCode" | "providerErrorParam"> {
   const error = record(record(body).error);
   return { providerErrorType: safeDiagnostic(error.type), providerErrorCode: safeDiagnostic(error.code), providerErrorParam: safeDiagnostic(error.param) };
+}
+function knownOpenRouterRejection(status: number): string | null {
+  if (status === 400 || status === 415 || status === 422) return "openrouter_search_request_rejected";
+  if (status === 401) return "openrouter_search_authentication_rejected";
+  if (status === 402) return "openrouter_search_account_rejected";
+  if (status === 403) return "openrouter_search_authorization_rejected";
+  if (status === 404) return "openrouter_search_model_or_endpoint_rejected";
+  if (status === 405 || status === 406) return "openrouter_search_request_contract_rejected";
+  return null;
 }
 function safeIdentifier(value: unknown): string | null { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(value) ? value : null; }
 function safeModel(value: unknown): string | null { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:\/-]{0,255}$/.test(value) ? value : null; }
