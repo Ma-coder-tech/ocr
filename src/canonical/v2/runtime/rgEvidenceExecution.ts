@@ -17,7 +17,12 @@ import type {
 } from "./adaptiveExecutionTypes.js";
 import type { CanonicalRgOperationReconciliationPort, CanonicalRgReconciliationCapability } from "./rgOperationReconciliationTypes.js";
 import { assertClaimedCanonicalRgReconciliationIntent } from "./rgOperationReconciliationStore.js";
-import { dynamicallyBindPublisherOrigin, type CanonicalRgPublisherOriginProof } from "./rgPublisherOriginAuthority.js";
+import {
+  dynamicallyBindPublisherOrigin,
+  RG_PUBLISHER_ORIGIN_BINDING_CATALOG_HASH,
+  RG_PUBLISHER_ORIGIN_BINDING_CATALOG_VERSION,
+  type CanonicalRgPublisherOriginProof,
+} from "./rgPublisherOriginAuthority.js";
 import { persistedVerifiedEvidenceIntegrityValid } from "./rgEvidenceIntegrity.js";
 export { persistedVerifiedEvidenceIntegrityValid } from "./rgEvidenceIntegrity.js";
 import {
@@ -86,7 +91,7 @@ export type CanonicalRgSearchIntent = {
 };
 
 type CanonicalRgCandidateResearchOutcome = {
-  schemaVersion: "canonical_rg_candidate_research_outcome_v1";
+  schemaVersion: "canonical_rg_candidate_research_outcome_v1" | "canonical_rg_candidate_research_outcome_v2";
   runId: string;
   planHash: string;
   workItemId: string;
@@ -113,13 +118,78 @@ type CanonicalRgCandidateResearchOutcome = {
   exactAtomicClaimSupport: boolean;
   applicabilityReuse:
     | "exclude_document_for_matching_discovery_scope"
+    | "typed_negative_applicability_proof_required"
     | "claim_specific_no_cross_facet_semantic_reuse";
   admittedEvidenceId: string | null;
   analyticalCompletionEffect: "none";
 };
 
-type ReusableCandidateInapplicability = Pick<CanonicalRgCandidateResearchOutcome,
-  "documentFingerprint" | "verificationOperationId" | "outcomeClass">;
+export type CanonicalRgVerificationNegativeApplicabilityProof = {
+  schemaVersion: "canonical_rg_verification_negative_applicability_proof_v1";
+  outcomeClass: "wrong_scope" | "wrong_period" | "wrong_authority";
+  granularity: "document" | "passage" | "provision";
+  proofLocatorId: string;
+  scopeDimension: "country" | "processor" | "processorProgram" | "network" | "region" | "jurisdiction" | null;
+  requiredScopeValue: string | null;
+  observedScopeValue: string | null;
+};
+
+type NegativeApplicabilityContext = {
+  productionScopeVersion: typeof CANONICAL_PRODUCTION_APPLICABILITY_SCOPE_VERSION;
+  countryCode: typeof CANONICAL_PRODUCTION_COUNTRY_CODE;
+  exactPublicDimensions: Record<string, string>;
+  asOf: string;
+  statementPeriod: CanonicalRgClaimAdmission["statementPeriod"];
+};
+
+type CanonicalRgReusableNegativeApplicabilityProof = {
+  schemaVersion: "canonical_rg_reusable_negative_applicability_proof_v1";
+  proofId: string;
+  runId: string;
+  candidateUrl: string;
+  sourceUrl: string;
+  sourceOrigin: string;
+  documentFingerprint: string;
+  verificationOperationId: string;
+  outcomeClass: "wrong_scope" | "wrong_period" | "wrong_authority";
+  granularity: "document" | "source_origin";
+  proofLocatorId: string | null;
+  applicabilityContext: NegativeApplicabilityContext;
+  applicabilityContextFingerprint: string;
+  proofBasis:
+    | {
+      kind: "document_scope_mismatch";
+      scopeDimension: NonNullable<CanonicalRgVerificationNegativeApplicabilityProof["scopeDimension"]>;
+      requiredScopeValue: string;
+      observedScopeValue: string;
+    }
+    | {
+      kind: "document_period_mismatch";
+      requiredAsOf: string;
+      effectiveFrom: string | null;
+      effectiveTo: string | null;
+    }
+    | {
+      kind: "publisher_origin_binding_not_established";
+      authorityClass: Extract<KnowledgeSourceAuthority, "official_network_publication" | "processor_publication">;
+      publisherIdentityCode: string;
+      applicableScopeDimension: "processor" | "processorProgram" | "acquirer" | "isoReseller" | "network";
+      applicableScopeIdentityCode: string;
+      publisherOriginBindingCatalogVersion: typeof RG_PUBLISHER_ORIGIN_BINDING_CATALOG_VERSION;
+      publisherOriginBindingCatalogHash: string;
+    };
+  reusePermission: "retrieval_exclusion_for_exact_applicability_question_only";
+  semanticReuse: "prohibited";
+  analyticalCompletionEffect: "none";
+};
+
+type ReusableCandidateInapplicability = {
+  documentFingerprint: string;
+  verificationOperationId: string;
+  outcomeClass: "wrong_authority" | "wrong_scope" | "wrong_period";
+  reuseIdentity: "legacy_matching_discovery_scope" | "typed_claim_independent_applicability_proof";
+  authorityClass: Extract<KnowledgeSourceAuthority, "official_network_publication" | "processor_publication"> | null;
+};
 
 class CandidateRetrievalExcludedBeforeSend extends Error {
   constructor(public readonly inapplicability: ReusableCandidateInapplicability) {
@@ -193,6 +263,7 @@ export type CanonicalRgVerificationJudgment = {
   periodStatus: "applicable" | "wrong_period" | "unresolved";
   effectiveFrom: string | null;
   effectiveTo: string | null;
+  negativeApplicabilityProof?: CanonicalRgVerificationNegativeApplicabilityProof | null;
   limitationCodes: string[];
 };
 
@@ -520,7 +591,8 @@ async function executeWorkItem(input: {
   let investigationAttempted = false;
   for (const [index, candidate] of candidates.entries()) {
     if (index > 0) appendExtensionDecision(input.runId, input.workItem.workItemId, "extended", "prior_candidate_did_not_produce_verified_support");
-    const priorInapplicable = knownInapplicableDocumentsForIntent(input.runId, intent).get(candidate.url);
+    const priorInapplicable = knownInapplicableCandidate(
+      knownInapplicableDocumentsForIntent(input.runId, intent), candidate);
     if (priorInapplicable) {
       candidateOutcomes.push(priorInapplicable.outcomeClass);
       appendKnownInapplicableCandidateSkip(input.runId, input.workItem.workItemId, intent, candidate,
@@ -530,7 +602,8 @@ async function executeWorkItem(input: {
     const retrieval = await runExternalOperation({ ...input, kind: "public_retrieval", candidateId: candidate.candidateId,
       providerCode: "independent_https_retrieval", operationInput: { intentId: intent.intentId, candidate },
       projectResult: sanitizeRetrievedDocument,
-      beforeSend: () => knownInapplicableDocumentsForIntent(input.runId, intent).get(candidate.url) ?? null,
+      beforeSend: () => knownInapplicableCandidate(
+        knownInapplicableDocumentsForIntent(input.runId, intent), candidate),
       call: (onSend) => input.ports.retrieve({ intent, candidate, maximumBytes: 5_242_880 }, onSend) });
     if (retrieval.state === "excluded_known_inapplicable") {
       candidateOutcomes.push(retrieval.inapplicability.outcomeClass);
@@ -612,6 +685,18 @@ async function executeWorkItem(input: {
       verificationOperationId: verification.operation.operationId,
       judgment: verification.value as CanonicalRgVerificationJudgment, verifiedEvidence: verified });
     appendCandidateResearchOutcome(input.runId, candidateOutcome);
+    const reusableNegativeProof = canonicalReusableNegativeApplicabilityProof({
+      runId: input.runId,
+      intent,
+      candidate,
+      document,
+      frozenCandidate,
+      verificationOperationId: verification.operation.operationId,
+      judgment: verification.value as CanonicalRgVerificationJudgment,
+      outcome: candidateOutcome,
+    });
+    if (reusableNegativeProof) appendReusableNegativeApplicabilityProof(input.runId, input.workItem.workItemId,
+      reusableNegativeProof);
     candidateOutcomes.push(candidateOutcome.outcomeClass);
     if (verified) break;
   }
@@ -1238,7 +1323,23 @@ function sanitizeVerificationJudgment(value: CanonicalRgVerificationJudgment): C
     publisherIdentityCode: value?.publisherIdentityCode, authorityLocatorId: value?.authorityLocatorId,
     supportLocatorId: value?.supportLocatorId, scopeStatus: value?.scopeStatus, periodStatus: value?.periodStatus,
     effectiveFrom: value?.effectiveFrom, effectiveTo: value?.effectiveTo,
+    negativeApplicabilityProof: sanitizeVerificationNegativeApplicabilityProof(value?.negativeApplicabilityProof),
     limitationCodes: Array.isArray(value?.limitationCodes) ? value.limitationCodes.slice(0, 50) : [],
+  };
+}
+
+function sanitizeVerificationNegativeApplicabilityProof(
+  value: CanonicalRgVerificationNegativeApplicabilityProof | null | undefined,
+): CanonicalRgVerificationNegativeApplicabilityProof | null {
+  if (!value || typeof value !== "object") return null;
+  return {
+    schemaVersion: value.schemaVersion,
+    outcomeClass: value.outcomeClass,
+    granularity: value.granularity,
+    proofLocatorId: value.proofLocatorId,
+    scopeDimension: value.scopeDimension,
+    requiredScopeValue: value.requiredScopeValue,
+    observedScopeValue: value.observedScopeValue,
   };
 }
 
@@ -1492,10 +1593,10 @@ function canonicalCandidateResearchOutcome(input: {
             ? "wrong_period"
             : "exact_semantic_support_insufficient";
   const applicabilityReuse = ["wrong_authority", "wrong_scope", "wrong_period"].includes(outcomeClass)
-    ? "exclude_document_for_matching_discovery_scope" as const
+    ? "typed_negative_applicability_proof_required" as const
     : "claim_specific_no_cross_facet_semantic_reuse" as const;
   return {
-    schemaVersion: "canonical_rg_candidate_research_outcome_v1",
+    schemaVersion: "canonical_rg_candidate_research_outcome_v2",
     runId: input.runId,
     planHash: input.planHash,
     workItemId: input.workItem.workItemId,
@@ -1518,6 +1619,136 @@ function canonicalCandidateResearchOutcome(input: {
     admittedEvidenceId: input.verifiedEvidence?.evidenceId ?? null,
     analyticalCompletionEffect: "none",
   };
+}
+
+function negativeApplicabilityContext(intent: CanonicalRgSearchIntent): NegativeApplicabilityContext {
+  return {
+    productionScopeVersion: intent.discoveryScope.productionScopeVersion,
+    countryCode: intent.discoveryScope.countryCode,
+    exactPublicDimensions: structuredClone(intent.discoveryScope.exactPublicDimensions),
+    asOf: intent.asOf,
+    statementPeriod: structuredClone(intent.statementPeriod),
+  };
+}
+
+function expectedScopeValue(
+  context: NegativeApplicabilityContext,
+  dimension: NonNullable<CanonicalRgVerificationNegativeApplicabilityProof["scopeDimension"]>,
+): string | null {
+  if (dimension === "country") return context.countryCode;
+  return context.exactPublicDimensions[dimension] ?? null;
+}
+
+function publisherIdentityScopeDimension(
+  publisherIdentityCode: string,
+  publicScope: Record<string, string>,
+  authority: Extract<KnowledgeSourceAuthority, "official_network_publication" | "processor_publication">,
+): "processor" | "processorProgram" | "acquirer" | "isoReseller" | "network" | null {
+  const dimensions = authority === "official_network_publication"
+    ? ["network"] as const : ["processor", "processorProgram", "acquirer", "isoReseller"] as const;
+  return dimensions.find((dimension) => publicScope[dimension] === publisherIdentityCode) ?? null;
+}
+
+function canonicalReusableNegativeApplicabilityProof(input: {
+  runId: string;
+  intent: CanonicalRgSearchIntent;
+  candidate: CanonicalRgDiscoveryCandidate;
+  document: CanonicalRgRetrievedDocument;
+  frozenCandidate: CanonicalRgFrozenCandidate;
+  verificationOperationId: string;
+  judgment: CanonicalRgVerificationJudgment;
+  outcome: CanonicalRgCandidateResearchOutcome;
+}): CanonicalRgReusableNegativeApplicabilityProof | null {
+  if (!/^[a-f0-9]{64}$/.test(input.document.documentFingerprint)
+    || !isSafeId(input.verificationOperationId)) return null;
+  const locatorIds = new Set(input.document.locators.map((item) => item.locatorId));
+  const context = negativeApplicabilityContext(input.intent);
+  const applicabilityContextFingerprint = digest(context);
+  const common = {
+    schemaVersion: "canonical_rg_reusable_negative_applicability_proof_v1" as const,
+    runId: input.runId,
+    candidateUrl: input.candidate.url,
+    sourceUrl: input.document.finalUrl,
+    sourceOrigin: input.document.sourceOrigin,
+    documentFingerprint: input.document.documentFingerprint,
+    verificationOperationId: input.verificationOperationId,
+    applicabilityContext: context,
+    applicabilityContextFingerprint,
+    reusePermission: "retrieval_exclusion_for_exact_applicability_question_only" as const,
+    semanticReuse: "prohibited" as const,
+    analyticalCompletionEffect: "none" as const,
+  };
+  const providerProof = input.judgment.negativeApplicabilityProof;
+  let proofWithoutId: Omit<CanonicalRgReusableNegativeApplicabilityProof, "proofId"> | null = null;
+  if (input.outcome.outcomeClass === "wrong_scope" && input.judgment.sourceAuthorityStatus === "verified"
+    && providerProof?.schemaVersion === "canonical_rg_verification_negative_applicability_proof_v1"
+    && providerProof.outcomeClass === "wrong_scope" && providerProof.granularity === "document"
+    && locatorIds.has(providerProof.proofLocatorId) && providerProof.scopeDimension !== null
+    && typeof providerProof.requiredScopeValue === "string" && isSafeCode(providerProof.requiredScopeValue)
+    && typeof providerProof.observedScopeValue === "string" && isSafeCode(providerProof.observedScopeValue)
+    && providerProof.observedScopeValue !== providerProof.requiredScopeValue
+    && expectedScopeValue(context, providerProof.scopeDimension) === providerProof.requiredScopeValue) {
+    proofWithoutId = { ...common, outcomeClass: "wrong_scope", granularity: "document",
+      proofLocatorId: providerProof.proofLocatorId,
+      proofBasis: { kind: "document_scope_mismatch", scopeDimension: providerProof.scopeDimension,
+        requiredScopeValue: providerProof.requiredScopeValue, observedScopeValue: providerProof.observedScopeValue } };
+  } else if (input.outcome.outcomeClass === "wrong_period" && input.judgment.sourceAuthorityStatus === "verified"
+    && providerProof?.schemaVersion === "canonical_rg_verification_negative_applicability_proof_v1"
+    && providerProof.outcomeClass === "wrong_period" && providerProof.granularity === "document"
+    && locatorIds.has(providerProof.proofLocatorId) && providerProof.scopeDimension === null
+    && providerProof.requiredScopeValue === null && providerProof.observedScopeValue === null
+    && validNullableDay(input.judgment.effectiveFrom) && validNullableDay(input.judgment.effectiveTo)
+    && (input.judgment.effectiveFrom !== null || input.judgment.effectiveTo !== null)
+    && !periodApplicable(input.intent.asOf, input.judgment.effectiveFrom, input.judgment.effectiveTo)) {
+    proofWithoutId = { ...common, outcomeClass: "wrong_period", granularity: "document",
+      proofLocatorId: providerProof.proofLocatorId,
+      proofBasis: { kind: "document_period_mismatch", requiredAsOf: input.intent.asOf,
+        effectiveFrom: input.judgment.effectiveFrom, effectiveTo: input.judgment.effectiveTo } };
+  } else if (input.outcome.outcomeClass === "wrong_authority"
+    && input.judgment.frozenCandidateHash === input.frozenCandidate.frozenCandidateHash
+    && input.judgment.publisherIdentityCode === input.frozenCandidate.publisherIdentityCode
+    && locatorIds.has(input.judgment.authorityLocatorId)
+    && dynamicallyBindPublisherOrigin({ sourceOrigin: input.document.sourceOrigin, finalUrl: input.document.finalUrl,
+      publisherIdentityCode: input.judgment.publisherIdentityCode,
+      authorityClass: input.frozenCandidate.sourceAuthorityCandidate,
+      publicScope: input.intent.publicScope }) === null
+    && publisherIdentityApplicable(input.judgment.publisherIdentityCode, input.intent.publicScope,
+      input.frozenCandidate.sourceAuthorityCandidate)) {
+    const applicableScopeDimension = publisherIdentityScopeDimension(input.judgment.publisherIdentityCode,
+      input.intent.publicScope, input.frozenCandidate.sourceAuthorityCandidate)!;
+    proofWithoutId = { ...common, outcomeClass: "wrong_authority", granularity: "source_origin",
+      proofLocatorId: null,
+      proofBasis: { kind: "publisher_origin_binding_not_established",
+        authorityClass: input.frozenCandidate.sourceAuthorityCandidate,
+        publisherIdentityCode: input.judgment.publisherIdentityCode,
+        applicableScopeDimension, applicableScopeIdentityCode: input.judgment.publisherIdentityCode,
+        publisherOriginBindingCatalogVersion: RG_PUBLISHER_ORIGIN_BINDING_CATALOG_VERSION,
+        publisherOriginBindingCatalogHash: RG_PUBLISHER_ORIGIN_BINDING_CATALOG_HASH } };
+  }
+  if (!proofWithoutId) return null;
+  return { ...proofWithoutId, proofId: `rg-negative-applicability-${digest(proofWithoutId).slice(0, 32)}` };
+}
+
+function appendReusableNegativeApplicabilityProof(
+  runId: string,
+  workItemId: string,
+  proof: CanonicalRgReusableNegativeApplicabilityProof,
+): void {
+  const existing = db.prepare(`SELECT work_item_id, operation_id, event_type, event_json, event_hash FROM canonical_rg_execution_events
+    WHERE run_id = ? AND operation_id = ? AND event_type = 'reusable_negative_applicability_proof' ORDER BY rowid LIMIT 1`)
+    .get(runId, proof.verificationOperationId) as {
+      work_item_id: string; operation_id: string; event_type: string; event_json: string; event_hash: string;
+    } | undefined;
+  if (existing) {
+    const event = JSON.parse(existing.event_json);
+    if (existing.event_hash !== digest({ runId, workItemId: existing.work_item_id,
+      operationId: existing.operation_id, eventType: existing.event_type, event })
+      || canonicalJson(event) !== canonicalJson(proof)) {
+      throw new Error("rg_reusable_negative_applicability_proof_replay_mismatch");
+    }
+    return;
+  }
+  appendEvent(runId, workItemId, proof.verificationOperationId, "reusable_negative_applicability_proof", proof);
 }
 
 function appendCandidateResearchOutcome(runId: string, outcome: CanonicalRgCandidateResearchOutcome): void {
@@ -1554,6 +1785,7 @@ function appendKnownInapplicableCandidateSkip(
     discoveryApplicabilityFingerprint: intent.discoveryScope.applicabilityFingerprint,
     priorVerificationOperationId: prior.verificationOperationId,
     outcomeClass: prior.outcomeClass,
+    reuseIdentity: prior.reuseIdentity,
     semanticReuse: "prohibited",
     analyticalCompletionEffect: "none",
   });
@@ -1562,12 +1794,17 @@ function appendKnownInapplicableCandidateSkip(
 function knownInapplicableDocumentsForIntent(
   runId: string,
   intent: CanonicalRgSearchIntent,
-): Map<string, ReusableCandidateInapplicability> {
+): Map<string, ReusableCandidateInapplicability[]> {
   const rows = db.prepare(`SELECT work_item_id, operation_id, event_type, event_json, event_hash FROM canonical_rg_execution_events
     WHERE run_id = ? AND event_type = 'candidate_research_outcome' ORDER BY rowid`).all(runId) as Array<{
       work_item_id: string; operation_id: string; event_type: string; event_json: string; event_hash: string;
     }>;
-  const output = new Map<string, ReusableCandidateInapplicability>();
+  const output = new Map<string, ReusableCandidateInapplicability[]>();
+  const add = (url: string, reusable: ReusableCandidateInapplicability) => {
+    const values = output.get(url) ?? [];
+    if (!values.some((value) => canonicalJson(value) === canonicalJson(reusable))) values.push(reusable);
+    output.set(url, values);
+  };
   for (const row of rows) {
     let value: Partial<CanonicalRgCandidateResearchOutcome>;
     try {
@@ -1592,12 +1829,156 @@ function knownInapplicableDocumentsForIntent(
         || !/^[a-f0-9]{64}$/.test(value.documentFingerprint)) continue;
       const reusable = { documentFingerprint: value.documentFingerprint,
         verificationOperationId: value.verificationOperationId,
-        outcomeClass: value.outcomeClass as "wrong_authority" | "wrong_scope" | "wrong_period" };
-      output.set(candidateUrl, reusable);
-      output.set(sourceUrl, reusable);
+        outcomeClass: value.outcomeClass as "wrong_authority" | "wrong_scope" | "wrong_period",
+        reuseIdentity: "legacy_matching_discovery_scope" as const, authorityClass: null };
+      add(candidateUrl, reusable);
+      add(sourceUrl, reusable);
     } catch { /* malformed historical event remains unusable */ }
   }
+  const proofRows = db.prepare(`SELECT work_item_id, operation_id, event_type, event_json, event_hash FROM canonical_rg_execution_events
+    WHERE run_id = ? AND event_type = 'reusable_negative_applicability_proof' ORDER BY rowid`).all(runId) as Array<{
+      work_item_id: string; operation_id: string; event_type: string; event_json: string; event_hash: string;
+    }>;
+  const expectedContext = negativeApplicabilityContext(intent);
+  const expectedContextFingerprint = digest(expectedContext);
+  for (const row of proofRows) {
+    let value: CanonicalRgReusableNegativeApplicabilityProof;
+    try {
+      value = JSON.parse(row.event_json) as CanonicalRgReusableNegativeApplicabilityProof;
+      if (row.event_hash !== digest({ runId, workItemId: row.work_item_id, operationId: row.operation_id,
+        eventType: row.event_type, event: value })
+        || !validReusableNegativeApplicabilityProof(value, runId)
+        || value.verificationOperationId !== row.operation_id
+        || !reusableNegativeApplicabilityLineageValid(value)) {
+        throw new Error("rg_reusable_negative_applicability_proof_integrity_invalid");
+      }
+    } catch {
+      throw new Error("rg_reusable_negative_applicability_proof_integrity_invalid");
+    }
+    if (value.applicabilityContextFingerprint !== expectedContextFingerprint
+      || canonicalJson(value.applicabilityContext) !== canonicalJson(expectedContext)) continue;
+    if (value.proofBasis.kind === "publisher_origin_binding_not_established"
+      && intent.publicScope[value.proofBasis.applicableScopeDimension]
+        !== value.proofBasis.applicableScopeIdentityCode) continue;
+    const authorityClass = value.proofBasis.kind === "publisher_origin_binding_not_established"
+      ? value.proofBasis.authorityClass : null;
+    const reusable = { documentFingerprint: value.documentFingerprint,
+      verificationOperationId: value.verificationOperationId, outcomeClass: value.outcomeClass,
+      reuseIdentity: "typed_claim_independent_applicability_proof" as const, authorityClass };
+    add(value.candidateUrl, reusable);
+    add(value.sourceUrl, reusable);
+  }
   return output;
+}
+
+function reusableNegativeApplicabilityLineageValid(
+  proof: CanonicalRgReusableNegativeApplicabilityProof,
+): boolean {
+  const row = db.prepare(`SELECT work_item_id, operation_id, event_type, event_json, event_hash
+    FROM canonical_rg_execution_events WHERE run_id = ? AND operation_id = ?
+    AND event_type = 'candidate_research_outcome' ORDER BY rowid LIMIT 1`)
+    .get(proof.runId, proof.verificationOperationId) as {
+      work_item_id: string; operation_id: string; event_type: string; event_json: string; event_hash: string;
+    } | undefined;
+  if (!row) return false;
+  try {
+    const outcome = JSON.parse(row.event_json) as CanonicalRgCandidateResearchOutcome;
+    if (row.event_hash !== digest({ runId: proof.runId, workItemId: row.work_item_id,
+      operationId: row.operation_id, eventType: row.event_type, event: outcome })
+      || outcome.schemaVersion !== "canonical_rg_candidate_research_outcome_v2"
+      || outcome.verificationOperationId !== proof.verificationOperationId
+      || outcome.outcomeClass !== proof.outcomeClass
+      || outcome.documentFingerprint !== proof.documentFingerprint
+      || outcome.candidateUrl !== proof.candidateUrl || outcome.sourceUrl !== proof.sourceUrl
+      || outcome.applicabilityReuse !== "typed_negative_applicability_proof_required") return false;
+  } catch { return false; }
+  const operation = operationFromDb(proof.runId, proof.verificationOperationId)
+    ?? supersededOperationFromHistory(proof.runId, proof.verificationOperationId);
+  return Boolean(operation && operation.kind === "independent_verification" && operation.state === "completed"
+    && operation.candidateId !== null);
+}
+
+function supersededOperationFromHistory(runId: string, operationId: string): CanonicalRgOperation | null {
+  const rows = db.prepare(`SELECT work_item_id, operation_id, event_type, event_json, event_hash
+    FROM canonical_rg_execution_events WHERE run_id = ? AND operation_id = ?
+    AND event_type = 'superseded_plan_snapshot' ORDER BY rowid DESC`).all(runId, operationId) as Array<{
+      work_item_id: string; operation_id: string; event_type: string; event_json: string; event_hash: string;
+    }>;
+  for (const row of rows) {
+    try {
+      const event = JSON.parse(row.event_json) as { operation?: CanonicalRgOperation };
+      if (row.event_hash !== digest(event) || event.operation?.operationId !== operationId) continue;
+      return event.operation;
+    } catch { /* malformed snapshots do not establish lineage */ }
+  }
+  return null;
+}
+
+function knownInapplicableCandidate(
+  history: Map<string, ReusableCandidateInapplicability[]>,
+  candidate: CanonicalRgDiscoveryCandidate,
+): ReusableCandidateInapplicability | null {
+  const values = history.get(candidate.url) ?? [];
+  return values.find((value) => value.authorityClass === null || value.authorityClass === candidate.claimedAuthority) ?? null;
+}
+
+function validReusableNegativeApplicabilityProof(
+  value: CanonicalRgReusableNegativeApplicabilityProof,
+  runId: string,
+): boolean {
+  if (!value || value.schemaVersion !== "canonical_rg_reusable_negative_applicability_proof_v1"
+    || value.runId !== runId || !isSafeId(value.proofId)
+    || !isSafeId(value.verificationOperationId) || !/^[a-f0-9]{64}$/.test(value.documentFingerprint)
+    || value.reusePermission !== "retrieval_exclusion_for_exact_applicability_question_only"
+    || value.semanticReuse !== "prohibited" || value.analyticalCompletionEffect !== "none"
+    || value.applicabilityContext.productionScopeVersion !== CANONICAL_PRODUCTION_APPLICABILITY_SCOPE_VERSION
+    || value.applicabilityContext.countryCode !== CANONICAL_PRODUCTION_COUNTRY_CODE
+    || value.applicabilityContextFingerprint !== digest(value.applicabilityContext)) return false;
+  const allowedDimensions = new Set(["processor", "processorProgram", "network", "region", "jurisdiction"]);
+  if (!value.applicabilityContext.exactPublicDimensions
+    || Object.entries(value.applicabilityContext.exactPublicDimensions).some(([key, item]) =>
+      !allowedDimensions.has(key) || !isSafeCode(item))
+    || typeof value.applicabilityContext.asOf !== "string" || !validNullableDay(value.applicabilityContext.asOf)
+    || (value.applicabilityContext.statementPeriod !== null
+      && (typeof value.applicabilityContext.statementPeriod?.start !== "string"
+        || typeof value.applicabilityContext.statementPeriod?.end !== "string"
+        || !validNullableDay(value.applicabilityContext.statementPeriod.start)
+        || !validNullableDay(value.applicabilityContext.statementPeriod.end)))) return false;
+  let candidateUrl: string;
+  let sourceUrl: string;
+  try {
+    candidateUrl = normalizeSafeHttpsUrl(value.candidateUrl);
+    sourceUrl = normalizeSafeHttpsUrl(value.sourceUrl);
+  } catch { return false; }
+  if (candidateUrl !== value.candidateUrl || sourceUrl !== value.sourceUrl
+    || new URL(sourceUrl).origin !== value.sourceOrigin) return false;
+  const { proofId, ...withoutId } = value;
+  if (proofId !== `rg-negative-applicability-${digest(withoutId).slice(0, 32)}`) return false;
+  if (value.outcomeClass === "wrong_scope" && value.granularity === "document"
+    && value.proofLocatorId && value.proofBasis.kind === "document_scope_mismatch") {
+    return isSafeId(value.proofLocatorId) && isSafeCode(value.proofBasis.requiredScopeValue)
+      && isSafeCode(value.proofBasis.observedScopeValue)
+      && value.proofBasis.requiredScopeValue !== value.proofBasis.observedScopeValue
+      && expectedScopeValue(value.applicabilityContext, value.proofBasis.scopeDimension)
+        === value.proofBasis.requiredScopeValue;
+  }
+  if (value.outcomeClass === "wrong_period" && value.granularity === "document"
+    && value.proofLocatorId && value.proofBasis.kind === "document_period_mismatch") {
+    return isSafeId(value.proofLocatorId) && value.proofBasis.requiredAsOf === value.applicabilityContext.asOf
+      && validNullableDay(value.proofBasis.effectiveFrom) && validNullableDay(value.proofBasis.effectiveTo)
+      && (value.proofBasis.effectiveFrom !== null || value.proofBasis.effectiveTo !== null)
+      && !periodApplicable(value.proofBasis.requiredAsOf,
+        value.proofBasis.effectiveFrom, value.proofBasis.effectiveTo);
+  }
+  return value.outcomeClass === "wrong_authority" && value.granularity === "source_origin"
+    && value.proofLocatorId === null && value.proofBasis.kind === "publisher_origin_binding_not_established"
+    && value.proofBasis.publisherOriginBindingCatalogVersion === RG_PUBLISHER_ORIGIN_BINDING_CATALOG_VERSION
+    && value.proofBasis.publisherOriginBindingCatalogHash === RG_PUBLISHER_ORIGIN_BINDING_CATALOG_HASH
+    && ["official_network_publication", "processor_publication"].includes(value.proofBasis.authorityClass)
+    && ["processor", "processorProgram", "acquirer", "isoReseller", "network"]
+      .includes(value.proofBasis.applicableScopeDimension)
+    && value.proofBasis.applicableScopeIdentityCode === value.proofBasis.publisherIdentityCode
+    && isSafeCode(value.proofBasis.publisherIdentityCode);
 }
 
 function publisherIdentityApplicable(publisherIdentityCode: string, publicScope: Record<string, string>,

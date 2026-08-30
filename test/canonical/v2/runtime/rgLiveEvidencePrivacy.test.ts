@@ -141,7 +141,7 @@ describe("production approved-AI packet admission", () => {
       sentBodies.push(body);
       expect(body.store).toBe(false);
       const schemaName = ((body.text as { format?: { name?: string } })?.format?.name);
-      const output = schemaName === "rg_claim_verification_v1"
+      const output = schemaName === "rg_claim_verification_v1_1"
         ? { verification: { accepted: true } } : { investigation: { accepted: true } };
       return new Response(JSON.stringify({ id: `resp-approved-ai-${schemaName}`, model: "gpt-5.2",
         output_text: JSON.stringify(output), usage: { output_tokens: 3 } }), {
@@ -176,6 +176,16 @@ describe("production approved-AI packet admission", () => {
       expect(userInput).toHaveProperty("exactClaimContext.schemaVersion", "canonical_rg_approved_ai_claim_context_v1");
       expect(userInput).not.toHaveProperty("currentRunContext");
     }
+    const verificationBody = sentBodies.find((body) =>
+      ((body.text as { format?: { name?: string } })?.format?.name) === "rg_claim_verification_v1_1")!;
+    expect(verificationBody).toHaveProperty(
+      "text.format.schema.properties.verification.required",
+      expect.arrayContaining(["negativeApplicabilityProof"]),
+    );
+    expect(verificationBody).toHaveProperty(
+      "text.format.schema.properties.verification.properties.negativeApplicabilityProof.anyOf.1.properties.schemaVersion.const",
+      "canonical_rg_verification_negative_applicability_proof_v1",
+    );
   });
 
   it("fails before send when lossless required evidence cannot fit the approved model context budget", async () => {
