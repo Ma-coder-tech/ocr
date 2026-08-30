@@ -12,7 +12,7 @@ import {
   createProductionRgExecutionCapability,
   requireLiveCapabilityBinding,
 } from "../intelligence/providerPreflight.js";
-import { assertApprovedAiOutboundPacketSafe } from "../intelligence/providerPrivacy.js";
+import { assertApprovedAiOutboundPacketSafe, inspectCredentialMaterial } from "../intelligence/providerPrivacy.js";
 import { createNodeDestinationResolutionPort, createNodeHttpsRetrievalPort } from "../intelligence/publicRetrievalAdapters.js";
 import { createPublicDocumentExtractionPort } from "../intelligence/publicDocumentExtraction.js";
 import {
@@ -32,7 +32,7 @@ import type {
   CanonicalRgVerificationJudgment,
   RgEvidencePortReceipt,
 } from "./rgEvidenceExecution.js";
-import { RgEvidenceTransportError } from "./rgEvidenceExecution.js";
+import { RgEvidenceCompletedUnusableError, RgEvidenceTransportError } from "./rgEvidenceExecution.js";
 import { RG_PUBLISHER_ORIGIN_BINDING_CATALOG_HASH } from "./rgPublisherOriginAuthority.js";
 import type { CanonicalRgReconciliationCapability } from "./rgOperationReconciliationTypes.js";
 
@@ -113,13 +113,13 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
         providerCode: searchPort.providerCode, providerRequestId: null, calls: 1, tokens, retrievalBytes: 0 } };
     },
     async retrieve({ intent, candidate, maximumBytes }, onSend) {
-      onSend();
       const resolved = await destinationPort.resolve(candidate.candidateId, candidate.url);
       const permit = createDestinationPermit({ candidateId: candidate.candidateId, rawUrl: candidate.url,
         resolvedAddresses: resolved.addresses, permitId: resolved.permitId, nowMs: binding.clock.nowMs(), ttlMs: 30_000 });
       const documentId = `rg-document-${digest({ candidateId: candidate.candidateId, url: candidate.url }).slice(0, 24)}`;
       let streamedBytes = 0;
       const controller = new AbortController();
+      onSend();
       const response = await retrievalPort.retrieve({ reservationId: `${documentId}:document`, questionId: intent.atomicClaimId,
         candidateId: candidate.candidateId, documentId, permit, maximumBytes, httpsOnly: true, logicalAttempt: 1,
         signal: controller.signal,
@@ -133,19 +133,35 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
         retrievalEligibility: "eligible" as const, authorityAdmissionRef: null, authorityPublicationFamilyCode: null };
       const retrievalIssues = validateRetrievalResponse({ candidate: provisionalCandidate, documentId, permit, response,
         nowMs: binding.clock.nowMs(), maximumBytes, observedStreamedBytes: streamedBytes });
+      const retrievalReceipt = rgRetrievalReceipt(audit, documentId, response.streamedByteLength);
       if (response.status !== "retrieved" || !response.content || !response.mimeType || retrievalIssues.length > 0
         || validateContentSignature(response.mimeType, response.content).length > 0) {
-        response.content?.fill(0); throw new Error(retrievalIssues[0] ?? "rg_retrieval_not_usable");
+        const signatureIssues = response.content && response.mimeType
+          ? validateContentSignature(response.mimeType, response.content) : [];
+        response.content?.fill(0);
+        throw new RgEvidenceCompletedUnusableError(retrievalIssues[0] ?? signatureIssues[0]
+          ?? (response.status === "inaccessible" ? "rg_retrieval_http_response_inaccessible"
+            : response.status === "safety_blocked" ? "rg_retrieval_response_safety_blocked" : "rg_retrieval_not_usable"),
+        retrievalReceipt);
       }
       const fingerprint = createHash("sha256").update(response.content).digest("hex");
-      const extraction = await extractionPort.extract({ questionId: intent.atomicClaimId, candidateId: candidate.candidateId,
-        documentId, mimeType: response.mimeType, content: response.content, maximumOutputBytes: 262_144,
-        expectedDocumentFingerprint: fingerprint });
-      response.content.fill(0);
+      let extraction: Awaited<ReturnType<typeof extractionPort.extract>>;
+      try {
+        extraction = await extractionPort.extract({ questionId: intent.atomicClaimId, candidateId: candidate.candidateId,
+          documentId, mimeType: response.mimeType, content: response.content, maximumOutputBytes: 262_144,
+          expectedDocumentFingerprint: fingerprint });
+      } catch (error) {
+        throw new RgEvidenceCompletedUnusableError(
+          safeReason(error) === "rg_provider_unavailable" ? "rg_document_extraction_failed" : safeReason(error),
+          retrievalReceipt);
+      } finally {
+        response.content.fill(0);
+      }
       const validated = validateExtractionResponse({ extraction, questionId: intent.atomicClaimId,
         candidateId: candidate.candidateId, documentId, documentFingerprint: fingerprint, maximumOutputBytes: 262_144 });
       if (extraction.state !== "retrieved_extracted" || validated.issues.length > 0 || validated.locators.length === 0) {
-        throw new Error(validated.issues[0] ?? "rg_document_extraction_unusable");
+        throw new RgEvidenceCompletedUnusableError(validated.issues[0] ?? "rg_document_extraction_unusable",
+          retrievalReceipt);
       }
       const document: CanonicalRgRetrievedDocument = {
         candidateId: candidate.candidateId, requestedUrl: candidate.url, finalUrl: permit.normalizedUrl,
@@ -155,8 +171,13 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
           page: locator.page, sectionCode: locator.sectionCode, lineStart: locator.lineStart, lineEnd: locator.lineEnd,
           textExcerpt: locator.text.slice(0, 4096) })),
       };
-      return { value: document, receipt: { providerCode: "node_https_pinned", providerRequestId: null,
-        calls: 1, tokens: 0, retrievalBytes: response.streamedByteLength } };
+      const documentCredentialInspection = inspectCredentialMaterial(document);
+      if (!documentCredentialInspection.valid) {
+        throw new RgEvidenceCompletedUnusableError(
+          `rg_retrieved_document_credential_material_forbidden:${documentCredentialInspection.reasonCodes[0]}`,
+          retrievalReceipt);
+      }
+      return { value: document, receipt: retrievalReceipt };
     },
     async investigate(input, onSend) {
       const bodyInput = {
@@ -271,14 +292,14 @@ async function sendStructured(
     input: [{ role: "system", content: [{ type: "input_text", text: system }] },
       { role: "user", content: [{ type: "input_text", text: JSON.stringify(input) }] }],
     text: { format: { type: "json_schema", name: schemaName, strict: true, schema } } });
-  assertApprovedAiOutboundPacketSafe({ provider: "openai_responses_api", url: APPROVED_OPENAI_ENDPOINT,
-    method: "POST", headerNames: ["Authorization", "Content-Type"], body });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
   let sent = false;
   let providerRequestId: string | null = null;
   const localRequestId = `provider-request-${randomUUID()}`;
   try {
+    assertApprovedAiOutboundPacketSafe({ provider: "openai_responses_api", url: APPROVED_OPENAI_ENDPOINT,
+      method: "POST", headerNames: ["Authorization", "Content-Type"], body });
     onSend(); sent = true;
     const response = await fetch(APPROVED_OPENAI_ENDPOINT, { method: "POST", headers: {
       Authorization: `Bearer ${binding.openAiApiKey}`, "Content-Type": "application/json" }, body, signal: controller.signal });
@@ -305,15 +326,17 @@ async function sendStructured(
         response, envelope, disposition: "completed" }) } };
   } catch (error) {
     if (error instanceof RgEvidenceTransportError) throw error;
+    const reasonCode = safeReason(error);
     throw new RgEvidenceTransportError(sent ? (controller.signal.aborted ? "timed_out" : "after_send") : "before_send",
-      safeReason(error), sent ? { providerCode: "openai_responses_api", providerRequestId,
+      reasonCode, sent ? { providerCode: "openai_responses_api", providerRequestId,
         calls: 1, tokens: null, retrievalBytes: 0, providerDiagnostics: {
           schemaVersion: "canonical_rg_provider_diagnostics_v1", responseDisposition: "indeterminate_after_send",
           httpStatus: null, localRequestId, providerRequestId, providerResponseId: null,
           requestedModelIdentifier: binding.model, returnedModelIdentifier: null,
           providerErrorType: null, providerErrorCode: null, providerErrorParam: null,
           usageState: "unknown_possible_billable", outputTokens: null, providerRequestCount: null, usageCostUsd: null,
-        } } : null);
+        } } : { providerCode: "openai_responses_api", providerRequestId: null,
+        calls: 0, tokens: 0, retrievalBytes: 0, providerDiagnostics: null });
   } finally { clearTimeout(timeout); }
 }
 
@@ -475,6 +498,17 @@ function rgSearchReceipt(receipt: ProviderOperationReceiptV1): RgEvidencePortRec
       providerRequestCount: receipt.providerRequestCount,
       usageCostUsd: receipt.usageCostUsd,
     },
+  };
+}
+
+function rgRetrievalReceipt(audit: ProviderOperationAuditLog, operationId: string, retrievalBytes: number): RgEvidencePortReceipt {
+  const receipt = audit.snapshot().find((item) => item.operationId === operationId);
+  return {
+    providerCode: receipt?.providerCode ?? "node_https_pinned",
+    providerRequestId: receipt?.providerRequestId ?? null,
+    calls: receipt?.actualSendCount ?? 1,
+    tokens: 0,
+    retrievalBytes,
   };
 }
 

@@ -435,6 +435,59 @@ describe("production durable claim-bound RG evidence execution", () => {
     dbModule = indeterminateSetup.db;
   }, 30_000);
 
+  it("persists a received-but-unusable retrieval as deterministic failure without a reconciliation barrier", async () => {
+    const setup = await runWithOneWorkItem();
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const beforeTruth = setup.run.canonicalTruthHash;
+    const beforeFinancial = setup.run.financialFoundationHash;
+    let retrievalSends = 0;
+    ports.retrieve = async (_input, onSend) => {
+      calls.push("retrieve-unusable");
+      onSend();
+      retrievalSends += 1;
+      throw new setup.executor.RgEvidenceCompletedUnusableError("retrieval_html_signature_mismatch", {
+        providerCode: "node_https_pinned", providerRequestId: null, calls: 1, tokens: 0, retrievalBytes: 761,
+      });
+    };
+
+    const first = await setup.executor.executeDurableCanonicalRgEvidence({
+      runId: setup.run.runId, ports, workerId: "completed-unusable-worker-one",
+    });
+    const afterFirst = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const retrieval = afterFirst.rgOperations.find((operation) => operation.kind === "public_retrieval")!;
+
+    expect(first).toMatchObject({ workItemsCompletedWithEvidence: 0, workItemsCompletedUnresolved: 1,
+      workItemsDegraded: 0, canonicalTruthPreserved: true });
+    expect(calls).toEqual(["search", "retrieve-unusable"]);
+    expect(retrieval).toMatchObject({ state: "completed", receipt: {
+      sendState: "sent", completionState: "completed", providerCode: "node_https_pinned", calls: 1,
+      tokens: 0, retrievalBytes: 761, reasonCode: "retrieval_html_signature_mismatch",
+    }, result: { schemaVersion: "canonical_rg_completed_unusable_result_v1",
+      outcome: "completed_unusable", reasonCode: "retrieval_html_signature_mismatch" } });
+    expect(afterFirst.rgWorkItems[0]).toMatchObject({ executionState: "completed_unresolved",
+      stopReason: "rg_no_candidate_passed_dynamic_authority_and_exact_support",
+      resourceConsumption: { providerCalls: 2, searchCalls: 1, retrievalBytes: 761, aiCalls: 0 } });
+    expect(afterFirst.rgWorkItems[0]!.retryDecisions).toContainEqual(expect.objectContaining({
+      decision: "no_retry", reasonCode: "completed_unusable_public_retrieval_no_retry",
+    }));
+    expect(afterFirst.rgOperations.some((operation) => operation.state === "indeterminate_after_send")).toBe(false);
+    expect(afterFirst.canonicalTruthHash).toBe(beforeTruth);
+    expect(afterFirst.financialFoundationHash).toBe(beforeFinancial);
+    expect(afterFirst.result!.artifacts.rh).toEqual(setup.run.artifacts.rh);
+
+    const second = await setup.executor.executeDurableCanonicalRgEvidence({
+      runId: setup.run.runId, ports, workerId: "completed-unusable-worker-two",
+    });
+    expect(second.workItemsCompletedUnresolved).toBe(1);
+    expect(retrievalSends).toBe(1);
+    expect(calls).toEqual(["search", "retrieve-unusable"]);
+    expect(setup.store.getPersistedAnalysisRun(setup.run.runId)!.rgOperations).toHaveLength(2);
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    expect(controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId }).lifecycle)
+      .not.toBe("indeterminate_reconciliation_required");
+  }, 30_000);
+
   it("records convergence-required and deterministic post-convergence lifecycle states without executing a second provider pass", async () => {
     const setup = await runWithOneWorkItem("economic_category");
     const calls: string[] = [];

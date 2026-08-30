@@ -234,6 +234,19 @@ export class RgEvidenceTransportError extends Error {
   }
 }
 
+export type CanonicalRgCompletedUnusableResult = {
+  schemaVersion: "canonical_rg_completed_unusable_result_v1";
+  outcome: "completed_unusable";
+  reasonCode: string;
+};
+
+/** A side-effect-free retrieval result was received, but cannot be used as evidence. */
+export class RgEvidenceCompletedUnusableError extends Error {
+  constructor(reasonCode: string, public readonly receipt: RgEvidencePortReceipt) {
+    super(reasonCode);
+  }
+}
+
 export type CanonicalRgEvidenceExecutionResult = {
   schemaVersion: typeof RG_EVIDENCE_EXECUTION_SCHEMA_VERSION;
   runId: string;
@@ -655,8 +668,9 @@ async function runExternalOperation<T>(input: {
       executionGrantId: input.executionGrant?.grantId ?? null, workItemId: input.workItem.workItemId,
       kind: input.kind, candidateId: input.candidateId, attempt, inputHash }).slice(0, 32)}`;
     const existing = operationFromDb(input.runId, operationId);
-    if (existing?.state === "completed") return { state: "completed",
-      value: replayableCompletedOperationResult(existing), operation: existing };
+    if (existing?.state === "completed") return isCompletedUnusableResult(existing.result)
+      ? { state: "failed", value: null, operation: existing }
+      : { state: "completed", value: replayableCompletedOperationResult(existing), operation: existing };
     if (existing?.state === "provider_rejected") return { state: "failed", value: null, operation: existing };
     if (existing?.state === "failed_before_send") {
       if (attempt < MAX_BEFORE_SEND_ATTEMPTS) continue;
@@ -677,6 +691,22 @@ async function runExternalOperation<T>(input: {
       incrementResource(input.runId, input.workItem.workItemId, input.kind, result.receipt);
       return { state: "completed", value: projected, operation: settled };
     } catch (error) {
+      if (error instanceof RgEvidenceCompletedUnusableError) {
+        if (input.kind !== "public_retrieval" || !sent) {
+          throw new Error("rg_completed_unusable_outcome_invalid");
+        }
+        const reason = safeReason(error);
+        const completedUnusable: CanonicalRgCompletedUnusableResult = {
+          schemaVersion: "canonical_rg_completed_unusable_result_v1",
+          outcome: "completed_unusable",
+          reasonCode: reason,
+        };
+        const settled = settleOperation(input.runId, operation, "completed", completedUnusable, error.receipt, reason);
+        incrementResource(input.runId, input.workItem.workItemId, input.kind, error.receipt);
+        appendRetryDecision(input.runId, input.workItem.workItemId, operation.operationId,
+          "no_retry", "completed_unusable_public_retrieval_no_retry");
+        return { state: "failed", value: null, operation: settled };
+      }
       const providerRejected = error instanceof RgEvidenceTransportError && error.transportState === "provider_rejected";
       const afterSend = !providerRejected && (sent || (error instanceof RgEvidenceTransportError && error.transportState !== "before_send"));
       const reason = safeReason(error);
@@ -700,6 +730,14 @@ async function runExternalOperation<T>(input: {
     }
   }
   throw new Error("rg_operation_retry_state_invalid");
+}
+
+function isCompletedUnusableResult(value: unknown): value is CanonicalRgCompletedUnusableResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Record<string, unknown>;
+  return result.schemaVersion === "canonical_rg_completed_unusable_result_v1"
+    && result.outcome === "completed_unusable" && typeof result.reasonCode === "string"
+    && /^[a-z][a-z0-9_:.-]{0,191}$/.test(result.reasonCode);
 }
 
 function replayableCompletedOperationResult(operation: CanonicalRgOperation): unknown {
