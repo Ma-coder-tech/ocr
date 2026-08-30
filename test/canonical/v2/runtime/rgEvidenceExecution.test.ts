@@ -408,9 +408,48 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(result).toMatchObject({ workItemsCompletedWithEvidence: 0, workItemsCompletedUnresolved: 1,
       canonicalTruthHashAfter: before });
     expect(persisted.rgWorkItems[0]).toMatchObject({ executionState: "completed_unresolved",
-      stopReason: "rg_no_candidate_passed_dynamic_authority_and_exact_support", verifiedEvidenceRefs: [] });
+      stopReason: "rg_search_batch_completed_exact_semantic_support_insufficient", verifiedEvidenceRefs: [] });
+    expect(persisted.rgExecutionEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventType: "candidate_research_outcome", event: expect.objectContaining({
+        outcomeClass: "exact_semantic_support_insufficient", applicabilityReuse: "claim_specific_no_cross_facet_semantic_reuse",
+        exactAtomicClaimSupport: false, analyticalCompletionEffect: "none",
+      }) }),
+    ]));
     expect(persisted.result?.artifacts.rd).toEqual(setup.run.artifacts.rd);
     expect(persisted.result?.artifacts.rh).toEqual(setup.run.artifacts.rh);
+  }, 30_000);
+
+  it("preserves every proven public discovery dimension while leaving missing scope explicitly unknown", async () => {
+    const setup = await runWithOneWorkItem();
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const admission = persisted.rgClaimAdmissions[0]!;
+    const base = persisted.rgWorkItems[0]!;
+    const scoped = { ...base, knowledgeQuery: { ...base.knowledgeQuery, scope: { ...base.knowledgeQuery.scope,
+      processor: "fiserv_first_data", processorProgram: "north_america_frontend", network: "visa",
+      region: "us", jurisdiction: "us" } } };
+    const intent = setup.executor.compileCanonicalRgSearchIntent(setup.run.runId,
+      persisted.result!.artifacts.rgWorkLedger!.planHash, scoped, admission);
+
+    expect(intent.schemaVersion).toBe("canonical_rg_search_intent_v1_2");
+    expect(intent.discoveryScope).toMatchObject({ processorFamily: "fiserv_first_data",
+      processorProgram: "north_america_frontend", exactPublicDimensions: {
+        processor: "fiserv_first_data", processorProgram: "north_america_frontend", network: "visa",
+        region: "us", jurisdiction: "us",
+      }, unknownPublicDimensions: [] });
+    expect(intent.queryTerms).toEqual(expect.arrayContaining([
+      "fiserv first data processor family", "north america frontend processor program", "visa network",
+      "us region", "us jurisdiction",
+    ]));
+    expect(intent.queryText).not.toContain(admission.opaqueSubjectCode);
+    expect(intent.queryText).not.toContain(base.knowledgeQuery.scope.accountRef!);
+
+    const defaultIntent = setup.executor.compileCanonicalRgSearchIntent(setup.run.runId,
+      persisted.result!.artifacts.rgWorkLedger!.planHash, base, admission);
+    expect(defaultIntent.discoveryScope).toMatchObject({ processorFamily: "fiserv_first_data", processorProgram: null });
+    expect(defaultIntent.discoveryScope.unknownPublicDimensions).toEqual(expect.arrayContaining([
+      "processorProgram", "network", "region", "jurisdiction",
+    ]));
+    expect(defaultIntent.queryText).not.toMatch(/north america|visa network|us region|us jurisdiction|united states/i);
   }, 30_000);
 
   it("keeps source authority distinct from semantic support", async () => {
@@ -430,6 +469,42 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(persisted.rgWorkItems[0]).toMatchObject({ executionState: "completed_unresolved", verifiedEvidenceRefs: [] });
     expect(verification.result).toMatchObject({ sourceAuthorityStatus: "unverified",
       semanticSupportStatus: "supported", exactAtomicClaimSupport: true });
+  }, 30_000);
+
+  it("never admits exact support with wrong geography, processor-program scope, or period", async () => {
+    const cases = [
+      { name: "geography", scopeStatus: "wrong_scope" as const, periodStatus: "applicable" as const,
+        limitationCode: "document_geography_not_applicable", outcomeClass: "wrong_scope" },
+      { name: "processor program", scopeStatus: "wrong_scope" as const, periodStatus: "applicable" as const,
+        limitationCode: "document_processor_program_not_applicable", outcomeClass: "wrong_scope" },
+      { name: "period", scopeStatus: "applicable" as const, periodStatus: "wrong_period" as const,
+        limitationCode: "document_period_not_applicable", outcomeClass: "wrong_period" },
+    ];
+    for (const scenario of cases) {
+      const setup = await runWithOneWorkItem();
+      const ports = successfulPorts([]);
+      const verify = ports.verify;
+      ports.verify = async (input, onSend) => {
+        const result = await verify(input, onSend);
+        return { ...result, value: { ...result.value, scopeStatus: scenario.scopeStatus,
+          periodStatus: scenario.periodStatus, limitationCodes: [scenario.limitationCode] } };
+      };
+      const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+      const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
+      const after = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+      expect(result.workItemsCompletedWithEvidence, scenario.name).toBe(0);
+      expect(after.externalEvidenceRegistry, scenario.name).toHaveLength(0);
+      expect(after.rgWorkItems[0], scenario.name).toMatchObject({ executionState: "completed_unresolved",
+        verifiedEvidenceRefs: [] });
+      expect(after.rgExecutionEvents, scenario.name).toEqual(expect.arrayContaining([
+        expect.objectContaining({ eventType: "candidate_research_outcome", event: expect.objectContaining({
+          outcomeClass: scenario.outcomeClass, admittedEvidenceId: null, analyticalCompletionEffect: "none",
+        }) }),
+      ]));
+      expect(after.canonicalTruthHash, scenario.name).toBe(before.canonicalTruthHash);
+      expect(after.financialFoundationHash, scenario.name).toBe(before.financialFoundationHash);
+    }
   }, 30_000);
 
   it("durably records bounded before-send retry and never retries an indeterminate after-send operation", async () => {
@@ -683,6 +758,168 @@ describe("production durable claim-bound RG evidence execution", () => {
     await expect(setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports }))
       .rejects.toThrow("rg_evidence_regenerated_or_readjudicated_plan_execution_disabled");
     expect(calls).toEqual(["search-no-candidates"]);
+  }, 30_000);
+
+  it("records a fully processed insufficient candidate batch as unresolved progress rather than operational degradation or completion", async () => {
+    const setup = await runWithOneWorkItem();
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const search = ports.search;
+    ports.search = async (input, onSend) => {
+      const result = await search(input, onSend);
+      return { ...result, value: [result.value[0]!, { ...result.value[0]!,
+        candidateId: `${result.value[0]!.candidateId}-second`, url: `${result.value[0]!.url}-second` }] };
+    };
+    const verify = ports.verify;
+    ports.verify = async (input, onSend) => {
+      const result = await verify(input, onSend);
+      return { ...result, value: { ...result.value, semanticSupportStatus: "partial" as const,
+        exactAtomicClaimSupport: false } };
+    };
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+    const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    const state = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+    expect(result).toMatchObject({ workItemsCompletedUnresolved: 1, workItemsDegraded: 0,
+      workItemsCompletedWithEvidence: 0, canonicalTruthPreserved: true });
+    expect(persisted.rgWorkItems[0]).toMatchObject({ executionState: "completed_unresolved",
+      stopReason: "rg_search_batch_completed_exact_semantic_support_insufficient", verifiedEvidenceRefs: [] });
+    expect(persisted.rgOperations).toHaveLength(7);
+    expect(persisted.rgOperations.every((operation) => operation.state === "completed")).toBe(true);
+    expect(persisted.rgExecutionEvents.filter((event) => event.eventType === "candidate_research_outcome")).toHaveLength(2);
+    expect(state).toMatchObject({ lifecycle: "continuation_ready_provider_execution_authorized",
+      continuationReadyAtomicClaimIds: [persisted.rgClaimAdmissions[0]!.atomicClaimId] });
+    expect(state.decisions[0]).toMatchObject({ disposition: "justified_refinement",
+      nextOperationDelta: { kind: "locator_subsection_refinement",
+        requiredGap: "official_document_insufficient_locator_or_subsection" } });
+    expect(state.decisions[0]!.disposition).not.toBe("safely_unresolved");
+    expect(persisted.canonicalTruthHash).toBe(before.canonicalTruthHash);
+    expect(persisted.financialFoundationHash).toBe(before.financialFoundationHash);
+    expect(persisted.result!.artifacts.rh).toEqual(before.result!.artifacts.rh);
+  }, 30_000);
+
+  it("durably excludes a verified wrong-scope document for matching discovery scope without reusing semantic support across facets", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "rg-applicability-restart-"));
+    temporaryDirectories.push(directory);
+    process.env.FEECLEAR_DB_PATH = path.join(directory, "runtime.sqlite");
+    const setup = await runWithOneWorkItem("collector");
+    const sharedUrl = "https://merchants.fiserv.com/official-but-wrong-scope";
+    const firstCalls: string[] = [];
+    const firstPorts = successfulPorts(firstCalls);
+    const firstSearch = firstPorts.search;
+    firstPorts.search = async (input, onSend) => {
+      const result = await firstSearch(input, onSend);
+      return { ...result, value: [{ ...result.value[0]!, url: sharedUrl }] };
+    };
+    const firstVerify = firstPorts.verify;
+    firstPorts.verify = async (input, onSend) => {
+      const result = await firstVerify(input, onSend);
+      return { ...result, value: { ...result.value, scopeStatus: "wrong_scope" as const,
+        semanticSupportStatus: "unsupported" as const, exactAtomicClaimSupport: false,
+        limitationCodes: ["document_geography_not_applicable"] } };
+    };
+    const foundationBefore = setup.store.getPersistedAnalysisRun(setup.run.runId)!.financialFoundationHash;
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports: firstPorts });
+    const afterFirst = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const firstOutcome = afterFirst.rgExecutionEvents.find((event) => event.eventType === "candidate_research_outcome")!;
+    expect(firstOutcome.event).toMatchObject({ outcomeClass: "wrong_scope",
+      applicabilityReuse: "exclude_document_for_matching_discovery_scope", semanticSupportStatus: "unsupported",
+      exactAtomicClaimSupport: false, admittedEvidenceId: null, analyticalCompletionEffect: "none" });
+
+    const firstAdmission = afterFirst.rgClaimAdmissions[0]!;
+    const firstWork = afterFirst.rgWorkItems[0]!;
+    const relatedClaimId = `atomic-claim-${createHash("sha256").update("related-billing-intermediary").digest("hex")}`;
+    const relatedAdmission: CanonicalRgClaimAdmission = { ...structuredClone(firstAdmission), atomicClaimId: relatedClaimId,
+      facet: "billing_intermediary", opaqueSubjectCode: `${firstAdmission.opaqueSubjectCode}_billing_intermediary`,
+      decisionBasis: { ...structuredClone(firstAdmission.decisionBasis), atomicFacet: "billing_intermediary" },
+      expectedKnowledgeValueConstraint: { kind: "role", controlDimension: "billing_intermediary" },
+      evidenceObjective: "Resolve only the billing intermediary facet for the same exact subject and scope." };
+    const relatedWork: CanonicalRgWorkItem = { ...structuredClone(firstWork),
+      workItemId: `rg-work-${createHash("sha256").update("related-billing-intermediary-work").digest("hex")}`,
+      atomicClaimId: relatedClaimId, state: "planned", executionState: "planned_for_durable_execution",
+      evidenceObjective: relatedAdmission.evidenceObjective,
+      expectedKnowledgeValueConstraint: { kind: "role", controlDimension: "billing_intermediary" },
+      continuationContract: null, executionAuthorization: null, reservation: null,
+      progress: { state: "not_started", operationsAttempted: 0, evidenceItemsObserved: 0 },
+      extensionDecisions: [], retryDecisions: [],
+      resourceConsumption: { providerCalls: 0, searchCalls: 0, retrievalBytes: 0, aiCalls: 0, tokens: 0 },
+      stopReason: null, verifiedEvidenceRefs: [] };
+    installSyntheticPlan(setup, afterFirst.result!.artifacts.rgWorkLedger!, "matching-scope-related-facet-plan",
+      [relatedAdmission], [relatedWork]);
+    setup.db.db.close();
+
+    vi.resetModules();
+    const [reloadedExecutor, reloadedStore, reloadedDb] = await Promise.all([
+      import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js"),
+      import("../../../../src/canonical/v2/runtime/analysisRunStore.js"),
+      import("../../../../src/db.js"),
+    ]);
+    dbModule = reloadedDb;
+    const replayCalls: string[] = [];
+    const replayPorts = successfulPorts(replayCalls);
+    const replaySearch = replayPorts.search;
+    replayPorts.search = async (input, onSend) => {
+      const result = await replaySearch(input, onSend);
+      return { ...result, value: [{ ...result.value[0]!, url: sharedUrl }] };
+    };
+    await reloadedExecutor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports: replayPorts });
+    const afterRestart = reloadedStore.getPersistedAnalysisRun(setup.run.runId)!;
+
+    expect(replayCalls).toEqual(["search"]);
+    expect(afterRestart.rgWorkItems[0]).toMatchObject({ atomicClaimId: relatedClaimId,
+      executionState: "completed_unresolved", stopReason: "rg_search_batch_completed_wrong_scope",
+      verifiedEvidenceRefs: [] });
+    expect(afterRestart.rgExecutionEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventType: "candidate_retrieval_skipped_known_inapplicable", event: expect.objectContaining({
+        outcomeClass: "wrong_scope", semanticReuse: "prohibited", analyticalCompletionEffect: "none",
+      }) }),
+    ]));
+    expect(afterRestart.externalEvidenceRegistry).toHaveLength(0);
+    expect(afterRestart.financialFoundationHash).toBe(foundationBefore);
+    expect(afterRestart.result!.artifacts.rh).toEqual(setup.run.artifacts.rh);
+  }, 30_000);
+
+  it("fails closed before another provider send when durable candidate applicability history is corrupt", async () => {
+    const setup = await runWithOneWorkItem("collector");
+    const ports = successfulPorts([]);
+    const verify = ports.verify;
+    ports.verify = async (input, onSend) => {
+      const result = await verify(input, onSend);
+      return { ...result, value: { ...result.value, scopeStatus: "wrong_scope" as const,
+        semanticSupportStatus: "unsupported" as const, exactAtomicClaimSupport: false } };
+    };
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
+    const afterFirst = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const firstAdmission = afterFirst.rgClaimAdmissions[0]!;
+    const firstWork = afterFirst.rgWorkItems[0]!;
+    const nextClaimId = `atomic-claim-${createHash("sha256").update("corrupt-history-related-claim").digest("hex")}`;
+    const nextAdmission = { ...structuredClone(firstAdmission), atomicClaimId: nextClaimId };
+    const nextWork = { ...structuredClone(firstWork),
+      workItemId: `rg-work-${createHash("sha256").update("corrupt-history-related-work").digest("hex")}`,
+      atomicClaimId: nextClaimId, state: "planned" as const, executionState: "planned_for_durable_execution" as const,
+      reservation: null, progress: { state: "not_started" as const, operationsAttempted: 0, evidenceItemsObserved: 0 },
+      extensionDecisions: [], retryDecisions: [],
+      resourceConsumption: { providerCalls: 0, searchCalls: 0, retrievalBytes: 0, aiCalls: 0, tokens: 0 },
+      stopReason: null, verifiedEvidenceRefs: [] };
+    installSyntheticPlan(setup, afterFirst.result!.artifacts.rgWorkLedger!, "corrupt-applicability-history-plan",
+      [nextAdmission], [nextWork]);
+    setup.db.db.exec("DROP TRIGGER canonical_rg_execution_events_no_update");
+    setup.db.db.prepare(`UPDATE canonical_rg_execution_events SET event_json = json_set(event_json, '$.sourceUrl', ?)
+      WHERE run_id = ? AND event_type = 'candidate_research_outcome'`)
+      .run("https://merchants.fiserv.com/corrupted-history", setup.run.runId);
+    const calls: string[] = [];
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+    await expect(setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId,
+      ports: successfulPorts(calls) })).rejects.toThrow("rg_candidate_research_outcome_integrity_invalid");
+    const after = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(calls).toEqual([]);
+    expect(after.canonicalTruthHash).toBe(before.canonicalTruthHash);
+    expect(after.financialFoundationHash).toBe(before.financialFoundationHash);
+    expect(after.externalEvidenceRegistry).toEqual(before.externalEvidenceRegistry);
   }, 30_000);
 
   it("admits a grant-required justified refinement only for locally bound authority with a concrete period gap and changed objective", async () => {
@@ -1105,6 +1342,31 @@ describe("production durable claim-bound RG evidence execution", () => {
       stopReason: "production_rg_credentials_unavailable" });
     expect(persisted.rgOperations).toEqual([]);
     expect(persisted.result?.artifacts.rh).toEqual(setup.run.artifacts.rh);
+  }, 30_000);
+
+  it("reserves operational degradation for an actual provider rejection instead of recasting it as insufficient support", async () => {
+    const setup = await runWithOneWorkItem();
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    ports.investigate = async (_input, onSend) => {
+      calls.push("investigate-rejected"); onSend();
+      throw new setup.executor.RgEvidenceTransportError("provider_rejected", "synthetic_investigation_provider_rejected");
+    };
+
+    const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports });
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    const state = controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+    expect(result).toMatchObject({ workItemsDegraded: 1, workItemsCompletedUnresolved: 0,
+      workItemsCompletedWithEvidence: 0, canonicalTruthPreserved: true });
+    expect(persisted.rgWorkItems[0]).toMatchObject({ executionState: "degraded_provider_unavailable",
+      stopReason: "synthetic_investigation_provider_rejected" });
+    expect(state).toMatchObject({ lifecycle: "operational_degradation_blocks_judgment",
+      decisions: [expect.objectContaining({ disposition: "operationally_degraded_retry_eligible",
+        degradation: expect.objectContaining({ subtype: "provider_rejection",
+          continuationPermission: "bounded_retry_eligible" }) })] });
+    expect(persisted.externalEvidenceRegistry).toHaveLength(0);
   }, 30_000);
 
   it("stops remaining generation-zero work at an operational ceiling without analytical completion", async () => {

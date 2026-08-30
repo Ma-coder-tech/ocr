@@ -9,6 +9,7 @@ import {
   validatePublicDocumentLocatorTextDerivation,
 } from "../intelligence/publicDocumentTextNormalization.js";
 import { normalizeSafeHttpsUrl } from "../intelligence/retrievalSafety.js";
+import { providerSafeScope } from "../intelligence/providerPrivacy.js";
 import { getPersistedAnalysisRun, type PersistedAnalysisRunRecord } from "./analysisRunStore.js";
 import type {
   CanonicalAdaptiveOperationalPolicy,
@@ -32,14 +33,14 @@ import {
   type CanonicalRgWorkItem,
 } from "./rgWorkLedger.js";
 
-export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1_2" as const;
+export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1_3" as const;
 
 const MAX_CANDIDATES_PER_WORK_ITEM = 2;
 const MAX_BEFORE_SEND_ATTEMPTS = 2;
 const WORK_RESERVATION_MS = 5 * 60_000;
 
 export type CanonicalRgSearchIntent = {
-  schemaVersion: "canonical_rg_search_intent_v1_1";
+  schemaVersion: "canonical_rg_search_intent_v1_2";
   intentId: string;
   runId: string;
   planHash: string;
@@ -49,6 +50,13 @@ export type CanonicalRgSearchIntent = {
   claimType: CanonicalRgWorkItem["knowledgeQuery"]["claimType"];
   publicSubjectConcept: string;
   publicScope: Record<string, string>;
+  discoveryScope: {
+    processorFamily: string | null;
+    processorProgram: string | null;
+    exactPublicDimensions: Record<string, string>;
+    unknownPublicDimensions: string[];
+    applicabilityFingerprint: string;
+  };
   asOf: string;
   statementPeriod: CanonicalRgClaimAdmission["statementPeriod"];
   requiredSourceAuthorities: KnowledgeSourceAuthority[];
@@ -58,7 +66,7 @@ export type CanonicalRgSearchIntent = {
   privacy: {
     status: "validated_public_concepts_only";
     forbiddenPrivateValuesObserved: 0;
-    compiler: "deterministic_claim_lineage_v1";
+    compiler: "deterministic_claim_lineage_v2";
   };
   continuation: null | {
     executionGrantId: string;
@@ -68,6 +76,39 @@ export type CanonicalRgSearchIntent = {
     excludedDocumentFingerprints: string[];
     publicRefinementTerms: string[];
   };
+};
+
+type CanonicalRgCandidateResearchOutcome = {
+  schemaVersion: "canonical_rg_candidate_research_outcome_v1";
+  runId: string;
+  planHash: string;
+  workItemId: string;
+  atomicClaimId: string;
+  facet: CanonicalRgClaimAdmission["facet"];
+  intentId: string;
+  discoveryApplicabilityFingerprint: string;
+  candidateId: string;
+  candidateUrl: string;
+  sourceUrl: string;
+  documentFingerprint: string;
+  verificationOperationId: string;
+  outcomeClass:
+    | "exact_support_admitted"
+    | "wrong_authority"
+    | "wrong_scope"
+    | "wrong_period"
+    | "exact_semantic_support_insufficient"
+    | "verification_binding_invalid";
+  sourceAuthorityStatus: CanonicalRgVerificationJudgment["sourceAuthorityStatus"];
+  scopeStatus: CanonicalRgVerificationJudgment["scopeStatus"];
+  periodStatus: CanonicalRgVerificationJudgment["periodStatus"];
+  semanticSupportStatus: CanonicalRgVerificationJudgment["semanticSupportStatus"];
+  exactAtomicClaimSupport: boolean;
+  applicabilityReuse:
+    | "exclude_document_for_matching_discovery_scope"
+    | "claim_specific_no_cross_facet_semantic_reuse";
+  admittedEvidenceId: string | null;
+  analyticalCompletionEffect: "none";
 };
 
 export type CanonicalRgDiscoveryCandidate = {
@@ -443,6 +484,7 @@ async function executeWorkItem(input: {
       safeReason(error), [], input.workerId);
     return { state: "degraded", evidence: [] };
   }
+  const knownInapplicableDocuments = knownInapplicableDocumentsForIntent(input.runId, intent);
   const search = await runExternalOperation({ ...input, kind: "public_search", candidateId: null,
     providerCode: "public_search", operationInput: { intent, maximumCandidates: MAX_CANDIDATES_PER_WORK_ITEM },
     projectResult: sanitizeSearchResult,
@@ -456,9 +498,26 @@ async function executeWorkItem(input: {
 
   const evidence: CanonicalRgVerifiedEvidence[] = [];
   const documentAdmissionFailures: string[] = [];
+  const candidateOutcomes: CanonicalRgCandidateResearchOutcome["outcomeClass"][] = [];
   let investigationAttempted = false;
   for (const [index, candidate] of candidates.entries()) {
     if (index > 0) appendExtensionDecision(input.runId, input.workItem.workItemId, "extended", "prior_candidate_did_not_produce_verified_support");
+    const priorInapplicable = knownInapplicableDocuments.get(candidate.url);
+    if (priorInapplicable) {
+      candidateOutcomes.push(priorInapplicable.outcomeClass);
+      appendEvent(input.runId, input.workItem.workItemId, null, "candidate_retrieval_skipped_known_inapplicable", {
+        schemaVersion: "canonical_rg_candidate_retrieval_skip_v1",
+        candidateId: candidate.candidateId,
+        sourceUrl: candidate.url,
+        documentFingerprint: priorInapplicable.documentFingerprint,
+        discoveryApplicabilityFingerprint: intent.discoveryScope.applicabilityFingerprint,
+        priorVerificationOperationId: priorInapplicable.verificationOperationId,
+        outcomeClass: priorInapplicable.outcomeClass,
+        semanticReuse: "prohibited",
+        analyticalCompletionEffect: "none",
+      });
+      continue;
+    }
     const retrieval = await runExternalOperation({ ...input, kind: "public_retrieval", candidateId: candidate.candidateId,
       providerCode: "independent_https_retrieval", operationInput: { intentId: intent.intentId, candidate },
       projectResult: sanitizeRetrievedDocument,
@@ -469,8 +528,9 @@ async function executeWorkItem(input: {
       }
       if (isCompletedUnusableResult(retrieval.operation.result)) {
         documentAdmissionFailures.push(retrieval.operation.result.reasonCode);
+        continue;
       }
-      continue;
+      return finishFailedOperation(input, retrieval.operation);
     }
     const documentAdmission = admitCanonicalRgRetrievedDocument(
       retrieval.value as CanonicalRgRetrievedDocument, candidate);
@@ -498,7 +558,7 @@ async function executeWorkItem(input: {
       if (investigation.operation.state === "indeterminate_after_send" || operationStoppedByCircuitBreaker(investigation.operation)) {
         return finishFailedOperation(input, investigation.operation);
       }
-      continue;
+      return finishFailedOperation(input, investigation.operation);
     }
     const investigated = validateInvestigatedCandidate(investigation.value as CanonicalRgInvestigatedCandidate,
       input.workItem, input.admission, candidate, document);
@@ -522,7 +582,7 @@ async function executeWorkItem(input: {
       if (verification.operation.state === "indeterminate_after_send" || operationStoppedByCircuitBreaker(verification.operation)) {
         return finishFailedOperation(input, verification.operation);
       }
-      continue;
+      return finishFailedOperation(input, verification.operation);
     }
     const verified = validateVerification({ runId: input.runId, planHash: input.planHash, intent,
       workItem: input.workItem, admission: input.admission, candidate, document, frozenCandidate,
@@ -531,6 +591,12 @@ async function executeWorkItem(input: {
       attachVerifiedEvidence(input.runId, verification.operation, verified);
       evidence.push(verified);
     }
+    const candidateOutcome = canonicalCandidateResearchOutcome({ runId: input.runId, planHash: input.planHash,
+      workItem: input.workItem, admission: input.admission, intent, candidate, document, frozenCandidate,
+      verificationOperationId: verification.operation.operationId,
+      judgment: verification.value as CanonicalRgVerificationJudgment, verifiedEvidence: verified });
+    appendCandidateResearchOutcome(input.runId, candidateOutcome);
+    candidateOutcomes.push(candidateOutcome.outcomeClass);
     if (verified) break;
   }
   if (evidence.length > 0) {
@@ -539,18 +605,12 @@ async function executeWorkItem(input: {
     appendExtensionDecision(input.runId, input.workItem.workItemId, "stopped", "exact_claim_support_verified_early_completion");
     return { state: "verified", evidence };
   }
-  if (candidates.length >= MAX_CANDIDATES_PER_WORK_ITEM) {
-    terminalizeWork(input.runId, input.workItem, "degraded_emergency_circuit_breaker", "degraded",
-      !investigationAttempted && documentAdmissionFailures.length > 0
-        ? exactDocumentAdmissionStopReason(documentAdmissionFailures, true)
-        : "rg_emergency_candidate_ceiling_reached_with_claim_unresolved", [], input.workerId);
-    appendExtensionDecision(input.runId, input.workItem.workItemId, "stopped", "emergency_candidate_ceiling_not_completeness");
-    return { state: "degraded", evidence: [] };
-  }
   terminalizeWork(input.runId, input.workItem, "completed_unresolved", "unresolved",
     !investigationAttempted && documentAdmissionFailures.length > 0
-      ? exactDocumentAdmissionStopReason(documentAdmissionFailures, false)
-      : "rg_no_candidate_passed_dynamic_authority_and_exact_support", [], input.workerId);
+      ? exactDocumentAdmissionStopReason(documentAdmissionFailures)
+      : exactNoSupportStopReason(candidateOutcomes), [], input.workerId);
+  appendExtensionDecision(input.runId, input.workItem.workItemId, "stopped",
+    "settled_search_batch_without_exact_support_not_analytical_completion");
   return { state: "unresolved", evidence: [] };
 }
 
@@ -599,16 +659,37 @@ export function compileCanonicalRgSearchIntent(
   const publicScope = Object.fromEntries(Object.entries(workItem.knowledgeQuery.scope)
     .filter(([key, value]) => key !== "tenantRef" && key !== "accountRef" && typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,95}$/.test(value))
     .map(([key, value]) => [key, String(value)]));
-  const processorConcept = publicScope.processor ?? publicScope.processorProgram ?? publicScope.network ?? "payment processing";
+  const providerSafe = providerSafeScope(workItem.knowledgeQuery.scope);
+  const exactPublicDimensions = Object.fromEntries(Object.entries(providerSafe)
+    .filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  const unknownPublicDimensions = Object.entries(providerSafe)
+    .filter(([, value]) => value === null).map(([key]) => key).sort();
+  const discoveryApplicabilityBase = {
+    publicSubjectConcept,
+    claimType: workItem.knowledgeQuery.claimType,
+    exactPublicDimensions,
+    asOf: workItem.knowledgeQuery.asOf,
+    statementPeriod: admission.statementPeriod,
+    requiredSourceAuthorities: [...workItem.requiredSourceAuthorities].sort(),
+  };
+  const discoveryScope = {
+    processorFamily: providerSafe.processor,
+    processorProgram: providerSafe.processorProgram,
+    exactPublicDimensions,
+    unknownPublicDimensions,
+    applicabilityFingerprint: digest(discoveryApplicabilityBase),
+  };
+  const publicScopeTerms = discoveryScopeQueryTerms(exactPublicDimensions);
+  if (publicScopeTerms.length === 0) publicScopeTerms.push("payment processing");
   const facetConcept = publicSearchFacetConcept(workItem.expectedKnowledgeValueConstraint, admission.facet);
   const periodYear = workItem.knowledgeQuery.asOf.slice(0, 4);
   const publicRefinementTerms = refinementTerms(workItem.continuationContract?.kind ?? null);
-  const queryTerms = [processorConcept.replaceAll("_", " "), publicSubjectConcept, facetConcept, "official publication", periodYear,
+  const queryTerms = [...publicScopeTerms, publicSubjectConcept, facetConcept, "official publication", periodYear,
     ...publicRefinementTerms];
-  const queryText = queryTerms.map((term, index) => index === 1 ? `"${term}"` : term).join(" ");
+  const queryText = queryTerms.map((term) => term === publicSubjectConcept ? `"${term}"` : term).join(" ");
   validatePublicQuery(queryText, { runId, planHash, workItem, admission });
   const base = { runId, planHash, workItemId: workItem.workItemId, atomicClaimId: admission.atomicClaimId,
-    facet: admission.facet, claimType: workItem.knowledgeQuery.claimType, publicSubjectConcept, publicScope,
+    facet: admission.facet, claimType: workItem.knowledgeQuery.claimType, publicSubjectConcept, publicScope, discoveryScope,
     asOf: workItem.knowledgeQuery.asOf, statementPeriod: admission.statementPeriod,
     requiredSourceAuthorities: [...workItem.requiredSourceAuthorities].sort(), evidenceObjective: workItem.evidenceObjective,
     queryTerms, queryText,
@@ -621,12 +702,26 @@ export function compileCanonicalRgSearchIntent(
       publicRefinementTerms,
     } : null };
   return {
-    schemaVersion: "canonical_rg_search_intent_v1_1",
+    schemaVersion: "canonical_rg_search_intent_v1_2",
     intentId: `rg-intent-${digest(base).slice(0, 32)}`,
     ...base,
     privacy: { status: "validated_public_concepts_only", forbiddenPrivateValuesObserved: 0,
-      compiler: "deterministic_claim_lineage_v1" },
+      compiler: "deterministic_claim_lineage_v2" },
   };
+}
+
+function discoveryScopeQueryTerms(exactPublicDimensions: Record<string, string>): string[] {
+  const labeled = [
+    ["processor", "processor family"],
+    ["processorProgram", "processor program"],
+    ["network", "network"],
+    ["region", "region"],
+    ["jurisdiction", "jurisdiction"],
+  ] as const;
+  return labeled.flatMap(([dimension, label]) => {
+    const value = exactPublicDimensions[dimension];
+    return value ? [`${value.replaceAll("_", " ")} ${label}`] : [];
+  });
 }
 
 function publicSearchFacetConcept(
@@ -1017,12 +1112,21 @@ function appendDocumentAdmissionDecision(runId: string, workItemId: string, oper
   });
 }
 
-function exactDocumentAdmissionStopReason(reasonCodes: string[], candidateCeiling: boolean): string {
+function exactDocumentAdmissionStopReason(reasonCodes: string[]): string {
   const exact = [...new Set(reasonCodes)].sort()[0] ?? "document_admission_reason_unavailable";
-  const prefix = candidateCeiling
-    ? "rg_emergency_candidate_ceiling_not_completion_after_document_admission_failure:"
-    : "rg_document_admission_failed:";
-  return `${prefix}${exact}`.slice(0, 192);
+  return `rg_document_admission_failed:${exact}`.slice(0, 192);
+}
+
+function exactNoSupportStopReason(outcomes: CanonicalRgCandidateResearchOutcome["outcomeClass"][]): string {
+  const uniqueOutcomes = [...new Set(outcomes)].sort();
+  if (uniqueOutcomes.length === 0) return "rg_search_batch_completed_without_exact_support";
+  if (uniqueOutcomes.every((item) => item === "wrong_scope")) return "rg_search_batch_completed_wrong_scope";
+  if (uniqueOutcomes.every((item) => item === "wrong_period")) return "rg_search_batch_completed_wrong_period";
+  if (uniqueOutcomes.every((item) => item === "wrong_authority")) return "rg_search_batch_completed_wrong_authority";
+  if (uniqueOutcomes.every((item) => item === "exact_semantic_support_insufficient")) {
+    return "rg_search_batch_completed_exact_semantic_support_insufficient";
+  }
+  return `rg_search_batch_completed_without_exact_support:${uniqueOutcomes.join(",")}`.slice(0, 192);
 }
 
 function sanitizeSearchResult(value: CanonicalRgDiscoveryCandidate[]): CanonicalRgDiscoveryCandidate[] {
@@ -1299,6 +1403,134 @@ function validateVerification(input: {
     canonicalFinancialMutationAllowed: false,
     limitations: [...new Set([...frozenCandidate.limitationCodes, ...judgment.limitationCodes])].sort(),
   };
+}
+
+function canonicalCandidateResearchOutcome(input: {
+  runId: string;
+  planHash: string;
+  workItem: CanonicalRgWorkItem;
+  admission: CanonicalRgClaimAdmission;
+  intent: CanonicalRgSearchIntent;
+  candidate: CanonicalRgDiscoveryCandidate;
+  document: CanonicalRgRetrievedDocument;
+  frozenCandidate: CanonicalRgFrozenCandidate;
+  verificationOperationId: string;
+  judgment: CanonicalRgVerificationJudgment;
+  verifiedEvidence: CanonicalRgVerifiedEvidence | null;
+}): CanonicalRgCandidateResearchOutcome {
+  const { judgment, frozenCandidate, document } = input;
+  const locatorIds = new Set(document.locators.map((item) => item.locatorId));
+  const bindingValid = judgment.frozenCandidateHash === frozenCandidate.frozenCandidateHash
+    && judgment.publisherIdentityCode === frozenCandidate.publisherIdentityCode
+    && locatorIds.has(judgment.authorityLocatorId) && locatorIds.has(judgment.supportLocatorId)
+    && validNullableDay(judgment.effectiveFrom) && validNullableDay(judgment.effectiveTo);
+  const originPublisherProof = bindingValid ? dynamicallyBindPublisherOrigin({
+    sourceOrigin: document.sourceOrigin,
+    finalUrl: document.finalUrl,
+    publisherIdentityCode: judgment.publisherIdentityCode,
+    authorityClass: frozenCandidate.sourceAuthorityCandidate,
+    publicScope: input.intent.publicScope,
+  }) : null;
+  const outcomeClass: CanonicalRgCandidateResearchOutcome["outcomeClass"] = input.verifiedEvidence
+    ? "exact_support_admitted"
+    : !bindingValid
+      ? "verification_binding_invalid"
+      : judgment.sourceAuthorityStatus !== "verified" || !originPublisherProof
+        ? "wrong_authority"
+        : judgment.scopeStatus === "wrong_scope"
+          ? "wrong_scope"
+          : judgment.periodStatus === "wrong_period"
+            || (judgment.periodStatus === "applicable"
+              && !periodApplicable(input.workItem.knowledgeQuery.asOf, judgment.effectiveFrom, judgment.effectiveTo))
+            ? "wrong_period"
+            : "exact_semantic_support_insufficient";
+  const applicabilityReuse = ["wrong_authority", "wrong_scope", "wrong_period"].includes(outcomeClass)
+    ? "exclude_document_for_matching_discovery_scope" as const
+    : "claim_specific_no_cross_facet_semantic_reuse" as const;
+  return {
+    schemaVersion: "canonical_rg_candidate_research_outcome_v1",
+    runId: input.runId,
+    planHash: input.planHash,
+    workItemId: input.workItem.workItemId,
+    atomicClaimId: input.admission.atomicClaimId,
+    facet: input.admission.facet,
+    intentId: input.intent.intentId,
+    discoveryApplicabilityFingerprint: input.intent.discoveryScope.applicabilityFingerprint,
+    candidateId: input.candidate.candidateId,
+    candidateUrl: input.candidate.url,
+    sourceUrl: document.finalUrl,
+    documentFingerprint: document.documentFingerprint,
+    verificationOperationId: input.verificationOperationId,
+    outcomeClass,
+    sourceAuthorityStatus: judgment.sourceAuthorityStatus,
+    scopeStatus: judgment.scopeStatus,
+    periodStatus: judgment.periodStatus,
+    semanticSupportStatus: judgment.semanticSupportStatus,
+    exactAtomicClaimSupport: judgment.exactAtomicClaimSupport,
+    applicabilityReuse,
+    admittedEvidenceId: input.verifiedEvidence?.evidenceId ?? null,
+    analyticalCompletionEffect: "none",
+  };
+}
+
+function appendCandidateResearchOutcome(runId: string, outcome: CanonicalRgCandidateResearchOutcome): void {
+  const existing = db.prepare(`SELECT work_item_id, operation_id, event_type, event_json, event_hash FROM canonical_rg_execution_events
+    WHERE run_id = ? AND operation_id = ? AND event_type = 'candidate_research_outcome' ORDER BY rowid LIMIT 1`)
+    .get(runId, outcome.verificationOperationId) as {
+      work_item_id: string; operation_id: string; event_type: string; event_json: string; event_hash: string;
+    } | undefined;
+  if (existing) {
+    const event = JSON.parse(existing.event_json);
+    if (existing.event_hash !== digest({ runId, workItemId: existing.work_item_id,
+      operationId: existing.operation_id, eventType: existing.event_type, event })
+      || canonicalJson(event) !== canonicalJson(outcome)) {
+      throw new Error("rg_candidate_research_outcome_replay_mismatch");
+    }
+    return;
+  }
+  appendEvent(runId, outcome.workItemId, outcome.verificationOperationId, "candidate_research_outcome", outcome);
+}
+
+function knownInapplicableDocumentsForIntent(
+  runId: string,
+  intent: CanonicalRgSearchIntent,
+): Map<string, Pick<CanonicalRgCandidateResearchOutcome, "documentFingerprint" | "verificationOperationId" | "outcomeClass">> {
+  const rows = db.prepare(`SELECT work_item_id, operation_id, event_type, event_json, event_hash FROM canonical_rg_execution_events
+    WHERE run_id = ? AND event_type = 'candidate_research_outcome' ORDER BY rowid`).all(runId) as Array<{
+      work_item_id: string; operation_id: string; event_type: string; event_json: string; event_hash: string;
+    }>;
+  const output = new Map<string, Pick<CanonicalRgCandidateResearchOutcome,
+    "documentFingerprint" | "verificationOperationId" | "outcomeClass">>();
+  for (const row of rows) {
+    let value: Partial<CanonicalRgCandidateResearchOutcome>;
+    try {
+      value = JSON.parse(row.event_json) as Partial<CanonicalRgCandidateResearchOutcome>;
+      if (row.event_hash !== digest({ runId, workItemId: row.work_item_id, operationId: row.operation_id,
+        eventType: row.event_type, event: value })) throw new Error("rg_candidate_research_outcome_integrity_invalid");
+    } catch (error) {
+      if (error instanceof Error && error.message === "rg_candidate_research_outcome_integrity_invalid") throw error;
+      throw new Error("rg_candidate_research_outcome_integrity_invalid");
+    }
+    if (value.schemaVersion !== "canonical_rg_candidate_research_outcome_v1"
+      || value.discoveryApplicabilityFingerprint !== intent.discoveryScope.applicabilityFingerprint
+      || value.applicabilityReuse !== "exclude_document_for_matching_discovery_scope"
+      || typeof value.candidateUrl !== "string" || typeof value.sourceUrl !== "string"
+      || typeof value.documentFingerprint !== "string"
+      || typeof value.verificationOperationId !== "string"
+      || !["wrong_authority", "wrong_scope", "wrong_period"].includes(value.outcomeClass ?? "")) continue;
+    try {
+      const candidateUrl = normalizeSafeHttpsUrl(value.candidateUrl);
+      const sourceUrl = normalizeSafeHttpsUrl(value.sourceUrl);
+      if (candidateUrl !== value.candidateUrl || sourceUrl !== value.sourceUrl
+        || !/^[a-f0-9]{64}$/.test(value.documentFingerprint)) continue;
+      const reusable = { documentFingerprint: value.documentFingerprint,
+        verificationOperationId: value.verificationOperationId,
+        outcomeClass: value.outcomeClass as "wrong_authority" | "wrong_scope" | "wrong_period" };
+      output.set(candidateUrl, reusable);
+      output.set(sourceUrl, reusable);
+    } catch { /* malformed historical event remains unusable */ }
+  }
+  return output;
 }
 
 function publisherIdentityApplicable(publisherIdentityCode: string, publicScope: Record<string, string>,

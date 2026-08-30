@@ -351,7 +351,7 @@ function progressForAttempt(attempt: WorkAttempt): CanonicalContinuationProgress
     if (judgment.periodStatus === "wrong_period" && !periodApplies(attempt.work.knowledgeQuery.asOf,
       judgment.effectiveFrom, judgment.effectiveTo)) output.push({ kind: "correct_authority_wrong_period", ...common,
       remainingGap: "period_applicable_official_publication_required" });
-    else if (judgment.scopeStatus === "wrong_scope" && judgment.semanticSupportStatus === "supported") {
+    else if (judgment.scopeStatus === "wrong_scope") {
       output.push({ kind: "refinable_scope_mismatch", ...common,
         remainingGap: "scope_applicable_official_publication_required" });
     } else if (judgment.scopeStatus === "applicable" && judgment.periodStatus === "applicable" &&
