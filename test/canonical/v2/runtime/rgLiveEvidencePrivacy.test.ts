@@ -37,6 +37,33 @@ describe("production approved-AI packet admission", () => {
     expect(() => assertApprovedAiOutboundPacketSafe(packet)).not.toThrow();
   });
 
+  it("fully inspects legitimate AnalysisRun-shaped packets beyond the former recursion depth", () => {
+    let safeValue: unknown = {
+      textExcerpt: "Password authorization and token requirements are ordinary public documentation.",
+    };
+    for (let index = 0; index < 96; index += 1) safeValue = { [`canonicalLayer${index}`]: safeValue };
+    const safePacket = approvedAiPacket(safeValue);
+
+    expect(inspectApprovedAiOutboundPacket(safePacket)).toEqual({ valid: true, reasonCodes: [] });
+    expect(() => assertApprovedAiOutboundPacketSafe(safePacket)).not.toThrow();
+
+    const secret = `sk-or-v1-${"d".repeat(32)}`;
+    let unsafeValue: unknown = { externalValue: secret };
+    for (let index = 0; index < 96; index += 1) unsafeValue = { [`canonicalLayer${index}`]: unsafeValue };
+    const unsafeInspection = inspectApprovedAiOutboundPacket(approvedAiPacket(unsafeValue));
+    expect(unsafeInspection).toEqual({ valid: false,
+      reasonCodes: ["approved_ai_packet_api_key_material_forbidden"] });
+  });
+
+  it("fails safely on pathological structural fan-out within the packet byte ceiling", () => {
+    const packet = approvedAiPacket({ pathological: Array.from({ length: 300_001 }, () => 0) });
+    expect(Buffer.byteLength(packet.body!, "utf8")).toBeLessThan(2_500_000);
+    expect(inspectApprovedAiOutboundPacket(packet)).toEqual({ valid: false,
+      reasonCodes: ["approved_ai_packet_structure_complexity_invalid"] });
+    expect(() => assertApprovedAiOutboundPacketSafe(packet))
+      .toThrow("approved_ai_payload_blocked:approved_ai_packet_structure_complexity_invalid");
+  });
+
   it("blocks actual credential material with safe type-specific diagnostics", () => {
     const cases = [
       { value: { textExcerpt: `OPENROUTER_API_KEY=sk-or-v1-${"a".repeat(32)}` },
@@ -223,3 +250,14 @@ describe("production approved-AI packet admission", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });
+
+function approvedAiPacket(value: unknown) {
+  return {
+    provider: "openai_responses_api" as const,
+    url: "https://api.openai.com/v1/responses",
+    method: "POST" as const,
+    headerNames: ["Authorization", "Content-Type"],
+    body: JSON.stringify({ input: [{ role: "user", content: [{ type: "input_text", text: JSON.stringify(value) }] }],
+      store: false }),
+  };
+}

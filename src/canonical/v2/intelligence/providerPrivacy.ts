@@ -4,6 +4,10 @@ import { registeredObservationSubjectIdentity } from "./observationSubjectRegist
 
 const FORBIDDEN_KEY = /(?:tenant|account|merchant|filename|file_path|source_path|private_locator|private_evidence|statement_total|transaction_amount|fee_inventory|originatingCanonicalRefs|occurrenceRefs|evidenceRefs|(?:^|_)mid(?:$|_))/i;
 const FORBIDDEN_STRING = /(?:\b(?:mid|merchant\s*(?:id|number)|account\s*(?:id|number))\b|(?:^|[\\/])(?:Users|home|private|tmp)[\\/]|[A-Za-z]:\\|\.pdf\b|\b\d{6,}\b|\$\s*\d)/i;
+const MAX_APPROVED_AI_PACKET_BODY_BYTES = 2_500_000;
+const MAX_CREDENTIAL_INSPECTION_NODES = 300_000;
+const MAX_CREDENTIAL_INSPECTION_DECODED_BYTES = 20_000_000;
+const MAX_CREDENTIAL_NESTED_JSON_DOCUMENTS = 4_096;
 
 export type ProviderPrivacyInspection = { valid: boolean; reasonCodes: string[] };
 
@@ -59,7 +63,9 @@ export function inspectApprovedAiOutboundPacket(packet: ProviderOutboundPacketV1
   try { url = new URL(packet.url); } catch { return { valid: false, reasonCodes: ["approved_ai_packet_url_invalid"] }; }
   if (url.protocol !== "https:" || url.username || url.password || packet.method !== "POST") reasons.push("approved_ai_packet_transport_unsafe");
   if (packet.headerNames.some((name) => !/^[A-Za-z][A-Za-z0-9-]{0,63}$/.test(name))) reasons.push("approved_ai_packet_header_invalid");
-  if (packet.body === null || Buffer.byteLength(packet.body, "utf8") > 2_500_000) reasons.push("approved_ai_packet_body_invalid");
+  if (packet.body === null || Buffer.byteLength(packet.body, "utf8") > MAX_APPROVED_AI_PACKET_BODY_BYTES) {
+    reasons.push("approved_ai_packet_body_invalid");
+  }
   if (packet.body !== null) {
     try {
       const parsed = JSON.parse(packet.body) as unknown;
@@ -127,29 +133,62 @@ const JWT = /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/;
 const PRIVATE_KEY = /-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----/i;
 const CREDENTIAL_ASSIGNMENT = /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|auth[_-]?token|password|passwd|secret[_-]?key|client[_-]?secret)\s*[:=]\s*["']?([^\s,"'}]{6,})/i;
 
-function inspectApprovedAiCredentialMaterial(value: unknown, reasons: string[], key = "", depth = 0): void {
-  if (depth > 16) {
-    reasons.push("approved_ai_packet_structure_depth_invalid");
-    return;
-  }
-  if (typeof value === "string") {
-    for (const candidate of decodedCredentialCandidates(value)) {
-      const reason = credentialMaterialReason(candidate, key);
-      if (reason) reasons.push(reason);
-      if (/^\s*[\[{]/.test(candidate)) {
-        try { inspectApprovedAiCredentialMaterial(JSON.parse(candidate), reasons, key, depth + 1); }
-        catch { /* Public document prose may begin with punctuation. */ }
+function inspectApprovedAiCredentialMaterial(value: unknown, reasons: string[]): void {
+  const pending: Array<{ value: unknown; key: string }> = [{ value, key: "" }];
+  const seenObjects = new WeakSet<object>();
+  const parsedNestedJson = new Set<string>();
+  let cursor = 0;
+  let inspectedNodes = 0;
+  let inspectedDecodedBytes = 0;
+  let nestedJsonDocuments = 0;
+  while (cursor < pending.length) {
+    const current = pending[cursor++]!;
+    inspectedNodes += 1;
+    if (inspectedNodes > MAX_CREDENTIAL_INSPECTION_NODES) {
+      reasons.push("approved_ai_packet_structure_complexity_invalid");
+      return;
+    }
+    if (typeof current.value === "string") {
+      for (const candidate of decodedCredentialCandidates(current.value)) {
+        inspectedDecodedBytes += Buffer.byteLength(candidate, "utf8");
+        if (inspectedDecodedBytes > MAX_CREDENTIAL_INSPECTION_DECODED_BYTES) {
+          reasons.push("approved_ai_packet_decoded_content_budget_invalid");
+          return;
+        }
+        const reason = credentialMaterialReason(candidate, current.key);
+        if (reason) reasons.push(reason);
+        if (/^\s*[\[{]/.test(candidate) && !parsedNestedJson.has(candidate)) {
+          try {
+            const parsed = JSON.parse(candidate) as unknown;
+            parsedNestedJson.add(candidate);
+            nestedJsonDocuments += 1;
+            if (nestedJsonDocuments > MAX_CREDENTIAL_NESTED_JSON_DOCUMENTS) {
+              reasons.push("approved_ai_packet_nested_document_budget_invalid");
+              return;
+            }
+            pending.push({ value: parsed, key: current.key });
+          } catch { /* Public document prose may begin with punctuation. */ }
+        }
+      }
+      continue;
+    }
+    if (!current.value || typeof current.value !== "object") continue;
+    if (seenObjects.has(current.value)) {
+      reasons.push("approved_ai_packet_cyclic_or_aliased_structure_invalid");
+      return;
+    }
+    seenObjects.add(current.value);
+    if (Array.isArray(current.value)) {
+      for (const item of current.value) pending.push({ value: item, key: current.key });
+    } else {
+      for (const [childKey, child] of Object.entries(current.value as Record<string, unknown>)) {
+        pending.push({ value: child, key: normalizedCredentialKey(childKey) });
       }
     }
-    return;
-  }
-  if (Array.isArray(value)) {
-    value.forEach((item) => inspectApprovedAiCredentialMaterial(item, reasons, key, depth + 1));
-    return;
-  }
-  if (value && typeof value === "object") {
-    Object.entries(value as Record<string, unknown>)
-      .forEach(([childKey, child]) => inspectApprovedAiCredentialMaterial(child, reasons, normalizedCredentialKey(childKey), depth + 1));
+    if (pending.length > MAX_CREDENTIAL_INSPECTION_NODES) {
+      reasons.push("approved_ai_packet_structure_complexity_invalid");
+      return;
+    }
   }
 }
 
