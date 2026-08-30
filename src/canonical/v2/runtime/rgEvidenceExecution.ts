@@ -15,6 +15,11 @@ import { dynamicallyBindPublisherOrigin, type CanonicalRgPublisherOriginProof } 
 import { persistedVerifiedEvidenceIntegrityValid } from "./rgEvidenceIntegrity.js";
 export { persistedVerifiedEvidenceIntegrityValid } from "./rgEvidenceIntegrity.js";
 import {
+  compileCanonicalRgApprovedAiClaimContext,
+  type CanonicalRgApprovedAiClaimContext,
+  type CanonicalRgCurrentRunContext,
+} from "./rgApprovedAiContext.js";
+import {
   canonicalRgWorkContractFingerprint,
   type CanonicalRgClaimAdmission,
   type CanonicalRgOperation,
@@ -215,7 +220,7 @@ export type CanonicalRgEvidenceExecutionPorts = {
     expectedValueConstraint: CanonicalRgWorkItem["expectedKnowledgeValueConstraint"];
     candidate: CanonicalRgDiscoveryCandidate;
     document: CanonicalRgRetrievedDocument;
-    currentRunContext: unknown;
+    claimContext: CanonicalRgApprovedAiClaimContext;
   }, onSend: () => void): Promise<RgEvidencePortResult<CanonicalRgInvestigatedCandidate>>;
   verify(input: {
     intent: CanonicalRgSearchIntent;
@@ -224,6 +229,7 @@ export type CanonicalRgEvidenceExecutionPorts = {
     candidate: CanonicalRgDiscoveryCandidate;
     document: CanonicalRgRetrievedDocument;
     frozenCandidate: CanonicalRgFrozenCandidate;
+    claimContext: CanonicalRgApprovedAiClaimContext;
   }, onSend: () => void): Promise<RgEvidencePortResult<CanonicalRgVerificationJudgment>>;
 };
 
@@ -369,7 +375,11 @@ export async function executeDurableCanonicalRgEvidence(input: {
     const reservation = reserveWork(input.runId, latest, workerId);
     if (!reservation) continue;
     const result = await executeWorkItem({ runId: input.runId, planHash: ledger.planHash, workItem: reservation,
-      admission, ports: input.ports, workerId, currentRunContext: persisted.result, executionGrant,
+      admission, ports: input.ports, workerId,
+      currentRunContext: { analysisRun: persisted.result, externalEvidenceRegistry: persisted.externalEvidenceRegistry,
+        activeRgState: { planHash: ledger.planHash, claimAdmissions: persisted.rgClaimAdmissions,
+          workItems: persisted.rgWorkItems, rfBinding: ledger.rfBinding } },
+      executionGrant,
       generationZeroOperationalScope });
     if (result.state === "verified") verifiedEvidence.push(...result.evidence);
     else if (result.state === "unresolved") completedUnresolved += 1;
@@ -406,7 +416,7 @@ async function executeWorkItem(input: {
   admission: CanonicalRgClaimAdmission;
   ports: CanonicalRgEvidenceExecutionPorts;
   workerId: string;
-  currentRunContext: unknown;
+  currentRunContext: CanonicalRgCurrentRunContext;
   executionGrant: CanonicalContinuationExecutionGrant | null;
   generationZeroOperationalScope: GenerationZeroOperationalScope | null;
 }): Promise<{ state: "verified"; evidence: CanonicalRgVerifiedEvidence[] } | { state: "unresolved" | "degraded"; evidence: [] }> {
@@ -416,6 +426,15 @@ async function executeWorkItem(input: {
   } catch (error) {
     terminalizeWork(input.runId, input.workItem, "completed_unresolved", "unresolved", safeReason(error), [], input.workerId);
     return { state: "unresolved", evidence: [] };
+  }
+  let claimContext: CanonicalRgApprovedAiClaimContext;
+  try {
+    claimContext = compileCanonicalRgApprovedAiClaimContext({ currentRunContext: input.currentRunContext,
+      intent, admission: input.admission, expectedValueConstraint: input.workItem.expectedKnowledgeValueConstraint });
+  } catch (error) {
+    terminalizeWork(input.runId, input.workItem, "degraded_emergency_circuit_breaker", "degraded",
+      safeReason(error), [], input.workerId);
+    return { state: "degraded", evidence: [] };
   }
   const search = await runExternalOperation({ ...input, kind: "public_search", candidateId: null,
     providerCode: "public_search", operationInput: { intent, maximumCandidates: MAX_CANDIDATES_PER_WORK_ITEM },
@@ -449,11 +468,12 @@ async function executeWorkItem(input: {
       continue;
     }
     const investigation = await runExternalOperation({ ...input, kind: "investigation", candidateId: candidate.candidateId,
-      providerCode: "approved_ai_investigation", operationInput: { intent, candidate, documentFingerprint: document.documentFingerprint },
+      providerCode: "approved_ai_investigation", operationInput: { intent, candidate,
+        documentFingerprint: document.documentFingerprint, approvedAiContextHash: claimContext.contextHash },
       projectResult: sanitizeInvestigatedCandidate,
       call: (onSend) => input.ports.investigate({ intent, admission: input.admission,
         expectedValueConstraint: input.workItem.expectedKnowledgeValueConstraint, candidate, document,
-        currentRunContext: input.currentRunContext }, onSend) });
+        claimContext }, onSend) });
     if (investigation.state !== "completed") {
       if (investigation.operation.state === "indeterminate_after_send" || operationStoppedByCircuitBreaker(investigation.operation)) {
         return finishFailedOperation(input, investigation.operation);
@@ -472,10 +492,12 @@ async function executeWorkItem(input: {
       ? replayDurableVerificationOperation(input.runId, durableVerification)
       : await runExternalOperation({ ...input, kind: "independent_verification", candidateId: candidate.candidateId,
         providerCode: "approved_ai_independent_verification", operationInput: { intent, candidate,
-          documentFingerprint: document.documentFingerprint, frozenCandidate },
+          documentFingerprint: document.documentFingerprint, frozenCandidate,
+          approvedAiContextHash: claimContext.contextHash },
         projectResult: sanitizeVerificationJudgment,
         call: (onSend) => input.ports.verify({ intent, admission: input.admission,
-          expectedValueConstraint: input.workItem.expectedKnowledgeValueConstraint, candidate, document, frozenCandidate }, onSend) });
+          expectedValueConstraint: input.workItem.expectedKnowledgeValueConstraint, candidate, document, frozenCandidate,
+          claimContext }, onSend) });
     if (verification.state !== "completed") {
       if (verification.operation.state === "indeterminate_after_send" || operationStoppedByCircuitBreaker(verification.operation)) {
         return finishFailedOperation(input, verification.operation);

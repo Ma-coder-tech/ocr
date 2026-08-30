@@ -16,6 +16,7 @@ import type {
   CanonicalRgRetrievedDocument,
   CanonicalRgVerificationJudgment,
 } from "../../../../src/canonical/v2/runtime/rgEvidenceExecution.js";
+import type { CanonicalRgApprovedAiClaimContext } from "../../../../src/canonical/v2/runtime/rgApprovedAiContext.js";
 import type { CanonicalRgClaimAdmission, CanonicalRgWorkItem, CanonicalRgWorkLedger,
 } from "../../../../src/canonical/v2/runtime/rgWorkLedger.js";
 import type {
@@ -45,7 +46,8 @@ describe("production durable claim-bound RG evidence execution", () => {
   it("executes only an admitted persisted work item through a privacy-safe intent and dynamically verified new official source", async () => {
     const setup = await runWithOneWorkItem();
     const calls: string[] = [];
-    const ports = successfulPorts(calls);
+    const claimContexts: CanonicalRgApprovedAiClaimContext[] = [];
+    const ports = successfulPorts(calls, claimContexts);
     const before = setup.run.canonicalTruthHash;
 
     const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports, workerId: "worker-a" });
@@ -56,6 +58,29 @@ describe("production durable claim-bound RG evidence execution", () => {
       workItemsCompletedUnresolved: 0, workItemsDegraded: 0,
       canonicalTruthHashBefore: before, canonicalTruthHashAfter: before, canonicalTruthPreserved: true });
     expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
+    expect(claimContexts).toHaveLength(2);
+    expect(claimContexts[0]).toEqual(claimContexts[1]);
+    expect(claimContexts[0]).toMatchObject({
+      schemaVersion: "canonical_rg_approved_ai_claim_context_v1",
+      authority: "deterministic_exact_claim_projection_of_durable_analysis_run",
+      runBinding: { runId: setup.run.runId, financialFoundationHash: setup.run.financialFoundationHash,
+        canonicalTruthPreserved: true },
+      canonicalLineage: { completeness: "all_required_exact_claim_lineage_present" },
+      safeguards: { exactFacetOnly: true, adjacentClaimInference: "prohibited",
+        financialMutationAllowed: false, evidenceOmissionAllowed: false },
+    });
+    expect(Buffer.byteLength(JSON.stringify(claimContexts[0]), "utf8")).toBeLessThan(50_000);
+    expect(Buffer.byteLength(JSON.stringify(persisted.result), "utf8"))
+      .toBeGreaterThan(Buffer.byteLength(JSON.stringify(claimContexts[0]), "utf8") * 10);
+    expect(claimContexts[0]!.canonicalLineage.requiredCanonicalRefs.every((ref) =>
+      claimContexts[0]!.canonicalLineage.canonicalEntities.some((entity) => entity.identity === ref))).toBe(true);
+    expect(claimContexts[0]!.canonicalLineage.requiredOccurrenceRefs.every((ref) =>
+      claimContexts[0]!.canonicalLineage.sourceOccurrences.some((occurrence) =>
+        (occurrence as { id?: string }).id === ref))).toBe(true);
+    expect(claimContexts[0]!.canonicalLineage.requiredEvidenceRefs.every((ref) =>
+      claimContexts[0]!.canonicalLineage.sourceEvidence.some((evidence) =>
+        (evidence as { id?: string }).id === ref)
+        || claimContexts[0]!.canonicalLineage.currentRunExternalEvidence.some((evidence) => evidence.evidenceId === ref))).toBe(true);
     expect(item).toMatchObject({ state: "terminal", executionState: "completed_verified_evidence",
       reservation: null, progress: { state: "verified_evidence", operationsAttempted: 4, evidenceItemsObserved: 1 },
       stopReason: "rg_verified_claim_scoped_evidence_obtained" });
@@ -86,6 +111,22 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(persisted.canonicalTruthHash).toBe(before);
     expect(persisted.result?.canonicalTruthHash).toBe(before);
     expect(persisted.result?.artifacts.rh).toEqual(setup.run.artifacts.rh);
+
+    const contextCompiler = await import("../../../../src/canonical/v2/runtime/rgApprovedAiContext.js");
+    const exactAdmission = persisted.rgClaimAdmissions[0]!;
+    const exactWork = persisted.rgWorkItems[0]!;
+    const intent = setup.executor.compileCanonicalRgSearchIntent(setup.run.runId,
+      persisted.result!.artifacts.rgWorkLedger!.planHash, exactWork, exactAdmission);
+    const corruptedRun = structuredClone(persisted.result!);
+    corruptedRun.artifacts.rb!.sourceModel.evidence = corruptedRun.artifacts.rb!.sourceModel.evidence
+      .filter((evidence) => !exactAdmission.evidenceRefs.includes(evidence.id));
+    expect(() => contextCompiler.compileCanonicalRgApprovedAiClaimContext({
+      currentRunContext: { analysisRun: corruptedRun, externalEvidenceRegistry: persisted.externalEvidenceRegistry,
+        activeRgState: { planHash: persisted.result!.artifacts.rgWorkLedger!.planHash,
+          claimAdmissions: persisted.rgClaimAdmissions, workItems: persisted.rgWorkItems,
+          rfBinding: persisted.result!.artifacts.rgWorkLedger!.rfBinding } },
+      intent, admission: exactAdmission, expectedValueConstraint: exactWork.expectedKnowledgeValueConstraint,
+    })).toThrow("rg_approved_ai_context_required_lineage_incomplete");
 
     const repeated = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports, workerId: "worker-b" });
     expect(repeated.workItemsCompletedWithEvidence).toBe(1);
@@ -1373,6 +1414,9 @@ describe("production durable claim-bound RG evidence execution", () => {
       statementPeriod: secondPersisted.result!.artifacts.rb!.identity.statementPeriod,
       canonicalRefs: rfDecision.canonicalRefs,
       occurrenceRefs: rfDecision.occurrenceRefs,
+      evidenceRefs: secondPersisted.result!.artifacts.rb!.sourceModel.occurrences
+        .filter((occurrence) => rfDecision.occurrenceRefs.includes(occurrence.id))
+        .map((occurrence) => occurrence.evidenceRef),
       knowledgeQuery: rfDecision.query,
       expectedKnowledgeValueConstraint: { kind: "role" as const, controlDimension: "price_setter" as const },
     };
@@ -1886,7 +1930,7 @@ describe("production durable claim-bound RG evidence execution", () => {
   }
 });
 
-function successfulPorts(calls: string[]): CanonicalRgEvidenceExecutionPorts {
+function successfulPorts(calls: string[], claimContexts?: CanonicalRgApprovedAiClaimContext[]): CanonicalRgEvidenceExecutionPorts {
   return {
     availability: "available", unavailabilityReasonCodes: [],
     async search({ intent }, onSend) {
@@ -1919,6 +1963,8 @@ function successfulPorts(calls: string[]): CanonicalRgEvidenceExecutionPorts {
     },
     async investigate(input, onSend) {
       calls.push("investigate"); onSend();
+      claimContexts?.push(structuredClone(input.claimContext));
+      expect(input.claimContext.exactClaim.admission.atomicClaimId).toBe(input.intent.atomicClaimId);
       const publisher = input.candidate.claimedAuthority === "official_network_publication"
         ? input.intent.publicScope.network
         : input.intent.publicScope.processor ?? input.intent.publicScope.processorProgram
@@ -1963,6 +2009,8 @@ function successfulPorts(calls: string[]): CanonicalRgEvidenceExecutionPorts {
     },
     async verify(input, onSend) {
       calls.push("verify"); onSend();
+      claimContexts?.push(structuredClone(input.claimContext));
+      expect(input.claimContext.exactClaim.admission.atomicClaimId).toBe(input.intent.atomicClaimId);
       expect(input.frozenCandidate).not.toHaveProperty("rationale");
       expect(input.frozenCandidate).not.toHaveProperty("confidence");
       const locatorId = input.document.locators[0]!.locatorId;

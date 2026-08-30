@@ -1,9 +1,12 @@
+import { createHash } from "node:crypto";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   assertApprovedAiOutboundPacketSafe,
   inspectApprovedAiOutboundPacket,
 } from "../../../../src/canonical/v2/intelligence/providerPrivacy.js";
+import { canonicalJson } from "../../../../src/canonical/v2/canonicalJson.js";
 
 const environmentNames = ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "OPENROUTER_SEARCH_MODEL",
   "OPENAI_INTERNAL_ANALYSIS_MODEL"] as const;
@@ -107,11 +110,11 @@ describe("production approved-AI packet admission", () => {
     const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
     const ports = live.createProductionRgEvidencePortsFromEnvironment("approved-ai-privacy-test-run");
     const secret = `sk-or-v1-${"z".repeat(32)}`;
+    const binding = approvedClaimBinding({ externalText: secret });
     let sends = 0;
 
     try {
-      await ports.investigate({ intent: {}, admission: {}, expectedValueConstraint: {}, candidate: {}, document: {},
-        currentRunContext: { externalText: secret } } as never, () => { sends += 1; });
+      await ports.investigate({ ...binding, candidate: {}, document: {} } as never, () => { sends += 1; });
       throw new Error("expected approved AI packet rejection");
     } catch (error) {
       expect(error).toBeInstanceOf(execution.RgEvidenceTransportError);
@@ -132,28 +135,99 @@ describe("production approved-AI packet admission", () => {
     process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";
     process.env.OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2";
     process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = "gpt-5.2";
+    const sentBodies: Array<Record<string, unknown>> = [];
     globalThis.fetch = vi.fn(async (_url, init) => {
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      sentBodies.push(body);
       expect(body.store).toBe(false);
-      return new Response(JSON.stringify({ id: "resp-approved-ai-words", model: "gpt-5.2",
-        output_text: JSON.stringify({ investigation: { accepted: true } }), usage: { output_tokens: 3 } }), {
+      const schemaName = ((body.text as { format?: { name?: string } })?.format?.name);
+      const output = schemaName === "rg_claim_verification_v1"
+        ? { verification: { accepted: true } } : { investigation: { accepted: true } };
+      return new Response(JSON.stringify({ id: `resp-approved-ai-${schemaName}`, model: "gpt-5.2",
+        output_text: JSON.stringify(output), usage: { output_tokens: 3 } }), {
         status: 200, headers: { "Content-Type": "application/json", "x-request-id": "request-approved-ai-words" },
       });
     });
     const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
     const ports = live.createProductionRgEvidencePortsFromEnvironment("approved-ai-public-words-run");
+    const binding = approvedClaimBinding({
+      publicExplanation: "Authorization processing can include a tokenized credential category.",
+    }, "approved-ai-public-words-run");
     let sends = 0;
     const result = await ports.investigate({
-      intent: {}, admission: {}, expectedValueConstraint: {}, candidate: {},
+      ...binding, candidate: {},
       document: { locators: [{ textExcerpt: "Password, authorization, and token policies are public terms." }] },
-      currentRunContext: { publicExplanation: "Authorization processing can include a tokenized credential category." },
+    } as never, () => { sends += 1; });
+    const verification = await ports.verify({ ...binding, candidate: {},
+      document: { locators: [{ textExcerpt: "Password, authorization, and token policies are public terms." }] },
+      frozenCandidate: { frozenCandidateHash: "a".repeat(64) },
     } as never, () => { sends += 1; });
 
-    expect(sends).toBe(1);
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(sends).toBe(2);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     expect(result.value).toEqual({ accepted: true });
+    expect(verification.value).toEqual({ accepted: true });
     expect(result.receipt).toMatchObject({ providerCode: "openai_responses_api_investigation",
       providerRequestId: "request-approved-ai-words", calls: 1, tokens: 3, retrievalBytes: 0 });
+    for (const body of sentBodies) {
+      expect(Buffer.byteLength(JSON.stringify(body), "utf8")).toBeLessThan(300_000);
+      const inputItems = body.input as Array<{ content: Array<{ text: string }> }>;
+      const userInput = JSON.parse(String(inputItems[1]!.content[0]!.text)) as Record<string, unknown>;
+      expect(userInput).toHaveProperty("exactClaimContext.schemaVersion", "canonical_rg_approved_ai_claim_context_v1");
+      expect(userInput).not.toHaveProperty("currentRunContext");
+    }
+  });
+
+  it("fails before send when lossless required evidence cannot fit the approved model context budget", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000000000";
+    process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";
+    process.env.OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2";
+    process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = "gpt-5.2";
+    globalThis.fetch = vi.fn(async () => { throw new Error("fetch_must_not_run"); });
+    const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
+    const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
+    const ports = live.createProductionRgEvidencePortsFromEnvironment("approved-ai-context-budget-run");
+    const binding = approvedClaimBinding({}, "approved-ai-context-budget-run");
+    let sends = 0;
+
+    try {
+      await ports.investigate({ ...binding, candidate: {}, document: {
+        locators: [{ textExcerpt: "x".repeat(320_000) }],
+      } } as never, () => { sends += 1; });
+      throw new Error("expected context budget rejection");
+    } catch (error) {
+      expect(error).toBeInstanceOf(execution.RgEvidenceTransportError);
+      expect(error).toMatchObject({ transportState: "before_send", message: "rg_approved_ai_packet_context_budget_exceeded",
+        receipt: { providerCode: "openai_responses_api", providerRequestId: null, calls: 0, tokens: 0,
+          retrievalBytes: 0, providerDiagnostics: null } });
+    }
+    expect(sends).toBe(0);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("fails before send when the compiled exact-claim context is changed after integrity binding", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000000000";
+    process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";
+    process.env.OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2";
+    process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = "gpt-5.2";
+    globalThis.fetch = vi.fn(async () => { throw new Error("fetch_must_not_run"); });
+    const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
+    const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
+    const ports = live.createProductionRgEvidencePortsFromEnvironment("approved-ai-context-integrity-run");
+    const binding = approvedClaimBinding({}, "approved-ai-context-integrity-run");
+    binding.claimContext.canonicalLineage.sourceIdentity = { substitutedAfterCompilation: true };
+    let sends = 0;
+
+    try {
+      await ports.investigate({ ...binding, candidate: {}, document: {} } as never, () => { sends += 1; });
+      throw new Error("expected context integrity rejection");
+    } catch (error) {
+      expect(error).toBeInstanceOf(execution.RgEvidenceTransportError);
+      expect(error).toMatchObject({ transportState: "before_send", message: "rg_approved_ai_context_integrity_invalid",
+        receipt: { providerRequestId: null, calls: 0, tokens: 0 } });
+    }
+    expect(sends).toBe(0);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it("classifies a completed HTTPS response with unusable content as deterministic, not indeterminate", async () => {
@@ -260,4 +334,34 @@ function approvedAiPacket(value: unknown) {
     body: JSON.stringify({ input: [{ role: "user", content: [{ type: "input_text", text: JSON.stringify(value) }] }],
       store: false }),
   };
+}
+
+function approvedClaimBinding(sourceIdentity: Record<string, unknown>, runId = "approved-ai-privacy-test-run") {
+  const intent = { runId, atomicClaimId: "atomic-claim-approved-ai", facet: "economic_category" };
+  const admission = { atomicClaimId: intent.atomicClaimId, facet: intent.facet };
+  const expectedValueConstraint = { kind: "mapping", sourceCode: "opaque-source-code" };
+  const base = {
+    schemaVersion: "canonical_rg_approved_ai_claim_context_v1",
+    authority: "deterministic_exact_claim_projection_of_durable_analysis_run",
+    runBinding: { runId, sourceFingerprint: "1".repeat(64), policyVersion: "policy-v1",
+      synthesisContractId: "canonical_synthesis_admission_contract_v1_1", financialFoundationHash: "2".repeat(64),
+      semanticHash: "3".repeat(64), canonicalStateHash: "4".repeat(64), semanticRevision: 0,
+      canonicalTruthPreserved: true },
+    exactClaim: { admission, workContract: { workItemId: "work-approved-ai", atomicClaimId: intent.atomicClaimId,
+      requestedOperation: "claim_scoped_public_research", evidenceObjective: "Resolve only the exact claim.",
+      expectedDecisionEffects: [], knowledgeQuery: {}, expectedKnowledgeValueConstraint: expectedValueConstraint,
+      requiredSourceAuthorities: ["processor_publication"], continuationContract: null },
+      unresolvedParentClaims: [] },
+    canonicalLineage: { sourceIdentity, documentIntegrity: {}, canonicalEntities: [], sourceOccurrences: [],
+      sourceEvidence: [], currentRunExternalEvidence: [], requiredCanonicalRefs: [], requiredOccurrenceRefs: [],
+      requiredEvidenceRefs: [], relatedReferenceIds: [], completeness: "all_required_exact_claim_lineage_present" },
+    authorityContext: { rfBinding: {}, requiredSourceAuthorities: ["processor_publication"], statementPeriod: null,
+      scopeFingerprint: "scope-approved-ai", direction: "not_monetary" },
+    adjacentClaimBoundary: [],
+    safeguards: { exactFacetOnly: true, adjacentClaimInference: "prohibited", financialMutationAllowed: false,
+      evidenceOmissionAllowed: false, externalEvidenceAuthority: "current_run_support_only_not_rf_promotion" },
+  };
+  const claimContext = { ...base,
+    contextHash: createHash("sha256").update(canonicalJson(base)).digest("hex") };
+  return { intent, admission, expectedValueConstraint, claimContext };
 }
