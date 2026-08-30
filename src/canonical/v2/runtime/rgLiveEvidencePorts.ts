@@ -162,18 +162,23 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
         response.content.fill(0);
       }
       const validated = validateExtractionResponse({ extraction, questionId: intent.atomicClaimId,
-        candidateId: candidate.candidateId, documentId, documentFingerprint: fingerprint, maximumOutputBytes: 262_144 });
+        candidateId: candidate.candidateId, documentId, documentFingerprint: fingerprint,
+        maximumOutputBytes: 262_144, mimeType: response.mimeType });
       if (extraction.state !== "retrieved_extracted" || validated.issues.length > 0 || validated.locators.length === 0) {
         throw new RgEvidenceCompletedUnusableError(validated.issues[0] ?? "rg_document_extraction_unusable",
           retrievalReceipt);
+      }
+      if (validated.locators.length > 200) {
+        throw new RgEvidenceCompletedUnusableError(
+          "rg_document_admission_locator_collection_limit_exceeded_complete_lineage_required", retrievalReceipt);
       }
       const document: CanonicalRgRetrievedDocument = {
         candidateId: candidate.candidateId, requestedUrl: candidate.url, finalUrl: permit.normalizedUrl,
         sourceOrigin: new URL(permit.normalizedUrl).origin, documentId, documentFingerprint: fingerprint,
         mimeType: response.mimeType, byteLength: response.byteLength, independentlyRetrieved: true,
-        locators: validated.locators.slice(0, 200).map((locator) => ({ locatorId: locator.locatorId,
+        locators: validated.locators.map((locator) => ({ locatorId: locator.locatorId,
           page: locator.page, sectionCode: locator.sectionCode, lineStart: locator.lineStart, lineEnd: locator.lineEnd,
-          textExcerpt: locator.text.slice(0, 4096) })),
+          textExcerpt: locator.text, textDerivation: locator.textDerivation })),
       };
       const documentCredentialInspection = inspectCredentialMaterial(document);
       if (!documentCredentialInspection.valid) {

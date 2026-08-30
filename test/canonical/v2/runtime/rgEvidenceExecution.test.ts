@@ -23,6 +23,8 @@ import type {
   CanonicalRgReconciliationCapability,
   CanonicalRgReconciliationProof,
 } from "../../../../src/canonical/v2/runtime/rgOperationReconciliationTypes.js";
+import { normalizeAndChunkPublicDocumentText } from
+  "../../../../src/canonical/v2/intelligence/publicDocumentTextNormalization.js";
 
 const fixture = path.resolve(process.cwd(), "test/fixtures/pdfs/SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf");
 
@@ -507,8 +509,13 @@ describe("production durable claim-bound RG evidence execution", () => {
     }, result: { schemaVersion: "canonical_rg_completed_unusable_result_v1",
       outcome: "completed_unusable", reasonCode: "retrieval_html_signature_mismatch" } });
     expect(afterFirst.rgWorkItems[0]).toMatchObject({ executionState: "completed_unresolved",
-      stopReason: "rg_no_candidate_passed_dynamic_authority_and_exact_support",
+      stopReason: "rg_document_admission_failed:retrieval_html_signature_mismatch",
       resourceConsumption: { providerCalls: 2, searchCalls: 1, retrievalBytes: 761, aiCalls: 0 } });
+    expect(afterFirst.rgExecutionEvents).toContainEqual(expect.objectContaining({
+      eventType: "document_admission_decision", operationId: retrieval.operationId,
+      event: expect.objectContaining({ state: "rejected", reasonCode: "retrieval_html_signature_mismatch",
+        reconciliationRequired: false, analyticalCompletionEffect: "none" }),
+    }));
     expect(afterFirst.rgWorkItems[0]!.retryDecisions).toContainEqual(expect.objectContaining({
       decision: "no_retry", reasonCode: "completed_unusable_public_retrieval_no_retry",
     }));
@@ -527,6 +534,79 @@ describe("production durable claim-bound RG evidence execution", () => {
     const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
     expect(controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId }).lifecycle)
       .not.toBe("indeterminate_reconciliation_required");
+  }, 30_000);
+
+  it("durably preserves an exact late document-admission rejection instead of hiding it behind candidate failure", async () => {
+    const setup = await runWithOneWorkItem();
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const originalRetrieve = ports.retrieve;
+    ports.retrieve = async (input, onSend) => {
+      const result = await originalRetrieve(input, onSend);
+      result.value.locators[0]!.textExcerpt = "Official publisher\u202e identity";
+      delete result.value.locators[0]!.textDerivation;
+      return result;
+    };
+    const beforeTruth = setup.run.canonicalTruthHash;
+    const beforeFinancial = setup.run.financialFoundationHash;
+
+    const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+      workerId: "late-document-admission-worker" });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const retrieval = persisted.rgOperations.find((operation) => operation.kind === "public_retrieval")!;
+
+    expect(result).toMatchObject({ workItemsCompletedWithEvidence: 0, workItemsCompletedUnresolved: 1,
+      workItemsDegraded: 0, canonicalTruthPreserved: true });
+    expect(calls).toEqual(["search", "retrieve"]);
+    expect(persisted.rgWorkItems[0]).toMatchObject({ executionState: "completed_unresolved",
+      stopReason: "rg_document_admission_failed:rg_document_admission_text_directional_format_character_forbidden" });
+    expect(persisted.rgExecutionEvents).toContainEqual(expect.objectContaining({
+      eventType: "document_admission_decision", operationId: retrieval.operationId,
+      event: expect.objectContaining({ schemaVersion: "canonical_rg_document_admission_decision_v1",
+        state: "rejected", reasonCode: "rg_document_admission_text_directional_format_character_forbidden",
+        documentFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/), reconciliationRequired: false,
+        analyticalCompletionEffect: "none" }),
+    }));
+    expect(persisted.rgOperations.some((operation) => operation.kind === "investigation")).toBe(false);
+    expect(persisted.rgOperations.some((operation) => operation.state === "indeterminate_after_send")).toBe(false);
+    expect(persisted.canonicalTruthHash).toBe(beforeTruth);
+    expect(persisted.financialFoundationHash).toBe(beforeFinancial);
+  }, 30_000);
+
+  it("refuses oversized locator text before bounded persistence without silently truncating it", async () => {
+    const setup = await runWithOneWorkItem();
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const originalRetrieve = ports.retrieve;
+    ports.retrieve = async (input, onSend) => {
+      const result = await originalRetrieve(input, onSend);
+      result.value.locators[0]!.textExcerpt = "a".repeat(4_097);
+      delete result.value.locators[0]!.textDerivation;
+      return result;
+    };
+
+    const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+      workerId: "oversized-locator-worker" });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const retrieval = persisted.rgOperations.find((operation) => operation.kind === "public_retrieval")!;
+
+    expect(result).toMatchObject({ workItemsCompletedUnresolved: 1, workItemsDegraded: 0,
+      canonicalTruthPreserved: true });
+    expect(calls).toEqual(["search", "retrieve"]);
+    expect(retrieval.result).toMatchObject({
+      admissionProjectionReasonCode: "rg_document_admission_locator_text_limit_exceeded_complete_lineage_required",
+      locators: [],
+    });
+    expect(persisted.rgWorkItems[0]).toMatchObject({ executionState: "completed_unresolved",
+      stopReason: "rg_document_admission_failed:rg_document_admission_locator_text_limit_exceeded_complete_lineage_required" });
+    expect(persisted.rgExecutionEvents).toContainEqual(expect.objectContaining({
+      eventType: "document_admission_decision", operationId: retrieval.operationId,
+      event: expect.objectContaining({ state: "rejected",
+        reasonCode: "rg_document_admission_locator_text_limit_exceeded_complete_lineage_required",
+        reconciliationRequired: false, analyticalCompletionEffect: "none" }),
+    }));
+    expect(persisted.rgOperations.some((operation) => operation.kind === "investigation"
+      || operation.state === "indeterminate_after_send")).toBe(false);
   }, 30_000);
 
   it("records convergence-required and deterministic post-convergence lifecycle states without executing a second provider pass", async () => {
@@ -1948,15 +2028,19 @@ function successfulPorts(calls: string[], claimContexts?: CanonicalRgApprovedAiC
     async retrieve({ candidate }, onSend) {
       calls.push("retrieve"); onSend();
       const fingerprint = createHash("sha256").update(candidate.url).digest("hex");
+      const authorityText = normalizedLocator("Official Fiserv publisher identity.", "text/html", 0);
+      const supportText = normalizedLocator("Exact claim-scoped semantic support.", "text/html", 1);
       const document: CanonicalRgRetrievedDocument = {
         candidateId: candidate.candidateId, requestedUrl: candidate.url, finalUrl: candidate.url,
         sourceOrigin: new URL(candidate.url).origin, documentId: `document-${fingerprint.slice(0, 24)}`,
         documentFingerprint: fingerprint, mimeType: "text/html", byteLength: 512, independentlyRetrieved: true,
         locators: [
           { locatorId: `authority-${fingerprint.slice(0, 24)}`, page: null, sectionCode: "publisher_identity",
-            lineStart: 1, lineEnd: 2, textExcerpt: "Official Fiserv publisher identity." },
+            lineStart: 1, lineEnd: 2, textExcerpt: authorityText.text,
+            textDerivation: authorityText.derivation },
           { locatorId: `support-${fingerprint.slice(0, 24)}`, page: null, sectionCode: "claim_support",
-            lineStart: 10, lineEnd: 12, textExcerpt: "Exact claim-scoped semantic support." },
+            lineStart: 10, lineEnd: 12, textExcerpt: supportText.text,
+            textDerivation: supportText.derivation },
         ],
       };
       return { value: document, receipt: receipt("synthetic_independent_retrieval", 1, 512, 0) };
@@ -2024,6 +2108,14 @@ function successfulPorts(calls: string[], claimContexts?: CanonicalRgApprovedAiC
       return { value, receipt: receipt("synthetic_independent_verification", 1, 0, 29) };
     },
   };
+}
+
+function normalizedLocator(text: string, mimeType: string, sourceUnitIndex: number) {
+  const normalized = normalizeAndChunkPublicDocumentText({ text, mimeType, sourceUnitIndex });
+  if (normalized.state !== "normalized" || normalized.chunks.length !== 1) {
+    throw new Error("synthetic_locator_normalization_failed");
+  }
+  return normalized.chunks[0]!;
 }
 
 function receipt(providerCode: string, calls: number, retrievalBytes: number, tokens: number | null) {

@@ -3,6 +3,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { db, nowIso } from "../../../db.js";
 import { canonicalJson } from "../canonicalJson.js";
 import type { CanonicalRgClaimValue, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
+import type { ExtractedLocator } from "../intelligence/intelligenceTypes.js";
+import {
+  normalizeAndChunkPublicDocumentText,
+  validatePublicDocumentLocatorTextDerivation,
+} from "../intelligence/publicDocumentTextNormalization.js";
 import { normalizeSafeHttpsUrl } from "../intelligence/retrievalSafety.js";
 import { getPersistedAnalysisRun, type PersistedAnalysisRunRecord } from "./analysisRunStore.js";
 import type {
@@ -85,6 +90,7 @@ export type CanonicalRgRetrievedDocument = {
   mimeType: string;
   byteLength: number;
   independentlyRetrieved: true;
+  admissionProjectionReasonCode?: string;
   locators: Array<{
     locatorId: string;
     page: number | null;
@@ -92,6 +98,7 @@ export type CanonicalRgRetrievedDocument = {
     lineStart: number;
     lineEnd: number;
     textExcerpt: string;
+    textDerivation?: NonNullable<ExtractedLocator["textDerivation"]>;
   }>;
 };
 
@@ -448,6 +455,8 @@ async function executeWorkItem(input: {
   }
 
   const evidence: CanonicalRgVerifiedEvidence[] = [];
+  const documentAdmissionFailures: string[] = [];
+  let investigationAttempted = false;
   for (const [index, candidate] of candidates.entries()) {
     if (index > 0) appendExtensionDecision(input.runId, input.workItem.workItemId, "extended", "prior_candidate_did_not_produce_verified_support");
     const retrieval = await runExternalOperation({ ...input, kind: "public_retrieval", candidateId: candidate.candidateId,
@@ -458,15 +467,26 @@ async function executeWorkItem(input: {
       if (retrieval.operation.state === "indeterminate_after_send" || operationStoppedByCircuitBreaker(retrieval.operation)) {
         return finishFailedOperation(input, retrieval.operation);
       }
+      if (isCompletedUnusableResult(retrieval.operation.result)) {
+        documentAdmissionFailures.push(retrieval.operation.result.reasonCode);
+      }
       continue;
     }
-    const document = validateRetrievedDocument(retrieval.value as CanonicalRgRetrievedDocument, candidate);
-    if (!document) continue;
+    const documentAdmission = admitCanonicalRgRetrievedDocument(
+      retrieval.value as CanonicalRgRetrievedDocument, candidate);
+    appendDocumentAdmissionDecision(input.runId, input.workItem.workItemId, retrieval.operation.operationId,
+      candidate.candidateId, documentAdmission);
+    if (documentAdmission.state === "rejected") {
+      documentAdmissionFailures.push(documentAdmission.reasonCode);
+      continue;
+    }
+    const document = documentAdmission.document;
     if (intent.continuation?.excludedDocumentFingerprints.includes(document.documentFingerprint)) {
       appendExtensionDecision(input.runId, input.workItem.workItemId, "stopped",
         "continuation_excluded_previously_insufficient_document");
       continue;
     }
+    investigationAttempted = true;
     const investigation = await runExternalOperation({ ...input, kind: "investigation", candidateId: candidate.candidateId,
       providerCode: "approved_ai_investigation", operationInput: { intent, candidate,
         documentFingerprint: document.documentFingerprint, approvedAiContextHash: claimContext.contextHash },
@@ -521,12 +541,16 @@ async function executeWorkItem(input: {
   }
   if (candidates.length >= MAX_CANDIDATES_PER_WORK_ITEM) {
     terminalizeWork(input.runId, input.workItem, "degraded_emergency_circuit_breaker", "degraded",
-      "rg_emergency_candidate_ceiling_reached_with_claim_unresolved", [], input.workerId);
+      !investigationAttempted && documentAdmissionFailures.length > 0
+        ? exactDocumentAdmissionStopReason(documentAdmissionFailures, true)
+        : "rg_emergency_candidate_ceiling_reached_with_claim_unresolved", [], input.workerId);
     appendExtensionDecision(input.runId, input.workItem.workItemId, "stopped", "emergency_candidate_ceiling_not_completeness");
     return { state: "degraded", evidence: [] };
   }
   terminalizeWork(input.runId, input.workItem, "completed_unresolved", "unresolved",
-    "rg_no_candidate_passed_dynamic_authority_and_exact_support", [], input.workerId);
+    !investigationAttempted && documentAdmissionFailures.length > 0
+      ? exactDocumentAdmissionStopReason(documentAdmissionFailures, false)
+      : "rg_no_candidate_passed_dynamic_authority_and_exact_support", [], input.workerId);
   return { state: "unresolved", evidence: [] };
 }
 
@@ -724,6 +748,8 @@ async function runExternalOperation<T>(input: {
           reasonCode: reason,
         };
         const settled = settleOperation(input.runId, operation, "completed", completedUnusable, error.receipt, reason);
+        appendDocumentAdmissionDecision(input.runId, input.workItem.workItemId, operation.operationId,
+          input.candidateId, { state: "rejected", reasonCode: reason, documentFingerprint: null });
         incrementResource(input.runId, input.workItem.workItemId, input.kind, error.receipt);
         appendRetryDecision(input.runId, input.workItem.workItemId, operation.operationId,
           "no_retry", "completed_unusable_public_retrieval_no_retry");
@@ -973,6 +999,32 @@ function appendRetryDecision(runId: string, workItemId: string, operationId: str
   appendEvent(runId, workItemId, operationId, "retry_decision", entry);
 }
 
+function appendDocumentAdmissionDecision(runId: string, workItemId: string, operationId: string,
+  candidateId: string | null, admission: CanonicalRgRetrievedDocumentAdmission): void {
+  appendEvent(runId, workItemId, operationId, "document_admission_decision", {
+    schemaVersion: "canonical_rg_document_admission_decision_v1",
+    state: admission.state,
+    candidateId,
+    documentFingerprint: admission.state === "admitted"
+      ? admission.document.documentFingerprint : admission.documentFingerprint,
+    reasonCode: admission.reasonCode,
+    rawDocumentIdentityAuthority: "immutable_sha256_fingerprint",
+    extractedTextAuthority: "deterministic_derived_locator_text_only",
+    normalizationVersion: "public_document_text_normalization_v1",
+    normalizedLocatorCount: admission.state === "admitted" ? admission.normalizedLocatorCount : 0,
+    analyticalCompletionEffect: "none",
+    reconciliationRequired: false,
+  });
+}
+
+function exactDocumentAdmissionStopReason(reasonCodes: string[], candidateCeiling: boolean): string {
+  const exact = [...new Set(reasonCodes)].sort()[0] ?? "document_admission_reason_unavailable";
+  const prefix = candidateCeiling
+    ? "rg_emergency_candidate_ceiling_not_completion_after_document_admission_failure:"
+    : "rg_document_admission_failed:";
+  return `${prefix}${exact}`.slice(0, 192);
+}
+
 function sanitizeSearchResult(value: CanonicalRgDiscoveryCandidate[]): CanonicalRgDiscoveryCandidate[] {
   return Array.isArray(value) ? value.slice(0, MAX_CANDIDATES_PER_WORK_ITEM).map((item) => ({
     candidateId: item?.candidateId, url: item?.url, title: item?.title, claimedAuthority: item?.claimedAuthority,
@@ -981,15 +1033,38 @@ function sanitizeSearchResult(value: CanonicalRgDiscoveryCandidate[]): Canonical
 }
 
 function sanitizeRetrievedDocument(value: CanonicalRgRetrievedDocument): CanonicalRgRetrievedDocument {
+  const locators = Array.isArray(value?.locators) ? value.locators : [];
+  const projectionReasonCode = locators.length > 200
+    ? "rg_document_admission_locator_collection_limit_exceeded_complete_lineage_required"
+    : locators.some((locator) => typeof locator?.textExcerpt === "string" && locator.textExcerpt.length > 4_096)
+      ? "rg_document_admission_locator_text_limit_exceeded_complete_lineage_required"
+      : locators.some((locator) => locator?.textDerivation && Array.isArray(locator.textDerivation.transformations)
+        && locator.textDerivation.transformations.length > 3)
+        ? "rg_document_admission_locator_derivation_transformations_limit_exceeded"
+        : undefined;
   return {
     candidateId: value?.candidateId, requestedUrl: value?.requestedUrl, finalUrl: value?.finalUrl,
     sourceOrigin: value?.sourceOrigin, documentId: value?.documentId, documentFingerprint: value?.documentFingerprint,
     mimeType: value?.mimeType, byteLength: value?.byteLength, independentlyRetrieved: value?.independentlyRetrieved,
-    locators: Array.isArray(value?.locators) ? value.locators.slice(0, 200).map((locator) => ({
+    admissionProjectionReasonCode: projectionReasonCode,
+    locators: projectionReasonCode ? [] : locators.map((locator) => ({
       locatorId: locator?.locatorId, page: locator?.page, sectionCode: locator?.sectionCode,
       lineStart: locator?.lineStart, lineEnd: locator?.lineEnd,
-      textExcerpt: typeof locator?.textExcerpt === "string" ? locator.textExcerpt.slice(0, 4096) : locator?.textExcerpt,
-    })) : [],
+      textExcerpt: locator?.textExcerpt,
+      textDerivation: locator?.textDerivation ? {
+        schemaVersion: locator.textDerivation.schemaVersion,
+        normalizationVersion: locator.textDerivation.normalizationVersion,
+        extractedTextInputHash: locator.textDerivation.extractedTextInputHash,
+        normalizedFullTextHash: locator.textDerivation.normalizedFullTextHash,
+        locatorTextHash: locator.textDerivation.locatorTextHash,
+        sourceUnitIndex: locator.textDerivation.sourceUnitIndex,
+        chunkIndex: locator.textDerivation.chunkIndex,
+        chunkCount: locator.textDerivation.chunkCount,
+        pdfControlCodePointsReplaced: locator.textDerivation.pdfControlCodePointsReplaced,
+        unicodeWhitespaceRunsCollapsed: locator.textDerivation.unicodeWhitespaceRunsCollapsed,
+        transformations: locator.textDerivation.transformations,
+      } : undefined,
+    })),
   };
 }
 
@@ -1043,27 +1118,104 @@ function validateSearchCandidates(values: CanonicalRgDiscoveryCandidate[], inten
   return output;
 }
 
-function validateRetrievedDocument(document: CanonicalRgRetrievedDocument,
-  candidate: CanonicalRgDiscoveryCandidate): CanonicalRgRetrievedDocument | null {
-  try {
-    const requested = normalizeSafeHttpsUrl(document.requestedUrl);
-    const final = normalizeSafeHttpsUrl(document.finalUrl);
-    if (document.candidateId !== candidate.candidateId || requested !== candidate.url || final !== requested
-      || document.independentlyRetrieved !== true
-      || document.sourceOrigin !== new URL(final).origin || !isSafeId(document.documentId)
-      || !/^[a-f0-9]{64}$/.test(document.documentFingerprint) || !safePublicText(document.mimeType, 100)
-      || !Number.isSafeInteger(document.byteLength) || document.byteLength < 1 || document.byteLength > 5_242_880
-      || !Array.isArray(document.locators) || document.locators.length === 0 || document.locators.length > 200) return null;
-    const locatorIds = new Set<string>();
-    for (const locator of document.locators) {
-      if (!isSafeId(locator.locatorId) || !Number.isSafeInteger(locator.lineStart) || !Number.isSafeInteger(locator.lineEnd)
-        || locator.lineStart < 1 || locator.lineEnd < locator.lineStart || !safePublicText(locator.textExcerpt, 4096)
-        || (locator.page !== null && (!Number.isSafeInteger(locator.page) || locator.page < 1))
-        || locatorIds.has(locator.locatorId)) return null;
-      locatorIds.add(locator.locatorId);
+export type CanonicalRgRetrievedDocumentAdmission = {
+  state: "admitted";
+  reasonCode: "rg_retrieved_document_admitted";
+  document: CanonicalRgRetrievedDocument;
+  normalizedLocatorCount: number;
+} | {
+  state: "rejected";
+  reasonCode: string;
+  documentFingerprint: string | null;
+};
+
+export function admitCanonicalRgRetrievedDocument(document: CanonicalRgRetrievedDocument,
+  candidate: CanonicalRgDiscoveryCandidate): CanonicalRgRetrievedDocumentAdmission {
+  const reject = (reasonCode: string): CanonicalRgRetrievedDocumentAdmission => ({ state: "rejected", reasonCode,
+    documentFingerprint: typeof document?.documentFingerprint === "string" && /^[a-f0-9]{64}$/.test(document.documentFingerprint)
+      ? document.documentFingerprint : null });
+  if (document?.admissionProjectionReasonCode) {
+    return /^[a-z][a-z0-9_]{0,191}$/.test(document.admissionProjectionReasonCode)
+      ? reject(document.admissionProjectionReasonCode)
+      : reject("rg_document_admission_projection_reason_invalid");
+  }
+  let requested: string; let final: string;
+  try { requested = normalizeSafeHttpsUrl(document.requestedUrl); final = normalizeSafeHttpsUrl(document.finalUrl); }
+  catch { return reject("rg_document_admission_https_url_invalid"); }
+  if (document.candidateId !== candidate.candidateId) return reject("rg_document_admission_candidate_identity_mismatch");
+  if (requested !== candidate.url) return reject("rg_document_admission_requested_url_mismatch");
+  if (final !== requested) return reject("rg_document_admission_unapproved_redirect");
+  if (document.independentlyRetrieved !== true) return reject("rg_document_admission_independent_retrieval_unproven");
+  if (document.sourceOrigin !== new URL(final).origin) return reject("rg_document_admission_source_origin_mismatch");
+  if (!isSafeId(document.documentId)) return reject("rg_document_admission_document_identity_invalid");
+  if (!/^[a-f0-9]{64}$/.test(document.documentFingerprint)) return reject("rg_document_admission_fingerprint_invalid");
+  if (!safePublicText(document.mimeType, 100)) return reject("rg_document_admission_mime_type_invalid");
+  if (!Number.isSafeInteger(document.byteLength) || document.byteLength < 1 || document.byteLength > 5_242_880) {
+    return reject("rg_document_admission_byte_length_invalid");
+  }
+  if (!Array.isArray(document.locators) || document.locators.length === 0 || document.locators.length > 200) {
+    return reject("rg_document_admission_locator_collection_invalid");
+  }
+  const locatorIds = new Set<string>();
+  const admittedLocators: CanonicalRgRetrievedDocument["locators"] = [];
+  let normalizedLocatorCount = 0;
+  for (const [sourceUnitIndex, locator] of document.locators.entries()) {
+    if (!isSafeId(locator.locatorId)) return reject("rg_document_admission_locator_identity_invalid");
+    if (locatorIds.has(locator.locatorId)) return reject("rg_document_admission_locator_identity_duplicate");
+    if (!Number.isSafeInteger(locator.lineStart) || !Number.isSafeInteger(locator.lineEnd)
+      || locator.lineStart < 1 || locator.lineEnd < locator.lineStart) {
+      return reject("rg_document_admission_locator_lineage_invalid");
     }
-    return structuredClone(document);
-  } catch { return null; }
+    if (locator.page !== null && (!Number.isSafeInteger(locator.page) || locator.page < 1)) {
+      return reject("rg_document_admission_locator_page_invalid");
+    }
+    if (locator.sectionCode !== null && !safePublicText(locator.sectionCode, 100)) {
+      return reject("rg_document_admission_locator_section_invalid");
+    }
+    let textExcerpt = locator.textExcerpt;
+    let textDerivation = locator.textDerivation;
+    if (!textDerivation) {
+      const normalized = normalizeAndChunkPublicDocumentText({ text: textExcerpt, mimeType: document.mimeType,
+        sourceUnitIndex });
+      if (normalized.state === "rejected") return reject(documentAdmissionReason(normalized.reasonCode));
+      if (normalized.chunks.length !== 1) return reject("rg_document_admission_legacy_locator_chunking_required");
+      textExcerpt = normalized.chunks[0]!.text;
+      textDerivation = normalized.chunks[0]!.derivation;
+      normalizedLocatorCount += 1;
+    }
+    const derivationIssue = validatePublicDocumentLocatorTextDerivation({ text: textExcerpt,
+      mimeType: document.mimeType, derivation: textDerivation });
+    if (derivationIssue) return reject(documentAdmissionReason(derivationIssue));
+    admittedLocators.push({ ...structuredClone(locator), textExcerpt, textDerivation: structuredClone(textDerivation) });
+    locatorIds.add(locator.locatorId);
+  }
+  const groups = new Map<string, typeof admittedLocators>();
+  for (const locator of admittedLocators) {
+    const derivation = locator.textDerivation!;
+    const key = canonicalJson({ page: locator.page, sectionCode: locator.sectionCode,
+      sourceUnitIndex: derivation.sourceUnitIndex,
+      extractedTextInputHash: derivation.extractedTextInputHash,
+      normalizedFullTextHash: derivation.normalizedFullTextHash });
+    groups.set(key, [...(groups.get(key) ?? []), locator]);
+  }
+  for (const locators of groups.values()) {
+    const ordered = [...locators].sort((left, right) => left.textDerivation!.chunkIndex - right.textDerivation!.chunkIndex);
+    const expectedCount = ordered[0]!.textDerivation!.chunkCount;
+    if (ordered.length !== expectedCount || ordered.some((locator, index) =>
+      locator.textDerivation!.chunkCount !== expectedCount || locator.textDerivation!.chunkIndex !== index)) {
+      return reject("rg_document_admission_locator_chunk_lineage_incomplete");
+    }
+    if (digest(ordered.map((locator) => locator.textExcerpt).join(" "))
+      !== ordered[0]!.textDerivation!.normalizedFullTextHash) {
+      return reject("rg_document_admission_locator_chunk_reconstruction_mismatch");
+    }
+  }
+  return { state: "admitted", reasonCode: "rg_retrieved_document_admitted",
+    document: { ...structuredClone(document), locators: admittedLocators }, normalizedLocatorCount };
+}
+
+function documentAdmissionReason(reasonCode: string): string {
+  return `rg_document_admission_${reasonCode.replace(/^document_/, "")}`;
 }
 
 function validateInvestigatedCandidate(value: CanonicalRgInvestigatedCandidate, workItem: CanonicalRgWorkItem,

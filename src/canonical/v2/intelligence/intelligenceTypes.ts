@@ -380,6 +380,19 @@ export type ExtractedLocator = {
   lineEnd: number;
   text: string;
   documentFingerprint: string;
+  textDerivation?: {
+    schemaVersion: "public_document_locator_text_derivation_v1";
+    normalizationVersion: "public_document_text_normalization_v1";
+    extractedTextInputHash: string;
+    normalizedFullTextHash: string;
+    locatorTextHash: string;
+    sourceUnitIndex: number;
+    chunkIndex: number;
+    chunkCount: number;
+    pdfControlCodePointsReplaced: number;
+    unicodeWhitespaceRunsCollapsed: number;
+    transformations: Array<"pdf_control_code_to_space" | "unicode_whitespace_to_ascii_space" | "bounded_lossless_chunking">;
+  };
 };
 
 export type DocumentExtractionRequest = {
@@ -400,6 +413,7 @@ export type DocumentExtractionResponse = {
   state: DocumentState;
   text: string | null;
   locators: ExtractedLocator[];
+  reasonCodes?: string[];
 };
 
 export type RuntimeDocumentResult = {

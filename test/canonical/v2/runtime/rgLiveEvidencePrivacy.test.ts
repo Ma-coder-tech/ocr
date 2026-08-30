@@ -279,6 +279,97 @@ describe("production approved-AI packet admission", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
+  it("preserves raw-byte identity while returning deterministically normalized locator provenance", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000000000";
+    process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";
+    process.env.OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2";
+    process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = "gpt-5.2";
+    const source = "Official application\u00a0fee  schedule";
+    const content = new TextEncoder().encode(source);
+    const rawFingerprint = createHash("sha256").update(content).digest("hex");
+    globalThis.fetch = vi.fn(async () => { throw new Error("fetch_must_not_run"); });
+    vi.resetModules();
+    vi.doMock("../../../../src/canonical/v2/intelligence/publicRetrievalAdapters.js", () => ({
+      createNodeDestinationResolutionPort: () => ({ resolve: async (candidateId: string, normalizedUrl: string) => ({
+        candidateId, normalizedUrl, addresses: ["93.184.216.34"], permitId: "permit-normalized-provenance",
+      }) }),
+      createNodeHttpsRetrievalPort: () => ({ retrieve: async (request: {
+        questionId: string; candidateId: string; documentId: string; recordReceivedBytes(value: number): string;
+      }) => {
+        request.recordReceivedBytes(content.byteLength);
+        return { questionId: request.questionId, candidateId: request.candidateId, documentId: request.documentId,
+          status: "retrieved", connectedAddress: "93.184.216.34", redirects: [], mimeType: "text/plain",
+          content: Uint8Array.from(content), byteLength: content.byteLength, streamedByteLength: content.byteLength,
+          safetyContract: { streamingByteLimitEnforced: true, abortSignalObserved: true,
+            destinationPermitEnforced: true } };
+      } }),
+    }));
+    const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
+    const ports = live.createProductionRgEvidencePortsFromEnvironment("normalized-document-provenance-run");
+    try {
+      const result = await ports.retrieve({ intent: { atomicClaimId: "atomic-claim-normalized" }, candidate: {
+        candidateId: "candidate-normalized", url: "https://www.fiserv.com/public-document", title: "Public document",
+        claimedAuthority: "processor_publication", publicationDate: null, effectiveFrom: null, effectiveTo: null,
+      }, maximumBytes: 5_242_880 } as never, () => undefined);
+      expect(result.value).toMatchObject({ documentFingerprint: rawFingerprint, byteLength: content.byteLength,
+        locators: [{ textExcerpt: "Official application fee schedule", textDerivation: {
+          schemaVersion: "public_document_locator_text_derivation_v1",
+          normalizationVersion: "public_document_text_normalization_v1",
+          extractedTextInputHash: createHash("sha256").update(source).digest("hex"),
+          normalizedFullTextHash: createHash("sha256").update("Official application fee schedule").digest("hex"),
+          transformations: ["unicode_whitespace_to_ascii_space"],
+        } }] });
+      expect(result.receipt).toMatchObject({ providerCode: "node_https_pinned", calls: 1,
+        retrievalBytes: content.byteLength });
+    } finally {
+      vi.doUnmock("../../../../src/canonical/v2/intelligence/publicRetrievalAdapters.js");
+    }
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects unsafe non-PDF control content with an exact deterministic admission reason", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000000000";
+    process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";
+    process.env.OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2";
+    process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = "gpt-5.2";
+    const content = new TextEncoder().encode("Official application\u0002fee schedule");
+    globalThis.fetch = vi.fn(async () => { throw new Error("fetch_must_not_run"); });
+    vi.resetModules();
+    vi.doMock("../../../../src/canonical/v2/intelligence/publicRetrievalAdapters.js", () => ({
+      createNodeDestinationResolutionPort: () => ({ resolve: async (candidateId: string, normalizedUrl: string) => ({
+        candidateId, normalizedUrl, addresses: ["93.184.216.34"], permitId: "permit-control-rejection",
+      }) }),
+      createNodeHttpsRetrievalPort: () => ({ retrieve: async (request: {
+        questionId: string; candidateId: string; documentId: string; recordReceivedBytes(value: number): string;
+      }) => {
+        request.recordReceivedBytes(content.byteLength);
+        return { questionId: request.questionId, candidateId: request.candidateId, documentId: request.documentId,
+          status: "retrieved", connectedAddress: "93.184.216.34", redirects: [], mimeType: "text/plain",
+          content: Uint8Array.from(content), byteLength: content.byteLength, streamedByteLength: content.byteLength,
+          safetyContract: { streamingByteLimitEnforced: true, abortSignalObserved: true,
+            destinationPermitEnforced: true } };
+      } }),
+    }));
+    const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
+    const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
+    const ports = live.createProductionRgEvidencePortsFromEnvironment("control-document-rejection-run");
+    try {
+      await ports.retrieve({ intent: { atomicClaimId: "atomic-claim-control" }, candidate: {
+        candidateId: "candidate-control", url: "https://www.fiserv.com/public-document", title: "Public document",
+        claimedAuthority: "processor_publication", publicationDate: null, effectiveFrom: null, effectiveTo: null,
+      }, maximumBytes: 5_242_880 } as never, () => undefined);
+      throw new Error("expected deterministic control-content rejection");
+    } catch (error) {
+      expect(error).toBeInstanceOf(execution.RgEvidenceCompletedUnusableError);
+      expect(error).toMatchObject({ message: "document_text_non_pdf_control_character_forbidden",
+        receipt: { providerCode: "node_https_pinned", calls: 1, retrievalBytes: content.byteLength } });
+      expect(error).not.toBeInstanceOf(execution.RgEvidenceTransportError);
+    } finally {
+      vi.doUnmock("../../../../src/canonical/v2/intelligence/publicRetrievalAdapters.js");
+    }
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it("rejects credential material in retrieved public content before the document can be returned for persistence", async () => {
     process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000000000";
     process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";
