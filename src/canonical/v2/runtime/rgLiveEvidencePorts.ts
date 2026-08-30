@@ -13,7 +13,8 @@ import {
   requireLiveCapabilityBinding,
 } from "../intelligence/providerPreflight.js";
 import { assertApprovedAiOutboundPacketSafe, inspectCredentialMaterial } from "../intelligence/providerPrivacy.js";
-import { createNodeDestinationResolutionPort, createNodeHttpsRetrievalPort } from "../intelligence/publicRetrievalAdapters.js";
+import { createNodeDestinationResolutionPort, createNodeHttpsRetrievalPort,
+  type PublicRetrievalTransportOperationalPolicyV1 } from "../intelligence/publicRetrievalAdapters.js";
 import { createPublicDocumentExtractionPort } from "../intelligence/publicDocumentExtraction.js";
 import {
   createDestinationPermit,
@@ -30,9 +31,11 @@ import type {
   CanonicalRgInvestigatedCandidate,
   CanonicalRgRetrievedDocument,
   CanonicalRgVerificationJudgment,
+  CanonicalQualifiedPublicReadOperationalPolicyV1,
   RgEvidencePortReceipt,
 } from "./rgEvidenceExecution.js";
-import { RgEvidenceCompletedUnusableError, RgEvidenceTransportError } from "./rgEvidenceExecution.js";
+import { assertCanonicalQualifiedPublicReadContract,
+  RgEvidenceCompletedUnusableError, RgEvidenceTransportError } from "./rgEvidenceExecution.js";
 import {
   assertApprovedAiRequestContextBudget,
   assertCanonicalRgApprovedAiClaimContext,
@@ -42,6 +45,9 @@ import type { CanonicalRgReconciliationCapability } from "./rgOperationReconcili
 
 const MAX_AI_OUTPUT_TOKENS = 1_500;
 const AI_TIMEOUT_MS = 30_000;
+const DEFAULT_PUBLIC_RETRIEVAL_DESTINATION_RESOLUTION_TIMEOUT_MS = 5_000;
+const DEFAULT_PUBLIC_RETRIEVAL_SOCKET_INACTIVITY_TIMEOUT_MS = 12_000;
+const DEFAULT_PUBLIC_RETRIEVAL_TOTAL_ATTEMPT_TIMEOUT_MS = 45_000;
 const PRODUCTION_INVESTIGATION_SCHEMA_HASH = createHash("sha256").update(canonicalJson(investigationSchema())).digest("hex");
 const PRODUCTION_VERIFICATION_SCHEMA_HASH = createHash("sha256").update(canonicalJson(verificationSchema())).digest("hex");
 const UNSUPPORTED_PRODUCTION_RECONCILIATION: CanonicalRgReconciliationCapability = {
@@ -66,13 +72,26 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
   const runtimeReadiness = availableRuntimeReadiness(capability);
   const audit = new ProviderOperationAuditLog();
   const searchPort = createLiveOpenRouterSearchAdapter(capability, audit);
-  const destinationPort = createNodeDestinationResolutionPort(capability);
-  const retrievalPort = createNodeHttpsRetrievalPort(capability, { audit, userAgent: "RateReveal-Production-RG/1.0" });
+  let retrievalOperationalPolicy: PublicRetrievalTransportOperationalPolicyV1;
+  let qualifiedPublicReadOperationalPolicy: CanonicalQualifiedPublicReadOperationalPolicyV1;
+  try {
+    retrievalOperationalPolicy = publicRetrievalTransportOperationalPolicyFromEnvironment();
+    qualifiedPublicReadOperationalPolicy = qualifiedPublicReadOperationalPolicyFromEnvironment();
+  } catch (error) {
+    return unavailablePorts(safeReason(error));
+  }
+  const destinationPort = createNodeDestinationResolutionPort(capability, {
+    resolutionTimeoutMs: retrievalOperationalPolicy.destinationResolutionTimeoutMs,
+  });
+  const retrievalPort = createNodeHttpsRetrievalPort(capability, { audit, userAgent: "RateReveal-Production-RG/1.0",
+    operationalPolicy: retrievalOperationalPolicy });
   const extractionPort = createPublicDocumentExtractionPort();
   return {
     availability: "available",
     unavailabilityReasonCodes: [],
     runtimeReadiness,
+    qualifiedPublicReadOperationalPolicy,
+    publicRetrievalTransportOperationalPolicy: retrievalOperationalPolicy,
     reconciliationCapability: productionRgReconciliationCapability(),
     async search({ intent, maximumCandidates }, onSend) {
       const candidates: CanonicalRgDiscoveryCandidate[] = [];
@@ -116,7 +135,11 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
       return { value: candidates.slice(0, maximumCandidates), receipt: receipt ? rgSearchReceipt(receipt) : {
         providerCode: searchPort.providerCode, providerRequestId: null, calls: 1, tokens, retrievalBytes: 0 } };
     },
-    async retrieve({ intent, candidate, maximumBytes }, onSend) {
+    async retrieve({ intent, candidate, maximumBytes, logicalAttempt, qualifiedPublicRead }, onSend) {
+      assertCanonicalQualifiedPublicReadContract("public_retrieval", { qualifiedPublicRead }, qualifiedPublicRead);
+      if (qualifiedPublicRead.normalizedUrl !== new URL(candidate.url).toString()) {
+        throw new Error("rg_qualified_public_read_candidate_url_binding_invalid");
+      }
       const resolutionStartedMs = binding.clock.nowMs();
       let resolved: Awaited<ReturnType<typeof destinationPort.resolve>>;
       try {
@@ -124,26 +147,28 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
       } catch (error) {
         const reasonCode = safeReason(error);
         throw new RgEvidenceTransportError("before_send", reasonCode,
-          resolutionFailureReceipt(reasonCode, Math.max(0, Math.round(binding.clock.nowMs() - resolutionStartedMs))));
+          resolutionFailureReceipt(reasonCode, Math.max(0, Math.round(binding.clock.nowMs() - resolutionStartedMs)),
+            retrievalOperationalPolicy));
       }
       const resolutionElapsedMs = Math.max(0, Math.round(binding.clock.nowMs() - resolutionStartedMs));
       const permit = createDestinationPermit({ candidateId: candidate.candidateId, rawUrl: candidate.url,
         resolvedAddresses: resolved.addresses, permitId: resolved.permitId, nowMs: binding.clock.nowMs(), ttlMs: 30_000 });
       const documentId = `rg-document-${digest({ candidateId: candidate.candidateId, url: candidate.url }).slice(0, 24)}`;
+      const transportOperationId = `${documentId}-attempt-${logicalAttempt}`;
       let streamedBytes = 0;
       const controller = new AbortController();
       onSend();
       let response: Awaited<ReturnType<typeof retrievalPort.retrieve>>;
       try {
-        response = await retrievalPort.retrieve({ reservationId: `${documentId}:document`, questionId: intent.atomicClaimId,
-          candidateId: candidate.candidateId, documentId, permit, maximumBytes, httpsOnly: true, logicalAttempt: 1,
+        response = await retrievalPort.retrieve({ reservationId: `${transportOperationId}:document`, questionId: intent.atomicClaimId,
+          candidateId: candidate.candidateId, documentId, permit, maximumBytes, httpsOnly: true, logicalAttempt,
           signal: controller.signal,
           recordReceivedBytes(cumulativeBytes) { streamedBytes = cumulativeBytes; return cumulativeBytes > maximumBytes ? "abort" : "continue"; },
           async authorizeRedirect() { throw new Error("rg_retrieval_redirect_requires_new_operation"); },
         });
       } catch (error) {
-        const auditReceipt = audit.snapshot().find((item) => item.operationId === documentId);
-        const receipt = rgRetrievalReceipt(audit, documentId, streamedBytes, resolutionElapsedMs);
+        const auditReceipt = audit.snapshot().find((item) => item.operationId === transportOperationId);
+        const receipt = rgRetrievalReceipt(audit, transportOperationId, streamedBytes, resolutionElapsedMs);
         const transportState = error instanceof LiveOperationTransportError ? error.transportState
           : auditReceipt?.actualSendCount === 1 ? "after_send" : "before_send";
         throw new RgEvidenceTransportError(transportState,
@@ -156,7 +181,7 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
         retrievalEligibility: "eligible" as const, authorityAdmissionRef: null, authorityPublicationFamilyCode: null };
       const retrievalIssues = validateRetrievalResponse({ candidate: provisionalCandidate, documentId, permit, response,
         nowMs: binding.clock.nowMs(), maximumBytes, observedStreamedBytes: streamedBytes });
-      const retrievalReceipt = rgRetrievalReceipt(audit, documentId, response.streamedByteLength, resolutionElapsedMs);
+      const retrievalReceipt = rgRetrievalReceipt(audit, transportOperationId, response.streamedByteLength, resolutionElapsedMs);
       if (response.status !== "retrieved" || !response.content || !response.mimeType || retrievalIssues.length > 0
         || validateContentSignature(response.mimeType, response.content).length > 0) {
         const signatureIssues = response.content && response.mimeType
@@ -521,6 +546,41 @@ function safeReason(error: unknown): string { const candidate = typeof error ===
   const value = typeof candidate === "string" ? candidate : "rg_provider_unavailable";
   return /^[a-z][a-z0-9_:.-]{0,191}$/.test(value) ? value : "rg_provider_unavailable"; }
 
+function publicRetrievalTransportOperationalPolicyFromEnvironment(): PublicRetrievalTransportOperationalPolicyV1 {
+  const socketInactivityTimeoutMs = boundedOperationalInteger(
+    process.env.RATEREVEAL_PUBLIC_RETRIEVAL_SOCKET_INACTIVITY_TIMEOUT_MS,
+    DEFAULT_PUBLIC_RETRIEVAL_SOCKET_INACTIVITY_TIMEOUT_MS, 1_000, 120_000);
+  const totalAttemptTimeoutMs = boundedOperationalInteger(
+    process.env.RATEREVEAL_PUBLIC_RETRIEVAL_TOTAL_ATTEMPT_TIMEOUT_MS,
+    DEFAULT_PUBLIC_RETRIEVAL_TOTAL_ATTEMPT_TIMEOUT_MS, 1_000, 300_000);
+  if (totalAttemptTimeoutMs < socketInactivityTimeoutMs) {
+    throw new Error("rg_public_retrieval_operational_configuration_invalid");
+  }
+  const destinationResolutionTimeoutMs = boundedOperationalInteger(
+    process.env.RATEREVEAL_PUBLIC_RETRIEVAL_DESTINATION_RESOLUTION_TIMEOUT_MS,
+    DEFAULT_PUBLIC_RETRIEVAL_DESTINATION_RESOLUTION_TIMEOUT_MS, 500, 60_000);
+  return { schemaVersion: "public_retrieval_transport_operational_policy_v1",
+    destinationResolutionTimeoutMs, socketInactivityTimeoutMs, totalAttemptTimeoutMs };
+}
+
+function qualifiedPublicReadOperationalPolicyFromEnvironment(): CanonicalQualifiedPublicReadOperationalPolicyV1 {
+  return {
+    schemaVersion: "canonical_qualified_public_read_operational_policy_v1",
+    maximumAttemptsPerCandidate: boundedOperationalInteger(
+      process.env.RATEREVEAL_QUALIFIED_PUBLIC_READ_MAX_ATTEMPTS, 2, 1, 5),
+  };
+}
+
+function boundedOperationalInteger(raw: string | undefined, fallback: number, minimum: number, maximum: number): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  if (!/^\d+$/.test(raw)) throw new Error("rg_public_retrieval_operational_configuration_invalid");
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+    throw new Error("rg_public_retrieval_operational_configuration_invalid");
+  }
+  return value;
+}
+
 function rgSearchReceipt(receipt: ProviderOperationReceiptV1): RgEvidencePortReceipt {
   return {
     providerCode: receipt.providerCode,
@@ -567,7 +627,8 @@ function rgRetrievalReceipt(audit: ProviderOperationAuditLog, operationId: strin
   };
 }
 
-function resolutionFailureReceipt(reasonCode: string, resolutionElapsedMs: number): RgEvidencePortReceipt {
+function resolutionFailureReceipt(reasonCode: string, resolutionElapsedMs: number,
+  operationalPolicy: PublicRetrievalTransportOperationalPolicyV1): RgEvidencePortReceipt {
   return {
     providerCode: "node_https_pinned",
     providerRequestId: null,
@@ -576,7 +637,7 @@ function resolutionFailureReceipt(reasonCode: string, resolutionElapsedMs: numbe
     retrievalBytes: 0,
     retrievalTransportDiagnostics: {
       schemaVersion: "public_https_retrieval_transport_diagnostics_v1",
-      configurationCode: "ratereveal_node_https_pinned_v3",
+      configurationCode: "ratereveal_node_https_pinned_v4",
       resolution: {
         state: "failed_before_permit",
         resolutionElapsedMs,
@@ -606,7 +667,8 @@ function resolutionFailureReceipt(reasonCode: string, resolutionElapsedMs: numbe
         outcome: "failed",
         phase: "destination_resolution",
         safeReasonClass: reasonCode,
-        socketInactivityTimeoutMs: 12_000,
+        socketInactivityTimeoutMs: operationalPolicy.socketInactivityTimeoutMs,
+        totalAttemptTimeoutMs: operationalPolicy.totalAttemptTimeoutMs,
       },
     },
   };

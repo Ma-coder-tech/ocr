@@ -528,7 +528,7 @@ describe("internal-analysis construction-bound provider seams", () => {
     expect(timeoutSends).toBe(1); expect(timeoutAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "timed_out", usageState: "unknown_possible_billable", retryCount: 0 });
     expect(timeoutAudit.snapshot()[0]!.retrievalTransportDiagnostics).toMatchObject({
       schemaVersion: "public_https_retrieval_transport_diagnostics_v1",
-      configurationCode: "ratereveal_node_https_pinned_v3",
+      configurationCode: "ratereveal_node_https_pinned_v4",
       resolution: { state: "permit_bound", resolutionElapsedMs: null, approvedAddressCount: 1,
         selectedAddressFamily: 4, selectionPolicy: "first_lexicographically_sorted_approved_address" },
       milestones: { socketAssignedMs: expect.any(Number), tcpConnectedMs: expect.any(Number),
@@ -537,7 +537,7 @@ describe("internal-analysis construction-bound provider seams", () => {
       response: { connectedAddressFamily: 4, httpStatus: null, redirectObserved: false,
         responseHeadersObserved: false, firstBodyByteObserved: false, bytesObserved: 0, bodyCompleted: false },
       termination: { outcome: "timed_out", phase: "response_headers", safeReasonClass: "retrieval_timeout",
-        socketInactivityTimeoutMs: 12_000 },
+        socketInactivityTimeoutMs: 12_000, totalAttemptTimeoutMs: 45_000 },
     });
     timeoutSpy.mockRestore();
 
@@ -559,7 +559,7 @@ describe("internal-analysis construction-bound provider seams", () => {
     }) as never);
     await expect(createNodeHttpsRetrievalPort(pinCap, { audit: pinAudit }).retrieve(request(new AbortController().signal))).rejects.toThrow("Invalid IP address");
     expect(pinAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "failed",
-      providerConfigurationCode: "ratereveal_node_https_pinned_v3", safeReasonCode: "retrieval_destination_pin_invalid" });
+      providerConfigurationCode: "ratereveal_node_https_pinned_v4", safeReasonCode: "retrieval_destination_pin_invalid" });
 
     for (const [code, safeReasonCode] of [["ECONNRESET", "retrieval_network_connect_failed"],
       ["ERR_TLS_CERT_ALTNAME_INVALID", "retrieval_tls_validation_failed"]] as const) {
@@ -622,12 +622,53 @@ describe("internal-analysis construction-bound provider seams", () => {
     const completed = await createNodeHttpsRetrievalPort(completedCap, { audit: completedAudit }).retrieve(request());
     expect(completed).toMatchObject({ status: "retrieved", byteLength: 8, streamedByteLength: 8 });
     expect(completedAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "completed",
-      retryCount: 0, providerConfigurationCode: "ratereveal_node_https_pinned_v3",
+      retryCount: 0, providerConfigurationCode: "ratereveal_node_https_pinned_v4",
       retrievalTransportDiagnostics: {
         response: { httpStatus: 200, responseHeadersObserved: true, firstBodyByteObserved: true,
           bytesObserved: 8, bodyCompleted: true },
         termination: { outcome: "completed", phase: "completed", safeReasonClass: "retrieval_completed" },
       } });
+  });
+
+  it("rotates only across approved addresses on a distinct logical attempt and settles deterministic HTTP failures", async () => {
+    const permit = createDestinationPermit({ candidateId: "candidate-recovery",
+      rawUrl: "https://docs.example.test/recovery", resolvedAddresses: ["93.184.216.34", "93.184.216.35"],
+      permitId: "permit-recovery", nowMs: 0, ttlMs: 60_000 });
+    for (const statusCode of [401, 403, 404, 410, 429, 503]) {
+      const audit = new ProviderOperationAuditLog(); const cap = await capability(); let optionsSeen: any = null;
+      vi.spyOn(https, "request").mockImplementation(((options: any, callback: any) => {
+        optionsSeen = options;
+        const socket = new EventEmitter() as any; socket.remoteAddress = "93.184.216.35";
+        const req = new EventEmitter() as any; req.setTimeout = () => req;
+        req.destroy = (error?: Error) => { if (error) req.emit("error", error); };
+        req.end = () => {
+          req.emit("socket", socket); socket.emit("connect"); socket.emit("secureConnect");
+          const response = new EventEmitter() as any; response.statusCode = statusCode;
+          response.headers = { "content-type": "text/plain" }; response.socket = socket;
+          response.destroy = () => undefined; callback(response); response.emit("data", Buffer.from("settled"));
+          response.emit("end");
+        };
+        return req;
+      }) as never);
+      const response = await createNodeHttpsRetrievalPort(cap, { audit }).retrieve({
+        reservationId: `retrieval-status-${statusCode}:document`, questionId: "question-recovery",
+        candidateId: "candidate-recovery", documentId: "document-recovery", permit, maximumBytes: 1_024,
+        httpsOnly: true, logicalAttempt: 2, signal: new AbortController().signal,
+        recordReceivedBytes: () => "continue", authorizeRedirect: async () => permit,
+      });
+      expect(response).toMatchObject({ status: "inaccessible", connectedAddress: "93.184.216.35" });
+      expect(optionsSeen).toMatchObject({ method: "GET", hostname: "docs.example.test", family: 4,
+        headers: expect.not.objectContaining({ Authorization: expect.anything(), Cookie: expect.anything() }) });
+      let selectedAddress = "";
+      optionsSeen.lookup("docs.example.test", {}, (_error: unknown, address: string) => { selectedAddress = address; });
+      expect(selectedAddress).toBe("93.184.216.35");
+      expect(audit.snapshot()[0]).toMatchObject({ logicalAttempt: 2, actualSendCount: 1, retryCount: 1,
+        completionState: "completed", httpStatus: statusCode,
+        retrievalTransportDiagnostics: { configurationCode: "ratereveal_node_https_pinned_v4",
+          resolution: { selectionPolicy: "logical_attempt_rotated_approved_address" },
+          termination: { outcome: "completed", phase: "completed" } } });
+      vi.restoreAllMocks();
+    }
   });
 
   it("fails missing credentials, caller-asserted external preflight, and forged capabilities before send", async () => {

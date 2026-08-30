@@ -4,6 +4,7 @@ import { db, nowIso } from "../../../db.js";
 import { canonicalJson } from "../canonicalJson.js";
 import type { CanonicalRgClaimValue, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 import type { ExtractedLocator, PublicRetrievalTransportDiagnosticsV1 } from "../intelligence/intelligenceTypes.js";
+import type { PublicRetrievalTransportOperationalPolicyV1 } from "../intelligence/publicRetrievalAdapters.js";
 import {
   normalizeAndChunkPublicDocumentText,
   validatePublicDocumentLocatorTextDerivation,
@@ -43,16 +44,43 @@ import {
   type CanonicalRgWorkItem,
 } from "./rgWorkLedger.js";
 
-export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1_6" as const;
+export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1_7" as const;
 
 const MAX_CANDIDATES_PER_WORK_ITEM = 2;
 const MAX_BEFORE_SEND_ATTEMPTS = 2;
+const DEFAULT_QUALIFIED_PUBLIC_READ_MAX_ATTEMPTS = 2;
 const WORK_RESERVATION_MS = 5 * 60_000;
 const PUBLIC_DOCUMENT_RETRIEVAL_REPLAY_CONTRACT_VERSION =
   "canonical_rg_public_document_retrieval_replay_contract_v1" as const;
 const PUBLIC_DOCUMENT_RETRIEVAL_ARTIFACT_VERSION =
   "canonical_rg_public_document_retrieval_artifact_v1" as const;
 const PUBLIC_DOCUMENT_RETRIEVAL_MAXIMUM_BYTES = 5_242_880;
+
+export type CanonicalQualifiedPublicReadContractV1 = {
+  schemaVersion: "canonical_qualified_public_read_v1";
+  runtimePolicyAmendment: "frozen_product_model_runtime_policy_amendment_v0_3";
+  normalizedUrl: string;
+  method: "GET";
+  transport: "https";
+  authentication: "none";
+  authorizationHeader: "absent";
+  cookieHeader: "absent";
+  credentialMaterial: "absent";
+  requestBody: "absent";
+  merchantPrivateData: "absent";
+  redirectHandling: "fresh_destination_authorization_required";
+  destinationSafety: "dns_public_address_pinned_and_rebinding_protected";
+  canonicalMutationBeforeAdmission: false;
+  recoveryPermission: "new_separately_identified_bounded_read_attempt";
+  reconciliationEffect: "no_run_wide_barrier_for_this_qualified_read_only";
+  evidenceEffect: "none";
+  analyticalCompletionEffect: "none";
+};
+
+export type CanonicalQualifiedPublicReadOperationalPolicyV1 = {
+  schemaVersion: "canonical_qualified_public_read_operational_policy_v1";
+  maximumAttemptsPerCandidate: number;
+};
 
 export type CanonicalRgSearchIntent = {
   schemaVersion: "canonical_rg_search_intent_v1_3";
@@ -430,8 +458,12 @@ export type CanonicalRgEvidenceExecutionPorts = {
   runtimeReadiness?: CanonicalRgRuntimeReadiness;
   reconciliationCapability?: CanonicalRgReconciliationCapability;
   reconciliation?: CanonicalRgOperationReconciliationPort;
+  qualifiedPublicReadOperationalPolicy?: CanonicalQualifiedPublicReadOperationalPolicyV1;
+  publicRetrievalTransportOperationalPolicy?: PublicRetrievalTransportOperationalPolicyV1;
   search(input: { intent: CanonicalRgSearchIntent; maximumCandidates: number }, onSend: () => void): Promise<RgEvidencePortResult<CanonicalRgDiscoveryCandidate[]>>;
-  retrieve(input: { intent: CanonicalRgSearchIntent; candidate: CanonicalRgDiscoveryCandidate; maximumBytes: number }, onSend: () => void): Promise<RgEvidencePortResult<CanonicalRgRetrievedDocument>>;
+  retrieve(input: { intent: CanonicalRgSearchIntent; candidate: CanonicalRgDiscoveryCandidate;
+    maximumBytes: number; logicalAttempt: number; qualifiedPublicRead: CanonicalQualifiedPublicReadContractV1 },
+    onSend: () => void): Promise<RgEvidencePortResult<CanonicalRgRetrievedDocument>>;
   investigate(input: {
     intent: CanonicalRgSearchIntent;
     admission: CanonicalRgClaimAdmission;
@@ -549,6 +581,8 @@ export async function executeDurableCanonicalRgEvidence(input: {
     appendEvent(input.runId, selectedWork[0].workItemId, null, "production_rg_runtime_readiness_observed", {
       readiness: input.ports.runtimeReadiness,
       operationalPolicy: generationZeroOperationalScope?.policy ?? null,
+      qualifiedPublicReadOperationalPolicy: input.ports.qualifiedPublicReadOperationalPolicy ?? null,
+      publicRetrievalTransportOperationalPolicy: input.ports.publicRetrievalTransportOperationalPolicy ?? null,
       analyticalCompletionEffect: "none",
       secretMaterialPersisted: false,
     });
@@ -670,6 +704,7 @@ async function executeWorkItem(input: {
 
   const evidence: CanonicalRgVerifiedEvidence[] = [];
   const documentAdmissionFailures: string[] = [];
+  const publicReadTransportFailures: string[] = [];
   const candidateOutcomes: CanonicalRgCandidateResearchOutcome["outcomeClass"][] = [];
   let investigationAttempted = false;
   for (const [index, candidate] of candidates.entries()) {
@@ -684,14 +719,17 @@ async function executeWorkItem(input: {
     }
     const replayContract = publicDocumentRetrievalReplayContract(intent, candidate,
       PUBLIC_DOCUMENT_RETRIEVAL_MAXIMUM_BYTES);
+    const qualifiedPublicRead = compileCanonicalQualifiedPublicReadContract(candidate);
     const retrieval = await runExternalOperation({ ...input, kind: "public_retrieval", candidateId: candidate.candidateId,
-      providerCode: "independent_https_retrieval", operationInput: { intentId: intent.intentId, candidate },
+      providerCode: "independent_https_retrieval", operationInput: { intentId: intent.intentId, candidate,
+        qualifiedPublicRead }, qualifiedPublicRead,
       projectResult: sanitizeRetrievedDocument,
       beforeSend: () => knownInapplicableCandidate(
         knownInapplicableDocumentsForIntent(input.runId, intent), candidate),
       publicDocumentReplay: { contract: replayContract, candidate },
-      call: (onSend) => input.ports.retrieve({ intent, candidate,
-        maximumBytes: PUBLIC_DOCUMENT_RETRIEVAL_MAXIMUM_BYTES }, onSend) });
+      call: (onSend, attempt) => input.ports.retrieve({ intent, candidate,
+        maximumBytes: PUBLIC_DOCUMENT_RETRIEVAL_MAXIMUM_BYTES, logicalAttempt: attempt,
+        qualifiedPublicRead }, onSend) });
     if (retrieval.state === "excluded_known_inapplicable") {
       candidateOutcomes.push(retrieval.inapplicability.outcomeClass);
       appendKnownInapplicableCandidateSkip(input.runId, input.workItem.workItemId, intent, candidate,
@@ -701,6 +739,19 @@ async function executeWorkItem(input: {
     if (retrieval.state !== "completed") {
       if (retrieval.operation.state === "indeterminate_after_send" || operationStoppedByCircuitBreaker(retrieval.operation)) {
         return finishFailedOperation(input, retrieval.operation);
+      }
+      if (retrieval.operation.state === "public_read_transport_outcome_unknown") {
+        publicReadTransportFailures.push(retrieval.operation.receipt.reasonCode);
+        appendEvent(input.runId, input.workItem.workItemId, retrieval.operation.operationId,
+          "qualified_public_read_candidate_transport_unavailable", {
+            candidateId: candidate.candidateId,
+            attempt: retrieval.operation.attempt,
+            reasonCode: retrieval.operation.receipt.reasonCode,
+            evidenceEffect: "none",
+            analyticalCompletionEffect: "none",
+            continuation: "next_legitimate_candidate_permitted",
+          });
+        continue;
       }
       if (isCompletedUnusableResult(retrieval.operation.result)) {
         if (!retrieval.replayArtifact && !isPublicDocumentReplayOperation(retrieval.operation)) {
@@ -808,7 +859,9 @@ async function executeWorkItem(input: {
     return { state: "verified", evidence };
   }
   terminalizeWork(input.runId, input.workItem, "completed_unresolved", "unresolved",
-    !investigationAttempted && documentAdmissionFailures.length > 0
+    !investigationAttempted && publicReadTransportFailures.length > 0
+      ? exactPublicReadTransportStopReason(publicReadTransportFailures)
+      : !investigationAttempted && documentAdmissionFailures.length > 0
       ? exactDocumentAdmissionStopReason(documentAdmissionFailures)
       : exactNoSupportStopReason(candidateOutcomes), [], input.workerId);
   appendExtensionDecision(input.runId, input.workItem.workItemId, "stopped",
@@ -993,21 +1046,28 @@ async function runExternalOperation<T>(input: {
   workItem: CanonicalRgWorkItem;
   admission: CanonicalRgClaimAdmission;
   workerId: string;
+  ports: CanonicalRgEvidenceExecutionPorts;
   kind: CanonicalRgOperation["kind"];
   candidateId: string | null;
   providerCode: string;
   operationInput: unknown;
   projectResult(value: T): unknown;
-  call(onSend: () => void): Promise<RgEvidencePortResult<T>>;
+  call(onSend: () => void, attempt: number): Promise<RgEvidencePortResult<T>>;
   beforeSend?: () => ReusableCandidateInapplicability | null;
   publicDocumentReplay?: {
     contract: CanonicalRgPublicDocumentRetrievalReplayContract;
     candidate: CanonicalRgDiscoveryCandidate;
   };
+  qualifiedPublicRead?: CanonicalQualifiedPublicReadContractV1;
   executionGrant: CanonicalContinuationExecutionGrant | null;
   generationZeroOperationalScope: GenerationZeroOperationalScope | null;
 }): Promise<OperationCallResult> {
   const inputHash = digest(input.operationInput);
+  const qualifiedPublicRead = input.qualifiedPublicRead
+    ? assertCanonicalQualifiedPublicReadContract(input.kind, input.operationInput, input.qualifiedPublicRead) : null;
+  const maximumAttempts = qualifiedPublicRead
+    ? validatedQualifiedPublicReadMaximumAttempts(input.ports.qualifiedPublicReadOperationalPolicy)
+    : MAX_BEFORE_SEND_ATTEMPTS;
   const ceilingReason = operationalCeilingReason(input.runId, input.executionGrant,
     input.generationZeroOperationalScope);
   if (ceilingReason) {
@@ -1022,7 +1082,7 @@ async function runExternalOperation<T>(input: {
       "emergency_operational_ceiling_not_analytical_completion");
     return { state: "failed", value: null, operation: failed };
   }
-  for (let attempt = 1; attempt <= MAX_BEFORE_SEND_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
     const operationId = `rg-op-${digest({ runId: input.runId, planHash: input.planHash,
       executionGrantId: input.executionGrant?.grantId ?? null, workItemId: input.workItem.workItemId,
       kind: input.kind, candidateId: input.candidateId, attempt, inputHash }).slice(0, 32)}`;
@@ -1032,10 +1092,25 @@ async function runExternalOperation<T>(input: {
       : { state: "completed", value: replayableCompletedOperationResult(existing), operation: existing };
     if (existing?.state === "provider_rejected") return { state: "failed", value: null, operation: existing };
     if (existing?.state === "failed_before_send") {
-      if (attempt < MAX_BEFORE_SEND_ATTEMPTS) continue;
+      if (attempt < maximumAttempts) continue;
+      return { state: "failed", value: null, operation: existing };
+    }
+    if (existing?.state === "public_read_transport_outcome_unknown") {
+      if (!qualifiedPublicRead) throw new Error("rg_qualified_public_read_recovery_binding_missing");
+      if (attempt < maximumAttempts) continue;
       return { state: "failed", value: null, operation: existing };
     }
     if (existing?.state === "sent" || existing?.state === "indeterminate_after_send") {
+      if (existing.state === "sent" && qualifiedPublicRead) {
+        const unknown = settleOperation(input.runId, existing, "public_read_transport_outcome_unknown", null, null,
+          "rg_qualified_public_read_prior_send_completion_unknown");
+        appendRetryDecision(input.runId, input.workItem.workItemId, unknown.operationId,
+          attempt < maximumAttempts ? "retry" : "no_retry",
+          attempt < maximumAttempts ? "qualified_public_read_new_attempt_authorized_after_restart"
+            : "qualified_public_read_operational_attempt_limit_reached_not_analytical_completion");
+        if (attempt < maximumAttempts) continue;
+        return { state: "failed", value: null, operation: unknown };
+      }
       const indeterminate = existing.state === "indeterminate_after_send" ? existing : settleOperation(input.runId, existing,
         "indeterminate_after_send", null, null, "rg_operation_prior_send_completion_unknown");
       return { state: "failed", value: null, operation: indeterminate };
@@ -1054,7 +1129,7 @@ async function runExternalOperation<T>(input: {
           ? publicDocumentRetrievalArtifactForReplay(input.runId, input.publicDocumentReplay.contract) : null;
         if (replayBeforeSend) throw new PublicDocumentRetrievalReplayBeforeSend(replayBeforeSend);
         markOperationSent(input.runId, operation.operationId, input.workerId); sent = true;
-      });
+      }, attempt);
       const projected = input.projectResult(result.value);
       const settled = settleOperation(input.runId, operation, "completed", projected, result.receipt, "rg_operation_completed");
       incrementResource(input.runId, input.workItem.workItemId, input.kind, result.receipt);
@@ -1112,8 +1187,10 @@ async function runExternalOperation<T>(input: {
       const afterSend = !providerRejected && (sent || (error instanceof RgEvidenceTransportError && error.transportState !== "before_send"));
       const reason = safeReason(error);
       const errorReceipt = error instanceof RgEvidenceTransportError ? error.receipt : null;
+      const qualifiedReadUnknown = Boolean(qualifiedPublicRead && afterSend && !providerRejected);
       const settled = settleOperation(input.runId, operation,
-        providerRejected ? "provider_rejected" : afterSend ? "indeterminate_after_send" : "failed_before_send",
+        providerRejected ? "provider_rejected" : qualifiedReadUnknown ? "public_read_transport_outcome_unknown"
+          : afterSend ? "indeterminate_after_send" : "failed_before_send",
         null, errorReceipt, reason);
       if (afterSend || providerRejected) incrementResource(input.runId, input.workItem.workItemId, input.kind, {
         providerCode: errorReceipt?.providerCode ?? input.providerCode,
@@ -1124,11 +1201,17 @@ async function runExternalOperation<T>(input: {
         retrievalTransportDiagnostics: errorReceipt?.retrievalTransportDiagnostics ?? null,
       });
       appendRetryDecision(input.runId, input.workItem.workItemId, operation.operationId,
-        !afterSend && !providerRejected && attempt < MAX_BEFORE_SEND_ATTEMPTS ? "retry" : "no_retry",
+        qualifiedReadUnknown && attempt < maximumAttempts ? "retry"
+          : !afterSend && !providerRejected && attempt < maximumAttempts ? "retry" : "no_retry",
         providerRejected ? "known_provider_rejection_no_immediate_retry"
-          : afterSend ? "indeterminate_after_send_no_blind_retry" : attempt < MAX_BEFORE_SEND_ATTEMPTS
+          : qualifiedReadUnknown ? attempt < maximumAttempts
+            ? "qualified_public_read_new_attempt_authorized"
+            : "qualified_public_read_operational_attempt_limit_reached_not_analytical_completion"
+          : afterSend ? "indeterminate_after_send_no_blind_retry" : attempt < maximumAttempts
           ? "before_send_failure_bounded_retry" : "before_send_retry_limit_reached");
-      if (afterSend || providerRejected || attempt === MAX_BEFORE_SEND_ATTEMPTS) return { state: "failed", value: null, operation: settled };
+      if ((!qualifiedReadUnknown && afterSend) || providerRejected || attempt === maximumAttempts) {
+        return { state: "failed", value: null, operation: settled };
+      }
     }
   }
   throw new Error("rg_operation_retry_state_invalid");
@@ -1243,6 +1326,72 @@ function publicDocumentRetrievalReplayContract(
       contractVersion: "canonical_rg_retrieved_document_admission_v1",
     },
   };
+}
+
+export function compileCanonicalQualifiedPublicReadContract(
+  candidate: CanonicalRgDiscoveryCandidate,
+): CanonicalQualifiedPublicReadContractV1 {
+  return {
+    schemaVersion: "canonical_qualified_public_read_v1",
+    runtimePolicyAmendment: "frozen_product_model_runtime_policy_amendment_v0_3",
+    normalizedUrl: normalizeSafeHttpsUrl(candidate.url),
+    method: "GET",
+    transport: "https",
+    authentication: "none",
+    authorizationHeader: "absent",
+    cookieHeader: "absent",
+    credentialMaterial: "absent",
+    requestBody: "absent",
+    merchantPrivateData: "absent",
+    redirectHandling: "fresh_destination_authorization_required",
+    destinationSafety: "dns_public_address_pinned_and_rebinding_protected",
+    canonicalMutationBeforeAdmission: false,
+    recoveryPermission: "new_separately_identified_bounded_read_attempt",
+    reconciliationEffect: "no_run_wide_barrier_for_this_qualified_read_only",
+    evidenceEffect: "none",
+    analyticalCompletionEffect: "none",
+  };
+}
+
+export function assertCanonicalQualifiedPublicReadContract(
+  kind: CanonicalRgOperation["kind"],
+  operationInput: unknown,
+  contract: CanonicalQualifiedPublicReadContractV1,
+): CanonicalQualifiedPublicReadContractV1 {
+  const embedded = operationInput && typeof operationInput === "object"
+    ? (operationInput as Record<string, unknown>).qualifiedPublicRead : null;
+  if (kind !== "public_retrieval" || !embedded || digest(embedded) !== digest(contract)
+    || contract.schemaVersion !== "canonical_qualified_public_read_v1"
+    || contract.runtimePolicyAmendment !== "frozen_product_model_runtime_policy_amendment_v0_3"
+    || normalizeSafeHttpsUrl(contract.normalizedUrl) !== contract.normalizedUrl
+    || contract.method !== "GET" || contract.transport !== "https"
+    || contract.authentication !== "none" || contract.authorizationHeader !== "absent"
+    || contract.cookieHeader !== "absent" || contract.credentialMaterial !== "absent"
+    || contract.requestBody !== "absent" || contract.merchantPrivateData !== "absent"
+    || contract.redirectHandling !== "fresh_destination_authorization_required"
+    || contract.destinationSafety !== "dns_public_address_pinned_and_rebinding_protected"
+    || contract.canonicalMutationBeforeAdmission !== false
+    || contract.recoveryPermission !== "new_separately_identified_bounded_read_attempt"
+    || contract.reconciliationEffect !== "no_run_wide_barrier_for_this_qualified_read_only"
+    || contract.evidenceEffect !== "none" || contract.analyticalCompletionEffect !== "none") {
+    throw new Error("rg_qualified_public_read_contract_invalid");
+  }
+  return contract;
+}
+
+function validatedQualifiedPublicReadMaximumAttempts(
+  policy: CanonicalQualifiedPublicReadOperationalPolicyV1 | undefined,
+): number {
+  const value = policy ?? {
+    schemaVersion: "canonical_qualified_public_read_operational_policy_v1" as const,
+    maximumAttemptsPerCandidate: DEFAULT_QUALIFIED_PUBLIC_READ_MAX_ATTEMPTS,
+  };
+  if (value.schemaVersion !== "canonical_qualified_public_read_operational_policy_v1"
+    || !Number.isSafeInteger(value.maximumAttemptsPerCandidate)
+    || value.maximumAttemptsPerCandidate < 1 || value.maximumAttemptsPerCandidate > 5) {
+    throw new Error("rg_qualified_public_read_operational_policy_invalid");
+  }
+  return value.maximumAttemptsPerCandidate;
 }
 
 function rebindReplayedPublicDocument(
@@ -1391,7 +1540,8 @@ function markOperationSent(runId: string, operationId: string, workerId: string)
 }
 
 function settleOperation(runId: string, operation: CanonicalRgOperation,
-  state: Extract<CanonicalRgOperation["state"], "completed" | "failed_before_send" | "provider_rejected" | "indeterminate_after_send">,
+  state: Extract<CanonicalRgOperation["state"], "completed" | "failed_before_send" | "provider_rejected"
+    | "public_read_transport_outcome_unknown" | "indeterminate_after_send">,
   result: unknown | null, receipt: RgEvidencePortReceipt | null, reasonCode: string): CanonicalRgOperation {
   const latest = operationFromDb(runId, operation.operationId) ?? operation;
   assertRetrievalTransportDiagnostics(operation.kind, receipt?.retrievalTransportDiagnostics ?? null);
@@ -1399,7 +1549,8 @@ function settleOperation(runId: string, operation: CanonicalRgOperation,
     receipt: { ...latest.receipt,
       sendState: latest.receipt.sendState,
       completionState: state === "completed" ? "completed" : state === "provider_rejected" ? "provider_rejected"
-        : state === "indeterminate_after_send" ? "indeterminate" : "failed",
+        : state === "indeterminate_after_send" ? "indeterminate"
+        : state === "public_read_transport_outcome_unknown" ? "public_read_transport_outcome_unknown" : "failed",
       providerCode: receipt?.providerCode ?? latest.receipt.providerCode,
       providerRequestId: receipt?.providerRequestId ?? latest.receipt.providerRequestId,
       calls: receipt?.calls ?? latest.receipt.calls,
@@ -1422,7 +1573,7 @@ function assertRetrievalTransportDiagnostics(kind: CanonicalRgOperation["kind"],
   if (diagnostics === null) return;
   if (kind !== "public_retrieval"
     || diagnostics.schemaVersion !== "public_https_retrieval_transport_diagnostics_v1"
-    || diagnostics.configurationCode !== "ratereveal_node_https_pinned_v3") {
+    || !["ratereveal_node_https_pinned_v3", "ratereveal_node_https_pinned_v4"].includes(diagnostics.configurationCode)) {
     throw new Error("rg_retrieval_transport_diagnostics_binding_invalid");
   }
   const resolution = diagnostics.resolution;
@@ -1430,14 +1581,16 @@ function assertRetrievalTransportDiagnostics(kind: CanonicalRgOperation["kind"],
     || !safeElapsed(resolution.resolutionElapsedMs)
     || !Number.isSafeInteger(resolution.approvedAddressCount) || resolution.approvedAddressCount < 0
     || ![null, 4, 6].includes(resolution.selectedAddressFamily)
-    || !["none", "first_lexicographically_sorted_approved_address"].includes(resolution.selectionPolicy)
+    || !["none", "first_lexicographically_sorted_approved_address",
+      "logical_attempt_rotated_approved_address"].includes(resolution.selectionPolicy)
     || (resolution.state === "failed_before_permit"
       && (resolution.approvedAddressCount !== 0 || resolution.selectedAddressFamily !== null
         || resolution.selectionPolicy !== "none"))
     || (resolution.state === "permit_bound"
       && (resolution.approvedAddressCount < 1
         || (resolution.selectedAddressFamily !== 4 && resolution.selectedAddressFamily !== 6)
-        || resolution.selectionPolicy !== "first_lexicographically_sorted_approved_address"))) {
+        || !["first_lexicographically_sorted_approved_address",
+          "logical_attempt_rotated_approved_address"].includes(resolution.selectionPolicy)))) {
     throw new Error("rg_retrieval_transport_diagnostics_resolution_invalid");
   }
   const milestoneValues = Object.values(diagnostics.milestones);
@@ -1461,7 +1614,12 @@ function assertRetrievalTransportDiagnostics(kind: CanonicalRgOperation["kind"],
     || !["destination_resolution", "connection_establishment", "tls_handshake", "response_headers",
       "response_body", "completed"].includes(termination.phase)
     || !/^[a-z][a-z0-9_]{0,127}$/.test(termination.safeReasonClass)
-    || termination.socketInactivityTimeoutMs !== 12_000
+    || !Number.isSafeInteger(termination.socketInactivityTimeoutMs)
+    || termination.socketInactivityTimeoutMs < 1_000 || termination.socketInactivityTimeoutMs > 120_000
+    || (termination.totalAttemptTimeoutMs !== undefined
+      && (!Number.isSafeInteger(termination.totalAttemptTimeoutMs)
+        || termination.totalAttemptTimeoutMs < termination.socketInactivityTimeoutMs
+        || termination.totalAttemptTimeoutMs > 300_000))
     || (termination.outcome === "completed" && termination.phase !== "completed")) {
     throw new Error("rg_retrieval_transport_diagnostics_termination_invalid");
   }
@@ -1812,6 +1970,11 @@ function safeReasonCode(value: unknown): value is string {
 function exactDocumentAdmissionStopReason(reasonCodes: string[]): string {
   const exact = [...new Set(reasonCodes)].sort()[0] ?? "document_admission_reason_unavailable";
   return `rg_document_admission_failed:${exact}`.slice(0, 192);
+}
+
+function exactPublicReadTransportStopReason(reasonCodes: string[]): string {
+  const exact = [...new Set(reasonCodes)].sort()[0] ?? "retrieval_transport_reason_unavailable";
+  return `rg_qualified_public_read_transport_unavailable:${exact}`.slice(0, 192);
 }
 
 function exactNoSupportStopReason(outcomes: CanonicalRgCandidateResearchOutcome["outcomeClass"][]): string {

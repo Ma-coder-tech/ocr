@@ -336,13 +336,14 @@ export type PublicRetrievalTransportPhase =
  */
 export type PublicRetrievalTransportDiagnosticsV1 = {
   schemaVersion: "public_https_retrieval_transport_diagnostics_v1";
-  configurationCode: "ratereveal_node_https_pinned_v3";
+  configurationCode: "ratereveal_node_https_pinned_v3" | "ratereveal_node_https_pinned_v4";
   resolution: {
     state: "failed_before_permit" | "permit_bound";
     resolutionElapsedMs: number | null;
     approvedAddressCount: number;
     selectedAddressFamily: 4 | 6 | null;
-    selectionPolicy: "none" | "first_lexicographically_sorted_approved_address";
+    selectionPolicy: "none" | "first_lexicographically_sorted_approved_address"
+      | "logical_attempt_rotated_approved_address";
   };
   milestones: {
     socketAssignedMs: number | null;
@@ -366,7 +367,8 @@ export type PublicRetrievalTransportDiagnosticsV1 = {
     outcome: "in_progress" | "completed" | "timed_out" | "cancelled" | "failed";
     phase: PublicRetrievalTransportPhase;
     safeReasonClass: string;
-    socketInactivityTimeoutMs: 12_000;
+    socketInactivityTimeoutMs: number;
+    totalAttemptTimeoutMs?: number;
   };
 };
 
@@ -384,7 +386,7 @@ export type RetrievalRequest = {
   permit: DestinationPermit;
   maximumBytes: number;
   httpsOnly: true;
-  logicalAttempt: 1;
+  logicalAttempt: number;
   signal: AbortSignal;
   recordReceivedBytes(cumulativeBytes: number): "continue" | "abort";
   authorizeRedirect(rawUrl: string): Promise<DestinationPermit>;

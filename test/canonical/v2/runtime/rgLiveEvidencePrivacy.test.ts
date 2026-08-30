@@ -267,12 +267,12 @@ describe("production approved-AI packet admission", () => {
     const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
     const ports = live.createProductionRgEvidencePortsFromEnvironment("completed-unusable-live-adapter-run");
     let sends = 0;
+    const candidate = { candidateId: "candidate-one", url: "https://www.fiserv.com/public-document",
+      title: "Public document", claimedAuthority: "processor_publication" as const, publicationDate: null,
+      effectiveFrom: null, effectiveTo: null };
 
     try {
-      await ports.retrieve({ intent: { atomicClaimId: "atomic-claim-one" }, candidate: {
-        candidateId: "candidate-one", url: "https://www.fiserv.com/public-document", title: "Public document",
-        claimedAuthority: "processor_publication", publicationDate: null, effectiveFrom: null, effectiveTo: null,
-      }, maximumBytes: 5_242_880 } as never, () => { sends += 1; });
+      await ports.retrieve(qualifiedRetrievalInput(execution, "atomic-claim-one", candidate), () => { sends += 1; });
       throw new Error("expected deterministic unusable retrieval");
     } catch (error) {
       expect(error).toBeInstanceOf(execution.RgEvidenceCompletedUnusableError);
@@ -315,8 +315,9 @@ describe("production approved-AI packet admission", () => {
       }) }),
       createNodeHttpsRetrievalPort: (_capability: unknown, config: { audit: { reserve(value: unknown): void } }) => ({
         retrieve: async (request: { reservationId: string; documentId: string }) => {
+          const transportOperationId = request.reservationId.slice(0, -":document".length);
           config.audit.reserve({ receiptId: "receipt-timeout-diagnostics", reservationId: request.reservationId,
-            operationId: request.documentId, operation: "retrieval", providerCode: "node_https_pinned",
+            operationId: transportOperationId, operation: "retrieval", providerCode: "node_https_pinned",
             logicalAttempt: 1, actualSendCount: 1, retryCount: 0, sendState: "sent", completionState: "timed_out",
             elapsedMs: 12_004, usageState: "unknown_possible_billable", outputTokens: null,
             providerRequestCount: null, usageCostUsd: null, providerConfigurationCode: "ratereveal_node_https_pinned_v3",
@@ -333,11 +334,11 @@ describe("production approved-AI packet admission", () => {
     const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
     const ports = live.createProductionRgEvidencePortsFromEnvironment("phase-diagnostics-live-adapter-run");
     let sends = 0;
+    const candidate = { candidateId: "candidate-timeout", url: "https://www.fiserv.com/public-document",
+      title: "Public document", claimedAuthority: "processor_publication" as const, publicationDate: null,
+      effectiveFrom: null, effectiveTo: null };
     try {
-      await ports.retrieve({ intent: { atomicClaimId: "atomic-claim-timeout" }, candidate: {
-        candidateId: "candidate-timeout", url: "https://www.fiserv.com/public-document", title: "Public document",
-        claimedAuthority: "processor_publication", publicationDate: null, effectiveFrom: null, effectiveTo: null,
-      }, maximumBytes: 5_242_880 } as never, () => { sends += 1; });
+      await ports.retrieve(qualifiedRetrievalInput(execution, "atomic-claim-timeout", candidate), () => { sends += 1; });
       throw new Error("expected transport timeout");
     } catch (error) {
       expect(error).toBeInstanceOf(execution.RgEvidenceTransportError);
@@ -378,11 +379,11 @@ describe("production approved-AI packet admission", () => {
     const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
     const ports = live.createProductionRgEvidencePortsFromEnvironment("resolution-diagnostics-live-adapter-run");
     let sends = 0;
+    const candidate = { candidateId: "candidate-resolution", url: "https://www.fiserv.com/public-document",
+      title: "Public document", claimedAuthority: "processor_publication" as const, publicationDate: null,
+      effectiveFrom: null, effectiveTo: null };
     try {
-      await ports.retrieve({ intent: { atomicClaimId: "atomic-claim-resolution" }, candidate: {
-        candidateId: "candidate-resolution", url: "https://www.fiserv.com/public-document", title: "Public document",
-        claimedAuthority: "processor_publication", publicationDate: null, effectiveFrom: null, effectiveTo: null,
-      }, maximumBytes: 5_242_880 } as never, () => { sends += 1; });
+      await ports.retrieve(qualifiedRetrievalInput(execution, "atomic-claim-resolution", candidate), () => { sends += 1; });
       throw new Error("expected destination resolution failure");
     } catch (error) {
       expect(error).toBeInstanceOf(execution.RgEvidenceTransportError);
@@ -429,12 +430,14 @@ describe("production approved-AI packet admission", () => {
       } }),
     }));
     const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
+    const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
     const ports = live.createProductionRgEvidencePortsFromEnvironment("normalized-document-provenance-run");
+    const candidate = { candidateId: "candidate-normalized", url: "https://www.fiserv.com/public-document",
+      title: "Public document", claimedAuthority: "processor_publication" as const, publicationDate: null,
+      effectiveFrom: null, effectiveTo: null };
     try {
-      const result = await ports.retrieve({ intent: { atomicClaimId: "atomic-claim-normalized" }, candidate: {
-        candidateId: "candidate-normalized", url: "https://www.fiserv.com/public-document", title: "Public document",
-        claimedAuthority: "processor_publication", publicationDate: null, effectiveFrom: null, effectiveTo: null,
-      }, maximumBytes: 5_242_880 } as never, () => undefined);
+      const result = await ports.retrieve(qualifiedRetrievalInput(execution, "atomic-claim-normalized", candidate),
+        () => undefined);
       expect(result.value).toMatchObject({ documentFingerprint: rawFingerprint, byteLength: content.byteLength,
         locators: [{ textExcerpt: "Official application fee schedule", textDerivation: {
           schemaVersion: "public_document_locator_text_derivation_v1",
@@ -477,11 +480,11 @@ describe("production approved-AI packet admission", () => {
     const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
     const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
     const ports = live.createProductionRgEvidencePortsFromEnvironment("control-document-rejection-run");
+    const candidate = { candidateId: "candidate-control", url: "https://www.fiserv.com/public-document",
+      title: "Public document", claimedAuthority: "processor_publication" as const, publicationDate: null,
+      effectiveFrom: null, effectiveTo: null };
     try {
-      await ports.retrieve({ intent: { atomicClaimId: "atomic-claim-control" }, candidate: {
-        candidateId: "candidate-control", url: "https://www.fiserv.com/public-document", title: "Public document",
-        claimedAuthority: "processor_publication", publicationDate: null, effectiveFrom: null, effectiveTo: null,
-      }, maximumBytes: 5_242_880 } as never, () => undefined);
+      await ports.retrieve(qualifiedRetrievalInput(execution, "atomic-claim-control", candidate), () => undefined);
       throw new Error("expected deterministic control-content rejection");
     } catch (error) {
       expect(error).toBeInstanceOf(execution.RgEvidenceCompletedUnusableError);
@@ -521,12 +524,12 @@ describe("production approved-AI packet admission", () => {
     const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
     const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
     const ports = live.createProductionRgEvidencePortsFromEnvironment("retrieved-secret-admission-run");
+    const candidate = { candidateId: "candidate-secret", url: "https://www.fiserv.com/public-document",
+      title: "Public document", claimedAuthority: "processor_publication" as const, publicationDate: null,
+      effectiveFrom: null, effectiveTo: null };
 
     try {
-      await ports.retrieve({ intent: { atomicClaimId: "atomic-claim-secret" }, candidate: {
-        candidateId: "candidate-secret", url: "https://www.fiserv.com/public-document", title: "Public document",
-        claimedAuthority: "processor_publication", publicationDate: null, effectiveFrom: null, effectiveTo: null,
-      }, maximumBytes: 5_242_880 } as never, () => undefined);
+      await ports.retrieve(qualifiedRetrievalInput(execution, "atomic-claim-secret", candidate), () => undefined);
       throw new Error("expected retrieved credential rejection");
     } catch (error) {
       expect(error).toBeInstanceOf(execution.RgEvidenceCompletedUnusableError);
@@ -539,6 +542,20 @@ describe("production approved-AI packet admission", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });
+
+function qualifiedRetrievalInput(
+  execution: typeof import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js"),
+  atomicClaimId: string,
+  candidate: Parameters<typeof execution.compileCanonicalQualifiedPublicReadContract>[0],
+) {
+  return {
+    intent: { atomicClaimId } as never,
+    candidate,
+    maximumBytes: 5_242_880,
+    logicalAttempt: 1,
+    qualifiedPublicRead: execution.compileCanonicalQualifiedPublicReadContract(candidate),
+  };
+}
 
 function approvedAiPacket(value: unknown) {
   return {

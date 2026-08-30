@@ -256,9 +256,9 @@ export type ProviderOperationReceiptV1 = {
   operationId: string;
   operation: "search" | "retrieval" | "investigative_model" | "semantic_model";
   providerCode: string;
-  logicalAttempt: 1;
+  logicalAttempt: number;
   actualSendCount: 0 | 1;
-  retryCount: 0;
+  retryCount: number;
   sendState: "not_sent" | "sent";
   completionState: "reserved" | "not_sent" | "completed" | "timed_out" | "cancelled" | "failed" | "unknown_possible_billable";
   elapsedMs: number;

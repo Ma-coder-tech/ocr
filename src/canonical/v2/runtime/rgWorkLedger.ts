@@ -135,11 +135,13 @@ export type CanonicalRgOperation = {
   kind: "public_search" | "public_retrieval" | "investigation" | "independent_verification";
   attempt: number;
   candidateId: string | null;
-  state: "reserved" | "sent" | "completed" | "failed_before_send" | "provider_rejected" | "indeterminate_after_send";
+  state: "reserved" | "sent" | "completed" | "failed_before_send" | "provider_rejected"
+    | "public_read_transport_outcome_unknown" | "indeterminate_after_send";
   reservation: { reservationId: string; workerId: string; reservedAt: string; expiresAt: string };
   receipt: {
     sendState: "not_sent" | "sent";
-    completionState: "reserved" | "completed" | "failed" | "provider_rejected" | "indeterminate";
+    completionState: "reserved" | "completed" | "failed" | "provider_rejected"
+      | "public_read_transport_outcome_unknown" | "indeterminate";
     providerCode: string;
     providerRequestId: string | null;
     calls: number;

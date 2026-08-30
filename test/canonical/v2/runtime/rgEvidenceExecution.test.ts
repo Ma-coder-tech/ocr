@@ -46,6 +46,33 @@ describe("production durable claim-bound RG evidence execution", () => {
     await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
   });
 
+  it("qualifies only the exact anonymous bodyless public HTTPS GET contract", async () => {
+    const executor = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
+    const candidate: CanonicalRgDiscoveryCandidate = {
+      candidateId: "qualified-contract-candidate", url: "https://docs.example.test/public-rule",
+      title: "Public rule", claimedAuthority: "processor_publication", publicationDate: null,
+      effectiveFrom: null, effectiveTo: null,
+    };
+    const contract = executor.compileCanonicalQualifiedPublicReadContract(candidate);
+    const operationInput = { intentId: "intent-one", candidate, qualifiedPublicRead: contract };
+    expect(executor.assertCanonicalQualifiedPublicReadContract("public_retrieval", operationInput, contract))
+      .toEqual(contract);
+    for (const mutation of [
+      { method: "POST" }, { authentication: "present" }, { authorizationHeader: "present" },
+      { cookieHeader: "present" }, { credentialMaterial: "present" }, { requestBody: "present" },
+      { merchantPrivateData: "present" }, { redirectHandling: "follow_automatically" },
+      { normalizedUrl: "http://docs.example.test/public-rule" },
+    ]) {
+      const malicious = { ...contract, ...mutation } as typeof contract;
+      expect(() => executor.assertCanonicalQualifiedPublicReadContract("public_retrieval",
+        { ...operationInput, qualifiedPublicRead: malicious }, malicious)).toThrow();
+    }
+    expect(() => executor.assertCanonicalQualifiedPublicReadContract("investigation", operationInput, contract))
+      .toThrow("rg_qualified_public_read_contract_invalid");
+    expect(() => executor.compileCanonicalQualifiedPublicReadContract({ ...candidate,
+      url: "https://user:password@docs.example.test/private" })).toThrow();
+  });
+
   it("executes only an admitted persisted work item through a privacy-safe intent and dynamically verified new official source", async () => {
     const setup = await runWithOneWorkItem();
     const calls: string[] = [];
@@ -944,7 +971,7 @@ describe("production durable claim-bound RG evidence execution", () => {
     dbModule = indeterminateSetup.db;
   }, 30_000);
 
-  it("durably preserves retrieval timeout phase evidence without changing the reconciliation barrier or truth", async () => {
+  it("durably preserves qualified public-read timeouts, retries separately, and never creates reconciliation", async () => {
     const setup = await runWithOneWorkItem();
     const ports = successfulPorts([]);
     const beforeTruth = setup.run.canonicalTruthHash;
@@ -974,13 +1001,17 @@ describe("production durable claim-bound RG evidence execution", () => {
     const second = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
       workerId: "retrieval-timeout-diagnostics-two" });
     const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
-    const retrieval = persisted.rgOperations.find((operation) => operation.kind === "public_retrieval")!;
+    const retrievals = persisted.rgOperations.filter((operation) => operation.kind === "public_retrieval")
+      .sort((left, right) => left.attempt - right.attempt);
 
-    expect(first).toMatchObject({ workItemsDegraded: 1, canonicalTruthPreserved: true });
-    expect(second).toMatchObject({ workItemsDegraded: 1, canonicalTruthPreserved: true });
-    expect(retrievalSends).toBe(1);
-    expect(retrieval).toMatchObject({ state: "indeterminate_after_send", receipt: {
-      sendState: "sent", completionState: "indeterminate", providerCode: "node_https_pinned", calls: 1,
+    expect(first).toMatchObject({ workItemsCompletedUnresolved: 1, workItemsDegraded: 0,
+      canonicalTruthPreserved: true });
+    expect(second).toMatchObject({ workItemsCompletedUnresolved: 1, workItemsDegraded: 0,
+      canonicalTruthPreserved: true });
+    expect(retrievalSends).toBe(2);
+    expect(retrievals).toHaveLength(2);
+    expect(retrievals[0]).toMatchObject({ attempt: 1, state: "public_read_transport_outcome_unknown", receipt: {
+      sendState: "sent", completionState: "public_read_transport_outcome_unknown", providerCode: "node_https_pinned", calls: 1,
       retrievalBytes: 0, reasonCode: "retrieval_timeout", retrievalTransportDiagnostics: {
         resolution: { state: "permit_bound", resolutionElapsedMs: 4, approvedAddressCount: 2,
           selectedAddressFamily: 4 },
@@ -988,18 +1019,165 @@ describe("production durable claim-bound RG evidence execution", () => {
         response: { httpStatus: null, bytesObserved: 0, bodyCompleted: false },
         termination: { outcome: "timed_out", phase: "response_headers", safeReasonClass: "retrieval_timeout" },
       } } });
-    expect(persisted.rgWorkItems[0]!.retryDecisions).toContainEqual(expect.objectContaining({
-      decision: "no_retry", reasonCode: "indeterminate_after_send_no_blind_retry",
-    }));
+    expect(retrievals[1]).toMatchObject({ attempt: 2, state: "public_read_transport_outcome_unknown", receipt: {
+      sendState: "sent", completionState: "public_read_transport_outcome_unknown", providerCode: "node_https_pinned", calls: 1,
+      retrievalBytes: 0, reasonCode: "retrieval_timeout", retrievalTransportDiagnostics: {
+        resolution: { state: "permit_bound", resolutionElapsedMs: 4, approvedAddressCount: 2,
+          selectedAddressFamily: 4 },
+        milestones: { tcpConnectedMs: 2, tlsEstablishedMs: 3, responseHeadersMs: null },
+        response: { httpStatus: null, bytesObserved: 0, bodyCompleted: false },
+        termination: { outcome: "timed_out", phase: "response_headers", safeReasonClass: "retrieval_timeout" },
+      } } });
+    expect(retrievals[1]!.receipt.completionState).toBe("public_read_transport_outcome_unknown");
+    expect(persisted.rgWorkItems[0]!.retryDecisions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ decision: "retry", reasonCode: "qualified_public_read_new_attempt_authorized" }),
+      expect.objectContaining({ decision: "no_retry",
+        reasonCode: "qualified_public_read_operational_attempt_limit_reached_not_analytical_completion" }),
+    ]));
+    expect(persisted.rgWorkItems[0]).toMatchObject({ executionState: "completed_unresolved",
+      stopReason: "rg_qualified_public_read_transport_unavailable:retrieval_timeout" });
     expect(persisted.externalEvidenceRegistry).toHaveLength(0);
     expect(persisted.canonicalTruthHash).toBe(beforeTruth);
     expect(persisted.financialFoundationHash).toBe(beforeFinancial);
     expect(persisted.result!.artifacts.rh).toEqual(setup.run.artifacts.rh);
     const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
-    expect(controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId })).toMatchObject({
-      lifecycle: "indeterminate_reconciliation_required",
-    });
+    expect(controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId }).lifecycle)
+      .not.toBe("indeterminate_reconciliation_required");
     dbModule = setup.db;
+  }, 30_000);
+
+  it("continues to another candidate after bounded partial-body public-read recovery without semantic transfer", async () => {
+    const setup = await runWithOneWorkItem();
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const originalSearch = ports.search;
+    const originalRetrieve = ports.retrieve;
+    const attempts: number[] = [];
+    ports.search = async (input, onSend) => {
+      const result = await originalSearch(input, onSend);
+      const first = { ...result.value[0]!, candidateId: "candidate-stalled",
+        url: "https://merchants.fiserv.com/stalled-official-document" };
+      const second = { ...result.value[0]!, candidateId: "candidate-available",
+        url: "https://merchants.fiserv.com/available-official-document" };
+      return { ...result, value: [first, second] };
+    };
+    ports.retrieve = async (input, onSend) => {
+      if (input.candidate.candidateId !== "candidate-stalled") return originalRetrieve(input, onSend);
+      calls.push(`retrieve-stalled-${input.logicalAttempt}`); attempts.push(input.logicalAttempt); onSend();
+      throw new setup.executor.RgEvidenceTransportError("timed_out", "retrieval_timeout", {
+        providerCode: "node_https_pinned", providerRequestId: null, calls: 1, tokens: 0, retrievalBytes: 128,
+        retrievalTransportDiagnostics: {
+          schemaVersion: "public_https_retrieval_transport_diagnostics_v1",
+          configurationCode: "ratereveal_node_https_pinned_v4",
+          resolution: { state: "permit_bound", resolutionElapsedMs: 2, approvedAddressCount: 2,
+            selectedAddressFamily: 4, selectionPolicy: input.logicalAttempt === 1
+              ? "first_lexicographically_sorted_approved_address" : "logical_attempt_rotated_approved_address" },
+          milestones: { socketAssignedMs: 1, tcpConnectedMs: 2, tlsEstablishedMs: 3, requestSentMs: 0,
+            responseHeadersMs: 4, firstBodyByteMs: 5, bodyCompletedMs: null },
+          response: { connectedAddressFamily: 4, httpStatus: 200, redirectObserved: false,
+            responseHeadersObserved: true, firstBodyByteObserved: true, bytesObserved: 128, bodyCompleted: false },
+          termination: { outcome: "timed_out", phase: "response_body", safeReasonClass: "retrieval_timeout",
+            socketInactivityTimeoutMs: 12_000, totalAttemptTimeoutMs: 45_000 },
+        },
+      });
+    };
+
+    const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+      workerId: "qualified-read-alternate-candidate-worker" });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const stalled = persisted.rgOperations.filter((operation) => operation.candidateId === "candidate-stalled");
+    const available = persisted.rgOperations.filter((operation) => operation.candidateId === "candidate-available");
+
+    expect(result).toMatchObject({ workItemsCompletedWithEvidence: 1, workItemsDegraded: 0,
+      canonicalTruthPreserved: true });
+    expect(attempts).toEqual([1, 2]);
+    expect(stalled).toHaveLength(2);
+    expect(stalled.every((operation) => operation.state === "public_read_transport_outcome_unknown")).toBe(true);
+    expect(stalled.reduce((sum, operation) => sum + operation.receipt.retrievalBytes, 0)).toBe(256);
+    expect(available.map((operation) => operation.kind).sort()).toEqual([
+      "independent_verification", "investigation", "public_retrieval",
+    ]);
+    expect(persisted.externalEvidenceRegistry).toHaveLength(0);
+    expect(result.verifiedEvidence).toHaveLength(1);
+    expect(result.verifiedEvidence[0]!.candidateId).toBe("candidate-available");
+    expect(result.verifiedEvidence[0]!.sourceUrl).toBe("https://merchants.fiserv.com/available-official-document");
+    expect(persisted.rgOperations.some((operation) => operation.state === "indeterminate_after_send")).toBe(false);
+    expect(persisted.canonicalTruthHash).toBe(setup.run.canonicalTruthHash);
+    expect(persisted.financialFoundationHash).toBe(setup.run.financialFoundationHash);
+  }, 30_000);
+
+  it("resumes a durable qualified-read attempt lineage after restart without repeating the original send", async () => {
+    const setup = await runWithOneWorkItem();
+    let sends = 0;
+    const firstPorts = successfulPorts([]);
+    firstPorts.qualifiedPublicReadOperationalPolicy = {
+      schemaVersion: "canonical_qualified_public_read_operational_policy_v1", maximumAttemptsPerCandidate: 1,
+    };
+    firstPorts.retrieve = async (_input, onSend) => {
+      onSend(); sends += 1;
+      throw new setup.executor.RgEvidenceTransportError("after_send", "retrieval_network_connect_failed");
+    };
+    await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports: firstPorts,
+      workerId: "qualified-read-before-restart" });
+    const beforeRestart = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const prior = beforeRestart.rgOperations.find((operation) => operation.kind === "public_retrieval")!;
+    expect(prior).toMatchObject({ attempt: 1, state: "public_read_transport_outcome_unknown" });
+
+    const priorWork = beforeRestart.rgWorkItems[0]!;
+    const reopened: CanonicalRgWorkItem = { ...structuredClone(priorWork), state: "planned",
+      executionState: "planned_for_durable_execution", reservation: null,
+      progress: { state: "not_started", operationsAttempted: priorWork.progress.operationsAttempted,
+        evidenceItemsObserved: 0 }, stopReason: null, verifiedEvidenceRefs: [] };
+    setup.db.db.prepare(`UPDATE canonical_rg_work_items SET state = ?, execution_state = ?, work_item_json = ?
+      WHERE run_id = ? AND work_item_id = ?`).run(reopened.state, reopened.executionState, JSON.stringify(reopened),
+      setup.run.runId, reopened.workItemId);
+
+    const restartCalls: string[] = [];
+    const restartedPorts = successfulPorts(restartCalls);
+    restartedPorts.qualifiedPublicReadOperationalPolicy = {
+      schemaVersion: "canonical_qualified_public_read_operational_policy_v1", maximumAttemptsPerCandidate: 2,
+    };
+    const result = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId,
+      ports: restartedPorts, workerId: "qualified-read-after-restart" });
+    const afterRestart = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const attempts = afterRestart.rgOperations.filter((operation) => operation.kind === "public_retrieval")
+      .sort((left, right) => left.attempt - right.attempt);
+
+    expect(result.workItemsCompletedWithEvidence).toBe(1);
+    expect(sends).toBe(1);
+    expect(restartCalls).toEqual(["retrieve", "investigate", "verify"]);
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0]).toMatchObject({ operationId: prior.operationId, attempt: 1,
+      state: "public_read_transport_outcome_unknown" });
+    expect(attempts[1]).toMatchObject({ attempt: 2, state: "completed" });
+    expect(afterRestart.rgOperations.some((operation) => operation.state === "indeterminate_after_send")).toBe(false);
+    expect(afterRestart.canonicalTruthHash).toBe(setup.run.canonicalTruthHash);
+    expect(afterRestart.financialFoundationHash).toBe(setup.run.financialFoundationHash);
+  }, 30_000);
+
+  it("serializes concurrent qualified-read recovery so one attempt identity is sent at most once", async () => {
+    const setup = await runWithOneWorkItem();
+    let retrievalSends = 0;
+    const ports = successfulPorts([]);
+    ports.retrieve = async (_input, onSend) => {
+      onSend(); retrievalSends += 1;
+      await Promise.resolve();
+      throw new setup.executor.RgEvidenceTransportError("timed_out", "retrieval_timeout");
+    };
+    const [left, right] = await Promise.all([
+      setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+        workerId: "qualified-read-concurrent-left" }),
+      setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+        workerId: "qualified-read-concurrent-right" }),
+    ]);
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const retrievals = persisted.rgOperations.filter((operation) => operation.kind === "public_retrieval");
+    expect(left.workItemsConsidered + right.workItemsConsidered).toBeGreaterThanOrEqual(1);
+    expect(retrievalSends).toBe(2);
+    expect(retrievals).toHaveLength(2);
+    expect(new Set(retrievals.map((operation) => operation.operationId)).size).toBe(2);
+    expect(retrievals.every((operation) => operation.state === "public_read_transport_outcome_unknown")).toBe(true);
+    expect(persisted.rgOperations.some((operation) => operation.state === "indeterminate_after_send")).toBe(false);
   }, 30_000);
 
   it("persists a received-but-unusable retrieval as deterministic failure without a reconciliation barrier", async () => {
