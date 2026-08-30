@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { db, nowIso } from "../../../db.js";
 import { canonicalJson } from "../canonicalJson.js";
 import type { CanonicalRgClaimValue, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
-import type { ExtractedLocator } from "../intelligence/intelligenceTypes.js";
+import type { ExtractedLocator, PublicRetrievalTransportDiagnosticsV1 } from "../intelligence/intelligenceTypes.js";
 import {
   normalizeAndChunkPublicDocumentText,
   validatePublicDocumentLocatorTextDerivation,
@@ -43,7 +43,7 @@ import {
   type CanonicalRgWorkItem,
 } from "./rgWorkLedger.js";
 
-export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1_5" as const;
+export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1_6" as const;
 
 const MAX_CANDIDATES_PER_WORK_ITEM = 2;
 const MAX_BEFORE_SEND_ATTEMPTS = 2;
@@ -397,6 +397,7 @@ export type RgEvidencePortReceipt = {
   tokens: number | null;
   retrievalBytes: number;
   providerDiagnostics?: CanonicalRgProviderDiagnostics | null;
+  retrievalTransportDiagnostics?: PublicRetrievalTransportDiagnosticsV1 | null;
 };
 
 export type RgEvidencePortResult<T> = { value: T; receipt: RgEvidencePortReceipt };
@@ -1120,6 +1121,7 @@ async function runExternalOperation<T>(input: {
         calls: errorReceipt?.calls ?? 1, tokens: errorReceipt?.tokens ?? null,
         retrievalBytes: errorReceipt?.retrievalBytes ?? 0,
         providerDiagnostics: errorReceipt?.providerDiagnostics ?? null,
+        retrievalTransportDiagnostics: errorReceipt?.retrievalTransportDiagnostics ?? null,
       });
       appendRetryDecision(input.runId, input.workItem.workItemId, operation.operationId,
         !afterSend && !providerRejected && attempt < MAX_BEFORE_SEND_ATTEMPTS ? "retry" : "no_retry",
@@ -1349,7 +1351,7 @@ function reserveOperation(input: {
     state: "reserved", reservation,
     receipt: { sendState: "not_sent", completionState: "reserved", providerCode: input.providerCode,
       providerRequestId: null, calls: 0, tokens: null, retrievalBytes: 0, reasonCode: "rg_operation_reserved",
-      providerDiagnostics: null },
+      providerDiagnostics: null, retrievalTransportDiagnostics: null },
     input: structuredClone(input.operationInput), inputHash: input.inputHash, result: null, createdAt: now, updatedAt: now,
   };
   db.prepare(`INSERT INTO canonical_rg_operations
@@ -1392,6 +1394,7 @@ function settleOperation(runId: string, operation: CanonicalRgOperation,
   state: Extract<CanonicalRgOperation["state"], "completed" | "failed_before_send" | "provider_rejected" | "indeterminate_after_send">,
   result: unknown | null, receipt: RgEvidencePortReceipt | null, reasonCode: string): CanonicalRgOperation {
   const latest = operationFromDb(runId, operation.operationId) ?? operation;
+  assertRetrievalTransportDiagnostics(operation.kind, receipt?.retrievalTransportDiagnostics ?? null);
   const updated: CanonicalRgOperation = { ...latest, state, result,
     receipt: { ...latest.receipt,
       sendState: latest.receipt.sendState,
@@ -1404,12 +1407,68 @@ function settleOperation(runId: string, operation: CanonicalRgOperation,
       retrievalBytes: receipt?.retrievalBytes ?? latest.receipt.retrievalBytes,
       reasonCode,
       providerDiagnostics: receipt?.providerDiagnostics ?? latest.receipt.providerDiagnostics ?? null,
+      retrievalTransportDiagnostics: receipt?.retrievalTransportDiagnostics
+        ?? latest.receipt.retrievalTransportDiagnostics ?? null,
     }, updatedAt: nowIso() };
   updateOperation(runId, updated);
   appendEvent(runId, updated.workItemId, updated.operationId, `operation_${state}`, {
     state, receipt: updated.receipt, resultHash: result === null ? null : digest(result),
   });
   return updated;
+}
+
+function assertRetrievalTransportDiagnostics(kind: CanonicalRgOperation["kind"],
+  diagnostics: PublicRetrievalTransportDiagnosticsV1 | null): void {
+  if (diagnostics === null) return;
+  if (kind !== "public_retrieval"
+    || diagnostics.schemaVersion !== "public_https_retrieval_transport_diagnostics_v1"
+    || diagnostics.configurationCode !== "ratereveal_node_https_pinned_v3") {
+    throw new Error("rg_retrieval_transport_diagnostics_binding_invalid");
+  }
+  const resolution = diagnostics.resolution;
+  if (!["failed_before_permit", "permit_bound"].includes(resolution.state)
+    || !safeElapsed(resolution.resolutionElapsedMs)
+    || !Number.isSafeInteger(resolution.approvedAddressCount) || resolution.approvedAddressCount < 0
+    || ![null, 4, 6].includes(resolution.selectedAddressFamily)
+    || !["none", "first_lexicographically_sorted_approved_address"].includes(resolution.selectionPolicy)
+    || (resolution.state === "failed_before_permit"
+      && (resolution.approvedAddressCount !== 0 || resolution.selectedAddressFamily !== null
+        || resolution.selectionPolicy !== "none"))
+    || (resolution.state === "permit_bound"
+      && (resolution.approvedAddressCount < 1
+        || (resolution.selectedAddressFamily !== 4 && resolution.selectedAddressFamily !== 6)
+        || resolution.selectionPolicy !== "first_lexicographically_sorted_approved_address"))) {
+    throw new Error("rg_retrieval_transport_diagnostics_resolution_invalid");
+  }
+  const milestoneValues = Object.values(diagnostics.milestones);
+  if (milestoneValues.some((value) => !safeElapsed(value))) {
+    throw new Error("rg_retrieval_transport_diagnostics_milestones_invalid");
+  }
+  const response = diagnostics.response;
+  if (![null, 4, 6].includes(response.connectedAddressFamily)
+    || (response.httpStatus !== null && (!Number.isSafeInteger(response.httpStatus)
+      || response.httpStatus < 100 || response.httpStatus > 599))
+    || !Number.isSafeInteger(response.bytesObserved) || response.bytesObserved < 0
+    || response.responseHeadersObserved !== (diagnostics.milestones.responseHeadersMs !== null)
+    || response.firstBodyByteObserved !== (diagnostics.milestones.firstBodyByteMs !== null)
+    || response.bodyCompleted !== (diagnostics.milestones.bodyCompletedMs !== null)
+    || (response.firstBodyByteObserved && !response.responseHeadersObserved)
+    || (response.bodyCompleted && !response.responseHeadersObserved)) {
+    throw new Error("rg_retrieval_transport_diagnostics_response_invalid");
+  }
+  const termination = diagnostics.termination;
+  if (!["completed", "timed_out", "cancelled", "failed"].includes(termination.outcome)
+    || !["destination_resolution", "connection_establishment", "tls_handshake", "response_headers",
+      "response_body", "completed"].includes(termination.phase)
+    || !/^[a-z][a-z0-9_]{0,127}$/.test(termination.safeReasonClass)
+    || termination.socketInactivityTimeoutMs !== 12_000
+    || (termination.outcome === "completed" && termination.phase !== "completed")) {
+    throw new Error("rg_retrieval_transport_diagnostics_termination_invalid");
+  }
+}
+
+function safeElapsed(value: number | null): boolean {
+  return value === null || (Number.isSafeInteger(value) && value >= 0 && value <= 24 * 60 * 60_000);
 }
 
 function updateOperation(runId: string, operation: CanonicalRgOperation): void {

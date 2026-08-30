@@ -518,11 +518,27 @@ describe("internal-analysis construction-bound provider seams", () => {
 
     const timeoutAudit = new ProviderOperationAuditLog(); const timeoutCap = await capability(); let timeoutSends = 0;
     const timeoutSpy = vi.spyOn(https, "request").mockImplementation(((_options: any, _callback: any) => {
+      const socket = new EventEmitter() as any; socket.remoteAddress = "93.184.216.34";
       const req = new EventEmitter() as any; let timeout: () => void = () => undefined; req.setTimeout = (_ms: number, value: () => void) => { timeout = value; return req; };
-      req.destroy = (error?: Error) => { if (error) req.emit("error", error); }; req.end = () => { timeoutSends += 1; timeout(); }; return req;
+      req.destroy = (error?: Error) => { if (error) req.emit("error", error); }; req.end = () => {
+        timeoutSends += 1; req.emit("socket", socket); socket.emit("connect"); socket.emit("secureConnect"); timeout();
+      }; return req;
     }) as never);
     await expect(createNodeHttpsRetrievalPort(timeoutCap, { audit: timeoutAudit }).retrieve(request(new AbortController().signal))).rejects.toThrow("retrieval_timeout");
     expect(timeoutSends).toBe(1); expect(timeoutAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "timed_out", usageState: "unknown_possible_billable", retryCount: 0 });
+    expect(timeoutAudit.snapshot()[0]!.retrievalTransportDiagnostics).toMatchObject({
+      schemaVersion: "public_https_retrieval_transport_diagnostics_v1",
+      configurationCode: "ratereveal_node_https_pinned_v3",
+      resolution: { state: "permit_bound", resolutionElapsedMs: null, approvedAddressCount: 1,
+        selectedAddressFamily: 4, selectionPolicy: "first_lexicographically_sorted_approved_address" },
+      milestones: { socketAssignedMs: expect.any(Number), tcpConnectedMs: expect.any(Number),
+        tlsEstablishedMs: expect.any(Number), requestSentMs: expect.any(Number), responseHeadersMs: null,
+        firstBodyByteMs: null, bodyCompletedMs: null },
+      response: { connectedAddressFamily: 4, httpStatus: null, redirectObserved: false,
+        responseHeadersObserved: false, firstBodyByteObserved: false, bytesObserved: 0, bodyCompleted: false },
+      termination: { outcome: "timed_out", phase: "response_headers", safeReasonClass: "retrieval_timeout",
+        socketInactivityTimeoutMs: 12_000 },
+    });
     timeoutSpy.mockRestore();
 
     const cancelAudit = new ProviderOperationAuditLog(); const cancelCap = await capability(); const cancellation = new AbortController(); let cancelSends = 0;
@@ -543,7 +559,7 @@ describe("internal-analysis construction-bound provider seams", () => {
     }) as never);
     await expect(createNodeHttpsRetrievalPort(pinCap, { audit: pinAudit }).retrieve(request(new AbortController().signal))).rejects.toThrow("Invalid IP address");
     expect(pinAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "failed",
-      providerConfigurationCode: "ratereveal_node_https_pinned_v2", safeReasonCode: "retrieval_destination_pin_invalid" });
+      providerConfigurationCode: "ratereveal_node_https_pinned_v3", safeReasonCode: "retrieval_destination_pin_invalid" });
 
     for (const [code, safeReasonCode] of [["ECONNRESET", "retrieval_network_connect_failed"],
       ["ERR_TLS_CERT_ALTNAME_INVALID", "retrieval_tls_validation_failed"]] as const) {
@@ -556,6 +572,62 @@ describe("internal-analysis construction-bound provider seams", () => {
       await expect(createNodeHttpsRetrievalPort(categoryCap, { audit: categoryAudit }).retrieve(request(new AbortController().signal))).rejects.toThrow();
       expect(categoryAudit.snapshot()[0]).toMatchObject({ completionState: "failed", safeReasonCode });
     }
+  });
+
+  it("distinguishes response-body progress and completed retrieval phases without changing send counts", async () => {
+    const permit = createDestinationPermit({ candidateId: "candidate-phases", rawUrl: "https://docs.example.test/phases",
+      resolvedAddresses: ["93.184.216.34"], permitId: "permit-phases", nowMs: 0, ttlMs: 60_000 });
+    const request = () => ({ reservationId: "retrieval-phases:document", questionId: "question-phases",
+      candidateId: "candidate-phases", documentId: "document-phases", permit, maximumBytes: 1_024,
+      httpsOnly: true as const, logicalAttempt: 1 as const, signal: new AbortController().signal,
+      recordReceivedBytes: () => "continue" as const, authorizeRedirect: async () => permit });
+
+    const bodyTimeoutAudit = new ProviderOperationAuditLog(); const bodyTimeoutCap = await capability();
+    vi.spyOn(https, "request").mockImplementation(((_options: any, callback: any) => {
+      const socket = new EventEmitter() as any; socket.remoteAddress = "93.184.216.34";
+      const req = new EventEmitter() as any; let timeout: () => void = () => undefined;
+      req.setTimeout = (_ms: number, value: () => void) => { timeout = value; return req; };
+      req.destroy = (error?: Error) => { if (error) req.emit("error", error); };
+      req.end = () => {
+        req.emit("socket", socket); socket.emit("connect"); socket.emit("secureConnect");
+        const response = new EventEmitter() as any; response.statusCode = 200;
+        response.headers = { "content-type": "text/plain" }; response.socket = socket; response.destroy = () => undefined;
+        callback(response); response.emit("data", Buffer.from("partial")); timeout();
+      };
+      return req;
+    }) as never);
+    await expect(createNodeHttpsRetrievalPort(bodyTimeoutCap, { audit: bodyTimeoutAudit }).retrieve(request()))
+      .rejects.toThrow("retrieval_timeout");
+    expect(bodyTimeoutAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "timed_out",
+      retryCount: 0, retrievalTransportDiagnostics: {
+        response: { httpStatus: 200, responseHeadersObserved: true, firstBodyByteObserved: true,
+          bytesObserved: 7, bodyCompleted: false },
+        termination: { outcome: "timed_out", phase: "response_body", safeReasonClass: "retrieval_timeout" },
+      } });
+
+    vi.restoreAllMocks();
+    const completedAudit = new ProviderOperationAuditLog(); const completedCap = await capability();
+    vi.spyOn(https, "request").mockImplementation(((_options: any, callback: any) => {
+      const socket = new EventEmitter() as any; socket.remoteAddress = "93.184.216.34";
+      const req = new EventEmitter() as any; req.setTimeout = () => req;
+      req.destroy = (error?: Error) => { if (error) req.emit("error", error); };
+      req.end = () => {
+        req.emit("socket", socket); socket.emit("connect"); socket.emit("secureConnect");
+        const response = new EventEmitter() as any; response.statusCode = 200;
+        response.headers = { "content-type": "text/plain" }; response.socket = socket; response.destroy = () => undefined;
+        callback(response); response.emit("data", Buffer.from("complete")); response.emit("end");
+      };
+      return req;
+    }) as never);
+    const completed = await createNodeHttpsRetrievalPort(completedCap, { audit: completedAudit }).retrieve(request());
+    expect(completed).toMatchObject({ status: "retrieved", byteLength: 8, streamedByteLength: 8 });
+    expect(completedAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "completed",
+      retryCount: 0, providerConfigurationCode: "ratereveal_node_https_pinned_v3",
+      retrievalTransportDiagnostics: {
+        response: { httpStatus: 200, responseHeadersObserved: true, firstBodyByteObserved: true,
+          bytesObserved: 8, bodyCompleted: true },
+        termination: { outcome: "completed", phase: "completed", safeReasonClass: "retrieval_completed" },
+      } });
   });
 
   it("fails missing credentials, caller-asserted external preflight, and forged capabilities before send", async () => {

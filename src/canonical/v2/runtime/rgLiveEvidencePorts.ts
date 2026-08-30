@@ -117,19 +117,38 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
         providerCode: searchPort.providerCode, providerRequestId: null, calls: 1, tokens, retrievalBytes: 0 } };
     },
     async retrieve({ intent, candidate, maximumBytes }, onSend) {
-      const resolved = await destinationPort.resolve(candidate.candidateId, candidate.url);
+      const resolutionStartedMs = binding.clock.nowMs();
+      let resolved: Awaited<ReturnType<typeof destinationPort.resolve>>;
+      try {
+        resolved = await destinationPort.resolve(candidate.candidateId, candidate.url);
+      } catch (error) {
+        const reasonCode = safeReason(error);
+        throw new RgEvidenceTransportError("before_send", reasonCode,
+          resolutionFailureReceipt(reasonCode, Math.max(0, Math.round(binding.clock.nowMs() - resolutionStartedMs))));
+      }
+      const resolutionElapsedMs = Math.max(0, Math.round(binding.clock.nowMs() - resolutionStartedMs));
       const permit = createDestinationPermit({ candidateId: candidate.candidateId, rawUrl: candidate.url,
         resolvedAddresses: resolved.addresses, permitId: resolved.permitId, nowMs: binding.clock.nowMs(), ttlMs: 30_000 });
       const documentId = `rg-document-${digest({ candidateId: candidate.candidateId, url: candidate.url }).slice(0, 24)}`;
       let streamedBytes = 0;
       const controller = new AbortController();
       onSend();
-      const response = await retrievalPort.retrieve({ reservationId: `${documentId}:document`, questionId: intent.atomicClaimId,
-        candidateId: candidate.candidateId, documentId, permit, maximumBytes, httpsOnly: true, logicalAttempt: 1,
-        signal: controller.signal,
-        recordReceivedBytes(cumulativeBytes) { streamedBytes = cumulativeBytes; return cumulativeBytes > maximumBytes ? "abort" : "continue"; },
-        async authorizeRedirect() { throw new Error("rg_retrieval_redirect_requires_new_operation"); },
-      });
+      let response: Awaited<ReturnType<typeof retrievalPort.retrieve>>;
+      try {
+        response = await retrievalPort.retrieve({ reservationId: `${documentId}:document`, questionId: intent.atomicClaimId,
+          candidateId: candidate.candidateId, documentId, permit, maximumBytes, httpsOnly: true, logicalAttempt: 1,
+          signal: controller.signal,
+          recordReceivedBytes(cumulativeBytes) { streamedBytes = cumulativeBytes; return cumulativeBytes > maximumBytes ? "abort" : "continue"; },
+          async authorizeRedirect() { throw new Error("rg_retrieval_redirect_requires_new_operation"); },
+        });
+      } catch (error) {
+        const auditReceipt = audit.snapshot().find((item) => item.operationId === documentId);
+        const receipt = rgRetrievalReceipt(audit, documentId, streamedBytes, resolutionElapsedMs);
+        const transportState = error instanceof LiveOperationTransportError ? error.transportState
+          : auditReceipt?.actualSendCount === 1 ? "after_send" : "before_send";
+        throw new RgEvidenceTransportError(transportState,
+          auditReceipt?.safeReasonCode ? safeReason(auditReceipt.safeReasonCode) : safeReason(error), receipt);
+      }
       const provisionalCandidate = { ...candidate, questionId: intent.atomicClaimId, attemptId: intent.intentId, rank: 1,
         locatorHint: null, selectionReasonCode: "typed_search_intent_discovery", sourceTypeCode: "official_public_document",
         discoveryMetadata: { providerCode: searchPort.providerCode, configurationCode: "typed_search_intent_v1",
@@ -137,7 +156,7 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
         retrievalEligibility: "eligible" as const, authorityAdmissionRef: null, authorityPublicationFamilyCode: null };
       const retrievalIssues = validateRetrievalResponse({ candidate: provisionalCandidate, documentId, permit, response,
         nowMs: binding.clock.nowMs(), maximumBytes, observedStreamedBytes: streamedBytes });
-      const retrievalReceipt = rgRetrievalReceipt(audit, documentId, response.streamedByteLength);
+      const retrievalReceipt = rgRetrievalReceipt(audit, documentId, response.streamedByteLength, resolutionElapsedMs);
       if (response.status !== "retrieved" || !response.content || !response.mimeType || retrievalIssues.length > 0
         || validateContentSignature(response.mimeType, response.content).length > 0) {
         const signatureIssues = response.content && response.mimeType
@@ -497,7 +516,9 @@ function safeDiagnostic(value: unknown): string | null {
   const text = typeof value === "number" && Number.isSafeInteger(value) ? String(value) : typeof value === "string" ? value : "";
   return /^[A-Za-z0-9][A-Za-z0-9_.:\[\]-]{0,127}$/.test(text) ? text : null;
 }
-function safeReason(error: unknown): string { const value = error instanceof Error ? error.message : "rg_provider_unavailable";
+function safeReason(error: unknown): string { const candidate = typeof error === "string" ? error
+    : error instanceof Error ? error.message : record(error).message;
+  const value = typeof candidate === "string" ? candidate : "rg_provider_unavailable";
   return /^[a-z][a-z0-9_:.-]{0,191}$/.test(value) ? value : "rg_provider_unavailable"; }
 
 function rgSearchReceipt(receipt: ProviderOperationReceiptV1): RgEvidencePortReceipt {
@@ -529,14 +550,65 @@ function rgSearchReceipt(receipt: ProviderOperationReceiptV1): RgEvidencePortRec
   };
 }
 
-function rgRetrievalReceipt(audit: ProviderOperationAuditLog, operationId: string, retrievalBytes: number): RgEvidencePortReceipt {
+function rgRetrievalReceipt(audit: ProviderOperationAuditLog, operationId: string, retrievalBytes: number,
+  resolutionElapsedMs: number): RgEvidencePortReceipt {
   const receipt = audit.snapshot().find((item) => item.operationId === operationId);
+  const transportDiagnostics = receipt?.retrievalTransportDiagnostics
+    ? { ...receipt.retrievalTransportDiagnostics,
+      resolution: { ...receipt.retrievalTransportDiagnostics.resolution, resolutionElapsedMs } }
+    : null;
   return {
     providerCode: receipt?.providerCode ?? "node_https_pinned",
     providerRequestId: receipt?.providerRequestId ?? null,
     calls: receipt?.actualSendCount ?? 1,
     tokens: 0,
     retrievalBytes,
+    retrievalTransportDiagnostics: transportDiagnostics,
+  };
+}
+
+function resolutionFailureReceipt(reasonCode: string, resolutionElapsedMs: number): RgEvidencePortReceipt {
+  return {
+    providerCode: "node_https_pinned",
+    providerRequestId: null,
+    calls: 0,
+    tokens: 0,
+    retrievalBytes: 0,
+    retrievalTransportDiagnostics: {
+      schemaVersion: "public_https_retrieval_transport_diagnostics_v1",
+      configurationCode: "ratereveal_node_https_pinned_v3",
+      resolution: {
+        state: "failed_before_permit",
+        resolutionElapsedMs,
+        approvedAddressCount: 0,
+        selectedAddressFamily: null,
+        selectionPolicy: "none",
+      },
+      milestones: {
+        socketAssignedMs: null,
+        tcpConnectedMs: null,
+        tlsEstablishedMs: null,
+        requestSentMs: null,
+        responseHeadersMs: null,
+        firstBodyByteMs: null,
+        bodyCompletedMs: null,
+      },
+      response: {
+        connectedAddressFamily: null,
+        httpStatus: null,
+        redirectObserved: false,
+        responseHeadersObserved: false,
+        firstBodyByteObserved: false,
+        bytesObserved: 0,
+        bodyCompleted: false,
+      },
+      termination: {
+        outcome: "failed",
+        phase: "destination_resolution",
+        safeReasonClass: reasonCode,
+        socketInactivityTimeoutMs: 12_000,
+      },
+    },
   };
 }
 

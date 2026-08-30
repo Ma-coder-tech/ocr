@@ -9,6 +9,7 @@ import type { CanonicalEconomicsV2SynthesisAnalysis } from "../synthesisTypes.js
 import { CONTRACT_V1_1_SAFE_ACTION_CODES, CONTRACT_V1_SAFE_ACTION_CODES,
   type KnowledgeClaimType, type KnowledgeQuery, type KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 import type { CanonicalSynthesisAdmissionContractId } from "../synthesisContractV1Types.js";
+import type { PublicRetrievalTransportDiagnosticsV1 } from "../intelligence/intelligenceTypes.js";
 import { KNOWLEDGE_CLAIM_POLICIES } from "../knowledge/knowledgePolicy.js";
 import type { CanonicalRfClaimDecision, CanonicalRfClaimResolution } from "./rfClaimResolution.js";
 import type { CanonicalUnresolvedClaim, CanonicalUnresolvedClaimClass, CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
@@ -146,6 +147,7 @@ export type CanonicalRgOperation = {
     retrievalBytes: number;
     reasonCode: string;
     providerDiagnostics?: CanonicalRgProviderDiagnostics | null;
+    retrievalTransportDiagnostics?: PublicRetrievalTransportDiagnosticsV1 | null;
   };
   input: unknown;
   inputHash: string;

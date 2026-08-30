@@ -944,6 +944,64 @@ describe("production durable claim-bound RG evidence execution", () => {
     dbModule = indeterminateSetup.db;
   }, 30_000);
 
+  it("durably preserves retrieval timeout phase evidence without changing the reconciliation barrier or truth", async () => {
+    const setup = await runWithOneWorkItem();
+    const ports = successfulPorts([]);
+    const beforeTruth = setup.run.canonicalTruthHash;
+    const beforeFinancial = setup.run.financialFoundationHash;
+    let retrievalSends = 0;
+    ports.retrieve = async (_input, onSend) => {
+      onSend(); retrievalSends += 1;
+      throw new setup.executor.RgEvidenceTransportError("timed_out", "retrieval_timeout", {
+        providerCode: "node_https_pinned", providerRequestId: null, calls: 1, tokens: 0, retrievalBytes: 0,
+        retrievalTransportDiagnostics: {
+          schemaVersion: "public_https_retrieval_transport_diagnostics_v1",
+          configurationCode: "ratereveal_node_https_pinned_v3",
+          resolution: { state: "permit_bound", resolutionElapsedMs: 4, approvedAddressCount: 2,
+            selectedAddressFamily: 4, selectionPolicy: "first_lexicographically_sorted_approved_address" },
+          milestones: { socketAssignedMs: 1, tcpConnectedMs: 2, tlsEstablishedMs: 3, requestSentMs: 0,
+            responseHeadersMs: null, firstBodyByteMs: null, bodyCompletedMs: null },
+          response: { connectedAddressFamily: 4, httpStatus: null, redirectObserved: false,
+            responseHeadersObserved: false, firstBodyByteObserved: false, bytesObserved: 0, bodyCompleted: false },
+          termination: { outcome: "timed_out", phase: "response_headers", safeReasonClass: "retrieval_timeout",
+            socketInactivityTimeoutMs: 12_000 },
+        },
+      });
+    };
+
+    const first = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+      workerId: "retrieval-timeout-diagnostics-one" });
+    const second = await setup.executor.executeDurableCanonicalRgEvidence({ runId: setup.run.runId, ports,
+      workerId: "retrieval-timeout-diagnostics-two" });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const retrieval = persisted.rgOperations.find((operation) => operation.kind === "public_retrieval")!;
+
+    expect(first).toMatchObject({ workItemsDegraded: 1, canonicalTruthPreserved: true });
+    expect(second).toMatchObject({ workItemsDegraded: 1, canonicalTruthPreserved: true });
+    expect(retrievalSends).toBe(1);
+    expect(retrieval).toMatchObject({ state: "indeterminate_after_send", receipt: {
+      sendState: "sent", completionState: "indeterminate", providerCode: "node_https_pinned", calls: 1,
+      retrievalBytes: 0, reasonCode: "retrieval_timeout", retrievalTransportDiagnostics: {
+        resolution: { state: "permit_bound", resolutionElapsedMs: 4, approvedAddressCount: 2,
+          selectedAddressFamily: 4 },
+        milestones: { tcpConnectedMs: 2, tlsEstablishedMs: 3, responseHeadersMs: null },
+        response: { httpStatus: null, bytesObserved: 0, bodyCompleted: false },
+        termination: { outcome: "timed_out", phase: "response_headers", safeReasonClass: "retrieval_timeout" },
+      } } });
+    expect(persisted.rgWorkItems[0]!.retryDecisions).toContainEqual(expect.objectContaining({
+      decision: "no_retry", reasonCode: "indeterminate_after_send_no_blind_retry",
+    }));
+    expect(persisted.externalEvidenceRegistry).toHaveLength(0);
+    expect(persisted.canonicalTruthHash).toBe(beforeTruth);
+    expect(persisted.financialFoundationHash).toBe(beforeFinancial);
+    expect(persisted.result!.artifacts.rh).toEqual(setup.run.artifacts.rh);
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    expect(controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId })).toMatchObject({
+      lifecycle: "indeterminate_reconciliation_required",
+    });
+    dbModule = setup.db;
+  }, 30_000);
+
   it("persists a received-but-unusable retrieval as deterministic failure without a reconciliation barrier", async () => {
     const setup = await runWithOneWorkItem();
     const calls: string[] = [];

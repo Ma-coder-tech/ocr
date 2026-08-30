@@ -1,4 +1,5 @@
-import type { BudgetSnapshot, IntelligenceDiagnostic, RuntimeDocumentResult, SearchAttempt, SemanticVerificationStatus } from "../intelligence/intelligenceTypes.js";
+import type { BudgetSnapshot, IntelligenceDiagnostic, PublicRetrievalTransportDiagnosticsV1,
+  RuntimeDocumentResult, SearchAttempt, SemanticVerificationStatus } from "../intelligence/intelligenceTypes.js";
 export type { ProviderSafeQuestionContextV1 } from "../intelligence/intelligenceTypes.js";
 import type { KnowledgeClaimValue, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 import type { ObservationPlanningAuditV1 } from "./observationOrigins.js";
@@ -281,4 +282,5 @@ export type ProviderOperationReceiptV1 = {
   providerErrorParam: string | null;
   structuredOutputValidation: "not_applicable" | "not_reached" | "passed" | "failed";
   safeReasonCode: string;
+  retrievalTransportDiagnostics?: PublicRetrievalTransportDiagnosticsV1 | null;
 };

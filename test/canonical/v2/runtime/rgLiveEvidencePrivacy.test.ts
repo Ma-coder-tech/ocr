@@ -289,6 +289,120 @@ describe("production approved-AI packet admission", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
+  it("propagates safe phase-aware HTTPS timeout diagnostics across the production RG port boundary", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000000000";
+    process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";
+    process.env.OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2";
+    process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = "gpt-5.2";
+    vi.resetModules();
+    const { LiveOperationTransportError } = await import(
+      "../../../../src/canonical/v2/intelligence/providerPreflight.js");
+    const diagnostics = {
+      schemaVersion: "public_https_retrieval_transport_diagnostics_v1" as const,
+      configurationCode: "ratereveal_node_https_pinned_v3" as const,
+      resolution: { state: "permit_bound" as const, resolutionElapsedMs: null, approvedAddressCount: 2,
+        selectedAddressFamily: 4 as const, selectionPolicy: "first_lexicographically_sorted_approved_address" as const },
+      milestones: { socketAssignedMs: 1, tcpConnectedMs: 2, tlsEstablishedMs: 3, requestSentMs: 0,
+        responseHeadersMs: null, firstBodyByteMs: null, bodyCompletedMs: null },
+      response: { connectedAddressFamily: 4 as const, httpStatus: null, redirectObserved: false,
+        responseHeadersObserved: false, firstBodyByteObserved: false, bytesObserved: 0, bodyCompleted: false },
+      termination: { outcome: "timed_out" as const, phase: "response_headers" as const,
+        safeReasonClass: "retrieval_timeout", socketInactivityTimeoutMs: 12_000 as const },
+    };
+    vi.doMock("../../../../src/canonical/v2/intelligence/publicRetrievalAdapters.js", () => ({
+      createNodeDestinationResolutionPort: () => ({ resolve: async (candidateId: string, normalizedUrl: string) => ({
+        candidateId, normalizedUrl, addresses: ["93.184.216.34", "93.184.216.35"], permitId: "permit-timeout-diagnostics",
+      }) }),
+      createNodeHttpsRetrievalPort: (_capability: unknown, config: { audit: { reserve(value: unknown): void } }) => ({
+        retrieve: async (request: { reservationId: string; documentId: string }) => {
+          config.audit.reserve({ receiptId: "receipt-timeout-diagnostics", reservationId: request.reservationId,
+            operationId: request.documentId, operation: "retrieval", providerCode: "node_https_pinned",
+            logicalAttempt: 1, actualSendCount: 1, retryCount: 0, sendState: "sent", completionState: "timed_out",
+            elapsedMs: 12_004, usageState: "unknown_possible_billable", outputTokens: null,
+            providerRequestCount: null, usageCostUsd: null, providerConfigurationCode: "ratereveal_node_https_pinned_v3",
+            httpStatus: null, localRequestId: null, providerRequestId: null, providerResponseId: null,
+            requestedModelIdentifier: null, returnedModelIdentifier: null, finishReason: null, toolExecutionState: null,
+            annotationCount: null, normalizedCandidateCount: null, providerErrorType: null, providerErrorCode: null,
+            providerErrorParam: null, structuredOutputValidation: "not_applicable", safeReasonCode: "retrieval_timeout",
+            retrievalTransportDiagnostics: diagnostics });
+          throw new LiveOperationTransportError("timed_out", "retrieval_timeout");
+        },
+      }),
+    }));
+    const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
+    const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
+    const ports = live.createProductionRgEvidencePortsFromEnvironment("phase-diagnostics-live-adapter-run");
+    let sends = 0;
+    try {
+      await ports.retrieve({ intent: { atomicClaimId: "atomic-claim-timeout" }, candidate: {
+        candidateId: "candidate-timeout", url: "https://www.fiserv.com/public-document", title: "Public document",
+        claimedAuthority: "processor_publication", publicationDate: null, effectiveFrom: null, effectiveTo: null,
+      }, maximumBytes: 5_242_880 } as never, () => { sends += 1; });
+      throw new Error("expected transport timeout");
+    } catch (error) {
+      expect(error).toBeInstanceOf(execution.RgEvidenceTransportError);
+      expect(error).toMatchObject({ transportState: "timed_out", message: "retrieval_timeout",
+        receipt: { providerCode: "node_https_pinned", calls: 1, tokens: 0, retrievalBytes: 0,
+          retrievalTransportDiagnostics: {
+            schemaVersion: "public_https_retrieval_transport_diagnostics_v1",
+            resolution: { state: "permit_bound", resolutionElapsedMs: expect.any(Number),
+              approvedAddressCount: 2, selectedAddressFamily: 4 },
+            termination: { outcome: "timed_out", phase: "response_headers",
+              safeReasonClass: "retrieval_timeout" },
+          } } });
+      expect(JSON.stringify(error)).not.toContain("openrouter-test-secret");
+      expect(JSON.stringify(error)).not.toContain("openai-test-secret");
+    } finally {
+      vi.doUnmock("../../../../src/canonical/v2/intelligence/publicRetrievalAdapters.js");
+    }
+    expect(sends).toBe(1);
+  });
+
+  it("records destination-resolution failure before send without creating transport ambiguity", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000000000";
+    process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";
+    process.env.OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2";
+    process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = "gpt-5.2";
+    vi.resetModules();
+    let retrievalCalls = 0;
+    vi.doMock("../../../../src/canonical/v2/intelligence/publicRetrievalAdapters.js", () => ({
+      createNodeDestinationResolutionPort: () => ({ resolve: async () => {
+        throw new Error("destination_resolution_failed");
+      } }),
+      createNodeHttpsRetrievalPort: () => ({ retrieve: async () => {
+        retrievalCalls += 1;
+        throw new Error("unexpected_retrieval_send");
+      } }),
+    }));
+    const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
+    const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
+    const ports = live.createProductionRgEvidencePortsFromEnvironment("resolution-diagnostics-live-adapter-run");
+    let sends = 0;
+    try {
+      await ports.retrieve({ intent: { atomicClaimId: "atomic-claim-resolution" }, candidate: {
+        candidateId: "candidate-resolution", url: "https://www.fiserv.com/public-document", title: "Public document",
+        claimedAuthority: "processor_publication", publicationDate: null, effectiveFrom: null, effectiveTo: null,
+      }, maximumBytes: 5_242_880 } as never, () => { sends += 1; });
+      throw new Error("expected destination resolution failure");
+    } catch (error) {
+      expect(error).toBeInstanceOf(execution.RgEvidenceTransportError);
+      expect(error).toMatchObject({ transportState: "before_send", message: "destination_resolution_failed",
+        receipt: { providerCode: "node_https_pinned", calls: 0, tokens: 0, retrievalBytes: 0,
+          retrievalTransportDiagnostics: {
+            schemaVersion: "public_https_retrieval_transport_diagnostics_v1",
+            resolution: { state: "failed_before_permit", resolutionElapsedMs: expect.any(Number),
+              approvedAddressCount: 0, selectedAddressFamily: null, selectionPolicy: "none" },
+            milestones: { requestSentMs: null },
+            termination: { outcome: "failed", phase: "destination_resolution",
+              safeReasonClass: "destination_resolution_failed" },
+          } } });
+    } finally {
+      vi.doUnmock("../../../../src/canonical/v2/intelligence/publicRetrievalAdapters.js");
+    }
+    expect(sends).toBe(0);
+    expect(retrievalCalls).toBe(0);
+  });
+
   it("preserves raw-byte identity while returning deterministically normalized locator provenance", async () => {
     process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000000000";
     process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";

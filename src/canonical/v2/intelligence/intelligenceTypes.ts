@@ -320,6 +320,56 @@ export type DestinationResolution = {
   permitId: string;
 };
 
+export type PublicRetrievalTransportPhase =
+  | "destination_resolution"
+  | "connection_establishment"
+  | "tls_handshake"
+  | "response_headers"
+  | "response_body"
+  | "completed";
+
+/**
+ * Privacy-safe transport observations for one HTTPS retrieval send. Timings are
+ * monotonic elapsed milliseconds from entry into the pinned HTTPS adapter; no
+ * wall-clock timestamps, response bodies, headers, or credential material are
+ * retained here.
+ */
+export type PublicRetrievalTransportDiagnosticsV1 = {
+  schemaVersion: "public_https_retrieval_transport_diagnostics_v1";
+  configurationCode: "ratereveal_node_https_pinned_v3";
+  resolution: {
+    state: "failed_before_permit" | "permit_bound";
+    resolutionElapsedMs: number | null;
+    approvedAddressCount: number;
+    selectedAddressFamily: 4 | 6 | null;
+    selectionPolicy: "none" | "first_lexicographically_sorted_approved_address";
+  };
+  milestones: {
+    socketAssignedMs: number | null;
+    tcpConnectedMs: number | null;
+    tlsEstablishedMs: number | null;
+    requestSentMs: number | null;
+    responseHeadersMs: number | null;
+    firstBodyByteMs: number | null;
+    bodyCompletedMs: number | null;
+  };
+  response: {
+    connectedAddressFamily: 4 | 6 | null;
+    httpStatus: number | null;
+    redirectObserved: boolean;
+    responseHeadersObserved: boolean;
+    firstBodyByteObserved: boolean;
+    bytesObserved: number;
+    bodyCompleted: boolean;
+  };
+  termination: {
+    outcome: "in_progress" | "completed" | "timed_out" | "cancelled" | "failed";
+    phase: PublicRetrievalTransportPhase;
+    safeReasonClass: string;
+    socketInactivityTimeoutMs: 12_000;
+  };
+};
+
 export type RedirectHop = {
   normalizedUrl: string;
   permitId: string;
