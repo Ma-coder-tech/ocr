@@ -153,6 +153,20 @@ export type CanonicalRgOperation = {
   };
   input: unknown;
   inputHash: string;
+  phaseReplay?: {
+    schemaVersion: "canonical_rg_completed_phase_replay_binding_v1";
+    objectiveHash: string;
+    workContractFingerprint: string;
+    disposition: "original_execution" | "replayed_completed_phase";
+    sourceOperationId: string | null;
+    sourceOperationInputHash: string | null;
+    sourceOperationResultHash: string | null;
+    sourceCompletedAt: string | null;
+    reuseAuthority: "same_analysis_run_exact_claim_completed_phase_only";
+    semanticReuse: "prohibited";
+    evidenceAdmissionEffect: "none";
+    analyticalCompletionEffect: "none";
+  };
   result: unknown | null;
   createdAt: string;
   updatedAt: string;

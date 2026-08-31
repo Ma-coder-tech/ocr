@@ -190,12 +190,20 @@ describe("durable continuation-authorized adaptive execution", () => {
     expect(recoveryStore.listDueCanonicalAnalysisRecoveryIntents()).toEqual([]);
 
     const resumedCalls: string[] = [];
+    const resumedPorts = unresolvedPorts(resumedCalls);
+    resumedPorts.retrieve = async (_input, onSend) => {
+      resumedCalls.push("continuation-retrieve"); onSend();
+      throw new setup.executor.RgEvidenceCompletedUnusableError("rg_retrieval_content_unusable",
+        receipt("retrieve"));
+    };
     const resumed = await recoveryWorker.processCanonicalAnalysisRecoveryIntent({
       intentId: intent!.intent.intentId, workerId: "generation-zero-recovery-worker",
-      ports: unresolvedPorts(resumedCalls), operationalPolicy: operationalPolicy(1_000),
+      ports: resumedPorts, operationalPolicy: operationalPolicy(1_000),
     });
     const afterResume = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
-    expect(resumedCalls).toEqual(["continuation-search"]);
+    expect(resumedCalls).toEqual(["continuation-retrieve"]);
+    expect(afterResume.rgOperations.filter((operation) => operation.kind === "public_search")
+      .reduce((sum, operation) => sum + operation.receipt.calls, 0)).toBe(1);
     expect(resumed).toMatchObject({ completion: "stopped_unresolved", financialFoundationPreserved: true });
     expect(afterResume.continuationExecutionGrants.filter((grant) =>
       grant.disposition === "operationally_degraded_retry_eligible")).toHaveLength(1);
@@ -396,6 +404,111 @@ describe("durable continuation-authorized adaptive execution", () => {
     expect(after.financialFoundationHash).toBe(before.financialFoundationHash);
     expect(after.canonicalTruthHash).toBe(before.canonicalTruthHash);
     expect(after.result!.manifest.customerReportAuthority).toBe("legacy_report_unchanged");
+  }, 30_000);
+
+  it("resumes each exact work phase after allowance replenishment without repeating completed provider work", async () => {
+    process.env.CANONICAL_RECOVERY_BASE_DELAY_MS = "0";
+    process.env.RG_PROVIDER_COOLDOWN_BASE_MS = "0";
+    const directory = await mkdtemp(path.join(os.tmpdir(), "ratereveal-phase-resumption-"));
+    temporaryDirectories.push(directory);
+    const databasePath = path.join(directory, "phase-resumption.sqlite");
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const setup = await setupOneWorkItem();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(Date.now() + 61_000));
+    const policy = replenishingOperationalPolicy(1, 1);
+    const calls: string[] = [];
+    const ports = phaseResumptionPorts(calls);
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+
+    const initial = await setup.adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId,
+      ports, workerId: "phase-generation-zero", operationalPolicy: policy });
+    expect(initial).toMatchObject({ completion: "stopped_operationally", financialFoundationPreserved: true });
+    expect(calls).toEqual(["search"]);
+    const recoveryStore = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryStore.js");
+    const recoveryWorkerBeforeRestart = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryWorker.js");
+    const firstIntent = recoveryStore.listCanonicalAnalysisRecoveryIntents(setup.run.runId).at(-1)!;
+    expect(await recoveryWorkerBeforeRestart.processCanonicalAnalysisRecoveryIntent({
+      intentId: firstIntent.intent.intentId, workerId: "phase-allowance-wait", ports,
+      operationalPolicy: policy,
+    })).toBeNull();
+    const waitingFirstIntent = recoveryStore.getCanonicalAnalysisRecoveryIntent(firstIntent.intent.intentId)!;
+    expect(waitingFirstIntent).toMatchObject({ state: "waiting_for_operational_reset", dispatchCount: 0,
+      waitGate: { kind: "operational_allowance", analyticalCompletionEffect: "none" } });
+
+    setup.db.db.close();
+    vi.resetModules();
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    vi.setSystemTime(new Date(Date.parse(waitingFirstIntent.waitGate!.nextEligibleAt!) + 1));
+    let [worker, recoveryAfter, runStore, loadedDb] = await Promise.all([
+      import("../../../../src/canonical/v2/runtime/adaptiveRecoveryWorker.js"),
+      import("../../../../src/canonical/v2/runtime/adaptiveRecoveryStore.js"),
+      import("../../../../src/canonical/v2/runtime/analysisRunStore.js"),
+      import("../../../../src/db.js"),
+    ]);
+    dbModule = loadedDb;
+    const firstRecovery = await Promise.all([
+      worker.processCanonicalAnalysisRecoveryIntent({ intentId: firstIntent.intent.intentId,
+        workerId: "phase-restart-a", ports, operationalPolicy: policy }),
+      worker.processCanonicalAnalysisRecoveryIntent({ intentId: firstIntent.intent.intentId,
+        workerId: "phase-restart-b", ports, operationalPolicy: policy }),
+    ]);
+    expect(firstRecovery.filter(Boolean)).toHaveLength(1);
+    expect(calls).toEqual(["search", "retrieve"]);
+    expect(recoveryAfter.getCanonicalAnalysisRecoveryIntent(firstIntent.intent.intentId)).toMatchObject({
+      state: "completed", dispatchCount: 1,
+    });
+
+    let persisted = runStore.getPersistedAnalysisRun(setup.run.runId)!;
+    const searchOperationsAfterRetrieval = persisted.rgOperations.filter((operation) => operation.kind === "public_search");
+    expect(searchOperationsAfterRetrieval).toHaveLength(2);
+    expect(searchOperationsAfterRetrieval.reduce((sum, operation) => sum + operation.receipt.calls, 0)).toBe(1);
+    expect(searchOperationsAfterRetrieval).toEqual(expect.arrayContaining([
+      expect.objectContaining({ phaseReplay: expect.objectContaining({ disposition: "original_execution",
+        sourceOperationId: null }) }),
+      expect.objectContaining({ receipt: expect.objectContaining({ calls: 0,
+        providerCode: "durable_analysis_run_completed_phase_replay" }),
+      phaseReplay: expect.objectContaining({ disposition: "replayed_completed_phase",
+        sourceOperationId: searchOperationsAfterRetrieval[0]!.operationId,
+        semanticReuse: "prohibited", evidenceAdmissionEffect: "none", analyticalCompletionEffect: "none" }) }),
+    ]));
+    expect(persisted.rgOperations.filter((operation) => operation.kind === "public_retrieval"
+      && operation.receipt.calls === 1)).toHaveLength(1);
+
+    for (const expectedNextCall of ["investigate", "verify"] as const) {
+      let nextIntent = recoveryAfter.listCanonicalAnalysisRecoveryIntents(setup.run.runId)
+        .filter((record) => ["scheduled", "waiting_for_operational_reset"].includes(record.state)).at(-1)!;
+      if (nextIntent.state === "scheduled") {
+        expect(await worker.processCanonicalAnalysisRecoveryIntent({ intentId: nextIntent.intent.intentId,
+          workerId: `phase-${expectedNextCall}-wait`, ports, operationalPolicy: policy })).toBeNull();
+        nextIntent = recoveryAfter.getCanonicalAnalysisRecoveryIntent(nextIntent.intent.intentId)!;
+      }
+      expect(nextIntent).toMatchObject({ state: "waiting_for_operational_reset",
+        waitGate: { kind: "operational_allowance", analyticalCompletionEffect: "none" } });
+      vi.setSystemTime(new Date(Date.parse(nextIntent.waitGate!.nextEligibleAt!) + 1));
+      const resumed = await worker.processCanonicalAnalysisRecoveryIntent({ intentId: nextIntent.intent.intentId,
+        workerId: `phase-${expectedNextCall}`, ports, operationalPolicy: policy });
+      expect(resumed).not.toBeNull();
+      expect(calls.at(-1)).toBe(expectedNextCall);
+      persisted = runStore.getPersistedAnalysisRun(setup.run.runId)!;
+    }
+
+    expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
+    const callsByKind = Object.fromEntries(["public_search", "public_retrieval", "investigation",
+      "independent_verification"].map((kind) => [kind, persisted.rgOperations
+        .filter((operation) => operation.kind === kind).reduce((sum, operation) => sum + operation.receipt.calls, 0)]));
+    expect(callsByKind).toEqual({ public_search: 1, public_retrieval: 1, investigation: 1,
+      independent_verification: 1 });
+    expect(persisted.rgExecutionEvents.filter((event) =>
+      event.eventType === "completed_research_phase_replayed").length).toBeGreaterThanOrEqual(4);
+    expect(persisted.rgOperations.filter((operation) => operation.kind === "investigation")).toEqual(
+      expect.arrayContaining([expect.objectContaining({ receipt: expect.objectContaining({ calls: 0 }),
+        phaseReplay: expect.objectContaining({ disposition: "replayed_completed_phase" }) })]));
+    expect(persisted.externalEvidenceRegistry).toHaveLength(0);
+    expect(persisted.rgOperations.some((operation) => operation.state === "indeterminate_after_send")).toBe(false);
+    expect(persisted.financialFoundationHash).toBe(before.financialFoundationHash);
+    expect(persisted.canonicalTruthHash).toBe(before.canonicalTruthHash);
+    expect(persisted.result!.manifest.customerReportAuthority).toBe("legacy_report_unchanged");
   }, 30_000);
 
   it("holds definitive provider configuration rejection until its non-secret configuration identity changes", async () => {
@@ -885,6 +998,39 @@ function adaptivePorts(observations: { calls: string[]; maximumExcludedFingerpri
         publisherIdentityCode: input.frozenCandidate.publisherIdentityCode, authorityLocatorId: locator,
         supportLocatorId: locator, scopeStatus: input.candidate.title === "wrong-scope" ? "wrong_scope" : "applicable",
         periodStatus: wrong ? "wrong_period" : "applicable",
+        effectiveFrom: input.frozenCandidate.effectiveFrom, effectiveTo: input.frozenCandidate.effectiveTo,
+        limitationCodes: [] } as CanonicalRgVerificationJudgment, receipt: receipt("verify") };
+    },
+  };
+}
+
+function phaseResumptionPorts(calls: string[]): CanonicalRgEvidenceExecutionPorts {
+  return {
+    availability: "available", unavailabilityReasonCodes: [],
+    async search({ intent }, onSend) {
+      calls.push("search"); onSend();
+      return { value: [{ candidateId: "phase-resumption-candidate",
+        url: "https://merchants.fiserv.com/phase-resumption-public-rule",
+        title: "Phase resumption public rule", claimedAuthority: "processor_publication" as const,
+        publicationDate: "2024-01-01", effectiveFrom: null, effectiveTo: null }], receipt: receipt("search") };
+    },
+    async retrieve({ candidate }, onSend) {
+      calls.push("retrieve"); onSend();
+      const fingerprint = createHash("sha256").update(candidate.url).digest("hex");
+      return { value: document(candidate, fingerprint), receipt: { ...receipt("retrieve"), retrievalBytes: 512 } };
+    },
+    async investigate(input, onSend) {
+      calls.push("investigate"); onSend();
+      return { value: investigation(input, null), receipt: receipt("investigate") };
+    },
+    async verify(input, onSend) {
+      calls.push("verify"); onSend();
+      const locator = input.document.locators[0]!.locatorId;
+      return { value: { frozenCandidateHash: input.frozenCandidate.frozenCandidateHash,
+        sourceAuthorityStatus: "verified", semanticSupportStatus: "insufficient", exactAtomicClaimSupport: false,
+        publisherIdentityCode: input.frozenCandidate.publisherIdentityCode,
+        authorityLocatorId: locator, supportLocatorId: locator,
+        scopeStatus: "applicable", periodStatus: "applicable",
         effectiveFrom: input.frozenCandidate.effectiveFrom, effectiveTo: input.frozenCandidate.effectiveTo,
         limitationCodes: [] } as CanonicalRgVerificationJudgment, receipt: receipt("verify") };
     },

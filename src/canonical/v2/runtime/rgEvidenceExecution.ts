@@ -56,6 +56,8 @@ const PUBLIC_DOCUMENT_RETRIEVAL_REPLAY_CONTRACT_VERSION =
 const PUBLIC_DOCUMENT_RETRIEVAL_ARTIFACT_VERSION =
   "canonical_rg_public_document_retrieval_artifact_v1" as const;
 const PUBLIC_DOCUMENT_RETRIEVAL_MAXIMUM_BYTES = 5_242_880;
+const COMPLETED_PHASE_REPLAY_BINDING_VERSION =
+  "canonical_rg_completed_phase_replay_binding_v1" as const;
 
 export type CanonicalQualifiedPublicReadContractV1 = {
   schemaVersion: "canonical_qualified_public_read_v1";
@@ -809,7 +811,7 @@ async function executeWorkItem(input: {
     const investigated = validateInvestigatedCandidate(investigation.value as CanonicalRgInvestigatedCandidate,
       input.workItem, input.admission, candidate, document);
     if (!investigated) continue;
-    const frozenCandidate = freezeCandidate(investigated, investigation.operation.updatedAt);
+    const frozenCandidate = freezeCandidate(investigated, phaseCompletionAt(investigation.operation));
     const durableVerification = priorVerificationOperationForCandidate({ runId: input.runId, planHash: input.planHash,
       workItem: input.workItem, candidateId: candidate.candidateId,
       documentFingerprint: document.documentFingerprint, frozenCandidateHash: frozenCandidate.frozenCandidateHash,
@@ -1052,6 +1054,225 @@ type OperationCallResult =
   | { state: "excluded_known_inapplicable"; value: null; operation: CanonicalRgOperation;
     inapplicability: ReusableCandidateInapplicability };
 
+type PhaseReplayOperationInput<T = unknown> = {
+  runId: string;
+  planHash: string;
+  workItem: CanonicalRgWorkItem;
+  admission: CanonicalRgClaimAdmission;
+  kind: CanonicalRgOperation["kind"];
+  candidateId: string | null;
+  operationInput: unknown;
+  projectResult(value: T): unknown;
+  executionGrant: CanonicalContinuationExecutionGrant | null;
+};
+
+type CompletedPhaseReplaySource = {
+  operation: CanonicalRgOperation;
+  projectedResult: unknown;
+};
+
+function operationIdentity(input: Pick<PhaseReplayOperationInput,
+  "runId" | "planHash" | "workItem" | "kind" | "candidateId" | "executionGrant">,
+inputHash: string, attempt: number): string {
+  return `rg-op-${digest({ runId: input.runId, planHash: input.planHash,
+    executionGrantId: input.executionGrant?.grantId ?? null, workItemId: input.workItem.workItemId,
+    kind: input.kind, candidateId: input.candidateId, attempt, inputHash }).slice(0, 32)}`;
+}
+
+function completedOperationCallResult(runId: string, operation: CanonicalRgOperation): OperationCallResult {
+  assertCompletedPhaseReplayLineage(runId, operation);
+  assertSearchOutputAdmission(operation.kind, operation.receipt.providerDiagnostics ?? null);
+  return isCompletedUnusableResult(operation.result)
+    ? { state: "failed", value: null, operation }
+    : { state: "completed", value: replayableCompletedOperationResult(operation), operation };
+}
+
+function assertCompletedPhaseReplayLineage(runId: string, operation: CanonicalRgOperation): void {
+  const binding = operation.phaseReplay;
+  if (!binding || binding.disposition === "original_execution") return;
+  const source = binding.sourceOperationId ? operationFromDb(runId, binding.sourceOperationId) : null;
+  const sourceBinding = source?.phaseReplay;
+  if (binding.schemaVersion !== COMPLETED_PHASE_REPLAY_BINDING_VERSION
+    || binding.reuseAuthority !== "same_analysis_run_exact_claim_completed_phase_only"
+    || binding.semanticReuse !== "prohibited" || binding.evidenceAdmissionEffect !== "none"
+    || binding.analyticalCompletionEffect !== "none" || operation.kind === "public_retrieval"
+    || operation.state !== "completed" || operation.receipt.sendState !== "not_sent"
+    || operation.receipt.completionState !== "completed" || operation.receipt.calls !== 0
+    || operation.receipt.tokens !== 0 || operation.receipt.retrievalBytes !== 0
+    || operation.receipt.providerCode !== "durable_analysis_run_completed_phase_replay"
+    || operation.inputHash !== digest(operation.input)
+    || completedPhaseObjectiveHash(operation.kind, operation.input) !== binding.objectiveHash
+    || !source || source.operationId === operation.operationId
+    || source.kind !== operation.kind || source.planHash !== operation.planHash
+    || source.workItemId !== operation.workItemId || source.atomicClaimId !== operation.atomicClaimId
+    || source.candidateId !== operation.candidateId || source.state !== "completed"
+    || sourceBinding?.schemaVersion !== COMPLETED_PHASE_REPLAY_BINDING_VERSION
+    || sourceBinding.disposition !== "original_execution"
+    || sourceBinding.objectiveHash !== binding.objectiveHash
+    || sourceBinding.workContractFingerprint !== binding.workContractFingerprint
+    || sourceBinding.sourceOperationId !== null || sourceBinding.sourceOperationInputHash !== null
+    || sourceBinding.sourceOperationResultHash !== null || sourceBinding.sourceCompletedAt !== null
+    || source.inputHash !== digest(source.input)
+    || binding.sourceOperationInputHash !== source.inputHash
+    || binding.sourceOperationResultHash !== digest(source.result)
+    || binding.sourceCompletedAt !== source.updatedAt
+    || digest(operation.result) !== digest(replayableCompletedOperationResult(source))) {
+    throw new Error("rg_completed_phase_replay_lineage_invalid");
+  }
+}
+
+function completedPhaseForReplay<T>(input: PhaseReplayOperationInput<T>): CompletedPhaseReplaySource | null {
+  const objectiveHash = completedPhaseObjectiveHash(input.kind, input.operationInput);
+  if (objectiveHash === null || input.kind === "public_retrieval") return null;
+  const workContractFingerprint = canonicalRgWorkContractFingerprint(input.admission, input.workItem);
+  const rows = db.prepare(`SELECT operation_json FROM canonical_rg_operations
+    WHERE run_id = ? AND work_item_id = ? AND plan_hash = ? AND state = 'completed'
+    ORDER BY created_at, operation_id`).all(input.runId, input.workItem.workItemId, input.planHash) as
+    Array<{ operation_json: string }>;
+  const matching = rows.map((row) => JSON.parse(row.operation_json) as CanonicalRgOperation)
+    .filter((operation) => operation.kind === input.kind && operation.candidateId === input.candidateId
+      && operation.atomicClaimId === input.admission.atomicClaimId
+      && operation.phaseReplay?.schemaVersion === COMPLETED_PHASE_REPLAY_BINDING_VERSION
+      && operation.phaseReplay.disposition === "original_execution"
+      && operation.phaseReplay.objectiveHash === objectiveHash
+      && operation.phaseReplay.workContractFingerprint === workContractFingerprint);
+  if (matching.length === 0) return null;
+  const validated = matching.map((operation) => validateCompletedPhaseReplaySource(input,
+    objectiveHash, workContractFingerprint, operation));
+  if (new Set(validated.map((item) => digest(item.projectedResult))).size !== 1) {
+    throw new Error("rg_completed_phase_replay_source_conflict");
+  }
+  return validated[0]!;
+}
+
+function validateCompletedPhaseReplaySource<T>(input: PhaseReplayOperationInput<T>, objectiveHash: string,
+  workContractFingerprint: string,
+  operation: CanonicalRgOperation): CompletedPhaseReplaySource {
+  const binding = operation.phaseReplay;
+  if (!binding || binding.schemaVersion !== COMPLETED_PHASE_REPLAY_BINDING_VERSION
+    || binding.disposition !== "original_execution" || binding.sourceOperationId !== null
+    || binding.sourceOperationInputHash !== null || binding.sourceOperationResultHash !== null
+    || binding.sourceCompletedAt !== null
+    || binding.reuseAuthority !== "same_analysis_run_exact_claim_completed_phase_only"
+    || binding.semanticReuse !== "prohibited" || binding.evidenceAdmissionEffect !== "none"
+    || binding.analyticalCompletionEffect !== "none" || binding.objectiveHash !== objectiveHash
+    || binding.workContractFingerprint !== workContractFingerprint
+    || operation.state !== "completed" || operation.receipt.sendState !== "sent"
+    || operation.receipt.completionState !== "completed" || operation.receipt.calls !== 1
+    || operation.inputHash !== digest(operation.input)
+    || completedPhaseObjectiveHash(operation.kind, operation.input) !== objectiveHash
+    || operation.result === null) {
+    throw new Error("rg_completed_phase_replay_source_integrity_invalid");
+  }
+  assertSearchOutputAdmission(operation.kind, operation.receipt.providerDiagnostics ?? null);
+  const replayable = replayableCompletedOperationResult(operation);
+  const projectedResult = isCompletedUnusableResult(operation.result)
+    ? structuredClone(operation.result) : input.projectResult(replayable as T);
+  if (!isCompletedUnusableResult(operation.result) && digest(projectedResult) !== digest(replayable)) {
+    throw new Error("rg_completed_phase_replay_projection_integrity_invalid");
+  }
+  return { operation, projectedResult };
+}
+
+function completedPhaseObjectiveHash(kind: CanonicalRgOperation["kind"], operationInput: unknown): string | null {
+  if (kind === "public_retrieval" || !operationInput || typeof operationInput !== "object"
+    || Array.isArray(operationInput)) return null;
+  const projected = structuredClone(operationInput) as Record<string, unknown>;
+  if (!projected.intent || typeof projected.intent !== "object" || Array.isArray(projected.intent)) return null;
+  const intent = projected.intent as Record<string, unknown>;
+  delete intent.intentId;
+  if (intent.continuation && typeof intent.continuation === "object" && !Array.isArray(intent.continuation)) {
+    const continuation = intent.continuation as Record<string, unknown>;
+    delete continuation.executionGrantId;
+    delete continuation.executionGeneration;
+    const changesObjective = continuation.requiredGap !== null
+      || (Array.isArray(continuation.excludedDocumentFingerprints)
+        && continuation.excludedDocumentFingerprints.length > 0)
+      || (Array.isArray(continuation.publicRefinementTerms) && continuation.publicRefinementTerms.length > 0);
+    if (!changesObjective) intent.continuation = null;
+  }
+  return digest({ schemaVersion: COMPLETED_PHASE_REPLAY_BINDING_VERSION, kind, operationInput: projected });
+}
+
+function originalPhaseBinding(input: Pick<PhaseReplayOperationInput,
+  "kind" | "operationInput" | "admission" | "workItem">): NonNullable<CanonicalRgOperation["phaseReplay"]> {
+  const objectiveHash = completedPhaseObjectiveHash(input.kind, input.operationInput) ?? digest({
+    schemaVersion: COMPLETED_PHASE_REPLAY_BINDING_VERSION,
+    nonReplayableKind: input.kind,
+    operationInputHash: digest(input.operationInput),
+  });
+  return {
+    schemaVersion: COMPLETED_PHASE_REPLAY_BINDING_VERSION,
+    objectiveHash,
+    workContractFingerprint: canonicalRgWorkContractFingerprint(input.admission, input.workItem),
+    disposition: "original_execution",
+    sourceOperationId: null,
+    sourceOperationInputHash: null,
+    sourceOperationResultHash: null,
+    sourceCompletedAt: null,
+    reuseAuthority: "same_analysis_run_exact_claim_completed_phase_only",
+    semanticReuse: "prohibited",
+    evidenceAdmissionEffect: "none",
+    analyticalCompletionEffect: "none",
+  };
+}
+
+function replayedPhaseBinding<T>(input: PhaseReplayOperationInput<T>,
+  source: CompletedPhaseReplaySource): NonNullable<CanonicalRgOperation["phaseReplay"]> {
+  const original = originalPhaseBinding(input);
+  return { ...original, disposition: "replayed_completed_phase",
+    sourceOperationId: source.operation.operationId,
+    sourceOperationInputHash: source.operation.inputHash,
+    sourceOperationResultHash: digest(source.operation.result),
+    sourceCompletedAt: source.operation.updatedAt };
+}
+
+function settleCompletedPhaseReplay<T>(input: PhaseReplayOperationInput<T>, operation: CanonicalRgOperation,
+  source: CompletedPhaseReplaySource): OperationCallResult {
+  if (operation.state !== "reserved" || operation.phaseReplay?.disposition !== "replayed_completed_phase"
+    || operation.phaseReplay.sourceOperationId !== source.operation.operationId
+    || operation.phaseReplay.sourceOperationInputHash !== source.operation.inputHash
+    || operation.phaseReplay.sourceOperationResultHash !== digest(source.operation.result)
+    || operation.phaseReplay.sourceCompletedAt !== source.operation.updatedAt) {
+    throw new Error("rg_completed_phase_replay_binding_invalid");
+  }
+  const settled = settleOperation(input.runId, operation, "completed", structuredClone(source.projectedResult), {
+    providerCode: "durable_analysis_run_completed_phase_replay",
+    providerRequestId: null,
+    calls: 0,
+    tokens: 0,
+    retrievalBytes: 0,
+  }, "rg_completed_phase_replayed");
+  appendEvent(input.runId, input.workItem.workItemId, settled.operationId,
+    "completed_research_phase_replayed", {
+      schemaVersion: COMPLETED_PHASE_REPLAY_BINDING_VERSION,
+      objectiveHash: operation.phaseReplay.objectiveHash,
+      workContractFingerprint: operation.phaseReplay.workContractFingerprint,
+      kind: operation.kind,
+      candidateId: operation.candidateId,
+      sourceOperationId: source.operation.operationId,
+      sourceOperationInputHash: source.operation.inputHash,
+      sourceOperationResultHash: digest(source.operation.result),
+      providerCalls: 0,
+      retrievalBytes: 0,
+      exactClaimOnly: true,
+      semanticReuse: "prohibited",
+      evidenceAdmissionEffect: "none",
+      analyticalCompletionEffect: "none",
+      canonicalMutationAllowed: false,
+    });
+  return completedOperationCallResult(input.runId, settled);
+}
+
+function phaseCompletionAt(operation: CanonicalRgOperation): string {
+  const value = operation.phaseReplay?.disposition === "replayed_completed_phase"
+    ? operation.phaseReplay.sourceCompletedAt : operation.updatedAt;
+  if (!value || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) {
+    throw new Error("rg_completed_phase_replay_completion_time_invalid");
+  }
+  return value;
+}
+
 async function runExternalOperation<T>(input: {
   runId: string;
   planHash: string;
@@ -1080,12 +1301,21 @@ async function runExternalOperation<T>(input: {
   const maximumAttempts = qualifiedPublicRead
     ? validatedQualifiedPublicReadMaximumAttempts(input.ports.qualifiedPublicReadOperationalPolicy)
     : MAX_BEFORE_SEND_ATTEMPTS;
+  const firstOperationId = operationIdentity(input, inputHash, 1);
+  const currentFirst = operationFromDb(input.runId, firstOperationId);
+  if (currentFirst?.state === "completed") return completedOperationCallResult(input.runId, currentFirst);
+  if (!currentFirst) {
+    const completedPhase = completedPhaseForReplay(input);
+    if (completedPhase) {
+      const reserved = reserveOperation({ ...input, operationId: firstOperationId, attempt: 1, inputHash,
+        phaseReplay: replayedPhaseBinding(input, completedPhase) });
+      return settleCompletedPhaseReplay(input, reserved, completedPhase);
+    }
+  }
   const ceilingReason = operationalCeilingReason(input.runId, input.executionGrant,
     input.generationZeroOperationalScope);
   if (ceilingReason) {
-    const operationId = `rg-op-${digest({ runId: input.runId, planHash: input.planHash,
-      executionGrantId: input.executionGrant?.grantId ?? null, workItemId: input.workItem.workItemId,
-      kind: input.kind, candidateId: input.candidateId, attempt: 1, inputHash }).slice(0, 32)}`;
+    const operationId = firstOperationId;
     const existing = operationFromDb(input.runId, operationId);
     const reserved = existing ?? reserveOperation({ ...input, operationId, attempt: 1, inputHash });
     const failed = existing?.state === "failed_before_send" ? existing
@@ -1095,15 +1325,10 @@ async function runExternalOperation<T>(input: {
     return { state: "failed", value: null, operation: failed };
   }
   for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
-    const operationId = `rg-op-${digest({ runId: input.runId, planHash: input.planHash,
-      executionGrantId: input.executionGrant?.grantId ?? null, workItemId: input.workItem.workItemId,
-      kind: input.kind, candidateId: input.candidateId, attempt, inputHash }).slice(0, 32)}`;
+    const operationId = operationIdentity(input, inputHash, attempt);
     const existing = operationFromDb(input.runId, operationId);
     if (existing?.state === "completed") {
-      assertSearchOutputAdmission(existing.kind, existing.receipt.providerDiagnostics ?? null);
-      return isCompletedUnusableResult(existing.result)
-        ? { state: "failed", value: null, operation: existing }
-        : { state: "completed", value: replayableCompletedOperationResult(existing), operation: existing };
+      return completedOperationCallResult(input.runId, existing);
     }
     if (existing?.state === "provider_rejected") return { state: "failed", value: null, operation: existing };
     if (existing?.state === "failed_before_send") {
@@ -1512,6 +1737,7 @@ function reserveOperation(input: {
   workerId: string; kind: CanonicalRgOperation["kind"]; candidateId: string | null; providerCode: string;
   operationInput: unknown; operationId: string; attempt: number; inputHash: string;
   executionGrant: CanonicalContinuationExecutionGrant | null;
+  phaseReplay?: NonNullable<CanonicalRgOperation["phaseReplay"]>;
 }): CanonicalRgOperation {
   const now = nowIso();
   const reservation = { reservationId: `rg-operation-reservation-${randomUUID()}`, workerId: input.workerId,
@@ -1525,7 +1751,9 @@ function reserveOperation(input: {
     receipt: { sendState: "not_sent", completionState: "reserved", providerCode: input.providerCode,
       providerRequestId: null, calls: 0, tokens: null, retrievalBytes: 0, reasonCode: "rg_operation_reserved",
       providerDiagnostics: null, retrievalTransportDiagnostics: null },
-    input: structuredClone(input.operationInput), inputHash: input.inputHash, result: null, createdAt: now, updatedAt: now,
+    input: structuredClone(input.operationInput), inputHash: input.inputHash,
+    phaseReplay: structuredClone(input.phaseReplay ?? originalPhaseBinding(input)),
+    result: null, createdAt: now, updatedAt: now,
   };
   db.prepare(`INSERT INTO canonical_rg_operations
     (run_id, operation_id, work_item_id, state, operation_json, plan_hash, created_at, updated_at)
