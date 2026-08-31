@@ -34,7 +34,8 @@ export type CanonicalAnalysisRecoveryIntent = {
   createdAt: string;
 };
 
-export type CanonicalAnalysisRecoveryIntentState = "scheduled" | "leased" | "completed" | "superseded";
+export type CanonicalAnalysisRecoveryIntentState = "scheduled" | "waiting_for_operational_reset" | "leased"
+  | "completed" | "superseded";
 
 export type CanonicalAnalysisRecoveryRecord = {
   intent: CanonicalAnalysisRecoveryIntent;
@@ -54,8 +55,9 @@ export type CanonicalAnalysisRecoveryEvent = {
   intentId: string;
   eventSequence: number;
   parentEventHash: string | null;
-  eventType: "scheduled" | "leased" | "lease_recovered" | "lease_renewed" | "rescheduled_retry_eligible"
-    | "completed" | "superseded" | "released_after_failure";
+  eventType: "scheduled" | "waiting_for_operational_reset" | "operational_reset_admitted" | "leased"
+    | "lease_recovered" | "lease_renewed" | "rescheduled_retry_eligible" | "completed" | "superseded"
+    | "released_after_failure";
   fromState: CanonicalAnalysisRecoveryIntentState | null;
   toState: CanonicalAnalysisRecoveryIntentState;
   workerId: string | null;

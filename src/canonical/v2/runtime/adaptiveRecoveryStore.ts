@@ -125,6 +125,62 @@ export function listCanonicalAnalysisRecoveryIntents(runId: string): CanonicalAn
   return rows.map(mapRecoveryRecord);
 }
 
+export function waitCanonicalAnalysisRecoveryIntentForOperationalReset(
+  intentId: string,
+  reasonCode: string,
+): CanonicalAnalysisRecoveryRecord | null {
+  const record = getCanonicalAnalysisRecoveryIntent(intentId);
+  if (!record) return null;
+  if (!recoveryIntentMatchesCurrent(record.intent, getPersistedAnalysisRun(record.intent.runId))) {
+    supersedeRecoveryIntent(intentId, null, "recovery_binding_no_longer_current");
+    return null;
+  }
+  if (record.state === "waiting_for_operational_reset") return record;
+  if (record.state !== "scheduled") return null;
+  const event = recoveryEvent({ intentId, eventSequence: record.latestEventSequence + 1,
+    parentEventHash: record.latestEventHash, eventType: "waiting_for_operational_reset",
+    fromState: "scheduled", toState: "waiting_for_operational_reset", workerId: null,
+    reasonCode, occurredAt: nowIso() });
+  const transaction = db.transaction(() => {
+    const updated = db.prepare(`UPDATE canonical_analysis_recovery_intents
+      SET state = 'waiting_for_operational_reset', lease_owner = NULL, lease_expires_at = NULL,
+          latest_event_sequence = ?, latest_event_hash = ?, updated_at = ?
+      WHERE intent_id = ? AND latest_event_sequence = ? AND state = 'scheduled'`)
+      .run(event.eventSequence, event.eventHash, event.occurredAt, intentId, record.latestEventSequence);
+    if (updated.changes === 1) insertRecoveryEvent(event);
+  });
+  transaction();
+  return getCanonicalAnalysisRecoveryIntent(intentId);
+}
+
+export function admitCanonicalAnalysisRecoveryIntentAfterOperationalReset(
+  intentId: string,
+): CanonicalAnalysisRecoveryRecord | null {
+  const record = getCanonicalAnalysisRecoveryIntent(intentId);
+  if (!record) return null;
+  if (!recoveryIntentMatchesCurrent(record.intent, getPersistedAnalysisRun(record.intent.runId))) {
+    supersedeRecoveryIntent(intentId, null, "recovery_binding_no_longer_current");
+    return null;
+  }
+  if (record.state === "scheduled") return record;
+  if (record.state !== "waiting_for_operational_reset") return null;
+  const occurredAt = nowIso();
+  const event = recoveryEvent({ intentId, eventSequence: record.latestEventSequence + 1,
+    parentEventHash: record.latestEventHash, eventType: "operational_reset_admitted",
+    fromState: "waiting_for_operational_reset", toState: "scheduled", workerId: null,
+    reasonCode: "current_operational_budget_admits_useful_recovery", occurredAt });
+  const transaction = db.transaction(() => {
+    const updated = db.prepare(`UPDATE canonical_analysis_recovery_intents
+      SET state = 'scheduled', next_run_at = ?, lease_owner = NULL, lease_expires_at = NULL,
+          latest_event_sequence = ?, latest_event_hash = ?, updated_at = ?
+      WHERE intent_id = ? AND latest_event_sequence = ? AND state = 'waiting_for_operational_reset'`)
+      .run(occurredAt, event.eventSequence, event.eventHash, occurredAt, intentId, record.latestEventSequence);
+    if (updated.changes === 1) insertRecoveryEvent(event);
+  });
+  transaction();
+  return getCanonicalAnalysisRecoveryIntent(intentId);
+}
+
 export function listDueCanonicalAnalysisRecoveryIntents(): CanonicalAnalysisRecoveryRecord[] {
   const now = nowIso();
   const rows = db.prepare(`SELECT * FROM canonical_analysis_recovery_intents
@@ -273,7 +329,8 @@ export function assertClaimedCanonicalAnalysisRecoveryIntent(
 
 function supersedeStaleRecoveryIntents(runId: string): void {
   const rows = db.prepare(`SELECT intent_id FROM canonical_analysis_recovery_intents
-    WHERE run_id = ? AND state IN ('scheduled', 'leased') ORDER BY created_at`).all(runId) as Array<{ intent_id: string }>;
+    WHERE run_id = ? AND state IN ('scheduled', 'waiting_for_operational_reset', 'leased') ORDER BY created_at`)
+    .all(runId) as Array<{ intent_id: string }>;
   for (const row of rows) {
     const record = getCanonicalAnalysisRecoveryIntent(row.intent_id);
     if (record && !recoveryIntentMatchesCurrent(record.intent, getPersistedAnalysisRun(runId))) {

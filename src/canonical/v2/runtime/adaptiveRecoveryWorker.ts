@@ -6,6 +6,7 @@ import type { CanonicalRgEvidenceExecutionPorts } from "./rgEvidenceExecution.js
 import { createProductionRgEvidencePortsFromEnvironment } from "./rgLiveEvidencePorts.js";
 import { getPersistedAnalysisRun } from "./analysisRunStore.js";
 import {
+  admitCanonicalAnalysisRecoveryIntentAfterOperationalReset,
   claimCanonicalAnalysisRecoveryIntent,
   settleCanonicalAnalysisRecoveryIntentAfterCycle,
   ensureCanonicalAnalysisRecoveryIntent,
@@ -14,6 +15,7 @@ import {
   listDueCanonicalAnalysisRecoveryIntents,
   reconcileCanonicalAnalysisRecoveryIntents,
   releaseCanonicalAnalysisRecoveryIntentAfterFailure,
+  waitCanonicalAnalysisRecoveryIntentForOperationalReset,
 } from "./adaptiveRecoveryStore.js";
 
 const queue = new Set<string>();
@@ -23,13 +25,15 @@ let delayedTick: ReturnType<typeof setTimeout> | null = null;
 let delayedTickAt = 0;
 
 export function enqueueCanonicalAnalysisRecovery(runId: string): void {
-  const intent = ensureCanonicalAnalysisRecoveryIntent(runId);
-  if (intent && Date.parse(intent.nextRunAt) <= Date.now()) queue.add(intent.intent.intentId);
+  const intent = refreshOperationalRecoveryAdmission(ensureCanonicalAnalysisRecoveryIntent(runId),
+    productionAdaptiveOperationalPolicy());
+  if (intent?.state === "scheduled" && Date.parse(intent.nextRunAt) <= Date.now()) queue.add(intent.intent.intentId);
   scheduleFromDurableState();
 }
 
 export function hydrateCanonicalAnalysisRecoveryIntents(): void {
-  reconcileCanonicalAnalysisRecoveryIntents();
+  const policy = productionAdaptiveOperationalPolicy();
+  for (const intent of reconcileCanonicalAnalysisRecoveryIntents()) refreshOperationalRecoveryAdmission(intent, policy);
   for (const intent of listDueCanonicalAnalysisRecoveryIntents()) queue.add(intent.intent.intentId);
   scheduleFromDurableState();
 }
@@ -41,15 +45,12 @@ export async function processCanonicalAnalysisRecoveryIntent(input: {
   operationalPolicy?: CanonicalAdaptiveOperationalPolicy;
 }): Promise<CanonicalAdaptiveExecutionResult | null> {
   const workerId = input.workerId ?? `canonical-recovery-worker-${randomUUID()}`;
+  const operationalPolicy = input.operationalPolicy ?? productionAdaptiveOperationalPolicy();
+  const admitted = refreshOperationalRecoveryAdmission(getCanonicalAnalysisRecoveryIntent(input.intentId), operationalPolicy);
+  if (!admitted || admitted.state === "waiting_for_operational_reset") return null;
   const claimed = claimCanonicalAnalysisRecoveryIntent(input.intentId, workerId);
   if (!claimed) return null;
   try {
-    const operationalPolicy = input.operationalPolicy ?? productionAdaptiveOperationalPolicy();
-    if (claimed.intent.authorization.degradationSubtype === "resource_or_runtime_exhaustion"
-      && !operationalPolicyAdmitsRecovery(claimed.intent.runId, operationalPolicy)) {
-      settleCanonicalAnalysisRecoveryIntentAfterCycle(claimed.intent.intentId, workerId);
-      return null;
-    }
     const result = await executeDurableCanonicalAdaptiveLoop({
       runId: claimed.intent.runId,
       workerId,
@@ -69,13 +70,38 @@ export async function processCanonicalAnalysisRecoveryIntent(input: {
   }
 }
 
-function operationalPolicyAdmitsRecovery(runId: string, policy: CanonicalAdaptiveOperationalPolicy): boolean {
+function refreshOperationalRecoveryAdmission(
+  record: ReturnType<typeof getCanonicalAnalysisRecoveryIntent>,
+  policy: CanonicalAdaptiveOperationalPolicy,
+): ReturnType<typeof getCanonicalAnalysisRecoveryIntent> {
+  if (!record || !["scheduled", "waiting_for_operational_reset"].includes(record.state)) return record;
+  const admission = operationalRecoveryAdmission(record.intent.runId, policy);
+  if (!admission.admitted) {
+    return waitCanonicalAnalysisRecoveryIntentForOperationalReset(record.intent.intentId, admission.reasonCode);
+  }
+  return admitCanonicalAnalysisRecoveryIntentAfterOperationalReset(record.intent.intentId);
+}
+
+function operationalRecoveryAdmission(runId: string, policy: CanonicalAdaptiveOperationalPolicy):
+  { admitted: true } | { admitted: false; reasonCode: string } {
   const state = getPersistedAnalysisRun(runId)?.continuationRevisions.at(-1);
   if (!state || policy.authority !== "deployment_emergency_circuit_breaker_only"
-    || policy.analyticalCompletionAuthority !== "none" || policy.maximumConcurrentWork !== 1) return false;
-  return state.cumulativeResource.providerCalls < policy.maximumCumulativeProviderCalls
-    && state.cumulativeResource.retrievalBytes < policy.maximumCumulativeRetrievalBytes
-    && state.cumulativeResource.elapsedMsObserved < policy.maximumCumulativeElapsedMs;
+    || policy.analyticalCompletionAuthority !== "none" || policy.maximumConcurrentWork !== 1) {
+    return { admitted: false, reasonCode: "recovery_operational_policy_invalid_waiting_for_reset" };
+  }
+  if (state.cumulativeResource.providerCalls >= policy.maximumCumulativeProviderCalls) {
+    return { admitted: false,
+      reasonCode: "recovery_cumulative_provider_call_ceiling_exhausted_waiting_for_operational_reset" };
+  }
+  if (state.cumulativeResource.retrievalBytes >= policy.maximumCumulativeRetrievalBytes) {
+    return { admitted: false,
+      reasonCode: "recovery_cumulative_retrieval_byte_ceiling_exhausted_waiting_for_operational_reset" };
+  }
+  if (state.cumulativeResource.elapsedMsObserved >= policy.maximumCumulativeElapsedMs) {
+    return { admitted: false,
+      reasonCode: "recovery_cumulative_elapsed_ceiling_exhausted_waiting_for_operational_reset" };
+  }
+  return { admitted: true };
 }
 
 async function tick(): Promise<void> {
