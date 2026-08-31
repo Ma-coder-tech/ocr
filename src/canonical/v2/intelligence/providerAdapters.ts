@@ -36,7 +36,7 @@ export class ProviderOperationAuditLog {
 }
 
 type LiveJsonRequest = { url: string; method: "GET" | "POST"; headers: Record<string, string>; body: string | null; timeoutMs: number; cancellationSignal: AbortSignal | null };
-type SafeHttpMetadata = { status: number; providerRequestId: string | null };
+type SafeHttpMetadata = { status: number; providerRequestId: string | null; retryAfterAt: string | null };
 
 async function sendLiveJson(request: LiveJsonRequest, onSend: () => void, onResponse: (metadata: SafeHttpMetadata) => void): Promise<{ status: number; body: unknown; providerRequestId: string | null }> {
   const controller = new AbortController(); let timedOut = false; let externallyCancelled = false; let sent = false;
@@ -49,7 +49,8 @@ async function sendLiveJson(request: LiveJsonRequest, onSend: () => void, onResp
     onSend(); sent = true;
     const response = await fetch(request.url, { method: request.method, headers: request.headers, body: request.body, redirect: "error", signal: controller.signal });
     const providerRequestId = safeIdentifier(response.headers?.get?.("x-request-id"));
-    onResponse({ status: response.status, providerRequestId });
+    onResponse({ status: response.status, providerRequestId,
+      retryAfterAt: safeRetryAfterAt(response.headers?.get?.("retry-after")) });
     let responseBody: unknown;
     try { responseBody = await response.json() as unknown; }
     catch (error) {
@@ -102,7 +103,8 @@ export function createLiveOpenRouterSearchAdapter(capability: LiveExecutionCapab
         "Content-Type": "application/json", "X-OpenRouter-Metadata": "enabled" }, body,
         timeoutMs: RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET.searchTimeoutMs, cancellationSignal: binding.cancellationSignal },
         () => audit.settle(receiptId, { actualSendCount: 1, sendState: "sent" }),
-        (metadata) => audit.settle(receiptId, { httpStatus: metadata.status, providerRequestId: metadata.providerRequestId }));
+        (metadata) => audit.settle(receiptId, { httpStatus: metadata.status,
+          providerRequestId: metadata.providerRequestId, retryAfterAt: metadata.retryAfterAt }));
       if (response.status < 200 || response.status >= 300) {
         audit.settle(receiptId, safeProviderError(response.body));
         if (response.status === 429) throw new LiveOperationTransportError("provider_rejected", "openrouter_search_rate_limited");
@@ -262,7 +264,8 @@ async function sendOpenAiStructured<TRequest extends { batchId: string; attemptI
     assertProviderOutboundPacketSafe({ provider: "openai_responses_api", url: APPROVED_OPENAI_ENDPOINT, method: "POST", headerNames: ["Authorization", "Content-Type"], body });
     const response = await sendLiveJson({ url: APPROVED_OPENAI_ENDPOINT, method: "POST", headers: { Authorization: `Bearer ${binding.openAiApiKey}`, "Content-Type": "application/json" }, body, timeoutMs: 20_000, cancellationSignal: binding.cancellationSignal },
       () => audit.settle(receiptId, { actualSendCount: 1, sendState: "sent" }),
-      (metadata) => audit.settle(receiptId, { httpStatus: metadata.status, providerRequestId: metadata.providerRequestId }));
+      (metadata) => audit.settle(receiptId, { httpStatus: metadata.status,
+        providerRequestId: metadata.providerRequestId, retryAfterAt: metadata.retryAfterAt }));
     if (response.status < 200 || response.status >= 300) {
       audit.settle(receiptId, { ...safeProviderError(response.body), structuredOutputValidation: "not_reached" });
       throw new LiveOperationTransportError("after_send", "openai_responses_http_failure");
@@ -366,6 +369,7 @@ function baseReceipt(receiptId: string, reservationId: string, operationId: stri
     httpStatus: null, localRequestId: null, providerRequestId: null, providerResponseId: null,
     requestedModelIdentifier: null, returnedModelIdentifier: null, finishReason: null, toolExecutionState: null,
     annotationCount: null, normalizedCandidateCount: null, providerErrorType: null, providerErrorCode: null, providerErrorParam: null,
+    retryAfterAt: null,
     structuredOutputValidation: operation === "investigative_model" || operation === "semantic_model" ? "not_reached" : "not_applicable",
     safeReasonCode: "reserved" };
 }
@@ -435,6 +439,12 @@ function safeModel(value: unknown): string | null { return typeof value === "str
 function safeDiagnostic(value: unknown): string | null {
   const text = typeof value === "number" && Number.isSafeInteger(value) ? String(value) : typeof value === "string" ? value : "";
   return /^[A-Za-z0-9][A-Za-z0-9_.:\[\]-]{0,127}$/.test(text) ? text : null;
+}
+function safeRetryAfterAt(value: unknown): string | null {
+  if (typeof value !== "string" || value.length > 128) return null;
+  if (/^\d{1,10}$/.test(value)) return new Date(Date.now() + (Number(value) * 1_000)).toISOString();
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
 }
 function extractOutputText(body: Record<string, unknown>): string { if (typeof body.output_text === "string") return body.output_text;
   for (const output of asArray(body.output)) for (const content of asArray(record(output).content)) { const text = record(content).text; if (typeof text === "string") return text; }

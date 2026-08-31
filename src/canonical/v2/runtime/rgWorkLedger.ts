@@ -170,6 +170,7 @@ export type CanonicalRgProviderDiagnostics = {
   providerErrorType: string | null;
   providerErrorCode: string | null;
   providerErrorParam: string | null;
+  retryAfterAt?: string | null;
   usageState: "known" | "unknown_possible_billable";
   outputTokens: number | null;
   providerRequestCount: number | null;

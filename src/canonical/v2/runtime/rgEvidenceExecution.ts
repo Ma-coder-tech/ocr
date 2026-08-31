@@ -16,6 +16,7 @@ import type {
   CanonicalAdaptiveOperationalPolicy,
   CanonicalContinuationExecutionGrant,
 } from "./adaptiveExecutionTypes.js";
+import { canonicalOperationalAllowanceDecision } from "./adaptiveOperationalAllowance.js";
 import type { CanonicalRgOperationReconciliationPort, CanonicalRgReconciliationCapability } from "./rgOperationReconciliationTypes.js";
 import { assertClaimedCanonicalRgReconciliationIntent } from "./rgOperationReconciliationStore.js";
 import {
@@ -1569,6 +1570,7 @@ function settleOperation(runId: string, operation: CanonicalRgOperation,
   const latest = operationFromDb(runId, operation.operationId) ?? operation;
   assertRetrievalTransportDiagnostics(operation.kind, receipt?.retrievalTransportDiagnostics ?? null);
   assertSearchOutputAdmission(operation.kind, receipt?.providerDiagnostics ?? null);
+  assertProviderCooldownDiagnostics(receipt?.providerDiagnostics ?? null);
   const updated: CanonicalRgOperation = { ...latest, state, result,
     receipt: { ...latest.receipt,
       sendState: latest.receipt.sendState,
@@ -1590,6 +1592,14 @@ function settleOperation(runId: string, operation: CanonicalRgOperation,
     state, receipt: updated.receipt, resultHash: result === null ? null : digest(result),
   });
   return updated;
+}
+
+function assertProviderCooldownDiagnostics(diagnostics: CanonicalRgProviderDiagnostics | null): void {
+  const retryAfterAt = diagnostics?.retryAfterAt;
+  if (retryAfterAt === undefined || retryAfterAt === null) return;
+  if (!Number.isFinite(Date.parse(retryAfterAt)) || new Date(retryAfterAt).toISOString() !== retryAfterAt) {
+    throw new Error("rg_provider_retry_after_diagnostics_invalid");
+  }
 }
 
 function assertSearchOutputAdmission(kind: CanonicalRgOperation["kind"],
@@ -2913,6 +2923,14 @@ function operationalCeilingReason(runId: string,
   grant: CanonicalContinuationExecutionGrant | null,
   generationZero: GenerationZeroOperationalScope | null = null): string | null {
   if (!grant && !generationZero) return null;
+  const allowancePolicy = generationZero?.policy ?? grant?.operationalPolicy;
+  if (allowancePolicy?.operationalAllowance) {
+    const allowance = canonicalOperationalAllowanceDecision(runId, allowancePolicy);
+    if (!allowance || allowance.admitted) return null;
+    return allowance.kind === "exceptional_runaway_hold"
+      ? `${grant ? "rg" : "rg_generation_zero"}_exceptional_operational_runaway_guard_reached_not_analytical_completion`
+      : `${grant ? "rg" : "rg_generation_zero"}_operational_allowance_temporarily_unavailable_not_analytical_completion`;
+  }
   const rows = db.prepare(`SELECT operation_json FROM canonical_rg_operations WHERE run_id = ?`)
     .all(runId) as Array<{ operation_json: string }>;
   const allOperations = rows.map((row) => JSON.parse(row.operation_json) as CanonicalRgOperation);

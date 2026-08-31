@@ -242,12 +242,15 @@ describe("internal-analysis construction-bound provider seams", () => {
     await expect(adapter.search(searchRequest)).rejects.toThrow("duplicate_provider_operation_receipt"); expect(sends).toBe(1);
 
     const rateCap = await capability(); const rateAudit = new ProviderOperationAuditLog(); let rateSends = 0;
-    globalThis.fetch = vi.fn(async () => { rateSends += 1; return { status: 429, headers: new Headers({ "x-request-id": "or-rate-request-001" }),
+    const beforeRateLimit = Date.now();
+    globalThis.fetch = vi.fn(async () => { rateSends += 1; return { status: 429, headers: new Headers({
+      "x-request-id": "or-rate-request-001", "retry-after": "7" }),
       json: async () => ({ error: { type: "rate_limit_error", code: 429, param: "web_search", message: "unsafe provider prose" } }) } as Response; });
     await expect(createLiveOpenRouterSearchAdapter(rateCap, rateAudit).search(searchRequest)).rejects.toThrow("rate_limited");
     expect(rateSends).toBe(1); expect(rateAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, retryCount: 0, completionState: "failed", usageState: "known",
       outputTokens: 0, providerRequestCount: 0, usageCostUsd: 0,
       httpStatus: 429, providerRequestId: "or-rate-request-001", providerErrorType: "rate_limit_error", providerErrorCode: "429", providerErrorParam: "web_search" });
+    expect(Date.parse(rateAudit.snapshot()[0]!.retryAfterAt!)).toBeGreaterThanOrEqual(beforeRateLimit + 7_000);
     expect(JSON.stringify(rateAudit.snapshot())).not.toContain("unsafe provider prose");
   });
 

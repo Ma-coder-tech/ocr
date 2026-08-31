@@ -9,10 +9,11 @@ import {
   type CanonicalAnalysisRecoveryIntent,
   type CanonicalAnalysisRecoveryIntentState,
   type CanonicalAnalysisRecoveryRecord,
+  type CanonicalAnalysisRecoveryWaitGate,
 } from "./adaptiveRecoveryTypes.js";
 
-const DEFAULT_BASE_DELAY_MS = 30_000;
-const DEFAULT_MAX_DELAY_MS = 15 * 60_000;
+const DEFAULT_BASE_DELAY_MS = 2_000;
+const DEFAULT_MAX_DELAY_MS = 2 * 60_000;
 const DEFAULT_LEASE_MS = 10 * 60_000;
 
 export function ensureCanonicalAnalysisRecoveryIntent(runId: string): CanonicalAnalysisRecoveryRecord | null {
@@ -31,8 +32,9 @@ export function ensureCanonicalAnalysisRecoveryIntent(runId: string): CanonicalA
     && item.degradation?.continuationPermission === "bounded_retry_eligible"
     && (["provider_unavailable_before_send", "provider_rejection", "before_send_failure_retry_eligible"].includes(item.degradation.subtype)
       || (item.degradation.subtype === "resource_or_runtime_exhaustion"
-        && item.degradation.reasonCodes.some((reason) => reason.startsWith("rg_generation_zero_emergency_")
-          && reason.endsWith("_not_analytical_completion")))))
+        && item.degradation.reasonCodes.some((reason) => (reason.startsWith("rg_generation_zero_emergency_")
+          && reason.endsWith("_not_analytical_completion"))
+          || /^(?:rg|rg_generation_zero)_operational_allowance_temporarily_unavailable_not_analytical_completion$/.test(reason)))))
     .sort((left, right) => left.atomicClaimId.localeCompare(right.atomicClaimId))[0];
   if (!decision || !state.binding.planHash || !persisted.autonomousOutcomeHash
     || !persisted.continuationStateHash) return null;
@@ -128,6 +130,7 @@ export function listCanonicalAnalysisRecoveryIntents(runId: string): CanonicalAn
 export function waitCanonicalAnalysisRecoveryIntentForOperationalReset(
   intentId: string,
   reasonCode: string,
+  waitGate?: CanonicalAnalysisRecoveryWaitGate,
 ): CanonicalAnalysisRecoveryRecord | null {
   const record = getCanonicalAnalysisRecoveryIntent(intentId);
   if (!record) return null;
@@ -135,18 +138,22 @@ export function waitCanonicalAnalysisRecoveryIntentForOperationalReset(
     supersedeRecoveryIntent(intentId, null, "recovery_binding_no_longer_current");
     return null;
   }
-  if (record.state === "waiting_for_operational_reset") return record;
-  if (record.state !== "scheduled") return null;
+  if (!["scheduled", "waiting_for_operational_reset"].includes(record.state)) return null;
+  if (record.state === "waiting_for_operational_reset"
+    && canonicalJson(record.waitGate) === canonicalJson(waitGate ?? null)) return record;
+  const fromState = record.state;
   const event = recoveryEvent({ intentId, eventSequence: record.latestEventSequence + 1,
     parentEventHash: record.latestEventHash, eventType: "waiting_for_operational_reset",
-    fromState: "scheduled", toState: "waiting_for_operational_reset", workerId: null,
-    reasonCode, occurredAt: nowIso() });
+    fromState, toState: "waiting_for_operational_reset", workerId: null,
+    reasonCode, waitGate: waitGate ?? null, occurredAt: nowIso() });
+  const nextRunAt = waitGate?.nextEligibleAt ?? record.nextRunAt;
   const transaction = db.transaction(() => {
     const updated = db.prepare(`UPDATE canonical_analysis_recovery_intents
       SET state = 'waiting_for_operational_reset', lease_owner = NULL, lease_expires_at = NULL,
-          latest_event_sequence = ?, latest_event_hash = ?, updated_at = ?
-      WHERE intent_id = ? AND latest_event_sequence = ? AND state = 'scheduled'`)
-      .run(event.eventSequence, event.eventHash, event.occurredAt, intentId, record.latestEventSequence);
+          next_run_at = ?, latest_event_sequence = ?, latest_event_hash = ?, updated_at = ?
+      WHERE intent_id = ? AND latest_event_sequence = ? AND state = ?`)
+      .run(nextRunAt, event.eventSequence, event.eventHash, event.occurredAt, intentId,
+        record.latestEventSequence, fromState);
     if (updated.changes === 1) insertRecoveryEvent(event);
   });
   transaction();
@@ -168,7 +175,7 @@ export function admitCanonicalAnalysisRecoveryIntentAfterOperationalReset(
   const event = recoveryEvent({ intentId, eventSequence: record.latestEventSequence + 1,
     parentEventHash: record.latestEventHash, eventType: "operational_reset_admitted",
     fromState: "waiting_for_operational_reset", toState: "scheduled", workerId: null,
-    reasonCode: "current_operational_budget_admits_useful_recovery", occurredAt });
+    reasonCode: "current_operational_allowance_admits_useful_recovery", waitGate: null, occurredAt });
   const transaction = db.transaction(() => {
     const updated = db.prepare(`UPDATE canonical_analysis_recovery_intents
       SET state = 'scheduled', next_run_at = ?, lease_owner = NULL, lease_expires_at = NULL,
@@ -184,12 +191,15 @@ export function admitCanonicalAnalysisRecoveryIntentAfterOperationalReset(
 export function listDueCanonicalAnalysisRecoveryIntents(): CanonicalAnalysisRecoveryRecord[] {
   const now = nowIso();
   const rows = db.prepare(`SELECT * FROM canonical_analysis_recovery_intents
-    WHERE (state = 'scheduled' AND next_run_at <= ?)
+    WHERE (state IN ('scheduled', 'waiting_for_operational_reset') AND next_run_at <= ?)
        OR (state = 'leased' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?)
     ORDER BY next_run_at, created_at, intent_id`).all(now, now) as Array<Record<string, unknown>>;
   const due: CanonicalAnalysisRecoveryRecord[] = [];
   for (const row of rows) {
     const record = mapRecoveryRecord(row);
+    if (record.state === "waiting_for_operational_reset"
+      && (!record.waitGate?.nextEligibleAt || record.waitGate.kind === "provider_readiness_change"
+        || record.waitGate.kind === "exceptional_runaway_hold")) continue;
     if (record.state === "leased" && record.leaseOwner
       && activeAdaptiveCycleLease(record.intent.runId, record.leaseOwner, now)) continue;
     if (recoveryIntentMatchesCurrent(record.intent, getPersistedAnalysisRun(record.intent.runId))) due.push(record);
@@ -200,16 +210,20 @@ export function listDueCanonicalAnalysisRecoveryIntents(): CanonicalAnalysisReco
 
 export function getNextCanonicalAnalysisRecoveryDelayMs(): number | null {
   const rows = db.prepare(`SELECT * FROM canonical_analysis_recovery_intents
-    WHERE state = 'scheduled' OR (state = 'leased' AND lease_expires_at IS NOT NULL)
+    WHERE state IN ('scheduled', 'waiting_for_operational_reset') OR (state = 'leased' AND lease_expires_at IS NOT NULL)
     ORDER BY created_at, intent_id`).all() as Array<Record<string, unknown>>;
   const wakeTimes = rows.map(mapRecoveryRecord).map((record) => {
     if (record.state === "scheduled") return Date.parse(record.nextRunAt);
+    if (record.state === "waiting_for_operational_reset") {
+      return record.waitGate?.nextEligibleAt ? Date.parse(record.waitGate.nextEligibleAt) : Number.POSITIVE_INFINITY;
+    }
     const activeCycleExpiry = record.leaseOwner
       ? activeAdaptiveCycleLease(record.intent.runId, record.leaseOwner, nowIso()) : null;
     return Math.max(Date.parse(record.leaseExpiresAt!), activeCycleExpiry ? Date.parse(activeCycleExpiry) : 0);
   });
-  if (wakeTimes.length === 0) return null;
-  return Math.max(0, Math.min(...wakeTimes) - Date.now());
+  const finiteWakeTimes = wakeTimes.filter(Number.isFinite);
+  if (finiteWakeTimes.length === 0) return null;
+  return Math.max(0, Math.min(...finiteWakeTimes) - Date.now());
 }
 
 export function claimCanonicalAnalysisRecoveryIntent(intentId: string, workerId: string): CanonicalAnalysisRecoveryRecord | null {
@@ -437,6 +451,13 @@ function mapRecoveryRecord(row: Record<string, unknown>): CanonicalAnalysisRecov
     || latest.eventHash !== String(row.latest_event_hash) || latest.toState !== String(row.state)) {
     throw new Error("canonical_recovery_event_lineage_invalid");
   }
+  const waitGate = latest.waitGate ?? null;
+  if (waitGate && !recoveryWaitGateValid(waitGate)) {
+    throw new Error("canonical_recovery_wait_gate_integrity_invalid");
+  }
+  if (String(row.state) !== "waiting_for_operational_reset" && waitGate !== null) {
+    throw new Error("canonical_recovery_wait_gate_state_invalid");
+  }
   return {
     intent,
     state: String(row.state) as CanonicalAnalysisRecoveryIntentState,
@@ -448,7 +469,21 @@ function mapRecoveryRecord(row: Record<string, unknown>): CanonicalAnalysisRecov
     latestEventHash: String(row.latest_event_hash),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
+    waitGate,
   };
+}
+
+function recoveryWaitGateValid(gate: CanonicalAnalysisRecoveryWaitGate): boolean {
+  const timed = gate.kind === "operational_allowance" || gate.kind === "provider_cooldown";
+  return gate.schemaVersion === "canonical_analysis_recovery_wait_gate_v1"
+    && ["operational_allowance", "provider_cooldown", "provider_readiness_change",
+      "exceptional_runaway_hold"].includes(gate.kind)
+    && (timed ? gate.nextEligibleAt !== null && Number.isFinite(Date.parse(gate.nextEligibleAt))
+      : gate.nextEligibleAt === null)
+    && /^[a-f0-9]{64}$/.test(gate.operationalPolicyHash)
+    && (gate.providerConfigurationHash === null || /^[a-f0-9]{64}$/.test(gate.providerConfigurationHash))
+    && /^[a-z][a-z0-9_]{0,191}$/.test(gate.reasonCode)
+    && gate.analyticalCompletionEffect === "none";
 }
 
 function recoveryEvents(intentId: string): CanonicalAnalysisRecoveryEvent[] {

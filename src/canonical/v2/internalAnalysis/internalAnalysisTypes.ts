@@ -280,6 +280,7 @@ export type ProviderOperationReceiptV1 = {
   providerErrorType: string | null;
   providerErrorCode: string | null;
   providerErrorParam: string | null;
+  retryAfterAt?: string | null;
   structuredOutputValidation: "not_applicable" | "not_reached" | "passed" | "failed";
   safeReasonCode: string;
   retrievalTransportDiagnostics?: PublicRetrievalTransportDiagnosticsV1 | null;

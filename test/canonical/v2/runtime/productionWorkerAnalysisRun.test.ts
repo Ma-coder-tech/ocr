@@ -110,7 +110,9 @@ describe("production worker canonical AnalysisRun integration", () => {
     expect(degradedDecisions.every((item) => item.degradation?.subtype === "provider_unavailable_before_send"
       && item.degradation.continuationPermission === "bounded_retry_eligible")).toBe(true);
     expect(recoveryStore.listCanonicalAnalysisRecoveryIntents(canonical!.id)).toEqual([
-      expect.objectContaining({ state: "scheduled", dispatchCount: 0,
+      expect.objectContaining({ state: "waiting_for_operational_reset", dispatchCount: 0,
+        waitGate: expect.objectContaining({ kind: "provider_readiness_change", nextEligibleAt: null,
+          analyticalCompletionEffect: "none" }),
         intent: expect.objectContaining({
           runId: canonical!.id,
           authorization: expect.objectContaining({

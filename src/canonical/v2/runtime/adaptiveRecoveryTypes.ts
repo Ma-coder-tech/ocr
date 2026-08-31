@@ -48,6 +48,18 @@ export type CanonicalAnalysisRecoveryRecord = {
   latestEventHash: string;
   createdAt: string;
   updatedAt: string;
+  waitGate: CanonicalAnalysisRecoveryWaitGate | null;
+};
+
+export type CanonicalAnalysisRecoveryWaitGate = {
+  schemaVersion: "canonical_analysis_recovery_wait_gate_v1";
+  kind: "operational_allowance" | "provider_cooldown" | "provider_readiness_change"
+    | "exceptional_runaway_hold";
+  nextEligibleAt: string | null;
+  operationalPolicyHash: string;
+  providerConfigurationHash: string | null;
+  reasonCode: string;
+  analyticalCompletionEffect: "none";
 };
 
 export type CanonicalAnalysisRecoveryEvent = {
@@ -62,6 +74,7 @@ export type CanonicalAnalysisRecoveryEvent = {
   toState: CanonicalAnalysisRecoveryIntentState;
   workerId: string | null;
   reasonCode: string;
+  waitGate?: CanonicalAnalysisRecoveryWaitGate | null;
   occurredAt: string;
   eventHash: string;
 };

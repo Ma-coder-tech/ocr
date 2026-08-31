@@ -404,6 +404,7 @@ async function sendStructured(
           httpStatus: null, localRequestId, providerRequestId, providerResponseId: null,
           requestedModelIdentifier: binding.model, returnedModelIdentifier: null,
           providerErrorType: null, providerErrorCode: null, providerErrorParam: null,
+          retryAfterAt: null,
           usageState: "unknown_possible_billable", outputTokens: null, providerRequestCount: null, usageCostUsd: null,
         } } : { providerCode: "openai_responses_api", providerRequestId: null,
         calls: 0, tokens: 0, retrievalBytes: 0, providerDiagnostics: null });
@@ -431,6 +432,7 @@ function structuredDiagnostics(input: {
     requestedModelIdentifier: input.requestedModel, returnedModelIdentifier: safeModel(input.envelope.model),
     providerErrorType: safeDiagnostic(error.type), providerErrorCode: safeDiagnostic(error.code),
     providerErrorParam: safeDiagnostic(error.param),
+    retryAfterAt: safeRetryAfterAt(input.response.headers.get("retry-after")),
     usageState: rejected || outputTokens !== null ? "known" : "unknown_possible_billable",
     outputTokens, providerRequestCount: rejected ? 0 : 1,
     usageCostUsd: rejected ? 0 : Number.isFinite(usage.cost) && Number(usage.cost) >= 0 ? Number(usage.cost) : null,
@@ -444,6 +446,13 @@ function openAiRejectionReason(status: number): string {
   if (status === 404) return "rg_openai_model_or_endpoint_rejected";
   if (status === 429) return "rg_openai_rate_limited";
   return "rg_openai_request_rejected";
+}
+
+function safeRetryAfterAt(value: string | null): string | null {
+  if (value === null || value.length > 128) return null;
+  if (/^\d{1,10}$/.test(value)) return new Date(Date.now() + (Number(value) * 1_000)).toISOString();
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
 }
 
 function investigationSchema(): object {
@@ -621,6 +630,7 @@ function rgSearchReceipt(receipt: ProviderOperationReceiptV1,
       providerErrorType: receipt.providerErrorType,
       providerErrorCode: receipt.providerErrorCode,
       providerErrorParam: receipt.providerErrorParam,
+      retryAfterAt: receipt.retryAfterAt ?? null,
       usageState: receipt.usageState,
       outputTokens: receipt.outputTokens,
       providerRequestCount: receipt.providerRequestCount,
