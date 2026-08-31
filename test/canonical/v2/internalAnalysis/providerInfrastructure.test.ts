@@ -12,6 +12,7 @@ import {
   createDestinationPermit, createNodeHttpsRetrievalPort, createPublicDocumentExtractionPort, createPublicSourceAuthorityAdmission,
   INVESTIGATIVE_RESPONSE_SCHEMA_HASH, INVESTIGATIVE_RESPONSE_SCHEMA_V1, OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH,
   LiveOperationTransportError,
+  LiveSearchResponseAdmissionError,
   ProviderReadinessDiagnosticLog, SEMANTIC_RESPONSE_SCHEMA_V1, type SearchRequest, type SemanticVerificationInput,
   inspectProviderOutboundPacket, normalizeOpenRouterSearchResponse, runInternalProviderPreflight, runProviderReadinessProbe,
   sanitizePublicDocumentTextForProvider, validateSemanticMember,
@@ -133,13 +134,46 @@ describe("internal-analysis construction-bound provider seams", () => {
       providerRequestCount: 1, usageCostUsd: 0.02, safeReasonCode: "openrouter_search_response_truncated" });
   });
 
-  it("fails malformed, URL-less, duplicate, excessive, wrong-identity, and hidden-fallback OpenRouter responses closed", async () => {
+  it("admits valid citations independently while rejecting malformed, duplicate, and unsafe citations", async () => {
+    const body = openRouterResponse([], { choices: [{ index: 0, message: { role: "assistant", content: "",
+      annotations: [
+        citation("https://docs.example.test/application-fee", "Valid official document"),
+        citation("not a URL", "Malformed URL"),
+        citation("http://docs.example.test/insecure", "Insecure URL"),
+        citation("https://user:password@docs.example.test/private", "Credential URL"),
+        citation("https://docs.example.test/application-fee", "Duplicate URL"),
+        { type: "url_citation", url_citation: { title: "Missing URL" } },
+      ],
+    } }], usage: { completion_tokens: 21, cost: 0.013, server_tool_use: { web_search_requests: 1 } } });
+    const request = { ...searchRequest, maximumCandidates: 6 };
+    const normalized = normalizeOpenRouterSearchResponse(body, { request, expectedModel: "openai/gpt-5.2" });
+    expect(normalized.candidates).toEqual([expect.objectContaining({
+      url: "https://docs.example.test/application-fee", rank: 1,
+    })]);
+    expect(normalized.citationAdmission).toEqual({
+      schemaVersion: "openrouter_search_citation_admission_v1",
+      outcome: "partially_admitted", annotationCount: 6, admittedCitationCount: 1,
+      rejectedCitationCount: 5,
+      reasonCodes: ["openrouter_search_duplicate_url", "openrouter_search_result_malformed",
+        "openrouter_search_result_url_invalid"],
+      evidenceAdmissionEffect: "none", analyticalCompletionEffect: "none",
+    });
+    expect(JSON.stringify(normalized)).not.toContain("user:password");
+
+    const cap = await capability(); const audit = new ProviderOperationAuditLog();
+    globalThis.fetch = vi.fn(async () => ({ status: 200, headers: new Headers({ "x-request-id": "or-mixed-001" }),
+      json: async () => body } as Response));
+    const response = await createLiveOpenRouterSearchAdapter(cap, audit).search(request);
+    expect(response.candidates).toHaveLength(1);
+    expect(response.citationAdmission).toEqual(normalized.citationAdmission);
+    expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "completed",
+      usageState: "known", outputTokens: 21, providerRequestCount: 1, usageCostUsd: 0.013,
+      annotationCount: 6, normalizedCandidateCount: 1, providerRequestId: "or-mixed-001" });
+  });
+
+  it("keeps fully received batch-level admission failures settled with safe usage diagnostics", async () => {
     const cases: Array<{ name: string; mutate: (response: ReturnType<typeof openRouterResponse>) => unknown; reason: string }> = [
       { name: "malformed", mutate: (response) => ({ ...response, choices: [{ index: 0, message: { role: "assistant", content: [], annotations: [] } }] }), reason: "response_malformed" },
-      { name: "missing-url", mutate: (response) => ({ ...response, choices: [{ ...response.choices[0], message: { ...response.choices[0]!.message,
-        annotations: [{ type: "url_citation", url_citation: { title: "Missing URL" } }] } }] }), reason: "result_malformed" },
-      { name: "duplicate-url", mutate: (response) => ({ ...response, choices: [{ ...response.choices[0], message: { ...response.choices[0]!.message,
-        annotations: [citation("https://docs.example.test/application-fee", "One"), citation("https://docs.example.test/application-fee", "Two")] } }] }), reason: "duplicate_url" },
       { name: "too-many", mutate: (response) => ({ ...response, choices: [{ ...response.choices[0], message: { ...response.choices[0]!.message,
         annotations: Array.from({ length: 4 }, (_, index) => citation(`https://docs.example.test/application-fee-${index}`, `Title ${index}`)) } }] }), reason: "result_cap_exceeded" },
       { name: "wrong-model", mutate: (response) => ({ ...response, model: "openai/different-model" }), reason: "identity_invalid" },
@@ -149,10 +183,53 @@ describe("internal-analysis construction-bound provider seams", () => {
       const cap = await capability(); const audit = new ProviderOperationAuditLog(); let sends = 0;
       globalThis.fetch = vi.fn(async () => { sends += 1;
         return { status: 200, json: async () => item.mutate(openRouterResponse([])) } as Response; });
-      await expect(createLiveOpenRouterSearchAdapter(cap, audit).search(searchRequest)).rejects.toThrow(item.reason);
-      expect(sends, item.name).toBe(1); expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, retryCount: 0, completionState: "failed", usageState: "unknown_possible_billable",
+      const error = await createLiveOpenRouterSearchAdapter(cap, audit).search(searchRequest).then(() => null, (value) => value);
+      expect(error, item.name).toBeInstanceOf(LiveSearchResponseAdmissionError);
+      expect(error).toMatchObject({ message: expect.stringContaining(item.reason), admission: {
+        schemaVersion: "openrouter_search_citation_admission_v1", outcome: "batch_rejected",
+        admittedCitationCount: 0, reasonCodes: [expect.stringContaining(item.reason)],
+        evidenceAdmissionEffect: "none", analyticalCompletionEffect: "none",
+      } });
+      expect(sends, item.name).toBe(1); expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, retryCount: 0, completionState: "completed", usageState: "known",
+        outputTokens: 12, providerRequestCount: 1, usageCostUsd: 0.0123,
         httpStatus: 200, providerResponseId: "chatcmpl-openrouter-test", returnedModelIdentifier: item.name === "wrong-model" ? "openai/different-model" : "openai/gpt-5.2" });
     }
+  });
+
+  it("returns an entirely citation-malformed response as a deterministic no-usable-citations batch", async () => {
+    const body = openRouterResponse([], { choices: [{ index: 0, message: { role: "assistant", content: "",
+      annotations: [citation("not-a-url", "Bad URL"),
+        { type: "url_citation", url_citation: { title: "Missing URL" } }],
+    } }] });
+    const normalized = normalizeOpenRouterSearchResponse(body, { request: searchRequest,
+      expectedModel: "openai/gpt-5.2" });
+    expect(normalized.candidates).toEqual([]);
+    expect(normalized.citationAdmission).toMatchObject({ outcome: "no_usable_citations",
+      annotationCount: 2, admittedCitationCount: 0, rejectedCitationCount: 2,
+      reasonCodes: ["openrouter_search_result_malformed", "openrouter_search_result_url_invalid"] });
+  });
+
+  it("keeps a fully received invalid JSON search response settled while body-transfer failure remains ambiguous", async () => {
+    const settledCap = await capability(); const settledAudit = new ProviderOperationAuditLog();
+    globalThis.fetch = vi.fn(async () => ({ status: 200, headers: new Headers({ "x-request-id": "or-json-001" }),
+      json: async () => { throw new SyntaxError("Unexpected token"); } } as unknown as Response));
+    const settledError = await createLiveOpenRouterSearchAdapter(settledCap, settledAudit).search(searchRequest)
+      .then(() => null, (error) => error);
+    expect(settledError).toMatchObject({ message: "openrouter_search_response_json_invalid",
+      admission: { outcome: "batch_rejected", admittedCitationCount: 0,
+        reasonCodes: ["openrouter_search_response_json_invalid"], evidenceAdmissionEffect: "none",
+        analyticalCompletionEffect: "none" } });
+    expect(settledAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, httpStatus: 200,
+      providerRequestId: "or-json-001", completionState: "completed", usageState: "unknown_possible_billable",
+      safeReasonCode: "openrouter_search_response_json_invalid" });
+
+    const ambiguousCap = await capability(); const ambiguousAudit = new ProviderOperationAuditLog();
+    globalThis.fetch = vi.fn(async () => ({ status: 200, headers: new Headers({ "x-request-id": "or-body-001" }),
+      json: async () => { throw new TypeError("terminated"); } } as unknown as Response));
+    await expect(createLiveOpenRouterSearchAdapter(ambiguousCap, ambiguousAudit).search(searchRequest))
+      .rejects.toMatchObject({ transportState: "after_send" });
+    expect(ambiguousAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, httpStatus: 200,
+      providerRequestId: "or-body-001", completionState: "failed", usageState: "unknown_possible_billable" });
   });
 
   it("preserves missing OpenRouter usage as unknown, distinguishes rate limits, and forbids a second send for one reservation", async () => {

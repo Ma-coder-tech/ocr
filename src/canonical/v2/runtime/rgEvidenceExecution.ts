@@ -496,7 +496,7 @@ export type CanonicalRgCompletedUnusableResult = {
   reasonCode: string;
 };
 
-/** A side-effect-free retrieval result was received, but cannot be used as evidence. */
+/** A provider result was fully received, but its local admission failed deterministically. */
 export class RgEvidenceCompletedUnusableError extends Error {
   constructor(reasonCode: string, public readonly receipt: RgEvidencePortReceipt) {
     super(reasonCode);
@@ -698,7 +698,11 @@ async function executeWorkItem(input: {
   if (search.state !== "completed") return finishFailedOperation(input, search.operation);
   const candidates = validateSearchCandidates(search.value as CanonicalRgDiscoveryCandidate[], intent);
   if (candidates.length === 0) {
-    terminalizeWork(input.runId, input.workItem, "completed_unresolved", "unresolved", "rg_search_no_valid_candidates", [], input.workerId);
+    const searchAdmission = search.operation.receipt?.providerDiagnostics?.searchOutputAdmission;
+    const stopReason = searchAdmission?.outcome === "no_usable_citations"
+      ? "rg_search_completed_no_usable_citations"
+      : "rg_search_no_valid_candidates";
+    terminalizeWork(input.runId, input.workItem, "completed_unresolved", "unresolved", stopReason, [], input.workerId);
     return { state: "unresolved", evidence: [] };
   }
 
@@ -872,7 +876,14 @@ async function executeWorkItem(input: {
 function finishFailedOperation(
   input: { runId: string; workItem: CanonicalRgWorkItem; workerId: string },
   operation: CanonicalRgOperation,
-): { state: "degraded"; evidence: [] } {
+): { state: "unresolved" | "degraded"; evidence: [] } {
+  if (operation.state === "completed" && isCompletedUnusableResult(operation.result)) {
+    terminalizeWork(input.runId, input.workItem, "completed_unresolved", "unresolved",
+      operation.receipt.reasonCode, [], input.workerId);
+    appendExtensionDecision(input.runId, input.workItem.workItemId, "stopped",
+      "settled_search_batch_without_exact_support_not_analytical_completion");
+    return { state: "unresolved", evidence: [] };
+  }
   const indeterminate = operation.state === "indeterminate_after_send";
   const providerRejected = operation.state === "provider_rejected";
   terminalizeWork(input.runId, input.workItem, indeterminate ? "indeterminate_after_send"
@@ -1087,9 +1098,12 @@ async function runExternalOperation<T>(input: {
       executionGrantId: input.executionGrant?.grantId ?? null, workItemId: input.workItem.workItemId,
       kind: input.kind, candidateId: input.candidateId, attempt, inputHash }).slice(0, 32)}`;
     const existing = operationFromDb(input.runId, operationId);
-    if (existing?.state === "completed") return isCompletedUnusableResult(existing.result)
-      ? { state: "failed", value: null, operation: existing }
-      : { state: "completed", value: replayableCompletedOperationResult(existing), operation: existing };
+    if (existing?.state === "completed") {
+      assertSearchOutputAdmission(existing.kind, existing.receipt.providerDiagnostics ?? null);
+      return isCompletedUnusableResult(existing.result)
+        ? { state: "failed", value: null, operation: existing }
+        : { state: "completed", value: replayableCompletedOperationResult(existing), operation: existing };
+    }
     if (existing?.state === "provider_rejected") return { state: "failed", value: null, operation: existing };
     if (existing?.state === "failed_before_send") {
       if (attempt < maximumAttempts) continue;
@@ -1166,7 +1180,7 @@ async function runExternalOperation<T>(input: {
         throw error;
       }
       if (error instanceof RgEvidenceCompletedUnusableError) {
-        if (input.kind !== "public_retrieval" || !sent) {
+        if (!["public_search", "public_retrieval"].includes(input.kind) || !sent) {
           throw new Error("rg_completed_unusable_outcome_invalid");
         }
         const reason = safeReason(error);
@@ -1176,11 +1190,14 @@ async function runExternalOperation<T>(input: {
           reasonCode: reason,
         };
         const settled = settleOperation(input.runId, operation, "completed", completedUnusable, error.receipt, reason);
-        appendDocumentAdmissionDecision(input.runId, input.workItem.workItemId, operation.operationId,
-          input.candidateId, { state: "rejected", reasonCode: reason, documentFingerprint: null });
+        if (input.kind === "public_retrieval") {
+          appendDocumentAdmissionDecision(input.runId, input.workItem.workItemId, operation.operationId,
+            input.candidateId, { state: "rejected", reasonCode: reason, documentFingerprint: null });
+        }
         incrementResource(input.runId, input.workItem.workItemId, input.kind, error.receipt);
         appendRetryDecision(input.runId, input.workItem.workItemId, operation.operationId,
-          "no_retry", "completed_unusable_public_retrieval_no_retry");
+          "no_retry", input.kind === "public_search" ? "completed_unusable_public_search_no_retry"
+            : "completed_unusable_public_retrieval_no_retry");
         return { state: "failed", value: null, operation: settled };
       }
       const providerRejected = error instanceof RgEvidenceTransportError && error.transportState === "provider_rejected";
@@ -1545,6 +1562,7 @@ function settleOperation(runId: string, operation: CanonicalRgOperation,
   result: unknown | null, receipt: RgEvidencePortReceipt | null, reasonCode: string): CanonicalRgOperation {
   const latest = operationFromDb(runId, operation.operationId) ?? operation;
   assertRetrievalTransportDiagnostics(operation.kind, receipt?.retrievalTransportDiagnostics ?? null);
+  assertSearchOutputAdmission(operation.kind, receipt?.providerDiagnostics ?? null);
   const updated: CanonicalRgOperation = { ...latest, state, result,
     receipt: { ...latest.receipt,
       sendState: latest.receipt.sendState,
@@ -1566,6 +1584,40 @@ function settleOperation(runId: string, operation: CanonicalRgOperation,
     state, receipt: updated.receipt, resultHash: result === null ? null : digest(result),
   });
   return updated;
+}
+
+function assertSearchOutputAdmission(kind: CanonicalRgOperation["kind"],
+  diagnostics: CanonicalRgProviderDiagnostics | null): void {
+  const admission = diagnostics?.searchOutputAdmission;
+  if (admission === undefined || admission === null) return;
+  const counts = [admission.annotationCount, admission.admittedCitationCount, admission.rejectedCitationCount];
+  const reasons = Array.isArray(admission.reasonCodes) ? admission.reasonCodes : [];
+  const countsValid = counts.every((value) => Number.isSafeInteger(value) && value >= 0)
+    && admission.admittedCitationCount + admission.rejectedCitationCount === admission.annotationCount;
+  const reasonsValid = Array.isArray(admission.reasonCodes)
+    && reasons.every((value) => /^[a-z][a-z0-9_]{0,191}$/.test(value))
+    && new Set(reasons).size === reasons.length
+    && [...reasons].sort().every((value, index) => value === reasons[index]);
+  const outcomeValid = admission.outcome === "no_citations"
+    ? admission.annotationCount === 0 && admission.admittedCitationCount === 0 && admission.rejectedCitationCount === 0
+    : admission.outcome === "all_citations_admitted"
+      ? admission.annotationCount > 0 && admission.admittedCitationCount === admission.annotationCount
+        && admission.rejectedCitationCount === 0 && reasons.length === 0
+      : admission.outcome === "partially_admitted"
+        ? admission.admittedCitationCount > 0 && admission.rejectedCitationCount > 0 && reasons.length > 0
+        : admission.outcome === "no_usable_citations"
+          ? admission.annotationCount > 0 && admission.admittedCitationCount === 0
+            && admission.rejectedCitationCount === admission.annotationCount && reasons.length > 0
+          : admission.outcome === "batch_rejected"
+            ? admission.admittedCitationCount === 0 && admission.rejectedCitationCount === admission.annotationCount
+              && reasons.length > 0
+            : false;
+  if (kind !== "public_search" || diagnostics?.responseDisposition !== "completed"
+    || admission.schemaVersion !== "openrouter_search_citation_admission_v1"
+    || admission.evidenceAdmissionEffect !== "none" || admission.analyticalCompletionEffect !== "none"
+    || !countsValid || !reasonsValid || !outcomeValid) {
+    throw new Error("rg_search_output_admission_integrity_invalid");
+  }
 }
 
 function assertRetrievalTransportDiagnostics(kind: CanonicalRgOperation["kind"],

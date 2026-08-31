@@ -242,6 +242,18 @@ export type SearchCandidateAuditV1 = {
 
 export type SearchToolExecutionState = "verified" | "unverified" | "not_executed";
 
+export type SearchCitationAdmissionV1 = {
+  schemaVersion: "openrouter_search_citation_admission_v1";
+  outcome: "all_citations_admitted" | "partially_admitted" | "no_usable_citations" | "no_citations"
+    | "batch_rejected";
+  annotationCount: number;
+  admittedCitationCount: number;
+  rejectedCitationCount: number;
+  reasonCodes: string[];
+  evidenceAdmissionEffect: "none";
+  analyticalCompletionEffect: "none";
+};
+
 export type SearchProviderMetadataV1 = {
   providerResponseId: string | null;
   modelIdentifier: string | null;
@@ -301,6 +313,7 @@ export type SearchResponse = {
   candidates: SearchDiscoveryCandidate[];
   suggestedAdaptiveReason: SearchAttempt["adaptiveReason"];
   providerMetadata: SearchProviderMetadataV1;
+  citationAdmission?: SearchCitationAdmissionV1;
   outputAccounting: "search_discovery_not_model_generation";
 };
 

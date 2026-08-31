@@ -175,6 +175,51 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(afterDeterministicReplay.rgOperations).toHaveLength(4);
   }, 30_000);
 
+  it("continues a valid citation from a partially admitted search batch without transferring rejected output", async () => {
+    const setup = await runWithOneWorkItem();
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const originalSearch = ports.search;
+    ports.search = async (input, onSend) => {
+      const result = await originalSearch(input, onSend);
+      return { ...result, receipt: { ...result.receipt, providerDiagnostics: {
+        schemaVersion: "canonical_rg_provider_diagnostics_v1", responseDisposition: "completed",
+        httpStatus: 200, localRequestId: "provider-request-partial-search-001",
+        providerRequestId: "or-partial-search-001", providerResponseId: "or-response-partial-search-001",
+        requestedModelIdentifier: "openai/gpt-5.2", returnedModelIdentifier: "openai/gpt-5.2",
+        providerErrorType: null, providerErrorCode: null, providerErrorParam: null,
+        usageState: "known", outputTokens: 17, providerRequestCount: 1, usageCostUsd: 0.004,
+        searchOutputAdmission: {
+          schemaVersion: "openrouter_search_citation_admission_v1", outcome: "partially_admitted",
+          annotationCount: 2, admittedCitationCount: 1, rejectedCitationCount: 1,
+          reasonCodes: ["openrouter_search_result_url_invalid"], evidenceAdmissionEffect: "none",
+          analyticalCompletionEffect: "none",
+        },
+      } } };
+    };
+    const beforeApplications = structuredClone(setup.run.artifacts.rd!.economicLayer.semanticApplications);
+
+    const result = await setup.executor.executeDurableCanonicalRgEvidence({
+      runId: setup.run.runId, ports, workerId: "partial-search-admission-worker",
+    });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const search = persisted.rgOperations.find((operation) => operation.kind === "public_search")!;
+
+    expect(result).toMatchObject({ workItemsCompletedWithEvidence: 1, workItemsCompletedUnresolved: 0,
+      workItemsDegraded: 0, canonicalTruthPreserved: true });
+    expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
+    expect(search).toMatchObject({ state: "completed", receipt: { providerDiagnostics: {
+      responseDisposition: "completed", searchOutputAdmission: { outcome: "partially_admitted",
+        admittedCitationCount: 1, rejectedCitationCount: 1, evidenceAdmissionEffect: "none",
+        analyticalCompletionEffect: "none" } } } });
+    expect(result.verifiedEvidence).toHaveLength(1);
+    expect(persisted.rgWorkItems[0]!.verifiedEvidenceRefs).toHaveLength(1);
+    expect(persisted.result!.artifacts.rd!.economicLayer.semanticApplications).toEqual(beforeApplications);
+    expect(JSON.stringify(persisted)).not.toContain("user:password");
+    expect(persisted.canonicalTruthHash).toBe(setup.run.canonicalTruthHash);
+    expect(persisted.financialFoundationHash).toBe(setup.run.financialFoundationHash);
+  }, 30_000);
+
   it("fails closed when public RG proposes merchant-contract or multi-statement recurrence", async () => {
     for (const recurrenceBasis of ["merchant_contract", "multi_statement"] as const) {
       const setup = await runWithOneWorkItem("recurrence");
@@ -1233,6 +1278,94 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(retrievalSends).toBe(1);
     expect(calls).toEqual(["search", "retrieve-unusable"]);
     expect(setup.store.getPersistedAnalysisRun(setup.run.runId)!.rgOperations).toHaveLength(2);
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    expect(controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId }).lifecycle)
+      .not.toBe("indeterminate_reconciliation_required");
+  }, 30_000);
+
+  it("persists a completed-but-unusable search batch as unresolved and replays it without another send", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "ratereveal-settled-search-restart-"));
+    temporaryDirectories.push(directory);
+    const databasePath = path.join(directory, "settled-search.sqlite");
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const setup = await runWithOneWorkItem();
+    const beforeTruth = setup.run.canonicalTruthHash;
+    const beforeFinancial = setup.run.financialFoundationHash;
+    let searchSends = 0;
+    const ports = successfulPorts([]);
+    ports.search = async (_input, onSend) => {
+      onSend(); searchSends += 1;
+      throw new setup.executor.RgEvidenceCompletedUnusableError("openrouter_search_response_malformed", {
+        providerCode: "openrouter_web_search", providerRequestId: "or-settled-search-001", calls: 1,
+        tokens: 19, retrievalBytes: 0,
+        providerDiagnostics: {
+          schemaVersion: "canonical_rg_provider_diagnostics_v1", responseDisposition: "completed",
+          httpStatus: 200, localRequestId: "provider-request-settled-search-001",
+          providerRequestId: "or-settled-search-001", providerResponseId: "or-response-settled-001",
+          requestedModelIdentifier: "openai/gpt-5.2", returnedModelIdentifier: "openai/gpt-5.2",
+          providerErrorType: null, providerErrorCode: null, providerErrorParam: null,
+          usageState: "known", outputTokens: 19, providerRequestCount: 1, usageCostUsd: 0.005,
+          searchOutputAdmission: {
+            schemaVersion: "openrouter_search_citation_admission_v1", outcome: "batch_rejected",
+            annotationCount: 0, admittedCitationCount: 0, rejectedCitationCount: 0,
+            reasonCodes: ["openrouter_search_response_malformed"], evidenceAdmissionEffect: "none",
+            analyticalCompletionEffect: "none",
+          },
+        },
+      });
+    };
+
+    const first = await setup.executor.executeDurableCanonicalRgEvidence({
+      runId: setup.run.runId, ports, workerId: "settled-search-worker-one",
+    });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const operation = persisted.rgOperations[0]!;
+
+    expect(first).toMatchObject({ workItemsCompletedWithEvidence: 0, workItemsCompletedUnresolved: 1,
+      workItemsDegraded: 0, canonicalTruthPreserved: true });
+    expect(operation).toMatchObject({ kind: "public_search", state: "completed", receipt: {
+      sendState: "sent", completionState: "completed", providerRequestId: "or-settled-search-001",
+      calls: 1, tokens: 19, reasonCode: "openrouter_search_response_malformed",
+      providerDiagnostics: { responseDisposition: "completed", usageState: "known",
+        providerRequestCount: 1, usageCostUsd: 0.005,
+        searchOutputAdmission: { outcome: "batch_rejected", evidenceAdmissionEffect: "none",
+          analyticalCompletionEffect: "none" } },
+    }, result: { schemaVersion: "canonical_rg_completed_unusable_result_v1",
+      outcome: "completed_unusable", reasonCode: "openrouter_search_response_malformed" } });
+    expect(persisted.rgWorkItems[0]).toMatchObject({ executionState: "completed_unresolved",
+      stopReason: "openrouter_search_response_malformed",
+      resourceConsumption: { providerCalls: 1, searchCalls: 1, retrievalBytes: 0, aiCalls: 0, tokens: 19 } });
+    expect(persisted.rgWorkItems[0]!.retryDecisions).toContainEqual(expect.objectContaining({
+      decision: "no_retry", reasonCode: "completed_unusable_public_search_no_retry",
+    }));
+    expect(persisted.rgOperations.some((item) => item.state === "indeterminate_after_send")).toBe(false);
+    expect(persisted.externalEvidenceRegistry).toEqual([]);
+    expect(persisted.result!.artifacts.rd!.economicLayer.semanticApplications).toEqual(
+      setup.run.artifacts.rd!.economicLayer.semanticApplications);
+    expect(persisted.canonicalTruthHash).toBe(beforeTruth);
+    expect(persisted.financialFoundationHash).toBe(beforeFinancial);
+    expect(persisted.result!.artifacts.rh).toEqual(setup.run.artifacts.rh);
+
+    setup.db.db.close();
+    vi.resetModules();
+    process.env.FEECLEAR_DB_PATH = databasePath;
+    const [reloadedStore, reloadedExecutor, reloadedDb] = await Promise.all([
+      import("../../../../src/canonical/v2/runtime/analysisRunStore.js"),
+      import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js"),
+      import("../../../../src/db.js"),
+    ]);
+    dbModule = reloadedDb;
+    const restartCalls: string[] = [];
+    const second = await reloadedExecutor.executeDurableCanonicalRgEvidence({
+      runId: setup.run.runId, ports: successfulPorts(restartCalls), workerId: "settled-search-worker-two",
+    });
+    expect(second.workItemsCompletedUnresolved).toBe(1);
+    expect(searchSends).toBe(1);
+    expect(restartCalls).toEqual([]);
+    const afterRestart = reloadedStore.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(afterRestart.rgOperations).toHaveLength(1);
+    expect(afterRestart.rgOperations[0]!.receipt.providerDiagnostics?.searchOutputAdmission)
+      .toEqual(operation.receipt.providerDiagnostics?.searchOutputAdmission);
     const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
     expect(controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId }).lifecycle)
       .not.toBe("indeterminate_reconciliation_required");

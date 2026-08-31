@@ -28,6 +28,73 @@ afterEach(() => {
 });
 
 describe("production approved-AI packet admission", () => {
+  it("bridges mixed search citations as a completed partial admission without retaining rejected URLs", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000000000";
+    process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";
+    process.env.OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2";
+    process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = "gpt-5.2";
+    const unsafeUrl = "https://user:password@malicious.example.test/private";
+    globalThis.fetch = vi.fn(async () => ({ status: 200, headers: new Headers({ "x-request-id": "or-partial-001" }),
+      json: async () => ({ id: "openrouter-partial-001", model: "openai/gpt-5.2",
+        choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content: "",
+          annotations: [
+            { type: "url_citation", url_citation: { url: "https://docs.example.test/official", title: "Official document" } },
+            { type: "url_citation", url_citation: { url: unsafeUrl, title: "Unsafe result" } },
+          ] } }],
+        usage: { completion_tokens: 17, cost: 0.004, server_tool_use: { web_search_requests: 1 } },
+        openrouter_metadata: { attempts: [{ provider: "openai" }] } }),
+    } as Response));
+    const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
+    const ports = live.createProductionRgEvidencePortsFromEnvironment("partial-search-admission-run");
+    let sends = 0;
+    const result = await ports.search(searchPortInput("partial-search-admission-run"), () => { sends += 1; });
+
+    expect(sends).toBe(1);
+    expect(result.value).toEqual([expect.objectContaining({ url: "https://docs.example.test/official" })]);
+    expect(result.receipt).toMatchObject({ calls: 1, tokens: 17, providerRequestId: "or-partial-001",
+      providerDiagnostics: { responseDisposition: "completed", httpStatus: 200, usageState: "known",
+        providerRequestCount: 1, usageCostUsd: 0.004, searchOutputAdmission: {
+          outcome: "partially_admitted", annotationCount: 2, admittedCitationCount: 1,
+          rejectedCitationCount: 1, reasonCodes: ["openrouter_search_result_url_invalid"],
+          evidenceAdmissionEffect: "none", analyticalCompletionEffect: "none",
+        } } });
+    expect(JSON.stringify(result)).not.toContain(unsafeUrl);
+    expect(JSON.stringify(result)).not.toContain("password");
+  });
+
+  it("bridges a fully received structurally unusable search response as settled local rejection", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000000000";
+    process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";
+    process.env.OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2";
+    process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = "gpt-5.2";
+    globalThis.fetch = vi.fn(async () => ({ status: 200, headers: new Headers({ "x-request-id": "or-rejected-001" }),
+      json: async () => ({ id: "openrouter-rejected-001", model: "openai/gpt-5.2", choices: [],
+        usage: { completion_tokens: 11, cost: 0.003, server_tool_use: { web_search_requests: 1 } } }),
+    } as Response));
+    const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
+    const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
+    const ports = live.createProductionRgEvidencePortsFromEnvironment("rejected-search-admission-run");
+    let sends = 0;
+
+    try {
+      await ports.search(searchPortInput("rejected-search-admission-run"), () => { sends += 1; });
+      throw new Error("expected settled search admission rejection");
+    } catch (error) {
+      expect(error).toBeInstanceOf(execution.RgEvidenceCompletedUnusableError);
+      const unusable = error as InstanceType<typeof execution.RgEvidenceCompletedUnusableError>;
+      expect(unusable.message).toBe("openrouter_search_response_malformed");
+      expect(unusable.receipt).toMatchObject({ calls: 1, tokens: 11, providerRequestId: "or-rejected-001",
+        providerDiagnostics: { responseDisposition: "completed", httpStatus: 200, usageState: "known",
+          providerRequestCount: 1, usageCostUsd: 0.003, searchOutputAdmission: {
+            outcome: "batch_rejected", admittedCitationCount: 0,
+            reasonCodes: ["openrouter_search_response_malformed"],
+            evidenceAdmissionEffect: "none", analyticalCompletionEffect: "none",
+          } } });
+      expect(error).not.toBeInstanceOf(execution.RgEvidenceTransportError);
+    }
+    expect(sends).toBe(1);
+  });
+
   it("admits ordinary public-document credential terminology without treating words as secrets", () => {
     const body = JSON.stringify({ input: [{ content: [{ type: "input_text", text: JSON.stringify({
       textExcerpt: "Password authorization and token requirements are public product documentation.",
@@ -555,6 +622,15 @@ function qualifiedRetrievalInput(
     logicalAttempt: 1,
     qualifiedPublicRead: execution.compileCanonicalQualifiedPublicReadContract(candidate),
   };
+}
+
+function searchPortInput(runId: string) {
+  return { intent: {
+    schemaVersion: "canonical_rg_search_intent_v1_3", runId, intentId: `${runId}-intent`,
+    atomicClaimId: `${runId}-claim`, queryTerms: ["public", "processor", "term"],
+    queryText: "US processor public term", requiredSourceAuthorities: ["processor_publication"],
+    publicScope: { processor: "fiserv", processorProgram: null },
+  } as never, maximumCandidates: 3 };
 }
 
 function approvedAiPacket(value: unknown) {

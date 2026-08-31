@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { canonicalJson } from "../canonicalJson.js";
 import {
   createLiveOpenRouterSearchAdapter,
+  LiveSearchResponseAdmissionError,
   ProviderOperationAuditLog,
 } from "../intelligence/providerAdapters.js";
 import {
@@ -96,6 +97,7 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
     async search({ intent, maximumCandidates }, onSend) {
       const candidates: CanonicalRgDiscoveryCandidate[] = [];
       let tokens: number | null = 0;
+      let searchOutputAdmission: NonNullable<RgEvidencePortReceipt["providerDiagnostics"]>["searchOutputAdmission"] = null;
       const authority = intent.publicScope.processor || intent.publicScope.processorProgram
         ? intent.requiredSourceAuthorities.find((item) => item === "processor_publication")
         : intent.requiredSourceAuthorities.find((item) => item === "official_network_publication");
@@ -116,6 +118,10 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
           response = await searchPort.search(request);
         } catch (error) {
           const receipt = audit.snapshot().find((item) => item.operationId === attemptId);
+          if (error instanceof LiveSearchResponseAdmissionError && receipt) {
+            throw new RgEvidenceCompletedUnusableError(error.message,
+              rgSearchReceipt(receipt, error.admission));
+          }
           if (error instanceof LiveOperationTransportError) {
             throw new RgEvidenceTransportError(error.transportState, safeReason(error),
               receipt ? rgSearchReceipt(receipt) : null);
@@ -123,6 +129,7 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
           throw error;
         }
         const receipt = audit.snapshot().find((item) => item.operationId === attemptId);
+        searchOutputAdmission = response.citationAdmission ?? null;
         tokens = receipt?.outputTokens === null || tokens === null ? null : tokens + (receipt?.outputTokens ?? 0);
         for (const candidate of response.candidates) {
           candidates.push({ candidateId: candidate.candidateId, url: candidate.url,
@@ -132,7 +139,8 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
         }
       }
       const receipt = audit.snapshot().find((item) => item.operationId === `${intent.intentId}-search-1`);
-      return { value: candidates.slice(0, maximumCandidates), receipt: receipt ? rgSearchReceipt(receipt) : {
+      return { value: candidates.slice(0, maximumCandidates), receipt: receipt ? rgSearchReceipt(receipt,
+        searchOutputAdmission) : {
         providerCode: searchPort.providerCode, providerRequestId: null, calls: 1, tokens, retrievalBytes: 0 } };
     },
     async retrieve({ intent, candidate, maximumBytes, logicalAttempt, qualifiedPublicRead }, onSend) {
@@ -581,7 +589,9 @@ function boundedOperationalInteger(raw: string | undefined, fallback: number, mi
   return value;
 }
 
-function rgSearchReceipt(receipt: ProviderOperationReceiptV1): RgEvidencePortReceipt {
+function rgSearchReceipt(receipt: ProviderOperationReceiptV1,
+  searchOutputAdmission: NonNullable<RgEvidencePortReceipt["providerDiagnostics"]>["searchOutputAdmission"] = null,
+): RgEvidencePortReceipt {
   return {
     providerCode: receipt.providerCode,
     providerRequestId: receipt.providerRequestId,
@@ -606,6 +616,7 @@ function rgSearchReceipt(receipt: ProviderOperationReceiptV1): RgEvidencePortRec
       outputTokens: receipt.outputTokens,
       providerRequestCount: receipt.providerRequestCount,
       usageCostUsd: receipt.usageCostUsd,
+      searchOutputAdmission,
     },
   };
 }

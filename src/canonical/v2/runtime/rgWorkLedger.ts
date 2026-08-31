@@ -174,6 +174,17 @@ export type CanonicalRgProviderDiagnostics = {
   outputTokens: number | null;
   providerRequestCount: number | null;
   usageCostUsd: number | null;
+  searchOutputAdmission?: {
+    schemaVersion: "openrouter_search_citation_admission_v1";
+    outcome: "all_citations_admitted" | "partially_admitted" | "no_usable_citations" | "no_citations"
+      | "batch_rejected";
+    annotationCount: number;
+    admittedCitationCount: number;
+    rejectedCitationCount: number;
+    reasonCodes: string[];
+    evidenceAdmissionEffect: "none";
+    analyticalCompletionEffect: "none";
+  } | null;
 };
 
 export type CanonicalRgWorkLedger = {
