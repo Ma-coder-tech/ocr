@@ -41,6 +41,8 @@ import {
   assertApprovedAiRequestContextBudget,
   assertCanonicalRgApprovedAiClaimContext,
 } from "./rgApprovedAiContext.js";
+import { isProviderAccountQuotaExhaustion, OPENAI_ACCOUNT_QUOTA_EXHAUSTED_REASON }
+  from "./providerRejectionTaxonomy.js";
 import { RG_PUBLISHER_ORIGIN_BINDING_CATALOG_HASH } from "./rgPublisherOriginAuthority.js";
 import type { CanonicalRgReconciliationCapability } from "./rgOperationReconciliationTypes.js";
 
@@ -385,7 +387,7 @@ async function sendStructured(
       const receipt = structuredReceipt({ localRequestId, providerRequestId, requestedModel: binding.model,
         response, envelope, disposition: rejected ? "known_provider_rejection" : "indeterminate_after_send" });
       throw new RgEvidenceTransportError(rejected ? "provider_rejected" : "after_send",
-        rejected ? openAiRejectionReason(response.status) : "rg_openai_http_failure", receipt);
+        rejected ? openAiRejectionReason(response.status, envelope) : "rg_openai_http_failure", receipt);
     }
     const outputText = typeof envelope.output_text === "string" ? envelope.output_text : extractOutputText(envelope);
     const parsed = JSON.parse(outputText) as unknown;
@@ -439,7 +441,12 @@ function structuredDiagnostics(input: {
   };
 }
 
-function openAiRejectionReason(status: number): string {
+function openAiRejectionReason(status: number, envelope: Record<string, unknown>): string {
+  const error = record(envelope.error);
+  if (status === 429 && isProviderAccountQuotaExhaustion({
+    providerErrorType: safeDiagnostic(error.type),
+    providerErrorCode: safeDiagnostic(error.code),
+  })) return OPENAI_ACCOUNT_QUOTA_EXHAUSTED_REASON;
   if (status === 401) return "rg_openai_authentication_rejected";
   if (status === 402) return "rg_openai_account_rejected";
   if (status === 403) return "rg_openai_authorization_rejected";

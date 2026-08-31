@@ -547,6 +547,48 @@ describe("durable continuation-authorized adaptive execution", () => {
     });
   }, 30_000);
 
+  it("holds exhausted provider account quota until readiness identity changes, including historical generic 429 reasons", async () => {
+    process.env.CANONICAL_RECOVERY_BASE_DELAY_MS = "0";
+    const setup = await setupReadyRefinement();
+    const policy = replenishingOperationalPolicy(1_000, 1_000);
+    const rejectedPorts = unresolvedPorts([]);
+    rejectedPorts.search = async (_input, onSend) => {
+      onSend();
+      throw new setup.executor.RgEvidenceTransportError("provider_rejected",
+        "rg_openai_rate_limited", providerRejectedReceipt(429, null, {
+          providerErrorType: "insufficient_quota", providerErrorCode: "credit_balance_exhausted",
+        }));
+    };
+    const before = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    await setup.adaptive.executeDurableCanonicalAdaptiveLoop({ runId: setup.run.runId,
+      ports: rejectedPorts, workerId: "quota-exhausted-worker", operationalPolicy: policy });
+    const recoveryStore = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryStore.js");
+    const recoveryWorker = await import("../../../../src/canonical/v2/runtime/adaptiveRecoveryWorker.js");
+    const [intent] = recoveryStore.listCanonicalAnalysisRecoveryIntents(setup.run.runId);
+    const calls: string[] = [];
+
+    expect(await recoveryWorker.processCanonicalAnalysisRecoveryIntent({ intentId: intent!.intent.intentId,
+      workerId: "unchanged-quota-worker-a", ports: unresolvedPorts(calls), operationalPolicy: policy })).toBeNull();
+    expect(await recoveryWorker.processCanonicalAnalysisRecoveryIntent({ intentId: intent!.intent.intentId,
+      workerId: "unchanged-quota-worker-b", ports: unresolvedPorts(calls), operationalPolicy: policy })).toBeNull();
+    expect(calls).toEqual([]);
+    expect(recoveryStore.getCanonicalAnalysisRecoveryIntent(intent!.intent.intentId)).toMatchObject({
+      state: "waiting_for_operational_reset", waitGate: { kind: "provider_readiness_change", nextEligibleAt: null,
+        reasonCode: "recovery_provider_rejection_waiting_for_configuration_identity_change",
+        analyticalCompletionEffect: "none" },
+    });
+
+    const changed = structuredClone(policy);
+    changed.operationalAllowance!.providerConfigurationRevision = "quota-restored-v2";
+    const resumed = await recoveryWorker.processCanonicalAnalysisRecoveryIntent({ intentId: intent!.intent.intentId,
+      workerId: "restored-quota-worker", ports: unresolvedPorts(calls), operationalPolicy: changed });
+    expect(resumed).not.toBeNull();
+    expect(calls).toEqual(["continuation-search"]);
+    const after = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    expect(after.financialFoundationHash).toBe(before.financialFoundationHash);
+    expect(after.canonicalTruthHash).toBe(before.canonicalTruthHash);
+  }, 30_000);
+
   it("persists provider Retry-After as the exact cooldown gate without changing analytical state", async () => {
     process.env.CANONICAL_RECOVERY_BASE_DELAY_MS = "0";
     const setup = await setupReadyRefinement();
@@ -1099,15 +1141,19 @@ function receipt(providerCode: string) {
   return { providerCode, providerRequestId: null, calls: 1, retrievalBytes: 0, tokens: 1 };
 }
 
-function providerRejectedReceipt(httpStatus: number, retryAfterAt: string | null = null) {
+function providerRejectedReceipt(httpStatus: number, retryAfterAt: string | null = null,
+  identity: { providerErrorType: string; providerErrorCode: string } = {
+    providerErrorType: httpStatus === 429 ? "rate_limit_error" : "authentication_error",
+    providerErrorCode: httpStatus === 429 ? "rate_limit_exceeded" : "invalid_api_key",
+  }) {
   return { providerCode: "openai_responses_api", providerRequestId: "provider-request-rejected",
     calls: 1, retrievalBytes: 0, tokens: 0, providerDiagnostics: {
       schemaVersion: "canonical_rg_provider_diagnostics_v1" as const,
       responseDisposition: "known_provider_rejection" as const, httpStatus,
       localRequestId: "local-request-rejected", providerRequestId: "provider-request-rejected",
       providerResponseId: null, requestedModelIdentifier: "approved-model",
-      returnedModelIdentifier: null, providerErrorType: "authentication_error",
-      providerErrorCode: httpStatus === 429 ? "rate_limit" : "invalid_api_key",
+      returnedModelIdentifier: null, providerErrorType: identity.providerErrorType,
+      providerErrorCode: identity.providerErrorCode,
       providerErrorParam: null, retryAfterAt,
       usageState: "known" as const, outputTokens: 0, providerRequestCount: 0, usageCostUsd: 0,
     } };

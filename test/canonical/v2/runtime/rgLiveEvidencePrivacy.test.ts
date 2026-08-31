@@ -290,6 +290,62 @@ describe("production approved-AI packet admission", () => {
     );
   });
 
+  it("preserves exhausted account quota diagnostics and does not label the rejection as a transient rate limit", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000000000";
+    process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";
+    process.env.OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2";
+    process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = "gpt-5.2";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ error: {
+      type: "insufficient_quota", code: "credit_balance_exhausted", param: null,
+    } }), { status: 429, headers: { "Content-Type": "application/json", "x-request-id": "request-quota-exhausted" } }));
+    const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
+    const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
+    const ports = live.createProductionRgEvidencePortsFromEnvironment("quota-exhausted-run");
+    const binding = approvedClaimBinding({ publicExplanation: "Public pricing terminology." }, "quota-exhausted-run");
+    let sends = 0;
+
+    const error = await ports.investigate({ ...binding, candidate: {},
+      document: { locators: [{ textExcerpt: "Public pricing terminology." }] },
+    } as never, () => { sends += 1; }).then(() => null, (value) => value);
+
+    expect(error).toBeInstanceOf(execution.RgEvidenceTransportError);
+    expect(error).toMatchObject({ transportState: "provider_rejected", message: "rg_openai_account_quota_exhausted",
+      receipt: { calls: 1, tokens: 0, providerRequestId: "request-quota-exhausted",
+        providerDiagnostics: { responseDisposition: "known_provider_rejection", httpStatus: 429,
+          providerErrorType: "insufficient_quota", providerErrorCode: "credit_balance_exhausted",
+          retryAfterAt: null, usageState: "known", outputTokens: 0, providerRequestCount: 0, usageCostUsd: 0 } } });
+    expect(sends).toBe(1);
+  });
+
+  it("keeps a genuine temporary 429 eligible for the exact provider Retry-After cooldown", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000000000";
+    process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";
+    process.env.OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2";
+    process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = "gpt-5.2";
+    const before = Date.now();
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ error: {
+      type: "rate_limit_error", code: "rate_limit_exceeded", param: "tokens",
+    } }), { status: 429, headers: { "Content-Type": "application/json", "x-request-id": "request-rate-limited",
+      "retry-after": "17" } }));
+    const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
+    const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
+    const ports = live.createProductionRgEvidencePortsFromEnvironment("transient-rate-limit-run");
+    const binding = approvedClaimBinding({ publicExplanation: "Public pricing terminology." }, "transient-rate-limit-run");
+
+    const error = await ports.investigate({ ...binding, candidate: {},
+      document: { locators: [{ textExcerpt: "Public pricing terminology." }] },
+    } as never, () => undefined).then(() => null, (value) => value);
+
+    expect(error).toBeInstanceOf(execution.RgEvidenceTransportError);
+    expect(error).toMatchObject({ transportState: "provider_rejected", message: "rg_openai_rate_limited",
+      receipt: { providerRequestId: "request-rate-limited", providerDiagnostics: {
+        providerErrorType: "rate_limit_error", providerErrorCode: "rate_limit_exceeded",
+        providerErrorParam: "tokens", responseDisposition: "known_provider_rejection" } } });
+    const retryAfterAt = Date.parse(error.receipt.providerDiagnostics.retryAfterAt);
+    expect(retryAfterAt).toBeGreaterThanOrEqual(before + 17_000);
+    expect(retryAfterAt).toBeLessThanOrEqual(Date.now() + 17_000);
+  });
+
   it("fails before send when lossless required evidence cannot fit the approved model context budget", async () => {
     process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000000000";
     process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";

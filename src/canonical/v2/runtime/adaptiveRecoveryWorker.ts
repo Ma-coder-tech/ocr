@@ -7,6 +7,7 @@ import type { CanonicalRgEvidenceExecutionPorts } from "./rgEvidenceExecution.js
 import { createProductionRgEvidencePortsFromEnvironment } from "./rgLiveEvidencePorts.js";
 import { getPersistedAnalysisRun } from "./analysisRunStore.js";
 import { canonicalOperationalAllowanceDecision } from "./adaptiveOperationalAllowance.js";
+import { providerRejectionRequiresReadinessChange } from "./providerRejectionTaxonomy.js";
 import type { CanonicalAnalysisRecoveryRecord, CanonicalAnalysisRecoveryWaitGate } from "./adaptiveRecoveryTypes.js";
 import type { CanonicalRgOperation } from "./rgWorkLedger.js";
 import {
@@ -169,8 +170,7 @@ function providerRecoveryGate(record: CanonicalAnalysisRecoveryRecord, policyHas
   if (!latest || latest.receipt.calls === 0) return null;
   const reason = latest.receipt.reasonCode;
   const diagnostics = latest.receipt.providerDiagnostics;
-  const readinessFailure = /(authentication|authorization|account|model|configuration|credential)/.test(reason)
-    || [400, 401, 402, 403, 404, 415, 422].includes(diagnostics?.httpStatus ?? -1);
+  const readinessFailure = providerRejectionRequiresReadinessChange(reason, diagnostics);
   if (readinessFailure) {
     if (record.waitGate?.kind === "provider_readiness_change"
       && record.waitGate.providerConfigurationHash !== readinessHash) return null;
