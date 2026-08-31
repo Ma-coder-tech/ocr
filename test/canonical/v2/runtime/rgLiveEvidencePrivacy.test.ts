@@ -95,6 +95,41 @@ describe("production approved-AI packet admission", () => {
     expect(sends).toBe(1);
   });
 
+  it("keeps a completed response with unverified search-tool output settled but unusable", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-test-secret-000000000000";
+    process.env.OPENAI_API_KEY = "openai-test-secret-000000000000000";
+    process.env.OPENROUTER_SEARCH_MODEL = "openai/gpt-5.2";
+    process.env.OPENAI_INTERNAL_ANALYSIS_MODEL = "gpt-5.2";
+    globalThis.fetch = vi.fn(async () => ({ status: 200, headers: new Headers({ "x-request-id": "or-unverified-001" }),
+      json: async () => ({ id: "openrouter-unverified-001", model: "openai/gpt-5.2",
+        choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant",
+          content: "No verified tool result was produced.", annotations: [] } }],
+        usage: { completion_tokens: 7, cost: 0.002 },
+        openrouter_metadata: { attempts: [{ provider: "openai" }] } }),
+    } as Response));
+    const live = await import("../../../../src/canonical/v2/runtime/rgLiveEvidencePorts.js");
+    const execution = await import("../../../../src/canonical/v2/runtime/rgEvidenceExecution.js");
+    const ports = live.createProductionRgEvidencePortsFromEnvironment("unverified-search-output-run");
+    let sends = 0;
+
+    const error = await ports.search(searchPortInput("unverified-search-output-run"), () => { sends += 1; })
+      .then(() => null, (value) => value);
+
+    expect(error).toBeInstanceOf(execution.RgEvidenceCompletedUnusableError);
+    expect(error).toMatchObject({ message: "search_tool_execution_unverified", receipt: {
+      calls: 1, tokens: 7, providerRequestId: "or-unverified-001",
+      providerDiagnostics: { responseDisposition: "completed", httpStatus: 200,
+        localRequestId: expect.stringMatching(/^provider-request-/), providerRequestId: "or-unverified-001",
+        providerResponseId: "openrouter-unverified-001", usageState: "unknown_possible_billable",
+        outputTokens: 7, providerRequestCount: null, usageCostUsd: 0.002,
+        searchOutputAdmission: { outcome: "batch_rejected", annotationCount: 0,
+          admittedCitationCount: 0, rejectedCitationCount: 0,
+          reasonCodes: ["search_tool_execution_unverified"], evidenceAdmissionEffect: "none",
+          analyticalCompletionEffect: "none" } } } });
+    expect(error).not.toBeInstanceOf(execution.RgEvidenceTransportError);
+    expect(sends).toBe(1);
+  });
+
   it("admits ordinary public-document credential terminology without treating words as secrets", () => {
     const body = JSON.stringify({ input: [{ content: [{ type: "input_text", text: JSON.stringify({
       textExcerpt: "Password authorization and token requirements are public product documentation.",

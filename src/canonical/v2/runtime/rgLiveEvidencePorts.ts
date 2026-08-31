@@ -23,7 +23,7 @@ import {
   validateExtractionResponse,
   validateRetrievalResponse,
 } from "../intelligence/retrievalSafety.js";
-import type { SearchRequest } from "../intelligence/intelligenceTypes.js";
+import type { SearchCitationAdmissionV1, SearchRequest, SearchResponse } from "../intelligence/intelligenceTypes.js";
 import type { ProviderOperationReceiptV1 } from "../internalAnalysis/internalAnalysisTypes.js";
 import type {
   CanonicalRgDiscoveryCandidate,
@@ -130,6 +130,15 @@ export function createProductionRgEvidencePortsFromEnvironment(runId: string): C
         }
         const receipt = audit.snapshot().find((item) => item.operationId === attemptId);
         searchOutputAdmission = response.citationAdmission ?? null;
+        if (response.providerMetadata.toolExecutionState !== "verified") {
+          const reasonCode = response.providerMetadata.finishReason === "length"
+            ? "openrouter_search_response_truncated"
+            : response.providerMetadata.toolExecutionState === "not_executed"
+              ? "search_tool_not_executed" : "search_tool_execution_unverified";
+          if (!receipt) throw new Error("rg_search_provider_receipt_missing");
+          throw new RgEvidenceCompletedUnusableError(reasonCode,
+            rgSearchReceipt(receipt, rejectedUnusableSearchAdmission(response, reasonCode)));
+        }
         tokens = receipt?.outputTokens === null || tokens === null ? null : tokens + (receipt?.outputTokens ?? 0);
         for (const candidate of response.candidates) {
           candidates.push({ candidateId: candidate.candidateId, url: candidate.url,
@@ -618,6 +627,21 @@ function rgSearchReceipt(receipt: ProviderOperationReceiptV1,
       usageCostUsd: receipt.usageCostUsd,
       searchOutputAdmission,
     },
+  };
+}
+
+function rejectedUnusableSearchAdmission(response: SearchResponse, reasonCode: string): SearchCitationAdmissionV1 {
+  const annotationCount = response.providerMetadata.annotationCount;
+  const observedReasons = response.citationAdmission?.reasonCodes ?? [];
+  return {
+    schemaVersion: "openrouter_search_citation_admission_v1",
+    outcome: "batch_rejected",
+    annotationCount,
+    admittedCitationCount: 0,
+    rejectedCitationCount: annotationCount,
+    reasonCodes: [...new Set([...observedReasons, reasonCode])].sort(),
+    evidenceAdmissionEffect: "none",
+    analyticalCompletionEffect: "none",
   };
 }
 

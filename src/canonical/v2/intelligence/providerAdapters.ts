@@ -125,7 +125,10 @@ export function createLiveOpenRouterSearchAdapter(capability: LiveExecutionCapab
       const toolReason = normalized.providerMetadata.finishReason === "length" ? "openrouter_search_response_truncated"
         : normalized.providerMetadata.toolExecutionState === "verified" ? "search_completed"
           : normalized.providerMetadata.toolExecutionState === "not_executed" ? "search_tool_not_executed" : "search_tool_execution_unverified";
-      audit.settle(receiptId, { completionState: normalized.providerMetadata.toolExecutionState === "verified" ? "completed" : "failed",
+      // Response transport completion and search-material usability are independent. A
+      // normalized 2xx envelope was completely received even when the requested search
+      // tool was not executed or its output cannot be trusted after truncation.
+      audit.settle(receiptId, { completionState: "completed",
         elapsedMs: elapsed(binding.clock.nowMs(), started), usageState: normalized.usageKnown ? "known" : "unknown_possible_billable",
         outputTokens: normalized.outputTokens, providerRequestCount: normalized.providerRequestCount, usageCostUsd: normalized.usageCostUsd,
         providerResponseId: normalized.providerMetadata.providerResponseId,

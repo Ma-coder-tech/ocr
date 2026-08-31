@@ -1145,6 +1145,11 @@ async function runExternalOperation<T>(input: {
         markOperationSent(input.runId, operation.operationId, input.workerId); sent = true;
       }, attempt);
       const projected = input.projectResult(result.value);
+      const localSearchAdmissionFailure = completedSearchAdmissionFailure(input.kind, result.receipt);
+      if (localSearchAdmissionFailure) {
+        throw new RgEvidenceCompletedUnusableError(localSearchAdmissionFailure.reasonCode,
+          localSearchAdmissionFailure.receipt);
+      }
       const settled = settleOperation(input.runId, operation, "completed", projected, result.receipt, "rg_operation_completed");
       incrementResource(input.runId, input.workItem.workItemId, input.kind, result.receipt);
       return { state: "completed", value: projected, operation: settled };
@@ -1184,17 +1189,18 @@ async function runExternalOperation<T>(input: {
           throw new Error("rg_completed_unusable_outcome_invalid");
         }
         const reason = safeReason(error);
+        const completedReceipt = completedUnusableReceipt(input.kind, error.receipt, reason);
         const completedUnusable: CanonicalRgCompletedUnusableResult = {
           schemaVersion: "canonical_rg_completed_unusable_result_v1",
           outcome: "completed_unusable",
           reasonCode: reason,
         };
-        const settled = settleOperation(input.runId, operation, "completed", completedUnusable, error.receipt, reason);
+        const settled = settleOperation(input.runId, operation, "completed", completedUnusable, completedReceipt, reason);
         if (input.kind === "public_retrieval") {
           appendDocumentAdmissionDecision(input.runId, input.workItem.workItemId, operation.operationId,
             input.candidateId, { state: "rejected", reasonCode: reason, documentFingerprint: null });
         }
-        incrementResource(input.runId, input.workItem.workItemId, input.kind, error.receipt);
+        incrementResource(input.runId, input.workItem.workItemId, input.kind, completedReceipt);
         appendRetryDecision(input.runId, input.workItem.workItemId, operation.operationId,
           "no_retry", input.kind === "public_search" ? "completed_unusable_public_search_no_retry"
             : "completed_unusable_public_retrieval_no_retry");
@@ -1618,6 +1624,54 @@ function assertSearchOutputAdmission(kind: CanonicalRgOperation["kind"],
     || !countsValid || !reasonsValid || !outcomeValid) {
     throw new Error("rg_search_output_admission_integrity_invalid");
   }
+}
+
+function completedSearchAdmissionFailure(kind: CanonicalRgOperation["kind"],
+  receipt: RgEvidencePortReceipt): { reasonCode: string; receipt: RgEvidencePortReceipt } | null {
+  try {
+    assertSearchOutputAdmission(kind, receipt.providerDiagnostics ?? null);
+    return null;
+  } catch (error) {
+    if (kind !== "public_search" || receipt.providerDiagnostics?.responseDisposition !== "completed") throw error;
+    const reasonCode = safeReason(error);
+    return { reasonCode, receipt: settledSearchAdmissionRejectionReceipt(receipt, reasonCode) };
+  }
+}
+
+function completedUnusableReceipt(kind: CanonicalRgOperation["kind"], receipt: RgEvidencePortReceipt,
+  reasonCode: string): RgEvidencePortReceipt {
+  if (kind !== "public_search") return receipt;
+  try {
+    assertSearchOutputAdmission(kind, receipt.providerDiagnostics ?? null);
+    return receipt;
+  } catch (error) {
+    if (receipt.providerDiagnostics?.responseDisposition !== "completed") throw error;
+    return settledSearchAdmissionRejectionReceipt(receipt, reasonCode);
+  }
+}
+
+function settledSearchAdmissionRejectionReceipt(receipt: RgEvidencePortReceipt,
+  reasonCode: string): RgEvidencePortReceipt {
+  const diagnostics = receipt.providerDiagnostics;
+  if (!diagnostics || diagnostics.responseDisposition !== "completed") {
+    throw new Error("rg_completed_search_response_receipt_missing");
+  }
+  const observedCount = diagnostics.searchOutputAdmission?.annotationCount;
+  const annotationCount = Number.isSafeInteger(observedCount) && Number(observedCount) >= 0
+    && Number(observedCount) <= 10
+    ? Number(observedCount) : 0;
+  const observedReasonCodes = diagnostics.searchOutputAdmission?.reasonCodes
+    ?.filter((value) => /^[a-z][a-z0-9_]{0,191}$/.test(value)) ?? [];
+  return { ...receipt, providerDiagnostics: { ...diagnostics, searchOutputAdmission: {
+    schemaVersion: "openrouter_search_citation_admission_v1",
+    outcome: "batch_rejected",
+    annotationCount,
+    admittedCitationCount: 0,
+    rejectedCitationCount: annotationCount,
+    reasonCodes: [...new Set([...observedReasonCodes, reasonCode])].sort(),
+    evidenceAdmissionEffect: "none",
+    analyticalCompletionEffect: "none",
+  } } };
 }
 
 function assertRetrievalTransportDiagnostics(kind: CanonicalRgOperation["kind"],

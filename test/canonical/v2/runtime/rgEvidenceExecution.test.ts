@@ -1371,6 +1371,69 @@ describe("production durable claim-bound RG evidence execution", () => {
       .not.toBe("indeterminate_reconciliation_required");
   }, 30_000);
 
+  it("converts a completed response with corrupt local citation admission into a settled unusable batch", async () => {
+    const setup = await runWithOneWorkItem();
+    const beforeTruth = setup.run.canonicalTruthHash;
+    const beforeFinancial = setup.run.financialFoundationHash;
+    const beforeRh = structuredClone(setup.run.artifacts.rh);
+    const calls: string[] = [];
+    const ports = successfulPorts(calls);
+    const originalSearch = ports.search;
+    ports.search = async (input, onSend) => {
+      const result = await originalSearch(input, onSend);
+      return { ...result, receipt: { ...result.receipt, providerRequestId: "or-local-admission-001",
+        tokens: 23, providerDiagnostics: { ...result.receipt.providerDiagnostics!,
+          responseDisposition: "completed", providerRequestId: "or-local-admission-001",
+          providerResponseId: "or-response-local-admission-001", outputTokens: 23,
+          providerRequestCount: 1, usageCostUsd: 0.006,
+          searchOutputAdmission: {
+            schemaVersion: "openrouter_search_citation_admission_v1", outcome: "partially_admitted",
+            annotationCount: 2, admittedCitationCount: 2, rejectedCitationCount: 1,
+            reasonCodes: ["openrouter_search_result_url_invalid"], evidenceAdmissionEffect: "none",
+            analyticalCompletionEffect: "none",
+          } } } };
+    };
+
+    const first = await setup.executor.executeDurableCanonicalRgEvidence({
+      runId: setup.run.runId, ports, workerId: "local-search-admission-worker-one",
+    });
+    const persisted = setup.store.getPersistedAnalysisRun(setup.run.runId)!;
+    const operation = persisted.rgOperations[0]!;
+
+    expect(first).toMatchObject({ workItemsCompletedWithEvidence: 0, workItemsCompletedUnresolved: 1,
+      workItemsDegraded: 0, canonicalTruthPreserved: true });
+    expect(calls).toEqual(["search"]);
+    expect(operation).toMatchObject({ kind: "public_search", state: "completed",
+      result: { outcome: "completed_unusable", reasonCode: "rg_search_output_admission_integrity_invalid" },
+      receipt: { completionState: "completed", providerRequestId: "or-local-admission-001",
+        tokens: 23, reasonCode: "rg_search_output_admission_integrity_invalid",
+        providerDiagnostics: { responseDisposition: "completed",
+          providerResponseId: "or-response-local-admission-001", providerRequestCount: 1,
+          usageCostUsd: 0.006, searchOutputAdmission: { outcome: "batch_rejected",
+            annotationCount: 2, admittedCitationCount: 0, rejectedCitationCount: 2,
+            reasonCodes: ["openrouter_search_result_url_invalid", "rg_search_output_admission_integrity_invalid"],
+            evidenceAdmissionEffect: "none", analyticalCompletionEffect: "none" } } } });
+    expect(persisted.rgWorkItems[0]).toMatchObject({ executionState: "completed_unresolved",
+      resourceConsumption: { providerCalls: 1, searchCalls: 1, tokens: 23 },
+      stopReason: "rg_search_output_admission_integrity_invalid" });
+    expect(persisted.rgOperations.some((item) => item.state === "indeterminate_after_send")).toBe(false);
+    expect(persisted.externalEvidenceRegistry).toEqual([]);
+    expect(persisted.canonicalTruthHash).toBe(beforeTruth);
+    expect(persisted.financialFoundationHash).toBe(beforeFinancial);
+    expect(persisted.result!.artifacts.rh).toEqual(beforeRh);
+
+    const restartCalls: string[] = [];
+    const second = await setup.executor.executeDurableCanonicalRgEvidence({
+      runId: setup.run.runId, ports: successfulPorts(restartCalls), workerId: "local-search-admission-worker-two",
+    });
+    expect(second.workItemsCompletedUnresolved).toBe(1);
+    expect(restartCalls).toEqual([]);
+    expect(setup.store.getPersistedAnalysisRun(setup.run.runId)!.rgOperations).toEqual([operation]);
+    const controller = await import("../../../../src/canonical/v2/runtime/adaptiveContinuation.js");
+    expect(controller.adjudicateDurableCanonicalContinuation({ runId: setup.run.runId }).lifecycle)
+      .not.toBe("indeterminate_reconciliation_required");
+  }, 30_000);
+
   it("durably preserves an exact late document-admission rejection instead of hiding it behind candidate failure", async () => {
     const setup = await runWithOneWorkItem();
     const calls: string[] = [];

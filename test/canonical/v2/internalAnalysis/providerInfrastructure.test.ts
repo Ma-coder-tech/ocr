@@ -130,7 +130,7 @@ describe("internal-analysis construction-bound provider seams", () => {
     });
     const response = await createLiveOpenRouterSearchAdapter(cap, audit).search(searchRequest);
     expect(response.providerMetadata).toMatchObject({ finishReason: "length", toolExecutionState: "unverified" });
-    expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "failed", outputTokens: 512,
+    expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "completed", outputTokens: 512,
       providerRequestCount: 1, usageCostUsd: 0.02, safeReasonCode: "openrouter_search_response_truncated" });
   });
 
