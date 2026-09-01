@@ -9,6 +9,7 @@ export * from "./fiservShortTemplateAdmission.js";
 export * from "./fiservFullTemplateAdmission.js";
 export * from "./fiservTemplateAdmission.js";
 export * from "./fiservRuntimeCapabilityAdmission.js";
+export * from "./fiservCapabilityContract.js";
 export * from "./validate.js";
 export * from "./compareV1.js";
 export * from "./goldObservation.js";

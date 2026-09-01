@@ -12,6 +12,8 @@ import { canonicalJson } from "../canonicalJson.js";
 import { buildCanonicalEconomicsV2FromFiserv } from "../fiservAdapter.js";
 import { resolveFiservTemplateAdmission } from "../fiservTemplateAdmission.js";
 import { resolveFiservRuntimeCapabilityAdmission } from "../fiservRuntimeCapabilityAdmission.js";
+import { addNormalizedFiservProtocolEvidence, adjudicateSupportedFiservProtocolIdentity,
+  assessFiservCandidateExtraction, FISERV_CAPABILITY_CONTRACT_VERSION } from "../fiservCapabilityContract.js";
 import { buildObservationalCanonicalPricingV2FromFiserv } from "../fiservPricingAdapter.js";
 import { buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing } from "../fiservEconomicAdapter.js";
 import { observeFiservEconomicsInCanonicalSynthesisV2 } from "../fiservSynthesisAdapter.js";
@@ -119,7 +121,12 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
     suppliedDocumentIntegrity: suppliedDocument.status,
   }, [], [], []);
 
-  const driverCandidates = DRIVERS.filter((candidate) => candidate.supports(input.document));
+  const candidateExtraction = assessFiservCandidateExtraction(input.document);
+  const protocolIdentity = adjudicateSupportedFiservProtocolIdentity(input.document);
+  const supportedCandidates = DRIVERS.filter((candidate) => candidate.supports(input.document));
+  const driverCandidates = candidateExtraction.eligible && !supportedCandidates.includes(genericFiservStatementDriver)
+    ? [...supportedCandidates, genericFiservStatementDriver]
+    : supportedCandidates;
   if (driverCandidates.length === 0) {
     const limitation = "No supported Fiserv-family parser could be selected from source evidence.";
     finishStage(input.observer, stageOutcomes, "capability_admission", "unsupported", null, [], [], [limitation]);
@@ -140,7 +147,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   const parserFailures: string[] = [];
   for (const candidate of driverCandidates) {
     try {
-      parserOutput = addRuntimeFamilyEvidence(input.document, record(candidate.parse(input.document)));
+      parserOutput = addNormalizedFiservProtocolEvidence(input.document, record(candidate.parse(input.document)));
       if (input.privacySafePersistence) parserOutput = stripMerchantIdentityEvidence(parserOutput);
       driver = candidate;
       break;
@@ -199,14 +206,13 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
     knownLayoutAdmission = knownEvaluation.resolution;
     fullFamilyDecision = knownEvaluation.fullFamilyDecision;
     const runtimeAdmission = resolveFiservRuntimeCapabilityAdmission({
+      document: input.document,
       driverId: driver.id,
       parserOutput,
       observationalFoundation,
       knownLayoutResolution: knownLayoutAdmission,
-      dynamicAdmissionAllowed: ![
-        "fiserv_first_data_full_statement",
-        "fiserv_first_data_short_statement",
-      ].includes(driver.id) || knownLayoutAdmission !== null,
+      candidateExtraction,
+      protocolIdentity,
     });
     admission = runtimeAdmission.resolution;
     capabilityProof = runtimeAdmission.proof;
@@ -214,7 +220,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
     finishStage(input.observer, stageOutcomes, "capability_admission", capabilityStatus, capabilityProof, [], [],
       admission ? capabilityProof.limitations : [...capabilityProof.limitations,
         capabilityProof.family.status === "proven"
-          ? "Claim capabilities were not admitted; an exact-layout admission failed or claim proof was insufficient."
+          ? "Claim capabilities were not admitted because statement-level proof was insufficient."
           : "Fiserv-family identity was not proven."]);
   } catch (error) {
     const limitation = `Capability admission failed closed: ${errorMessage(error)}`;
@@ -242,6 +248,10 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
       statementCompleteness,
       authority: "observational",
       humanReviewRequired: profile.humanReviewRequired ?? false,
+      capabilitySupport: capabilityProof ? {
+        state: capabilityProof.supportState,
+        outputPermissions: capabilityProof.outputPermissions,
+      } : undefined,
     },
   });
 
@@ -434,6 +444,9 @@ function terminalRun(input: {
       regeneratedPlanExecution: "continuation_authorized_existing_executor",
       researchControlPolicy: ATOMIC_RESEARCH_CONTROL_POLICY_VERSION,
       researchControlBoundary: "internal_rh_ready_disposition_only",
+      fiservCapabilityContract: FISERV_CAPABILITY_CONTRACT_VERSION,
+      supportAuthority: "statement_level_capability_adjudication_only",
+      adapterAndMappingAuthority: "candidate_generation_and_diagnostics_only",
       benchmarkExecution: "disabled",
       savingsExecution: "disabled",
       businessContextAuthority: "excluded_from_canonical_economics",
@@ -463,26 +476,6 @@ function terminalRun(input: {
   };
 }
 
-function addRuntimeFamilyEvidence(document: ParsedDocument, parserOutput: Record<string, any>): Record<string, any> {
-  const evidence = Array.isArray(parserOutput.evidence) ? [...parserOutput.evidence] : [];
-  const rows = document.rows.map((row, index) => ({ row, index, content: String(row.content ?? "").trim() }));
-  const identityRow = rows.find((item) => /\b(?:fiserv|first data|clover|basys(?:pro)?)\b/i.test(item.content));
-  if (identityRow) evidence.push(evidenceEntry("processorIdentity", identityRow, "Fiserv-family source marker"));
-  const structuralPatterns = [
-    /\byour card processing statement\b/i,
-    /\btotal amount submitted\b/i,
-    /\btotal amount funded(?: to your bank)?\b/i,
-    /\binterchange charges(?:\/program fees)?\b/i,
-    /\bservice charges\b/i,
-    /\bfees charged\b/i,
-  ];
-  for (const pattern of structuralPatterns) {
-    const row = rows.find((item) => pattern.test(item.content));
-    if (row) evidence.push(evidenceEntry("processorStructure", row, "Fiserv-family structural marker"));
-  }
-  return { ...parserOutput, evidence };
-}
-
 function stripMerchantIdentityEvidence(parserOutput: Record<string, any>): Record<string, any> {
   const evidence = Array.isArray(parserOutput.evidence)
     ? parserOutput.evidence.filter((item: unknown) => {
@@ -491,12 +484,6 @@ function stripMerchantIdentityEvidence(parserOutput: Record<string, any>): Recor
     })
     : parserOutput.evidence;
   return { ...parserOutput, evidence };
-}
-
-function evidenceEntry(field: string, item: { row: Record<string, string | number>; index: number; content: string }, value: string) {
-  const match = String(item.row.page ?? "").match(/page-(\d+)/i);
-  return { field, sourceSection: "HEADER", pageNumber: match ? Number(match[1]) : null,
-    lineIndex: item.index, evidenceLine: item.content, value };
 }
 
 function finishValidatedStage(
