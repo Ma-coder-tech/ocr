@@ -1,5 +1,6 @@
 import type { CanonicalAtomicClaimFacet } from "./atomicClaims.js";
 import type { CanonicalUnresolvedClaimClass } from "./unresolvedClaims.js";
+import type { CanonicalMarginalValueDecision } from "./researchControl.js";
 
 export const ADAPTIVE_CONTINUATION_SCHEMA_VERSION = "canonical_adaptive_continuation_v1_2" as const;
 
@@ -100,6 +101,7 @@ export type CanonicalClaimContinuationDecision = {
   nextOperationDelta: CanonicalContinuationOperationDelta | null;
   degradation: CanonicalContinuationDegradation | null;
   cumulativeResource: CanonicalContinuationResourceAccounting;
+  marginalValueDecision: CanonicalMarginalValueDecision;
   reasonCodes: string[];
   regeneratedProviderExecution: "disabled" | "authorized_exact_claim_delta" | "executed_exact_claim_delta";
 };

@@ -58,12 +58,26 @@ describe("production durable claim-bound RG evidence execution", () => {
     expect(calls).toEqual(["search", "retrieve", "investigate", "verify"]);
     expect(item).toMatchObject({ state: "terminal", executionState: "completed_verified_evidence",
       reservation: null, progress: { state: "verified_evidence", operationsAttempted: 4, evidenceItemsObserved: 1 },
-      stopReason: "rg_verified_claim_scoped_evidence_obtained" });
+      stopReason: "rg_verified_claim_scoped_evidence_obtained",
+      researchControl: {
+        terminalDisposition: "resolved_to_public_evidence_ceiling",
+        telemetry: {
+          privacy: "opaque_ids_enums_and_counts_only",
+          budgetSemantics: "operational_circuit_breaker_only",
+          admittedSupport: { verifiedEvidenceCount: 1, reachedEvidenceCeiling: true },
+          rhReadyProjection: { authority: "internal_rh_ready_disposition_only",
+            customerReportAuthority: "unchanged" },
+        },
+      } });
     expect(item.verifiedEvidenceRefs).toHaveLength(1);
     expect(persisted.rgExecutionEvents.map((event) => event.eventType)).toEqual(expect.arrayContaining([
       "work_reserved", "operation_reserved", "operation_sent", "operation_completed",
       "verified_evidence_persisted", "work_terminal",
+      "research_marginal_value_pre_search", "research_search_universe_observed", "research_control_telemetry",
     ]));
+    const eventTypes = persisted.rgExecutionEvents.map((event) => event.eventType);
+    expect(eventTypes.indexOf("research_marginal_value_pre_search")).toBeLessThan(eventTypes.indexOf("operation_sent"));
+    expect(result.claimTelemetry).toEqual([item.researchControl.telemetry]);
     expect(persisted.rgOperations.map((operation) => [operation.kind, operation.state]).sort()).toEqual([
       ["independent_verification", "completed"], ["investigation", "completed"],
       ["public_retrieval", "completed"], ["public_search", "completed"],

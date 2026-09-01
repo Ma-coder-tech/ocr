@@ -9,7 +9,8 @@ import { dynamicallyBindPublisherOrigin } from "./rgPublisherOriginAuthority.js"
 export function persistedVerifiedEvidenceIntegrityValid(value: unknown): value is CanonicalRgVerifiedEvidence {
   if (!value || typeof value !== "object") return false;
   const evidence = value as CanonicalRgVerifiedEvidence;
-  if (!["canonical_rg_verified_evidence_v1_1", "canonical_rg_verified_evidence_v1_2", "canonical_rg_verified_evidence_v1_3"].includes(evidence.schemaVersion)
+  if (!["canonical_rg_verified_evidence_v1_1", "canonical_rg_verified_evidence_v1_2", "canonical_rg_verified_evidence_v1_3",
+    "canonical_rg_verified_evidence_v1_4"].includes(evidence.schemaVersion)
     || !isSafeId(evidence.evidenceId) || !isSafeId(evidence.runId) || !/^[a-f0-9]{32}$/.test(evidence.planHash)
     || !isSafeId(evidence.workItemId) || !isSafeId(evidence.atomicClaimId) || !isSafeId(evidence.intentId)
     || !isSafeId(evidence.candidateId) || !isSafeId(evidence.documentId)
@@ -22,7 +23,8 @@ export function persistedVerifiedEvidenceIntegrityValid(value: unknown): value i
   if (!validNullableDay(evidence.effectiveFrom) || !validNullableDay(evidence.effectiveTo)
     || !validStatementPeriod(evidence.statementPeriod)) return false;
   const identity = { runId: evidence.runId, planHash: evidence.planHash,
-    ...(["canonical_rg_verified_evidence_v1_2", "canonical_rg_verified_evidence_v1_3"].includes(evidence.schemaVersion) ? {
+    ...(["canonical_rg_verified_evidence_v1_2", "canonical_rg_verified_evidence_v1_3",
+      "canonical_rg_verified_evidence_v1_4"].includes(evidence.schemaVersion) ? {
       executionGrantId: evidence.executionGrantId ?? null,
       executionGeneration: evidence.executionGeneration ?? 0,
     } : {}), workItemId: evidence.workItemId,
@@ -31,8 +33,14 @@ export function persistedVerifiedEvidenceIntegrityValid(value: unknown): value i
     investigatorLocatorId: evidence.investigatorLocatorId, authorityLocatorId: evidence.authorityLocatorId,
     supportLocatorId: evidence.supportLocatorId, frozenCandidateHash: evidence.frozenCandidateHash,
     originPublisherBindingId: evidence.originPublisherProof?.bindingId,
-    ...(evidence.schemaVersion === "canonical_rg_verified_evidence_v1_3" ? { scopeFingerprint: evidence.scopeFingerprint } : {}) };
-  if (evidence.schemaVersion === "canonical_rg_verified_evidence_v1_3" && !/^[a-f0-9]{32}$/.test(evidence.scopeFingerprint ?? "")) return false;
+    ...(["canonical_rg_verified_evidence_v1_3", "canonical_rg_verified_evidence_v1_4"].includes(evidence.schemaVersion)
+      ? { scopeFingerprint: evidence.scopeFingerprint } : {}),
+    ...(evidence.schemaVersion === "canonical_rg_verified_evidence_v1_4"
+      ? { researchControl: evidence.researchControl } : {}) };
+  if (["canonical_rg_verified_evidence_v1_3", "canonical_rg_verified_evidence_v1_4"].includes(evidence.schemaVersion)
+    && !/^[a-f0-9]{32}$/.test(evidence.scopeFingerprint ?? "")) return false;
+  if (evidence.schemaVersion === "canonical_rg_verified_evidence_v1_4"
+    && (!evidence.researchControl || evidence.researchControl.adjacentInferenceAuthority !== "none")) return false;
   if (evidence.evidenceId !== `rg-evidence-${digest(identity).slice(0, 32)}`) return false;
   const rebound = dynamicallyBindPublisherOrigin({ sourceOrigin: evidence.sourceOrigin, finalUrl: evidence.sourceUrl,
     publisherIdentityCode: evidence.publisherIdentityCode, authorityClass: evidence.sourceAuthority,

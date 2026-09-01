@@ -271,8 +271,10 @@ export function authorizeNextDurableCanonicalContinuationExecution(input: {
   }
   const decision = nextAuthorizedDecision(state.decisions, input.recoveryDecisionId ?? null);
   const normalContinuation = decision && state.continuationReadyAtomicClaimIds.includes(decision.atomicClaimId)
+    && decision.marginalValueDecision.externalResearchAuthorized
     && (decision.disposition === "newly_eligible" || decision.disposition === "justified_refinement");
   const recoveryContinuation = decision?.disposition === "operationally_degraded_retry_eligible"
+    && decision.marginalValueDecision.externalResearchAuthorized
     && recovery?.intent.authorization.atomicClaimId === decision.atomicClaimId
     && decision.degradation?.continuationPermission === "bounded_retry_eligible";
   if (!decision || (!normalContinuation && !recoveryContinuation)) {
@@ -375,7 +377,7 @@ function materializeEffectiveWork(work: CanonicalRgWorkItem,
     if (decision.nextOperationDelta) throw new Error("adaptive_execution_new_work_has_unexpected_delta");
     return { ...structuredClone(base), state: "planned", executionState: "planned_for_durable_execution",
       reservation: null, progress: { ...base.progress, state: "not_started" }, stopReason: null,
-      executionAuthorization: null };
+      executionAuthorization: null, researchControl: resetResearchControl(base, decision) };
   }
   if (decision.disposition === "operationally_degraded_retry_eligible") {
     if (decision.nextOperationDelta || decision.degradation?.continuationPermission !== "bounded_retry_eligible") {
@@ -383,7 +385,7 @@ function materializeEffectiveWork(work: CanonicalRgWorkItem,
     }
     return { ...structuredClone(base), state: "planned", executionState: "planned_for_durable_execution",
       reservation: null, progress: { ...base.progress, state: "not_started" }, stopReason: null,
-      executionAuthorization: null };
+      executionAuthorization: null, researchControl: resetResearchControl(base, decision) };
   }
   const delta = decision.nextOperationDelta;
   if (decision.disposition !== "justified_refinement" || !delta
@@ -393,6 +395,7 @@ function materializeEffectiveWork(work: CanonicalRgWorkItem,
   return { ...structuredClone(base), state: "planned", executionState: "planned_for_durable_execution",
     evidenceObjective: delta.nextEvidenceObjective, reservation: null,
     progress: { ...base.progress, state: "not_started" }, stopReason: null, executionAuthorization: null,
+    researchControl: resetResearchControl(base, decision),
     continuationContract: { kind: delta.kind, requiredGap: delta.requiredGap,
       priorWorkContractFingerprint: delta.priorWorkContractFingerprint,
       excludedDocumentFingerprints: [...new Set(delta.excludedDocumentFingerprints)].sort() } };
@@ -406,10 +409,21 @@ function normalizedWork(work: CanonicalRgWorkItem): CanonicalRgWorkItem {
 function nextAuthorizedDecision(decisions: CanonicalClaimContinuationDecision[], recoveryDecisionId: string | null): CanonicalClaimContinuationDecision | null {
   if (recoveryDecisionId) {
     return decisions.find((item) => item.decisionId === recoveryDecisionId
-      && item.disposition === "operationally_degraded_retry_eligible") ?? null;
+      && item.disposition === "operationally_degraded_retry_eligible"
+      && item.marginalValueDecision.externalResearchAuthorized) ?? null;
   }
-  return decisions.filter((item) => item.disposition === "newly_eligible" || item.disposition === "justified_refinement")
+  return decisions.filter((item) => item.marginalValueDecision.externalResearchAuthorized
+    && (item.disposition === "newly_eligible" || item.disposition === "justified_refinement"))
     .sort((left, right) => left.atomicClaimId.localeCompare(right.atomicClaimId))[0] ?? null;
+}
+
+function resetResearchControl(work: CanonicalRgWorkItem, decision: CanonicalClaimContinuationDecision) {
+  const decisions = work.researchControl.marginalValueDecisions.some((item) =>
+    item.decisionId === decision.marginalValueDecision.decisionId)
+    ? work.researchControl.marginalValueDecisions
+    : [...work.researchControl.marginalValueDecisions, decision.marginalValueDecision];
+  return { ...structuredClone(work.researchControl), marginalValueDecisions: decisions,
+    terminalDisposition: null, telemetry: null };
 }
 
 function hasCurrentOperationalRecoveryGrant(persisted: NonNullable<ReturnType<typeof getPersistedAnalysisRun>>): boolean {

@@ -17,9 +17,10 @@ import type { CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
 import type { CanonicalRfClaimResolution } from "./rfClaimResolution.js";
 import type { CanonicalRgWorkLedger } from "./rgWorkLedger.js";
 import type { CanonicalAnalysisRunAutonomousLifecycle } from "./adaptiveContinuationTypes.js";
+import { ATOMIC_RESEARCH_CONTROL_POLICY_VERSION } from "./researchControl.js";
 
-export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v9";
-export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "adaptive_continuation_execution_loop_v1";
+export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v10";
+export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "atomic_research_control_and_saturation_v1";
 export const ANALYSIS_RUN_POLICY_VERSION = "frozen_product_model_runtime_policy_v0_2";
 
 export const ANALYSIS_RUN_STAGE_IDS = [
@@ -63,6 +64,8 @@ export type AnalysisRunManifest = {
   synthesisAdmissionContract: "canonical_synthesis_admission_contract_v1";
   adaptiveContinuation: "durable_deterministic_delta_admission";
   regeneratedPlanExecution: "continuation_authorized_existing_executor";
+  researchControlPolicy: typeof ATOMIC_RESEARCH_CONTROL_POLICY_VERSION;
+  researchControlBoundary: "internal_rh_ready_disposition_only";
   benchmarkExecution: "disabled";
   savingsExecution: "disabled";
   businessContextAuthority: "excluded_from_canonical_economics";

@@ -20,6 +20,15 @@ import {
   type CanonicalRgOperation,
   type CanonicalRgWorkItem,
 } from "./rgWorkLedger.js";
+import {
+  ATOMIC_RESEARCH_CONTROL_POLICY_VERSION,
+  buildCanonicalResearchTelemetry,
+  canonicalTerminalDisposition,
+  evaluateCanonicalMarginalValue,
+  observeCanonicalSearchUniverse,
+  type CanonicalMarginalValueDecision,
+  type CanonicalResearchControlTelemetry,
+} from "./researchControl.js";
 
 export const RG_EVIDENCE_EXECUTION_SCHEMA_VERSION = "canonical_rg_evidence_execution_v1_2" as const;
 
@@ -127,7 +136,8 @@ export type CanonicalRgVerificationJudgment = {
 };
 
 export type CanonicalRgVerifiedEvidence = {
-  schemaVersion: "canonical_rg_verified_evidence_v1_1" | "canonical_rg_verified_evidence_v1_2" | "canonical_rg_verified_evidence_v1_3";
+  schemaVersion: "canonical_rg_verified_evidence_v1_1" | "canonical_rg_verified_evidence_v1_2"
+    | "canonical_rg_verified_evidence_v1_3" | "canonical_rg_verified_evidence_v1_4";
   evidenceId: string;
   runId: string;
   planHash: string;
@@ -164,6 +174,13 @@ export type CanonicalRgVerifiedEvidence = {
   rfAdmissionAuthority: "none";
   automaticKnowledgePromotion: false;
   canonicalFinancialMutationAllowed: false;
+  researchControl?: {
+    policyVersion: typeof ATOMIC_RESEARCH_CONTROL_POLICY_VERSION;
+    claimFamily: CanonicalRgClaimAdmission["researchControl"]["claimFamily"];
+    evidenceCeilingCode: CanonicalRgClaimAdmission["researchControl"]["evidenceCeiling"]["code"];
+    maximumRhReadyEffect: CanonicalRgClaimAdmission["researchControl"]["evidenceCeiling"]["maximumRhReadyEffect"];
+    adjacentInferenceAuthority: "none";
+  };
   limitations: string[];
 };
 
@@ -241,6 +258,7 @@ export type CanonicalRgEvidenceExecutionResult = {
   workItemsCompletedUnresolved: number;
   workItemsDegraded: number;
   verifiedEvidence: CanonicalRgVerifiedEvidence[];
+  claimTelemetry: CanonicalResearchControlTelemetry[];
   canonicalTruthHashBefore: string | null;
   canonicalTruthHashAfter: string | null;
   canonicalTruthPreserved: true;
@@ -338,6 +356,16 @@ export async function executeDurableCanonicalRgEvidence(input: {
       if (latest.executionState === "completed_unresolved") completedUnresolved += 1; else degraded += 1;
       continue;
     }
+    const preSearchDecision = latest.researchControl.marginalValueDecisions.at(-1)
+      ?? latest.researchControl.plan.initialMarginalValueDecision;
+    persistPreSearchDecisionObservation(input.runId, latest.workItemId, preSearchDecision);
+    if (!preSearchDecision.externalResearchAuthorized
+      || !["CLOSE", "UPGRADE", "NARROW"].includes(preSearchDecision.decision)) {
+      terminalizeWork(input.runId, latest, "completed_unresolved", "unresolved",
+        `rg_pre_search_marginal_value_${preSearchDecision.decision.toLowerCase()}_zero_send`, [], workerId);
+      completedUnresolved += 1;
+      continue;
+    }
     const generationZeroCeiling = operationalCeilingReason(input.runId, null, generationZeroOperationalScope);
     if (generationZeroCeiling) {
       terminalizeWork(input.runId, latest, "degraded_emergency_circuit_breaker", "degraded",
@@ -378,6 +406,8 @@ export async function executeDurableCanonicalRgEvidence(input: {
     workItemsCompletedUnresolved: completedUnresolved,
     workItemsDegraded: degraded,
     verifiedEvidence,
+    claimTelemetry: after.rgWorkItems.flatMap((item) => item.researchControl.telemetry
+      ? [item.researchControl.telemetry] : []),
     canonicalTruthHashBefore: beforeHash,
     canonicalTruthHashAfter: after.canonicalTruthHash,
     canonicalTruthPreserved: true,
@@ -402,6 +432,10 @@ async function executeWorkItem(input: {
     terminalizeWork(input.runId, input.workItem, "completed_unresolved", "unresolved", safeReason(error), [], input.workerId);
     return { state: "unresolved", evidence: [] };
   }
+  updateSearchUniverse(input.runId, input.workItem.workItemId, {
+    formulationFingerprints: [digest({ queryTerms: intent.queryTerms, continuation: intent.continuation })],
+    requiredAuthorityClasses: input.workItem.requiredSourceAuthorities,
+  });
   const search = await runExternalOperation({ ...input, kind: "public_search", candidateId: null,
     providerCode: "public_search", operationInput: { intent, maximumCandidates: MAX_CANDIDATES_PER_WORK_ITEM },
     projectResult: sanitizeSearchResult,
@@ -409,13 +443,25 @@ async function executeWorkItem(input: {
   if (search.state !== "completed") return finishFailedOperation(input, search.operation);
   const candidates = validateSearchCandidates(search.value as CanonicalRgDiscoveryCandidate[], intent);
   if (candidates.length === 0) {
+    appendMarginalReassessment(input, "qualification_rejected");
     terminalizeWork(input.runId, input.workItem, "completed_unresolved", "unresolved", "rg_search_no_valid_candidates", [], input.workerId);
     return { state: "unresolved", evidence: [] };
   }
 
   const evidence: CanonicalRgVerifiedEvidence[] = [];
+  let continuationDecision: CanonicalMarginalValueDecision | null = null;
+  let stoppedByMarginalReassessment = false;
   for (const [index, candidate] of candidates.entries()) {
-    if (index > 0) appendExtensionDecision(input.runId, input.workItem.workItemId, "extended", "prior_candidate_did_not_produce_verified_support");
+    if (index > 0) {
+      if (!continuationDecision?.externalResearchAuthorized) {
+        stoppedByMarginalReassessment = true;
+        appendExtensionDecision(input.runId, input.workItem.workItemId, "stopped",
+          "marginal_value_reassessment_did_not_authorize_candidate_continuation");
+        break;
+      }
+      appendExtensionDecision(input.runId, input.workItem.workItemId, "extended",
+        `marginal_value_${continuationDecision.decision.toLowerCase()}_authorized_candidate_continuation`);
+    }
     const retrieval = await runExternalOperation({ ...input, kind: "public_retrieval", candidateId: candidate.candidateId,
       providerCode: "independent_https_retrieval", operationInput: { intentId: intent.intentId, candidate },
       projectResult: sanitizeRetrievedDocument,
@@ -427,10 +473,23 @@ async function executeWorkItem(input: {
       continue;
     }
     const document = validateRetrievedDocument(retrieval.value as CanonicalRgRetrievedDocument, candidate);
-    if (!document) continue;
+    if (!document) {
+      continuationDecision = appendMarginalReassessment(input, "qualification_rejected");
+      continue;
+    }
+    updateSearchUniverse(input.runId, input.workItem.workItemId, {
+      documentFingerprints: [document.documentFingerprint],
+      requiredAuthorityClasses: input.workItem.requiredSourceAuthorities,
+    });
     if (intent.continuation?.excludedDocumentFingerprints.includes(document.documentFingerprint)) {
       appendExtensionDecision(input.runId, input.workItem.workItemId, "stopped",
         "continuation_excluded_previously_insufficient_document");
+      updateSearchUniverse(input.runId, input.workItem.workItemId, {
+        reusableNegativeApplicabilityKeys: [digest({ documentFingerprint: document.documentFingerprint,
+          reason: "previously_insufficient" })],
+        requiredAuthorityClasses: input.workItem.requiredSourceAuthorities,
+      });
+      continuationDecision = appendMarginalReassessment(input, "wrong_scope_or_period");
       continue;
     }
     const investigation = await runExternalOperation({ ...input, kind: "investigation", candidateId: candidate.candidateId,
@@ -447,7 +506,10 @@ async function executeWorkItem(input: {
     }
     const investigated = validateInvestigatedCandidate(investigation.value as CanonicalRgInvestigatedCandidate,
       input.workItem, input.admission, candidate, document);
-    if (!investigated) continue;
+    if (!investigated) {
+      continuationDecision = appendMarginalReassessment(input, "qualification_rejected");
+      continue;
+    }
     const frozenCandidate = freezeCandidate(investigated, investigation.operation.updatedAt);
     const durableVerification = priorVerificationOperationForCandidate({ runId: input.runId, planHash: input.planHash,
       workItem: input.workItem, candidateId: candidate.candidateId,
@@ -467,12 +529,34 @@ async function executeWorkItem(input: {
       }
       continue;
     }
+    const judgment = verification.value as CanonicalRgVerificationJudgment;
+    if (judgment.sourceAuthorityStatus === "verified" && judgment.scopeStatus === "applicable"
+      && judgment.periodStatus === "applicable") {
+      updateSearchUniverse(input.runId, input.workItem.workItemId, {
+        applicableAuthorityClasses: [candidate.claimedAuthority],
+        requiredAuthorityClasses: input.workItem.requiredSourceAuthorities,
+      });
+    }
     const verified = validateVerification({ runId: input.runId, planHash: input.planHash, intent,
       workItem: input.workItem, admission: input.admission, candidate, document, frozenCandidate,
-      judgment: verification.value as CanonicalRgVerificationJudgment });
+      judgment });
     if (verified) {
       attachVerifiedEvidence(input.runId, verification.operation, verified);
       evidence.push(verified);
+    }
+    if (!verified) {
+      const candidateOutcome = judgment.semanticSupportStatus === "contradicted" ? "contradicted"
+        : judgment.scopeStatus !== "applicable" || judgment.periodStatus !== "applicable" ? "wrong_scope_or_period"
+          : judgment.semanticSupportStatus === "partial" ? "partial_support" : "qualification_rejected";
+      if (candidateOutcome === "contradicted" || candidateOutcome === "wrong_scope_or_period") {
+        updateSearchUniverse(input.runId, input.workItem.workItemId, {
+          reusableNegativeApplicabilityKeys: [digest({ documentFingerprint: document.documentFingerprint,
+            scopeStatus: judgment.scopeStatus, periodStatus: judgment.periodStatus,
+            semanticSupportStatus: judgment.semanticSupportStatus })],
+          requiredAuthorityClasses: input.workItem.requiredSourceAuthorities,
+        });
+      }
+      continuationDecision = appendMarginalReassessment(input, candidateOutcome);
     }
     if (verified) break;
   }
@@ -481,6 +565,11 @@ async function executeWorkItem(input: {
       "rg_verified_claim_scoped_evidence_obtained", evidence.map((item) => item.evidenceId), input.workerId);
     appendExtensionDecision(input.runId, input.workItem.workItemId, "stopped", "exact_claim_support_verified_early_completion");
     return { state: "verified", evidence };
+  }
+  if (stoppedByMarginalReassessment) {
+    terminalizeWork(input.runId, input.workItem, "completed_unresolved", "unresolved",
+      "rg_candidate_continuation_withheld_after_marginal_value_reassessment", [], input.workerId);
+    return { state: "unresolved", evidence: [] };
   }
   if (candidates.length >= MAX_CANDIDATES_PER_WORK_ITEM) {
     terminalizeWork(input.runId, input.workItem, "degraded_emergency_circuit_breaker", "degraded",
@@ -506,6 +595,98 @@ function finishFailedOperation(
 function operationStoppedByCircuitBreaker(operation: CanonicalRgOperation): boolean {
   return operation.state === "failed_before_send"
     && operation.receipt.reasonCode.endsWith("_not_analytical_completion");
+}
+
+function persistPreSearchDecisionObservation(
+  runId: string,
+  workItemId: string,
+  decision: CanonicalMarginalValueDecision,
+): void {
+  const existing = db.prepare(`SELECT 1 FROM canonical_rg_execution_events
+    WHERE run_id = ? AND work_item_id = ? AND event_type = 'research_marginal_value_pre_search'
+      AND json_extract(event_json, '$.decisionId') = ? LIMIT 1`).get(runId, workItemId, decision.decisionId);
+  if (existing) return;
+  appendEvent(runId, workItemId, null, "research_marginal_value_pre_search", {
+    decisionId: decision.decisionId,
+    stage: decision.stage,
+    decision: decision.decision,
+    externalResearchAuthorized: decision.externalResearchAuthorized,
+    materialityAdmissionRequired: true,
+    reasonCodes: decision.reasonCodes,
+  });
+}
+
+function updateSearchUniverse(
+  runId: string,
+  workItemId: string,
+  observation: Parameters<typeof observeCanonicalSearchUniverse>[1],
+) {
+  const item = workItemFromDb(runId, workItemId);
+  if (!item) throw new Error("research_control_work_item_unavailable");
+  const observationFingerprint = digest(observation);
+  const priorEvents = db.prepare(`SELECT event_json FROM canonical_rg_execution_events
+    WHERE run_id = ? AND work_item_id = ? AND event_type = 'research_search_universe_observed'`)
+    .all(runId, workItemId) as Array<{ event_json: string }>;
+  if (priorEvents.some((row) => {
+    const value = JSON.parse(row.event_json) as { observationFingerprint?: string };
+    return value.observationFingerprint === observationFingerprint;
+  })) return item.researchControl.searchUniverse;
+  const searchUniverse = observeCanonicalSearchUniverse(item.researchControl.searchUniverse, observation);
+  const updated: CanonicalRgWorkItem = { ...item, researchControl: { ...item.researchControl, searchUniverse } };
+  db.prepare(`UPDATE canonical_rg_work_items SET work_item_json = ?, updated_at = ? WHERE run_id = ? AND work_item_id = ?`)
+    .run(JSON.stringify(updated), nowIso(), runId, workItemId);
+  appendEvent(runId, workItemId, null, "research_search_universe_observed", {
+    observationFingerprint,
+    stateHash: searchUniverse.stateHash,
+    novelty: searchUniverse.lastNovelty,
+    saturationSignal: searchUniverse.saturationSignal,
+    semanticReassessmentRequired: searchUniverse.semanticReassessmentRequired,
+    analyticalExhaustionClaimed: false,
+  });
+  return searchUniverse;
+}
+
+function appendMarginalReassessment(
+  input: { runId: string; workItem: CanonicalRgWorkItem; admission: CanonicalRgClaimAdmission },
+  candidateOutcome: "qualification_rejected" | "partial_support" | "wrong_scope_or_period" | "contradicted",
+): CanonicalMarginalValueDecision {
+  const item = workItemFromDb(input.runId, input.workItem.workItemId);
+  if (!item) throw new Error("research_control_work_item_unavailable");
+  const last = item.researchControl.marginalValueDecisions.at(-1);
+  const reasonByOutcome = {
+    qualification_rejected: "higher_or_applicable_authority_can_improve_admitted_support_within_ceiling",
+    partial_support: "narrower_claim_formulation_can_change_exact_claim_disposition_within_ceiling",
+    wrong_scope_or_period: "materially_distinct_scope_period_or_applicability_formulation_required",
+    contradicted: "materially_distinct_scope_period_or_applicability_formulation_required",
+  } as const;
+  if (last?.stage === "candidate_reassessment" && last.searchUniverseHash === item.researchControl.searchUniverse.stateHash
+    && last.reasonCodes.includes(reasonByOutcome[candidateOutcome])) return last;
+  const decision = evaluateCanonicalMarginalValue({
+    atomicClaimId: input.admission.atomicClaimId,
+    stage: "candidate_reassessment",
+    sequence: item.researchControl.marginalValueDecisions.length,
+    claimFamily: item.researchControl.plan.claimFamily,
+    researchAdmission: input.admission.researchAdmission,
+    materiality: input.admission.materiality,
+    decisionTier: input.admission.decisionTier,
+    publicPathPermitted: input.admission.knowledgeQuery !== null && input.admission.requiredSourceAuthorities.length > 0,
+    searchUniverse: item.researchControl.searchUniverse,
+    claimAlreadyAtCeiling: false,
+    candidateOutcome,
+  });
+  const updated: CanonicalRgWorkItem = { ...item, researchControl: { ...item.researchControl,
+    marginalValueDecisions: [...item.researchControl.marginalValueDecisions, decision] } };
+  db.prepare(`UPDATE canonical_rg_work_items SET work_item_json = ?, updated_at = ? WHERE run_id = ? AND work_item_id = ?`)
+    .run(JSON.stringify(updated), nowIso(), input.runId, item.workItemId);
+  appendEvent(input.runId, item.workItemId, null, "research_marginal_value_reassessed", {
+    decisionId: decision.decisionId,
+    stage: decision.stage,
+    decision: decision.decision,
+    externalResearchAuthorized: decision.externalResearchAuthorized,
+    searchUniverseHash: decision.searchUniverseHash,
+    reasonCodes: decision.reasonCodes,
+  });
+  return decision;
 }
 
 export function compileCanonicalRgSearchIntent(
@@ -831,20 +1012,37 @@ function updateOperation(runId: string, operation: CanonicalRgOperation): void {
 }
 
 function terminalizeWork(runId: string, original: CanonicalRgWorkItem,
-  executionState: CanonicalRgWorkItem["executionState"], progressState: CanonicalRgWorkItem["progress"]["state"],
+  executionState: Exclude<CanonicalRgWorkItem["executionState"], "planned_for_durable_execution" | "executing">,
+  progressState: CanonicalRgWorkItem["progress"]["state"],
   stopReason: string, verifiedEvidenceRefs: string[], workerId: string): void {
   const current = workItemFromDb(runId, original.workItemId) ?? original;
   if (current.reservation && current.reservation.workerId !== workerId) throw new Error("rg_work_terminalization_reservation_mismatch");
   const operationCount = Number((db.prepare(`SELECT COUNT(*) AS count FROM canonical_rg_operations WHERE run_id = ? AND work_item_id = ?`)
     .get(runId, current.workItemId) as { count: number }).count);
+  const latestDecision = current.researchControl.marginalValueDecisions.at(-1)
+    ?? current.researchControl.plan.initialMarginalValueDecision;
+  const terminalDisposition = canonicalTerminalDisposition({ executionState, stopReason,
+    latestDecision: latestDecision.decision,
+    searchUniverse: current.researchControl.searchUniverse,
+    privateEvidenceRequired: /private|non_public|merchant_document|statement_history|account_explanation/.test(stopReason) });
+  const controlWithDisposition = { ...current.researchControl, terminalDisposition };
+  const telemetry = buildCanonicalResearchTelemetry({
+    atomicClaimId: current.atomicClaimId,
+    control: controlWithDisposition,
+    expectedDecisionEffects: current.expectedDecisionEffects,
+    resource: current.resourceConsumption,
+    verifiedEvidenceCount: verifiedEvidenceRefs.length,
+  });
   const updated: CanonicalRgWorkItem = { ...current, state: "terminal", executionState, reservation: null,
     progress: { state: progressState, operationsAttempted: operationCount, evidenceItemsObserved: verifiedEvidenceRefs.length },
+    researchControl: { ...controlWithDisposition, telemetry },
     stopReason, verifiedEvidenceRefs: [...new Set(verifiedEvidenceRefs)].sort() };
   db.prepare(`UPDATE canonical_rg_work_items SET state = ?, execution_state = ?, work_item_json = ?, updated_at = ?
     WHERE run_id = ? AND work_item_id = ?`).run(updated.state, updated.executionState, JSON.stringify(updated),
     nowIso(), runId, updated.workItemId);
   appendEvent(runId, updated.workItemId, null, "work_terminal", { executionState, progressState, stopReason,
-    verifiedEvidenceRefs: updated.verifiedEvidenceRefs });
+    verifiedEvidenceRefs: updated.verifiedEvidenceRefs, terminalDisposition });
+  appendEvent(runId, updated.workItemId, null, "research_control_telemetry", telemetry);
 }
 
 function incrementResource(runId: string, workItemId: string, kind: CanonicalRgOperation["kind"], receipt: RgEvidencePortReceipt): void {
@@ -1023,6 +1221,13 @@ function validateVerification(input: {
     publicScope: input.intent.publicScope,
   });
   if (!investigatorLocator || !authorityLocator || !supportLocator || !originPublisherProof) return null;
+  const researchControl = {
+    policyVersion: ATOMIC_RESEARCH_CONTROL_POLICY_VERSION,
+    claimFamily: admission.researchControl.claimFamily,
+    evidenceCeilingCode: admission.researchControl.evidenceCeiling.code,
+    maximumRhReadyEffect: admission.researchControl.evidenceCeiling.maximumRhReadyEffect,
+    adjacentInferenceAuthority: "none" as const,
+  };
   const evidenceBase = { runId: input.runId, planHash: input.planHash,
     executionGrantId: workItem.executionAuthorization?.grantId ?? null,
     executionGeneration: workItem.executionAuthorization?.executionGeneration ?? 0,
@@ -1031,9 +1236,10 @@ function validateVerification(input: {
     candidateId: input.candidate.candidateId, documentFingerprint: document.documentFingerprint,
     investigatorLocatorId: investigatorLocator.locatorId, authorityLocatorId: authorityLocator.locatorId,
     supportLocatorId: supportLocator.locatorId, frozenCandidateHash: frozenCandidate.frozenCandidateHash,
-    originPublisherBindingId: originPublisherProof.bindingId, scopeFingerprint: admission.scopeFingerprint };
+    originPublisherBindingId: originPublisherProof.bindingId, scopeFingerprint: admission.scopeFingerprint,
+    researchControl };
   return {
-    schemaVersion: "canonical_rg_verified_evidence_v1_3",
+    schemaVersion: "canonical_rg_verified_evidence_v1_4",
     evidenceId: `rg-evidence-${digest(evidenceBase).slice(0, 32)}`,
     ...evidenceBase,
     sourceUrl: document.finalUrl,

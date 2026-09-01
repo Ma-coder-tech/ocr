@@ -20,6 +20,7 @@ import {
   type CanonicalContinuationProgress,
   type CanonicalContinuationResourceAccounting,
 } from "./adaptiveContinuationTypes.js";
+import { buildCanonicalClaimResearchControlPlan, evaluateCanonicalMarginalValue } from "./researchControl.js";
 
 type WorkAttempt = {
   planHash: string;
@@ -112,7 +113,8 @@ export function buildAdaptiveContinuationState(
   decisions.sort((left, right) => left.atomicClaimId.localeCompare(right.atomicClaimId));
   const lifecycle = lifecycleFor(decisions);
   const continuationReadyAtomicClaimIds = decisions.filter((item) =>
-    item.disposition === "newly_eligible" || item.disposition === "justified_refinement")
+    (item.disposition === "newly_eligible" || item.disposition === "justified_refinement")
+    && item.marginalValueDecision.externalResearchAuthorized)
     .map((item) => item.atomicClaimId).sort();
   const reasonCodes = lifecycleReasons(lifecycle, decisions);
   const cumulativeResource = aggregateResources(history, persisted.rgExecutionEvents);
@@ -167,6 +169,25 @@ function decideClaim(input: {
   ]);
   const progress = uniqueProgress(input.attempts.flatMap(progressForAttempt));
   const cumulativeResource = aggregateResources(input.attempts, input.persisted.rgExecutionEvents);
+  const marginalValueDecision = evaluateCanonicalMarginalValue({
+    atomicClaimId: input.admission.atomicClaimId,
+    stage: "continuation_reassessment",
+    sequence: input.currentWork ? input.currentWork.researchControl.searchUniverse.assessmentCount + 1
+      : input.priorDecision?.marginalValueDecision.sequence ?? 1,
+    claimFamily: input.admission.researchControl.claimFamily,
+    researchAdmission: input.admission.researchAdmission,
+    materiality: input.admission.materiality,
+    decisionTier: input.admission.decisionTier,
+    publicPathPermitted: input.admission.knowledgeQuery !== null && input.admission.requiredSourceAuthorities.length > 0,
+    searchUniverse: input.currentWork?.researchControl.searchUniverse ?? null,
+    claimAlreadyAtCeiling: input.resolved || input.semanticDisposition?.disposition === "applied"
+      || input.semanticDisposition?.disposition === "already_resolved_by_rf",
+    candidateOutcome: input.semanticDisposition?.disposition === "withheld_conflicting_current_run_evidence"
+      || input.semanticDisposition?.disposition === "withheld_conflicting_rf_and_rg" ? "contradicted"
+      : input.currentWork?.researchControl.searchUniverse.reusableNegativeApplicabilityKeys.length ? "wrong_scope_or_period"
+        : null,
+    semanticRefinementAvailable: progress.length > 0,
+  });
   const base = {
     atomicClaimId: input.admission.atomicClaimId,
     claimClass: input.admission.claimClass,
@@ -182,6 +203,7 @@ function decideClaim(input: {
     evidenceRefs,
     progress,
     cumulativeResource,
+    marginalValueDecision,
   };
   const make = (disposition: CanonicalClaimContinuationDecision["disposition"], reasonCodes: string[],
     degradation: CanonicalContinuationDegradation | null = null,
@@ -567,6 +589,16 @@ function latestHistoricalAdmission(attempts: WorkAttempt[], atomicClaimId: strin
 
 function admissionFromPriorDecision(decision: CanonicalClaimContinuationDecision | undefined): CanonicalRgClaimAdmission | null {
   if (!decision) return null;
+  const researchControl = buildCanonicalClaimResearchControlPlan({
+    atomicClaimId: decision.atomicClaimId,
+    facet: decision.facet,
+    researchAdmission: "withheld_no_authorized_research_mapping",
+    materiality: decision.materiality,
+    decisionTier: decision.decisionTier,
+    blockingPrerequisiteCodes: [],
+    knowledgeQueryPresent: false,
+    requiredSourceAuthorities: [],
+  });
   return {
     atomicClaimId: decision.atomicClaimId, parentClaimIds: [], claimClass: decision.claimClass, facet: decision.facet,
     opaqueSubjectCode: "prior_lineage", scopeFingerprint: "prior_lineage", statementPeriod: null,
@@ -578,7 +610,8 @@ function admissionFromPriorDecision(decision: CanonicalClaimContinuationDecision
       independentBlockingPrerequisiteCodes: [], admissibleOutcomes: [] }, materiality: decision.materiality,
     researchAdmission: "withheld_no_authorized_research_mapping", knowledgeQuery: null,
     expectedKnowledgeValueConstraint: null, requiredSourceAuthorities: [], evidenceObjective: "prior_lineage",
-    expectedDecisionEffects: [], limitations: ["Prior continuation lineage retained after claim left the active plan."],
+    expectedDecisionEffects: [], researchControl,
+    limitations: ["Prior continuation lineage retained after claim left the active plan."],
   };
 }
 

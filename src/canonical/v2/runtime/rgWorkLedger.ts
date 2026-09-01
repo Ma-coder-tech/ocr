@@ -25,8 +25,17 @@ import {
   type CanonicalAtomicClaimSeed,
   type CanonicalAtomicClaimFacet,
 } from "./atomicClaims.js";
+import {
+  buildCanonicalClaimResearchControlPlan,
+  buildCanonicalResearchTelemetry,
+  initialCanonicalSearchUniverse,
+  validateCanonicalResearchControlPlan,
+  type CanonicalClaimResearchControlPlan,
+  type CanonicalResearchControlRuntimeState,
+  type CanonicalResearchControlTelemetry,
+} from "./researchControl.js";
 
-export const RG_WORK_LEDGER_SCHEMA_VERSION = "canonical_rg_work_ledger_v1" as const;
+export const RG_WORK_LEDGER_SCHEMA_VERSION = "canonical_rg_work_ledger_v1_1_research_control" as const;
 
 export type { CanonicalAtomicClaimFacet } from "./atomicClaims.js";
 
@@ -87,6 +96,7 @@ export type CanonicalRgClaimAdmission = {
   requiredSourceAuthorities: KnowledgeSourceAuthority[];
   evidenceObjective: string;
   expectedDecisionEffects: CanonicalUnresolvedClaim["possibleDecisionEffects"];
+  researchControl: CanonicalClaimResearchControlPlan;
   limitations: string[];
 };
 
@@ -131,6 +141,7 @@ export type CanonicalRgWorkItem = {
   extensionDecisions: Array<{ decisionId: string; decision: "extended" | "stopped"; reasonCode: string; createdAt: string }>;
   retryDecisions: Array<{ decisionId: string; operationId: string; decision: "retry" | "no_retry"; reasonCode: string; createdAt: string }>;
   resourceConsumption: { providerCalls: number; searchCalls: number; retrievalBytes: number; aiCalls: number; tokens: number | null };
+  researchControl: CanonicalResearchControlRuntimeState;
   stopReason: null | string;
   verifiedEvidenceRefs: string[];
 };
@@ -185,6 +196,7 @@ export type CanonicalRgWorkLedger = {
   claimAdmissions: CanonicalRgClaimAdmission[];
   workItems: CanonicalRgWorkItem[];
   operations: CanonicalRgOperation[];
+  zeroSendResearchTelemetry: CanonicalResearchControlTelemetry[];
   summary: {
     atomicClaimCount: number;
     materialCount: number;
@@ -192,6 +204,7 @@ export type CanonicalRgWorkLedger = {
     immaterialCount: number;
     unresolvedCount: number;
     plannedWorkItemCount: number;
+    zeroSendClaimCount: number;
     operationCount: 0;
   };
   planHash: string;
@@ -230,6 +243,21 @@ export function buildCanonicalRgWorkLedger(input: {
     && admission.knowledgeQuery ? [workItem(admission)] : [])
     .sort((left, right) => left.workItemId.localeCompare(right.workItemId));
   validateAdmissions(admissions, workItems, errors);
+  const zeroSendResearchTelemetry = admissions.flatMap((admission) => {
+    const terminalDisposition = admission.researchControl.planningTerminalDisposition;
+    if (!terminalDisposition) return [];
+    const control: CanonicalResearchControlRuntimeState = {
+      plan: admission.researchControl,
+      marginalValueDecisions: [admission.researchControl.initialMarginalValueDecision],
+      searchUniverse: initialCanonicalSearchUniverse(),
+      terminalDisposition,
+      telemetry: null,
+    };
+    return [buildCanonicalResearchTelemetry({ atomicClaimId: admission.atomicClaimId, control,
+      expectedDecisionEffects: admission.expectedDecisionEffects,
+      resource: { providerCalls: 0, searchCalls: 0, aiCalls: 0, retrievalBytes: 0, tokens: 0 },
+      verifiedEvidenceCount: 0 })];
+  });
   const summary = {
     atomicClaimCount: admissions.length,
     materialCount: admissions.filter((item) => item.materiality === "material").length,
@@ -237,6 +265,7 @@ export function buildCanonicalRgWorkLedger(input: {
     immaterialCount: admissions.filter((item) => item.materiality === "immaterial").length,
     unresolvedCount: admissions.filter((item) => item.materiality === "unresolved").length,
     plannedWorkItemCount: workItems.length,
+    zeroSendClaimCount: zeroSendResearchTelemetry.length,
     operationCount: 0 as const,
   };
   const planHash = digest({ materialityContract: MATERIALITY_CONTRACT_V1.version, rfAvailability,
@@ -262,6 +291,7 @@ export function buildCanonicalRgWorkLedger(input: {
     claimAdmissions: admissions,
     workItems,
     operations: [],
+    zeroSendResearchTelemetry,
     summary,
     planHash,
     validation: { status: errors.length === 0 ? "valid" : "invalid", errors: unique(errors), warnings: [] },
@@ -311,6 +341,16 @@ function admissionForGroup(input: {
   const materiality = combineMaterialityAxes(magnitude.tier, decision.tier);
   const research = researchRoute(first, materiality, input.rfAvailability);
   const atomicClaimId = atomicClaimIdForSeed(first, input.period);
+  const researchControl = buildCanonicalClaimResearchControlPlan({
+    atomicClaimId,
+    facet: first.facet,
+    researchAdmission: research.admission,
+    materiality,
+    decisionTier: decision.tier,
+    blockingPrerequisiteCodes: decision.basis.independentBlockingPrerequisiteCodes,
+    knowledgeQueryPresent: research.query !== null,
+    requiredSourceAuthorities: research.authorities,
+  });
   return {
     atomicClaimId,
     parentClaimIds,
@@ -334,6 +374,7 @@ function admissionForGroup(input: {
     requiredSourceAuthorities: research.authorities,
     evidenceObjective: evidenceObjective(first.facet),
     expectedDecisionEffects: unique(input.group.flatMap((seed) => seed.parent.possibleDecisionEffects)),
+    researchControl,
     limitations: unique(input.group.flatMap((seed) => seed.parent.limitations)),
   };
 }
@@ -604,6 +645,13 @@ function workItem(admission: CanonicalRgClaimAdmission): CanonicalRgWorkItem {
     extensionDecisions: [],
     retryDecisions: [],
     resourceConsumption: { providerCalls: 0, searchCalls: 0, retrievalBytes: 0, aiCalls: 0, tokens: 0 },
+    researchControl: {
+      plan: structuredClone(admission.researchControl),
+      marginalValueDecisions: [structuredClone(admission.researchControl.initialMarginalValueDecision)],
+      searchUniverse: initialCanonicalSearchUniverse(),
+      terminalDisposition: null,
+      telemetry: null,
+    },
     stopReason: null,
     verifiedEvidenceRefs: [],
   };
@@ -630,6 +678,7 @@ export function canonicalRgWorkContractFingerprint(
     decisionTier: admission.decisionTier,
     decisionBasis: admission.decisionBasis,
     expectedDecisionEffects: work.expectedDecisionEffects,
+    researchControlPlan: admission.researchControl,
     continuationContract: work.continuationContract ?? null,
   });
 }
@@ -639,6 +688,8 @@ function validateAdmissions(admissions: CanonicalRgClaimAdmission[], workItems: 
   if (new Set(workItems.map((item) => item.workItemId)).size !== workItems.length) errors.push("rg_duplicate_work_item_id");
   const admissionIds = new Set(admissions.map((item) => item.atomicClaimId));
   for (const admission of admissions) {
+    errors.push(...validateCanonicalResearchControlPlan(admission.researchControl)
+      .map((error) => `${error}:${admission.atomicClaimId}`));
     errors.push(...validateAtomicDecisionEvaluation({
       facet: admission.facet,
       tier: admission.decisionTier,
@@ -662,6 +713,12 @@ function validateAdmissions(admissions: CanonicalRgClaimAdmission[], workItems: 
     const admission = admissions.find((candidate) => candidate.atomicClaimId === item.atomicClaimId);
     if (admission?.materiality !== "material") errors.push(`rg_nonmaterial_independent_work:${item.workItemId}`);
     if (!admission?.expectedKnowledgeValueConstraint) errors.push(`rg_work_item_missing_value_constraint:${item.workItemId}`);
+    if (admission && canonicalJson(item.researchControl.plan) !== canonicalJson(admission.researchControl)) {
+      errors.push(`rg_work_item_research_control_plan_mismatch:${item.workItemId}`);
+    }
+    if (!item.researchControl.marginalValueDecisions[0]?.externalResearchAuthorized) {
+      errors.push(`rg_work_item_missing_authorized_pre_search_marginal_decision:${item.workItemId}`);
+    }
     if (admission?.facet === "recurrence" && (item.expectedKnowledgeValueConstraint.kind !== "synthesis_recurrence"
       || item.expectedKnowledgeValueConstraint.recurrenceBasis !== "verified_schedule")) {
       errors.push(`rg_recurrence_work_public_evidence_route_binding_invalid:${item.workItemId}`);

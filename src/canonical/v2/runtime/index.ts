@@ -15,3 +15,4 @@ export * from "./semanticConvergenceTypes.js";
 export * from "./semanticTail.js";
 export * from "./adaptiveContinuationTypes.js";
 export * from "./adaptiveContinuation.js";
+export * from "./researchControl.js";

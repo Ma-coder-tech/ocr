@@ -43,6 +43,7 @@ import {
   type CanonicalAnalysisRunExecution,
 } from "./analysisRunTypes.js";
 import { initialAutonomousLifecycle } from "./adaptiveContinuationTypes.js";
+import { ATOMIC_RESEARCH_CONTROL_POLICY_VERSION } from "./researchControl.js";
 
 const DRIVERS: ParserDriver[] = [
   fiservFirstDataProcessorStatementDriver,
@@ -431,6 +432,8 @@ function terminalRun(input: {
       synthesisAdmissionContract: "canonical_synthesis_admission_contract_v1",
       adaptiveContinuation: "durable_deterministic_delta_admission",
       regeneratedPlanExecution: "continuation_authorized_existing_executor",
+      researchControlPolicy: ATOMIC_RESEARCH_CONTROL_POLICY_VERSION,
+      researchControlBoundary: "internal_rh_ready_disposition_only",
       benchmarkExecution: "disabled",
       savingsExecution: "disabled",
       businessContextAuthority: "excluded_from_canonical_economics",
