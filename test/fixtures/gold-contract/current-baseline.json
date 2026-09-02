@@ -1,0 +1,129 @@
+{
+  "schema_version": "ratereveal_gold_current_baseline_v1",
+  "repository_head": "158eb671b7cf26a59e14d31da300ecc350f5305f",
+  "entries": [
+    {
+      "assertion_id": "G3-RATE-STATE",
+      "expected_outcome": "expected_current_failure",
+      "observed_signature": "numeric_zero",
+      "issue_id": "RA-CONFLICT-ZERO-VOLUME-RATE",
+      "description": "The current selected-financial output reports numeric zero while Frozen Gold requires an undefined effective-rate state.",
+      "review_status": "product_owner_reviewed",
+      "approval_ref": "RA authorization: zero-volume effective rate reported as 0",
+      "deferred_to": "later authorized headline-financial semantics package"
+    },
+    {
+      "assertion_id": "G4-NO-EXACT-OWNER",
+      "expected_outcome": "expected_current_failure",
+      "observed_signature": true,
+      "issue_id": "RA-CONFLICT-OVERCONFIDENT-OWNERSHIP-G4",
+      "description": "Current legacy analysis emits an exact processor-controlled total without the frozen positive-mapping standard.",
+      "review_status": "product_owner_reviewed",
+      "approval_ref": "RA authorization: overly strong processor-control conclusions",
+      "deferred_to": "later authorized ownership semantics package"
+    },
+    {
+      "assertion_id": "G7-NO-EXACT-OWNER",
+      "expected_outcome": "expected_current_failure",
+      "observed_signature": true,
+      "issue_id": "RA-CONFLICT-OVERCONFIDENT-OWNERSHIP-G7",
+      "description": "Current legacy analysis emits exact processor ownership and junk-fee totals that Frozen Gold keeps evidence-bound.",
+      "review_status": "product_owner_reviewed",
+      "approval_ref": "RA authorization: overly strong processor-control conclusions",
+      "deferred_to": "later authorized ownership semantics package"
+    },
+    {
+      "assertion_id": "G8-NO-BUNDLED-BENCHMARK",
+      "expected_outcome": "expected_current_failure",
+      "observed_signature": true,
+      "issue_id": "RA-CONFLICT-UNSUPPORTED-BENCHMARK-G8",
+      "description": "Current legacy analysis emits a ready bundled benchmark not authorized by the frozen evidence boundary.",
+      "review_status": "product_owner_reviewed",
+      "approval_ref": "RA authorization: unsupported benchmark outputs",
+      "deferred_to": "later authorized benchmark package"
+    },
+    {
+      "assertion_id": "G8-NO-SAVINGS",
+      "expected_outcome": "expected_current_failure",
+      "observed_signature": true,
+      "issue_id": "RA-CONFLICT-UNSUPPORTED-SAVINGS-G8",
+      "description": "Current legacy analysis emits exact annual savings without a valid admitted counterfactual.",
+      "review_status": "product_owner_reviewed",
+      "approval_ref": "RA authorization: unsupported savings outputs",
+      "deferred_to": "later authorized counterfactual and savings package"
+    },
+    {
+      "assertion_id": "G1-NO-EXACT-OWNER",
+      "expected_outcome": "expected_current_failure",
+      "observed_signature": true,
+      "issue_id": "RA-CONFLICT-OVERCONFIDENT-OWNERSHIP-G1",
+      "description": "Current legacy analysis emits an exact processor-controlled total without the frozen positive-mapping standard.",
+      "review_status": "product_owner_reviewed",
+      "approval_ref": "product-owner-gold-finalization-D6-and-RA-baseline-authorization-2026-08-22",
+      "deferred_to": "later authorized ownership semantics package"
+    },
+    {
+      "assertion_id": "G3-NO-NUMERIC-RATE",
+      "expected_outcome": "expected_current_failure",
+      "observed_signature": true,
+      "issue_id": "RA-CONFLICT-ZERO-VOLUME-NUMERIC-CONCLUSION",
+      "description": "Current output emits a numeric effective rate for a zero-volume period where Gold prohibits that semantic conclusion.",
+      "review_status": "product_owner_reviewed",
+      "approval_ref": "product-owner-gold-finalization-D6-D8-and-RA-baseline-authorization-2026-08-22",
+      "deferred_to": "later authorized headline-financial semantics package"
+    },
+    {
+      "assertion_id": "G4-NO-RATE-VERDICT",
+      "expected_outcome": "expected_current_failure",
+      "observed_signature": true,
+      "issue_id": "RA-CONFLICT-RATE-AS-VERDICT-G4",
+      "description": "Current legacy analysis turns an arithmetic effective rate into a pricing verdict prohibited by Gold.",
+      "review_status": "product_owner_reviewed",
+      "approval_ref": "product-owner-gold-finalization-D6-and-RA-baseline-authorization-2026-08-22",
+      "deferred_to": "later authorized interpretation semantics package"
+    },
+    {
+      "assertion_id": "G5-RATE",
+      "expected_outcome": "expected_current_failure",
+      "observed_signature": 0.0207,
+      "issue_id": "RA-CONFLICT-RATE-PRECISION-G5",
+      "description": "Current summary output rounds the rate to 2.0700% while Frozen Gold preserves 2.0740% on the canonical denominator.",
+      "review_status": "product_owner_reviewed",
+      "approval_ref": "product-owner-gold-finalization-D3-D11-and-RA-baseline-authorization-2026-08-22",
+      "deferred_to": "later authorized headline-financial semantics package"
+    },
+    {
+      "assertion_id": "G7-NO-RATE-VERDICT",
+      "expected_outcome": "expected_current_failure",
+      "observed_signature": true,
+      "issue_id": "RA-CONFLICT-RATE-AS-VERDICT-G7",
+      "description": "Current legacy analysis turns an arithmetic effective rate into a pricing verdict prohibited by Gold.",
+      "review_status": "product_owner_reviewed",
+      "approval_ref": "product-owner-gold-finalization-D6-and-RA-baseline-authorization-2026-08-22",
+      "deferred_to": "later authorized interpretation semantics package"
+    }
+  ],
+  "historical_conflicts": [
+    {
+      "issue_id": "RA-CONFLICT-LEGACY-PRICING-LABEL",
+      "test_ref": "test/fiservFirstDataParser.test.ts:810,1011,1336",
+      "description": "Legacy tests assert overloaded pricing-model labels rather than the frozen independent pricing axes.",
+      "deferred_to": "later authorized canonical pricing-axis package",
+      "review_status": "product_owner_reviewed"
+    },
+    {
+      "issue_id": "RA-CONFLICT-AI-PRICING-OVERRIDE",
+      "test_ref": "test/fullStatementAnomalyReviewAi.test.ts:11",
+      "description": "A legacy test permits an AI pricing-model override; RA preserves it only as historical evidence.",
+      "deferred_to": "later authorized AI authority package",
+      "review_status": "product_owner_reviewed"
+    },
+    {
+      "issue_id": "RA-CONFLICT-LEGACY-JUNK-OWNERSHIP",
+      "test_ref": "test/fiservFirstDataParser.test.ts:550,1568",
+      "description": "Legacy findings use strong processor-control, junk-fee, and avoidability conclusions without the frozen evidence standard.",
+      "deferred_to": "later authorized ownership/actionability package",
+      "review_status": "product_owner_reviewed"
+    }
+  ]
+}

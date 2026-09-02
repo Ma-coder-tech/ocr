@@ -1983,6 +1983,116 @@ function buildFiservShortStatementReconciliationResults(params: {
   return results;
 }
 
+function buildFiservFullStatementReconciliationResults(params: {
+  selectedFinancials: SelectedStatementFinancials;
+  cardTypeSubmitted: number;
+  feeLedger: ReturnType<typeof buildFiservFullStatementFeeLedger>;
+  fundingBatchLedger: ReturnType<typeof buildFiservFullStatementFundingBatchLedger>;
+  cardTypeTotalRow: EvidenceRow;
+}) {
+  const exactBand = exactMoneyToleranceBand();
+  const results = [];
+  const selected = params.selectedFinancials;
+  const fundingComputed = round2(
+    selected.totalVolume +
+      (selected.adjustmentsChargebacks ?? 0) -
+      selected.totalFees -
+      (selected.thirdPartyTransactions ?? 0),
+  );
+
+  results.push(
+    makeReconResult({
+      identity: "headline:submitted_plus_adjustments_minus_fees_eq_processed",
+      stated: selected.amountFunded,
+      computed: fundingComputed,
+      toleranceBand: exactBand,
+      note: "Full-statement headline funding formula using selected top-line totals.",
+      evidence: { section: "SUMMARY", rowLabel: "Total Amount Processed" },
+    }),
+    makeReconResult({
+      identity: "batch_columns:sum_submitted_eq_submitted_total",
+      stated: params.fundingBatchLedger.controlSubmittedTotal,
+      computed: params.fundingBatchLedger.submittedTotal,
+      toleranceBand: sumMoneyToleranceBand(params.fundingBatchLedger.rows.length, { cap: 0.25 }),
+      note: "Submitted batch amounts are checked against the Summary By Batch total.",
+      evidence: { section: "SUMMARY BY BATCH", rowLabel: "Total", sourceText: params.fundingBatchLedger.evidenceLine },
+    }),
+    makeReconResult({
+      identity: "batch_columns:sum_funded_eq_processed_total",
+      stated: params.fundingBatchLedger.controlFundedTotal,
+      computed: params.fundingBatchLedger.fundedTotal,
+      toleranceBand: sumMoneyToleranceBand(params.fundingBatchLedger.rows.length, { cap: 0.25 }),
+      note: "Submitted batches, adjustment rows, and month-end fees are summed to the printed Total Amount Processed.",
+      evidence: { section: "SUMMARY BY BATCH", rowLabel: "Total Amount Processed" },
+    }),
+    makeReconResult({
+      identity: "batch_columns:sum_fees_eq_total_fees",
+      stated: params.fundingBatchLedger.controlFeesChargedTotal,
+      computed: params.fundingBatchLedger.feesChargedTotal,
+      toleranceBand: sumMoneyToleranceBand(params.fundingBatchLedger.rows.length, { cap: 0.25 }),
+      note: "Month-end fee row is checked against selected total fees.",
+      evidence: { section: "SUMMARY BY BATCH", rowLabel: "Month End Charge" },
+    }),
+  );
+
+  for (const [index, row] of params.fundingBatchLedger.rows.entries()) {
+    results.push(
+      makeReconResult({
+        identity: `batch_row:${row.dateSubmitted}:${row.batchNumber ?? "adjustment_or_month_end"}:funding_formula`,
+        stated: row.amountFunded,
+        computed: row.formulaResult,
+        toleranceBand: exactBand,
+        note: "Full-statement funding row checked using the row's exposed submitted, adjustment, and fee values.",
+        evidence: {
+          section: "SUMMARY BY BATCH / ADJUSTMENTS",
+          pageNumber: row.pageNumber,
+          rowLabel: row.dateSubmitted,
+          rowIndex: index,
+          sourceText: row.evidenceLine,
+        },
+      }),
+    );
+  }
+
+  for (const control of params.feeLedger.controls) {
+    results.push(
+      makeReconResult({
+        identity: `fee_detail:${control.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}:line_sum_eq_printed_total`,
+        stated: control.printedTotal,
+        computed: control.rowSum,
+        toleranceBand: sumMoneyToleranceBand(params.feeLedger.rows.length, { cap: 0.25 }),
+        note: "Full-statement fee rows are checked against printed fee controls.",
+        evidence: { section: "FEES", rowLabel: control.label, sourceText: control.evidenceLine },
+      }),
+    );
+  }
+  results.push(
+    makeReconResult({
+      identity: "fee_detail:all_line_items_eq_total_fees",
+      stated: selected.totalFees,
+      computed: params.feeLedger.totalRowSum,
+      toleranceBand: sumMoneyToleranceBand(params.feeLedger.rows.length, { cap: 0.25 }),
+      note: "All parsed full-statement fee rows compared with the selected all-in fee total.",
+      evidence: { section: "FEES", rowLabel: "Grand total", sourceText: params.feeLedger.evidenceLine },
+    }),
+    makeReconResult({
+      identity: "cross_reference:summary_by_card_type_submitted_eq_selected_submitted",
+      stated: selected.totalVolume,
+      computed: params.cardTypeSubmitted,
+      toleranceBand: exactBand,
+      note: "Summary By Card Type total cross-checks the selected submitted volume.",
+      evidence: {
+        section: "SUMMARY BY CARD TYPE",
+        pageNumber: params.cardTypeTotalRow.pageNumber,
+        rowLabel: "Total",
+        sourceText: params.cardTypeTotalRow.content,
+      },
+    }),
+  );
+
+  return results;
+}
+
 export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, options: ParseOptions = {}): FiservParserOutput {
   if (!isFirstDataFullStatement(doc)) {
     throw new Error("Document does not match the Fiserv / First Data full statement layout.");
@@ -2115,7 +2225,10 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
               {
                 role: "gross_sale_items",
                 value: grossSaleItems,
-                reason: "Summary by card type shows 1,797 gross sale items before 3 refund items.",
+                reason: "Summary by card type identifies the gross-sale item population before refund items.",
+                sourceSection: "SUMMARY BY CARD TYPE",
+                pageNumber: cardTypeTotalRow.pageNumber,
+                evidenceLine: cardTypeTotalRow.content,
               },
             ],
     },
@@ -2168,6 +2281,18 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
       selected: false,
       selectionReason: null,
       rejectionReason: "Gross sales before refunds are not the effective-rate denominator when submitted volume is available.",
+      confidence: "high",
+    },
+    {
+      roleCandidate: "refund_volume",
+      label: "Total Refunds You Submitted",
+      amount: refunds,
+      sourceSection: "SUMMARY BY CARD TYPE",
+      pageNumber: cardTypeTotalRow.pageNumber,
+      evidenceLine: cardTypeTotalRow.content,
+      selected: false,
+      selectionReason: null,
+      rejectionReason: "Refund volume is a separately signed population used to reconcile gross sales to net submitted volume.",
       confidence: "high",
     },
     {
@@ -2277,7 +2402,20 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
       evidenceLine: ytdSalesRow.content,
     },
   ] as const;
-  const decision = buildParserDecision({ reconciliation, warnings: [...warnings], confidence: confidence.overall });
+  const reconciliationResults = buildFiservFullStatementReconciliationResults({
+    selectedFinancials,
+    cardTypeSubmitted,
+    feeLedger,
+    fundingBatchLedger,
+    cardTypeTotalRow,
+  });
+  const decision = buildParserDecision({
+    reconciliation,
+    reconciliationResults,
+    feeClassification: feeLedger.feeClassificationSummary,
+    warnings: [...warnings],
+    confidence: confidence.overall,
+  });
 
   return fiservParserOutputSchema.parse({
     statementIdentity: {
@@ -2371,6 +2509,7 @@ export function parseFiservFirstDataFullStatement(doc: RawExtractedDocument, opt
       },
     ],
     reconciliation,
+    reconciliationResults,
     decision,
     confidence,
     fiservFeeAnalysisV2,
@@ -2485,9 +2624,10 @@ export function parseFiservFirstDataShortStatement(doc: RawExtractedDocument, op
       signedMoneyTokens(rowContent(row)).length >= 3,
     "summary by batch total",
   );
-  const adjustmentDetailTotalRow = findRow(
+  const adjustmentDetailTotalRow = findRowAfter(
     doc,
-    (row) => rowContent(row) === "TOTAL | -$1,200.00",
+    (row) => /^ADJUSTMENTS$/i.test(rowContent(row)),
+    (row) => /^TOTAL\s*\|/i.test(rowContent(row)) && signedMoneyTokens(rowContent(row)).length > 0,
     "adjustment detail total",
   );
   const serviceChargesRow = findRow(doc, (row) => String(row.label ?? "") === "Total Service Charges", "service charges bucket");
@@ -2570,16 +2710,24 @@ export function parseFiservFirstDataShortStatement(doc: RawExtractedDocument, op
     thirdPartyTransactions: documentIrTopLevel.thirdPartyTransactions,
     transactionCount: {
       primaryTransactionCount,
-      supportingTransactionCounts:
-        grossSaleItems === null
-          ? []
-          : [
-              {
-                role: "gross_sale_items",
-                value: grossSaleItems,
-                reason: "Summary by card type shows 8 gross sale items before 2 refund items.",
-              },
-            ],
+      supportingTransactionCounts: [
+        ...(grossSaleItems === null ? [] : [{
+          role: "gross_sale_items",
+          value: grossSaleItems,
+          reason: "Summary by card type identifies the gross-sale item population before refunds.",
+          sourceSection: "SUMMARY BY CARD TYPE",
+          pageNumber: cardTypeTotalRow.pageNumber,
+          evidenceLine: cardTypeTotalRow.content,
+        }]),
+        ...(primaryTransactionCount === null ? [] : [{
+          role: "submitted_transactions",
+          value: primaryTransactionCount,
+          reason: "Summary by card type identifies the submitted transaction population separately from gross-sale items.",
+          sourceSection: "SUMMARY BY CARD TYPE",
+          pageNumber: cardTypeTotalRow.pageNumber,
+          evidenceLine: cardTypeTotalRow.content,
+        }]),
+      ],
     },
   };
 
@@ -2630,6 +2778,30 @@ export function parseFiservFirstDataShortStatement(doc: RawExtractedDocument, op
       selected: false,
       selectionReason: null,
       rejectionReason: "Gross sales before refunds are not the effective-rate denominator when submitted volume is available.",
+      confidence: "high",
+    },
+    {
+      roleCandidate: "refund_volume",
+      label: "Refunds",
+      amount: refunds,
+      sourceSection: "SUMMARY BY CARD TYPE",
+      pageNumber: cardTypeTotalRow.pageNumber,
+      evidenceLine: cardTypeTotalRow.content,
+      selected: true,
+      selectionReason: "The card-type total structurally separates refunds from gross sales and submitted volume.",
+      rejectionReason: null,
+      confidence: "high",
+    },
+    {
+      roleCandidate: "settlement_adjustment",
+      label: "Adjustments",
+      amount: adjustments,
+      sourceSection: "ADJUSTMENTS",
+      pageNumber: adjustmentDetailTotalRow.pageNumber,
+      evidenceLine: adjustmentDetailTotalRow.content,
+      selected: true,
+      selectionReason: "Summary and adjustment-detail controls isolate the settlement adjustment from sales and processing fees.",
+      rejectionReason: null,
       confidence: "high",
     },
     {

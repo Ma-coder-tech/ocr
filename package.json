@@ -22,12 +22,20 @@
     "corpus:secure": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/canonical-secure-corpus-runner.ts",
     "evaluation:integrity:dry-run": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluation-run-integrity-dry-run.ts",
     "evaluation:integrity:run": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluation-run-integrity-run.ts",
+    "gold:validate": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/gold-contract-validate.ts",
+    "gold:test": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs ./node_modules/vitest/vitest.mjs run test/gold-contract",
+    "gold:audit": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/gold-contract-audit.ts",
+    "gold:review": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/gold-contract-review.ts",
+    "gold:secure": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/gold-contract-secure.ts",
+    "gold:scope-check": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/gold-contract-scope-check.ts",
     "fiserv:coverage": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/fiserv-coverage-audit.ts",
     "bakeoff:pdf": "npm run build && node scripts/pdf-bakeoff.mjs",
     "bakeoff:azure": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/azure-layout-bakeoff.ts",
     "bakeoff:document-ir": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/document-ir-bakeoff.ts",
     "bakeoff:fiserv-document-ir": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/document-ir-bakeoff.ts",
-    "validate:foundation": "node scripts/validate-merchant-foundation.mjs"
+    "validate:foundation": "node scripts/validate-merchant-foundation.mjs",
+    "evaluate:fiserv-one": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/run-fiserv-pre-uat-evaluation.ts",
+    "evaluate:fiserv-internal-live": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/run-fiserv-internal-live-evaluation.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",

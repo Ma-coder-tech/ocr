@@ -1,0 +1,67 @@
+[
+  {
+    "rule_id": "TOL-EXACT",
+    "availability": "retired",
+    "comparison": "retired",
+    "decimal_scale": null,
+    "quantization_space": "not_applicable",
+    "units": "typed value",
+    "rationale": "Retired as redundant; exact assertions use native typed equality with no tolerance reference.",
+    "source_refs": ["gold-v0.3:20-26,690-722"],
+    "review_classification": "retired_redundant",
+    "review_reason": "D9 rejects TOL-EXACT as a tolerance and requires native typed equality.",
+    "approval": { "status": "not_approved", "authority": "product_owner", "approval_ref": "product-owner-gold-finalization-D9-2026-08-22" }
+  },
+  {
+    "rule_id": "TOL-MONEY-CENT",
+    "availability": "active",
+    "comparison": "quantized_decimal",
+    "decimal_scale": 2,
+    "quantization_space": "major_currency_unit",
+    "units": "major currency unit",
+    "rationale": "Quantize expected and observed decimal major-currency values to two places and compare minor units exactly.",
+    "source_refs": ["gold-v0.3:73-97", "gold-v0.3:477"],
+    "review_classification": "approved_corrected_machine_comparison",
+    "review_reason": "D10 approves decimal cent quantization and rejects a generic floating-point half-cent delta.",
+    "approval": { "status": "approved", "authority": "product_owner", "approval_ref": "product-owner-gold-finalization-D10-2026-08-22" }
+  },
+  {
+    "rule_id": "TOL-MONEY-APPROX",
+    "availability": "unavailable",
+    "comparison": "unavailable",
+    "decimal_scale": null,
+    "quantization_space": "not_applicable",
+    "units": "major currency unit",
+    "rationale": "Approximate money remains descriptive only until a future explicit comparison policy is approved.",
+    "source_refs": ["gold-v0.3:107-124", "gold-v0.3:216-235"],
+    "review_classification": "unsupported_policy_unavailable",
+    "review_reason": "D12 expressly withholds approval and forbids deriving a delta from current behavior or convention.",
+    "approval": { "status": "not_approved", "authority": "product_owner", "approval_ref": "product-owner-gold-finalization-D12-2026-08-22" }
+  },
+  {
+    "rule_id": "TOL-RATE-4DP-PERCENT",
+    "availability": "active",
+    "comparison": "quantized_decimal",
+    "decimal_scale": 6,
+    "quantization_space": "decimal_fraction_after_four_place_percentage_normalization",
+    "units": "decimal fraction",
+    "rationale": "After denominator compatibility and percentage normalization, quantize to six decimal-fraction places and compare exactly.",
+    "source_refs": ["gold-v0.3:73-97"],
+    "review_classification": "approved_corrected_machine_comparison",
+    "review_reason": "D11 approves four percentage-decimal quantization, equivalent to six decimal-fraction places, and rejects a floating delta.",
+    "approval": { "status": "approved", "authority": "product_owner", "approval_ref": "product-owner-gold-finalization-D11-2026-08-22" }
+  },
+  {
+    "rule_id": "TOL-RATE-APPROX",
+    "availability": "unavailable",
+    "comparison": "unavailable",
+    "decimal_scale": null,
+    "quantization_space": "not_applicable",
+    "units": "decimal rate or ratio",
+    "rationale": "Approximate rates and shares remain descriptive only until a future explicit comparison policy is approved.",
+    "source_refs": ["gold-v0.3:107-124", "gold-v0.3:143-162"],
+    "review_classification": "unsupported_policy_unavailable",
+    "review_reason": "D12 expressly withholds approval and forbids deriving a delta from current behavior or convention.",
+    "approval": { "status": "not_approved", "authority": "product_owner", "approval_ref": "product-owner-gold-finalization-D12-2026-08-22" }
+  }
+]

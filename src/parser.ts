@@ -13,6 +13,16 @@ export type ParsedDocument = {
   rows: Array<Record<string, string | number>>;
   textPreview: string;
   extraction: ExtractionDiagnostics;
+  suppliedDocumentIntegrity?: SuppliedDocumentIntegrityDiagnostics;
+};
+
+export type SuppliedDocumentIntegrityDiagnostics = {
+  openedSuccessfully: boolean;
+  enumeratedPageCount: number;
+  processedPageCount: number;
+  fatalPageErrorCount: number;
+  extractionLineageComplete: boolean;
+  localIngestionTruncated: boolean;
 };
 
 export type ExtractionMode = "structured" | "text_only" | "unusable";
@@ -282,7 +292,7 @@ function extractPdfLabelValue(line: PdfLine): { label: string; value: string | n
   return { label, value, kind };
 }
 
-async function extractPdfLines(buffer: Buffer): Promise<PdfLine[]> {
+async function extractPdfLines(buffer: Buffer): Promise<{ lines: PdfLine[]; enumeratedPageCount: number; processedPageCount: number }> {
   // pdfjs-dist expects browser geometry classes even when we only extract text.
   // Some local Node installs do not load the optional canvas package, so provide
   // the minimal constructor surface needed for text extraction.
@@ -313,9 +323,12 @@ async function extractPdfLines(buffer: Buffer): Promise<PdfLine[]> {
   }) as PdfJsLoadingTask;
 
   const lines: PdfLine[] = [];
+  let enumeratedPageCount = 0;
+  let processedPageCount = 0;
   let document: PdfJsDocumentProxy | null = null;
   try {
     document = await loadingTask.promise;
+    enumeratedPageCount = document.numPages;
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
       const page = await document.getPage(pageNumber);
       try {
@@ -335,6 +348,7 @@ async function extractPdfLines(buffer: Buffer): Promise<PdfLine[]> {
       } finally {
         page.cleanup();
       }
+      processedPageCount += 1;
     }
   } finally {
     if (document) {
@@ -344,7 +358,7 @@ async function extractPdfLines(buffer: Buffer): Promise<PdfLine[]> {
     }
   }
 
-  return lines;
+  return { lines, enumeratedPageCount, processedPageCount };
 }
 
 function buildStructuredPdfRows(lines: PdfLine[]): Array<Record<string, string | number>> {
@@ -472,11 +486,13 @@ export async function parsePdfBytes(bytes: Uint8Array, jobId?: string): Promise<
     }, PDF_PARSE_TIMEOUT_MS);
   });
 
-  const lines = await Promise.race([extractPdfLines(Buffer.from(bytes)), timeoutPromise]).finally(() => {
+  const extracted = await Promise.race([extractPdfLines(Buffer.from(bytes)), timeoutPromise]).finally(() => {
     if (timer) {
       clearTimeout(timer);
     }
   });
+  const lines = extracted.lines;
+  const localIngestionTruncated = lines.length > 1500;
   const rows = buildStructuredPdfRows(lines).slice(0, 1500);
   const extraction = summarizePdfExtraction(rows, lines);
   const text = lines.map((line) => line.text).join(" ");
@@ -487,5 +503,13 @@ export async function parsePdfBytes(bytes: Uint8Array, jobId?: string): Promise<
     rows,
     textPreview: text.slice(0, 1500),
     extraction,
+    suppliedDocumentIntegrity: {
+      openedSuccessfully: true,
+      enumeratedPageCount: extracted.enumeratedPageCount,
+      processedPageCount: extracted.processedPageCount,
+      fatalPageErrorCount: 0,
+      extractionLineageComplete: !localIngestionTruncated,
+      localIngestionTruncated,
+    },
   };
 }

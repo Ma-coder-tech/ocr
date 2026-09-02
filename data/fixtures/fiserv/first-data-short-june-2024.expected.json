@@ -25,7 +25,18 @@
         {
           "role": "gross_sale_items",
           "value": 8,
-          "reason": "Summary by card type shows 8 gross sale items before 2 refund items."
+          "reason": "Summary by card type identifies the gross-sale item population before refunds.",
+          "sourceSection": "SUMMARY BY CARD TYPE",
+          "pageNumber": 1,
+          "evidenceLine": "Total | 8 | $2,900.00 | 2 | -$500.00 | 10 | $1,200.00"
+        },
+        {
+          "role": "submitted_transactions",
+          "value": 10,
+          "reason": "Summary by card type identifies the submitted transaction population separately from gross-sale items.",
+          "sourceSection": "SUMMARY BY CARD TYPE",
+          "pageNumber": 1,
+          "evidenceLine": "Total | 8 | $2,900.00 | 2 | -$500.00 | 10 | $1,200.00"
         }
       ]
     }
@@ -492,6 +503,30 @@
       "selected": false,
       "selectionReason": null,
       "rejectionReason": "Gross sales before refunds are not the effective-rate denominator when submitted volume is available.",
+      "confidence": "high"
+    },
+    {
+      "roleCandidate": "refund_volume",
+      "label": "Refunds",
+      "amount": 500,
+      "sourceSection": "SUMMARY BY CARD TYPE",
+      "pageNumber": 1,
+      "evidenceLine": "Total | 8 | $2,900.00 | 2 | -$500.00 | 10 | $1,200.00",
+      "selected": true,
+      "selectionReason": "The card-type total structurally separates refunds from gross sales and submitted volume.",
+      "rejectionReason": null,
+      "confidence": "high"
+    },
+    {
+      "roleCandidate": "settlement_adjustment",
+      "label": "Adjustments",
+      "amount": -1200,
+      "sourceSection": "ADJUSTMENTS",
+      "pageNumber": 2,
+      "evidenceLine": "TOTAL | -$1,200.00",
+      "selected": true,
+      "selectionReason": "Summary and adjustment-detail controls isolate the settlement adjustment from sales and processing fees.",
+      "rejectionReason": null,
       "confidence": "high"
     },
     {

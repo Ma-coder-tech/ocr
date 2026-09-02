@@ -95,6 +95,353 @@ function migrate(): void {
       message TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS canonical_analysis_runs (
+      id TEXT PRIMARY KEY,
+      job_id TEXT NOT NULL UNIQUE REFERENCES analysis_jobs(id) ON DELETE CASCADE,
+      source_document_ref TEXT NOT NULL,
+      source_fingerprint TEXT NOT NULL,
+      schema_version TEXT NOT NULL,
+      implementation_version TEXT NOT NULL,
+      policy_version TEXT NOT NULL,
+      status TEXT NOT NULL,
+      family_status TEXT NOT NULL,
+      parser_driver_id TEXT,
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      canonical_truth_hash TEXT,
+      financial_foundation_hash TEXT,
+      semantic_hash TEXT,
+      canonical_state_hash TEXT,
+      semantic_revision INTEGER NOT NULL DEFAULT 0,
+      rg_plan_hash TEXT,
+      rg_plan_generation INTEGER NOT NULL DEFAULT 0,
+      rg_execution_generation INTEGER NOT NULL DEFAULT 0,
+      continuation_revision INTEGER NOT NULL DEFAULT 0,
+      continuation_lifecycle TEXT NOT NULL DEFAULT 'awaiting_first_pass_outcome',
+      continuation_state_hash TEXT,
+      autonomous_outcome_revision INTEGER NOT NULL DEFAULT 0,
+      autonomous_outcome_hash TEXT,
+      adaptive_cycle_owner TEXT,
+      adaptive_cycle_lease_expires_at TEXT,
+      rf_snapshot_hash TEXT NOT NULL DEFAULT '',
+      rf_context_hash TEXT NOT NULL DEFAULT '',
+      rf_catalog_status TEXT NOT NULL DEFAULT 'unbound',
+      rf_catalog_binding_json TEXT,
+      limitations_json TEXT NOT NULL DEFAULT '[]',
+      result_json TEXT,
+      created_at TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      completed_at TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_run_stages (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      stage TEXT NOT NULL,
+      status TEXT NOT NULL,
+      claim_ref TEXT NOT NULL,
+      evidence_objective TEXT NOT NULL,
+      expected_decision_effect TEXT NOT NULL,
+      artifact_json TEXT,
+      artifact_hash TEXT,
+      errors_json TEXT NOT NULL DEFAULT '[]',
+      warnings_json TEXT NOT NULL DEFAULT '[]',
+      limitations_json TEXT NOT NULL DEFAULT '[]',
+      resource_json TEXT NOT NULL,
+      started_at TEXT,
+      completed_at TEXT,
+      elapsed_ms INTEGER,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, stage)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_rg_claim_admissions (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      atomic_claim_id TEXT NOT NULL,
+      parent_claim_ids_json TEXT NOT NULL,
+      claim_class TEXT NOT NULL,
+      facet TEXT NOT NULL,
+      opaque_subject_code TEXT NOT NULL,
+      scope_fingerprint TEXT NOT NULL,
+      statement_period_json TEXT,
+      direction TEXT NOT NULL,
+      amount_minor INTEGER,
+      authoritative_statement_cost_minor INTEGER,
+      economic_tier TEXT NOT NULL,
+      decision_tier TEXT NOT NULL,
+      materiality TEXT NOT NULL,
+      research_admission TEXT NOT NULL,
+      admission_json TEXT NOT NULL,
+      plan_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, atomic_claim_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_rg_work_items (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      work_item_id TEXT NOT NULL,
+      atomic_claim_id TEXT NOT NULL,
+      state TEXT NOT NULL,
+      execution_state TEXT NOT NULL,
+      requested_operation TEXT NOT NULL,
+      work_item_json TEXT NOT NULL,
+      plan_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, work_item_id),
+      FOREIGN KEY (run_id, atomic_claim_id) REFERENCES canonical_rg_claim_admissions(run_id, atomic_claim_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_rg_operations (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      operation_id TEXT NOT NULL,
+      work_item_id TEXT NOT NULL,
+      state TEXT NOT NULL,
+      operation_json TEXT NOT NULL,
+      plan_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, operation_id),
+      FOREIGN KEY (run_id, work_item_id) REFERENCES canonical_rg_work_items(run_id, work_item_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_rg_execution_events (
+      event_id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      work_item_id TEXT NOT NULL,
+      operation_id TEXT,
+      event_type TEXT NOT NULL,
+      event_json TEXT NOT NULL,
+      event_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_external_evidence (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      evidence_id TEXT NOT NULL,
+      evidence_json TEXT NOT NULL,
+      evidence_hash TEXT NOT NULL,
+      source_plan_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, evidence_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_semantic_revisions (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL,
+      parent_semantic_hash TEXT,
+      financial_foundation_hash TEXT NOT NULL,
+      semantic_hash TEXT NOT NULL,
+      canonical_state_hash TEXT NOT NULL,
+      evidence_registry_hash TEXT NOT NULL,
+      prior_plan_hash TEXT,
+      next_plan_hash TEXT,
+      revision_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, revision),
+      UNIQUE (run_id, semantic_hash)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_semantic_applications (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL,
+      application_id TEXT NOT NULL,
+      atomic_claim_id TEXT NOT NULL,
+      facet TEXT NOT NULL,
+      source_kind TEXT,
+      disposition TEXT NOT NULL,
+      application_json TEXT NOT NULL,
+      application_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, revision, application_id),
+      FOREIGN KEY (run_id, revision) REFERENCES canonical_analysis_semantic_revisions(run_id, revision) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_stage_revisions (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL,
+      stage TEXT NOT NULL,
+      artifact_json TEXT,
+      artifact_hash TEXT,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, revision, stage),
+      FOREIGN KEY (run_id, revision) REFERENCES canonical_analysis_semantic_revisions(run_id, revision) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_continuation_revisions (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      controller_revision INTEGER NOT NULL,
+      semantic_revision INTEGER NOT NULL,
+      semantic_hash TEXT,
+      canonical_state_hash TEXT,
+      plan_hash TEXT,
+      plan_generation INTEGER NOT NULL DEFAULT 0,
+      rf_snapshot_hash TEXT NOT NULL,
+      lifecycle TEXT NOT NULL,
+      state_hash TEXT NOT NULL,
+      state_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, controller_revision),
+      UNIQUE (run_id, state_hash)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_continuation_decisions (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      controller_revision INTEGER NOT NULL,
+      decision_id TEXT NOT NULL,
+      atomic_claim_id TEXT NOT NULL,
+      disposition TEXT NOT NULL,
+      work_contract_fingerprint TEXT,
+      decision_json TEXT NOT NULL,
+      decision_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, controller_revision, decision_id),
+      FOREIGN KEY (run_id, controller_revision)
+        REFERENCES canonical_analysis_continuation_revisions(run_id, controller_revision) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_continuation_execution_grants (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      execution_generation INTEGER NOT NULL,
+      grant_id TEXT NOT NULL,
+      controller_revision INTEGER NOT NULL,
+      decision_id TEXT NOT NULL,
+      atomic_claim_id TEXT NOT NULL,
+      semantic_revision INTEGER NOT NULL,
+      plan_hash TEXT NOT NULL,
+      plan_generation INTEGER NOT NULL,
+      work_contract_fingerprint TEXT NOT NULL,
+      grant_json TEXT NOT NULL,
+      grant_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, execution_generation),
+      UNIQUE (run_id, grant_id),
+      UNIQUE (run_id, controller_revision, decision_id),
+      FOREIGN KEY (run_id, controller_revision, decision_id)
+        REFERENCES canonical_analysis_continuation_decisions(run_id, controller_revision, decision_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_autonomous_outcome_revisions (
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      outcome_revision INTEGER NOT NULL,
+      checkpoint_kind TEXT NOT NULL,
+      lifecycle TEXT NOT NULL,
+      completion TEXT,
+      outcome_hash TEXT NOT NULL,
+      outcome_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, outcome_revision),
+      UNIQUE (run_id, outcome_hash)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_recovery_intents (
+      intent_id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      outcome_revision INTEGER NOT NULL,
+      outcome_hash TEXT NOT NULL,
+      controller_revision INTEGER NOT NULL,
+      decision_id TEXT NOT NULL,
+      atomic_claim_id TEXT NOT NULL,
+      state TEXT NOT NULL,
+      next_run_at TEXT NOT NULL,
+      lease_owner TEXT,
+      lease_expires_at TEXT,
+      dispatch_count INTEGER NOT NULL DEFAULT 0,
+      latest_event_sequence INTEGER NOT NULL,
+      latest_event_hash TEXT NOT NULL,
+      intent_json TEXT NOT NULL,
+      intent_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (run_id, outcome_revision, decision_id),
+      FOREIGN KEY (run_id, outcome_revision)
+        REFERENCES canonical_analysis_autonomous_outcome_revisions(run_id, outcome_revision) ON DELETE CASCADE,
+      FOREIGN KEY (run_id, controller_revision, decision_id)
+        REFERENCES canonical_analysis_continuation_decisions(run_id, controller_revision, decision_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_analysis_recovery_events (
+      event_id TEXT PRIMARY KEY,
+      intent_id TEXT NOT NULL REFERENCES canonical_analysis_recovery_intents(intent_id) ON DELETE CASCADE,
+      event_sequence INTEGER NOT NULL,
+      parent_event_hash TEXT,
+      event_type TEXT NOT NULL,
+      event_json TEXT NOT NULL,
+      event_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE (intent_id, event_sequence)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_rg_reconciliation_intents (
+      intent_id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL REFERENCES canonical_analysis_runs(id) ON DELETE CASCADE,
+      outcome_revision INTEGER NOT NULL,
+      outcome_hash TEXT NOT NULL,
+      controller_revision INTEGER NOT NULL,
+      state TEXT NOT NULL,
+      next_run_at TEXT NOT NULL,
+      lease_owner TEXT,
+      lease_expires_at TEXT,
+      dispatch_count INTEGER NOT NULL DEFAULT 0,
+      latest_event_sequence INTEGER NOT NULL,
+      latest_event_hash TEXT NOT NULL,
+      intent_json TEXT NOT NULL,
+      intent_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (run_id, outcome_revision),
+      FOREIGN KEY (run_id, outcome_revision)
+        REFERENCES canonical_analysis_autonomous_outcome_revisions(run_id, outcome_revision) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_rg_reconciliation_events (
+      event_id TEXT PRIMARY KEY,
+      intent_id TEXT NOT NULL REFERENCES canonical_rg_reconciliation_intents(intent_id) ON DELETE CASCADE,
+      event_sequence INTEGER NOT NULL,
+      parent_event_hash TEXT,
+      event_type TEXT NOT NULL,
+      event_json TEXT NOT NULL,
+      event_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE (intent_id, event_sequence)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_rf_knowledge_audit_events (
+      event_id TEXT PRIMARY KEY,
+      entry_ref TEXT NOT NULL,
+      previous_entry_ref TEXT,
+      event_type TEXT NOT NULL,
+      prior_version INTEGER,
+      next_version INTEGER NOT NULL,
+      prior_state TEXT,
+      next_state TEXT NOT NULL,
+      prior_visibility TEXT,
+      next_visibility TEXT NOT NULL,
+      event_json TEXT NOT NULL,
+      event_hash TEXT NOT NULL,
+      occurred_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE(entry_ref, next_version)
+    );
+
+    CREATE TABLE IF NOT EXISTS canonical_rf_knowledge_entries (
+      entry_ref TEXT PRIMARY KEY,
+      entry_version INTEGER NOT NULL,
+      claim_type TEXT NOT NULL,
+      subject_code TEXT NOT NULL,
+      lifecycle TEXT NOT NULL,
+      visibility TEXT NOT NULL,
+      tenant_ref TEXT,
+      account_ref TEXT,
+      effective_from TEXT,
+      effective_to TEXT,
+      entry_json TEXT NOT NULL,
+      entry_hash TEXT NOT NULL,
+      audit_event_id TEXT NOT NULL UNIQUE REFERENCES canonical_rf_knowledge_audit_events(event_id),
+      created_at TEXT NOT NULL,
+      UNIQUE(entry_ref, entry_version)
+    );
+
     CREATE TABLE IF NOT EXISTS statement_uploads (
       id TEXT PRIMARY KEY,
       merchant_id INTEGER NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
@@ -247,6 +594,32 @@ function migrate(): void {
     CREATE INDEX IF NOT EXISTS idx_jobs_status_updated ON analysis_jobs(status, updated_at);
     CREATE INDEX IF NOT EXISTS idx_uploads_merchant ON statement_uploads(merchant_id);
     CREATE INDEX IF NOT EXISTS idx_job_events_job ON analysis_job_events(job_id);
+    CREATE INDEX IF NOT EXISTS idx_canonical_runs_job ON canonical_analysis_runs(job_id);
+    CREATE INDEX IF NOT EXISTS idx_canonical_runs_status ON canonical_analysis_runs(status, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_canonical_run_stages_status ON canonical_analysis_run_stages(run_id, status);
+    CREATE INDEX IF NOT EXISTS idx_canonical_rg_claim_materiality ON canonical_rg_claim_admissions(run_id, materiality, research_admission);
+    CREATE INDEX IF NOT EXISTS idx_canonical_rg_claim_semantics ON canonical_rg_claim_admissions(run_id, claim_class, facet, opaque_subject_code, scope_fingerprint);
+    CREATE INDEX IF NOT EXISTS idx_canonical_rg_work_state ON canonical_rg_work_items(run_id, state, execution_state);
+    CREATE INDEX IF NOT EXISTS idx_canonical_rg_operation_state ON canonical_rg_operations(run_id, state);
+    CREATE INDEX IF NOT EXISTS idx_canonical_rg_execution_events ON canonical_rg_execution_events(run_id, work_item_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_canonical_external_evidence_plan ON canonical_analysis_external_evidence(run_id, source_plan_hash);
+    CREATE INDEX IF NOT EXISTS idx_canonical_semantic_revision_hash ON canonical_analysis_semantic_revisions(run_id, semantic_hash);
+    CREATE INDEX IF NOT EXISTS idx_canonical_continuation_state ON canonical_analysis_continuation_revisions(run_id, lifecycle, controller_revision);
+    CREATE INDEX IF NOT EXISTS idx_canonical_continuation_claim ON canonical_analysis_continuation_decisions(run_id, atomic_claim_id, controller_revision);
+    CREATE INDEX IF NOT EXISTS idx_canonical_autonomous_outcome
+      ON canonical_analysis_autonomous_outcome_revisions(run_id, outcome_revision, checkpoint_kind);
+    CREATE INDEX IF NOT EXISTS idx_canonical_recovery_due
+      ON canonical_analysis_recovery_intents(state, next_run_at, lease_expires_at);
+    CREATE INDEX IF NOT EXISTS idx_canonical_recovery_run
+      ON canonical_analysis_recovery_intents(run_id, outcome_revision, atomic_claim_id);
+    CREATE INDEX IF NOT EXISTS idx_canonical_rg_reconciliation_due
+      ON canonical_rg_reconciliation_intents(state, next_run_at, lease_expires_at);
+    CREATE INDEX IF NOT EXISTS idx_canonical_rg_reconciliation_run
+      ON canonical_rg_reconciliation_intents(run_id, outcome_revision);
+    CREATE INDEX IF NOT EXISTS idx_rf_catalog_claim ON canonical_rf_knowledge_entries(claim_type, subject_code, lifecycle);
+    CREATE INDEX IF NOT EXISTS idx_rf_catalog_visibility ON canonical_rf_knowledge_entries(visibility, tenant_ref, account_ref);
+    CREATE INDEX IF NOT EXISTS idx_rf_catalog_effective_period ON canonical_rf_knowledge_entries(effective_from, effective_to);
+    CREATE INDEX IF NOT EXISTS idx_rf_catalog_audit_previous ON canonical_rf_knowledge_audit_events(previous_entry_ref, prior_version);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_statements_merchant_period ON statements(merchant_id, period_key);
     CREATE INDEX IF NOT EXISTS idx_multi_jobs_merchant ON multi_statement_jobs(merchant_id);
     CREATE INDEX IF NOT EXISTS idx_multi_jobs_status ON multi_statement_jobs(status);
@@ -282,6 +655,25 @@ function migrate(): void {
   ensureColumn("analysis_jobs", "attempt_count", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("analysis_jobs", "max_attempts", "INTEGER NOT NULL DEFAULT 3");
   ensureColumn("analysis_jobs", "next_run_at", "TEXT");
+  ensureColumn("canonical_analysis_runs", "rf_snapshot_hash", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn("canonical_analysis_runs", "rf_context_hash", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn("canonical_analysis_runs", "rf_catalog_status", "TEXT NOT NULL DEFAULT 'unbound'");
+  ensureColumn("canonical_analysis_runs", "rf_catalog_binding_json", "TEXT");
+  ensureColumn("canonical_analysis_runs", "financial_foundation_hash", "TEXT");
+  ensureColumn("canonical_analysis_runs", "semantic_hash", "TEXT");
+  ensureColumn("canonical_analysis_runs", "canonical_state_hash", "TEXT");
+  ensureColumn("canonical_analysis_runs", "semantic_revision", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("canonical_analysis_runs", "rg_plan_hash", "TEXT");
+  ensureColumn("canonical_analysis_runs", "rg_plan_generation", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("canonical_analysis_runs", "rg_execution_generation", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("canonical_analysis_runs", "continuation_revision", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("canonical_analysis_runs", "continuation_lifecycle", "TEXT NOT NULL DEFAULT 'awaiting_first_pass_outcome'");
+  ensureColumn("canonical_analysis_runs", "continuation_state_hash", "TEXT");
+  ensureColumn("canonical_analysis_runs", "autonomous_outcome_revision", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("canonical_analysis_runs", "autonomous_outcome_hash", "TEXT");
+  ensureColumn("canonical_analysis_runs", "adaptive_cycle_owner", "TEXT");
+  ensureColumn("canonical_analysis_runs", "adaptive_cycle_lease_expires_at", "TEXT");
+  ensureColumn("canonical_analysis_continuation_revisions", "plan_generation", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("statements", "analysis_status", "TEXT NOT NULL DEFAULT 'completed'");
   ensureColumn("statements", "processor_markup_bps", "REAL");
   ensureColumn("comparisons", "processor_markup_bps_delta", "REAL");
@@ -289,6 +681,57 @@ function migrate(): void {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_jobs_due ON analysis_jobs(status, next_run_at, created_at);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_upload_id ON analysis_jobs(upload_id) WHERE upload_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_canonical_continuation_grants
+      ON canonical_analysis_continuation_execution_grants(run_id, execution_generation);
+    CREATE TRIGGER IF NOT EXISTS canonical_rf_knowledge_entries_no_update
+      BEFORE UPDATE ON canonical_rf_knowledge_entries BEGIN SELECT RAISE(ABORT, 'canonical_rf_catalog_is_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_rf_knowledge_entries_no_delete
+      BEFORE DELETE ON canonical_rf_knowledge_entries BEGIN SELECT RAISE(ABORT, 'canonical_rf_catalog_is_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_rf_knowledge_audit_no_update
+      BEFORE UPDATE ON canonical_rf_knowledge_audit_events BEGIN SELECT RAISE(ABORT, 'canonical_rf_catalog_is_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_rf_knowledge_audit_no_delete
+      BEFORE DELETE ON canonical_rf_knowledge_audit_events BEGIN SELECT RAISE(ABORT, 'canonical_rf_catalog_is_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_external_evidence_no_update
+      BEFORE UPDATE ON canonical_analysis_external_evidence
+      BEGIN SELECT RAISE(ABORT, 'canonical_external_evidence_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_semantic_revisions_no_update
+      BEFORE UPDATE ON canonical_analysis_semantic_revisions
+      BEGIN SELECT RAISE(ABORT, 'canonical_semantic_revision_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_semantic_applications_no_update
+      BEFORE UPDATE ON canonical_analysis_semantic_applications
+      BEGIN SELECT RAISE(ABORT, 'canonical_semantic_revision_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_stage_revisions_no_update
+      BEFORE UPDATE ON canonical_analysis_stage_revisions
+      BEGIN SELECT RAISE(ABORT, 'canonical_semantic_revision_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_continuation_revisions_no_update
+      BEFORE UPDATE ON canonical_analysis_continuation_revisions
+      BEGIN SELECT RAISE(ABORT, 'canonical_continuation_revision_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_continuation_decisions_no_update
+      BEFORE UPDATE ON canonical_analysis_continuation_decisions
+      BEGIN SELECT RAISE(ABORT, 'canonical_continuation_revision_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_continuation_execution_grants_no_update
+      BEFORE UPDATE ON canonical_analysis_continuation_execution_grants
+      BEGIN SELECT RAISE(ABORT, 'canonical_continuation_execution_grant_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_autonomous_outcome_revisions_no_update
+      BEFORE UPDATE ON canonical_analysis_autonomous_outcome_revisions
+      BEGIN SELECT RAISE(ABORT, 'canonical_autonomous_outcome_checkpoint_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_recovery_intent_binding_no_update
+      BEFORE UPDATE OF run_id, outcome_revision, outcome_hash, controller_revision, decision_id,
+        atomic_claim_id, intent_json, intent_hash, created_at ON canonical_analysis_recovery_intents
+      BEGIN SELECT RAISE(ABORT, 'canonical_analysis_recovery_intent_binding_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_analysis_recovery_events_no_update
+      BEFORE UPDATE ON canonical_analysis_recovery_events
+      BEGIN SELECT RAISE(ABORT, 'canonical_analysis_recovery_event_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_rg_reconciliation_intent_binding_no_update
+      BEFORE UPDATE OF run_id, outcome_revision, outcome_hash, controller_revision,
+        intent_json, intent_hash, created_at ON canonical_rg_reconciliation_intents
+      BEGIN SELECT RAISE(ABORT, 'canonical_rg_reconciliation_intent_binding_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_rg_reconciliation_events_no_update
+      BEFORE UPDATE ON canonical_rg_reconciliation_events
+      BEGIN SELECT RAISE(ABORT, 'canonical_rg_reconciliation_event_is_immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS canonical_rg_execution_events_no_update
+      BEFORE UPDATE ON canonical_rg_execution_events
+      BEGIN SELECT RAISE(ABORT, 'canonical_rg_execution_history_is_immutable'); END;
   `);
 }
 
