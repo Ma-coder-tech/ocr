@@ -1,5 +1,9 @@
 import type { ParserDecision, ParserDriver } from "../../../parserFoundation.js";
 import type { ParsedDocument } from "../../../parser.js";
+import type { CanonicalRbLimitedAuthorityResult } from "../../../reconstructionKernel/canonicalRbLimitedAuthority.js";
+import type { CanonicalRbLimitedAuthorityRegenerationResult } from "../../../reconstructionKernel/canonicalRbLimitedAuthorityRegeneration.js";
+import type { CanonicalRbReconstructionShadowResult } from "../../../reconstructionKernel/canonicalRbShadow.js";
+import type { CombinedAdjustmentChargebackQualificationResult } from "../../../reconstructionKernel/combinedAdjustmentChargebackQualification.js";
 import type { ReturnTypeOrNull } from "./typeUtilities.js";
 import type { buildCanonicalEconomicsV2FromFiserv } from "../fiservAdapter.js";
 import type { buildObservationalCanonicalPricingV2FromFiserv } from "../fiservPricingAdapter.js";
@@ -143,6 +147,10 @@ export type CanonicalAnalysisRunDiagnostics = {
   provenance: "observational";
   authority: "observational";
   observationalFoundation: ReturnTypeOrNull<typeof buildCanonicalEconomicsV2FromFiserv>;
+  reconstructionShadow?: CanonicalRbReconstructionShadowResult | null;
+  reconstructionLimitedAuthority?: CanonicalRbLimitedAuthorityResult | null;
+  reconstructionLimitedAuthorityRegeneration?: CanonicalRbLimitedAuthorityRegenerationResult | null;
+  combinedAdjustmentChargebackQualification?: CombinedAdjustmentChargebackQualificationResult | null;
 };
 
 export type CanonicalAnalysisRunExecution = {

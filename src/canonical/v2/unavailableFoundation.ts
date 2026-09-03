@@ -102,7 +102,9 @@ export function buildUnavailableCanonicalEconomicsV2Foundation(input: {
       proofEvidenceRefs: [],
       limitations: [input.reason],
     },
-    sourceModel: { sections: [], occurrences: [], representationGroups: [], evidence: [], parserInterpretations: [] },
+    sourceModel: { sections: [], occurrences: [], representationGroups: [], processorPresentedCategories: [],
+      processorPresentedCategoryControls: [],
+      evidence: [], parserInterpretations: [] },
     financialPopulations: facts,
     metrics: { headlineEffectiveRate: rate.metric, grossBasedRateDiagnostic: null, headlineAverageTicket: average.metric },
     billingAndFunding: {

@@ -5,6 +5,16 @@ import type {
   CanonicalEconomicsV2Foundation,
   CanonicalEconomicsV2SemanticAmendmentId,
 } from "./types.js";
+import { validateRbAdjustmentChargebackRepresentationSelection } from "./adjustmentChargebackRepresentationPolicy.js";
+import {
+  RB_KERNEL_LIMITED_AUTHORITY_DESCRIPTORS,
+  RB_KERNEL_LIMITED_AUTHORITY_POLICY,
+  RB_KERNEL_LIMITED_AUTHORITY_POPULATIONS,
+  RB_KERNEL_LIMITED_AUTHORITY_REF,
+  rbKernelAuthorityProofHash,
+  type RbKernelLimitedAuthorityPopulation,
+} from "./kernelAuthorityContract.js";
+import { validateRbKernelReconstructableControlProof } from "./kernelControlProof.js";
 import { RB_SEMANTIC_AMENDMENT_IDS } from "./versionManifest.js";
 
 export class CanonicalEconomicsV2ValidationError extends Error {
@@ -33,6 +43,16 @@ export function validateCanonicalEconomicsV2Foundation(
   const evidenceIds = uniqueIdSet(foundation.sourceModel.evidence, "evidence", errors);
   const sectionIds = uniqueIdSet(foundation.sourceModel.sections, "section", errors);
   const occurrenceIds = uniqueIdSet(foundation.sourceModel.occurrences, "occurrence", errors);
+  const processorCategoryIds = uniqueIdSet(
+    foundation.sourceModel.processorPresentedCategories,
+    "processor-presented category",
+    errors,
+  );
+  const processorCategoryControlIds = uniqueIdSet(
+    foundation.sourceModel.processorPresentedCategoryControls,
+    "processor-presented category control",
+    errors,
+  );
   const interpretationIds = uniqueIdSet(foundation.sourceModel.parserInterpretations, "parser interpretation", errors);
   const calculationIds = uniqueIdSet(foundation.calculations, "calculation", errors);
   const reconciliationIds = uniqueIdSet(foundation.reconciliation, "reconciliation", errors);
@@ -60,6 +80,7 @@ export function validateCanonicalEconomicsV2Foundation(
     if (evidence.redactedExcerpt && (/\b\d{6,}\b/.test(evidence.redactedExcerpt) || /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(evidence.redactedExcerpt))) {
       errors.push(`Evidence ${evidence.id} contains prohibited unredacted identifier content.`);
     }
+    validateKernelEvidenceRecord(foundation, evidence, errors);
   }
   for (const interpretation of foundation.sourceModel.parserInterpretations) {
     if (!occurrenceIds.has(interpretation.occurrenceRef)) errors.push(`Parser interpretation ${interpretation.id} has broken occurrence ref.`);
@@ -70,6 +91,113 @@ export function validateCanonicalEconomicsV2Foundation(
     if (!evidenceIds.has(occurrence.evidenceRef)) errors.push(`Occurrence ${occurrence.id} has broken evidence ref.`);
     for (const ref of occurrence.parserInterpretationRefs) if (!interpretationIds.has(ref)) errors.push(`Occurrence ${occurrence.id} has broken interpretation ref ${ref}.`);
     for (const ref of occurrence.reconciliationRefs) if (!reconciliationIds.has(ref)) errors.push(`Occurrence ${occurrence.id} has broken reconciliation ref ${ref}.`);
+  }
+  const seenProcessorCategories = new Set<string>();
+  for (const representation of foundation.sourceModel.processorPresentedCategories) {
+    if (seenProcessorCategories.has(representation.categoryIdentity)) {
+      errors.push(`Processor-presented category ${representation.categoryIdentity} is represented more than once.`);
+    }
+    seenProcessorCategories.add(representation.categoryIdentity);
+    if (representation.contributionPermission !== "prohibited_observation_only") {
+      errors.push(`Processor-presented category ${representation.id} has financial contribution permission.`);
+    }
+    if (representation.sourceProvenance.documentRef !== foundation.identity.sourceDocumentRef
+      || representation.sourceProvenance.sourceFingerprint !== foundation.identity.sourceFingerprint) {
+      errors.push(`Processor-presented category ${representation.id} is not bound to the canonical source identity.`);
+    }
+    if (representation.observationStatus !== "observed" && representation.observedAmount !== null) {
+      errors.push(`Withheld processor-presented category ${representation.id} cannot select an amount.`);
+    }
+    if (representation.observationStatus === "observed" && representation.observedAmount === null) {
+      errors.push(`Observed processor-presented category ${representation.id} must select its printed amount.`);
+    }
+    if ((representation.coverageStatus === "ambiguous_source_scope"
+      && representation.observationStatus !== "withheld_ambiguous_scope")
+      || (representation.coverageStatus === "incomplete_source_scope"
+        && representation.observationStatus !== "withheld_incomplete_scope")) {
+      errors.push(`Processor-presented category ${representation.id} has inconsistent coverage and observation states.`);
+    }
+    if (representation.completenessState.suppliedDocumentStatus !== foundation.documentIntegrity.suppliedDocumentStatus
+      || representation.completenessState.statementCompletenessStatus !== foundation.documentIntegrity.completenessStatus) {
+      errors.push(`Processor-presented category ${representation.id} is not bound to the foundation completeness state.`);
+    }
+    for (const ref of representation.completenessState.proofEvidenceRefs) {
+      if (!evidenceIds.has(ref)) errors.push(`Processor-presented category ${representation.id} has broken completeness proof ref ${ref}.`);
+    }
+    for (const ref of representation.sourceProvenance.occurrenceRefs) {
+      if (!occurrenceIds.has(ref)) errors.push(`Processor-presented category ${representation.id} has broken occurrence ref ${ref}.`);
+      const role = foundation.sourceModel.occurrences.find((occurrence) => occurrence.id === ref)?.contributionRole;
+      if (role === "authoritative_contributor" || role === "funding_only") {
+        errors.push(`Processor-presented category ${representation.id} contains a contributing occurrence.`);
+      }
+    }
+    for (const ref of representation.sourceProvenance.evidenceRefs) {
+      if (!evidenceIds.has(ref)) errors.push(`Processor-presented category ${representation.id} has broken evidence ref ${ref}.`);
+    }
+    for (const ref of representation.independentlyProvenSplitFactRefs) {
+      if (!factIds.has(ref)) errors.push(`Processor-presented category ${representation.id} has broken split fact ref ${ref}.`);
+      const fact = factList.find((item) => item.id === ref);
+      const allowedRefs = representation.categoryIdentity === "adjustments_chargebacks"
+        ? new Set([
+            foundation.financialPopulations.settlementAdjustmentAmount.id,
+            foundation.financialPopulations.chargebackPrincipalDebitAmount.id,
+            foundation.financialPopulations.chargebackRepresentmentAmount.id,
+          ])
+        : new Set([
+            foundation.financialPopulations.chargebackPrincipalDebitAmount.id,
+          ]);
+      if (!allowedRefs.has(ref)) {
+        errors.push(`Processor-presented category ${representation.id} references a split fact outside its permitted subtype set.`);
+      }
+      const hasIndependentSplitLineage = fact?.status === "available" && fact.occurrenceRefs.some((occurrenceRef) =>
+        foundation.sourceModel.occurrences.find((occurrence) => occurrence.id === occurrenceRef)?.limitations.some((limitation) =>
+          limitation.startsWith("Independent split proof basis:")));
+      if (!hasIndependentSplitLineage) {
+        errors.push(`Processor-presented category ${representation.id} references a split fact without independent statement proof.`);
+      }
+    }
+    for (const ref of representation.controlRefs) {
+      if (!processorCategoryControlIds.has(ref)) errors.push(`Processor-presented category ${representation.id} has broken control ref ${ref}.`);
+    }
+    const availableFactUsesRepresentation = factList.some((fact) => fact.status === "available"
+      && fact.occurrenceRefs.some((ref) => representation.sourceProvenance.occurrenceRefs.includes(ref)));
+    if (availableFactUsesRepresentation) {
+      errors.push(`Processor-presented category ${representation.id} was used by an available financial fact.`);
+    }
+  }
+  const seenProcessorCategoryControls = new Set<string>();
+  for (const control of foundation.sourceModel.processorPresentedCategoryControls) {
+    if (seenProcessorCategoryControls.has(control.categoryIdentity)) {
+      errors.push(`Processor-presented category ${control.categoryIdentity} has more than one claim-specific control.`);
+    }
+    seenProcessorCategoryControls.add(control.categoryIdentity);
+    if (control.authorityEffect !== "none_observation_only") {
+      errors.push(`Processor-presented category control ${control.id} has an authority effect.`);
+    }
+    if (control.representationRef && !processorCategoryIds.has(control.representationRef)) {
+      errors.push(`Processor-presented category control ${control.id} has a broken representation ref.`);
+    }
+    const controlledRepresentation = foundation.sourceModel.processorPresentedCategories.find((representation) =>
+      representation.id === control.representationRef);
+    if (controlledRepresentation && controlledRepresentation.categoryIdentity !== control.categoryIdentity) {
+      errors.push(`Processor-presented category control ${control.id} targets the wrong category representation.`);
+    }
+    if (controlledRepresentation && !controlledRepresentation.controlRefs.includes(control.id)) {
+      errors.push(`Processor-presented category control ${control.id} is not linked back from its representation.`);
+    }
+    if (control.status === "pass" && controlledRepresentation?.contradictionState === "contradicts_independently_proven_splits") {
+      errors.push(`Processor-presented category control ${control.id} passed despite a split contradiction.`);
+    }
+    if (control.status === "missing_input" && control.representationRef !== null
+      && control.sourceScope !== "incomplete_source_scope") {
+      errors.push(`Processor-presented category control ${control.id} has inconsistent missing-input state.`);
+    }
+    for (const ref of control.occurrenceRefs) {
+      if (!occurrenceIds.has(ref)) errors.push(`Processor-presented category control ${control.id} has broken occurrence ref ${ref}.`);
+    }
+    for (const ref of control.evidenceRefs) {
+      if (!evidenceIds.has(ref)) errors.push(`Processor-presented category control ${control.id} has broken evidence ref ${ref}.`);
+    }
   }
 
   const groupedOccurrenceRefs = new Set<string>();
@@ -108,6 +236,7 @@ export function validateCanonicalEconomicsV2Foundation(
   }
 
   for (const fact of factList) validateFact(fact, evidenceIds, occurrenceIds, calculationIds, errors);
+  validateKernelAuthorityFacts(foundation, errors);
   validateFinancialRelationships(foundation, errors, warnings);
   validateMetrics(foundation, factIds, calculationIds, metricIds, errors);
   validateBillingAndFunding(foundation, factIds, occurrenceIds, reconciliationIds, errors);
@@ -267,17 +396,15 @@ function validateFinancialRelationships(foundation: CanonicalEconomicsV2Foundati
       errors.push("Gross sales less refunds does not equal canonical net submitted card volume.");
     }
   }
-  if (facts.unresolvedAdjustmentChargebackAmount.status === "available" &&
-      (facts.settlementAdjustmentAmount.status === "available" || facts.chargebackPrincipalDebitAmount.status === "available" || facts.chargebackRepresentmentAmount.status === "available")) {
-    errors.push("An unresolved combined adjustment/chargeback fact cannot coexist as selected with separated adjustment or chargeback populations.");
-  }
+  errors.push(...validateRbAdjustmentChargebackRepresentationSelection(facts));
   for (const fact of [facts.chargebackPrincipalDebitAmount, facts.chargebackRepresentmentAmount, facts.chargebackFeeAmount, facts.feeCreditAmount]) {
     if (fact.value && fact.value.amountMinor < 0) errors.push(`Fact ${fact.id} must preserve direction by population and expose a non-negative magnitude.`);
   }
   if (facts.canonicalNetSubmittedCardVolume.status === "available" && facts.grossSaleVolume.status !== "available") {
     warnings.push("Net submitted is available while gross-sale volume remains unavailable; V2 correctly preserves the capability ceiling.");
   }
-  if (facts.grossSaleTransactionCount.status === "available" && foundation.identity.provenanceStatus !== "approved_synthetic") {
+  if (facts.grossSaleTransactionCount.status === "available" && foundation.identity.provenanceStatus !== "approved_synthetic"
+      && facts.grossSaleTransactionCount.authorityBasis?.kind !== "statement_reconstruction_kernel_limited_authority") {
     const countCapability = foundation.templateCapability.capabilities.find(
       (capability) => capability.capability === "gross_sale_transaction_count",
     );
@@ -291,6 +418,142 @@ function validateFinancialRelationships(foundation: CanonicalEconomicsV2Foundati
       errors.push("Gross-sale transaction count requires an admitted, complete template capability with population proof.");
     }
   }
+}
+
+function validateKernelEvidenceRecord(
+  foundation: CanonicalEconomicsV2Foundation,
+  evidence: CanonicalEconomicsV2Foundation["sourceModel"]["evidence"][number],
+  errors: string[],
+): void {
+  const proof = evidence.kernelProof;
+  if (!proof) {
+    if (evidence.extractionMethod === "reconstruction_kernel_deterministic") {
+      errors.push(`Kernel evidence ${evidence.id} is missing its typed proof binding.`);
+    }
+    return;
+  }
+  if (foundation.versionManifest.kernelAuthorityMode !== "evaluation_limited_overlay") {
+    errors.push(`Kernel evidence ${evidence.id} is prohibited outside the evaluation-limited overlay mode.`);
+  }
+  if (evidence.extractionMethod !== "reconstruction_kernel_deterministic") {
+    errors.push(`Kernel evidence ${evidence.id} must use deterministic Kernel extraction lineage.`);
+  }
+  if (evidence.documentRef !== foundation.identity.sourceDocumentRef) {
+    errors.push(`Kernel evidence ${evidence.id} is bound to the wrong source document.`);
+  }
+  if (!Number.isSafeInteger(evidence.pageNumber) || (evidence.pageNumber ?? 0) <= 0 || !evidence.lineRef) {
+    errors.push(`Kernel evidence ${evidence.id} requires an exact page and line locator.`);
+  }
+  if (!RB_KERNEL_LIMITED_AUTHORITY_POPULATIONS.includes(proof.populationKey)) {
+    errors.push(`Kernel evidence ${evidence.id} names a non-allowlisted population.`);
+  }
+  if (!/^[a-f0-9]{64}$/.test(proof.authorityOverlayHash) || !/^[a-f0-9]{64}$/.test(proof.proofHash)) {
+    errors.push(`Kernel evidence ${evidence.id} has an invalid authority or proof hash.`);
+  }
+  if (proof.sourceFingerprint !== foundation.identity.sourceFingerprint) {
+    errors.push(`Kernel evidence ${evidence.id} is bound to the wrong source fingerprint.`);
+  }
+  if (!proof.observationRef || !proof.authorityFactRef) {
+    errors.push(`Kernel evidence ${evidence.id} is missing its observation or authority-fact identity.`);
+  }
+  const linked = Object.values(foundation.financialPopulations).some((fact) =>
+    fact.authorityBasis?.proofHash === proof.proofHash && fact.evidenceRefs.includes(evidence.id));
+  if (!linked) errors.push(`Kernel evidence ${evidence.id} is not linked to its owning RB fact.`);
+}
+
+function validateKernelAuthorityFacts(foundation: CanonicalEconomicsV2Foundation, errors: string[]): void {
+  const entries = Object.entries(foundation.financialPopulations) as Array<[
+    keyof CanonicalEconomicsV2Foundation["financialPopulations"],
+    CanonicalEconomicsV2Fact<unknown, string>,
+  ]>;
+  const kernelFacts = entries.filter(([, fact]) => fact.authorityBasis?.kind === "statement_reconstruction_kernel_limited_authority");
+  if (foundation.versionManifest.kernelAuthorityMode === "evaluation_limited_overlay" && kernelFacts.length === 0) {
+    errors.push("Evaluation-limited Kernel authority mode requires at least one Kernel-owned fact.");
+  }
+  for (const [populationKey, fact] of entries) {
+    const proof = fact.authorityBasis;
+    const kernelEvidence = fact.evidenceRefs.map((ref) =>
+      foundation.sourceModel.evidence.find((item) => item.id === ref)).filter((item) => item?.kernelProof);
+    if (!proof) {
+      if (kernelEvidence.length > 0) errors.push(`Fact ${fact.id} uses Kernel evidence without a typed authority basis.`);
+      continue;
+    }
+    if (foundation.versionManifest.kernelAuthorityMode !== "evaluation_limited_overlay") {
+      errors.push(`Fact ${fact.id} Kernel authority is prohibited outside the evaluation-limited overlay mode.`);
+    }
+    if (!RB_KERNEL_LIMITED_AUTHORITY_POPULATIONS.includes(populationKey as RbKernelLimitedAuthorityPopulation)) {
+      errors.push(`Fact ${fact.id} attempts Kernel authority outside the approved population allowlist.`);
+      continue;
+    }
+    const key = populationKey as RbKernelLimitedAuthorityPopulation;
+    const descriptor = RB_KERNEL_LIMITED_AUTHORITY_DESCRIPTORS[key];
+    if (proof.populationKey !== key || fact.population !== descriptor.population) {
+      errors.push(`Fact ${fact.id} has a mismatched Kernel population proof.`);
+    }
+    if (proof.authorityRef !== RB_KERNEL_LIMITED_AUTHORITY_REF
+        || proof.policyVersion !== RB_KERNEL_LIMITED_AUTHORITY_POLICY) {
+      errors.push(`Fact ${fact.id} uses an unapproved Kernel authority contract.`);
+    }
+    if (proof.sourceDocumentRef !== foundation.identity.sourceDocumentRef
+        || proof.sourceFingerprint !== foundation.identity.sourceFingerprint) {
+      errors.push(`Fact ${fact.id} Kernel proof is bound to the wrong source identity.`);
+    }
+    if (!/^[a-f0-9]{64}$/.test(proof.authorityOverlayHash)) {
+      errors.push(`Fact ${fact.id} has an invalid Kernel overlay hash.`);
+    }
+    const { proofHash: _proofHash, ...proofCore } = proof;
+    if (proof.proofHash !== rbKernelAuthorityProofHash(proofCore)) {
+      errors.push(`Fact ${fact.id} has a non-reconstructable Kernel proof hash.`);
+    }
+    if (fact.status !== "available" || fact.provenanceStatus !== "authoritative" || fact.confidence !== "high") {
+      errors.push(`Fact ${fact.id} Kernel authority requires an available, authoritative, high-confidence fact.`);
+    }
+    if (fact.calculationRef !== null) errors.push(`Fact ${fact.id} Kernel authority must remain directly source-observed.`);
+    if (proof.providerAuthority !== "prohibited" || proof.deterministicOnly !== true) {
+      errors.push(`Fact ${fact.id} Kernel proof grants non-deterministic authority.`);
+    }
+    if (!sameStringSet(proof.evidenceRefs, fact.evidenceRefs) || proof.evidenceRefs.length === 0) {
+      errors.push(`Fact ${fact.id} Kernel proof and fact evidence lineage do not match.`);
+    }
+    const expectedControls = [...descriptor.requiredControlIds];
+    if (!sameStringSet(proof.controlProofs.map((item) => item.controlId), expectedControls)
+        || proof.controlProofs.some((item) => item.state !== "pass")) {
+      errors.push(`Fact ${fact.id} does not carry the exact passing claim-specific Kernel controls.`);
+    }
+    for (const controlProof of proof.controlProofs) {
+      const controlValidation = validateRbKernelReconstructableControlProof(controlProof);
+      if (controlValidation.status !== "valid") {
+        errors.push(`Fact ${fact.id} has an invalid reconstructable Kernel control ${controlProof.controlId}.`);
+      }
+      if (controlProof.sourceScope.documentRef !== foundation.identity.sourceDocumentRef
+          || controlProof.sourceScope.sourceFingerprint !== foundation.identity.sourceFingerprint) {
+        errors.push(`Fact ${fact.id} has a Kernel control bound to the wrong source scope.`);
+      }
+      const requiredExclusions = [
+        "population_within_product_approved_allowlist",
+        "claim_remains_direct_source_fact",
+        "provider_authority_prohibited",
+        "downstream_use_prohibited",
+      ];
+      if (!sameStringSet(controlProof.exclusionConditions.map((item) => item.conditionId), requiredExclusions)) {
+        errors.push(`Fact ${fact.id} has incomplete Kernel control exclusions.`);
+      }
+    }
+    for (const evidenceRef of proof.evidenceRefs) {
+      const evidence = foundation.sourceModel.evidence.find((item) => item.id === evidenceRef);
+      if (!evidence?.kernelProof || evidence.kernelProof.populationKey !== key
+          || evidence.kernelProof.authorityFactRef !== proof.authorityFactRef
+          || evidence.kernelProof.authorityOverlayHash !== proof.authorityOverlayHash
+          || evidence.kernelProof.sourceFingerprint !== proof.sourceFingerprint
+          || evidence.kernelProof.proofHash !== proof.proofHash) {
+        errors.push(`Fact ${fact.id} has broken or inconsistent Kernel evidence ${evidenceRef}.`);
+      }
+    }
+  }
+}
+
+function sameStringSet(left: readonly string[], right: readonly string[]): boolean {
+  return [...new Set(left)].sort().join("\n") === [...new Set(right)].sort().join("\n");
 }
 
 function validateMetrics(

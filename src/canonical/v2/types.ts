@@ -1,4 +1,5 @@
 import type { DecimalString, MoneyAmount } from "../types.js";
+import type { RbKernelAuthorityProof } from "./kernelAuthorityContract.js";
 
 export type CanonicalEconomicsV2Availability = "available" | "unavailable" | "ambiguous" | "unsupported";
 export type CanonicalEconomicsV2Confidence = "high" | "medium" | "low" | "needs_review";
@@ -178,6 +179,7 @@ export type CanonicalEconomicsV2OccurrenceRole =
   | "subtotal_or_control"
   | "supporting_representation"
   | "unresolved_adjustment_or_chargeback"
+  | "unresolved_chargeback_or_reversal"
   | "unknown";
 
 export type CanonicalEconomicsV2ContributionRole =
@@ -195,9 +197,17 @@ export type CanonicalEconomicsV2EvidenceRecord = {
   pageNumber: number | null;
   lineRef: string | null;
   rowIndex: number | null;
-  extractionMethod: "document_ir" | "deterministic_parser" | "approved_synthetic";
+  extractionMethod: "document_ir" | "deterministic_parser" | "approved_synthetic" | "reconstruction_kernel_deterministic";
   redactedExcerpt: string | null;
   redactionApplied: true;
+  kernelProof?: {
+    authorityFactRef: string;
+    populationKey: RbKernelAuthorityProof["populationKey"];
+    observationRef: string;
+    authorityOverlayHash: string;
+    sourceFingerprint: string;
+    proofHash: string;
+  } | null;
 };
 
 export type CanonicalEconomicsV2ParserInterpretation = {
@@ -243,10 +253,91 @@ export type CanonicalEconomicsV2RepresentationGroup = {
   limitations: string[];
 };
 
+export type CanonicalEconomicsV2ProcessorPresentedCategoryIdentity =
+  | "adjustments_chargebacks"
+  | "chargebacks_reversals";
+
+export type CanonicalEconomicsV2ProcessorPresentedCategoryRepresentation = {
+  id: string;
+  categoryIdentity: CanonicalEconomicsV2ProcessorPresentedCategoryIdentity;
+  processorPresentedLabel: "Adjustments/Chargebacks" | "Chargebacks/Reversals";
+  preservedMeaning:
+    | "processor_presented_combined_adjustments_chargebacks"
+    | "processor_presented_combined_chargebacks_reversals";
+  observationStatus: "observed" | "withheld_ambiguous_scope" | "withheld_incomplete_scope";
+  observedAmount: MoneyAmount | null;
+  coverageStatus:
+    | "explicit_no_activity"
+    | "reconciled_detail"
+    | "printed_total_only"
+    | "unreconciled_detail"
+    | "ambiguous_source_scope"
+    | "incomplete_source_scope";
+  completenessState: {
+    suppliedDocumentStatus: CanonicalEconomicsV2SuppliedDocumentIntegrityStatus;
+    statementCompletenessStatus: CanonicalEconomicsV2CompletenessStatus;
+    proofEvidenceRefs: string[];
+  };
+  contradictionState:
+    | "not_comparable"
+    | "matches_independently_proven_splits"
+    | "contradicts_independently_proven_splits";
+  sourceProvenance: {
+    documentRef: string;
+    sourceFingerprint: string;
+    occurrenceRefs: string[];
+    evidenceRefs: string[];
+  };
+  independentlyProvenSplitFactRefs: string[];
+  controlRefs: string[];
+  contributionPermission: "prohibited_observation_only";
+  prohibitedDerivedSemantics: readonly [
+    "settlement_adjustment",
+    "chargeback_principal",
+    "representment",
+    "reversal",
+    "lifecycle",
+    "net_funded",
+    "fee",
+    "downstream_economics",
+  ];
+  limitations: string[];
+};
+
+export type CanonicalEconomicsV2ProcessorPresentedCategoryControl = {
+  id: string;
+  controlIdentity:
+    | "processor_presented_combined_category:adjustments_chargebacks"
+    | "processor_presented_combined_category:chargebacks_reversals";
+  categoryIdentity: CanonicalEconomicsV2ProcessorPresentedCategoryIdentity;
+  representationRef: string | null;
+  status: "pass" | "fail" | "missing_input";
+  sourceScope: CanonicalEconomicsV2ProcessorPresentedCategoryRepresentation["coverageStatus"] | "not_observed";
+  inputs: {
+    headingCount: number;
+    printedTotalMinor: number | null;
+    visibleDetailRowSumMinor: number | null;
+    independentlyProvenSplitNetMinor: number | null;
+  };
+  calculation:
+    | "preserve_printed_category_amount"
+    | "visible_detail_sum_equals_printed_total"
+    | "printed_category_amount_equals_independently_proven_split_net"
+    | "not_runnable";
+  toleranceMinor: 1;
+  occurrenceRefs: string[];
+  evidenceRefs: string[];
+  exclusionConditions: string[];
+  authorityEffect: "none_observation_only";
+  limitations: string[];
+};
+
 export type CanonicalEconomicsV2SourceModel = {
   sections: CanonicalEconomicsV2SourceSection[];
   occurrences: CanonicalEconomicsV2SourceOccurrence[];
   representationGroups: CanonicalEconomicsV2RepresentationGroup[];
+  processorPresentedCategories: CanonicalEconomicsV2ProcessorPresentedCategoryRepresentation[];
+  processorPresentedCategoryControls: CanonicalEconomicsV2ProcessorPresentedCategoryControl[];
   evidence: CanonicalEconomicsV2EvidenceRecord[];
   parserInterpretations: CanonicalEconomicsV2ParserInterpretation[];
 };
@@ -263,6 +354,7 @@ export type CanonicalEconomicsV2Fact<T, TPopulation extends string> = {
   occurrenceRefs: string[];
   calculationRef: string | null;
   limitations: string[];
+  authorityBasis?: RbKernelAuthorityProof;
 };
 
 export type CanonicalEconomicsV2MoneyPopulation =
@@ -363,7 +455,8 @@ export type CanonicalEconomicsV2AverageTicketMetric = {
 
 export type CanonicalEconomicsV2ReconciliationReference = {
   id: string;
-  implementation: "existing_procedural_fiserv" | "approved_synthetic";
+  implementation: "existing_procedural_fiserv" | "independent_document_ir" | "approved_synthetic";
+  controlScope: "global_financial" | "claim_specific_fact" | "source_representation";
   controlIdentity: string;
   status:
     | "pass"
@@ -413,6 +506,7 @@ export type CanonicalEconomicsV2VersionManifest = {
   authority: "shadow_non_authoritative";
   persistence: "none";
   aiResearchAuthority: "prohibited";
+  kernelAuthorityMode?: "evaluation_limited_overlay";
 };
 
 export type CanonicalEconomicsV2Foundation = {

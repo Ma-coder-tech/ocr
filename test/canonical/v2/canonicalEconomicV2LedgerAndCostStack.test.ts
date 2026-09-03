@@ -78,19 +78,22 @@ describe("Canonical Economics V2 RD economic ledger and cost stack", () => {
     expect(analysis.economicLayer.costStack.completeness).toBe("financially_unreconciled");
   });
 
-  it("excludes settlement, refund, chargeback-principal, representment, and funding populations from fee cost", () => {
+  it("excludes proven refund and funding populations without manufacturing split adjustment or chargeback facts", () => {
     const analysis = buildApprovedEconomics();
     const reasons = new Set(analysis.economicLayer.nonFeeExclusions.map((item) => item.reason));
     const contributingRefs = new Set(analysis.economicLayer.charges.map((charge) => charge.contributingOccurrenceRef));
 
-    expect(reasons).toEqual(new Set(["sales_refund", "settlement_adjustment", "chargeback_principal", "funding_activity"]));
+    expect(reasons).toEqual(new Set(["sales_refund", "funding_activity"]));
+    expect(analysis.pricingAnalysis.foundation.financialPopulations.settlementAdjustmentAmount.status).toBe("unavailable");
+    expect(analysis.pricingAnalysis.foundation.financialPopulations.chargebackPrincipalDebitAmount.status).toBe("unavailable");
     for (const exclusion of analysis.economicLayer.nonFeeExclusions) expect(contributingRefs.has(exclusion.occurrenceRef)).toBe(false);
   });
 
-  it("keeps a chargeback representment outside processing-fee cost", () => {
+  it("withholds an unproven chargeback representment rather than emitting a non-fee fact", () => {
     const analysis = buildApprovedEconomics(economicPricing({ chargeback: 6 }));
 
-    expect(analysis.economicLayer.nonFeeExclusions).toContainEqual(expect.objectContaining({
+    expect(analysis.pricingAnalysis.foundation.financialPopulations.chargebackRepresentmentAmount.status).toBe("unavailable");
+    expect(analysis.economicLayer.nonFeeExclusions).not.toContainEqual(expect.objectContaining({
       reason: "chargeback_representment",
     }));
     expect(analysis.economicLayer.costStack.totalStatementProcessingCost).toEqual({ amountMinor: 4500, currency: "USD" });

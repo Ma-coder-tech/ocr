@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 
 import type { ParsedDocument } from "../../../parser.js";
+import { grantCanonicalRbLimitedAuthority } from "../../../reconstructionKernel/canonicalRbLimitedAuthority.js";
+import { evaluateCanonicalRbLimitedAuthorityRegeneration } from "../../../reconstructionKernel/canonicalRbLimitedAuthorityRegeneration.js";
+import { runCanonicalRbReconstructionShadow } from "../../../reconstructionKernel/canonicalRbShadow.js";
+import { qualifyCombinedAdjustmentChargebackAmount } from "../../../reconstructionKernel/combinedAdjustmentChargebackQualification.js";
+import { assessStatementCompleteness } from "../../../reconstructionKernel/statementCompleteness.js";
 import type { ParserDecision, ParserDriver, ParserValidationState } from "../../../parserFoundation.js";
 import {
   fiservFirstDataFullStatementDriver,
@@ -94,11 +99,27 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   observer?: AnalysisRunStageObserver;
   stageBuilders?: Partial<StageBuilders>;
   rfKnowledge?: CanonicalRfKnowledgeInput;
+  reconstructionShadow?: { enabled: true };
+  reconstructionLimitedAuthority?: { enabled: true };
+  reconstructionLimitedAuthorityRegeneration?: { enabled: true };
+  combinedAdjustmentChargebackQualification?: { enabled: true };
 }): CanonicalAnalysisRunExecution {
   const fingerprint = sourceFingerprintForAnalysisRun(input.document);
   const executionContext = input.executionContext ?? "production";
   if (input.evaluationContinueInvalidStages && executionContext !== "evaluation_compatibility") {
     throw new Error("INVALID_ANALYSIS_RUN_EXECUTION_CONTEXT");
+  }
+  if (input.reconstructionShadow?.enabled && executionContext !== "evaluation_compatibility") {
+    throw new Error("RECONSTRUCTION_SHADOW_REQUIRES_EVALUATION_CONTEXT");
+  }
+  if (input.reconstructionLimitedAuthority?.enabled && executionContext !== "evaluation_compatibility") {
+    throw new Error("RECONSTRUCTION_LIMITED_AUTHORITY_REQUIRES_EVALUATION_CONTEXT");
+  }
+  if (input.reconstructionLimitedAuthorityRegeneration?.enabled && executionContext !== "evaluation_compatibility") {
+    throw new Error("RECONSTRUCTION_AUTHORITY_REGENERATION_REQUIRES_EVALUATION_CONTEXT");
+  }
+  if (input.combinedAdjustmentChargebackQualification?.enabled && executionContext !== "evaluation_compatibility") {
+    throw new Error("COMBINED_ADJUSTMENT_CHARGEBACK_QUALIFICATION_REQUIRES_EVALUATION_CONTEXT");
   }
   const stageOutcomes = emptyStageOutcomes();
   const artifacts: CanonicalAnalysisArtifacts = {
@@ -195,6 +216,11 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
       templateAdmission: { admissionStatus: "unknown", completenessStatus: "unknown", identityStatus: "observed" },
       documentIntegrity,
     });
+    const independentStatementCompleteness = assessStatementCompleteness({
+      document: input.document,
+      foundation: observationalFoundation,
+      sourceDocumentRef: input.sourceDocumentRef,
+    }).statementCompleteness.status;
     const knownEvaluation = resolveFiservTemplateAdmission({ driverId: driver.id, parserOutput, observationalFoundation });
     knownLayoutAdmission = knownEvaluation.resolution;
     fullFamilyDecision = knownEvaluation.fullFamilyDecision;
@@ -207,6 +233,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
         "fiserv_first_data_full_statement",
         "fiserv_first_data_short_statement",
       ].includes(driver.id) || knownLayoutAdmission !== null,
+      statementCompleteness: independentStatementCompleteness,
     });
     admission = runtimeAdmission.resolution;
     capabilityProof = runtimeAdmission.proof;
@@ -373,6 +400,49 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   const semanticHash = artifacts.rb ? semanticStateHash(artifacts) : null;
   const canonicalStateHash = semanticHash ? buildCanonicalStateHash({ financialFoundationHash: financialHash,
     semanticHash, rfSnapshotHash: artifacts.rfResolution?.snapshot.snapshotHash ?? "" }) : null;
+  const reconstructionShadow = input.reconstructionShadow?.enabled && artifacts.rb
+    ? runCanonicalRbReconstructionShadow({
+      document: structuredClone(input.document),
+      sourceDocumentRef: input.sourceDocumentRef,
+      foundation: structuredClone(artifacts.rb),
+    })
+    : null;
+  const limitedAuthorityRequested = input.reconstructionLimitedAuthority?.enabled
+    || input.reconstructionLimitedAuthorityRegeneration?.enabled;
+  const reconstructionLimitedAuthority = limitedAuthorityRequested && artifacts.rb
+    ? grantCanonicalRbLimitedAuthority({
+      document: structuredClone(input.document),
+      sourceDocumentRef: input.sourceDocumentRef,
+      foundation: structuredClone(artifacts.rb),
+      executionContext: "evaluation_compatibility",
+    })
+    : null;
+  const reconstructionLimitedAuthorityRegeneration = input.reconstructionLimitedAuthorityRegeneration?.enabled
+    && artifacts.rb && reconstructionLimitedAuthority
+    ? evaluateCanonicalRbLimitedAuthorityRegeneration({
+      foundation: artifacts.rb,
+      authority: reconstructionLimitedAuthority,
+      protectedDownstreamArtifacts: {
+        rc: artifacts.rc,
+        rfResolution: artifacts.rfResolution,
+        rd: artifacts.rd,
+        re: artifacts.re,
+        unresolvedClaims: artifacts.unresolvedClaims,
+        rgWorkLedger: artifacts.rgWorkLedger,
+        rh: artifacts.rh,
+      },
+      executionContext: "evaluation_compatibility",
+    })
+    : null;
+  const combinedAdjustmentChargebackQualification = input.combinedAdjustmentChargebackQualification?.enabled
+    && artifacts.rb
+    ? qualifyCombinedAdjustmentChargebackAmount({
+      document: structuredClone(input.document),
+      sourceDocumentRef: input.sourceDocumentRef,
+      foundation: structuredClone(artifacts.rb),
+      executionContext: "evaluation_compatibility",
+    })
+    : null;
   return {
     run: terminalRun({ input, fingerprint, status, parser: parserState,
       familyStatus: capabilityProof?.family.status ?? "unresolved", capabilityProof, admission, knownLayoutAdmission,
@@ -392,6 +462,12 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
       provenance,
       authority: "observational",
       observationalFoundation,
+      ...(input.reconstructionShadow?.enabled ? { reconstructionShadow } : {}),
+      ...(limitedAuthorityRequested ? { reconstructionLimitedAuthority } : {}),
+      ...(input.reconstructionLimitedAuthorityRegeneration?.enabled
+        ? { reconstructionLimitedAuthorityRegeneration } : {}),
+      ...(input.combinedAdjustmentChargebackQualification?.enabled
+        ? { combinedAdjustmentChargebackQualification } : {}),
     },
   };
 }

@@ -7,6 +7,7 @@ import type {
   CanonicalEconomicsV2SourceOccurrence,
 } from "./types.js";
 import { fiservFeeLedgerOccurrences } from "./fiservAdapter.js";
+import { evaluateRbClaimCapabilityDependencies } from "./rbDependencyRegistry.js";
 
 export const FISERV_RUNTIME_CAPABILITY_POLICY_ID = "fiserv_family_deterministic_capability_policy";
 export const FISERV_RUNTIME_CAPABILITY_POLICY_VERSION = "1.0.0";
@@ -83,6 +84,7 @@ export function resolveFiservRuntimeCapabilityAdmission(input: {
   observationalFoundation: CanonicalEconomicsV2Foundation;
   knownLayoutResolution?: KnownLayoutResolution | null;
   dynamicAdmissionAllowed?: boolean;
+  statementCompleteness?: "proven_complete" | "proven_incomplete" | "unproven";
 }): { resolution: FiservRuntimeCapabilityAdmissionResolution | null; proof: FiservRuntimeCapabilityProof } {
   const output = record(input.parserOutput);
   const identity = record(output.statementIdentity);
@@ -125,7 +127,15 @@ export function resolveFiservRuntimeCapabilityAdmission(input: {
     ...(suppliedDocumentComplete ? ["complete_supplied_document_lineage"] : ["supplied_document_lineage_incomplete"]),
   ]);
   const controls = foundation.reconciliation;
-  const controlsFor = (pattern: RegExp) => controls.filter((control) => pattern.test(control.controlIdentity));
+  // Independent claim-validation controls may narrow their own fact, but they
+  // cannot implicitly grant or revoke an adjacent template capability. Keep
+  // capability admission on its explicit pre-existing control authority.
+  const capabilityAdmissionControls = controls.filter((control) =>
+    control.implementation === "existing_procedural_fiserv" || control.implementation === "approved_synthetic",
+  );
+  const controlsFor = (pattern: RegExp) => capabilityAdmissionControls.filter(
+    (control) => pattern.test(control.controlIdentity),
+  );
   const controlProof = (pattern: RegExp) => unique(controlsFor(pattern)
     .filter((control) => control.status === "pass" || control.status === "pass_with_rounding")
     .flatMap((control) => control.evidenceRefs));
@@ -154,6 +164,18 @@ export function resolveFiservRuntimeCapabilityAdmission(input: {
   const fundingProven = validation.batchDetailAllowed === true && fundingRows.length > 0
     && ["reconciled", "reconciled_with_warnings"].includes(String(fundingLedger.status ?? ""))
     && controlsPass(batchControlPattern);
+  const claimDependencyEvaluations = {
+    settlement_adjustments: evaluateRbClaimCapabilityDependencies({
+      capabilityId: "settlement_adjustments",
+      foundation,
+      statementCompleteness: input.statementCompleteness,
+    }),
+    chargeback_financial_populations: evaluateRbClaimCapabilityDependencies({
+      capabilityId: "chargeback_financial_populations",
+      foundation,
+      statementCompleteness: input.statementCompleteness,
+    }),
+  } as const;
   const roleRefs: Partial<Record<CanonicalEconomicsV2CapabilityId, string[]>> = {
     processor_identity: familyRefs,
     statement_period: statementPeriodRefs,
@@ -174,7 +196,7 @@ export function resolveFiservRuntimeCapabilityAdmission(input: {
       ...refsForRole("chargeback_principal_debit"),
       ...refsForRole("chargeback_representment"),
     ]),
-    reconciliation_controls: unique(controls
+    reconciliation_controls: unique(capabilityAdmissionControls
       .filter((control) => control.status === "pass" || control.status === "pass_with_rounding")
       .flatMap((control) => control.evidenceRefs)),
   };
@@ -184,8 +206,6 @@ export function resolveFiservRuntimeCapabilityAdmission(input: {
       .map((occurrence) => occurrence.printedCount).filter((value): value is number => value !== null);
     return values.length > 0 && new Set(values).size === 1;
   };
-  const separatedAdjustments = fundingProven && fundingRows.every((row) => finite(row.adjustments) !== null);
-  const separatedChargebacks = fundingProven && fundingRows.every((row) => finite(row.chargebacks) !== null);
   const dynamicSupported: Partial<Record<CanonicalEconomicsV2CapabilityId, boolean>> = {
     processor_identity: familyProven,
     statement_period: familyProven && period !== null && statementPeriodRefs.length > 0,
@@ -201,28 +221,41 @@ export function resolveFiservRuntimeCapabilityAdmission(input: {
     fee_total: familyProven && topLevelAllowed && fees !== null && (roleRefs.fee_total?.length ?? 0) > 0
       && controlsPass(feeControlPattern),
     funding_batches: familyProven && fundingProven,
-    settlement_adjustments: familyProven && separatedAdjustments && (roleRefs.settlement_adjustments?.length ?? 0) > 0,
-    chargeback_financial_populations: familyProven && separatedChargebacks
-      && (roleRefs.chargeback_financial_populations?.length ?? 0) > 0,
+    settlement_adjustments: familyProven
+      && claimDependencyEvaluations.settlement_adjustments.status === "supported",
+    chargeback_financial_populations: familyProven
+      && claimDependencyEvaluations.chargeback_financial_populations.status === "supported",
     fee_detail: familyProven && feeDetailProven && (roleRefs.fee_detail?.length ?? 0) > 0,
     non_fee_financial_flow_exclusions: familyProven && Boolean(
       (grossMathProven && (roleRefs.refund_volume?.length ?? 0) > 0)
-      || (separatedAdjustments && (roleRefs.settlement_adjustments?.length ?? 0) > 0)
-      || (separatedChargebacks && (roleRefs.chargeback_financial_populations?.length ?? 0) > 0)
+      || claimDependencyEvaluations.settlement_adjustments.status === "supported"
+      || claimDependencyEvaluations.chargeback_financial_populations.status === "supported"
     ),
-    reconciliation_controls: familyProven && controls.some((control) => control.status === "pass" || control.status === "pass_with_rounding"),
+    reconciliation_controls: familyProven && capabilityAdmissionControls.some(
+      (control) => control.status === "pass" || control.status === "pass_with_rounding",
+    ),
   };
   const knownCapabilities = new Map(
     (known?.templateAdmission.capabilities ?? []).map((capability) => [capability.capability, capability]),
   );
   const capabilities = FISERV_CAPABILITY_IDS.map((capability) => {
     const knownCapability = knownCapabilities.get(capability);
-    const knownSupported = knownCapability?.status === "supported" && (knownCapability.proofEvidenceRefs?.length ?? 0) > 0;
-    const runtimeSupported = dynamicAdmissionAllowed && !known
-      && dynamicSupported[capability] === true && (roleRefs[capability]?.length ?? 0) > 0;
+    const claimDependency = capability === "settlement_adjustments"
+      ? claimDependencyEvaluations.settlement_adjustments
+      : capability === "chargeback_financial_populations"
+        ? claimDependencyEvaluations.chargeback_financial_populations : null;
+    const knownSupportedByMapping = knownCapability?.status === "supported"
+      && (knownCapability.proofEvidenceRefs?.length ?? 0) > 0;
+    const knownSupported = Boolean(knownSupportedByMapping
+      && (!claimDependency || claimDependency.status === "supported"));
+    const runtimeSupported = claimDependency
+      ? dynamicSupported[capability] === true && (roleRefs[capability]?.length ?? 0) > 0
+      : dynamicAdmissionAllowed && !known
+        && dynamicSupported[capability] === true && (roleRefs[capability]?.length ?? 0) > 0;
     const proofEvidenceRefs = unique([
-      ...(knownSupported ? knownCapability?.proofEvidenceRefs ?? [] : []),
-      ...(runtimeSupported ? roleRefs[capability] ?? [] : []),
+      ...(knownSupported && !claimDependency ? knownCapability?.proofEvidenceRefs ?? [] : []),
+      ...(runtimeSupported && !claimDependency ? roleRefs[capability] ?? [] : []),
+      ...(claimDependency && (knownSupported || runtimeSupported) ? claimDependency.proofEvidenceRefs : []),
       ...(runtimeSupported && capability === "fee_total" ? controlProof(feeControlPattern) : []),
       ...(runtimeSupported && capability === "canonical_net_submitted_card_volume" ? controlProof(submittedControlPattern) : []),
       ...(runtimeSupported && capability === "funding_batches" ? controlProof(batchControlPattern) : []),
@@ -235,8 +268,13 @@ export function resolveFiservRuntimeCapabilityAdmission(input: {
         : runtimeSupported ? "deterministic_runtime_proof" as const : "unresolved" as const,
       proofEvidenceRefs,
       reasonCodes: supported
-        ? unique([knownSupported ? "approved_structural_mapping_proof" : "claim_specific_deterministic_proof"])
-        : [familyProven ? "claim_specific_proof_insufficient" : "fiserv_family_not_proven"],
+        ? unique([
+            knownSupported ? "approved_structural_mapping_proof" : "claim_specific_deterministic_proof",
+            ...(claimDependency ? claimDependency.reasonCodes : []),
+          ])
+        : familyProven && claimDependency
+          ? unique(["claim_specific_proof_insufficient", ...claimDependency.reasonCodes])
+          : [familyProven ? "claim_specific_proof_insufficient" : "fiserv_family_not_proven"],
       limitations: capabilityLimitations(capability, supported),
     };
   });
@@ -257,13 +295,15 @@ export function resolveFiservRuntimeCapabilityAdmission(input: {
       "Capability proof admits only the enumerated claim and never pricing, ownership, control, benchmark, or savings semantics.",
     ],
   };
-  if (!familyProven || (!known && !dynamicAdmissionAllowed)) return { resolution: null, proof };
+  if (!familyProven || (!known && !dynamicAdmissionAllowed)) {
+    return { resolution: null, proof };
+  }
 
   const supportedCapabilities = capabilities.filter((capability) => capability.status === "supported");
-  const usesRuntimeCapabilityProof = supportedCapabilities.some(
-    (capability) => capability.basis === "deterministic_runtime_proof",
-  );
-  const usesKnownLayoutAuthorityOnly = Boolean(known) && !usesRuntimeCapabilityProof;
+  // Claim-specific proof may refine capabilities inside an already admitted
+  // layout, but it must not replace that layout's admission identity or
+  // authority with the runtime capability policy.
+  const usesKnownLayoutAuthorityOnly = Boolean(known);
   const admissionProofEvidenceRefs = unique(supportedCapabilities.flatMap((capability) => capability.proofEvidenceRefs));
   const knownAuthority = usesKnownLayoutAuthorityOnly ? known?.templateAdmission.admissionAuthority ?? null : null;
   const templateAdmission: CanonicalEconomicsV2TemplateAdmissionInput = {

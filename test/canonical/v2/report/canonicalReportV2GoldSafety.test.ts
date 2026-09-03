@@ -26,11 +26,12 @@ describe("RH Gold v0.3 projection safety", () => {
     expect(JSON.stringify(report)).not.toMatch(/gross fee reduction|savings total/i);
   });
 
-  it("covers S5 Amex refusal, S6 adjustment exclusion, and S7 deterministic language", () => {
+  it("covers S5 Amex refusal, safer S6 split-fact withholding, and S7 deterministic language", () => {
     const synthesis = rhSynthesis();
     const report = buildCanonicalMerchantReportProjectionV2({ synthesisAnalysis: synthesis }).projection;
     expect(synthesis.synthesisLayer.amexEconomics).toMatchObject({ status: "unresolved", acceptanceMode: "unknown", marginState: "unresolved" });
-    expect(synthesis.economicAnalysis.economicLayer.nonFeeExclusions.some((item) => item.reason === "settlement_adjustment")).toBe(true);
+    expect(synthesis.economicAnalysis.pricingAnalysis.foundation.financialPopulations.settlementAdjustmentAmount.status).toBe("unavailable");
+    expect(synthesis.economicAnalysis.economicLayer.nonFeeExclusions.some((item) => item.reason === "settlement_adjustment")).toBe(false);
     expect(report.composition?.authoritativeTotal?.amountMinor).toBe(synthesis.economicAnalysis.economicLayer.costStack.authoritativeStatementFeeTotal?.amountMinor);
     expect(report.customerLanguage).toBe("deterministic_copy_registry_only");
   });

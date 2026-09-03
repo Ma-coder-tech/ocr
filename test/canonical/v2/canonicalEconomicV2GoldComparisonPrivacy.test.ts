@@ -11,11 +11,12 @@ import {
 import { approvedEconomicInput, buildApprovedEconomics } from "./economicFixtures.js";
 
 describe("Canonical Economics V2 RD Gold, comparison, privacy, and anti-overfitting", () => {
-  it("exposes generic S6 exclusion and S10 observed-cost behavior without savings semantics", () => {
+  it("withholds unproven split adjustments while preserving S10 observed-cost behavior", () => {
     const observation = observeCanonicalEconomicsV2ForGold(buildApprovedEconomics());
 
     expect(observation.provenanceStatus).toBe("approved_synthetic");
-    expect(observation.states["financial.settlement_adjustment"]).toBe("funding_only_not_processing_cost");
+    expect(observation.states["financial.settlement_adjustment"]).toBe("not_observed");
+    expect(observation.values).not.toHaveProperty("financial.settlement_adjustment");
     expect(observation.values["cost.observed_processor_billed_fee"]).toBe(31);
     expect(observation.values["risk.misc_chargebacks_fee"]).toBe(15);
     expect(observation.states["cost.statement_cost_scope"]).toBe("statement_evidenced_processing_cost_not_total_acceptance_cost");
