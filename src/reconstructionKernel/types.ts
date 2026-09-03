@@ -121,7 +121,7 @@ export interface ProofGapConceptEvaluation {
 }
 
 export interface ProofGapUnderstanding {
-  rubricVersion: "ratereveal-proof-gap-concepts-v1";
+  rubricVersion: "ratereveal-proof-gap-concepts-v2";
   requiredConceptIds: string[];
   understoodConceptIds: string[];
   evaluations: ProofGapConceptEvaluation[];

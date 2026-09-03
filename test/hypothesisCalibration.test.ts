@@ -91,8 +91,8 @@ function responseFor(
 }
 
 describe("offline AI hypothesis calibration", () => {
-  it("classifies all 25 recorded, live-derived, paraphrase, and adversarial proof-gap cases as expected", () => {
-    expect(offlineProofGapCalibrationCases).toHaveLength(25);
+  it("classifies all 31 recorded, live-derived, paraphrase, and adversarial proof-gap cases as expected", () => {
+    expect(offlineProofGapCalibrationCases).toHaveLength(31);
     const outcomes = offlineProofGapCalibrationCases.map((calibrationCase) => {
       const topic = topicsByStatement[calibrationCase.statementId];
       const result = evaluateProofGapUnderstanding(topic, calibrationCase.alternativeId, calibrationCase.missingProof);
@@ -104,9 +104,9 @@ describe("offline AI hypothesis calibration", () => {
     })));
   });
 
-  it("recognizes every semantically valid proof gap from the six recorded live runs", () => {
+  it("recognizes every semantically valid proof gap from the approved recorded live runs", () => {
     const liveCases = offlineProofGapCalibrationCases.filter((calibrationCase) => calibrationCase.source === "live-evaluation-record");
-    expect(liveCases).toHaveLength(11);
+    expect(liveCases).toHaveLength(14);
     expect(liveCases.every((calibrationCase) => {
       const result = evaluateProofGapUnderstanding(
         topicsByStatement[calibrationCase.statementId],
@@ -117,9 +117,30 @@ describe("offline AI hypothesis calibration", () => {
     })).toBe(true);
   });
 
+  it("recognizes the three exact v3 live phrasings that exposed bounded vocabulary gaps", () => {
+    const v3CaseIds = new Set([
+      "clover-live-v3-inflected-correspondence",
+      "paysafe-live-v3-absent-component",
+      "wells-live-v3-transaction-linkage",
+    ]);
+    const liveV3Cases = offlineProofGapCalibrationCases.filter((calibrationCase) => v3CaseIds.has(calibrationCase.id));
+    expect(liveV3Cases).toHaveLength(3);
+    expect(liveV3Cases.map((calibrationCase) => {
+      const result = evaluateProofGapUnderstanding(
+        topicsByStatement[calibrationCase.statementId],
+        calibrationCase.alternativeId,
+        calibrationCase.missingProof,
+      );
+      return {
+        id: calibrationCase.id,
+        understood: result.evaluations.every((evaluation) => evaluation.understood),
+      };
+    })).toEqual(liveV3Cases.map((calibrationCase) => ({ id: calibrationCase.id, understood: true })));
+  });
+
   it("rejects identifier echo, generic language, and incomplete concept fragments", () => {
     const adversarialFailures = offlineProofGapCalibrationCases.filter((calibrationCase) => !calibrationCase.expectedUnderstood);
-    expect(adversarialFailures).toHaveLength(7);
+    expect(adversarialFailures).toHaveLength(10);
     expect(adversarialFailures.every((calibrationCase) => {
       const result = evaluateProofGapUnderstanding(
         topicsByStatement[calibrationCase.statementId],

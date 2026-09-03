@@ -4,7 +4,7 @@ import type {
   ProofGapUnderstanding,
 } from "./types.js";
 
-export const PROOF_GAP_CONCEPT_RUBRIC_VERSION = "ratereveal-proof-gap-concepts-v1" as const;
+export const PROOF_GAP_CONCEPT_RUBRIC_VERSION = "ratereveal-proof-gap-concepts-v2" as const;
 
 /**
  * Deterministically evaluates meaning-bearing proof-gap facets owned by
@@ -55,13 +55,19 @@ function normalizedMeaningTokens(value: string): Set<string> {
 function normalizeToken(value: string): string {
   const token = value.toLowerCase();
   const aliases: Record<string, string> = {
+    absent: "omit",
     associated: "associate",
+    associates: "associate",
     association: "associate",
     amounts: "amount",
     batches: "batch",
     charges: "charge",
     connecting: "connect",
     connected: "connect",
+    connects: "connect",
+    corresponded: "correspond",
+    corresponding: "correspond",
+    corresponds: "correspond",
     declined: "decline",
     dated: "date",
     entries: "entry",
@@ -70,7 +76,9 @@ function normalizeToken(value: string): string {
     identified: "identify",
     identifying: "identify",
     linked: "link",
+    linkage: "link",
     linking: "link",
+    links: "link",
     matches: "match",
     matching: "match",
     omitted: "omit",
