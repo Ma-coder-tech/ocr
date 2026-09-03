@@ -145,6 +145,8 @@ function qualifyProviderInference(
   const unresolved = compatibility.filter((result) => !result || result.state === "unresolved");
   const acknowledged = new Set(hypothesis.inference.acknowledgedEvidenceNeedIds ?? []);
   const unacknowledgedGaps = policy.materialEvidenceNeedIds.filter((id) => !acknowledged.has(id));
+  const understoodConcepts = new Set(hypothesis.inference.proofGapUnderstanding?.understoodConceptIds ?? []);
+  const ununderstoodConcepts = topic.requiredProofGapConceptIds.filter((id) => !understoodConcepts.has(id));
   const competingAlternativeCount = hypotheses.filter((candidate) =>
     candidate.id !== hypothesis.id && candidate.groupId === hypothesis.groupId).length;
   const reasonCodes = [
@@ -184,6 +186,12 @@ function qualifyProviderInference(
       reasonCodes: [...reasonCodes, "material_proof_gap_not_acknowledged"],
     };
   }
+  if (ununderstoodConcepts.length > 0) {
+    return {
+      strength: "weak",
+      reasonCodes: [...reasonCodes, "material_proof_gap_concept_not_understood"],
+    };
+  }
   const strength = lowerStrength(
     confidenceAsStrength(hypothesis.inference.confidence),
     policy.maximumStrength,
@@ -194,6 +202,7 @@ function qualifyProviderInference(
       ...reasonCodes,
       "deterministic_compatibility_controls_passed",
       "material_proof_gaps_acknowledged",
+      "material_proof_gap_concepts_understood",
       ...(policy.completenessRequirement === "observed_rows_sufficient"
         ? ["topic_is_bounded_to_observed_rows"] : ["required_statement_completeness_proven"]),
       ...(strength !== confidenceAsStrength(hypothesis.inference.confidence)

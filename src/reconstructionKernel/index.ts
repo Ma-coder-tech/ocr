@@ -6,6 +6,7 @@ export * from "./provider.js";
 export * from "./liveHypothesisProvider.js";
 export * from "./liveHypothesisEvaluationRecord.js";
 export * from "./recordedHypothesisExperiment.js";
+export * from "./proofGapEvaluation.js";
 export * from "./validation.js";
 export * from "./worlds.js";
 export * from "./kernel.js";

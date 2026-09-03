@@ -1,19 +1,22 @@
 import { createHash } from "node:crypto";
 
+import { evaluateProofGapUnderstanding } from "./proofGapEvaluation.js";
 import type {
   EventNode,
   EvidenceNeed,
   Hypothesis,
   InferenceConfidenceLevel,
   InferenceTopic,
+  InferenceTopicMaterialAlternative,
   Observation,
   PopulationNode,
   ScalarValue,
 } from "./types.js";
 
-export const HYPOTHESIS_PROPOSAL_SCHEMA = "source_bound_hypothesis_proposal_v2" as const;
+export const HYPOTHESIS_PROPOSAL_SCHEMA = "source_bound_hypothesis_proposal_v3" as const;
 export const MAX_PROVIDER_HYPOTHESES = 16;
 export const MAX_PROVIDER_CLAIMS_PER_HYPOTHESIS = 16;
+export const MAX_PROVIDER_ALTERNATIVE_ASSESSMENTS = 16;
 
 export interface SourceBoundProposalObservation {
   observationRef: string;
@@ -47,6 +50,11 @@ export interface SourceBoundInferenceTopic {
   question: string;
   observationRefs: string[];
   allowedClaims: Array<{ key: string; allowedValues: ScalarValue[] }>;
+  materialAlternatives: Array<{
+    alternativeRef: string;
+    description: string;
+    claim: { key: string; value: ScalarValue };
+  }>;
   knownEvidenceGaps: Array<{
     evidenceNeedRef: string;
     description: string;
@@ -63,6 +71,7 @@ export interface ProviderClaimProposal {
 export interface ProviderHypothesisProposal {
   id: string;
   topicRef: string;
+  alternativeRef: string;
   description: string;
   observationRefs: string[];
   events: EventNode[];
@@ -76,9 +85,28 @@ export interface ProviderHypothesisProposal {
   };
 }
 
+export type ProviderAlternativeDisposition = "proposed" | "not_supported";
+export type ProviderAlternativeReasonCode =
+  | "proposal_supplied"
+  | "insufficient_source_evidence"
+  | "contradicted_by_source"
+  | "less_supported_than_competing_alternative"
+  | "not_applicable_to_observations";
+
+export interface ProviderAlternativeCoverageAssessment {
+  topicRef: string;
+  alternativeRef: string;
+  disposition: ProviderAlternativeDisposition;
+  reasonCode: ProviderAlternativeReasonCode;
+  rationale: string;
+  observationRefs: string[];
+  acknowledgedEvidenceNeedRefs: string[];
+}
+
 export interface HypothesisProposalResponse {
   providerId: string;
   hypotheses: ProviderHypothesisProposal[];
+  alternativeCoverage: ProviderAlternativeCoverageAssessment[];
 }
 
 export interface StatementHypothesisProposer {
@@ -95,6 +123,10 @@ type ProposalPacket = {
   request: HypothesisProposalRequest;
   internalObservationIdByOpaqueRef: Map<string, string>;
   inferenceTopicByOpaqueRef: Map<string, InferenceTopic>;
+  materialAlternativeByOpaqueRef: Map<string, {
+    topic: InferenceTopic;
+    alternative: InferenceTopicMaterialAlternative;
+  }>;
   internalEvidenceNeedIdByOpaqueRef: Map<string, string>;
 };
 
@@ -134,6 +166,17 @@ function proposalPacket(
   const inferenceTopicByOpaqueRef = new Map(
     orderedTopics.map((topic) => [topicRefById.get(topic.id)!, topic]),
   );
+  const orderedAlternatives = orderedTopics.flatMap((topic) => topic.materialAlternatives
+    .map((alternative) => ({ topic, alternative })))
+    .sort((left, right) => `${left.topic.id}\0${left.alternative.id}`.localeCompare(`${right.topic.id}\0${right.alternative.id}`));
+  const alternativeRefById = new Map(orderedAlternatives.map(({ alternative }, index) => [
+    alternative.id,
+    `material-alternative-${String(index + 1).padStart(4, "0")}`,
+  ]));
+  const materialAlternativeByOpaqueRef = new Map(orderedAlternatives.map(({ topic, alternative }) => [
+    alternativeRefById.get(alternative.id)!,
+    { topic, alternative },
+  ]));
   const evidenceNeedIds = [...new Set(orderedTopics.flatMap((topic) =>
     topic.qualification.materialEvidenceNeedIds))].sort();
   const evidenceNeedRefById = new Map(evidenceNeedIds.map((id, index) => [
@@ -181,6 +224,11 @@ function proposalPacket(
       question: topic.question,
       observationRefs: topic.observationRefs.map((reference) => opaqueRefByInternalId.get(reference)!),
       allowedClaims: structuredClone(topic.allowedClaims),
+      materialAlternatives: topic.materialAlternatives.map((alternative) => ({
+        alternativeRef: alternativeRefById.get(alternative.id)!,
+        description: alternative.description,
+        claim: structuredClone(alternative.claim),
+      })),
       knownEvidenceGaps: topic.qualification.materialEvidenceNeedIds.map((id) => ({
         evidenceNeedRef: evidenceNeedRefById.get(id)!,
         description: evidenceNeedById.get(id)?.description ?? "RateReveal requires additional evidence before confirmation.",
@@ -197,6 +245,7 @@ function proposalPacket(
     request,
     internalObservationIdByOpaqueRef,
     inferenceTopicByOpaqueRef,
+    materialAlternativeByOpaqueRef,
     internalEvidenceNeedIdByOpaqueRef,
   };
 }
@@ -220,12 +269,22 @@ export function validateProviderResponse(
   if (!response || typeof response !== "object") return ["Provider response must be an object."];
   if (response.providerId !== expectedProviderId) errors.push("Provider response identity mismatch.");
   if (!Array.isArray(response.hypotheses)) return [...errors, "Provider hypotheses must be an array."].sort();
+  if (!Array.isArray(response.alternativeCoverage)) {
+    errors.push("Provider alternativeCoverage must be an array addressing every RateReveal material alternative.");
+  } else if (response.alternativeCoverage.length > MAX_PROVIDER_ALTERNATIVE_ASSESSMENTS) {
+    errors.push(`Provider alternative coverage limit exceeded: ${response.alternativeCoverage.length}/${MAX_PROVIDER_ALTERNATIVE_ASSESSMENTS}.`);
+  }
   if (response.hypotheses.length > MAX_PROVIDER_HYPOTHESES) {
     errors.push(`Provider hypothesis limit exceeded: ${response.hypotheses.length}/${MAX_PROVIDER_HYPOTHESES}.`);
   }
   const allowed = new Set(request.allowedObservationRefs);
   const topics = new Map(request.inferenceTopics.map((topic) => [topic.topicRef, topic]));
+  const alternatives = new Map(request.inferenceTopics.flatMap((topic) => topic.materialAlternatives.map((alternative) => [
+    alternative.alternativeRef,
+    { topic, alternative },
+  ] as const)));
   const seenIds = new Set<string>();
+  const hypothesesByAlternativeRef = new Map<string, ProviderHypothesisProposal[]>();
   for (const rawHypothesis of response.hypotheses) {
     const hypothesis = rawHypothesis as ProviderHypothesisProposal & Record<string, unknown>;
     if (!hypothesis || typeof hypothesis !== "object") {
@@ -237,6 +296,16 @@ export function validateProviderResponse(
     else seenIds.add(hypothesis.id);
     if (typeof hypothesis.topicRef !== "string" || !topics.has(hypothesis.topicRef)) {
       errors.push(`Provider hypothesis ${String(hypothesis.id)} does not select an offered RateReveal inference topic.`);
+    }
+    const selectedAlternative = typeof hypothesis.alternativeRef === "string"
+      ? alternatives.get(hypothesis.alternativeRef)
+      : undefined;
+    if (!selectedAlternative || selectedAlternative.topic.topicRef !== hypothesis.topicRef) {
+      errors.push(`Provider hypothesis ${String(hypothesis.id)} does not select a material alternative from its RateReveal-owned topic.`);
+    } else {
+      const proposed = hypothesesByAlternativeRef.get(hypothesis.alternativeRef) ?? [];
+      proposed.push(hypothesis);
+      hypothesesByAlternativeRef.set(hypothesis.alternativeRef, proposed);
     }
     if (typeof hypothesis.description !== "string" || hypothesis.description.trim() === "") {
       errors.push(`Provider hypothesis ${String(hypothesis.id)} has an invalid description.`);
@@ -261,9 +330,14 @@ export function validateProviderResponse(
     if (!inference || !["low", "medium", "high"].includes(inference.confidence)
       || typeof inference.rationale !== "string" || inference.rationale.trim() === ""
       || !Array.isArray(inference.missingProof)
+      || inference.missingProof.length === 0
+      || !inference.missingProof.every((item) => typeof item === "string" && item.trim() !== "")
       || !Array.isArray(inference.acknowledgedEvidenceNeedRefs)
       || !inference.acknowledgedEvidenceNeedRefs.every((reference) => typeof reference === "string")) {
       errors.push(`Provider hypothesis ${String(hypothesis.id)} has invalid inference metadata.`);
+    }
+    if (inference && Object.hasOwn(inference as object, "proofGapUnderstanding")) {
+      errors.push(`Provider hypothesis ${String(hypothesis.id)} attempts to supply RateReveal-owned proof-gap qualification.`);
     }
     const claims = Array.isArray(hypothesis.claims) ? hypothesis.claims : [];
     if (!Array.isArray(hypothesis.claims)) errors.push(`Provider hypothesis ${String(hypothesis.id)} claims must be an array.`);
@@ -307,6 +381,15 @@ export function validateProviderResponse(
           errors.push(`Provider hypothesis ${String(hypothesis.id)} proposes a claim outside its RateReveal-owned topic.`);
         }
       }
+      if (selectedAlternative) {
+        const expected = selectedAlternative.alternative.claim;
+        const exactAlternativeClaim = claims.length === 1
+          && claims[0]?.key === expected.key
+          && JSON.stringify(claims[0].value) === JSON.stringify(expected.value);
+        if (!exactAlternativeClaim) {
+          errors.push(`Provider hypothesis ${String(hypothesis.id)} does not match its selected RateReveal material alternative.`);
+        }
+      }
       const allowedEvidenceNeeds = new Set(topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef));
       for (const reference of inference?.acknowledgedEvidenceNeedRefs ?? []) {
         if (!allowedEvidenceNeeds.has(reference)) {
@@ -324,7 +407,113 @@ export function validateProviderResponse(
       if (!allowed.has(reference)) errors.push(`Provider hypothesis ${String(hypothesis.id)} references unavailable observation ${reference}.`);
     }
   }
+  validateAlternativeCoverage(
+    response.alternativeCoverage,
+    alternatives,
+    topics,
+    hypothesesByAlternativeRef,
+    allowed,
+    errors,
+  );
   return [...new Set(errors)].sort();
+}
+
+function validateAlternativeCoverage(
+  rawCoverage: unknown,
+  alternatives: Map<string, { topic: SourceBoundInferenceTopic; alternative: SourceBoundInferenceTopic["materialAlternatives"][number] }>,
+  topics: Map<string, SourceBoundInferenceTopic>,
+  hypothesesByAlternativeRef: Map<string, ProviderHypothesisProposal[]>,
+  allowedObservationRefs: Set<string>,
+  errors: string[],
+): void {
+  if (!Array.isArray(rawCoverage)) return;
+  const coverageByAlternativeRef = new Map<string, ProviderAlternativeCoverageAssessment[]>();
+  const unsupportedReasonCodes = new Set<ProviderAlternativeReasonCode>([
+    "insufficient_source_evidence",
+    "contradicted_by_source",
+    "less_supported_than_competing_alternative",
+    "not_applicable_to_observations",
+  ]);
+  for (const rawAssessment of rawCoverage) {
+    if (!rawAssessment || typeof rawAssessment !== "object") {
+      errors.push("Provider alternative coverage assessment must be an object.");
+      continue;
+    }
+    const assessment = rawAssessment as ProviderAlternativeCoverageAssessment;
+    for (const forbidden of [
+      "authority", "canonicalAuthority", "controlRefs", "requiredControlIds", "qualification",
+      "qualifiedInferenceStrength", "ownership", "origin", "groupId", "evidenceClass",
+    ]) {
+      if (Object.hasOwn(assessment, forbidden)) {
+        errors.push(`Provider coverage assessment ${String(assessment.alternativeRef)} attempts to supply prohibited authority metadata ${forbidden}.`);
+      }
+    }
+    const selected = typeof assessment.alternativeRef === "string"
+      ? alternatives.get(assessment.alternativeRef)
+      : undefined;
+    if (!selected || selected.topic.topicRef !== assessment.topicRef || !topics.has(assessment.topicRef)) {
+      errors.push(`Provider coverage assessment ${String(assessment.alternativeRef)} does not select a material alternative from its RateReveal-owned topic.`);
+      continue;
+    }
+    const entries = coverageByAlternativeRef.get(assessment.alternativeRef) ?? [];
+    entries.push(assessment);
+    coverageByAlternativeRef.set(assessment.alternativeRef, entries);
+    if (assessment.disposition !== "proposed" && assessment.disposition !== "not_supported") {
+      errors.push(`Provider coverage assessment ${assessment.alternativeRef} has an invalid disposition.`);
+    }
+    if (typeof assessment.rationale !== "string" || assessment.rationale.trim() === "") {
+      errors.push(`Provider coverage assessment ${assessment.alternativeRef} requires a structured rationale.`);
+    }
+    if (!Array.isArray(assessment.observationRefs) || assessment.observationRefs.length === 0
+        || !assessment.observationRefs.every((reference) => typeof reference === "string")) {
+      errors.push(`Provider coverage assessment ${assessment.alternativeRef} must cite source observations.`);
+    } else {
+      const topicObservationRefs = new Set(selected.topic.observationRefs);
+      for (const reference of assessment.observationRefs) {
+        if (!topicObservationRefs.has(reference) || !allowedObservationRefs.has(reference)) {
+          errors.push(`Provider coverage assessment ${assessment.alternativeRef} cites unavailable observation ${reference}.`);
+        }
+      }
+    }
+    if (!Array.isArray(assessment.acknowledgedEvidenceNeedRefs)
+        || !assessment.acknowledgedEvidenceNeedRefs.every((reference) => typeof reference === "string")) {
+      errors.push(`Provider coverage assessment ${assessment.alternativeRef} has invalid evidence-need references.`);
+    } else {
+      const allowedEvidenceNeeds = new Set(selected.topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef));
+      for (const reference of assessment.acknowledgedEvidenceNeedRefs) {
+        if (!allowedEvidenceNeeds.has(reference)) {
+          errors.push(`Provider coverage assessment ${assessment.alternativeRef} acknowledges unavailable evidence need ${reference}.`);
+        }
+      }
+    }
+    const hypothesisCount = hypothesesByAlternativeRef.get(assessment.alternativeRef)?.length ?? 0;
+    if (assessment.disposition === "proposed") {
+      if (assessment.reasonCode !== "proposal_supplied") {
+        errors.push(`Proposed alternative ${assessment.alternativeRef} must use reasonCode proposal_supplied.`);
+      }
+      if (hypothesisCount !== 1) {
+        errors.push(`Proposed alternative ${assessment.alternativeRef} must have exactly one matching hypothesis.`);
+      }
+    } else {
+      if (!unsupportedReasonCodes.has(assessment.reasonCode)) {
+        errors.push(`Unsupported alternative ${assessment.alternativeRef} requires a permitted structured reason code.`);
+      }
+      if (hypothesisCount !== 0) {
+        errors.push(`Unsupported alternative ${assessment.alternativeRef} cannot also have a matching hypothesis.`);
+      }
+    }
+  }
+  for (const alternativeRef of alternatives.keys()) {
+    const entries = coverageByAlternativeRef.get(alternativeRef) ?? [];
+    if (entries.length !== 1) {
+      errors.push(`RateReveal material alternative ${alternativeRef} must be addressed exactly once; received ${entries.length}.`);
+    }
+  }
+  for (const alternativeRef of hypothesesByAlternativeRef.keys()) {
+    if ((coverageByAlternativeRef.get(alternativeRef) ?? []).length !== 1) {
+      errors.push(`Provider hypothesis for ${alternativeRef} lacks exactly one matching coverage assessment.`);
+    }
+  }
 }
 
 export async function collectRecordedProviderHypotheses(
@@ -334,13 +523,19 @@ export async function collectRecordedProviderHypotheses(
   sourceBinding: HypothesisProposalSourceBinding,
   inferenceTopics: InferenceTopic[] = [],
   evidenceNeeds: EvidenceNeed[] = [],
-): Promise<{ hypotheses: Hypothesis[]; errors: string[]; request: HypothesisProposalRequest | null }> {
+): Promise<{
+  hypotheses: Hypothesis[];
+  alternativeCoverage: ProviderAlternativeCoverageAssessment[];
+  errors: string[];
+  request: HypothesisProposalRequest | null;
+}> {
   let packet: ProposalPacket;
   try {
     packet = proposalPacket(statementId, observations, sourceBinding, inferenceTopics, evidenceNeeds);
   } catch (error) {
     return {
       hypotheses: [],
+      alternativeCoverage: [],
       errors: [error instanceof Error ? error.message : "Provider proposal source binding failed."],
       request: null,
     };
@@ -355,15 +550,18 @@ export async function collectRecordedProviderHypotheses(
             proposer.providerId,
             packet.internalObservationIdByOpaqueRef,
             packet.inferenceTopicByOpaqueRef,
+            packet.materialAlternativeByOpaqueRef,
             packet.internalEvidenceNeedIdByOpaqueRef,
           ))
         : [],
+      alternativeCoverage: errors.length === 0 ? structuredClone(response.alternativeCoverage) : [],
       errors,
       request: packet.request,
     };
   } catch {
     return {
       hypotheses: [],
+      alternativeCoverage: [],
       errors: [`Provider ${proposer.providerId} was unavailable; deterministic reconstruction remains authoritative.`],
       request: packet.request,
     };
@@ -375,10 +573,13 @@ function normalizeProviderProposal(
   providerId: string,
   internalObservationIdByOpaqueRef: Map<string, string>,
   inferenceTopicByOpaqueRef: Map<string, InferenceTopic>,
+  materialAlternativeByOpaqueRef: Map<string, { topic: InferenceTopic; alternative: InferenceTopicMaterialAlternative }>,
   internalEvidenceNeedIdByOpaqueRef: Map<string, string>,
 ): Hypothesis {
   const translate = (references: string[]) => references.map((reference) => internalObservationIdByOpaqueRef.get(reference)!);
   const topic = inferenceTopicByOpaqueRef.get(proposal.topicRef)!;
+  const alternative = materialAlternativeByOpaqueRef.get(proposal.alternativeRef)!.alternative;
+  const proofGapUnderstanding = evaluateProofGapUnderstanding(topic, alternative.id, proposal.inference.missingProof);
   return deepFreeze({
     id: providerOwnedId(providerId, proposal.id),
     groupId: topic.hypothesisGroupId,
@@ -392,10 +593,14 @@ function normalizeProviderProposal(
       missingProof: structuredClone(proposal.inference.missingProof),
       acknowledgedEvidenceNeedIds: proposal.inference.acknowledgedEvidenceNeedRefs
         .map((reference) => internalEvidenceNeedIdByOpaqueRef.get(reference)!),
+      proofGapUnderstanding,
     },
     inferenceTopic: {
       topicId: topic.id,
       hypothesisGroupId: topic.hypothesisGroupId,
+      alternativeId: alternative.id,
+      requiredProofGapConceptIds: structuredClone(alternative.requiredProofGapConceptIds),
+      proofGapConcepts: structuredClone(topic.proofGapConcepts),
       immutable: true as const,
       qualification: structuredClone(topic.qualification),
     },
@@ -419,17 +624,65 @@ function normalizeProviderProposal(
 function validateInferenceTopics(topics: InferenceTopic[], observations: Observation[]): void {
   const observationIds = new Set(observations.map((observation) => observation.id));
   const topicIds = new Set<string>();
+  const alternativeIds = new Set<string>();
+  const conceptIds = new Set<string>();
+  let materialAlternativeCount = 0;
   for (const topic of topics) {
     if (!topic.id.trim() || topicIds.has(topic.id)) throw new Error(`RateReveal inference topic identity ${topic.id || "<empty>"} is invalid or duplicated.`);
     topicIds.add(topic.id);
     if (!topic.hypothesisGroupId.trim() || !topic.question.trim()) throw new Error(`RateReveal inference topic ${topic.id} is incomplete.`);
     if (topic.allowedClaims.length === 0) throw new Error(`RateReveal inference topic ${topic.id} has no allowed claims.`);
+    if (topic.materialAlternatives.length === 0) throw new Error(`RateReveal inference topic ${topic.id} has no material alternatives.`);
+    materialAlternativeCount += topic.materialAlternatives.length;
+    if (materialAlternativeCount > MAX_PROVIDER_ALTERNATIVE_ASSESSMENTS) {
+      throw new Error(`RateReveal material alternative limit exceeded: ${materialAlternativeCount}/${MAX_PROVIDER_ALTERNATIVE_ASSESSMENTS}.`);
+    }
     if (topic.observationRefs.length === 0) throw new Error(`RateReveal inference topic ${topic.id} has no source observations.`);
     if (new Set(topic.observationRefs).size !== topic.observationRefs.length) {
       throw new Error(`RateReveal inference topic ${topic.id} repeats a source observation.`);
     }
     if (new Set(topic.allowedClaims.map((claim) => claim.key)).size !== topic.allowedClaims.length) {
       throw new Error(`RateReveal inference topic ${topic.id} repeats an allowed claim key.`);
+    }
+    const topicConceptIds = new Set(topic.proofGapConcepts.map((concept) => concept.id));
+    for (const concept of topic.proofGapConcepts) {
+      if (!concept.id.trim() || conceptIds.has(concept.id)) {
+        throw new Error(`RateReveal proof-gap concept identity ${concept.id || "<empty>"} is invalid or duplicated.`);
+      }
+      conceptIds.add(concept.id);
+      if (!concept.description.trim() || concept.evidenceNeedIds.length === 0 || concept.requiredFacets.length === 0) {
+        throw new Error(`RateReveal proof-gap concept ${concept.id} is incomplete.`);
+      }
+      if (concept.requiredFacets.some((facet) => !facet.id.trim() || facet.acceptedTokenGroups.length === 0
+        || facet.acceptedTokenGroups.some((group) => group.length === 0 || group.some((token) => !token.trim())))) {
+        throw new Error(`RateReveal proof-gap concept ${concept.id} contains an invalid semantic facet.`);
+      }
+      if (concept.evidenceNeedIds.some((id) => !topic.qualification.materialEvidenceNeedIds.includes(id))) {
+        throw new Error(`RateReveal proof-gap concept ${concept.id} references evidence outside topic ${topic.id}.`);
+      }
+    }
+    for (const alternative of topic.materialAlternatives) {
+      if (!alternative.id.trim() || alternativeIds.has(alternative.id)) {
+        throw new Error(`RateReveal material alternative identity ${alternative.id || "<empty>"} is invalid or duplicated.`);
+      }
+      alternativeIds.add(alternative.id);
+      if (!alternative.description.trim() || alternative.requiredProofGapConceptIds.length === 0
+          || alternative.requiredProofGapConceptIds.some((id) => !topicConceptIds.has(id))) {
+        throw new Error(`RateReveal material alternative ${alternative.id} is incomplete.`);
+      }
+      const allowedClaim = topic.allowedClaims.find((claim) => claim.key === alternative.claim.key);
+      if (!allowedClaim || !allowedClaim.allowedValues.some((value) => JSON.stringify(value) === JSON.stringify(alternative.claim.value))) {
+        throw new Error(`RateReveal material alternative ${alternative.id} is outside topic ${topic.id}.`);
+      }
+    }
+    for (const allowedClaim of topic.allowedClaims) {
+      for (const allowedValue of allowedClaim.allowedValues) {
+        const count = topic.materialAlternatives.filter((alternative) => alternative.claim.key === allowedClaim.key
+          && JSON.stringify(alternative.claim.value) === JSON.stringify(allowedValue)).length;
+        if (count !== 1) {
+          throw new Error(`RateReveal topic ${topic.id} must map allowed claim ${allowedClaim.key}=${JSON.stringify(allowedValue)} to exactly one material alternative.`);
+        }
+      }
     }
     for (const reference of topic.observationRefs) {
       if (!observationIds.has(reference)) throw new Error(`RateReveal inference topic ${topic.id} references unknown observation ${reference}.`);

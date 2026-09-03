@@ -9,7 +9,7 @@ import {
 
 function request(): HypothesisProposalRequest {
   return {
-    schemaVersion: "source_bound_hypothesis_proposal_v2",
+    schemaVersion: "source_bound_hypothesis_proposal_v3",
     sourceDocument: {
       documentId: "approved-case",
       sourceDocumentRef: "approved-evaluation-document:approved-case",
@@ -30,6 +30,11 @@ function request(): HypothesisProposalRequest {
       question: "What explains the gap?",
       observationRefs: ["source-observation-0001"],
       allowedClaims: [{ key: "gap.explanation", allowedValues: ["rounding"] }],
+      materialAlternatives: [{
+        alternativeRef: "material-alternative-0001",
+        description: "The visible gap is rounding.",
+        claim: { key: "gap.explanation", value: "rounding" },
+      }],
       knownEvidenceGaps: [{ evidenceNeedRef: "evidence-need-0001", description: "Unrounded inputs are missing.", material: true }],
     }],
     authorityPolicy: {
@@ -55,6 +60,7 @@ describe("live hypothesis provider boundary", () => {
             text: JSON.stringify({
               hypotheses: [{
                 topicRef: "inference-topic-0001",
+                alternativeRef: "material-alternative-0001",
                 description: "Displayed rounding is compatible with the gap.",
                 observationRefs: ["source-observation-0001"],
                 events: [],
@@ -66,6 +72,15 @@ describe("live hypothesis provider boundary", () => {
                   missingProof: ["Unrounded inputs are missing."],
                   acknowledgedEvidenceNeedRefs: ["evidence-need-0001"],
                 },
+              }],
+              alternativeCoverage: [{
+                topicRef: "inference-topic-0001",
+                alternativeRef: "material-alternative-0001",
+                disposition: "proposed",
+                reasonCode: "proposal_supplied",
+                rationale: "The source observations support a rounding proposal.",
+                observationRefs: ["source-observation-0001"],
+                acknowledgedEvidenceNeedRefs: ["evidence-need-0001"],
               }],
             }),
           }],
@@ -86,7 +101,10 @@ describe("live hypothesis provider boundary", () => {
     expect(sentBody).toMatchObject({ model: "gpt-5.6-terra", store: false, reasoning: { effort: "high" } });
     expect(sentBody).not.toHaveProperty("tools");
     expect(JSON.stringify(sentBody)).not.toContain("test-only-key");
+    expect(JSON.stringify(sentBody)).toContain("alternativeCoverage");
+    expect(JSON.stringify(sentBody)).toContain("material-alternative-0001");
     expect(result.hypotheses[0]?.id).toBe(stableLiveProposalId("inference-topic-0001", "gap.explanation", "rounding"));
+    expect(result.alternativeCoverage).toHaveLength(1);
     expect(proposer.getAttemptAudits()).toEqual([expect.objectContaining({
       attemptNumber: 1,
       automaticRetryCount: 0,

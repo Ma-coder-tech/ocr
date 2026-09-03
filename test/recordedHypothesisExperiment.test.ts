@@ -45,6 +45,18 @@ const inferenceTopicsByCase: Record<CaseId, InferenceTopic[]> = {
   "wells-fargo-september-2024": wellsInferenceTopics,
 };
 
+function unsupportedAlternativeCoverage(request: Parameters<StatementHypothesisProposer["propose"]>[0]) {
+  return request.inferenceTopics.flatMap((topic) => topic.materialAlternatives.map((alternative) => ({
+    topicRef: topic.topicRef,
+    alternativeRef: alternative.alternativeRef,
+    disposition: "not_supported" as const,
+    reasonCode: "insufficient_source_evidence" as const,
+    rationale: "The supplied source observations are insufficient to support this alternative.",
+    observationRefs: topic.observationRefs,
+    acknowledgedEvidenceNeedRefs: topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef),
+  })));
+}
+
 async function loadCase(caseId: CaseId): Promise<LoadedCase> {
   const replayCase = realStatementReplayCases.find((candidate) => candidate.definition.id === caseId)!;
   const [document, bytes] = await Promise.all([parsePdf(replayCase.pdfPath), readFile(replayCase.pdfPath)]);
@@ -126,6 +138,8 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
       "existing_interpretation_explained",
     ]);
     expect(result.proposalReviews.every((review) => review.missingProofAcknowledged)).toBe(true);
+    expect(result.proposalReviews.every((review) => review.proofGapConceptsUnderstood)).toBe(true);
+    expect(result.allMaterialAlternativesAddressed).toBe(true);
     expect(result.unknownAlternativeRetainedForEveryProviderGroup).toBe(true);
   });
 
@@ -200,7 +214,7 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
       proposalId: "unsupported-high-confidence-answer",
       expectedClaims: [{ key: "batches.same_lifecycle", value: true }],
       confidenceCeiling: "medium",
-      requiredMissingProofTerms: ["stable source identifier"],
+      requiredProofGapConceptIds: ["stable-row-identity-linkage"],
     };
     const result = await runCase(
       "clover-duplicate-resubmission",
@@ -232,9 +246,9 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     let invoked = false;
     const proposer: StatementHypothesisProposer = {
       providerId: "must-not-run",
-      async propose() {
+      async propose(request) {
         invoked = true;
-        return { providerId: "must-not-run", hypotheses: [] };
+        return { providerId: "must-not-run", hypotheses: [], alternativeCoverage: unsupportedAlternativeCoverage(request) };
       },
     };
     const result = await runRecordedHypothesisExperiment({
@@ -281,7 +295,11 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
       providerId: "recorded-context-inspector",
       async propose(request) {
         observedPacket = JSON.stringify(request);
-        return { providerId: "recorded-context-inspector", hypotheses: [] };
+        return {
+          providerId: "recorded-context-inspector",
+          hypotheses: [],
+          alternativeCoverage: unsupportedAlternativeCoverage(request),
+        };
       },
     };
     const result = await runRecordedHypothesisExperiment({

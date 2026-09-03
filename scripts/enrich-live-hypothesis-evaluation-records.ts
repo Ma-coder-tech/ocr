@@ -2,8 +2,6 @@ import { createHash } from "node:crypto";
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import { LIVE_HYPOTHESIS_EVALUATION_RECORD_VERSION } from "../src/reconstructionKernel/index.js";
-
 const directory = process.argv[2];
 if (!directory) throw new Error("Usage: enrich-live-hypothesis-evaluation-records.ts <record-directory>");
 
@@ -42,7 +40,8 @@ for (const name of (await readdir(directory)).filter((value) => value.endsWith("
         : null,
     };
   });
-  payload.recordVersion = LIVE_HYPOTHESIS_EVALUATION_RECORD_VERSION;
+  // This one-way historical migration remains pinned to its original v1 -> v2 contract.
+  payload.recordVersion = "ratereveal-live-hypothesis-evaluation-record-v2";
   payload.supersedesIntegritySha256 = source.integrity.payloadSha256;
   const payloadSha256 = createHash("sha256").update(stableJson(payload)).digest("hex");
   const record = { integrity: { algorithm: "sha256", payloadSha256 }, payload };

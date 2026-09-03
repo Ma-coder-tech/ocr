@@ -86,11 +86,45 @@ export interface HypothesisInference {
   rationale: string;
   missingProof: string[];
   acknowledgedEvidenceNeedIds?: string[];
+  proofGapUnderstanding?: ProofGapUnderstanding;
 }
 
 export interface InferenceTopicClaim {
   key: string;
   allowedValues: ScalarValue[];
+}
+
+export interface ProofGapConceptFacet {
+  id: string;
+  acceptedTokenGroups: string[][];
+}
+
+export interface ProofGapConceptRubric {
+  id: string;
+  description: string;
+  evidenceNeedIds: string[];
+  requiredFacets: ProofGapConceptFacet[];
+}
+
+export interface InferenceTopicMaterialAlternative {
+  id: string;
+  description: string;
+  claim: { key: string; value: ScalarValue };
+  requiredProofGapConceptIds: string[];
+}
+
+export interface ProofGapConceptEvaluation {
+  conceptId: string;
+  requiredFacetIds: string[];
+  matchedFacetIds: string[];
+  understood: boolean;
+}
+
+export interface ProofGapUnderstanding {
+  rubricVersion: "ratereveal-proof-gap-concepts-v1";
+  requiredConceptIds: string[];
+  understoodConceptIds: string[];
+  evaluations: ProofGapConceptEvaluation[];
 }
 
 /**
@@ -104,6 +138,8 @@ export interface InferenceTopic {
   question: string;
   observationRefs: string[];
   allowedClaims: InferenceTopicClaim[];
+  materialAlternatives: InferenceTopicMaterialAlternative[];
+  proofGapConcepts: ProofGapConceptRubric[];
   qualification: {
     maximumStrength: Exclude<QualifiedInferenceStrength, "unknown_competing">;
     compatibilityControlIds: string[];
@@ -116,6 +152,9 @@ export interface InferenceTopic {
 export interface SystemInferenceTopicAssignment {
   topicId: string;
   hypothesisGroupId: string;
+  alternativeId: string;
+  requiredProofGapConceptIds: string[];
+  proofGapConcepts: ProofGapConceptRubric[];
   immutable: true;
   qualification: InferenceTopic["qualification"];
 }

@@ -6,8 +6,8 @@ import type { LiveProviderAttemptAudit } from "./liveHypothesisProvider.js";
 import type { RecordedHypothesisExperimentResult } from "./recordedHypothesisExperiment.js";
 import type { InferenceTopic } from "./types.js";
 
-export const LIVE_HYPOTHESIS_EVALUATION_RECORD_VERSION = "ratereveal-live-hypothesis-evaluation-record-v2" as const;
-export const LIVE_INFERENCE_TOPIC_REGISTRY_VERSION = "ratereveal-approved-topic-registry-v1" as const;
+export const LIVE_HYPOTHESIS_EVALUATION_RECORD_VERSION = "ratereveal-live-hypothesis-evaluation-record-v3" as const;
+export const LIVE_INFERENCE_TOPIC_REGISTRY_VERSION = "ratereveal-approved-topic-registry-v2" as const;
 
 export interface LiveProviderPrivacyConfiguration {
   verifiedAt: string;
@@ -58,6 +58,8 @@ export interface LiveHypothesisEvaluationRecordPayload {
     canonicalTruthAfter: string;
     canonicalTruthInvariant: boolean;
     acceptedProviderHypotheses: RecordedHypothesisExperimentResult["acceptedProviderHypotheses"];
+    alternativeCoverage: RecordedHypothesisExperimentResult["alternativeCoverage"];
+    allMaterialAlternativesAddressed: boolean;
     providerAndQualifiedConfidence: Array<{
       proposalId: string;
       providerReportedConfidence: string | null;
@@ -68,6 +70,7 @@ export interface LiveHypothesisEvaluationRecordPayload {
       requiredMaterialEvidenceNeedIds: string[];
       acknowledgedEvidenceNeedIds: string[];
       unacknowledgedMaterialEvidenceNeedIds: string[];
+      proofGapUnderstanding: NonNullable<RecordedHypothesisExperimentResult["acceptedProviderHypotheses"][number]["inference"]>["proofGapUnderstanding"] | null;
       competingAlternativeProposalIds: string[];
       strongInferenceExplanation: {
         whyStrong: string;
@@ -142,6 +145,8 @@ export function buildLiveHypothesisEvaluationRecord(input: {
       canonicalTruthAfter: input.result.canonicalTruthAfter,
       canonicalTruthInvariant: input.result.canonicalTruthInvariant,
       acceptedProviderHypotheses: structuredClone(input.result.acceptedProviderHypotheses),
+      alternativeCoverage: structuredClone(input.result.alternativeCoverage),
+      allMaterialAlternativesAddressed: input.result.allMaterialAlternativesAddressed,
       providerAndQualifiedConfidence: input.result.acceptedProviderHypotheses.map((hypothesis) => {
         const proposalId = hypothesis.ownership.kind === "provider" ? hypothesis.ownership.proposalId : hypothesis.id;
         const qualified = providerResults.get(proposalId);
@@ -164,6 +169,7 @@ export function buildLiveHypothesisEvaluationRecord(input: {
           requiredMaterialEvidenceNeedIds,
           acknowledgedEvidenceNeedIds,
           unacknowledgedMaterialEvidenceNeedIds: requiredMaterialEvidenceNeedIds.filter((id) => !acknowledged.has(id)),
+          proofGapUnderstanding: structuredClone(hypothesis.inference?.proofGapUnderstanding ?? null),
           competingAlternativeProposalIds,
           strongInferenceExplanation: qualified?.qualifiedInferenceStrength === "strong" && hypothesis.inference
             ? {

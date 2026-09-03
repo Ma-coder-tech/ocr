@@ -3,23 +3,25 @@ import { createHash } from "node:crypto";
 import type {
   HypothesisProposalRequest,
   HypothesisProposalResponse,
+  ProviderAlternativeCoverageAssessment,
   ProviderHypothesisProposal,
   StatementHypothesisProposer,
 } from "./provider.js";
 import type { ScalarValue } from "./types.js";
 
-export const LIVE_HYPOTHESIS_PROMPT_VERSION = "ratereveal-live-hypothesis-evaluation-v1" as const;
-export const LIVE_HYPOTHESIS_RESPONSE_SCHEMA_VERSION = "ratereveal-live-hypothesis-response-v1" as const;
+export const LIVE_HYPOTHESIS_PROMPT_VERSION = "ratereveal-live-hypothesis-evaluation-v2" as const;
+export const LIVE_HYPOTHESIS_RESPONSE_SCHEMA_VERSION = "ratereveal-live-hypothesis-response-v2" as const;
 
 export const LIVE_HYPOTHESIS_DEVELOPER_PROMPT = [
   "You are an evaluation-only hypothesis proposer for merchant-statement reconstruction.",
   "Use only the source-bound packet in the user message. Do not use outside knowledge, web search, tools, or unstated merchant facts.",
-  "The RateReveal inference topics, allowed claims, observation references, and known evidence gaps are immutable. Select only offered topics and allowed claim values.",
+  "The RateReveal inference topics, material alternatives, allowed claims, observation references, and known evidence gaps are immutable. Select only offered topics, alternative references, and allowed claim values.",
   "Return non-authoritative candidate explanations, never canonical facts, accounting truth, controls, or customer advice.",
-  "For each source-compatible allowed claim value, return at most one distinct hypothesis. Preserve a competing or unknown interpretation whenever identity or completeness is unproven.",
+  "Address every offered material alternative exactly once in alternativeCoverage. Mark it proposed when supplying exactly one matching hypothesis; otherwise mark it not_supported and give a source-bound structured reason. Never omit an alternative because another answer appears stronger.",
+  "For each proposed material alternative, return at most one distinct hypothesis. Preserve an unknown interpretation whenever identity or completeness is unproven.",
   "Every claim must cite only observation references listed on its selected topic. Every hypothesis must acknowledge each material known evidence gap it relies on.",
   "Provider confidence means: high = strongly favored by the supplied rows while explicit confirmation proof is still missing; medium = plausible and useful but materially unresolved; low = weakly supported. Never describe an inference as confirmed.",
-  "A high-confidence proposal must state why it is likely, identify the strongest competing explanation in its rationale, and name the exact missing confirmation proof.",
+  "A high-confidence proposal must state why it is likely, identify the strongest competing explanation in its rationale, and describe the missing confirmation proof in concrete semantic terms. Merely echoing an evidence-need reference or saying more information is needed is insufficient.",
   "Use empty events and populations arrays. Keep descriptions and rationales concise and source-bound.",
 ].join("\n");
 
@@ -57,7 +59,7 @@ type RawProposal = Omit<ProviderHypothesisProposal, "id">;
 const responseSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["hypotheses"],
+  required: ["hypotheses", "alternativeCoverage"],
   properties: {
     hypotheses: {
       type: "array",
@@ -65,9 +67,10 @@ const responseSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["topicRef", "description", "observationRefs", "events", "populations", "claims", "inference"],
+        required: ["topicRef", "alternativeRef", "description", "observationRefs", "events", "populations", "claims", "inference"],
         properties: {
           topicRef: { type: "string" },
+          alternativeRef: { type: "string" },
           description: { type: "string" },
           observationRefs: { type: "array", items: { type: "string" } },
           events: { type: "array", maxItems: 0, items: { type: "object", additionalProperties: false, properties: {} } },
@@ -105,6 +108,36 @@ const responseSchema = {
               acknowledgedEvidenceNeedRefs: { type: "array", items: { type: "string" } },
             },
           },
+        },
+      },
+    },
+    alternativeCoverage: {
+      type: "array",
+      maxItems: 16,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "topicRef", "alternativeRef", "disposition", "reasonCode", "rationale",
+          "observationRefs", "acknowledgedEvidenceNeedRefs",
+        ],
+        properties: {
+          topicRef: { type: "string" },
+          alternativeRef: { type: "string" },
+          disposition: { type: "string", enum: ["proposed", "not_supported"] },
+          reasonCode: {
+            type: "string",
+            enum: [
+              "proposal_supplied",
+              "insufficient_source_evidence",
+              "contradicted_by_source",
+              "less_supported_than_competing_alternative",
+              "not_applicable_to_observations",
+            ],
+          },
+          rationale: { type: "string" },
+          observationRefs: { type: "array", minItems: 1, items: { type: "string" } },
+          acknowledgedEvidenceNeedRefs: { type: "array", items: { type: "string" } },
         },
       },
     },
@@ -186,8 +219,14 @@ export class OpenAiLiveHypothesisProposer implements StatementHypothesisProposer
         throw new Error(failure);
       }
       const envelope = asRecord(fullProviderResponse);
-      const parsed = JSON.parse(extractOutputText(envelope)) as { hypotheses?: RawProposal[] };
+      const parsed = JSON.parse(extractOutputText(envelope)) as {
+        hypotheses?: RawProposal[];
+        alternativeCoverage?: ProviderAlternativeCoverageAssessment[];
+      };
       if (!Array.isArray(parsed.hypotheses)) throw new Error("OpenAI structured response did not contain hypotheses.");
+      if (!Array.isArray(parsed.alternativeCoverage)) {
+        throw new Error("OpenAI structured response did not contain exhaustive alternative coverage.");
+      }
       const normalizedResponse: HypothesisProposalResponse = {
         providerId: this.providerId,
         hypotheses: parsed.hypotheses.map((hypothesis) => {
@@ -198,6 +237,7 @@ export class OpenAiLiveHypothesisProposer implements StatementHypothesisProposer
             id: stableLiveProposalId(hypothesis.topicRef, claim.key, claim.value),
           };
         }),
+        alternativeCoverage: structuredClone(parsed.alternativeCoverage),
       };
       this.attempts.push(audit("completed", null, normalizedResponse));
       return normalizedResponse;

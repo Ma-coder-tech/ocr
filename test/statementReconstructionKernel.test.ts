@@ -353,16 +353,35 @@ describe("provider-neutral offline proposal boundary", () => {
 
     async propose(request: HypothesisProposalRequest): Promise<HypothesisProposalResponse> {
       if (this.fail) throw new Error("recorded outage");
-      return { providerId: this.providerId, hypotheses: clone(this.factory(request)) };
+      const hypotheses = clone(this.factory(request));
+      return {
+        providerId: this.providerId,
+        hypotheses,
+        alternativeCoverage: request.inferenceTopics.flatMap((topic) => topic.materialAlternatives.map((alternative) => {
+          const proposed = hypotheses.find((hypothesis) => hypothesis.alternativeRef === alternative.alternativeRef);
+          return {
+            topicRef: topic.topicRef,
+            alternativeRef: alternative.alternativeRef,
+            disposition: proposed ? "proposed" as const : "not_supported" as const,
+            reasonCode: proposed ? "proposal_supplied" as const : "insufficient_source_evidence" as const,
+            rationale: proposed?.inference.rationale ?? "The source observations are insufficient to propose this alternative.",
+            observationRefs: proposed?.observationRefs ?? topic.observationRefs,
+            acknowledgedEvidenceNeedRefs: topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef),
+          };
+        })),
+      };
     }
   }
 
   function providerHypothesis(request: HypothesisProposalRequest, id: string, value: boolean): ProviderHypothesisProposal {
     const observationRef = request.observations.find((observation) => observation.value === 70_000)!.observationRef;
     const topic = request.inferenceTopics[0]!;
+    const alternative = topic.materialAlternatives.find((candidate) => candidate.claim.key === "batches.same_lifecycle"
+      && candidate.claim.value === value)!;
     return {
       id,
       topicRef: topic.topicRef,
+      alternativeRef: alternative.alternativeRef,
       description: "Recorded non-authoritative proposal.",
       observationRefs: [observationRef],
       events: [],
@@ -373,7 +392,7 @@ describe("provider-neutral offline proposal boundary", () => {
       inference: {
         confidence: "high",
         rationale: "The amounts and ordering strongly suggest the proposed relationship.",
-        missingProof: ["stable identifier linking the source rows"],
+        missingProof: ["A stable identifier linking each rejected row to its later submitted batch is missing."],
         acknowledgedEvidenceNeedRefs: topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef),
       },
     };
@@ -558,7 +577,7 @@ describe("provider-neutral offline proposal boundary", () => {
     expect(Object.isFrozen(hypothesis.claims[0])).toBe(true);
   });
 
-  it("prevents providers from manufacturing possible-world groups", async () => {
+  it("rejects duplicate proposals for RateReveal-owned alternatives before possible-world grouping", async () => {
     const baseline = canonicalProjection(cloverDuplicateResubmission);
     const collected = await collectRecordedProviderHypotheses(new RecordedProposer("overflow-provider", (request) =>
       Array.from({ length: 16 }, (_, index) => providerHypothesis(
@@ -568,17 +587,12 @@ describe("provider-neutral offline proposal boundary", () => {
       ))),
     cloverDuplicateResubmission.statementId, cloverDuplicateResubmission.observations, cloverProviderSourceBinding,
     cloverInferenceTopics, cloverDuplicateResubmission.evidenceNeeds);
-    expect(collected.errors).toEqual([]);
-    expect(collected.hypotheses[0]!.id).toMatch(
-      /^provider\.overflow-provider\.[a-f0-9]{8}\.clover\.same-lifecycle\.[a-f0-9]{8}$/,
-    );
+    expect(collected.errors.join(" ")).toContain("must have exactly one matching hypothesis");
+    expect(collected.hypotheses).toEqual([]);
     const input = clone(cloverDuplicateResubmission);
     input.hypotheses.push(...collected.hypotheses);
     const result = reconstructStatement(input);
     expect(result.status).toBe("complete");
-    expect(new Set(collected.hypotheses.map((hypothesis) => hypothesis.groupId))).toEqual(
-      new Set(["clover.duplicate-resubmission"]),
-    );
     expect(result.canonicalClaims.map((claim) => [claim.key, claim.value])).toEqual(baseline);
     expect(result.canonicalClaims.some((claim) => claim.key === "batches.same_lifecycle")).toBe(false);
   });

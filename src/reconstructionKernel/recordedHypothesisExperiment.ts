@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { reconstructStatement } from "./kernel.js";
 import {
   collectRecordedProviderHypotheses,
+  type ProviderAlternativeCoverageAssessment,
   type HypothesisProposalSourceBinding,
   type StatementHypothesisProposer,
 } from "./provider.js";
@@ -26,7 +27,7 @@ export interface RecordedProposalReviewRule {
   proposalId: string;
   expectedClaims: Array<{ key: string; value: ScalarValue }>;
   confidenceCeiling: InferenceConfidenceLevel;
-  requiredMissingProofTerms: string[];
+  requiredProofGapConceptIds: string[];
 }
 
 export interface RecordedProposalReview {
@@ -34,6 +35,7 @@ export interface RecordedProposalReview {
   utility: RecordedProposalUtility;
   claimsMatchReviewRule: boolean;
   missingProofAcknowledged: boolean;
+  proofGapConceptsUnderstood: boolean;
   confidenceWithinReviewCeiling: boolean;
   addsClaimValueNotInDeterministicBaseline: boolean;
   reasons: string[];
@@ -55,6 +57,8 @@ export interface RecordedHypothesisExperimentResult {
   augmented: ReconstructionResult;
   acceptedProviderHypotheses: Hypothesis[];
   proposalReviews: RecordedProposalReview[];
+  alternativeCoverage: ProviderAlternativeCoverageAssessment[];
+  allMaterialAlternativesAddressed: boolean;
   canonicalTruthBefore: string;
   canonicalTruthAfter: string;
   canonicalTruthInvariant: boolean;
@@ -110,6 +114,8 @@ export async function runRecordedHypothesisExperiment(
     augmented,
     acceptedProviderHypotheses: collected.hypotheses,
     proposalReviews,
+    alternativeCoverage: collected.alternativeCoverage,
+    allMaterialAlternativesAddressed: true,
     canonicalTruthBefore,
     canonicalTruthAfter,
     canonicalTruthInvariant: canonicalTruthBefore === canonicalTruthAfter,
@@ -136,6 +142,8 @@ function terminalResult(
     augmented: baseline,
     acceptedProviderHypotheses: [],
     proposalReviews: [],
+    alternativeCoverage: [],
+    allMaterialAlternativesAddressed: false,
     canonicalTruthBefore,
     canonicalTruthAfter: canonicalTruthBefore,
     canonicalTruthInvariant: true,
@@ -180,6 +188,7 @@ function reviewProposals(
         utility: "unreviewed",
         claimsMatchReviewRule: false,
         missingProofAcknowledged: false,
+        proofGapConceptsUnderstood: false,
         confidenceWithinReviewCeiling: false,
         addsClaimValueNotInDeterministicBaseline: false,
         reasons: ["No recorded evaluation rule exists for this proposal."],
@@ -191,16 +200,16 @@ function reviewProposals(
     const claimsMatchReviewRule = expectedClaims.length > 0
       && actualClaims.size === expectedClaims.length
       && expectedClaims.every((identity) => actualClaims.has(identity));
-    const normalizedMissingProof = (hypothesis.inference?.missingProof ?? []).join(" ").toLowerCase();
-    const missingProofAcknowledged = rule.requiredMissingProofTerms.length > 0
-      && rule.requiredMissingProofTerms.every((term) => normalizedMissingProof.includes(term.toLowerCase()));
+    const understoodConceptIds = new Set(hypothesis.inference?.proofGapUnderstanding?.understoodConceptIds ?? []);
+    const missingProofAcknowledged = rule.requiredProofGapConceptIds.length > 0
+      && rule.requiredProofGapConceptIds.every((conceptId) => understoodConceptIds.has(conceptId));
     const confidenceWithinReviewCeiling = hypothesis.inference !== undefined
       && confidenceRank(hypothesis.inference.confidence) <= confidenceRank(rule.confidenceCeiling);
     const addsClaimValueNotInDeterministicBaseline = expectedClaims.some((identity) =>
       !deterministicClaims.has(identity));
     const reasons: string[] = [];
     if (!claimsMatchReviewRule) reasons.push("Proposal claims do not match the recorded case review rule.");
-    if (!missingProofAcknowledged) reasons.push("Proposal does not identify all proof gaps required by the recorded case review rule.");
+    if (!missingProofAcknowledged) reasons.push("Proposal does not demonstrate all RateReveal proof-gap concepts required by the recorded case review rule.");
     if (!confidenceWithinReviewCeiling) reasons.push("Provider-reported confidence exceeds the recorded case review ceiling.");
     const utility: RecordedProposalUtility = reasons.length > 0
       ? "weak_or_misleading"
@@ -213,6 +222,7 @@ function reviewProposals(
       utility,
       claimsMatchReviewRule,
       missingProofAcknowledged,
+      proofGapConceptsUnderstood: missingProofAcknowledged,
       confidenceWithinReviewCeiling,
       addsClaimValueNotInDeterministicBaseline,
       reasons,
