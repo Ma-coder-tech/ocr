@@ -80,6 +80,7 @@ function proposalFor(
       missingProof,
       acknowledgedEvidenceNeedRefs: topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef),
       proofObligationBindings: proofObligationBindingsForAlternative(request, alternative.alternativeRef),
+      verificationRequests: [],
     },
   };
 }

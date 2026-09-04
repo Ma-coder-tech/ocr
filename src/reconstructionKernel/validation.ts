@@ -115,6 +115,43 @@ function validateHypothesis(
         }
       }
     }
+    const recipeById = new Map(topic.verificationRecipes.map((recipe) => [recipe.id, recipe]));
+    const requestIds = new Set<string>();
+    for (const request of hypothesis.inference?.verificationRequests ?? []) {
+      if (!request.requestId.trim() || requestIds.has(request.requestId)) {
+        errors.push(`Provider-owned hypothesis ${hypothesis.id} has an empty or duplicate verification request id.`);
+      }
+      requestIds.add(request.requestId);
+      const recipe = recipeById.get(request.recipeId);
+      if (!recipe) {
+        errors.push(`Provider-owned hypothesis ${hypothesis.id} requests unknown verification recipe ${request.recipeId}.`);
+        continue;
+      }
+      const candidate = recipe.candidates.find((item) => item.id === request.candidateId);
+      if (!candidate) {
+        errors.push(`Provider-owned hypothesis ${hypothesis.id} requests unknown verification candidate ${request.candidateId}.`);
+        continue;
+      }
+      const bindingByRole = new Map(request.roleBindings.map((binding) => [binding.role, binding]));
+      const candidateBindingByRole = new Map(candidate.roleBindings.map((binding) => [binding.role, binding]));
+      if (bindingByRole.size !== recipe.roles.length || request.roleBindings.length !== recipe.roles.length) {
+        errors.push(`Provider-owned hypothesis ${hypothesis.id} does not bind each verification role exactly once.`);
+      }
+      for (const role of recipe.roles) {
+        const binding = bindingByRole.get(role.role);
+        if (!binding || !role.allowedObservationRefs.includes(binding.observationRef)
+            || !observations.has(binding.observationRef)
+            || candidateBindingByRole.get(role.role)?.observationRef !== binding.observationRef) {
+          errors.push(`Provider-owned hypothesis ${hypothesis.id} has an invalid source binding for verification role ${role.role}.`);
+        }
+      }
+    }
+  }
+  if (providerOwned && !hypothesis.inferenceTopic && (hypothesis.inference?.verificationRequests?.length ?? 0) > 0) {
+    errors.push(`Provider-owned hypothesis ${hypothesis.id} cannot request verification without a RateReveal topic.`);
+  }
+  if (!providerOwned && (hypothesis.inference?.verificationRequests?.length ?? 0) > 0) {
+    errors.push(`Deterministic hypothesis ${hypothesis.id} cannot contain provider verification requests.`);
   }
   if (hypothesis.evidenceClass === "claim_proof" && hypothesis.requiredControlIds.length === 0) {
     errors.push(`Proof hypothesis ${hypothesis.id} has no deterministic proof controls.`);

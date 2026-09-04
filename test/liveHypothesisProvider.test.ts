@@ -9,7 +9,7 @@ import {
 
 function request(): HypothesisProposalRequest {
   return {
-    schemaVersion: "source_bound_hypothesis_proposal_v4",
+    schemaVersion: "source_bound_hypothesis_proposal_v6",
     sourceDocument: {
       documentId: "approved-case",
       sourceDocumentRef: "approved-evaluation-document:approved-case",
@@ -44,12 +44,15 @@ function request(): HypothesisProposalRequest {
         missingProperty: "underlying_calculation_basis",
         permittedResolutionEvidenceKinds: ["unrounded_source_amounts"],
       }],
+      verificationChecks: [],
       knownEvidenceGaps: [{ evidenceNeedRef: "evidence-need-0001", description: "Unrounded inputs are missing.", material: true }],
     }],
     authorityPolicy: {
       providerOutput: "proposal_only",
       canonicalAuthority: "prohibited",
       controlSelection: "prohibited",
+      verificationSemantics: "ratereveal_owned",
+      verificationResultAssignment: "prohibited",
     },
   };
 }
@@ -87,6 +90,7 @@ describe("live hypothesis provider boundary", () => {
                     missingProperty: "underlying_calculation_basis",
                     resolutionEvidenceKinds: ["unrounded_source_amounts"],
                   }],
+                  verificationRequests: [],
                 },
               }],
               alternativeCoverage: [{

@@ -6,6 +6,9 @@ import type {
   EvidenceNeed,
   Hypothesis,
   InferenceConfidenceLevel,
+  InferenceVerificationCheckType,
+  InferenceVerificationRequest,
+  InferenceVerificationRole,
   InferenceTopic,
   InferenceTopicMaterialAlternative,
   Observation,
@@ -18,10 +21,11 @@ import type {
   ScalarValue,
 } from "./types.js";
 
-export const HYPOTHESIS_PROPOSAL_SCHEMA = "source_bound_hypothesis_proposal_v4" as const;
+export const HYPOTHESIS_PROPOSAL_SCHEMA = "source_bound_hypothesis_proposal_v6" as const;
 export const MAX_PROVIDER_HYPOTHESES = 16;
 export const MAX_PROVIDER_CLAIMS_PER_HYPOTHESIS = 16;
 export const MAX_PROVIDER_ALTERNATIVE_ASSESSMENTS = 16;
+export const MAX_PROVIDER_VERIFICATION_REQUESTS = 8;
 
 export interface SourceBoundProposalObservation {
   observationRef: string;
@@ -47,6 +51,8 @@ export interface HypothesisProposalRequest {
     providerOutput: "proposal_only";
     canonicalAuthority: "prohibited";
     controlSelection: "prohibited";
+    verificationSemantics: "ratereveal_owned";
+    verificationResultAssignment: "prohibited";
   };
 }
 
@@ -71,6 +77,23 @@ export interface SourceBoundInferenceTopic {
     }>;
     missingProperty: ProofObligationMissingProperty;
     permittedResolutionEvidenceKinds: ProofObligationResolutionEvidenceKind[];
+  }>;
+  verificationChecks: Array<{
+    verificationRef: string;
+    description: string;
+    checkType: InferenceVerificationCheckType;
+    roles: Array<{
+      role: InferenceVerificationRole;
+      description: string;
+    }>;
+    candidates: Array<{
+      candidateRef: string;
+      description: string;
+      roleBindings: Array<{
+        role: InferenceVerificationRole;
+        observationRef: string;
+      }>;
+    }>;
   }>;
   knownEvidenceGaps: Array<{
     evidenceNeedRef: string;
@@ -108,6 +131,11 @@ export interface ProviderHypothesisProposal {
       }>;
       missingProperty: ProofObligationMissingProperty;
       resolutionEvidenceKinds: ProofObligationResolutionEvidenceKind[];
+    }>;
+    verificationRequests: Array<{
+      requestId: string;
+      verificationRef: string;
+      candidateRef: string;
     }>;
   };
 }
@@ -156,6 +184,8 @@ type ProposalPacket = {
   }>;
   internalEvidenceNeedIdByOpaqueRef: Map<string, string>;
   internalProofObligationIdByOpaqueRef: Map<string, string>;
+  internalVerificationRecipeIdByOpaqueRef: Map<string, string>;
+  internalVerificationCandidateIdByOpaqueRef: Map<string, string>;
 };
 
 function proposalPacket(
@@ -225,6 +255,27 @@ function proposalPacket(
   const internalProofObligationIdByOpaqueRef = new Map(
     [...proofObligationRefById].map(([internalId, opaqueRef]) => [opaqueRef, internalId]),
   );
+  const orderedVerificationRecipes = orderedTopics.flatMap((topic) => topic.verificationRecipes
+    .map((recipe) => ({ topic, recipe })))
+    .sort((left, right) => `${left.topic.id}\0${left.recipe.id}`.localeCompare(`${right.topic.id}\0${right.recipe.id}`));
+  const verificationRefById = new Map(orderedVerificationRecipes.map(({ recipe }, index) => [
+    recipe.id,
+    `verification-${String(index + 1).padStart(4, "0")}`,
+  ]));
+  const internalVerificationRecipeIdByOpaqueRef = new Map(
+    [...verificationRefById].map(([internalId, opaqueRef]) => [opaqueRef, internalId]),
+  );
+  const orderedVerificationCandidates = orderedVerificationRecipes.flatMap(({ topic, recipe }) =>
+    recipe.candidates.map((candidate) => ({ topic, recipe, candidate })))
+    .sort((left, right) => `${left.topic.id}\0${left.recipe.id}\0${left.candidate.id}`
+      .localeCompare(`${right.topic.id}\0${right.recipe.id}\0${right.candidate.id}`));
+  const verificationCandidateRefById = new Map(orderedVerificationCandidates.map(({ candidate }, index) => [
+    candidate.id,
+    `verification-candidate-${String(index + 1).padStart(4, "0")}`,
+  ]));
+  const internalVerificationCandidateIdByOpaqueRef = new Map(
+    [...verificationCandidateRefById].map(([internalId, opaqueRef]) => [opaqueRef, internalId]),
+  );
   const request: HypothesisProposalRequest = {
     schemaVersion: HYPOTHESIS_PROPOSAL_SCHEMA,
     sourceDocument: {
@@ -280,6 +331,23 @@ function proposalPacket(
         missingProperty: obligation.missingProperty,
         permittedResolutionEvidenceKinds: structuredClone(obligation.resolutionEvidenceKinds),
       })),
+      verificationChecks: topic.verificationRecipes.map((recipe) => ({
+        verificationRef: verificationRefById.get(recipe.id)!,
+        description: recipe.description,
+        checkType: recipe.checkType,
+        roles: recipe.roles.map((role) => ({
+          role: role.role,
+          description: role.description,
+        })),
+        candidates: recipe.candidates.map((candidate) => ({
+          candidateRef: verificationCandidateRefById.get(candidate.id)!,
+          description: candidate.description,
+          roleBindings: candidate.roleBindings.map((binding) => ({
+            role: binding.role,
+            observationRef: opaqueRefByInternalId.get(binding.observationRef)!,
+          })),
+        })),
+      })),
       knownEvidenceGaps: topic.qualification.materialEvidenceNeedIds.map((id) => ({
         evidenceNeedRef: evidenceNeedRefById.get(id)!,
         description: evidenceNeedById.get(id)?.description ?? "RateReveal requires additional evidence before confirmation.",
@@ -290,6 +358,8 @@ function proposalPacket(
       providerOutput: "proposal_only",
       canonicalAuthority: "prohibited",
       controlSelection: "prohibited",
+      verificationSemantics: "ratereveal_owned",
+      verificationResultAssignment: "prohibited",
     },
   };
   return {
@@ -299,6 +369,8 @@ function proposalPacket(
     materialAlternativeByOpaqueRef,
     internalEvidenceNeedIdByOpaqueRef,
     internalProofObligationIdByOpaqueRef,
+    internalVerificationRecipeIdByOpaqueRef,
+    internalVerificationCandidateIdByOpaqueRef,
   };
 }
 
@@ -372,7 +444,8 @@ export function validateProviderResponse(
     for (const forbidden of [
       "origin", "ownership", "evidenceClass", "alternativeCoverage",
       "requiredControlIds", "contradictedByControlIds", "controlRefs", "support", "groupId",
-      "inferenceTopic", "qualification", "qualifiedInferenceStrength",
+      "inferenceTopic", "qualification", "qualifiedInferenceStrength", "verificationResults",
+      "verificationClassification", "evidenceWeight",
     ]) {
       if (Object.hasOwn(hypothesis, forbidden)) {
         errors.push(`Provider hypothesis ${String(hypothesis.id)} attempts to supply prohibited authority metadata ${forbidden}.`);
@@ -386,12 +459,15 @@ export function validateProviderResponse(
       || !inference.missingProof.every((item) => typeof item === "string" && item.trim() !== "")
       || !Array.isArray(inference.acknowledgedEvidenceNeedRefs)
       || !inference.acknowledgedEvidenceNeedRefs.every((reference) => typeof reference === "string")
-      || !Array.isArray(inference.proofObligationBindings)) {
+      || !Array.isArray(inference.proofObligationBindings)
+      || !Array.isArray(inference.verificationRequests)) {
       errors.push(`Provider hypothesis ${String(hypothesis.id)} has invalid inference metadata.`);
     }
     if (inference && (Object.hasOwn(inference as object, "proofGapUnderstanding")
-      || Object.hasOwn(inference as object, "proofObligationValidation"))) {
-      errors.push(`Provider hypothesis ${String(hypothesis.id)} attempts to supply RateReveal-owned proof-obligation qualification.`);
+      || Object.hasOwn(inference as object, "proofObligationValidation")
+      || Object.hasOwn(inference as object, "verificationResults")
+      || Object.hasOwn(inference as object, "evidencePosture"))) {
+      errors.push(`Provider hypothesis ${String(hypothesis.id)} attempts to supply RateReveal-owned qualification or verification results.`);
     }
     const claims = Array.isArray(hypothesis.claims) ? hypothesis.claims : [];
     if (!Array.isArray(hypothesis.claims)) errors.push(`Provider hypothesis ${String(hypothesis.id)} claims must be an array.`);
@@ -452,6 +528,12 @@ export function validateProviderResponse(
           selectedAlternative.alternative,
           errors,
         );
+        validateProviderVerificationRequests(
+          hypothesis.id,
+          inference?.verificationRequests,
+          topic,
+          errors,
+        );
       }
       const allowedEvidenceNeeds = new Set(topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef));
       for (const reference of inference?.acknowledgedEvidenceNeedRefs ?? []) {
@@ -479,6 +561,45 @@ export function validateProviderResponse(
     errors,
   );
   return [...new Set(errors)].sort();
+}
+
+function validateProviderVerificationRequests(
+  hypothesisId: string,
+  rawRequests: unknown,
+  topic: SourceBoundInferenceTopic,
+  errors: string[],
+): void {
+  if (!Array.isArray(rawRequests)) return;
+  if (rawRequests.length > MAX_PROVIDER_VERIFICATION_REQUESTS) {
+    errors.push(`Provider hypothesis ${hypothesisId} verification request limit exceeded.`);
+  }
+  const checks = new Map(topic.verificationChecks.map((check) => [check.verificationRef, check]));
+  const seenRequestIds = new Set<string>();
+  for (const rawRequest of rawRequests) {
+    if (!rawRequest || typeof rawRequest !== "object") {
+      errors.push(`Provider hypothesis ${hypothesisId} contains an invalid verification request.`);
+      continue;
+    }
+    const request = rawRequest as Record<string, unknown>;
+    if (Object.keys(request).some((key) => !["requestId", "verificationRef", "candidateRef"].includes(key))) {
+      errors.push(`Provider hypothesis ${hypothesisId} attempts to define verification semantics or results.`);
+    }
+    const requestId = typeof request.requestId === "string" ? request.requestId : "";
+    if (!requestId.trim() || seenRequestIds.has(requestId)) {
+      errors.push(`Provider hypothesis ${hypothesisId} has an empty or duplicate verification request id.`);
+    }
+    seenRequestIds.add(requestId);
+    const verificationRef = typeof request.verificationRef === "string" ? request.verificationRef : "";
+    const check = checks.get(verificationRef);
+    if (!check) {
+      errors.push(`Provider hypothesis ${hypothesisId} selects unapproved verification ${verificationRef || "<empty>"}.`);
+      continue;
+    }
+    const candidateRef = typeof request.candidateRef === "string" ? request.candidateRef : "";
+    if (!check.candidates.some((candidate) => candidate.candidateRef === candidateRef)) {
+      errors.push(`Provider hypothesis ${hypothesisId} selects an unapproved candidate relationship ${candidateRef || "<empty>"} for ${verificationRef}.`);
+    }
+  }
 }
 
 function validateProviderProofObligationBindings(
@@ -692,6 +813,8 @@ export async function collectRecordedProviderHypotheses(
           packet.materialAlternativeByOpaqueRef,
           packet.internalEvidenceNeedIdByOpaqueRef,
           packet.internalProofObligationIdByOpaqueRef,
+          packet.internalVerificationRecipeIdByOpaqueRef,
+          packet.internalVerificationCandidateIdByOpaqueRef,
         ))
       : [];
     const proofObligationErrors = normalized.flatMap((hypothesis) =>
@@ -723,6 +846,8 @@ function normalizeProviderProposal(
   materialAlternativeByOpaqueRef: Map<string, { topic: InferenceTopic; alternative: InferenceTopicMaterialAlternative }>,
   internalEvidenceNeedIdByOpaqueRef: Map<string, string>,
   internalProofObligationIdByOpaqueRef: Map<string, string>,
+  internalVerificationRecipeIdByOpaqueRef: Map<string, string>,
+  internalVerificationCandidateIdByOpaqueRef: Map<string, string>,
 ): Hypothesis {
   const translate = (references: string[]) => references.map((reference) => internalObservationIdByOpaqueRef.get(reference)!);
   const topic = inferenceTopicByOpaqueRef.get(proposal.topicRef)!;
@@ -758,6 +883,18 @@ function normalizeProviderProposal(
         .map((reference) => internalEvidenceNeedIdByOpaqueRef.get(reference)!),
       proofObligationBindings,
       proofObligationValidation,
+      verificationRequests: proposal.inference.verificationRequests.map<InferenceVerificationRequest>((request) => {
+        const recipeId = internalVerificationRecipeIdByOpaqueRef.get(request.verificationRef)!;
+        const candidateId = internalVerificationCandidateIdByOpaqueRef.get(request.candidateRef)!;
+        const candidate = topic.verificationRecipes.find((recipe) => recipe.id === recipeId)!
+          .candidates.find((item) => item.id === candidateId)!;
+        return {
+          requestId: request.requestId,
+          recipeId,
+          candidateId,
+          roleBindings: structuredClone(candidate.roleBindings),
+        };
+      }),
     },
     inferenceTopic: {
       topicId: topic.id,
@@ -765,6 +902,7 @@ function normalizeProviderProposal(
       alternativeId: alternative.id,
       requiredProofObligationIds: structuredClone(alternative.requiredProofObligationIds),
       proofObligations: structuredClone(topic.proofObligations),
+      verificationRecipes: structuredClone(topic.verificationRecipes),
       immutable: true as const,
       qualification: structuredClone(topic.qualification),
     },
@@ -791,6 +929,8 @@ function validateInferenceTopics(topics: InferenceTopic[], observations: Observa
   const alternativeIds = new Set<string>();
   const obligationIds = new Set<string>();
   const evidenceFactorIds = new Set<string>();
+  const verificationRecipeIds = new Set<string>();
+  const verificationCandidateIds = new Set<string>();
   let materialAlternativeCount = 0;
   for (const topic of topics) {
     if (!topic.id.trim() || topicIds.has(topic.id)) throw new Error(`RateReveal inference topic identity ${topic.id || "<empty>"} is invalid or duplicated.`);
@@ -891,6 +1031,67 @@ function validateInferenceTopics(topics: InferenceTopic[], observations: Observa
           || !["all_pass", "any_fail"].includes(factor.activation)
           || factor.alternativeIds.some((id) => !topicAlternativeIds.has(id))) {
         throw new Error(`RateReveal evidence factor ${factor.id} is incomplete or outside topic ${topic.id}.`);
+      }
+    }
+    if (!Array.isArray(topic.verificationRecipes)) {
+      throw new Error(`RateReveal inference topic ${topic.id} has no verification-recipe registry.`);
+    }
+    for (const recipe of topic.verificationRecipes) {
+      if (!recipe.id.trim() || verificationRecipeIds.has(recipe.id)) {
+        throw new Error(`RateReveal verification-recipe identity ${recipe.id || "<empty>"} is invalid or duplicated.`);
+      }
+      verificationRecipeIds.add(recipe.id);
+      const expectedRoles: InferenceVerificationRole[] = recipe.checkType === "row_pair_match"
+        ? ["left_amount", "right_amount", "left_count", "right_count", "earlier_date", "later_date"]
+        : recipe.checkType === "identifier_pair_match"
+          ? ["left_identifier", "right_identifier"]
+          : [];
+      const roles = recipe.roles.map((role) => role.role);
+      if (!recipe.description.trim() || expectedRoles.length === 0
+          || roles.length !== expectedRoles.length || new Set(roles).size !== roles.length
+          || expectedRoles.some((role) => !roles.includes(role))
+          || !Array.isArray(recipe.candidates) || recipe.candidates.length < 2) {
+        throw new Error(`RateReveal verification recipe ${recipe.id} is incomplete or outside topic ${topic.id}.`);
+      }
+      for (const role of recipe.roles) {
+        if (!role.description.trim() || role.allowedObservationRefs.length === 0 || role.allowedKinds.length === 0
+            || role.allowedObservationRefs.some((reference) => !topic.observationRefs.includes(reference))) {
+          throw new Error(`RateReveal verification recipe ${recipe.id} has an invalid source role ${role.role}.`);
+        }
+        for (const reference of role.allowedObservationRefs) {
+          const observation = observations.find((candidate) => candidate.id === reference);
+          if (!observation || !role.allowedKinds.includes(observation.kind)) {
+            throw new Error(`RateReveal verification recipe ${recipe.id} has a source-role kind mismatch.`);
+          }
+        }
+      }
+      for (const candidate of recipe.candidates) {
+        const candidateBindings = new Map(candidate.roleBindings.map((binding) => [binding.role, binding.observationRef]));
+        const impacts = candidate.alternativeImpacts.map((impact) => impact.alternativeId);
+        if (!candidate.id.trim() || verificationCandidateIds.has(candidate.id)
+            || !candidate.description.trim()
+            || candidate.roleBindings.length !== expectedRoles.length
+            || candidateBindings.size !== expectedRoles.length
+            || expectedRoles.some((role) => !candidateBindings.has(role))
+            || impacts.length === 0 || new Set(impacts).size !== impacts.length
+            || impacts.some((alternativeId) => !topicAlternativeIds.has(alternativeId))) {
+          throw new Error(`RateReveal verification candidate ${candidate.id || "<empty>"} is incomplete or outside recipe ${recipe.id}.`);
+        }
+        verificationCandidateIds.add(candidate.id);
+        for (const role of recipe.roles) {
+          const reference = candidateBindings.get(role.role)!;
+          if (!role.allowedObservationRefs.includes(reference)) {
+            throw new Error(`RateReveal verification candidate ${candidate.id} has a binding outside role ${role.role}.`);
+          }
+        }
+        for (const impact of candidate.alternativeImpacts) {
+          if (!impact.independenceGroupId.trim()
+              || !["supporting", "contradicting", "irrelevant"].includes(impact.pass)
+              || !["supporting", "contradicting", "irrelevant"].includes(impact.fail)
+              || !["contextual", "material", "decisive"].includes(impact.diagnosticity)) {
+            throw new Error(`RateReveal verification candidate ${candidate.id} has an invalid outcome policy.`);
+          }
+        }
       }
     }
     for (const reference of topic.observationRefs) {

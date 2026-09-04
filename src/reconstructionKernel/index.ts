@@ -8,6 +8,7 @@ export * from "./liveHypothesisEvaluationRecord.js";
 export * from "./recordedHypothesisExperiment.js";
 export * from "./proofObligationEvaluation.js";
 export * from "./inferenceEvidencePosture.js";
+export * from "./inferenceVerification.js";
 export * from "./validation.js";
 export * from "./worlds.js";
 export * from "./kernel.js";

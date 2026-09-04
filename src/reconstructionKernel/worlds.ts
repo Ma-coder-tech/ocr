@@ -8,6 +8,7 @@ import type {
   PossibleWorldClaim,
   Observation,
   QualifiedInferenceStrength,
+  InferenceVerificationResult,
 } from "./types.js";
 import { evaluateInferenceEvidencePosture } from "./inferenceEvidencePosture.js";
 
@@ -51,6 +52,7 @@ function truthEligibleObservation(
 export function adjudicateHypotheses(
   hypotheses: Hypothesis[],
   controlResults: ControlResult[],
+  verificationResults: Map<string, InferenceVerificationResult[]> = new Map(),
 ): HypothesisResult[] {
   const controls = new Map(controlResults.map((result) => [result.controlId, result]));
   return [...hypotheses]
@@ -108,7 +110,7 @@ export function adjudicateHypotheses(
         reasonCodes: string[];
         evidencePosture?: HypothesisResult["evidencePosture"];
       } = hypothesis.ownership.kind === "provider"
-        ? qualifyProviderInference(hypothesis, hypotheses, controls)
+        ? qualifyProviderInference(hypothesis, hypotheses, controls, verificationResults.get(hypothesis.id) ?? [])
         : qualifyDeterministicInference(hypothesis, allRequiredPassed);
       if (hypothesis.ownership.kind === "provider" && qualification.evidencePosture?.outcome === "contradicted") {
         return {
@@ -125,6 +127,7 @@ export function adjudicateHypotheses(
           qualifiedInferenceStrength: qualification.strength,
           qualificationReasonCodes: qualification.reasonCodes,
           evidencePosture: qualification.evidencePosture,
+          verificationResults: verificationResults.get(hypothesis.id) ?? [],
           reason: "The selected interpretation is contradicted by RateReveal-owned deterministic evidence.",
         };
       }
@@ -143,6 +146,8 @@ export function adjudicateHypotheses(
         qualifiedInferenceStrength: qualification.strength,
         qualificationReasonCodes: qualification.reasonCodes,
         ...(qualification.evidencePosture ? { evidencePosture: qualification.evidencePosture } : {}),
+        ...(hypothesis.ownership.kind === "provider"
+          ? { verificationResults: verificationResults.get(hypothesis.id) ?? [] } : {}),
         reason: hypothesis.ownership.kind === "provider"
           ? "Provider reasoning remains a non-authoritative inference; deterministic proof and alternative exhaustion are not provider-controlled."
           : required.length === 0
@@ -158,10 +163,16 @@ function qualifyProviderInference(
   hypothesis: Hypothesis,
   hypotheses: Hypothesis[],
   controls: Map<string, ControlResult>,
+  verificationResults: InferenceVerificationResult[],
 ): { strength: QualifiedInferenceStrength; reasonCodes: string[]; evidencePosture: HypothesisResult["evidencePosture"] } {
   const competingAlternativeCount = hypotheses.filter((candidate) =>
     candidate.id !== hypothesis.id && candidate.groupId === hypothesis.groupId).length;
-  const evidencePosture = evaluateInferenceEvidencePosture(hypothesis, controls, competingAlternativeCount);
+  const evidencePosture = evaluateInferenceEvidencePosture(
+    hypothesis,
+    controls,
+    competingAlternativeCount,
+    verificationResults.flatMap((result) => result.evidenceFactor ? [result.evidenceFactor] : []),
+  );
   return {
     strength: evidencePosture.qualifiedStrength,
     reasonCodes: evidencePosture.reasonCodes,

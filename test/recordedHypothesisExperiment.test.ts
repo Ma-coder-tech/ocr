@@ -82,6 +82,24 @@ function withProviderConfidence(
   };
 }
 
+function withoutVerificationRequests(proposer: StatementHypothesisProposer): StatementHypothesisProposer {
+  const providerId = `${proposer.providerId}-without-verification`;
+  return {
+    providerId,
+    async propose(request) {
+      const response = await proposer.propose(request);
+      return {
+        ...response,
+        providerId,
+        hypotheses: response.hypotheses.map((hypothesis) => ({
+          ...hypothesis,
+          inference: { ...hypothesis.inference, verificationRequests: [] },
+        })),
+      };
+    },
+  };
+}
+
 async function loadCase(caseId: CaseId): Promise<LoadedCase> {
   const replayCase = realStatementReplayCases.find((candidate) => candidate.definition.id === caseId)!;
   const [document, bytes] = await Promise.all([parsePdf(replayCase.pdfPath), readFile(replayCase.pdfPath)]);
@@ -152,7 +170,25 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
       qualifiedInferenceStrength: "strong",
       evidenceClass: "compatibility_only",
       alternativeCoverage: "non_exhaustive",
+      verificationResults: [expect.objectContaining({
+        requestId: "verify-second-row-pair",
+        candidateId: "clover.second-reject-to-second-submission",
+        validationState: "accepted",
+        controlState: "pass",
+        classification: "supporting",
+        componentResults: [
+          { component: "amount_equality", state: "pass" },
+          { component: "count_equality", state: "pass" },
+          { component: "temporal_order", state: "pass" },
+        ],
+      })],
     }));
+    expect(result.baseline.controlResults.some((control) => [
+      "clover.second.amounts.match", "clover.second.counts.match", "clover.second.time.ordered",
+      "clover.second.lifecycle.valid",
+    ].includes(control.controlId))).toBe(false);
+    expect(result.baseline.hypothesisResults.filter((hypothesis) =>
+      hypothesis.ownership.kind === "provider")).toEqual([]);
     expect(result.augmented.hypothesisResults).toContainEqual(expect.objectContaining({
       ownership: expect.objectContaining({ proposalId: "separate-batches-remain-possible" }),
       interpretationState: "unknown_or_competing_interpretations",
@@ -166,6 +202,18 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     expect(result.proposalReviews.every((review) => review.proofObligationsValidated)).toBe(true);
     expect(result.allMaterialAlternativesAddressed).toBe(true);
     expect(result.unknownAlternativeRetainedForEveryProviderGroup).toBe(true);
+
+    const withoutVerification = await runCase(
+      "clover-duplicate-resubmission",
+      withoutVerificationRequests(cloverRecordedProposer),
+      cloverRecordedReviewRules,
+    );
+    expect(withoutVerification.augmented.hypothesisResults).toContainEqual(expect.objectContaining({
+      ownership: expect.objectContaining({ proposalId: "likely-reject-resubmission" }),
+      qualifiedInferenceStrength: "moderate",
+      verificationResults: [],
+    }));
+    expect(withoutVerification.canonicalTruthAfter).toBe(result.canonicalTruthAfter);
   });
 
   it("adds two genuinely new, appropriately uncertain explanations for the PaySafe one-cent fee gap", async () => {
@@ -208,6 +256,17 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     expect(result.augmented.hypothesisResults).toContainEqual(expect.objectContaining({
       ownership: expect.objectContaining({ proposalId: "related-tax-amendment" }),
       qualifiedInferenceStrength: "moderate",
+      verificationResults: [expect.objectContaining({
+        candidateId: "wells.shipping-to-tax-reference",
+        controlState: "pass",
+        classification: "supporting",
+        componentResults: [{ component: "identifier_equality", state: "pass" }],
+      })],
+      evidencePosture: expect.objectContaining({
+        independentSupportGroups: [expect.objectContaining({
+          independenceGroupId: "wells.shared-source-reference",
+        })],
+      }),
     }));
     expect(result.augmented.hypothesisResults).toContainEqual(expect.objectContaining({
       ownership: expect.objectContaining({ proposalId: "reference-reuse-only" }),

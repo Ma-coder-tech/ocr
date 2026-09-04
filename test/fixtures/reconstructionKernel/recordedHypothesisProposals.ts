@@ -9,6 +9,75 @@ import type {
 
 type RecordedFactory = (request: HypothesisProposalRequest) => ProviderHypothesisProposal[];
 
+function candidateRelationship(
+  id: string,
+  description: string,
+  rejectedPrefix: string,
+  submittedPrefix: string,
+  independenceGroupId: string,
+): InferenceTopic["verificationRecipes"][number]["candidates"][number] {
+  return {
+    id,
+    description,
+    roleBindings: [
+      { role: "left_amount", observationRef: `${rejectedPrefix}.amount` },
+      { role: "right_amount", observationRef: `${submittedPrefix}.amount` },
+      { role: "left_count", observationRef: `${rejectedPrefix}.count` },
+      { role: "right_count", observationRef: `${submittedPrefix}.count` },
+      { role: "earlier_date", observationRef: `${rejectedPrefix}.date` },
+      { role: "later_date", observationRef: `${submittedPrefix}.date` },
+    ],
+    alternativeImpacts: [
+      {
+        alternativeId: "clover.same-lifecycle",
+        pass: "supporting",
+        fail: "contradicting",
+        diagnosticity: "material",
+        independenceGroupId,
+      },
+      {
+        alternativeId: "clover.separate-batches",
+        pass: "irrelevant",
+        fail: "irrelevant",
+        diagnosticity: "contextual",
+        independenceGroupId,
+      },
+    ],
+  };
+}
+
+function wellsIdentifierCandidate(
+  id: string,
+  description: string,
+  rightObservationRef: string,
+  independenceGroupId: string,
+): InferenceTopic["verificationRecipes"][number]["candidates"][number] {
+  return {
+    id,
+    description,
+    roleBindings: [
+      { role: "left_identifier", observationRef: "wells.shipping.ref" },
+      { role: "right_identifier", observationRef: rightObservationRef },
+    ],
+    alternativeImpacts: [
+      {
+        alternativeId: "wells.same-lifecycle",
+        pass: "supporting",
+        fail: "contradicting",
+        diagnosticity: "material",
+        independenceGroupId,
+      },
+      {
+        alternativeId: "wells.reference-reuse-only",
+        pass: "supporting",
+        fail: "irrelevant",
+        diagnosticity: "contextual",
+        independenceGroupId,
+      },
+    ],
+  };
+}
+
 export class RecordedFixtureProposer implements StatementHypothesisProposer {
   constructor(
     readonly providerId: string,
@@ -72,6 +141,7 @@ function proposal(
       missingProof,
       acknowledgedEvidenceNeedRefs: topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef),
       proofObligationBindings: proofObligationBindingsForAlternative(request, alternative.alternativeRef),
+      verificationRequests: [],
     },
   };
 }
@@ -165,12 +235,29 @@ export const cloverInferenceTopics: InferenceTopic[] = [{
     missingProperty: "stable_identity_link",
     resolutionEvidenceKinds: ["stable_source_identifier", "explicit_source_relation"],
   }],
+  verificationRecipes: [{
+    id: "clover.verify-reject-resubmission-candidate",
+    description: "Check one RateReveal-approved rejected/submitted row pairing for matching amount, matching count, and temporal order.",
+    checkType: "row_pair_match",
+    roles: [
+      { role: "left_amount", description: "Candidate rejected-row amount.", allowedObservationRefs: ["clover.rejected.amount", "clover.second.rejected.amount"], allowedKinds: ["amount"] },
+      { role: "right_amount", description: "Candidate later submitted-row amount.", allowedObservationRefs: ["clover.resubmitted.amount", "clover.second.resubmitted.amount"], allowedKinds: ["amount"] },
+      { role: "left_count", description: "Candidate rejected-row transaction count.", allowedObservationRefs: ["clover.rejected.count", "clover.second.rejected.count"], allowedKinds: ["count"] },
+      { role: "right_count", description: "Candidate later submitted-row transaction count.", allowedObservationRefs: ["clover.resubmitted.count", "clover.second.resubmitted.count"], allowedKinds: ["count"] },
+      { role: "earlier_date", description: "Candidate rejected-row date.", allowedObservationRefs: ["clover.rejected.date", "clover.second.rejected.date"], allowedKinds: ["date"] },
+      { role: "later_date", description: "Candidate later submitted-row date.", allowedObservationRefs: ["clover.resubmitted.date", "clover.second.resubmitted.date"], allowedKinds: ["date"] },
+    ],
+    candidates: [
+      candidateRelationship("clover.first-reject-to-first-submission", "The first rejected row paired with the first later submitted row.", "clover.rejected", "clover.resubmitted", "clover.first-reject-resubmission-pattern"),
+      candidateRelationship("clover.second-reject-to-second-submission", "The second rejected row paired with the second later submitted row.", "clover.second.rejected", "clover.second.resubmitted", "clover.second-reject-resubmission-pattern"),
+      candidateRelationship("clover.first-reject-to-second-submission", "The first rejected row paired with the second later submitted row.", "clover.rejected", "clover.second.resubmitted", "clover.cross-pair-first-to-second"),
+      candidateRelationship("clover.second-reject-to-first-submission", "The second rejected row paired with the first later submitted row.", "clover.second.rejected", "clover.resubmitted", "clover.cross-pair-second-to-first"),
+    ],
+  }],
   qualification: {
     maximumStrength: "strong",
     compatibilityControlIds: [
       "clover.amounts.match", "clover.counts.match", "clover.time.ordered", "clover.lifecycle.valid",
-      "clover.second.amounts.match", "clover.second.counts.match", "clover.second.time.ordered",
-      "clover.second.lifecycle.valid",
     ],
     evidenceFactors: [
       {
@@ -181,19 +268,6 @@ export const cloverInferenceTopics: InferenceTopic[] = [{
         diagnosticity: "material",
         independenceGroupId: "clover.first-reject-resubmission-pattern",
         controlIds: ["clover.amounts.match", "clover.counts.match", "clover.time.ordered", "clover.lifecycle.valid"],
-        activation: "all_pass",
-      },
-      {
-        id: "clover.second-reject-resubmission-pattern",
-        description: "The second rejected and later submitted rows independently match in amount and count and occur in a valid reject-to-submit order.",
-        alternativeIds: ["clover.same-lifecycle"],
-        effect: "supports",
-        diagnosticity: "material",
-        independenceGroupId: "clover.second-reject-resubmission-pattern",
-        controlIds: [
-          "clover.second.amounts.match", "clover.second.counts.match", "clover.second.time.ordered",
-          "clover.second.lifecycle.valid",
-        ],
         activation: "all_pass",
       },
     ],
@@ -254,6 +328,7 @@ export const paysafeInferenceTopics: InferenceTopic[] = [{
       resolutionEvidenceKinds: ["complete_fee_detail", "reconciliation_mapping"],
     },
   ],
+  verificationRecipes: [],
   qualification: {
     maximumStrength: "moderate",
     compatibilityControlIds: ["paysafe.fee.delta"],
@@ -280,6 +355,7 @@ export const wellsInferenceTopics: InferenceTopic[] = [{
   observationRefs: [
     "wells.shipping.ref", "wells.tax.ref", "wells.shipping", "wells.tax",
     "wells.amendment.earlier", "wells.amendment.later",
+    "wells.batch.0923.ref", "wells.batch.0924.ref",
   ],
   allowedClaims: [{ key: "shipping_tax.same_lifecycle", allowedValues: [true, false] }],
   materialAlternatives: [
@@ -309,6 +385,30 @@ export const wellsInferenceTopics: InferenceTopic[] = [{
     ],
     missingProperty: "row_level_temporal_link",
     resolutionEvidenceKinds: ["row_level_date", "explicit_temporal_relation"],
+  }],
+  verificationRecipes: [{
+    id: "wells.verify-shipping-reference-candidate",
+    description: "Compare the printed shipping reference with one RateReveal-approved candidate source reference.",
+    checkType: "identifier_pair_match",
+    roles: [
+      {
+        role: "left_identifier",
+        description: "The printed supply shipping and handling reference.",
+        allowedObservationRefs: ["wells.shipping.ref"],
+        allowedKinds: ["identifier"],
+      },
+      {
+        role: "right_identifier",
+        description: "A candidate printed reference from another source row.",
+        allowedObservationRefs: ["wells.tax.ref", "wells.batch.0923.ref", "wells.batch.0924.ref"],
+        allowedKinds: ["identifier"],
+      },
+    ],
+    candidates: [
+      wellsIdentifierCandidate("wells.shipping-to-tax-reference", "The shipping reference paired with the sales-tax adjustment reference.", "wells.tax.ref", "wells.shared-source-reference"),
+      wellsIdentifierCandidate("wells.shipping-to-prior-batch-reference", "The shipping reference paired with the September 23 submitted-batch reference.", "wells.batch.0923.ref", "wells.shipping-prior-batch-reference"),
+      wellsIdentifierCandidate("wells.shipping-to-same-day-batch-reference", "The shipping reference paired with the September 24 submitted-batch reference.", "wells.batch.0924.ref", "wells.shipping-same-day-batch-reference"),
+    ],
   }],
   qualification: {
     maximumStrength: "moderate",
@@ -391,6 +491,7 @@ export const vortaxInferenceTopics: InferenceTopic[] = [{
       resolutionEvidenceKinds: ["complete_source_document"],
     },
   ],
+  verificationRecipes: [],
   qualification: {
     maximumStrength: "moderate",
     compatibilityControlIds: ["vortax.counts.match"],
@@ -414,17 +515,25 @@ export const cloverRecordedProposer = new RecordedFixtureProposer(
   "recorded-evaluation-clover-v1",
   (request) => {
     const refs = topicRefs(request);
+    const likely = proposal(
+      request,
+      "likely-reject-resubmission",
+      "The two rejected amounts and counts very likely reappear as later submitted batches.",
+      refs,
+      { key: "batches.same_lifecycle", value: true },
+      "high",
+      "Two independently printed reject rows have exact amount/count counterparts later in the period, and reject followed by resubmission is a coherent operational pattern.",
+      ["A stable source identifier shared by each reject row and its later submitted row is missing."],
+    );
+    const check = request.inferenceTopics[0]!.verificationChecks[0]!;
+    const candidate = check.candidates.find((item) => item.description.startsWith("The second rejected row paired with the second"))!;
+    likely.inference.verificationRequests = [{
+      requestId: "verify-second-row-pair",
+      verificationRef: check.verificationRef,
+      candidateRef: candidate.candidateRef,
+    }];
     return [
-      proposal(
-        request,
-        "likely-reject-resubmission",
-        "The two rejected amounts and counts very likely reappear as later submitted batches.",
-        refs,
-        { key: "batches.same_lifecycle", value: true },
-        "high",
-        "Two independently printed reject rows have exact amount/count counterparts later in the period, and reject followed by resubmission is a coherent operational pattern.",
-        ["A stable source identifier shared by each reject row and its later submitted row is missing."],
-      ),
+      likely,
       proposal(
         request,
         "separate-batches-remain-possible",
@@ -502,17 +611,25 @@ export const wellsRecordedProposer = new RecordedFixtureProposer(
   "recorded-evaluation-wells-v1",
   (request) => {
     const refs = topicRefs(request);
+    const related = proposal(
+      request,
+      "related-tax-amendment",
+      "The tax row may be a later amendment related to the shipping charge with the same reference.",
+      refs,
+      { key: "shipping_tax.same_lifecycle", value: true },
+      "medium",
+      "The exact reference reuse and compatible descriptions support a relationship, but the shipping evidence does not provide enough temporal identity proof.",
+      ["A dated source row or explicit lifecycle link tying the shipping and tax entries is missing."],
+    );
+    const check = request.inferenceTopics[0]!.verificationChecks[0]!;
+    const candidate = check.candidates.find((item) => item.description.includes("sales-tax adjustment"))!;
+    related.inference.verificationRequests = [{
+      requestId: "verify-shipping-tax-reference",
+      verificationRef: check.verificationRef,
+      candidateRef: candidate.candidateRef,
+    }];
     return [
-      proposal(
-        request,
-        "related-tax-amendment",
-        "The tax row may be a later amendment related to the shipping charge with the same reference.",
-        refs,
-        { key: "shipping_tax.same_lifecycle", value: true },
-        "medium",
-        "The exact reference reuse and compatible descriptions support a relationship, but the shipping evidence does not provide enough temporal identity proof.",
-        ["A dated source row or explicit lifecycle link tying the shipping and tax entries is missing."],
-      ),
+      related,
       proposal(
         request,
         "reference-reuse-only",

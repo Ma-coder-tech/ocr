@@ -100,6 +100,7 @@ export function evaluateInferenceEvidencePosture(
   hypothesis: Hypothesis,
   controls: Map<string, ControlResult>,
   competingAlternativeCount: number,
+  verifiedFactors: InferenceEvidenceFactorEvaluation[] = [],
 ): InferenceEvidencePosture {
   const topic = hypothesis.inferenceTopic;
   const inference = hypothesis.inference;
@@ -127,7 +128,10 @@ export function evaluateInferenceEvidencePosture(
   const policy = topic.qualification;
   const applicableFactors = policy.evidenceFactors
     .filter((factor) => factor.alternativeIds.includes(topic.alternativeId));
-  const factorEvaluations = applicableFactors.map((factor) => evaluateFactor(factor, controls));
+  const factorEvaluations = [
+    ...applicableFactors.map((factor) => evaluateFactor(factor, controls)),
+    ...verifiedFactors,
+  ];
   const independentSupportGroups = aggregateIndependentSupport(factorEvaluations);
   const baseStrength = strengthFromIndependentSupport(independentSupportGroups);
   const compatibility = policy.compatibilityControlIds.map((id) => controls.get(id));

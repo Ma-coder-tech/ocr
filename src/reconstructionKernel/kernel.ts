@@ -1,6 +1,7 @@
 import { evaluateControls } from "./controls.js";
 import { routeEvidenceNeeds } from "./evidenceRouting.js";
 import { generateDeterministicFeatures } from "./features.js";
+import { executeInferenceVerificationRequests } from "./inferenceVerification.js";
 import type { ReconstructionInput, ReconstructionResult } from "./types.js";
 import { resolveLimits, validateReconstructionInput } from "./validation.js";
 import { adjudicateHypotheses, enumeratePossibleWorlds, intersectCanonicalClaims } from "./worlds.js";
@@ -26,7 +27,8 @@ export function reconstructStatement(input: ReconstructionInput): Reconstruction
 
   const features = generateDeterministicFeatures(input.observations);
   const controlResults = evaluateControls(input.controls, input.observations);
-  const hypothesisResults = adjudicateHypotheses(input.hypotheses, controlResults);
+  const verificationResults = executeInferenceVerificationRequests(input.hypotheses, input.observations);
+  const hypothesisResults = adjudicateHypotheses(input.hypotheses, controlResults, verificationResults);
   const enumeration = enumeratePossibleWorlds(input.hypotheses, hypothesisResults, input.baseClaims, limits.maxPossibleWorlds);
   // Provider proposals participate in the explanatory possible-world surface, but
   // never in the authority calculation. This makes canonical truth invariant to

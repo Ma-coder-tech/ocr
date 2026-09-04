@@ -84,6 +84,74 @@ export type InferenceEvidenceEffect = "supports" | "contradicts";
 export type InferenceEvidenceDiagnosticity = "contextual" | "material" | "decisive";
 export type InferenceEvidenceActivation = "all_pass" | "any_fail";
 export type InferenceEvidenceFactorState = "satisfied" | "not_satisfied" | "unresolved";
+export type InferenceVerificationCheckType = "row_pair_match" | "identifier_pair_match";
+export type InferenceVerificationRole =
+  | "left_amount"
+  | "right_amount"
+  | "left_count"
+  | "right_count"
+  | "earlier_date"
+  | "later_date"
+  | "left_identifier"
+  | "right_identifier";
+export type InferenceVerificationClassification = "supporting" | "contradicting" | "unresolved" | "irrelevant";
+export type InferenceVerificationOutcomeClassification = Exclude<InferenceVerificationClassification, "unresolved">;
+
+export interface InferenceVerificationCandidateDefinition {
+  id: string;
+  description: string;
+  roleBindings: Array<{
+    role: InferenceVerificationRole;
+    observationRef: string;
+  }>;
+  alternativeImpacts: Array<{
+    alternativeId: string;
+    pass: InferenceVerificationOutcomeClassification;
+    fail: InferenceVerificationOutcomeClassification;
+    diagnosticity: InferenceEvidenceDiagnosticity;
+    independenceGroupId: string;
+  }>;
+}
+
+export interface InferenceVerificationRecipeDefinition {
+  id: string;
+  description: string;
+  checkType: InferenceVerificationCheckType;
+  roles: Array<{
+    role: InferenceVerificationRole;
+    description: string;
+    allowedObservationRefs: string[];
+    allowedKinds: ObservationKind[];
+  }>;
+  candidates: InferenceVerificationCandidateDefinition[];
+}
+
+/** Provider request after opaque source references have been translated by RateReveal. */
+export interface InferenceVerificationRequest {
+  requestId: string;
+  recipeId: string;
+  candidateId: string;
+  roleBindings: Array<{
+    role: InferenceVerificationRole;
+    observationRef: string;
+  }>;
+}
+
+export interface InferenceVerificationResult {
+  requestId: string;
+  recipeId: string;
+  candidateId: string;
+  validationState: "accepted" | "rejected";
+  controlState: ControlState;
+  classification: InferenceVerificationClassification;
+  observationRefs: string[];
+  componentResults: Array<{
+    component: "amount_equality" | "count_equality" | "temporal_order" | "identifier_equality";
+    state: ControlState;
+  }>;
+  evidenceFactor?: InferenceEvidenceFactorEvaluation;
+  reason: string;
+}
 
 /** RateReveal-owned evidence policy. Providers cannot add factors or select controls. */
 export interface InferenceEvidenceFactorDefinition {
@@ -136,6 +204,7 @@ export interface HypothesisInference {
   acknowledgedEvidenceNeedIds?: string[];
   proofObligationBindings?: ProofObligationBinding[];
   proofObligationValidation?: ProofObligationValidation;
+  verificationRequests?: InferenceVerificationRequest[];
 }
 
 export interface InferenceTopicClaim {
@@ -245,6 +314,7 @@ export interface InferenceTopic {
   allowedClaims: InferenceTopicClaim[];
   materialAlternatives: InferenceTopicMaterialAlternative[];
   proofObligations: ProofObligationDefinition[];
+  verificationRecipes: InferenceVerificationRecipeDefinition[];
   qualification: {
     maximumStrength: Exclude<QualifiedInferenceStrength, "unknown_competing">;
     compatibilityControlIds: string[];
@@ -261,6 +331,7 @@ export interface SystemInferenceTopicAssignment {
   alternativeId: string;
   requiredProofObligationIds: string[];
   proofObligations: ProofObligationDefinition[];
+  verificationRecipes: InferenceVerificationRecipeDefinition[];
   immutable: true;
   qualification: InferenceTopic["qualification"];
 }
@@ -429,6 +500,7 @@ export interface HypothesisResult {
   qualifiedInferenceStrength?: QualifiedInferenceStrength;
   qualificationReasonCodes?: string[];
   evidencePosture?: InferenceEvidencePosture;
+  verificationResults?: InferenceVerificationResult[];
   reason: string;
 }
 

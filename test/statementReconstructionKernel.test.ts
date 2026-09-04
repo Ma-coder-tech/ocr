@@ -20,6 +20,7 @@ import {
 } from "./fixtures/reconstructionKernel/rescueCorpus.js";
 import {
   cloverInferenceTopics,
+  cloverRecordedProposer,
   proofObligationBindingsForAlternative,
 } from "./fixtures/reconstructionKernel/recordedHypothesisProposals.js";
 
@@ -398,6 +399,7 @@ describe("provider-neutral offline proposal boundary", () => {
         missingProof: ["A stable identifier linking each rejected row to its later submitted batch is missing."],
         acknowledgedEvidenceNeedRefs: topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef),
         proofObligationBindings: proofObligationBindingsForAlternative(request, alternative.alternativeRef),
+        verificationRequests: [],
       },
     };
   }
@@ -425,9 +427,9 @@ describe("provider-neutral offline proposal boundary", () => {
     expect(canonicalProjection(inputA)).toEqual(canonicalProjection(cloverDuplicateResubmission));
     expect(reconstructStatement(inputA).hypothesisResults).toContainEqual(expect.objectContaining({
       hypothesisId: expect.stringMatching(/^provider\.provider-a\.[a-f0-9]{8}\.proposal-a\.[a-f0-9]{8}$/),
-      interpretationState: "strong_inference",
+      interpretationState: "moderate_inference",
       providerReportedConfidence: "high",
-      qualifiedInferenceStrength: "strong",
+      qualifiedInferenceStrength: "moderate",
       state: "viable_unresolved",
       ownership: { kind: "provider", providerId: "provider-a", proposalId: "proposal-a", immutable: true },
     }));
@@ -489,9 +491,9 @@ describe("provider-neutral offline proposal boundary", () => {
     }));
 
     expect(outcomes.map((item) => item.providerReportedConfidence)).toEqual(["low", "medium", "high"]);
-    expect(outcomes.map((item) => item.qualifiedInferenceStrength)).toEqual(["strong", "strong", "strong"]);
+    expect(outcomes.map((item) => item.qualifiedInferenceStrength)).toEqual(["moderate", "moderate", "moderate"]);
     expect(outcomes.every((item) => item.evidencePosture?.providerConfidenceUsed === false)).toBe(true);
-    expect(outcomes.every((item) => item.evidencePosture?.independentSupportGroups.length === 2)).toBe(true);
+    expect(outcomes.every((item) => item.evidencePosture?.independentSupportGroups.length === 1)).toBe(true);
     expect(outcomes.map((item) => item.qualificationReasonCodes)).toEqual([
       outcomes[0]!.qualificationReasonCodes,
       outcomes[0]!.qualificationReasonCodes,
@@ -517,6 +519,184 @@ describe("provider-neutral offline proposal boundary", () => {
       evidencePosture: { outcome: "contradicted", providerConfidenceUsed: false },
     });
     expect(providerResult.qualificationReasonCodes).toContain("deterministic_compatibility_control_failed");
+  });
+
+  it("fails closed when a provider invents a verification or tries to assign its result", async () => {
+    const attempts = await Promise.all([
+      collectRecordedProviderHypotheses(new RecordedProposer("invented-verification", (request) => {
+        const proposal = providerHypothesis(request, "invented-verification", true);
+        proposal.inference.verificationRequests = [{
+          requestId: "invented",
+          verificationRef: "provider-created-verification",
+          candidateRef: "provider-created-candidate",
+        }];
+        return [proposal];
+      }), cloverDuplicateResubmission.statementId, cloverDuplicateResubmission.observations,
+      cloverProviderSourceBinding, cloverInferenceTopics, cloverDuplicateResubmission.evidenceNeeds),
+      collectRecordedProviderHypotheses(new RecordedProposer("assigned-result", (request) => {
+        const proposal = providerHypothesis(request, "assigned-result", true);
+        const check = request.inferenceTopics[0]!.verificationChecks[0]!;
+        const candidate = check.candidates[0]!;
+        proposal.inference.verificationRequests = [{
+          requestId: "assigned",
+          verificationRef: check.verificationRef,
+          candidateRef: candidate.candidateRef,
+        }];
+        (proposal.inference.verificationRequests[0] as object as Record<string, unknown>).classification = "supporting";
+        return [proposal];
+      }), cloverDuplicateResubmission.statementId, cloverDuplicateResubmission.observations,
+      cloverProviderSourceBinding, cloverInferenceTopics, cloverDuplicateResubmission.evidenceNeeds),
+      collectRecordedProviderHypotheses(new RecordedProposer("invented-candidate", (request) => {
+        const proposal = providerHypothesis(request, "invented-candidate", true);
+        const check = request.inferenceTopics[0]!.verificationChecks[0]!;
+        proposal.inference.verificationRequests = [{
+          requestId: "invented-candidate",
+          verificationRef: check.verificationRef,
+          candidateRef: "provider-created-candidate",
+        }];
+        return [proposal];
+      }), cloverDuplicateResubmission.statementId, cloverDuplicateResubmission.observations,
+      cloverProviderSourceBinding, cloverInferenceTopics, cloverDuplicateResubmission.evidenceNeeds),
+    ]);
+
+    expect(attempts.every((attempt) => attempt.hypotheses.length === 0)).toBe(true);
+    expect(attempts[0]!.errors.join(" ")).toContain("unapproved verification");
+    expect(attempts[1]!.errors.join(" ")).toContain("define verification semantics or results");
+    expect(attempts[2]!.errors.join(" ")).toContain("unapproved candidate relationship");
+  });
+
+  it("keeps an on-demand verification unresolved when a required source value is missing", async () => {
+    const collected = await collectRecordedProviderHypotheses(
+      cloverRecordedProposer,
+      cloverDuplicateResubmission.statementId,
+      cloverDuplicateResubmission.observations,
+      cloverProviderSourceBinding,
+      cloverInferenceTopics,
+      cloverDuplicateResubmission.evidenceNeeds,
+    );
+    const input = clone(cloverDuplicateResubmission);
+    input.observations.find((observation) => observation.id === "clover.second.resubmitted.date")!.value = null;
+    input.hypotheses.push(...collected.hypotheses);
+    const result = reconstructStatement(input);
+    const likely = result.hypothesisResults.find((item) =>
+      item.ownership.kind === "provider" && item.ownership.proposalId === "likely-reject-resubmission")!;
+
+    expect(likely.qualifiedInferenceStrength).toBe("moderate");
+    expect(likely.verificationResults).toEqual([expect.objectContaining({
+      controlState: "unresolved",
+      classification: "unresolved",
+    })]);
+    expect(canonicalProjection(input)).toEqual(canonicalProjection(cloverDuplicateResubmission));
+  });
+
+  it("rejects an AI-selected cross-pair relationship after deterministic verification", async () => {
+    const collected = await collectRecordedProviderHypotheses(new RecordedProposer("cross-pair-selection", (request) => {
+      const proposal = providerHypothesis(request, "cross-pair", true);
+      const check = request.inferenceTopics[0]!.verificationChecks[0]!;
+      const candidate = check.candidates.find((item) => item.description.startsWith("The first rejected row paired with the second"))!;
+      proposal.inference.verificationRequests = [{
+        requestId: "verify-cross-pair",
+        verificationRef: check.verificationRef,
+        candidateRef: candidate.candidateRef,
+      }];
+      return [proposal];
+    }), cloverDuplicateResubmission.statementId, cloverDuplicateResubmission.observations,
+    cloverProviderSourceBinding, cloverInferenceTopics, cloverDuplicateResubmission.evidenceNeeds);
+    const input = clone(cloverDuplicateResubmission);
+    input.hypotheses.push(...collected.hypotheses);
+    const providerResult = reconstructStatement(input).hypothesisResults
+      .find((item) => item.ownership.kind === "provider")!;
+
+    expect(providerResult).toMatchObject({ state: "rejected", interpretationState: "rejected" });
+    expect(providerResult.verificationResults).toEqual([expect.objectContaining({
+      candidateId: "clover.first-reject-to-second-submission",
+      controlState: "fail",
+      classification: "contradicting",
+      componentResults: expect.arrayContaining([
+        { component: "amount_equality", state: "fail" },
+        { component: "count_equality", state: "fail" },
+      ]),
+    })]);
+    expect(canonicalProjection(input)).toEqual(canonicalProjection(cloverDuplicateResubmission));
+  });
+
+  it("does not double-count an AI-selected relationship already represented by existing controls", async () => {
+    const collected = await collectRecordedProviderHypotheses(new RecordedProposer("redundant-pair-selection", (request) => {
+      const proposal = providerHypothesis(request, "redundant-pair", true);
+      const check = request.inferenceTopics[0]!.verificationChecks[0]!;
+      const candidate = check.candidates.find((item) => item.description.startsWith("The first rejected row paired with the first"))!;
+      proposal.inference.verificationRequests = [{
+        requestId: "verify-redundant-pair",
+        verificationRef: check.verificationRef,
+        candidateRef: candidate.candidateRef,
+      }];
+      return [proposal];
+    }), cloverDuplicateResubmission.statementId, cloverDuplicateResubmission.observations,
+    cloverProviderSourceBinding, cloverInferenceTopics, cloverDuplicateResubmission.evidenceNeeds);
+    const input = clone(cloverDuplicateResubmission);
+    input.hypotheses.push(...collected.hypotheses);
+    const providerResult = reconstructStatement(input).hypothesisResults
+      .find((item) => item.ownership.kind === "provider")!;
+
+    expect(providerResult.qualifiedInferenceStrength).toBe("moderate");
+    expect(providerResult.verificationResults).toEqual([expect.objectContaining({
+      candidateId: "clover.first-reject-to-first-submission",
+      controlState: "pass",
+      classification: "supporting",
+    })]);
+    expect(providerResult.evidencePosture?.independentSupportGroups).toHaveLength(1);
+    expect(canonicalProjection(input)).toEqual(canonicalProjection(cloverDuplicateResubmission));
+  });
+
+  it("classifies a valid but non-diagnostic verification as irrelevant without changing posture", async () => {
+    const collected = await collectRecordedProviderHypotheses(new RecordedProposer("irrelevant-verification", (request) => {
+      const proposal = providerHypothesis(request, "irrelevant", false);
+      const check = request.inferenceTopics[0]!.verificationChecks[0]!;
+      const candidate = check.candidates.find((item) => item.description.startsWith("The second rejected row paired with the second"))!;
+      proposal.inference.verificationRequests = [{
+        requestId: "valid-but-irrelevant",
+        verificationRef: check.verificationRef,
+        candidateRef: candidate.candidateRef,
+      }];
+      return [proposal];
+    }), cloverDuplicateResubmission.statementId, cloverDuplicateResubmission.observations,
+    cloverProviderSourceBinding, cloverInferenceTopics, cloverDuplicateResubmission.evidenceNeeds);
+    const input = clone(cloverDuplicateResubmission);
+    input.hypotheses.push(...collected.hypotheses);
+    const result = reconstructStatement(input);
+    const providerResult = result.hypothesisResults.find((item) => item.ownership.kind === "provider")!;
+
+    expect(providerResult.qualifiedInferenceStrength).toBe("unknown_competing");
+    expect(providerResult.verificationResults).toEqual([expect.objectContaining({
+      validationState: "accepted",
+      controlState: "pass",
+      classification: "irrelevant",
+    })]);
+    expect(providerResult.evidencePosture?.satisfiedSupportFactorIds).toEqual([]);
+  });
+
+  it("rejects the proposed relationship when its on-demand deterministic verification fails", async () => {
+    const collected = await collectRecordedProviderHypotheses(
+      cloverRecordedProposer,
+      cloverDuplicateResubmission.statementId,
+      cloverDuplicateResubmission.observations,
+      cloverProviderSourceBinding,
+      cloverInferenceTopics,
+      cloverDuplicateResubmission.evidenceNeeds,
+    );
+    const input = clone(cloverDuplicateResubmission);
+    input.observations.find((observation) => observation.id === "clover.second.resubmitted.date")!.value = "2024-06-10";
+    input.hypotheses.push(...collected.hypotheses);
+    const result = reconstructStatement(input);
+    const likely = result.hypothesisResults.find((item) =>
+      item.ownership.kind === "provider" && item.ownership.proposalId === "likely-reject-resubmission")!;
+
+    expect(likely).toMatchObject({ state: "rejected", interpretationState: "rejected" });
+    expect(likely.verificationResults).toEqual([expect.objectContaining({
+      controlState: "fail",
+      classification: "contradicting",
+    })]);
+    expect(canonicalProjection(input)).toEqual(canonicalProjection(cloverDuplicateResubmission));
   });
 
   it("provides opaque source-bound context without exposing semantic observation ids", async () => {
@@ -559,6 +739,15 @@ describe("provider-neutral offline proposal boundary", () => {
     ]);
     expect(JSON.stringify(collected.request.inferenceTopics[0]!.proofObligations))
       .not.toContain("clover.rejected.id");
+    const offeredCheck = collected.request.inferenceTopics[0]!.verificationChecks[0]!;
+    expect(offeredCheck.candidates).toHaveLength(4);
+    expect(offeredCheck.candidates.every((candidate) =>
+      /^verification-candidate-\d{4}$/.test(candidate.candidateRef)
+      && candidate.roleBindings.length === 6
+      && candidate.roleBindings.every((binding) => /^source-observation-\d{4}$/.test(binding.observationRef))))
+      .toBe(true);
+    expect(JSON.stringify(offeredCheck)).not.toContain("clover.second.rejected.amount");
+    expect(JSON.stringify(offeredCheck)).not.toContain("alternativeImpacts");
   });
 
   it("fails closed before provider execution when exact source binding is invalid", async () => {

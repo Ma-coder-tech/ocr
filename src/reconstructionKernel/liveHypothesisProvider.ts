@@ -10,8 +10,8 @@ import type {
 } from "./provider.js";
 import type { ScalarValue } from "./types.js";
 
-export const LIVE_HYPOTHESIS_PROMPT_VERSION = "ratereveal-live-hypothesis-evaluation-v3" as const;
-export const LIVE_HYPOTHESIS_RESPONSE_SCHEMA_VERSION = "ratereveal-live-hypothesis-response-v3" as const;
+export const LIVE_HYPOTHESIS_PROMPT_VERSION = "ratereveal-live-hypothesis-evaluation-v5" as const;
+export const LIVE_HYPOTHESIS_RESPONSE_SCHEMA_VERSION = "ratereveal-live-hypothesis-response-v5" as const;
 
 export const LIVE_HYPOTHESIS_DEVELOPER_PROMPT = [
   "You are an evaluation-only hypothesis proposer for merchant-statement reconstruction.",
@@ -23,6 +23,7 @@ export const LIVE_HYPOTHESIS_DEVELOPER_PROMPT = [
   "Every claim must cite only observation references listed on its selected topic. Every hypothesis must acknowledge each material known evidence gap it relies on.",
   "Provider confidence means: high = strongly favored by the supplied rows while explicit confirmation proof is still missing; medium = plausible and useful but materially unresolved; low = weakly supported. Never describe an inference as confirmed.",
   "For each proposed alternative, bind every required proof obligation exactly once. Bind every required source role to the observations that actually play that role, repeat the offered gap kind and missing property exactly, and select one or more offered resolution evidence kinds. Do not invent obligations, roles, properties, or evidence kinds.",
+  "You may ask RateReveal to execute an offered verification check by selecting its verificationRef and one offered candidateRef. Choose the candidate relationship whose bound source rows are most useful to test. Do not alter candidate bindings or supply check semantics, expected results, classifications, evidence weight, controls, or authority. Use an empty verificationRequests array when no offered candidate would add useful evidence.",
   "Natural-language rationale and missingProof are audit explanations only. A high-confidence proposal must still state why it is likely and identify the strongest competing explanation, but prose cannot substitute for complete proof-obligation bindings.",
   "Use empty events and populations arrays. Keep descriptions and rationales concise and source-bound.",
 ].join("\n");
@@ -102,7 +103,7 @@ const responseSchema = {
           inference: {
             type: "object",
             additionalProperties: false,
-            required: ["confidence", "rationale", "missingProof", "acknowledgedEvidenceNeedRefs", "proofObligationBindings"],
+            required: ["confidence", "rationale", "missingProof", "acknowledgedEvidenceNeedRefs", "proofObligationBindings", "verificationRequests"],
             properties: {
               confidence: { type: "string", enum: ["low", "medium", "high"] },
               rationale: { type: "string" },
@@ -164,6 +165,20 @@ const responseSchema = {
                         ],
                       },
                     },
+                  },
+                },
+              },
+              verificationRequests: {
+                type: "array",
+                maxItems: 8,
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["requestId", "verificationRef", "candidateRef"],
+                  properties: {
+                    requestId: { type: "string" },
+                    verificationRef: { type: "string" },
+                    candidateRef: { type: "string" },
                   },
                 },
               },
@@ -359,6 +374,11 @@ export function assertLiveEvaluationPacketSafe(request: HypothesisProposalReques
   if (request.allowedObservationRefs.length !== observationRefs.size
       || request.allowedObservationRefs.some((reference) => !observationRefs.has(reference))) {
     throw new Error("Live evaluation packet exposes observation references outside the selected topic.");
+  }
+  if (request.inferenceTopics[0]!.verificationChecks.some((check) =>
+    check.candidates.some((candidate) => candidate.roleBindings
+      .some((binding) => !topicRefs.has(binding.observationRef))))) {
+    throw new Error("Live evaluation verification policy references observations outside the selected topic.");
   }
   if (request.observations.length > 24) throw new Error("Live evaluation observation bound exceeded.");
   const serialized = JSON.stringify(request);
