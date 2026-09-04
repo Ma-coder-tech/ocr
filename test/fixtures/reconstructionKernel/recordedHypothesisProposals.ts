@@ -71,8 +71,60 @@ function proposal(
       rationale,
       missingProof,
       acknowledgedEvidenceNeedRefs: topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef),
+      proofObligationBindings: proofObligationBindingsForAlternative(request, alternative.alternativeRef),
     },
   };
+}
+
+export function proofObligationBindingsForAlternative(
+  request: HypothesisProposalRequest,
+  alternativeRef: string,
+): ProviderHypothesisProposal["inference"]["proofObligationBindings"] {
+  const topic = request.inferenceTopics.find((candidate) =>
+    candidate.materialAlternatives.some((alternative) => alternative.alternativeRef === alternativeRef))!;
+  const alternative = topic.materialAlternatives.find((candidate) => candidate.alternativeRef === alternativeRef)!;
+  const observations = request.observations.filter((observation) => topic.observationRefs.includes(observation.observationRef));
+  const refs = (predicate: (observation: HypothesisProposalRequest["observations"][number]) => boolean): string[] =>
+    observations.filter(predicate).map((observation) => observation.observationRef);
+
+  return alternative.requiredProofObligationRefs.map((proofObligationRef) => {
+    const obligation = topic.proofObligations.find((candidate) => candidate.proofObligationRef === proofObligationRef)!;
+    const observationBindings = request.sourceDocument.documentId === "clover-duplicate-resubmission"
+      ? [
+          { role: "subject" as const, observationRefs: refs((item) => item.kind === "identifier" && item.value === null) },
+          { role: "counterpart" as const, observationRefs: refs((item) => item.kind === "identifier" && item.value !== null) },
+        ]
+      : request.sourceDocument.documentId === "paysafe-october-2025"
+        ? [
+            { role: "reported_total" as const, observationRefs: refs((item) => item.kind === "amount" && item.value === 37_855) },
+            { role: "visible_subtotal" as const, observationRefs: refs((item) => item.kind === "amount" && item.value === 37_854) },
+            { role: "discrepancy" as const, observationRefs: refs((item) => item.kind === "amount" && item.value === 1) },
+          ]
+        : request.sourceDocument.documentId === "wells-fargo-september-2024"
+          ? [
+              { role: "subject" as const, observationRefs: refs((item) => item.kind === "amount" && item.value === 1_595) },
+              { role: "counterpart" as const, observationRefs: refs((item) => item.kind === "amount" && item.value === -108) },
+              { role: "missing_subject_attribute" as const, observationRefs: refs((item) => item.kind === "date" && item.value === null && item.sourceLocation.section?.includes("shipping") === true) },
+              { role: "missing_counterpart_attribute" as const, observationRefs: refs((item) => item.kind === "date" && item.value === null && item.sourceLocation.section?.includes("tax") === true) },
+            ]
+          : obligation.gapKind === "source_completeness"
+            ? [
+                { role: "document_completeness_gap" as const, observationRefs: refs((item) => item.kind === "count" && item.value === 1 && item.sourceLocation.section?.includes("document integrity") === true) },
+              ]
+            : [
+                { role: "subject" as const, observationRefs: refs((item) => item.kind === "count" && item.value === 11 && item.sourceLocation.section?.includes("negative adjustment") === true) },
+                { role: "counterpart" as const, observationRefs: refs((item) => item.kind === "count" && item.value === 11 && item.sourceLocation.section?.includes("chargeback fee") === true) },
+                { role: "missing_subject_attribute" as const, observationRefs: refs((item) => item.kind === "identifier" && item.value === null && item.sourceLocation.section?.includes("adjustment rows") === true) },
+                { role: "missing_counterpart_attribute" as const, observationRefs: refs((item) => item.kind === "identifier" && item.value === null && item.sourceLocation.section?.includes("chargeback fee") === true) },
+              ];
+    return {
+      proofObligationRef,
+      gapKind: obligation.gapKind,
+      observationBindings,
+      missingProperty: obligation.missingProperty,
+      resolutionEvidenceKinds: structuredClone(obligation.permittedResolutionEvidenceKinds),
+    };
+  });
 }
 
 export const cloverInferenceTopics: InferenceTopic[] = [{
@@ -92,24 +144,26 @@ export const cloverInferenceTopics: InferenceTopic[] = [{
       id: "clover.same-lifecycle",
       description: "The rejected rows and later submitted rows belong to the same lifecycle.",
       claim: { key: "batches.same_lifecycle", value: true },
-      requiredProofGapConceptIds: ["stable-row-identity-linkage"],
+      requiredProofObligationIds: ["stable-row-identity-linkage"],
     },
     {
       id: "clover.separate-batches",
       description: "The matching rejected and submitted rows are separate batches.",
       claim: { key: "batches.same_lifecycle", value: false },
-      requiredProofGapConceptIds: ["stable-row-identity-linkage"],
+      requiredProofObligationIds: ["stable-row-identity-linkage"],
     },
   ],
-  proofGapConcepts: [{
+  proofObligations: [{
     id: "stable-row-identity-linkage",
     description: "A stable source identity must link or distinguish the rejected rows and later submitted batches.",
     evidenceNeedIds: ["clover.batch-identity"],
-    requiredFacets: [
-      { id: "stable-identity", acceptedTokenGroups: [["stable", "identifier"], ["stable", "reference"], ["persistent", "identifier"], ["unique", "identifier"], ["batch", "reference"], ["row", "identifier"], ["trace", "identifier"]] },
-      { id: "linkage", acceptedTokenGroups: [["link"], ["tie"], ["connect"], ["associate"], ["correspond"], ["share"]] },
-      { id: "rejected-and-later-rows", acceptedTokenGroups: [["reject", "later"], ["reject", "submit"], ["reject", "resubmit"], ["decline", "later"], ["decline", "submit"], ["reject", "batch"]] },
+    gapKind: "identity_linkage",
+    observationRequirements: [
+      { role: "subject", description: "Identifier fields on the rejected rows whose lifecycle identity is unresolved.", observationRefs: ["clover.rejected.id", "clover.second.rejected.id"], allowedKinds: ["identifier"], valueState: "missing" },
+      { role: "counterpart", description: "Printed identifiers on the later submitted rows that may or may not correspond to the rejected rows.", observationRefs: ["clover.resubmitted.id", "clover.second.resubmitted.id"], allowedKinds: ["identifier"], valueState: "present" },
     ],
+    missingProperty: "stable_identity_link",
+    resolutionEvidenceKinds: ["stable_source_identifier", "explicit_source_relation"],
   }],
   qualification: {
     maximumStrength: "strong",
@@ -117,6 +171,31 @@ export const cloverInferenceTopics: InferenceTopic[] = [{
       "clover.amounts.match", "clover.counts.match", "clover.time.ordered", "clover.lifecycle.valid",
       "clover.second.amounts.match", "clover.second.counts.match", "clover.second.time.ordered",
       "clover.second.lifecycle.valid",
+    ],
+    evidenceFactors: [
+      {
+        id: "clover.first-reject-resubmission-pattern",
+        description: "The first rejected and later submitted rows match in amount and count and occur in a valid reject-to-submit order.",
+        alternativeIds: ["clover.same-lifecycle"],
+        effect: "supports",
+        diagnosticity: "material",
+        independenceGroupId: "clover.first-reject-resubmission-pattern",
+        controlIds: ["clover.amounts.match", "clover.counts.match", "clover.time.ordered", "clover.lifecycle.valid"],
+        activation: "all_pass",
+      },
+      {
+        id: "clover.second-reject-resubmission-pattern",
+        description: "The second rejected and later submitted rows independently match in amount and count and occur in a valid reject-to-submit order.",
+        alternativeIds: ["clover.same-lifecycle"],
+        effect: "supports",
+        diagnosticity: "material",
+        independenceGroupId: "clover.second-reject-resubmission-pattern",
+        controlIds: [
+          "clover.second.amounts.match", "clover.second.counts.match", "clover.second.time.ordered",
+          "clover.second.lifecycle.valid",
+        ],
+        activation: "all_pass",
+      },
     ],
     materialEvidenceNeedIds: ["clover.batch-identity"],
     sourceCompleteness: "unproven",
@@ -138,40 +217,56 @@ export const paysafeInferenceTopics: InferenceTopic[] = [{
       id: "paysafe.aggregate-display-rounding",
       description: "The visible one-cent gap is aggregate display rounding.",
       claim: { key: "fees.visible_gap_explanation", value: "aggregate_display_rounding" },
-      requiredProofGapConceptIds: ["underlying-fee-precision-and-rounding-method"],
+      requiredProofObligationIds: ["underlying-fee-precision-and-rounding-method"],
     },
     {
       id: "paysafe.unobserved-fee-component",
       description: "The visible one-cent gap is an unobserved fee component.",
       claim: { key: "fees.visible_gap_explanation", value: "unobserved_fee_component" },
-      requiredProofGapConceptIds: ["complete-fee-detail-for-omitted-component"],
+      requiredProofObligationIds: ["complete-fee-detail-for-omitted-component"],
     },
   ],
-  proofGapConcepts: [
+  proofObligations: [
     {
       id: "underlying-fee-precision-and-rounding-method",
       description: "Underlying fee precision or the processor rounding method is required to prove rounding.",
       evidenceNeedIds: ["paysafe.fee-cent-gap"],
-      requiredFacets: [
-        { id: "underlying-precision", acceptedTokenGroups: [["unround"], ["precision"], ["raw", "amount"], ["decimal", "input"], ["underlying", "amount"]] },
-        { id: "rounding-method", acceptedTokenGroups: [["round", "formula"], ["round", "method"], ["round", "treatment"], ["round", "calculation"], ["round", "underlying"], ["round", "total"]] },
-        { id: "fee-basis", acceptedTokenGroups: [["fee"], ["amount"], ["input"]] },
+      gapKind: "calculation_basis",
+      observationRequirements: [
+        { role: "reported_total", description: "The processor-printed aggregate fee total.", observationRefs: ["paysafe.fees"], allowedKinds: ["amount"], valueState: "present" },
+        { role: "visible_subtotal", description: "The deterministic subtotal of visible fee detail.", observationRefs: ["paysafe.visible-fee-subtotal"], allowedKinds: ["amount"], valueState: "present" },
+        { role: "discrepancy", description: "The deterministic difference between the reported total and visible subtotal.", observationRefs: ["paysafe.one-cent-gap"], allowedKinds: ["amount"], valueState: "present" },
       ],
+      missingProperty: "underlying_calculation_basis",
+      resolutionEvidenceKinds: ["unrounded_source_amounts", "processor_rounding_method"],
     },
     {
       id: "complete-fee-detail-for-omitted-component",
       description: "Line-level fee detail must identify or rule out an omitted component.",
       evidenceNeedIds: ["paysafe.fee-cent-gap"],
-      requiredFacets: [
-        { id: "detail-basis", acceptedTokenGroups: [["detail", "row"], ["line", "level"], ["fee", "basis"], ["fee", "formula"]] },
-        { id: "additional-component", acceptedTokenGroups: [["additional", "component"], ["omit", "component"], ["unobserved", "fee"], ["undisplayed", "charge"]] },
-        { id: "identification-or-reconciliation", acceptedTokenGroups: [["identify"], ["reconciliation"], ["account", "for"], ["rule", "out"]] },
+      gapKind: "component_reconciliation",
+      observationRequirements: [
+        { role: "reported_total", description: "The processor-printed aggregate fee total.", observationRefs: ["paysafe.fees"], allowedKinds: ["amount"], valueState: "present" },
+        { role: "visible_subtotal", description: "The deterministic subtotal of visible fee detail.", observationRefs: ["paysafe.visible-fee-subtotal"], allowedKinds: ["amount"], valueState: "present" },
+        { role: "discrepancy", description: "The deterministic difference between the reported total and visible subtotal.", observationRefs: ["paysafe.one-cent-gap"], allowedKinds: ["amount"], valueState: "present" },
       ],
+      missingProperty: "complete_component_membership",
+      resolutionEvidenceKinds: ["complete_fee_detail", "reconciliation_mapping"],
     },
   ],
   qualification: {
     maximumStrength: "moderate",
     compatibilityControlIds: ["paysafe.fee.delta"],
+    evidenceFactors: [{
+      id: "paysafe.printed-fee-gap",
+      description: "The printed aggregate and visible detail have a deterministic one-cent gap compatible with either permitted explanation.",
+      alternativeIds: ["paysafe.aggregate-display-rounding", "paysafe.unobserved-fee-component"],
+      effect: "supports",
+      diagnosticity: "contextual",
+      independenceGroupId: "paysafe.printed-fee-gap",
+      controlIds: ["paysafe.fee.delta"],
+      activation: "all_pass",
+    }],
     materialEvidenceNeedIds: ["paysafe.fee-cent-gap"],
     sourceCompleteness: "unproven",
     completenessRequirement: "observed_rows_sufficient",
@@ -192,30 +287,125 @@ export const wellsInferenceTopics: InferenceTopic[] = [{
       id: "wells.same-lifecycle",
       description: "The shipping and tax rows are part of the same lifecycle.",
       claim: { key: "shipping_tax.same_lifecycle", value: true },
-      requiredProofGapConceptIds: ["shipping-tax-temporal-linkage"],
+      requiredProofObligationIds: ["shipping-tax-temporal-linkage"],
     },
     {
       id: "wells.reference-reuse-only",
       description: "The shared reference is reuse and does not establish one lifecycle.",
       claim: { key: "shipping_tax.same_lifecycle", value: false },
-      requiredProofGapConceptIds: ["shipping-tax-temporal-linkage"],
+      requiredProofObligationIds: ["shipping-tax-temporal-linkage"],
     },
   ],
-  proofGapConcepts: [{
+  proofObligations: [{
     id: "shipping-tax-temporal-linkage",
     description: "Row-level temporal evidence must link or separate the shipping and tax rows.",
     evidenceNeedIds: ["wells.shipping-tax-order"],
-    requiredFacets: [
-      { id: "temporal-evidence", acceptedTokenGroups: [["date"], ["temporal"], ["timestamp"], ["chronology"], ["order"]] },
-      { id: "linkage", acceptedTokenGroups: [["link"], ["tie"], ["associate"], ["belong"], ["lifecycle"]] },
-      { id: "shipping-and-tax", acceptedTokenGroups: [["shipping", "tax"]] },
+    gapKind: "temporal_linkage",
+    observationRequirements: [
+      { role: "subject", description: "The shipping charge whose lifecycle relationship is unresolved.", observationRefs: ["wells.shipping"], allowedKinds: ["amount"], valueState: "present" },
+      { role: "counterpart", description: "The tax entry sharing a source reference with the shipping charge.", observationRefs: ["wells.tax"], allowedKinds: ["amount"], valueState: "present" },
+      { role: "missing_subject_attribute", description: "Missing row-level date evidence for the shipping charge.", observationRefs: ["wells.amendment.earlier"], allowedKinds: ["date"], valueState: "missing" },
+      { role: "missing_counterpart_attribute", description: "Missing row-level date evidence for the tax entry in the bounded reconstruction packet.", observationRefs: ["wells.amendment.later"], allowedKinds: ["date"], valueState: "missing" },
     ],
+    missingProperty: "row_level_temporal_link",
+    resolutionEvidenceKinds: ["row_level_date", "explicit_temporal_relation"],
   }],
   qualification: {
     maximumStrength: "moderate",
     compatibilityControlIds: ["wells.refs.match"],
+    evidenceFactors: [
+      {
+        id: "wells.shared-reference-supports-lifecycle",
+        description: "The shared source reference materially supports, but does not prove, one lifecycle.",
+        alternativeIds: ["wells.same-lifecycle"],
+        effect: "supports",
+        diagnosticity: "material",
+        independenceGroupId: "wells.shared-source-reference",
+        controlIds: ["wells.refs.match"],
+        activation: "all_pass",
+      },
+      {
+        id: "wells.shared-reference-compatible-with-reuse",
+        description: "The shared source reference leaves source-reference reuse possible without positively establishing it.",
+        alternativeIds: ["wells.reference-reuse-only"],
+        effect: "supports",
+        diagnosticity: "contextual",
+        independenceGroupId: "wells.shared-source-reference",
+        controlIds: ["wells.refs.match"],
+        activation: "all_pass",
+      },
+    ],
     materialEvidenceNeedIds: ["wells.shipping-tax-order"],
     sourceCompleteness: "unproven",
+    completenessRequirement: "observed_rows_sufficient",
+  },
+}];
+
+export const vortaxInferenceTopics: InferenceTopic[] = [{
+  id: "vortax.adjustment-chargeback-link",
+  hypothesisGroupId: "vortax.adjustment-chargeback-link",
+  question: "Do the eleven negative adjustment entries and eleven printed CHARGEBACKS fee units represent row-linked chargebacks, or only count correlation?",
+  observationRefs: [
+    "vortax.adjustments.negative", "vortax.negative.count", "vortax.chargeback-fee.count",
+    "vortax.adjustment.reference", "vortax.chargeback.reference", "vortax.missing-page-count",
+  ],
+  allowedClaims: [{ key: "adjustments.chargebacks.row_linked", allowedValues: [true, false] }],
+  materialAlternatives: [
+    {
+      id: "vortax.rows-linked",
+      description: "Each negative adjustment entry corresponds to one of the printed chargeback fee units.",
+      claim: { key: "adjustments.chargebacks.row_linked", value: true },
+      requiredProofObligationIds: ["row-level-adjustment-chargeback-identity", "complete-statement-source-scope"],
+    },
+    {
+      id: "vortax.count-correlation-only",
+      description: "The equal counts are correlation and do not establish row-level chargeback identity.",
+      claim: { key: "adjustments.chargebacks.row_linked", value: false },
+      requiredProofObligationIds: ["row-level-adjustment-chargeback-identity", "complete-statement-source-scope"],
+    },
+  ],
+  proofObligations: [
+    {
+      id: "row-level-adjustment-chargeback-identity",
+      description: "Stable row identity or an explicit source relation must link or distinguish the adjustment entries and chargeback fee units.",
+      evidenceNeedIds: ["vortax.obtain-missing-page"],
+      gapKind: "identity_linkage",
+      observationRequirements: [
+        { role: "subject", description: "The source-bound count of negative adjustment entries.", observationRefs: ["vortax.negative.count"], allowedKinds: ["count"], valueState: "present" },
+        { role: "counterpart", description: "The processor-printed CHARGEBACKS fee-unit count.", observationRefs: ["vortax.chargeback-fee.count"], allowedKinds: ["count"], valueState: "present" },
+        { role: "missing_subject_attribute", description: "Missing row identifiers on the adjustment entries.", observationRefs: ["vortax.adjustment.reference"], allowedKinds: ["identifier"], valueState: "missing" },
+        { role: "missing_counterpart_attribute", description: "Missing row identifiers on the aggregate chargeback fee row.", observationRefs: ["vortax.chargeback.reference"], allowedKinds: ["identifier"], valueState: "missing" },
+      ],
+      missingProperty: "stable_identity_link",
+      resolutionEvidenceKinds: ["stable_source_identifier", "explicit_source_relation"],
+    },
+    {
+      id: "complete-statement-source-scope",
+      description: "The absent eleventh page must be obtained before the statement can be treated as complete evidence for this interpretation.",
+      evidenceNeedIds: ["vortax.obtain-missing-page"],
+      gapKind: "source_completeness",
+      observationRequirements: [
+        { role: "document_completeness_gap", description: "The supplied source ends at printed page 10 of 11.", observationRefs: ["vortax.missing-page-count"], allowedKinds: ["count"], valueState: "present" },
+      ],
+      missingProperty: "complete_source_scope",
+      resolutionEvidenceKinds: ["complete_source_document"],
+    },
+  ],
+  qualification: {
+    maximumStrength: "moderate",
+    compatibilityControlIds: ["vortax.counts.match"],
+    evidenceFactors: [{
+      id: "vortax.matched-chargeback-counts",
+      description: "The equal printed counts are compatible with both row linkage and count correlation alone.",
+      alternativeIds: ["vortax.rows-linked", "vortax.count-correlation-only"],
+      effect: "supports",
+      diagnosticity: "contextual",
+      independenceGroupId: "vortax.matched-chargeback-counts",
+      controlIds: ["vortax.counts.match"],
+      activation: "all_pass",
+    }],
+    materialEvidenceNeedIds: ["vortax.obtain-missing-page"],
+    sourceCompleteness: "proven_incomplete",
     completenessRequirement: "observed_rows_sufficient",
   },
 }];
@@ -254,13 +444,13 @@ export const cloverRecordedReviewRules: RecordedProposalReviewRule[] = [
     proposalId: "likely-reject-resubmission",
     expectedClaims: [{ key: "batches.same_lifecycle", value: true }],
     confidenceCeiling: "high",
-    requiredProofGapConceptIds: ["stable-row-identity-linkage"],
+    requiredProofObligationIds: ["stable-row-identity-linkage"],
   },
   {
     proposalId: "separate-batches-remain-possible",
     expectedClaims: [{ key: "batches.same_lifecycle", value: false }],
     confidenceCeiling: "medium",
-    requiredProofGapConceptIds: ["stable-row-identity-linkage"],
+    requiredProofObligationIds: ["stable-row-identity-linkage"],
   },
 ];
 
@@ -298,13 +488,13 @@ export const paysafeRecordedReviewRules: RecordedProposalReviewRule[] = [
     proposalId: "display-rounding-gap",
     expectedClaims: [{ key: "fees.visible_gap_explanation", value: "aggregate_display_rounding" }],
     confidenceCeiling: "medium",
-    requiredProofGapConceptIds: ["underlying-fee-precision-and-rounding-method"],
+    requiredProofObligationIds: ["underlying-fee-precision-and-rounding-method"],
   },
   {
     proposalId: "unobserved-fee-component",
     expectedClaims: [{ key: "fees.visible_gap_explanation", value: "unobserved_fee_component" }],
     confidenceCeiling: "medium",
-    requiredProofGapConceptIds: ["complete-fee-detail-for-omitted-component"],
+    requiredProofObligationIds: ["complete-fee-detail-for-omitted-component"],
   },
 ];
 
@@ -342,13 +532,57 @@ export const wellsRecordedReviewRules: RecordedProposalReviewRule[] = [
     proposalId: "related-tax-amendment",
     expectedClaims: [{ key: "shipping_tax.same_lifecycle", value: true }],
     confidenceCeiling: "medium",
-    requiredProofGapConceptIds: ["shipping-tax-temporal-linkage"],
+    requiredProofObligationIds: ["shipping-tax-temporal-linkage"],
   },
   {
     proposalId: "reference-reuse-only",
     expectedClaims: [{ key: "shipping_tax.same_lifecycle", value: false }],
     confidenceCeiling: "medium",
-    requiredProofGapConceptIds: ["shipping-tax-temporal-linkage"],
+    requiredProofObligationIds: ["shipping-tax-temporal-linkage"],
+  },
+];
+
+export const vortaxRecordedProposer = new RecordedFixtureProposer(
+  "recorded-evaluation-vortax-v1",
+  (request) => {
+    const refs = topicRefs(request);
+    return [
+      proposal(
+        request,
+        "rows-linked",
+        "The matching eleven-entry counts may represent row-linked chargebacks.",
+        refs,
+        { key: "adjustments.chargebacks.row_linked", value: true },
+        "medium",
+        "The negative-adjustment count equals the printed CHARGEBACKS fee-unit count, which is compatible with row linkage but does not prove identity.",
+        ["Stable row identifiers or an explicit source relation are absent, and the supplied statement is missing page 11."],
+      ),
+      proposal(
+        request,
+        "count-correlation-only",
+        "The matching counts may be aggregate correlation without row-level identity.",
+        refs,
+        { key: "adjustments.chargebacks.row_linked", value: false },
+        "medium",
+        "Equal aggregate counts do not establish which adjustment corresponds to which fee unit, especially in an incomplete source document.",
+        ["Stable row identifiers or an explicit source relation are absent, and the supplied statement is missing page 11."],
+      ),
+    ];
+  },
+);
+
+export const vortaxRecordedReviewRules: RecordedProposalReviewRule[] = [
+  {
+    proposalId: "rows-linked",
+    expectedClaims: [{ key: "adjustments.chargebacks.row_linked", value: true }],
+    confidenceCeiling: "medium",
+    requiredProofObligationIds: ["row-level-adjustment-chargeback-identity", "complete-statement-source-scope"],
+  },
+  {
+    proposalId: "count-correlation-only",
+    expectedClaims: [{ key: "adjustments.chargebacks.row_linked", value: false }],
+    confidenceCeiling: "medium",
+    requiredProofObligationIds: ["row-level-adjustment-chargeback-identity", "complete-statement-source-scope"],
   },
 ];
 

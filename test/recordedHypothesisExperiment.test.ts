@@ -24,13 +24,16 @@ import {
   paysafeRecordedReviewRules,
   paysafeInferenceTopics,
   unavailableRecordedProposer,
+  vortaxRecordedProposer,
+  vortaxRecordedReviewRules,
+  vortaxInferenceTopics,
   wellsRecordedProposer,
   wellsRecordedReviewRules,
   wellsInferenceTopics,
 } from "./fixtures/reconstructionKernel/recordedHypothesisProposals.js";
 import { realStatementReplayCases } from "./fixtures/reconstructionKernel/realStatementReplay.js";
 
-type CaseId = "clover-duplicate-resubmission" | "paysafe-october-2025" | "wells-fargo-september-2024";
+type CaseId = "clover-duplicate-resubmission" | "paysafe-october-2025" | "wells-fargo-september-2024" | "vortax-september-2022";
 
 interface LoadedCase {
   input: ReconstructionInput;
@@ -43,6 +46,7 @@ const inferenceTopicsByCase: Record<CaseId, InferenceTopic[]> = {
   "clover-duplicate-resubmission": cloverInferenceTopics,
   "paysafe-october-2025": paysafeInferenceTopics,
   "wells-fargo-september-2024": wellsInferenceTopics,
+  "vortax-september-2022": vortaxInferenceTopics,
 };
 
 function unsupportedAlternativeCoverage(request: Parameters<StatementHypothesisProposer["propose"]>[0]) {
@@ -55,6 +59,27 @@ function unsupportedAlternativeCoverage(request: Parameters<StatementHypothesisP
     observationRefs: topic.observationRefs,
     acknowledgedEvidenceNeedRefs: topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef),
   })));
+}
+
+function withProviderConfidence(
+  proposer: StatementHypothesisProposer,
+  confidence: "low" | "medium" | "high",
+): StatementHypothesisProposer {
+  const providerId = `${proposer.providerId}-${confidence}-confidence-replay`;
+  return {
+    providerId,
+    async propose(request) {
+      const response = await proposer.propose(request);
+      return {
+        ...response,
+        providerId,
+        hypotheses: response.hypotheses.map((hypothesis) => ({
+          ...hypothesis,
+          inference: { ...hypothesis.inference, confidence },
+        })),
+      };
+    },
+  };
 }
 
 async function loadCase(caseId: CaseId): Promise<LoadedCase> {
@@ -100,6 +125,7 @@ beforeAll(async () => {
     "clover-duplicate-resubmission",
     "paysafe-october-2025",
     "wells-fargo-september-2024",
+    "vortax-september-2022",
   ] as const) {
     loadedCases.set(caseId, await loadCase(caseId));
   }
@@ -129,16 +155,15 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     }));
     expect(result.augmented.hypothesisResults).toContainEqual(expect.objectContaining({
       ownership: expect.objectContaining({ proposalId: "separate-batches-remain-possible" }),
-      interpretationState: "moderate_inference",
+      interpretationState: "unknown_or_competing_interpretations",
       providerReportedConfidence: "medium",
-      qualifiedInferenceStrength: "moderate",
+      qualifiedInferenceStrength: "unknown_competing",
     }));
     expect(result.proposalReviews.map((review) => review.utility)).toEqual([
       "existing_interpretation_explained",
       "existing_interpretation_explained",
     ]);
-    expect(result.proposalReviews.every((review) => review.missingProofAcknowledged)).toBe(true);
-    expect(result.proposalReviews.every((review) => review.proofGapConceptsUnderstood)).toBe(true);
+    expect(result.proposalReviews.every((review) => review.proofObligationsValidated)).toBe(true);
     expect(result.allMaterialAlternativesAddressed).toBe(true);
     expect(result.unknownAlternativeRetainedForEveryProviderGroup).toBe(true);
   });
@@ -159,7 +184,7 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     expect(result.proposalReviews.every((review) => review.confidenceWithinReviewCeiling)).toBe(true);
     expect(result.augmented.hypothesisResults.filter((hypothesis) =>
       hypothesis.ownership.kind === "provider").every((hypothesis) =>
-      hypothesis.interpretationState === "moderate_inference")).toBe(true);
+      hypothesis.interpretationState === "weak_inference")).toBe(true);
     expect(result.augmented.canonicalClaims.some((claim) => claim.key === "fees.visible_gap_explanation")).toBe(false);
     expect(result.explanatoryWorldCountAfter).toBeGreaterThan(result.explanatoryWorldCountBefore);
     expect(result.unknownAlternativeRetainedForEveryProviderGroup).toBe(true);
@@ -180,9 +205,82 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     ]);
     expect(result.proposalReviews.every((review) => review.confidenceWithinReviewCeiling)).toBe(true);
     expect(result.augmented.canonicalClaims.some((claim) => claim.key === "shipping_tax.same_lifecycle")).toBe(false);
+    expect(result.augmented.hypothesisResults).toContainEqual(expect.objectContaining({
+      ownership: expect.objectContaining({ proposalId: "related-tax-amendment" }),
+      qualifiedInferenceStrength: "moderate",
+    }));
+    expect(result.augmented.hypothesisResults).toContainEqual(expect.objectContaining({
+      ownership: expect.objectContaining({ proposalId: "reference-reuse-only" }),
+      qualifiedInferenceStrength: "weak",
+    }));
+  });
+
+  it("replays all four approved evidence packets identically across low, medium, and high provider confidence", async () => {
+    const cases = [
+      {
+        caseId: "clover-duplicate-resubmission" as const,
+        proposer: cloverRecordedProposer,
+        rules: cloverRecordedReviewRules,
+        expected: { "likely-reject-resubmission": "strong", "separate-batches-remain-possible": "unknown_competing" },
+      },
+      {
+        caseId: "paysafe-october-2025" as const,
+        proposer: paysafeRecordedProposer,
+        rules: paysafeRecordedReviewRules,
+        expected: { "display-rounding-gap": "weak", "unobserved-fee-component": "weak" },
+      },
+      {
+        caseId: "wells-fargo-september-2024" as const,
+        proposer: wellsRecordedProposer,
+        rules: wellsRecordedReviewRules,
+        expected: { "related-tax-amendment": "moderate", "reference-reuse-only": "weak" },
+      },
+      {
+        caseId: "vortax-september-2022" as const,
+        proposer: vortaxRecordedProposer,
+        rules: vortaxRecordedReviewRules,
+        expected: { "rows-linked": "weak", "count-correlation-only": "weak" },
+      },
+    ];
+
+    for (const item of cases) {
+      for (const confidence of ["low", "medium", "high"] as const) {
+        const result = await runCase(item.caseId, withProviderConfidence(item.proposer, confidence), item.rules);
+        const actual = Object.fromEntries(result.augmented.hypothesisResults
+          .filter((hypothesis) => hypothesis.ownership.kind === "provider")
+          .map((hypothesis) => [
+            hypothesis.ownership.kind === "provider" ? hypothesis.ownership.proposalId : hypothesis.id,
+            hypothesis.qualifiedInferenceStrength,
+          ]));
+        expect(actual).toEqual(item.expected);
+        expect(result.augmented.hypothesisResults
+          .filter((hypothesis) => hypothesis.ownership.kind === "provider")
+          .every((hypothesis) => hypothesis.providerReportedConfidence === confidence
+            && hypothesis.evidencePosture?.providerConfidenceUsed === false)).toBe(true);
+        expect(result.canonicalTruthInvariant).toBe(true);
+      }
+    }
+  });
+
+  it("keeps VORTAX row linkage weak and unresolved because identity proof and page 11 are missing", async () => {
+    const result = await runCase(
+      "vortax-september-2022",
+      vortaxRecordedProposer,
+      vortaxRecordedReviewRules,
+    );
+
+    expect(result.status).toBe("evaluated");
+    expect(result.errors).toEqual([]);
+    expect(result.canonicalTruthInvariant).toBe(true);
+    expect(result.canonicalTruthAfter).toBe(result.canonicalTruthBefore);
+    expect(result.allMaterialAlternativesAddressed).toBe(true);
+    expect(result.proposalReviews.every((review) => review.proofObligationsValidated)).toBe(true);
+    expect(result.augmented.canonicalClaims.some((claim) => claim.key === "adjustments.chargebacks.row_linked")).toBe(false);
     expect(result.augmented.hypothesisResults.filter((hypothesis) =>
       hypothesis.ownership.kind === "provider").every((hypothesis) =>
-      hypothesis.interpretationState === "moderate_inference")).toBe(true);
+      hypothesis.qualifiedInferenceStrength === "weak"
+      && hypothesis.qualificationReasonCodes?.includes("source_proven_incomplete") === true)).toBe(true);
+    expect(result.unknownAlternativeRetainedForEveryProviderGroup).toBe(true);
   });
 
   it("reconciles provider and deterministic alternatives under RateReveal-owned topics", async () => {
@@ -209,12 +307,12 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     expect(wells.canonicalTruthInvariant).toBe(true);
   });
 
-  it("marks a familiar-sounding high-confidence answer as misleading when it omits the proof gap", async () => {
+  it("keeps a structured high-confidence answer weak when it omits the material evidence acknowledgement", async () => {
     const rule: RecordedProposalReviewRule = {
       proposalId: "unsupported-high-confidence-answer",
       expectedClaims: [{ key: "batches.same_lifecycle", value: true }],
       confidenceCeiling: "medium",
-      requiredProofGapConceptIds: ["stable-row-identity-linkage"],
+      requiredProofObligationIds: ["stable-row-identity-linkage"],
     };
     const result = await runCase(
       "clover-duplicate-resubmission",
@@ -226,7 +324,7 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     expect(result.proposalReviews).toEqual([expect.objectContaining({
       proposalId: "unsupported-high-confidence-answer",
       utility: "weak_or_misleading",
-      missingProofAcknowledged: false,
+      proofObligationsValidated: true,
       confidenceWithinReviewCeiling: false,
     })]);
     expect(result.augmented.hypothesisResults).toContainEqual(expect.objectContaining({

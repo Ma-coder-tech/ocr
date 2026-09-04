@@ -11,6 +11,7 @@ import {
   basysMarch2020,
   cloverDuplicateResubmission,
   paysafeOctober2025,
+  vortaxSeptember2022,
   wellsFargoSeptember2024,
 } from "./rescueCorpus.js";
 import { rescueSourceManifest } from "./rescueSourceManifest.js";
@@ -152,4 +153,40 @@ const clover: RealStatementReplayCase = {
   },
 };
 
-export const realStatementReplayCases = [basys, paysafe, wells, clover] as const;
+const vortax: RealStatementReplayCase = {
+  pdfPath: `${pdfRoot}/fiserv_NXGEN_VORTAX_Sep_2022.pdf`,
+  sourceManifest: rescueSourceManifest["vortax-september-2022"],
+  expectedStatus: "replayed",
+  definition: {
+    id: vortaxSeptember2022.statementId,
+    inputTemplate: vortaxSeptember2022,
+    bindings: [
+      sum({ id: "vortax.adjustments.positive", observationKind: "amount", expectedValue: 311_166, section: "positive adjustment rows", rowPattern: /^\d{2}\/\d{2}\/\d{2} \| ADJUSTMENT \| (?!-)([\d,.]+)$/, captureGroup: 1, parseAs: "money_minor", minimumMatches: 4 }),
+      arithmetic({ id: "vortax.adjustments.negative", observationKind: "amount", expectedValue: -289_990, section: "negative adjustment rows", terms: [
+        { rowPattern: /^\d{2}\/\d{2}\/\d{2} \| ADJUSTMENT \| -([\d,.]+)$/, captureGroup: 1, parseAs: "money_minor", coefficient: -1, minimumMatches: 11 },
+      ] }),
+      single({ id: "vortax.adjustments.net", observationKind: "amount", expectedValue: 21_176, section: "adjustment total", rowPattern: /^Total Adjustment \| ([\d,.]+)$/, captureGroup: 1, parseAs: "money_minor" }),
+      arithmetic({ id: "vortax.adjustments.gross", observationKind: "amount", expectedValue: 601_156, section: "gross adjustment movement", terms: [
+        { rowPattern: /^\d{2}\/\d{2}\/\d{2} \| ADJUSTMENT \| (?!-)([\d,.]+)$/, captureGroup: 1, parseAs: "money_minor", coefficient: 1, minimumMatches: 4 },
+        { rowPattern: /^\d{2}\/\d{2}\/\d{2} \| ADJUSTMENT \| -([\d,.]+)$/, captureGroup: 1, parseAs: "money_minor", coefficient: 1, minimumMatches: 11 },
+      ] }),
+      count({ id: "vortax.negative.count", observationKind: "count", expectedValue: 11, section: "negative adjustment rows", rowPattern: /^\d{2}\/\d{2}\/\d{2} \| ADJUSTMENT \| -[\d,.]+$/ }),
+      single({ id: "vortax.chargeback-fee.count", observationKind: "count", expectedValue: 11, section: "chargeback fee row", rowPattern: /^09\/30\/22 \| MISC \| CHARGEBACKS \| (11) \| 25\.000 \| -275\.00$/, captureGroup: 1, parseAs: "integer" }),
+      literal({ id: "vortax.adjustment.reference", observationKind: "identifier", expectedValue: null, value: null, section: "adjustment rows lack row identifiers", rowPattern: /^\d{2}\/\d{2}\/\d{2} \| ADJUSTMENT \| -?[\d,.]+$/, minimumMatches: 15, maximumMatches: 15 }),
+      literal({ id: "vortax.chargeback.reference", observationKind: "identifier", expectedValue: null, value: null, section: "aggregate chargeback fee lacks row identifiers", rowPattern: /^09\/30\/22 \| MISC \| CHARGEBACKS \| 11 \| 25\.000 \| -275\.00$/ }),
+      single({ id: "vortax.missing-page-count", observationKind: "count", expectedValue: 1, section: "document integrity: page 11 is absent", rowPattern: /^Page 10 of 1(1)$/, captureGroup: 1, parseAs: "integer" }),
+      arithmetic({ id: "vortax.fee-delta", observationKind: "amount", expectedValue: 2, section: "fee reconciliation", terms: [
+        { rowPattern: /^Total \(Miscellaneous Fees and Card Fees\) \| -\$([\d,.]+)$/, captureGroup: 1, parseAs: "money_minor", coefficient: 1 },
+        { rowPattern: /^Total Card Fees \| -([\d,.]+)$/, captureGroup: 1, parseAs: "money_minor", coefficient: -1 },
+        { rowPattern: /^Total Miscellaneous Fees \| -([\d,.]+)$/, captureGroup: 1, parseAs: "money_minor", coefficient: -1 },
+      ] }),
+      arithmetic({ id: "vortax.interchange-delta", observationKind: "amount", expectedValue: 9, section: "interchange reconciliation", terms: [
+        { rowPattern: /^09\/30\/22 \| CF \| INTERCHANGE \| -([\d,.]+)$/, captureGroup: 1, parseAs: "money_minor", coefficient: 1, minimumMatches: 5 },
+        { rowPattern: /^09\/30\/22 \| CF \| PROGRAM FEES \| -([\d,.]+)$/, captureGroup: 1, parseAs: "money_minor", coefficient: 1 },
+        { rowPattern: /^Total \| 42,638\.08 \| 158 \| -([\d,.]+)$/, captureGroup: 1, parseAs: "money_minor", coefficient: -1 },
+      ] }),
+    ],
+  },
+};
+
+export const realStatementReplayCases = [basys, paysafe, wells, clover, vortax] as const;

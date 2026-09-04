@@ -6,8 +6,8 @@ import type { LiveProviderAttemptAudit } from "./liveHypothesisProvider.js";
 import type { RecordedHypothesisExperimentResult } from "./recordedHypothesisExperiment.js";
 import type { InferenceTopic } from "./types.js";
 
-export const LIVE_HYPOTHESIS_EVALUATION_RECORD_VERSION = "ratereveal-live-hypothesis-evaluation-record-v3" as const;
-export const LIVE_INFERENCE_TOPIC_REGISTRY_VERSION = "ratereveal-approved-topic-registry-v2" as const;
+export const LIVE_HYPOTHESIS_EVALUATION_RECORD_VERSION = "ratereveal-live-hypothesis-evaluation-record-v4" as const;
+export const LIVE_INFERENCE_TOPIC_REGISTRY_VERSION = "ratereveal-approved-topic-registry-v3" as const;
 
 export interface LiveProviderPrivacyConfiguration {
   verifiedAt: string;
@@ -65,12 +65,14 @@ export interface LiveHypothesisEvaluationRecordPayload {
       providerReportedConfidence: string | null;
       qualifiedInferenceStrength: string | null;
       qualificationReasonCodes: string[];
+      evidencePosture: RecordedHypothesisExperimentResult["augmented"]["hypothesisResults"][number]["evidencePosture"] | null;
       rationale: string | null;
       missingProof: string[];
       requiredMaterialEvidenceNeedIds: string[];
       acknowledgedEvidenceNeedIds: string[];
       unacknowledgedMaterialEvidenceNeedIds: string[];
-      proofGapUnderstanding: NonNullable<RecordedHypothesisExperimentResult["acceptedProviderHypotheses"][number]["inference"]>["proofGapUnderstanding"] | null;
+      proofObligationBindings: NonNullable<RecordedHypothesisExperimentResult["acceptedProviderHypotheses"][number]["inference"]>["proofObligationBindings"];
+      proofObligationValidation: NonNullable<RecordedHypothesisExperimentResult["acceptedProviderHypotheses"][number]["inference"]>["proofObligationValidation"] | null;
       competingAlternativeProposalIds: string[];
       strongInferenceExplanation: {
         whyStrong: string;
@@ -164,12 +166,14 @@ export function buildLiveHypothesisEvaluationRecord(input: {
           providerReportedConfidence: hypothesis.inference?.confidence ?? null,
           qualifiedInferenceStrength: qualified?.qualifiedInferenceStrength ?? null,
           qualificationReasonCodes: structuredClone(qualified?.qualificationReasonCodes ?? []),
+          evidencePosture: structuredClone(qualified?.evidencePosture ?? null),
           rationale: hypothesis.inference?.rationale ?? null,
           missingProof: structuredClone(hypothesis.inference?.missingProof ?? []),
           requiredMaterialEvidenceNeedIds,
           acknowledgedEvidenceNeedIds,
           unacknowledgedMaterialEvidenceNeedIds: requiredMaterialEvidenceNeedIds.filter((id) => !acknowledged.has(id)),
-          proofGapUnderstanding: structuredClone(hypothesis.inference?.proofGapUnderstanding ?? null),
+          proofObligationBindings: structuredClone(hypothesis.inference?.proofObligationBindings ?? []),
+          proofObligationValidation: structuredClone(hypothesis.inference?.proofObligationValidation ?? null),
           competingAlternativeProposalIds,
           strongInferenceExplanation: qualified?.qualifiedInferenceStrength === "strong" && hypothesis.inference
             ? {

@@ -80,13 +80,62 @@ export type InferenceConfidenceLevel = "low" | "medium" | "high";
 export type QualifiedInferenceStrength = "strong" | "moderate" | "weak" | "unknown_competing";
 export type InferenceSourceCompleteness = "proven_complete" | "proven_incomplete" | "unproven";
 export type InferenceCompletenessRequirement = "observed_rows_sufficient" | "complete_statement_required";
+export type InferenceEvidenceEffect = "supports" | "contradicts";
+export type InferenceEvidenceDiagnosticity = "contextual" | "material" | "decisive";
+export type InferenceEvidenceActivation = "all_pass" | "any_fail";
+export type InferenceEvidenceFactorState = "satisfied" | "not_satisfied" | "unresolved";
+
+/** RateReveal-owned evidence policy. Providers cannot add factors or select controls. */
+export interface InferenceEvidenceFactorDefinition {
+  id: string;
+  description: string;
+  alternativeIds: string[];
+  effect: InferenceEvidenceEffect;
+  diagnosticity: InferenceEvidenceDiagnosticity;
+  independenceGroupId: string;
+  controlIds: string[];
+  activation: InferenceEvidenceActivation;
+}
+
+export interface InferenceEvidenceFactorEvaluation {
+  factorId: string;
+  effect: InferenceEvidenceEffect;
+  diagnosticity: InferenceEvidenceDiagnosticity;
+  independenceGroupId: string;
+  controlIds: string[];
+  state: InferenceEvidenceFactorState;
+}
+
+export interface InferenceEvidencePosture {
+  modelVersion: "ratereveal-inference-evidence-posture-v1";
+  alternativeId: string;
+  outcome: "qualified" | "contradicted";
+  factorEvaluations: InferenceEvidenceFactorEvaluation[];
+  satisfiedSupportFactorIds: string[];
+  satisfiedContradictionFactorIds: string[];
+  unresolvedFactorIds: string[];
+  independentSupportGroups: Array<{
+    independenceGroupId: string;
+    diagnosticity: InferenceEvidenceDiagnosticity;
+    factorIds: string[];
+  }>;
+  baseStrength: QualifiedInferenceStrength;
+  qualifiedStrength: QualifiedInferenceStrength;
+  sourceCompleteness: InferenceSourceCompleteness;
+  unresolvedProofObligationIds: string[];
+  allMaterialEvidenceNeedsAcknowledged: boolean;
+  allRequiredProofObligationsValidated: boolean;
+  providerConfidenceUsed: false;
+  reasonCodes: string[];
+}
 
 export interface HypothesisInference {
   confidence: InferenceConfidenceLevel;
   rationale: string;
   missingProof: string[];
   acknowledgedEvidenceNeedIds?: string[];
-  proofGapUnderstanding?: ProofGapUnderstanding;
+  proofObligationBindings?: ProofObligationBinding[];
+  proofObligationValidation?: ProofObligationValidation;
 }
 
 export interface InferenceTopicClaim {
@@ -94,37 +143,93 @@ export interface InferenceTopicClaim {
   allowedValues: ScalarValue[];
 }
 
-export interface ProofGapConceptFacet {
-  id: string;
-  acceptedTokenGroups: string[][];
+export type ProofObligationGapKind =
+  | "identity_linkage"
+  | "calculation_basis"
+  | "component_reconciliation"
+  | "temporal_linkage"
+  | "source_completeness";
+
+export type ProofObligationObservationRole =
+  | "subject"
+  | "counterpart"
+  | "missing_subject_attribute"
+  | "missing_counterpart_attribute"
+  | "reported_total"
+  | "visible_subtotal"
+  | "discrepancy"
+  | "document_completeness_gap";
+
+export type ProofObligationMissingProperty =
+  | "stable_identity_link"
+  | "underlying_calculation_basis"
+  | "complete_component_membership"
+  | "row_level_temporal_link"
+  | "complete_source_scope";
+
+export type ProofObligationResolutionEvidenceKind =
+  | "stable_source_identifier"
+  | "explicit_source_relation"
+  | "unrounded_source_amounts"
+  | "processor_rounding_method"
+  | "complete_fee_detail"
+  | "reconciliation_mapping"
+  | "row_level_date"
+  | "explicit_temporal_relation"
+  | "complete_source_document";
+
+export type ProofObligationValueState = "present" | "missing" | "any";
+
+export interface ProofObligationObservationRequirement {
+  role: ProofObligationObservationRole;
+  description: string;
+  observationRefs: string[];
+  allowedKinds: ObservationKind[];
+  valueState: ProofObligationValueState;
 }
 
-export interface ProofGapConceptRubric {
+/** RateReveal-owned definition. Providers can bind to it but cannot define it. */
+export interface ProofObligationDefinition {
   id: string;
   description: string;
+  gapKind: ProofObligationGapKind;
   evidenceNeedIds: string[];
-  requiredFacets: ProofGapConceptFacet[];
+  observationRequirements: ProofObligationObservationRequirement[];
+  missingProperty: ProofObligationMissingProperty;
+  resolutionEvidenceKinds: ProofObligationResolutionEvidenceKind[];
+}
+
+/** Provider answer constrained to a RateReveal-owned proof obligation. */
+export interface ProofObligationBinding {
+  obligationId: string;
+  gapKind: ProofObligationGapKind;
+  observationBindings: Array<{
+    role: ProofObligationObservationRole;
+    observationRefs: string[];
+  }>;
+  missingProperty: ProofObligationMissingProperty;
+  resolutionEvidenceKinds: ProofObligationResolutionEvidenceKind[];
 }
 
 export interface InferenceTopicMaterialAlternative {
   id: string;
   description: string;
   claim: { key: string; value: ScalarValue };
-  requiredProofGapConceptIds: string[];
+  requiredProofObligationIds: string[];
 }
 
-export interface ProofGapConceptEvaluation {
-  conceptId: string;
-  requiredFacetIds: string[];
-  matchedFacetIds: string[];
-  understood: boolean;
+export interface ProofObligationBindingEvaluation {
+  obligationId: string;
+  valid: boolean;
+  errors: string[];
 }
 
-export interface ProofGapUnderstanding {
-  rubricVersion: "ratereveal-proof-gap-concepts-v2";
-  requiredConceptIds: string[];
-  understoodConceptIds: string[];
-  evaluations: ProofGapConceptEvaluation[];
+export interface ProofObligationValidation {
+  modelVersion: "ratereveal-proof-obligations-v1";
+  requiredObligationIds: string[];
+  validatedObligationIds: string[];
+  evaluations: ProofObligationBindingEvaluation[];
+  errors: string[];
 }
 
 /**
@@ -139,10 +244,11 @@ export interface InferenceTopic {
   observationRefs: string[];
   allowedClaims: InferenceTopicClaim[];
   materialAlternatives: InferenceTopicMaterialAlternative[];
-  proofGapConcepts: ProofGapConceptRubric[];
+  proofObligations: ProofObligationDefinition[];
   qualification: {
     maximumStrength: Exclude<QualifiedInferenceStrength, "unknown_competing">;
     compatibilityControlIds: string[];
+    evidenceFactors: InferenceEvidenceFactorDefinition[];
     materialEvidenceNeedIds: string[];
     sourceCompleteness: InferenceSourceCompleteness;
     completenessRequirement: InferenceCompletenessRequirement;
@@ -153,8 +259,8 @@ export interface SystemInferenceTopicAssignment {
   topicId: string;
   hypothesisGroupId: string;
   alternativeId: string;
-  requiredProofGapConceptIds: string[];
-  proofGapConcepts: ProofGapConceptRubric[];
+  requiredProofObligationIds: string[];
+  proofObligations: ProofObligationDefinition[];
   immutable: true;
   qualification: InferenceTopic["qualification"];
 }
@@ -322,6 +428,7 @@ export interface HypothesisResult {
   providerReportedConfidence?: InferenceConfidenceLevel;
   qualifiedInferenceStrength?: QualifiedInferenceStrength;
   qualificationReasonCodes?: string[];
+  evidencePosture?: InferenceEvidencePosture;
   reason: string;
 }
 

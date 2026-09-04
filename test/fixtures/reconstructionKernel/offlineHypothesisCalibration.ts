@@ -8,8 +8,9 @@ export interface OfflineProofGapCalibrationCase {
 }
 
 /**
- * A source-bound, evaluation-only calibration set derived solely from the
- * three approved digital-statement cases and their six recorded live runs.
+ * Historical wording corpus derived solely from the three approved digital
+ * statement cases and their recorded live runs. The structured evaluator does
+ * not score this prose; the corpus now proves wording is qualification-neutral.
  */
 export const offlineProofGapCalibrationCases: OfflineProofGapCalibrationCase[] = [
   {

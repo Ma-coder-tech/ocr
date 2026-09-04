@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { evaluateProofGapUnderstanding } from "./proofGapEvaluation.js";
+import { evaluateProofObligationBindings } from "./proofObligationEvaluation.js";
 import type {
   EventNode,
   EvidenceNeed,
@@ -10,10 +10,15 @@ import type {
   InferenceTopicMaterialAlternative,
   Observation,
   PopulationNode,
+  ProofObligationBinding,
+  ProofObligationGapKind,
+  ProofObligationMissingProperty,
+  ProofObligationObservationRole,
+  ProofObligationResolutionEvidenceKind,
   ScalarValue,
 } from "./types.js";
 
-export const HYPOTHESIS_PROPOSAL_SCHEMA = "source_bound_hypothesis_proposal_v3" as const;
+export const HYPOTHESIS_PROPOSAL_SCHEMA = "source_bound_hypothesis_proposal_v4" as const;
 export const MAX_PROVIDER_HYPOTHESES = 16;
 export const MAX_PROVIDER_CLAIMS_PER_HYPOTHESIS = 16;
 export const MAX_PROVIDER_ALTERNATIVE_ASSESSMENTS = 16;
@@ -54,6 +59,18 @@ export interface SourceBoundInferenceTopic {
     alternativeRef: string;
     description: string;
     claim: { key: string; value: ScalarValue };
+    requiredProofObligationRefs: string[];
+  }>;
+  proofObligations: Array<{
+    proofObligationRef: string;
+    description: string;
+    gapKind: ProofObligationGapKind;
+    requiredObservationRoles: Array<{
+      role: ProofObligationObservationRole;
+      description: string;
+    }>;
+    missingProperty: ProofObligationMissingProperty;
+    permittedResolutionEvidenceKinds: ProofObligationResolutionEvidenceKind[];
   }>;
   knownEvidenceGaps: Array<{
     evidenceNeedRef: string;
@@ -82,6 +99,16 @@ export interface ProviderHypothesisProposal {
     rationale: string;
     missingProof: string[];
     acknowledgedEvidenceNeedRefs: string[];
+    proofObligationBindings: Array<{
+      proofObligationRef: string;
+      gapKind: ProofObligationGapKind;
+      observationBindings: Array<{
+        role: ProofObligationObservationRole;
+        observationRefs: string[];
+      }>;
+      missingProperty: ProofObligationMissingProperty;
+      resolutionEvidenceKinds: ProofObligationResolutionEvidenceKind[];
+    }>;
   };
 }
 
@@ -128,6 +155,7 @@ type ProposalPacket = {
     alternative: InferenceTopicMaterialAlternative;
   }>;
   internalEvidenceNeedIdByOpaqueRef: Map<string, string>;
+  internalProofObligationIdByOpaqueRef: Map<string, string>;
 };
 
 function proposalPacket(
@@ -187,6 +215,16 @@ function proposalPacket(
     [...evidenceNeedRefById].map(([internalId, opaqueRef]) => [opaqueRef, internalId]),
   );
   const evidenceNeedById = new Map(evidenceNeeds.map((need) => [need.id, need]));
+  const orderedProofObligations = orderedTopics.flatMap((topic) => topic.proofObligations
+    .map((obligation) => ({ topic, obligation })))
+    .sort((left, right) => `${left.topic.id}\0${left.obligation.id}`.localeCompare(`${right.topic.id}\0${right.obligation.id}`));
+  const proofObligationRefById = new Map(orderedProofObligations.map(({ obligation }, index) => [
+    obligation.id,
+    `proof-obligation-${String(index + 1).padStart(4, "0")}`,
+  ]));
+  const internalProofObligationIdByOpaqueRef = new Map(
+    [...proofObligationRefById].map(([internalId, opaqueRef]) => [opaqueRef, internalId]),
+  );
   const request: HypothesisProposalRequest = {
     schemaVersion: HYPOTHESIS_PROPOSAL_SCHEMA,
     sourceDocument: {
@@ -228,6 +266,19 @@ function proposalPacket(
         alternativeRef: alternativeRefById.get(alternative.id)!,
         description: alternative.description,
         claim: structuredClone(alternative.claim),
+        requiredProofObligationRefs: alternative.requiredProofObligationIds
+          .map((id) => proofObligationRefById.get(id)!),
+      })),
+      proofObligations: topic.proofObligations.map((obligation) => ({
+        proofObligationRef: proofObligationRefById.get(obligation.id)!,
+        description: obligation.description,
+        gapKind: obligation.gapKind,
+        requiredObservationRoles: obligation.observationRequirements.map((requirement) => ({
+          role: requirement.role,
+          description: requirement.description,
+        })),
+        missingProperty: obligation.missingProperty,
+        permittedResolutionEvidenceKinds: structuredClone(obligation.resolutionEvidenceKinds),
       })),
       knownEvidenceGaps: topic.qualification.materialEvidenceNeedIds.map((id) => ({
         evidenceNeedRef: evidenceNeedRefById.get(id)!,
@@ -247,6 +298,7 @@ function proposalPacket(
     inferenceTopicByOpaqueRef,
     materialAlternativeByOpaqueRef,
     internalEvidenceNeedIdByOpaqueRef,
+    internalProofObligationIdByOpaqueRef,
   };
 }
 
@@ -333,11 +385,13 @@ export function validateProviderResponse(
       || inference.missingProof.length === 0
       || !inference.missingProof.every((item) => typeof item === "string" && item.trim() !== "")
       || !Array.isArray(inference.acknowledgedEvidenceNeedRefs)
-      || !inference.acknowledgedEvidenceNeedRefs.every((reference) => typeof reference === "string")) {
+      || !inference.acknowledgedEvidenceNeedRefs.every((reference) => typeof reference === "string")
+      || !Array.isArray(inference.proofObligationBindings)) {
       errors.push(`Provider hypothesis ${String(hypothesis.id)} has invalid inference metadata.`);
     }
-    if (inference && Object.hasOwn(inference as object, "proofGapUnderstanding")) {
-      errors.push(`Provider hypothesis ${String(hypothesis.id)} attempts to supply RateReveal-owned proof-gap qualification.`);
+    if (inference && (Object.hasOwn(inference as object, "proofGapUnderstanding")
+      || Object.hasOwn(inference as object, "proofObligationValidation"))) {
+      errors.push(`Provider hypothesis ${String(hypothesis.id)} attempts to supply RateReveal-owned proof-obligation qualification.`);
     }
     const claims = Array.isArray(hypothesis.claims) ? hypothesis.claims : [];
     if (!Array.isArray(hypothesis.claims)) errors.push(`Provider hypothesis ${String(hypothesis.id)} claims must be an array.`);
@@ -371,6 +425,8 @@ export function validateProviderResponse(
       ...claims.flatMap((claim) => stringArray(claim.observationRefs)),
       ...arrayOfObjects(hypothesis.events).flatMap((event) => stringArray(event.observationRefs)),
       ...arrayOfObjects(hypothesis.populations).flatMap((population) => stringArray(population.observationRefs)),
+      ...arrayOfObjects(inference?.proofObligationBindings).flatMap((binding) =>
+        arrayOfObjects(binding.observationBindings).flatMap((entry) => stringArray(entry.observationRefs))),
     ];
     const topic = topics.get(hypothesis.topicRef);
     if (topic) {
@@ -389,6 +445,13 @@ export function validateProviderResponse(
         if (!exactAlternativeClaim) {
           errors.push(`Provider hypothesis ${String(hypothesis.id)} does not match its selected RateReveal material alternative.`);
         }
+        validateProviderProofObligationBindings(
+          hypothesis.id,
+          inference?.proofObligationBindings,
+          topic,
+          selectedAlternative.alternative,
+          errors,
+        );
       }
       const allowedEvidenceNeeds = new Set(topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef));
       for (const reference of inference?.acknowledgedEvidenceNeedRefs ?? []) {
@@ -416,6 +479,82 @@ export function validateProviderResponse(
     errors,
   );
   return [...new Set(errors)].sort();
+}
+
+function validateProviderProofObligationBindings(
+  hypothesisId: string,
+  rawBindings: unknown,
+  topic: SourceBoundInferenceTopic,
+  alternative: SourceBoundInferenceTopic["materialAlternatives"][number],
+  errors: string[],
+): void {
+  if (!Array.isArray(rawBindings)) return;
+  const obligationByRef = new Map(topic.proofObligations.map((obligation) => [obligation.proofObligationRef, obligation]));
+  const bindingsByRef = new Map<string, Array<Record<string, unknown>>>();
+  for (const rawBinding of rawBindings) {
+    if (!rawBinding || typeof rawBinding !== "object") {
+      errors.push(`Provider hypothesis ${hypothesisId} contains an invalid proof-obligation binding.`);
+      continue;
+    }
+    const binding = rawBinding as Record<string, unknown>;
+    const allowedBindingKeys = new Set([
+      "proofObligationRef", "gapKind", "observationBindings", "missingProperty", "resolutionEvidenceKinds",
+    ]);
+    for (const key of Object.keys(binding)) {
+      if (!allowedBindingKeys.has(key)) {
+        errors.push(`Provider hypothesis ${hypothesisId} supplies prohibited proof-obligation field ${key}.`);
+      }
+    }
+    const obligationRef = typeof binding.proofObligationRef === "string" ? binding.proofObligationRef : "";
+    const obligation = obligationByRef.get(obligationRef);
+    if (!obligation || !alternative.requiredProofObligationRefs.includes(obligationRef)) {
+      errors.push(`Provider hypothesis ${hypothesisId} binds an unoffered or non-required proof obligation ${obligationRef || "<empty>"}.`);
+      continue;
+    }
+    const entries = bindingsByRef.get(obligationRef) ?? [];
+    entries.push(binding);
+    bindingsByRef.set(obligationRef, entries);
+    if (binding.gapKind !== obligation.gapKind) {
+      errors.push(`Provider hypothesis ${hypothesisId} changes RateReveal-owned gap kind for ${obligationRef}.`);
+    }
+    if (binding.missingProperty !== obligation.missingProperty) {
+      errors.push(`Provider hypothesis ${hypothesisId} changes RateReveal-owned missing property for ${obligationRef}.`);
+    }
+    const resolutionKinds = stringArray(binding.resolutionEvidenceKinds);
+    if (!Array.isArray(binding.resolutionEvidenceKinds) || resolutionKinds.length === 0
+      || resolutionKinds.length !== binding.resolutionEvidenceKinds.length
+      || new Set(resolutionKinds).size !== resolutionKinds.length
+      || resolutionKinds.some((kind) => !obligation.permittedResolutionEvidenceKinds.includes(kind as ProofObligationResolutionEvidenceKind))) {
+      errors.push(`Provider hypothesis ${hypothesisId} supplies invalid resolution evidence for ${obligationRef}.`);
+    }
+    const observationBindings = arrayOfObjects(binding.observationBindings);
+    if (!Array.isArray(binding.observationBindings) || observationBindings.length !== binding.observationBindings.length) {
+      errors.push(`Provider hypothesis ${hypothesisId} supplies invalid observation bindings for ${obligationRef}.`);
+      continue;
+    }
+    const requiredRoles = obligation.requiredObservationRoles.map((entry) => entry.role);
+    const roles = observationBindings.map((entry) => typeof entry.role === "string" ? entry.role : "");
+    if (roles.length !== requiredRoles.length
+      || new Set(roles).size !== roles.length
+      || roles.some((role) => !requiredRoles.includes(role as ProofObligationObservationRole))) {
+      errors.push(`Provider hypothesis ${hypothesisId} does not bind exactly the RateReveal-owned source roles for ${obligationRef}.`);
+    }
+    for (const entry of observationBindings) {
+      if (Object.keys(entry).some((key) => key !== "role" && key !== "observationRefs")) {
+        errors.push(`Provider hypothesis ${hypothesisId} supplies prohibited source-binding metadata for ${obligationRef}.`);
+      }
+      if (!Array.isArray(entry.observationRefs) || entry.observationRefs.length === 0
+        || !entry.observationRefs.every((reference) => typeof reference === "string")) {
+        errors.push(`Provider hypothesis ${hypothesisId} supplies an incomplete source binding for ${obligationRef}.`);
+      }
+    }
+  }
+  for (const obligationRef of alternative.requiredProofObligationRefs) {
+    const count = bindingsByRef.get(obligationRef)?.length ?? 0;
+    if (count !== 1) {
+      errors.push(`Provider hypothesis ${hypothesisId} must bind proof obligation ${obligationRef} exactly once; received ${count}.`);
+    }
+  }
 }
 
 function validateAlternativeCoverage(
@@ -543,19 +682,26 @@ export async function collectRecordedProviderHypotheses(
   try {
     const response = await proposer.propose(packet.request);
     const errors = validateProviderResponse(response, packet.request, proposer.providerId);
+    const normalized = errors.length === 0
+      ? response.hypotheses.map((proposal) => normalizeProviderProposal(
+          proposal,
+          proposer.providerId,
+          observations,
+          packet.internalObservationIdByOpaqueRef,
+          packet.inferenceTopicByOpaqueRef,
+          packet.materialAlternativeByOpaqueRef,
+          packet.internalEvidenceNeedIdByOpaqueRef,
+          packet.internalProofObligationIdByOpaqueRef,
+        ))
+      : [];
+    const proofObligationErrors = normalized.flatMap((hypothesis) =>
+      (hypothesis.inference?.proofObligationValidation?.errors ?? [])
+        .map((error) => `Provider hypothesis ${hypothesis.ownership.kind === "provider" ? hypothesis.ownership.proposalId : hypothesis.id} failed proof-obligation validation: ${error}`));
+    const allErrors = [...errors, ...proofObligationErrors].sort();
     return {
-      hypotheses: errors.length === 0
-        ? response.hypotheses.map((proposal) => normalizeProviderProposal(
-            proposal,
-            proposer.providerId,
-            packet.internalObservationIdByOpaqueRef,
-            packet.inferenceTopicByOpaqueRef,
-            packet.materialAlternativeByOpaqueRef,
-            packet.internalEvidenceNeedIdByOpaqueRef,
-          ))
-        : [],
-      alternativeCoverage: errors.length === 0 ? structuredClone(response.alternativeCoverage) : [],
-      errors,
+      hypotheses: allErrors.length === 0 ? normalized : [],
+      alternativeCoverage: allErrors.length === 0 ? structuredClone(response.alternativeCoverage) : [],
+      errors: allErrors,
       request: packet.request,
     };
   } catch {
@@ -571,15 +717,32 @@ export async function collectRecordedProviderHypotheses(
 function normalizeProviderProposal(
   proposal: ProviderHypothesisProposal,
   providerId: string,
+  observations: Observation[],
   internalObservationIdByOpaqueRef: Map<string, string>,
   inferenceTopicByOpaqueRef: Map<string, InferenceTopic>,
   materialAlternativeByOpaqueRef: Map<string, { topic: InferenceTopic; alternative: InferenceTopicMaterialAlternative }>,
   internalEvidenceNeedIdByOpaqueRef: Map<string, string>,
+  internalProofObligationIdByOpaqueRef: Map<string, string>,
 ): Hypothesis {
   const translate = (references: string[]) => references.map((reference) => internalObservationIdByOpaqueRef.get(reference)!);
   const topic = inferenceTopicByOpaqueRef.get(proposal.topicRef)!;
   const alternative = materialAlternativeByOpaqueRef.get(proposal.alternativeRef)!.alternative;
-  const proofGapUnderstanding = evaluateProofGapUnderstanding(topic, alternative.id, proposal.inference.missingProof);
+  const proofObligationBindings = proposal.inference.proofObligationBindings.map<ProofObligationBinding>((binding) => ({
+    obligationId: internalProofObligationIdByOpaqueRef.get(binding.proofObligationRef)!,
+    gapKind: binding.gapKind,
+    observationBindings: binding.observationBindings.map((entry) => ({
+      role: entry.role,
+      observationRefs: translate(entry.observationRefs),
+    })),
+    missingProperty: binding.missingProperty,
+    resolutionEvidenceKinds: structuredClone(binding.resolutionEvidenceKinds),
+  }));
+  const proofObligationValidation = evaluateProofObligationBindings(
+    topic,
+    alternative.id,
+    proofObligationBindings,
+    observations,
+  );
   return deepFreeze({
     id: providerOwnedId(providerId, proposal.id),
     groupId: topic.hypothesisGroupId,
@@ -593,14 +756,15 @@ function normalizeProviderProposal(
       missingProof: structuredClone(proposal.inference.missingProof),
       acknowledgedEvidenceNeedIds: proposal.inference.acknowledgedEvidenceNeedRefs
         .map((reference) => internalEvidenceNeedIdByOpaqueRef.get(reference)!),
-      proofGapUnderstanding,
+      proofObligationBindings,
+      proofObligationValidation,
     },
     inferenceTopic: {
       topicId: topic.id,
       hypothesisGroupId: topic.hypothesisGroupId,
       alternativeId: alternative.id,
-      requiredProofGapConceptIds: structuredClone(alternative.requiredProofGapConceptIds),
-      proofGapConcepts: structuredClone(topic.proofGapConcepts),
+      requiredProofObligationIds: structuredClone(alternative.requiredProofObligationIds),
+      proofObligations: structuredClone(topic.proofObligations),
       immutable: true as const,
       qualification: structuredClone(topic.qualification),
     },
@@ -625,7 +789,8 @@ function validateInferenceTopics(topics: InferenceTopic[], observations: Observa
   const observationIds = new Set(observations.map((observation) => observation.id));
   const topicIds = new Set<string>();
   const alternativeIds = new Set<string>();
-  const conceptIds = new Set<string>();
+  const obligationIds = new Set<string>();
+  const evidenceFactorIds = new Set<string>();
   let materialAlternativeCount = 0;
   for (const topic of topics) {
     if (!topic.id.trim() || topicIds.has(topic.id)) throw new Error(`RateReveal inference topic identity ${topic.id || "<empty>"} is invalid or duplicated.`);
@@ -644,21 +809,44 @@ function validateInferenceTopics(topics: InferenceTopic[], observations: Observa
     if (new Set(topic.allowedClaims.map((claim) => claim.key)).size !== topic.allowedClaims.length) {
       throw new Error(`RateReveal inference topic ${topic.id} repeats an allowed claim key.`);
     }
-    const topicConceptIds = new Set(topic.proofGapConcepts.map((concept) => concept.id));
-    for (const concept of topic.proofGapConcepts) {
-      if (!concept.id.trim() || conceptIds.has(concept.id)) {
-        throw new Error(`RateReveal proof-gap concept identity ${concept.id || "<empty>"} is invalid or duplicated.`);
+    const topicObligationIds = new Set(topic.proofObligations.map((obligation) => obligation.id));
+    for (const obligation of topic.proofObligations) {
+      if (!obligation.id.trim() || obligationIds.has(obligation.id)) {
+        throw new Error(`RateReveal proof-obligation identity ${obligation.id || "<empty>"} is invalid or duplicated.`);
       }
-      conceptIds.add(concept.id);
-      if (!concept.description.trim() || concept.evidenceNeedIds.length === 0 || concept.requiredFacets.length === 0) {
-        throw new Error(`RateReveal proof-gap concept ${concept.id} is incomplete.`);
+      obligationIds.add(obligation.id);
+      if (!obligation.description.trim() || obligation.evidenceNeedIds.length === 0
+        || obligation.observationRequirements.length === 0 || obligation.resolutionEvidenceKinds.length === 0) {
+        throw new Error(`RateReveal proof obligation ${obligation.id} is incomplete.`);
       }
-      if (concept.requiredFacets.some((facet) => !facet.id.trim() || facet.acceptedTokenGroups.length === 0
-        || facet.acceptedTokenGroups.some((group) => group.length === 0 || group.some((token) => !token.trim())))) {
-        throw new Error(`RateReveal proof-gap concept ${concept.id} contains an invalid semantic facet.`);
+      if (new Set(obligation.evidenceNeedIds).size !== obligation.evidenceNeedIds.length
+        || new Set(obligation.resolutionEvidenceKinds).size !== obligation.resolutionEvidenceKinds.length) {
+        throw new Error(`RateReveal proof obligation ${obligation.id} repeats evidence requirements.`);
       }
-      if (concept.evidenceNeedIds.some((id) => !topic.qualification.materialEvidenceNeedIds.includes(id))) {
-        throw new Error(`RateReveal proof-gap concept ${concept.id} references evidence outside topic ${topic.id}.`);
+      const roles = obligation.observationRequirements.map((requirement) => requirement.role);
+      if (new Set(roles).size !== roles.length) {
+        throw new Error(`RateReveal proof obligation ${obligation.id} repeats a source role.`);
+      }
+      for (const requirement of obligation.observationRequirements) {
+        if (!requirement.description.trim() || requirement.observationRefs.length === 0 || requirement.allowedKinds.length === 0
+          || requirement.observationRefs.some((reference) => !topic.observationRefs.includes(reference))) {
+          throw new Error(`RateReveal proof obligation ${obligation.id} has an invalid source-role requirement.`);
+        }
+        for (const reference of requirement.observationRefs) {
+          const observation = observations.find((candidate) => candidate.id === reference);
+          if (!observation || !requirement.allowedKinds.includes(observation.kind)) {
+            throw new Error(`RateReveal proof obligation ${obligation.id} has a source-role kind mismatch.`);
+          }
+          if (requirement.valueState === "missing" && observation.value !== null) {
+            throw new Error(`RateReveal proof obligation ${obligation.id} expects missing source evidence that is present.`);
+          }
+          if (requirement.valueState === "present" && observation.value === null) {
+            throw new Error(`RateReveal proof obligation ${obligation.id} expects present source evidence that is missing.`);
+          }
+        }
+      }
+      if (obligation.evidenceNeedIds.some((id) => !topic.qualification.materialEvidenceNeedIds.includes(id))) {
+        throw new Error(`RateReveal proof obligation ${obligation.id} references evidence outside topic ${topic.id}.`);
       }
     }
     for (const alternative of topic.materialAlternatives) {
@@ -666,8 +854,9 @@ function validateInferenceTopics(topics: InferenceTopic[], observations: Observa
         throw new Error(`RateReveal material alternative identity ${alternative.id || "<empty>"} is invalid or duplicated.`);
       }
       alternativeIds.add(alternative.id);
-      if (!alternative.description.trim() || alternative.requiredProofGapConceptIds.length === 0
-          || alternative.requiredProofGapConceptIds.some((id) => !topicConceptIds.has(id))) {
+      if (!alternative.description.trim() || alternative.requiredProofObligationIds.length === 0
+          || new Set(alternative.requiredProofObligationIds).size !== alternative.requiredProofObligationIds.length
+          || alternative.requiredProofObligationIds.some((id) => !topicObligationIds.has(id))) {
         throw new Error(`RateReveal material alternative ${alternative.id} is incomplete.`);
       }
       const allowedClaim = topic.allowedClaims.find((claim) => claim.key === alternative.claim.key);
@@ -682,6 +871,26 @@ function validateInferenceTopics(topics: InferenceTopic[], observations: Observa
         if (count !== 1) {
           throw new Error(`RateReveal topic ${topic.id} must map allowed claim ${allowedClaim.key}=${JSON.stringify(allowedValue)} to exactly one material alternative.`);
         }
+      }
+    }
+    const topicAlternativeIds = new Set(topic.materialAlternatives.map((alternative) => alternative.id));
+    if (!Array.isArray(topic.qualification.evidenceFactors)) {
+      throw new Error(`RateReveal inference topic ${topic.id} has no evidence-factor policy.`);
+    }
+    for (const factor of topic.qualification.evidenceFactors) {
+      if (!factor.id.trim() || evidenceFactorIds.has(factor.id)) {
+        throw new Error(`RateReveal evidence-factor identity ${factor.id || "<empty>"} is invalid or duplicated.`);
+      }
+      evidenceFactorIds.add(factor.id);
+      if (!factor.description.trim() || !factor.independenceGroupId.trim()
+          || factor.alternativeIds.length === 0 || factor.controlIds.length === 0
+          || new Set(factor.alternativeIds).size !== factor.alternativeIds.length
+          || new Set(factor.controlIds).size !== factor.controlIds.length
+          || !["supports", "contradicts"].includes(factor.effect)
+          || !["contextual", "material", "decisive"].includes(factor.diagnosticity)
+          || !["all_pass", "any_fail"].includes(factor.activation)
+          || factor.alternativeIds.some((id) => !topicAlternativeIds.has(id))) {
+        throw new Error(`RateReveal evidence factor ${factor.id} is incomplete or outside topic ${topic.id}.`);
       }
     }
     for (const reference of topic.observationRefs) {

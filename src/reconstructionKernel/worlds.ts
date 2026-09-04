@@ -9,6 +9,7 @@ import type {
   Observation,
   QualifiedInferenceStrength,
 } from "./types.js";
+import { evaluateInferenceEvidencePosture } from "./inferenceEvidencePosture.js";
 
 function stableValue(value: Claim["value"]): string {
   return JSON.stringify(value);
@@ -102,9 +103,31 @@ export function adjudicateHypotheses(
           reason: "Claim-sufficient deterministic proof passed and alternatives are exhausted for this claim.",
         };
       }
-      const qualification = hypothesis.ownership.kind === "provider"
+      const qualification: {
+        strength: QualifiedInferenceStrength;
+        reasonCodes: string[];
+        evidencePosture?: HypothesisResult["evidencePosture"];
+      } = hypothesis.ownership.kind === "provider"
         ? qualifyProviderInference(hypothesis, hypotheses, controls)
         : qualifyDeterministicInference(hypothesis, allRequiredPassed);
+      if (hypothesis.ownership.kind === "provider" && qualification.evidencePosture?.outcome === "contradicted") {
+        return {
+          hypothesisId: hypothesis.id,
+          groupId: hypothesis.groupId,
+          state: "rejected" as const,
+          interpretationState: "rejected" as const,
+          ownership: hypothesis.ownership,
+          evidenceClass: hypothesis.evidenceClass,
+          alternativeCoverage: hypothesis.alternativeCoverage,
+          ...(hypothesis.inference ? { inference: hypothesis.inference } : {}),
+          ...(hypothesis.inferenceTopic ? { inferenceTopicId: hypothesis.inferenceTopic.topicId } : {}),
+          ...(hypothesis.inference ? { providerReportedConfidence: hypothesis.inference.confidence } : {}),
+          qualifiedInferenceStrength: qualification.strength,
+          qualificationReasonCodes: qualification.reasonCodes,
+          evidencePosture: qualification.evidencePosture,
+          reason: "The selected interpretation is contradicted by RateReveal-owned deterministic evidence.",
+        };
+      }
       return {
         hypothesisId: hypothesis.id,
         groupId: hypothesis.groupId,
@@ -119,6 +142,7 @@ export function adjudicateHypotheses(
           ? { providerReportedConfidence: hypothesis.inference.confidence } : {}),
         qualifiedInferenceStrength: qualification.strength,
         qualificationReasonCodes: qualification.reasonCodes,
+        ...(qualification.evidencePosture ? { evidencePosture: qualification.evidencePosture } : {}),
         reason: hypothesis.ownership.kind === "provider"
           ? "Provider reasoning remains a non-authoritative inference; deterministic proof and alternative exhaustion are not provider-controlled."
           : required.length === 0
@@ -134,80 +158,14 @@ function qualifyProviderInference(
   hypothesis: Hypothesis,
   hypotheses: Hypothesis[],
   controls: Map<string, ControlResult>,
-): { strength: QualifiedInferenceStrength; reasonCodes: string[] } {
-  const topic = hypothesis.inferenceTopic;
-  if (!topic || !hypothesis.inference) {
-    return { strength: "unknown_competing", reasonCodes: ["ratereveal_topic_or_provider_inference_missing"] };
-  }
-  const policy = topic.qualification;
-  const compatibility = policy.compatibilityControlIds.map((id) => controls.get(id));
-  const failed = compatibility.filter((result) => result?.state === "fail");
-  const unresolved = compatibility.filter((result) => !result || result.state === "unresolved");
-  const acknowledged = new Set(hypothesis.inference.acknowledgedEvidenceNeedIds ?? []);
-  const unacknowledgedGaps = policy.materialEvidenceNeedIds.filter((id) => !acknowledged.has(id));
-  const understoodConcepts = new Set(hypothesis.inference.proofGapUnderstanding?.understoodConceptIds ?? []);
-  const ununderstoodConcepts = topic.requiredProofGapConceptIds.filter((id) => !understoodConcepts.has(id));
+): { strength: QualifiedInferenceStrength; reasonCodes: string[]; evidencePosture: HypothesisResult["evidencePosture"] } {
   const competingAlternativeCount = hypotheses.filter((candidate) =>
     candidate.id !== hypothesis.id && candidate.groupId === hypothesis.groupId).length;
-  const reasonCodes = [
-    `provider_reported_confidence_${hypothesis.inference.confidence}`,
-    `topic_maximum_strength_${policy.maximumStrength}`,
-    `source_completeness_${policy.sourceCompleteness}`,
-    ...(competingAlternativeCount > 0 ? ["competing_alternatives_retained"] : ["implicit_unknown_alternative_retained"]),
-  ];
-  if (failed.length > 0) {
-    return {
-      strength: "weak",
-      reasonCodes: [...reasonCodes, "deterministic_compatibility_control_failed"],
-    };
-  }
-  if (unresolved.length > 0) {
-    return {
-      strength: "unknown_competing",
-      reasonCodes: [...reasonCodes, "deterministic_compatibility_control_unresolved"],
-    };
-  }
-  if (policy.completenessRequirement === "complete_statement_required"
-      && policy.sourceCompleteness !== "proven_complete") {
-    return {
-      strength: "unknown_competing",
-      reasonCodes: [...reasonCodes, "required_statement_completeness_not_proven"],
-    };
-  }
-  if (policy.sourceCompleteness === "proven_incomplete") {
-    return {
-      strength: "weak",
-      reasonCodes: [...reasonCodes, "source_proven_incomplete"],
-    };
-  }
-  if (unacknowledgedGaps.length > 0) {
-    return {
-      strength: "weak",
-      reasonCodes: [...reasonCodes, "material_proof_gap_not_acknowledged"],
-    };
-  }
-  if (ununderstoodConcepts.length > 0) {
-    return {
-      strength: "weak",
-      reasonCodes: [...reasonCodes, "material_proof_gap_concept_not_understood"],
-    };
-  }
-  const strength = lowerStrength(
-    confidenceAsStrength(hypothesis.inference.confidence),
-    policy.maximumStrength,
-  );
+  const evidencePosture = evaluateInferenceEvidencePosture(hypothesis, controls, competingAlternativeCount);
   return {
-    strength,
-    reasonCodes: [
-      ...reasonCodes,
-      "deterministic_compatibility_controls_passed",
-      "material_proof_gaps_acknowledged",
-      "material_proof_gap_concepts_understood",
-      ...(policy.completenessRequirement === "observed_rows_sufficient"
-        ? ["topic_is_bounded_to_observed_rows"] : ["required_statement_completeness_proven"]),
-      ...(strength !== confidenceAsStrength(hypothesis.inference.confidence)
-        ? ["ratereveal_topic_policy_lowered_provider_confidence"] : []),
-    ],
+    strength: evidencePosture.qualifiedStrength,
+    reasonCodes: evidencePosture.reasonCodes,
+    evidencePosture,
   };
 }
 
@@ -229,17 +187,6 @@ function qualifyDeterministicInference(
 
 function confidenceAsStrength(confidence: "low" | "medium" | "high"): Exclude<QualifiedInferenceStrength, "unknown_competing"> {
   return confidence === "high" ? "strong" : confidence === "medium" ? "moderate" : "weak";
-}
-
-function strengthRank(strength: Exclude<QualifiedInferenceStrength, "unknown_competing">): number {
-  return strength === "weak" ? 1 : strength === "moderate" ? 2 : 3;
-}
-
-function lowerStrength(
-  left: Exclude<QualifiedInferenceStrength, "unknown_competing">,
-  right: Exclude<QualifiedInferenceStrength, "unknown_competing">,
-): Exclude<QualifiedInferenceStrength, "unknown_competing"> {
-  return strengthRank(left) <= strengthRank(right) ? left : right;
 }
 
 function interpretationStateForStrength(strength: QualifiedInferenceStrength): HypothesisResult["interpretationState"] {

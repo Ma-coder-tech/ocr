@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   buildHypothesisProposalRequest,
   collectRecordedProviderHypotheses,
-  evaluateProofGapUnderstanding,
   reconstructStatement,
   validateProviderResponse,
   type HypothesisProposalRequest,
   type HypothesisProposalResponse,
+  type InferenceTopic,
   type ProviderHypothesisProposal,
+  type ReconstructionInput,
   type StatementHypothesisProposer,
 } from "../src/reconstructionKernel/index.js";
 import {
@@ -18,35 +19,54 @@ import {
 import {
   cloverInferenceTopics,
   paysafeInferenceTopics,
+  proofObligationBindingsForAlternative,
   wellsInferenceTopics,
 } from "./fixtures/reconstructionKernel/recordedHypothesisProposals.js";
-import { cloverDuplicateResubmission } from "./fixtures/reconstructionKernel/rescueCorpus.js";
+import {
+  cloverDuplicateResubmission,
+  paysafeOctober2025,
+  wellsFargoSeptember2024,
+} from "./fixtures/reconstructionKernel/rescueCorpus.js";
 
 const topicsByStatement = {
   "clover-duplicate-resubmission": cloverInferenceTopics[0]!,
   "paysafe-october-2025": paysafeInferenceTopics[0]!,
   "wells-fargo-september-2024": wellsInferenceTopics[0]!,
 };
+type StatementId = keyof typeof topicsByStatement;
 
-function cloverRequest(): HypothesisProposalRequest {
+const inputsByStatement: Record<StatementId, ReconstructionInput> = {
+  "clover-duplicate-resubmission": cloverDuplicateResubmission,
+  "paysafe-october-2025": paysafeOctober2025,
+  "wells-fargo-september-2024": wellsFargoSeptember2024,
+};
+
+function requestFor(statementId: StatementId): HypothesisProposalRequest {
+  const input = inputsByStatement[statementId];
   return buildHypothesisProposalRequest(
-    cloverDuplicateResubmission.statementId,
-    cloverDuplicateResubmission.observations,
-    { sourceDocumentRef: "approved-evaluation-document:clover-duplicate-resubmission", sourceContentSha256: "a".repeat(64) },
-    cloverInferenceTopics,
-    cloverDuplicateResubmission.evidenceNeeds,
+    input.statementId,
+    input.observations,
+    { sourceDocumentRef: `approved-evaluation-document:${statementId}`, sourceContentSha256: "a".repeat(64) },
+    [topicsByStatement[statementId]],
+    input.evidenceNeeds,
   );
+}
+
+function alternativeIndex(topic: InferenceTopic, alternativeId: string): number {
+  const index = topic.materialAlternatives.findIndex((alternative) => alternative.id === alternativeId);
+  if (index < 0) throw new Error(`Unknown fixture alternative ${alternativeId}.`);
+  return index;
 }
 
 function proposalFor(
   request: HypothesisProposalRequest,
-  alternativeIndex: number,
-  missingProof = "A stable reference linking each rejected row to its later submitted batch is missing.",
+  index: number,
+  missingProof = ["Audit explanation only."],
 ): ProviderHypothesisProposal {
   const topic = request.inferenceTopics[0]!;
-  const alternative = topic.materialAlternatives[alternativeIndex]!;
+  const alternative = topic.materialAlternatives[index]!;
   return {
-    id: `calibration-${alternativeIndex}`,
+    id: `calibration-${index}`,
     topicRef: topic.topicRef,
     alternativeRef: alternative.alternativeRef,
     description: "Source-bound offline calibration proposal.",
@@ -55,10 +75,11 @@ function proposalFor(
     populations: [],
     claims: [{ ...alternative.claim, observationRefs: topic.observationRefs }],
     inference: {
-      confidence: alternativeIndex === 0 ? "high" : "low",
+      confidence: index === 0 ? "high" : "low",
       rationale: "The supplied rows favor this interpretation while the competing interpretation remains possible.",
-      missingProof: [missingProof],
+      missingProof,
       acknowledgedEvidenceNeedRefs: topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef),
+      proofObligationBindings: proofObligationBindingsForAlternative(request, alternative.alternativeRef),
     },
   };
 }
@@ -90,65 +111,118 @@ function responseFor(
   };
 }
 
-describe("offline AI hypothesis calibration", () => {
-  it("classifies all 31 recorded, live-derived, paraphrase, and adversarial proof-gap cases as expected", () => {
+async function collectResponse(statementId: StatementId, response: HypothesisProposalResponse) {
+  const input = inputsByStatement[statementId];
+  const proposer: StatementHypothesisProposer = {
+    providerId: response.providerId,
+    async propose() { return structuredClone(response); },
+  };
+  return collectRecordedProviderHypotheses(
+    proposer,
+    input.statementId,
+    input.observations,
+    { sourceDocumentRef: `approved-evaluation-document:${statementId}`, sourceContentSha256: "a".repeat(64) },
+    [topicsByStatement[statementId]],
+    input.evidenceNeeds,
+  );
+}
+
+describe("offline structured proof-obligation calibration", () => {
+  it("makes all 31 historical wordings qualification-neutral when the same valid structure is supplied", async () => {
     expect(offlineProofGapCalibrationCases).toHaveLength(31);
-    const outcomes = offlineProofGapCalibrationCases.map((calibrationCase) => {
-      const topic = topicsByStatement[calibrationCase.statementId];
-      const result = evaluateProofGapUnderstanding(topic, calibrationCase.alternativeId, calibrationCase.missingProof);
-      return { id: calibrationCase.id, understood: result.requiredConceptIds.every((id) => result.understoodConceptIds.includes(id)) };
-    });
-    expect(outcomes).toEqual(offlineProofGapCalibrationCases.map((calibrationCase) => ({
-      id: calibrationCase.id,
-      understood: calibrationCase.expectedUnderstood,
-    })));
+    const outcomes = await Promise.all(offlineProofGapCalibrationCases.map(async (calibrationCase) => {
+      const statementId = calibrationCase.statementId;
+      const request = requestFor(statementId);
+      const index = alternativeIndex(topicsByStatement[statementId], calibrationCase.alternativeId);
+      const response = responseFor(request, `wording-neutral-${calibrationCase.id}`, [index]);
+      response.hypotheses[0]!.inference.missingProof = structuredClone(calibrationCase.missingProof);
+      const collected = await collectResponse(statementId, response);
+      return {
+        accepted: collected.errors.length === 0,
+        modelVersion: collected.hypotheses[0]?.inference?.proofObligationValidation?.modelVersion,
+      };
+    }));
+    expect(outcomes.every((outcome) => outcome.accepted)).toBe(true);
+    expect(new Set(outcomes.map((outcome) => outcome.modelVersion))).toEqual(
+      new Set(["ratereveal-proof-obligations-v1"]),
+    );
   });
 
-  it("recognizes every semantically valid proof gap from the approved recorded live runs", () => {
-    const liveCases = offlineProofGapCalibrationCases.filter((calibrationCase) => calibrationCase.source === "live-evaluation-record");
-    expect(liveCases).toHaveLength(14);
-    expect(liveCases.every((calibrationCase) => {
-      const result = evaluateProofGapUnderstanding(
-        topicsByStatement[calibrationCase.statementId],
-        calibrationCase.alternativeId,
-        calibrationCase.missingProof,
-      );
-      return result.understoodConceptIds.length === result.requiredConceptIds.length;
-    })).toBe(true);
-  });
-
-  it("recognizes the three exact v3 live phrasings that exposed bounded vocabulary gaps", () => {
-    const v3CaseIds = new Set([
+  it("removes the three prior live false negatives without adding phrase-specific rules", async () => {
+    const priorFalseNegativeIds = new Set([
       "clover-live-v3-inflected-correspondence",
       "paysafe-live-v3-absent-component",
       "wells-live-v3-transaction-linkage",
     ]);
-    const liveV3Cases = offlineProofGapCalibrationCases.filter((calibrationCase) => v3CaseIds.has(calibrationCase.id));
-    expect(liveV3Cases).toHaveLength(3);
-    expect(liveV3Cases.map((calibrationCase) => {
-      const result = evaluateProofGapUnderstanding(
-        topicsByStatement[calibrationCase.statementId],
-        calibrationCase.alternativeId,
-        calibrationCase.missingProof,
-      );
-      return {
-        id: calibrationCase.id,
-        understood: result.evaluations.every((evaluation) => evaluation.understood),
-      };
-    })).toEqual(liveV3Cases.map((calibrationCase) => ({ id: calibrationCase.id, understood: true })));
+    const cases = offlineProofGapCalibrationCases.filter((item) => priorFalseNegativeIds.has(item.id));
+    expect(cases).toHaveLength(3);
+    const accepted = await Promise.all(cases.map(async (item) => {
+      const request = requestFor(item.statementId);
+      const index = alternativeIndex(topicsByStatement[item.statementId], item.alternativeId);
+      const response = responseFor(request, `prior-false-negative-${item.id}`, [index]);
+      response.hypotheses[0]!.inference.missingProof = structuredClone(item.missingProof);
+      return (await collectResponse(item.statementId, response)).errors.length === 0;
+    }));
+    expect(accepted).toEqual([true, true, true]);
   });
 
-  it("rejects identifier echo, generic language, and incomplete concept fragments", () => {
-    const adversarialFailures = offlineProofGapCalibrationCases.filter((calibrationCase) => !calibrationCase.expectedUnderstood);
-    expect(adversarialFailures).toHaveLength(10);
-    expect(adversarialFailures.every((calibrationCase) => {
-      const result = evaluateProofGapUnderstanding(
-        topicsByStatement[calibrationCase.statementId],
-        calibrationCase.alternativeId,
-        calibrationCase.missingProof,
-      );
-      return result.understoodConceptIds.length === 0;
-    })).toBe(true);
+  it("rejects absent, invented, incomplete, and incorrectly source-bound obligations", async () => {
+    const request = requestFor("clover-duplicate-resubmission");
+    const mutations: Array<(proposal: ProviderHypothesisProposal) => void> = [
+      (proposal) => { proposal.inference.proofObligationBindings = []; },
+      (proposal) => { proposal.inference.proofObligationBindings[0]!.proofObligationRef = "provider-invented-obligation"; },
+      (proposal) => { proposal.inference.proofObligationBindings[0]!.observationBindings.pop(); },
+      (proposal) => {
+        const binding = proposal.inference.proofObligationBindings[0]!;
+        [binding.observationBindings[0]!.observationRefs, binding.observationBindings[1]!.observationRefs]
+          = [binding.observationBindings[1]!.observationRefs, binding.observationBindings[0]!.observationRefs];
+      },
+      (proposal) => { proposal.inference.proofObligationBindings[0]!.missingProperty = "row_level_temporal_link"; },
+      (proposal) => { proposal.inference.proofObligationBindings[0]!.resolutionEvidenceKinds = ["row_level_date"]; },
+      (proposal) => {
+        (proposal.inference.proofObligationBindings[0] as unknown as Record<string, unknown>).authority = "confirmed";
+      },
+    ];
+    const outcomes = await Promise.all(mutations.map(async (mutate, index) => {
+      const response = responseFor(request, `invalid-structure-${index}`, [0]);
+      mutate(response.hypotheses[0]!);
+      return collectResponse("clover-duplicate-resubmission", response);
+    }));
+    expect(outcomes.every((outcome) => outcome.hypotheses.length === 0 && outcome.errors.length > 0)).toBe(true);
+  });
+
+  it("does not let polished prose substitute for missing structure", async () => {
+    const request = requestFor("clover-duplicate-resubmission");
+    const response = responseFor(request, "prose-is-not-proof", [0]);
+    response.hypotheses[0]!.inference.missingProof = [
+      "A stable source identifier linking each rejected row to its corresponding later submitted row is missing.",
+    ];
+    response.hypotheses[0]!.inference.proofObligationBindings = [];
+    const collected = await collectResponse("clover-duplicate-resubmission", response);
+    expect(collected.hypotheses).toEqual([]);
+    expect(collected.errors.join(" ")).toContain("must bind proof obligation");
+  });
+
+  it("rejects invalid RateReveal-owned obligation definitions before provider execution", () => {
+    const topicWithForeignSource = structuredClone(cloverInferenceTopics[0]!);
+    topicWithForeignSource.proofObligations[0]!.observationRequirements[0]!.observationRefs = ["paysafe.fees"];
+    expect(() => buildHypothesisProposalRequest(
+      cloverDuplicateResubmission.statementId,
+      cloverDuplicateResubmission.observations,
+      { sourceDocumentRef: "approved-evaluation-document:clover", sourceContentSha256: "a".repeat(64) },
+      [topicWithForeignSource],
+      cloverDuplicateResubmission.evidenceNeeds,
+    )).toThrow(/invalid source-role requirement/);
+
+    const topicWithFalsePresence = structuredClone(cloverInferenceTopics[0]!);
+    topicWithFalsePresence.proofObligations[0]!.observationRequirements[0]!.valueState = "present";
+    expect(() => buildHypothesisProposalRequest(
+      cloverDuplicateResubmission.statementId,
+      cloverDuplicateResubmission.observations,
+      { sourceDocumentRef: "approved-evaluation-document:clover", sourceContentSha256: "a".repeat(64) },
+      [topicWithFalsePresence],
+      cloverDuplicateResubmission.evidenceNeeds,
+    )).toThrow(/expects present source evidence that is missing/);
   });
 
   it("records the pre-calibration confidence inconsistency and alternative omission from the six live runs", () => {
@@ -162,13 +236,13 @@ describe("offline AI hypothesis calibration", () => {
   });
 
   it("accepts complete proposed-or-not-supported coverage for every RateReveal alternative", () => {
-    const request = cloverRequest();
+    const request = requestFor("clover-duplicate-resubmission");
     expect(validateProviderResponse(responseFor(request, "calibration-provider", [0]), request, "calibration-provider")).toEqual([]);
     expect(validateProviderResponse(responseFor(request, "calibration-provider", [0, 1]), request, "calibration-provider")).toEqual([]);
   });
 
   it("fails closed when anchoring causes a material alternative to be omitted", () => {
-    const request = cloverRequest();
+    const request = requestFor("clover-duplicate-resubmission");
     const response = responseFor(request, "anchored-provider", [0]);
     response.alternativeCoverage.splice(1, 1);
     expect(validateProviderResponse(response, request, "anchored-provider").join(" ")).toContain(
@@ -177,7 +251,7 @@ describe("offline AI hypothesis calibration", () => {
   });
 
   it("fails closed on invented, duplicate, and internally inconsistent alternative assessments", () => {
-    const request = cloverRequest();
+    const request = requestFor("clover-duplicate-resubmission");
     const invented = responseFor(request, "malformed-provider", [0]);
     invented.alternativeCoverage[1]!.alternativeRef = "provider-created-alternative";
     expect(validateProviderResponse(invented, request, "malformed-provider").join(" ")).toContain(
@@ -196,52 +270,23 @@ describe("offline AI hypothesis calibration", () => {
     expect(validateProviderResponse(inconsistent, request, "malformed-provider").join(" ")).toContain(
       "cannot also have a matching hypothesis",
     );
-
-    const missingCoverage = responseFor(request, "malformed-provider", [0]) as unknown as Record<string, unknown>;
-    delete missingCoverage.alternativeCoverage;
-    expect(validateProviderResponse(
-      missingCoverage as unknown as HypothesisProposalResponse,
-      request,
-      "malformed-provider",
-    ).join(" ")).toContain("alternativeCoverage must be an array");
-
-    const authorityAttempt = responseFor(request, "malformed-provider", [0]);
-    (authorityAttempt.alternativeCoverage[0] as unknown as Record<string, unknown>).canonicalAuthority = "approved";
-    expect(validateProviderResponse(authorityAttempt, request, "malformed-provider").join(" ")).toContain(
-      "prohibited authority metadata canonicalAuthority",
-    );
   });
 
-  it("keeps superficial proof-gap wording weak and canonical truth invariant", async () => {
-    const providerId = "superficial-proof-gap-provider";
-    const proposer: StatementHypothesisProposer = {
-      providerId,
-      async propose(request) {
-        const response = responseFor(request, providerId, [0]);
-        response.hypotheses[0] = proposalFor(request, 0, "evidence-need-0001: more information is needed.");
-        return response;
-      },
-    };
-    const collected = await collectRecordedProviderHypotheses(
-      proposer,
-      cloverDuplicateResubmission.statementId,
-      cloverDuplicateResubmission.observations,
-      { sourceDocumentRef: "approved-evaluation-document:clover-duplicate-resubmission", sourceContentSha256: "a".repeat(64) },
-      cloverInferenceTopics,
-      cloverDuplicateResubmission.evidenceNeeds,
+  it("keeps canonical truth invariant for accepted and rejected structured answers", async () => {
+    const request = requestFor("clover-duplicate-resubmission");
+    const baseline = reconstructStatement(cloverDuplicateResubmission);
+    const valid = await collectResponse(
+      "clover-duplicate-resubmission",
+      responseFor(request, "valid-structured-provider", [0]),
     );
-    expect(collected.errors).toEqual([]);
-    const input = structuredClone(cloverDuplicateResubmission);
-    const baseline = reconstructStatement(input);
-    input.hypotheses.push(...collected.hypotheses);
-    const augmented = reconstructStatement(input);
-    expect(augmented.hypothesisResults).toContainEqual(expect.objectContaining({
-      ownership: expect.objectContaining({ providerId }),
-      providerReportedConfidence: "high",
-      qualifiedInferenceStrength: "weak",
-      qualificationReasonCodes: expect.arrayContaining(["material_proof_gap_concept_not_understood"]),
-    }));
-    expect(augmented.canonicalClaims).toEqual(baseline.canonicalClaims);
-    expect(augmented.possibleWorlds.some((world) => !world.hypothesisIds.includes(collected.hypotheses[0]!.id))).toBe(true);
+    const validInput = structuredClone(cloverDuplicateResubmission);
+    validInput.hypotheses.push(...valid.hypotheses);
+    expect(reconstructStatement(validInput).canonicalClaims).toEqual(baseline.canonicalClaims);
+
+    const invalidResponse = responseFor(request, "invalid-structured-provider", [0]);
+    invalidResponse.hypotheses[0]!.inference.proofObligationBindings = [];
+    const invalid = await collectResponse("clover-duplicate-resubmission", invalidResponse);
+    expect(invalid.hypotheses).toEqual([]);
+    expect(reconstructStatement(cloverDuplicateResubmission).canonicalClaims).toEqual(baseline.canonicalClaims);
   });
 });

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { HYPOTHESIS_PROPOSAL_SCHEMA } from "./provider.js";
 import type {
   HypothesisProposalRequest,
   HypothesisProposalResponse,
@@ -9,19 +10,20 @@ import type {
 } from "./provider.js";
 import type { ScalarValue } from "./types.js";
 
-export const LIVE_HYPOTHESIS_PROMPT_VERSION = "ratereveal-live-hypothesis-evaluation-v2" as const;
-export const LIVE_HYPOTHESIS_RESPONSE_SCHEMA_VERSION = "ratereveal-live-hypothesis-response-v2" as const;
+export const LIVE_HYPOTHESIS_PROMPT_VERSION = "ratereveal-live-hypothesis-evaluation-v3" as const;
+export const LIVE_HYPOTHESIS_RESPONSE_SCHEMA_VERSION = "ratereveal-live-hypothesis-response-v3" as const;
 
 export const LIVE_HYPOTHESIS_DEVELOPER_PROMPT = [
   "You are an evaluation-only hypothesis proposer for merchant-statement reconstruction.",
   "Use only the source-bound packet in the user message. Do not use outside knowledge, web search, tools, or unstated merchant facts.",
-  "The RateReveal inference topics, material alternatives, allowed claims, observation references, and known evidence gaps are immutable. Select only offered topics, alternative references, and allowed claim values.",
+  "The RateReveal inference topics, material alternatives, allowed claims, observation references, known evidence gaps, proof obligations, source roles, missing properties, and permitted resolution evidence kinds are immutable. Select and bind only offered values.",
   "Return non-authoritative candidate explanations, never canonical facts, accounting truth, controls, or customer advice.",
   "Address every offered material alternative exactly once in alternativeCoverage. Mark it proposed when supplying exactly one matching hypothesis; otherwise mark it not_supported and give a source-bound structured reason. Never omit an alternative because another answer appears stronger.",
   "For each proposed material alternative, return at most one distinct hypothesis. Preserve an unknown interpretation whenever identity or completeness is unproven.",
   "Every claim must cite only observation references listed on its selected topic. Every hypothesis must acknowledge each material known evidence gap it relies on.",
   "Provider confidence means: high = strongly favored by the supplied rows while explicit confirmation proof is still missing; medium = plausible and useful but materially unresolved; low = weakly supported. Never describe an inference as confirmed.",
-  "A high-confidence proposal must state why it is likely, identify the strongest competing explanation in its rationale, and describe the missing confirmation proof in concrete semantic terms. Merely echoing an evidence-need reference or saying more information is needed is insufficient.",
+  "For each proposed alternative, bind every required proof obligation exactly once. Bind every required source role to the observations that actually play that role, repeat the offered gap kind and missing property exactly, and select one or more offered resolution evidence kinds. Do not invent obligations, roles, properties, or evidence kinds.",
+  "Natural-language rationale and missingProof are audit explanations only. A high-confidence proposal must still state why it is likely and identify the strongest competing explanation, but prose cannot substitute for complete proof-obligation bindings.",
   "Use empty events and populations arrays. Keep descriptions and rationales concise and source-bound.",
 ].join("\n");
 
@@ -100,12 +102,71 @@ const responseSchema = {
           inference: {
             type: "object",
             additionalProperties: false,
-            required: ["confidence", "rationale", "missingProof", "acknowledgedEvidenceNeedRefs"],
+            required: ["confidence", "rationale", "missingProof", "acknowledgedEvidenceNeedRefs", "proofObligationBindings"],
             properties: {
               confidence: { type: "string", enum: ["low", "medium", "high"] },
               rationale: { type: "string" },
               missingProof: { type: "array", minItems: 1, items: { type: "string" } },
               acknowledgedEvidenceNeedRefs: { type: "array", items: { type: "string" } },
+              proofObligationBindings: {
+                type: "array",
+                minItems: 1,
+                maxItems: 8,
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: [
+                    "proofObligationRef", "gapKind", "observationBindings",
+                    "missingProperty", "resolutionEvidenceKinds",
+                  ],
+                  properties: {
+                    proofObligationRef: { type: "string" },
+                    gapKind: {
+                      type: "string",
+                      enum: ["identity_linkage", "calculation_basis", "component_reconciliation", "temporal_linkage", "source_completeness"],
+                    },
+                    observationBindings: {
+                      type: "array",
+                      minItems: 1,
+                      maxItems: 8,
+                      items: {
+                        type: "object",
+                        additionalProperties: false,
+                        required: ["role", "observationRefs"],
+                        properties: {
+                          role: {
+                            type: "string",
+                            enum: [
+                              "subject", "counterpart", "missing_subject_attribute", "missing_counterpart_attribute",
+                              "reported_total", "visible_subtotal", "discrepancy", "document_completeness_gap",
+                            ],
+                          },
+                          observationRefs: { type: "array", minItems: 1, items: { type: "string" } },
+                        },
+                      },
+                    },
+                    missingProperty: {
+                      type: "string",
+                      enum: [
+                        "stable_identity_link", "underlying_calculation_basis",
+                        "complete_component_membership", "row_level_temporal_link", "complete_source_scope",
+                      ],
+                    },
+                    resolutionEvidenceKinds: {
+                      type: "array",
+                      minItems: 1,
+                      items: {
+                        type: "string",
+                        enum: [
+                          "stable_source_identifier", "explicit_source_relation", "unrounded_source_amounts",
+                          "processor_rounding_method", "complete_fee_detail", "reconciliation_mapping",
+                          "row_level_date", "explicit_temporal_relation", "complete_source_document",
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -281,6 +342,9 @@ export class OpenAiLiveHypothesisProposer implements StatementHypothesisProposer
 }
 
 export function assertLiveEvaluationPacketSafe(request: HypothesisProposalRequest): void {
+  if (request.schemaVersion !== HYPOTHESIS_PROPOSAL_SCHEMA) {
+    throw new Error(`Live evaluation requires ${HYPOTHESIS_PROPOSAL_SCHEMA}.`);
+  }
   if (!request.sourceDocument.sourceDocumentRef.startsWith("approved-evaluation-document:")) {
     throw new Error("Live evaluation requires an opaque approved-evaluation document reference.");
   }

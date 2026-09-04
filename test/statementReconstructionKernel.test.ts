@@ -18,7 +18,10 @@ import {
   vortaxSeptember2022,
   wellsFargoSeptember2024,
 } from "./fixtures/reconstructionKernel/rescueCorpus.js";
-import { cloverInferenceTopics } from "./fixtures/reconstructionKernel/recordedHypothesisProposals.js";
+import {
+  cloverInferenceTopics,
+  proofObligationBindingsForAlternative,
+} from "./fixtures/reconstructionKernel/recordedHypothesisProposals.js";
 
 function clone<T>(value: T): T {
   return structuredClone(value);
@@ -394,6 +397,7 @@ describe("provider-neutral offline proposal boundary", () => {
         rationale: "The amounts and ordering strongly suggest the proposed relationship.",
         missingProof: ["A stable identifier linking each rejected row to its later submitted batch is missing."],
         acknowledgedEvidenceNeedRefs: topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef),
+        proofObligationBindings: proofObligationBindingsForAlternative(request, alternative.alternativeRef),
       },
     };
   }
@@ -468,23 +472,51 @@ describe("provider-neutral offline proposal boundary", () => {
     })).toEqual([canonicalProjection(cloverDuplicateResubmission), canonicalProjection(cloverDuplicateResubmission)]);
   });
 
-  it("preserves provider confidence separately from RateReveal-qualified strength", async () => {
-    const collected = await collectRecordedProviderHypotheses(new RecordedProposer("low-confidence-provider", (request) => {
-      const proposal = providerHypothesis(request, "low-confidence", true);
-      proposal.inference.confidence = "low";
-      return [proposal];
-    }), cloverDuplicateResubmission.statementId, cloverDuplicateResubmission.observations,
+  it("keeps provider confidence audit-only when verified evidence is identical", async () => {
+    const outcomes = await Promise.all((["low", "medium", "high"] as const).map(async (confidence) => {
+      const collected = await collectRecordedProviderHypotheses(new RecordedProposer(`${confidence}-confidence-provider`, (request) => {
+        const proposal = providerHypothesis(request, `${confidence}-confidence`, true);
+        proposal.inference.confidence = confidence;
+        return [proposal];
+      }), cloverDuplicateResubmission.statementId, cloverDuplicateResubmission.observations,
+      cloverProviderSourceBinding, cloverInferenceTopics, cloverDuplicateResubmission.evidenceNeeds);
+      const input = clone(cloverDuplicateResubmission);
+      input.hypotheses.push(...collected.hypotheses);
+      const result = reconstructStatement(input);
+      const providerResult = result.hypothesisResults.find((item) => item.ownership.kind === "provider")!;
+      expect(canonicalProjection(input)).toEqual(canonicalProjection(cloverDuplicateResubmission));
+      return providerResult;
+    }));
+
+    expect(outcomes.map((item) => item.providerReportedConfidence)).toEqual(["low", "medium", "high"]);
+    expect(outcomes.map((item) => item.qualifiedInferenceStrength)).toEqual(["strong", "strong", "strong"]);
+    expect(outcomes.every((item) => item.evidencePosture?.providerConfidenceUsed === false)).toBe(true);
+    expect(outcomes.every((item) => item.evidencePosture?.independentSupportGroups.length === 2)).toBe(true);
+    expect(outcomes.map((item) => item.qualificationReasonCodes)).toEqual([
+      outcomes[0]!.qualificationReasonCodes,
+      outcomes[0]!.qualificationReasonCodes,
+      outcomes[0]!.qualificationReasonCodes,
+    ]);
+  });
+
+  it("rejects a provider interpretation when a RateReveal compatibility premise is deterministically contradicted", async () => {
+    const collected = await collectRecordedProviderHypotheses(new RecordedProposer("contradicted-provider", (request) => [
+      providerHypothesis(request, "contradicted", true),
+    ]), cloverDuplicateResubmission.statementId, cloverDuplicateResubmission.observations,
     cloverProviderSourceBinding, cloverInferenceTopics, cloverDuplicateResubmission.evidenceNeeds);
     const input = clone(cloverDuplicateResubmission);
+    input.observations.find((observation) => observation.id === "clover.resubmitted.amount")!.value = 2501;
     input.hypotheses.push(...collected.hypotheses);
-    const result = reconstructStatement(input);
+    const providerResult = reconstructStatement(input).hypothesisResults
+      .find((item) => item.ownership.kind === "provider")!;
 
-    expect(result.hypothesisResults).toContainEqual(expect.objectContaining({
-      providerReportedConfidence: "low",
-      qualifiedInferenceStrength: "weak",
-      interpretationState: "weak_inference",
-    }));
-    expect(canonicalProjection(input)).toEqual(canonicalProjection(cloverDuplicateResubmission));
+    expect(providerResult).toMatchObject({
+      state: "rejected",
+      interpretationState: "rejected",
+      qualifiedInferenceStrength: "unknown_competing",
+      evidencePosture: { outcome: "contradicted", providerConfidenceUsed: false },
+    });
+    expect(providerResult.qualificationReasonCodes).toContain("deterministic_compatibility_control_failed");
   });
 
   it("provides opaque source-bound context without exposing semantic observation ids", async () => {
@@ -518,6 +550,15 @@ describe("provider-neutral offline proposal boundary", () => {
     expect(JSON.stringify(collected.request.observations)).not.toContain("parser says");
     expect(collected.request.observations.some((observation) =>
       observation.sourceLocation.section === "06/12 electronic deposit reject")).toBe(true);
+    expect(collected.request.inferenceTopics[0]!.proofObligations).toEqual([
+      expect.objectContaining({
+        proofObligationRef: "proof-obligation-0001",
+        gapKind: "identity_linkage",
+        missingProperty: "stable_identity_link",
+      }),
+    ]);
+    expect(JSON.stringify(collected.request.inferenceTopics[0]!.proofObligations))
+      .not.toContain("clover.rejected.id");
   });
 
   it("fails closed before provider execution when exact source binding is invalid", async () => {

@@ -27,15 +27,14 @@ export interface RecordedProposalReviewRule {
   proposalId: string;
   expectedClaims: Array<{ key: string; value: ScalarValue }>;
   confidenceCeiling: InferenceConfidenceLevel;
-  requiredProofGapConceptIds: string[];
+  requiredProofObligationIds: string[];
 }
 
 export interface RecordedProposalReview {
   proposalId: string;
   utility: RecordedProposalUtility;
   claimsMatchReviewRule: boolean;
-  missingProofAcknowledged: boolean;
-  proofGapConceptsUnderstood: boolean;
+  proofObligationsValidated: boolean;
   confidenceWithinReviewCeiling: boolean;
   addsClaimValueNotInDeterministicBaseline: boolean;
   reasons: string[];
@@ -187,8 +186,7 @@ function reviewProposals(
         proposalId,
         utility: "unreviewed",
         claimsMatchReviewRule: false,
-        missingProofAcknowledged: false,
-        proofGapConceptsUnderstood: false,
+        proofObligationsValidated: false,
         confidenceWithinReviewCeiling: false,
         addsClaimValueNotInDeterministicBaseline: false,
         reasons: ["No recorded evaluation rule exists for this proposal."],
@@ -200,16 +198,16 @@ function reviewProposals(
     const claimsMatchReviewRule = expectedClaims.length > 0
       && actualClaims.size === expectedClaims.length
       && expectedClaims.every((identity) => actualClaims.has(identity));
-    const understoodConceptIds = new Set(hypothesis.inference?.proofGapUnderstanding?.understoodConceptIds ?? []);
-    const missingProofAcknowledged = rule.requiredProofGapConceptIds.length > 0
-      && rule.requiredProofGapConceptIds.every((conceptId) => understoodConceptIds.has(conceptId));
+    const validatedObligationIds = new Set(hypothesis.inference?.proofObligationValidation?.validatedObligationIds ?? []);
+    const proofObligationsValidated = rule.requiredProofObligationIds.length > 0
+      && rule.requiredProofObligationIds.every((obligationId) => validatedObligationIds.has(obligationId));
     const confidenceWithinReviewCeiling = hypothesis.inference !== undefined
       && confidenceRank(hypothesis.inference.confidence) <= confidenceRank(rule.confidenceCeiling);
     const addsClaimValueNotInDeterministicBaseline = expectedClaims.some((identity) =>
       !deterministicClaims.has(identity));
     const reasons: string[] = [];
     if (!claimsMatchReviewRule) reasons.push("Proposal claims do not match the recorded case review rule.");
-    if (!missingProofAcknowledged) reasons.push("Proposal does not demonstrate all RateReveal proof-gap concepts required by the recorded case review rule.");
+    if (!proofObligationsValidated) reasons.push("Proposal does not validly bind every RateReveal proof obligation required by the recorded case review rule.");
     if (!confidenceWithinReviewCeiling) reasons.push("Provider-reported confidence exceeds the recorded case review ceiling.");
     const utility: RecordedProposalUtility = reasons.length > 0
       ? "weak_or_misleading"
@@ -221,8 +219,7 @@ function reviewProposals(
       proposalId,
       utility,
       claimsMatchReviewRule,
-      missingProofAcknowledged,
-      proofGapConceptsUnderstood: missingProofAcknowledged,
+      proofObligationsValidated,
       confidenceWithinReviewCeiling,
       addsClaimValueNotInDeterministicBaseline,
       reasons,

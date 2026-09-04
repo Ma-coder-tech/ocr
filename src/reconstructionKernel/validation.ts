@@ -93,6 +93,29 @@ function validateHypothesis(
         || hypothesis.inferenceTopic.hypothesisGroupId !== hypothesis.groupId)) {
     errors.push(`Provider-owned hypothesis ${hypothesis.id} has an invalid system inference-topic assignment.`);
   }
+  if (providerOwned && hypothesis.inferenceTopic) {
+    const topic = hypothesis.inferenceTopic;
+    const factorIds = topic.qualification.evidenceFactors.map((factor) => factor.id);
+    if (new Set(factorIds).size !== factorIds.length) {
+      errors.push(`Provider-owned hypothesis ${hypothesis.id} has duplicate RateReveal evidence factors.`);
+    }
+    for (const controlId of topic.qualification.compatibilityControlIds) {
+      if (!controlIds.has(controlId)) {
+        errors.push(`Provider-owned hypothesis ${hypothesis.id} topic references unknown compatibility control ${controlId}.`);
+      }
+    }
+    for (const factor of topic.qualification.evidenceFactors) {
+      if (!factor.id.trim() || !factor.description.trim() || !factor.independenceGroupId.trim()
+          || factor.alternativeIds.length === 0 || factor.controlIds.length === 0) {
+        errors.push(`Provider-owned hypothesis ${hypothesis.id} has an incomplete RateReveal evidence factor.`);
+      }
+      for (const controlId of factor.controlIds) {
+        if (!controlIds.has(controlId)) {
+          errors.push(`Provider-owned hypothesis ${hypothesis.id} evidence factor ${factor.id} references unknown control ${controlId}.`);
+        }
+      }
+    }
+  }
   if (hypothesis.evidenceClass === "claim_proof" && hypothesis.requiredControlIds.length === 0) {
     errors.push(`Proof hypothesis ${hypothesis.id} has no deterministic proof controls.`);
   }

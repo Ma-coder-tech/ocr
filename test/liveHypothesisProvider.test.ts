@@ -9,7 +9,7 @@ import {
 
 function request(): HypothesisProposalRequest {
   return {
-    schemaVersion: "source_bound_hypothesis_proposal_v3",
+    schemaVersion: "source_bound_hypothesis_proposal_v4",
     sourceDocument: {
       documentId: "approved-case",
       sourceDocumentRef: "approved-evaluation-document:approved-case",
@@ -34,6 +34,15 @@ function request(): HypothesisProposalRequest {
         alternativeRef: "material-alternative-0001",
         description: "The visible gap is rounding.",
         claim: { key: "gap.explanation", value: "rounding" },
+        requiredProofObligationRefs: ["proof-obligation-0001"],
+      }],
+      proofObligations: [{
+        proofObligationRef: "proof-obligation-0001",
+        description: "The underlying calculation basis is missing.",
+        gapKind: "calculation_basis",
+        requiredObservationRoles: [{ role: "reported_total", description: "The printed reported total." }],
+        missingProperty: "underlying_calculation_basis",
+        permittedResolutionEvidenceKinds: ["unrounded_source_amounts"],
       }],
       knownEvidenceGaps: [{ evidenceNeedRef: "evidence-need-0001", description: "Unrounded inputs are missing.", material: true }],
     }],
@@ -71,6 +80,13 @@ describe("live hypothesis provider boundary", () => {
                   rationale: "The row is compatible with rounding, while an omitted component remains an alternative.",
                   missingProof: ["Unrounded inputs are missing."],
                   acknowledgedEvidenceNeedRefs: ["evidence-need-0001"],
+                  proofObligationBindings: [{
+                    proofObligationRef: "proof-obligation-0001",
+                    gapKind: "calculation_basis",
+                    observationBindings: [{ role: "reported_total", observationRefs: ["source-observation-0001"] }],
+                    missingProperty: "underlying_calculation_basis",
+                    resolutionEvidenceKinds: ["unrounded_source_amounts"],
+                  }],
                 },
               }],
               alternativeCoverage: [{
@@ -103,6 +119,7 @@ describe("live hypothesis provider boundary", () => {
     expect(JSON.stringify(sentBody)).not.toContain("test-only-key");
     expect(JSON.stringify(sentBody)).toContain("alternativeCoverage");
     expect(JSON.stringify(sentBody)).toContain("material-alternative-0001");
+    expect(JSON.stringify(sentBody)).toContain("proofObligationBindings");
     expect(result.hypotheses[0]?.id).toBe(stableLiveProposalId("inference-topic-0001", "gap.explanation", "rounding"));
     expect(result.alternativeCoverage).toHaveLength(1);
     expect(proposer.getAttemptAudits()).toEqual([expect.objectContaining({
