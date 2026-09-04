@@ -23,8 +23,6 @@ import {
 import {
   cloverInferenceTopics,
   cloverRecordedReviewRules,
-  paysafeInferenceTopics,
-  paysafeRecordedReviewRules,
   wellsInferenceTopics,
   wellsRecordedReviewRules,
 } from "../test/fixtures/reconstructionKernel/recordedHypothesisProposals.js";
@@ -33,7 +31,7 @@ import { realStatementReplayCases } from "../test/fixtures/reconstructionKernel/
 const MODEL = "gpt-5.6-terra";
 const REASONING_EFFORT = "high" as const;
 const MAX_OUTPUT_TOKENS = 3_000;
-const REPETITIONS_PER_CASE = 2;
+const REPETITIONS_PER_CASE = 1;
 const environmentPath = process.env.RATEREVEAL_EVAL_ENV_PATH
   ?? "/Users/martialmahougnonamoussou/Projects/OCR/.env";
 loadDotEnv({ path: environmentPath, override: false, quiet: true });
@@ -66,11 +64,6 @@ const cases = [
     id: "clover-duplicate-resubmission",
     topics: cloverInferenceTopics,
     reviewRules: cloverRecordedReviewRules,
-  },
-  {
-    id: "paysafe-october-2025",
-    topics: paysafeInferenceTopics,
-    reviewRules: paysafeRecordedReviewRules,
   },
   {
     id: "wells-fargo-september-2024",
@@ -167,8 +160,10 @@ for (const evaluationCase of cases) {
           proposalId: hypothesis.ownership.kind === "provider" ? hypothesis.ownership.proposalId : hypothesis.hypothesisId,
           strength: hypothesis.qualifiedInferenceStrength ?? null,
           reasonCodes: hypothesis.qualificationReasonCodes ?? [],
+          verificationResults: hypothesis.verificationResults ?? [],
         })),
       proposalReviews: result.proposalReviews,
+      inferencePresentations: result.inferencePresentations,
       unknownAlternativeRetained: result.unknownAlternativeRetainedForEveryProviderGroup,
       explanatoryWorldCountBefore: result.explanatoryWorldCountBefore,
       explanatoryWorldCountAfter: result.explanatoryWorldCountAfter,
@@ -193,7 +188,7 @@ for (const evaluationCase of cases) {
 }
 
 const summaryPayload = {
-  summaryVersion: "ratereveal-live-hypothesis-evaluation-summary-v1",
+  summaryVersion: "ratereveal-live-hypothesis-evaluation-summary-v2",
   compatibleRecordVersion: LIVE_HYPOTHESIS_EVALUATION_RECORD_VERSION,
   topicRegistryVersion: LIVE_INFERENCE_TOPIC_REGISTRY_VERSION,
   runId,

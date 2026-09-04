@@ -15,6 +15,7 @@ import {
   type InferenceEvidencePosture,
   type InferenceTopic,
   type QualifiedInferenceStrength,
+  type RateRevealAlternativeEvidencePosture,
   type ReconstructionInput,
   type StatementHypothesisProposer,
 } from "../src/reconstructionKernel/index.js";
@@ -183,11 +184,44 @@ function contradictedPosture(alternativeId: string): InferenceEvidencePosture {
   };
 }
 
-function present(hypotheses: Hypothesis[], results: HypothesisResult[]) {
+function alternativePosture(
+  alternativeId: "safety.same" | "safety.separate",
+  strength: QualifiedInferenceStrength,
+  outcome: "qualified" | "contradicted" = "qualified",
+): RateRevealAlternativeEvidencePosture {
+  return {
+    modelVersion: "ratereveal-alternative-evidence-posture-v1",
+    topicId: topic.id,
+    alternativeId,
+    outcome,
+    factorEvaluations: [],
+    satisfiedSupportFactorIds: [],
+    satisfiedContradictionFactorIds: outcome === "contradicted" ? ["deterministic-contradiction"] : [],
+    unresolvedFactorIds: [],
+    independentSupportGroups: [],
+    baseStrength: strength,
+    qualifiedStrength: outcome === "contradicted" ? "unknown_competing" : strength,
+    sourceCompleteness: "unproven",
+    unresolvedProofObligationIds: ["safety-proof"],
+    providerProposalRequired: false,
+    providerConfidenceUsed: false,
+    reasonCodes: ["synthetic_rate_reveal_evidence_posture"],
+  };
+}
+
+function present(
+  hypotheses: Hypothesis[],
+  results: HypothesisResult[],
+  postures: RateRevealAlternativeEvidencePosture[] = [
+    alternativePosture("safety.same", "unknown_competing"),
+    alternativePosture("safety.separate", "unknown_competing"),
+  ],
+) {
   return buildInferencePresentations({
     topics: [topic],
     providerHypotheses: hypotheses,
     hypothesisResults: results,
+    alternativeEvidencePostures: postures,
     evidenceNeeds: [evidenceNeed],
     evidenceRoutes: [evidenceRoute],
   })[0]!;
@@ -209,6 +243,7 @@ describe("inference presentation adversarial safety matrix", () => {
     const presentation = present(
       [same, separate],
       [hypothesisResult(same, "moderate"), hypothesisResult(separate, "moderate")],
+      [alternativePosture("safety.same", "moderate"), alternativePosture("safety.separate", "moderate")],
     );
 
     expectUnresolved(presentation);
@@ -218,7 +253,11 @@ describe("inference presentation adversarial safety matrix", () => {
 
   it("keeps a high-confidence weak-only hypothesis unresolved and available internally", () => {
     const weak = providerHypothesis("weak-high-confidence", "safety.same", "high");
-    const presentation = present([weak], [hypothesisResult(weak, "weak")]);
+    const presentation = present(
+      [weak],
+      [hypothesisResult(weak, "weak")],
+      [alternativePosture("safety.same", "weak"), alternativePosture("safety.separate", "unknown_competing")],
+    );
 
     expectUnresolved(presentation);
     expect(presentation.reasonCodes).toEqual(["evidence_too_weak_to_favor_an_alternative"]);
@@ -238,6 +277,7 @@ describe("inference presentation adversarial safety matrix", () => {
         hypothesisResult(contradicted, "strong", contradictedPosture("safety.same")),
         hypothesisResult(weak, "weak"),
       ],
+      [alternativePosture("safety.same", "unknown_competing", "contradicted"), alternativePosture("safety.separate", "weak")],
     );
 
     expectUnresolved(presentation);
@@ -253,6 +293,7 @@ describe("inference presentation adversarial safety matrix", () => {
     const presentation = present(
       [moderate, weak],
       [hypothesisResult(moderate, "moderate"), hypothesisResult(weak, "weak")],
+      [alternativePosture("safety.same", "moderate"), alternativePosture("safety.separate", "weak")],
     );
 
     expect(presentation.merchantConclusion).toEqual({

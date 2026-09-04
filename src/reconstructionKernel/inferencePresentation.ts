@@ -7,6 +7,7 @@ import type {
   ProofObligationMissingProperty,
   ProofObligationResolutionEvidenceKind,
   QualifiedInferenceStrength,
+  RateRevealAlternativeEvidencePosture,
 } from "./types.js";
 
 export const UNRESOLVED_MERCHANT_INFERENCE_CONCLUSION =
@@ -60,6 +61,7 @@ export interface InferencePresentation {
   question: string;
   merchantConclusion: MerchantInferenceConclusion;
   internalHypotheses: InternalInferenceHypothesisSummary[];
+  alternativeEvidencePostures: RateRevealAlternativeEvidencePosture[];
   resolutionEvidenceNeeds: InferencePresentationResolutionNeed[];
   reasonCodes: string[];
 }
@@ -86,6 +88,7 @@ export function buildInferencePresentations(input: {
   topics: InferenceTopic[];
   providerHypotheses: Hypothesis[];
   hypothesisResults: HypothesisResult[];
+  alternativeEvidencePostures: RateRevealAlternativeEvidencePosture[];
   evidenceNeeds: EvidenceNeed[];
   evidenceRoutes: EvidenceRoute[];
 }): InferencePresentation[] {
@@ -97,6 +100,10 @@ export function buildInferencePresentations(input: {
   const evidenceRouteByNeedId = new Map(input.evidenceRoutes.map((route) => [
     route.evidenceNeedId,
     route,
+  ]));
+  const postureByTopicAlternative = new Map(input.alternativeEvidencePostures.map((posture) => [
+    `${posture.topicId}|${posture.alternativeId}`,
+    posture,
   ]));
 
   return [...input.topics]
@@ -124,40 +131,16 @@ export function buildInferencePresentations(input: {
         .sort((left, right) => left.proposalId.localeCompare(right.proposalId));
 
       const alternatives = topic.materialAlternatives.map<AlternativePosture>((alternative) => {
-        const strengths = internalHypotheses
-          .filter((hypothesis) => hypothesis.alternativeId === alternative.id)
-          .filter((hypothesis) => hypothesis.eligibleForLeadingConclusion)
-          .map((hypothesis) => hypothesis.qualifiedInferenceStrength)
-          .filter((strength): strength is QualifiedInferenceStrength => strength !== null);
+        const posture = postureByTopicAlternative.get(`${topic.id}|${alternative.id}`);
         return {
           alternativeId: alternative.id,
           description: alternative.description,
-          bestStrength: strengths.sort((left, right) => strengthRank[right] - strengthRank[left])[0] ?? null,
+          bestStrength: posture?.outcome === "qualified" ? posture.qualifiedStrength : null,
         };
       });
 
-      const rankedAlternatives = [...alternatives].sort((left, right) =>
-        rank(right.bestStrength) - rank(left.bestStrength)
-        || left.alternativeId.localeCompare(right.alternativeId));
-      const leader = rankedAlternatives[0];
-      const runnerUp = rankedAlternatives[1];
-      const hasPresentableStrength = leader?.bestStrength === "strong" || leader?.bestStrength === "moderate";
-      const hasMeaningfulAdvantage = leader !== undefined
-        && rank(leader.bestStrength) > rank(runnerUp?.bestStrength ?? null);
-
-      const merchantConclusion: MerchantInferenceConclusion = hasPresentableStrength && hasMeaningfulAdvantage
-        ? {
-            state: "leading_interpretation",
-            text: leader.description,
-            alternativeId: leader.alternativeId,
-            qualifiedInferenceStrength: leader.bestStrength as "strong" | "moderate",
-          }
-        : {
-            state: "unresolved",
-            text: UNRESOLVED_MERCHANT_INFERENCE_CONCLUSION,
-            alternativeId: null,
-            qualifiedInferenceStrength: "unknown_competing",
-          };
+      const merchantSelection = selectMerchantInferenceConclusion(alternatives);
+      const merchantConclusion = merchantSelection.conclusion;
 
       return {
         modelVersion: INFERENCE_PRESENTATION_MODEL_VERSION,
@@ -167,18 +150,70 @@ export function buildInferencePresentations(input: {
         question: topic.question,
         merchantConclusion,
         internalHypotheses,
+        alternativeEvidencePostures: input.alternativeEvidencePostures
+          .filter((posture) => posture.topicId === topic.id)
+          .map((posture) => structuredClone(posture))
+          .sort((left, right) => left.alternativeId.localeCompare(right.alternativeId)),
         resolutionEvidenceNeeds: resolutionEvidenceNeeds(
           topic,
           evidenceNeedById,
           evidenceRouteByNeedId,
         ),
         reasonCodes: presentationReasonCodes(
-          internalHypotheses,
-          hasPresentableStrength,
-          hasMeaningfulAdvantage,
+          alternatives,
+          merchantSelection.hasPresentableStrength,
+          merchantSelection.hasMeaningfulAdvantage,
         ),
       };
     });
+}
+
+/** Replays the merchant conclusion from RateReveal-owned alternative postures only. */
+export function replayMerchantInferenceConclusion(
+  topic: InferenceTopic,
+  postures: RateRevealAlternativeEvidencePosture[],
+): MerchantInferenceConclusion {
+  const postureByAlternative = new Map(postures
+    .filter((posture) => posture.topicId === topic.id)
+    .map((posture) => [posture.alternativeId, posture]));
+  const alternatives = topic.materialAlternatives.map<AlternativePosture>((alternative) => {
+    const posture = postureByAlternative.get(alternative.id);
+    return {
+      alternativeId: alternative.id,
+      description: alternative.description,
+      bestStrength: posture?.outcome === "qualified" ? posture.qualifiedStrength : null,
+    };
+  });
+  return selectMerchantInferenceConclusion(alternatives).conclusion;
+}
+
+function selectMerchantInferenceConclusion(alternatives: AlternativePosture[]): {
+  conclusion: MerchantInferenceConclusion;
+  hasPresentableStrength: boolean;
+  hasMeaningfulAdvantage: boolean;
+} {
+  const rankedAlternatives = [...alternatives].sort((left, right) =>
+    rank(right.bestStrength) - rank(left.bestStrength)
+    || left.alternativeId.localeCompare(right.alternativeId));
+  const leader = rankedAlternatives[0];
+  const runnerUp = rankedAlternatives[1];
+  const hasPresentableStrength = leader?.bestStrength === "strong" || leader?.bestStrength === "moderate";
+  const hasMeaningfulAdvantage = leader !== undefined
+    && rank(leader.bestStrength) > rank(runnerUp?.bestStrength ?? null);
+  const conclusion: MerchantInferenceConclusion = hasPresentableStrength && hasMeaningfulAdvantage
+    ? {
+        state: "leading_interpretation",
+        text: leader.description,
+        alternativeId: leader.alternativeId,
+        qualifiedInferenceStrength: leader.bestStrength as "strong" | "moderate",
+      }
+    : {
+        state: "unresolved",
+        text: UNRESOLVED_MERCHANT_INFERENCE_CONCLUSION,
+        alternativeId: null,
+        qualifiedInferenceStrength: "unknown_competing",
+      };
+  return { conclusion, hasPresentableStrength, hasMeaningfulAdvantage };
 }
 
 function isEligibleForLeadingConclusion(result: HypothesisResult): boolean {
@@ -220,7 +255,7 @@ function resolutionEvidenceNeeds(
 }
 
 function presentationReasonCodes(
-  internalHypotheses: InternalInferenceHypothesisSummary[],
+  alternatives: AlternativePosture[],
   hasPresentableStrength: boolean,
   hasMeaningfulAdvantage: boolean,
 ): string[] {
@@ -230,11 +265,10 @@ function presentationReasonCodes(
       "leading_interpretation_has_meaningful_evidence_advantage",
     ];
   }
-  if (internalHypotheses.length === 0) return ["no_accepted_internal_hypothesis"];
-  if (!hasPresentableStrength && internalHypotheses.every((hypothesis) =>
-    hypothesis.qualifiedInferenceStrength === "weak"
-    || hypothesis.qualifiedInferenceStrength === "unknown_competing"
-    || hypothesis.qualifiedInferenceStrength === null)) {
+  if (!hasPresentableStrength && alternatives.every((alternative) =>
+    alternative.bestStrength === "weak"
+    || alternative.bestStrength === "unknown_competing"
+    || alternative.bestStrength === null)) {
     return ["evidence_too_weak_to_favor_an_alternative"];
   }
   if (!hasMeaningfulAdvantage) return ["no_meaningful_evidence_advantage_over_alternatives"];

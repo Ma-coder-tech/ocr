@@ -422,10 +422,10 @@ export const wellsInferenceTopics: InferenceTopic[] = [{
     evidenceFactors: [
       {
         id: "wells.shared-reference-supports-lifecycle",
-        description: "The shared source reference materially supports, but does not prove, one lifecycle.",
+        description: "The shared source reference is compatible with one lifecycle, but is contextual while uniqueness and temporal linkage remain unproven.",
         alternativeIds: ["wells.same-lifecycle"],
         effect: "supports",
-        diagnosticity: "material",
+        diagnosticity: "contextual",
         independenceGroupId: "wells.shared-source-reference",
         controlIds: ["wells.refs.match"],
         activation: "all_pass",

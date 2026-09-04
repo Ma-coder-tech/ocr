@@ -15,6 +15,7 @@ import {
   type RecordedHypothesisExperimentResult,
   type RecordedProposalReviewRule,
   type StatementHypothesisProposer,
+  type VerifiedInferenceEvidence,
 } from "../src/reconstructionKernel/index.js";
 import {
   cloverRecordedProposer,
@@ -151,6 +152,7 @@ async function runCase(
   caseId: CaseId,
   proposer: StatementHypothesisProposer,
   reviewRules: RecordedProposalReviewRule[],
+  persistedVerifiedInferenceEvidence: VerifiedInferenceEvidence[] = [],
 ): Promise<RecordedHypothesisExperimentResult> {
   const loaded = loadedCases.get(caseId)!;
   return runRecordedHypothesisExperiment({
@@ -160,6 +162,7 @@ async function runCase(
     proposer,
     inferenceTopics: inferenceTopicsByCase[caseId],
     reviewRules,
+    persistedVerifiedInferenceEvidence,
   });
 }
 
@@ -320,7 +323,7 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     expect(result.augmented.canonicalClaims.some((claim) => claim.key === "shipping_tax.same_lifecycle")).toBe(false);
     expect(result.augmented.hypothesisResults).toContainEqual(expect.objectContaining({
       ownership: expect.objectContaining({ proposalId: "related-tax-amendment" }),
-      qualifiedInferenceStrength: "moderate",
+      qualifiedInferenceStrength: "weak",
       verificationResults: [],
       evidencePosture: expect.objectContaining({
         independentSupportGroups: [expect.objectContaining({
@@ -333,11 +336,17 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
       qualifiedInferenceStrength: "weak",
     }));
     expect(result.inferencePresentations[0]?.merchantConclusion).toEqual({
-      state: "leading_interpretation",
-      text: "The shipping and tax rows are part of the same lifecycle.",
-      alternativeId: "wells.same-lifecycle",
-      qualifiedInferenceStrength: "moderate",
+      state: "unresolved",
+      text: UNRESOLVED_MERCHANT_INFERENCE_CONCLUSION,
+      alternativeId: null,
+      qualifiedInferenceStrength: "unknown_competing",
     });
+    expect(result.alternativeEvidencePostures).toContainEqual(expect.objectContaining({
+      alternativeId: "wells.same-lifecycle",
+      baseStrength: "weak",
+      qualifiedStrength: "weak",
+      providerProposalRequired: false,
+    }));
 
     const weakOnly = await runCase(
       "wells-fargo-september-2024",
@@ -368,6 +377,56 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     expect(weakOnly.canonicalTruthAfter).toBe(result.canonicalTruthAfter);
   });
 
+  it("retains source-bound verified evidence when a later provider call fails", async () => {
+    const learned = await runCase(
+      "clover-duplicate-resubmission",
+      cloverRecordedProposer,
+      cloverRecordedReviewRules,
+    );
+    expect(learned.verifiedInferenceEvidence).toContainEqual(expect.objectContaining({
+      topicId: "clover.duplicate-resubmission",
+      alternativeId: "clover.same-lifecycle",
+      verification: expect.objectContaining({
+        candidateId: "clover.second-reject-to-second-submission",
+      }),
+    }));
+
+    const providerFailure = await runCase(
+      "clover-duplicate-resubmission",
+      unavailableRecordedProposer,
+      [],
+      learned.verifiedInferenceEvidence,
+    );
+
+    expect(providerFailure.status).toBe("provider_rejected");
+    expect(providerFailure.acceptedProviderHypotheses).toEqual([]);
+    expect(providerFailure.inferencePresentations[0]?.internalHypotheses).toEqual([]);
+    expect(providerFailure.inferencePresentations[0]?.merchantConclusion).toEqual({
+      state: "leading_interpretation",
+      text: "The rejected rows and later submitted rows belong to the same lifecycle.",
+      alternativeId: "clover.same-lifecycle",
+      qualifiedInferenceStrength: "strong",
+    });
+    expect(providerFailure.canonicalTruthInvariant).toBe(true);
+
+    const wrongSourceEvidence = structuredClone(learned.verifiedInferenceEvidence);
+    wrongSourceEvidence[0]!.sourceContentSha256 = "0".repeat(64);
+    const rejectedEvidence = await runCase(
+      "clover-duplicate-resubmission",
+      unavailableRecordedProposer,
+      [],
+      wrongSourceEvidence,
+    );
+    expect(rejectedEvidence.status).toBe("source_rejected");
+    expect(rejectedEvidence.errors.join(" ")).toContain("different source fingerprint");
+    expect(rejectedEvidence.inferencePresentations[0]?.merchantConclusion).toEqual({
+      state: "leading_interpretation",
+      text: "The rejected rows and later submitted rows belong to the same lifecycle.",
+      alternativeId: "clover.same-lifecycle",
+      qualifiedInferenceStrength: "moderate",
+    });
+  });
+
   it("replays all four approved evidence packets identically across low, medium, and high provider confidence", async () => {
     const cases = [
       {
@@ -386,7 +445,7 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
         caseId: "wells-fargo-september-2024" as const,
         proposer: wellsRecordedProposer,
         rules: wellsRecordedReviewRules,
-        expected: { "related-tax-amendment": "moderate", "reference-reuse-only": "weak" },
+        expected: { "related-tax-amendment": "weak", "reference-reuse-only": "weak" },
       },
       {
         caseId: "vortax-september-2022" as const,
@@ -593,8 +652,11 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     expect(observedPacket).toContain("adjustments");
     expect(observedPacket).toMatch(/\"page\":\d+/);
     expect(observedPacket).not.toContain("clover.rejected.amount");
-    expect(result.inferencePresentations[0]?.merchantConclusion.text).toBe(
-      UNRESOLVED_MERCHANT_INFERENCE_CONCLUSION,
-    );
+    expect(result.inferencePresentations[0]?.merchantConclusion).toEqual({
+      state: "leading_interpretation",
+      text: "The rejected rows and later submitted rows belong to the same lifecycle.",
+      alternativeId: "clover.same-lifecycle",
+      qualifiedInferenceStrength: "moderate",
+    });
   });
 });

@@ -197,6 +197,44 @@ export interface InferenceEvidencePosture {
   reasonCodes: string[];
 }
 
+/**
+ * RateReveal-owned posture for one permitted alternative. Unlike a provider
+ * hypothesis result, this exists even when no provider proposes the alternative.
+ */
+export interface RateRevealAlternativeEvidencePosture {
+  modelVersion: "ratereveal-alternative-evidence-posture-v1";
+  topicId: string;
+  alternativeId: string;
+  outcome: "qualified" | "contradicted";
+  factorEvaluations: InferenceEvidenceFactorEvaluation[];
+  satisfiedSupportFactorIds: string[];
+  satisfiedContradictionFactorIds: string[];
+  unresolvedFactorIds: string[];
+  independentSupportGroups: InferenceEvidencePosture["independentSupportGroups"];
+  baseStrength: QualifiedInferenceStrength;
+  qualifiedStrength: QualifiedInferenceStrength;
+  sourceCompleteness: InferenceSourceCompleteness;
+  unresolvedProofObligationIds: string[];
+  providerProposalRequired: false;
+  providerConfidenceUsed: false;
+  reasonCodes: string[];
+}
+
+/** Source-bound deterministic verification evidence that can survive provider omission. */
+export interface VerifiedInferenceEvidence {
+  modelVersion: "ratereveal-verified-inference-evidence-v1";
+  sourceContentSha256: string;
+  topicId: string;
+  alternativeId: string;
+  factor: InferenceEvidenceFactorEvaluation;
+  verification: {
+    requestId: string;
+    recipeId: string;
+    candidateId: string;
+  };
+  verificationResult: InferenceVerificationResult;
+}
+
 export interface HypothesisInference {
   confidence: InferenceConfidenceLevel;
   rationale: string;

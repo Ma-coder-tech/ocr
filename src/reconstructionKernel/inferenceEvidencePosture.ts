@@ -23,7 +23,7 @@ const strengthRank: Record<QualifiedInferenceStrength, number> = {
   strong: 3,
 };
 
-function evaluateFactor(
+export function evaluateInferenceEvidenceFactor(
   factor: InferenceEvidenceFactorDefinition,
   controls: Map<string, ControlResult>,
 ): InferenceEvidenceFactorEvaluation {
@@ -52,7 +52,7 @@ function evaluateFactor(
   };
 }
 
-function aggregateIndependentSupport(
+export function aggregateIndependentInferenceSupport(
   factors: InferenceEvidenceFactorEvaluation[],
 ): InferenceEvidencePosture["independentSupportGroups"] {
   const groups = new Map<string, InferenceEvidenceFactorEvaluation[]>();
@@ -73,7 +73,7 @@ function aggregateIndependentSupport(
     }));
 }
 
-function strengthFromIndependentSupport(
+export function inferenceStrengthFromIndependentSupport(
   groups: InferenceEvidencePosture["independentSupportGroups"],
 ): QualifiedInferenceStrength {
   const decisive = groups.filter((group) => group.diagnosticity === "decisive").length;
@@ -85,7 +85,7 @@ function strengthFromIndependentSupport(
   return "unknown_competing";
 }
 
-function capStrength(
+export function capInferenceStrength(
   strength: QualifiedInferenceStrength,
   ceiling: QualifiedInferenceStrength,
 ): QualifiedInferenceStrength {
@@ -129,11 +129,11 @@ export function evaluateInferenceEvidencePosture(
   const applicableFactors = policy.evidenceFactors
     .filter((factor) => factor.alternativeIds.includes(topic.alternativeId));
   const factorEvaluations = [
-    ...applicableFactors.map((factor) => evaluateFactor(factor, controls)),
+    ...applicableFactors.map((factor) => evaluateInferenceEvidenceFactor(factor, controls)),
     ...verifiedFactors,
   ];
-  const independentSupportGroups = aggregateIndependentSupport(factorEvaluations);
-  const baseStrength = strengthFromIndependentSupport(independentSupportGroups);
+  const independentSupportGroups = aggregateIndependentInferenceSupport(factorEvaluations);
+  const baseStrength = inferenceStrengthFromIndependentSupport(independentSupportGroups);
   const compatibility = policy.compatibilityControlIds.map((id) => controls.get(id));
   const failedCompatibility = compatibility.filter((result) => result?.state === "fail");
   const unresolvedCompatibility = compatibility.filter((result) => !result || result.state === "unresolved");
@@ -176,7 +176,7 @@ export function evaluateInferenceEvidencePosture(
     };
   }
 
-  let qualifiedStrength = capStrength(baseStrength, policy.maximumStrength);
+  let qualifiedStrength = capInferenceStrength(baseStrength, policy.maximumStrength);
   const reasonCodes = [...commonReasonCodes];
   if (unresolvedCompatibility.length > 0) {
     qualifiedStrength = "unknown_competing";
@@ -189,7 +189,7 @@ export function evaluateInferenceEvidencePosture(
     qualifiedStrength = "unknown_competing";
     reasonCodes.push("required_statement_completeness_not_proven");
   } else if (policy.sourceCompleteness === "proven_incomplete") {
-    qualifiedStrength = capStrength(qualifiedStrength, "weak");
+    qualifiedStrength = capInferenceStrength(qualifiedStrength, "weak");
     reasonCodes.push("source_proven_incomplete");
   } else if (policy.completenessRequirement === "observed_rows_sufficient") {
     reasonCodes.push("topic_is_bounded_to_observed_rows");
@@ -197,13 +197,13 @@ export function evaluateInferenceEvidencePosture(
     reasonCodes.push("required_statement_completeness_proven");
   }
   if (!allMaterialEvidenceNeedsAcknowledged) {
-    qualifiedStrength = capStrength(qualifiedStrength, "weak");
+    qualifiedStrength = capInferenceStrength(qualifiedStrength, "weak");
     reasonCodes.push("material_proof_gap_not_acknowledged");
   } else {
     reasonCodes.push("material_proof_gaps_acknowledged");
   }
   if (!allRequiredProofObligationsValidated) {
-    qualifiedStrength = capStrength(qualifiedStrength, "weak");
+    qualifiedStrength = capInferenceStrength(qualifiedStrength, "weak");
     reasonCodes.push("material_proof_obligation_not_validated");
   } else {
     reasonCodes.push("material_proof_obligations_validated");

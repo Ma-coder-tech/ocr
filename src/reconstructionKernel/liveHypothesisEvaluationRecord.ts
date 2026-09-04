@@ -2,12 +2,27 @@ import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import {
+  evaluateAlternativeEvidencePostures,
+  validateVerifiedInferenceEvidence,
+} from "./alternativeEvidencePosture.js";
+import {
+  replayMerchantInferenceConclusion,
+  type InferencePresentation,
+  type MerchantInferenceConclusion,
+} from "./inferencePresentation.js";
 import type { LiveProviderAttemptAudit } from "./liveHypothesisProvider.js";
 import type { RecordedHypothesisExperimentResult } from "./recordedHypothesisExperiment.js";
-import type { InferenceTopic } from "./types.js";
+import type {
+  ControlResult,
+  InferenceTopic,
+  RateRevealAlternativeEvidencePosture,
+  VerifiedInferenceEvidence,
+} from "./types.js";
 
-export const LIVE_HYPOTHESIS_EVALUATION_RECORD_VERSION = "ratereveal-live-hypothesis-evaluation-record-v7" as const;
+export const LIVE_HYPOTHESIS_EVALUATION_RECORD_VERSION = "ratereveal-live-hypothesis-evaluation-record-v8" as const;
 export const LIVE_INFERENCE_TOPIC_REGISTRY_VERSION = "ratereveal-approved-topic-registry-v6" as const;
+export const LIVE_INFERENCE_EVIDENCE_AUDIT_VERSION = "ratereveal-inference-evidence-audit-v1" as const;
 
 export interface LiveProviderPrivacyConfiguration {
   verifiedAt: string;
@@ -87,6 +102,18 @@ export interface LiveHypothesisEvaluationRecordPayload {
     explanatoryWorldCountBefore: number;
     explanatoryWorldCountAfter: number;
     crossOriginContradictionWorldCount: number;
+    rateRevealEvidenceAudit: {
+      modelVersion: typeof LIVE_INFERENCE_EVIDENCE_AUDIT_VERSION;
+      sourceContentSha256: string;
+      topicId: string;
+      relevantControlResults: ControlResult[];
+      verifiedInferenceEvidence: VerifiedInferenceEvidence[];
+      alternativeEvidencePostures: RateRevealAlternativeEvidencePosture[];
+      inferencePresentations: InferencePresentation[];
+      providerProposalRequiredForPresentation: false;
+      providerConfidenceUsedForQualification: false;
+      canonicalAuthorityGranted: false;
+    };
   };
 }
 
@@ -96,6 +123,14 @@ export interface ImmutableLiveHypothesisEvaluationRecord {
     payloadSha256: string;
   };
   payload: LiveHypothesisEvaluationRecordPayload;
+}
+
+export interface LiveInferenceEvidenceAuditReplay {
+  valid: boolean;
+  errors: string[];
+  sourceContentSha256: string;
+  alternativeEvidencePostures: RateRevealAlternativeEvidencePosture[];
+  merchantConclusions: MerchantInferenceConclusion[];
 }
 
 export function buildLiveHypothesisEvaluationRecord(input: {
@@ -113,6 +148,11 @@ export function buildLiveHypothesisEvaluationRecord(input: {
   const providerResults = new Map(input.result.augmented.hypothesisResults
     .filter((item) => item.ownership.kind === "provider")
     .map((item) => [item.ownership.kind === "provider" ? item.ownership.proposalId : item.hypothesisId, item]));
+  const relevantControlIds = topicRelevantControlIds(input.topic);
+  const relevantControlResults = input.result.augmented.controlResults
+    .filter((result) => relevantControlIds.has(result.controlId))
+    .map((result) => structuredClone(result))
+    .sort((left, right) => left.controlId.localeCompare(right.controlId));
   const payload: LiveHypothesisEvaluationRecordPayload = {
     recordVersion: LIVE_HYPOTHESIS_EVALUATION_RECORD_VERSION,
     createdAt: input.attempt.completedAt,
@@ -192,15 +232,181 @@ export function buildLiveHypothesisEvaluationRecord(input: {
       explanatoryWorldCountBefore: input.result.explanatoryWorldCountBefore,
       explanatoryWorldCountAfter: input.result.explanatoryWorldCountAfter,
       crossOriginContradictionWorldCount: input.result.crossOriginContradictionWorldCount,
+      rateRevealEvidenceAudit: {
+        modelVersion: LIVE_INFERENCE_EVIDENCE_AUDIT_VERSION,
+        sourceContentSha256: input.sourceContentSha256,
+        topicId: input.topic.id,
+        relevantControlResults,
+        verifiedInferenceEvidence: structuredClone(input.result.verifiedInferenceEvidence
+          .filter((evidence) => evidence.topicId === input.topic.id)),
+        alternativeEvidencePostures: structuredClone(input.result.alternativeEvidencePostures
+          .filter((posture) => posture.topicId === input.topic.id)),
+        inferencePresentations: structuredClone(input.result.inferencePresentations
+          .filter((presentation) => presentation.topicId === input.topic.id)),
+        providerProposalRequiredForPresentation: false,
+        providerConfidenceUsedForQualification: false,
+        canonicalAuthorityGranted: false,
+      },
     },
   };
-  return {
+  const record: ImmutableLiveHypothesisEvaluationRecord = {
     integrity: {
       algorithm: "sha256",
-      payloadSha256: createHash("sha256").update(stableJson(payload)).digest("hex"),
+      payloadSha256: liveHypothesisEvaluationPayloadSha256(payload),
     },
     payload,
   };
+  const replay = replayLiveInferenceEvidenceAudit(record, input.sourceContentSha256);
+  if (!replay.valid) {
+    throw new Error(`Cannot build invalid live inference evidence audit: ${replay.errors.join(" ")}`);
+  }
+  return record;
+}
+
+export function liveHypothesisEvaluationPayloadSha256(payload: unknown): string {
+  return createHash("sha256").update(stableJson(payload)).digest("hex");
+}
+
+/**
+ * Validates an immutable v8 record and independently replays its RateReveal
+ * alternative postures and merchant conclusions from the preserved evidence.
+ */
+export function replayLiveInferenceEvidenceAudit(
+  record: ImmutableLiveHypothesisEvaluationRecord,
+  expectedSourceContentSha256?: string,
+): LiveInferenceEvidenceAuditReplay {
+  try {
+    const replay = replayEvidenceAudit(record, expectedSourceContentSha256);
+    return replay.valid ? replay : { ...replay, alternativeEvidencePostures: [], merchantConclusions: [] };
+  } catch {
+    return {
+      valid: false, errors: ["Evaluation record is incomplete or malformed."],
+      sourceContentSha256: expectedSourceContentSha256 ?? "",
+      alternativeEvidencePostures: [], merchantConclusions: [],
+    };
+  }
+}
+
+function replayEvidenceAudit(
+  record: ImmutableLiveHypothesisEvaluationRecord,
+  expectedSourceContentSha256?: string,
+): LiveInferenceEvidenceAuditReplay {
+  const errors: string[] = [];
+  const payload = record.payload;
+  const sourceSha = payload.approvedDocument.sourceContentSha256;
+  const audit = (payload.evaluation as Partial<LiveHypothesisEvaluationRecordPayload["evaluation"]>)
+    .rateRevealEvidenceAudit;
+  if (!audit) {
+    return {
+      valid: false,
+      errors: ["Evaluation record has no durable RateReveal inference evidence audit."],
+      sourceContentSha256: sourceSha,
+      alternativeEvidencePostures: [],
+      merchantConclusions: [],
+    };
+  }
+  const packetSource = payload.invocation.exactSourceBoundPacket.sourceDocument;
+  const topic = payload.topicRegistry.exactTopic;
+
+  if (record.integrity.algorithm !== "sha256") errors.push("Evaluation record uses an unsupported integrity algorithm.");
+  if (record.integrity.payloadSha256 !== liveHypothesisEvaluationPayloadSha256(payload)) {
+    errors.push("Evaluation record payload integrity hash does not match.");
+  }
+  if (payload.recordVersion !== LIVE_HYPOTHESIS_EVALUATION_RECORD_VERSION) {
+    errors.push(`Evaluation record version ${String(payload.recordVersion)} is not replayable by the v8 evidence audit.`);
+  }
+  if (audit.modelVersion !== LIVE_INFERENCE_EVIDENCE_AUDIT_VERSION) {
+    errors.push("Evaluation record has an unsupported inference evidence audit version.");
+  }
+  if (payload.evaluationOnly !== true
+      || payload.topicRegistry.providerCreatedTopicsAllowed !== false
+      || packetSource.documentId !== payload.approvedDocument.statementId) {
+    errors.push("Evaluation record violates the bounded evaluation topic contract.");
+  }
+  if (packetSource.sourceContentSha256 !== sourceSha
+      || payload.invocation.exactSourceBoundPacket.authorityPolicy.providerOutput !== "proposal_only"
+      || payload.invocation.exactSourceBoundPacket.authorityPolicy.canonicalAuthority !== "prohibited"
+      || payload.invocation.exactSourceBoundPacket.authorityPolicy.verificationResultAssignment !== "prohibited") {
+    errors.push("Evaluation record violates the source-bound provider authority contract.");
+  }
+  if (!/^[a-f0-9]{64}$/.test(sourceSha)) errors.push("Approved source fingerprint is not a SHA-256 digest.");
+  if (expectedSourceContentSha256 !== undefined && sourceSha !== expectedSourceContentSha256) {
+    errors.push("Evaluation record does not belong to the expected source statement.");
+  }
+  if (audit.sourceContentSha256 !== sourceSha
+      || packetSource.sourceContentSha256 !== sourceSha) {
+    errors.push("Inference evidence audit source fingerprint does not match the approved source statement.");
+  }
+  if (packetSource.sourceDocumentRef !== payload.approvedDocument.sourceDocumentRef) {
+    errors.push("Provider packet source identity does not match the approved evaluation document.");
+  }
+  if (audit.topicId !== topic.id) errors.push("Inference evidence audit topic does not match the approved topic.");
+  if (audit.providerProposalRequiredForPresentation !== false
+      || audit.providerConfidenceUsedForQualification !== false
+      || audit.canonicalAuthorityGranted !== false) {
+    errors.push("Inference evidence audit violates the provider or canonical-authority boundary.");
+  }
+  if (payload.evaluation.canonicalTruthInvariant !== true
+      || payload.evaluation.canonicalTruthBefore !== payload.evaluation.canonicalTruthAfter) {
+    errors.push("Evaluation record does not preserve canonical truth invariance.");
+  }
+
+  const requiredControlIds = topicRelevantControlIds(topic);
+  const recordedControlIds = new Set(audit.relevantControlResults.map((result) => result.controlId));
+  if (recordedControlIds.size !== audit.relevantControlResults.length) {
+    errors.push("Inference evidence audit contains duplicate relevant control results.");
+  }
+  for (const controlId of requiredControlIds) {
+    if (!recordedControlIds.has(controlId)) errors.push(`Inference evidence audit is missing required control ${controlId}.`);
+  }
+  for (const controlId of recordedControlIds) {
+    if (!requiredControlIds.has(controlId)) errors.push(`Inference evidence audit contains unrelated control ${controlId}.`);
+  }
+  errors.push(...validateVerifiedInferenceEvidence({
+    sourceContentSha256: sourceSha,
+    topics: [topic],
+    evidence: audit.verifiedInferenceEvidence,
+  }));
+
+  // Invalid evidence must never produce a usable replay conclusion, even if a
+  // caller accidentally ignores `valid`.
+  if (errors.length > 0) return {
+    valid: false, errors, sourceContentSha256: sourceSha,
+    alternativeEvidencePostures: [], merchantConclusions: [],
+  };
+
+  const alternativeEvidencePostures = evaluateAlternativeEvidencePostures({
+    topics: [topic],
+    controlResults: audit.relevantControlResults,
+    verifiedEvidence: audit.verifiedInferenceEvidence,
+  });
+  if (stableJson(alternativeEvidencePostures) !== stableJson(audit.alternativeEvidencePostures)) {
+    errors.push("Recorded alternative evidence postures do not reproduce from the preserved evidence.");
+  }
+
+  const merchantConclusion = replayMerchantInferenceConclusion(topic, alternativeEvidencePostures);
+  const storedPresentation = audit.inferencePresentations.find((presentation) => presentation.topicId === topic.id);
+  if (!storedPresentation || stableJson(storedPresentation.merchantConclusion) !== stableJson(merchantConclusion)) {
+    errors.push("Recorded merchant conclusion does not reproduce from the preserved evidence posture.");
+  }
+  if (audit.inferencePresentations.length !== 1) {
+    errors.push("Inference evidence audit must contain exactly one presentation for its approved topic.");
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    sourceContentSha256: sourceSha,
+    alternativeEvidencePostures,
+    merchantConclusions: [merchantConclusion],
+  };
+}
+
+function topicRelevantControlIds(topic: InferenceTopic): Set<string> {
+  return new Set([
+    ...topic.qualification.compatibilityControlIds,
+    ...topic.qualification.evidenceFactors.flatMap((factor) => factor.controlIds),
+  ]);
 }
 
 export async function writeImmutableLiveHypothesisEvaluationRecord(

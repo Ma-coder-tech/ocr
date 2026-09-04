@@ -2,6 +2,12 @@ import { createHash } from "node:crypto";
 
 import { reconstructStatement } from "./kernel.js";
 import {
+  evaluateAlternativeEvidencePostures,
+  mergeVerifiedInferenceEvidence,
+  validateVerifiedInferenceEvidence,
+  verifiedInferenceEvidenceFromResults,
+} from "./alternativeEvidencePosture.js";
+import {
   buildInferencePresentations,
   type InferencePresentation,
 } from "./inferencePresentation.js";
@@ -17,7 +23,9 @@ import type {
   InferenceConfidenceLevel,
   ReconstructionInput,
   ReconstructionResult,
+  RateRevealAlternativeEvidencePosture,
   ScalarValue,
+  VerifiedInferenceEvidence,
 } from "./types.js";
 
 export type RecordedExperimentStatus = "evaluated" | "source_rejected" | "provider_rejected";
@@ -51,6 +59,7 @@ export interface RecordedHypothesisExperimentInput {
   proposer: StatementHypothesisProposer;
   inferenceTopics: InferenceTopic[];
   reviewRules?: RecordedProposalReviewRule[];
+  persistedVerifiedInferenceEvidence?: VerifiedInferenceEvidence[];
 }
 
 export interface RecordedHypothesisExperimentResult {
@@ -69,6 +78,8 @@ export interface RecordedHypothesisExperimentResult {
   explanatoryWorldCountBefore: number;
   explanatoryWorldCountAfter: number;
   crossOriginContradictionWorldCount: number;
+  verifiedInferenceEvidence: VerifiedInferenceEvidence[];
+  alternativeEvidencePostures: RateRevealAlternativeEvidencePosture[];
   inferencePresentations: InferencePresentation[];
 }
 
@@ -88,6 +99,25 @@ export async function runRecordedHypothesisExperiment(
       canonicalTruthBefore,
       input.inferenceTopics,
       reconstructionInput.evidenceNeeds,
+      [],
+    );
+  }
+
+  const persistedEvidence = structuredClone(input.persistedVerifiedInferenceEvidence ?? []);
+  const persistedEvidenceErrors = validateVerifiedInferenceEvidence({
+    sourceContentSha256: observedFingerprint,
+    topics: input.inferenceTopics,
+    evidence: persistedEvidence,
+  });
+  if (persistedEvidenceErrors.length > 0) {
+    return terminalResult(
+      "source_rejected",
+      persistedEvidenceErrors,
+      baseline,
+      canonicalTruthBefore,
+      input.inferenceTopics,
+      reconstructionInput.evidenceNeeds,
+      [],
     );
   }
 
@@ -107,6 +137,7 @@ export async function runRecordedHypothesisExperiment(
       canonicalTruthBefore,
       input.inferenceTopics,
       reconstructionInput.evidenceNeeds,
+      persistedEvidence,
     );
   }
 
@@ -119,6 +150,19 @@ export async function runRecordedHypothesisExperiment(
     reconstructionInput.hypotheses,
     input.reviewRules ?? [],
   );
+  const verifiedInferenceEvidence = mergeVerifiedInferenceEvidence(
+    persistedEvidence,
+    verifiedInferenceEvidenceFromResults({
+      sourceContentSha256: observedFingerprint,
+      providerHypotheses: collected.hypotheses,
+      hypothesisResults: augmented.hypothesisResults,
+    }),
+  );
+  const alternativeEvidencePostures = evaluateAlternativeEvidencePostures({
+    topics: input.inferenceTopics,
+    controlResults: augmented.controlResults,
+    verifiedEvidence: verifiedInferenceEvidence,
+  });
 
   return {
     status: "evaluated",
@@ -139,10 +183,13 @@ export async function runRecordedHypothesisExperiment(
     explanatoryWorldCountBefore: baseline.possibleWorlds.length,
     explanatoryWorldCountAfter: augmented.possibleWorlds.length,
     crossOriginContradictionWorldCount: countCrossOriginContradictionWorlds(augmented),
+    verifiedInferenceEvidence,
+    alternativeEvidencePostures,
     inferencePresentations: buildInferencePresentations({
       topics: input.inferenceTopics,
       providerHypotheses: collected.hypotheses,
       hypothesisResults: augmented.hypothesisResults,
+      alternativeEvidencePostures,
       evidenceNeeds: reconstructionInput.evidenceNeeds,
       evidenceRoutes: augmented.evidenceRoutes,
     }),
@@ -156,7 +203,13 @@ function terminalResult(
   canonicalTruthBefore: string,
   inferenceTopics: InferenceTopic[],
   evidenceNeeds: ReconstructionInput["evidenceNeeds"],
+  verifiedInferenceEvidence: VerifiedInferenceEvidence[],
 ): RecordedHypothesisExperimentResult {
+  const alternativeEvidencePostures = evaluateAlternativeEvidencePostures({
+    topics: inferenceTopics,
+    controlResults: baseline.controlResults,
+    verifiedEvidence: verifiedInferenceEvidence,
+  });
   return {
     status,
     errors,
@@ -173,10 +226,13 @@ function terminalResult(
     explanatoryWorldCountBefore: baseline.possibleWorlds.length,
     explanatoryWorldCountAfter: baseline.possibleWorlds.length,
     crossOriginContradictionWorldCount: 0,
+    verifiedInferenceEvidence: structuredClone(verifiedInferenceEvidence),
+    alternativeEvidencePostures,
     inferencePresentations: buildInferencePresentations({
       topics: inferenceTopics,
       providerHypotheses: [],
       hypothesisResults: baseline.hypothesisResults,
+      alternativeEvidencePostures,
       evidenceNeeds,
       evidenceRoutes: baseline.evidenceRoutes,
     }),
