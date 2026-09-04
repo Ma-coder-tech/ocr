@@ -80,7 +80,12 @@ function proposalFor(
       missingProof,
       acknowledgedEvidenceNeedRefs: topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef),
       proofObligationBindings: proofObligationBindingsForAlternative(request, alternative.alternativeRef),
-      verificationRequests: [],
+      verificationRequests: alternative.requiredVerificationRefs.map((verificationRef, requiredIndex) => ({
+        requestId: `calibration-required-${requiredIndex + 1}`,
+        verificationRef,
+        candidateRef: topic.verificationChecks.find((check) =>
+          check.verificationRef === verificationRef)!.candidates[0]!.candidateRef,
+      })),
     },
   };
 }

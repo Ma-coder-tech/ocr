@@ -6,8 +6,8 @@ import type { LiveProviderAttemptAudit } from "./liveHypothesisProvider.js";
 import type { RecordedHypothesisExperimentResult } from "./recordedHypothesisExperiment.js";
 import type { InferenceTopic } from "./types.js";
 
-export const LIVE_HYPOTHESIS_EVALUATION_RECORD_VERSION = "ratereveal-live-hypothesis-evaluation-record-v6" as const;
-export const LIVE_INFERENCE_TOPIC_REGISTRY_VERSION = "ratereveal-approved-topic-registry-v5" as const;
+export const LIVE_HYPOTHESIS_EVALUATION_RECORD_VERSION = "ratereveal-live-hypothesis-evaluation-record-v7" as const;
+export const LIVE_INFERENCE_TOPIC_REGISTRY_VERSION = "ratereveal-approved-topic-registry-v6" as const;
 
 export interface LiveProviderPrivacyConfiguration {
   verifiedAt: string;

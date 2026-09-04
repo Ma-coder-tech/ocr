@@ -10,20 +10,20 @@ import type {
 } from "./provider.js";
 import type { ScalarValue } from "./types.js";
 
-export const LIVE_HYPOTHESIS_PROMPT_VERSION = "ratereveal-live-hypothesis-evaluation-v5" as const;
-export const LIVE_HYPOTHESIS_RESPONSE_SCHEMA_VERSION = "ratereveal-live-hypothesis-response-v5" as const;
+export const LIVE_HYPOTHESIS_PROMPT_VERSION = "ratereveal-live-hypothesis-evaluation-v6" as const;
+export const LIVE_HYPOTHESIS_RESPONSE_SCHEMA_VERSION = "ratereveal-live-hypothesis-response-v6" as const;
 
 export const LIVE_HYPOTHESIS_DEVELOPER_PROMPT = [
   "You are an evaluation-only hypothesis proposer for merchant-statement reconstruction.",
   "Use only the source-bound packet in the user message. Do not use outside knowledge, web search, tools, or unstated merchant facts.",
-  "The RateReveal inference topics, material alternatives, allowed claims, observation references, known evidence gaps, proof obligations, source roles, missing properties, and permitted resolution evidence kinds are immutable. Select and bind only offered values.",
+  "The RateReveal inference topics, material alternatives, allowed claims, observation references, known evidence gaps, proof obligations, source-role bindings, missing properties, and permitted resolution evidence kinds are immutable. Select only offered values.",
   "Return non-authoritative candidate explanations, never canonical facts, accounting truth, controls, or customer advice.",
-  "Address every offered material alternative exactly once in alternativeCoverage. Mark it proposed when supplying exactly one matching hypothesis; otherwise mark it not_supported and give a source-bound structured reason. Never omit an alternative because another answer appears stronger.",
+  "Address every offered material alternative exactly once in alternativeAssessments. Use the proposed form with one proposal, or the not_supported form with no proposal. Never omit an alternative because another answer appears stronger.",
   "For each proposed material alternative, return at most one distinct hypothesis. Preserve an unknown interpretation whenever identity or completeness is unproven.",
   "Every claim must cite only observation references listed on its selected topic. Every hypothesis must acknowledge each material known evidence gap it relies on.",
   "Provider confidence means: high = strongly favored by the supplied rows while explicit confirmation proof is still missing; medium = plausible and useful but materially unresolved; low = weakly supported. Never describe an inference as confirmed.",
-  "For each proposed alternative, bind every required proof obligation exactly once. Bind every required source role to the observations that actually play that role, repeat the offered gap kind and missing property exactly, and select one or more offered resolution evidence kinds. Do not invent obligations, roles, properties, or evidence kinds.",
-  "You may ask RateReveal to execute an offered verification check by selecting its verificationRef and one offered candidateRef. Choose the candidate relationship whose bound source rows are most useful to test. Do not alter candidate bindings or supply check semantics, expected results, classifications, evidence weight, controls, or authority. Use an empty verificationRequests array when no offered candidate would add useful evidence.",
+  "For each proposed alternative, select every required proof obligation exactly once and choose one or more of its offered resolution evidence kinds. RateReveal owns and supplies the exact source-role bindings, gap kind, and missing property; do not reproduce or alter them.",
+  "Ask RateReveal to execute an offered verification check only by selecting its verificationRef and one offered candidateRef. Every requiredVerificationRef for the proposed alternative must be selected exactly once. Choose the relationship most useful to test. Do not alter candidate bindings or supply check semantics, expected results, classifications, evidence weight, controls, or authority.",
   "Natural-language rationale and missingProof are audit explanations only. A high-confidence proposal must still state why it is likely and identify the strongest competing explanation, but prose cannot substitute for complete proof-obligation bindings.",
   "Use empty events and populations arrays. Keep descriptions and rationales concise and source-bound.",
 ].join("\n");
@@ -57,9 +57,32 @@ export interface LiveProviderAttemptAudit {
   failure: string | null;
 }
 
-type RawProposal = Omit<ProviderHypothesisProposal, "id">;
+type RawProposal = Omit<ProviderHypothesisProposal, "id" | "topicRef" | "alternativeRef" | "inference"> & {
+  inference: Omit<ProviderHypothesisProposal["inference"], "proofObligationBindings"> & {
+    proofObligationSelections: Array<{
+      proofObligationRef: string;
+      resolutionEvidenceKinds: ProviderHypothesisProposal["inference"]["proofObligationBindings"][number]["resolutionEvidenceKinds"];
+    }>;
+  };
+};
 
-const responseSchema = {
+type RawAlternativeAssessment = {
+  topicRef: string;
+  alternativeRef: string;
+  rationale: string;
+  observationRefs: string[];
+  acknowledgedEvidenceNeedRefs: string[];
+} & ({
+  disposition: "proposed";
+  reasonCode: "proposal_supplied";
+  proposal: RawProposal;
+} | {
+  disposition: "not_supported";
+  reasonCode: Exclude<ProviderAlternativeCoverageAssessment["reasonCode"], "proposal_supplied">;
+  proposal: null;
+});
+
+const responseSchemaParts = {
   type: "object",
   additionalProperties: false,
   required: ["hypotheses", "alternativeCoverage"],
@@ -220,6 +243,115 @@ const responseSchema = {
   },
 } as const;
 
+const proofObligationSelectionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["proofObligationRef", "resolutionEvidenceKinds"],
+  properties: {
+    proofObligationRef: { type: "string" },
+    resolutionEvidenceKinds: {
+      type: "array",
+      minItems: 1,
+      items: responseSchemaParts.properties.hypotheses.items.properties.inference.properties
+        .proofObligationBindings.items.properties.resolutionEvidenceKinds.items,
+    },
+  },
+} as const;
+
+const rawProposalSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["description", "observationRefs", "events", "populations", "claims", "inference"],
+  properties: {
+    description: responseSchemaParts.properties.hypotheses.items.properties.description,
+    observationRefs: responseSchemaParts.properties.hypotheses.items.properties.observationRefs,
+    events: responseSchemaParts.properties.hypotheses.items.properties.events,
+    populations: responseSchemaParts.properties.hypotheses.items.properties.populations,
+    claims: responseSchemaParts.properties.hypotheses.items.properties.claims,
+    inference: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "confidence", "rationale", "missingProof", "acknowledgedEvidenceNeedRefs",
+        "proofObligationSelections", "verificationRequests",
+      ],
+      properties: {
+        confidence: responseSchemaParts.properties.hypotheses.items.properties.inference.properties.confidence,
+        rationale: responseSchemaParts.properties.hypotheses.items.properties.inference.properties.rationale,
+        missingProof: responseSchemaParts.properties.hypotheses.items.properties.inference.properties.missingProof,
+        acknowledgedEvidenceNeedRefs: responseSchemaParts.properties.hypotheses.items.properties.inference.properties.acknowledgedEvidenceNeedRefs,
+        proofObligationSelections: {
+          type: "array",
+          minItems: 1,
+          maxItems: 8,
+          items: proofObligationSelectionSchema,
+        },
+        verificationRequests: responseSchemaParts.properties.hypotheses.items.properties.inference.properties.verificationRequests,
+      },
+    },
+  },
+} as const;
+
+const assessmentProperties = {
+  topicRef: { type: "string" },
+  alternativeRef: { type: "string" },
+  rationale: { type: "string" },
+  observationRefs: { type: "array", minItems: 1, items: { type: "string" } },
+  acknowledgedEvidenceNeedRefs: { type: "array", items: { type: "string" } },
+} as const;
+
+const responseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["alternativeAssessments"],
+  properties: {
+    alternativeAssessments: {
+      type: "array",
+      maxItems: 16,
+      items: {
+        anyOf: [
+          {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "topicRef", "alternativeRef", "disposition", "reasonCode", "rationale",
+              "observationRefs", "acknowledgedEvidenceNeedRefs", "proposal",
+            ],
+            properties: {
+              ...assessmentProperties,
+              disposition: { type: "string", enum: ["proposed"] },
+              reasonCode: { type: "string", enum: ["proposal_supplied"] },
+              proposal: rawProposalSchema,
+            },
+          },
+          {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "topicRef", "alternativeRef", "disposition", "reasonCode", "rationale",
+              "observationRefs", "acknowledgedEvidenceNeedRefs", "proposal",
+            ],
+            properties: {
+              ...assessmentProperties,
+              disposition: { type: "string", enum: ["not_supported"] },
+              reasonCode: {
+                type: "string",
+                enum: [
+                  "insufficient_source_evidence",
+                  "contradicted_by_source",
+                  "less_supported_than_competing_alternative",
+                  "not_applicable_to_observations",
+                ],
+              },
+              proposal: { type: "null" },
+            },
+          },
+        ],
+      },
+    },
+  },
+} as const;
+
 export function liveHypothesisResponseSchema(): object {
   return structuredClone(responseSchema);
 }
@@ -296,24 +428,24 @@ export class OpenAiLiveHypothesisProposer implements StatementHypothesisProposer
       }
       const envelope = asRecord(fullProviderResponse);
       const parsed = JSON.parse(extractOutputText(envelope)) as {
-        hypotheses?: RawProposal[];
-        alternativeCoverage?: ProviderAlternativeCoverageAssessment[];
+        alternativeAssessments?: RawAlternativeAssessment[];
       };
-      if (!Array.isArray(parsed.hypotheses)) throw new Error("OpenAI structured response did not contain hypotheses.");
-      if (!Array.isArray(parsed.alternativeCoverage)) {
-        throw new Error("OpenAI structured response did not contain exhaustive alternative coverage.");
+      if (!Array.isArray(parsed.alternativeAssessments)) {
+        throw new Error("OpenAI structured response did not contain exhaustive alternative assessments.");
       }
+      const proposed = parsed.alternativeAssessments.filter((assessment) => assessment.disposition === "proposed");
       const normalizedResponse: HypothesisProposalResponse = {
         providerId: this.providerId,
-        hypotheses: parsed.hypotheses.map((hypothesis) => {
-          const claim = hypothesis.claims?.[0];
-          if (!claim) throw new Error("OpenAI hypothesis did not contain exactly one claim.");
-          return {
-            ...hypothesis,
-            id: stableLiveProposalId(hypothesis.topicRef, claim.key, claim.value),
-          };
-        }),
-        alternativeCoverage: structuredClone(parsed.alternativeCoverage),
+        hypotheses: proposed.map((assessment) => normalizeLiveProposal(assessment, request)),
+        alternativeCoverage: parsed.alternativeAssessments.map((assessment) => ({
+          topicRef: assessment.topicRef,
+          alternativeRef: assessment.alternativeRef,
+          disposition: assessment.disposition,
+          reasonCode: assessment.reasonCode,
+          rationale: assessment.rationale,
+          observationRefs: structuredClone(assessment.observationRefs),
+          acknowledgedEvidenceNeedRefs: structuredClone(assessment.acknowledgedEvidenceNeedRefs),
+        })),
       };
       this.attempts.push(audit("completed", null, normalizedResponse));
       return normalizedResponse;
@@ -354,6 +486,43 @@ export class OpenAiLiveHypothesisProposer implements StatementHypothesisProposer
       };
     }
   }
+}
+
+function normalizeLiveProposal(
+  assessment: Extract<RawAlternativeAssessment, { disposition: "proposed" }>,
+  request: HypothesisProposalRequest,
+): ProviderHypothesisProposal {
+  const topic = request.inferenceTopics.find((candidate) => candidate.topicRef === assessment.topicRef);
+  const alternative = topic?.materialAlternatives.find((candidate) =>
+    candidate.alternativeRef === assessment.alternativeRef);
+  if (!topic || !alternative) throw new Error("OpenAI proposal selected an unavailable RateReveal alternative.");
+  const claim = assessment.proposal.claims?.[0];
+  if (!claim) throw new Error("OpenAI proposal did not contain exactly one claim.");
+  const { proofObligationSelections, ...inference } = assessment.proposal.inference;
+  return {
+    ...assessment.proposal,
+    id: stableLiveProposalId(assessment.topicRef, claim.key, claim.value),
+    topicRef: assessment.topicRef,
+    alternativeRef: assessment.alternativeRef,
+    inference: {
+      ...inference,
+      proofObligationBindings: proofObligationSelections.map((selection) => {
+        const obligation = topic.proofObligations.find((candidate) =>
+          candidate.proofObligationRef === selection.proofObligationRef);
+        if (!obligation) throw new Error("OpenAI proposal selected an unavailable proof obligation.");
+        return {
+          proofObligationRef: selection.proofObligationRef,
+          gapKind: obligation.gapKind,
+          observationBindings: obligation.requiredObservationRoles.map((role) => ({
+            role: role.role,
+            observationRefs: structuredClone(role.observationRefs),
+          })),
+          missingProperty: obligation.missingProperty,
+          resolutionEvidenceKinds: structuredClone(selection.resolutionEvidenceKinds),
+        };
+      }),
+    },
+  };
 }
 
 export function assertLiveEvaluationPacketSafe(request: HypothesisProposalRequest): void {

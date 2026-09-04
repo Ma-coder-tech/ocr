@@ -3,13 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   OpenAiLiveHypothesisProposer,
   assertLiveEvaluationPacketSafe,
+  liveHypothesisResponseSchema,
   stableLiveProposalId,
   type HypothesisProposalRequest,
 } from "../src/reconstructionKernel/index.js";
 
 function request(): HypothesisProposalRequest {
   return {
-    schemaVersion: "source_bound_hypothesis_proposal_v6",
+    schemaVersion: "source_bound_hypothesis_proposal_v7",
     sourceDocument: {
       documentId: "approved-case",
       sourceDocumentRef: "approved-evaluation-document:approved-case",
@@ -35,12 +36,17 @@ function request(): HypothesisProposalRequest {
         description: "The visible gap is rounding.",
         claim: { key: "gap.explanation", value: "rounding" },
         requiredProofObligationRefs: ["proof-obligation-0001"],
+        requiredVerificationRefs: [],
       }],
       proofObligations: [{
         proofObligationRef: "proof-obligation-0001",
         description: "The underlying calculation basis is missing.",
         gapKind: "calculation_basis",
-        requiredObservationRoles: [{ role: "reported_total", description: "The printed reported total." }],
+        requiredObservationRoles: [{
+          role: "reported_total",
+          description: "The printed reported total.",
+          observationRefs: ["source-observation-0001"],
+        }],
         missingProperty: "underlying_calculation_basis",
         permittedResolutionEvidenceKinds: ["unrounded_source_amounts"],
       }],
@@ -58,6 +64,18 @@ function request(): HypothesisProposalRequest {
 }
 
 describe("live hypothesis provider boundary", () => {
+  it("uses one discriminated alternative assessment and keeps source-role binding RateReveal-owned", () => {
+    const serialized = JSON.stringify(liveHypothesisResponseSchema());
+    expect(serialized).toContain("alternativeAssessments");
+    expect(serialized).toContain("anyOf");
+    expect(serialized).toContain('"enum":["proposed"]');
+    expect(serialized).toContain('"enum":["not_supported"]');
+    expect(serialized).toContain('"proposal":{"type":"null"}');
+    expect(serialized).toContain("proofObligationSelections");
+    expect(serialized).not.toContain("proofObligationBindings");
+    expect(serialized).not.toContain("alternativeCoverage");
+  });
+
   it("sends one stateless structured request and records the full response without credentials", async () => {
     let sentBody: Record<string, unknown> = {};
     const fetchImplementation: typeof fetch = async (_url, init) => {
@@ -70,30 +88,7 @@ describe("live hypothesis provider boundary", () => {
           content: [{
             type: "output_text",
             text: JSON.stringify({
-              hypotheses: [{
-                topicRef: "inference-topic-0001",
-                alternativeRef: "material-alternative-0001",
-                description: "Displayed rounding is compatible with the gap.",
-                observationRefs: ["source-observation-0001"],
-                events: [],
-                populations: [],
-                claims: [{ key: "gap.explanation", value: "rounding", observationRefs: ["source-observation-0001"] }],
-                inference: {
-                  confidence: "medium",
-                  rationale: "The row is compatible with rounding, while an omitted component remains an alternative.",
-                  missingProof: ["Unrounded inputs are missing."],
-                  acknowledgedEvidenceNeedRefs: ["evidence-need-0001"],
-                  proofObligationBindings: [{
-                    proofObligationRef: "proof-obligation-0001",
-                    gapKind: "calculation_basis",
-                    observationBindings: [{ role: "reported_total", observationRefs: ["source-observation-0001"] }],
-                    missingProperty: "underlying_calculation_basis",
-                    resolutionEvidenceKinds: ["unrounded_source_amounts"],
-                  }],
-                  verificationRequests: [],
-                },
-              }],
-              alternativeCoverage: [{
+              alternativeAssessments: [{
                 topicRef: "inference-topic-0001",
                 alternativeRef: "material-alternative-0001",
                 disposition: "proposed",
@@ -101,6 +96,24 @@ describe("live hypothesis provider boundary", () => {
                 rationale: "The source observations support a rounding proposal.",
                 observationRefs: ["source-observation-0001"],
                 acknowledgedEvidenceNeedRefs: ["evidence-need-0001"],
+                proposal: {
+                  description: "Displayed rounding is compatible with the gap.",
+                  observationRefs: ["source-observation-0001"],
+                  events: [],
+                  populations: [],
+                  claims: [{ key: "gap.explanation", value: "rounding", observationRefs: ["source-observation-0001"] }],
+                  inference: {
+                    confidence: "medium",
+                    rationale: "The row is compatible with rounding, while an omitted component remains an alternative.",
+                    missingProof: ["Unrounded inputs are missing."],
+                    acknowledgedEvidenceNeedRefs: ["evidence-need-0001"],
+                    proofObligationSelections: [{
+                      proofObligationRef: "proof-obligation-0001",
+                      resolutionEvidenceKinds: ["unrounded_source_amounts"],
+                    }],
+                    verificationRequests: [],
+                  },
+                },
               }],
             }),
           }],
@@ -121,10 +134,18 @@ describe("live hypothesis provider boundary", () => {
     expect(sentBody).toMatchObject({ model: "gpt-5.6-terra", store: false, reasoning: { effort: "high" } });
     expect(sentBody).not.toHaveProperty("tools");
     expect(JSON.stringify(sentBody)).not.toContain("test-only-key");
-    expect(JSON.stringify(sentBody)).toContain("alternativeCoverage");
+    expect(JSON.stringify(sentBody)).toContain("alternativeAssessments");
     expect(JSON.stringify(sentBody)).toContain("material-alternative-0001");
-    expect(JSON.stringify(sentBody)).toContain("proofObligationBindings");
+    expect(JSON.stringify(sentBody)).toContain("proofObligationSelections");
+    expect(JSON.stringify(sentBody)).not.toContain("proofObligationBindings");
     expect(result.hypotheses[0]?.id).toBe(stableLiveProposalId("inference-topic-0001", "gap.explanation", "rounding"));
+    expect(result.hypotheses[0]?.inference.proofObligationBindings).toEqual([{
+      proofObligationRef: "proof-obligation-0001",
+      gapKind: "calculation_basis",
+      observationBindings: [{ role: "reported_total", observationRefs: ["source-observation-0001"] }],
+      missingProperty: "underlying_calculation_basis",
+      resolutionEvidenceKinds: ["unrounded_source_amounts"],
+    }]);
     expect(result.alternativeCoverage).toHaveLength(1);
     expect(proposer.getAttemptAudits()).toEqual([expect.objectContaining({
       attemptNumber: 1,

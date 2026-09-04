@@ -285,6 +285,8 @@ export interface InferenceTopicMaterialAlternative {
   description: string;
   claim: { key: string; value: ScalarValue };
   requiredProofObligationIds: string[];
+  /** RateReveal-owned checks the provider must select when proposing this alternative. */
+  requiredVerificationRecipeIds: string[];
 }
 
 export interface ProofObligationBindingEvaluation {

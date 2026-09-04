@@ -208,11 +208,8 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
       withoutVerificationRequests(cloverRecordedProposer),
       cloverRecordedReviewRules,
     );
-    expect(withoutVerification.augmented.hypothesisResults).toContainEqual(expect.objectContaining({
-      ownership: expect.objectContaining({ proposalId: "likely-reject-resubmission" }),
-      qualifiedInferenceStrength: "moderate",
-      verificationResults: [],
-    }));
+    expect(withoutVerification.status).toBe("provider_rejected");
+    expect(withoutVerification.errors.join(" ")).toContain("must select exactly one candidate for required verification");
     expect(withoutVerification.canonicalTruthAfter).toBe(result.canonicalTruthAfter);
   });
 
@@ -239,9 +236,18 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
   });
 
   it("finds Wells Fargo proposals explanatory but not novel and keeps lifecycle unresolved", async () => {
+    let offeredCandidateDescriptions: string[] = [];
+    const inspectingProposer: StatementHypothesisProposer = {
+      providerId: wellsRecordedProposer.providerId,
+      async propose(request) {
+        offeredCandidateDescriptions = request.inferenceTopics.flatMap((topic) =>
+          topic.verificationChecks.flatMap((check) => check.candidates.map((candidate) => candidate.description)));
+        return wellsRecordedProposer.propose(request);
+      },
+    };
     const result = await runCase(
       "wells-fargo-september-2024",
-      wellsRecordedProposer,
+      inspectingProposer,
       wellsRecordedReviewRules,
     );
 
@@ -252,16 +258,13 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
       "existing_interpretation_explained",
     ]);
     expect(result.proposalReviews.every((review) => review.confidenceWithinReviewCeiling)).toBe(true);
+    expect(offeredCandidateDescriptions.some((description) => description.includes("sales-tax adjustment"))).toBe(false);
+    expect(offeredCandidateDescriptions).toHaveLength(2);
     expect(result.augmented.canonicalClaims.some((claim) => claim.key === "shipping_tax.same_lifecycle")).toBe(false);
     expect(result.augmented.hypothesisResults).toContainEqual(expect.objectContaining({
       ownership: expect.objectContaining({ proposalId: "related-tax-amendment" }),
       qualifiedInferenceStrength: "moderate",
-      verificationResults: [expect.objectContaining({
-        candidateId: "wells.shipping-to-tax-reference",
-        controlState: "pass",
-        classification: "supporting",
-        componentResults: [{ component: "identifier_equality", state: "pass" }],
-      })],
+      verificationResults: [],
       evidencePosture: expect.objectContaining({
         independentSupportGroups: [expect.objectContaining({
           independenceGroupId: "wells.shared-source-reference",

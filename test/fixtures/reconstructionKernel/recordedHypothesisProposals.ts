@@ -63,7 +63,7 @@ function wellsIdentifierCandidate(
       {
         alternativeId: "wells.same-lifecycle",
         pass: "supporting",
-        fail: "contradicting",
+        fail: "irrelevant",
         diagnosticity: "material",
         independenceGroupId,
       },
@@ -215,12 +215,14 @@ export const cloverInferenceTopics: InferenceTopic[] = [{
       description: "The rejected rows and later submitted rows belong to the same lifecycle.",
       claim: { key: "batches.same_lifecycle", value: true },
       requiredProofObligationIds: ["stable-row-identity-linkage"],
+      requiredVerificationRecipeIds: ["clover.verify-reject-resubmission-candidate"],
     },
     {
       id: "clover.separate-batches",
       description: "The matching rejected and submitted rows are separate batches.",
       claim: { key: "batches.same_lifecycle", value: false },
       requiredProofObligationIds: ["stable-row-identity-linkage"],
+      requiredVerificationRecipeIds: [],
     },
   ],
   proofObligations: [{
@@ -292,12 +294,14 @@ export const paysafeInferenceTopics: InferenceTopic[] = [{
       description: "The visible one-cent gap is aggregate display rounding.",
       claim: { key: "fees.visible_gap_explanation", value: "aggregate_display_rounding" },
       requiredProofObligationIds: ["underlying-fee-precision-and-rounding-method"],
+      requiredVerificationRecipeIds: [],
     },
     {
       id: "paysafe.unobserved-fee-component",
       description: "The visible one-cent gap is an unobserved fee component.",
       claim: { key: "fees.visible_gap_explanation", value: "unobserved_fee_component" },
       requiredProofObligationIds: ["complete-fee-detail-for-omitted-component"],
+      requiredVerificationRecipeIds: [],
     },
   ],
   proofObligations: [
@@ -364,12 +368,14 @@ export const wellsInferenceTopics: InferenceTopic[] = [{
       description: "The shipping and tax rows are part of the same lifecycle.",
       claim: { key: "shipping_tax.same_lifecycle", value: true },
       requiredProofObligationIds: ["shipping-tax-temporal-linkage"],
+      requiredVerificationRecipeIds: [],
     },
     {
       id: "wells.reference-reuse-only",
       description: "The shared reference is reuse and does not establish one lifecycle.",
       claim: { key: "shipping_tax.same_lifecycle", value: false },
       requiredProofObligationIds: ["shipping-tax-temporal-linkage"],
+      requiredVerificationRecipeIds: [],
     },
   ],
   proofObligations: [{
@@ -456,12 +462,14 @@ export const vortaxInferenceTopics: InferenceTopic[] = [{
       description: "Each negative adjustment entry corresponds to one of the printed chargeback fee units.",
       claim: { key: "adjustments.chargebacks.row_linked", value: true },
       requiredProofObligationIds: ["row-level-adjustment-chargeback-identity", "complete-statement-source-scope"],
+      requiredVerificationRecipeIds: [],
     },
     {
       id: "vortax.count-correlation-only",
       description: "The equal counts are correlation and do not establish row-level chargeback identity.",
       claim: { key: "adjustments.chargebacks.row_linked", value: false },
       requiredProofObligationIds: ["row-level-adjustment-chargeback-identity", "complete-statement-source-scope"],
+      requiredVerificationRecipeIds: [],
     },
   ],
   proofObligations: [
@@ -621,13 +629,6 @@ export const wellsRecordedProposer = new RecordedFixtureProposer(
       "The exact reference reuse and compatible descriptions support a relationship, but the shipping evidence does not provide enough temporal identity proof.",
       ["A dated source row or explicit lifecycle link tying the shipping and tax entries is missing."],
     );
-    const check = request.inferenceTopics[0]!.verificationChecks[0]!;
-    const candidate = check.candidates.find((item) => item.description.includes("sales-tax adjustment"))!;
-    related.inference.verificationRequests = [{
-      requestId: "verify-shipping-tax-reference",
-      verificationRef: check.verificationRef,
-      candidateRef: candidate.candidateRef,
-    }];
     return [
       related,
       proposal(
@@ -716,6 +717,12 @@ export function misleadingHighConfidenceProposer(caseId: string): RecordedFixtur
       ["More information is needed."],
     );
     result.inference.acknowledgedEvidenceNeedRefs = [];
+    const check = request.inferenceTopics[0]!.verificationChecks[0]!;
+    result.inference.verificationRequests = [{
+      requestId: "verify-required-row-pair",
+      verificationRef: check.verificationRef,
+      candidateRef: check.candidates[0]!.candidateRef,
+    }];
     return [result];
   });
 }

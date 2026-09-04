@@ -399,7 +399,12 @@ describe("provider-neutral offline proposal boundary", () => {
         missingProof: ["A stable identifier linking each rejected row to its later submitted batch is missing."],
         acknowledgedEvidenceNeedRefs: topic.knownEvidenceGaps.map((gap) => gap.evidenceNeedRef),
         proofObligationBindings: proofObligationBindingsForAlternative(request, alternative.alternativeRef),
-        verificationRequests: [],
+        verificationRequests: alternative.requiredVerificationRefs.map((verificationRef, index) => ({
+          requestId: `required-${index + 1}`,
+          verificationRef,
+          candidateRef: topic.verificationChecks.find((check) =>
+            check.verificationRef === verificationRef)!.candidates[0]!.candidateRef,
+        })),
       },
     };
   }
@@ -427,9 +432,9 @@ describe("provider-neutral offline proposal boundary", () => {
     expect(canonicalProjection(inputA)).toEqual(canonicalProjection(cloverDuplicateResubmission));
     expect(reconstructStatement(inputA).hypothesisResults).toContainEqual(expect.objectContaining({
       hypothesisId: expect.stringMatching(/^provider\.provider-a\.[a-f0-9]{8}\.proposal-a\.[a-f0-9]{8}$/),
-      interpretationState: "moderate_inference",
+      interpretationState: "strong_inference",
       providerReportedConfidence: "high",
-      qualifiedInferenceStrength: "moderate",
+      qualifiedInferenceStrength: "strong",
       state: "viable_unresolved",
       ownership: { kind: "provider", providerId: "provider-a", proposalId: "proposal-a", immutable: true },
     }));
@@ -491,9 +496,9 @@ describe("provider-neutral offline proposal boundary", () => {
     }));
 
     expect(outcomes.map((item) => item.providerReportedConfidence)).toEqual(["low", "medium", "high"]);
-    expect(outcomes.map((item) => item.qualifiedInferenceStrength)).toEqual(["moderate", "moderate", "moderate"]);
+    expect(outcomes.map((item) => item.qualifiedInferenceStrength)).toEqual(["strong", "strong", "strong"]);
     expect(outcomes.every((item) => item.evidencePosture?.providerConfidenceUsed === false)).toBe(true);
-    expect(outcomes.every((item) => item.evidencePosture?.independentSupportGroups.length === 1)).toBe(true);
+    expect(outcomes.every((item) => item.evidencePosture?.independentSupportGroups.length === 2)).toBe(true);
     expect(outcomes.map((item) => item.qualificationReasonCodes)).toEqual([
       outcomes[0]!.qualificationReasonCodes,
       outcomes[0]!.qualificationReasonCodes,
@@ -620,32 +625,21 @@ describe("provider-neutral offline proposal boundary", () => {
     expect(canonicalProjection(input)).toEqual(canonicalProjection(cloverDuplicateResubmission));
   });
 
-  it("does not double-count an AI-selected relationship already represented by existing controls", async () => {
-    const collected = await collectRecordedProviderHypotheses(new RecordedProposer("redundant-pair-selection", (request) => {
-      const proposal = providerHypothesis(request, "redundant-pair", true);
-      const check = request.inferenceTopics[0]!.verificationChecks[0]!;
-      const candidate = check.candidates.find((item) => item.description.startsWith("The first rejected row paired with the first"))!;
-      proposal.inference.verificationRequests = [{
-        requestId: "verify-redundant-pair",
-        verificationRef: check.verificationRef,
-        candidateRef: candidate.candidateRef,
-      }];
-      return [proposal];
+  it("withholds a candidate relationship already represented by RateReveal evidence policy", async () => {
+    let descriptions: string[] = [];
+    const collected = await collectRecordedProviderHypotheses(new RecordedProposer("candidate-inspector", (request) => {
+      descriptions = request.inferenceTopics[0]!.verificationChecks[0]!.candidates
+        .map((candidate) => candidate.description);
+      return [];
     }), cloverDuplicateResubmission.statementId, cloverDuplicateResubmission.observations,
     cloverProviderSourceBinding, cloverInferenceTopics, cloverDuplicateResubmission.evidenceNeeds);
-    const input = clone(cloverDuplicateResubmission);
-    input.hypotheses.push(...collected.hypotheses);
-    const providerResult = reconstructStatement(input).hypothesisResults
-      .find((item) => item.ownership.kind === "provider")!;
 
-    expect(providerResult.qualifiedInferenceStrength).toBe("moderate");
-    expect(providerResult.verificationResults).toEqual([expect.objectContaining({
-      candidateId: "clover.first-reject-to-first-submission",
-      controlState: "pass",
-      classification: "supporting",
-    })]);
-    expect(providerResult.evidencePosture?.independentSupportGroups).toHaveLength(1);
-    expect(canonicalProjection(input)).toEqual(canonicalProjection(cloverDuplicateResubmission));
+    expect(collected.errors).toEqual([]);
+    expect(descriptions).toHaveLength(3);
+    expect(descriptions.some((description) =>
+      description.startsWith("The first rejected row paired with the first"))).toBe(false);
+    expect(descriptions.some((description) =>
+      description.startsWith("The second rejected row paired with the second"))).toBe(true);
   });
 
   it("classifies a valid but non-diagnostic verification as irrelevant without changing posture", async () => {
@@ -740,7 +734,13 @@ describe("provider-neutral offline proposal boundary", () => {
     expect(JSON.stringify(collected.request.inferenceTopics[0]!.proofObligations))
       .not.toContain("clover.rejected.id");
     const offeredCheck = collected.request.inferenceTopics[0]!.verificationChecks[0]!;
-    expect(offeredCheck.candidates).toHaveLength(4);
+    expect(collected.request.inferenceTopics[0]!.materialAlternatives).toContainEqual(expect.objectContaining({
+      claim: { key: "batches.same_lifecycle", value: true },
+      requiredVerificationRefs: [offeredCheck.verificationRef],
+    }));
+    expect(offeredCheck.candidates).toHaveLength(3);
+    expect(offeredCheck.candidates.some((candidate) =>
+      candidate.description.startsWith("The first rejected row paired with the first"))).toBe(false);
     expect(offeredCheck.candidates.every((candidate) =>
       /^verification-candidate-\d{4}$/.test(candidate.candidateRef)
       && candidate.roleBindings.length === 6
