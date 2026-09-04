@@ -2,6 +2,10 @@ import { createHash } from "node:crypto";
 
 import { reconstructStatement } from "./kernel.js";
 import {
+  buildInferencePresentations,
+  type InferencePresentation,
+} from "./inferencePresentation.js";
+import {
   collectRecordedProviderHypotheses,
   type ProviderAlternativeCoverageAssessment,
   type HypothesisProposalSourceBinding,
@@ -65,6 +69,7 @@ export interface RecordedHypothesisExperimentResult {
   explanatoryWorldCountBefore: number;
   explanatoryWorldCountAfter: number;
   crossOriginContradictionWorldCount: number;
+  inferencePresentations: InferencePresentation[];
 }
 
 export async function runRecordedHypothesisExperiment(
@@ -81,6 +86,8 @@ export async function runRecordedHypothesisExperiment(
       [`Recorded proposal source SHA-256 ${observedFingerprint} does not match approved ${input.sourceBinding.sourceContentSha256}.`],
       baseline,
       canonicalTruthBefore,
+      input.inferenceTopics,
+      reconstructionInput.evidenceNeeds,
     );
   }
 
@@ -93,7 +100,14 @@ export async function runRecordedHypothesisExperiment(
     reconstructionInput.evidenceNeeds,
   );
   if (collected.errors.length > 0) {
-    return terminalResult("provider_rejected", collected.errors, baseline, canonicalTruthBefore);
+    return terminalResult(
+      "provider_rejected",
+      collected.errors,
+      baseline,
+      canonicalTruthBefore,
+      input.inferenceTopics,
+      reconstructionInput.evidenceNeeds,
+    );
   }
 
   const augmentedInput = structuredClone(reconstructionInput);
@@ -125,6 +139,13 @@ export async function runRecordedHypothesisExperiment(
     explanatoryWorldCountBefore: baseline.possibleWorlds.length,
     explanatoryWorldCountAfter: augmented.possibleWorlds.length,
     crossOriginContradictionWorldCount: countCrossOriginContradictionWorlds(augmented),
+    inferencePresentations: buildInferencePresentations({
+      topics: input.inferenceTopics,
+      providerHypotheses: collected.hypotheses,
+      hypothesisResults: augmented.hypothesisResults,
+      evidenceNeeds: reconstructionInput.evidenceNeeds,
+      evidenceRoutes: augmented.evidenceRoutes,
+    }),
   };
 }
 
@@ -133,6 +154,8 @@ function terminalResult(
   errors: string[],
   baseline: ReconstructionResult,
   canonicalTruthBefore: string,
+  inferenceTopics: InferenceTopic[],
+  evidenceNeeds: ReconstructionInput["evidenceNeeds"],
 ): RecordedHypothesisExperimentResult {
   return {
     status,
@@ -150,6 +173,13 @@ function terminalResult(
     explanatoryWorldCountBefore: baseline.possibleWorlds.length,
     explanatoryWorldCountAfter: baseline.possibleWorlds.length,
     crossOriginContradictionWorldCount: 0,
+    inferencePresentations: buildInferencePresentations({
+      topics: inferenceTopics,
+      providerHypotheses: [],
+      hypothesisResults: baseline.hypothesisResults,
+      evidenceNeeds,
+      evidenceRoutes: baseline.evidenceRoutes,
+    }),
   };
 }
 

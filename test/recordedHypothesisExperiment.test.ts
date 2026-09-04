@@ -8,6 +8,7 @@ import {
   adaptParsedDocumentToObservationPacket,
   bindReplayObservations,
   runRecordedHypothesisExperiment,
+  UNRESOLVED_MERCHANT_INFERENCE_CONCLUSION,
   verifyReplaySourceProvenance,
   type ReconstructionInput,
   type InferenceTopic,
@@ -95,6 +96,30 @@ function withoutVerificationRequests(proposer: StatementHypothesisProposer): Sta
           ...hypothesis,
           inference: { ...hypothesis.inference, verificationRequests: [] },
         })),
+      };
+    },
+  };
+}
+
+function weakWellsReferenceReuseOnlyProposer(): StatementHypothesisProposer {
+  const providerId = "recorded-evaluation-wells-weak-reference-reuse-only";
+  return {
+    providerId,
+    async propose(request) {
+      const response = await wellsRecordedProposer.propose(request);
+      const selected = response.hypotheses.find((hypothesis) => hypothesis.id === "reference-reuse-only")!;
+      return {
+        providerId,
+        hypotheses: [{ ...selected }],
+        alternativeCoverage: response.alternativeCoverage.map((assessment) =>
+          assessment.alternativeRef === selected.alternativeRef
+            ? assessment
+            : {
+                ...assessment,
+                disposition: "not_supported" as const,
+                reasonCode: "insufficient_source_evidence" as const,
+                rationale: "The bounded source evidence does not support selecting this alternative.",
+              }),
       };
     },
   };
@@ -202,6 +227,23 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     expect(result.proposalReviews.every((review) => review.proofObligationsValidated)).toBe(true);
     expect(result.allMaterialAlternativesAddressed).toBe(true);
     expect(result.unknownAlternativeRetainedForEveryProviderGroup).toBe(true);
+    expect(result.inferencePresentations).toEqual([expect.objectContaining({
+      topicId: "clover.duplicate-resubmission",
+      authority: "non_authoritative_inference_presentation",
+      merchantConclusion: {
+        state: "leading_interpretation",
+        text: "The rejected rows and later submitted rows belong to the same lifecycle.",
+        alternativeId: "clover.same-lifecycle",
+        qualifiedInferenceStrength: "strong",
+      },
+      resolutionEvidenceNeeds: [expect.objectContaining({
+        evidenceNeedId: "clover.batch-identity",
+        proofObligations: [expect.objectContaining({
+          proofObligationId: "stable-row-identity-linkage",
+          missingProperty: "stable_identity_link",
+        })],
+      })],
+    })]);
 
     const withoutVerification = await runCase(
       "clover-duplicate-resubmission",
@@ -233,6 +275,21 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     expect(result.augmented.canonicalClaims.some((claim) => claim.key === "fees.visible_gap_explanation")).toBe(false);
     expect(result.explanatoryWorldCountAfter).toBeGreaterThan(result.explanatoryWorldCountBefore);
     expect(result.unknownAlternativeRetainedForEveryProviderGroup).toBe(true);
+    expect(result.inferencePresentations[0]?.merchantConclusion).toEqual({
+      state: "unresolved",
+      text: UNRESOLVED_MERCHANT_INFERENCE_CONCLUSION,
+      alternativeId: null,
+      qualifiedInferenceStrength: "unknown_competing",
+    });
+    expect(result.inferencePresentations[0]?.internalHypotheses.map((hypothesis) =>
+      hypothesis.qualifiedInferenceStrength)).toEqual(["weak", "weak"]);
+    expect(result.inferencePresentations[0]?.resolutionEvidenceNeeds[0]).toEqual(expect.objectContaining({
+      evidenceNeedId: "paysafe.fee-cent-gap",
+      proofObligations: expect.arrayContaining([
+        expect.objectContaining({ resolutionEvidenceKinds: expect.arrayContaining(["processor_rounding_method"]) }),
+        expect.objectContaining({ resolutionEvidenceKinds: expect.arrayContaining(["complete_fee_detail"]) }),
+      ]),
+    }));
   });
 
   it("finds Wells Fargo proposals explanatory but not novel and keeps lifecycle unresolved", async () => {
@@ -275,6 +332,40 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
       ownership: expect.objectContaining({ proposalId: "reference-reuse-only" }),
       qualifiedInferenceStrength: "weak",
     }));
+    expect(result.inferencePresentations[0]?.merchantConclusion).toEqual({
+      state: "leading_interpretation",
+      text: "The shipping and tax rows are part of the same lifecycle.",
+      alternativeId: "wells.same-lifecycle",
+      qualifiedInferenceStrength: "moderate",
+    });
+
+    const weakOnly = await runCase(
+      "wells-fargo-september-2024",
+      weakWellsReferenceReuseOnlyProposer(),
+      wellsRecordedReviewRules.filter((rule) => rule.proposalId === "reference-reuse-only"),
+    );
+    expect(weakOnly.status).toBe("evaluated");
+    expect(weakOnly.inferencePresentations[0]?.merchantConclusion).toEqual({
+      state: "unresolved",
+      text: UNRESOLVED_MERCHANT_INFERENCE_CONCLUSION,
+      alternativeId: null,
+      qualifiedInferenceStrength: "unknown_competing",
+    });
+    expect(weakOnly.inferencePresentations[0]?.internalHypotheses).toEqual([
+      expect.objectContaining({
+        proposalId: "reference-reuse-only",
+        qualifiedInferenceStrength: "weak",
+        eligibleForLeadingConclusion: false,
+      }),
+    ]);
+    expect(weakOnly.inferencePresentations[0]?.resolutionEvidenceNeeds[0]).toEqual(expect.objectContaining({
+      evidenceNeedId: "wells.shipping-tax-order",
+      proofObligations: [expect.objectContaining({
+        missingProperty: "row_level_temporal_link",
+        resolutionEvidenceKinds: ["row_level_date", "explicit_temporal_relation"],
+      })],
+    }));
+    expect(weakOnly.canonicalTruthAfter).toBe(result.canonicalTruthAfter);
   });
 
   it("replays all four approved evidence packets identically across low, medium, and high provider confidence", async () => {
@@ -306,6 +397,7 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     ];
 
     for (const item of cases) {
+      let firstPresentationProjection: string | undefined;
       for (const confidence of ["low", "medium", "high"] as const) {
         const result = await runCase(item.caseId, withProviderConfidence(item.proposer, confidence), item.rules);
         const actual = Object.fromEntries(result.augmented.hypothesisResults
@@ -320,6 +412,16 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
           .every((hypothesis) => hypothesis.providerReportedConfidence === confidence
             && hypothesis.evidencePosture?.providerConfidenceUsed === false)).toBe(true);
         expect(result.canonicalTruthInvariant).toBe(true);
+        expect(result.inferencePresentations.every((presentation) =>
+          presentation.internalHypotheses.every((hypothesis) =>
+            hypothesis.qualifiedInferenceStrength === item.expected[hypothesis.proposalId as keyof typeof item.expected]))).toBe(true);
+        const presentationProjection = JSON.stringify(result.inferencePresentations.map((presentation) => ({
+          merchantConclusion: presentation.merchantConclusion,
+          resolutionEvidenceNeeds: presentation.resolutionEvidenceNeeds,
+          reasonCodes: presentation.reasonCodes,
+        })));
+        firstPresentationProjection ??= presentationProjection;
+        expect(presentationProjection).toBe(firstPresentationProjection);
       }
     }
   });
@@ -343,6 +445,18 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
       hypothesis.qualifiedInferenceStrength === "weak"
       && hypothesis.qualificationReasonCodes?.includes("source_proven_incomplete") === true)).toBe(true);
     expect(result.unknownAlternativeRetainedForEveryProviderGroup).toBe(true);
+    expect(result.inferencePresentations[0]?.merchantConclusion).toEqual({
+      state: "unresolved",
+      text: UNRESOLVED_MERCHANT_INFERENCE_CONCLUSION,
+      alternativeId: null,
+      qualifiedInferenceStrength: "unknown_competing",
+    });
+    expect(result.inferencePresentations[0]?.resolutionEvidenceNeeds[0]).toEqual(expect.objectContaining({
+      evidenceNeedId: "vortax.obtain-missing-page",
+      proofObligations: expect.arrayContaining([
+        expect.objectContaining({ resolutionEvidenceKinds: ["complete_source_document"] }),
+      ]),
+    }));
   });
 
   it("reconciles provider and deterministic alternatives under RateReveal-owned topics", async () => {
@@ -436,6 +550,9 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     expect(result.errors.join(" ")).toContain("deterministic reconstruction remains authoritative");
     expect(result.canonicalTruthAfter).toBe(result.canonicalTruthBefore);
     expect(result.canonicalTruthInvariant).toBe(true);
+    expect(result.inferencePresentations[0]?.merchantConclusion.text).toBe(
+      UNRESOLVED_MERCHANT_INFERENCE_CONCLUSION,
+    );
   });
 
   it("does not change the five-fact Kernel authority allowlist", () => {
@@ -476,5 +593,8 @@ describe("recorded, source-bound AI hypothesis experiment", () => {
     expect(observedPacket).toContain("adjustments");
     expect(observedPacket).toMatch(/\"page\":\d+/);
     expect(observedPacket).not.toContain("clover.rejected.amount");
+    expect(result.inferencePresentations[0]?.merchantConclusion.text).toBe(
+      UNRESOLVED_MERCHANT_INFERENCE_CONCLUSION,
+    );
   });
 });
