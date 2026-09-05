@@ -1697,6 +1697,48 @@ export type CanonicalFeeLedgerControl = {
   explanation: string;
 };
 
+export type CanonicalFeeRowSectionAssignment = {
+  feeRowId: string;
+  status: "assigned" | "unassigned" | "ambiguous";
+  sectionControlRef: string | null;
+  candidateSectionControlRefs: string[];
+  printedSectionLabel: string | null;
+  sourceSection: string | null;
+  evidenceRefs: string[];
+  ruleId: "explicit_source_section_label_v1" | "unique_control_coverage_fallback_v1" | null;
+};
+
+export type CanonicalFeeRowArithmeticProvenance = {
+  feeRowId: string;
+  status: "complete" | "partial" | "charged_amount_only" | "ambiguous";
+  formulaBasis: "rate_times_volume" | "per_item" | "unknown" | "ambiguous";
+  printedRate: CanonicalPrintedRate | null;
+  volumeBasis: MoneyAmount | null;
+  printedPerItemRate: CanonicalPrintedRate | null;
+  itemCount: CountValue | null;
+  chargedAmount: MoneyAmount | null;
+  fieldEvidenceRefs: {
+    rate: string[];
+    volumeBasis: string[];
+    count: string[];
+    chargedAmount: string[];
+  };
+  missingFields: string[];
+};
+
+export type CanonicalFeePartitionSourceProvenance = {
+  policyVersion: "fee_partition_source_provenance_v1";
+  authority: "diagnostic_relationship_only";
+  status: "available" | "partial" | "unavailable";
+  assignmentMode: "explicit_source_section_labels" | "unique_control_coverage_fallback" | "unavailable";
+  eligibleFeeRowIds: string[];
+  sectionControlRefs: string[];
+  arithmeticControlRefs: string[];
+  assignments: CanonicalFeeRowSectionAssignment[];
+  rowArithmetic: CanonicalFeeRowArithmeticProvenance[];
+  limitations: string[];
+};
+
 export type CanonicalFeeRollupRoundingBridge = {
   policyVersion: "fee_rollup_rounding_bridge_v1";
   method: "exact_unrounded_partition_bridge";
@@ -1715,6 +1757,7 @@ export type CanonicalFeeLedger = {
   uniqueChargeTotal: MoneyAmount | null;
   uniqueChargeCalculationRef?: string;
   controls: CanonicalFeeLedgerControl[];
+  partitionSourceProvenance: CanonicalFeePartitionSourceProvenance;
   limitations: string[];
 };
 
@@ -1886,6 +1929,7 @@ export type CanonicalAnalysisVersionManifest = {
   crossSummaryLinkEvidencePolicyVersion: "cross_summary_link_evidence_v2";
   crossSummaryReconciliationAdjudicationPolicyVersion: "cross_summary_reconciliation_adjudication_v1";
   feeRollupCompletenessPolicyVersion: "fee_rollup_completeness_rounding_attribution_v1";
+  feePartitionSourceProvenancePolicyVersion: "fee_partition_source_provenance_v1";
   parserId: string | null;
   parserVersion: string | null;
   extractionVersion: string;

@@ -16,6 +16,7 @@ import {
 import { aggregateCanonicalOpportunityComponents } from "./opportunityEngine.js";
 import { targetSupportsApprovedEstimate, targetSupportsDeterministic } from "./opportunityPolicy.js";
 import { buildCanonicalFeeRollupAssessments, FEE_ROLLUP_COMPLETENESS_POLICY_VERSION } from "./feeRollupEvidence.js";
+import { buildCanonicalFeePartitionSourceProvenance, FEE_PARTITION_SOURCE_PROVENANCE_POLICY_VERSION } from "./feePartitionSourceProvenance.js";
 import { validateCanonicalMerchantAttentionModel } from "./merchantAttention.js";
 import type {
   CanonicalCustomerPermissionKey,
@@ -183,6 +184,9 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   if (analysis.versionManifest?.feeRollupCompletenessPolicyVersion !== FEE_ROLLUP_COMPLETENESS_POLICY_VERSION) {
     errors.push("Canonical version manifest must include fee_rollup_completeness_rounding_attribution_v1.");
   }
+  if (analysis.versionManifest?.feePartitionSourceProvenancePolicyVersion !== FEE_PARTITION_SOURCE_PROVENANCE_POLICY_VERSION) {
+    errors.push("Canonical version manifest must include fee_partition_source_provenance_v1.");
+  }
   if (analysis.financialFacts.effectiveRateBasis?.policyVersion !== "effective_rate_basis_v1") {
     errors.push("Effective rate basis is missing or unsupported.");
   }
@@ -320,6 +324,31 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
     }
     if (analysis.feeLedger.uniqueChargeCalculationRef && !calculationIds.has(analysis.feeLedger.uniqueChargeCalculationRef)) {
       errors.push(`Fee ledger calculation ref ${analysis.feeLedger.uniqueChargeCalculationRef} is broken.`);
+    }
+    const expectedPartitionProvenance = buildCanonicalFeePartitionSourceProvenance({
+      rows: analysis.feeLedger.rows,
+      interpretations: analysis.feeLedger.parserInterpretations,
+      sourceOccurrences: analysis.feeLedger.sourceOccurrences,
+      controls: analysis.feeLedger.controls,
+    });
+    if (JSON.stringify(analysis.feeLedger.partitionSourceProvenance) !== JSON.stringify(expectedPartitionProvenance)) {
+      errors.push("Fee partition source provenance does not reconstruct from fee rows, interpretations, occurrences, and controls.");
+    }
+    if (analysis.feeLedger.partitionSourceProvenance.policyVersion !== FEE_PARTITION_SOURCE_PROVENANCE_POLICY_VERSION) {
+      errors.push("Fee partition source provenance is missing or unsupported.");
+    }
+    if (analysis.feeLedger.partitionSourceProvenance.authority !== "diagnostic_relationship_only") {
+      errors.push("Fee partition source provenance must remain diagnostic-only.");
+    }
+    for (const assignment of analysis.feeLedger.partitionSourceProvenance.assignments) {
+      for (const evidenceRef of assignment.evidenceRefs) {
+        if (!evidenceIds.has(evidenceRef)) errors.push(`Fee section assignment ${assignment.feeRowId} evidence ref ${evidenceRef} is broken.`);
+      }
+    }
+    for (const arithmetic of analysis.feeLedger.partitionSourceProvenance.rowArithmetic) {
+      for (const evidenceRef of Object.values(arithmetic.fieldEvidenceRefs).flat()) {
+        if (!evidenceIds.has(evidenceRef)) errors.push(`Fee arithmetic provenance ${arithmetic.feeRowId} evidence ref ${evidenceRef} is broken.`);
+      }
     }
   }
   validateCrossSummaryLinkEvidence(analysis.crossSummaryLinkEvidence, analysis, evidenceIds, errors);

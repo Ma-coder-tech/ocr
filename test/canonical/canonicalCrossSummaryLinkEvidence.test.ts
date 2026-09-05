@@ -91,29 +91,30 @@ describe("cross-summary link evidence v2", () => {
   it("withholds missing and overlapping partitions and does not excuse a small residual", () => {
     const fixture = crossSummaryFixture(true);
     const sections = fixture.input.feeLedger.controls.filter((control) => control.basis === "section_control");
-    const grand = fixture.input.feeLedger.controls.find((control) => control.basis === "grand_control")!;
-    const secondSectionRows = [...sections[1]!.coveredFeeRowIds];
-    const grandRows = [...grand.coveredFeeRowIds];
+    const originalAssignments = structuredClone(fixture.input.feeLedger.partitionSourceProvenance.assignments);
     sections[0]!.expectedAmount = { amountMinor: 601, currency: "USD" };
     let rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
     expect(rollup).toMatchObject({ status: "unresolved", membershipStatus: "complete_non_overlapping", residualMinor: 1, residualAttribution: "unresolved" });
     expect(rollup.reasonCodes).toContain("nonzero_residual_lacks_exact_rounding_attribution");
-    sections[1]!.coveredFeeRowIds = [...sections[0]!.coveredFeeRowIds];
+    const secondAssignment = fixture.input.feeLedger.partitionSourceProvenance.assignments.find((item) => item.sectionControlRef === sections[1]!.id)!;
+    secondAssignment.status = "ambiguous";
+    secondAssignment.sectionControlRef = null;
+    secondAssignment.candidateSectionControlRefs = [sections[0]!.id, sections[1]!.id];
+    secondAssignment.ruleId = null;
     rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
     expect(rollup.status).toBe("unresolved");
     expect(rollup.membershipStatus).toBe("overlapping_members");
-    expect(rollup.overlappingFeeRowIds).toEqual(sections[0]!.coveredFeeRowIds);
-    expect(rollup.missingFeeRowIds).toHaveLength(1);
-    sections[1]!.coveredFeeRowIds = secondSectionRows;
-    grand.coveredFeeRowIds = grandRows.slice(0, 1);
-    rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
-    expect(rollup.membershipStatus).toBe("missing_members");
-    expect(rollup.uncoveredByGrandFeeRowIds).toHaveLength(1);
-    expect(rollup.outsideGrandFeeRowIds).toHaveLength(1);
-    grand.coveredFeeRowIds = grandRows;
-    sections[1]!.coveredFeeRowIds = [];
+    expect(rollup.overlappingFeeRowIds).toEqual([secondAssignment.feeRowId]);
+    fixture.input.feeLedger.partitionSourceProvenance.assignments = structuredClone(originalAssignments);
+    const unassigned = fixture.input.feeLedger.partitionSourceProvenance.assignments.find((item) => item.sectionControlRef === sections[1]!.id)!;
+    unassigned.status = "unassigned";
+    unassigned.sectionControlRef = null;
+    unassigned.candidateSectionControlRefs = [];
+    unassigned.printedSectionLabel = null;
+    unassigned.ruleId = null;
     rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
     expect(rollup.membershipStatus).toBe("incomplete_controls");
+    expect(rollup.missingFeeRowIds).toEqual([unassigned.feeRowId]);
   });
 
   it("attributes a residual only when exact unrounded arithmetic reconstructs every printed total", () => {
