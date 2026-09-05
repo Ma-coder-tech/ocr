@@ -4,6 +4,7 @@ import { buildCanonicalCrossSummaryLinkEvidence } from "../../src/canonical/cros
 import { makeEvidenceRecord } from "../../src/canonical/evidence.js";
 import { selectedFact } from "../../src/canonical/facts.js";
 import { buildCanonicalFeeLedger } from "../../src/canonical/feeLedger.js";
+import { buildCanonicalFeeRollupAssessments } from "../../src/canonical/feeRollupEvidence.js";
 import { moneyFromNumber } from "../../src/canonical/money.js";
 import type { ParsedDocument } from "../../src/parser.js";
 import type { CanonicalCalculationRecord, CanonicalEvidenceRecord } from "../../src/canonical/types.js";
@@ -61,7 +62,7 @@ describe("cross-summary link evidence v2", () => {
     expect(layer.limitations.join(" ")).toMatch(/matching dollar amounts|unknown|reference-only/i);
   });
 
-  it("proves exact independent printed-total identity while a two-cent detail control still blocks component rollups", () => {
+  it("proves an exact printed section partition independently of a two-cent detail mismatch", () => {
     const fixture = crossSummaryFixture(true);
     const grand = fixture.input.feeLedger.controls.find((control) => control.basis === "grand_control")!;
     grand.status = "verification_required";
@@ -81,9 +82,67 @@ describe("cross-summary link evidence v2", () => {
       relationshipClass: "resolved_independent_printed_totals",
       reusableRuleId: "independent_printed_total_identity_v1",
     });
-    expect(componentRelationships.every((relationship) => relationship.status === "unknown")).toBe(true);
-    expect(componentRelationships.every((relationship) => relationship.adjudication.relationshipClass === "unresolved_incomplete_or_conflicting_controls")).toBe(true);
+    expect(componentRelationships.every((relationship) => relationship.status === "proven")).toBe(true);
+    expect(componentRelationships.every((relationship) => relationship.adjudication.relationshipClass === "resolved_complete_fee_partition")).toBe(true);
+    expect(layer.feeRollups).toMatchObject([{ status: "proven_complete_exact", membershipStatus: "complete_non_overlapping", residualMinor: 0, residualAttribution: "not_needed_exact", countingTreatment: "reference_only_no_addition" }]);
     expect(fixture.input.feeLedger.uniqueChargeTotal).toEqual({ amountMinor: 1000, currency: "USD" });
+  });
+
+  it("withholds missing and overlapping partitions and does not excuse a small residual", () => {
+    const fixture = crossSummaryFixture(true);
+    const sections = fixture.input.feeLedger.controls.filter((control) => control.basis === "section_control");
+    const grand = fixture.input.feeLedger.controls.find((control) => control.basis === "grand_control")!;
+    const secondSectionRows = [...sections[1]!.coveredFeeRowIds];
+    const grandRows = [...grand.coveredFeeRowIds];
+    sections[0]!.expectedAmount = { amountMinor: 601, currency: "USD" };
+    let rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
+    expect(rollup).toMatchObject({ status: "unresolved", membershipStatus: "complete_non_overlapping", residualMinor: 1, residualAttribution: "unresolved" });
+    expect(rollup.reasonCodes).toContain("nonzero_residual_lacks_exact_rounding_attribution");
+    sections[1]!.coveredFeeRowIds = [...sections[0]!.coveredFeeRowIds];
+    rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
+    expect(rollup.status).toBe("unresolved");
+    expect(rollup.membershipStatus).toBe("overlapping_members");
+    expect(rollup.overlappingFeeRowIds).toEqual(sections[0]!.coveredFeeRowIds);
+    expect(rollup.missingFeeRowIds).toHaveLength(1);
+    sections[1]!.coveredFeeRowIds = secondSectionRows;
+    grand.coveredFeeRowIds = grandRows.slice(0, 1);
+    rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
+    expect(rollup.membershipStatus).toBe("missing_members");
+    expect(rollup.uncoveredByGrandFeeRowIds).toHaveLength(1);
+    expect(rollup.outsideGrandFeeRowIds).toHaveLength(1);
+    grand.coveredFeeRowIds = grandRows;
+    sections[1]!.coveredFeeRowIds = [];
+    rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
+    expect(rollup.membershipStatus).toBe("incomplete_controls");
+  });
+
+  it("attributes a residual only when exact unrounded arithmetic reconstructs every printed total", () => {
+    const fixture = crossSummaryFixture(true);
+    const sections = fixture.input.feeLedger.controls.filter((control) => control.basis === "section_control");
+    const grand = fixture.input.feeLedger.controls.find((control) => control.basis === "grand_control")!;
+    sections[0]!.expectedAmount = { amountMinor: 601, currency: "USD" };
+    grand.roundingBridge = {
+      policyVersion: "fee_rollup_rounding_bridge_v1",
+      method: "exact_unrounded_partition_bridge",
+      sectionAmountsMicros: [
+        { controlRef: sections[0]!.id, amountMicros: 6_005_000 },
+        { controlRef: sections[1]!.id, amountMicros: 3_995_000 },
+      ],
+      grandAmountMicros: 10_000_000,
+      roundingMode: "nearest_cent_half_away_from_zero",
+      evidenceRefs: [...new Set([...sections.flatMap((section) => section.evidenceRefs), ...grand.evidenceRefs])],
+    };
+    let rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
+    expect(rollup).toMatchObject({ status: "proven_complete_with_rounding", residualMinor: 1, residualAttribution: "proven_exact_rounding_bridge" });
+    expect(rollup.roundingEvidenceRefs.length).toBeGreaterThan(0);
+    grand.roundingBridge.evidenceRefs = [...grand.evidenceRefs];
+    rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
+    expect(rollup.status).toBe("unresolved");
+    grand.roundingBridge.evidenceRefs = [...new Set([...sections.flatMap((section) => section.evidenceRefs), ...grand.evidenceRefs])];
+    grand.roundingBridge.grandAmountMicros += 1;
+    rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
+    expect(rollup.status).toBe("unresolved");
+    expect(rollup.residualAttribution).toBe("unresolved");
   });
 
   it("adjudicates a warning-state funding ledger per directly printed total without accepting its detail reconciliation", () => {

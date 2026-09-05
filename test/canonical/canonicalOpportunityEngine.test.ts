@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCanonicalStatementFactsFromParsedDocument, canonicalActualValues } from "../../src/canonical/buildCanonicalFacts.js";
+import { buildCanonicalCrossSummaryLinkEvidence } from "../../src/canonical/crossSummaryLinkEvidence.js";
 import { buildCanonicalAiCapabilities } from "../../src/canonical/buildCanonicalAiCapabilities.js";
 import { buildCanonicalCustomerState } from "../../src/canonical/customerStateResolver.js";
 import { buildCanonicalFeeLedger } from "../../src/canonical/feeLedger.js";
@@ -882,8 +883,9 @@ function calculation(id: string, evidenceRefs: string[], observed: MoneyAmount, 
 
 function analysisWithFeeRows(rows: Record<string, unknown>[]): CanonicalStatementAnalysis {
   const { ledger, evidence, calculations } = ledgerFromRowsWithEvidence(rows);
+  const doc = feeDocument(["Total Amount Submitted | $100.00", "Fees Charged | -$10.00"]);
   const analysis = buildCanonicalStatementFactsFromParsedDocument(
-    feeDocument(["Total Amount Submitted | $100.00", "Fees Charged | -$10.00"]),
+    doc,
     { sourceFileName: "package-e-validation.pdf", preferExtractedRows: true },
   );
   analysis.evidence = [...analysis.evidence, ...evidence.values()];
@@ -913,6 +915,17 @@ function analysisWithFeeRows(rows: Record<string, unknown>[]): CanonicalStatemen
     selectionReason: "Synthetic Package E business context.",
   });
   analysis.feeLedger = ledger;
+  const evidenceById = new Map(analysis.evidence.map((item) => [item.id, item]));
+  analysis.crossSummaryLinkEvidence = buildCanonicalCrossSummaryLinkEvidence({
+    doc,
+    documentId: analysis.identity.sourceDocumentRef,
+    identity: analysis.identity,
+    financialFacts: analysis.financialFacts,
+    feeLedger: ledger,
+    parserOutput: null,
+    evidence: evidenceById,
+  });
+  analysis.evidence = [...evidenceById.values()];
   analysis.feeOwnershipActionability = buildCanonicalFeeOwnershipActionability(ledger, {
     processorFamily: "fiserv",
     statementPeriodStart: "2026-01-01",

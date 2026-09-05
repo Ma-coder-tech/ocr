@@ -1,5 +1,6 @@
 import { makeEvidenceRecord, normalizeEvidenceText } from "./evidence.js";
 import { moneyFromNumber } from "./money.js";
+import { buildCanonicalFeeRollupAssessments, FEE_ROLLUP_COMPLETENESS_POLICY_VERSION } from "./feeRollupEvidence.js";
 import type { ParsedDocument } from "../parser.js";
 import type {
   CanonicalCrossSummaryLinkEvidence,
@@ -101,6 +102,7 @@ export function buildCanonicalCrossSummaryLinkEvidence(input: {
   const headlineSubmitted = nodeById(nodes, "headline_submitted");
   const headlineFunded = nodeById(nodes, "headline_funded");
   const feeControls = [...feeControlByNodeId.entries()];
+  const feeRollups = buildCanonicalFeeRollupAssessments(input.feeLedger);
 
   for (const [controlNodeId, control] of feeControls) {
     const controlNode = nodeById(nodes, controlNodeId);
@@ -125,14 +127,18 @@ export function buildCanonicalCrossSummaryLinkEvidence(input: {
     for (const [grandNodeId, grand] of grandControls) {
       const sectionNode = nodeById(nodes, sectionNodeId);
       const grandNode = nodeById(nodes, grandNodeId);
-      const sectionRows = new Set(section.coveredFeeRowIds);
+      const rollup = feeRollups.find(
+        (assessment) => assessment.grandControlRef === grand.id && assessment.sectionControlRefs.includes(section.id),
+      );
+      const rollupProven = rollup?.status === "proven_complete_exact" || rollup?.status === "proven_complete_with_rounding";
       const explicitCoverage =
-        sectionRows.size > 0 &&
-        [...sectionRows].every((rowId) => grand.coveredFeeRowIds.includes(rowId)) &&
-        isPassing(section.status) &&
-        isPassing(grand.status) &&
+        rollupProven &&
         feeMeasureIsPrinted(sectionNode, input.evidence) &&
         feeMeasureIsPrinted(grandNode, input.evidence);
+      const reusableRuleId: CanonicalCrossSummaryReusableRule =
+        rollup?.status === "proven_complete_with_rounding"
+          ? "exact_rounding_bridge_fee_partition_v1"
+          : "complete_non_overlapping_fee_partition_v1";
       relationships.push(
         evaluateRelationship({
           left: sectionNode,
@@ -140,11 +146,11 @@ export function buildCanonicalCrossSummaryLinkEvidence(input: {
           candidateType: "component_rollup",
           evidence: input.evidence,
           explicitLink: explicitCoverage,
-          reusableRuleId: "passing_covered_component_rollup_v1",
+          reusableRuleId,
           blockingClass:
-            isPassing(section.status) && isPassing(grand.status)
-              ? undefined
-              : "unresolved_incomplete_or_conflicting_controls",
+            rollup?.membershipStatus !== "complete_non_overlapping"
+              ? "unresolved_fee_partition_membership"
+              : "unresolved_fee_rollup_residual",
         }),
       );
     }
@@ -216,16 +222,26 @@ export function buildCanonicalCrossSummaryLinkEvidence(input: {
 
   const unknownCount = relationships.filter((relationship) => relationship.status === "unknown").length;
   const provenCount = relationships.length - unknownCount;
+  const unresolvedRollupCount = feeRollups.filter((rollup) => rollup.status === "unresolved").length;
   return {
     policyVersion: CROSS_SUMMARY_LINK_EVIDENCE_POLICY_VERSION,
     adjudicationPolicyVersion: CROSS_SUMMARY_RECONCILIATION_ADJUDICATION_POLICY_VERSION,
+    feeRollupPolicyVersion: FEE_ROLLUP_COMPLETENESS_POLICY_VERSION,
     authority: "diagnostic_relationship_only",
-    status: relationships.length === 0 ? "unavailable" : unknownCount === 0 && provenCount > 0 ? "available" : "partial",
+    status:
+      relationships.length === 0 && feeRollups.length === 0
+        ? "unavailable"
+        : unknownCount === 0 && unresolvedRollupCount === 0 && provenCount > 0
+          ? "available"
+          : "partial",
     nodes,
     relationships,
+    feeRollups,
     limitations: [
       ...(unknownCount > 0 ? [`${unknownCount} evaluated cross-summary relationship(s) remain unknown because one or more proof dimensions were missing or incompatible.`] : []),
-      "Detail reconciliation warnings neither prove nor disprove identity between independently printed totals; they continue to block component roll-up claims.",
+      ...(unresolvedRollupCount > 0 ? [`${unresolvedRollupCount} fee roll-up assessment(s) remain unresolved because partition or residual evidence is incomplete.`] : []),
+      "Detail reconciliation warnings neither prove nor disprove identity between independently printed totals; section-to-grand claims are decided by partition completeness and printed-total arithmetic.",
+      "Fee section-to-grand roll-ups require a complete, non-overlapping partition; nonzero residuals remain unresolved unless exact unrounded arithmetic reconstructs every printed total.",
       "Cross-summary links are reference-only and never add amounts to the canonical fee total or opportunity totals.",
     ],
   };
@@ -297,8 +313,10 @@ function evaluateRelationship(input: {
     ...(input.candidateType !== "component_rollup" && amount !== "corroborates" ? ["amount_does_not_corroborate"] : []),
   ];
   const relationshipClass: CanonicalCrossSummaryAdjudicationClass = proven
-    ? input.reusableRuleId === "passing_covered_component_rollup_v1"
-      ? "resolved_passing_component_controls"
+    ? input.reusableRuleId === "complete_non_overlapping_fee_partition_v1"
+      ? "resolved_complete_fee_partition"
+      : input.reusableRuleId === "exact_rounding_bridge_fee_partition_v1"
+        ? "resolved_rounding_attributed_fee_partition"
       : input.reusableRuleId === "measure_scoped_funding_warning_v1"
         ? "resolved_measure_scoped_funding_warning"
         : "resolved_independent_printed_totals"
@@ -506,10 +524,6 @@ function nodeById(nodes: CanonicalCrossSummaryNode[], id: string): CanonicalCros
 
 function moneyFromUnknown(value: unknown): MoneyAmount | null {
   return typeof value === "number" && Number.isFinite(value) ? moneyFromNumber(value) : null;
-}
-
-function isPassing(status: string): boolean {
-  return status === "pass" || status === "pass_with_rounding";
 }
 
 function pageFromRow(row: ParsedDocument["rows"][number]): number | null {

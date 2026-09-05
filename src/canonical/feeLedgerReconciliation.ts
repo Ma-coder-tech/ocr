@@ -18,7 +18,6 @@ export function printedMonetaryControl(input: {
   expectedAmount: MoneyAmount | null;
   actualAmount: MoneyAmount | null;
   derivationGroupId: string;
-  documentedOneCentRounding?: boolean;
   coveredFeeRowIds?: string[];
   basis?: CanonicalFeeLedgerControl["basis"];
   amountBasis?: CanonicalFeeLedgerControl["amountBasis"];
@@ -29,8 +28,7 @@ export function printedMonetaryControl(input: {
   reasonCode?: string;
 }): CanonicalFeeLedgerControl {
   const deltaMinor = input.expectedAmount && input.actualAmount ? input.actualAmount.amountMinor - input.expectedAmount.amountMinor : null;
-  const toleranceMinor = input.documentedOneCentRounding ? 1 : 0;
-  const withinTolerance = deltaMinor !== null && Math.abs(deltaMinor) <= toleranceMinor;
+  const toleranceMinor = 0;
   return {
     id: input.id,
     type: "printed_charge_sum",
@@ -46,9 +44,7 @@ export function printedMonetaryControl(input: {
         ? "limited"
         : deltaMinor === 0
           ? "pass"
-          : withinTolerance
-            ? "pass_with_rounding"
-            : "verification_required",
+          : "verification_required",
     derivationGroupId: input.derivationGroupId,
     coveredFeeRowIds: input.coveredFeeRowIds ?? [],
     basis: input.basis ?? "unknown",
@@ -57,9 +53,9 @@ export function printedMonetaryControl(input: {
     parserReportedActualAmount: input.parserReportedActualAmount ?? null,
     reconstructedFromCoveredRows: input.reconstructedFromCoveredRows ?? false,
     reconstructionFormula: input.reconstructionFormula ?? "not_reconstructed",
-    reasonCode: input.reasonCode ?? (withinTolerance && deltaMinor !== 0 ? "documented_one_cent_rounding" : deltaMinor === 0 ? "exact_reconciliation" : "printed_control_requires_verification"),
+    reasonCode: input.reasonCode ?? (deltaMinor === 0 ? "exact_reconciliation" : "printed_control_requires_verification"),
     explanation:
-      "Printed monetary charge rows must reconcile to printed controls exactly, with only documented one-cent printed rounding accepted.",
+      "Printed monetary charge rows must reconcile exactly; a nonzero difference requires a separate evidence-backed rounding attribution and is not accepted by size alone.",
   };
 }
 

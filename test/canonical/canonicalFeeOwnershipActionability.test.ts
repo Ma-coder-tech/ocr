@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
+import { buildCanonicalCrossSummaryLinkEvidence } from "../../src/canonical/crossSummaryLinkEvidence.js";
 import {
   buildCanonicalFeeOwnershipActionability,
   createStatementSpecificHumanOverride,
@@ -571,14 +572,26 @@ function ledgerFromRowsWithEvidence(rows: Record<string, unknown>[]): { ledger: 
 
 function canonicalAnalysisForValidation(): CanonicalStatementAnalysis {
   const { ledger, evidence, calculations } = ledgerFromRowsWithEvidence([feeRow({ description: "QUAL DISC", section: "Service Charges" })]);
+  const doc = feeDocument(["Total Amount Submitted | $100.00", "Fees Charged | -$1.00"]);
   const analysis = buildCanonicalStatementFactsFromParsedDocument(
-    feeDocument(["Total Amount Submitted | $100.00", "Fees Charged | -$1.00"]),
+    doc,
     { sourceFileName: "package-d-validation.pdf", preferExtractedRows: true },
   );
   analysis.feeLedger = ledger;
   analysis.feeOwnershipActionability = buildCanonicalFeeOwnershipActionability(ledger);
   analysis.evidence = [...analysis.evidence, ...evidence.values()];
   analysis.calculations = [...analysis.calculations, ...calculations];
+  const evidenceById = new Map(analysis.evidence.map((item) => [item.id, item]));
+  analysis.crossSummaryLinkEvidence = buildCanonicalCrossSummaryLinkEvidence({
+    doc,
+    documentId: analysis.identity.sourceDocumentRef,
+    identity: analysis.identity,
+    financialFacts: analysis.financialFacts,
+    feeLedger: ledger,
+    parserOutput: null,
+    evidence: evidenceById,
+  });
+  analysis.evidence = [...evidenceById.values()];
   return analysis;
 }
 

@@ -15,6 +15,7 @@ import {
 } from "./customerStateTypes.js";
 import { aggregateCanonicalOpportunityComponents } from "./opportunityEngine.js";
 import { targetSupportsApprovedEstimate, targetSupportsDeterministic } from "./opportunityPolicy.js";
+import { buildCanonicalFeeRollupAssessments, FEE_ROLLUP_COMPLETENESS_POLICY_VERSION } from "./feeRollupEvidence.js";
 import { validateCanonicalMerchantAttentionModel } from "./merchantAttention.js";
 import type {
   CanonicalCustomerPermissionKey,
@@ -179,6 +180,9 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   if (analysis.versionManifest?.crossSummaryReconciliationAdjudicationPolicyVersion !== "cross_summary_reconciliation_adjudication_v1") {
     errors.push("Canonical version manifest must include cross_summary_reconciliation_adjudication_v1.");
   }
+  if (analysis.versionManifest?.feeRollupCompletenessPolicyVersion !== FEE_ROLLUP_COMPLETENESS_POLICY_VERSION) {
+    errors.push("Canonical version manifest must include fee_rollup_completeness_rounding_attribution_v1.");
+  }
   if (analysis.financialFacts.effectiveRateBasis?.policyVersion !== "effective_rate_basis_v1") {
     errors.push("Effective rate basis is missing or unsupported.");
   }
@@ -267,6 +271,20 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
     for (const control of analysis.feeLedger.controls) {
       for (const evidenceRef of control.evidenceRefs) {
         if (!evidenceIds.has(evidenceRef)) errors.push(`Fee ledger control ${control.id} evidence ref ${evidenceRef} is broken.`);
+      }
+      for (const evidenceRef of control.roundingBridge?.evidenceRefs ?? []) {
+        if (!evidenceIds.has(evidenceRef)) errors.push(`Fee ledger control ${control.id} rounding evidence ref ${evidenceRef} is broken.`);
+      }
+      if (
+        control.roundingBridge &&
+        (control.roundingBridge.policyVersion !== "fee_rollup_rounding_bridge_v1" ||
+          control.roundingBridge.method !== "exact_unrounded_partition_bridge" ||
+          control.roundingBridge.roundingMode !== "nearest_cent_half_away_from_zero")
+      ) {
+        errors.push(`Fee ledger control ${control.id} has an unsupported rounding bridge.`);
+      }
+      if (control.status === "pass_with_rounding" && !control.roundingBridge) {
+        errors.push(`Fee ledger control ${control.id} claims rounding without an exact evidence-backed rounding bridge.`);
       }
       if (control.expectedAmount && !isMoneyAmount(control.expectedAmount)) errors.push(`Fee ledger control ${control.id} has invalid expected amount.`);
       if (control.actualAmount && !isMoneyAmount(control.actualAmount)) errors.push(`Fee ledger control ${control.id} has invalid actual amount.`);
@@ -624,6 +642,9 @@ function validateCrossSummaryLinkEvidence(
   if (layer.adjudicationPolicyVersion !== "cross_summary_reconciliation_adjudication_v1") {
     errors.push("Cross-summary reconciliation adjudication policy is missing or unsupported.");
   }
+  if (layer.feeRollupPolicyVersion !== FEE_ROLLUP_COMPLETENESS_POLICY_VERSION) {
+    errors.push("Fee roll-up completeness and rounding attribution policy is missing or unsupported.");
+  }
   if (layer.authority !== "diagnostic_relationship_only") {
     errors.push("Cross-summary link evidence must remain diagnostic-only and cannot create canonical financial authority.");
   }
@@ -635,6 +656,25 @@ function validateCrossSummaryLinkEvidence(
       .flatMap((relationship) => [relationship.leftSummaryId, relationship.rightSummaryId]),
   );
   const statementPeriod = analysis.identity.statementPeriod.status === "selected" ? analysis.identity.statementPeriod.value : null;
+  const expectedFeeRollups = buildCanonicalFeeRollupAssessments(analysis.feeLedger);
+  if (JSON.stringify(layer.feeRollups) !== JSON.stringify(expectedFeeRollups)) {
+    errors.push("Fee roll-up assessments do not reconstruct from canonical fee controls.");
+  }
+  for (const rollup of layer.feeRollups) {
+    if (rollup.policyVersion !== FEE_ROLLUP_COMPLETENESS_POLICY_VERSION) errors.push(`Fee roll-up ${rollup.id} uses an unsupported policy.`);
+    if (rollup.countingTreatment !== "reference_only_no_addition") errors.push(`Fee roll-up ${rollup.id} could affect additive totals.`);
+    for (const evidenceRef of rollup.roundingEvidenceRefs) {
+      if (!evidenceIds.has(evidenceRef)) errors.push(`Fee roll-up ${rollup.id} rounding evidence ref ${evidenceRef} is broken.`);
+    }
+  }
+  const provenRoundedGrandControls = new Set(
+    expectedFeeRollups.filter((rollup) => rollup.status === "proven_complete_with_rounding").map((rollup) => rollup.grandControlRef),
+  );
+  for (const control of analysis.feeLedger.controls) {
+    if (control.status === "pass_with_rounding" && !provenRoundedGrandControls.has(control.id)) {
+      errors.push(`Fee ledger control ${control.id} claims rounding without a reconstructable exact rounding attribution.`);
+    }
+  }
   for (const node of layer.nodes) {
     if (node.sourceDocumentRef !== analysis.identity.sourceDocumentRef) {
       errors.push(`Cross-summary node ${node.id} is linked to a different source document.`);
@@ -741,9 +781,10 @@ function validateCrossSummaryLinkEvidence(
     }
   }
   const expectedStatus =
-    layer.relationships.length === 0
+    layer.relationships.length === 0 && layer.feeRollups.length === 0
       ? "unavailable"
-      : layer.relationships.every((relationship) => relationship.status === "proven")
+      : layer.relationships.every((relationship) => relationship.status === "proven") &&
+          layer.feeRollups.every((rollup) => rollup.status !== "unresolved")
         ? "available"
         : "partial";
   if (layer.status !== expectedStatus) errors.push("Cross-summary link evidence status does not reconstruct from relationship results.");

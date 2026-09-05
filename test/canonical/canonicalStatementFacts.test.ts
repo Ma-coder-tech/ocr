@@ -201,6 +201,14 @@ describe("canonical statement facts", () => {
     unsupportedAdjudication.crossSummaryLinkEvidence.adjudicationPolicyVersion = "unsupported" as never;
     expect(() => validateCanonicalStatementAnalysis(unsupportedAdjudication)).toThrow(/adjudication policy/);
 
+    const unsupportedFeeRollup = structuredClone(valid) as CanonicalStatementAnalysis;
+    unsupportedFeeRollup.crossSummaryLinkEvidence.feeRollupPolicyVersion = "unsupported" as never;
+    expect(() => validateCanonicalStatementAnalysis(unsupportedFeeRollup)).toThrow(/roll-up completeness/);
+
+    const unsupportedFeeRollupManifest = structuredClone(valid) as CanonicalStatementAnalysis;
+    unsupportedFeeRollupManifest.versionManifest.feeRollupCompletenessPolicyVersion = "unsupported" as never;
+    expect(() => validateCanonicalStatementAnalysis(unsupportedFeeRollupManifest)).toThrow(/fee_rollup_completeness/);
+
     const contradictoryCandidate = structuredClone(valid) as CanonicalStatementAnalysis;
     contradictoryCandidate.financialFacts.processedSales.candidates.push(
       {

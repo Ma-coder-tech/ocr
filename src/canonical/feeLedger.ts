@@ -141,7 +141,6 @@ export function buildCanonicalFeeLedger(input: {
           expectedAmount: printedTotal,
           actualAmount: uniqueChargeTotal,
           derivationGroupId: "canonical_fee_rows_vs_printed_control",
-          documentedOneCentRounding: Math.abs(numberOrNull(feeLedger.delta) ?? 0) === 0.01,
           coveredFeeRowIds: contributingRows.map((row) => row.id),
           basis: "grand_control",
           amountBasis: "signed_net",
@@ -262,7 +261,6 @@ function parserReconciliationControls(input: {
     const coveredFeeRowIds = coveredRowsForControl(label, input.rows, input.interpretations, hasExplicitGrandControl);
     const amountBasis = controlAmountBasisForLabel(label, basis);
     const actualAmount = reconstructedCoveredRowAmount(input.rows, coveredFeeRowIds, amountBasis);
-    const delta = numberOrNull(control.delta);
     return [
       printedMonetaryControl({
         id: `ctrl_parser_${stableControlId(label, index)}`,
@@ -271,7 +269,6 @@ function parserReconciliationControls(input: {
         expectedAmount: printedTotal,
         actualAmount,
         derivationGroupId: "parser_printed_fee_controls",
-        documentedOneCentRounding: Math.abs(delta ?? Number.NaN) === 0.01,
         coveredFeeRowIds,
         basis,
         amountBasis,
