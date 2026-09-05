@@ -1,0 +1,6931 @@
+{
+  "method": "Single-reviewer source-page visual annotation, then source-only native transcription; before structure outputs. Exhaustive detail cells in nine in-scope logical tables, not whole-document gold.",
+  "created_utc": "2026-09-05T02:36:01.511674+00:00",
+  "layout_families": 1,
+  "statements": [
+    {
+      "id": "holdout-1",
+      "sourceSha256": "d052c1c0e137e0f0cd27a72daf2dac7a67b35b171a6fc78bee389cdd1e135016",
+      "tables": [
+        {
+          "kind": "batch",
+          "regions": [
+            [
+              146,
+              589,
+              706,
+              13
+            ],
+            [
+              147,
+              166,
+              216,
+              6
+            ]
+          ],
+          "rows": [
+            {
+              "page": 146,
+              "y": 589.85,
+              "cells": [
+                {
+                  "rawText": "012200407644",
+                  "fragmentRefs": [
+                    "p146-f452"
+                  ]
+                },
+                {
+                  "rawText": "02/01/23",
+                  "fragmentRefs": [
+                    "p146-f454"
+                  ]
+                },
+                {
+                  "rawText": "$465.58",
+                  "fragmentRefs": [
+                    "p146-f456"
+                  ]
+                },
+                {
+                  "rawText": "6",
+                  "fragmentRefs": [
+                    "p146-f458"
+                  ]
+                },
+                {
+                  "rawText": "$2,793.50",
+                  "fragmentRefs": [
+                    "p146-f460"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p146-f462"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p146-f464"
+                  ]
+                },
+                {
+                  "rawText": "6",
+                  "fragmentRefs": [
+                    "p146-f466"
+                  ]
+                },
+                {
+                  "rawText": "$2,793.50",
+                  "fragmentRefs": [
+                    "p146-f468"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 146,
+              "y": 599.45,
+              "cells": [
+                {
+                  "rawText": "022156336794",
+                  "fragmentRefs": [
+                    "p146-f469"
+                  ]
+                },
+                {
+                  "rawText": "02/02/23",
+                  "fragmentRefs": [
+                    "p146-f471"
+                  ]
+                },
+                {
+                  "rawText": "$206.67",
+                  "fragmentRefs": [
+                    "p146-f473"
+                  ]
+                },
+                {
+                  "rawText": "3",
+                  "fragmentRefs": [
+                    "p146-f475"
+                  ]
+                },
+                {
+                  "rawText": "$620.00",
+                  "fragmentRefs": [
+                    "p146-f477"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p146-f479"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p146-f481"
+                  ]
+                },
+                {
+                  "rawText": "3",
+                  "fragmentRefs": [
+                    "p146-f483"
+                  ]
+                },
+                {
+                  "rawText": "$620.00",
+                  "fragmentRefs": [
+                    "p146-f485"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 146,
+              "y": 609.05,
+              "cells": [
+                {
+                  "rawText": "032155381492",
+                  "fragmentRefs": [
+                    "p146-f486"
+                  ]
+                },
+                {
+                  "rawText": "02/03/23",
+                  "fragmentRefs": [
+                    "p146-f488"
+                  ]
+                },
+                {
+                  "rawText": "$136.25",
+                  "fragmentRefs": [
+                    "p146-f490"
+                  ]
+                },
+                {
+                  "rawText": "4",
+                  "fragmentRefs": [
+                    "p146-f492"
+                  ]
+                },
+                {
+                  "rawText": "$545.00",
+                  "fragmentRefs": [
+                    "p146-f494"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p146-f496"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p146-f498"
+                  ]
+                },
+                {
+                  "rawText": "4",
+                  "fragmentRefs": [
+                    "p146-f500"
+                  ]
+                },
+                {
+                  "rawText": "$545.00",
+                  "fragmentRefs": [
+                    "p146-f502"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 146,
+              "y": 618.65,
+              "cells": [
+                {
+                  "rawText": "062156577818",
+                  "fragmentRefs": [
+                    "p146-f503"
+                  ]
+                },
+                {
+                  "rawText": "02/06/23",
+                  "fragmentRefs": [
+                    "p146-f505"
+                  ]
+                },
+                {
+                  "rawText": "$247.65",
+                  "fragmentRefs": [
+                    "p146-f507"
+                  ]
+                },
+                {
+                  "rawText": "30",
+                  "fragmentRefs": [
+                    "p146-f509"
+                  ]
+                },
+                {
+                  "rawText": "$7,429.50",
+                  "fragmentRefs": [
+                    "p146-f511"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p146-f513"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p146-f515"
+                  ]
+                },
+                {
+                  "rawText": "30",
+                  "fragmentRefs": [
+                    "p146-f517"
+                  ]
+                },
+                {
+                  "rawText": "$7,429.50",
+                  "fragmentRefs": [
+                    "p146-f519"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 146,
+              "y": 628.25,
+              "cells": [
+                {
+                  "rawText": "072157374369",
+                  "fragmentRefs": [
+                    "p146-f520"
+                  ]
+                },
+                {
+                  "rawText": "02/07/23",
+                  "fragmentRefs": [
+                    "p146-f522"
+                  ]
+                },
+                {
+                  "rawText": "$384.62",
+                  "fragmentRefs": [
+                    "p146-f524"
+                  ]
+                },
+                {
+                  "rawText": "36",
+                  "fragmentRefs": [
+                    "p146-f526"
+                  ]
+                },
+                {
+                  "rawText": "$13,846.15",
+                  "fragmentRefs": [
+                    "p146-f528"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p146-f530"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p146-f532"
+                  ]
+                },
+                {
+                  "rawText": "36",
+                  "fragmentRefs": [
+                    "p146-f534"
+                  ]
+                },
+                {
+                  "rawText": "$13,846.15",
+                  "fragmentRefs": [
+                    "p146-f536"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 146,
+              "y": 637.85,
+              "cells": [
+                {
+                  "rawText": "082210551074",
+                  "fragmentRefs": [
+                    "p146-f537"
+                  ]
+                },
+                {
+                  "rawText": "02/08/23",
+                  "fragmentRefs": [
+                    "p146-f539"
+                  ]
+                },
+                {
+                  "rawText": "$158.77",
+                  "fragmentRefs": [
+                    "p146-f541"
+                  ]
+                },
+                {
+                  "rawText": "14",
+                  "fragmentRefs": [
+                    "p146-f543"
+                  ]
+                },
+                {
+                  "rawText": "$2,222.76",
+                  "fragmentRefs": [
+                    "p146-f545"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p146-f547"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p146-f549"
+                  ]
+                },
+                {
+                  "rawText": "14",
+                  "fragmentRefs": [
+                    "p146-f551"
+                  ]
+                },
+                {
+                  "rawText": "$2,222.76",
+                  "fragmentRefs": [
+                    "p146-f553"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 146,
+              "y": 647.45,
+              "cells": [
+                {
+                  "rawText": "092148260443",
+                  "fragmentRefs": [
+                    "p146-f554"
+                  ]
+                },
+                {
+                  "rawText": "02/09/23",
+                  "fragmentRefs": [
+                    "p146-f556"
+                  ]
+                },
+                {
+                  "rawText": "$225.30",
+                  "fragmentRefs": [
+                    "p146-f558"
+                  ]
+                },
+                {
+                  "rawText": "23",
+                  "fragmentRefs": [
+                    "p146-f560"
+                  ]
+                },
+                {
+                  "rawText": "$5,182.00",
+                  "fragmentRefs": [
+                    "p146-f562"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p146-f564"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p146-f566"
+                  ]
+                },
+                {
+                  "rawText": "23",
+                  "fragmentRefs": [
+                    "p146-f568"
+                  ]
+                },
+                {
+                  "rawText": "$5,182.00",
+                  "fragmentRefs": [
+                    "p146-f570"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 146,
+              "y": 657.05,
+              "cells": [
+                {
+                  "rawText": "102149577259",
+                  "fragmentRefs": [
+                    "p146-f571"
+                  ]
+                },
+                {
+                  "rawText": "02/10/23",
+                  "fragmentRefs": [
+                    "p146-f573"
+                  ]
+                },
+                {
+                  "rawText": "$200.91",
+                  "fragmentRefs": [
+                    "p146-f575"
+                  ]
+                },
+                {
+                  "rawText": "23",
+                  "fragmentRefs": [
+                    "p146-f577"
+                  ]
+                },
+                {
+                  "rawText": "$4,621.00",
+                  "fragmentRefs": [
+                    "p146-f579"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p146-f581"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p146-f583"
+                  ]
+                },
+                {
+                  "rawText": "23",
+                  "fragmentRefs": [
+                    "p146-f585"
+                  ]
+                },
+                {
+                  "rawText": "$4,621.00",
+                  "fragmentRefs": [
+                    "p146-f587"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 146,
+              "y": 666.65,
+              "cells": [
+                {
+                  "rawText": "132148120843",
+                  "fragmentRefs": [
+                    "p146-f588"
+                  ]
+                },
+                {
+                  "rawText": "02/13/23",
+                  "fragmentRefs": [
+                    "p146-f590"
+                  ]
+                },
+                {
+                  "rawText": "$287.22",
+                  "fragmentRefs": [
+                    "p146-f592"
+                  ]
+                },
+                {
+                  "rawText": "24",
+                  "fragmentRefs": [
+                    "p146-f594"
+                  ]
+                },
+                {
+                  "rawText": "$6,893.25",
+                  "fragmentRefs": [
+                    "p146-f596"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p146-f598"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p146-f600"
+                  ]
+                },
+                {
+                  "rawText": "24",
+                  "fragmentRefs": [
+                    "p146-f602"
+                  ]
+                },
+                {
+                  "rawText": "$6,893.25",
+                  "fragmentRefs": [
+                    "p146-f604"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 146,
+              "y": 676.25,
+              "cells": [
+                {
+                  "rawText": "152148298834",
+                  "fragmentRefs": [
+                    "p146-f605"
+                  ]
+                },
+                {
+                  "rawText": "02/15/23",
+                  "fragmentRefs": [
+                    "p146-f607"
+                  ]
+                },
+                {
+                  "rawText": "$236.36",
+                  "fragmentRefs": [
+                    "p146-f609"
+                  ]
+                },
+                {
+                  "rawText": "45",
+                  "fragmentRefs": [
+                    "p146-f611"
+                  ]
+                },
+                {
+                  "rawText": "$10,636.04",
+                  "fragmentRefs": [
+                    "p146-f613"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p146-f615"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p146-f617"
+                  ]
+                },
+                {
+                  "rawText": "45",
+                  "fragmentRefs": [
+                    "p146-f619"
+                  ]
+                },
+                {
+                  "rawText": "$10,636.04",
+                  "fragmentRefs": [
+                    "p146-f621"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 146,
+              "y": 685.85,
+              "cells": [
+                {
+                  "rawText": "162148567263",
+                  "fragmentRefs": [
+                    "p146-f622"
+                  ]
+                },
+                {
+                  "rawText": "02/16/23",
+                  "fragmentRefs": [
+                    "p146-f624"
+                  ]
+                },
+                {
+                  "rawText": "$248.06",
+                  "fragmentRefs": [
+                    "p146-f626"
+                  ]
+                },
+                {
+                  "rawText": "37",
+                  "fragmentRefs": [
+                    "p146-f628"
+                  ]
+                },
+                {
+                  "rawText": "$9,178.40",
+                  "fragmentRefs": [
+                    "p146-f630"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p146-f632"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p146-f634"
+                  ]
+                },
+                {
+                  "rawText": "37",
+                  "fragmentRefs": [
+                    "p146-f636"
+                  ]
+                },
+                {
+                  "rawText": "$9,178.40",
+                  "fragmentRefs": [
+                    "p146-f638"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 146,
+              "y": 695.45,
+              "cells": [
+                {
+                  "rawText": "172155170378",
+                  "fragmentRefs": [
+                    "p146-f639"
+                  ]
+                },
+                {
+                  "rawText": "02/17/23",
+                  "fragmentRefs": [
+                    "p146-f641"
+                  ]
+                },
+                {
+                  "rawText": "$262.17",
+                  "fragmentRefs": [
+                    "p146-f643"
+                  ]
+                },
+                {
+                  "rawText": "37",
+                  "fragmentRefs": [
+                    "p146-f645"
+                  ]
+                },
+                {
+                  "rawText": "$9,700.28",
+                  "fragmentRefs": [
+                    "p146-f647"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p146-f649"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p146-f651"
+                  ]
+                },
+                {
+                  "rawText": "37",
+                  "fragmentRefs": [
+                    "p146-f653"
+                  ]
+                },
+                {
+                  "rawText": "$9,700.28",
+                  "fragmentRefs": [
+                    "p146-f655"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 146,
+              "y": 705.05,
+              "cells": [
+                {
+                  "rawText": "202147494887",
+                  "fragmentRefs": [
+                    "p146-f656"
+                  ]
+                },
+                {
+                  "rawText": "02/20/23",
+                  "fragmentRefs": [
+                    "p146-f658"
+                  ]
+                },
+                {
+                  "rawText": "$533.02",
+                  "fragmentRefs": [
+                    "p146-f660"
+                  ]
+                },
+                {
+                  "rawText": "12",
+                  "fragmentRefs": [
+                    "p146-f662"
+                  ]
+                },
+                {
+                  "rawText": "$6,396.27",
+                  "fragmentRefs": [
+                    "p146-f664"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p146-f666"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p146-f668"
+                  ]
+                },
+                {
+                  "rawText": "12",
+                  "fragmentRefs": [
+                    "p146-f670"
+                  ]
+                },
+                {
+                  "rawText": "$6,396.27",
+                  "fragmentRefs": [
+                    "p146-f672"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 166.75,
+              "cells": [
+                {
+                  "rawText": "221456304277",
+                  "fragmentRefs": [
+                    "p147-f59"
+                  ]
+                },
+                {
+                  "rawText": "02/22/23",
+                  "fragmentRefs": [
+                    "p147-f61"
+                  ]
+                },
+                {
+                  "rawText": "$212.01",
+                  "fragmentRefs": [
+                    "p147-f63"
+                  ]
+                },
+                {
+                  "rawText": "28",
+                  "fragmentRefs": [
+                    "p147-f65"
+                  ]
+                },
+                {
+                  "rawText": "$5,936.35",
+                  "fragmentRefs": [
+                    "p147-f67"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p147-f69"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p147-f71"
+                  ]
+                },
+                {
+                  "rawText": "28",
+                  "fragmentRefs": [
+                    "p147-f73"
+                  ]
+                },
+                {
+                  "rawText": "$5,936.35",
+                  "fragmentRefs": [
+                    "p147-f75"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 176.35000000000002,
+              "cells": [
+                {
+                  "rawText": "222147410488",
+                  "fragmentRefs": [
+                    "p147-f76"
+                  ]
+                },
+                {
+                  "rawText": "02/22/23",
+                  "fragmentRefs": [
+                    "p147-f78"
+                  ]
+                },
+                {
+                  "rawText": "$481.50",
+                  "fragmentRefs": [
+                    "p147-f80"
+                  ]
+                },
+                {
+                  "rawText": "16",
+                  "fragmentRefs": [
+                    "p147-f82"
+                  ]
+                },
+                {
+                  "rawText": "$7,704.00",
+                  "fragmentRefs": [
+                    "p147-f84"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p147-f86"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p147-f88"
+                  ]
+                },
+                {
+                  "rawText": "16",
+                  "fragmentRefs": [
+                    "p147-f90"
+                  ]
+                },
+                {
+                  "rawText": "$7,704.00",
+                  "fragmentRefs": [
+                    "p147-f92"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 185.95000000000005,
+              "cells": [
+                {
+                  "rawText": "232147415229",
+                  "fragmentRefs": [
+                    "p147-f93"
+                  ]
+                },
+                {
+                  "rawText": "02/23/23",
+                  "fragmentRefs": [
+                    "p147-f95"
+                  ]
+                },
+                {
+                  "rawText": "$266.47",
+                  "fragmentRefs": [
+                    "p147-f97"
+                  ]
+                },
+                {
+                  "rawText": "19",
+                  "fragmentRefs": [
+                    "p147-f99"
+                  ]
+                },
+                {
+                  "rawText": "$5,063.00",
+                  "fragmentRefs": [
+                    "p147-f101"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p147-f103"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p147-f105"
+                  ]
+                },
+                {
+                  "rawText": "19",
+                  "fragmentRefs": [
+                    "p147-f107"
+                  ]
+                },
+                {
+                  "rawText": "$5,063.00",
+                  "fragmentRefs": [
+                    "p147-f109"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 195.54999999999995,
+              "cells": [
+                {
+                  "rawText": "242147209176",
+                  "fragmentRefs": [
+                    "p147-f110"
+                  ]
+                },
+                {
+                  "rawText": "02/24/23",
+                  "fragmentRefs": [
+                    "p147-f112"
+                  ]
+                },
+                {
+                  "rawText": "$175.00",
+                  "fragmentRefs": [
+                    "p147-f114"
+                  ]
+                },
+                {
+                  "rawText": "18",
+                  "fragmentRefs": [
+                    "p147-f116"
+                  ]
+                },
+                {
+                  "rawText": "$3,150.00",
+                  "fragmentRefs": [
+                    "p147-f118"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p147-f120"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p147-f122"
+                  ]
+                },
+                {
+                  "rawText": "18",
+                  "fragmentRefs": [
+                    "p147-f124"
+                  ]
+                },
+                {
+                  "rawText": "$3,150.00",
+                  "fragmentRefs": [
+                    "p147-f126"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 205.14999999999998,
+              "cells": [
+                {
+                  "rawText": "272147396028",
+                  "fragmentRefs": [
+                    "p147-f127"
+                  ]
+                },
+                {
+                  "rawText": "02/27/23",
+                  "fragmentRefs": [
+                    "p147-f129"
+                  ]
+                },
+                {
+                  "rawText": "$295.00",
+                  "fragmentRefs": [
+                    "p147-f131"
+                  ]
+                },
+                {
+                  "rawText": "2",
+                  "fragmentRefs": [
+                    "p147-f133"
+                  ]
+                },
+                {
+                  "rawText": "$590.00",
+                  "fragmentRefs": [
+                    "p147-f135"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p147-f137"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p147-f139"
+                  ]
+                },
+                {
+                  "rawText": "2",
+                  "fragmentRefs": [
+                    "p147-f141"
+                  ]
+                },
+                {
+                  "rawText": "$590.00",
+                  "fragmentRefs": [
+                    "p147-f143"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 214.75,
+              "cells": [
+                {
+                  "rawText": "282151414934",
+                  "fragmentRefs": [
+                    "p147-f144"
+                  ]
+                },
+                {
+                  "rawText": "02/28/23",
+                  "fragmentRefs": [
+                    "p147-f146"
+                  ]
+                },
+                {
+                  "rawText": "$275.35",
+                  "fragmentRefs": [
+                    "p147-f148"
+                  ]
+                },
+                {
+                  "rawText": "37",
+                  "fragmentRefs": [
+                    "p147-f150"
+                  ]
+                },
+                {
+                  "rawText": "$10,188.00",
+                  "fragmentRefs": [
+                    "p147-f152"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p147-f154"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p147-f156"
+                  ]
+                },
+                {
+                  "rawText": "37",
+                  "fragmentRefs": [
+                    "p147-f158"
+                  ]
+                },
+                {
+                  "rawText": "$10,188.00",
+                  "fragmentRefs": [
+                    "p147-f160"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 147,
+          "totalAmount": "$112,695.50",
+          "expectedMemberCount": 19,
+          "continuation": "repeated_header",
+          "totalFragmentRefs": [
+            "p147-f162",
+            "p147-f164",
+            "p147-f166",
+            "p147-f168",
+            "p147-f170",
+            "p147-f172",
+            "p147-f174"
+          ]
+        },
+        {
+          "kind": "transaction",
+          "regions": [
+            [
+              147,
+              480,
+              716,
+              22
+            ],
+            [
+              148,
+              130,
+              307,
+              15
+            ]
+          ],
+          "rows": [
+            {
+              "page": 147,
+              "y": 489.29999999999995,
+              "cells": [
+                {
+                  "rawText": "MC ASSESSMNT TRAN AMT >=$1K 0 X TRNS $4994.00",
+                  "fragmentRefs": [
+                    "p147-f229"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f231"
+                  ]
+                },
+                {
+                  "rawText": "-$0.49",
+                  "fragmentRefs": [
+                    "p147-f233"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 498.9,
+              "cells": [
+                {
+                  "rawText": "MC-WORLDCARD PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p147-f234"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f236"
+                  ]
+                },
+                {
+                  "rawText": "-$4.75",
+                  "fragmentRefs": [
+                    "p147-f238"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 508.5,
+              "cells": [
+                {
+                  "rawText": "MC-EMRG MKT EDU/GOVT(DB)",
+                  "fragmentRefs": [
+                    "p147-f239"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f241"
+                  ]
+                },
+                {
+                  "rawText": "-$21.78",
+                  "fragmentRefs": [
+                    "p147-f243"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 518.1,
+              "cells": [
+                {
+                  "rawText": "MC-COMM DATA RATE II BUS (DB)",
+                  "fragmentRefs": [
+                    "p147-f244"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f246"
+                  ]
+                },
+                {
+                  "rawText": "-$3.35",
+                  "fragmentRefs": [
+                    "p147-f248"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 527.7,
+              "cells": [
+                {
+                  "rawText": "MC-INT CON RTE 3 BASE SPRM",
+                  "fragmentRefs": [
+                    "p147-f249"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f251"
+                  ]
+                },
+                {
+                  "rawText": "-$2.61",
+                  "fragmentRefs": [
+                    "p147-f253"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 537.3000000000001,
+              "cells": [
+                {
+                  "rawText": "MC-EMRG MKT EDU/GOVT(DB)CAP",
+                  "fragmentRefs": [
+                    "p147-f254"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f256"
+                  ]
+                },
+                {
+                  "rawText": "-$16.00",
+                  "fragmentRefs": [
+                    "p147-f258"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 546.9000000000001,
+              "cells": [
+                {
+                  "rawText": "MASTERCARD ASSESSMENT FEE 0.0013 TIMES $38428.20",
+                  "fragmentRefs": [
+                    "p147-f259"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f261"
+                  ]
+                },
+                {
+                  "rawText": "-$49.96",
+                  "fragmentRefs": [
+                    "p147-f263"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 556.5,
+              "cells": [
+                {
+                  "rawText": "MC-REG INCENT FRF ADJ POS (DB)",
+                  "fragmentRefs": [
+                    "p147-f264"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f266"
+                  ]
+                },
+                {
+                  "rawText": "-$21.45",
+                  "fragmentRefs": [
+                    "p147-f268"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 566.1,
+              "cells": [
+                {
+                  "rawText": "MC-HIGH VAL PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p147-f269"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f271"
+                  ]
+                },
+                {
+                  "rawText": "-$5.06",
+                  "fragmentRefs": [
+                    "p147-f273"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 575.7,
+              "cells": [
+                {
+                  "rawText": "MC-WORLD ELITE PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p147-f274"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f276"
+                  ]
+                },
+                {
+                  "rawText": "-$90.62",
+                  "fragmentRefs": [
+                    "p147-f278"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 585.3,
+              "cells": [
+                {
+                  "rawText": "MC-ENHANCED PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p147-f279"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f281"
+                  ]
+                },
+                {
+                  "rawText": "-$72.14",
+                  "fragmentRefs": [
+                    "p147-f283"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 594.9,
+              "cells": [
+                {
+                  "rawText": "MC-REGULATED FRD ADJ COMM (DB)",
+                  "fragmentRefs": [
+                    "p147-f284"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f286"
+                  ]
+                },
+                {
+                  "rawText": "-$1.79",
+                  "fragmentRefs": [
+                    "p147-f288"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 604.5,
+              "cells": [
+                {
+                  "rawText": "MC-PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p147-f289"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f291"
+                  ]
+                },
+                {
+                  "rawText": "-$26.89",
+                  "fragmentRefs": [
+                    "p147-f293"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 614.1,
+              "cells": [
+                {
+                  "rawText": "MC-BUS LEVEL 5 DATA RATE II",
+                  "fragmentRefs": [
+                    "p147-f294"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f296"
+                  ]
+                },
+                {
+                  "rawText": "-$1.23",
+                  "fragmentRefs": [
+                    "p147-f298"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 623.7,
+              "cells": [
+                {
+                  "rawText": "MC-REG INCENTIVE POS (DB)",
+                  "fragmentRefs": [
+                    "p147-f299"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f301"
+                  ]
+                },
+                {
+                  "rawText": "-$0.46",
+                  "fragmentRefs": [
+                    "p147-f303"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 633.3,
+              "cells": [
+                {
+                  "rawText": "MC-AUTH DIGITAL ENABLEMENT MAX 6 TRANSACTIONS AT 0.2",
+                  "fragmentRefs": [
+                    "p147-f304"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p147-f306"
+                  ]
+                },
+                {
+                  "rawText": "-$1.20",
+                  "fragmentRefs": [
+                    "p147-f308"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 642.9,
+              "cells": [
+                {
+                  "rawText": "MC-AUTH DIGITAL ENABLEMENT MIN 52 TRANSACTIONS AT 0.02",
+                  "fragmentRefs": [
+                    "p147-f309"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p147-f311"
+                  ]
+                },
+                {
+                  "rawText": "-$1.04",
+                  "fragmentRefs": [
+                    "p147-f313"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 666.9,
+              "cells": [
+                {
+                  "rawText": "VI-CPS GOVERNMENT PREPAID",
+                  "fragmentRefs": [
+                    "p147-f317"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f319"
+                  ]
+                },
+                {
+                  "rawText": "-$7.53",
+                  "fragmentRefs": [
+                    "p147-f321"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 676.5,
+              "cells": [
+                {
+                  "rawText": "VISA ASSESSMENT FEE DB 0.0013 TIMES $60965.01",
+                  "fragmentRefs": [
+                    "p147-f322"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f324"
+                  ]
+                },
+                {
+                  "rawText": "-$79.25",
+                  "fragmentRefs": [
+                    "p147-f326"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 686.0999999999999,
+              "cells": [
+                {
+                  "rawText": "VI-CPS GOVERNMENT DEBIT (CAP)",
+                  "fragmentRefs": [
+                    "p147-f327"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f329"
+                  ]
+                },
+                {
+                  "rawText": "-$18.00",
+                  "fragmentRefs": [
+                    "p147-f331"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 695.6999999999999,
+              "cells": [
+                {
+                  "rawText": "VI-BUSINESS CARD TR3 LEVEL 2",
+                  "fragmentRefs": [
+                    "p147-f332"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f334"
+                  ]
+                },
+                {
+                  "rawText": "-$1.15",
+                  "fragmentRefs": [
+                    "p147-f336"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 147,
+              "y": 705.3,
+              "cells": [
+                {
+                  "rawText": "VI-GOVERNMENT PREPAID(CAP)",
+                  "fragmentRefs": [
+                    "p147-f337"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p147-f339"
+                  ]
+                },
+                {
+                  "rawText": "-$6.00",
+                  "fragmentRefs": [
+                    "p147-f341"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 133.60000000000002,
+              "cells": [
+                {
+                  "rawText": "VI-US REGULATED (DB)",
+                  "fragmentRefs": [
+                    "p148-f31"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p148-f33"
+                  ]
+                },
+                {
+                  "rawText": "-$63.03",
+                  "fragmentRefs": [
+                    "p148-f35"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 143.20000000000005,
+              "cells": [
+                {
+                  "rawText": "VISA ASSESSMENT FEE CR 0.0014 TIMES $11272.29",
+                  "fragmentRefs": [
+                    "p148-f36"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p148-f38"
+                  ]
+                },
+                {
+                  "rawText": "-$15.78",
+                  "fragmentRefs": [
+                    "p148-f40"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 152.80000000000007,
+              "cells": [
+                {
+                  "rawText": "VI-CPS GOVERNMENT ALL",
+                  "fragmentRefs": [
+                    "p148-f41"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p148-f43"
+                  ]
+                },
+                {
+                  "rawText": "-$171.27",
+                  "fragmentRefs": [
+                    "p148-f45"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 162.4000000000001,
+              "cells": [
+                {
+                  "rawText": "VI-US REGULATED COMM (DB)",
+                  "fragmentRefs": [
+                    "p148-f46"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p148-f48"
+                  ]
+                },
+                {
+                  "rawText": "-$4.37",
+                  "fragmentRefs": [
+                    "p148-f50"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 172.0000000000001,
+              "cells": [
+                {
+                  "rawText": "VI-BUSINESS CARD TR2 LEVEL 2",
+                  "fragmentRefs": [
+                    "p148-f51"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p148-f53"
+                  ]
+                },
+                {
+                  "rawText": "-$8.67",
+                  "fragmentRefs": [
+                    "p148-f55"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 181.60000000000014,
+              "cells": [
+                {
+                  "rawText": "VI-CPS GOVERNMENT DEBIT",
+                  "fragmentRefs": [
+                    "p148-f56"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p148-f58"
+                  ]
+                },
+                {
+                  "rawText": "-$7.14",
+                  "fragmentRefs": [
+                    "p148-f60"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 191.20000000000016,
+              "cells": [
+                {
+                  "rawText": "VI NEVER APPROVE REATTEMPT FEE 1 TRANSACTIONS AT 0.1",
+                  "fragmentRefs": [
+                    "p148-f61"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p148-f63"
+                  ]
+                },
+                {
+                  "rawText": "-$0.10",
+                  "fragmentRefs": [
+                    "p148-f65"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 200.80000000000018,
+              "cells": [
+                {
+                  "rawText": "VI-ADDRESS VER SVC FEE 63 TRANSACTIONS AT 0.001",
+                  "fragmentRefs": [
+                    "p148-f66"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p148-f68"
+                  ]
+                },
+                {
+                  "rawText": "-$0.08",
+                  "fragmentRefs": [
+                    "p148-f70"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 224.80000000000018,
+              "cells": [
+                {
+                  "rawText": "DISCOVER ASSESSMENT FEE 0.0014 TIMES $2030.00",
+                  "fragmentRefs": [
+                    "p148-f74"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p148-f76"
+                  ]
+                },
+                {
+                  "rawText": "-$2.84",
+                  "fragmentRefs": [
+                    "p148-f78"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 234.4000000000002,
+              "cells": [
+                {
+                  "rawText": "DSCVR COMML ELECT EMRG MKT",
+                  "fragmentRefs": [
+                    "p148-f79"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p148-f81"
+                  ]
+                },
+                {
+                  "rawText": "-$36.92",
+                  "fragmentRefs": [
+                    "p148-f83"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 244.00000000000023,
+              "cells": [
+                {
+                  "rawText": "DSCVR PSL PUBLIC SVC RW",
+                  "fragmentRefs": [
+                    "p148-f84"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p148-f86"
+                  ]
+                },
+                {
+                  "rawText": "-$8.91",
+                  "fragmentRefs": [
+                    "p148-f88"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 253.60000000000025,
+              "cells": [
+                {
+                  "rawText": "ADDRS VERIFICATION SERVICE FEE 8 TRANSACTIONS AT 0.005",
+                  "fragmentRefs": [
+                    "p148-f89"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p148-f91"
+                  ]
+                },
+                {
+                  "rawText": "-$0.07",
+                  "fragmentRefs": [
+                    "p148-f93"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 277.6000000000002,
+              "cells": [
+                {
+                  "rawText": "DIGITAL INVESTMENT FEE $2030.00 AT0.0001",
+                  "fragmentRefs": [
+                    "p148-f97"
+                  ]
+                },
+                {
+                  "rawText": "Service charges",
+                  "fragmentRefs": [
+                    "p148-f99"
+                  ]
+                },
+                {
+                  "rawText": "-$0.22",
+                  "fragmentRefs": [
+                    "p148-f101"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 287.2000000000002,
+              "cells": [
+                {
+                  "rawText": "VI COMM CARD I/C SAVINGS ADJ 0.5 DISC RATE TIMES $3.51",
+                  "fragmentRefs": [
+                    "p148-f102"
+                  ]
+                },
+                {
+                  "rawText": "Service charges",
+                  "fragmentRefs": [
+                    "p148-f104"
+                  ]
+                },
+                {
+                  "rawText": "-$1.76",
+                  "fragmentRefs": [
+                    "p148-f106"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 296.80000000000024,
+              "cells": [
+                {
+                  "rawText": "MC-AUTH DIGITAL ENABLEMENT FEE $27165.20 AT0.0002",
+                  "fragmentRefs": [
+                    "p148-f107"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p148-f109"
+                  ]
+                },
+                {
+                  "rawText": "-$5.44",
+                  "fragmentRefs": [
+                    "p148-f111"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 148,
+          "totalAmount": "-$759.35",
+          "expectedMemberCount": 37,
+          "continuation": "headerless",
+          "totalFragmentRefs": [
+            "p148-f113",
+            "p148-f115"
+          ]
+        },
+        {
+          "kind": "account",
+          "regions": [
+            [
+              148,
+              334,
+              365,
+              4
+            ]
+          ],
+          "rows": [
+            {
+              "page": 148,
+              "y": 335.2,
+              "cells": [
+                {
+                  "rawText": "MC MONTHLY LOCATION FEE",
+                  "fragmentRefs": [
+                    "p148-f122"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p148-f124"
+                  ]
+                },
+                {
+                  "rawText": "-$1.25",
+                  "fragmentRefs": [
+                    "p148-f126"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 344.8,
+              "cells": [
+                {
+                  "rawText": "VISA NETWORK FEE CNP 2-06",
+                  "fragmentRefs": [
+                    "p148-f127"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p148-f129"
+                  ]
+                },
+                {
+                  "rawText": "-$36.72",
+                  "fragmentRefs": [
+                    "p148-f131"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 354.40000000000003,
+              "cells": [
+                {
+                  "rawText": "MC GLOBAL ACQUIRER FEE 0 TRANS TOTALING $131.64",
+                  "fragmentRefs": [
+                    "p148-f132"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p148-f134"
+                  ]
+                },
+                {
+                  "rawText": "-$1.12",
+                  "fragmentRefs": [
+                    "p148-f136"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 148,
+              "y": 364.00000000000006,
+              "cells": [
+                {
+                  "rawText": "US CROSS BORDER FEE 0 TRANS TOTALING $131.64",
+                  "fragmentRefs": [
+                    "p148-f137"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p148-f139"
+                  ]
+                },
+                {
+                  "rawText": "-$0.79",
+                  "fragmentRefs": [
+                    "p148-f141"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 148,
+          "totalAmount": "-$39.88",
+          "expectedMemberCount": 4,
+          "continuation": null,
+          "totalFragmentRefs": [
+            "p148-f143",
+            "p148-f145"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "holdout-2",
+      "sourceSha256": "d052c1c0e137e0f0cd27a72daf2dac7a67b35b171a6fc78bee389cdd1e135016",
+      "tables": [
+        {
+          "kind": "batch",
+          "regions": [
+            [
+              152,
+              608,
+              706,
+              11
+            ],
+            [
+              153,
+              166,
+              245,
+              9
+            ]
+          ],
+          "rows": [
+            {
+              "page": 152,
+              "y": 609.05,
+              "cells": [
+                {
+                  "rawText": "032156362909",
+                  "fragmentRefs": [
+                    "p152-f474"
+                  ]
+                },
+                {
+                  "rawText": "01/03/23",
+                  "fragmentRefs": [
+                    "p152-f476"
+                  ]
+                },
+                {
+                  "rawText": "$338.57",
+                  "fragmentRefs": [
+                    "p152-f478"
+                  ]
+                },
+                {
+                  "rawText": "32",
+                  "fragmentRefs": [
+                    "p152-f480"
+                  ]
+                },
+                {
+                  "rawText": "$10,834.16",
+                  "fragmentRefs": [
+                    "p152-f482"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p152-f484"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p152-f486"
+                  ]
+                },
+                {
+                  "rawText": "32",
+                  "fragmentRefs": [
+                    "p152-f488"
+                  ]
+                },
+                {
+                  "rawText": "$10,834.16",
+                  "fragmentRefs": [
+                    "p152-f490"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 152,
+              "y": 618.65,
+              "cells": [
+                {
+                  "rawText": "042156554434",
+                  "fragmentRefs": [
+                    "p152-f491"
+                  ]
+                },
+                {
+                  "rawText": "01/04/23",
+                  "fragmentRefs": [
+                    "p152-f493"
+                  ]
+                },
+                {
+                  "rawText": "$204.42",
+                  "fragmentRefs": [
+                    "p152-f495"
+                  ]
+                },
+                {
+                  "rawText": "24",
+                  "fragmentRefs": [
+                    "p152-f497"
+                  ]
+                },
+                {
+                  "rawText": "$4,906.00",
+                  "fragmentRefs": [
+                    "p152-f499"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p152-f501"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p152-f503"
+                  ]
+                },
+                {
+                  "rawText": "24",
+                  "fragmentRefs": [
+                    "p152-f505"
+                  ]
+                },
+                {
+                  "rawText": "$4,906.00",
+                  "fragmentRefs": [
+                    "p152-f507"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 152,
+              "y": 628.25,
+              "cells": [
+                {
+                  "rawText": "052158245934",
+                  "fragmentRefs": [
+                    "p152-f508"
+                  ]
+                },
+                {
+                  "rawText": "01/05/23",
+                  "fragmentRefs": [
+                    "p152-f510"
+                  ]
+                },
+                {
+                  "rawText": "$211.87",
+                  "fragmentRefs": [
+                    "p152-f512"
+                  ]
+                },
+                {
+                  "rawText": "16",
+                  "fragmentRefs": [
+                    "p152-f514"
+                  ]
+                },
+                {
+                  "rawText": "$3,389.90",
+                  "fragmentRefs": [
+                    "p152-f516"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p152-f518"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p152-f520"
+                  ]
+                },
+                {
+                  "rawText": "16",
+                  "fragmentRefs": [
+                    "p152-f522"
+                  ]
+                },
+                {
+                  "rawText": "$3,389.90",
+                  "fragmentRefs": [
+                    "p152-f524"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 152,
+              "y": 637.85,
+              "cells": [
+                {
+                  "rawText": "062156296321",
+                  "fragmentRefs": [
+                    "p152-f525"
+                  ]
+                },
+                {
+                  "rawText": "01/06/23",
+                  "fragmentRefs": [
+                    "p152-f527"
+                  ]
+                },
+                {
+                  "rawText": "$346.03",
+                  "fragmentRefs": [
+                    "p152-f529"
+                  ]
+                },
+                {
+                  "rawText": "21",
+                  "fragmentRefs": [
+                    "p152-f531"
+                  ]
+                },
+                {
+                  "rawText": "$7,266.62",
+                  "fragmentRefs": [
+                    "p152-f533"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p152-f535"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p152-f537"
+                  ]
+                },
+                {
+                  "rawText": "21",
+                  "fragmentRefs": [
+                    "p152-f539"
+                  ]
+                },
+                {
+                  "rawText": "$7,266.62",
+                  "fragmentRefs": [
+                    "p152-f541"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 152,
+              "y": 647.45,
+              "cells": [
+                {
+                  "rawText": "092156149479",
+                  "fragmentRefs": [
+                    "p152-f542"
+                  ]
+                },
+                {
+                  "rawText": "01/09/23",
+                  "fragmentRefs": [
+                    "p152-f544"
+                  ]
+                },
+                {
+                  "rawText": "$177.53",
+                  "fragmentRefs": [
+                    "p152-f546"
+                  ]
+                },
+                {
+                  "rawText": "38",
+                  "fragmentRefs": [
+                    "p152-f548"
+                  ]
+                },
+                {
+                  "rawText": "$7,061.68",
+                  "fragmentRefs": [
+                    "p152-f550"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p152-f552"
+                  ]
+                },
+                {
+                  "rawText": "-$138.00",
+                  "fragmentRefs": [
+                    "p152-f554"
+                  ]
+                },
+                {
+                  "rawText": "39",
+                  "fragmentRefs": [
+                    "p152-f556"
+                  ]
+                },
+                {
+                  "rawText": "$6,923.68",
+                  "fragmentRefs": [
+                    "p152-f558"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 152,
+              "y": 657.05,
+              "cells": [
+                {
+                  "rawText": "102155334663",
+                  "fragmentRefs": [
+                    "p152-f559"
+                  ]
+                },
+                {
+                  "rawText": "01/10/23",
+                  "fragmentRefs": [
+                    "p152-f561"
+                  ]
+                },
+                {
+                  "rawText": "$266.52",
+                  "fragmentRefs": [
+                    "p152-f563"
+                  ]
+                },
+                {
+                  "rawText": "18",
+                  "fragmentRefs": [
+                    "p152-f565"
+                  ]
+                },
+                {
+                  "rawText": "$4,797.40",
+                  "fragmentRefs": [
+                    "p152-f567"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p152-f569"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p152-f571"
+                  ]
+                },
+                {
+                  "rawText": "18",
+                  "fragmentRefs": [
+                    "p152-f573"
+                  ]
+                },
+                {
+                  "rawText": "$4,797.40",
+                  "fragmentRefs": [
+                    "p152-f575"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 152,
+              "y": 666.65,
+              "cells": [
+                {
+                  "rawText": "112158263084",
+                  "fragmentRefs": [
+                    "p152-f576"
+                  ]
+                },
+                {
+                  "rawText": "01/11/23",
+                  "fragmentRefs": [
+                    "p152-f578"
+                  ]
+                },
+                {
+                  "rawText": "$209.00",
+                  "fragmentRefs": [
+                    "p152-f580"
+                  ]
+                },
+                {
+                  "rawText": "19",
+                  "fragmentRefs": [
+                    "p152-f582"
+                  ]
+                },
+                {
+                  "rawText": "$3,971.00",
+                  "fragmentRefs": [
+                    "p152-f584"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p152-f586"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p152-f588"
+                  ]
+                },
+                {
+                  "rawText": "19",
+                  "fragmentRefs": [
+                    "p152-f590"
+                  ]
+                },
+                {
+                  "rawText": "$3,971.00",
+                  "fragmentRefs": [
+                    "p152-f592"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 152,
+              "y": 676.25,
+              "cells": [
+                {
+                  "rawText": "122154288723",
+                  "fragmentRefs": [
+                    "p152-f593"
+                  ]
+                },
+                {
+                  "rawText": "01/12/23",
+                  "fragmentRefs": [
+                    "p152-f595"
+                  ]
+                },
+                {
+                  "rawText": "$379.35",
+                  "fragmentRefs": [
+                    "p152-f597"
+                  ]
+                },
+                {
+                  "rawText": "17",
+                  "fragmentRefs": [
+                    "p152-f599"
+                  ]
+                },
+                {
+                  "rawText": "$6,449.00",
+                  "fragmentRefs": [
+                    "p152-f601"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p152-f603"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p152-f605"
+                  ]
+                },
+                {
+                  "rawText": "17",
+                  "fragmentRefs": [
+                    "p152-f607"
+                  ]
+                },
+                {
+                  "rawText": "$6,449.00",
+                  "fragmentRefs": [
+                    "p152-f609"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 152,
+              "y": 685.85,
+              "cells": [
+                {
+                  "rawText": "132155260615",
+                  "fragmentRefs": [
+                    "p152-f610"
+                  ]
+                },
+                {
+                  "rawText": "01/13/23",
+                  "fragmentRefs": [
+                    "p152-f612"
+                  ]
+                },
+                {
+                  "rawText": "$216.88",
+                  "fragmentRefs": [
+                    "p152-f614"
+                  ]
+                },
+                {
+                  "rawText": "25",
+                  "fragmentRefs": [
+                    "p152-f616"
+                  ]
+                },
+                {
+                  "rawText": "$5,422.00",
+                  "fragmentRefs": [
+                    "p152-f618"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p152-f620"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p152-f622"
+                  ]
+                },
+                {
+                  "rawText": "25",
+                  "fragmentRefs": [
+                    "p152-f624"
+                  ]
+                },
+                {
+                  "rawText": "$5,422.00",
+                  "fragmentRefs": [
+                    "p152-f626"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 152,
+              "y": 695.45,
+              "cells": [
+                {
+                  "rawText": "172157466429",
+                  "fragmentRefs": [
+                    "p152-f627"
+                  ]
+                },
+                {
+                  "rawText": "01/17/23",
+                  "fragmentRefs": [
+                    "p152-f629"
+                  ]
+                },
+                {
+                  "rawText": "$488.56",
+                  "fragmentRefs": [
+                    "p152-f631"
+                  ]
+                },
+                {
+                  "rawText": "34",
+                  "fragmentRefs": [
+                    "p152-f633"
+                  ]
+                },
+                {
+                  "rawText": "$16,611.14",
+                  "fragmentRefs": [
+                    "p152-f635"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p152-f637"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p152-f639"
+                  ]
+                },
+                {
+                  "rawText": "34",
+                  "fragmentRefs": [
+                    "p152-f641"
+                  ]
+                },
+                {
+                  "rawText": "$16,611.14",
+                  "fragmentRefs": [
+                    "p152-f643"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 152,
+              "y": 705.05,
+              "cells": [
+                {
+                  "rawText": "182155170666",
+                  "fragmentRefs": [
+                    "p152-f644"
+                  ]
+                },
+                {
+                  "rawText": "01/18/23",
+                  "fragmentRefs": [
+                    "p152-f646"
+                  ]
+                },
+                {
+                  "rawText": "$473.74",
+                  "fragmentRefs": [
+                    "p152-f648"
+                  ]
+                },
+                {
+                  "rawText": "21",
+                  "fragmentRefs": [
+                    "p152-f650"
+                  ]
+                },
+                {
+                  "rawText": "$9,948.50",
+                  "fragmentRefs": [
+                    "p152-f652"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p152-f654"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p152-f656"
+                  ]
+                },
+                {
+                  "rawText": "21",
+                  "fragmentRefs": [
+                    "p152-f658"
+                  ]
+                },
+                {
+                  "rawText": "$9,948.50",
+                  "fragmentRefs": [
+                    "p152-f660"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 166.75,
+              "cells": [
+                {
+                  "rawText": "192156275307",
+                  "fragmentRefs": [
+                    "p153-f59"
+                  ]
+                },
+                {
+                  "rawText": "01/19/23",
+                  "fragmentRefs": [
+                    "p153-f61"
+                  ]
+                },
+                {
+                  "rawText": "$480.68",
+                  "fragmentRefs": [
+                    "p153-f63"
+                  ]
+                },
+                {
+                  "rawText": "23",
+                  "fragmentRefs": [
+                    "p153-f65"
+                  ]
+                },
+                {
+                  "rawText": "$11,055.64",
+                  "fragmentRefs": [
+                    "p153-f67"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p153-f69"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p153-f71"
+                  ]
+                },
+                {
+                  "rawText": "23",
+                  "fragmentRefs": [
+                    "p153-f73"
+                  ]
+                },
+                {
+                  "rawText": "$11,055.64",
+                  "fragmentRefs": [
+                    "p153-f75"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 176.35000000000002,
+              "cells": [
+                {
+                  "rawText": "202157382704",
+                  "fragmentRefs": [
+                    "p153-f76"
+                  ]
+                },
+                {
+                  "rawText": "01/20/23",
+                  "fragmentRefs": [
+                    "p153-f78"
+                  ]
+                },
+                {
+                  "rawText": "$479.28",
+                  "fragmentRefs": [
+                    "p153-f80"
+                  ]
+                },
+                {
+                  "rawText": "11",
+                  "fragmentRefs": [
+                    "p153-f82"
+                  ]
+                },
+                {
+                  "rawText": "$5,272.03",
+                  "fragmentRefs": [
+                    "p153-f84"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p153-f86"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p153-f88"
+                  ]
+                },
+                {
+                  "rawText": "11",
+                  "fragmentRefs": [
+                    "p153-f90"
+                  ]
+                },
+                {
+                  "rawText": "$5,272.03",
+                  "fragmentRefs": [
+                    "p153-f92"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 185.95000000000005,
+              "cells": [
+                {
+                  "rawText": "232155355489",
+                  "fragmentRefs": [
+                    "p153-f93"
+                  ]
+                },
+                {
+                  "rawText": "01/23/23",
+                  "fragmentRefs": [
+                    "p153-f95"
+                  ]
+                },
+                {
+                  "rawText": "$239.94",
+                  "fragmentRefs": [
+                    "p153-f97"
+                  ]
+                },
+                {
+                  "rawText": "18",
+                  "fragmentRefs": [
+                    "p153-f99"
+                  ]
+                },
+                {
+                  "rawText": "$4,319.00",
+                  "fragmentRefs": [
+                    "p153-f101"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p153-f103"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p153-f105"
+                  ]
+                },
+                {
+                  "rawText": "18",
+                  "fragmentRefs": [
+                    "p153-f107"
+                  ]
+                },
+                {
+                  "rawText": "$4,319.00",
+                  "fragmentRefs": [
+                    "p153-f109"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 195.54999999999995,
+              "cells": [
+                {
+                  "rawText": "242157413057",
+                  "fragmentRefs": [
+                    "p153-f110"
+                  ]
+                },
+                {
+                  "rawText": "01/24/23",
+                  "fragmentRefs": [
+                    "p153-f112"
+                  ]
+                },
+                {
+                  "rawText": "$212.57",
+                  "fragmentRefs": [
+                    "p153-f114"
+                  ]
+                },
+                {
+                  "rawText": "23",
+                  "fragmentRefs": [
+                    "p153-f116"
+                  ]
+                },
+                {
+                  "rawText": "$4,889.15",
+                  "fragmentRefs": [
+                    "p153-f118"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p153-f120"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p153-f122"
+                  ]
+                },
+                {
+                  "rawText": "23",
+                  "fragmentRefs": [
+                    "p153-f124"
+                  ]
+                },
+                {
+                  "rawText": "$4,889.15",
+                  "fragmentRefs": [
+                    "p153-f126"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 205.14999999999998,
+              "cells": [
+                {
+                  "rawText": "252155281759",
+                  "fragmentRefs": [
+                    "p153-f127"
+                  ]
+                },
+                {
+                  "rawText": "01/25/23",
+                  "fragmentRefs": [
+                    "p153-f129"
+                  ]
+                },
+                {
+                  "rawText": "$416.48",
+                  "fragmentRefs": [
+                    "p153-f131"
+                  ]
+                },
+                {
+                  "rawText": "24",
+                  "fragmentRefs": [
+                    "p153-f133"
+                  ]
+                },
+                {
+                  "rawText": "$9,995.57",
+                  "fragmentRefs": [
+                    "p153-f135"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p153-f137"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p153-f139"
+                  ]
+                },
+                {
+                  "rawText": "24",
+                  "fragmentRefs": [
+                    "p153-f141"
+                  ]
+                },
+                {
+                  "rawText": "$9,995.57",
+                  "fragmentRefs": [
+                    "p153-f143"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 214.75,
+              "cells": [
+                {
+                  "rawText": "262157050028",
+                  "fragmentRefs": [
+                    "p153-f144"
+                  ]
+                },
+                {
+                  "rawText": "01/26/23",
+                  "fragmentRefs": [
+                    "p153-f146"
+                  ]
+                },
+                {
+                  "rawText": "$324.47",
+                  "fragmentRefs": [
+                    "p153-f148"
+                  ]
+                },
+                {
+                  "rawText": "15",
+                  "fragmentRefs": [
+                    "p153-f150"
+                  ]
+                },
+                {
+                  "rawText": "$4,867.00",
+                  "fragmentRefs": [
+                    "p153-f152"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p153-f154"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p153-f156"
+                  ]
+                },
+                {
+                  "rawText": "15",
+                  "fragmentRefs": [
+                    "p153-f158"
+                  ]
+                },
+                {
+                  "rawText": "$4,867.00",
+                  "fragmentRefs": [
+                    "p153-f160"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 224.35000000000002,
+              "cells": [
+                {
+                  "rawText": "272154396234",
+                  "fragmentRefs": [
+                    "p153-f161"
+                  ]
+                },
+                {
+                  "rawText": "01/27/23",
+                  "fragmentRefs": [
+                    "p153-f163"
+                  ]
+                },
+                {
+                  "rawText": "$262.67",
+                  "fragmentRefs": [
+                    "p153-f165"
+                  ]
+                },
+                {
+                  "rawText": "6",
+                  "fragmentRefs": [
+                    "p153-f167"
+                  ]
+                },
+                {
+                  "rawText": "$1,576.00",
+                  "fragmentRefs": [
+                    "p153-f169"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p153-f171"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p153-f173"
+                  ]
+                },
+                {
+                  "rawText": "6",
+                  "fragmentRefs": [
+                    "p153-f175"
+                  ]
+                },
+                {
+                  "rawText": "$1,576.00",
+                  "fragmentRefs": [
+                    "p153-f177"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 233.95000000000005,
+              "cells": [
+                {
+                  "rawText": "302154161519",
+                  "fragmentRefs": [
+                    "p153-f178"
+                  ]
+                },
+                {
+                  "rawText": "01/30/23",
+                  "fragmentRefs": [
+                    "p153-f180"
+                  ]
+                },
+                {
+                  "rawText": "$202.57",
+                  "fragmentRefs": [
+                    "p153-f182"
+                  ]
+                },
+                {
+                  "rawText": "23",
+                  "fragmentRefs": [
+                    "p153-f184"
+                  ]
+                },
+                {
+                  "rawText": "$4,659.00",
+                  "fragmentRefs": [
+                    "p153-f186"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p153-f188"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p153-f190"
+                  ]
+                },
+                {
+                  "rawText": "23",
+                  "fragmentRefs": [
+                    "p153-f192"
+                  ]
+                },
+                {
+                  "rawText": "$4,659.00",
+                  "fragmentRefs": [
+                    "p153-f194"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 243.54999999999995,
+              "cells": [
+                {
+                  "rawText": "312158320268",
+                  "fragmentRefs": [
+                    "p153-f195"
+                  ]
+                },
+                {
+                  "rawText": "01/31/23",
+                  "fragmentRefs": [
+                    "p153-f197"
+                  ]
+                },
+                {
+                  "rawText": "$289.33",
+                  "fragmentRefs": [
+                    "p153-f199"
+                  ]
+                },
+                {
+                  "rawText": "3",
+                  "fragmentRefs": [
+                    "p153-f201"
+                  ]
+                },
+                {
+                  "rawText": "$868.00",
+                  "fragmentRefs": [
+                    "p153-f203"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p153-f205"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p153-f207"
+                  ]
+                },
+                {
+                  "rawText": "3",
+                  "fragmentRefs": [
+                    "p153-f209"
+                  ]
+                },
+                {
+                  "rawText": "$868.00",
+                  "fragmentRefs": [
+                    "p153-f211"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 153,
+          "totalAmount": "$128,020.79",
+          "expectedMemberCount": 20,
+          "continuation": "repeated_header",
+          "totalFragmentRefs": [
+            "p153-f213",
+            "p153-f215",
+            "p153-f217",
+            "p153-f219",
+            "p153-f221",
+            "p153-f223",
+            "p153-f225"
+          ]
+        },
+        {
+          "kind": "transaction",
+          "regions": [
+            [
+              153,
+              508,
+              716,
+              19
+            ],
+            [
+              154,
+              130,
+              327,
+              17
+            ]
+          ],
+          "rows": [
+            {
+              "page": 153,
+              "y": 518.0999999999999,
+              "cells": [
+                {
+                  "rawText": "MC-WORLDCARD PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p153-f280"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f282"
+                  ]
+                },
+                {
+                  "rawText": "-$11.83",
+                  "fragmentRefs": [
+                    "p153-f284"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 527.7,
+              "cells": [
+                {
+                  "rawText": "MC-EMRG MKT EDU/GOVT(DB)CAP",
+                  "fragmentRefs": [
+                    "p153-f285"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f287"
+                  ]
+                },
+                {
+                  "rawText": "-$12.00",
+                  "fragmentRefs": [
+                    "p153-f289"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 537.3,
+              "cells": [
+                {
+                  "rawText": "MC-COMM DATA RATE II BUS (DB)",
+                  "fragmentRefs": [
+                    "p153-f290"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f292"
+                  ]
+                },
+                {
+                  "rawText": "-$1.15",
+                  "fragmentRefs": [
+                    "p153-f294"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 546.9,
+              "cells": [
+                {
+                  "rawText": "MC-EMRG MKT EDU/GOVT(DB)",
+                  "fragmentRefs": [
+                    "p153-f295"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f297"
+                  ]
+                },
+                {
+                  "rawText": "-$20.80",
+                  "fragmentRefs": [
+                    "p153-f299"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 556.5,
+              "cells": [
+                {
+                  "rawText": "MC-WORLD ELITE PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p153-f300"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f302"
+                  ]
+                },
+                {
+                  "rawText": "-$144.80",
+                  "fragmentRefs": [
+                    "p153-f304"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 566.0999999999999,
+              "cells": [
+                {
+                  "rawText": "MC-ENHANCED PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p153-f305"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f307"
+                  ]
+                },
+                {
+                  "rawText": "-$10.79",
+                  "fragmentRefs": [
+                    "p153-f309"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 575.6999999999999,
+              "cells": [
+                {
+                  "rawText": "MC ASSESSMNT TRAN AMT >=$1K 0 X TRNS $15459.00",
+                  "fragmentRefs": [
+                    "p153-f310"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f312"
+                  ]
+                },
+                {
+                  "rawText": "-$1.54",
+                  "fragmentRefs": [
+                    "p153-f314"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 585.3,
+              "cells": [
+                {
+                  "rawText": "MC-WORLD SMALL TICKET CNP",
+                  "fragmentRefs": [
+                    "p153-f315"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f317"
+                  ]
+                },
+                {
+                  "rawText": "-$0.04",
+                  "fragmentRefs": [
+                    "p153-f319"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 594.9,
+              "cells": [
+                {
+                  "rawText": "MC-HIGH VAL PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p153-f320"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f322"
+                  ]
+                },
+                {
+                  "rawText": "-$155.41",
+                  "fragmentRefs": [
+                    "p153-f324"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 604.5,
+              "cells": [
+                {
+                  "rawText": "MC-REG INCENT FRF ADJ POS (DB)",
+                  "fragmentRefs": [
+                    "p153-f325"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f327"
+                  ]
+                },
+                {
+                  "rawText": "-$20.51",
+                  "fragmentRefs": [
+                    "p153-f329"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 614.0999999999999,
+              "cells": [
+                {
+                  "rawText": "MC-REGULATED FRD ADJ COMM (DB)",
+                  "fragmentRefs": [
+                    "p153-f330"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f332"
+                  ]
+                },
+                {
+                  "rawText": "-$1.84",
+                  "fragmentRefs": [
+                    "p153-f334"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 623.6999999999999,
+              "cells": [
+                {
+                  "rawText": "MC-PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p153-f335"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f337"
+                  ]
+                },
+                {
+                  "rawText": "-$1.65",
+                  "fragmentRefs": [
+                    "p153-f339"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 633.3,
+              "cells": [
+                {
+                  "rawText": "MASTERCARD ASSESSMENT FEE 0.0013 TIMES $41366.92",
+                  "fragmentRefs": [
+                    "p153-f340"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f342"
+                  ]
+                },
+                {
+                  "rawText": "-$53.79",
+                  "fragmentRefs": [
+                    "p153-f344"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 642.8999999999999,
+              "cells": [
+                {
+                  "rawText": "MC-BUS LEVEL 5 DATA RATE II",
+                  "fragmentRefs": [
+                    "p153-f345"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f347"
+                  ]
+                },
+                {
+                  "rawText": "-$3.58",
+                  "fragmentRefs": [
+                    "p153-f349"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 652.4999999999999,
+              "cells": [
+                {
+                  "rawText": "MC-AUTH DIGITAL ENABLEMENT MAX 7 TRANSACTIONS AT 0.2",
+                  "fragmentRefs": [
+                    "p153-f350"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p153-f352"
+                  ]
+                },
+                {
+                  "rawText": "-$1.40",
+                  "fragmentRefs": [
+                    "p153-f354"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 662.0999999999999,
+              "cells": [
+                {
+                  "rawText": "MC-AUTH DIGITAL ENABLEMENT MIN 65 TRANSACTIONS AT 0.02",
+                  "fragmentRefs": [
+                    "p153-f355"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p153-f357"
+                  ]
+                },
+                {
+                  "rawText": "-$1.30",
+                  "fragmentRefs": [
+                    "p153-f359"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 686.0999999999999,
+              "cells": [
+                {
+                  "rawText": "VISA ASSESSMENT FEE CR 0.0014 TIMES $18337.71",
+                  "fragmentRefs": [
+                    "p153-f363"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f365"
+                  ]
+                },
+                {
+                  "rawText": "-$25.68",
+                  "fragmentRefs": [
+                    "p153-f367"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 695.6999999999999,
+              "cells": [
+                {
+                  "rawText": "VI-US REGULATED (DB)",
+                  "fragmentRefs": [
+                    "p153-f368"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f370"
+                  ]
+                },
+                {
+                  "rawText": "-$59.74",
+                  "fragmentRefs": [
+                    "p153-f372"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 153,
+              "y": 705.3,
+              "cells": [
+                {
+                  "rawText": "VI-CPS GOVERNMENT ALL",
+                  "fragmentRefs": [
+                    "p153-f373"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p153-f375"
+                  ]
+                },
+                {
+                  "rawText": "-$271.75",
+                  "fragmentRefs": [
+                    "p153-f377"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 133.60000000000002,
+              "cells": [
+                {
+                  "rawText": "VI-CPS GOVERNMENT PREPAID",
+                  "fragmentRefs": [
+                    "p154-f31"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p154-f33"
+                  ]
+                },
+                {
+                  "rawText": "-$7.83",
+                  "fragmentRefs": [
+                    "p154-f35"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 143.20000000000005,
+              "cells": [
+                {
+                  "rawText": "VI-US REGULATED COMM (DB)",
+                  "fragmentRefs": [
+                    "p154-f36"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p154-f38"
+                  ]
+                },
+                {
+                  "rawText": "-$4.40",
+                  "fragmentRefs": [
+                    "p154-f40"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 152.80000000000007,
+              "cells": [
+                {
+                  "rawText": "VI-CPS GOVERNMENT DEBIT",
+                  "fragmentRefs": [
+                    "p154-f41"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p154-f43"
+                  ]
+                },
+                {
+                  "rawText": "-$13.05",
+                  "fragmentRefs": [
+                    "p154-f45"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 162.4000000000001,
+              "cells": [
+                {
+                  "rawText": "VI-BUSINESS CARD TR3 LEVEL 2",
+                  "fragmentRefs": [
+                    "p154-f46"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p154-f48"
+                  ]
+                },
+                {
+                  "rawText": "-$8.81",
+                  "fragmentRefs": [
+                    "p154-f50"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 172.0000000000001,
+              "cells": [
+                {
+                  "rawText": "VISA ASSESSMENT FEE DB 0.0013 TIMES $66300.59",
+                  "fragmentRefs": [
+                    "p154-f51"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p154-f53"
+                  ]
+                },
+                {
+                  "rawText": "-$86.21",
+                  "fragmentRefs": [
+                    "p154-f55"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 181.60000000000014,
+              "cells": [
+                {
+                  "rawText": "VI-BUSINESS CARD TR1 LEVEL 2",
+                  "fragmentRefs": [
+                    "p154-f56"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p154-f58"
+                  ]
+                },
+                {
+                  "rawText": "-$1.05",
+                  "fragmentRefs": [
+                    "p154-f60"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 191.20000000000016,
+              "cells": [
+                {
+                  "rawText": "VI-CPS GOVERNMENT DEBIT (CAP)",
+                  "fragmentRefs": [
+                    "p154-f61"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p154-f63"
+                  ]
+                },
+                {
+                  "rawText": "-$22.00",
+                  "fragmentRefs": [
+                    "p154-f65"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 200.80000000000018,
+              "cells": [
+                {
+                  "rawText": "VI-US BUS TR5 LVL2",
+                  "fragmentRefs": [
+                    "p154-f66"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p154-f68"
+                  ]
+                },
+                {
+                  "rawText": "-$15.29",
+                  "fragmentRefs": [
+                    "p154-f70"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 210.4000000000002,
+              "cells": [
+                {
+                  "rawText": "VI-BUSINESS CARD CNP (DB)",
+                  "fragmentRefs": [
+                    "p154-f71"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p154-f73"
+                  ]
+                },
+                {
+                  "rawText": "-$15.73",
+                  "fragmentRefs": [
+                    "p154-f75"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 220.00000000000023,
+              "cells": [
+                {
+                  "rawText": "VI-ADDRESS VER SVC FEE 107 TRANSACTIONS AT 0.001",
+                  "fragmentRefs": [
+                    "p154-f76"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p154-f78"
+                  ]
+                },
+                {
+                  "rawText": "-$0.14",
+                  "fragmentRefs": [
+                    "p154-f80"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 244.00000000000023,
+              "cells": [
+                {
+                  "rawText": "DISCOVER ASSESSMENT FEE 0.0014 TIMES $2153.57",
+                  "fragmentRefs": [
+                    "p154-f84"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p154-f86"
+                  ]
+                },
+                {
+                  "rawText": "-$3.01",
+                  "fragmentRefs": [
+                    "p154-f88"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 253.60000000000025,
+              "cells": [
+                {
+                  "rawText": "DSCVR PSL PUBLIC SVC RW",
+                  "fragmentRefs": [
+                    "p154-f89"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p154-f91"
+                  ]
+                },
+                {
+                  "rawText": "-$1.76",
+                  "fragmentRefs": [
+                    "p154-f93"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 263.2000000000003,
+              "cells": [
+                {
+                  "rawText": "DSCVR COMML ELECT EMRG MKT",
+                  "fragmentRefs": [
+                    "p154-f94"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p154-f96"
+                  ]
+                },
+                {
+                  "rawText": "-$50.77",
+                  "fragmentRefs": [
+                    "p154-f98"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 272.8000000000003,
+              "cells": [
+                {
+                  "rawText": "ADDRS VERIFICATION SERVICE FEE 5 TRANSACTIONS AT 0.005",
+                  "fragmentRefs": [
+                    "p154-f99"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p154-f101"
+                  ]
+                },
+                {
+                  "rawText": "-$0.05",
+                  "fragmentRefs": [
+                    "p154-f103"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 296.8000000000003,
+              "cells": [
+                {
+                  "rawText": "VI COMM CARD I/C SAVINGS ADJ 0.5 DISC RATE TIMES $8.51",
+                  "fragmentRefs": [
+                    "p154-f107"
+                  ]
+                },
+                {
+                  "rawText": "Service charges",
+                  "fragmentRefs": [
+                    "p154-f109"
+                  ]
+                },
+                {
+                  "rawText": "-$4.26",
+                  "fragmentRefs": [
+                    "p154-f111"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 306.4000000000003,
+              "cells": [
+                {
+                  "rawText": "DIGITAL INVESTMENT FEE $2153.57 AT0.0001",
+                  "fragmentRefs": [
+                    "p154-f112"
+                  ]
+                },
+                {
+                  "rawText": "Service charges",
+                  "fragmentRefs": [
+                    "p154-f114"
+                  ]
+                },
+                {
+                  "rawText": "-$0.23",
+                  "fragmentRefs": [
+                    "p154-f116"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 316.00000000000034,
+              "cells": [
+                {
+                  "rawText": "MC-AUTH DIGITAL ENABLEMENT FEE $21703.95 AT0.0002",
+                  "fragmentRefs": [
+                    "p154-f117"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p154-f119"
+                  ]
+                },
+                {
+                  "rawText": "-$4.33",
+                  "fragmentRefs": [
+                    "p154-f121"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 154,
+          "totalAmount": "-$1,038.52",
+          "expectedMemberCount": 36,
+          "continuation": "headerless",
+          "totalFragmentRefs": [
+            "p154-f123",
+            "p154-f125"
+          ]
+        },
+        {
+          "kind": "account",
+          "regions": [
+            [
+              154,
+              353,
+              365,
+              2
+            ]
+          ],
+          "rows": [
+            {
+              "page": 154,
+              "y": 354.4,
+              "cells": [
+                {
+                  "rawText": "VISA NETWORK FEE CNP 2-06",
+                  "fragmentRefs": [
+                    "p154-f132"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p154-f134"
+                  ]
+                },
+                {
+                  "rawText": "-$34.95",
+                  "fragmentRefs": [
+                    "p154-f136"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 154,
+              "y": 364,
+              "cells": [
+                {
+                  "rawText": "MC MONTHLY LOCATION FEE",
+                  "fragmentRefs": [
+                    "p154-f137"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p154-f139"
+                  ]
+                },
+                {
+                  "rawText": "-$1.25",
+                  "fragmentRefs": [
+                    "p154-f141"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 154,
+          "totalAmount": "-$36.20",
+          "expectedMemberCount": 2,
+          "continuation": null,
+          "totalFragmentRefs": [
+            "p154-f143",
+            "p154-f145"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "holdout-3",
+      "sourceSha256": "d052c1c0e137e0f0cd27a72daf2dac7a67b35b171a6fc78bee389cdd1e135016",
+      "tables": [
+        {
+          "kind": "batch",
+          "regions": [
+            [
+              159,
+              282,
+              496,
+              23
+            ]
+          ],
+          "rows": [
+            {
+              "page": 159,
+              "y": 282.9,
+              "cells": [
+                {
+                  "rawText": "012150127398",
+                  "fragmentRefs": [
+                    "p159-f153"
+                  ]
+                },
+                {
+                  "rawText": "03/01/23",
+                  "fragmentRefs": [
+                    "p159-f155"
+                  ]
+                },
+                {
+                  "rawText": "$254.40",
+                  "fragmentRefs": [
+                    "p159-f157"
+                  ]
+                },
+                {
+                  "rawText": "30",
+                  "fragmentRefs": [
+                    "p159-f159"
+                  ]
+                },
+                {
+                  "rawText": "$7,632.00",
+                  "fragmentRefs": [
+                    "p159-f161"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f163"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f165"
+                  ]
+                },
+                {
+                  "rawText": "30",
+                  "fragmentRefs": [
+                    "p159-f167"
+                  ]
+                },
+                {
+                  "rawText": "$7,632.00",
+                  "fragmentRefs": [
+                    "p159-f169"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 292.5,
+              "cells": [
+                {
+                  "rawText": "022148397896",
+                  "fragmentRefs": [
+                    "p159-f170"
+                  ]
+                },
+                {
+                  "rawText": "03/02/23",
+                  "fragmentRefs": [
+                    "p159-f172"
+                  ]
+                },
+                {
+                  "rawText": "$297.19",
+                  "fragmentRefs": [
+                    "p159-f174"
+                  ]
+                },
+                {
+                  "rawText": "30",
+                  "fragmentRefs": [
+                    "p159-f176"
+                  ]
+                },
+                {
+                  "rawText": "$8,915.75",
+                  "fragmentRefs": [
+                    "p159-f178"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f180"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f182"
+                  ]
+                },
+                {
+                  "rawText": "30",
+                  "fragmentRefs": [
+                    "p159-f184"
+                  ]
+                },
+                {
+                  "rawText": "$8,915.75",
+                  "fragmentRefs": [
+                    "p159-f186"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 302.1,
+              "cells": [
+                {
+                  "rawText": "032147586227",
+                  "fragmentRefs": [
+                    "p159-f187"
+                  ]
+                },
+                {
+                  "rawText": "03/03/23",
+                  "fragmentRefs": [
+                    "p159-f189"
+                  ]
+                },
+                {
+                  "rawText": "$268.27",
+                  "fragmentRefs": [
+                    "p159-f191"
+                  ]
+                },
+                {
+                  "rawText": "26",
+                  "fragmentRefs": [
+                    "p159-f193"
+                  ]
+                },
+                {
+                  "rawText": "$6,975.04",
+                  "fragmentRefs": [
+                    "p159-f195"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f197"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f199"
+                  ]
+                },
+                {
+                  "rawText": "26",
+                  "fragmentRefs": [
+                    "p159-f201"
+                  ]
+                },
+                {
+                  "rawText": "$6,975.04",
+                  "fragmentRefs": [
+                    "p159-f203"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 311.7,
+              "cells": [
+                {
+                  "rawText": "062147580758",
+                  "fragmentRefs": [
+                    "p159-f204"
+                  ]
+                },
+                {
+                  "rawText": "03/06/23",
+                  "fragmentRefs": [
+                    "p159-f206"
+                  ]
+                },
+                {
+                  "rawText": "$220.27",
+                  "fragmentRefs": [
+                    "p159-f208"
+                  ]
+                },
+                {
+                  "rawText": "29",
+                  "fragmentRefs": [
+                    "p159-f210"
+                  ]
+                },
+                {
+                  "rawText": "$6,387.84",
+                  "fragmentRefs": [
+                    "p159-f212"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f214"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f216"
+                  ]
+                },
+                {
+                  "rawText": "29",
+                  "fragmentRefs": [
+                    "p159-f218"
+                  ]
+                },
+                {
+                  "rawText": "$6,387.84",
+                  "fragmentRefs": [
+                    "p159-f220"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 321.3,
+              "cells": [
+                {
+                  "rawText": "072147366483",
+                  "fragmentRefs": [
+                    "p159-f221"
+                  ]
+                },
+                {
+                  "rawText": "03/07/23",
+                  "fragmentRefs": [
+                    "p159-f223"
+                  ]
+                },
+                {
+                  "rawText": "$295.21",
+                  "fragmentRefs": [
+                    "p159-f225"
+                  ]
+                },
+                {
+                  "rawText": "19",
+                  "fragmentRefs": [
+                    "p159-f227"
+                  ]
+                },
+                {
+                  "rawText": "$5,609.00",
+                  "fragmentRefs": [
+                    "p159-f229"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f231"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f233"
+                  ]
+                },
+                {
+                  "rawText": "19",
+                  "fragmentRefs": [
+                    "p159-f235"
+                  ]
+                },
+                {
+                  "rawText": "$5,609.00",
+                  "fragmentRefs": [
+                    "p159-f237"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 330.9,
+              "cells": [
+                {
+                  "rawText": "082147155579",
+                  "fragmentRefs": [
+                    "p159-f238"
+                  ]
+                },
+                {
+                  "rawText": "03/08/23",
+                  "fragmentRefs": [
+                    "p159-f240"
+                  ]
+                },
+                {
+                  "rawText": "$206.58",
+                  "fragmentRefs": [
+                    "p159-f242"
+                  ]
+                },
+                {
+                  "rawText": "19",
+                  "fragmentRefs": [
+                    "p159-f244"
+                  ]
+                },
+                {
+                  "rawText": "$3,925.10",
+                  "fragmentRefs": [
+                    "p159-f246"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f248"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f250"
+                  ]
+                },
+                {
+                  "rawText": "19",
+                  "fragmentRefs": [
+                    "p159-f252"
+                  ]
+                },
+                {
+                  "rawText": "$3,925.10",
+                  "fragmentRefs": [
+                    "p159-f254"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 340.5,
+              "cells": [
+                {
+                  "rawText": "092148084194",
+                  "fragmentRefs": [
+                    "p159-f255"
+                  ]
+                },
+                {
+                  "rawText": "03/09/23",
+                  "fragmentRefs": [
+                    "p159-f257"
+                  ]
+                },
+                {
+                  "rawText": "$220.45",
+                  "fragmentRefs": [
+                    "p159-f259"
+                  ]
+                },
+                {
+                  "rawText": "22",
+                  "fragmentRefs": [
+                    "p159-f261"
+                  ]
+                },
+                {
+                  "rawText": "$4,850.00",
+                  "fragmentRefs": [
+                    "p159-f263"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f265"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f267"
+                  ]
+                },
+                {
+                  "rawText": "22",
+                  "fragmentRefs": [
+                    "p159-f269"
+                  ]
+                },
+                {
+                  "rawText": "$4,850.00",
+                  "fragmentRefs": [
+                    "p159-f271"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 350.1,
+              "cells": [
+                {
+                  "rawText": "102147553281",
+                  "fragmentRefs": [
+                    "p159-f272"
+                  ]
+                },
+                {
+                  "rawText": "03/10/23",
+                  "fragmentRefs": [
+                    "p159-f274"
+                  ]
+                },
+                {
+                  "rawText": "$317.83",
+                  "fragmentRefs": [
+                    "p159-f276"
+                  ]
+                },
+                {
+                  "rawText": "17",
+                  "fragmentRefs": [
+                    "p159-f278"
+                  ]
+                },
+                {
+                  "rawText": "$5,403.05",
+                  "fragmentRefs": [
+                    "p159-f280"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f282"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f284"
+                  ]
+                },
+                {
+                  "rawText": "17",
+                  "fragmentRefs": [
+                    "p159-f286"
+                  ]
+                },
+                {
+                  "rawText": "$5,403.05",
+                  "fragmentRefs": [
+                    "p159-f288"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 359.7,
+              "cells": [
+                {
+                  "rawText": "132148101567",
+                  "fragmentRefs": [
+                    "p159-f289"
+                  ]
+                },
+                {
+                  "rawText": "03/13/23",
+                  "fragmentRefs": [
+                    "p159-f291"
+                  ]
+                },
+                {
+                  "rawText": "$401.77",
+                  "fragmentRefs": [
+                    "p159-f293"
+                  ]
+                },
+                {
+                  "rawText": "22",
+                  "fragmentRefs": [
+                    "p159-f295"
+                  ]
+                },
+                {
+                  "rawText": "$8,839.00",
+                  "fragmentRefs": [
+                    "p159-f297"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f299"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f301"
+                  ]
+                },
+                {
+                  "rawText": "22",
+                  "fragmentRefs": [
+                    "p159-f303"
+                  ]
+                },
+                {
+                  "rawText": "$8,839.00",
+                  "fragmentRefs": [
+                    "p159-f305"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 369.3,
+              "cells": [
+                {
+                  "rawText": "142148442595",
+                  "fragmentRefs": [
+                    "p159-f306"
+                  ]
+                },
+                {
+                  "rawText": "03/14/23",
+                  "fragmentRefs": [
+                    "p159-f308"
+                  ]
+                },
+                {
+                  "rawText": "$199.86",
+                  "fragmentRefs": [
+                    "p159-f310"
+                  ]
+                },
+                {
+                  "rawText": "25",
+                  "fragmentRefs": [
+                    "p159-f312"
+                  ]
+                },
+                {
+                  "rawText": "$4,996.50",
+                  "fragmentRefs": [
+                    "p159-f314"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f316"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f318"
+                  ]
+                },
+                {
+                  "rawText": "25",
+                  "fragmentRefs": [
+                    "p159-f320"
+                  ]
+                },
+                {
+                  "rawText": "$4,996.50",
+                  "fragmentRefs": [
+                    "p159-f322"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 378.9,
+              "cells": [
+                {
+                  "rawText": "152147385573",
+                  "fragmentRefs": [
+                    "p159-f323"
+                  ]
+                },
+                {
+                  "rawText": "03/15/23",
+                  "fragmentRefs": [
+                    "p159-f325"
+                  ]
+                },
+                {
+                  "rawText": "$303.32",
+                  "fragmentRefs": [
+                    "p159-f327"
+                  ]
+                },
+                {
+                  "rawText": "22",
+                  "fragmentRefs": [
+                    "p159-f329"
+                  ]
+                },
+                {
+                  "rawText": "$6,673.00",
+                  "fragmentRefs": [
+                    "p159-f331"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f333"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f335"
+                  ]
+                },
+                {
+                  "rawText": "22",
+                  "fragmentRefs": [
+                    "p159-f337"
+                  ]
+                },
+                {
+                  "rawText": "$6,673.00",
+                  "fragmentRefs": [
+                    "p159-f339"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 388.5,
+              "cells": [
+                {
+                  "rawText": "162148440935",
+                  "fragmentRefs": [
+                    "p159-f340"
+                  ]
+                },
+                {
+                  "rawText": "03/16/23",
+                  "fragmentRefs": [
+                    "p159-f342"
+                  ]
+                },
+                {
+                  "rawText": "$383.63",
+                  "fragmentRefs": [
+                    "p159-f344"
+                  ]
+                },
+                {
+                  "rawText": "15",
+                  "fragmentRefs": [
+                    "p159-f346"
+                  ]
+                },
+                {
+                  "rawText": "$5,754.49",
+                  "fragmentRefs": [
+                    "p159-f348"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f350"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f352"
+                  ]
+                },
+                {
+                  "rawText": "15",
+                  "fragmentRefs": [
+                    "p159-f354"
+                  ]
+                },
+                {
+                  "rawText": "$5,754.49",
+                  "fragmentRefs": [
+                    "p159-f356"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 398.1,
+              "cells": [
+                {
+                  "rawText": "172147554080",
+                  "fragmentRefs": [
+                    "p159-f357"
+                  ]
+                },
+                {
+                  "rawText": "03/17/23",
+                  "fragmentRefs": [
+                    "p159-f359"
+                  ]
+                },
+                {
+                  "rawText": "$386.10",
+                  "fragmentRefs": [
+                    "p159-f361"
+                  ]
+                },
+                {
+                  "rawText": "22",
+                  "fragmentRefs": [
+                    "p159-f363"
+                  ]
+                },
+                {
+                  "rawText": "$8,494.28",
+                  "fragmentRefs": [
+                    "p159-f365"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f367"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f369"
+                  ]
+                },
+                {
+                  "rawText": "22",
+                  "fragmentRefs": [
+                    "p159-f371"
+                  ]
+                },
+                {
+                  "rawText": "$8,494.28",
+                  "fragmentRefs": [
+                    "p159-f373"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 407.7,
+              "cells": [
+                {
+                  "rawText": "202148351891",
+                  "fragmentRefs": [
+                    "p159-f374"
+                  ]
+                },
+                {
+                  "rawText": "03/20/23",
+                  "fragmentRefs": [
+                    "p159-f376"
+                  ]
+                },
+                {
+                  "rawText": "$237.13",
+                  "fragmentRefs": [
+                    "p159-f378"
+                  ]
+                },
+                {
+                  "rawText": "16",
+                  "fragmentRefs": [
+                    "p159-f380"
+                  ]
+                },
+                {
+                  "rawText": "$3,794.00",
+                  "fragmentRefs": [
+                    "p159-f382"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f384"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f386"
+                  ]
+                },
+                {
+                  "rawText": "16",
+                  "fragmentRefs": [
+                    "p159-f388"
+                  ]
+                },
+                {
+                  "rawText": "$3,794.00",
+                  "fragmentRefs": [
+                    "p159-f390"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 417.3,
+              "cells": [
+                {
+                  "rawText": "212150592071",
+                  "fragmentRefs": [
+                    "p159-f391"
+                  ]
+                },
+                {
+                  "rawText": "03/21/23",
+                  "fragmentRefs": [
+                    "p159-f393"
+                  ]
+                },
+                {
+                  "rawText": "$407.52",
+                  "fragmentRefs": [
+                    "p159-f395"
+                  ]
+                },
+                {
+                  "rawText": "22",
+                  "fragmentRefs": [
+                    "p159-f397"
+                  ]
+                },
+                {
+                  "rawText": "$8,965.50",
+                  "fragmentRefs": [
+                    "p159-f399"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f401"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f403"
+                  ]
+                },
+                {
+                  "rawText": "22",
+                  "fragmentRefs": [
+                    "p159-f405"
+                  ]
+                },
+                {
+                  "rawText": "$8,965.50",
+                  "fragmentRefs": [
+                    "p159-f407"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 426.9,
+              "cells": [
+                {
+                  "rawText": "222148069225",
+                  "fragmentRefs": [
+                    "p159-f408"
+                  ]
+                },
+                {
+                  "rawText": "03/22/23",
+                  "fragmentRefs": [
+                    "p159-f410"
+                  ]
+                },
+                {
+                  "rawText": "$278.96",
+                  "fragmentRefs": [
+                    "p159-f412"
+                  ]
+                },
+                {
+                  "rawText": "10",
+                  "fragmentRefs": [
+                    "p159-f414"
+                  ]
+                },
+                {
+                  "rawText": "$2,789.64",
+                  "fragmentRefs": [
+                    "p159-f416"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f418"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f420"
+                  ]
+                },
+                {
+                  "rawText": "10",
+                  "fragmentRefs": [
+                    "p159-f422"
+                  ]
+                },
+                {
+                  "rawText": "$2,789.64",
+                  "fragmentRefs": [
+                    "p159-f424"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 436.5,
+              "cells": [
+                {
+                  "rawText": "232152063866",
+                  "fragmentRefs": [
+                    "p159-f425"
+                  ]
+                },
+                {
+                  "rawText": "03/23/23",
+                  "fragmentRefs": [
+                    "p159-f427"
+                  ]
+                },
+                {
+                  "rawText": "$417.10",
+                  "fragmentRefs": [
+                    "p159-f429"
+                  ]
+                },
+                {
+                  "rawText": "16",
+                  "fragmentRefs": [
+                    "p159-f431"
+                  ]
+                },
+                {
+                  "rawText": "$6,673.64",
+                  "fragmentRefs": [
+                    "p159-f433"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f435"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f437"
+                  ]
+                },
+                {
+                  "rawText": "16",
+                  "fragmentRefs": [
+                    "p159-f439"
+                  ]
+                },
+                {
+                  "rawText": "$6,673.64",
+                  "fragmentRefs": [
+                    "p159-f441"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 446.1,
+              "cells": [
+                {
+                  "rawText": "242150110882",
+                  "fragmentRefs": [
+                    "p159-f442"
+                  ]
+                },
+                {
+                  "rawText": "03/24/23",
+                  "fragmentRefs": [
+                    "p159-f444"
+                  ]
+                },
+                {
+                  "rawText": "$222.87",
+                  "fragmentRefs": [
+                    "p159-f446"
+                  ]
+                },
+                {
+                  "rawText": "23",
+                  "fragmentRefs": [
+                    "p159-f448"
+                  ]
+                },
+                {
+                  "rawText": "$5,126.00",
+                  "fragmentRefs": [
+                    "p159-f450"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f452"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f454"
+                  ]
+                },
+                {
+                  "rawText": "23",
+                  "fragmentRefs": [
+                    "p159-f456"
+                  ]
+                },
+                {
+                  "rawText": "$5,126.00",
+                  "fragmentRefs": [
+                    "p159-f458"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 455.7,
+              "cells": [
+                {
+                  "rawText": "272148521686",
+                  "fragmentRefs": [
+                    "p159-f459"
+                  ]
+                },
+                {
+                  "rawText": "03/27/23",
+                  "fragmentRefs": [
+                    "p159-f461"
+                  ]
+                },
+                {
+                  "rawText": "$196.49",
+                  "fragmentRefs": [
+                    "p159-f463"
+                  ]
+                },
+                {
+                  "rawText": "25",
+                  "fragmentRefs": [
+                    "p159-f465"
+                  ]
+                },
+                {
+                  "rawText": "$5,158.84",
+                  "fragmentRefs": [
+                    "p159-f467"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p159-f469"
+                  ]
+                },
+                {
+                  "rawText": "-$50.00",
+                  "fragmentRefs": [
+                    "p159-f471"
+                  ]
+                },
+                {
+                  "rawText": "26",
+                  "fragmentRefs": [
+                    "p159-f473"
+                  ]
+                },
+                {
+                  "rawText": "$5,108.84",
+                  "fragmentRefs": [
+                    "p159-f475"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 465.3,
+              "cells": [
+                {
+                  "rawText": "282151057407",
+                  "fragmentRefs": [
+                    "p159-f476"
+                  ]
+                },
+                {
+                  "rawText": "03/28/23",
+                  "fragmentRefs": [
+                    "p159-f478"
+                  ]
+                },
+                {
+                  "rawText": "$340.23",
+                  "fragmentRefs": [
+                    "p159-f480"
+                  ]
+                },
+                {
+                  "rawText": "24",
+                  "fragmentRefs": [
+                    "p159-f482"
+                  ]
+                },
+                {
+                  "rawText": "$8,617.22",
+                  "fragmentRefs": [
+                    "p159-f484"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p159-f486"
+                  ]
+                },
+                {
+                  "rawText": "-$111.36",
+                  "fragmentRefs": [
+                    "p159-f488"
+                  ]
+                },
+                {
+                  "rawText": "25",
+                  "fragmentRefs": [
+                    "p159-f490"
+                  ]
+                },
+                {
+                  "rawText": "$8,505.86",
+                  "fragmentRefs": [
+                    "p159-f492"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 474.9,
+              "cells": [
+                {
+                  "rawText": "292149044882",
+                  "fragmentRefs": [
+                    "p159-f493"
+                  ]
+                },
+                {
+                  "rawText": "03/29/23",
+                  "fragmentRefs": [
+                    "p159-f495"
+                  ]
+                },
+                {
+                  "rawText": "$276.99",
+                  "fragmentRefs": [
+                    "p159-f497"
+                  ]
+                },
+                {
+                  "rawText": "16",
+                  "fragmentRefs": [
+                    "p159-f499"
+                  ]
+                },
+                {
+                  "rawText": "$4,431.85",
+                  "fragmentRefs": [
+                    "p159-f501"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f503"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f505"
+                  ]
+                },
+                {
+                  "rawText": "16",
+                  "fragmentRefs": [
+                    "p159-f507"
+                  ]
+                },
+                {
+                  "rawText": "$4,431.85",
+                  "fragmentRefs": [
+                    "p159-f509"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 484.5,
+              "cells": [
+                {
+                  "rawText": "302150388618",
+                  "fragmentRefs": [
+                    "p159-f510"
+                  ]
+                },
+                {
+                  "rawText": "03/30/23",
+                  "fragmentRefs": [
+                    "p159-f512"
+                  ]
+                },
+                {
+                  "rawText": "$357.67",
+                  "fragmentRefs": [
+                    "p159-f514"
+                  ]
+                },
+                {
+                  "rawText": "15",
+                  "fragmentRefs": [
+                    "p159-f516"
+                  ]
+                },
+                {
+                  "rawText": "$5,365.00",
+                  "fragmentRefs": [
+                    "p159-f518"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f520"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f522"
+                  ]
+                },
+                {
+                  "rawText": "15",
+                  "fragmentRefs": [
+                    "p159-f524"
+                  ]
+                },
+                {
+                  "rawText": "$5,365.00",
+                  "fragmentRefs": [
+                    "p159-f526"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 159,
+              "y": 494.1,
+              "cells": [
+                {
+                  "rawText": "312151236139",
+                  "fragmentRefs": [
+                    "p159-f527"
+                  ]
+                },
+                {
+                  "rawText": "03/31/23",
+                  "fragmentRefs": [
+                    "p159-f529"
+                  ]
+                },
+                {
+                  "rawText": "$245.99",
+                  "fragmentRefs": [
+                    "p159-f531"
+                  ]
+                },
+                {
+                  "rawText": "14",
+                  "fragmentRefs": [
+                    "p159-f533"
+                  ]
+                },
+                {
+                  "rawText": "$3,443.91",
+                  "fragmentRefs": [
+                    "p159-f535"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p159-f537"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p159-f539"
+                  ]
+                },
+                {
+                  "rawText": "14",
+                  "fragmentRefs": [
+                    "p159-f541"
+                  ]
+                },
+                {
+                  "rawText": "$3,443.91",
+                  "fragmentRefs": [
+                    "p159-f543"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 159,
+          "totalAmount": "$138,659.29",
+          "expectedMemberCount": 23,
+          "continuation": null,
+          "totalFragmentRefs": [
+            "p159-f545",
+            "p159-f547",
+            "p159-f549",
+            "p159-f551",
+            "p159-f553",
+            "p159-f555",
+            "p159-f557"
+          ]
+        },
+        {
+          "kind": "transaction",
+          "regions": [
+            [
+              160,
+              161,
+              562,
+              38
+            ]
+          ],
+          "rows": [
+            {
+              "page": 160,
+              "y": 162.39999999999998,
+              "cells": [
+                {
+                  "rawText": "MC-INT CON RTE 3 BASE SPRM",
+                  "fragmentRefs": [
+                    "p160-f39"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f41"
+                  ]
+                },
+                {
+                  "rawText": "-$2.61",
+                  "fragmentRefs": [
+                    "p160-f43"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 172,
+              "cells": [
+                {
+                  "rawText": "MC-REGULATED FRD ADJ COMM (DB)",
+                  "fragmentRefs": [
+                    "p160-f44"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f46"
+                  ]
+                },
+                {
+                  "rawText": "-$4.19",
+                  "fragmentRefs": [
+                    "p160-f48"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 181.60000000000002,
+              "cells": [
+                {
+                  "rawText": "MC-WORLD ELITE PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p160-f49"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f51"
+                  ]
+                },
+                {
+                  "rawText": "-$176.00",
+                  "fragmentRefs": [
+                    "p160-f53"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 191.20000000000005,
+              "cells": [
+                {
+                  "rawText": "MC-HIGH VAL PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p160-f54"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f56"
+                  ]
+                },
+                {
+                  "rawText": "-$6.99",
+                  "fragmentRefs": [
+                    "p160-f58"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 200.80000000000007,
+              "cells": [
+                {
+                  "rawText": "MC-ENHANCED PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p160-f59"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f61"
+                  ]
+                },
+                {
+                  "rawText": "-$41.97",
+                  "fragmentRefs": [
+                    "p160-f63"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 210.4000000000001,
+              "cells": [
+                {
+                  "rawText": "MC-REG INCENT FRF ADJ POS (DB)",
+                  "fragmentRefs": [
+                    "p160-f64"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f66"
+                  ]
+                },
+                {
+                  "rawText": "-$22.77",
+                  "fragmentRefs": [
+                    "p160-f68"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 220.0000000000001,
+              "cells": [
+                {
+                  "rawText": "MC-COMM DATA RATE II BUS (DB)",
+                  "fragmentRefs": [
+                    "p160-f69"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f71"
+                  ]
+                },
+                {
+                  "rawText": "-$24.15",
+                  "fragmentRefs": [
+                    "p160-f73"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 229.60000000000014,
+              "cells": [
+                {
+                  "rawText": "MC-WORLDCARD PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p160-f74"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f76"
+                  ]
+                },
+                {
+                  "rawText": "-$7.08",
+                  "fragmentRefs": [
+                    "p160-f78"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 239.20000000000016,
+              "cells": [
+                {
+                  "rawText": "MASTERCARD ASSESSMENT FEE 0.0013 TIMES $47650.72",
+                  "fragmentRefs": [
+                    "p160-f79"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f81"
+                  ]
+                },
+                {
+                  "rawText": "-$61.95",
+                  "fragmentRefs": [
+                    "p160-f83"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 248.80000000000018,
+              "cells": [
+                {
+                  "rawText": "MC-PUBLIC SECTOR",
+                  "fragmentRefs": [
+                    "p160-f84"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f86"
+                  ]
+                },
+                {
+                  "rawText": "-$18.90",
+                  "fragmentRefs": [
+                    "p160-f88"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 258.4000000000002,
+              "cells": [
+                {
+                  "rawText": "MC-BUS LEVEL 4 DATA RATE II",
+                  "fragmentRefs": [
+                    "p160-f89"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f91"
+                  ]
+                },
+                {
+                  "rawText": "-$39.87",
+                  "fragmentRefs": [
+                    "p160-f93"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 268.0000000000002,
+              "cells": [
+                {
+                  "rawText": "MC-EMRG MKT EDU/GOVT(DB)",
+                  "fragmentRefs": [
+                    "p160-f94"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f96"
+                  ]
+                },
+                {
+                  "rawText": "-$24.49",
+                  "fragmentRefs": [
+                    "p160-f98"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 277.60000000000025,
+              "cells": [
+                {
+                  "rawText": "MC ASSESSMNT TRAN AMT >=$1K 0 X TRNS $8774.72",
+                  "fragmentRefs": [
+                    "p160-f99"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f101"
+                  ]
+                },
+                {
+                  "rawText": "-$0.88",
+                  "fragmentRefs": [
+                    "p160-f103"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 287.2000000000003,
+              "cells": [
+                {
+                  "rawText": "MC-EMRG MKT EDU/GOVT(DB)CAP",
+                  "fragmentRefs": [
+                    "p160-f104"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f106"
+                  ]
+                },
+                {
+                  "rawText": "-$22.00",
+                  "fragmentRefs": [
+                    "p160-f108"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 296.8000000000003,
+              "cells": [
+                {
+                  "rawText": "MC-AUTH DIGITAL ENABLEMENT MAX 15 TRANSACTIONS AT 0.2",
+                  "fragmentRefs": [
+                    "p160-f109"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p160-f111"
+                  ]
+                },
+                {
+                  "rawText": "-$3.00",
+                  "fragmentRefs": [
+                    "p160-f113"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 306.4000000000003,
+              "cells": [
+                {
+                  "rawText": "MC-AUTH DIGITAL ENABLEMENT MIN 63 TRANSACTIONS AT 0.02",
+                  "fragmentRefs": [
+                    "p160-f114"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p160-f116"
+                  ]
+                },
+                {
+                  "rawText": "-$1.26",
+                  "fragmentRefs": [
+                    "p160-f118"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 330.4000000000003,
+              "cells": [
+                {
+                  "rawText": "VI-INTREG STANDARD (US)",
+                  "fragmentRefs": [
+                    "p160-f122"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f124"
+                  ]
+                },
+                {
+                  "rawText": "-$6.24",
+                  "fragmentRefs": [
+                    "p160-f126"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 340.00000000000034,
+              "cells": [
+                {
+                  "rawText": "VISA ASSESSMENT FEE CR 0.0014 TIMES $22186.73",
+                  "fragmentRefs": [
+                    "p160-f127"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f129"
+                  ]
+                },
+                {
+                  "rawText": "-$31.05",
+                  "fragmentRefs": [
+                    "p160-f131"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 349.60000000000036,
+              "cells": [
+                {
+                  "rawText": "VI-CPS GOVERNMENT DEBIT (CAP)",
+                  "fragmentRefs": [
+                    "p160-f132"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f134"
+                  ]
+                },
+                {
+                  "rawText": "-$16.00",
+                  "fragmentRefs": [
+                    "p160-f136"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 359.2000000000004,
+              "cells": [
+                {
+                  "rawText": "VI-BUSINESS CARD TR3 LEVEL 2",
+                  "fragmentRefs": [
+                    "p160-f137"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f139"
+                  ]
+                },
+                {
+                  "rawText": "-$7.87",
+                  "fragmentRefs": [
+                    "p160-f141"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 368.8000000000004,
+              "cells": [
+                {
+                  "rawText": "VI-US BUS TR5 LVL2",
+                  "fragmentRefs": [
+                    "p160-f142"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f144"
+                  ]
+                },
+                {
+                  "rawText": "-$29.31",
+                  "fragmentRefs": [
+                    "p160-f146"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 378.40000000000043,
+              "cells": [
+                {
+                  "rawText": "VI-BUSINESS CARD TR2 LEVEL 2",
+                  "fragmentRefs": [
+                    "p160-f147"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f149"
+                  ]
+                },
+                {
+                  "rawText": "-$2.15",
+                  "fragmentRefs": [
+                    "p160-f151"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 388.00000000000045,
+              "cells": [
+                {
+                  "rawText": "VI-US REGULATED COMM (DB)",
+                  "fragmentRefs": [
+                    "p160-f152"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f154"
+                  ]
+                },
+                {
+                  "rawText": "-$8.00",
+                  "fragmentRefs": [
+                    "p160-f156"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 397.6000000000005,
+              "cells": [
+                {
+                  "rawText": "VI-CPS GOVERNMENT PREPAID",
+                  "fragmentRefs": [
+                    "p160-f157"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f159"
+                  ]
+                },
+                {
+                  "rawText": "-$5.93",
+                  "fragmentRefs": [
+                    "p160-f161"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 407.2000000000005,
+              "cells": [
+                {
+                  "rawText": "VISA ASSESSMENT FEE DB 0.0013 TIMES $65256.15",
+                  "fragmentRefs": [
+                    "p160-f162"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f164"
+                  ]
+                },
+                {
+                  "rawText": "-$84.84",
+                  "fragmentRefs": [
+                    "p160-f166"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 416.8000000000005,
+              "cells": [
+                {
+                  "rawText": "VI-CPS GOVERNMENT ALL",
+                  "fragmentRefs": [
+                    "p160-f167"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f169"
+                  ]
+                },
+                {
+                  "rawText": "-$315.98",
+                  "fragmentRefs": [
+                    "p160-f171"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 426.40000000000055,
+              "cells": [
+                {
+                  "rawText": "VI-GOVERNMENT PREPAID(CAP)",
+                  "fragmentRefs": [
+                    "p160-f172"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f174"
+                  ]
+                },
+                {
+                  "rawText": "-$6.00",
+                  "fragmentRefs": [
+                    "p160-f176"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 436.00000000000057,
+              "cells": [
+                {
+                  "rawText": "VI-CPS GOVERNMENT DEBIT",
+                  "fragmentRefs": [
+                    "p160-f177"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f179"
+                  ]
+                },
+                {
+                  "rawText": "-$14.11",
+                  "fragmentRefs": [
+                    "p160-f181"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 445.6000000000006,
+              "cells": [
+                {
+                  "rawText": "VI-US REGULATED (DB)",
+                  "fragmentRefs": [
+                    "p160-f182"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f184"
+                  ]
+                },
+                {
+                  "rawText": "-$66.79",
+                  "fragmentRefs": [
+                    "p160-f186"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 455.2000000000006,
+              "cells": [
+                {
+                  "rawText": "VI-ADDRESS VER SVC FEE 139 TRANSACTIONS AT 0.001",
+                  "fragmentRefs": [
+                    "p160-f187"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p160-f189"
+                  ]
+                },
+                {
+                  "rawText": "-$0.19",
+                  "fragmentRefs": [
+                    "p160-f191"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 479.2000000000006,
+              "cells": [
+                {
+                  "rawText": "DSCVR PSL PUBLIC SVC RW",
+                  "fragmentRefs": [
+                    "p160-f195"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f197"
+                  ]
+                },
+                {
+                  "rawText": "-$56.92",
+                  "fragmentRefs": [
+                    "p160-f199"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 488.80000000000064,
+              "cells": [
+                {
+                  "rawText": "DSCVR PSL PUBLIC SVC PR",
+                  "fragmentRefs": [
+                    "p160-f200"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f202"
+                  ]
+                },
+                {
+                  "rawText": "-$1.65",
+                  "fragmentRefs": [
+                    "p160-f204"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 498.40000000000066,
+              "cells": [
+                {
+                  "rawText": "DISCOVER ASSESSMENT FEE 0.0014 TIMES $3727.05",
+                  "fragmentRefs": [
+                    "p160-f205"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p160-f207"
+                  ]
+                },
+                {
+                  "rawText": "-$5.22",
+                  "fragmentRefs": [
+                    "p160-f209"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 508.0000000000007,
+              "cells": [
+                {
+                  "rawText": "ADDRS VERIFICATION SERVICE FEE 8 TRANSACTIONS AT 0.005",
+                  "fragmentRefs": [
+                    "p160-f210"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p160-f212"
+                  ]
+                },
+                {
+                  "rawText": "-$0.06",
+                  "fragmentRefs": [
+                    "p160-f214"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 532.0000000000007,
+              "cells": [
+                {
+                  "rawText": "VI COMM CARD I/C SAVINGS ADJ 0.5 DISC RATE TIMES $13.26",
+                  "fragmentRefs": [
+                    "p160-f218"
+                  ]
+                },
+                {
+                  "rawText": "Service charges",
+                  "fragmentRefs": [
+                    "p160-f220"
+                  ]
+                },
+                {
+                  "rawText": "-$6.63",
+                  "fragmentRefs": [
+                    "p160-f222"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 541.6000000000007,
+              "cells": [
+                {
+                  "rawText": "DIGITAL INVESTMENT FEE $3727.05 AT0.0001",
+                  "fragmentRefs": [
+                    "p160-f223"
+                  ]
+                },
+                {
+                  "rawText": "Service charges",
+                  "fragmentRefs": [
+                    "p160-f225"
+                  ]
+                },
+                {
+                  "rawText": "-$0.37",
+                  "fragmentRefs": [
+                    "p160-f227"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 551.2000000000007,
+              "cells": [
+                {
+                  "rawText": "VI BASE II CR VCHER FEE US D/P 1 TRANSACTIONS AT 0.0155",
+                  "fragmentRefs": [
+                    "p160-f228"
+                  ]
+                },
+                {
+                  "rawText": "Service charges",
+                  "fragmentRefs": [
+                    "p160-f230"
+                  ]
+                },
+                {
+                  "rawText": "-$0.02",
+                  "fragmentRefs": [
+                    "p160-f232"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 560.8000000000006,
+              "cells": [
+                {
+                  "rawText": "MC-AUTH DIGITAL ENABLEMENT FEE $30500.11 AT0.0002",
+                  "fragmentRefs": [
+                    "p160-f233"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p160-f235"
+                  ]
+                },
+                {
+                  "rawText": "-$6.10",
+                  "fragmentRefs": [
+                    "p160-f237"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 160,
+          "totalAmount": "-$1,129.54",
+          "expectedMemberCount": 38,
+          "continuation": null,
+          "totalFragmentRefs": [
+            "p160-f239",
+            "p160-f241"
+          ]
+        },
+        {
+          "kind": "account",
+          "regions": [
+            [
+              160,
+              598,
+              649,
+              6
+            ]
+          ],
+          "rows": [
+            {
+              "page": 160,
+              "y": 599.2,
+              "cells": [
+                {
+                  "rawText": "MC MONTHLY LOCATION FEE",
+                  "fragmentRefs": [
+                    "p160-f248"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p160-f250"
+                  ]
+                },
+                {
+                  "rawText": "-$1.25",
+                  "fragmentRefs": [
+                    "p160-f252"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 608.8,
+              "cells": [
+                {
+                  "rawText": "VISA NETWORK FEE CNP 2-06",
+                  "fragmentRefs": [
+                    "p160-f253"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p160-f255"
+                  ]
+                },
+                {
+                  "rawText": "-$34.88",
+                  "fragmentRefs": [
+                    "p160-f257"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 618.4,
+              "cells": [
+                {
+                  "rawText": "MC GLOBAL ACQUIRER FEE 0 TRANS TOTALING $131.64",
+                  "fragmentRefs": [
+                    "p160-f258"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p160-f260"
+                  ]
+                },
+                {
+                  "rawText": "-$1.12",
+                  "fragmentRefs": [
+                    "p160-f262"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 628,
+              "cells": [
+                {
+                  "rawText": "VISA INTL SERVICE FEE - BASE 0 TRANS TOTALING $390.00",
+                  "fragmentRefs": [
+                    "p160-f263"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p160-f265"
+                  ]
+                },
+                {
+                  "rawText": "-$3.90",
+                  "fragmentRefs": [
+                    "p160-f267"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 637.5999999999999,
+              "cells": [
+                {
+                  "rawText": "US CROSS BORDER FEE 0 TRANS TOTALING $131.64",
+                  "fragmentRefs": [
+                    "p160-f268"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p160-f270"
+                  ]
+                },
+                {
+                  "rawText": "-$0.79",
+                  "fragmentRefs": [
+                    "p160-f272"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 160,
+              "y": 647.1999999999999,
+              "cells": [
+                {
+                  "rawText": "VS INTL ACQUIRER FEE 0 TRANS TOTALING $390.00",
+                  "fragmentRefs": [
+                    "p160-f273"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p160-f275"
+                  ]
+                },
+                {
+                  "rawText": "-$1.76",
+                  "fragmentRefs": [
+                    "p160-f277"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 160,
+          "totalAmount": "-$43.70",
+          "expectedMemberCount": 6,
+          "continuation": null,
+          "totalFragmentRefs": [
+            "p160-f279",
+            "p160-f281"
+          ]
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "No independent second reviewer",
+    "One previously unstudied merchant/layout family",
+    "Day/card/chargeback/interchange and fee-category summaries are outside positive scope",
+    "No natural split-number/wrapped-row positive in this holdout; adversarial and known cases cover these separately"
+  ]
+}

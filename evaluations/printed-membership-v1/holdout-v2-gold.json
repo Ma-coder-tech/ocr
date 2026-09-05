@@ -1,0 +1,1411 @@
+{
+  "method": "Single-reviewer source-page visual annotation, then source-only native transcription; before structure outputs. Exhaustive detail cells in nine in-scope logical tables, not whole-document gold.",
+  "created_utc": "2026-09-05T02:44:25.204730+00:00",
+  "layout_families": 1,
+  "statements": [
+    {
+      "id": "holdout-4",
+      "sourceSha256": "d052c1c0e137e0f0cd27a72daf2dac7a67b35b171a6fc78bee389cdd1e135016",
+      "tables": [
+        {
+          "kind": "batch",
+          "regions": [
+            [
+              256,
+              378,
+              390,
+              2
+            ]
+          ],
+          "rows": [
+            {
+              "page": 256,
+              "y": 378.65,
+              "cells": [
+                {
+                  "rawText": "082210564101",
+                  "fragmentRefs": [
+                    "p256-f202"
+                  ]
+                },
+                {
+                  "rawText": "02/08/23",
+                  "fragmentRefs": [
+                    "p256-f204"
+                  ]
+                },
+                {
+                  "rawText": "$800.00",
+                  "fragmentRefs": [
+                    "p256-f206"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p256-f208"
+                  ]
+                },
+                {
+                  "rawText": "$800.00",
+                  "fragmentRefs": [
+                    "p256-f210"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p256-f212"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p256-f214"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p256-f216"
+                  ]
+                },
+                {
+                  "rawText": "$800.00",
+                  "fragmentRefs": [
+                    "p256-f218"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 256,
+              "y": 388.25,
+              "cells": [
+                {
+                  "rawText": "232147426722",
+                  "fragmentRefs": [
+                    "p256-f219"
+                  ]
+                },
+                {
+                  "rawText": "02/23/23",
+                  "fragmentRefs": [
+                    "p256-f221"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p256-f223"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p256-f225"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p256-f227"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p256-f229"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p256-f231"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p256-f233"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p256-f235"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 256,
+          "totalAmount": "$1,000.00",
+          "expectedMemberCount": 2,
+          "continuation": null,
+          "totalFragmentRefs": [
+            "p256-f237",
+            "p256-f239",
+            "p256-f241",
+            "p256-f243",
+            "p256-f245",
+            "p256-f247",
+            "p256-f249"
+          ]
+        },
+        {
+          "kind": "transaction",
+          "regions": [
+            [
+              256,
+              650,
+              683,
+              2
+            ]
+          ],
+          "rows": [
+            {
+              "page": 256,
+              "y": 662.8000000000001,
+              "cells": [
+                {
+                  "rawText": "VI-US REGULATED COMM (DB)",
+                  "fragmentRefs": [
+                    "p256-f304"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p256-f306"
+                  ]
+                },
+                {
+                  "rawText": "-$0.94",
+                  "fragmentRefs": [
+                    "p256-f308"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 256,
+              "y": 672.4,
+              "cells": [
+                {
+                  "rawText": "VISA ASSESSMENT FEE DB 0.0013 TIMES $1000.00",
+                  "fragmentRefs": [
+                    "p256-f309"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p256-f311"
+                  ]
+                },
+                {
+                  "rawText": "-$1.30",
+                  "fragmentRefs": [
+                    "p256-f313"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 256,
+          "totalAmount": "-$2.24",
+          "expectedMemberCount": 2,
+          "continuation": null,
+          "totalFragmentRefs": [
+            "p256-f315",
+            "p256-f317"
+          ]
+        },
+        {
+          "kind": "account",
+          "regions": [
+            [
+              257,
+              146,
+              159,
+              2
+            ]
+          ],
+          "rows": [
+            {
+              "page": 257,
+              "y": 148,
+              "cells": [
+                {
+                  "rawText": "MC MONTHLY LOCATION FEE",
+                  "fragmentRefs": [
+                    "p257-f38"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p257-f40"
+                  ]
+                },
+                {
+                  "rawText": "-$1.25",
+                  "fragmentRefs": [
+                    "p257-f42"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 257,
+              "y": 157.60000000000002,
+              "cells": [
+                {
+                  "rawText": "VISA NETWORK FEE CNP 2-06",
+                  "fragmentRefs": [
+                    "p257-f43"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p257-f45"
+                  ]
+                },
+                {
+                  "rawText": "-$0.26",
+                  "fragmentRefs": [
+                    "p257-f47"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 257,
+          "totalAmount": "-$1.51",
+          "expectedMemberCount": 2,
+          "continuation": null,
+          "totalFragmentRefs": [
+            "p257-f49",
+            "p257-f51"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "holdout-5",
+      "sourceSha256": "d052c1c0e137e0f0cd27a72daf2dac7a67b35b171a6fc78bee389cdd1e135016",
+      "tables": [
+        {
+          "kind": "batch",
+          "regions": [
+            [
+              260,
+              425,
+              457,
+              4
+            ]
+          ],
+          "rows": [
+            {
+              "page": 260,
+              "y": 426.65,
+              "cells": [
+                {
+                  "rawText": "042156529806",
+                  "fragmentRefs": [
+                    "p260-f261"
+                  ]
+                },
+                {
+                  "rawText": "01/04/23",
+                  "fragmentRefs": [
+                    "p260-f263"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p260-f265"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p260-f267"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p260-f269"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p260-f271"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p260-f273"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p260-f275"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p260-f277"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 260,
+              "y": 436.25,
+              "cells": [
+                {
+                  "rawText": "112158298408",
+                  "fragmentRefs": [
+                    "p260-f278"
+                  ]
+                },
+                {
+                  "rawText": "01/11/23",
+                  "fragmentRefs": [
+                    "p260-f280"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p260-f282"
+                  ]
+                },
+                {
+                  "rawText": "2",
+                  "fragmentRefs": [
+                    "p260-f284"
+                  ]
+                },
+                {
+                  "rawText": "$400.00",
+                  "fragmentRefs": [
+                    "p260-f286"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p260-f288"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p260-f290"
+                  ]
+                },
+                {
+                  "rawText": "2",
+                  "fragmentRefs": [
+                    "p260-f292"
+                  ]
+                },
+                {
+                  "rawText": "$400.00",
+                  "fragmentRefs": [
+                    "p260-f294"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 260,
+              "y": 445.85,
+              "cells": [
+                {
+                  "rawText": "182155166812",
+                  "fragmentRefs": [
+                    "p260-f295"
+                  ]
+                },
+                {
+                  "rawText": "01/18/23",
+                  "fragmentRefs": [
+                    "p260-f297"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p260-f299"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p260-f301"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p260-f303"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p260-f305"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p260-f307"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p260-f309"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p260-f311"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 260,
+              "y": 455.45,
+              "cells": [
+                {
+                  "rawText": "202157286392",
+                  "fragmentRefs": [
+                    "p260-f312"
+                  ]
+                },
+                {
+                  "rawText": "01/20/23",
+                  "fragmentRefs": [
+                    "p260-f314"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p260-f316"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p260-f318"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p260-f320"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p260-f322"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p260-f324"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p260-f326"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p260-f328"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 260,
+          "totalAmount": "$1,000.00",
+          "expectedMemberCount": 4,
+          "continuation": null,
+          "totalFragmentRefs": [
+            "p260-f330",
+            "p260-f332",
+            "p260-f334",
+            "p260-f336",
+            "p260-f338",
+            "p260-f340",
+            "p260-f342"
+          ]
+        },
+        {
+          "kind": "transaction",
+          "regions": [
+            [
+              261,
+              160,
+              269,
+              8
+            ]
+          ],
+          "rows": [
+            {
+              "page": 261,
+              "y": 162.39999999999998,
+              "cells": [
+                {
+                  "rawText": "MC-EMRG MKT EDU/GOVT(DB)",
+                  "fragmentRefs": [
+                    "p261-f39"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p261-f41"
+                  ]
+                },
+                {
+                  "rawText": "-$1.45",
+                  "fragmentRefs": [
+                    "p261-f43"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 261,
+              "y": 172,
+              "cells": [
+                {
+                  "rawText": "MC-COMM DATA RATE II BUS (DB)",
+                  "fragmentRefs": [
+                    "p261-f44"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p261-f46"
+                  ]
+                },
+                {
+                  "rawText": "-$4.30",
+                  "fragmentRefs": [
+                    "p261-f48"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 261,
+              "y": 181.60000000000002,
+              "cells": [
+                {
+                  "rawText": "MASTERCARD ASSESSMENT FEE 0.0013 TIMES $400.00",
+                  "fragmentRefs": [
+                    "p261-f49"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p261-f51"
+                  ]
+                },
+                {
+                  "rawText": "-$0.52",
+                  "fragmentRefs": [
+                    "p261-f53"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 261,
+              "y": 205.60000000000002,
+              "cells": [
+                {
+                  "rawText": "VISA ASSESSMENT FEE CR 0.0014 TIMES $600.00",
+                  "fragmentRefs": [
+                    "p261-f57"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p261-f59"
+                  ]
+                },
+                {
+                  "rawText": "-$0.84",
+                  "fragmentRefs": [
+                    "p261-f61"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 261,
+              "y": 215.20000000000005,
+              "cells": [
+                {
+                  "rawText": "VI-BUSINESS CARD TR3 LEVEL 2",
+                  "fragmentRefs": [
+                    "p261-f62"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p261-f64"
+                  ]
+                },
+                {
+                  "rawText": "-$4.30",
+                  "fragmentRefs": [
+                    "p261-f66"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 261,
+              "y": 224.80000000000007,
+              "cells": [
+                {
+                  "rawText": "VI-CPS GOVERNMENT ALL",
+                  "fragmentRefs": [
+                    "p261-f67"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p261-f69"
+                  ]
+                },
+                {
+                  "rawText": "-$6.40",
+                  "fragmentRefs": [
+                    "p261-f71"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 261,
+              "y": 248.80000000000007,
+              "cells": [
+                {
+                  "rawText": "VI COMM CARD I/C SAVINGS ADJ 0.5 DISC RATE TIMES $1.50",
+                  "fragmentRefs": [
+                    "p261-f75"
+                  ]
+                },
+                {
+                  "rawText": "Service charges",
+                  "fragmentRefs": [
+                    "p261-f77"
+                  ]
+                },
+                {
+                  "rawText": "-$0.75",
+                  "fragmentRefs": [
+                    "p261-f79"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 261,
+              "y": 258.4000000000001,
+              "cells": [
+                {
+                  "rawText": "MC-AUTH DIGITAL ENABLEMENT FEE $400.00 AT0.0002",
+                  "fragmentRefs": [
+                    "p261-f80"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p261-f82"
+                  ]
+                },
+                {
+                  "rawText": "-$0.08",
+                  "fragmentRefs": [
+                    "p261-f84"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 261,
+          "totalAmount": "-$18.64",
+          "expectedMemberCount": 8,
+          "continuation": null,
+          "totalFragmentRefs": [
+            "p261-f86",
+            "p261-f88"
+          ]
+        },
+        {
+          "kind": "account",
+          "regions": [
+            [
+              261,
+              295,
+              299,
+              1
+            ]
+          ],
+          "rows": [
+            {
+              "page": 261,
+              "y": 296.8,
+              "cells": [
+                {
+                  "rawText": "VISA NETWORK FEE CNP 2-06",
+                  "fragmentRefs": [
+                    "p261-f95"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p261-f97"
+                  ]
+                },
+                {
+                  "rawText": "-$0.38",
+                  "fragmentRefs": [
+                    "p261-f99"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 261,
+          "totalAmount": "-$0.38",
+          "expectedMemberCount": 1,
+          "continuation": null,
+          "totalFragmentRefs": [
+            "p261-f101",
+            "p261-f103"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "holdout-6",
+      "sourceSha256": "d052c1c0e137e0f0cd27a72daf2dac7a67b35b171a6fc78bee389cdd1e135016",
+      "tables": [
+        {
+          "kind": "batch",
+          "regions": [
+            [
+              264,
+              648,
+              679,
+              4
+            ]
+          ],
+          "rows": [
+            {
+              "page": 264,
+              "y": 648.4,
+              "cells": [
+                {
+                  "rawText": "072147279872",
+                  "fragmentRefs": [
+                    "p264-f284"
+                  ]
+                },
+                {
+                  "rawText": "03/07/23",
+                  "fragmentRefs": [
+                    "p264-f286"
+                  ]
+                },
+                {
+                  "rawText": "$166.67",
+                  "fragmentRefs": [
+                    "p264-f288"
+                  ]
+                },
+                {
+                  "rawText": "3",
+                  "fragmentRefs": [
+                    "p264-f290"
+                  ]
+                },
+                {
+                  "rawText": "$500.00",
+                  "fragmentRefs": [
+                    "p264-f292"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p264-f294"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p264-f296"
+                  ]
+                },
+                {
+                  "rawText": "3",
+                  "fragmentRefs": [
+                    "p264-f298"
+                  ]
+                },
+                {
+                  "rawText": "$500.00",
+                  "fragmentRefs": [
+                    "p264-f300"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 264,
+              "y": 658,
+              "cells": [
+                {
+                  "rawText": "082147191059",
+                  "fragmentRefs": [
+                    "p264-f301"
+                  ]
+                },
+                {
+                  "rawText": "03/08/23",
+                  "fragmentRefs": [
+                    "p264-f303"
+                  ]
+                },
+                {
+                  "rawText": "$1,500.00",
+                  "fragmentRefs": [
+                    "p264-f305"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p264-f307"
+                  ]
+                },
+                {
+                  "rawText": "$1,500.00",
+                  "fragmentRefs": [
+                    "p264-f309"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p264-f311"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p264-f313"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p264-f315"
+                  ]
+                },
+                {
+                  "rawText": "$1,500.00",
+                  "fragmentRefs": [
+                    "p264-f317"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 264,
+              "y": 667.6,
+              "cells": [
+                {
+                  "rawText": "102148023383",
+                  "fragmentRefs": [
+                    "p264-f318"
+                  ]
+                },
+                {
+                  "rawText": "03/10/23",
+                  "fragmentRefs": [
+                    "p264-f320"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p264-f322"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p264-f324"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p264-f326"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p264-f328"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p264-f330"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p264-f332"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p264-f334"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 264,
+              "y": 677.2,
+              "cells": [
+                {
+                  "rawText": "232152063105",
+                  "fragmentRefs": [
+                    "p264-f335"
+                  ]
+                },
+                {
+                  "rawText": "03/23/23",
+                  "fragmentRefs": [
+                    "p264-f337"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p264-f339"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p264-f341"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p264-f343"
+                  ]
+                },
+                {
+                  "rawText": "0",
+                  "fragmentRefs": [
+                    "p264-f345"
+                  ]
+                },
+                {
+                  "rawText": "0.00",
+                  "fragmentRefs": [
+                    "p264-f347"
+                  ]
+                },
+                {
+                  "rawText": "1",
+                  "fragmentRefs": [
+                    "p264-f349"
+                  ]
+                },
+                {
+                  "rawText": "$200.00",
+                  "fragmentRefs": [
+                    "p264-f351"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 264,
+          "totalAmount": "$2,400.00",
+          "expectedMemberCount": 4,
+          "continuation": null,
+          "totalFragmentRefs": [
+            "p264-f353",
+            "p264-f355",
+            "p264-f357",
+            "p264-f359",
+            "p264-f361",
+            "p264-f363",
+            "p264-f365"
+          ]
+        },
+        {
+          "kind": "transaction",
+          "regions": [
+            [
+              265,
+              340,
+              470,
+              10
+            ]
+          ],
+          "rows": [
+            {
+              "page": 265,
+              "y": 344.3499999999999,
+              "cells": [
+                {
+                  "rawText": "MC-REGULATED FRD ADJ COMM (DB)",
+                  "fragmentRefs": [
+                    "p265-f79"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p265-f81"
+                  ]
+                },
+                {
+                  "rawText": "-$0.32",
+                  "fragmentRefs": [
+                    "p265-f83"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 265,
+              "y": 353.94999999999993,
+              "cells": [
+                {
+                  "rawText": "MASTERCARD ASSESSMENT FEE 0.0013 TIMES $200.00",
+                  "fragmentRefs": [
+                    "p265-f84"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p265-f86"
+                  ]
+                },
+                {
+                  "rawText": "-$0.26",
+                  "fragmentRefs": [
+                    "p265-f88"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 265,
+              "y": 377.94999999999993,
+              "cells": [
+                {
+                  "rawText": "VI-CPS GOVERNMENT ALL",
+                  "fragmentRefs": [
+                    "p265-f92"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p265-f94"
+                  ]
+                },
+                {
+                  "rawText": "-$3.20",
+                  "fragmentRefs": [
+                    "p265-f96"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 265,
+              "y": 387.54999999999995,
+              "cells": [
+                {
+                  "rawText": "VI-US REGULATED COMM (DB)",
+                  "fragmentRefs": [
+                    "p265-f97"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p265-f99"
+                  ]
+                },
+                {
+                  "rawText": "-$0.97",
+                  "fragmentRefs": [
+                    "p265-f101"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 265,
+              "y": 397.15,
+              "cells": [
+                {
+                  "rawText": "VISA ASSESSMENT FEE DB 0.0013 TIMES $1900.00",
+                  "fragmentRefs": [
+                    "p265-f102"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p265-f104"
+                  ]
+                },
+                {
+                  "rawText": "-$2.47",
+                  "fragmentRefs": [
+                    "p265-f106"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 265,
+              "y": 406.75,
+              "cells": [
+                {
+                  "rawText": "VISA ASSESSMENT FEE CR 0.0014 TIMES $300.00",
+                  "fragmentRefs": [
+                    "p265-f107"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p265-f109"
+                  ]
+                },
+                {
+                  "rawText": "-$0.42",
+                  "fragmentRefs": [
+                    "p265-f111"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 265,
+              "y": 416.35,
+              "cells": [
+                {
+                  "rawText": "VI-US REGULATED (DB)",
+                  "fragmentRefs": [
+                    "p265-f112"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p265-f114"
+                  ]
+                },
+                {
+                  "rawText": "-$0.64",
+                  "fragmentRefs": [
+                    "p265-f116"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 265,
+              "y": 425.95000000000005,
+              "cells": [
+                {
+                  "rawText": "VI-BUSINESS CARD TR4 LEVEL 2",
+                  "fragmentRefs": [
+                    "p265-f117"
+                  ]
+                },
+                {
+                  "rawText": "Interchange charges",
+                  "fragmentRefs": [
+                    "p265-f119"
+                  ]
+                },
+                {
+                  "rawText": "-$2.30",
+                  "fragmentRefs": [
+                    "p265-f121"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 265,
+              "y": 449.95000000000005,
+              "cells": [
+                {
+                  "rawText": "VI COMM CARD I/C SAVINGS ADJ 0.5 DISC RATE TIMES $0.75",
+                  "fragmentRefs": [
+                    "p265-f125"
+                  ]
+                },
+                {
+                  "rawText": "Service charges",
+                  "fragmentRefs": [
+                    "p265-f127"
+                  ]
+                },
+                {
+                  "rawText": "-$0.38",
+                  "fragmentRefs": [
+                    "p265-f129"
+                  ]
+                }
+              ]
+            },
+            {
+              "page": 265,
+              "y": 459.55000000000007,
+              "cells": [
+                {
+                  "rawText": "MC-AUTH DIGITAL ENABLEMENT FEE $200.00 AT0.0002",
+                  "fragmentRefs": [
+                    "p265-f130"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p265-f132"
+                  ]
+                },
+                {
+                  "rawText": "-$0.04",
+                  "fragmentRefs": [
+                    "p265-f134"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 265,
+          "totalAmount": "-$11.00",
+          "expectedMemberCount": 10,
+          "continuation": null,
+          "totalFragmentRefs": [
+            "p265-f136",
+            "p265-f138"
+          ]
+        },
+        {
+          "kind": "account",
+          "regions": [
+            [
+              265,
+              496,
+              499,
+              1
+            ]
+          ],
+          "rows": [
+            {
+              "page": 265,
+              "y": 497.95,
+              "cells": [
+                {
+                  "rawText": "VISA NETWORK FEE CNP 2-06",
+                  "fragmentRefs": [
+                    "p265-f145"
+                  ]
+                },
+                {
+                  "rawText": "Fees",
+                  "fragmentRefs": [
+                    "p265-f147"
+                  ]
+                },
+                {
+                  "rawText": "-$0.48",
+                  "fragmentRefs": [
+                    "p265-f149"
+                  ]
+                }
+              ]
+            }
+          ],
+          "totalPage": 265,
+          "totalAmount": "-$0.48",
+          "expectedMemberCount": 1,
+          "continuation": null,
+          "totalFragmentRefs": [
+            "p265-f151",
+            "p265-f153"
+          ]
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "No independent second reviewer",
+    "One previously unstudied merchant/layout family",
+    "Day/card/chargeback/interchange and fee-category summaries are outside positive scope",
+    "No natural split-number/wrapped-row positive in this holdout; adversarial and known cases cover these separately"
+  ]
+}
