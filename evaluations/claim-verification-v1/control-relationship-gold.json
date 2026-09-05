@@ -1,0 +1,2108 @@
+{
+  "createdUtc": "2026-09-05T12:15:27.717704+00:00",
+  "method": "Single-reviewer source/control expectations over prior admitted semantic evidence; all documents previously studied",
+  "statements": [
+    {
+      "id": "priority",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-a1fd75878693bf89",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-a1fd75878693bf89",
+            "role": "third_party_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-a1fd75878693bf89",
+            "role": "combined_adjustments_chargebacks"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-a1fd75878693bf89",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-a1fd75878693bf89",
+            "role": "funded_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-732d7d7b62aec1f4",
+            "role": "fee_basis_or_volume"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-732d7d7b62aec1f4",
+            "role": "printed_rate"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-732d7d7b62aec1f4",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-525be8e2b292a3d8",
+            "role": "fee_basis_or_volume"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-525be8e2b292a3d8",
+            "role": "printed_rate"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-525be8e2b292a3d8",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-4a12018df71b4e57",
+            "role": "fee_basis_or_volume"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-4a12018df71b4e57",
+            "role": "printed_rate"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-4a12018df71b4e57",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-9fbc2c9cf181b8976775da83",
+              "s-974efd3b1c2e882e1b316b49"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-9fbc2c9cf181b8976775da83",
+              "s-974efd3b1c2e882e1b316b49"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-9fbc2c9cf181b8976775da83",
+              "s-9bd6e49d42770a1cf1945081"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-9fbc2c9cf181b8976775da83",
+              "s-9bd6e49d42770a1cf1945081"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-9fbc2c9cf181b8976775da83",
+              "s-bd9702e539799ff9ef38bc9d"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-9fbc2c9cf181b8976775da83",
+              "s-bd9702e539799ff9ef38bc9d"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-974efd3b1c2e882e1b316b49",
+              "s-9bd6e49d42770a1cf1945081"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-974efd3b1c2e882e1b316b49",
+              "s-9bd6e49d42770a1cf1945081"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-974efd3b1c2e882e1b316b49",
+              "s-bd9702e539799ff9ef38bc9d"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-974efd3b1c2e882e1b316b49",
+              "s-bd9702e539799ff9ef38bc9d"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-9bd6e49d42770a1cf1945081",
+              "s-bd9702e539799ff9ef38bc9d"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-9bd6e49d42770a1cf1945081",
+              "s-bd9702e539799ff9ef38bc9d"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-9fbc2c9cf181b8976775da83"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_union",
+            "scopeRefs": [
+              "s-974efd3b1c2e882e1b316b49",
+              "s-9bd6e49d42770a1cf1945081",
+              "s-bd9702e539799ff9ef38bc9d"
+            ],
+            "claimedValue": -308282
+          },
+          "status": "supported",
+          "duplicateReferencesRemoved": 14
+        }
+      ]
+    },
+    {
+      "id": "paysafe",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-847de8f1055cfef2",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-847de8f1055cfef2",
+            "role": "third_party_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-847de8f1055cfef2",
+            "role": "combined_adjustments_chargebacks"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-847de8f1055cfef2",
+            "role": "fee_charge"
+          },
+          "status": "contradicted",
+          "calculation": {
+            "computedValue": -154713,
+            "claimedValue": 156573,
+            "residualComputedMinusClaimed": -311286
+          }
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-847de8f1055cfef2",
+            "role": "funded_amount"
+          },
+          "status": "contradicted",
+          "calculation": {
+            "computedValue": 3534722,
+            "claimedValue": 3534721,
+            "residualComputedMinusClaimed": 1
+          }
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-82caaa931c831133",
+            "role": "fee_charge"
+          },
+          "status": "incomplete_evidence"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-9d7219165f0d2e2b",
+            "role": "fee_charge"
+          },
+          "status": "incomplete_evidence"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-de0d0dfcb47ced47",
+            "role": "fee_charge"
+          },
+          "status": "incomplete_evidence"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-d032c827035a70aa134cfb4f"
+          },
+          "status": "unresolved_interpretation"
+        }
+      ]
+    },
+    {
+      "id": "paysafe-zero",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-56c42acc689876b8",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-56c42acc689876b8",
+            "role": "third_party_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-56c42acc689876b8",
+            "role": "combined_adjustments_chargebacks"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-56c42acc689876b8",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-56c42acc689876b8",
+            "role": "funded_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-4ccd79ec6f925078",
+            "role": "printed_rate"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-4ccd79ec6f925078",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-2a9b1bdbb7321db5",
+            "role": "printed_rate"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-2a9b1bdbb7321db5",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-c99db3aaac8b8a50",
+            "role": "printed_rate"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-c99db3aaac8b8a50",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-98d5611b28a692f4fddaadf1",
+              "s-8e6192c72d845ca2210b82da"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-98d5611b28a692f4fddaadf1",
+              "s-8e6192c72d845ca2210b82da"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-98d5611b28a692f4fddaadf1",
+              "s-6a821245e735e07d25908c5b"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-98d5611b28a692f4fddaadf1",
+              "s-6a821245e735e07d25908c5b"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-98d5611b28a692f4fddaadf1",
+              "s-f2192adbb88f6f0fa552ecaf"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-98d5611b28a692f4fddaadf1",
+              "s-f2192adbb88f6f0fa552ecaf"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-8e6192c72d845ca2210b82da",
+              "s-6a821245e735e07d25908c5b"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-8e6192c72d845ca2210b82da",
+              "s-6a821245e735e07d25908c5b"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-8e6192c72d845ca2210b82da",
+              "s-f2192adbb88f6f0fa552ecaf"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-8e6192c72d845ca2210b82da",
+              "s-f2192adbb88f6f0fa552ecaf"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-6a821245e735e07d25908c5b",
+              "s-f2192adbb88f6f0fa552ecaf"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-6a821245e735e07d25908c5b",
+              "s-f2192adbb88f6f0fa552ecaf"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-f2192adbb88f6f0fa552ecaf"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_union",
+            "scopeRefs": [
+              "s-8e6192c72d845ca2210b82da",
+              "s-6a821245e735e07d25908c5b",
+              "s-f2192adbb88f6f0fa552ecaf"
+            ],
+            "claimedValue": -4490
+          },
+          "status": "supported",
+          "duplicateReferencesRemoved": 6
+        }
+      ]
+    },
+    {
+      "id": "basys",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-cd836444058ad759",
+            "role": "average_ticket"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-cd836444058ad759",
+            "role": "gross_sales_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-cd836444058ad759",
+            "role": "gross_sales_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-cd836444058ad759",
+            "role": "refunds_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-cd836444058ad759",
+            "role": "refunds_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-cd836444058ad759",
+            "role": "submitted_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-cd836444058ad759",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-beeba6315192ed27",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-a9144887c4a4c045",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-c2ed381e25ece505",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-aec886366bc274af",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-6aeadb9de0a64d1fbfb3b625",
+              "s-508d03dd164e2c329b623dac"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-6aeadb9de0a64d1fbfb3b625",
+              "s-508d03dd164e2c329b623dac"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-6aeadb9de0a64d1fbfb3b625",
+              "s-2b96145179c425669419d754"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-6aeadb9de0a64d1fbfb3b625",
+              "s-2b96145179c425669419d754"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-6aeadb9de0a64d1fbfb3b625",
+              "s-7fc04ea56dfbbba249c834d2"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-6aeadb9de0a64d1fbfb3b625",
+              "s-7fc04ea56dfbbba249c834d2"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-508d03dd164e2c329b623dac",
+              "s-2b96145179c425669419d754"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-508d03dd164e2c329b623dac",
+              "s-2b96145179c425669419d754"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-508d03dd164e2c329b623dac",
+              "s-7fc04ea56dfbbba249c834d2"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-508d03dd164e2c329b623dac",
+              "s-7fc04ea56dfbbba249c834d2"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-2b96145179c425669419d754",
+              "s-7fc04ea56dfbbba249c834d2"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-2b96145179c425669419d754",
+              "s-7fc04ea56dfbbba249c834d2"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-6aeadb9de0a64d1fbfb3b625"
+          },
+          "status": "unresolved_interpretation"
+        }
+      ]
+    },
+    {
+      "id": "clover-october",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-00a06b140ecfc911",
+            "role": "average_ticket"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-00a06b140ecfc911",
+            "role": "gross_sales_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-00a06b140ecfc911",
+            "role": "gross_sales_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-00a06b140ecfc911",
+            "role": "refunds_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-00a06b140ecfc911",
+            "role": "refunds_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-00a06b140ecfc911",
+            "role": "submitted_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-00a06b140ecfc911",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-0f9a2a080cdd63de",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-f4e45b832bf02ee0",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-df18498a933b26f8",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-a01a1c2cf10ebf85e8eb3b27",
+              "s-a77bee931bc40ac834c2584e"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-a01a1c2cf10ebf85e8eb3b27",
+              "s-a77bee931bc40ac834c2584e"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-a01a1c2cf10ebf85e8eb3b27",
+              "s-552a08c2159a97ad0399253d"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-a01a1c2cf10ebf85e8eb3b27",
+              "s-552a08c2159a97ad0399253d"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-a77bee931bc40ac834c2584e",
+              "s-552a08c2159a97ad0399253d"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-a77bee931bc40ac834c2584e",
+              "s-552a08c2159a97ad0399253d"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-a01a1c2cf10ebf85e8eb3b27"
+          },
+          "status": "unresolved_interpretation"
+        }
+      ]
+    },
+    {
+      "id": "clover-november",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-d8921e8319926530",
+            "role": "average_ticket"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-d8921e8319926530",
+            "role": "gross_sales_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-d8921e8319926530",
+            "role": "gross_sales_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-d8921e8319926530",
+            "role": "refunds_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-d8921e8319926530",
+            "role": "refunds_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-d8921e8319926530",
+            "role": "submitted_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-d8921e8319926530",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-8942fc12c48f20f2",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-2ddc4eab5dbb8179",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-c28bedd0e1d3b5b1",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-66a17c2e76d4dc5a225e2e03",
+              "s-22e64cd410fad38f923a5d1f"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-66a17c2e76d4dc5a225e2e03",
+              "s-22e64cd410fad38f923a5d1f"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-66a17c2e76d4dc5a225e2e03",
+              "s-1d331f66651fbc45fbb0ec73"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-66a17c2e76d4dc5a225e2e03",
+              "s-1d331f66651fbc45fbb0ec73"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-22e64cd410fad38f923a5d1f",
+              "s-1d331f66651fbc45fbb0ec73"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-22e64cd410fad38f923a5d1f",
+              "s-1d331f66651fbc45fbb0ec73"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-66a17c2e76d4dc5a225e2e03"
+          },
+          "status": "unresolved_interpretation"
+        }
+      ]
+    },
+    {
+      "id": "holdout-1",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6116062799fb5e11",
+            "role": "average_ticket"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6116062799fb5e11",
+            "role": "gross_sales_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6116062799fb5e11",
+            "role": "gross_sales_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6116062799fb5e11",
+            "role": "refunds_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6116062799fb5e11",
+            "role": "refunds_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6116062799fb5e11",
+            "role": "submitted_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6116062799fb5e11",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-599038595428a984",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-d2494c859a13b16d",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-ab0335f9eaca4ba893310a88",
+              "s-d8aa35fe9860c1da3dd7392e"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-ab0335f9eaca4ba893310a88",
+              "s-d8aa35fe9860c1da3dd7392e"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-ab0335f9eaca4ba893310a88"
+          },
+          "status": "unresolved_interpretation"
+        }
+      ]
+    },
+    {
+      "id": "holdout-2",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-955ec818c0260f67",
+            "role": "average_ticket"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-955ec818c0260f67",
+            "role": "gross_sales_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-955ec818c0260f67",
+            "role": "gross_sales_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-955ec818c0260f67",
+            "role": "refunds_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-955ec818c0260f67",
+            "role": "refunds_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-955ec818c0260f67",
+            "role": "submitted_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-955ec818c0260f67",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-49e75473a22190de",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-ad5852cf697f2ae2",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-7c11db9a95413305c52cd7e9",
+              "s-0a0fc8b8bce0cfcdb0bcc6d3"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-7c11db9a95413305c52cd7e9",
+              "s-0a0fc8b8bce0cfcdb0bcc6d3"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-7c11db9a95413305c52cd7e9"
+          },
+          "status": "unresolved_interpretation"
+        }
+      ]
+    },
+    {
+      "id": "holdout-3",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-b2372fea27b14344",
+            "role": "average_ticket"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-b2372fea27b14344",
+            "role": "gross_sales_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-b2372fea27b14344",
+            "role": "gross_sales_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-b2372fea27b14344",
+            "role": "refunds_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-b2372fea27b14344",
+            "role": "refunds_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-b2372fea27b14344",
+            "role": "submitted_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-b2372fea27b14344",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-16b59d29a29dcd7b",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-aea631dbed879be2",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-5a3d3a8a770f620de14a1d19",
+              "s-32988e1a70f734efcce6429e"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-5a3d3a8a770f620de14a1d19",
+              "s-32988e1a70f734efcce6429e"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-5a3d3a8a770f620de14a1d19"
+          },
+          "status": "unresolved_interpretation"
+        }
+      ]
+    },
+    {
+      "id": "holdout-4",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-7c15d24f22343376",
+            "role": "average_ticket"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-7c15d24f22343376",
+            "role": "gross_sales_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-7c15d24f22343376",
+            "role": "gross_sales_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-7c15d24f22343376",
+            "role": "refunds_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-7c15d24f22343376",
+            "role": "refunds_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-7c15d24f22343376",
+            "role": "submitted_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-7c15d24f22343376",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-4159986f0b9dbc59",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-a372d4411885a66b",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-7fb1bba38d96b108cb8e52e1",
+              "s-6ed733c52537683b5c3a9778"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-7fb1bba38d96b108cb8e52e1",
+              "s-6ed733c52537683b5c3a9778"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-7fb1bba38d96b108cb8e52e1"
+          },
+          "status": "unresolved_interpretation"
+        }
+      ]
+    },
+    {
+      "id": "holdout-5",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6774e1db9942bcc9",
+            "role": "average_ticket"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6774e1db9942bcc9",
+            "role": "gross_sales_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6774e1db9942bcc9",
+            "role": "gross_sales_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6774e1db9942bcc9",
+            "role": "refunds_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6774e1db9942bcc9",
+            "role": "refunds_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6774e1db9942bcc9",
+            "role": "submitted_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6774e1db9942bcc9",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-ee364db9fb504438",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-255c8b16d27a68ad",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-d900a24bb10da1ee23ddd833",
+              "s-86d4d64898f264e0b8d0bda8"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-d900a24bb10da1ee23ddd833",
+              "s-86d4d64898f264e0b8d0bda8"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-d900a24bb10da1ee23ddd833"
+          },
+          "status": "unresolved_interpretation"
+        }
+      ]
+    },
+    {
+      "id": "holdout-6",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6c3f1ad0b0290a4c",
+            "role": "average_ticket"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6c3f1ad0b0290a4c",
+            "role": "gross_sales_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6c3f1ad0b0290a4c",
+            "role": "gross_sales_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6c3f1ad0b0290a4c",
+            "role": "refunds_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6c3f1ad0b0290a4c",
+            "role": "refunds_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6c3f1ad0b0290a4c",
+            "role": "submitted_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-6c3f1ad0b0290a4c",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-9cd3a21215939300",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-1b652a45b2e35f6d",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-60b3ab07d7012983473a29e8",
+              "s-35093674d4b62f267a21aa45"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-60b3ab07d7012983473a29e8",
+              "s-35093674d4b62f267a21aa45"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-60b3ab07d7012983473a29e8"
+          },
+          "status": "unresolved_interpretation"
+        }
+      ]
+    },
+    {
+      "id": "holdout-7",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-2aade8fc327321aa",
+            "role": "average_ticket"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-2aade8fc327321aa",
+            "role": "gross_sales_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-2aade8fc327321aa",
+            "role": "gross_sales_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-2aade8fc327321aa",
+            "role": "refunds_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-2aade8fc327321aa",
+            "role": "refunds_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-2aade8fc327321aa",
+            "role": "submitted_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-2aade8fc327321aa",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-2488e2a5c6a676ff",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-55ccad438e064709",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-63ec6503a751672771ef65e0",
+              "s-151b83a4a614f3a90713a7a9"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-63ec6503a751672771ef65e0",
+              "s-151b83a4a614f3a90713a7a9"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-63ec6503a751672771ef65e0"
+          },
+          "status": "unresolved_interpretation"
+        }
+      ]
+    },
+    {
+      "id": "holdout-8",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-02e0a4f87edb1d0c",
+            "role": "average_ticket"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-02e0a4f87edb1d0c",
+            "role": "gross_sales_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-02e0a4f87edb1d0c",
+            "role": "gross_sales_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-02e0a4f87edb1d0c",
+            "role": "refunds_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-02e0a4f87edb1d0c",
+            "role": "refunds_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-02e0a4f87edb1d0c",
+            "role": "submitted_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-02e0a4f87edb1d0c",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-8d3bbc4c6bc41845",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-5766e0b9ecfcc9ea",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-51108846379af674c1420fa4",
+              "s-f888eb43fc15143b44e7bea7"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-51108846379af674c1420fa4",
+              "s-f888eb43fc15143b44e7bea7"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-51108846379af674c1420fa4"
+          },
+          "status": "unresolved_interpretation"
+        }
+      ]
+    },
+    {
+      "id": "holdout-9",
+      "expectedClaims": [
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-620130d25fc5bdd8",
+            "role": "average_ticket"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-620130d25fc5bdd8",
+            "role": "gross_sales_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-620130d25fc5bdd8",
+            "role": "gross_sales_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-620130d25fc5bdd8",
+            "role": "refunds_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-620130d25fc5bdd8",
+            "role": "refunds_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-620130d25fc5bdd8",
+            "role": "submitted_count"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-620130d25fc5bdd8",
+            "role": "submitted_amount"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-82806fb7f7c88d72",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "printed_total",
+            "totalRowRef": "r-8b5d79c3af59db75",
+            "role": "fee_charge"
+          },
+          "status": "supported"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-eb1aad0c5dd112e1c5defce5",
+              "s-7280d49214a29df8dc85564c"
+            ],
+            "relation": "same_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "economic_relation",
+            "scopeRefs": [
+              "s-eb1aad0c5dd112e1c5defce5",
+              "s-7280d49214a29df8dc85564c"
+            ],
+            "relation": "separate_activity"
+          },
+          "status": "unresolved_interpretation"
+        },
+        {
+          "request": {
+            "kind": "financial_completeness",
+            "scopeRef": "s-eb1aad0c5dd112e1c5defce5"
+          },
+          "status": "unresolved_interpretation"
+        }
+      ]
+    }
+  ]
+}

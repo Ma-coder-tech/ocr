@@ -1,0 +1,270 @@
+{
+  "schema": "claim-verification-preservation-v1",
+  "files": [
+    {
+      "file": "000-basys-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/basys-requests.json",
+      "sha256": "c2a8450c39f3ba62a38f3e2d1fa10293f26fc464bea743137cd6b63256275ec3"
+    },
+    {
+      "file": "001-basys-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/basys-verification.json",
+      "sha256": "760d5703e7cd6aabd3c5b6038e771b071e264bead90564e0d38c353812c85c2e"
+    },
+    {
+      "file": "002-boundary-audit.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/boundary-audit.json",
+      "sha256": "318c977a12bf73d5ee4c7f37bc087411156cbf5d4175e94e713031e3c8f44faf"
+    },
+    {
+      "file": "003-challenges.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/challenges.json",
+      "sha256": "523490b1aa061a7632fd7bc38583fd02acab47dca8bbb61efec2c14ccdae200d"
+    },
+    {
+      "file": "004-clover-november-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/clover-november-requests.json",
+      "sha256": "9ecb134c158d5ca7911415c1c5c9884d1bdf3963b59a44777b2904ad7058e9e3"
+    },
+    {
+      "file": "005-clover-november-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/clover-november-verification.json",
+      "sha256": "f142e35e2e69ad4313a70dae2a8661db455607079ad3e50f579a841782b08072"
+    },
+    {
+      "file": "006-clover-october-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/clover-october-requests.json",
+      "sha256": "06be5ac51a06f8d9045107d6dc86d1e14e1b15ba37993082384bef5240d577e9"
+    },
+    {
+      "file": "007-clover-october-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/clover-october-verification.json",
+      "sha256": "b799ba23da5d05012649cdaee7ca9887fe4c364da1a62f2b14c9c126c7775427"
+    },
+    {
+      "file": "008-development-summary.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/development-summary.json",
+      "sha256": "f87067655b0de2512fa58dd43dec6402f3e03e6f137ebbca1e996633a0addfaf"
+    },
+    {
+      "file": "009-holdout-1-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-1-requests.json",
+      "sha256": "5dafcd4d9b6cbba39f5b93e1ca998e773530f15f55a12da3a4b9c08de1e955cf"
+    },
+    {
+      "file": "010-holdout-1-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-1-verification.json",
+      "sha256": "e7eadb333f900254233f2b3e412c31a1ac92cb74f80ff9c4f295637406e1fabc"
+    },
+    {
+      "file": "011-holdout-2-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-2-requests.json",
+      "sha256": "107766715e97d663d186d311fb50a3331eb0b34d4fd8437d932b94970a28f074"
+    },
+    {
+      "file": "012-holdout-2-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-2-verification.json",
+      "sha256": "c1e13c05bbec0e9da85764f6710404a78a1efb345ddff011d99733bb6b685805"
+    },
+    {
+      "file": "013-holdout-3-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-3-requests.json",
+      "sha256": "0c69707c75f4304b7d0bba2a4478893ab1490c5ddbebe5a7376f488ce1de29ee"
+    },
+    {
+      "file": "014-holdout-3-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-3-verification.json",
+      "sha256": "3ba0e8beabd68be260aef7a3fcc7caa2e1d2c8d5a97a816365281ddd71cc2b62"
+    },
+    {
+      "file": "015-holdout-4-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-4-requests.json",
+      "sha256": "a8b1c213716f069eb1b940b34be1d1169db5cc4c46c698e5fb3c436da0843ff3"
+    },
+    {
+      "file": "016-holdout-4-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-4-verification.json",
+      "sha256": "a13659c3ad55941fbbbfdfe6253ccfb733232b15eba1edf8bcd3f063eed53e57"
+    },
+    {
+      "file": "017-holdout-5-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-5-requests.json",
+      "sha256": "5901dc15a3133d15af354924b34bc412d6ebb9a958448dc39959581afe5bd3cf"
+    },
+    {
+      "file": "018-holdout-5-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-5-verification.json",
+      "sha256": "a4c2cd51e3286d27f90bcef001a4e2cf596eb1223bdebe38294c22601052cb22"
+    },
+    {
+      "file": "019-holdout-6-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-6-requests.json",
+      "sha256": "4ce6f3eca66835fec92f361827af3667ea0a48397aa363b68e50ef8d28eb125b"
+    },
+    {
+      "file": "020-holdout-6-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-6-verification.json",
+      "sha256": "a3c58e3d8eca16f078091613c8369e5574391b90ad8b1365ab6f2f744ba836a9"
+    },
+    {
+      "file": "021-holdout-7-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-7-requests.json",
+      "sha256": "e15ef0115f82114a9f7042e3d4e6c3d316532e3b4850a9f60c48096c339a77df"
+    },
+    {
+      "file": "022-holdout-7-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-7-verification.json",
+      "sha256": "51dd7d989d34b490171a28f9c152525fe7ed5badcfe86d5b71e1c19d67c8ef41"
+    },
+    {
+      "file": "023-holdout-8-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-8-requests.json",
+      "sha256": "612619d729bef53ae82b96f12f533dcda230d69d7de9da350223d7a1df63ab1d"
+    },
+    {
+      "file": "024-holdout-8-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-8-verification.json",
+      "sha256": "1ca5fd0dfa9ba25781beaa0a414d763d16ab092629de40d4825c07175b36bed7"
+    },
+    {
+      "file": "025-holdout-9-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-9-requests.json",
+      "sha256": "c59811a6bb3e9349aaa42bf710e3ef8b58e2bb69f606371dda1071a235c15a13"
+    },
+    {
+      "file": "026-holdout-9-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/holdout-9-verification.json",
+      "sha256": "9358ac89c94b0e5eb4854f8a8b4117454b9044c3317aecc7ca2a90035f529564"
+    },
+    {
+      "file": "027-paysafe-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/paysafe-requests.json",
+      "sha256": "fabf9146ae81cc553890fb457c9c7a451285ac581ff58838e20417d88ae45ea6"
+    },
+    {
+      "file": "028-paysafe-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/paysafe-verification.json",
+      "sha256": "0e2b6c0081a579bd54c58e0b1250ba9504dee5987a4cf2340a9385b75e12e8d4"
+    },
+    {
+      "file": "029-paysafe-zero-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/paysafe-zero-requests.json",
+      "sha256": "02b6ea2699d3a5975aad8c9f646b730291c0fa6ae5884dae926ca73680e6b6ee"
+    },
+    {
+      "file": "030-paysafe-zero-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/paysafe-zero-verification.json",
+      "sha256": "dc9d663c1524b9287c77187f3d17b7d968a46686ca9bdb617198e7cd2bce194c"
+    },
+    {
+      "file": "031-priority-requests.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/priority-requests.json",
+      "sha256": "cc4587d0cb93be9ca0273abeb942e7b85b98c25fc4f738b89eccf68f08f2b8d0"
+    },
+    {
+      "file": "032-priority-verification.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/priority-verification.json",
+      "sha256": "8c0793477735179a7dee76e691d071a0f566bac10320b2d0a43e8c3caf1bc42c"
+    },
+    {
+      "file": "033-reserved-summary.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/reserved-summary.json",
+      "sha256": "8c8f9fbc79318e4e56e68aea3233ff14eb16dc29c2897fbc2488bd12119971e4"
+    },
+    {
+      "file": "034-scores.json.gz",
+      "restorePath": "artifacts/claim-verification-v1/scores.json",
+      "sha256": "a4685f1d23fb6e6ec7d6acc9cae9c798834f9768ac2f3adb63c099d084ff3c51"
+    },
+    {
+      "file": "035-semantic-regression.log.gz",
+      "restorePath": "artifacts/claim-verification-v1/semantic-regression.log",
+      "sha256": "145f08aa98012b9b52601c19a376de6ebeb96ce40d65d545432f0170f83dc694"
+    },
+    {
+      "file": "036-structure-regression.log.gz",
+      "restorePath": "artifacts/claim-verification-v1/structure-regression.log",
+      "sha256": "c52ef770ec31fca092d04252589026dac8758d4848e86f8f397a5321240031d2"
+    },
+    {
+      "file": "037-tests.log.gz",
+      "restorePath": "artifacts/claim-verification-v1/tests.log",
+      "sha256": "3747bf576b19e34e8f5287eb368034b7bdcbb64fb64a2d6f4ea5e037689cdc7c"
+    },
+    {
+      "file": "038-basys-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/basys-semantic.json",
+      "sha256": "f5b30097f5100eeb43855f294aa358006fa78d0bd6f8b28c1e6dcba4fcf76bbd"
+    },
+    {
+      "file": "039-clover-november-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/clover-november-semantic.json",
+      "sha256": "47a95e4bccfe590b1ef9e8828f5f50bdc6cce329fa1936704f53a1752198207b"
+    },
+    {
+      "file": "040-clover-october-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/clover-october-semantic.json",
+      "sha256": "a62bfc3b536bd5379fb5991c76b22bdbf4bfd68872fb566739126476ee027dec"
+    },
+    {
+      "file": "041-holdout-1-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/holdout-1-semantic.json",
+      "sha256": "8b0e66386ee10581b3997791b9a02514b3b16ad63f9a6d36af2af1d498b92081"
+    },
+    {
+      "file": "042-holdout-2-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/holdout-2-semantic.json",
+      "sha256": "8e3df433e54746a2f346dbf8540a04318e6789756589ab94f38e03acbec4d8e5"
+    },
+    {
+      "file": "043-holdout-3-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/holdout-3-semantic.json",
+      "sha256": "acf32d6624e6db9eefd4ceb409cfa5547e7db9033850731f28b5f6b80c1847b0"
+    },
+    {
+      "file": "044-holdout-4-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/holdout-4-semantic.json",
+      "sha256": "16395de2f60e89b944431d5ac5f2b191e4e409e832ae4c4c67423df6ab4c3042"
+    },
+    {
+      "file": "045-holdout-5-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/holdout-5-semantic.json",
+      "sha256": "907a68c28d513b6a2032a0f60e29a048229124eebe2c229578d57c92c8d3f478"
+    },
+    {
+      "file": "046-holdout-6-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/holdout-6-semantic.json",
+      "sha256": "ab148c9b55665fa8f702ae74c5bf8fc3110ac177f03d88d1a9498483376c7ac5"
+    },
+    {
+      "file": "047-holdout-7-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/holdout-7-semantic.json",
+      "sha256": "c1d1715abba064bb32a6b82cb59fdbf335c04d4d415ba6d4cb5916a52c02e250"
+    },
+    {
+      "file": "048-holdout-8-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/holdout-8-semantic.json",
+      "sha256": "d2be5db2336b8a1e81c4795382afeb73a5f8c0ab542c97fa9eee3cbe62bf7d4f"
+    },
+    {
+      "file": "049-holdout-9-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/holdout-9-semantic.json",
+      "sha256": "105a9b2e0ee7e524210e7098fa62262e71751590f0299179e2ced09604ad913f"
+    },
+    {
+      "file": "050-paysafe-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/paysafe-semantic.json",
+      "sha256": "b8d7dd6bf22966a15acb0e8662b41d6b5432be061c55894f6349eaf8daa2da45"
+    },
+    {
+      "file": "051-paysafe-zero-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/paysafe-zero-semantic.json",
+      "sha256": "840155d115efde77d9a381b0cb0eda512d379a36d9d1949c20edb50ddf6769df"
+    },
+    {
+      "file": "052-priority-semantic.json.gz",
+      "restorePath": "artifacts/financial-population-scope-v1/priority-semantic.json",
+      "sha256": "7a449595004be8b8d988a061785cd2a4fce874605deed41cee02e6187ce01193"
+    }
+  ]
+}

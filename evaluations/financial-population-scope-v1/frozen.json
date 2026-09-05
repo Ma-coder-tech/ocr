@@ -1,0 +1,23 @@
+{
+  "frozenUtc": "2026-09-05T11:31:20.498307+00:00",
+  "preservationSha": "f5e89d4e3afd63a7f687d1359f801fe62136b6fe",
+  "testsPassed": 29,
+  "reservedSemanticHoldout": [
+    "holdout-7",
+    "holdout-8",
+    "holdout-9"
+  ],
+  "untouchedDocuments": false,
+  "sha256": {
+    "semantics.py": "8049ab126961a19a38266b70eedcc0e1348eb25aa32f05447ca25b7fe34f49c3",
+    "test_semantics.py": "f789db673699f9a6e2343bbd0a5c4780b7add1fbabcf49bcf29c7e10867b8bdc",
+    "protocol.md": "245f3be1408be8b135ff8894bc5481513ca9fcaeed5adc02fba563cfeb4fb0f7",
+    "io_evidence.py": "3047182a7f621573ec68af0354c8b2c8cccb5163757ef929cd28e0618299ae34",
+    "run.py": "7641e41113c7f85fdf7207e45d99f071edee3b694bb9e8a2a4cff15d0eb0329f",
+    "annotate_semantic_gold.py": "409045d9c7b7edf2963d31a17eb46b2ac74fb13ddc8e188a215291965e56704c",
+    "development-semantic-gold.json": "1db629a64b018aef51e15fa6947238b4aff625f309af5e9c1419f2b8000f0b63"
+  },
+  "revision": 2,
+  "previousFreeze": "first-pass/frozen.json",
+  "postUnblindingCorrection": "Reject generated fee titles and explicit basis/estimate headings as charged-fee evidence; all existing holdout outputs must remain byte-identical on replay. Final version has no untouched holdout."
+}
