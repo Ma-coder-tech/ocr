@@ -63,6 +63,29 @@ describe("fee partition source provenance v1", () => {
     expect(arithmetic.get("Count without rate")).toMatchObject({ status: "partial", missingFields: ["per_item_rate"] });
   });
 
+  it("promotes safely recovered table operands into arithmetic provenance", () => {
+    const ledger = ledgerFrom({
+      rows: [
+        row("DISC 1", 0.56, "TRANSACTION FEES", "Fees", "08/31/25 | CF | DISC 1 | 281.07 | 0.00200 | -$0.56"),
+        row("OTHER ITEM FEES", 0.3, "TRANSACTION FEES", "Fees", "08/31/25 | CF | OTHER ITEM FEES | 3.00 | 0.10000 | -$0.30"),
+        row("KILOBYTE AUTH FEE US", 0.04, "TRANSACTION FEES", "Fees", "08/31/25 | CF | KILOBYTE AUTH FEE US | 18.35 | 0.00229 | -$0.04"),
+      ],
+      controls: [control("Total Transaction Fees", 0.9), control("Generic Fee Grand Total", 0.9)],
+    });
+    const arithmetic = new Map(
+      ledger.partitionSourceProvenance.rowArithmetic.map((item) => [ledger.rows.find((row) => row.id === item.feeRowId)!.selectedLabel, item]),
+    );
+
+    expect(arithmetic.get("DISC 1")).toMatchObject({ status: "complete", formulaBasis: "rate_times_volume", operandRecovery: { status: "recovered" } });
+    expect(arithmetic.get("OTHER ITEM FEES")).toMatchObject({ status: "complete", formulaBasis: "per_item", operandRecovery: { status: "recovered" } });
+    expect(arithmetic.get("KILOBYTE AUTH FEE US")).toMatchObject({
+      status: "complete",
+      formulaBasis: "source_units_times_per_unit",
+      sourceUnitBasis: "18.35",
+      operandRecovery: { status: "recovered" },
+    });
+  });
+
   it("keeps duplicate section candidates ambiguous instead of choosing by amount", () => {
     const ledger = ledgerFrom({
       rows: [row("Account row", 1, "ACCOUNT FEES", "Fees", "Account row | -$1.00")],

@@ -133,6 +133,11 @@ function exactAmountMinor(
     const rateDollars = decimalRational(row.printedPerItemRate.normalizedFractionalRate);
     return rateDollars ? multiply(rateDollars, BigInt(row.itemCount) * 100n) : null;
   }
+  if (row.formulaBasis === "source_units_times_per_unit" && row.printedPerUnitRate?.normalizedFractionalRate && row.sourceUnitBasis) {
+    const units = decimalRational(row.sourceUnitBasis);
+    const rateDollars = decimalRational(row.printedPerUnitRate.normalizedFractionalRate);
+    return units && rateDollars ? multiply(multiplyRationals(units, rateDollars), 100n) : null;
+  }
   return null;
 }
 
@@ -146,6 +151,10 @@ function decimalRational(value: string): Rational | null {
 
 function multiply(value: Rational, factor: bigint): Rational {
   return normalize({ numerator: value.numerator * factor, denominator: value.denominator });
+}
+
+function multiplyRationals(left: Rational, right: Rational): Rational {
+  return normalize({ numerator: left.numerator * right.numerator, denominator: left.denominator * right.denominator });
 }
 
 function sumRationals(values: Rational[]): Rational {

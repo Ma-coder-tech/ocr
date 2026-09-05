@@ -18,6 +18,7 @@ import { targetSupportsApprovedEstimate, targetSupportsDeterministic } from "./o
 import { buildCanonicalFeeRollupAssessments, FEE_ROLLUP_COMPLETENESS_POLICY_VERSION } from "./feeRollupEvidence.js";
 import { buildCanonicalFeePartitionSourceProvenance, FEE_PARTITION_SOURCE_PROVENANCE_POLICY_VERSION } from "./feePartitionSourceProvenance.js";
 import { EXACT_SOURCE_ARITHMETIC_BRIDGE_POLICY_VERSION } from "./exactSourceArithmeticBridge.js";
+import { FEE_BASIS_OPERAND_COVERAGE_POLICY_VERSION } from "./feeOperandRecovery.js";
 import { validateCanonicalMerchantAttentionModel } from "./merchantAttention.js";
 import type {
   CanonicalCustomerPermissionKey,
@@ -191,6 +192,9 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   if (analysis.versionManifest?.exactSourceArithmeticBridgePolicyVersion !== EXACT_SOURCE_ARITHMETIC_BRIDGE_POLICY_VERSION) {
     errors.push("Canonical version manifest must include exact_source_arithmetic_bridge_v1.");
   }
+  if (analysis.versionManifest?.feeBasisOperandCoveragePolicyVersion !== FEE_BASIS_OPERAND_COVERAGE_POLICY_VERSION) {
+    errors.push("Canonical version manifest must include fee_basis_operand_coverage_conflict_resolution_v1.");
+  }
   if (analysis.financialFacts.effectiveRateBasis?.policyVersion !== "effective_rate_basis_v1") {
     errors.push("Effective rate basis is missing or unsupported.");
   }
@@ -350,8 +354,16 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
       }
     }
     for (const arithmetic of analysis.feeLedger.partitionSourceProvenance.rowArithmetic) {
+      if (arithmetic.operandRecovery.policyVersion !== FEE_BASIS_OPERAND_COVERAGE_POLICY_VERSION) {
+        errors.push(`Fee arithmetic provenance ${arithmetic.feeRowId} uses an unsupported operand-recovery policy.`);
+      }
       for (const evidenceRef of Object.values(arithmetic.fieldEvidenceRefs).flat()) {
         if (!evidenceIds.has(evidenceRef)) errors.push(`Fee arithmetic provenance ${arithmetic.feeRowId} evidence ref ${evidenceRef} is broken.`);
+      }
+      for (const candidate of arithmetic.operandRecovery.candidates) {
+        for (const evidenceRef of candidate.evidenceRefs) {
+          if (!evidenceIds.has(evidenceRef)) errors.push(`Fee operand candidate ${candidate.id} evidence ref ${evidenceRef} is broken.`);
+        }
       }
     }
   }

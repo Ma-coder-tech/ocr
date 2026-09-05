@@ -1711,19 +1711,49 @@ export type CanonicalFeeRowSectionAssignment = {
 export type CanonicalFeeRowArithmeticProvenance = {
   feeRowId: string;
   status: "complete" | "partial" | "charged_amount_only" | "ambiguous";
-  formulaBasis: "rate_times_volume" | "per_item" | "unknown" | "ambiguous";
+  formulaBasis: "rate_times_volume" | "per_item" | "source_units_times_per_unit" | "unknown" | "ambiguous";
   printedRate: CanonicalPrintedRate | null;
   volumeBasis: MoneyAmount | null;
   printedPerItemRate: CanonicalPrintedRate | null;
   itemCount: CountValue | null;
+  printedPerUnitRate: CanonicalPrintedRate | null;
+  sourceUnitBasis: DecimalString | null;
   chargedAmount: MoneyAmount | null;
   fieldEvidenceRefs: {
     rate: string[];
     volumeBasis: string[];
     count: string[];
+    perUnitRate: string[];
+    sourceUnitBasis: string[];
     chargedAmount: string[];
   };
+  operandRecovery: CanonicalFeeOperandRecovery;
   missingFields: string[];
+};
+
+export type CanonicalFeeOperandCandidate = {
+  id: string;
+  formulaBasis: "rate_times_volume" | "per_item" | "source_units_times_per_unit";
+  basisKind: "money_volume" | "transaction_count" | "other_source_units";
+  printedRate: CanonicalPrintedRate;
+  volumeBasis: MoneyAmount | null;
+  itemCount: CountValue | null;
+  sourceUnitBasis: DecimalString | null;
+  evidenceRefs: string[];
+  ruleId:
+    | "integer_count_column_v1"
+    | "explicit_count_description_v1"
+    | "explicit_source_unit_description_v1"
+    | "fractional_volume_column_v1"
+    | "ambiguous_decimal_integer_basis_v1";
+};
+
+export type CanonicalFeeOperandRecovery = {
+  policyVersion: "fee_basis_operand_coverage_conflict_resolution_v1";
+  status: "not_needed_existing" | "recovered" | "ambiguous" | "conflicting" | "unavailable";
+  selectedCandidateId: string | null;
+  candidates: CanonicalFeeOperandCandidate[];
+  reasonCodes: string[];
 };
 
 export type CanonicalFeePartitionSourceProvenance = {
@@ -1969,6 +1999,7 @@ export type CanonicalAnalysisVersionManifest = {
   feeRollupCompletenessPolicyVersion: "fee_rollup_completeness_rounding_attribution_v1";
   feePartitionSourceProvenancePolicyVersion: "fee_partition_source_provenance_v1";
   exactSourceArithmeticBridgePolicyVersion: "exact_source_arithmetic_bridge_v1";
+  feeBasisOperandCoveragePolicyVersion: "fee_basis_operand_coverage_conflict_resolution_v1";
   parserId: string | null;
   parserVersion: string | null;
   extractionVersion: string;

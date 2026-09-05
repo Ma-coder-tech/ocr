@@ -7,6 +7,7 @@ import type {
   CanonicalPrintedRate,
   MoneyAmount,
 } from "./types.js";
+import { recoverPrintedFeeOperands } from "./feeOperandRecovery.js";
 
 export const FEE_PARTITION_SOURCE_PROVENANCE_POLICY_VERSION = "fee_partition_source_provenance_v1" as const;
 
@@ -83,44 +84,84 @@ function arithmeticForRow(
   occurrenceById: Map<string, CanonicalFeeSourceOccurrence>,
 ): CanonicalFeePartitionSourceProvenance["rowArithmetic"][number] {
   const evidenceRefs = sortedUnique(row.sourceOccurrenceIds.map((id) => occurrenceById.get(id)?.evidenceRef).filter((id): id is string => Boolean(id)));
-  const printedRate = uniqueObject(interpretations.map((item) => item.printedRate));
-  const volumeBasis = uniqueMoney(interpretations.map((item) => item.volume));
-  const printedPerItemRate = uniqueObject(interpretations.map((item) => item.printedPerItemRate));
-  const itemCount = uniqueNumber(interpretations.map((item) => item.itemCount));
+  let printedRate = uniqueObject(interpretations.map((item) => item.printedRate));
+  let volumeBasis = uniqueMoney(interpretations.map((item) => item.volume));
+  let printedPerItemRate = uniqueObject(interpretations.map((item) => item.printedPerItemRate));
+  let itemCount = uniqueNumber(interpretations.map((item) => item.itemCount));
+  let printedPerUnitRate: CanonicalPrintedRate | null = null;
+  let sourceUnitBasis: string | null = null;
   const chargedAmount = row.selectedAmount;
-  const conflicting =
+  const interpretationConflict =
     row.mergeReason === "ambiguous_similarity_unresolved" ||
     hasConflictingObjects(interpretations.map((item) => item.printedRate)) ||
     hasConflictingMoney(interpretations.map((item) => item.volume)) ||
     hasConflictingObjects(interpretations.map((item) => item.printedPerItemRate)) ||
     hasConflictingNumbers(interpretations.map((item) => item.itemCount));
+  const existingRateVolumeComplete = printedRate !== null && printedRate.normalizedFractionalRate !== null && volumeBasis !== null && chargedAmount !== null;
+  const existingPerItemComplete = printedPerItemRate !== null && printedPerItemRate.normalizedFractionalRate !== null && itemCount !== null && chargedAmount !== null;
+  const existingComplete = existingRateVolumeComplete || existingPerItemComplete;
+  const operandRecovery = existingComplete
+    ? {
+        policyVersion: "fee_basis_operand_coverage_conflict_resolution_v1" as const,
+        status: "not_needed_existing" as const,
+        selectedCandidateId: null,
+        candidates: [],
+        reasonCodes: ["complete_operands_already_preserved"],
+      }
+    : recoverPrintedFeeOperands({
+        label: row.selectedLabel,
+        sources: row.sourceOccurrenceIds.map((id) => ({ evidenceRef: occurrenceById.get(id)?.evidenceRef ?? id, text: occurrenceById.get(id)?.normalizedSourceText ?? null })),
+      });
+  const selectedRecovery = operandRecovery.status === "recovered"
+    ? operandRecovery.candidates.find((candidate) => candidate.id === operandRecovery.selectedCandidateId) ?? null
+    : null;
+  if (selectedRecovery?.formulaBasis === "rate_times_volume") {
+    printedRate = selectedRecovery.printedRate;
+    volumeBasis = selectedRecovery.volumeBasis;
+  } else if (selectedRecovery?.formulaBasis === "per_item") {
+    printedPerItemRate = selectedRecovery.printedRate;
+    itemCount = selectedRecovery.itemCount;
+  } else if (selectedRecovery?.formulaBasis === "source_units_times_per_unit") {
+    printedPerUnitRate = selectedRecovery.printedRate;
+    sourceUnitBasis = selectedRecovery.sourceUnitBasis;
+  }
   const rateVolumeComplete = printedRate !== null && printedRate.normalizedFractionalRate !== null && volumeBasis !== null && chargedAmount !== null;
   const perItemComplete = printedPerItemRate !== null && printedPerItemRate.normalizedFractionalRate !== null && itemCount !== null && chargedAmount !== null;
-  const ambiguous = conflicting || (rateVolumeComplete && perItemComplete);
-  const hasAnyOperand = Boolean(printedRate || volumeBasis || printedPerItemRate || itemCount !== null);
-  const status = ambiguous ? "ambiguous" as const : rateVolumeComplete || perItemComplete ? "complete" as const : hasAnyOperand ? "partial" as const : "charged_amount_only" as const;
-  const formulaBasis = ambiguous ? "ambiguous" as const : rateVolumeComplete ? "rate_times_volume" as const : perItemComplete ? "per_item" as const : "unknown" as const;
+  const sourceUnitComplete = printedPerUnitRate !== null && printedPerUnitRate.normalizedFractionalRate !== null && sourceUnitBasis !== null && chargedAmount !== null;
+  const ambiguous = interpretationConflict || operandRecovery.status === "ambiguous" || operandRecovery.status === "conflicting" || [rateVolumeComplete, perItemComplete, sourceUnitComplete].filter(Boolean).length > 1;
+  const hasAnyOperand = Boolean(printedRate || volumeBasis || printedPerItemRate || itemCount !== null || printedPerUnitRate || sourceUnitBasis);
+  const completeStatus = rateVolumeComplete || perItemComplete || sourceUnitComplete;
+  const resolvedStatus = ambiguous ? "ambiguous" as const : completeStatus ? "complete" as const : hasAnyOperand ? "partial" as const : "charged_amount_only" as const;
+  const formulaBasis = ambiguous ? "ambiguous" as const : rateVolumeComplete ? "rate_times_volume" as const : perItemComplete ? "per_item" as const : sourceUnitComplete ? "source_units_times_per_unit" as const : "unknown" as const;
+  const selectedEvidenceRefs = selectedRecovery?.evidenceRefs ?? evidenceRefs;
   return {
     feeRowId: row.id,
-    status,
+    status: resolvedStatus,
     formulaBasis,
     printedRate,
     volumeBasis,
     printedPerItemRate,
     itemCount,
+    printedPerUnitRate,
+    sourceUnitBasis,
     chargedAmount,
     fieldEvidenceRefs: {
-      rate: printedRate ? evidenceRefs : [],
-      volumeBasis: volumeBasis ? evidenceRefs : [],
-      count: itemCount !== null ? evidenceRefs : [],
+      rate: printedRate ? selectedEvidenceRefs : [],
+      volumeBasis: volumeBasis ? selectedEvidenceRefs : [],
+      count: itemCount !== null ? selectedEvidenceRefs : [],
+      perUnitRate: printedPerUnitRate ? selectedEvidenceRefs : [],
+      sourceUnitBasis: sourceUnitBasis ? selectedEvidenceRefs : [],
       chargedAmount: chargedAmount ? evidenceRefs : [],
     },
-    missingFields: status === "partial"
+    operandRecovery,
+    missingFields: resolvedStatus === "partial"
       ? [
           ...((printedRate && !volumeBasis) ? ["volume_basis"] : []),
           ...((volumeBasis && !printedRate) ? ["rate"] : []),
           ...((printedPerItemRate && itemCount === null) ? ["count"] : []),
           ...((itemCount !== null && !printedPerItemRate) ? ["per_item_rate"] : []),
+          ...((printedPerUnitRate && !sourceUnitBasis) ? ["source_unit_basis"] : []),
+          ...((sourceUnitBasis && !printedPerUnitRate) ? ["per_unit_rate"] : []),
           ...(!chargedAmount ? ["charged_amount"] : []),
         ]
       : [],
