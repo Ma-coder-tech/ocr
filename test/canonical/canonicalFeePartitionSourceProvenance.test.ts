@@ -76,6 +76,64 @@ describe("fee partition source provenance v1", () => {
     expect(ledger.partitionSourceProvenance.assignments[0]!.candidateSectionControlRefs).toHaveLength(2);
     expect(buildCanonicalFeeRollupAssessments(ledger)[0]!.status).toBe("unresolved");
   });
+
+  it("proves a one-cent residual only when exact printed operands reproduce rows, sections, and grand total", () => {
+    const ledger = ledgerFrom({
+      rows: [
+        row("Alpha", 6.01, "SECTION A FEES", "Fees", "Alpha | 1 | 6.005 | -$6.01", { count: 1 }),
+        row("Beta", 4, "SECTION B FEES", "Fees", "Beta | 1 | 3.995 | -$4.00", { count: 1 }),
+      ],
+      controls: [control("Total Section A Fees", 6.01), control("Total Section B Fees", 4), control("Generic Fee Grand Total", 10)],
+    });
+    const rollup = buildCanonicalFeeRollupAssessments(ledger)[0]!;
+
+    expect(rollup).toMatchObject({
+      status: "proven_complete_with_rounding",
+      residualMinor: 1,
+      residualAttribution: "proven_exact_rounding_bridge",
+      sourceArithmetic: {
+        status: "proven_rounding",
+        reasonCode: "exact_source_arithmetic_proves_rounding",
+        reconstructedFeeRowIds: expect.arrayContaining(ledger.rows.map((item) => item.id)),
+        incompleteFeeRowIds: [],
+        ambiguousFeeRowIds: [],
+        mismatchedFeeRowIds: [],
+        grandAmount: { numeratorMinorUnits: "1000", denominator: "1", roundedAmountMinor: 1000 },
+      },
+    });
+    expect(rollup.sourceArithmetic.sectionAmounts.map((item) => item.reproducesPrintedTotal)).toEqual([true, true]);
+    expect(rollup.roundingEvidenceRefs.length).toBeGreaterThan(0);
+  });
+
+  it("withholds rounding when any participating row lacks source operands", () => {
+    const ledger = ledgerFrom({
+      rows: [
+        row("Alpha", 6.01, "SECTION A FEES", "Fees", "Alpha | -$6.01"),
+        row("Beta", 4, "SECTION B FEES", "Fees", "Beta | 1 | 3.995 | -$4.00", { count: 1 }),
+      ],
+      controls: [control("Total Section A Fees", 6.01), control("Total Section B Fees", 4), control("Generic Fee Grand Total", 10)],
+    });
+    const rollup = buildCanonicalFeeRollupAssessments(ledger)[0]!;
+
+    expect(rollup.status).toBe("unresolved");
+    expect(rollup.sourceArithmetic).toMatchObject({ status: "unresolved", reasonCode: "incomplete_source_arithmetic" });
+    expect(rollup.sourceArithmetic.incompleteFeeRowIds).toHaveLength(1);
+  });
+
+  it("withholds rounding when exact source arithmetic does not reproduce a printed row charge", () => {
+    const ledger = ledgerFrom({
+      rows: [
+        row("Alpha", 6.01, "SECTION A FEES", "Fees", "Alpha | 1 | 6.004 | -$6.01", { count: 1 }),
+        row("Beta", 4, "SECTION B FEES", "Fees", "Beta | 1 | 3.995 | -$4.00", { count: 1 }),
+      ],
+      controls: [control("Total Section A Fees", 6.01), control("Total Section B Fees", 4), control("Generic Fee Grand Total", 10)],
+    });
+    const rollup = buildCanonicalFeeRollupAssessments(ledger)[0]!;
+
+    expect(rollup.status).toBe("unresolved");
+    expect(rollup.sourceArithmetic).toMatchObject({ status: "unresolved", reasonCode: "source_arithmetic_row_mismatch" });
+    expect(rollup.sourceArithmetic.mismatchedFeeRowIds).toHaveLength(1);
+  });
 });
 
 function ledgerFrom(input: { rows: Record<string, unknown>[]; controls: Record<string, unknown>[] }) {

@@ -117,7 +117,7 @@ describe("cross-summary link evidence v2", () => {
     expect(rollup.missingFeeRowIds).toEqual([unassigned.feeRowId]);
   });
 
-  it("attributes a residual only when exact unrounded arithmetic reconstructs every printed total", () => {
+  it("does not accept an aggregate endpoint bridge without exhaustive row source arithmetic", () => {
     const fixture = crossSummaryFixture(true);
     const sections = fixture.input.feeLedger.controls.filter((control) => control.basis === "section_control");
     const grand = fixture.input.feeLedger.controls.find((control) => control.basis === "grand_control")!;
@@ -133,17 +133,14 @@ describe("cross-summary link evidence v2", () => {
       roundingMode: "nearest_cent_half_away_from_zero",
       evidenceRefs: [...new Set([...sections.flatMap((section) => section.evidenceRefs), ...grand.evidenceRefs])],
     };
-    let rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
-    expect(rollup).toMatchObject({ status: "proven_complete_with_rounding", residualMinor: 1, residualAttribution: "proven_exact_rounding_bridge" });
-    expect(rollup.roundingEvidenceRefs.length).toBeGreaterThan(0);
-    grand.roundingBridge.evidenceRefs = [...grand.evidenceRefs];
-    rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
-    expect(rollup.status).toBe("unresolved");
-    grand.roundingBridge.evidenceRefs = [...new Set([...sections.flatMap((section) => section.evidenceRefs), ...grand.evidenceRefs])];
-    grand.roundingBridge.grandAmountMicros += 1;
-    rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
-    expect(rollup.status).toBe("unresolved");
-    expect(rollup.residualAttribution).toBe("unresolved");
+    const rollup = buildCanonicalFeeRollupAssessments(fixture.input.feeLedger)[0]!;
+    expect(rollup).toMatchObject({
+      status: "unresolved",
+      residualMinor: 1,
+      residualAttribution: "unresolved",
+      sourceArithmetic: { status: "unresolved", reasonCode: "incomplete_source_arithmetic" },
+    });
+    expect(rollup.roundingEvidenceRefs).toEqual([]);
   });
 
   it("adjudicates a warning-state funding ledger per directly printed total without accepting its detail reconciliation", () => {

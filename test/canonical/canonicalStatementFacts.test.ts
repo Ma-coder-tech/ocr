@@ -213,6 +213,10 @@ describe("canonical statement facts", () => {
     unsupportedFeePartitionManifest.versionManifest.feePartitionSourceProvenancePolicyVersion = "unsupported" as never;
     expect(() => validateCanonicalStatementAnalysis(unsupportedFeePartitionManifest)).toThrow(/fee_partition_source_provenance/);
 
+    const unsupportedExactSourceArithmeticManifest = structuredClone(valid) as CanonicalStatementAnalysis;
+    unsupportedExactSourceArithmeticManifest.versionManifest.exactSourceArithmeticBridgePolicyVersion = "unsupported" as never;
+    expect(() => validateCanonicalStatementAnalysis(unsupportedExactSourceArithmeticManifest)).toThrow(/exact_source_arithmetic_bridge/);
+
     const unsupportedFeePartition = structuredClone(valid) as CanonicalStatementAnalysis;
     unsupportedFeePartition.feeLedger.partitionSourceProvenance.policyVersion = "unsupported" as never;
     expect(() => validateCanonicalStatementAnalysis(unsupportedFeePartition)).toThrow(/partition source provenance/);

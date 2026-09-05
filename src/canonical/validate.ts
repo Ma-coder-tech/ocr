@@ -17,6 +17,7 @@ import { aggregateCanonicalOpportunityComponents } from "./opportunityEngine.js"
 import { targetSupportsApprovedEstimate, targetSupportsDeterministic } from "./opportunityPolicy.js";
 import { buildCanonicalFeeRollupAssessments, FEE_ROLLUP_COMPLETENESS_POLICY_VERSION } from "./feeRollupEvidence.js";
 import { buildCanonicalFeePartitionSourceProvenance, FEE_PARTITION_SOURCE_PROVENANCE_POLICY_VERSION } from "./feePartitionSourceProvenance.js";
+import { EXACT_SOURCE_ARITHMETIC_BRIDGE_POLICY_VERSION } from "./exactSourceArithmeticBridge.js";
 import { validateCanonicalMerchantAttentionModel } from "./merchantAttention.js";
 import type {
   CanonicalCustomerPermissionKey,
@@ -186,6 +187,9 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   }
   if (analysis.versionManifest?.feePartitionSourceProvenancePolicyVersion !== FEE_PARTITION_SOURCE_PROVENANCE_POLICY_VERSION) {
     errors.push("Canonical version manifest must include fee_partition_source_provenance_v1.");
+  }
+  if (analysis.versionManifest?.exactSourceArithmeticBridgePolicyVersion !== EXACT_SOURCE_ARITHMETIC_BRIDGE_POLICY_VERSION) {
+    errors.push("Canonical version manifest must include exact_source_arithmetic_bridge_v1.");
   }
   if (analysis.financialFacts.effectiveRateBasis?.policyVersion !== "effective_rate_basis_v1") {
     errors.push("Effective rate basis is missing or unsupported.");
@@ -694,6 +698,18 @@ function validateCrossSummaryLinkEvidence(
     if (rollup.countingTreatment !== "reference_only_no_addition") errors.push(`Fee roll-up ${rollup.id} could affect additive totals.`);
     for (const evidenceRef of rollup.roundingEvidenceRefs) {
       if (!evidenceIds.has(evidenceRef)) errors.push(`Fee roll-up ${rollup.id} rounding evidence ref ${evidenceRef} is broken.`);
+    }
+    if (rollup.sourceArithmetic.policyVersion !== EXACT_SOURCE_ARITHMETIC_BRIDGE_POLICY_VERSION) {
+      errors.push(`Fee roll-up ${rollup.id} uses an unsupported exact source arithmetic policy.`);
+    }
+    if (rollup.sourceArithmetic.authority !== "diagnostic_relationship_only") {
+      errors.push(`Fee roll-up ${rollup.id} exact source arithmetic must remain diagnostic-only.`);
+    }
+    if (rollup.sourceArithmetic.roundingMode !== "nearest_cent_half_away_from_zero") {
+      errors.push(`Fee roll-up ${rollup.id} uses an unsupported exact source arithmetic rounding mode.`);
+    }
+    for (const evidenceRef of rollup.sourceArithmetic.evidenceRefs) {
+      if (!evidenceIds.has(evidenceRef)) errors.push(`Fee roll-up ${rollup.id} source arithmetic evidence ref ${evidenceRef} is broken.`);
     }
   }
   const provenRoundedGrandControls = new Set(

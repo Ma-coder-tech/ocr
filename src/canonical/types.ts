@@ -1748,6 +1748,43 @@ export type CanonicalFeeRollupRoundingBridge = {
   evidenceRefs: string[];
 };
 
+export type CanonicalExactSourceArithmeticAmount = {
+  numeratorMinorUnits: string;
+  denominator: string;
+  roundedAmountMinor: number;
+};
+
+export type CanonicalExactSourceArithmeticAssessment = {
+  policyVersion: "exact_source_arithmetic_bridge_v1";
+  authority: "diagnostic_relationship_only";
+  roundingMode: "nearest_cent_half_away_from_zero";
+  status: "not_needed_exact" | "proven_rounding" | "unresolved";
+  reasonCode:
+    | "printed_totals_exact"
+    | "exact_source_arithmetic_proves_rounding"
+    | "printed_totals_not_comparable"
+    | "incomplete_partition_membership"
+    | "incomplete_source_arithmetic"
+    | "ambiguous_source_arithmetic"
+    | "unsupported_source_arithmetic"
+    | "source_arithmetic_row_mismatch"
+    | "source_arithmetic_section_mismatch"
+    | "source_arithmetic_grand_mismatch";
+  reconstructedFeeRowIds: string[];
+  incompleteFeeRowIds: string[];
+  ambiguousFeeRowIds: string[];
+  mismatchedFeeRowIds: string[];
+  sectionAmounts: Array<{
+    controlRef: string;
+    feeRowIds: string[];
+    exactAmount: CanonicalExactSourceArithmeticAmount;
+    printedAmountMinor: number;
+    reproducesPrintedTotal: boolean;
+  }>;
+  grandAmount: CanonicalExactSourceArithmeticAmount | null;
+  evidenceRefs: string[];
+};
+
 export type CanonicalFeeLedger = {
   policyVersion: "canonical_fee_ledger_v1";
   status: "available" | "partial" | "unavailable";
@@ -1853,6 +1890,7 @@ export type CanonicalFeeRollupAssessment = {
   grandPrintedTotal: MoneyAmount | null;
   residualMinor: number | null;
   residualAttribution: "not_needed_exact" | "proven_exact_rounding_bridge" | "unresolved";
+  sourceArithmetic: CanonicalExactSourceArithmeticAssessment;
   roundingEvidenceRefs: string[];
   countingTreatment: "reference_only_no_addition";
   reasonCodes: string[];
@@ -1930,6 +1968,7 @@ export type CanonicalAnalysisVersionManifest = {
   crossSummaryReconciliationAdjudicationPolicyVersion: "cross_summary_reconciliation_adjudication_v1";
   feeRollupCompletenessPolicyVersion: "fee_rollup_completeness_rounding_attribution_v1";
   feePartitionSourceProvenancePolicyVersion: "fee_partition_source_provenance_v1";
+  exactSourceArithmeticBridgePolicyVersion: "exact_source_arithmetic_bridge_v1";
   parserId: string | null;
   parserVersion: string | null;
   extractionVersion: string;
