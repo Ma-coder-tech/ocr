@@ -7,7 +7,8 @@ describe("fee basis operand coverage and conflict resolution v1", () => {
 
     expect(recovery).toMatchObject({
       status: "recovered",
-      candidates: [{ formulaBasis: "per_item", basisKind: "transaction_count", itemCount: 71, ruleId: "integer_count_column_v1" }],
+      unitSemanticsPolicyVersion: "fee_operand_unit_semantics_adjudication_v1",
+      candidates: [{ formulaBasis: "per_item", basisKind: "transaction_count", itemCount: 71, ruleId: "integer_count_column_v1", unitEvidenceBasis: "printed_source_format" }],
     });
   });
 
@@ -16,7 +17,7 @@ describe("fee basis operand coverage and conflict resolution v1", () => {
 
     expect(recovery).toMatchObject({
       status: "recovered",
-      candidates: [{ formulaBasis: "per_item", itemCount: 3, ruleId: "explicit_count_description_v1" }],
+      candidates: [{ formulaBasis: "per_item", itemCount: 3, ruleId: "explicit_count_description_v1", unitEvidenceBasis: "printed_description_and_source_format" }],
     });
   });
 
@@ -27,7 +28,22 @@ describe("fee basis operand coverage and conflict resolution v1", () => {
     });
     expect(recover("KILOBYTE AUTH FEE US", "08/31/25 | CF | KILOBYTE AUTH FEE US | 18.35 | 0.00229 | -$0.04")).toMatchObject({
       status: "recovered",
-      candidates: [{ formulaBasis: "source_units_times_per_unit", sourceUnitBasis: "18.35", ruleId: "explicit_source_unit_description_v1" }],
+      candidates: [{ formulaBasis: "source_units_times_per_unit", sourceUnitBasis: "18.35", sourceUnit: "kilobytes", ruleId: "explicit_source_unit_description_v1" }],
+    });
+  });
+
+  it("recovers explicitly named source-event units without using arithmetic fit", () => {
+    expect(recover("BATCH HEADER", "08/31/25 | MISC | BATCH HEADER | 20.00 | 0.3500 | -$7.00")).toMatchObject({
+      status: "recovered",
+      candidates: [{ formulaBasis: "source_units_times_per_unit", sourceUnit: "batches", ruleId: "explicit_batch_unit_description_v1" }],
+    });
+    expect(recover("ACH REJECT FEE", "08/31/25 | MISC | ACH REJECT FEE | 3.00 | 20.00 | -$60.00")).toMatchObject({
+      status: "recovered",
+      candidates: [{ sourceUnit: "rejection_events", ruleId: "explicit_rejection_unit_description_v1" }],
+    });
+    expect(recover("DISC NETWORK AUTH FEE", "08/31/25 | CF | DISC NETWORK AUTH FEE | 2.00 | 0.01900 | -$0.04")).toMatchObject({
+      status: "recovered",
+      candidates: [{ sourceUnit: "authorization_events", ruleId: "explicit_authorization_unit_description_v1" }],
     });
   });
 
@@ -53,6 +69,16 @@ describe("fee basis operand coverage and conflict resolution v1", () => {
     expect(recovery.selectedCandidateId).toBeNull();
     expect(recovery.candidates).toHaveLength(2);
     expect(recovery.reasonCodes).toEqual(["conflicting_printed_operand_pairs"]);
+  });
+
+  it("keeps explicit unit and source-format conflicts visible", () => {
+    const recovery = recover("TRANSACTION FEE", "08/31/25 | CF | TRANSACTION FEE | 3.25 | 0.10000 | -$0.33");
+
+    expect(recovery).toMatchObject({
+      status: "conflicting",
+      selectedCandidateId: null,
+      reasonCodes: ["explicit_count_language_conflicts_with_fractional_basis"],
+    });
   });
 
   it("does not invent a missing side of an incomplete printed operand pair", () => {

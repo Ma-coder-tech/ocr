@@ -90,6 +90,7 @@ function arithmeticForRow(
   let itemCount = uniqueNumber(interpretations.map((item) => item.itemCount));
   let printedPerUnitRate: CanonicalPrintedRate | null = null;
   let sourceUnitBasis: string | null = null;
+  let sourceUnit: CanonicalFeePartitionSourceProvenance["rowArithmetic"][number]["sourceUnit"] = null;
   const chargedAmount = row.selectedAmount;
   const interpretationConflict =
     row.mergeReason === "ambiguous_similarity_unresolved" ||
@@ -103,6 +104,7 @@ function arithmeticForRow(
   const operandRecovery = existingComplete
     ? {
         policyVersion: "fee_basis_operand_coverage_conflict_resolution_v1" as const,
+        unitSemanticsPolicyVersion: "fee_operand_unit_semantics_adjudication_v1" as const,
         status: "not_needed_existing" as const,
         selectedCandidateId: null,
         candidates: [],
@@ -124,12 +126,13 @@ function arithmeticForRow(
   } else if (selectedRecovery?.formulaBasis === "source_units_times_per_unit") {
     printedPerUnitRate = selectedRecovery.printedRate;
     sourceUnitBasis = selectedRecovery.sourceUnitBasis;
+    sourceUnit = selectedRecovery.sourceUnit;
   }
   const rateVolumeComplete = printedRate !== null && printedRate.normalizedFractionalRate !== null && volumeBasis !== null && chargedAmount !== null;
   const perItemComplete = printedPerItemRate !== null && printedPerItemRate.normalizedFractionalRate !== null && itemCount !== null && chargedAmount !== null;
-  const sourceUnitComplete = printedPerUnitRate !== null && printedPerUnitRate.normalizedFractionalRate !== null && sourceUnitBasis !== null && chargedAmount !== null;
+  const sourceUnitComplete = printedPerUnitRate !== null && printedPerUnitRate.normalizedFractionalRate !== null && sourceUnitBasis !== null && sourceUnit !== null && chargedAmount !== null;
   const ambiguous = interpretationConflict || operandRecovery.status === "ambiguous" || operandRecovery.status === "conflicting" || [rateVolumeComplete, perItemComplete, sourceUnitComplete].filter(Boolean).length > 1;
-  const hasAnyOperand = Boolean(printedRate || volumeBasis || printedPerItemRate || itemCount !== null || printedPerUnitRate || sourceUnitBasis);
+  const hasAnyOperand = Boolean(printedRate || volumeBasis || printedPerItemRate || itemCount !== null || printedPerUnitRate || sourceUnitBasis || sourceUnit);
   const completeStatus = rateVolumeComplete || perItemComplete || sourceUnitComplete;
   const resolvedStatus = ambiguous ? "ambiguous" as const : completeStatus ? "complete" as const : hasAnyOperand ? "partial" as const : "charged_amount_only" as const;
   const formulaBasis = ambiguous ? "ambiguous" as const : rateVolumeComplete ? "rate_times_volume" as const : perItemComplete ? "per_item" as const : sourceUnitComplete ? "source_units_times_per_unit" as const : "unknown" as const;
@@ -144,6 +147,7 @@ function arithmeticForRow(
     itemCount,
     printedPerUnitRate,
     sourceUnitBasis,
+    sourceUnit,
     chargedAmount,
     fieldEvidenceRefs: {
       rate: printedRate ? selectedEvidenceRefs : [],
@@ -162,6 +166,7 @@ function arithmeticForRow(
           ...((itemCount !== null && !printedPerItemRate) ? ["per_item_rate"] : []),
           ...((printedPerUnitRate && !sourceUnitBasis) ? ["source_unit_basis"] : []),
           ...((sourceUnitBasis && !printedPerUnitRate) ? ["per_unit_rate"] : []),
+          ...((sourceUnitBasis && !sourceUnit) ? ["source_unit_identity"] : []),
           ...(!chargedAmount ? ["charged_amount"] : []),
         ]
       : [],

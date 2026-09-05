@@ -1718,6 +1718,7 @@ export type CanonicalFeeRowArithmeticProvenance = {
   itemCount: CountValue | null;
   printedPerUnitRate: CanonicalPrintedRate | null;
   sourceUnitBasis: DecimalString | null;
+  sourceUnit: CanonicalFeeSourceUnit | null;
   chargedAmount: MoneyAmount | null;
   fieldEvidenceRefs: {
     rate: string[];
@@ -1731,6 +1732,8 @@ export type CanonicalFeeRowArithmeticProvenance = {
   missingFields: string[];
 };
 
+export type CanonicalFeeSourceUnit = "kilobytes" | "batches" | "authorization_events" | "rejection_events" | "verification_events";
+
 export type CanonicalFeeOperandCandidate = {
   id: string;
   formulaBasis: "rate_times_volume" | "per_item" | "source_units_times_per_unit";
@@ -1739,17 +1742,25 @@ export type CanonicalFeeOperandCandidate = {
   volumeBasis: MoneyAmount | null;
   itemCount: CountValue | null;
   sourceUnitBasis: DecimalString | null;
+  sourceUnit: CanonicalFeeSourceUnit | null;
   evidenceRefs: string[];
+  unitEvidenceBasis: "printed_fee_description" | "printed_source_format" | "printed_description_and_source_format";
   ruleId:
     | "integer_count_column_v1"
     | "explicit_count_description_v1"
+    | "explicit_money_volume_description_v1"
     | "explicit_source_unit_description_v1"
+    | "explicit_batch_unit_description_v1"
+    | "explicit_authorization_unit_description_v1"
+    | "explicit_rejection_unit_description_v1"
+    | "explicit_verification_unit_description_v1"
     | "fractional_volume_column_v1"
     | "ambiguous_decimal_integer_basis_v1";
 };
 
 export type CanonicalFeeOperandRecovery = {
   policyVersion: "fee_basis_operand_coverage_conflict_resolution_v1";
+  unitSemanticsPolicyVersion: "fee_operand_unit_semantics_adjudication_v1";
   status: "not_needed_existing" | "recovered" | "ambiguous" | "conflicting" | "unavailable";
   selectedCandidateId: string | null;
   candidates: CanonicalFeeOperandCandidate[];
@@ -2000,6 +2011,7 @@ export type CanonicalAnalysisVersionManifest = {
   feePartitionSourceProvenancePolicyVersion: "fee_partition_source_provenance_v1";
   exactSourceArithmeticBridgePolicyVersion: "exact_source_arithmetic_bridge_v1";
   feeBasisOperandCoveragePolicyVersion: "fee_basis_operand_coverage_conflict_resolution_v1";
+  feeOperandUnitSemanticsPolicyVersion: "fee_operand_unit_semantics_adjudication_v1";
   parserId: string | null;
   parserVersion: string | null;
   extractionVersion: string;

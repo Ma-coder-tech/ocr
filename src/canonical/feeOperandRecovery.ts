@@ -1,6 +1,7 @@
 import { moneyFromDecimalString } from "./money.js";
 import { parsePrintedRate } from "./feeLedgerReconciliation.js";
 import type { CanonicalFeeOperandCandidate, CanonicalFeeOperandRecovery, DecimalString } from "./types.js";
+import { FEE_OPERAND_UNIT_SEMANTICS_POLICY_VERSION, resolvePrintedFeeOperandUnit } from "./feeOperandUnitSemantics.js";
 
 export const FEE_BASIS_OPERAND_COVERAGE_POLICY_VERSION = "fee_basis_operand_coverage_conflict_resolution_v1" as const;
 
@@ -10,10 +11,22 @@ export function recoverPrintedFeeOperands(input: {
 }): CanonicalFeeOperandRecovery {
   const extracted = input.sources.flatMap((source) => candidatesFromSource(input.label, source));
   const pairSignatures = new Set(extracted.map((item) => item.pairSignature));
-  const candidates = deduplicateCandidates(extracted.map((item) => item.candidate));
+  const candidates = deduplicateCandidates(extracted.flatMap((item) => item.candidate ? [item.candidate] : []));
+  const semanticConflicts = extracted.filter((item) => item.semanticConflict).map((item) => item.semanticConflict!);
+  if (semanticConflicts.length > 0) {
+    return {
+      policyVersion: FEE_BASIS_OPERAND_COVERAGE_POLICY_VERSION,
+      unitSemanticsPolicyVersion: FEE_OPERAND_UNIT_SEMANTICS_POLICY_VERSION,
+      status: "conflicting",
+      selectedCandidateId: null,
+      candidates,
+      reasonCodes: [...new Set(semanticConflicts)],
+    };
+  }
   if (candidates.length === 0) {
     return {
       policyVersion: FEE_BASIS_OPERAND_COVERAGE_POLICY_VERSION,
+      unitSemanticsPolicyVersion: FEE_OPERAND_UNIT_SEMANTICS_POLICY_VERSION,
       status: "unavailable",
       selectedCandidateId: null,
       candidates: [],
@@ -23,6 +36,7 @@ export function recoverPrintedFeeOperands(input: {
   if (pairSignatures.size > 1) {
     return {
       policyVersion: FEE_BASIS_OPERAND_COVERAGE_POLICY_VERSION,
+      unitSemanticsPolicyVersion: FEE_OPERAND_UNIT_SEMANTICS_POLICY_VERSION,
       status: "conflicting",
       selectedCandidateId: null,
       candidates,
@@ -32,6 +46,7 @@ export function recoverPrintedFeeOperands(input: {
   if (candidates.length > 1) {
     return {
       policyVersion: FEE_BASIS_OPERAND_COVERAGE_POLICY_VERSION,
+      unitSemanticsPolicyVersion: FEE_OPERAND_UNIT_SEMANTICS_POLICY_VERSION,
       status: "ambiguous",
       selectedCandidateId: null,
       candidates,
@@ -40,6 +55,7 @@ export function recoverPrintedFeeOperands(input: {
   }
   return {
     policyVersion: FEE_BASIS_OPERAND_COVERAGE_POLICY_VERSION,
+    unitSemanticsPolicyVersion: FEE_OPERAND_UNIT_SEMANTICS_POLICY_VERSION,
     status: "recovered",
     selectedCandidateId: candidates[0]!.id,
     candidates,
@@ -50,7 +66,7 @@ export function recoverPrintedFeeOperands(input: {
 function candidatesFromSource(
   label: string,
   source: { evidenceRef: string; text: string | null },
-): Array<{ pairSignature: string; candidate: CanonicalFeeOperandCandidate }> {
+): Array<{ pairSignature: string; candidate?: CanonicalFeeOperandCandidate; semanticConflict?: string }> {
   if (!source.text) return [];
   const cells = source.text.split("|").map((cell) => cell.trim()).filter(Boolean);
   if (cells.length < 6 || !/^\d{2}\/\d{2}(?:\/\d{2})?$/.test(cells[0] ?? "") || !/^(?:cf|misc)$/i.test(cells[1] ?? "")) return [];
@@ -62,13 +78,19 @@ function candidatesFromSource(
   const printedRate = parsePrintedRate(rateToken);
   if (printedRate.normalizedFractionalRate === null) return [];
   const pairSignature = `${basisToken}|${printedRate.original}`;
-  const normalizedLabel = label.toLowerCase();
   const sourceArguments = { basisToken, printedRate, evidenceRef: source.evidenceRef };
-  if (/\bkilobytes?\b/.test(normalizedLabel)) {
-    return [{ pairSignature, candidate: sourceUnitCandidate(sourceArguments, "explicit_source_unit_description_v1") }];
+  const unitResolution = resolvePrintedFeeOperandUnit({ label, basisToken });
+  if (unitResolution.status === "conflicting") {
+    return [{ pairSignature, semanticConflict: unitResolution.reasonCode }];
   }
-  if (/\b(?:items?|transactions?)\b/.test(normalizedLabel) && integerValue(basisToken) !== null) {
-    return [{ pairSignature, candidate: countCandidate(sourceArguments, "explicit_count_description_v1") }];
+  if (unitResolution.status === "resolved") {
+    if (unitResolution.basisKind === "transaction_count") {
+      return [{ pairSignature, candidate: countCandidate(sourceArguments, unitResolution.ruleId) }];
+    }
+    if (unitResolution.basisKind === "money_volume") {
+      return [{ pairSignature, candidate: volumeCandidate(sourceArguments, unitResolution.ruleId) }];
+    }
+    return [{ pairSignature, candidate: sourceUnitCandidate(sourceArguments, unitResolution.sourceUnit!, unitResolution.ruleId) }];
   }
   if (!basisToken.includes(".") && integerValue(basisToken) !== null) {
     return [{ pairSignature, candidate: countCandidate(sourceArguments, "integer_count_column_v1") }];
@@ -95,6 +117,7 @@ function countCandidate(
     volumeBasis: null,
     itemCount: integerValue(input.basisToken),
     sourceUnitBasis: null,
+    sourceUnit: null,
     evidenceRef: input.evidenceRef,
     ruleId,
   });
@@ -111,6 +134,7 @@ function volumeCandidate(
     volumeBasis: moneyFromDecimalString(input.basisToken),
     itemCount: null,
     sourceUnitBasis: null,
+    sourceUnit: null,
     evidenceRef: input.evidenceRef,
     ruleId,
   });
@@ -118,6 +142,7 @@ function volumeCandidate(
 
 function sourceUnitCandidate(
   input: { basisToken: DecimalString; printedRate: CanonicalFeeOperandCandidate["printedRate"]; evidenceRef: string },
+  sourceUnit: NonNullable<CanonicalFeeOperandCandidate["sourceUnit"]>,
   ruleId: CanonicalFeeOperandCandidate["ruleId"],
 ): CanonicalFeeOperandCandidate {
   return candidate({
@@ -127,6 +152,7 @@ function sourceUnitCandidate(
     volumeBasis: null,
     itemCount: null,
     sourceUnitBasis: input.basisToken,
+    sourceUnit,
     evidenceRef: input.evidenceRef,
     ruleId,
   });
@@ -139,6 +165,7 @@ function candidate(input: {
   volumeBasis: CanonicalFeeOperandCandidate["volumeBasis"];
   itemCount: CanonicalFeeOperandCandidate["itemCount"];
   sourceUnitBasis: CanonicalFeeOperandCandidate["sourceUnitBasis"];
+  sourceUnit: CanonicalFeeOperandCandidate["sourceUnit"];
   evidenceRef: string;
   ruleId: CanonicalFeeOperandCandidate["ruleId"];
 }): CanonicalFeeOperandCandidate {
@@ -151,8 +178,10 @@ function candidate(input: {
     volumeBasis: input.volumeBasis,
     itemCount: input.itemCount,
     sourceUnitBasis: input.sourceUnitBasis,
+    sourceUnit: input.sourceUnit,
     evidenceRefs: [input.evidenceRef],
     ruleId: input.ruleId,
+    unitEvidenceBasis: unitEvidenceBasis(input.ruleId),
   };
 }
 
@@ -166,7 +195,9 @@ function deduplicateCandidates(candidates: CanonicalFeeOperandCandidate[]): Cano
       volumeBasis: item.volumeBasis,
       itemCount: item.itemCount,
       sourceUnitBasis: item.sourceUnitBasis,
+      sourceUnit: item.sourceUnit,
       ruleId: item.ruleId,
+      unitEvidenceBasis: item.unitEvidenceBasis,
     });
     const existing = byValue.get(key);
     byValue.set(key, existing ? { ...existing, evidenceRefs: [...new Set([...existing.evidenceRefs, ...item.evidenceRefs])].sort() } : item);
@@ -187,6 +218,12 @@ function rateCell(value: string): string | null {
 function integerValue(value: DecimalString): number | null {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function unitEvidenceBasis(ruleId: CanonicalFeeOperandCandidate["ruleId"]): CanonicalFeeOperandCandidate["unitEvidenceBasis"] {
+  if (ruleId === "explicit_count_description_v1") return "printed_description_and_source_format";
+  if (ruleId.startsWith("explicit_")) return "printed_fee_description";
+  return "printed_source_format";
 }
 
 function stableId(value: string): string { return value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""); }

@@ -82,6 +82,7 @@ describe("fee partition source provenance v1", () => {
       status: "complete",
       formulaBasis: "source_units_times_per_unit",
       sourceUnitBasis: "18.35",
+      sourceUnit: "kilobytes",
       operandRecovery: { status: "recovered" },
     });
   });
