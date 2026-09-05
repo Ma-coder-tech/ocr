@@ -13,6 +13,7 @@ describe("cross-summary link evidence v2", () => {
     const fixture = crossSummaryFixture(true);
     const layer = buildCanonicalCrossSummaryLinkEvidence(fixture.input);
 
+    expect(layer.adjudicationPolicyVersion).toBe("cross_summary_reconciliation_adjudication_v1");
     expect(layer.relationships.filter((relationship) => relationship.status === "proven").map((relationship) => relationship.evaluatedCandidateType)).toEqual(
       expect.arrayContaining([
         "same_measure_same_population",
@@ -34,6 +35,11 @@ describe("cross-summary link evidence v2", () => {
         relationship.comparison.explicitLinkEvidence === "present"),
     ).toBe(true);
     expect(layer.relationships.every((relationship) => relationship.countingTreatment === "reference_only_no_addition")).toBe(true);
+    expect(
+      layer.relationships
+        .filter((relationship) => relationship.status === "proven")
+        .every((relationship) => relationship.adjudication.outcome === "resolved_by_reusable_rule" && relationship.adjudication.reusableRuleId !== null),
+    ).toBe(true);
     expect(fixture.input.feeLedger.uniqueChargeTotal).toEqual({ amountMinor: 1000, currency: "USD" });
   });
 
@@ -53,6 +59,112 @@ describe("cross-summary link evidence v2", () => {
     expect(fundingRelationships.length).toBeGreaterThan(0);
     expect(fundingRelationships.every((relationship) => relationship.status === "unknown")).toBe(true);
     expect(layer.limitations.join(" ")).toMatch(/matching dollar amounts|unknown|reference-only/i);
+  });
+
+  it("proves exact independent printed-total identity while a two-cent detail control still blocks component rollups", () => {
+    const fixture = crossSummaryFixture(true);
+    const grand = fixture.input.feeLedger.controls.find((control) => control.basis === "grand_control")!;
+    grand.status = "verification_required";
+    grand.actualAmount = moneyFromNumber(9.98);
+    grand.deltaMinor = -2;
+
+    const layer = buildCanonicalCrossSummaryLinkEvidence(fixture.input);
+    const headlineToGrand = layer.relationships.find(
+      (relationship) => relationship.leftSummaryId === "summary_headline_fees" && relationship.rightSummaryId.includes(grand.id),
+    )!;
+    const componentRelationships = layer.relationships.filter(
+      (relationship) => relationship.evaluatedCandidateType === "component_rollup",
+    );
+
+    expect(headlineToGrand.status).toBe("proven");
+    expect(headlineToGrand.adjudication).toMatchObject({
+      relationshipClass: "resolved_independent_printed_totals",
+      reusableRuleId: "independent_printed_total_identity_v1",
+    });
+    expect(componentRelationships.every((relationship) => relationship.status === "unknown")).toBe(true);
+    expect(componentRelationships.every((relationship) => relationship.adjudication.relationshipClass === "unresolved_incomplete_or_conflicting_controls")).toBe(true);
+    expect(fixture.input.feeLedger.uniqueChargeTotal).toEqual({ amountMinor: 1000, currency: "USD" });
+  });
+
+  it("adjudicates a warning-state funding ledger per directly printed total without accepting its detail reconciliation", () => {
+    const fixture = crossSummaryFixture(true);
+    const funding = (fixture.input.parserOutput.fundingBatchLedger as Record<string, unknown>);
+    funding.status = "reconciled_with_warnings";
+    funding.anomalyCount = 2;
+    funding.feesChargedDelta = 18.6;
+
+    const layer = buildCanonicalCrossSummaryLinkEvidence(fixture.input);
+    const fundingRelationships = layer.relationships.filter((relationship) =>
+      relationship.leftSummaryId.includes("funding_") || relationship.rightSummaryId.includes("funding_"),
+    );
+
+    expect(fundingRelationships).toHaveLength(4);
+    expect(fundingRelationships.every((relationship) => relationship.status === "proven")).toBe(true);
+    expect(
+      fundingRelationships.every((relationship) =>
+        relationship.adjudication.relationshipClass === "resolved_measure_scoped_funding_warning" &&
+        relationship.adjudication.reusableRuleId === "measure_scoped_funding_warning_v1",
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps small endpoint differences and unreconciled funding structures unknown", () => {
+    const fixture = crossSummaryFixture(true);
+    const funding = (fixture.input.parserOutput.fundingBatchLedger as Record<string, unknown>);
+    funding.controlFeesChargedTotal = 10.02;
+    funding.evidenceLine = "Total | $1,000.00 | $0.00 | $0.00 | $0.00 | $10.02 | $989.98";
+    fixture.input.doc.rows[fixture.input.doc.rows.length - 1]!.content = String(funding.evidenceLine);
+
+    let layer = buildCanonicalCrossSummaryLinkEvidence(fixture.input);
+    let headlineToFundingFees = layer.relationships.find(
+      (relationship) => relationship.leftSummaryId === "summary_headline_fees" && relationship.rightSummaryId === "summary_funding_fee_amount",
+    )!;
+    expect(headlineToFundingFees.status).toBe("unknown");
+    expect(headlineToFundingFees.reasonCodes).toContain("amount_does_not_corroborate");
+    expect(headlineToFundingFees.adjudication.relationshipClass).toBe("unresolved_amount_conflict");
+
+    funding.controlFeesChargedTotal = 10;
+    funding.evidenceLine = "Total | $1,000.00 | $0.00 | $0.00 | $0.00 | N/A | $990.00";
+    fixture.input.doc.rows[fixture.input.doc.rows.length - 1]!.content = String(funding.evidenceLine);
+    layer = buildCanonicalCrossSummaryLinkEvidence(fixture.input);
+    headlineToFundingFees = layer.relationships.find(
+      (relationship) => relationship.leftSummaryId === "summary_headline_fees" && relationship.rightSummaryId === "summary_funding_fee_amount",
+    )!;
+    expect(headlineToFundingFees.comparison.amount).toBe("corroborates");
+    expect(headlineToFundingFees.status).toBe("unknown");
+    expect(headlineToFundingFees.adjudication.relationshipClass).toBe("unresolved_incomplete_or_conflicting_controls");
+
+    funding.status = "unreconciled";
+    funding.evidenceLine = "Total | $1,000.00 | $0.00 | $0.00 | $0.00 | $10.00 | $990.00";
+    fixture.input.doc.rows[fixture.input.doc.rows.length - 1]!.content = String(funding.evidenceLine);
+    layer = buildCanonicalCrossSummaryLinkEvidence(fixture.input);
+    headlineToFundingFees = layer.relationships.find(
+      (relationship) => relationship.leftSummaryId === "summary_headline_fees" && relationship.rightSummaryId === "summary_funding_fee_amount",
+    )!;
+    expect(headlineToFundingFees.status).toBe("unknown");
+    expect(headlineToFundingFees.adjudication.relationshipClass).toBe("unresolved_incomplete_or_conflicting_controls");
+    expect(headlineToFundingFees.adjudication.reusableRuleId).toBeNull();
+  });
+
+  it("does not borrow a matching total from a neighboring summary table", () => {
+    const fixture = crossSummaryFixture(true);
+    fixture.input.doc.rows.splice(fixture.input.doc.rows.length - 1, 0, {
+      content: "SUMMARY BY CARD TYPE",
+      page: "page-1",
+    });
+
+    const layer = buildCanonicalCrossSummaryLinkEvidence(fixture.input);
+    const fundingRelationships = layer.relationships.filter((relationship) =>
+      relationship.leftSummaryId.includes("funding_") || relationship.rightSummaryId.includes("funding_"),
+    );
+
+    expect(fundingRelationships.length).toBeGreaterThan(0);
+    expect(fundingRelationships.every((relationship) => relationship.status === "unknown")).toBe(true);
+    expect(
+      fundingRelationships.every(
+        (relationship) => relationship.adjudication.relationshipClass === "unresolved_incomplete_or_conflicting_controls",
+      ),
+    ).toBe(true);
   });
 });
 

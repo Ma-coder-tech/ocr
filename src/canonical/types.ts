@@ -1734,6 +1734,21 @@ export type CanonicalCrossSummaryRelationshipCandidate =
   | "same_measure_same_population"
   | "component_rollup";
 
+export type CanonicalCrossSummaryAdjudicationClass =
+  | "resolved_independent_printed_totals"
+  | "resolved_measure_scoped_funding_warning"
+  | "resolved_passing_component_controls"
+  | "unresolved_period"
+  | "unresolved_grain"
+  | "unresolved_amount_conflict"
+  | "unresolved_incomplete_or_conflicting_controls"
+  | "unresolved_missing_explicit_link_evidence";
+
+export type CanonicalCrossSummaryReusableRule =
+  | "independent_printed_total_identity_v1"
+  | "measure_scoped_funding_warning_v1"
+  | "passing_covered_component_rollup_v1";
+
 export type CanonicalCrossSummaryRelationship = {
   id: string;
   leftSummaryId: string;
@@ -1753,10 +1768,17 @@ export type CanonicalCrossSummaryRelationship = {
   countingTreatment: "reference_only_no_addition";
   reasonCodes: string[];
   limitations: string[];
+  adjudication: {
+    policyVersion: "cross_summary_reconciliation_adjudication_v1";
+    outcome: "resolved_by_reusable_rule" | "remain_unknown";
+    relationshipClass: CanonicalCrossSummaryAdjudicationClass;
+    reusableRuleId: CanonicalCrossSummaryReusableRule | null;
+  };
 };
 
 export type CanonicalCrossSummaryLinkEvidence = {
   policyVersion: "cross_summary_link_evidence_v2";
+  adjudicationPolicyVersion: "cross_summary_reconciliation_adjudication_v1";
   authority: "diagnostic_relationship_only";
   status: "available" | "partial" | "unavailable";
   nodes: CanonicalCrossSummaryNode[];
@@ -1820,6 +1842,7 @@ export type CanonicalAnalysisVersionManifest = {
   customerWordingPolicyVersion: "canonical_customer_wording_v1";
   merchantAttentionPolicyVersion: "canonical_merchant_attention_v1";
   crossSummaryLinkEvidencePolicyVersion: "cross_summary_link_evidence_v2";
+  crossSummaryReconciliationAdjudicationPolicyVersion: "cross_summary_reconciliation_adjudication_v1";
   parserId: string | null;
   parserVersion: string | null;
   extractionVersion: string;

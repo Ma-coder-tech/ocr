@@ -5,7 +5,9 @@ import type {
   CanonicalCrossSummaryLinkEvidence,
   CanonicalCrossSummaryNode,
   CanonicalCrossSummaryRelationship,
+  CanonicalCrossSummaryAdjudicationClass,
   CanonicalCrossSummaryRelationshipCandidate,
+  CanonicalCrossSummaryReusableRule,
   CanonicalEvidenceRecord,
   CanonicalFactValue,
   CanonicalFeeLedger,
@@ -15,6 +17,7 @@ import type {
 } from "./types.js";
 
 export const CROSS_SUMMARY_LINK_EVIDENCE_POLICY_VERSION = "cross_summary_link_evidence_v2" as const;
+export const CROSS_SUMMARY_RECONCILIATION_ADJUDICATION_POLICY_VERSION = "cross_summary_reconciliation_adjudication_v1" as const;
 
 type FundingMeasure = "submitted_amount" | "fee_amount" | "funded_amount";
 
@@ -62,8 +65,11 @@ export function buildCanonicalCrossSummaryLinkEvidence(input: {
   }
 
   const funding = recordOrNull(input.parserOutput?.fundingBatchLedger);
-  const fundingHeaderRefs = funding ? addFundingHeaderEvidence(input.doc, input.documentId, input.evidence) : [];
-  const fundingTotalRef = funding ? addFundingTotalEvidence(input.doc, input.documentId, funding, input.evidence) : null;
+  const fundingTableEvidence = funding
+    ? addFundingTableEvidence(input.doc, input.documentId, funding, input.evidence)
+    : { headerRefs: [], totalRef: null };
+  const fundingHeaderRefs = fundingTableEvidence.headerRefs;
+  const fundingTotalRef = fundingTableEvidence.totalRef;
   const fundingEvidenceRefs = [...fundingHeaderRefs, fundingTotalRef].filter((ref): ref is string => Boolean(ref));
   const fundingNodes = new Map<FundingMeasure, CanonicalCrossSummaryNode>();
   if (funding) {
@@ -106,9 +112,9 @@ export function buildCanonicalCrossSummaryLinkEvidence(input: {
         evidence: input.evidence,
         explicitLink:
           control.basis === "grand_control" &&
-          isPassing(control.status) &&
           feeMeasureIsPrinted(headlineFees, input.evidence) &&
           feeMeasureIsPrinted(controlNode, input.evidence),
+        reusableRuleId: "independent_printed_total_identity_v1",
       }),
     );
   }
@@ -134,41 +140,75 @@ export function buildCanonicalCrossSummaryLinkEvidence(input: {
           candidateType: "component_rollup",
           evidence: input.evidence,
           explicitLink: explicitCoverage,
+          reusableRuleId: "passing_covered_component_rollup_v1",
+          blockingClass:
+            isPassing(section.status) && isPassing(grand.status)
+              ? undefined
+              : "unresolved_incomplete_or_conflicting_controls",
         }),
       );
     }
   }
 
-  const fundingStatusSafe = funding?.status === "reconciled";
   const fundingHeaderPresent = fundingHeaderRefs.length > 0 && Boolean(fundingTotalRef);
-  for (const [headline, measure, deltaField] of [
-    [headlineSubmitted, "submitted_amount", "submittedDelta"],
-    [headlineFees, "fee_amount", "feesChargedDelta"],
-    [headlineFunded, "funded_amount", "fundedDelta"],
+  const fundingStatus = stringOrNull(funding?.status);
+  const fundingStatusSafe = fundingStatus === "reconciled" || fundingStatus === "reconciled_with_warnings";
+  const fundingReusableRule: CanonicalCrossSummaryReusableRule =
+    fundingStatus === "reconciled_with_warnings"
+      ? "measure_scoped_funding_warning_v1"
+      : "independent_printed_total_identity_v1";
+  for (const [headline, measure] of [
+    [headlineSubmitted, "submitted_amount"],
+    [headlineFees, "fee_amount"],
+    [headlineFunded, "funded_amount"],
   ] as const) {
     const fundingNode = fundingNodes.get(measure);
     if (!fundingNode) continue;
+    const fundingValuePrinted = fundingControlDirectlyPrintsMeasure(
+      measure,
+      fundingNode.amount,
+      fundingHeaderRefs,
+      fundingTotalRef,
+      input.evidence,
+    );
     relationships.push(
       evaluateRelationship({
         left: headline,
         right: fundingNode,
         candidateType: "same_measure_same_population",
         evidence: input.evidence,
-        explicitLink: fundingStatusSafe && fundingHeaderPresent && withinOneCent(funding?.[deltaField]),
+        explicitLink: fundingStatusSafe && fundingHeaderPresent && fundingValuePrinted,
+        reusableRuleId: fundingReusableRule,
+        blockingClass:
+          fundingStatusSafe && fundingValuePrinted
+            ? undefined
+            : "unresolved_incomplete_or_conflicting_controls",
       }),
     );
   }
 
   const fundingFeeNode = fundingNodes.get("fee_amount");
   if (fundingFeeNode) {
-    for (const [grandNodeId, grand] of grandControls) {
+    const fundingFeeValuePrinted = fundingControlDirectlyPrintsMeasure(
+      "fee_amount",
+      fundingFeeNode.amount,
+      fundingHeaderRefs,
+      fundingTotalRef,
+      input.evidence,
+    );
+    for (const [grandNodeId] of grandControls) {
       relationships.push(
         evaluateRelationship({
           left: nodeById(nodes, grandNodeId),
           right: fundingFeeNode,
           candidateType: "same_measure_same_population",
           evidence: input.evidence,
-          explicitLink: fundingStatusSafe && fundingHeaderPresent && withinOneCent(funding?.feesChargedDelta) && isPassing(grand.status),
+          explicitLink: fundingStatusSafe && fundingHeaderPresent && fundingFeeValuePrinted,
+          reusableRuleId: fundingReusableRule,
+          blockingClass:
+            fundingStatusSafe && fundingFeeValuePrinted
+              ? undefined
+              : "unresolved_incomplete_or_conflicting_controls",
         }),
       );
     }
@@ -178,12 +218,14 @@ export function buildCanonicalCrossSummaryLinkEvidence(input: {
   const provenCount = relationships.length - unknownCount;
   return {
     policyVersion: CROSS_SUMMARY_LINK_EVIDENCE_POLICY_VERSION,
+    adjudicationPolicyVersion: CROSS_SUMMARY_RECONCILIATION_ADJUDICATION_POLICY_VERSION,
     authority: "diagnostic_relationship_only",
     status: relationships.length === 0 ? "unavailable" : unknownCount === 0 && provenCount > 0 ? "available" : "partial",
     nodes,
     relationships,
     limitations: [
       ...(unknownCount > 0 ? [`${unknownCount} evaluated cross-summary relationship(s) remain unknown because one or more proof dimensions were missing or incompatible.`] : []),
+      "Detail reconciliation warnings neither prove nor disprove identity between independently printed totals; they continue to block component roll-up claims.",
       "Cross-summary links are reference-only and never add amounts to the canonical fee total or opportunity totals.",
     ],
   };
@@ -222,6 +264,8 @@ function evaluateRelationship(input: {
   candidateType: CanonicalCrossSummaryRelationshipCandidate;
   evidence: Map<string, CanonicalEvidenceRecord>;
   explicitLink: boolean;
+  reusableRuleId: CanonicalCrossSummaryReusableRule;
+  blockingClass?: CanonicalCrossSummaryAdjudicationClass;
 }): CanonicalCrossSummaryRelationship {
   const measure = input.left.measure === input.right.measure ? "compatible" : "incompatible";
   const period =
@@ -252,6 +296,19 @@ function evaluateRelationship(input: {
     ...(explicitLinkEvidence !== "present" ? ["explicit_link_evidence_missing"] : []),
     ...(input.candidateType !== "component_rollup" && amount !== "corroborates" ? ["amount_does_not_corroborate"] : []),
   ];
+  const relationshipClass: CanonicalCrossSummaryAdjudicationClass = proven
+    ? input.reusableRuleId === "passing_covered_component_rollup_v1"
+      ? "resolved_passing_component_controls"
+      : input.reusableRuleId === "measure_scoped_funding_warning_v1"
+        ? "resolved_measure_scoped_funding_warning"
+        : "resolved_independent_printed_totals"
+    : period !== "same_statement_period"
+      ? "unresolved_period"
+      : grain !== "compatible"
+        ? "unresolved_grain"
+        : amount === "conflicts"
+          ? "unresolved_amount_conflict"
+          : input.blockingClass ?? "unresolved_missing_explicit_link_evidence";
   return {
     id: relationshipId(input.left.id, input.right.id, input.candidateType),
     leftSummaryId: input.left.id,
@@ -262,8 +319,14 @@ function evaluateRelationship(input: {
     comparison: { measure, period, grain, identifiers, explicitLinkEvidence, amount },
     evidenceRefs,
     countingTreatment: "reference_only_no_addition",
-    reasonCodes: proven ? [`${input.candidateType}_proven_by_comparable_printed_evidence`] : missing,
+    reasonCodes: proven ? [`${input.candidateType}_proven_by_comparable_printed_evidence`, input.reusableRuleId] : missing,
     limitations: proven ? [] : ["Relationship withheld: matching dollar amounts alone do not establish identity, overlap, or roll-up membership."],
+    adjudication: {
+      policyVersion: CROSS_SUMMARY_RECONCILIATION_ADJUDICATION_POLICY_VERSION,
+      outcome: proven ? "resolved_by_reusable_rule" : "remain_unknown",
+      relationshipClass,
+      reusableRuleId: proven ? input.reusableRuleId : null,
+    },
   };
 }
 
@@ -295,6 +358,43 @@ function feeMeasureIsPrinted(node: CanonicalCrossSummaryNode, evidence: Map<stri
   return /\b(fees?|charges?|service)\b/i.test(text);
 }
 
+function fundingControlDirectlyPrintsMeasure(
+  measure: FundingMeasure,
+  amount: MoneyAmount | null,
+  headerEvidenceRefs: string[],
+  totalEvidenceRef: string | null,
+  evidence: Map<string, CanonicalEvidenceRecord>,
+): boolean {
+  if (!amount || !totalEvidenceRef || headerEvidenceRefs.length === 0) return false;
+  const headerText = headerEvidenceRefs.map((ref) => evidence.get(ref)?.extractedText ?? "").join(" ");
+  if (!isCompleteFundingHeader(headerText, true)) return false;
+  const totalText = evidence.get(totalEvidenceRef)?.extractedText ?? "";
+  const printedAmounts = fundingRowAmounts(totalText);
+  if (printedAmounts.length < 3) return false;
+  const selected =
+    measure === "submitted_amount"
+      ? printedAmounts[0]
+      : measure === "fee_amount"
+        ? printedAmounts.at(-2)
+        : printedAmounts.at(-1);
+  return selected !== undefined && Math.round(Math.abs(selected) * 100) === Math.abs(amount.amountMinor);
+}
+
+function fundingRowAmounts(text: string): number[] {
+  return (text.match(/\(?-?\$?\s*\d[\d,]*\.\d{2}\)?/g) ?? [])
+    .map((token) => Number(token.replace(/[$,()\s]/g, "")))
+    .filter(Number.isFinite);
+}
+
+function sameMoneyNumber(left: number | undefined, right: unknown): boolean {
+  return (
+    left !== undefined &&
+    typeof right === "number" &&
+    Number.isFinite(right) &&
+    Math.round(Math.abs(left) * 100) === Math.round(Math.abs(right) * 100)
+  );
+}
+
 function haveDistinctPrintedSources(
   left: CanonicalCrossSummaryNode,
   right: CanonicalCrossSummaryNode,
@@ -310,26 +410,51 @@ function sourceFingerprint(evidence: CanonicalEvidenceRecord | undefined): strin
   return [evidence.documentId, evidence.pageNumber ?? "page_unknown", evidence.lineId ?? evidence.rowIndex ?? "row_unknown", evidence.normalizedText ?? ""].join("|");
 }
 
-function addFundingHeaderEvidence(
+function addFundingTableEvidence(
   doc: ParsedDocument,
   documentId: string,
+  funding: Record<string, unknown>,
   evidence: Map<string, CanonicalEvidenceRecord>,
-): string[] {
+): { headerRefs: string[]; totalRef: string | null } {
   const rows = doc.rows.map((row, index) => ({ row, index, text: String(row.content ?? "") }));
-  const single = rows.find(({ text }) => isCompleteFundingHeader(text, false));
-  if (single) return [addControlEvidence(documentId, single.text, pageFromRow(single.row), single.index, "FUNDING", evidence)];
-  for (let index = 0; index < rows.length - 1; index += 1) {
-    const first = rows[index]!;
-    const second = rows[index + 1]!;
-    if (pageFromRow(first.row) !== pageFromRow(second.row) || !isCompleteFundingHeader(`${first.text} ${second.text}`, true)) continue;
-    return [first, second].map((match) =>
-      addControlEvidence(documentId, match.text, pageFromRow(match.row), match.index, "FUNDING", evidence),
-    );
+  for (const total of rows.filter(({ text }) => /^\s*total\s*\|/i.test(text) && fundingTotalMatchesControls(text, funding))) {
+    const totalPage = pageFromRow(total.row);
+    for (let index = total.index - 1; index >= 0; index -= 1) {
+      const second = rows[index]!;
+      if (pageFromRow(second.row) !== totalPage) break;
+      if (isCompleteFundingHeader(second.text, false)) {
+        return {
+          headerRefs: [addControlEvidence(documentId, second.text, totalPage, second.index, "FUNDING", evidence)],
+          totalRef: addControlEvidence(documentId, total.text, totalPage, total.index, "FUNDING", evidence),
+        };
+      }
+      if (isFundingTableBoundary(second.text)) break;
+      const first = rows[index - 1];
+      if (
+        first &&
+        pageFromRow(first.row) === totalPage &&
+        isCompleteFundingHeader(`${first.text} ${second.text}`, true)
+      ) {
+        return {
+          headerRefs: [first, second].map((match) =>
+            addControlEvidence(documentId, match.text, totalPage, match.index, "FUNDING", evidence),
+          ),
+          totalRef: addControlEvidence(documentId, total.text, totalPage, total.index, "FUNDING", evidence),
+        };
+      }
+    }
   }
-  return [];
+  return { headerRefs: [], totalRef: null };
+}
+
+function isFundingTableBoundary(text: string): boolean {
+  const normalized = normalizeEvidenceText(text);
+  return /^(?:summary by|amounts submitted|fees charged|third party transactions|adjustments chargebacks|your card processing statement)\b/.test(normalized);
 }
 
 function isCompleteFundingHeader(text: string, allowSplitAmountLabel: boolean): boolean {
+  const cellCount = text.split("|").length;
+  if (cellCount < (allowSplitAmountLabel ? 5 : 6)) return false;
   const normalized = normalizeEvidenceText(text);
   const submitted = /(?:amounts?|total) submitted|submitted amount/.test(normalized);
   const fees = /\bfees?(?: charged)?\b/.test(normalized);
@@ -338,16 +463,17 @@ function isCompleteFundingHeader(text: string, allowSplitAmountLabel: boolean): 
   return submitted && fees && funded && bridgeComponent;
 }
 
-function addFundingTotalEvidence(
-  doc: ParsedDocument,
-  documentId: string,
+function fundingTotalMatchesControls(
+  text: string,
   funding: Record<string, unknown>,
-  evidence: Map<string, CanonicalEvidenceRecord>,
-): string | null {
-  const text = stringOrNull(funding.evidenceLine);
-  if (!text) return null;
-  const match = doc.rows.map((row, index) => ({ row, index })).find(({ row }) => normalizeEvidenceText(String(row.content ?? "")) === normalizeEvidenceText(text));
-  return addControlEvidence(documentId, text, match ? pageFromRow(match.row) : null, match?.index ?? null, "FUNDING", evidence);
+): boolean {
+  const printedAmounts = fundingRowAmounts(text);
+  if (printedAmounts.length < 3) return false;
+  return (
+    sameMoneyNumber(printedAmounts[0], funding.controlSubmittedTotal) &&
+    sameMoneyNumber(printedAmounts.at(-2), funding.controlFeesChargedTotal) &&
+    sameMoneyNumber(printedAmounts.at(-1), funding.controlFundedTotal)
+  );
 }
 
 function addControlEvidence(
@@ -384,10 +510,6 @@ function moneyFromUnknown(value: unknown): MoneyAmount | null {
 
 function isPassing(status: string): boolean {
   return status === "pass" || status === "pass_with_rounding";
-}
-
-function withinOneCent(value: unknown): boolean {
-  return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 0.01;
 }
 
 function pageFromRow(row: ParsedDocument["rows"][number]): number | null {

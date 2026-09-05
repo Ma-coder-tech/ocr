@@ -197,6 +197,10 @@ describe("canonical statement facts", () => {
     authorityExpansion.crossSummaryLinkEvidence.authority = "financial_authority" as never;
     expect(() => validateCanonicalStatementAnalysis(authorityExpansion)).toThrow(/diagnostic-only/);
 
+    const unsupportedAdjudication = structuredClone(valid) as CanonicalStatementAnalysis;
+    unsupportedAdjudication.crossSummaryLinkEvidence.adjudicationPolicyVersion = "unsupported" as never;
+    expect(() => validateCanonicalStatementAnalysis(unsupportedAdjudication)).toThrow(/adjudication policy/);
+
     const contradictoryCandidate = structuredClone(valid) as CanonicalStatementAnalysis;
     contradictoryCandidate.financialFacts.processedSales.candidates.push(
       {

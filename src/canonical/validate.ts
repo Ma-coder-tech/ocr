@@ -176,6 +176,9 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   if (analysis.versionManifest?.crossSummaryLinkEvidencePolicyVersion !== "cross_summary_link_evidence_v2") {
     errors.push("Canonical version manifest must include cross_summary_link_evidence_v2.");
   }
+  if (analysis.versionManifest?.crossSummaryReconciliationAdjudicationPolicyVersion !== "cross_summary_reconciliation_adjudication_v1") {
+    errors.push("Canonical version manifest must include cross_summary_reconciliation_adjudication_v1.");
+  }
   if (analysis.financialFacts.effectiveRateBasis?.policyVersion !== "effective_rate_basis_v1") {
     errors.push("Effective rate basis is missing or unsupported.");
   }
@@ -618,6 +621,9 @@ function validateCrossSummaryLinkEvidence(
     errors.push("Cross-summary link evidence layer is missing or unsupported.");
     return;
   }
+  if (layer.adjudicationPolicyVersion !== "cross_summary_reconciliation_adjudication_v1") {
+    errors.push("Cross-summary reconciliation adjudication policy is missing or unsupported.");
+  }
   if (layer.authority !== "diagnostic_relationship_only") {
     errors.push("Cross-summary link evidence must remain diagnostic-only and cannot create canonical financial authority.");
   }
@@ -664,6 +670,9 @@ function validateCrossSummaryLinkEvidence(
     if (relationship.countingTreatment !== "reference_only_no_addition") {
       errors.push(`Cross-summary relationship ${relationship.id} could affect additive totals.`);
     }
+    if (relationship.adjudication?.policyVersion !== "cross_summary_reconciliation_adjudication_v1") {
+      errors.push(`Cross-summary relationship ${relationship.id} lacks the supported adjudication policy.`);
+    }
     const expectedMeasure = left.measure === right.measure ? "compatible" : "incompatible";
     const expectedPeriod =
       left.period === null || right.period === null
@@ -693,8 +702,23 @@ function validateCrossSummaryLinkEvidence(
     if (relationship.status === "unknown" && relationship.relationshipType !== "unknown") {
       errors.push(`Unknown cross-summary relationship ${relationship.id} claims a proven relationship type.`);
     }
+    if (relationship.status === "unknown") {
+      if (relationship.adjudication?.outcome !== "remain_unknown" || relationship.adjudication?.reusableRuleId !== null) {
+        errors.push(`Unknown cross-summary relationship ${relationship.id} has an inconsistent adjudication outcome.`);
+      }
+      if (!relationship.adjudication?.relationshipClass.startsWith("unresolved_")) {
+        errors.push(`Unknown cross-summary relationship ${relationship.id} lacks an unresolved adjudication class.`);
+      }
+    }
     if (relationship.status === "proven") {
       if (relationship.relationshipType === "unknown") errors.push(`Proven cross-summary relationship ${relationship.id} has unknown type.`);
+      if (
+        relationship.adjudication?.outcome !== "resolved_by_reusable_rule" ||
+        !relationship.adjudication?.reusableRuleId ||
+        !relationship.adjudication?.relationshipClass.startsWith("resolved_")
+      ) {
+        errors.push(`Proven cross-summary relationship ${relationship.id} lacks a reusable adjudication rule.`);
+      }
       if (
         relationship.comparison.measure !== "compatible" ||
         relationship.comparison.period !== "same_statement_period" ||
