@@ -290,7 +290,8 @@ export function resolveFeeSemantics(catalog: FeeSemanticCatalog, query: FeeSeman
     return unresolvedResolution(query, candidates, emptyAxes, "unresolved_conflict", ["fee_semantics_multiple_or_conflicting_exact_identities"]);
   }
   if (identityEligible.length === 0) {
-    const hasScopeMiss = exactCandidates.some((item) => !item.scopeApplicable || !item.periodApplicable);
+    const hasApplicableExactCandidate = exactCandidates.some((item) => item.scopeApplicable && item.periodApplicable);
+    const hasScopeMiss = exactCandidates.length > 0 && !hasApplicableExactCandidate;
     const status = hasScopeMiss ? "unresolved_scope_or_period" : candidates.length > 0 ? "candidate_only" : "unresolved_no_evidence";
     return unresolvedResolution(query, candidates, emptyAxes, status, [
       hasScopeMiss ? "fee_semantics_exact_alias_outside_scope_or_period" : candidates.length > 0 ? "fee_semantics_candidates_require_qualification" : "fee_semantics_no_candidate",
