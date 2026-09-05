@@ -18,6 +18,7 @@ import { targetSupportsApprovedEstimate, targetSupportsDeterministic } from "./o
 import { validateCanonicalMerchantAttentionModel } from "./merchantAttention.js";
 import type {
   CanonicalCustomerPermissionKey,
+  CanonicalCrossSummaryLinkEvidence,
   CanonicalFeeLedgerControl,
   CanonicalFeeRow,
   CanonicalOpportunityComponent,
@@ -172,6 +173,9 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
   if (analysis.versionManifest?.customerWordingPolicyVersion !== CUSTOMER_WORDING_POLICY_VERSION) {
     errors.push("Canonical version manifest must include canonical_customer_wording_v1.");
   }
+  if (analysis.versionManifest?.crossSummaryLinkEvidencePolicyVersion !== "cross_summary_link_evidence_v2") {
+    errors.push("Canonical version manifest must include cross_summary_link_evidence_v2.");
+  }
   if (analysis.financialFacts.effectiveRateBasis?.policyVersion !== "effective_rate_basis_v1") {
     errors.push("Effective rate basis is missing or unsupported.");
   }
@@ -297,6 +301,7 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
       errors.push(`Fee ledger calculation ref ${analysis.feeLedger.uniqueChargeCalculationRef} is broken.`);
     }
   }
+  validateCrossSummaryLinkEvidence(analysis.crossSummaryLinkEvidence, analysis, evidenceIds, errors);
   if (analysis.feeOwnershipActionability?.policyVersion !== "fee_ownership_actionability_v1") {
     errors.push("Package D fee ownership/actionability layer is missing or unsupported.");
   }
@@ -601,6 +606,182 @@ function reconstructControlActualAmount(control: CanonicalFeeLedgerControl, rows
     }
   }
   return { amountMinor, currency: "USD" };
+}
+
+function validateCrossSummaryLinkEvidence(
+  layer: CanonicalCrossSummaryLinkEvidence | null | undefined,
+  analysis: CanonicalStatementAnalysis,
+  evidenceIds: Set<string>,
+  errors: string[],
+): void {
+  if (!layer || layer.policyVersion !== "cross_summary_link_evidence_v2") {
+    errors.push("Cross-summary link evidence layer is missing or unsupported.");
+    return;
+  }
+  if (layer.authority !== "diagnostic_relationship_only") {
+    errors.push("Cross-summary link evidence must remain diagnostic-only and cannot create canonical financial authority.");
+  }
+  const nodesById = new Map(layer.nodes.map((node) => [node.id, node]));
+  if (nodesById.size !== layer.nodes.length) errors.push("Cross-summary link evidence contains duplicate node ids.");
+  const provenNodeIds = new Set(
+    layer.relationships
+      .filter((relationship) => relationship.status === "proven")
+      .flatMap((relationship) => [relationship.leftSummaryId, relationship.rightSummaryId]),
+  );
+  const statementPeriod = analysis.identity.statementPeriod.status === "selected" ? analysis.identity.statementPeriod.value : null;
+  for (const node of layer.nodes) {
+    if (node.sourceDocumentRef !== analysis.identity.sourceDocumentRef) {
+      errors.push(`Cross-summary node ${node.id} is linked to a different source document.`);
+    }
+    if (!node.identifierBasis.includes("source_document_ref")) {
+      errors.push(`Cross-summary node ${node.id} lacks source-document identifier evidence.`);
+    }
+    if (node.amount && !isMoneyAmount(node.amount)) errors.push(`Cross-summary node ${node.id} has an invalid amount.`);
+    for (const evidenceRef of node.evidenceRefs) {
+      if (!evidenceIds.has(evidenceRef)) errors.push(`Cross-summary node ${node.id} evidence ref ${evidenceRef} is broken.`);
+    }
+    if (node.period && (!statementPeriod || node.period.start !== statementPeriod.start || node.period.end !== statementPeriod.end)) {
+      errors.push(`Cross-summary node ${node.id} period does not match the selected statement period.`);
+    }
+    if (provenNodeIds.has(node.id)) validateCrossSummaryNodeSource(node, analysis, errors);
+  }
+
+  const relationshipIds = new Set<string>();
+  const evidenceById = new Map(analysis.evidence.map((item) => [item.id, item]));
+  for (const relationship of layer.relationships) {
+    if (relationshipIds.has(relationship.id)) errors.push(`Cross-summary relationship ${relationship.id} is duplicated.`);
+    relationshipIds.add(relationship.id);
+    const left = nodesById.get(relationship.leftSummaryId);
+    const right = nodesById.get(relationship.rightSummaryId);
+    if (!left || !right) {
+      errors.push(`Cross-summary relationship ${relationship.id} references a missing summary node.`);
+      continue;
+    }
+    if (left.id === right.id) errors.push(`Cross-summary relationship ${relationship.id} links a summary to itself.`);
+    for (const evidenceRef of relationship.evidenceRefs) {
+      if (!evidenceIds.has(evidenceRef)) errors.push(`Cross-summary relationship ${relationship.id} evidence ref ${evidenceRef} is broken.`);
+    }
+    if (relationship.countingTreatment !== "reference_only_no_addition") {
+      errors.push(`Cross-summary relationship ${relationship.id} could affect additive totals.`);
+    }
+    const expectedMeasure = left.measure === right.measure ? "compatible" : "incompatible";
+    const expectedPeriod =
+      left.period === null || right.period === null
+        ? "unknown"
+        : left.period.start === right.period.start && left.period.end === right.period.end
+          ? "same_statement_period"
+          : "incompatible";
+    const expectedIdentifiers = left.sourceDocumentRef === right.sourceDocumentRef ? "matched" : "incompatible";
+    const expectedGrain = crossSummaryGrainComparison(left.grain, right.grain, relationship.evaluatedCandidateType);
+    const expectedAmount =
+      relationship.evaluatedCandidateType === "component_rollup"
+        ? "not_comparable"
+        : !left.amount || !right.amount || left.amount.currency !== right.amount.currency
+          ? "not_comparable"
+          : left.amount.amountMinor === right.amount.amountMinor
+            ? "corroborates"
+            : "conflicts";
+    if (
+      relationship.comparison.measure !== expectedMeasure ||
+      relationship.comparison.period !== expectedPeriod ||
+      relationship.comparison.grain !== expectedGrain ||
+      relationship.comparison.identifiers !== expectedIdentifiers ||
+      relationship.comparison.amount !== expectedAmount
+    ) {
+      errors.push(`Cross-summary relationship ${relationship.id} comparison does not reconstruct from its endpoints.`);
+    }
+    if (relationship.status === "unknown" && relationship.relationshipType !== "unknown") {
+      errors.push(`Unknown cross-summary relationship ${relationship.id} claims a proven relationship type.`);
+    }
+    if (relationship.status === "proven") {
+      if (relationship.relationshipType === "unknown") errors.push(`Proven cross-summary relationship ${relationship.id} has unknown type.`);
+      if (
+        relationship.comparison.measure !== "compatible" ||
+        relationship.comparison.period !== "same_statement_period" ||
+        relationship.comparison.grain !== "compatible" ||
+        relationship.comparison.identifiers !== "matched" ||
+        relationship.comparison.explicitLinkEvidence !== "present"
+      ) {
+        errors.push(`Proven cross-summary relationship ${relationship.id} lacks comparable measure, period, grain, identifiers, or explicit link evidence.`);
+      }
+      if (relationship.evaluatedCandidateType === "same_measure_same_population" && relationship.comparison.amount !== "corroborates") {
+        errors.push(`Proven same-measure cross-summary relationship ${relationship.id} lacks amount corroboration.`);
+      }
+      if (!haveDistinctCrossSummaryEvidence(left.evidenceRefs, right.evidenceRefs, evidenceById)) {
+        errors.push(`Proven cross-summary relationship ${relationship.id} does not reference distinct printed summaries.`);
+      }
+      const endpointEvidence = new Set([...left.evidenceRefs, ...right.evidenceRefs]);
+      if (endpointEvidence.size === 0 || [...endpointEvidence].some((ref) => !relationship.evidenceRefs.includes(ref))) {
+        errors.push(`Proven cross-summary relationship ${relationship.id} does not preserve all endpoint evidence.`);
+      }
+    }
+  }
+  const expectedStatus =
+    layer.relationships.length === 0
+      ? "unavailable"
+      : layer.relationships.every((relationship) => relationship.status === "proven")
+        ? "available"
+        : "partial";
+  if (layer.status !== expectedStatus) errors.push("Cross-summary link evidence status does not reconstruct from relationship results.");
+}
+
+function crossSummaryGrainComparison(
+  left: CanonicalCrossSummaryLinkEvidence["nodes"][number]["grain"],
+  right: CanonicalCrossSummaryLinkEvidence["nodes"][number]["grain"],
+  candidateType: CanonicalCrossSummaryLinkEvidence["relationships"][number]["evaluatedCandidateType"],
+): "compatible" | "incompatible" | "unknown" {
+  if (left === "unknown" || right === "unknown") return "unknown";
+  if (candidateType === "component_rollup") {
+    return left === "fee_section_total" && right === "statement_period_total" ? "compatible" : "incompatible";
+  }
+  const supported = new Set(["statement_period_total", "funding_batch_period_total"]);
+  return supported.has(left) && supported.has(right) ? "compatible" : "incompatible";
+}
+
+function validateCrossSummaryNodeSource(
+  node: CanonicalCrossSummaryLinkEvidence["nodes"][number],
+  analysis: CanonicalStatementAnalysis,
+  errors: string[],
+): void {
+  if (node.sourceKind === "selected_financial_fact") {
+    const facts = new Map<string, { value: MoneyAmount | null; measure: typeof node.measure }>([
+      ["financialFacts.processedSales", { value: analysis.financialFacts.processedSales.value, measure: "submitted_amount" }],
+      ["financialFacts.totalFees", { value: analysis.financialFacts.totalFees.value, measure: "fee_amount" }],
+      ["financialFacts.amountFunded", { value: analysis.financialFacts.amountFunded.value, measure: "funded_amount" }],
+    ]);
+    const fact = facts.get(node.summaryRef);
+    if (!fact || fact.measure !== node.measure || !sameNullableMoney(fact.value, node.amount)) {
+      errors.push(`Cross-summary node ${node.id} does not reconstruct from its selected financial fact.`);
+    }
+  }
+  if (node.sourceKind === "printed_fee_control") {
+    const controlId = node.summaryRef.replace(/^feeLedger\.controls\./, "");
+    const control = analysis.feeLedger.controls.find((item) => item.id === controlId);
+    if (!control || node.measure !== "fee_amount" || !sameNullableMoney(control.expectedAmount, node.amount)) {
+      errors.push(`Cross-summary node ${node.id} does not reconstruct from its printed fee control.`);
+    }
+  }
+}
+
+function haveDistinctCrossSummaryEvidence(
+  leftRefs: string[],
+  rightRefs: string[],
+  evidenceById: Map<string, CanonicalStatementAnalysis["evidence"][number]>,
+): boolean {
+  const fingerprint = (ref: string) => {
+    const evidence = evidenceById.get(ref);
+    return evidence
+      ? [evidence.documentId, evidence.pageNumber ?? "page_unknown", evidence.lineId ?? evidence.rowIndex ?? "row_unknown", evidence.normalizedText ?? ""].join("|")
+      : "";
+  };
+  const left = new Set(leftRefs.map(fingerprint).filter(Boolean));
+  const right = new Set(rightRefs.map(fingerprint).filter(Boolean));
+  return left.size > 0 && right.size > 0 && [...left].some((item) => !right.has(item));
+}
+
+function sameNullableMoney(left: MoneyAmount | null, right: MoneyAmount | null): boolean {
+  if (left === null || right === null) return left === right;
+  return left.amountMinor === right.amountMinor && left.currency === right.currency;
 }
 
 function validateCanonicalCustomerState(

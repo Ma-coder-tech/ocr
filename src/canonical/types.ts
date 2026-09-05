@@ -1708,6 +1708,62 @@ export type CanonicalFeeLedger = {
   limitations: string[];
 };
 
+export type CanonicalCrossSummaryMeasure = "submitted_amount" | "fee_amount" | "funded_amount";
+
+export type CanonicalCrossSummaryGrain =
+  | "statement_period_total"
+  | "fee_section_total"
+  | "funding_batch_period_total"
+  | "unknown";
+
+export type CanonicalCrossSummaryNode = {
+  id: string;
+  summaryRef: string;
+  sourceKind: "selected_financial_fact" | "printed_fee_control" | "funding_batch_control";
+  printedLabel: string;
+  measure: CanonicalCrossSummaryMeasure;
+  grain: CanonicalCrossSummaryGrain;
+  period: { start: string; end: string } | null;
+  sourceDocumentRef: string;
+  identifierBasis: Array<"source_document_ref" | "merchant_identifier">;
+  amount: MoneyAmount | null;
+  evidenceRefs: string[];
+};
+
+export type CanonicalCrossSummaryRelationshipCandidate =
+  | "same_measure_same_population"
+  | "component_rollup";
+
+export type CanonicalCrossSummaryRelationship = {
+  id: string;
+  leftSummaryId: string;
+  rightSummaryId: string;
+  evaluatedCandidateType: CanonicalCrossSummaryRelationshipCandidate;
+  relationshipType: CanonicalCrossSummaryRelationshipCandidate | "unknown";
+  status: "proven" | "unknown";
+  comparison: {
+    measure: "compatible" | "incompatible" | "unknown";
+    period: "same_statement_period" | "incompatible" | "unknown";
+    grain: "compatible" | "incompatible" | "unknown";
+    identifiers: "matched" | "incompatible" | "unknown";
+    explicitLinkEvidence: "present" | "absent";
+    amount: "corroborates" | "conflicts" | "not_comparable";
+  };
+  evidenceRefs: string[];
+  countingTreatment: "reference_only_no_addition";
+  reasonCodes: string[];
+  limitations: string[];
+};
+
+export type CanonicalCrossSummaryLinkEvidence = {
+  policyVersion: "cross_summary_link_evidence_v2";
+  authority: "diagnostic_relationship_only";
+  status: "available" | "partial" | "unavailable";
+  nodes: CanonicalCrossSummaryNode[];
+  relationships: CanonicalCrossSummaryRelationship[];
+  limitations: string[];
+};
+
 export type CanonicalFinancialFacts = {
   processedSales: CanonicalFactValue<MoneyAmount>;
   totalFees: CanonicalFactValue<MoneyAmount>;
@@ -1763,6 +1819,7 @@ export type CanonicalAnalysisVersionManifest = {
   customerActionGuidancePolicyVersion: "canonical_customer_action_guidance_v1";
   customerWordingPolicyVersion: "canonical_customer_wording_v1";
   merchantAttentionPolicyVersion: "canonical_merchant_attention_v1";
+  crossSummaryLinkEvidencePolicyVersion: "cross_summary_link_evidence_v2";
   parserId: string | null;
   parserVersion: string | null;
   extractionVersion: string;
@@ -1783,6 +1840,7 @@ export type CanonicalStatementAnalysis = {
   financialFacts: CanonicalFinancialFacts;
   businessQualification: CanonicalBusinessQualification;
   feeLedger: CanonicalFeeLedger;
+  crossSummaryLinkEvidence: CanonicalCrossSummaryLinkEvidence;
   feeOwnershipActionability: CanonicalFeeOwnershipActionability;
   opportunityEngine: CanonicalOpportunityEngine;
   aiCapabilities: CanonicalAiCapabilityLayer;

@@ -20,6 +20,7 @@ import {
   type CanonicalBusinessProfileInput,
 } from "./businessQualification.js";
 import type { QualifiedBenchmarkRegistry } from "./qualifiedBenchmarkRegistry.js";
+import { buildCanonicalCrossSummaryLinkEvidence } from "./crossSummaryLinkEvidence.js";
 import { moneyFromNumber } from "./money.js";
 import { buildAverageTicket, emptyTransactionCounts, transactionCountsFromParserSupport } from "./transactionCounts.js";
 import { buildVersionManifest, CANONICAL_SCHEMA_VERSION } from "./versionManifest.js";
@@ -125,6 +126,9 @@ export function canonicalActualValues(analysis: CanonicalStatementAnalysis): Rec
     "feeLedger.sourceOccurrenceCount": analysis.feeLedger.sourceOccurrences.length,
     "feeLedger.parserInterpretationCount": analysis.feeLedger.parserInterpretations.length,
     "feeLedger.controlStatuses": analysis.feeLedger.controls.map((control) => control.status),
+    "crossSummaryLinkEvidence.status": analysis.crossSummaryLinkEvidence.status,
+    "crossSummaryLinkEvidence.provenRelationshipCount": analysis.crossSummaryLinkEvidence.relationships.filter((relationship) => relationship.status === "proven").length,
+    "crossSummaryLinkEvidence.unknownRelationshipCount": analysis.crossSummaryLinkEvidence.relationships.filter((relationship) => relationship.status === "unknown").length,
     "feeOwnershipActionability.status": analysis.feeOwnershipActionability.status,
     "feeOwnershipActionability.rowCount": analysis.feeOwnershipActionability.rowClassifications.length,
     "feeOwnershipActionability.unknownOrVerifyOnlyCount": analysis.feeOwnershipActionability.rowClassifications.filter(
@@ -491,6 +495,15 @@ function buildAnalysisEnvelope(input: {
     evidence: input.evidence,
     calculations: input.calculations,
   });
+  const crossSummaryLinkEvidence = buildCanonicalCrossSummaryLinkEvidence({
+    doc: input.doc,
+    documentId: input.documentId,
+    identity: input.identity,
+    financialFacts,
+    feeLedger,
+    parserOutput: input.parserOutput,
+    evidence: input.evidence,
+  });
   const feeOwnershipActionability = buildCanonicalFeeOwnershipActionability(feeLedger, {
     processorFamily: input.identity.processorFamily.value,
     statementPeriodStart: input.identity.statementPeriod.value?.start ?? null,
@@ -550,6 +563,7 @@ function buildAnalysisEnvelope(input: {
     financialFacts,
     businessQualification,
     feeLedger,
+    crossSummaryLinkEvidence,
     feeOwnershipActionability,
     opportunityEngine,
     aiCapabilities,

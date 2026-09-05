@@ -193,6 +193,10 @@ describe("canonical statement facts", () => {
     brokenRef.financialFacts.totalFees.evidenceRefs = ["ev_missing"];
     expect(() => validateCanonicalStatementAnalysis(brokenRef)).toThrow(/broken/);
 
+    const authorityExpansion = structuredClone(valid) as CanonicalStatementAnalysis;
+    authorityExpansion.crossSummaryLinkEvidence.authority = "financial_authority" as never;
+    expect(() => validateCanonicalStatementAnalysis(authorityExpansion)).toThrow(/diagnostic-only/);
+
     const contradictoryCandidate = structuredClone(valid) as CanonicalStatementAnalysis;
     contradictoryCandidate.financialFacts.processedSales.candidates.push(
       {
