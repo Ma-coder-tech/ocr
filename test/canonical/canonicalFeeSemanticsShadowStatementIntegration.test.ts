@@ -210,12 +210,12 @@ describe("fee semantics shadow statement integration v1", () => {
 
     expect(totals).toEqual({
       rows: 324,
-      resolved: 12,
-      exactCandidates: 7,
-      retrievalOnly: 41,
-      scopeRejected: 10,
+      resolved: 26,
+      exactCandidates: 11,
+      retrievalOnly: 27,
+      scopeRejected: 19,
       conflicts: 0,
-      noEvidence: 254,
+      noEvidence: 241,
     });
     expect(reports.flatMap((report) => report.coverage.resolvedConceptIds)).toEqual(expect.arrayContaining([
       "interchange_fee",

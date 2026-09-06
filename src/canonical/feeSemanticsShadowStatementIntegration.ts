@@ -442,14 +442,14 @@ function removePrintedArithmeticSuffix(label: string): string {
 }
 
 function printedNetworkPrefix(label: string): { networkId: string | null; prefixLength: number } {
-  const match = label.match(/^\s*(MASTERCARD|VISA|DISCOVER|AMERICAN EXPRESS|AMEX(?:CT\d+)?|AMEX ACQ)\s*[-:]\s*/i);
+  const match = label.match(/^\s*(MASTERCARD|MC OFLN DB|VISA|VS OFLN DB|DISCOVER|DCVR ACQ|AMERICAN EXPRESS|AMEX(?:CT\d+)?|AMEX ACQ)\s*[-:]\s*/i);
   if (!match) return { networkId: null, prefixLength: 0 };
   const token = match[1]!.toUpperCase();
-  const networkId = token === "MASTERCARD"
+  const networkId = token === "MASTERCARD" || token === "MC OFLN DB"
     ? "mastercard"
-    : token === "VISA"
+    : token === "VISA" || token === "VS OFLN DB"
       ? "visa"
-      : token === "DISCOVER"
+      : token === "DISCOVER" || token === "DCVR ACQ"
         ? "discover"
         : "american_express";
   return { networkId, prefixLength: match[0].length };
@@ -459,6 +459,7 @@ function processorScopeId(analysis: Pick<CanonicalStatementAnalysis, "identity">
   const value = analysis.identity.processorFamily.value ?? analysis.identity.processorName.value;
   if (!value) return null;
   const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (normalized.includes("fiserv") || normalized.includes("first_data")) return "fiserv_first_data";
   return normalized || null;
 }
 
