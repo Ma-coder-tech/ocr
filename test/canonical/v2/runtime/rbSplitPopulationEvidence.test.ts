@@ -108,15 +108,16 @@ describe("RB split adjustment and chargeback population evidence", () => {
   }
 
   for (const caseId of ["vortax-september-2022"] as const) {
-    it(`keeps independently observed split evidence withheld when the claim capability is not admitted for ${caseId}`, () => {
+    it(`preserves independently observed split evidence without promoting it to capability authority for ${caseId}`, () => {
       const foundation = execute(caseId);
       for (const key of splitKeys) {
         const fact = foundation.financialPopulations[key];
-        expect(fact).toMatchObject({ status: "unavailable", value: null });
-        expect(fact.limitations).toContain(
-          "Independent source evidence was observed, but the claim-specific RB template capability is not admitted; the fact remains withheld.",
-        );
+        expect(fact).toMatchObject({ status: "available", provenanceStatus: "observational" });
+        expect(fact.value).not.toBeNull();
       }
+      const proof = execution(caseId).run.capabilityProof!;
+      expect(proof.capabilities.find((item) => item.capability === "settlement_adjustments")?.status).toBe("unknown");
+      expect(proof.capabilities.find((item) => item.capability === "chargeback_financial_populations")?.status).toBe("unknown");
     });
   }
 
@@ -155,16 +156,16 @@ describe("RB split adjustment and chargeback population evidence", () => {
     failedFundingOutput.decision.validationState.batchDetailAllowed = false;
     failedFundingOutput.decision.validationState.batchLedger = "failed";
     const resolved = resolveFiservRuntimeCapabilityAdmission({
+      document: documents.get(caseId)!,
       driverId: run.run.parser.driverId!,
       parserOutput: failedFundingOutput,
       observationalFoundation: foundation,
-      dynamicAdmissionAllowed: true,
       statementCompleteness: "proven_complete",
     }).proof;
     expect(resolved.capabilities.find((item) => item.capability === "settlement_adjustments"))
-      .toMatchObject({ status: "supported", reasonCodes: expect.arrayContaining(["funding_ledger_not_a_dependency"]) });
+      .toMatchObject({ status: "unknown", reasonCodes: expect.arrayContaining(["funding_ledger_not_a_dependency"]) });
     expect(resolved.capabilities.find((item) => item.capability === "chargeback_financial_populations"))
-      .toMatchObject({ status: "supported", reasonCodes: expect.arrayContaining(["funding_ledger_not_a_dependency"]) });
+      .toMatchObject({ status: "unknown", reasonCodes: expect.arrayContaining(["funding_ledger_not_a_dependency"]) });
     expect(resolved.capabilities.find((item) => item.capability === "funding_batches")?.status).toBe("unknown");
   });
 

@@ -25,9 +25,10 @@ describe("production canonical AnalysisRun core", () => {
     [fullDocument, processorDocument, genericDocument] = await Promise.all([
       parsePdf(fullFixture), parsePdf(processorFixture), parsePdf(genericFixture),
     ]);
+    genericDocument = withQualifyingFiservOrigin(genericDocument);
   }, 30_000);
 
-  it("admits a Fiserv-family processor statement by claim-specific runtime proof without an exact layout mapping", () => {
+  it("admits a Fiserv-family processor statement by statement-level proof without an exact layout mapping", () => {
     const { run } = executeDeterministicCanonicalAnalysisRun({
       runId: "runtime-capability-proof",
       sourceDocumentRef: "runtime-capability-proof-source",
@@ -63,14 +64,14 @@ describe("production canonical AnalysisRun core", () => {
     });
     expect(run.capabilityProof?.family.proofEvidenceRefs.length).toBeGreaterThan(0);
     expect(run.capabilityProof?.capabilities).toEqual(expect.arrayContaining([
-      expect.objectContaining({ capability: "canonical_net_submitted_card_volume", status: "supported", basis: "deterministic_runtime_proof" }),
-      expect.objectContaining({ capability: "fee_total", status: "supported", basis: "deterministic_runtime_proof" }),
+      expect.objectContaining({ capability: "canonical_net_submitted_card_volume", status: "supported", basis: "statement_level_capability_proof" }),
+      expect.objectContaining({ capability: "fee_total", status: "supported", basis: "statement_level_capability_proof" }),
       expect.objectContaining({ capability: "gross_sale_volume", status: "unknown", basis: "unresolved" }),
     ]));
     expect(run.artifacts.rb?.financialPopulations).toMatchObject({
       canonicalNetSubmittedCardVolume: { status: "available", provenanceStatus: "authoritative" },
       totalStatementProcessingFees: { status: "available", provenanceStatus: "authoritative" },
-      grossSaleVolume: { status: "unavailable" },
+      grossSaleVolume: { status: "unavailable", provenanceStatus: "observational" },
     });
     expect(Object.values(run.stageOutcomes).every((stage) => stage.status === "valid")).toBe(true);
     expect(run.artifacts.rh?.projection.permissions.financial_metrics.state).not.toBe("denied");
@@ -422,7 +423,7 @@ describe("production canonical AnalysisRun core", () => {
     expect(run.stageOutcomes.rb.status).toBe("unresolved");
   });
 
-  it("does not bypass a failed exact-layout admission through the dynamic fallback", () => {
+  it("does not let a known layout rescue broken artifact lineage", () => {
     const document = structuredClone(fullDocument);
     document.suppliedDocumentIntegrity = { ...document.suppliedDocumentIntegrity!, localIngestionTruncated: true };
     const { run } = executeDeterministicCanonicalAnalysisRun({
@@ -438,3 +439,10 @@ describe("production canonical AnalysisRun core", () => {
     expect(run.artifacts.rb?.templateCapability.admissionStatus).toBe("unknown");
   });
 });
+
+function withQualifyingFiservOrigin(document: ParsedDocument): ParsedDocument {
+  return { ...document, rows: [
+    { page: "page-1", content: "Merchant Services Provider | Fiserv" },
+    ...document.rows,
+  ] };
+}
