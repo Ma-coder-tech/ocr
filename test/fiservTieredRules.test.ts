@@ -211,7 +211,7 @@ describe("Fiserv V2 Vortax regression rules", () => {
     });
 
     expect(analysis.pricingModel).toMatchObject({
-      pricingModel: "flat_rate_bundled",
+      pricingModel: "flat_rate",
       confidence: "high",
     });
     expect(analysis.processorMarkupAnalysis.status).toBe("pending_pricing_model_rules");

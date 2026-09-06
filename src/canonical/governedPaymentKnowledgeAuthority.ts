@@ -9,9 +9,16 @@ import {
 } from "./feeSemanticsShadowStatementIntegration.js";
 import type { CanonicalStatementAnalysis } from "./types.js";
 import type { FeeSemanticSourceAuthority } from "./feeSemanticsEvidenceModel.js";
+import {
+  GOVERNED_PRICING_LAYER_KNOWLEDGE_V1,
+  governedPricingLayerRulesV1,
+  resolveGovernedPricingLayerKnowledgeV1,
+  type GovernedPricingLayerResolution,
+  type GovernedPricingObservationInput,
+} from "./governedPricingLayerKnowledgeV1.js";
 
 export const GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION =
-  "governed_payment_knowledge_authority_2026_09_06_v1" as const;
+  "governed_payment_knowledge_authority_2026_09_06_batch1_v2" as const;
 
 export type GovernedNormUnit =
   | "usd_per_event"
@@ -52,6 +59,7 @@ export type GovernedKnowledgeResolution = {
   semantics: FeeSemanticsShadowStatementReport;
   normsByFeeRowId: Readonly<Record<string, GovernedIndustryNorm[]>>;
   semanticSourceAuthorityByEvidenceRef: Readonly<Record<string, FeeSemanticSourceAuthority>>;
+  pricingLayers: GovernedPricingLayerResolution;
   authorityVersion: typeof GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION;
   semanticCatalogVersion: string;
   normCatalogVersion: string;
@@ -203,9 +211,10 @@ export class GovernedPaymentKnowledgeAuthority {
   readonly normCatalogVersion = NORM_VERSION;
 
   resolveStatement(input: {
-    analysis: Pick<CanonicalStatementAnalysis, "identity" | "feeLedger">;
+    analysis: CanonicalStatementAnalysis;
     context: FeeSemanticsShadowStatementContext;
     asOf?: string;
+    suppliedPricingObservation?: GovernedPricingObservationInput | null;
   }): GovernedKnowledgeResolution {
     const semantics = buildFeeSemanticsShadowStatementReport({
       analysis: input.analysis,
@@ -220,10 +229,15 @@ export class GovernedPaymentKnowledgeAuthority {
     const semanticSourceAuthorityByEvidenceRef = Object.fromEntries(
       QUALIFIED_FEE_SEMANTICS_FISERV_ALIAS_PACK_V1.catalog.evidence.map((item) => [item.evidenceId, item.sourceAuthority]),
     );
+    const pricingLayers = resolveGovernedPricingLayerKnowledgeV1({
+      analysis: input.analysis,
+      suppliedPricingObservation: input.suppliedPricingObservation,
+    });
     return deepFreeze({
       semantics,
       normsByFeeRowId,
       semanticSourceAuthorityByEvidenceRef,
+      pricingLayers,
       authorityVersion: this.authorityVersion,
       semanticCatalogVersion: semantics.catalogVersion,
       normCatalogVersion: this.normCatalogVersion,
@@ -249,6 +263,8 @@ export class GovernedPaymentKnowledgeAuthority {
       authorityVersion: this.authorityVersion,
       semanticCatalogVersion: QUALIFIED_FEE_SEMANTICS_FISERV_ALIAS_PACK_V1.catalog.catalogVersion,
       normCatalogVersion: this.normCatalogVersion,
+      pricingLayerCatalogVersion: GOVERNED_PRICING_LAYER_KNOWLEDGE_V1,
+      pricingLayerRules: governedPricingLayerRulesV1(),
       norms: NORMS,
     })).digest("hex");
   }
