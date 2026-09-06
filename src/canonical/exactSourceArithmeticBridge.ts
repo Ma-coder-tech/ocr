@@ -9,6 +9,34 @@ export const EXACT_SOURCE_ARITHMETIC_BRIDGE_POLICY_VERSION = "exact_source_arith
 
 type Rational = { numerator: bigint; denominator: bigint };
 
+export type CanonicalExactFeeRowArithmeticResult = {
+  status: "reproduces" | "does_not_reproduce" | "unavailable";
+  exactAmount: CanonicalExactSourceArithmeticAmount | null;
+  chargedAmountMinor: number | null;
+  evidenceRefs: string[];
+  reasonCode: "exact_source_arithmetic_matches_charge" | "exact_source_arithmetic_mismatch" | "source_arithmetic_unavailable";
+};
+
+/** Reuses the exact rational/rounding policy for a single printed fee row. */
+export function assessCanonicalExactFeeRowArithmetic(
+  row: CanonicalFeePartitionSourceProvenance["rowArithmetic"][number] | null,
+): CanonicalExactFeeRowArithmeticResult {
+  const basis = row ? exactAmountMinor(row) : null;
+  const exactAmount = basis ? serializableAmount(basis) : null;
+  const evidenceRefs = row ? sortedUnique(Object.values(row.fieldEvidenceRefs).flat()) : [];
+  if (!row?.chargedAmount || !exactAmount) {
+    return { status: "unavailable", exactAmount: null, chargedAmountMinor: row?.chargedAmount?.amountMinor ?? null, evidenceRefs, reasonCode: "source_arithmetic_unavailable" };
+  }
+  const reproduces = exactAmount.roundedAmountMinor === row.chargedAmount.amountMinor;
+  return {
+    status: reproduces ? "reproduces" : "does_not_reproduce",
+    exactAmount,
+    chargedAmountMinor: row.chargedAmount.amountMinor,
+    evidenceRefs,
+    reasonCode: reproduces ? "exact_source_arithmetic_matches_charge" : "exact_source_arithmetic_mismatch",
+  };
+}
+
 export function buildExactSourceArithmeticAssessment(input: {
   grand: CanonicalFeeLedgerControl;
   sections: CanonicalFeeLedgerControl[];

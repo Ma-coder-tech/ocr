@@ -35,7 +35,8 @@
     "bakeoff:fiserv-document-ir": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/document-ir-bakeoff.ts",
     "validate:foundation": "node scripts/validate-merchant-foundation.mjs",
     "evaluate:fiserv-one": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/run-fiserv-pre-uat-evaluation.ts",
-    "evaluate:fiserv-internal-live": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/run-fiserv-internal-live-evaluation.ts"
+    "evaluate:fiserv-internal-live": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/run-fiserv-internal-live-evaluation.ts",
+    "evaluate:internal-analyst-finding": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-internal-analyst-finding-v1.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
