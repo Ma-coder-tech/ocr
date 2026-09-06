@@ -242,6 +242,18 @@ export type SearchCandidateAuditV1 = {
 
 export type SearchToolExecutionState = "verified" | "unverified" | "not_executed";
 
+export type SearchCitationAdmissionV1 = {
+  schemaVersion: "openrouter_search_citation_admission_v1";
+  outcome: "all_citations_admitted" | "partially_admitted" | "no_usable_citations" | "no_citations"
+    | "batch_rejected";
+  annotationCount: number;
+  admittedCitationCount: number;
+  rejectedCitationCount: number;
+  reasonCodes: string[];
+  evidenceAdmissionEffect: "none";
+  analyticalCompletionEffect: "none";
+};
+
 export type SearchProviderMetadataV1 = {
   providerResponseId: string | null;
   modelIdentifier: string | null;
@@ -301,6 +313,7 @@ export type SearchResponse = {
   candidates: SearchDiscoveryCandidate[];
   suggestedAdaptiveReason: SearchAttempt["adaptiveReason"];
   providerMetadata: SearchProviderMetadataV1;
+  citationAdmission?: SearchCitationAdmissionV1;
   outputAccounting: "search_discovery_not_model_generation";
 };
 
@@ -320,6 +333,58 @@ export type DestinationResolution = {
   permitId: string;
 };
 
+export type PublicRetrievalTransportPhase =
+  | "destination_resolution"
+  | "connection_establishment"
+  | "tls_handshake"
+  | "response_headers"
+  | "response_body"
+  | "completed";
+
+/**
+ * Privacy-safe transport observations for one HTTPS retrieval send. Timings are
+ * monotonic elapsed milliseconds from entry into the pinned HTTPS adapter; no
+ * wall-clock timestamps, response bodies, headers, or credential material are
+ * retained here.
+ */
+export type PublicRetrievalTransportDiagnosticsV1 = {
+  schemaVersion: "public_https_retrieval_transport_diagnostics_v1";
+  configurationCode: "ratereveal_node_https_pinned_v3" | "ratereveal_node_https_pinned_v4";
+  resolution: {
+    state: "failed_before_permit" | "permit_bound";
+    resolutionElapsedMs: number | null;
+    approvedAddressCount: number;
+    selectedAddressFamily: 4 | 6 | null;
+    selectionPolicy: "none" | "first_lexicographically_sorted_approved_address"
+      | "logical_attempt_rotated_approved_address";
+  };
+  milestones: {
+    socketAssignedMs: number | null;
+    tcpConnectedMs: number | null;
+    tlsEstablishedMs: number | null;
+    requestSentMs: number | null;
+    responseHeadersMs: number | null;
+    firstBodyByteMs: number | null;
+    bodyCompletedMs: number | null;
+  };
+  response: {
+    connectedAddressFamily: 4 | 6 | null;
+    httpStatus: number | null;
+    redirectObserved: boolean;
+    responseHeadersObserved: boolean;
+    firstBodyByteObserved: boolean;
+    bytesObserved: number;
+    bodyCompleted: boolean;
+  };
+  termination: {
+    outcome: "in_progress" | "completed" | "timed_out" | "cancelled" | "failed";
+    phase: PublicRetrievalTransportPhase;
+    safeReasonClass: string;
+    socketInactivityTimeoutMs: number;
+    totalAttemptTimeoutMs?: number;
+  };
+};
+
 export type RedirectHop = {
   normalizedUrl: string;
   permitId: string;
@@ -334,7 +399,7 @@ export type RetrievalRequest = {
   permit: DestinationPermit;
   maximumBytes: number;
   httpsOnly: true;
-  logicalAttempt: 1;
+  logicalAttempt: number;
   signal: AbortSignal;
   recordReceivedBytes(cumulativeBytes: number): "continue" | "abort";
   authorizeRedirect(rawUrl: string): Promise<DestinationPermit>;
@@ -380,6 +445,19 @@ export type ExtractedLocator = {
   lineEnd: number;
   text: string;
   documentFingerprint: string;
+  textDerivation?: {
+    schemaVersion: "public_document_locator_text_derivation_v1";
+    normalizationVersion: "public_document_text_normalization_v1";
+    extractedTextInputHash: string;
+    normalizedFullTextHash: string;
+    locatorTextHash: string;
+    sourceUnitIndex: number;
+    chunkIndex: number;
+    chunkCount: number;
+    pdfControlCodePointsReplaced: number;
+    unicodeWhitespaceRunsCollapsed: number;
+    transformations: Array<"pdf_control_code_to_space" | "unicode_whitespace_to_ascii_space" | "bounded_lossless_chunking">;
+  };
 };
 
 export type DocumentExtractionRequest = {
@@ -400,6 +478,7 @@ export type DocumentExtractionResponse = {
   state: DocumentState;
   text: string | null;
   locators: ExtractedLocator[];
+  reasonCodes?: string[];
 };
 
 export type RuntimeDocumentResult = {

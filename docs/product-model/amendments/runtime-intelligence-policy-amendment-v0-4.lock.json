@@ -1,0 +1,31 @@
+{
+  "lockVersion": 1,
+  "contractId": "frozen_product_model_runtime_policy_amendment_v0_4",
+  "contractVersion": "v0.4",
+  "status": "authoritative_frozen_versioned_amendment",
+  "approved": "2026-08-31",
+  "repositoryPath": "docs/product-model/amendments",
+  "artifact": {
+    "file": "RateReveal_Runtime_Intelligence_Policy_Amendment_v0_4.md",
+    "bytes": 5647,
+    "sha256": "91b9c561ceb11c43f5323c36a6cd549d85963d2fcf8e8b2a85c1512a64e7f6ef"
+  },
+  "amends": {
+    "contractId": "frozen_product_model_runtime_policy_amendment_v0_3",
+    "contractVersion": "v0.3",
+    "artifact": {
+      "file": "RateReveal_Runtime_Intelligence_Policy_Amendment_v0_3.md",
+      "sha256": "5148fbb026b2aa0413ef011e77078c03a74f31b04243c74a4df0d94d702531d3"
+    },
+    "historicalMeaning": "preserved_immutable"
+  },
+  "normativeBaseline": {
+    "frozenPackageLock": {
+      "file": "../frozen/v0.1/frozen-product-model.lock.json",
+      "sha256": "c4e715d0c6f45c87dec5558c84a73d5456251919ef120ebfbece530a4bb23c0a"
+    }
+  },
+  "implementationAuthority": "operational_allowance_and_automatic_recovery_scheduling_only",
+  "customerReportAuthority": "unchanged",
+  "integrityRule": "The v0.4 Markdown artifact is immutable at this identity. Verify its byte count and SHA-256 value and the immutable v0.3 lineage before relying on it. Historical usage and v0.3 operations retain their recorded meaning. Further changes require another separate versioned amendment, integrity identity, and traceability update."
+}

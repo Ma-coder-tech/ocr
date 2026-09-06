@@ -5,6 +5,9 @@ import type { CanonicalEconomicsV2PricingAnalysis } from "../pricingTypes.js";
 import type { CanonicalEconomicsV2SynthesisAnalysis } from "../synthesisTypes.js";
 import { canonicalJson } from "../canonicalJson.js";
 import { facetsForUnresolvedClaimClass, type CanonicalAtomicClaimFacet } from "./atomicClaims.js";
+import type { CanonicalProjectedPrerequisite } from "./atomicClaims.js";
+import type { KnowledgeQuery } from "../knowledge/knowledgeTypes.js";
+import { CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1 } from "../synthesisContractV1Types.js";
 
 export const UNRESOLVED_CLAIM_INVENTORY_SCHEMA_VERSION = "canonical_unresolved_claim_inventory_v2" as const;
 
@@ -36,7 +39,8 @@ export type CanonicalUnresolvedClaim = {
     | "admitted_category_mapping"
     | "positive_period_applicable_ownership_evidence"
     | "positive_period_applicable_control_evidence"
-    | "proven_control_recurrence_and_counterfactual_evidence";
+    | "proven_control_recurrence_and_counterfactual_evidence"
+    | "positive_exact_contract_prerequisite_evidence";
   possibleDecisionEffects: Array<
     | "pricing_interpretation"
     | "cost_stack_completeness"
@@ -53,6 +57,7 @@ export type CanonicalUnresolvedClaim = {
   unresolvedFacets: CanonicalAtomicClaimFacet[];
   researchWithheldFacets: Array<{ facet: CanonicalAtomicClaimFacet; reasonCode: string }>;
   limitations: string[];
+  prerequisite?: CanonicalProjectedPrerequisite | null;
 };
 
 export type CanonicalUnresolvedClaimInventory = {
@@ -78,10 +83,14 @@ export function buildCanonicalUnresolvedClaimInventory(input: {
     disposition: "resolved" | "conflicting" | "verified_but_unapplied";
     reasonCode: string;
   }>;
+  projectionScopeBindings?: Array<{ atomicClaimId: string; knowledgeQuery: KnowledgeQuery | null }>;
 }): CanonicalUnresolvedClaimInventory {
   const claims: CanonicalUnresolvedClaim[] = [];
   if (input.pricing?.validation.status === "valid") claims.push(...pricingClaims(input.pricing));
   if (input.economic?.validation.status === "valid") claims.push(...economicClaims(input.economic, input.facetDispositions ?? []));
+  if (input.economic?.validation.status === "valid" && input.synthesis?.validation.status === "valid") {
+    claims.push(...projectContractV1_1Prerequisites(input.economic, input.synthesis, input.projectionScopeBindings ?? []));
+  }
   const sorted = claims.sort((left, right) => left.claimId.localeCompare(right.claimId));
   const countsByClass: CanonicalUnresolvedClaimInventory["countsByClass"] = {};
   for (const claim of sorted) countsByClass[claim.claimClass] = (countsByClass[claim.claimClass] ?? 0) + 1;
@@ -196,14 +205,141 @@ function economicClaims(
   return output;
 }
 
+function projectContractV1_1Prerequisites(
+  economic: CanonicalEconomicsV2EconomicAnalysis,
+  synthesis: CanonicalEconomicsV2SynthesisAnalysis,
+  bindings: Array<{ atomicClaimId: string; knowledgeQuery: KnowledgeQuery | null }>,
+): CanonicalUnresolvedClaim[] {
+  const contract = synthesis.synthesisLayer.contractV1;
+  if (!contract || contract.contractId !== CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1) return [];
+  const bindingByAtomic = new Map(bindings.map((item) => [item.atomicClaimId, item.knowledgeQuery] as const));
+  const applicationByAtomic = new Map(contract.applications.map((item) => [item.atomicClaimId, item] as const));
+  const constraintById = new Map(contract.constraints.map((item) => [item.constraintId, item] as const));
+  const output: CanonicalUnresolvedClaim[] = [];
+  for (const action of contract.actions) {
+    const source = applicationByAtomic.get(action.atomicClaimId);
+    if (!source || source.value.kind !== "synthesis_safe_action" || action.state === "not_available") continue;
+    // These exact actions never acquire influence/driver/impact prerequisites here. An independently admitted
+    // exact-action constraint effect may still name a condition, which remains isolated to that exact action.
+    const noInfluencePrerequisites = ["request_pricing_application_review", "establish_monitoring_baseline",
+      "request_governing_documentation", "verify_account_capability_or_configuration"].includes(action.safeActionCode);
+
+    const missing: Array<{ key: string; facet: CanonicalAtomicClaimFacet;
+      prerequisite: Omit<CanonicalProjectedPrerequisite, "decisionTier" | "independentBlockingPrerequisiteCodes"> }> = [];
+    const sameScope = (candidate: typeof source) => candidate.scopeFingerprint === source.scopeFingerprint
+      && candidate.statementPeriod.start === source.statementPeriod.start
+      && candidate.statementPeriod.end === source.statementPeriod.end
+      && sameSet(candidate.chargeRefs, source.chargeRefs);
+    const influenceKinds = noInfluencePrerequisites ? [] : action.requiredInfluence === "both"
+      ? ["merchant_change_right", "merchant_operational_controllability"] as const
+      : action.requiredInfluence === "none" ? []
+        : [action.requiredInfluence] as const;
+    for (const influenceKind of influenceKinds) {
+      const resolved = contract.applications.some((candidate) => sameScope(candidate)
+        && candidate.value.kind === "synthesis_merchant_influence"
+        && candidate.value.safeActionCode === action.safeActionCode
+        && candidate.value.influenceKind === influenceKind && candidate.value.state === "proven");
+      if (!resolved) missing.push({ key: influenceKind, facet: influenceKind, prerequisite: {
+        contractId: CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1,
+        sourceApplicationId: source.applicationId, sourceAtomicClaimId: source.atomicClaimId,
+        safeActionCode: action.safeActionCode, kind: "merchant_influence", evidenceRoute: "merchant_document",
+        expectedKnowledgeValueConstraint: { kind: "synthesis_merchant_influence",
+          safeActionCode: action.safeActionCode, influenceKind }, knowledgeQuery: null, forcedAtomicClaimId: null,
+      } });
+    }
+    if (action.safeActionCode === "review_supported_operational_process_change") {
+      const driverResolved = contract.applications.some((candidate) => sameScope(candidate)
+        && candidate.value.kind === "synthesis_economic_driver");
+      if (!driverResolved) {
+        const parentQuery = bindingByAtomic.get(source.atomicClaimId) ?? null;
+        const subjectCode = `contract_driver_${digest({ action: source.atomicClaimId, scope: source.scopeFingerprint })}`;
+        missing.push({ key: "economic_driver", facet: "economic_driver", prerequisite: {
+          contractId: CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1,
+          sourceApplicationId: source.applicationId, sourceAtomicClaimId: source.atomicClaimId,
+          safeActionCode: action.safeActionCode, kind: "economic_driver",
+          evidenceRoute: parentQuery ? "public_document" : "route_unresolved",
+          expectedKnowledgeValueConstraint: { kind: "synthesis_economic_driver" },
+          knowledgeQuery: parentQuery ? { ...parentQuery, claimType: "processor_term", subjectCode } : null,
+          forcedAtomicClaimId: null,
+        } });
+      }
+    }
+    const effects = contract.constraintActionEffects.filter((effect) => effect.safeActionCode === action.safeActionCode
+      && effect.scopeFingerprint === source.scopeFingerprint
+      && effect.statementPeriod.start === source.statementPeriod.start
+      && effect.statementPeriod.end === source.statementPeriod.end
+      && sameSet(constraintById.get(effect.constraintRef)?.constrainedChargeRefs ?? [], source.chargeRefs));
+    for (const effect of effects.filter((item) => item.effectState === "conditions_action")) {
+      const constraint = constraintById.get(effect.constraintRef);
+      if (!constraint) continue;
+      for (const conditionAtomicClaimId of effect.conditionAtomicClaimIds) {
+        if (applicationByAtomic.has(conditionAtomicClaimId)) continue;
+        missing.push({ key: `condition:${conditionAtomicClaimId}`, facet: "constraint_condition", prerequisite: {
+          contractId: CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1,
+          sourceApplicationId: source.applicationId, sourceAtomicClaimId: source.atomicClaimId,
+          safeActionCode: action.safeActionCode, kind: "constraint_condition", evidenceRoute: "route_unresolved",
+          // Contract v1 carries the exact condition atomic identity but no independently interpretable condition code.
+          // Preserve it as a typed blocker; never invent a provider query or semantic code from an opaque identifier.
+          expectedKnowledgeValueConstraint: null, knowledgeQuery: null, forcedAtomicClaimId: conditionAtomicClaimId,
+        } });
+      }
+    }
+    const opaqueBlockers = unique([
+      ...action.implementationDependencyCodes.map((code) => `implementation_dependency:${code}`),
+      ...effects.flatMap((effect) => effect.dependencyCodes.map((code) => `constraint_effect_dependency:${code}`)),
+    ]);
+    const allBlockers = unique([...missing.map((item) => item.key), ...opaqueBlockers]);
+    for (const item of missing) {
+      const prerequisite: CanonicalProjectedPrerequisite = {
+        ...item.prerequisite,
+        decisionTier: allBlockers.length === 1 ? "D2" : "D1",
+        independentBlockingPrerequisiteCodes: allBlockers.filter((code) => code !== item.key),
+      };
+      output.push(projectedPrerequisiteClaim(economic, source, item.facet, prerequisite));
+    }
+  }
+  return output;
+}
+
+function projectedPrerequisiteClaim(
+  economic: CanonicalEconomicsV2EconomicAnalysis,
+  source: NonNullable<CanonicalEconomicsV2SynthesisAnalysis["synthesisLayer"]["contractV1"]>["applications"][number],
+  facet: CanonicalAtomicClaimFacet,
+  prerequisite: CanonicalProjectedPrerequisite,
+): CanonicalUnresolvedClaim {
+  const charges = economic.economicLayer.charges.filter((item) => source.chargeRefs.includes(item.id));
+  const directions = unique(charges.map((item) => item.financialDirection)
+    .filter((item): item is "debit" | "credit" => item === "debit" || item === "credit"));
+  const amounts = charges.map((item) => item.observedAmount?.amountMinor ?? null);
+  const amountUnderReview = directions.length === 1 && amounts.every((item): item is number => item !== null)
+    ? { amountMinor: amounts.reduce((sum, value) => sum + Math.abs(value), 0), currency: "USD" as const,
+      direction: directions[0]! } : null;
+  const routeLimitation = prerequisite.evidenceRoute === "merchant_document"
+    ? "This exact prerequisite requires merchant/account-specific evidence and is not authorized for public research."
+    : prerequisite.evidenceRoute === "additional_statement_history"
+      ? "This exact prerequisite requires compatible additional-statement history and is not a public-document claim."
+      : prerequisite.evidenceRoute === "route_unresolved"
+        ? "The frozen semantics preserve this exact blocker but do not authorize inference of an evidence route from opaque codes."
+        : "This exact prerequisite may use only dynamically admitted public evidence for its own claim and scope.";
+  return claim({ claimClass: "merchant_actionability", state: "unresolved",
+    canonicalRefs: unique(source.chargeRefs), occurrenceRefs: unique(source.occurrenceRefs),
+    evidenceRefs: unique(charges.flatMap((item) => item.evidenceRefs)), amountUnderReview,
+    requiredEvidenceClass: "positive_exact_contract_prerequisite_evidence",
+    possibleDecisionEffects: ["merchant_lever", "recommendation_permission", "impact_permission"],
+    unresolvedFacets: [facet], prerequisite,
+    limitations: ["This is an exact action-scoped prerequisite; it resolves no adjacent action, facet, or impact claim.", routeLimitation] });
+}
+
 function claim(input: Omit<CanonicalUnresolvedClaim, "claimId" | "blockingEffect" | "materialityState" | "researchEligibility" |
-  "unresolvedFacets" | "researchWithheldFacets"> & Partial<Pick<CanonicalUnresolvedClaim, "unresolvedFacets" | "researchWithheldFacets">>): CanonicalUnresolvedClaim {
+  "unresolvedFacets" | "researchWithheldFacets" | "prerequisite"> & Partial<Pick<CanonicalUnresolvedClaim,
+    "unresolvedFacets" | "researchWithheldFacets" | "prerequisite">>): CanonicalUnresolvedClaim {
   const canonicalRefs = unique(input.canonicalRefs);
   const occurrenceRefs = unique(input.occurrenceRefs);
   const evidenceRefs = unique(input.evidenceRefs);
   return {
     ...input,
-    claimId: `unresolved-claim-${digest({ claimClass: input.claimClass, canonicalRefs, occurrenceRefs })}`,
+    claimId: `unresolved-claim-${digest({ claimClass: input.claimClass, canonicalRefs, occurrenceRefs,
+      prerequisite: input.prerequisite ?? null })}`,
     canonicalRefs,
     occurrenceRefs,
     evidenceRefs,
@@ -215,6 +351,7 @@ function claim(input: Omit<CanonicalUnresolvedClaim, "claimId" | "blockingEffect
     researchWithheldFacets: [...(input.researchWithheldFacets ?? [])]
       .sort((left, right) => left.facet.localeCompare(right.facet) || left.reasonCode.localeCompare(right.reasonCode)),
     limitations: unique(input.limitations),
+    prerequisite: input.prerequisite ?? null,
   };
 }
 
@@ -244,4 +381,8 @@ function digest(value: unknown): string {
 
 function unique<T>(values: readonly T[]): T[] {
   return [...new Set(values)].sort() as T[];
+}
+
+function sameSet<T>(left: readonly T[], right: readonly T[]): boolean {
+  return left.length === right.length && left.every((item) => right.includes(item));
 }

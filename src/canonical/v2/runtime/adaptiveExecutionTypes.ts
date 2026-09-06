@@ -64,6 +64,26 @@ export type CanonicalAdaptiveOperationalPolicy = {
   maximumCumulativeRetrievalBytes: number;
   maximumCumulativeElapsedMs: number;
   maximumConcurrentWork: 1;
+  operationalAllowance?: CanonicalOperationalAllowancePolicyV1;
+};
+
+export type CanonicalOperationalAllowancePolicyV1 = {
+  schemaVersion: "canonical_operational_allowance_policy_v1";
+  semantics: "dispatch_permission_only_not_analytical_completion";
+  providerCallBurstCapacity: number;
+  providerCallRefillPerMinute: number;
+  retrievalByteBurstCapacity: number;
+  retrievalByteRefillPerMinute: number;
+  activeElapsedMsBurstCapacity: number;
+  activeElapsedMsRefillPerMinute: number;
+  providerCostUsdBurstCapacity: number;
+  providerCostUsdRefillPerMinute: number;
+  providerCostUsdMinimumDispatchAllowance: number;
+  exceptionalMaximumHistoricalProviderCalls: number;
+  exceptionalMaximumHistoricalRetrievalBytes: number;
+  exceptionalMaximumHistoricalElapsedMs: number;
+  exceptionalMaximumHistoricalProviderCostUsd: number;
+  providerConfigurationRevision: string;
 };
 
 export type CanonicalContinuationExecutionGrant = {

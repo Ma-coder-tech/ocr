@@ -103,6 +103,7 @@ function migrate(): void {
       schema_version TEXT NOT NULL,
       implementation_version TEXT NOT NULL,
       policy_version TEXT NOT NULL,
+      synthesis_contract_id TEXT NOT NULL DEFAULT 'canonical_synthesis_admission_contract_v1',
       status TEXT NOT NULL,
       family_status TEXT NOT NULL,
       parser_driver_id TEXT,
@@ -656,6 +657,8 @@ function migrate(): void {
   ensureColumn("analysis_jobs", "max_attempts", "INTEGER NOT NULL DEFAULT 3");
   ensureColumn("analysis_jobs", "next_run_at", "TEXT");
   ensureColumn("canonical_analysis_runs", "rf_snapshot_hash", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn("canonical_analysis_runs", "synthesis_contract_id",
+    "TEXT NOT NULL DEFAULT 'canonical_synthesis_admission_contract_v1'");
   ensureColumn("canonical_analysis_runs", "rf_context_hash", "TEXT NOT NULL DEFAULT ''");
   ensureColumn("canonical_analysis_runs", "rf_catalog_status", "TEXT NOT NULL DEFAULT 'unbound'");
   ensureColumn("canonical_analysis_runs", "rf_catalog_binding_json", "TEXT");

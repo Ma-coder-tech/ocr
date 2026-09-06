@@ -57,6 +57,7 @@ export type CanonicalContinuationOperationDelta = {
 export type CanonicalContinuationDegradation = {
   subtype:
     | "provider_unavailable_before_send"
+    | "provider_rejection"
     | "before_send_failure_retry_eligible"
     | "indeterminate_after_send"
     | "emergency_circuit_breaker"

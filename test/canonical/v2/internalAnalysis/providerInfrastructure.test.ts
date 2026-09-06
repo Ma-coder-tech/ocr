@@ -11,6 +11,8 @@ import {
   createLiveOpenAiSemanticAdapter, createInternalLiveIntelligencePorts,
   createDestinationPermit, createNodeHttpsRetrievalPort, createPublicDocumentExtractionPort, createPublicSourceAuthorityAdmission,
   INVESTIGATIVE_RESPONSE_SCHEMA_HASH, INVESTIGATIVE_RESPONSE_SCHEMA_V1, OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH,
+  LiveOperationTransportError,
+  LiveSearchResponseAdmissionError,
   ProviderReadinessDiagnosticLog, SEMANTIC_RESPONSE_SCHEMA_V1, type SearchRequest, type SemanticVerificationInput,
   inspectProviderOutboundPacket, normalizeOpenRouterSearchResponse, runInternalProviderPreflight, runProviderReadinessProbe,
   sanitizePublicDocumentTextForProvider, validateSemanticMember,
@@ -128,17 +130,50 @@ describe("internal-analysis construction-bound provider seams", () => {
     });
     const response = await createLiveOpenRouterSearchAdapter(cap, audit).search(searchRequest);
     expect(response.providerMetadata).toMatchObject({ finishReason: "length", toolExecutionState: "unverified" });
-    expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "failed", outputTokens: 512,
+    expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "completed", outputTokens: 512,
       providerRequestCount: 1, usageCostUsd: 0.02, safeReasonCode: "openrouter_search_response_truncated" });
   });
 
-  it("fails malformed, URL-less, duplicate, excessive, wrong-identity, and hidden-fallback OpenRouter responses closed", async () => {
+  it("admits valid citations independently while rejecting malformed, duplicate, and unsafe citations", async () => {
+    const body = openRouterResponse([], { choices: [{ index: 0, message: { role: "assistant", content: "",
+      annotations: [
+        citation("https://docs.example.test/application-fee", "Valid official document"),
+        citation("not a URL", "Malformed URL"),
+        citation("http://docs.example.test/insecure", "Insecure URL"),
+        citation("https://user:password@docs.example.test/private", "Credential URL"),
+        citation("https://docs.example.test/application-fee", "Duplicate URL"),
+        { type: "url_citation", url_citation: { title: "Missing URL" } },
+      ],
+    } }], usage: { completion_tokens: 21, cost: 0.013, server_tool_use: { web_search_requests: 1 } } });
+    const request = { ...searchRequest, maximumCandidates: 6 };
+    const normalized = normalizeOpenRouterSearchResponse(body, { request, expectedModel: "openai/gpt-5.2" });
+    expect(normalized.candidates).toEqual([expect.objectContaining({
+      url: "https://docs.example.test/application-fee", rank: 1,
+    })]);
+    expect(normalized.citationAdmission).toEqual({
+      schemaVersion: "openrouter_search_citation_admission_v1",
+      outcome: "partially_admitted", annotationCount: 6, admittedCitationCount: 1,
+      rejectedCitationCount: 5,
+      reasonCodes: ["openrouter_search_duplicate_url", "openrouter_search_result_malformed",
+        "openrouter_search_result_url_invalid"],
+      evidenceAdmissionEffect: "none", analyticalCompletionEffect: "none",
+    });
+    expect(JSON.stringify(normalized)).not.toContain("user:password");
+
+    const cap = await capability(); const audit = new ProviderOperationAuditLog();
+    globalThis.fetch = vi.fn(async () => ({ status: 200, headers: new Headers({ "x-request-id": "or-mixed-001" }),
+      json: async () => body } as Response));
+    const response = await createLiveOpenRouterSearchAdapter(cap, audit).search(request);
+    expect(response.candidates).toHaveLength(1);
+    expect(response.citationAdmission).toEqual(normalized.citationAdmission);
+    expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "completed",
+      usageState: "known", outputTokens: 21, providerRequestCount: 1, usageCostUsd: 0.013,
+      annotationCount: 6, normalizedCandidateCount: 1, providerRequestId: "or-mixed-001" });
+  });
+
+  it("keeps fully received batch-level admission failures settled with safe usage diagnostics", async () => {
     const cases: Array<{ name: string; mutate: (response: ReturnType<typeof openRouterResponse>) => unknown; reason: string }> = [
       { name: "malformed", mutate: (response) => ({ ...response, choices: [{ index: 0, message: { role: "assistant", content: [], annotations: [] } }] }), reason: "response_malformed" },
-      { name: "missing-url", mutate: (response) => ({ ...response, choices: [{ ...response.choices[0], message: { ...response.choices[0]!.message,
-        annotations: [{ type: "url_citation", url_citation: { title: "Missing URL" } }] } }] }), reason: "result_malformed" },
-      { name: "duplicate-url", mutate: (response) => ({ ...response, choices: [{ ...response.choices[0], message: { ...response.choices[0]!.message,
-        annotations: [citation("https://docs.example.test/application-fee", "One"), citation("https://docs.example.test/application-fee", "Two")] } }] }), reason: "duplicate_url" },
       { name: "too-many", mutate: (response) => ({ ...response, choices: [{ ...response.choices[0], message: { ...response.choices[0]!.message,
         annotations: Array.from({ length: 4 }, (_, index) => citation(`https://docs.example.test/application-fee-${index}`, `Title ${index}`)) } }] }), reason: "result_cap_exceeded" },
       { name: "wrong-model", mutate: (response) => ({ ...response, model: "openai/different-model" }), reason: "identity_invalid" },
@@ -148,10 +183,53 @@ describe("internal-analysis construction-bound provider seams", () => {
       const cap = await capability(); const audit = new ProviderOperationAuditLog(); let sends = 0;
       globalThis.fetch = vi.fn(async () => { sends += 1;
         return { status: 200, json: async () => item.mutate(openRouterResponse([])) } as Response; });
-      await expect(createLiveOpenRouterSearchAdapter(cap, audit).search(searchRequest)).rejects.toThrow(item.reason);
-      expect(sends, item.name).toBe(1); expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, retryCount: 0, completionState: "failed", usageState: "unknown_possible_billable",
+      const error = await createLiveOpenRouterSearchAdapter(cap, audit).search(searchRequest).then(() => null, (value) => value);
+      expect(error, item.name).toBeInstanceOf(LiveSearchResponseAdmissionError);
+      expect(error).toMatchObject({ message: expect.stringContaining(item.reason), admission: {
+        schemaVersion: "openrouter_search_citation_admission_v1", outcome: "batch_rejected",
+        admittedCitationCount: 0, reasonCodes: [expect.stringContaining(item.reason)],
+        evidenceAdmissionEffect: "none", analyticalCompletionEffect: "none",
+      } });
+      expect(sends, item.name).toBe(1); expect(audit.snapshot()[0]).toMatchObject({ actualSendCount: 1, retryCount: 0, completionState: "completed", usageState: "known",
+        outputTokens: 12, providerRequestCount: 1, usageCostUsd: 0.0123,
         httpStatus: 200, providerResponseId: "chatcmpl-openrouter-test", returnedModelIdentifier: item.name === "wrong-model" ? "openai/different-model" : "openai/gpt-5.2" });
     }
+  });
+
+  it("returns an entirely citation-malformed response as a deterministic no-usable-citations batch", async () => {
+    const body = openRouterResponse([], { choices: [{ index: 0, message: { role: "assistant", content: "",
+      annotations: [citation("not-a-url", "Bad URL"),
+        { type: "url_citation", url_citation: { title: "Missing URL" } }],
+    } }] });
+    const normalized = normalizeOpenRouterSearchResponse(body, { request: searchRequest,
+      expectedModel: "openai/gpt-5.2" });
+    expect(normalized.candidates).toEqual([]);
+    expect(normalized.citationAdmission).toMatchObject({ outcome: "no_usable_citations",
+      annotationCount: 2, admittedCitationCount: 0, rejectedCitationCount: 2,
+      reasonCodes: ["openrouter_search_result_malformed", "openrouter_search_result_url_invalid"] });
+  });
+
+  it("keeps a fully received invalid JSON search response settled while body-transfer failure remains ambiguous", async () => {
+    const settledCap = await capability(); const settledAudit = new ProviderOperationAuditLog();
+    globalThis.fetch = vi.fn(async () => ({ status: 200, headers: new Headers({ "x-request-id": "or-json-001" }),
+      json: async () => { throw new SyntaxError("Unexpected token"); } } as unknown as Response));
+    const settledError = await createLiveOpenRouterSearchAdapter(settledCap, settledAudit).search(searchRequest)
+      .then(() => null, (error) => error);
+    expect(settledError).toMatchObject({ message: "openrouter_search_response_json_invalid",
+      admission: { outcome: "batch_rejected", admittedCitationCount: 0,
+        reasonCodes: ["openrouter_search_response_json_invalid"], evidenceAdmissionEffect: "none",
+        analyticalCompletionEffect: "none" } });
+    expect(settledAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, httpStatus: 200,
+      providerRequestId: "or-json-001", completionState: "completed", usageState: "unknown_possible_billable",
+      safeReasonCode: "openrouter_search_response_json_invalid" });
+
+    const ambiguousCap = await capability(); const ambiguousAudit = new ProviderOperationAuditLog();
+    globalThis.fetch = vi.fn(async () => ({ status: 200, headers: new Headers({ "x-request-id": "or-body-001" }),
+      json: async () => { throw new TypeError("terminated"); } } as unknown as Response));
+    await expect(createLiveOpenRouterSearchAdapter(ambiguousCap, ambiguousAudit).search(searchRequest))
+      .rejects.toMatchObject({ transportState: "after_send" });
+    expect(ambiguousAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, httpStatus: 200,
+      providerRequestId: "or-body-001", completionState: "failed", usageState: "unknown_possible_billable" });
   });
 
   it("preserves missing OpenRouter usage as unknown, distinguishes rate limits, and forbids a second send for one reservation", async () => {
@@ -164,12 +242,51 @@ describe("internal-analysis construction-bound provider seams", () => {
     await expect(adapter.search(searchRequest)).rejects.toThrow("duplicate_provider_operation_receipt"); expect(sends).toBe(1);
 
     const rateCap = await capability(); const rateAudit = new ProviderOperationAuditLog(); let rateSends = 0;
-    globalThis.fetch = vi.fn(async () => { rateSends += 1; return { status: 429, headers: new Headers({ "x-request-id": "or-rate-request-001" }),
+    const beforeRateLimit = Date.now();
+    globalThis.fetch = vi.fn(async () => { rateSends += 1; return { status: 429, headers: new Headers({
+      "x-request-id": "or-rate-request-001", "retry-after": "7" }),
       json: async () => ({ error: { type: "rate_limit_error", code: 429, param: "web_search", message: "unsafe provider prose" } }) } as Response; });
     await expect(createLiveOpenRouterSearchAdapter(rateCap, rateAudit).search(searchRequest)).rejects.toThrow("rate_limited");
-    expect(rateSends).toBe(1); expect(rateAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, retryCount: 0, completionState: "failed", usageState: "unknown_possible_billable",
+    expect(rateSends).toBe(1); expect(rateAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, retryCount: 0, completionState: "failed", usageState: "known",
+      outputTokens: 0, providerRequestCount: 0, usageCostUsd: 0,
       httpStatus: 429, providerRequestId: "or-rate-request-001", providerErrorType: "rate_limit_error", providerErrorCode: "429", providerErrorParam: "web_search" });
+    expect(Date.parse(rateAudit.snapshot()[0]!.retryAfterAt!)).toBeGreaterThanOrEqual(beforeRateLimit + 7_000);
     expect(JSON.stringify(rateAudit.snapshot())).not.toContain("unsafe provider prose");
+  });
+
+  it("classifies definitive OpenRouter request rejection separately from ambiguous upstream failure", async () => {
+    const rejectedCap = await capability();
+    const rejectedAudit = new ProviderOperationAuditLog();
+    globalThis.fetch = vi.fn(async () => ({ status: 401, headers: new Headers({ "x-request-id": "or-auth-001" }),
+      json: async () => ({ error: { code: 401, message: "unsafe provider prose" } }) } as Response));
+    const rejected = await createLiveOpenRouterSearchAdapter(rejectedCap, rejectedAudit).search(searchRequest)
+      .then(() => null, (error) => error);
+    expect(rejected).toBeInstanceOf(LiveOperationTransportError);
+    expect(rejected).toMatchObject({ transportState: "provider_rejected", message: "openrouter_search_authentication_rejected" });
+    expect(rejectedAudit.snapshot()[0]).toMatchObject({ httpStatus: 401, providerRequestId: "or-auth-001",
+      providerErrorCode: "401", completionState: "failed" });
+    expect(JSON.stringify(rejectedAudit.snapshot())).not.toContain("unsafe provider prose");
+
+    const ambiguousCap = await capability();
+    const ambiguousAudit = new ProviderOperationAuditLog();
+    globalThis.fetch = vi.fn(async () => ({ status: 502, headers: new Headers({ "x-request-id": "or-upstream-001" }),
+      json: async () => ({ error: { type: "upstream_error", code: "bad_gateway" } }) } as Response));
+    const ambiguous = await createLiveOpenRouterSearchAdapter(ambiguousCap, ambiguousAudit).search(searchRequest)
+      .then(() => null, (error) => error);
+    expect(ambiguous).toBeInstanceOf(LiveOperationTransportError);
+    expect(ambiguous).toMatchObject({ transportState: "after_send", message: "openrouter_search_http_failure" });
+    expect(ambiguousAudit.snapshot()[0]).toMatchObject({ httpStatus: 502, providerRequestId: "or-upstream-001",
+      providerErrorType: "upstream_error", providerErrorCode: "bad_gateway", completionState: "failed" });
+
+    const bodylessCap = await capability();
+    const bodylessAudit = new ProviderOperationAuditLog();
+    globalThis.fetch = vi.fn(async () => ({ status: 403, headers: new Headers({ "x-request-id": "or-forbidden-001" }),
+      json: async () => { throw new SyntaxError("non-json rejection body"); } } as Response));
+    const bodyless = await createLiveOpenRouterSearchAdapter(bodylessCap, bodylessAudit).search(searchRequest)
+      .then(() => null, (error) => error);
+    expect(bodyless).toMatchObject({ transportState: "provider_rejected", message: "openrouter_search_authorization_rejected" });
+    expect(bodylessAudit.snapshot()[0]).toMatchObject({ httpStatus: 403, providerRequestId: "or-forbidden-001",
+      providerErrorType: null, providerErrorCode: null, completionState: "failed" });
   });
 
   it("rejects unsupported OpenRouter engine/loop/fallback preflight configurations", () => {
@@ -481,11 +598,27 @@ describe("internal-analysis construction-bound provider seams", () => {
 
     const timeoutAudit = new ProviderOperationAuditLog(); const timeoutCap = await capability(); let timeoutSends = 0;
     const timeoutSpy = vi.spyOn(https, "request").mockImplementation(((_options: any, _callback: any) => {
+      const socket = new EventEmitter() as any; socket.remoteAddress = "93.184.216.34";
       const req = new EventEmitter() as any; let timeout: () => void = () => undefined; req.setTimeout = (_ms: number, value: () => void) => { timeout = value; return req; };
-      req.destroy = (error?: Error) => { if (error) req.emit("error", error); }; req.end = () => { timeoutSends += 1; timeout(); }; return req;
+      req.destroy = (error?: Error) => { if (error) req.emit("error", error); }; req.end = () => {
+        timeoutSends += 1; req.emit("socket", socket); socket.emit("connect"); socket.emit("secureConnect"); timeout();
+      }; return req;
     }) as never);
     await expect(createNodeHttpsRetrievalPort(timeoutCap, { audit: timeoutAudit }).retrieve(request(new AbortController().signal))).rejects.toThrow("retrieval_timeout");
     expect(timeoutSends).toBe(1); expect(timeoutAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "timed_out", usageState: "unknown_possible_billable", retryCount: 0 });
+    expect(timeoutAudit.snapshot()[0]!.retrievalTransportDiagnostics).toMatchObject({
+      schemaVersion: "public_https_retrieval_transport_diagnostics_v1",
+      configurationCode: "ratereveal_node_https_pinned_v4",
+      resolution: { state: "permit_bound", resolutionElapsedMs: null, approvedAddressCount: 1,
+        selectedAddressFamily: 4, selectionPolicy: "first_lexicographically_sorted_approved_address" },
+      milestones: { socketAssignedMs: expect.any(Number), tcpConnectedMs: expect.any(Number),
+        tlsEstablishedMs: expect.any(Number), requestSentMs: expect.any(Number), responseHeadersMs: null,
+        firstBodyByteMs: null, bodyCompletedMs: null },
+      response: { connectedAddressFamily: 4, httpStatus: null, redirectObserved: false,
+        responseHeadersObserved: false, firstBodyByteObserved: false, bytesObserved: 0, bodyCompleted: false },
+      termination: { outcome: "timed_out", phase: "response_headers", safeReasonClass: "retrieval_timeout",
+        socketInactivityTimeoutMs: 12_000, totalAttemptTimeoutMs: 45_000 },
+    });
     timeoutSpy.mockRestore();
 
     const cancelAudit = new ProviderOperationAuditLog(); const cancelCap = await capability(); const cancellation = new AbortController(); let cancelSends = 0;
@@ -506,7 +639,7 @@ describe("internal-analysis construction-bound provider seams", () => {
     }) as never);
     await expect(createNodeHttpsRetrievalPort(pinCap, { audit: pinAudit }).retrieve(request(new AbortController().signal))).rejects.toThrow("Invalid IP address");
     expect(pinAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "failed",
-      providerConfigurationCode: "ratereveal_node_https_pinned_v2", safeReasonCode: "retrieval_destination_pin_invalid" });
+      providerConfigurationCode: "ratereveal_node_https_pinned_v4", safeReasonCode: "retrieval_destination_pin_invalid" });
 
     for (const [code, safeReasonCode] of [["ECONNRESET", "retrieval_network_connect_failed"],
       ["ERR_TLS_CERT_ALTNAME_INVALID", "retrieval_tls_validation_failed"]] as const) {
@@ -518,6 +651,103 @@ describe("internal-analysis construction-bound provider seams", () => {
       }) as never);
       await expect(createNodeHttpsRetrievalPort(categoryCap, { audit: categoryAudit }).retrieve(request(new AbortController().signal))).rejects.toThrow();
       expect(categoryAudit.snapshot()[0]).toMatchObject({ completionState: "failed", safeReasonCode });
+    }
+  });
+
+  it("distinguishes response-body progress and completed retrieval phases without changing send counts", async () => {
+    const permit = createDestinationPermit({ candidateId: "candidate-phases", rawUrl: "https://docs.example.test/phases",
+      resolvedAddresses: ["93.184.216.34"], permitId: "permit-phases", nowMs: 0, ttlMs: 60_000 });
+    const request = () => ({ reservationId: "retrieval-phases:document", questionId: "question-phases",
+      candidateId: "candidate-phases", documentId: "document-phases", permit, maximumBytes: 1_024,
+      httpsOnly: true as const, logicalAttempt: 1 as const, signal: new AbortController().signal,
+      recordReceivedBytes: () => "continue" as const, authorizeRedirect: async () => permit });
+
+    const bodyTimeoutAudit = new ProviderOperationAuditLog(); const bodyTimeoutCap = await capability();
+    vi.spyOn(https, "request").mockImplementation(((_options: any, callback: any) => {
+      const socket = new EventEmitter() as any; socket.remoteAddress = "93.184.216.34";
+      const req = new EventEmitter() as any; let timeout: () => void = () => undefined;
+      req.setTimeout = (_ms: number, value: () => void) => { timeout = value; return req; };
+      req.destroy = (error?: Error) => { if (error) req.emit("error", error); };
+      req.end = () => {
+        req.emit("socket", socket); socket.emit("connect"); socket.emit("secureConnect");
+        const response = new EventEmitter() as any; response.statusCode = 200;
+        response.headers = { "content-type": "text/plain" }; response.socket = socket; response.destroy = () => undefined;
+        callback(response); response.emit("data", Buffer.from("partial")); timeout();
+      };
+      return req;
+    }) as never);
+    await expect(createNodeHttpsRetrievalPort(bodyTimeoutCap, { audit: bodyTimeoutAudit }).retrieve(request()))
+      .rejects.toThrow("retrieval_timeout");
+    expect(bodyTimeoutAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "timed_out",
+      retryCount: 0, retrievalTransportDiagnostics: {
+        response: { httpStatus: 200, responseHeadersObserved: true, firstBodyByteObserved: true,
+          bytesObserved: 7, bodyCompleted: false },
+        termination: { outcome: "timed_out", phase: "response_body", safeReasonClass: "retrieval_timeout" },
+      } });
+
+    vi.restoreAllMocks();
+    const completedAudit = new ProviderOperationAuditLog(); const completedCap = await capability();
+    vi.spyOn(https, "request").mockImplementation(((_options: any, callback: any) => {
+      const socket = new EventEmitter() as any; socket.remoteAddress = "93.184.216.34";
+      const req = new EventEmitter() as any; req.setTimeout = () => req;
+      req.destroy = (error?: Error) => { if (error) req.emit("error", error); };
+      req.end = () => {
+        req.emit("socket", socket); socket.emit("connect"); socket.emit("secureConnect");
+        const response = new EventEmitter() as any; response.statusCode = 200;
+        response.headers = { "content-type": "text/plain" }; response.socket = socket; response.destroy = () => undefined;
+        callback(response); response.emit("data", Buffer.from("complete")); response.emit("end");
+      };
+      return req;
+    }) as never);
+    const completed = await createNodeHttpsRetrievalPort(completedCap, { audit: completedAudit }).retrieve(request());
+    expect(completed).toMatchObject({ status: "retrieved", byteLength: 8, streamedByteLength: 8 });
+    expect(completedAudit.snapshot()[0]).toMatchObject({ actualSendCount: 1, completionState: "completed",
+      retryCount: 0, providerConfigurationCode: "ratereveal_node_https_pinned_v4",
+      retrievalTransportDiagnostics: {
+        response: { httpStatus: 200, responseHeadersObserved: true, firstBodyByteObserved: true,
+          bytesObserved: 8, bodyCompleted: true },
+        termination: { outcome: "completed", phase: "completed", safeReasonClass: "retrieval_completed" },
+      } });
+  });
+
+  it("rotates only across approved addresses on a distinct logical attempt and settles deterministic HTTP failures", async () => {
+    const permit = createDestinationPermit({ candidateId: "candidate-recovery",
+      rawUrl: "https://docs.example.test/recovery", resolvedAddresses: ["93.184.216.34", "93.184.216.35"],
+      permitId: "permit-recovery", nowMs: 0, ttlMs: 60_000 });
+    for (const statusCode of [401, 403, 404, 410, 429, 503]) {
+      const audit = new ProviderOperationAuditLog(); const cap = await capability(); let optionsSeen: any = null;
+      vi.spyOn(https, "request").mockImplementation(((options: any, callback: any) => {
+        optionsSeen = options;
+        const socket = new EventEmitter() as any; socket.remoteAddress = "93.184.216.35";
+        const req = new EventEmitter() as any; req.setTimeout = () => req;
+        req.destroy = (error?: Error) => { if (error) req.emit("error", error); };
+        req.end = () => {
+          req.emit("socket", socket); socket.emit("connect"); socket.emit("secureConnect");
+          const response = new EventEmitter() as any; response.statusCode = statusCode;
+          response.headers = { "content-type": "text/plain" }; response.socket = socket;
+          response.destroy = () => undefined; callback(response); response.emit("data", Buffer.from("settled"));
+          response.emit("end");
+        };
+        return req;
+      }) as never);
+      const response = await createNodeHttpsRetrievalPort(cap, { audit }).retrieve({
+        reservationId: `retrieval-status-${statusCode}:document`, questionId: "question-recovery",
+        candidateId: "candidate-recovery", documentId: "document-recovery", permit, maximumBytes: 1_024,
+        httpsOnly: true, logicalAttempt: 2, signal: new AbortController().signal,
+        recordReceivedBytes: () => "continue", authorizeRedirect: async () => permit,
+      });
+      expect(response).toMatchObject({ status: "inaccessible", connectedAddress: "93.184.216.35" });
+      expect(optionsSeen).toMatchObject({ method: "GET", hostname: "docs.example.test", family: 4,
+        headers: expect.not.objectContaining({ Authorization: expect.anything(), Cookie: expect.anything() }) });
+      let selectedAddress = "";
+      optionsSeen.lookup("docs.example.test", {}, (_error: unknown, address: string) => { selectedAddress = address; });
+      expect(selectedAddress).toBe("93.184.216.35");
+      expect(audit.snapshot()[0]).toMatchObject({ logicalAttempt: 2, actualSendCount: 1, retryCount: 1,
+        completionState: "completed", httpStatus: statusCode,
+        retrievalTransportDiagnostics: { configurationCode: "ratereveal_node_https_pinned_v4",
+          resolution: { selectionPolicy: "logical_attempt_rotated_approved_address" },
+          termination: { outcome: "completed", phase: "completed" } } });
+      vi.restoreAllMocks();
     }
   });
 

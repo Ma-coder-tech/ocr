@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { canonicalJson } from "../canonicalJson.js";
 import type { CanonicalEconomicCategory, CanonicalEconomicParticipantRole } from "../economicTypes.js";
-import type { KnowledgeClaimValue, KnowledgeQuery } from "../knowledge/knowledgeTypes.js";
+import type { ContractV1SafeActionCode, KnowledgeClaimValue, KnowledgeQuery } from "../knowledge/knowledgeTypes.js";
 import type { CanonicalUnresolvedClaim, CanonicalUnresolvedClaimClass } from "./unresolvedClaims.js";
 
 export const CANONICAL_ATOMIC_CLAIM_IDENTITY_VERSION = "canonical_atomic_claim_identity_v1" as const;
@@ -37,6 +37,40 @@ export type CanonicalAtomicClaimSeed = {
   opaqueSubjectCode: string;
   scopeFingerprint: string;
   knowledgeQuery: KnowledgeQuery | null;
+  forcedAtomicClaimId?: string;
+  prerequisite?: CanonicalProjectedPrerequisite;
+};
+
+export type CanonicalRgExpectedKnowledgeValueConstraint =
+  | { kind: "mapping"; sourceCode: string }
+  | { kind: "role"; controlDimension: Extract<CanonicalAtomicClaimFacet,
+    "economic_beneficiary" | "economic_owner" | "collector" | "billing_intermediary" | "rule_setter" | "price_setter"
+    | "negotiator_change_authority" | "contractual_controller"> }
+  | { kind: "boolean" }
+  | { kind: "synthesis_constraint_identity" }
+  | { kind: "synthesis_economic_driver" }
+  | { kind: "synthesis_recurrence"; recurrenceBasis: "verified_schedule" }
+  | { kind: "synthesis_counterfactual" }
+  | { kind: "synthesis_safe_action"; allowedSafeActionCodes: ContractV1SafeActionCode[] }
+  | { kind: "synthesis_merchant_influence"; safeActionCode: ContractV1SafeActionCode;
+    influenceKind: "merchant_change_right" | "merchant_operational_controllability" }
+  | { kind: "synthesis_constraint_action_effect"; safeActionCode: ContractV1SafeActionCode;
+    constraintAtomicClaimId: string }
+  | { kind: "synthesis_condition_state"; safeActionCode: ContractV1SafeActionCode;
+    constraintAtomicClaimId: string; conditionCode: string };
+
+export type CanonicalProjectedPrerequisite = {
+  contractId: "canonical_synthesis_admission_contract_v1_1";
+  sourceApplicationId: string;
+  sourceAtomicClaimId: string;
+  safeActionCode: ContractV1SafeActionCode;
+  kind: "merchant_influence" | "economic_driver" | "constraint_condition";
+  evidenceRoute: "public_document" | "merchant_document" | "additional_statement_history" | "route_unresolved";
+  expectedKnowledgeValueConstraint: CanonicalRgExpectedKnowledgeValueConstraint | null;
+  knowledgeQuery: KnowledgeQuery | null;
+  forcedAtomicClaimId: string | null;
+  decisionTier: "D2" | "D1";
+  independentBlockingPrerequisiteCodes: string[];
 };
 
 const LOSSLESS_CATEGORIES = new Set<Exclude<CanonicalEconomicCategory, "unresolved_unclassified">>([
@@ -95,6 +129,20 @@ export function compileCanonicalAtomicClaimSeeds(input: {
   claim: CanonicalUnresolvedClaim;
   categoryQuery: KnowledgeQuery | null;
 }): CanonicalAtomicClaimSeed[] {
+  if (input.claim.prerequisite) {
+    const prerequisite = input.claim.prerequisite;
+    const facet = input.claim.unresolvedFacets[0]!;
+    return [{ parent: input.claim, facet,
+      opaqueSubjectCode: `contract_prerequisite_${digest({ source: prerequisite.sourceAtomicClaimId,
+        action: prerequisite.safeActionCode, kind: prerequisite.kind, facet,
+        forcedAtomicClaimId: prerequisite.forcedAtomicClaimId }).slice(0, 32)}`,
+      scopeFingerprint: digest({ sourceScope: prerequisite.knowledgeQuery?.scope ?? null,
+        sourceApplicationId: prerequisite.sourceApplicationId,
+        canonicalRefs: input.claim.canonicalRefs, occurrenceRefs: input.claim.occurrenceRefs }).slice(0, 32),
+      knowledgeQuery: prerequisite.knowledgeQuery,
+      forcedAtomicClaimId: prerequisite.forcedAtomicClaimId ?? undefined,
+      prerequisite }];
+  }
   const withheld = new Set((input.claim.researchWithheldFacets ?? []).map((item) => item.facet));
   const facets = (input.claim.unresolvedFacets?.length > 0
     ? input.claim.unresolvedFacets
@@ -118,6 +166,7 @@ export function compileCanonicalAtomicClaimSeeds(input: {
 
 export function atomicClaimIdForSeed(seed: CanonicalAtomicClaimSeed,
   statementPeriod: { start: string; end: string } | null): string {
+  if (seed.forcedAtomicClaimId) return seed.forcedAtomicClaimId;
   return canonicalAtomicClaimId({ groupingKey: canonicalAtomicClaimGroupingKey({
     claimClass: seed.parent.claimClass,
     facet: seed.facet,

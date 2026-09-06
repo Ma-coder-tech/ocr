@@ -22,9 +22,10 @@ import type { CanonicalRfClaimResolution } from "./rfClaimResolution.js";
 import type { CanonicalRgWorkLedger } from "./rgWorkLedger.js";
 import type { CanonicalAnalysisRunAutonomousLifecycle } from "./adaptiveContinuationTypes.js";
 import { ATOMIC_RESEARCH_CONTROL_POLICY_VERSION } from "./researchControl.js";
+import type { CanonicalSynthesisAdmissionContractId } from "../synthesisContractV1Types.js";
 
 export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v10";
-export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "atomic_research_control_and_saturation_v1";
+export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "contract_v1_1_and_atomic_research_control_v1";
 export const ANALYSIS_RUN_POLICY_VERSION = "frozen_product_model_runtime_policy_v0_2";
 
 export const ANALYSIS_RUN_STAGE_IDS = [
@@ -65,7 +66,7 @@ export type AnalysisRunManifest = {
   rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled";
   rgPlanning: "durable_claim_scoped_execution_eligible";
   semanticConvergence: "current_run_exact_claim_revisioned";
-  synthesisAdmissionContract: "canonical_synthesis_admission_contract_v1";
+  synthesisAdmissionContract: CanonicalSynthesisAdmissionContractId;
   adaptiveContinuation: "durable_deterministic_delta_admission";
   regeneratedPlanExecution: "continuation_authorized_existing_executor";
   researchControlPolicy: typeof ATOMIC_RESEARCH_CONTROL_POLICY_VERSION;

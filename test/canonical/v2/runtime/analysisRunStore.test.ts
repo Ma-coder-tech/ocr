@@ -46,7 +46,9 @@ describe("durable canonical AnalysisRun persistence", () => {
       attemptCount: 1,
       canonicalTruthHash: first.canonicalTruthHash,
       rfCatalogStatus: "available",
+      synthesisContractId: "canonical_synthesis_admission_contract_v1_1",
     });
+    expect(first.manifest.synthesisAdmissionContract).toBe("canonical_synthesis_admission_contract_v1_1");
     expect(persisted.rfCatalogBinding).toMatchObject({
       source: "governed_catalog", availability: "available", entryRefs: [],
       visibility: { mode: "anonymous_run", accountPrivateKnowledge: "excluded", tenantPrivateKnowledge: "disabled" },
@@ -95,7 +97,7 @@ describe("durable canonical AnalysisRun persistence", () => {
     expect(afterUpgrade).toMatchObject({
       attemptCount: 2,
       schemaVersion: "canonical_analysis_run_v10",
-      implementationVersion: "atomic_research_control_and_saturation_v1",
+      implementationVersion: "contract_v1_1_and_atomic_research_control_v1",
     });
     expect(afterUpgrade.stages).toHaveLength(10);
     expect(afterUpgrade.stages.every((stage) => stage.status === "valid" && stage.artifact !== null)).toBe(true);
@@ -105,6 +107,29 @@ describe("durable canonical AnalysisRun persistence", () => {
     expect(serialized).not.toMatch(/"(?:merchantName|merchantNumber|sourceFileName|evidenceLine)"/i);
     expect(serialized).not.toContain(String(rawIdentity.merchantName));
     expect(serialized).not.toContain(String(rawIdentity.merchantNumber));
+  }, 30_000);
+
+  it("replays a historically bound Contract-v1 result without migrating its action semantics", async () => {
+    const [{ parsePdf }, store, runStore, loadedDb] = await Promise.all([
+      import("../../../../src/parser.js"), import("../../../../src/store.js"),
+      import("../../../../src/canonical/v2/runtime/analysisRunStore.js"), import("../../../../src/db.js"),
+    ]);
+    dbModule = loadedDb;
+    const document = await parsePdf(fixture);
+    const job = store.createJob({ fileName: "historical.pdf", filePath: fixture, fileType: "pdf", businessType: "retail" });
+    runStore.executeDurableCanonicalAnalysisRun({ jobId: job.id, document });
+    const row = loadedDb.db.prepare(`SELECT result_json FROM canonical_analysis_runs WHERE job_id = ?`).get(job.id) as { result_json: string };
+    const summary = JSON.parse(row.result_json);
+    summary.manifest.synthesisAdmissionContract = "canonical_synthesis_admission_contract_v1";
+    loadedDb.db.prepare(`UPDATE canonical_analysis_runs SET synthesis_contract_id = ?, implementation_version = ?, result_json = ?
+      WHERE job_id = ?`).run("canonical_synthesis_admission_contract_v1", "historical_contract_v1_runtime",
+        JSON.stringify(summary), job.id);
+
+    const replay = runStore.executeDurableCanonicalAnalysisRun({ jobId: job.id, document });
+    const persisted = runStore.getPersistedAnalysisRunForJob(job.id)!;
+    expect(replay.manifest.synthesisAdmissionContract).toBe("canonical_synthesis_admission_contract_v1");
+    expect(persisted).toMatchObject({ synthesisContractId: "canonical_synthesis_admission_contract_v1", attemptCount: 1,
+      implementationVersion: "historical_contract_v1_runtime" });
   }, 30_000);
 
   it("restarts a failed attempt from empty checkpoints without retaining stale authority", async () => {

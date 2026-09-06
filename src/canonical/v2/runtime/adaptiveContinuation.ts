@@ -245,7 +245,9 @@ function decideClaim(input: {
     return make(disposition, degradation.reasonCodes, degradation);
   }
   if (!input.currentWork) {
-    if (["withheld_non_public_evidence_required", "withheld_no_authorized_research_mapping"].includes(input.admission.researchAdmission)) {
+    if (["withheld_non_public_evidence_required", "withheld_no_authorized_research_mapping",
+      "withheld_merchant_document_evidence_required", "withheld_additional_statement_history_required",
+      "withheld_evidence_route_unresolved"].includes(input.admission.researchAdmission)) {
       return make("safely_unresolved", [input.admission.researchAdmission,
         "evidence_objective_not_resolvable_through_authorized_public_channel"]);
     }
@@ -371,7 +373,7 @@ function progressForAttempt(attempt: WorkAttempt): CanonicalContinuationProgress
     if (judgment.periodStatus === "wrong_period" && !periodApplies(attempt.work.knowledgeQuery.asOf,
       judgment.effectiveFrom, judgment.effectiveTo)) output.push({ kind: "correct_authority_wrong_period", ...common,
       remainingGap: "period_applicable_official_publication_required" });
-    else if (judgment.scopeStatus === "wrong_scope" && judgment.semanticSupportStatus === "supported") {
+    else if (judgment.scopeStatus === "wrong_scope") {
       output.push({ kind: "refinable_scope_mismatch", ...common,
         remainingGap: "scope_applicable_official_publication_required" });
     } else if (judgment.scopeStatus === "applicable" && judgment.periodStatus === "applicable" &&
@@ -410,14 +412,17 @@ function degradationFor(work: CanonicalRgWorkItem): CanonicalContinuationDegrada
   const reason = work.stopReason ?? "operational_degradation_reason_unavailable";
   if (work.executionState === "indeterminate_after_send") return { subtype: "indeterminate_after_send",
     continuationPermission: "reconciliation_required", reasonCodes: [reason, "blind_retry_prohibited"] };
-  if (work.executionState === "degraded_provider_unavailable") return { subtype: "provider_unavailable_before_send",
+  if (work.executionState === "degraded_provider_unavailable") return { subtype: /(?:rejected|rate_limited)$/.test(reason)
+    ? "provider_rejection" : "provider_unavailable_before_send",
     continuationPermission: "bounded_retry_eligible", reasonCodes: [reason, "existing_bounded_retry_policy_applies"] };
   if (work.executionState === "degraded_emergency_circuit_breaker") {
-    const resource = /(?:resource|time|token|cost|budget|ceiling)/i.test(reason);
+    const resource = /(?:resource|time|token|cost|budget|ceiling|allowance)/i.test(reason);
     const generationZeroOperationalPause = reason.startsWith("rg_generation_zero_emergency_")
       && reason.endsWith("_not_analytical_completion");
+    const replenishingAllowancePause = /^(?:rg|rg_generation_zero)_operational_allowance_temporarily_unavailable_not_analytical_completion$/.test(reason);
     return { subtype: resource ? "resource_or_runtime_exhaustion" : "emergency_circuit_breaker",
-      continuationPermission: generationZeroOperationalPause ? "bounded_retry_eligible" : "withheld_operationally",
+      continuationPermission: generationZeroOperationalPause || replenishingAllowancePause
+        ? "bounded_retry_eligible" : "withheld_operationally",
       reasonCodes: [reason, "operational_degradation_is_not_analytical_completion"] };
   }
   return null;
@@ -455,7 +460,10 @@ function aggregateResources(attempts: WorkAttempt[], events: PersistedAnalysisRu
     if (operation.kind === "public_search") output.searchCalls += operation.receipt.calls;
     if (["investigation", "independent_verification"].includes(operation.kind)) output.aiCalls += operation.receipt.calls;
     output.retrievalBytes += operation.receipt.retrievalBytes;
-    if (operation.kind === "public_retrieval" && operation.state === "completed") output.retrievalDocuments += 1;
+    if (operation.kind === "public_retrieval" && operation.state === "completed"
+      && operation.receipt.providerCode !== "durable_analysis_run_public_document_replay") {
+      output.retrievalDocuments += 1;
+    }
     if (operation.receipt.tokens === null) output.tokenAccountingComplete = false;
     else output.tokensObserved += operation.receipt.tokens;
     if (operation.receipt.providerCode) providerCodes.add(operation.receipt.providerCode);
