@@ -16,9 +16,15 @@ import {
   type GovernedPricingLayerResolution,
   type GovernedPricingObservationInput,
 } from "./governedPricingLayerKnowledgeV1.js";
+import {
+  GOVERNED_PER_ITEM_KNOWLEDGE_V1,
+  governedPerItemRulesV1,
+  resolveGovernedPerItemKnowledgeV1,
+  type GovernedPerItemResolution,
+} from "./governedPerItemKnowledgeV1.js";
 
 export const GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION =
-  "governed_payment_knowledge_authority_2026_09_06_batch1_v2" as const;
+  "governed_payment_knowledge_authority_2026_09_07_batch2_v3" as const;
 
 export type GovernedNormUnit =
   | "usd_per_event"
@@ -60,6 +66,7 @@ export type GovernedKnowledgeResolution = {
   normsByFeeRowId: Readonly<Record<string, GovernedIndustryNorm[]>>;
   semanticSourceAuthorityByEvidenceRef: Readonly<Record<string, FeeSemanticSourceAuthority>>;
   pricingLayers: GovernedPricingLayerResolution;
+  perItem: GovernedPerItemResolution;
   authorityVersion: typeof GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION;
   semanticCatalogVersion: string;
   normCatalogVersion: string;
@@ -233,11 +240,16 @@ export class GovernedPaymentKnowledgeAuthority {
       analysis: input.analysis,
       suppliedPricingObservation: input.suppliedPricingObservation,
     });
+    const perItem = resolveGovernedPerItemKnowledgeV1({
+      analysis: input.analysis,
+      semanticRows: semantics.rows,
+    });
     return deepFreeze({
       semantics,
       normsByFeeRowId,
       semanticSourceAuthorityByEvidenceRef,
       pricingLayers,
+      perItem,
       authorityVersion: this.authorityVersion,
       semanticCatalogVersion: semantics.catalogVersion,
       normCatalogVersion: this.normCatalogVersion,
@@ -265,6 +277,8 @@ export class GovernedPaymentKnowledgeAuthority {
       normCatalogVersion: this.normCatalogVersion,
       pricingLayerCatalogVersion: GOVERNED_PRICING_LAYER_KNOWLEDGE_V1,
       pricingLayerRules: governedPricingLayerRulesV1(),
+      perItemCatalogVersion: GOVERNED_PER_ITEM_KNOWLEDGE_V1,
+      perItemRules: governedPerItemRulesV1(),
       norms: NORMS,
     })).digest("hex");
   }

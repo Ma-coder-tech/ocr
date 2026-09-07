@@ -9,6 +9,7 @@ import type {
   GovernedPricingLayerRowResolution,
   GovernedUnrecoveredRefundCostResolution,
 } from "./governedPricingLayerKnowledgeV1.js";
+import type { GovernedPerItemRowResolution } from "./governedPerItemKnowledgeV1.js";
 import { assessCanonicalExactFeeRowArithmetic } from "./exactSourceArithmeticBridge.js";
 import {
   FEE_KNOWLEDGE_RESEARCH_LIMITS,
@@ -160,6 +161,7 @@ export type InternalAnalystFinding = {
   }>;
   whyItMatters: AnalystClaim<string>;
   practicalMerchantAction: AnalystClaim<string>;
+  perItemAnalysis: GovernedPerItemRowResolution | null;
 };
 
 export type InternalAnalystResearchQueueV1 = {
@@ -204,6 +206,8 @@ export type InternalAnalystFindingReportV1 = {
     normCatalogVersion: string;
     pricingLayerCatalogVersion: string;
     admittedPricingLayerRuleRefs: string[];
+    perItemCatalogVersion: string;
+    admittedPerItemRuleRefs: string[];
     legacyFeeCatalog: "retrieval_only_not_governing";
     feeKnowledgeResearchSystem: "research_transport_not_governing";
   };
@@ -257,6 +261,7 @@ export function buildInternalAnalystFindingV1(input: {
     merchantContext,
     pricingModel: effectivePricingModel,
     pricingLayer: knowledge.pricingLayers.rowsByFeeRowId[row.id]!,
+    perItem: knowledge.perItem.rowsByFeeRowId[row.id]!,
     refundCost: knowledge.pricingLayers.unrecoveredRefundCostByFeeRowId[row.id]!,
     contributions: contributions.filter((item) => item.targetFeeRowId === row.id),
   }));
@@ -282,6 +287,8 @@ export function buildInternalAnalystFindingV1(input: {
       normCatalogVersion: knowledge.normCatalogVersion,
       pricingLayerCatalogVersion: knowledge.pricingLayers.catalogVersion,
       admittedPricingLayerRuleRefs: knowledge.pricingLayers.rules.map((rule) => rule.ruleId),
+      perItemCatalogVersion: knowledge.perItem.catalogVersion,
+      admittedPerItemRuleRefs: knowledge.perItem.rules.map((rule) => rule.ruleId),
       legacyFeeCatalog: knowledge.legacyAuthorities.legacyFeeCatalog,
       feeKnowledgeResearchSystem: knowledge.legacyAuthorities.feeKnowledgeResearchSystem,
     },
@@ -299,6 +306,8 @@ export function buildInternalAnalystFindingV1(input: {
       "Batch 1 uses merchant-facing acquiring-side commercial pricing for structurally exposed pricing layers; it does not equate collection or price control with profit, ultimate retention, or economic beneficiary.",
       "Unrecovered cost on refunded volume is withheld unless line-specific gross basis, refund population, absence of credits/offsets, and relevant statement-section completeness are all established.",
       "Fiserv is the supported statement family, while the claim model, evidence classes, participant axes, and knowledge authority are processor-neutral.",
+      "Batch 2 population comparisons are diagnostic only: no universal ordering law, error, or decline count is inferred.",
+      "Batch 2 admits no new network value or market benchmark; all per-item burden figures are statement-period arithmetic or explicitly labeled current-month run rates.",
     ],
   };
   return deepFreeze(report);
@@ -324,6 +333,7 @@ function buildFeeFinding(input: {
   merchantContext: InternalAnalystMerchantContext;
   pricingModel: InternalAnalystPricingModelInput | null;
   pricingLayer: GovernedPricingLayerRowResolution;
+  perItem: GovernedPerItemRowResolution;
   refundCost: GovernedUnrecoveredRefundCostResolution;
   contributions: InternalAnalystResearchContribution[];
 }): InternalAnalystFinding {
@@ -339,13 +349,18 @@ function buildFeeFinding(input: {
   const pricingKnowledgeBasis = input.pricingLayer.matchedRuleRefs.length > 0
     ? evidence("G1_governed_payment_knowledge", input.pricingLayer.matchedRuleRefs, "governed_knowledge")
     : null;
-  const identityValue = input.pricingLayer.exactFeeIdentity ?? (semantic.status === "resolved_exact_trusted" ? semantic.semanticAxes?.identity.value ?? semantic.conceptId : admitted?.claims.exactFeeIdentity ?? null);
+  const perItemKnowledgeBasis = input.perItem.matchedRuleRefs.length > 0
+    ? evidence("G1_governed_payment_knowledge", input.perItem.matchedRuleRefs, "governed_knowledge")
+    : null;
+  const identityValue = input.perItem.exactIdentityDisposition === "suppress_as_unresolved"
+    ? null
+    : input.pricingLayer.exactFeeIdentity ?? (semantic.status === "resolved_exact_trusted" ? semantic.semanticAxes?.identity.value ?? semantic.conceptId : admitted?.claims.exactFeeIdentity ?? null);
   const identity = identityValue
     ? claim(
       "supported",
       identityValue,
       input.pricingLayer.exactFeeIdentity ? input.pricingLayer.confidence : semantic.status === "resolved_exact_trusted" ? "STRONG" : "LIKELY",
-      [...publishedBasis, ...compact([knowledgeBasis, pricingKnowledgeBasis, researchBasis]), evidence("E1_statement", rowEvidence, "statement_fact")],
+      [...publishedBasis, ...compact([knowledgeBasis, pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis]), evidence("E1_statement", rowEvidence, "statement_fact")],
       input.pricingLayer.exactFeeIdentity
         ? "Exact statement-local pricing identity follows an admitted Batch 1 decision procedure and its deterministic preconditions."
         : semantic.status === "resolved_exact_trusted"
@@ -353,50 +368,66 @@ function buildFeeFinding(input: {
           : "Previously unresolved terminology resolved by an independently evidenced, reviewed research contribution.",
       input.pricingLayer.limitations,
     )
-    : unresolvedClaim<string>("Exact identity is not established; candidates remain research leads.", [evidence("E1_statement", rowEvidence, "statement_fact")]);
-  const categoryValue = input.pricingLayer.broaderEconomicCategory ?? admitted?.claims.broaderEconomicCategory ?? categoryFor(semantic, input.row.selectedLabel);
+    : unresolvedClaim<string>(input.perItem.exactIdentityDisposition === "suppress_as_unresolved" ? input.perItem.exactIdentityReason : "Exact identity is not established; candidates remain research leads.", compact([perItemKnowledgeBasis, evidence("E1_statement", rowEvidence, "statement_fact")]));
+  const perItemCategory = input.perItem.applicable && input.perItem.economicLayer !== "PER_ITEM_LAYER_UNRESOLVED" ? input.perItem.economicLayer : null;
+  const categoryValue = perItemCategory ?? input.pricingLayer.broaderEconomicCategory ?? admitted?.claims.broaderEconomicCategory ?? categoryFor(semantic, input.row.selectedLabel);
   const category = categoryValue
     ? claim(
-      input.pricingLayer.broaderEconomicCategory ? "supported" : identityValue ? "supported" : "industry_judgment",
+      perItemCategory ? "supported" : input.pricingLayer.broaderEconomicCategory ? "supported" : identityValue ? "supported" : "industry_judgment",
       categoryValue,
-      input.pricingLayer.broaderEconomicCategory ? input.pricingLayer.confidence : identityValue ? "STRONG" : "CATEGORY_ONLY",
-      [...publishedBasis, ...compact([knowledgeBasis, pricingKnowledgeBasis, researchBasis, evidence("E1_statement", rowEvidence, "statement_fact")])],
-      input.pricingLayer.broaderEconomicCategory
+      perItemCategory ? input.perItem.confidence : input.pricingLayer.broaderEconomicCategory ? input.pricingLayer.confidence : identityValue ? "STRONG" : "CATEGORY_ONLY",
+      [...publishedBasis, ...compact([knowledgeBasis, pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis, evidence("E1_statement", rowEvidence, "statement_fact")])],
+      perItemCategory
+        ? "Economic layer follows the admitted Batch 2 per-item decision procedure; population evidence remains separate from ownership and price control."
+        : input.pricingLayer.broaderEconomicCategory
         ? "Economic category follows admitted Batch 1 pricing-layer knowledge without asserting profit, retention, or contract compliance."
         : identityValue
           ? "Economic category follows the admitted meaning, independently of pricing or contract conclusions."
           : "Category is supported by printed mechanics/position even though exact identity remains unresolved.",
-      input.pricingLayer.limitations,
+      [...input.pricingLayer.limitations, ...input.perItem.limitations],
     )
     : unresolvedClaim<string>("Neither an exact identity nor a defensible broader category is established.", [evidence("E1_statement", rowEvidence, "statement_fact")]);
-  const mechanicValue = input.pricingLayer.assessmentBasis.state === "supported"
+  const mechanicValue = input.perItem.applicable && input.perItem.unit.state === "supported"
+    ? input.perItem.unit.value
+    : input.pricingLayer.assessmentBasis.state === "supported"
     ? input.pricingLayer.assessmentBasis.value
     : semantic.semanticAxes?.assessment_unit.status === "resolved"
       ? semantic.semanticAxes.assessment_unit.value
       : admitted?.claims.assessmentUnit ?? mechanicFromCanonical(input.row, input.analysis);
   const mechanic = mechanicValue
-    ? claim("supported", mechanicValue, input.pricingLayer.assessmentBasis.state === "supported" ? "STRONG" : semantic.semanticAxes?.assessment_unit.status === "resolved" ? "STRONG" : "LIKELY", [...publishedBasis, ...compact([knowledgeBasis, pricingKnowledgeBasis, researchBasis, evidence("E1_statement", rowEvidence, "statement_fact")])], input.pricingLayer.assessmentBasis.state === "supported" ? input.pricingLayer.assessmentBasis.explanation : "Assessment mechanic is kept separate from identity and commercial judgment.")
+    ? claim("supported", mechanicValue, input.perItem.applicable && input.perItem.unit.state === "supported" ? "STRONG" : input.pricingLayer.assessmentBasis.state === "supported" ? "STRONG" : semantic.semanticAxes?.assessment_unit.status === "resolved" ? "STRONG" : "LIKELY", [...publishedBasis, ...compact([knowledgeBasis, pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis, evidence("E1_statement", rowEvidence, "statement_fact")])], input.perItem.applicable && input.perItem.unit.state === "supported" ? input.perItem.unit.explanation : input.pricingLayer.assessmentBasis.state === "supported" ? input.pricingLayer.assessmentBasis.explanation : "Assessment mechanic is kept separate from identity and commercial judgment.")
     : input.pricingLayer.assessmentBasis.state === "not_determinable"
       ? unresolvedClaim<string>(input.pricingLayer.assessmentBasis.explanation, compact([pricingKnowledgeBasis, evidence("E1_statement", input.pricingLayer.assessmentBasis.evidenceRefs, "statement_fact")]))
     : unresolvedClaim<string>("The statement does not expose a reliable assessment base.", [evidence("E1_statement", rowEvidence, "statement_fact")]);
   const ownership = semantic.semanticAxes?.ownership.status === "resolved" ? semantic.semanticAxes.ownership.value : null;
-  const beneficiary = participantClaim(input.pricingLayer.economicBeneficiary ?? admitted?.claims.economicBeneficiary ?? beneficiaryFor(ownership), input.pricingLayer.broaderEconomicCategory?.includes("acquiring_side") ? "Economic beneficiary and ultimate retention are not inferred from collection or merchant-facing price control." : ownership ? "Published semantic ownership supports the likely economic beneficiary; collection and merchant price control remain separate." : "Economic beneficiary is not established.", [...publishedBasis, ...compact([pricingKnowledgeBasis, researchBasis])]);
-  const collector = participantClaim(input.pricingLayer.collector ?? admitted?.claims.collector ?? (input.analysis.identity.processorFamily.evidenceRefs.length > 0 ? "processor_or_acquirer" : null), "The processor/acquirer presents or collects the statement charge; this does not prove it retains the economics.", [evidence("E1_statement", [...rowEvidence, ...input.analysis.identity.processorFamily.evidenceRefs], "statement_fact"), ...compact([pricingKnowledgeBasis])]);
-  const ruleSetter = participantClaim(input.pricingLayer.ruleSetter ?? admitted?.claims.ruleSetter ?? (ownership?.includes("network") ? "card_network" : null), "Rule setting is distinct from collection, economic benefit, and merchant-facing price control.", [...publishedBasis, ...compact([pricingKnowledgeBasis, researchBasis])]);
-  const priceSetter = participantClaim(input.pricingLayer.priceSetter ?? admitted?.claims.priceSetter ?? (ownership?.includes("network") ? "card_network" : null), "Price setting is stated only where supported; it does not establish which party ultimately retains the billed amount.", [...publishedBasis, ...compact([pricingKnowledgeBasis, researchBasis])]);
-  const controller = participantClaim(input.pricingLayer.merchantFacingPriceController ?? admitted?.claims.merchantFacingPriceController ?? null, input.pricingLayer.merchantFacingPriceController ? "The statement structure supports control at the acquiring-side commercial-program layer; the exact processor/acquirer/ISO allocation and ultimate retention remain unresolved." : "The evidence does not establish whether the processor, ISO, or another party controls the merchant-facing amount or adds spread.", compact([pricingKnowledgeBasis, researchBasis]));
+  const perItemAxesApply = input.perItem.applicable;
+  const beneficiary = participantClaim(perItemAxesApply ? input.perItem.economicBeneficiary : input.pricingLayer.economicBeneficiary ?? admitted?.claims.economicBeneficiary ?? beneficiaryFor(ownership), input.perItem.applicable ? "Batch 2 does not infer economic benefit from collection; acquiring-side ultimate retention remains unresolved unless independently evidenced." : input.pricingLayer.broaderEconomicCategory?.includes("acquiring_side") ? "Economic beneficiary and ultimate retention are not inferred from collection or merchant-facing price control." : ownership ? "Published semantic ownership supports the likely economic beneficiary; collection and merchant price control remain separate." : "Economic beneficiary is not established.", [...publishedBasis, ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis])]);
+  const collector = participantClaim(perItemAxesApply ? input.perItem.collector : input.pricingLayer.collector ?? admitted?.claims.collector ?? (input.analysis.identity.processorFamily.evidenceRefs.length > 0 ? "processor_or_acquirer" : null), "The processor/acquirer presents or collects the statement charge; this does not prove it retains the economics.", [evidence("E1_statement", [...rowEvidence, ...input.analysis.identity.processorFamily.evidenceRefs], "statement_fact"), ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis])]);
+  const ruleSetter = participantClaim(perItemAxesApply ? input.perItem.ruleSetter : input.pricingLayer.ruleSetter ?? admitted?.claims.ruleSetter ?? (ownership?.includes("network") ? "card_network" : null), "Rule setting is distinct from collection, economic benefit, and merchant-facing price control.", [...publishedBasis, ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis])]);
+  const priceSetter = participantClaim(perItemAxesApply ? input.perItem.priceSetter : input.pricingLayer.priceSetter ?? admitted?.claims.priceSetter ?? (ownership?.includes("network") ? "card_network" : null), "Price setting is stated only where supported; it does not establish which party ultimately retains the billed amount.", [...publishedBasis, ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis])]);
+  const controllerValue = perItemAxesApply ? input.perItem.merchantFacingPriceController : input.pricingLayer.merchantFacingPriceController ?? admitted?.claims.merchantFacingPriceController ?? null;
+  const controller = participantClaim(controllerValue, controllerValue ? "The statement structure supports control at the acquiring-side commercial-program layer; the exact processor/acquirer/ISO allocation and ultimate retention remain unresolved." : "The evidence does not establish whether the processor, ISO, or another party controls the merchant-facing amount or adds spread.", compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis]));
   const arithmetic = arithmeticClaim(input.row, input.analysis);
   const pricing = pricingClaim(input.pricingModel);
-  const populationValue = input.pricingLayer.assessmentBasis.state === "supported"
+  const populationValue = input.perItem.applicable && input.perItem.population.state !== "unresolved"
+    ? input.perItem.population.value
+    : input.pricingLayer.assessmentBasis.state === "supported"
     ? input.pricingLayer.assessmentBasis.value
     : input.pricingModel?.relevantPopulation ?? mechanicValue;
   const population = populationValue
     ? claim("supported", populationValue, "LIKELY", [evidence("E1_statement", rowEvidence, "statement_fact")], "The fee line's supported assessment basis takes precedence over a broader pricing-model population; no statement-wide basis is inferred.")
     : unresolvedClaim<string>("Relevant transaction or volume population is not established.", [evidence("E1_statement", rowEvidence, "statement_fact")]);
-  const reasonableness = commercialClaim(input.row, input.analysis, input.norms, input.merchantContext);
+  const reasonableness = input.perItem.applicable && (input.perItem.economicLayer === "PER_ITEM_LAYER_UNRESOLVED" || input.perItem.economicLayer?.startsWith("network_"))
+    ? notAssessableClaim<"within_norm" | "elevated" | "materially_elevated" | "context_justified">("No applicable governed commercial benchmark is applied to this per-item economic layer.")
+    : commercialClaim(input.row, input.analysis, input.norms, input.merchantContext);
   const primaryNorm = input.norms[0] ?? null;
-  const networkUnderlying = ownership?.includes("network") ?? false;
-  const negotiability = input.pricingLayer.negotiability
+  const networkUnderlying = input.perItem.applicable ? input.perItem.economicBeneficiary === "card_network" : ownership?.includes("network") ?? false;
+  const perItemControlsNegotiability = input.perItem.economicLayer === "PER_ITEM_LAYER_UNRESOLVED" || input.perItem.economicLayer?.startsWith("network_") || input.perItem.economicLayer?.startsWith("acquiring_side_");
+  const negotiability = input.perItem.applicable && perItemControlsNegotiability
+    ? input.perItem.negotiability
+      ? claim<"frequently_negotiable" | "sometimes_negotiable" | "rarely_negotiable">("industry_judgment", input.perItem.negotiability, "LIKELY", compact([perItemKnowledgeBasis]), input.perItem.commercialActionPermitted ? "The acquiring-side merchant-facing price is commonly reviewable; exact contractual negotiability remains merchant-document dependent." : "The network-set price is ordinarily not merchant-negotiable; operational incidence and any acquiring-side presentation remain separate.")
+      : unresolvedClaim<"frequently_negotiable" | "sometimes_negotiable" | "rarely_negotiable">("The economic layer is unresolved, so no negotiation recommendation is made.", compact([perItemKnowledgeBasis]))
+    : input.pricingLayer.negotiability
     ? claim<"frequently_negotiable" | "sometimes_negotiable" | "rarely_negotiable">("industry_judgment", input.pricingLayer.negotiability, "LIKELY", compact([pricingKnowledgeBasis]), "Negotiability follows supported merchant-facing acquiring-side price control, not an assertion about ultimate revenue retention or this merchant's contractual rights.")
     : primaryNorm && primaryNorm.normId.includes("chargeback") && input.merchantContext.riskClass === "high_risk"
     ? claim<"frequently_negotiable" | "sometimes_negotiable" | "rarely_negotiable">("industry_judgment", "rarely_negotiable", "LIKELY", [frameworkNormEvidence(primaryNorm), ...contextEvidence(input.merchantContext)], "High-risk/dispute-heavy context reduces ordinary negotiating leverage for exception pricing; this is a contextual commercial judgment, not a contractual conclusion.")
@@ -405,15 +436,17 @@ function buildFeeFinding(input: {
     : networkUnderlying
       ? claim<"frequently_negotiable" | "sometimes_negotiable" | "rarely_negotiable">("industry_judgment", "rarely_negotiable", "LIKELY", publishedBasis, "The underlying network schedule is rarely negotiated by an ordinary merchant, but processor-added spread or presentation remains reviewable.")
       : unresolvedClaim<"frequently_negotiable" | "sometimes_negotiable" | "rarely_negotiable">("Negotiability is not inferred from a legacy processor/network label.", []);
-  const waivability = primaryNorm
+  const waivability = input.perItem.applicable && input.perItem.economicLayer === "PER_ITEM_LAYER_UNRESOLVED"
+    ? unresolvedClaim<"frequently_waivable" | "sometimes_waivable" | "rarely_waivable">("The economic layer is unresolved, so waivability is not inferred.", compact([perItemKnowledgeBasis]))
+    : primaryNorm
     ? normDispositionClaim(primaryNorm.waivabilityNorm, primaryNorm, "Waivability/removability is a governed industry norm, not a promise about this merchant's agreement.")
     : networkUnderlying
       ? claim<"frequently_waivable" | "sometimes_waivable" | "rarely_waivable">("industry_judgment", "rarely_waivable", "LIKELY", publishedBasis, "The underlying network assessment is rarely waived, while unsupported padding or duplicate billing may still be challenged.")
       : unresolvedClaim<"frequently_waivable" | "sometimes_waivable" | "rarely_waivable">("Waivability is not established for this charge.", []);
-  const behavioral = behavioralClaim(identityValue, categoryValue, input.row.selectedLabel, rowEvidence);
+  const behavioral = input.perItem.applicable ? perItemBehavioralClaim(input.perItem) : behavioralClaim(identityValue, categoryValue, input.row.selectedLabel, rowEvidence);
   const contract = contractRequiredClaim();
   const materiality = materialityFor(input.row, input.analysis);
-  const action = actionClaim({
+  const action = input.perItem.applicable ? perItemActionClaim(input.perItem) : actionClaim({
     category: categoryValue,
     identity: identityValue,
     reasonableness,
@@ -422,7 +455,10 @@ function buildFeeFinding(input: {
     networkUnderlying,
     pricingRuleRefs: input.pricingLayer.matchedRuleRefs,
   });
-  const alternatives = competingInterpretations(semantic, input.contributions, input.pricingLayer.competingInterpretations, input.pricingLayer.matchedRuleRefs);
+  const alternatives = [
+    ...competingInterpretations(semantic, input.contributions, input.pricingLayer.competingInterpretations, input.pricingLayer.matchedRuleRefs),
+    ...input.perItem.competingInterpretations.map((interpretation) => ({ source: "governed_retrieval" as const, interpretation, evidenceRefs: input.perItem.matchedRuleRefs, status: "candidate" as const })),
+  ];
   return {
     findingId: `iaf_${stableId(input.row.id)}`,
     surface: surfaceFor(categoryValue, input.row.selectedLabel),
@@ -450,6 +486,7 @@ function buildFeeFinding(input: {
     competingInterpretations: alternatives,
     whyItMatters: claim("supported", whyItMatters(input.row, materiality, categoryValue), "LIKELY", [evidence("E1_statement", rowEvidence, "statement_fact")], "Materiality is period-bounded and does not assume recurrence."),
     practicalMerchantAction: action,
+    perItemAnalysis: input.perItem.applicable ? input.perItem : null,
   };
 }
 
@@ -495,6 +532,7 @@ function buildPricingOpacityFinding(
     competingInterpretations: [],
     whyItMatters: claim("supported", message, "STRONG", [evidence("E1_statement", evidenceRefs, "statement_fact")], "Opacity is a commercially material finding even when markup dollars are not computable."),
     practicalMerchantAction: claim("industry_judgment", "Request an interchange-cost and processor-markup breakout and a pricing review; this request does not require the merchant agreement. Use the agreement only to determine whether the current program violates an exact contracted term.", "STRONG", [frameworkNormEvidence()], "Commercial inquiry is distinct from a legal or contractual conclusion."),
+    perItemAnalysis: null,
   };
 }
 
@@ -643,6 +681,37 @@ function actionClaim(input: {
     ? [evidence("G1_governed_payment_knowledge", input.pricingRuleRefs, "governed_knowledge")]
     : [frameworkNormEvidence()];
   return claim("industry_judgment", value, "LIKELY", pricingBasis, "The action is a practical commercial inquiry, not a contract-compliance or legal conclusion.");
+}
+
+function perItemActionClaim(input: GovernedPerItemRowResolution): AnalystClaim<string> {
+  const basis = [
+    evidence("G1_governed_payment_knowledge", input.matchedRuleRefs, "governed_knowledge"),
+    evidence("E1_statement", input.evidenceRefs, "statement_fact"),
+  ];
+  if (input.economicLayer === "PER_ITEM_LAYER_UNRESOLVED") {
+    return claim("supported", "Ask for the billed unit, event population, economic layer, and price-setting party to be identified. Do not request repricing or a waiver until the commercial layer is supported; no merchant agreement is needed for this verification request.", "CATEGORY_ONLY", basis, "Unresolved economic character permits verification but not a negotiation conclusion.");
+  }
+  if (input.economicLayer === "acquiring_side_batch") {
+    return claim("industry_judgment", "Verify the charge against the actual settlement-batch table and review batch operations before changing frequency. Ask the acquiring side to explain or review the merchant-facing price; no agreement is needed to request that review.", "LIKELY", basis, "Reducing batch frequency is not recommended without considering funding timing, controls, and operations.");
+  }
+  if (input.commercialActionPermitted) {
+    return claim("industry_judgment", "Ask the processor/acquirer/ISO to explain and commercially review the acquiring-side per-item price. This request does not require the merchant agreement; the agreement is needed only for an exact contractual-rate, breach, right, or remedy conclusion.", "LIKELY", basis, "Commercial review is supported without claiming which party ultimately retains the charge.");
+  }
+  if (input.economicLayer?.startsWith("network_")) {
+    return claim("supported", "Verify the billed event population and the applicable dated network schedule, then investigate supported incidence drivers such as duplicate authorizations, reversals, force-post activity, or data quality where relevant. Do not treat all events as avoidable or the network-set price as merchant-negotiable.", "STRONG", basis, "Network price and operational incidence are separate questions.");
+  }
+  return claim("supported", "Request event-level support for the printed quantity and investigate the fee's operational incidence without assuming fault, avoidability, ownership, or negotiability.", "LIKELY", basis, "The action is an evidence request, not a pricing or contract conclusion.");
+}
+
+function perItemBehavioralClaim(input: GovernedPerItemRowResolution): AnalystClaim<"behavior_can_reduce_incidence" | "configuration_review_may_reduce_population" | "not_ordinarily_behavioral"> {
+  const basis = [evidence("G1_governed_payment_knowledge", input.matchedRuleRefs, "governed_knowledge")];
+  if (input.incidenceActionability === "behaviorally_influenceable_where_applicable") {
+    return claim("industry_judgment", "behavior_can_reduce_incidence", "LIKELY", basis, "Operational behavior may influence incidence where the documented trigger applies; this does not imply merchant fault or that every event is avoidable.");
+  }
+  if (input.incidenceActionability === "configuration_investigation_only" || input.economicLayer?.includes("authorization") || input.economicLayer?.includes("gateway") || input.economicLayer?.includes("avs")) {
+    return claim("industry_judgment", "configuration_review_may_reduce_population", "LIKELY", basis, "Configuration and event-flow review may change the billed population, but present evidence does not establish an error or causal defect.");
+  }
+  return claim("supported", "not_ordinarily_behavioral", input.economicLayer === "PER_ITEM_LAYER_UNRESOLVED" ? "UNRESOLVED" : "LIKELY", basis, "No supported behavioral conclusion is asserted for this fee population.");
 }
 
 function behavioralClaim(identity: string | null, category: string | null, label: string, refs: string[]): AnalystClaim<"behavior_can_reduce_incidence" | "configuration_review_may_reduce_population" | "not_ordinarily_behavioral"> {

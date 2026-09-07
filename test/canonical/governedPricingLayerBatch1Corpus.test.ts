@@ -81,13 +81,15 @@ describe("governed pricing-layer Batch 1 full Fiserv corpus", () => {
     const ambiguousExact = exact.filter((finding) => finding.competingInterpretations.length > 0 || finding.exactFeeIdentity.state === "conflicting");
 
     expect(findings).toHaveLength(483);
-    expect(exact).toHaveLength(81);
-    expect(categoryOnly).toHaveLength(84);
-    expect(unresolved).toHaveLength(318);
-    expect(ambiguous).toHaveLength(61);
+    // Batch 2 withdraws five overconfident exact per-item identities and adds
+    // governed broader categories without changing Batch 1 pricing semantics.
+    expect(exact).toHaveLength(76);
+    expect(categoryOnly).toHaveLength(96);
+    expect(unresolved).toHaveLength(311);
+    expect(ambiguous).toHaveLength(90);
     expect(ambiguousExact).toHaveLength(3);
     expect(ambiguousExact.every((finding) => finding.exactFeeIdentity.value?.startsWith("amex_"))).toBe(true);
-    expect(reports.reduce((sum, report) => sum + report.researchQueued, 0)).toBe(402);
+    expect(reports.reduce((sum, report) => sum + report.researchQueued, 0)).toBe(407);
 
     const priority = reports.find((report) => report.file.includes("PRIORITY_PAYMENT_SYSTEMS"))!;
     expect(priority.pricingModel).toBe("flat_rate");

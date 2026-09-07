@@ -68,7 +68,7 @@ describe("Internal Analyst Finding v1", () => {
     expect(auth.contractualCompliance.explanation).toMatch(/agreement\/pricing schedule/);
   });
 
-  it("admits independently evidenced AI-assisted research for unfamiliar terminology but leaves unsupported competing interpretations unresolved", () => {
+  it("keeps Batch 2 CPU identity bounded even when prior research supports only the broader category", () => {
     const cpu = rowByLabel(paysafe, "MASTERCARD - CPU GTWY");
     const additional = rowByLabel(paysafe, "**ADDITIONAL FEES");
     const contributions: InternalAnalystResearchContribution[] = [
@@ -131,8 +131,13 @@ describe("Internal Analyst Finding v1", () => {
     const unresolved = researched.findings.find((item) => item.sourceFeeRowId === additional.id)!;
     const opacity = researched.findings.find((item) => item.surface === "pricing_model_opacity")!;
 
-    expect(cpuFinding.exactFeeIdentity).toMatchObject({ value: "gateway_authorization_processing_fee", state: "supported", confidence: "LIKELY" });
-    expect(cpuFinding.exactFeeIdentity.evidence.some((item) => item.evidenceClass === "E4_processor_or_iso_publication")).toBe(true);
+    expect(cpuFinding.exactFeeIdentity).toMatchObject({ value: null, state: "unresolved", confidence: "UNRESOLVED" });
+    expect(cpuFinding.broaderEconomicCategory).toMatchObject({ value: "acquiring_side_gateway_commercial", state: "supported" });
+    expect(cpuFinding.perItemAnalysis).toMatchObject({
+      exactIdentityDisposition: "suppress_as_unresolved",
+      commercialActionPermitted: true,
+      retentionOrProfitEstablished: false,
+    });
     expect(unresolved.exactFeeIdentity.state).toBe("unresolved");
     expect(unresolved.competingInterpretations).toEqual(expect.arrayContaining([
       expect.objectContaining({ source: "research", status: "conflicting" }),
@@ -144,7 +149,7 @@ describe("Internal Analyst Finding v1", () => {
     });
     const queuedResearch = [...researched.researchQueue.selected, ...researched.researchQueue.deferred];
     expect(queuedResearch.some((item) => item.question.feeRowRef === additional.id)).toBe(true);
-    expect(queuedResearch.some((item) => item.question.feeRowRef === cpu.id)).toBe(false);
+    expect(queuedResearch.some((item) => item.question.feeRowRef === cpu.id)).toBe(true);
     expect(queuedResearch.every((item) =>
       item.question.deterministicCategory === null &&
       item.question.deterministicEconomicOwner === null &&
