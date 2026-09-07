@@ -37,9 +37,17 @@ import {
   resolveGovernedUsNetworkFeeEvidence2020_2026V1,
   type GovernedUsNetworkFeeEvidenceResolution,
 } from "./governedUsNetworkFeeEvidence2020_2026V1.js";
+import {
+  GOVERNED_MASTERCARD_FOCUSED_EVIDENCE_2024_2026_V1,
+  governedMastercardFocusedRecords2024_2026V1,
+  governedMastercardFocusedRules2024_2026V1,
+  governedMastercardFocusedSources2024_2026V1,
+  resolveGovernedMastercardFocusedEvidence2024_2026V1,
+  type GovernedMastercardFocusedEvidenceResolution,
+} from "./governedMastercardFocusedEvidence2024_2026V1.js";
 
 export const GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION =
-  "governed_payment_knowledge_authority_2026_09_07_us_network_evidence_v1" as const;
+  "governed_payment_knowledge_authority_2026_09_07_mastercard_focused_evidence_v1" as const;
 
 export type GovernedNormUnit =
   | "usd_per_event"
@@ -84,6 +92,7 @@ export type GovernedKnowledgeResolution = {
   perItem: GovernedPerItemResolution;
   datedNetworkFeeEvidence: GovernedDatedNetworkFeeEvidenceResolution;
   usNetworkFeeEvidence: GovernedUsNetworkFeeEvidenceResolution;
+  mastercardFocusedEvidence: GovernedMastercardFocusedEvidenceResolution;
   authorityVersion: typeof GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION;
   semanticCatalogVersion: string;
   normCatalogVersion: string;
@@ -270,6 +279,10 @@ export class GovernedPaymentKnowledgeAuthority {
       analysis: input.analysis,
       datedNetworkEvidence: datedNetworkFeeEvidence,
     });
+    const mastercardFocusedEvidence = resolveGovernedMastercardFocusedEvidence2024_2026V1({
+      analysis: input.analysis,
+      usNetworkFeeEvidence,
+    });
     return deepFreeze({
       semantics,
       normsByFeeRowId,
@@ -278,6 +291,7 @@ export class GovernedPaymentKnowledgeAuthority {
       perItem,
       datedNetworkFeeEvidence,
       usNetworkFeeEvidence,
+      mastercardFocusedEvidence,
       authorityVersion: this.authorityVersion,
       semanticCatalogVersion: semantics.catalogVersion,
       normCatalogVersion: this.normCatalogVersion,
@@ -314,6 +328,10 @@ export class GovernedPaymentKnowledgeAuthority {
       usNetworkFeeEvidenceSources: governedUsNetworkSources2020_2026V1(),
       usNetworkFeeEvidenceRecords: governedUsNetworkReferenceRecords2020_2026V1(),
       usNetworkFeeEvidenceRules: governedUsNetworkRules2020_2026V1(),
+      mastercardFocusedEvidenceCatalogVersion: GOVERNED_MASTERCARD_FOCUSED_EVIDENCE_2024_2026_V1,
+      mastercardFocusedEvidenceSources: governedMastercardFocusedSources2024_2026V1(),
+      mastercardFocusedEvidenceRecords: governedMastercardFocusedRecords2024_2026V1(),
+      mastercardFocusedEvidenceRules: governedMastercardFocusedRules2024_2026V1(),
       norms: NORMS,
     })).digest("hex");
   }

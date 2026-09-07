@@ -161,16 +161,16 @@ describe("Product-adjudicated U.S. network fee evidence pack 2020-2026", () => {
 
     expect(metrics.materialFindings).toBe(483);
     expect(metrics.networkRows).toBe(60);
-    expect(metrics.periodMatched).toBe(0);
-    expect(metrics.adjacentPeriod).toBe(39);
+    expect(metrics.periodMatched).toBe(1);
+    expect(metrics.adjacentPeriod).toBe(38);
     expect(metrics.identityMechanicOnly).toBe(0);
     expect(metrics.lacking2026Core).toBe(60);
-    expect(metrics.candidates).toBe(3);
+    expect(metrics.candidates).toBe(2);
     expect(metrics.nabuCorrected).toBe(2);
     expect(metrics.digitalCorrected).toBe(2);
     expect(metrics.dataUsageStrengthened).toBeGreaterThanOrEqual(1);
-    expect(metrics.sourceConflicts).toBeGreaterThanOrEqual(1);
-    expect(metrics.highPriorityResearch).toBeGreaterThanOrEqual(3);
+    expect(metrics.sourceConflicts).toBe(5);
+    expect(metrics.highPriorityResearch).toBe(2);
 
     expect(network.every((finding) => finding.usNetworkFeeEvidence.billedObservation?.establishesOfficialNetworkPar === false)).toBe(true);
     expect(network.every((finding) => finding.usNetworkFeeEvidence.reference.officialNetworkParEstablished === false && finding.usNetworkFeeEvidence.reference.historicalNetworkParEstablished === false)).toBe(true);
@@ -196,8 +196,9 @@ describe("Product-adjudicated U.S. network fee evidence pack 2020-2026", () => {
     expect(locationCandidates.every((finding) => finding.practicalMerchantAction.value?.includes("does not require the merchant agreement"))).toBe(true);
 
     const assessmentCandidate = byLabels(corpus, /0\.001475 TIMES/)[0]!;
-    expect(assessmentCandidate.usNetworkFeeEvidence?.comparison).toMatchObject({ state: "candidate_above_reference", confirmedMarkupEstablished: false });
-    expect(assessmentCandidate.practicalMerchantAction.value).toMatch(/no period-matched 2024 reference|period-applicable source/i);
+    expect(assessmentCandidate.usNetworkFeeEvidence?.comparison).toMatchObject({ state: "population_or_product_scope_unresolved", referenceValue: 0.0014, difference: 0.000075, confirmedMarkupEstablished: false });
+    expect(assessmentCandidate.mastercardFocusedEvidence?.assessment2024).toMatchObject({ structuralExplanation: "STRONGLY_EXPLAINED", aboveReferenceCandidate: false, confirmedAtPar: false, acquiringSideUpliftExcluded: false });
+    expect(assessmentCandidate.practicalMerchantAction.value).toMatch(/strongly explained|at-par pass-through/i);
 
     const assessment140 = byLabels(corpus, /MASTERCARD ASSESSMENT FEE 0\.0014 TIMES/);
     expect(assessment140.every((finding) => finding.usNetworkFeeEvidence?.comparison.state === "population_or_product_scope_unresolved")).toBe(true);
@@ -217,11 +218,11 @@ describe("Product-adjudicated U.S. network fee evidence pack 2020-2026", () => {
     const adjacent = network.filter((finding) => finding.usNetworkFeeEvidence.reference.state === "adjacent_period_processor_reference");
     expect(adjacent.length).toBeGreaterThan(0);
     expect(adjacent.every((finding) => !/confirmed.*at par|passed through at par/i.test(finding.usNetworkFeeEvidence.comparison.renderingText))).toBe(true);
-    expect(findings.flatMap((finding) => finding.competingInterpretations).some((item) => /8393.*8661.*8398/i.test(item.interpretation))).toBe(true);
+    expect(locationCandidates.every((finding) => finding.mastercardFocusedEvidence?.locationMccAdjudication?.canonicalExcludedMccs.join(",") === "8398,8661")).toBe(true);
 
     const queuedText = corpus.flatMap((item) => item.findings).flatMap((finding) => finding.usNetworkFeeEvidence?.research.question ?? []);
     expect(queuedText.some((text) => /2025.*Location Fee/i.test(text))).toBe(true);
-    expect(queuedText.some((text) => /2024.*assessment/i.test(text))).toBe(true);
+    expect(queuedText.some((text) => /2024.*assessment/i.test(text))).toBe(false);
   }, 60_000);
 });
 

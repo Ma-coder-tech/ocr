@@ -19,6 +19,11 @@ import type {
   GovernedUsNetworkRowResolution,
   GovernedUsNetworkSource,
 } from "./governedUsNetworkFeeEvidence2020_2026V1.js";
+import type {
+  GovernedMastercardFocusedRecord,
+  GovernedMastercardFocusedRowResolution,
+  GovernedMastercardFocusedSource,
+} from "./governedMastercardFocusedEvidence2024_2026V1.js";
 import { assessCanonicalExactFeeRowArithmetic } from "./exactSourceArithmeticBridge.js";
 import {
   FEE_KNOWLEDGE_RESEARCH_LIMITS,
@@ -173,6 +178,7 @@ export type InternalAnalystFinding = {
   perItemAnalysis: GovernedPerItemRowResolution | null;
   datedNetworkEvidence: GovernedDatedNetworkRowResolution | null;
   usNetworkFeeEvidence: GovernedUsNetworkRowResolution | null;
+  mastercardFocusedEvidence: GovernedMastercardFocusedRowResolution | null;
 };
 
 export type InternalAnalystResearchQueueV1 = {
@@ -223,12 +229,16 @@ export type InternalAnalystFindingReportV1 = {
     admittedDatedNetworkRuleRefs: string[];
     usNetworkFeeEvidenceCatalogVersion: string;
     admittedUsNetworkFeeRuleRefs: string[];
+    mastercardFocusedEvidenceCatalogVersion: string;
+    admittedMastercardFocusedRuleRefs: string[];
     legacyFeeCatalog: "retrieval_only_not_governing";
     feeKnowledgeResearchSystem: "research_transport_not_governing";
   };
   datedNetworkNotices: GovernedNetworkNoticeEvent[];
   usNetworkFeeEvidenceSources: GovernedUsNetworkSource[];
   usNetworkFeeEvidenceRecords: GovernedUsNetworkReferenceRecord[];
+  mastercardFocusedEvidenceSources: GovernedMastercardFocusedSource[];
+  mastercardFocusedEvidenceRecords: GovernedMastercardFocusedRecord[];
   merchantContext: InternalAnalystMerchantContext;
   findings: InternalAnalystFinding[];
   researchQueue: InternalAnalystResearchQueueV1;
@@ -252,6 +262,8 @@ export type InternalAnalystFindingReportV1 = {
     adjacentPeriodReferenceFindings: number;
     lackingCurrent2026CoreValueFindings: number;
     aboveReferenceCandidateFindings: number;
+    mastercardAssessmentStronglyExplainedFindings: number;
+    mastercardLocationLikelyUpliftFindings: number;
     confirmedAtParFindings: 0;
     confirmedMarkupFindings: 0;
   };
@@ -293,7 +305,8 @@ export function buildInternalAnalystFindingV1(input: {
     pricingLayer: knowledge.pricingLayers.rowsByFeeRowId[row.id]!,
     perItem: knowledge.perItem.rowsByFeeRowId[row.id]!,
     datedNetworkEvidence: knowledge.datedNetworkFeeEvidence.rowsByFeeRowId[row.id]!,
-    usNetworkFeeEvidence: knowledge.usNetworkFeeEvidence.rowsByFeeRowId[row.id]!,
+    usNetworkFeeEvidence: knowledge.mastercardFocusedEvidence.rowsByFeeRowId[row.id]!.effectiveUsNetworkEvidence,
+    mastercardFocusedEvidence: knowledge.mastercardFocusedEvidence.rowsByFeeRowId[row.id]!,
     refundCost: knowledge.pricingLayers.unrecoveredRefundCostByFeeRowId[row.id]!,
     contributions: contributions.filter((item) => item.targetFeeRowId === row.id),
   }));
@@ -325,12 +338,16 @@ export function buildInternalAnalystFindingV1(input: {
       admittedDatedNetworkRuleRefs: knowledge.datedNetworkFeeEvidence.rules.map((rule) => rule.ruleId),
       usNetworkFeeEvidenceCatalogVersion: knowledge.usNetworkFeeEvidence.catalogVersion,
       admittedUsNetworkFeeRuleRefs: knowledge.usNetworkFeeEvidence.rules.map((rule) => rule.ruleId),
+      mastercardFocusedEvidenceCatalogVersion: knowledge.mastercardFocusedEvidence.catalogVersion,
+      admittedMastercardFocusedRuleRefs: knowledge.mastercardFocusedEvidence.rules.map((rule) => rule.ruleId),
       legacyFeeCatalog: knowledge.legacyAuthorities.legacyFeeCatalog,
       feeKnowledgeResearchSystem: knowledge.legacyAuthorities.feeKnowledgeResearchSystem,
     },
     datedNetworkNotices: knowledge.datedNetworkFeeEvidence.statementNotices,
     usNetworkFeeEvidenceSources: knowledge.usNetworkFeeEvidence.sources,
     usNetworkFeeEvidenceRecords: knowledge.usNetworkFeeEvidence.records,
+    mastercardFocusedEvidenceSources: knowledge.mastercardFocusedEvidence.sources,
+    mastercardFocusedEvidenceRecords: knowledge.mastercardFocusedEvidence.records,
     merchantContext,
     findings,
     researchQueue,
@@ -380,6 +397,7 @@ function buildFeeFinding(input: {
   perItem: GovernedPerItemRowResolution;
   datedNetworkEvidence: GovernedDatedNetworkRowResolution;
   usNetworkFeeEvidence: GovernedUsNetworkRowResolution;
+  mastercardFocusedEvidence: GovernedMastercardFocusedRowResolution;
   refundCost: GovernedUnrecoveredRefundCostResolution;
   contributions: InternalAnalystResearchContribution[];
 }): InternalAnalystFinding {
@@ -403,6 +421,9 @@ function buildFeeFinding(input: {
     : null;
   const usNetworkPublishedBasis = input.usNetworkFeeEvidence.identity.evidenceRefs.length > 0
     ? evidence("E4_processor_or_iso_publication", input.usNetworkFeeEvidence.identity.evidenceRefs, "official_or_published")
+    : null;
+  const mastercardFocusedBasis = input.mastercardFocusedEvidence.matchedRuleRefs.length > 0
+    ? evidence("G1_governed_payment_knowledge", input.mastercardFocusedEvidence.matchedRuleRefs, "governed_knowledge")
     : null;
   const identityValue = input.usNetworkFeeEvidence.identity.state === "supported"
     ? input.usNetworkFeeEvidence.identity.value
@@ -479,7 +500,16 @@ function buildFeeFinding(input: {
   const population = populationValue
     ? claim("supported", populationValue, input.usNetworkFeeEvidence.population.state === "supported" ? "STRONG" : "LIKELY", input.usNetworkFeeEvidence.population.state === "supported" ? compact([usNetworkKnowledgeBasis, usNetworkPublishedBasis, evidence("E1_statement", rowEvidence, "statement_fact")]) : [evidence("E1_statement", rowEvidence, "statement_fact")], input.usNetworkFeeEvidence.population.state === "supported" ? "The dated Fiserv source supports this fee-specific population. It is not inferred from count matching and is not forced to equal another statement population." : "The fee line's supported assessment basis takes precedence over a broader pricing-model population; no statement-wide basis is inferred.")
     : unresolvedClaim<string>("Relevant transaction or volume population is not established.", [evidence("E1_statement", rowEvidence, "statement_fact")]);
-  const reasonableness = input.usNetworkFeeEvidence.comparison.state === "candidate_above_reference"
+  const reasonableness = input.mastercardFocusedEvidence.locationFee2025
+    ? {
+      state: "candidate" as const,
+      value: "elevated" as const,
+      confidence: "LIKELY" as const,
+      evidence: compact([mastercardFocusedBasis, usNetworkPublishedBasis, evidence("E1_statement", rowEvidence, "statement_fact")]),
+      explanation: input.usNetworkFeeEvidence.comparison.renderingText,
+      limitations: ["The acquiring-side uplift is LIKELY, not confirmed; contract violation and ultimate beneficiary of the excess remain unresolved."],
+    }
+    : input.usNetworkFeeEvidence.comparison.state === "candidate_above_reference"
     ? {
       state: "candidate" as const,
       value: null,
@@ -570,6 +600,7 @@ function buildFeeFinding(input: {
     perItemAnalysis: input.perItem.applicable ? input.perItem : null,
     datedNetworkEvidence: governedNetworkApplies ? input.datedNetworkEvidence : null,
     usNetworkFeeEvidence: input.usNetworkFeeEvidence.applicable ? input.usNetworkFeeEvidence : null,
+    mastercardFocusedEvidence: input.mastercardFocusedEvidence.applicable ? input.mastercardFocusedEvidence : null,
   };
 }
 
@@ -618,6 +649,7 @@ function buildPricingOpacityFinding(
     perItemAnalysis: null,
     datedNetworkEvidence: null,
     usNetworkFeeEvidence: null,
+    mastercardFocusedEvidence: null,
   };
 }
 
@@ -1056,6 +1088,8 @@ function coverage(
     adjacentPeriodReferenceFindings: findings.filter((item) => item.usNetworkFeeEvidence?.reference.state === "adjacent_period_processor_reference").length,
     lackingCurrent2026CoreValueFindings: findings.filter((item) => item.usNetworkFeeEvidence?.applicable && !item.usNetworkFeeEvidence.reference.current2026CoreValueEstablished).length,
     aboveReferenceCandidateFindings: findings.filter((item) => item.usNetworkFeeEvidence?.comparison.state === "candidate_above_reference").length,
+    mastercardAssessmentStronglyExplainedFindings: findings.filter((item) => item.mastercardFocusedEvidence?.assessment2024).length,
+    mastercardLocationLikelyUpliftFindings: findings.filter((item) => item.mastercardFocusedEvidence?.locationFee2025?.acquiringSideUplift === "LIKELY").length,
     confirmedAtParFindings: 0,
     confirmedMarkupFindings: 0,
   };
