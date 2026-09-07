@@ -149,7 +149,14 @@ describe("Internal Analyst Finding v1", () => {
     });
     const queuedResearch = [...researched.researchQueue.selected, ...researched.researchQueue.deferred];
     expect(queuedResearch.some((item) => item.question.feeRowRef === additional.id)).toBe(true);
-    expect(queuedResearch.some((item) => item.question.feeRowRef === cpu.id)).toBe(true);
+    expect(queuedResearch.some((item) => item.question.feeRowRef === cpu.id)).toBe(false);
+    expect(cpuFinding.openWorldDeterminants).toMatchObject({
+      exactIdentity: { state: "family_known_identity_unresolved" },
+      family: { value: "F9" },
+      determinantSufficiency: "DETERMINANT_SUFFICIENT",
+      stoppingReason: "S1_DETERMINANT_SUFFICIENCY",
+      research: { disposition: "STOP" },
+    });
     expect(queuedResearch.every((item) =>
       item.question.deterministicCategory === null &&
       item.question.deterministicEconomicOwner === null &&

@@ -53,9 +53,17 @@ import {
   resolveGovernedCurrent2026UsCoreNetworkReferenceV1,
   type GovernedCurrent2026UsCoreNetworkResolution,
 } from "./governedCurrent2026UsCoreNetworkReferenceV1.js";
+import {
+  GOVERNED_OPEN_WORLD_DETERMINANT_V1,
+  governedOpenWorldActionClassesV1,
+  governedOpenWorldFeeFamiliesV1,
+  governedOpenWorldRulesV1,
+  resolveGovernedOpenWorldDeterminantV1,
+  type GovernedOpenWorldDeterminantResolution,
+} from "./governedOpenWorldDeterminantV1.js";
 
 export const GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION =
-  "governed_payment_knowledge_authority_2026_09_07_current_us_core_network_reference_v1" as const;
+  "governed_payment_knowledge_authority_2026_09_08_open_world_determinant_v1" as const;
 
 export type GovernedNormUnit =
   | "usd_per_event"
@@ -102,6 +110,7 @@ export type GovernedKnowledgeResolution = {
   usNetworkFeeEvidence: GovernedUsNetworkFeeEvidenceResolution;
   mastercardFocusedEvidence: GovernedMastercardFocusedEvidenceResolution;
   current2026UsCoreNetworkReference: GovernedCurrent2026UsCoreNetworkResolution;
+  openWorldDeterminants: GovernedOpenWorldDeterminantResolution;
   authorityVersion: typeof GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION;
   semanticCatalogVersion: string;
   normCatalogVersion: string;
@@ -300,6 +309,20 @@ export class GovernedPaymentKnowledgeAuthority {
       mastercardFocusedRowsByFeeRowId: mastercardFocusedEvidence.rowsByFeeRowId,
       asOf,
     });
+    const openWorldDeterminants = resolveGovernedOpenWorldDeterminantV1({
+      analysis: input.analysis,
+      semanticRows: semantics.rows,
+      pricingLayers,
+      perItem,
+      datedNetworkFeeEvidence,
+      usNetworkFeeEvidence: {
+        ...usNetworkFeeEvidence,
+        rowsByFeeRowId: Object.fromEntries(
+          Object.entries(mastercardFocusedEvidence.rowsByFeeRowId).map(([feeRowId, row]) => [feeRowId, row.effectiveUsNetworkEvidence]),
+        ),
+      },
+      current2026UsCoreNetworkReference,
+    });
     return deepFreeze({
       semantics,
       normsByFeeRowId,
@@ -310,6 +333,7 @@ export class GovernedPaymentKnowledgeAuthority {
       usNetworkFeeEvidence,
       mastercardFocusedEvidence,
       current2026UsCoreNetworkReference,
+      openWorldDeterminants,
       authorityVersion: this.authorityVersion,
       semanticCatalogVersion: semantics.catalogVersion,
       normCatalogVersion: this.normCatalogVersion,
@@ -354,6 +378,10 @@ export class GovernedPaymentKnowledgeAuthority {
       current2026UsCoreNetworkReferenceSources: governedCurrent2026SourcesV1(),
       current2026UsCoreNetworkReferenceRecords: governedCurrent2026ReferenceRecordsV1(),
       current2026UsCoreNetworkReferenceRules: governedCurrent2026RulesV1(),
+      openWorldDeterminantCatalogVersion: GOVERNED_OPEN_WORLD_DETERMINANT_V1,
+      openWorldDeterminantFamilies: governedOpenWorldFeeFamiliesV1(),
+      openWorldDeterminantActionClasses: governedOpenWorldActionClassesV1(),
+      openWorldDeterminantRules: governedOpenWorldRulesV1(),
       norms: NORMS,
     })).digest("hex");
   }

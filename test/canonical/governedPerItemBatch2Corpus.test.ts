@@ -110,7 +110,7 @@ describe("Governed Knowledge Batch 2 full Fiserv corpus", () => {
       categoryOnly: 92,
       fullyUnresolved: 302,
       ambiguousOrCompeting: 104,
-      researchQueueQuestions: 412,
+      researchQueueQuestions: 200,
       perItemMaterial: 90,
       perItemUnitSupported: 65,
       perItemUnitUnresolved: 25,

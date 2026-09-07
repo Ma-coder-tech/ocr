@@ -29,6 +29,7 @@ import type {
   GovernedCurrent2026RowResolution,
   GovernedCurrent2026Source,
 } from "./governedCurrent2026UsCoreNetworkReferenceV1.js";
+import type { OpenWorldFeeDeterminant } from "./governedOpenWorldDeterminantV1.js";
 import { assessCanonicalExactFeeRowArithmetic } from "./exactSourceArithmeticBridge.js";
 import {
   FEE_KNOWLEDGE_RESEARCH_LIMITS,
@@ -185,6 +186,7 @@ export type InternalAnalystFinding = {
   usNetworkFeeEvidence: GovernedUsNetworkRowResolution | null;
   mastercardFocusedEvidence: GovernedMastercardFocusedRowResolution | null;
   current2026UsCoreNetworkReference: GovernedCurrent2026RowResolution | null;
+  openWorldDeterminants: OpenWorldFeeDeterminant | null;
 };
 
 export type InternalAnalystResearchQueueV1 = {
@@ -239,6 +241,8 @@ export type InternalAnalystFindingReportV1 = {
     admittedMastercardFocusedRuleRefs: string[];
     current2026UsCoreNetworkReferenceCatalogVersion: string;
     admittedCurrent2026UsCoreNetworkRuleRefs: string[];
+    openWorldDeterminantCatalogVersion: string;
+    admittedOpenWorldDeterminantRuleRefs: string[];
     legacyFeeCatalog: "retrieval_only_not_governing";
     feeKnowledgeResearchSystem: "research_transport_not_governing";
   };
@@ -282,6 +286,18 @@ export type InternalAnalystFindingReportV1 = {
     independentlyEvaluatedLocationCases: number;
     confirmedAtParFindings: 0;
     confirmedMarkupFindings: 0;
+    determinantSufficientFindings: number;
+    familyKnownIdentityUnresolvedFindings: number;
+    identityAndLayerUnresolvedFindings: number;
+    actionableClassifiedFindings: number;
+    materialFeeDollarsMinor: number;
+    explainedMaterialDollarsMinor: number;
+    actionableClassifiedDollarsMinor: number;
+    unexplainedMaterialDollarsMinor: number;
+    researchEscalations: number;
+    researchStoppedBySufficiency: number;
+    highMaterialityFindings: number;
+    actionableHighMaterialityFindings: number;
   };
   limitations: string[];
 };
@@ -324,6 +340,7 @@ export function buildInternalAnalystFindingV1(input: {
     usNetworkFeeEvidence: knowledge.mastercardFocusedEvidence.rowsByFeeRowId[row.id]!.effectiveUsNetworkEvidence,
     mastercardFocusedEvidence: knowledge.mastercardFocusedEvidence.rowsByFeeRowId[row.id]!,
     current2026UsCoreNetworkReference: knowledge.current2026UsCoreNetworkReference.rowsByFeeRowId[row.id]!,
+    openWorldDeterminants: knowledge.openWorldDeterminants.rowsByFeeRowId[row.id]!,
     refundCost: knowledge.pricingLayers.unrecoveredRefundCostByFeeRowId[row.id]!,
     contributions: contributions.filter((item) => item.targetFeeRowId === row.id),
   }));
@@ -359,6 +376,8 @@ export function buildInternalAnalystFindingV1(input: {
       admittedMastercardFocusedRuleRefs: knowledge.mastercardFocusedEvidence.rules.map((rule) => rule.ruleId),
       current2026UsCoreNetworkReferenceCatalogVersion: knowledge.current2026UsCoreNetworkReference.catalogVersion,
       admittedCurrent2026UsCoreNetworkRuleRefs: knowledge.current2026UsCoreNetworkReference.rules.map((rule) => rule.ruleId),
+      openWorldDeterminantCatalogVersion: knowledge.openWorldDeterminants.catalogVersion,
+      admittedOpenWorldDeterminantRuleRefs: knowledge.openWorldDeterminants.rules.map((rule) => rule.ruleId),
       legacyFeeCatalog: knowledge.legacyAuthorities.legacyFeeCatalog,
       feeKnowledgeResearchSystem: knowledge.legacyAuthorities.feeKnowledgeResearchSystem,
     },
@@ -391,6 +410,8 @@ export function buildInternalAnalystFindingV1(input: {
       "The April 2023 Fiserv pass-through guide is governed processor evidence, not primary network evidence; adjacent-period matches are never rendered as confirmed at par.",
       "The retained June 2026 Fiserv bulletin establishes only its listed changes and does not confirm unchanged 2026 core rates by silence.",
       "Current 2026 reference confidence is row-specific and never supplies an official-network-par or merchant-pricing verdict by itself; historical statement periods retain their period-specific values.",
+      "Open-world determinant analysis treats exact identity as independent from economic family, control, mechanic, materiality, and actionability; unknown is never used as a fee family.",
+      "Research is escalated only for material determinant gaps, conflicts, or applicable dated-value questions; determinant sufficiency is an explicit stopping condition.",
     ],
   };
   return deepFreeze(report);
@@ -421,6 +442,7 @@ function buildFeeFinding(input: {
   usNetworkFeeEvidence: GovernedUsNetworkRowResolution;
   mastercardFocusedEvidence: GovernedMastercardFocusedRowResolution;
   current2026UsCoreNetworkReference: GovernedCurrent2026RowResolution;
+  openWorldDeterminants: OpenWorldFeeDeterminant;
   refundCost: GovernedUnrecoveredRefundCostResolution;
   contributions: InternalAnalystResearchContribution[];
 }): InternalAnalystFinding {
@@ -495,7 +517,7 @@ function buildFeeFinding(input: {
     ? input.pricingLayer.assessmentBasis.value
     : semantic.semanticAxes?.assessment_unit.status === "resolved"
       ? semantic.semanticAxes.assessment_unit.value
-      : admitted?.claims.assessmentUnit ?? mechanicFromCanonical(input.row, input.analysis);
+    : admitted?.claims.assessmentUnit ?? input.openWorldDeterminants.d2MechanicAndPopulation.mechanic.value ?? mechanicFromCanonical(input.row, input.analysis);
   const mechanic = mechanicValue
     ? claim("supported", mechanicValue, input.usNetworkFeeEvidence.mechanic.state === "supported" ? "STRONG" : input.perItem.applicable && input.perItem.unit.state === "supported" ? "STRONG" : input.pricingLayer.assessmentBasis.state === "supported" ? "STRONG" : semantic.semanticAxes?.assessment_unit.status === "resolved" ? "STRONG" : "LIKELY", [...publishedBasis, ...compact([knowledgeBasis, pricingKnowledgeBasis, perItemKnowledgeBasis, usNetworkKnowledgeBasis, usNetworkPublishedBasis, researchBasis, evidence("E1_statement", rowEvidence, "statement_fact")])], input.usNetworkFeeEvidence.mechanic.state === "supported" ? `${input.usNetworkFeeEvidence.mechanic.value} Identity, mechanic, and reference value remain independently scoped.` : input.perItem.applicable && input.perItem.unit.state === "supported" ? input.perItem.unit.explanation : input.pricingLayer.assessmentBasis.state === "supported" ? input.pricingLayer.assessmentBasis.explanation : "Assessment mechanic is kept separate from identity and commercial judgment.")
     : input.pricingLayer.assessmentBasis.state === "not_determinable"
@@ -509,7 +531,10 @@ function buildFeeFinding(input: {
   const collector = participantClaim(governedNetworkApplies ? networkPrice.collector : perItemAxesApply ? input.perItem.collector : input.pricingLayer.collector ?? admitted?.claims.collector ?? (input.analysis.identity.processorFamily.evidenceRefs.length > 0 ? "processor_or_acquirer" : null), "The processor/acquirer presents or collects the statement charge; this does not prove it retains the economics.", [evidence("E1_statement", [...rowEvidence, ...input.analysis.identity.processorFamily.evidenceRefs], "statement_fact"), ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis])]);
   const ruleSetter = participantClaim(governedNetworkApplies ? networkPrice.underlyingNetworkPriceSetter : perItemAxesApply ? input.perItem.ruleSetter : input.pricingLayer.ruleSetter ?? admitted?.claims.ruleSetter ?? (ownership?.includes("network") ? "card_network" : null), "Rule setting is distinct from collection, economic benefit, and merchant-facing price control.", [...publishedBasis, ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis])]);
   const priceSetter = participantClaim(governedNetworkApplies ? networkPrice.underlyingNetworkPriceSetter : perItemAxesApply ? input.perItem.priceSetter : input.pricingLayer.priceSetter ?? admitted?.claims.priceSetter ?? (ownership?.includes("network") ? "card_network" : null), governedNetworkApplies ? "This identifies the underlying network price setter where supported; the acquiring-side merchant-facing billed amount may differ and its controller remains unresolved." : "Price setting is stated only where supported; it does not establish which party ultimately retains the billed amount.", [...publishedBasis, ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis])]);
-  const controllerValue = governedNetworkApplies ? null : perItemAxesApply ? input.perItem.merchantFacingPriceController : input.pricingLayer.merchantFacingPriceController ?? admitted?.claims.merchantFacingPriceController ?? null;
+  const openWorldController = input.openWorldDeterminants.d1EconomicLayerAndControl.merchantFacingPriceController.value === "acquiring_side_program"
+    ? "acquiring_side_program" as const
+    : null;
+  const controllerValue = governedNetworkApplies ? null : perItemAxesApply ? input.perItem.merchantFacingPriceController : input.pricingLayer.merchantFacingPriceController ?? admitted?.claims.merchantFacingPriceController ?? openWorldController;
   const controller = participantClaim(controllerValue, controllerValue ? "The statement structure supports control at the acquiring-side commercial-program layer; the exact processor/acquirer/ISO allocation and ultimate retention remain unresolved." : "The evidence does not establish whether the processor, ISO, or another party controls the merchant-facing amount or adds spread.", compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis]));
   const arithmetic = arithmeticClaim(input.row, input.analysis);
   const pricing = pricingClaim(input.pricingModel);
@@ -578,15 +603,7 @@ function buildFeeFinding(input: {
   const materiality = materialityFor(input.row, input.analysis);
   const action = input.usNetworkFeeEvidence.identity.state === "supported" || input.usNetworkFeeEvidence.reference.matchedRecordIds.length > 0
     ? usNetworkActionClaim(input.usNetworkFeeEvidence)
-    : governedNetworkApplies ? datedNetworkActionClaim(input.datedNetworkEvidence) : input.perItem.applicable ? perItemActionClaim(input.perItem) : actionClaim({
-    category: categoryValue,
-    identity: identityValue,
-    reasonableness,
-    controller,
-    behavioral,
-    networkUnderlying,
-    pricingRuleRefs: input.pricingLayer.matchedRuleRefs,
-  });
+    : governedNetworkApplies ? datedNetworkActionClaim(input.datedNetworkEvidence) : input.perItem.applicable ? perItemActionClaim(input.perItem) : openWorldActionClaim(input.openWorldDeterminants);
   const alternatives = [
     ...competingInterpretations(semantic, input.contributions, input.pricingLayer.competingInterpretations, input.pricingLayer.matchedRuleRefs),
     ...input.perItem.competingInterpretations.map((interpretation) => ({ source: "governed_retrieval" as const, interpretation, evidenceRefs: input.perItem.matchedRuleRefs, status: "candidate" as const })),
@@ -627,6 +644,7 @@ function buildFeeFinding(input: {
     usNetworkFeeEvidence: input.usNetworkFeeEvidence.applicable ? input.usNetworkFeeEvidence : null,
     mastercardFocusedEvidence: input.mastercardFocusedEvidence.applicable ? input.mastercardFocusedEvidence : null,
     current2026UsCoreNetworkReference: input.current2026UsCoreNetworkReference.applicable ? input.current2026UsCoreNetworkReference : null,
+    openWorldDeterminants: input.openWorldDeterminants,
   };
 }
 
@@ -677,6 +695,7 @@ function buildPricingOpacityFinding(
     usNetworkFeeEvidence: null,
     mastercardFocusedEvidence: null,
     current2026UsCoreNetworkReference: null,
+    openWorldDeterminants: null,
   };
 }
 
@@ -798,33 +817,21 @@ function contractRequiredClaim(): AnalystClaim<"compliant" | "noncompliant"> {
   return claim<"compliant" | "noncompliant">("contract_required", null, "UNRESOLVED", [], "Whether the charged rate or term complies with this merchant's agreement requires the operative agreement/pricing schedule and relevant amendments.", ["An industry norm can support a commercial judgment but cannot prove a contractual promise, breach, right, or remedy."]);
 }
 
-function actionClaim(input: {
-  category: string | null;
-  identity: string | null;
-  reasonableness: AnalystClaim<unknown>;
-  controller: AnalystClaim<unknown>;
-  behavioral: AnalystClaim<unknown>;
-  networkUnderlying: boolean;
-  pricingRuleRefs?: string[];
-}): AnalystClaim<string> {
-  let value: string;
-  if (input.category === "merchant_facing_acquiring_side_commercial_pricing") {
-    value = "Ask the processor/acquirer/ISO to explain and review this merchant-facing acquiring-side price. It is separate from interchange or a card-network assessment and can normally be raised for commercial review without asserting who ultimately retains it or requiring the merchant agreement.";
-  } else if (input.category === "bundled_merchant_facing_pricing") {
-    value = "Ask for the bundled merchant price to be explained and reviewed, including what interchange and network costs it contains. This request does not require the merchant agreement, but exact contracted terms and remedies do.";
-  } else if (input.reasonableness.value === "elevated" || input.reasonableness.value === "materially_elevated") {
-    value = "Ask the processor/ISO to itemize the billed unit and population, explain the price controller, and reduce or waive the merchant-facing charge. This commercial request does not require the merchant agreement.";
-  } else if (input.behavioral.value === "behavior_can_reduce_incidence" || input.behavioral.value === "configuration_review_may_reduce_population") {
-    value = "Request event-level detail and review authorization, reversal, clearing, batching, or gateway configuration to reduce avoidable incidence; also ask whether any processor-added amount can be removed. This operational and commercial review does not require the merchant agreement.";
-  } else if (input.networkUnderlying) {
-    value = "Verify the billed unit and current published schedule, then ask the processor to disclose any spread or bundling above the underlying charge. The underlying network rule and merchant-facing price are separate questions.";
-  } else {
-    value = "Request an itemized explanation, billed population, price owner, and a commercial review or waiver where applicable; no agreement is needed to make this request.";
-  }
-  const pricingBasis = input.pricingRuleRefs && input.pricingRuleRefs.length > 0
-    ? [evidence("G1_governed_payment_knowledge", input.pricingRuleRefs, "governed_knowledge")]
-    : [frameworkNormEvidence()];
-  return claim("industry_judgment", value, "LIKELY", pricingBasis, "The action is a practical commercial inquiry, not a contract-compliance or legal conclusion.");
+function openWorldActionClaim(input: OpenWorldFeeDeterminant): AnalystClaim<string> {
+  const evidenceBasis = [
+    evidence("G1_governed_payment_knowledge", input.matchedRuleRefs, "governed_knowledge"),
+    evidence("E1_statement", input.family.evidenceRefs, "statement_fact"),
+  ];
+  const state = input.d4Actionability.actionClass === "N7" ? "supported" : "industry_judgment";
+  const confidence = input.d4Actionability.actionClass === "N7" ? "STRONG" : input.family.confidence === "UNRESOLVED" ? "LIKELY" : "STRONG";
+  return claim(
+    state,
+    input.d4Actionability.action,
+    confidence,
+    evidenceBasis,
+    input.d4Actionability.explanation,
+    ["This action does not establish a contractual promise, violation, right, remedy, or ultimate revenue retention."],
+  );
 }
 
 function perItemActionClaim(input: GovernedPerItemRowResolution): AnalystClaim<string> {
@@ -1050,13 +1057,7 @@ function buildInternalAnalystResearchQueue(
   const questions = defaultFeeKnowledgeResearchQuestions(analysis)
     .filter((question) => {
       const finding = findingByFeeRowId.get(question.feeRowRef);
-      return Boolean(finding && (
-        finding.exactFeeIdentity.state === "unresolved" ||
-        finding.exactFeeIdentity.state === "conflicting" ||
-        finding.competingInterpretations.some((interpretation) => interpretation.status === "conflicting") ||
-        finding.usNetworkFeeEvidence?.research.priority === "high" ||
-        finding.current2026UsCoreNetworkReference?.research.priority === "high"
-      ));
+      return Boolean(finding?.openWorldDeterminants?.research.disposition === "ESCALATE_BOUNDED_RESEARCH");
     })
     .map((question): FeeKnowledgeResearchQuestion => ({
       ...question,
@@ -1065,7 +1066,7 @@ function buildInternalAnalystResearchQueue(
       deterministicContractualController: null,
       deterministicActionabilityCeiling: "verify_only",
       deterministicConfidence: "medium",
-      semanticQuestion: findingByFeeRowId.get(question.feeRowRef)?.current2026UsCoreNetworkReference?.research.question ?? findingByFeeRowId.get(question.feeRowRef)?.usNetworkFeeEvidence?.research.question ?? `Find authoritative and applicable evidence for the printed payment-processing label ${JSON.stringify(question.feeLabel)}. Resolve, where evidence permits, exact identity, aliases, broader category, assessment unit, collector, economic beneficiary, rule setter, price setter, and merchant-facing price controller. Preserve competing interpretations and do not infer negotiability or contract compliance from a processor/network label.`,
+      semanticQuestion: findingByFeeRowId.get(question.feeRowRef)?.openWorldDeterminants?.research.question ?? `Resolve only the material determinant gaps for ${JSON.stringify(question.feeLabel)}; preserve competing interpretations and do not infer acquiring-side ownership, negotiability, or contract compliance from catalog absence or collection.`,
     }));
   const plan = planFeeKnowledgeResearchQuestions(questions, FEE_KNOWLEDGE_RESEARCH_LIMITS);
   const queueItem = (item: (typeof plan.selected)[number]) => ({
@@ -1086,6 +1087,7 @@ function buildInternalAnalystResearchQueue(
       "This queue routes unresolved material fee questions to the existing bounded research transport; it does not execute network research while building the deterministic finding.",
       "Legacy category, ownership, contract-control, confidence, and actionability fields are neutralized before queueing so older deterministic conclusions do not bias research authority.",
       "Research output remains non-authoritative until the analyst admission gate receives independent evidence, source references, and a review date.",
+      "Missing exact identity alone does not create a research task when D1-D4 are sufficient for a safe, useful finding.",
     ],
   };
 }
@@ -1096,6 +1098,9 @@ function coverage(
   researchQueue: InternalAnalystResearchQueueV1,
   statementNoticeRecords: number,
 ): InternalAnalystFindingReportV1["coverage"] {
+  const material = findings.filter((item): item is InternalAnalystFinding & { sourceFeeRowId: string; openWorldDeterminants: OpenWorldFeeDeterminant } => Boolean(item.sourceFeeRowId && item.openWorldDeterminants));
+  const dollars = (predicate: (finding: typeof material[number]) => boolean) => material
+    .filter(predicate).reduce((sum, finding) => sum + (finding.observedAmountMinor ?? 0), 0);
   return {
     materialFeeRows: findings.filter((item) => item.sourceFeeRowId).length,
     findings: findings.length,
@@ -1126,6 +1131,18 @@ function coverage(
     independentlyEvaluatedLocationCases: findings.filter((item) => item.current2026UsCoreNetworkReference?.locationCase?.independentlyEvaluated).length,
     confirmedAtParFindings: 0,
     confirmedMarkupFindings: 0,
+    determinantSufficientFindings: material.filter((item) => item.openWorldDeterminants.determinantSufficiency === "DETERMINANT_SUFFICIENT").length,
+    familyKnownIdentityUnresolvedFindings: material.filter((item) => item.openWorldDeterminants.exactIdentity.state === "family_known_identity_unresolved").length,
+    identityAndLayerUnresolvedFindings: material.filter((item) => item.openWorldDeterminants.exactIdentity.state === "identity_unresolved" && item.openWorldDeterminants.d1EconomicLayerAndControl.economicLayer.value === "LAYER_UNRESOLVED").length,
+    actionableClassifiedFindings: material.filter((item) => item.openWorldDeterminants.d4Actionability.actionClass !== "N7").length,
+    materialFeeDollarsMinor: dollars(() => true),
+    explainedMaterialDollarsMinor: dollars((item) => item.openWorldDeterminants.family.value !== null && item.openWorldDeterminants.d1EconomicLayerAndControl.economicLayer.value !== "LAYER_UNRESOLVED"),
+    actionableClassifiedDollarsMinor: dollars((item) => item.openWorldDeterminants.d4Actionability.actionClass !== "N7"),
+    unexplainedMaterialDollarsMinor: dollars((item) => item.openWorldDeterminants.d1EconomicLayerAndControl.economicLayer.value === "LAYER_UNRESOLVED"),
+    researchEscalations: material.filter((item) => item.openWorldDeterminants.research.disposition === "ESCALATE_BOUNDED_RESEARCH").length,
+    researchStoppedBySufficiency: material.filter((item) => item.openWorldDeterminants.stoppingReason === "S1_DETERMINANT_SUFFICIENCY").length,
+    highMaterialityFindings: material.filter((item) => item.openWorldDeterminants.d3Materiality.highMateriality).length,
+    actionableHighMaterialityFindings: material.filter((item) => item.openWorldDeterminants.d3Materiality.highMateriality && item.openWorldDeterminants.d4Actionability.actionClass !== "N7").length,
   };
 }
 
