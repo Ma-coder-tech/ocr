@@ -458,6 +458,7 @@ describe("fee knowledge intelligence state model", () => {
 
     expect(bodies).toHaveLength(1);
     expect(bodies[0]).toMatchObject({
+      store: false,
       reasoning: { effort: "low" },
       max_output_tokens: 3200,
       text: {
