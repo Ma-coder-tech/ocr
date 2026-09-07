@@ -109,10 +109,10 @@ describe("Governed Knowledge Batch 3 full Fiserv corpus", () => {
     console.info("BATCH3_CORPUS_METRICS", JSON.stringify({ before: { totalMaterialFindings: 483, exact: 76, categoryOnly: 96, fullyUnresolved: 311, ambiguousOrCompeting: 90 }, after }));
 
     expect(after.totalMaterialFindings).toBe(483);
-    expect(after.exact).toBe(76);
-    expect(after.categoryOnly).toBe(96);
-    expect(after.fullyUnresolved).toBe(311);
-    expect(after.ambiguousOrCompeting).toBe(90);
+    expect(after.exact).toBe(89);
+    expect(after.categoryOnly).toBe(92);
+    expect(after.fullyUnresolved).toBe(302);
+    expect(after.ambiguousOrCompeting).toBe(94);
     expect(after.networkEvidenceFindings).toBe(60);
     expect(after.familySupported).toBe(58);
     expect(after.categoryOnlyNetworkFamily).toBe(2);

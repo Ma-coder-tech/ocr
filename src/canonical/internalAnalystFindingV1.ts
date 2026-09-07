@@ -14,6 +14,11 @@ import type {
   GovernedDatedNetworkRowResolution,
   GovernedNetworkNoticeEvent,
 } from "./governedDatedNetworkFeeEvidenceV1.js";
+import type {
+  GovernedUsNetworkReferenceRecord,
+  GovernedUsNetworkRowResolution,
+  GovernedUsNetworkSource,
+} from "./governedUsNetworkFeeEvidence2020_2026V1.js";
 import { assessCanonicalExactFeeRowArithmetic } from "./exactSourceArithmeticBridge.js";
 import {
   FEE_KNOWLEDGE_RESEARCH_LIMITS,
@@ -167,6 +172,7 @@ export type InternalAnalystFinding = {
   practicalMerchantAction: AnalystClaim<string>;
   perItemAnalysis: GovernedPerItemRowResolution | null;
   datedNetworkEvidence: GovernedDatedNetworkRowResolution | null;
+  usNetworkFeeEvidence: GovernedUsNetworkRowResolution | null;
 };
 
 export type InternalAnalystResearchQueueV1 = {
@@ -215,10 +221,14 @@ export type InternalAnalystFindingReportV1 = {
     admittedPerItemRuleRefs: string[];
     datedNetworkFeeEvidenceCatalogVersion: string;
     admittedDatedNetworkRuleRefs: string[];
+    usNetworkFeeEvidenceCatalogVersion: string;
+    admittedUsNetworkFeeRuleRefs: string[];
     legacyFeeCatalog: "retrieval_only_not_governing";
     feeKnowledgeResearchSystem: "research_transport_not_governing";
   };
   datedNetworkNotices: GovernedNetworkNoticeEvent[];
+  usNetworkFeeEvidenceSources: GovernedUsNetworkSource[];
+  usNetworkFeeEvidenceRecords: GovernedUsNetworkReferenceRecord[];
   merchantContext: InternalAnalystMerchantContext;
   findings: InternalAnalystFinding[];
   researchQueue: InternalAnalystResearchQueueV1;
@@ -235,6 +245,15 @@ export type InternalAnalystFindingReportV1 = {
     datedNetworkEvidenceFindings: number;
     officialNetworkRateComparisons: number;
     statementNoticeRecords: number;
+    networkIdentityStrengthenedFindings: number;
+    networkMechanicStrengthenedFindings: number;
+    networkPopulationStrengthenedFindings: number;
+    periodMatchedProcessorReferenceFindings: number;
+    adjacentPeriodReferenceFindings: number;
+    lackingCurrent2026CoreValueFindings: number;
+    aboveReferenceCandidateFindings: number;
+    confirmedAtParFindings: 0;
+    confirmedMarkupFindings: 0;
   };
   limitations: string[];
 };
@@ -274,6 +293,7 @@ export function buildInternalAnalystFindingV1(input: {
     pricingLayer: knowledge.pricingLayers.rowsByFeeRowId[row.id]!,
     perItem: knowledge.perItem.rowsByFeeRowId[row.id]!,
     datedNetworkEvidence: knowledge.datedNetworkFeeEvidence.rowsByFeeRowId[row.id]!,
+    usNetworkFeeEvidence: knowledge.usNetworkFeeEvidence.rowsByFeeRowId[row.id]!,
     refundCost: knowledge.pricingLayers.unrecoveredRefundCostByFeeRowId[row.id]!,
     contributions: contributions.filter((item) => item.targetFeeRowId === row.id),
   }));
@@ -303,10 +323,14 @@ export function buildInternalAnalystFindingV1(input: {
       admittedPerItemRuleRefs: knowledge.perItem.rules.map((rule) => rule.ruleId),
       datedNetworkFeeEvidenceCatalogVersion: knowledge.datedNetworkFeeEvidence.catalogVersion,
       admittedDatedNetworkRuleRefs: knowledge.datedNetworkFeeEvidence.rules.map((rule) => rule.ruleId),
+      usNetworkFeeEvidenceCatalogVersion: knowledge.usNetworkFeeEvidence.catalogVersion,
+      admittedUsNetworkFeeRuleRefs: knowledge.usNetworkFeeEvidence.rules.map((rule) => rule.ruleId),
       legacyFeeCatalog: knowledge.legacyAuthorities.legacyFeeCatalog,
       feeKnowledgeResearchSystem: knowledge.legacyAuthorities.feeKnowledgeResearchSystem,
     },
     datedNetworkNotices: knowledge.datedNetworkFeeEvidence.statementNotices,
+    usNetworkFeeEvidenceSources: knowledge.usNetworkFeeEvidence.sources,
+    usNetworkFeeEvidenceRecords: knowledge.usNetworkFeeEvidence.records,
     merchantContext,
     findings,
     researchQueue,
@@ -326,6 +350,8 @@ export function buildInternalAnalystFindingV1(input: {
       "Batch 3 separates semantic identity, mechanic/population, and rate/value confidence; it admits no primary network schedule and performs no official-par or above-par comparison.",
       "Dated statement notices establish announcements, presentation changes, or postponements only. They do not establish later implementation unless separately confirmed.",
       "Cross-corpus observations are not represented as a merchant's own history without verified merchant/account continuity.",
+      "The April 2023 Fiserv pass-through guide is governed processor evidence, not primary network evidence; adjacent-period matches are never rendered as confirmed at par.",
+      "The retained June 2026 Fiserv bulletin establishes only its listed changes and does not confirm unchanged 2026 core rates by silence.",
     ],
   };
   return deepFreeze(report);
@@ -353,6 +379,7 @@ function buildFeeFinding(input: {
   pricingLayer: GovernedPricingLayerRowResolution;
   perItem: GovernedPerItemRowResolution;
   datedNetworkEvidence: GovernedDatedNetworkRowResolution;
+  usNetworkFeeEvidence: GovernedUsNetworkRowResolution;
   refundCost: GovernedUnrecoveredRefundCostResolution;
   contributions: InternalAnalystResearchContribution[];
 }): InternalAnalystFinding {
@@ -371,16 +398,26 @@ function buildFeeFinding(input: {
   const perItemKnowledgeBasis = input.perItem.matchedRuleRefs.length > 0
     ? evidence("G1_governed_payment_knowledge", input.perItem.matchedRuleRefs, "governed_knowledge")
     : null;
-  const identityValue = input.perItem.exactIdentityDisposition === "suppress_as_unresolved"
+  const usNetworkKnowledgeBasis = input.usNetworkFeeEvidence.matchedRuleRefs.length > 0
+    ? evidence("G1_governed_payment_knowledge", input.usNetworkFeeEvidence.matchedRuleRefs, "governed_knowledge")
+    : null;
+  const usNetworkPublishedBasis = input.usNetworkFeeEvidence.identity.evidenceRefs.length > 0
+    ? evidence("E4_processor_or_iso_publication", input.usNetworkFeeEvidence.identity.evidenceRefs, "official_or_published")
+    : null;
+  const identityValue = input.usNetworkFeeEvidence.identity.state === "supported"
+    ? input.usNetworkFeeEvidence.identity.value
+    : input.perItem.exactIdentityDisposition === "suppress_as_unresolved"
     ? null
     : input.pricingLayer.exactFeeIdentity ?? (semantic.status === "resolved_exact_trusted" ? semantic.semanticAxes?.identity.value ?? semantic.conceptId : admitted?.claims.exactFeeIdentity ?? null);
   const identity = identityValue
     ? claim(
       "supported",
       identityValue,
-      input.pricingLayer.exactFeeIdentity ? input.pricingLayer.confidence : semantic.status === "resolved_exact_trusted" ? "STRONG" : "LIKELY",
-      [...publishedBasis, ...compact([knowledgeBasis, pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis]), evidence("E1_statement", rowEvidence, "statement_fact")],
-      input.pricingLayer.exactFeeIdentity
+      input.usNetworkFeeEvidence.identity.state === "supported" ? "STRONG" : input.pricingLayer.exactFeeIdentity ? input.pricingLayer.confidence : semantic.status === "resolved_exact_trusted" ? "STRONG" : "LIKELY",
+      [...publishedBasis, ...compact([knowledgeBasis, pricingKnowledgeBasis, perItemKnowledgeBasis, usNetworkKnowledgeBasis, usNetworkPublishedBasis, researchBasis]), evidence("E1_statement", rowEvidence, "statement_fact")],
+      input.usNetworkFeeEvidence.identity.state === "supported"
+        ? "Exact identity is supported by the Product-adjudicated, dated Fiserv source record; this does not establish an official network value or merchant-facing pass-through at par."
+        : input.pricingLayer.exactFeeIdentity
         ? "Exact statement-local pricing identity follows an admitted Batch 1 decision procedure and its deterministic preconditions."
         : semantic.status === "resolved_exact_trusted"
           ? "Exact scoped alias resolved through admitted governed knowledge."
@@ -406,7 +443,9 @@ function buildFeeFinding(input: {
       [...input.pricingLayer.limitations, ...input.perItem.limitations],
     )
     : unresolvedClaim<string>("Neither an exact identity nor a defensible broader category is established.", [evidence("E1_statement", rowEvidence, "statement_fact")]);
-  const mechanicValue = input.perItem.applicable && input.perItem.unit.state === "supported"
+  const mechanicValue = input.usNetworkFeeEvidence.mechanic.state === "supported"
+    ? input.usNetworkFeeEvidence.mechanic.value
+    : input.perItem.applicable && input.perItem.unit.state === "supported"
     ? input.perItem.unit.value
     : input.pricingLayer.assessmentBasis.state === "supported"
     ? input.pricingLayer.assessmentBasis.value
@@ -414,7 +453,7 @@ function buildFeeFinding(input: {
       ? semantic.semanticAxes.assessment_unit.value
       : admitted?.claims.assessmentUnit ?? mechanicFromCanonical(input.row, input.analysis);
   const mechanic = mechanicValue
-    ? claim("supported", mechanicValue, input.perItem.applicable && input.perItem.unit.state === "supported" ? "STRONG" : input.pricingLayer.assessmentBasis.state === "supported" ? "STRONG" : semantic.semanticAxes?.assessment_unit.status === "resolved" ? "STRONG" : "LIKELY", [...publishedBasis, ...compact([knowledgeBasis, pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis, evidence("E1_statement", rowEvidence, "statement_fact")])], input.perItem.applicable && input.perItem.unit.state === "supported" ? input.perItem.unit.explanation : input.pricingLayer.assessmentBasis.state === "supported" ? input.pricingLayer.assessmentBasis.explanation : "Assessment mechanic is kept separate from identity and commercial judgment.")
+    ? claim("supported", mechanicValue, input.usNetworkFeeEvidence.mechanic.state === "supported" ? "STRONG" : input.perItem.applicable && input.perItem.unit.state === "supported" ? "STRONG" : input.pricingLayer.assessmentBasis.state === "supported" ? "STRONG" : semantic.semanticAxes?.assessment_unit.status === "resolved" ? "STRONG" : "LIKELY", [...publishedBasis, ...compact([knowledgeBasis, pricingKnowledgeBasis, perItemKnowledgeBasis, usNetworkKnowledgeBasis, usNetworkPublishedBasis, researchBasis, evidence("E1_statement", rowEvidence, "statement_fact")])], input.usNetworkFeeEvidence.mechanic.state === "supported" ? `${input.usNetworkFeeEvidence.mechanic.value} Identity, mechanic, and reference value remain independently scoped.` : input.perItem.applicable && input.perItem.unit.state === "supported" ? input.perItem.unit.explanation : input.pricingLayer.assessmentBasis.state === "supported" ? input.pricingLayer.assessmentBasis.explanation : "Assessment mechanic is kept separate from identity and commercial judgment.")
     : input.pricingLayer.assessmentBasis.state === "not_determinable"
       ? unresolvedClaim<string>(input.pricingLayer.assessmentBasis.explanation, compact([pricingKnowledgeBasis, evidence("E1_statement", input.pricingLayer.assessmentBasis.evidenceRefs, "statement_fact")]))
     : unresolvedClaim<string>("The statement does not expose a reliable assessment base.", [evidence("E1_statement", rowEvidence, "statement_fact")]);
@@ -430,16 +469,27 @@ function buildFeeFinding(input: {
   const controller = participantClaim(controllerValue, controllerValue ? "The statement structure supports control at the acquiring-side commercial-program layer; the exact processor/acquirer/ISO allocation and ultimate retention remain unresolved." : "The evidence does not establish whether the processor, ISO, or another party controls the merchant-facing amount or adds spread.", compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis]));
   const arithmetic = arithmeticClaim(input.row, input.analysis);
   const pricing = pricingClaim(input.pricingModel);
-  const populationValue = input.perItem.applicable && input.perItem.population.state !== "unresolved"
+  const populationValue = input.usNetworkFeeEvidence.population.state === "supported"
+    ? input.usNetworkFeeEvidence.population.value
+    : input.perItem.applicable && input.perItem.population.state !== "unresolved"
     ? input.perItem.population.value
     : input.pricingLayer.assessmentBasis.state === "supported"
     ? input.pricingLayer.assessmentBasis.value
     : input.pricingModel?.relevantPopulation ?? mechanicValue;
   const population = populationValue
-    ? claim("supported", populationValue, "LIKELY", [evidence("E1_statement", rowEvidence, "statement_fact")], "The fee line's supported assessment basis takes precedence over a broader pricing-model population; no statement-wide basis is inferred.")
+    ? claim("supported", populationValue, input.usNetworkFeeEvidence.population.state === "supported" ? "STRONG" : "LIKELY", input.usNetworkFeeEvidence.population.state === "supported" ? compact([usNetworkKnowledgeBasis, usNetworkPublishedBasis, evidence("E1_statement", rowEvidence, "statement_fact")]) : [evidence("E1_statement", rowEvidence, "statement_fact")], input.usNetworkFeeEvidence.population.state === "supported" ? "The dated Fiserv source supports this fee-specific population. It is not inferred from count matching and is not forced to equal another statement population." : "The fee line's supported assessment basis takes precedence over a broader pricing-model population; no statement-wide basis is inferred.")
     : unresolvedClaim<string>("Relevant transaction or volume population is not established.", [evidence("E1_statement", rowEvidence, "statement_fact")]);
-  const reasonableness = governedNetworkApplies
-    ? notAssessableClaim<"within_norm" | "elevated" | "materially_elevated" | "context_justified">("No period-, geography-, and product-matched independent network reference is admitted, so neither at-par billing nor above-par spread is assessable.")
+  const reasonableness = input.usNetworkFeeEvidence.comparison.state === "candidate_above_reference"
+    ? {
+      state: "candidate" as const,
+      value: null,
+      confidence: "LIKELY" as const,
+      evidence: compact([usNetworkKnowledgeBasis, usNetworkPublishedBasis, evidence("E1_statement", rowEvidence, "statement_fact")]),
+      explanation: input.usNetworkFeeEvidence.comparison.renderingText,
+      limitations: ["Commercial reasonableness remains unresolved; this is an above-reference research candidate, not confirmed network-fee markup or a contractual violation."],
+    }
+    : governedNetworkApplies
+    ? notAssessableClaim<"within_norm" | "elevated" | "materially_elevated" | "context_justified">(input.usNetworkFeeEvidence.comparison.renderingText)
     : input.perItem.applicable && (input.perItem.economicLayer === "PER_ITEM_LAYER_UNRESOLVED" || input.perItem.economicLayer?.startsWith("network_"))
     ? notAssessableClaim<"within_norm" | "elevated" | "materially_elevated" | "context_justified">("No applicable governed commercial benchmark is applied to this per-item economic layer.")
     : commercialClaim(input.row, input.analysis, input.norms, input.merchantContext);
@@ -473,7 +523,9 @@ function buildFeeFinding(input: {
   const behavioral = governedNetworkApplies ? datedNetworkBehavioralClaim(input.datedNetworkEvidence) : input.perItem.applicable ? perItemBehavioralClaim(input.perItem) : behavioralClaim(identityValue, categoryValue, input.row.selectedLabel, rowEvidence);
   const contract = contractRequiredClaim();
   const materiality = materialityFor(input.row, input.analysis);
-  const action = governedNetworkApplies ? datedNetworkActionClaim(input.datedNetworkEvidence) : input.perItem.applicable ? perItemActionClaim(input.perItem) : actionClaim({
+  const action = input.usNetworkFeeEvidence.identity.state === "supported" || input.usNetworkFeeEvidence.reference.matchedRecordIds.length > 0
+    ? usNetworkActionClaim(input.usNetworkFeeEvidence)
+    : governedNetworkApplies ? datedNetworkActionClaim(input.datedNetworkEvidence) : input.perItem.applicable ? perItemActionClaim(input.perItem) : actionClaim({
     category: categoryValue,
     identity: identityValue,
     reasonableness,
@@ -485,6 +537,8 @@ function buildFeeFinding(input: {
   const alternatives = [
     ...competingInterpretations(semantic, input.contributions, input.pricingLayer.competingInterpretations, input.pricingLayer.matchedRuleRefs),
     ...input.perItem.competingInterpretations.map((interpretation) => ({ source: "governed_retrieval" as const, interpretation, evidenceRefs: input.perItem.matchedRuleRefs, status: "candidate" as const })),
+    ...input.usNetworkFeeEvidence.sourceConflicts.map((interpretation) => ({ source: "research" as const, interpretation, evidenceRefs: input.usNetworkFeeEvidence.identity.evidenceRefs, status: "conflicting" as const })),
+    ...(input.usNetworkFeeEvidence.research.question ? [{ source: "research" as const, interpretation: input.usNetworkFeeEvidence.research.question, evidenceRefs: input.usNetworkFeeEvidence.reference.matchedRecordIds, status: "candidate" as const }] : []),
   ];
   return {
     findingId: `iaf_${stableId(input.row.id)}`,
@@ -515,6 +569,7 @@ function buildFeeFinding(input: {
     practicalMerchantAction: action,
     perItemAnalysis: input.perItem.applicable ? input.perItem : null,
     datedNetworkEvidence: governedNetworkApplies ? input.datedNetworkEvidence : null,
+    usNetworkFeeEvidence: input.usNetworkFeeEvidence.applicable ? input.usNetworkFeeEvidence : null,
   };
 }
 
@@ -562,6 +617,7 @@ function buildPricingOpacityFinding(
     practicalMerchantAction: claim("industry_judgment", "Request an interchange-cost and processor-markup breakout and a pricing review; this request does not require the merchant agreement. Use the agreement only to determine whether the current program violates an exact contracted term.", "STRONG", [frameworkNormEvidence()], "Commercial inquiry is distinct from a legal or contractual conclusion."),
     perItemAnalysis: null,
     datedNetworkEvidence: null,
+    usNetworkFeeEvidence: null,
   };
 }
 
@@ -762,6 +818,49 @@ function datedNetworkActionClaim(input: GovernedDatedNetworkRowResolution): Anal
   );
 }
 
+function usNetworkActionClaim(input: GovernedUsNetworkRowResolution): AnalystClaim<string> {
+  const basis = compact([
+    input.matchedRuleRefs.length > 0 ? evidence("G1_governed_payment_knowledge", input.matchedRuleRefs, "governed_knowledge") : null,
+    input.identity.evidenceRefs.length > 0 ? evidence("E4_processor_or_iso_publication", input.identity.evidenceRefs, "official_or_published") : null,
+    input.billedObservation ? evidence("E1_statement", input.billedObservation.evidenceRefs, "statement_fact") : null,
+  ]);
+  if (input.research.priority === "high" && input.research.question) {
+    return claim(
+      "candidate",
+      `${input.comparison.renderingText} Ask the processor/acquirer for the period-applicable source, population, and merchant-facing price construction; this commercial verification does not require the merchant agreement.`,
+      "LIKELY",
+      basis,
+      input.research.question,
+      ["No confirmed markup, at-par, contractual breach, or merchant remedy is asserted."],
+    );
+  }
+  if (input.reference.state === "adjacent_period_processor_reference") {
+    return claim(
+      "supported",
+      `${input.comparison.renderingText} Ask for a period-matched source and confirmation of the billed population before drawing a price conclusion; this request does not require the merchant agreement.`,
+      "STRONG",
+      basis,
+      "Adjacent-period evidence supports useful verification without being promoted to historical par.",
+    );
+  }
+  if (input.reference.state === "period_matched_processor_reference") {
+    return claim(
+      "supported",
+      `${input.comparison.renderingText} Ask the processor/acquirer to identify any separate acquiring-side spread or bundling; this request does not require the merchant agreement.`,
+      "STRONG",
+      basis,
+      "Even a period-matched processor reference does not by itself prove merchant-facing pass-through at par.",
+    );
+  }
+  return claim(
+    "supported",
+    "Use the governed identity and mechanic to request the period-, geography-, and product-applicable source and the merchant-facing price construction. Do not use the retained 2023 or 2026 material as historical par; this request does not require the merchant agreement.",
+    "LIKELY",
+    basis,
+    "The source strengthens identity or mechanic while price comparison remains unavailable.",
+  );
+}
+
 function datedNetworkBehavioralClaim(input: GovernedDatedNetworkRowResolution): AnalystClaim<"behavior_can_reduce_incidence" | "configuration_review_may_reduce_population" | "not_ordinarily_behavioral"> {
   const basis = [evidence("G1_governed_payment_knowledge", input.matchedRuleRefs, "governed_knowledge")];
   if (input.actionability.incidenceInfluence === "behaviorally_influenceable_where_trigger_applies") {
@@ -895,7 +994,8 @@ function buildInternalAnalystResearchQueue(
       return Boolean(finding && (
         finding.exactFeeIdentity.state === "unresolved" ||
         finding.exactFeeIdentity.state === "conflicting" ||
-        finding.competingInterpretations.some((interpretation) => interpretation.status === "conflicting")
+        finding.competingInterpretations.some((interpretation) => interpretation.status === "conflicting") ||
+        finding.usNetworkFeeEvidence?.research.priority === "high"
       ));
     })
     .map((question): FeeKnowledgeResearchQuestion => ({
@@ -905,7 +1005,7 @@ function buildInternalAnalystResearchQueue(
       deterministicContractualController: null,
       deterministicActionabilityCeiling: "verify_only",
       deterministicConfidence: "medium",
-      semanticQuestion: `Find authoritative and applicable evidence for the printed payment-processing label ${JSON.stringify(question.feeLabel)}. Resolve, where evidence permits, exact identity, aliases, broader category, assessment unit, collector, economic beneficiary, rule setter, price setter, and merchant-facing price controller. Preserve competing interpretations and do not infer negotiability or contract compliance from a processor/network label.`,
+      semanticQuestion: findingByFeeRowId.get(question.feeRowRef)?.usNetworkFeeEvidence?.research.question ?? `Find authoritative and applicable evidence for the printed payment-processing label ${JSON.stringify(question.feeLabel)}. Resolve, where evidence permits, exact identity, aliases, broader category, assessment unit, collector, economic beneficiary, rule setter, price setter, and merchant-facing price controller. Preserve competing interpretations and do not infer negotiability or contract compliance from a processor/network label.`,
     }));
   const plan = planFeeKnowledgeResearchQuestions(questions, FEE_KNOWLEDGE_RESEARCH_LIMITS);
   const queueItem = (item: (typeof plan.selected)[number]) => ({
@@ -949,6 +1049,15 @@ function coverage(
     datedNetworkEvidenceFindings: findings.filter((item) => item.datedNetworkEvidence).length,
     officialNetworkRateComparisons: 0,
     statementNoticeRecords,
+    networkIdentityStrengthenedFindings: findings.filter((item) => item.usNetworkFeeEvidence?.identity.state === "supported").length,
+    networkMechanicStrengthenedFindings: findings.filter((item) => item.usNetworkFeeEvidence?.mechanic.state === "supported").length,
+    networkPopulationStrengthenedFindings: findings.filter((item) => item.usNetworkFeeEvidence?.population.state === "supported").length,
+    periodMatchedProcessorReferenceFindings: findings.filter((item) => item.usNetworkFeeEvidence?.reference.state === "period_matched_processor_reference").length,
+    adjacentPeriodReferenceFindings: findings.filter((item) => item.usNetworkFeeEvidence?.reference.state === "adjacent_period_processor_reference").length,
+    lackingCurrent2026CoreValueFindings: findings.filter((item) => item.usNetworkFeeEvidence?.applicable && !item.usNetworkFeeEvidence.reference.current2026CoreValueEstablished).length,
+    aboveReferenceCandidateFindings: findings.filter((item) => item.usNetworkFeeEvidence?.comparison.state === "candidate_above_reference").length,
+    confirmedAtParFindings: 0,
+    confirmedMarkupFindings: 0,
   };
 }
 

@@ -211,7 +211,8 @@ describe("governed pricing-layer knowledge Batch 1", () => {
     const exactTrusted = report.findings.filter((finding) =>
       finding.sourceFeeRowId &&
       finding.exactFeeIdentity.value &&
-      !finding.exactFeeIdentity.value.startsWith("amex_")
+      !finding.exactFeeIdentity.value.startsWith("amex_") &&
+      finding.exactFeeIdentity.evidence.some((basis) => basis.refs.some((ref) => ref.startsWith("RR-B1-")))
     );
 
     expect(report.knowledgeAuthority).toMatchObject({

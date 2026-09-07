@@ -106,11 +106,11 @@ describe("Governed Knowledge Batch 2 full Fiserv corpus", () => {
     expect(after.negotiationWithheldForUnresolved).toBe(after.perItemLayerUnresolved);
     expect(after).toEqual({
       totalMaterialFindings: 483,
-      exact: 76,
-      categoryOnly: 96,
-      fullyUnresolved: 311,
-      ambiguousOrCompeting: 90,
-      researchQueueQuestions: 407,
+      exact: 89,
+      categoryOnly: 92,
+      fullyUnresolved: 302,
+      ambiguousOrCompeting: 94,
+      researchQueueQuestions: 402,
       perItemMaterial: 90,
       perItemUnitSupported: 65,
       perItemUnitUnresolved: 25,
@@ -147,7 +147,8 @@ describe("Governed Knowledge Batch 2 full Fiserv corpus", () => {
     expect(unresolved.practicalMerchantAction.value).toMatch(/Do not request repricing or a waiver/i);
 
     const dataUsage = byLabel(corpus, "DATA USAGE FEE");
-    expect(dataUsage.assessmentUnitOrMechanic.value).toBe("clearing_or_data_records");
+    expect(dataUsage.assessmentUnitOrMechanic.value).toBe("per network card sales transaction");
+    expect(dataUsage.assessmentUnitOrMechanic.evidence.some((basis) => basis.evidenceClass === "E4_processor_or_iso_publication")).toBe(true);
     expect(dataUsage.perItemAnalysis!.population.explanation).not.toMatch(/proves.*network/i);
 
     const minimumApplied = byLabel(corpus, "PRE-AUTH FEE CP MIN");

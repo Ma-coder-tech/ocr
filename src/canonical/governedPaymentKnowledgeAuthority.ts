@@ -29,9 +29,17 @@ import {
   resolveGovernedDatedNetworkFeeEvidenceV1,
   type GovernedDatedNetworkFeeEvidenceResolution,
 } from "./governedDatedNetworkFeeEvidenceV1.js";
+import {
+  GOVERNED_US_NETWORK_FEE_EVIDENCE_2020_2026_V1,
+  governedUsNetworkReferenceRecords2020_2026V1,
+  governedUsNetworkRules2020_2026V1,
+  governedUsNetworkSources2020_2026V1,
+  resolveGovernedUsNetworkFeeEvidence2020_2026V1,
+  type GovernedUsNetworkFeeEvidenceResolution,
+} from "./governedUsNetworkFeeEvidence2020_2026V1.js";
 
 export const GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION =
-  "governed_payment_knowledge_authority_2026_09_07_batch3_v1" as const;
+  "governed_payment_knowledge_authority_2026_09_07_us_network_evidence_v1" as const;
 
 export type GovernedNormUnit =
   | "usd_per_event"
@@ -75,6 +83,7 @@ export type GovernedKnowledgeResolution = {
   pricingLayers: GovernedPricingLayerResolution;
   perItem: GovernedPerItemResolution;
   datedNetworkFeeEvidence: GovernedDatedNetworkFeeEvidenceResolution;
+  usNetworkFeeEvidence: GovernedUsNetworkFeeEvidenceResolution;
   authorityVersion: typeof GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION;
   semanticCatalogVersion: string;
   normCatalogVersion: string;
@@ -257,6 +266,10 @@ export class GovernedPaymentKnowledgeAuthority {
       semanticRows: semantics.rows,
       perItemRowsByFeeRowId: perItem.rowsByFeeRowId,
     });
+    const usNetworkFeeEvidence = resolveGovernedUsNetworkFeeEvidence2020_2026V1({
+      analysis: input.analysis,
+      datedNetworkEvidence: datedNetworkFeeEvidence,
+    });
     return deepFreeze({
       semantics,
       normsByFeeRowId,
@@ -264,6 +277,7 @@ export class GovernedPaymentKnowledgeAuthority {
       pricingLayers,
       perItem,
       datedNetworkFeeEvidence,
+      usNetworkFeeEvidence,
       authorityVersion: this.authorityVersion,
       semanticCatalogVersion: semantics.catalogVersion,
       normCatalogVersion: this.normCatalogVersion,
@@ -296,6 +310,10 @@ export class GovernedPaymentKnowledgeAuthority {
       datedNetworkFeeEvidenceCatalogVersion: GOVERNED_DATED_NETWORK_FEE_EVIDENCE_V1,
       datedNetworkFeeEvidenceRules: governedDatedNetworkRulesV1(),
       datedNetworkNoticeEvents: governedNetworkNoticeEventsV1(),
+      usNetworkFeeEvidenceCatalogVersion: GOVERNED_US_NETWORK_FEE_EVIDENCE_2020_2026_V1,
+      usNetworkFeeEvidenceSources: governedUsNetworkSources2020_2026V1(),
+      usNetworkFeeEvidenceRecords: governedUsNetworkReferenceRecords2020_2026V1(),
+      usNetworkFeeEvidenceRules: governedUsNetworkRules2020_2026V1(),
       norms: NORMS,
     })).digest("hex");
   }

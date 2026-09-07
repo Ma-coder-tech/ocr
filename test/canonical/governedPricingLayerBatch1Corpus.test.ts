@@ -81,15 +81,15 @@ describe("governed pricing-layer Batch 1 full Fiserv corpus", () => {
     const ambiguousExact = exact.filter((finding) => finding.competingInterpretations.length > 0 || finding.exactFeeIdentity.state === "conflicting");
 
     expect(findings).toHaveLength(483);
-    // Batch 2 withdraws five overconfident exact per-item identities and adds
-    // governed broader categories without changing Batch 1 pricing semantics.
-    expect(exact).toHaveLength(76);
-    expect(categoryOnly).toHaveLength(96);
-    expect(unresolved).toHaveLength(311);
-    expect(ambiguous).toHaveLength(90);
-    expect(ambiguousExact).toHaveLength(3);
-    expect(ambiguousExact.every((finding) => finding.exactFeeIdentity.value?.startsWith("amex_"))).toBe(true);
-    expect(reports.reduce((sum, report) => sum + report.researchQueued, 0)).toBe(407);
+    // Later admitted knowledge may strengthen identity without changing the
+    // Batch 1 pricing-layer semantics or canonical financial truth.
+    expect(exact).toHaveLength(89);
+    expect(categoryOnly).toHaveLength(92);
+    expect(unresolved).toHaveLength(302);
+    expect(ambiguous).toHaveLength(94);
+    expect(ambiguousExact.filter((finding) => finding.exactFeeIdentity.value?.startsWith("amex_"))).toHaveLength(3);
+    expect(ambiguousExact.some((finding) => (finding.usNetworkFeeEvidence?.sourceConflicts.length ?? 0) > 0)).toBe(true);
+    expect(reports.reduce((sum, report) => sum + report.researchQueued, 0)).toBe(402);
 
     const priority = reports.find((report) => report.file.includes("PRIORITY_PAYMENT_SYSTEMS"))!;
     expect(priority.pricingModel).toBe("flat_rate");
