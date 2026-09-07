@@ -45,9 +45,17 @@ import {
   resolveGovernedMastercardFocusedEvidence2024_2026V1,
   type GovernedMastercardFocusedEvidenceResolution,
 } from "./governedMastercardFocusedEvidence2024_2026V1.js";
+import {
+  GOVERNED_CURRENT_2026_US_CORE_NETWORK_REFERENCE_V1,
+  governedCurrent2026ReferenceRecordsV1,
+  governedCurrent2026RulesV1,
+  governedCurrent2026SourcesV1,
+  resolveGovernedCurrent2026UsCoreNetworkReferenceV1,
+  type GovernedCurrent2026UsCoreNetworkResolution,
+} from "./governedCurrent2026UsCoreNetworkReferenceV1.js";
 
 export const GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION =
-  "governed_payment_knowledge_authority_2026_09_07_mastercard_focused_evidence_v1" as const;
+  "governed_payment_knowledge_authority_2026_09_07_current_us_core_network_reference_v1" as const;
 
 export type GovernedNormUnit =
   | "usd_per_event"
@@ -93,6 +101,7 @@ export type GovernedKnowledgeResolution = {
   datedNetworkFeeEvidence: GovernedDatedNetworkFeeEvidenceResolution;
   usNetworkFeeEvidence: GovernedUsNetworkFeeEvidenceResolution;
   mastercardFocusedEvidence: GovernedMastercardFocusedEvidenceResolution;
+  current2026UsCoreNetworkReference: GovernedCurrent2026UsCoreNetworkResolution;
   authorityVersion: typeof GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION;
   semanticCatalogVersion: string;
   normCatalogVersion: string;
@@ -283,6 +292,14 @@ export class GovernedPaymentKnowledgeAuthority {
       analysis: input.analysis,
       usNetworkFeeEvidence,
     });
+    const current2026UsCoreNetworkReference = resolveGovernedCurrent2026UsCoreNetworkReferenceV1({
+      analysis: input.analysis,
+      usNetworkRowsByFeeRowId: Object.fromEntries(
+        Object.entries(mastercardFocusedEvidence.rowsByFeeRowId).map(([feeRowId, row]) => [feeRowId, row.effectiveUsNetworkEvidence]),
+      ),
+      mastercardFocusedRowsByFeeRowId: mastercardFocusedEvidence.rowsByFeeRowId,
+      asOf,
+    });
     return deepFreeze({
       semantics,
       normsByFeeRowId,
@@ -292,6 +309,7 @@ export class GovernedPaymentKnowledgeAuthority {
       datedNetworkFeeEvidence,
       usNetworkFeeEvidence,
       mastercardFocusedEvidence,
+      current2026UsCoreNetworkReference,
       authorityVersion: this.authorityVersion,
       semanticCatalogVersion: semantics.catalogVersion,
       normCatalogVersion: this.normCatalogVersion,
@@ -332,6 +350,10 @@ export class GovernedPaymentKnowledgeAuthority {
       mastercardFocusedEvidenceSources: governedMastercardFocusedSources2024_2026V1(),
       mastercardFocusedEvidenceRecords: governedMastercardFocusedRecords2024_2026V1(),
       mastercardFocusedEvidenceRules: governedMastercardFocusedRules2024_2026V1(),
+      current2026UsCoreNetworkReferenceCatalogVersion: GOVERNED_CURRENT_2026_US_CORE_NETWORK_REFERENCE_V1,
+      current2026UsCoreNetworkReferenceSources: governedCurrent2026SourcesV1(),
+      current2026UsCoreNetworkReferenceRecords: governedCurrent2026ReferenceRecordsV1(),
+      current2026UsCoreNetworkReferenceRules: governedCurrent2026RulesV1(),
       norms: NORMS,
     })).digest("hex");
   }

@@ -86,10 +86,12 @@ describe("governed pricing-layer Batch 1 full Fiserv corpus", () => {
     expect(exact).toHaveLength(89);
     expect(categoryOnly).toHaveLength(92);
     expect(unresolved).toHaveLength(302);
-    expect(ambiguous).toHaveLength(93);
+    // The current-2026 adjudication intentionally adds 11 material, explicitly
+    // unresolved rate conflicts without changing the Batch 1 identity counts.
+    expect(ambiguous).toHaveLength(104);
     expect(ambiguousExact.filter((finding) => finding.exactFeeIdentity.value?.startsWith("amex_"))).toHaveLength(3);
     expect(ambiguousExact.some((finding) => (finding.usNetworkFeeEvidence?.sourceConflicts.length ?? 0) > 0)).toBe(true);
-    expect(reports.reduce((sum, report) => sum + report.researchQueued, 0)).toBe(401);
+    expect(reports.reduce((sum, report) => sum + report.researchQueued, 0)).toBe(412);
 
     const priority = reports.find((report) => report.file.includes("PRIORITY_PAYMENT_SYSTEMS"))!;
     expect(priority.pricingModel).toBe("flat_rate");

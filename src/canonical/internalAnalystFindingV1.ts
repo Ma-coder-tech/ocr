@@ -24,6 +24,11 @@ import type {
   GovernedMastercardFocusedRowResolution,
   GovernedMastercardFocusedSource,
 } from "./governedMastercardFocusedEvidence2024_2026V1.js";
+import type {
+  GovernedCurrent2026ReferenceRecord,
+  GovernedCurrent2026RowResolution,
+  GovernedCurrent2026Source,
+} from "./governedCurrent2026UsCoreNetworkReferenceV1.js";
 import { assessCanonicalExactFeeRowArithmetic } from "./exactSourceArithmeticBridge.js";
 import {
   FEE_KNOWLEDGE_RESEARCH_LIMITS,
@@ -179,6 +184,7 @@ export type InternalAnalystFinding = {
   datedNetworkEvidence: GovernedDatedNetworkRowResolution | null;
   usNetworkFeeEvidence: GovernedUsNetworkRowResolution | null;
   mastercardFocusedEvidence: GovernedMastercardFocusedRowResolution | null;
+  current2026UsCoreNetworkReference: GovernedCurrent2026RowResolution | null;
 };
 
 export type InternalAnalystResearchQueueV1 = {
@@ -231,6 +237,8 @@ export type InternalAnalystFindingReportV1 = {
     admittedUsNetworkFeeRuleRefs: string[];
     mastercardFocusedEvidenceCatalogVersion: string;
     admittedMastercardFocusedRuleRefs: string[];
+    current2026UsCoreNetworkReferenceCatalogVersion: string;
+    admittedCurrent2026UsCoreNetworkRuleRefs: string[];
     legacyFeeCatalog: "retrieval_only_not_governing";
     feeKnowledgeResearchSystem: "research_transport_not_governing";
   };
@@ -239,6 +247,8 @@ export type InternalAnalystFindingReportV1 = {
   usNetworkFeeEvidenceRecords: GovernedUsNetworkReferenceRecord[];
   mastercardFocusedEvidenceSources: GovernedMastercardFocusedSource[];
   mastercardFocusedEvidenceRecords: GovernedMastercardFocusedRecord[];
+  current2026UsCoreNetworkReferenceSources: GovernedCurrent2026Source[];
+  current2026UsCoreNetworkReferenceRecords: GovernedCurrent2026ReferenceRecord[];
   merchantContext: InternalAnalystMerchantContext;
   findings: InternalAnalystFinding[];
   researchQueue: InternalAnalystResearchQueueV1;
@@ -264,6 +274,12 @@ export type InternalAnalystFindingReportV1 = {
     aboveReferenceCandidateFindings: number;
     mastercardAssessmentStronglyExplainedFindings: number;
     mastercardLocationLikelyUpliftFindings: number;
+    current2026ConfirmedChangeFindings: number;
+    current2026WorkingStrongFindings: number;
+    current2026WorkingLikelyFindings: number;
+    current2026UnresolvedFindings: number;
+    historicalRowsProtectedFromCurrentValues: number;
+    independentlyEvaluatedLocationCases: number;
     confirmedAtParFindings: 0;
     confirmedMarkupFindings: 0;
   };
@@ -307,6 +323,7 @@ export function buildInternalAnalystFindingV1(input: {
     datedNetworkEvidence: knowledge.datedNetworkFeeEvidence.rowsByFeeRowId[row.id]!,
     usNetworkFeeEvidence: knowledge.mastercardFocusedEvidence.rowsByFeeRowId[row.id]!.effectiveUsNetworkEvidence,
     mastercardFocusedEvidence: knowledge.mastercardFocusedEvidence.rowsByFeeRowId[row.id]!,
+    current2026UsCoreNetworkReference: knowledge.current2026UsCoreNetworkReference.rowsByFeeRowId[row.id]!,
     refundCost: knowledge.pricingLayers.unrecoveredRefundCostByFeeRowId[row.id]!,
     contributions: contributions.filter((item) => item.targetFeeRowId === row.id),
   }));
@@ -340,6 +357,8 @@ export function buildInternalAnalystFindingV1(input: {
       admittedUsNetworkFeeRuleRefs: knowledge.usNetworkFeeEvidence.rules.map((rule) => rule.ruleId),
       mastercardFocusedEvidenceCatalogVersion: knowledge.mastercardFocusedEvidence.catalogVersion,
       admittedMastercardFocusedRuleRefs: knowledge.mastercardFocusedEvidence.rules.map((rule) => rule.ruleId),
+      current2026UsCoreNetworkReferenceCatalogVersion: knowledge.current2026UsCoreNetworkReference.catalogVersion,
+      admittedCurrent2026UsCoreNetworkRuleRefs: knowledge.current2026UsCoreNetworkReference.rules.map((rule) => rule.ruleId),
       legacyFeeCatalog: knowledge.legacyAuthorities.legacyFeeCatalog,
       feeKnowledgeResearchSystem: knowledge.legacyAuthorities.feeKnowledgeResearchSystem,
     },
@@ -348,6 +367,8 @@ export function buildInternalAnalystFindingV1(input: {
     usNetworkFeeEvidenceRecords: knowledge.usNetworkFeeEvidence.records,
     mastercardFocusedEvidenceSources: knowledge.mastercardFocusedEvidence.sources,
     mastercardFocusedEvidenceRecords: knowledge.mastercardFocusedEvidence.records,
+    current2026UsCoreNetworkReferenceSources: knowledge.current2026UsCoreNetworkReference.sources,
+    current2026UsCoreNetworkReferenceRecords: knowledge.current2026UsCoreNetworkReference.records,
     merchantContext,
     findings,
     researchQueue,
@@ -369,6 +390,7 @@ export function buildInternalAnalystFindingV1(input: {
       "Cross-corpus observations are not represented as a merchant's own history without verified merchant/account continuity.",
       "The April 2023 Fiserv pass-through guide is governed processor evidence, not primary network evidence; adjacent-period matches are never rendered as confirmed at par.",
       "The retained June 2026 Fiserv bulletin establishes only its listed changes and does not confirm unchanged 2026 core rates by silence.",
+      "Current 2026 reference confidence is row-specific and never supplies an official-network-par or merchant-pricing verdict by itself; historical statement periods retain their period-specific values.",
     ],
   };
   return deepFreeze(report);
@@ -398,6 +420,7 @@ function buildFeeFinding(input: {
   datedNetworkEvidence: GovernedDatedNetworkRowResolution;
   usNetworkFeeEvidence: GovernedUsNetworkRowResolution;
   mastercardFocusedEvidence: GovernedMastercardFocusedRowResolution;
+  current2026UsCoreNetworkReference: GovernedCurrent2026RowResolution;
   refundCost: GovernedUnrecoveredRefundCostResolution;
   contributions: InternalAnalystResearchContribution[];
 }): InternalAnalystFinding {
@@ -569,6 +592,8 @@ function buildFeeFinding(input: {
     ...input.perItem.competingInterpretations.map((interpretation) => ({ source: "governed_retrieval" as const, interpretation, evidenceRefs: input.perItem.matchedRuleRefs, status: "candidate" as const })),
     ...input.usNetworkFeeEvidence.sourceConflicts.map((interpretation) => ({ source: "research" as const, interpretation, evidenceRefs: input.usNetworkFeeEvidence.identity.evidenceRefs, status: "conflicting" as const })),
     ...(input.usNetworkFeeEvidence.research.question ? [{ source: "research" as const, interpretation: input.usNetworkFeeEvidence.research.question, evidenceRefs: input.usNetworkFeeEvidence.reference.matchedRecordIds, status: "candidate" as const }] : []),
+    ...input.current2026UsCoreNetworkReference.reference.conflicts.map((interpretation) => ({ source: "research" as const, interpretation, evidenceRefs: input.current2026UsCoreNetworkReference.reference.evidenceRefs, status: "conflicting" as const })),
+    ...(input.current2026UsCoreNetworkReference.research.question ? [{ source: "research" as const, interpretation: input.current2026UsCoreNetworkReference.research.question, evidenceRefs: input.current2026UsCoreNetworkReference.reference.matchedRecordIds, status: "candidate" as const }] : []),
   ];
   return {
     findingId: `iaf_${stableId(input.row.id)}`,
@@ -601,6 +626,7 @@ function buildFeeFinding(input: {
     datedNetworkEvidence: governedNetworkApplies ? input.datedNetworkEvidence : null,
     usNetworkFeeEvidence: input.usNetworkFeeEvidence.applicable ? input.usNetworkFeeEvidence : null,
     mastercardFocusedEvidence: input.mastercardFocusedEvidence.applicable ? input.mastercardFocusedEvidence : null,
+    current2026UsCoreNetworkReference: input.current2026UsCoreNetworkReference.applicable ? input.current2026UsCoreNetworkReference : null,
   };
 }
 
@@ -650,6 +676,7 @@ function buildPricingOpacityFinding(
     datedNetworkEvidence: null,
     usNetworkFeeEvidence: null,
     mastercardFocusedEvidence: null,
+    current2026UsCoreNetworkReference: null,
   };
 }
 
@@ -1027,7 +1054,8 @@ function buildInternalAnalystResearchQueue(
         finding.exactFeeIdentity.state === "unresolved" ||
         finding.exactFeeIdentity.state === "conflicting" ||
         finding.competingInterpretations.some((interpretation) => interpretation.status === "conflicting") ||
-        finding.usNetworkFeeEvidence?.research.priority === "high"
+        finding.usNetworkFeeEvidence?.research.priority === "high" ||
+        finding.current2026UsCoreNetworkReference?.research.priority === "high"
       ));
     })
     .map((question): FeeKnowledgeResearchQuestion => ({
@@ -1037,7 +1065,7 @@ function buildInternalAnalystResearchQueue(
       deterministicContractualController: null,
       deterministicActionabilityCeiling: "verify_only",
       deterministicConfidence: "medium",
-      semanticQuestion: findingByFeeRowId.get(question.feeRowRef)?.usNetworkFeeEvidence?.research.question ?? `Find authoritative and applicable evidence for the printed payment-processing label ${JSON.stringify(question.feeLabel)}. Resolve, where evidence permits, exact identity, aliases, broader category, assessment unit, collector, economic beneficiary, rule setter, price setter, and merchant-facing price controller. Preserve competing interpretations and do not infer negotiability or contract compliance from a processor/network label.`,
+      semanticQuestion: findingByFeeRowId.get(question.feeRowRef)?.current2026UsCoreNetworkReference?.research.question ?? findingByFeeRowId.get(question.feeRowRef)?.usNetworkFeeEvidence?.research.question ?? `Find authoritative and applicable evidence for the printed payment-processing label ${JSON.stringify(question.feeLabel)}. Resolve, where evidence permits, exact identity, aliases, broader category, assessment unit, collector, economic beneficiary, rule setter, price setter, and merchant-facing price controller. Preserve competing interpretations and do not infer negotiability or contract compliance from a processor/network label.`,
     }));
   const plan = planFeeKnowledgeResearchQuestions(questions, FEE_KNOWLEDGE_RESEARCH_LIMITS);
   const queueItem = (item: (typeof plan.selected)[number]) => ({
@@ -1090,6 +1118,12 @@ function coverage(
     aboveReferenceCandidateFindings: findings.filter((item) => item.usNetworkFeeEvidence?.comparison.state === "candidate_above_reference").length,
     mastercardAssessmentStronglyExplainedFindings: findings.filter((item) => item.mastercardFocusedEvidence?.assessment2024).length,
     mastercardLocationLikelyUpliftFindings: findings.filter((item) => item.mastercardFocusedEvidence?.locationFee2025?.acquiringSideUplift === "LIKELY").length,
+    current2026ConfirmedChangeFindings: findings.filter((item) => item.current2026UsCoreNetworkReference?.reference.state === "CURRENT_CONFIRMED_CHANGE").length,
+    current2026WorkingStrongFindings: findings.filter((item) => item.current2026UsCoreNetworkReference?.reference.state === "CURRENT_WORKING_REFERENCE_STRONG").length,
+    current2026WorkingLikelyFindings: findings.filter((item) => item.current2026UsCoreNetworkReference?.reference.state === "CURRENT_WORKING_REFERENCE_LIKELY").length,
+    current2026UnresolvedFindings: findings.filter((item) => item.current2026UsCoreNetworkReference?.reference.state === "CURRENT_RATE_UNRESOLVED").length,
+    historicalRowsProtectedFromCurrentValues: findings.filter((item) => item.current2026UsCoreNetworkReference?.historicalApplication === "HISTORICAL_VALUE_PRESERVED_BEFORE_CHANGE" || item.current2026UsCoreNetworkReference?.historicalApplication === "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT").length,
+    independentlyEvaluatedLocationCases: findings.filter((item) => item.current2026UsCoreNetworkReference?.locationCase?.independentlyEvaluated).length,
     confirmedAtParFindings: 0,
     confirmedMarkupFindings: 0,
   };
