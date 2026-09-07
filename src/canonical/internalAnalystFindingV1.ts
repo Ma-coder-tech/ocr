@@ -10,6 +10,10 @@ import type {
   GovernedUnrecoveredRefundCostResolution,
 } from "./governedPricingLayerKnowledgeV1.js";
 import type { GovernedPerItemRowResolution } from "./governedPerItemKnowledgeV1.js";
+import type {
+  GovernedDatedNetworkRowResolution,
+  GovernedNetworkNoticeEvent,
+} from "./governedDatedNetworkFeeEvidenceV1.js";
 import { assessCanonicalExactFeeRowArithmetic } from "./exactSourceArithmeticBridge.js";
 import {
   FEE_KNOWLEDGE_RESEARCH_LIMITS,
@@ -162,6 +166,7 @@ export type InternalAnalystFinding = {
   whyItMatters: AnalystClaim<string>;
   practicalMerchantAction: AnalystClaim<string>;
   perItemAnalysis: GovernedPerItemRowResolution | null;
+  datedNetworkEvidence: GovernedDatedNetworkRowResolution | null;
 };
 
 export type InternalAnalystResearchQueueV1 = {
@@ -208,9 +213,12 @@ export type InternalAnalystFindingReportV1 = {
     admittedPricingLayerRuleRefs: string[];
     perItemCatalogVersion: string;
     admittedPerItemRuleRefs: string[];
+    datedNetworkFeeEvidenceCatalogVersion: string;
+    admittedDatedNetworkRuleRefs: string[];
     legacyFeeCatalog: "retrieval_only_not_governing";
     feeKnowledgeResearchSystem: "research_transport_not_governing";
   };
+  datedNetworkNotices: GovernedNetworkNoticeEvent[];
   merchantContext: InternalAnalystMerchantContext;
   findings: InternalAnalystFinding[];
   researchQueue: InternalAnalystResearchQueueV1;
@@ -224,6 +232,9 @@ export type InternalAnalystFindingReportV1 = {
     noAgreementActionFindings: number;
     contractDependentFindings: number;
     queuedResearchQuestions: number;
+    datedNetworkEvidenceFindings: number;
+    officialNetworkRateComparisons: number;
+    statementNoticeRecords: number;
   };
   limitations: string[];
 };
@@ -262,6 +273,7 @@ export function buildInternalAnalystFindingV1(input: {
     pricingModel: effectivePricingModel,
     pricingLayer: knowledge.pricingLayers.rowsByFeeRowId[row.id]!,
     perItem: knowledge.perItem.rowsByFeeRowId[row.id]!,
+    datedNetworkEvidence: knowledge.datedNetworkFeeEvidence.rowsByFeeRowId[row.id]!,
     refundCost: knowledge.pricingLayers.unrecoveredRefundCostByFeeRowId[row.id]!,
     contributions: contributions.filter((item) => item.targetFeeRowId === row.id),
   }));
@@ -289,13 +301,16 @@ export function buildInternalAnalystFindingV1(input: {
       admittedPricingLayerRuleRefs: knowledge.pricingLayers.rules.map((rule) => rule.ruleId),
       perItemCatalogVersion: knowledge.perItem.catalogVersion,
       admittedPerItemRuleRefs: knowledge.perItem.rules.map((rule) => rule.ruleId),
+      datedNetworkFeeEvidenceCatalogVersion: knowledge.datedNetworkFeeEvidence.catalogVersion,
+      admittedDatedNetworkRuleRefs: knowledge.datedNetworkFeeEvidence.rules.map((rule) => rule.ruleId),
       legacyFeeCatalog: knowledge.legacyAuthorities.legacyFeeCatalog,
       feeKnowledgeResearchSystem: knowledge.legacyAuthorities.feeKnowledgeResearchSystem,
     },
+    datedNetworkNotices: knowledge.datedNetworkFeeEvidence.statementNotices,
     merchantContext,
     findings,
     researchQueue,
-    coverage: coverage(findings, contributions, researchQueue),
+    coverage: coverage(findings, contributions, researchQueue, knowledge.datedNetworkFeeEvidence.statementNotices.length),
     limitations: [
       "This artifact is internal analyst work and has no customer-report authority.",
       "It analyzes one statement period; recurrence, trends, annual cadence, and annual savings are not inferred.",
@@ -308,6 +323,9 @@ export function buildInternalAnalystFindingV1(input: {
       "Fiserv is the supported statement family, while the claim model, evidence classes, participant axes, and knowledge authority are processor-neutral.",
       "Batch 2 population comparisons are diagnostic only: no universal ordering law, error, or decline count is inferred.",
       "Batch 2 admits no new network value or market benchmark; all per-item burden figures are statement-period arithmetic or explicitly labeled current-month run rates.",
+      "Batch 3 separates semantic identity, mechanic/population, and rate/value confidence; it admits no primary network schedule and performs no official-par or above-par comparison.",
+      "Dated statement notices establish announcements, presentation changes, or postponements only. They do not establish later implementation unless separately confirmed.",
+      "Cross-corpus observations are not represented as a merchant's own history without verified merchant/account continuity.",
     ],
   };
   return deepFreeze(report);
@@ -334,6 +352,7 @@ function buildFeeFinding(input: {
   pricingModel: InternalAnalystPricingModelInput | null;
   pricingLayer: GovernedPricingLayerRowResolution;
   perItem: GovernedPerItemRowResolution;
+  datedNetworkEvidence: GovernedDatedNetworkRowResolution;
   refundCost: GovernedUnrecoveredRefundCostResolution;
   contributions: InternalAnalystResearchContribution[];
 }): InternalAnalystFinding {
@@ -401,11 +420,13 @@ function buildFeeFinding(input: {
     : unresolvedClaim<string>("The statement does not expose a reliable assessment base.", [evidence("E1_statement", rowEvidence, "statement_fact")]);
   const ownership = semantic.semanticAxes?.ownership.status === "resolved" ? semantic.semanticAxes.ownership.value : null;
   const perItemAxesApply = input.perItem.applicable;
-  const beneficiary = participantClaim(perItemAxesApply ? input.perItem.economicBeneficiary : input.pricingLayer.economicBeneficiary ?? admitted?.claims.economicBeneficiary ?? beneficiaryFor(ownership), input.perItem.applicable ? "Batch 2 does not infer economic benefit from collection; acquiring-side ultimate retention remains unresolved unless independently evidenced." : input.pricingLayer.broaderEconomicCategory?.includes("acquiring_side") ? "Economic beneficiary and ultimate retention are not inferred from collection or merchant-facing price control." : ownership ? "Published semantic ownership supports the likely economic beneficiary; collection and merchant price control remain separate." : "Economic beneficiary is not established.", [...publishedBasis, ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis])]);
-  const collector = participantClaim(perItemAxesApply ? input.perItem.collector : input.pricingLayer.collector ?? admitted?.claims.collector ?? (input.analysis.identity.processorFamily.evidenceRefs.length > 0 ? "processor_or_acquirer" : null), "The processor/acquirer presents or collects the statement charge; this does not prove it retains the economics.", [evidence("E1_statement", [...rowEvidence, ...input.analysis.identity.processorFamily.evidenceRefs], "statement_fact"), ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis])]);
-  const ruleSetter = participantClaim(perItemAxesApply ? input.perItem.ruleSetter : input.pricingLayer.ruleSetter ?? admitted?.claims.ruleSetter ?? (ownership?.includes("network") ? "card_network" : null), "Rule setting is distinct from collection, economic benefit, and merchant-facing price control.", [...publishedBasis, ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis])]);
-  const priceSetter = participantClaim(perItemAxesApply ? input.perItem.priceSetter : input.pricingLayer.priceSetter ?? admitted?.claims.priceSetter ?? (ownership?.includes("network") ? "card_network" : null), "Price setting is stated only where supported; it does not establish which party ultimately retains the billed amount.", [...publishedBasis, ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis])]);
-  const controllerValue = perItemAxesApply ? input.perItem.merchantFacingPriceController : input.pricingLayer.merchantFacingPriceController ?? admitted?.claims.merchantFacingPriceController ?? null;
+  const governedNetworkApplies = input.datedNetworkEvidence.applicable;
+  const networkPrice = input.datedNetworkEvidence.priceSeparation;
+  const beneficiary = participantClaim(governedNetworkApplies ? networkPrice.underlyingNetworkEconomicBeneficiary : perItemAxesApply ? input.perItem.economicBeneficiary : input.pricingLayer.economicBeneficiary ?? admitted?.claims.economicBeneficiary ?? beneficiaryFor(ownership), governedNetworkApplies ? "Batch 3 resolves the beneficiary of the underlying network component only when the fee family is affirmatively supported; the beneficiary of any merchant-billed excess remains unresolved and statement collection never proves ownership." : input.perItem.applicable ? "Batch 2 does not infer economic benefit from collection; acquiring-side ultimate retention remains unresolved unless independently evidenced." : input.pricingLayer.broaderEconomicCategory?.includes("acquiring_side") ? "Economic beneficiary and ultimate retention are not inferred from collection or merchant-facing price control." : ownership ? "Published semantic ownership supports the likely economic beneficiary; collection and merchant price control remain separate." : "Economic beneficiary is not established.", [...publishedBasis, ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis])]);
+  const collector = participantClaim(governedNetworkApplies ? networkPrice.collector : perItemAxesApply ? input.perItem.collector : input.pricingLayer.collector ?? admitted?.claims.collector ?? (input.analysis.identity.processorFamily.evidenceRefs.length > 0 ? "processor_or_acquirer" : null), "The processor/acquirer presents or collects the statement charge; this does not prove it retains the economics.", [evidence("E1_statement", [...rowEvidence, ...input.analysis.identity.processorFamily.evidenceRefs], "statement_fact"), ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis])]);
+  const ruleSetter = participantClaim(governedNetworkApplies ? networkPrice.underlyingNetworkPriceSetter : perItemAxesApply ? input.perItem.ruleSetter : input.pricingLayer.ruleSetter ?? admitted?.claims.ruleSetter ?? (ownership?.includes("network") ? "card_network" : null), "Rule setting is distinct from collection, economic benefit, and merchant-facing price control.", [...publishedBasis, ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis])]);
+  const priceSetter = participantClaim(governedNetworkApplies ? networkPrice.underlyingNetworkPriceSetter : perItemAxesApply ? input.perItem.priceSetter : input.pricingLayer.priceSetter ?? admitted?.claims.priceSetter ?? (ownership?.includes("network") ? "card_network" : null), governedNetworkApplies ? "This identifies the underlying network price setter where supported; the acquiring-side merchant-facing billed amount may differ and its controller remains unresolved." : "Price setting is stated only where supported; it does not establish which party ultimately retains the billed amount.", [...publishedBasis, ...compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis])]);
+  const controllerValue = governedNetworkApplies ? null : perItemAxesApply ? input.perItem.merchantFacingPriceController : input.pricingLayer.merchantFacingPriceController ?? admitted?.claims.merchantFacingPriceController ?? null;
   const controller = participantClaim(controllerValue, controllerValue ? "The statement structure supports control at the acquiring-side commercial-program layer; the exact processor/acquirer/ISO allocation and ultimate retention remain unresolved." : "The evidence does not establish whether the processor, ISO, or another party controls the merchant-facing amount or adds spread.", compact([pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis]));
   const arithmetic = arithmeticClaim(input.row, input.analysis);
   const pricing = pricingClaim(input.pricingModel);
@@ -417,13 +438,17 @@ function buildFeeFinding(input: {
   const population = populationValue
     ? claim("supported", populationValue, "LIKELY", [evidence("E1_statement", rowEvidence, "statement_fact")], "The fee line's supported assessment basis takes precedence over a broader pricing-model population; no statement-wide basis is inferred.")
     : unresolvedClaim<string>("Relevant transaction or volume population is not established.", [evidence("E1_statement", rowEvidence, "statement_fact")]);
-  const reasonableness = input.perItem.applicable && (input.perItem.economicLayer === "PER_ITEM_LAYER_UNRESOLVED" || input.perItem.economicLayer?.startsWith("network_"))
+  const reasonableness = governedNetworkApplies
+    ? notAssessableClaim<"within_norm" | "elevated" | "materially_elevated" | "context_justified">("No period-, geography-, and product-matched independent network reference is admitted, so neither at-par billing nor above-par spread is assessable.")
+    : input.perItem.applicable && (input.perItem.economicLayer === "PER_ITEM_LAYER_UNRESOLVED" || input.perItem.economicLayer?.startsWith("network_"))
     ? notAssessableClaim<"within_norm" | "elevated" | "materially_elevated" | "context_justified">("No applicable governed commercial benchmark is applied to this per-item economic layer.")
     : commercialClaim(input.row, input.analysis, input.norms, input.merchantContext);
   const primaryNorm = input.norms[0] ?? null;
   const networkUnderlying = input.perItem.applicable ? input.perItem.economicBeneficiary === "card_network" : ownership?.includes("network") ?? false;
   const perItemControlsNegotiability = input.perItem.economicLayer === "PER_ITEM_LAYER_UNRESOLVED" || input.perItem.economicLayer?.startsWith("network_") || input.perItem.economicLayer?.startsWith("acquiring_side_");
-  const negotiability = input.perItem.applicable && perItemControlsNegotiability
+  const negotiability = governedNetworkApplies
+    ? unresolvedClaim<"frequently_negotiable" | "sometimes_negotiable" | "rarely_negotiable">("The underlying network schedule is ordinarily fixed if independently established, but the merchant-billed amount remains commercially reviewable until dated par and pass-through-at-par are proven. These are separate questions.", [evidence("G1_governed_payment_knowledge", input.datedNetworkEvidence.matchedRuleRefs, "governed_knowledge")])
+    : input.perItem.applicable && perItemControlsNegotiability
     ? input.perItem.negotiability
       ? claim<"frequently_negotiable" | "sometimes_negotiable" | "rarely_negotiable">("industry_judgment", input.perItem.negotiability, "LIKELY", compact([perItemKnowledgeBasis]), input.perItem.commercialActionPermitted ? "The acquiring-side merchant-facing price is commonly reviewable; exact contractual negotiability remains merchant-document dependent." : "The network-set price is ordinarily not merchant-negotiable; operational incidence and any acquiring-side presentation remain separate.")
       : unresolvedClaim<"frequently_negotiable" | "sometimes_negotiable" | "rarely_negotiable">("The economic layer is unresolved, so no negotiation recommendation is made.", compact([perItemKnowledgeBasis]))
@@ -436,17 +461,19 @@ function buildFeeFinding(input: {
     : networkUnderlying
       ? claim<"frequently_negotiable" | "sometimes_negotiable" | "rarely_negotiable">("industry_judgment", "rarely_negotiable", "LIKELY", publishedBasis, "The underlying network schedule is rarely negotiated by an ordinary merchant, but processor-added spread or presentation remains reviewable.")
       : unresolvedClaim<"frequently_negotiable" | "sometimes_negotiable" | "rarely_negotiable">("Negotiability is not inferred from a legacy processor/network label.", []);
-  const waivability = input.perItem.applicable && input.perItem.economicLayer === "PER_ITEM_LAYER_UNRESOLVED"
+  const waivability = governedNetworkApplies
+    ? unresolvedClaim<"frequently_waivable" | "sometimes_waivable" | "rarely_waivable">("Underlying network-price waivability and acquiring-side billed-price relief are separate; neither is collapsed into one answer without a dated reference and price-control evidence.", [evidence("G1_governed_payment_knowledge", input.datedNetworkEvidence.matchedRuleRefs, "governed_knowledge")])
+    : input.perItem.applicable && input.perItem.economicLayer === "PER_ITEM_LAYER_UNRESOLVED"
     ? unresolvedClaim<"frequently_waivable" | "sometimes_waivable" | "rarely_waivable">("The economic layer is unresolved, so waivability is not inferred.", compact([perItemKnowledgeBasis]))
     : primaryNorm
     ? normDispositionClaim(primaryNorm.waivabilityNorm, primaryNorm, "Waivability/removability is a governed industry norm, not a promise about this merchant's agreement.")
     : networkUnderlying
       ? claim<"frequently_waivable" | "sometimes_waivable" | "rarely_waivable">("industry_judgment", "rarely_waivable", "LIKELY", publishedBasis, "The underlying network assessment is rarely waived, while unsupported padding or duplicate billing may still be challenged.")
       : unresolvedClaim<"frequently_waivable" | "sometimes_waivable" | "rarely_waivable">("Waivability is not established for this charge.", []);
-  const behavioral = input.perItem.applicable ? perItemBehavioralClaim(input.perItem) : behavioralClaim(identityValue, categoryValue, input.row.selectedLabel, rowEvidence);
+  const behavioral = governedNetworkApplies ? datedNetworkBehavioralClaim(input.datedNetworkEvidence) : input.perItem.applicable ? perItemBehavioralClaim(input.perItem) : behavioralClaim(identityValue, categoryValue, input.row.selectedLabel, rowEvidence);
   const contract = contractRequiredClaim();
   const materiality = materialityFor(input.row, input.analysis);
-  const action = input.perItem.applicable ? perItemActionClaim(input.perItem) : actionClaim({
+  const action = governedNetworkApplies ? datedNetworkActionClaim(input.datedNetworkEvidence) : input.perItem.applicable ? perItemActionClaim(input.perItem) : actionClaim({
     category: categoryValue,
     identity: identityValue,
     reasonableness,
@@ -487,6 +514,7 @@ function buildFeeFinding(input: {
     whyItMatters: claim("supported", whyItMatters(input.row, materiality, categoryValue), "LIKELY", [evidence("E1_statement", rowEvidence, "statement_fact")], "Materiality is period-bounded and does not assume recurrence."),
     practicalMerchantAction: action,
     perItemAnalysis: input.perItem.applicable ? input.perItem : null,
+    datedNetworkEvidence: governedNetworkApplies ? input.datedNetworkEvidence : null,
   };
 }
 
@@ -533,6 +561,7 @@ function buildPricingOpacityFinding(
     whyItMatters: claim("supported", message, "STRONG", [evidence("E1_statement", evidenceRefs, "statement_fact")], "Opacity is a commercially material finding even when markup dollars are not computable."),
     practicalMerchantAction: claim("industry_judgment", "Request an interchange-cost and processor-markup breakout and a pricing review; this request does not require the merchant agreement. Use the agreement only to determine whether the current program violates an exact contracted term.", "STRONG", [frameworkNormEvidence()], "Commercial inquiry is distinct from a legal or contractual conclusion."),
     perItemAnalysis: null,
+    datedNetworkEvidence: null,
   };
 }
 
@@ -703,6 +732,47 @@ function perItemActionClaim(input: GovernedPerItemRowResolution): AnalystClaim<s
   return claim("supported", "Request event-level support for the printed quantity and investigate the fee's operational incidence without assuming fault, avoidability, ownership, or negotiability.", "LIKELY", basis, "The action is an evidence request, not a pricing or contract conclusion.");
 }
 
+function datedNetworkActionClaim(input: GovernedDatedNetworkRowResolution): AnalystClaim<string> {
+  const basis = [
+    evidence("G1_governed_payment_knowledge", input.matchedRuleRefs, "governed_knowledge"),
+    ...(input.billedObservation ? [evidence("E1_statement", input.billedObservation.evidenceRefs, "statement_fact")] : []),
+  ];
+  const incidence = input.actionability.incidenceInfluence === "behaviorally_influenceable_where_trigger_applies"
+    ? " Request event-level detail and review the applicable authorization, reversal, clearing, or data-quality trigger; do not assume merchant fault or that every event is avoidable."
+    : input.actionability.incidenceInfluence === "configuration_review_may_change_population"
+      ? " Review authorization routing and configuration against the supported event population without treating a count difference as an error."
+      : input.actionability.incidenceInfluence === "business_mix_or_acceptance_driven"
+        ? " Review whether incidence reflects expected international/card-acceptance mix; do not describe the underlying business mix as avoidable by default."
+        : "";
+  if (input.actionability.merchantBilledPriceReview === "verification_only") {
+    return claim(
+      "supported",
+      `Ask for the billed unit, event population, network family, and price-setting party to be identified.${incidence} Do not request repricing or a waiver until the economic layer is supported; no merchant agreement is needed for this verification request.`,
+      "CATEGORY_ONLY",
+      basis,
+      "A network-like label or population is not enough to establish economic ownership, pass-through status, or merchant-facing price control.",
+    );
+  }
+  return claim(
+    "supported",
+    `Ask the processor/acquirer to identify the period-, geography-, and product-applicable independent network schedule, show whether the merchant-facing billed amount is at par, and explain any bundling or spread.${incidence} This verification and commercial review does not require the merchant agreement; an exact contractual-rate, breach, right, or remedy conclusion does.`,
+    "STRONG",
+    basis,
+    "The underlying network price, merchant-facing billed amount, and incidence are separate actionable questions even though Batch 3 has no admitted network-par value.",
+  );
+}
+
+function datedNetworkBehavioralClaim(input: GovernedDatedNetworkRowResolution): AnalystClaim<"behavior_can_reduce_incidence" | "configuration_review_may_reduce_population" | "not_ordinarily_behavioral"> {
+  const basis = [evidence("G1_governed_payment_knowledge", input.matchedRuleRefs, "governed_knowledge")];
+  if (input.actionability.incidenceInfluence === "behaviorally_influenceable_where_trigger_applies") {
+    return claim("industry_judgment", "behavior_can_reduce_incidence", "LIKELY", basis, "Incidence may be operationally influenceable where the independently verified trigger applies; this does not imply merchant fault, identify an exact causal transaction, or mean every event is avoidable.");
+  }
+  if (input.actionability.incidenceInfluence === "configuration_review_may_change_population") {
+    return claim("industry_judgment", "configuration_review_may_reduce_population", "LIKELY", basis, "Authorization or access configuration may affect the event population, but no error, decline count, or avoidability conclusion follows from statement arithmetic alone.");
+  }
+  return claim("industry_judgment", "not_ordinarily_behavioral", "LIKELY", basis, input.actionability.incidenceInfluence === "business_mix_or_acceptance_driven" ? "Incidence ordinarily follows accepted card and geographic mix; the billed amount can still be reviewed against dated network par when that reference is available." : "No supported operational trigger is established, while billed-price verification remains available.");
+}
+
 function perItemBehavioralClaim(input: GovernedPerItemRowResolution): AnalystClaim<"behavior_can_reduce_incidence" | "configuration_review_may_reduce_population" | "not_ordinarily_behavioral"> {
   const basis = [evidence("G1_governed_payment_knowledge", input.matchedRuleRefs, "governed_knowledge")];
   if (input.incidenceActionability === "behaviorally_influenceable_where_applicable") {
@@ -864,6 +934,7 @@ function coverage(
   findings: InternalAnalystFinding[],
   contributions: InternalAnalystResearchContribution[],
   researchQueue: InternalAnalystResearchQueueV1,
+  statementNoticeRecords: number,
 ): InternalAnalystFindingReportV1["coverage"] {
   return {
     materialFeeRows: findings.filter((item) => item.sourceFeeRowId).length,
@@ -875,6 +946,9 @@ function coverage(
     noAgreementActionFindings: findings.filter((item) => item.practicalMerchantAction.value?.toLowerCase().includes("does not require") || item.practicalMerchantAction.value?.toLowerCase().includes("no agreement")).length,
     contractDependentFindings: findings.filter((item) => item.contractualCompliance.state === "contract_required").length,
     queuedResearchQuestions: researchQueue.selected.length + researchQueue.deferred.length,
+    datedNetworkEvidenceFindings: findings.filter((item) => item.datedNetworkEvidence).length,
+    officialNetworkRateComparisons: 0,
+    statementNoticeRecords,
   };
 }
 

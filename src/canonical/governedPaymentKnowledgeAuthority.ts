@@ -22,9 +22,16 @@ import {
   resolveGovernedPerItemKnowledgeV1,
   type GovernedPerItemResolution,
 } from "./governedPerItemKnowledgeV1.js";
+import {
+  GOVERNED_DATED_NETWORK_FEE_EVIDENCE_V1,
+  governedDatedNetworkRulesV1,
+  governedNetworkNoticeEventsV1,
+  resolveGovernedDatedNetworkFeeEvidenceV1,
+  type GovernedDatedNetworkFeeEvidenceResolution,
+} from "./governedDatedNetworkFeeEvidenceV1.js";
 
 export const GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION =
-  "governed_payment_knowledge_authority_2026_09_07_batch2_v3" as const;
+  "governed_payment_knowledge_authority_2026_09_07_batch3_v1" as const;
 
 export type GovernedNormUnit =
   | "usd_per_event"
@@ -67,6 +74,7 @@ export type GovernedKnowledgeResolution = {
   semanticSourceAuthorityByEvidenceRef: Readonly<Record<string, FeeSemanticSourceAuthority>>;
   pricingLayers: GovernedPricingLayerResolution;
   perItem: GovernedPerItemResolution;
+  datedNetworkFeeEvidence: GovernedDatedNetworkFeeEvidenceResolution;
   authorityVersion: typeof GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION;
   semanticCatalogVersion: string;
   normCatalogVersion: string;
@@ -244,12 +252,18 @@ export class GovernedPaymentKnowledgeAuthority {
       analysis: input.analysis,
       semanticRows: semantics.rows,
     });
+    const datedNetworkFeeEvidence = resolveGovernedDatedNetworkFeeEvidenceV1({
+      analysis: input.analysis,
+      semanticRows: semantics.rows,
+      perItemRowsByFeeRowId: perItem.rowsByFeeRowId,
+    });
     return deepFreeze({
       semantics,
       normsByFeeRowId,
       semanticSourceAuthorityByEvidenceRef,
       pricingLayers,
       perItem,
+      datedNetworkFeeEvidence,
       authorityVersion: this.authorityVersion,
       semanticCatalogVersion: semantics.catalogVersion,
       normCatalogVersion: this.normCatalogVersion,
@@ -279,6 +293,9 @@ export class GovernedPaymentKnowledgeAuthority {
       pricingLayerRules: governedPricingLayerRulesV1(),
       perItemCatalogVersion: GOVERNED_PER_ITEM_KNOWLEDGE_V1,
       perItemRules: governedPerItemRulesV1(),
+      datedNetworkFeeEvidenceCatalogVersion: GOVERNED_DATED_NETWORK_FEE_EVIDENCE_V1,
+      datedNetworkFeeEvidenceRules: governedDatedNetworkRulesV1(),
+      datedNetworkNoticeEvents: governedNetworkNoticeEventsV1(),
       norms: NORMS,
     })).digest("hex");
   }
