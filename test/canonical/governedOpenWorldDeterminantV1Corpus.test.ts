@@ -60,6 +60,7 @@ describe("Open-World Determinant & Unknown-Fee Analysis v1", () => {
     const stopped = rows.filter((row) => row.determinant.stoppingReason === "S1_DETERMINANT_SUFFICIENCY");
     const researchEscalations = rows.filter((row) => row.determinant.research.disposition === "ESCALATE_BOUNDED_RESEARCH");
     const queued = corpus.reduce((sum, item) => sum + item.report.coverage.queuedResearchQuestions, 0);
+    const calibratedResearchItems = corpus.flatMap((item) => [...item.report.researchQueue.selected, ...item.report.researchQueue.deferred]);
     const metrics = {
       statements: corpus.length,
       materialRows: rows.length,
@@ -82,6 +83,7 @@ describe("Open-World Determinant & Unknown-Fee Analysis v1", () => {
       researchStoppedBySufficiency: stopped.length,
       exactIdentityUnresolvedNotQueued: rows.filter((row) => row.determinant.exactIdentity.state !== "exact_supported" && row.determinant.research.disposition === "STOP").length,
       queued,
+      stage0SuppressedExternalResearch: researchEscalations.length - queued,
     };
     console.info("OPEN_WORLD_DETERMINANT_CORPUS_METRICS", JSON.stringify(metrics));
     expect(metrics).toEqual({
@@ -105,8 +107,12 @@ describe("Open-World Determinant & Unknown-Fee Analysis v1", () => {
       researchEscalations: 200,
       researchStoppedBySufficiency: 247,
       exactIdentityUnresolvedNotQueued: 206,
-      queued: 200,
+      queued: 168,
+      stage0SuppressedExternalResearch: 32,
     });
+    expect(calibratedResearchItems).toHaveLength(queued);
+    expect(calibratedResearchItems.every((item) => item.calibration.stage0.decision === "RESEARCH")).toBe(true);
+    expect(calibratedResearchItems.every((item) => item.calibration.budget.maximumExternalOperations <= 8)).toBe(true);
     expect(familyKnown.some((row) => row.determinant.determinantSufficiency === "DETERMINANT_SUFFICIENT" && row.determinant.research.disposition === "STOP")).toBe(true);
     expect(unresolved.length).toBeGreaterThan(0);
     expect(unresolved.every((row) => !row.determinant.renderingPermissions.acquiringSideLanguageAllowed && !row.determinant.renderingPermissions.networkOwnershipLanguageAllowed)).toBe(true);

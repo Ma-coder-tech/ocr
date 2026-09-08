@@ -30,6 +30,10 @@ import type {
   GovernedCurrent2026Source,
 } from "./governedCurrent2026UsCoreNetworkReferenceV1.js";
 import type { OpenWorldFeeDeterminant } from "./governedOpenWorldDeterminantV1.js";
+import {
+  buildUnknownFeeResearchPlanV1,
+  type UnknownFeeResearchPlanV1,
+} from "./unknownFeeResearchCalibrationV1.js";
 import { assessCanonicalExactFeeRowArithmetic } from "./exactSourceArithmeticBridge.js";
 import {
   FEE_KNOWLEDGE_RESEARCH_LIMITS,
@@ -200,6 +204,7 @@ export type InternalAnalystResearchQueueV1 = {
     question: FeeKnowledgeResearchQuestion;
     priorityScore: number;
     reasonCodes: string[];
+    calibration: UnknownFeeResearchPlanV1;
   }>;
   deferred: Array<{
     questionRef: string;
@@ -207,6 +212,7 @@ export type InternalAnalystResearchQueueV1 = {
     question: FeeKnowledgeResearchQuestion;
     priorityScore: number;
     reasonCodes: string[];
+    calibration: UnknownFeeResearchPlanV1;
   }>;
   limitations: string[];
 };
@@ -1054,10 +1060,31 @@ function buildInternalAnalystResearchQueue(
       .filter((finding): finding is InternalAnalystFinding & { sourceFeeRowId: string } => Boolean(finding.sourceFeeRowId))
       .map((finding) => [finding.sourceFeeRowId, finding]),
   );
+  const rowByFeeRowId = new Map(analysis.feeLedger.rows.map((row) => [row.id, row]));
+  const statementYear = analysis.identity.statementPeriod.value?.start?.slice(0, 4) ?? null;
+  const calibrationByFeeRowId = new Map(
+    [...findingByFeeRowId.entries()].flatMap(([feeRowId, finding]) => {
+      const row = rowByFeeRowId.get(feeRowId);
+      const determinant = finding.openWorldDeterminants;
+      if (!row || !determinant) return [];
+      return [[feeRowId, buildUnknownFeeResearchPlanV1({
+        feeRowId,
+        printedLabel: row.selectedLabel,
+        processorName: researchProcessorContext(analysis),
+        statementYear,
+        statementRole: row.role,
+        determinant,
+      })] as const];
+    }),
+  );
   const questions = defaultFeeKnowledgeResearchQuestions(analysis)
     .filter((question) => {
       const finding = findingByFeeRowId.get(question.feeRowRef);
-      return Boolean(finding?.openWorldDeterminants?.research.disposition === "ESCALATE_BOUNDED_RESEARCH");
+      const calibration = calibrationByFeeRowId.get(question.feeRowRef);
+      return Boolean(
+        finding?.openWorldDeterminants?.research.disposition === "ESCALATE_BOUNDED_RESEARCH" &&
+        calibration?.stage0.decision === "RESEARCH"
+      );
     })
     .map((question): FeeKnowledgeResearchQuestion => ({
       ...question,
@@ -1075,6 +1102,7 @@ function buildInternalAnalystResearchQueue(
     question: item.question,
     priorityScore: item.score,
     reasonCodes: item.reasonCodes,
+    calibration: calibrationByFeeRowId.get(item.question.feeRowRef)!,
   });
   return {
     schemaVersion: "internal_analyst_research_queue_v1",
@@ -1088,8 +1116,16 @@ function buildInternalAnalystResearchQueue(
       "Legacy category, ownership, contract-control, confidence, and actionability fields are neutralized before queueing so older deterministic conclusions do not bias research authority.",
       "Research output remains non-authoritative until the analyst admission gate receives independent evidence, source references, and a review date.",
       "Missing exact identity alone does not create a research task when D1-D4 are sufficient for a safe, useful finding.",
+      "Calibration classifies label type, applies Stage-0 determinant/materiality gating, and supplies distinct hypothesis-driven query shapes before any external operation.",
+      "Ordinary calibrated research is capped per fee at three to four searches, two to three document fetches, one synthesis call, and no more than eight total external operations.",
     ],
   };
+}
+
+function researchProcessorContext(analysis: CanonicalStatementAnalysis): string | null {
+  const processorName = analysis.identity.processorName.value;
+  if (processorName && /FISERV|FIRST DATA|CLOVER|PAYSAFE|BASYS|NXGEN|PRIORITY|WELLS FARGO/i.test(processorName)) return processorName;
+  return analysis.identity.processorFamily.value ?? processorName;
 }
 
 function coverage(
