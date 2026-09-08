@@ -13,10 +13,10 @@ import { parsePdf } from "../../src/parser.js";
 const US_CONTEXT = { geography: { value: "us", evidenceClass: "statement_local" as const, evidenceRefs: ["supported_fiserv_us_scope"] } };
 
 describe("Unknown-Fee Research Calibration & Retrieval Strategy v1", () => {
-  it("routes the two live-test fees through distinct processor-aware query shapes and stops already-usable exact pricing rows", async () => {
+  it("warrants the decision-relevant proprietary fee and suppresses determinant-sufficient rows", async () => {
     const { analysis, report } = await reportFor("Nov_2024_Statement.pdf", "restaurant_food_beverage");
     const monthly = queueItem(report, analysis, "MONTHLY ADVANTAGE FEE");
-    const batch = queueItem(report, analysis, "BATCH SETTLEMENT FEE");
+    const batch = stage0Plan(report, analysis, "BATCH SETTLEMENT FEE");
     const salesDiscountRow = analysis.feeLedger.rows.find((row) => row.selectedLabel.includes("AMEX SALES DISCOUNT"))!;
     const salesDiscountFinding = report.findings.find((finding) => finding.sourceFeeRowId === salesDiscountRow.id)!;
     const salesDiscount = buildUnknownFeeResearchPlanV1({
@@ -43,17 +43,23 @@ describe("Unknown-Fee Research Calibration & Retrieval Strategy v1", () => {
     expect(monthly.calibration.queryShapes.some((shape) => shape.query.includes("MCVDB") && shape.query.includes("AMDS") && shape.query.includes("Clover"))).toBe(true);
     expect(new Set(monthly.calibration.queryShapes.map((shape) => shape.query)).size).toBe(monthly.calibration.queryShapes.length);
 
-    expect(batch.calibration).toMatchObject({
+    expect(batch).toMatchObject({
       primaryType: "F_UNFAMILIAR_PER_ITEM_OR_RECURRING",
-      stage0: { decision: "RESEARCH", unresolvedMaterialDeterminant: true },
-      budget: { maximumExternalOperations: 7 },
+      stage0: {
+        decision: "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        researchWarranted: false,
+        determinantSufficient: true,
+        exactIdentityMateriallyChangesConclusion: false,
+        proposedResearchFields: [],
+        stoppingReason: "S1_DETERMINANT_SUFFICIENCY",
+      },
+      budget: { maximumExternalOperations: 0 },
     });
-    expect(batch.calibration.queryShapes.map((shape) => shape.kind)).toEqual([
-      "EXACT_QUOTED_LABEL",
-      "MECHANIC_POPULATION_HYPOTHESIS",
-      "PROCESSOR_FEE_SCHEDULE",
-    ]);
-    expect(batch.calibration.queryShapes[1]?.query).toContain("individual_charge");
+    expect(batch.queryShapes).toEqual([]);
+    expect(batch.stage0.establishedEvidence).toEqual(expect.arrayContaining([
+      expect.objectContaining({ field: "assessment_mechanic", value: "per_item" }),
+      expect.objectContaining({ field: "printed_arithmetic_correctness", value: "reproduces" }),
+    ]));
 
     expect(salesDiscount.stage0).toMatchObject({
       decision: "STOP_WITHOUT_EXTERNAL_RESEARCH",
@@ -186,6 +192,18 @@ function queueItem(
   const item = [...report.researchQueue.selected, ...report.researchQueue.deferred].find((candidate) => candidate.question.feeRowRef === row.id);
   if (!item) throw new Error(`research plan missing: ${labelPart}`);
   return item;
+}
+
+function stage0Plan(
+  report: ReturnType<typeof buildInternalAnalystFindingV1>,
+  analysis: ReturnType<typeof buildCanonicalStatementFactsFromParsedDocument>,
+  labelPart: string,
+) {
+  const row = analysis.feeLedger.rows.find((item) => item.selectedLabel.includes(labelPart));
+  if (!row) throw new Error(`row missing: ${labelPart}`);
+  const item = report.researchQueue.stage0Decisions.find((candidate) => candidate.feeRowId === row.id);
+  if (!item) throw new Error(`stage0 plan missing: ${labelPart}`);
+  return item.calibration;
 }
 
 function planFor(

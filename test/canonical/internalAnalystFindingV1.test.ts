@@ -148,7 +148,7 @@ describe("Internal Analyst Finding v1", () => {
       execution: "not_run_by_report_builder",
     });
     const queuedResearch = [...researched.researchQueue.selected, ...researched.researchQueue.deferred];
-    expect(queuedResearch.some((item) => item.question.feeRowRef === additional.id)).toBe(true);
+    expect(queuedResearch.some((item) => item.question.feeRowRef === additional.id)).toBe(false);
     expect(queuedResearch.some((item) => item.question.feeRowRef === cpu.id)).toBe(false);
     expect(cpuFinding.openWorldDeterminants).toMatchObject({
       exactIdentity: { state: "family_known_identity_unresolved" },

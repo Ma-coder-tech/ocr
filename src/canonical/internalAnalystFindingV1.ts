@@ -33,6 +33,9 @@ import type { OpenWorldFeeDeterminant } from "./governedOpenWorldDeterminantV1.j
 import {
   buildUnknownFeeResearchPlanV1,
   type UnknownFeeResearchPlanV1,
+  type UnknownFeeStage0EvidenceFieldV1,
+  type UnknownFeeStage0ReconciliationV1,
+  type UnknownFeeStage0UnresolvedFieldV1,
 } from "./unknownFeeResearchCalibrationV1.js";
 import { assessCanonicalExactFeeRowArithmetic } from "./exactSourceArithmeticBridge.js";
 import {
@@ -198,6 +201,11 @@ export type InternalAnalystResearchQueueV1 = {
   transport: "feeKnowledge_research_v1";
   authority: "research_leads_only";
   execution: "not_run_by_report_builder";
+  stage0Decisions: Array<{
+    findingId: string;
+    feeRowId: string;
+    calibration: UnknownFeeResearchPlanV1;
+  }>;
   selected: Array<{
     questionRef: string;
     findingId: string;
@@ -476,6 +484,9 @@ function buildFeeFinding(input: {
   const mastercardFocusedBasis = input.mastercardFocusedEvidence.matchedRuleRefs.length > 0
     ? evidence("G1_governed_payment_knowledge", input.mastercardFocusedEvidence.matchedRuleRefs, "governed_knowledge")
     : null;
+  const openWorldKnowledgeBasis = input.openWorldDeterminants.matchedRuleRefs.length > 0
+    ? evidence("G1_governed_payment_knowledge", input.openWorldDeterminants.matchedRuleRefs, "governed_knowledge")
+    : null;
   const identityValue = input.usNetworkFeeEvidence.identity.state === "supported"
     ? input.usNetworkFeeEvidence.identity.value
     : input.perItem.exactIdentityDisposition === "suppress_as_unresolved"
@@ -498,19 +509,23 @@ function buildFeeFinding(input: {
     )
     : unresolvedClaim<string>(input.perItem.exactIdentityDisposition === "suppress_as_unresolved" ? input.perItem.exactIdentityReason : "Exact identity is not established; candidates remain research leads.", compact([perItemKnowledgeBasis, evidence("E1_statement", rowEvidence, "statement_fact")]));
   const perItemCategory = input.perItem.applicable && input.perItem.economicLayer !== "PER_ITEM_LAYER_UNRESOLVED" ? input.perItem.economicLayer : null;
-  const categoryValue = perItemCategory ?? input.pricingLayer.broaderEconomicCategory ?? admitted?.claims.broaderEconomicCategory ?? categoryFor(semantic, input.row.selectedLabel);
+  const legacyCategory = categoryFor(semantic, input.row.selectedLabel);
+  const openWorldCategory = categoryFromOpenWorldFamily(input.openWorldDeterminants.family.value);
+  const categoryValue = perItemCategory ?? input.pricingLayer.broaderEconomicCategory ?? admitted?.claims.broaderEconomicCategory ?? legacyCategory ?? openWorldCategory;
   const category = categoryValue
     ? claim(
-      perItemCategory ? "supported" : input.pricingLayer.broaderEconomicCategory ? "supported" : identityValue ? "supported" : "industry_judgment",
+      perItemCategory || input.pricingLayer.broaderEconomicCategory || identityValue || (!legacyCategory && openWorldCategory) ? "supported" : "industry_judgment",
       categoryValue,
-      perItemCategory ? input.perItem.confidence : input.pricingLayer.broaderEconomicCategory ? input.pricingLayer.confidence : identityValue ? "STRONG" : "CATEGORY_ONLY",
-      [...publishedBasis, ...compact([knowledgeBasis, pricingKnowledgeBasis, perItemKnowledgeBasis, researchBasis, evidence("E1_statement", rowEvidence, "statement_fact")])],
+      perItemCategory ? input.perItem.confidence : input.pricingLayer.broaderEconomicCategory ? input.pricingLayer.confidence : identityValue ? "STRONG" : input.openWorldDeterminants.family.confidence,
+      [...publishedBasis, ...compact([knowledgeBasis, pricingKnowledgeBasis, perItemKnowledgeBasis, !legacyCategory && openWorldCategory ? openWorldKnowledgeBasis : null, researchBasis, evidence("E1_statement", rowEvidence, "statement_fact")])],
       perItemCategory
         ? "Economic layer follows the admitted Batch 2 per-item decision procedure; population evidence remains separate from ownership and price control."
         : input.pricingLayer.broaderEconomicCategory
         ? "Economic category follows admitted Batch 1 pricing-layer knowledge without asserting profit, retention, or contract compliance."
         : identityValue
           ? "Economic category follows the admitted meaning, independently of pricing or contract conclusions."
+          : !legacyCategory && openWorldCategory
+            ? "The processor-neutral Open-World family is supported by statement structure and governed determinant rules; exact identity, retention, recurrence, and contract compliance remain separate."
           : "Category is supported by printed mechanics/position even though exact identity remains unresolved.",
       [...input.pricingLayer.limitations, ...input.perItem.limitations],
     )
@@ -550,7 +565,7 @@ function buildFeeFinding(input: {
     ? input.perItem.population.value
     : input.pricingLayer.assessmentBasis.state === "supported"
     ? input.pricingLayer.assessmentBasis.value
-    : input.pricingModel?.relevantPopulation ?? mechanicValue;
+    : input.openWorldDeterminants.d2MechanicAndPopulation.population.value ?? input.pricingModel?.relevantPopulation ?? mechanicValue;
   const population = populationValue
     ? claim("supported", populationValue, input.usNetworkFeeEvidence.population.state === "supported" ? "STRONG" : "LIKELY", input.usNetworkFeeEvidence.population.state === "supported" ? compact([usNetworkKnowledgeBasis, usNetworkPublishedBasis, evidence("E1_statement", rowEvidence, "statement_fact")]) : [evidence("E1_statement", rowEvidence, "statement_fact")], input.usNetworkFeeEvidence.population.state === "supported" ? "The dated Fiserv source supports this fee-specific population. It is not inferred from count matching and is not forced to equal another statement population." : "The fee line's supported assessment basis takes precedence over a broader pricing-model population; no statement-wide basis is inferred.")
     : unresolvedClaim<string>("Relevant transaction or volume population is not established.", [evidence("E1_statement", rowEvidence, "statement_fact")]);
@@ -974,9 +989,28 @@ function categoryFor(semantic: FeeSemanticsShadowRowResult, label: string): stri
   if (/CHARGEBACK|RETRIEVAL|DISPUTE|ACH REJECT/.test(text)) return "exception_and_dispute";
   if (/AUTH|GATEWAY|GTWY|AVS|CPU/.test(text)) return "authorization_gateway_technology";
   if (/PCI|COMPLIANCE/.test(text)) return "compliance_and_security";
-  if (/MONTHLY|STATEMENT|ACCOUNT FEE|REGULATORY PRODUCT/.test(text)) return "administrative_and_account";
+  if (/MONTHLY SERVICE|MTHLY SERVICE|STATEMENT FEE|PAPER STATEM|ACCOUNT FEE|ADMIN(?:ISTRATIVE)? FEE|REGULATORY PRODUCT/.test(text)) return "administrative_and_account";
   if (/DISC(?:OUNT)? RATE/.test(text) && !/QUAL DISC|MQUAL|NQUAL/.test(text)) return "merchant_facing_pricing_candidate";
   return null;
+}
+
+function categoryFromOpenWorldFamily(family: OpenWorldFeeDeterminant["family"]["value"]): string | null {
+  if (!family) return null;
+  return ({
+    F1: "interchange",
+    F2: "network_assessment_or_dues",
+    F3: "network_per_event_or_access",
+    F4: "network_fixed_or_periodic",
+    F5: "acquiring_ad_valorem",
+    F6: "acquiring_per_item",
+    F7: "acquiring_fixed_or_administrative",
+    F8: "acquiring_exception_or_event",
+    F9: "technology_gateway_or_software",
+    F10: "security_compliance_or_risk",
+    F11: "equipment_physical_or_lease",
+    F12: "nonprocessing_pass_through",
+    F13: "not_a_fee",
+  } satisfies Record<NonNullable<OpenWorldFeeDeterminant["family"]["value"]>, string>)[family];
 }
 
 function mechanicFromCanonical(row: CanonicalFeeRow, analysis: CanonicalStatementAnalysis): string | null {
@@ -1074,6 +1108,7 @@ function buildInternalAnalystResearchQueue(
         statementYear,
         statementRole: row.role,
         determinant,
+        reconciliation: buildStage0Reconciliation(finding),
       })] as const];
     }),
   );
@@ -1081,10 +1116,7 @@ function buildInternalAnalystResearchQueue(
     .filter((question) => {
       const finding = findingByFeeRowId.get(question.feeRowRef);
       const calibration = calibrationByFeeRowId.get(question.feeRowRef);
-      return Boolean(
-        finding?.openWorldDeterminants?.research.disposition === "ESCALATE_BOUNDED_RESEARCH" &&
-        calibration?.stage0.decision === "RESEARCH"
-      );
+      return Boolean(finding?.openWorldDeterminants && calibration?.stage0.decision === "RESEARCH");
     })
     .map((question): FeeKnowledgeResearchQuestion => ({
       ...question,
@@ -1109,6 +1141,11 @@ function buildInternalAnalystResearchQueue(
     transport: "feeKnowledge_research_v1",
     authority: "research_leads_only",
     execution: "not_run_by_report_builder",
+    stage0Decisions: [...calibrationByFeeRowId.entries()].map(([feeRowId, calibration]) => ({
+      findingId: findingByFeeRowId.get(feeRowId)!.findingId,
+      feeRowId,
+      calibration,
+    })),
     selected: plan.selected.map(queueItem),
     deferred: plan.notSelectedQuestions.map(queueItem),
     limitations: [
@@ -1120,6 +1157,111 @@ function buildInternalAnalystResearchQueue(
       "Ordinary calibrated research is capped per fee at three to four searches, two to three document fetches, one synthesis call, and no more than eight total external operations.",
     ],
   };
+}
+
+function buildStage0Reconciliation(finding: InternalAnalystFinding): UnknownFeeStage0ReconciliationV1 {
+  const determinant = finding.openWorldDeterminants!;
+  const establishedEvidence: UnknownFeeStage0EvidenceFieldV1[] = [];
+  const unresolvedFields: UnknownFeeStage0UnresolvedFieldV1[] = [];
+  const addOpenWorld = (field: string, claim: { value: unknown; confidence: string; evidenceRefs: string[] }) => {
+    if (claim.value === null || claim.value === undefined || claim.value === "LAYER_UNRESOLVED") return;
+    establishedEvidence.push({ field, value: stage0Value(claim.value), confidence: claim.confidence, evidenceRefs: claim.evidenceRefs, sourceLayer: "open_world" });
+  };
+  const addAnalyst = (field: string, claim: AnalystClaim<unknown>) => {
+    if (claim.value === null || ["unresolved", "not_assessable", "contract_required", "not_applicable"].includes(claim.state)) return;
+    const evidenceRefs = [...new Set(claim.evidence.flatMap((basis) => basis.refs))];
+    const sourceLayer = claim.evidence.some((basis) => basis.evidenceClass === "G1_governed_payment_knowledge")
+      ? "governed_knowledge" as const
+      : claim.evidence.some((basis) => basis.evidenceClass === "E1_statement")
+        ? "canonical_statement" as const
+        : "internal_analyst" as const;
+    establishedEvidence.push({ field, value: stage0Value(claim.value), confidence: claim.confidence, evidenceRefs, sourceLayer });
+  };
+  addOpenWorld("fee_family", determinant.family);
+  addOpenWorld("economic_layer", determinant.d1EconomicLayerAndControl.economicLayer);
+  addOpenWorld("collector", determinant.d1EconomicLayerAndControl.collector);
+  addOpenWorld("economic_beneficiary", determinant.d1EconomicLayerAndControl.economicBeneficiary);
+  addOpenWorld("rule_setter", determinant.d1EconomicLayerAndControl.ruleSetter);
+  addOpenWorld("price_setter", determinant.d1EconomicLayerAndControl.priceSetter);
+  addOpenWorld("merchant_facing_price_controller", determinant.d1EconomicLayerAndControl.merchantFacingPriceController);
+  addOpenWorld("assessment_mechanic", determinant.d2MechanicAndPopulation.mechanic);
+  addOpenWorld("relevant_population", determinant.d2MechanicAndPopulation.population);
+  addOpenWorld("cardinality", determinant.cardinality);
+  addAnalyst("exact_fee_identity", finding.exactFeeIdentity);
+  addAnalyst("broader_economic_category", finding.broaderEconomicCategory);
+  addAnalyst("assessment_mechanic", finding.assessmentUnitOrMechanic);
+  addAnalyst("collector", finding.collector);
+  addAnalyst("economic_beneficiary", finding.economicBeneficiary);
+  addAnalyst("rule_setter", finding.ruleSetter);
+  addAnalyst("price_setter", finding.priceSetter);
+  addAnalyst("merchant_facing_price_controller", finding.merchantFacingPriceController);
+  addAnalyst("printed_arithmetic_correctness", finding.printedArithmeticCorrectness);
+  addAnalyst("pricing_model", finding.pricingModel);
+  addAnalyst("relevant_population", finding.relevantPopulationOrBase);
+  addAnalyst("commercial_reasonableness", finding.commercialReasonableness);
+  addAnalyst("practical_merchant_action", finding.practicalMerchantAction);
+
+  const hasEstablished = (field: string) => establishedEvidence.some((item) => item.field === field);
+  const unresolved = (field: string, decisionRelevant: boolean, requiresMerchantDocument: boolean, rationale: string) => {
+    if (!hasEstablished(field) && !unresolvedFields.some((item) => item.field === field)) unresolvedFields.push({ field, decisionRelevant, requiresMerchantDocument, rationale });
+  };
+  unresolved("exact_fee_identity", determinant.exactIdentity.necessaryForUsefulAction, false, determinant.exactIdentity.explanation);
+  unresolved("economic_layer", determinant.d4Actionability.actionClass === "N7", false, determinant.d1EconomicLayerAndControl.economicLayer.explanation);
+  unresolved("economic_beneficiary", false, false, determinant.d1EconomicLayerAndControl.economicBeneficiary.explanation);
+  unresolved("rule_setter", false, false, determinant.d1EconomicLayerAndControl.ruleSetter.explanation);
+  unresolved("price_setter", determinant.d4Actionability.actionClass === "N7", false, determinant.d1EconomicLayerAndControl.priceSetter.explanation);
+  unresolved("merchant_facing_price_controller", determinant.d4Actionability.actionClass === "N7", false, determinant.d1EconomicLayerAndControl.merchantFacingPriceController.explanation);
+  unresolved("assessment_mechanic", determinant.d4Actionability.actionClass === "N7", false, determinant.d2MechanicAndPopulation.mechanic.explanation);
+  unresolved("relevant_population", determinant.d4Actionability.actionClass === "N7", false, determinant.d2MechanicAndPopulation.population.explanation);
+  unresolved("printed_arithmetic_correctness", false, false, finding.printedArithmeticCorrectness.explanation);
+  unresolved("commercial_reasonableness", false, false, finding.commercialReasonableness.explanation);
+  unresolved("contractual_compliance", false, true, finding.contractualCompliance.explanation);
+  if (determinant.family.value === "F7" && determinant.d2MechanicAndPopulation.mechanic.value === "fixed_or_printed_charge") {
+    unresolved("recurrence", false, false, "Only the current statement occurrence is established; recurrence must not be inferred from a single statement.");
+  }
+
+  const conflicting = finding.competingInterpretations.filter((item) => item.status === "conflicting");
+  const explicitConflicts = conflicting.length > 0
+    ? [{ field: "governed_interpretation", interpretations: [...new Set(conflicting.map((item) => item.interpretation))], evidenceRefs: [...new Set(conflicting.flatMap((item) => item.evidenceRefs))] }]
+    : determinant.research.reasonCodes.includes("competing_interpretations")
+      ? [{ field: "governed_interpretation", interpretations: determinant.retrieval.candidateConceptIds, evidenceRefs: determinant.family.evidenceRefs }]
+      : [];
+  const evidenceByField = establishedEvidence.reduce((groups, item) => {
+    const entries = groups.get(item.field) ?? [];
+    entries.push(item);
+    groups.set(item.field, entries);
+    return groups;
+  }, new Map<string, UnknownFeeStage0EvidenceFieldV1[]>());
+  const comparableCrossLayerFields = new Set([
+    "exact_fee_identity",
+    "broader_economic_category",
+    "collector",
+    "economic_beneficiary",
+    "rule_setter",
+    "price_setter",
+    "merchant_facing_price_controller",
+  ]);
+  const crossLayerConflicts = [...evidenceByField.entries()].flatMap(([field, entries]) => {
+    const interpretations = [...new Set(entries.map((item) => item.value))];
+    const sourceLayers = new Set(entries.map((item) => item.sourceLayer));
+    return comparableCrossLayerFields.has(field) && interpretations.length > 1 && sourceLayers.size > 1
+      ? [{ field, interpretations, evidenceRefs: [...new Set(entries.flatMap((item) => item.evidenceRefs))] }]
+      : [];
+  });
+  return {
+    establishedEvidence,
+    unresolvedFields,
+    governedConflicts: [...explicitConflicts, ...crossLayerConflicts],
+    currentMerchantConclusion: {
+      actionClass: determinant.d4Actionability.actionClass,
+      action: finding.practicalMerchantAction.value ?? determinant.d4Actionability.action,
+      confidence: finding.practicalMerchantAction.confidence,
+    },
+  };
+}
+
+function stage0Value(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
 }
 
 function researchProcessorContext(analysis: CanonicalStatementAnalysis): string | null {

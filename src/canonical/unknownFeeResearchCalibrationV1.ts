@@ -2,6 +2,34 @@ import type { OpenWorldFeeDeterminant } from "./governedOpenWorldDeterminantV1.j
 
 export const UNKNOWN_FEE_RESEARCH_CALIBRATION_V1 =
   "unknown_fee_research_calibration_retrieval_strategy_2026_09_08_v1" as const;
+export const DECISION_RELEVANT_STAGE0_WARRANT_GATE_V1 =
+  "decision_relevant_stage0_warrant_gate_2026_09_08_v1" as const;
+
+export type UnknownFeeStage0EvidenceFieldV1 = {
+  field: string;
+  value: string;
+  confidence: string;
+  evidenceRefs: string[];
+  sourceLayer: "canonical_statement" | "internal_analyst" | "open_world" | "governed_knowledge";
+};
+
+export type UnknownFeeStage0UnresolvedFieldV1 = {
+  field: string;
+  decisionRelevant: boolean;
+  requiresMerchantDocument: boolean;
+  rationale: string;
+};
+
+export type UnknownFeeStage0ReconciliationV1 = {
+  establishedEvidence: UnknownFeeStage0EvidenceFieldV1[];
+  unresolvedFields: UnknownFeeStage0UnresolvedFieldV1[];
+  governedConflicts: Array<{ field: string; interpretations: string[]; evidenceRefs: string[] }>;
+  currentMerchantConclusion: {
+    actionClass: OpenWorldFeeDeterminant["d4Actionability"]["actionClass"];
+    action: string;
+    confidence: string;
+  };
+};
 
 export type UnknownFeeResearchType =
   | "A_PROPRIETARY_BRANDED"
@@ -55,12 +83,20 @@ export type UnknownFeeResearchPlanV1 = {
     statementRole: string | null;
   };
   stage0: {
+    gateVersion: typeof DECISION_RELEVANT_STAGE0_WARRANT_GATE_V1;
     decision: "RESEARCH" | "STOP_WITHOUT_EXTERNAL_RESEARCH";
+    researchWarranted: boolean;
+    adjudicationRequired: boolean;
     determinantSufficient: boolean;
     exactIdentityMateriallyChangesConclusion: boolean;
     unresolvedMaterialDeterminant: boolean;
+    establishedEvidence: UnknownFeeStage0EvidenceFieldV1[];
+    unresolvedFields: UnknownFeeStage0UnresolvedFieldV1[];
+    governedConflicts: UnknownFeeStage0ReconciliationV1["governedConflicts"];
+    proposedResearchFields: string[];
+    whyResearchCouldChangeMerchantDecision: string[];
     reasonCodes: string[];
-    stoppingReason: "S1_DETERMINANT_SUFFICIENCY" | "S2_BELOW_MATERIALITY_FLOOR" | "STRUCTURAL_ANALYSIS_PREFERRED" | null;
+    stoppingReason: "S1_DETERMINANT_SUFFICIENCY" | "S2_BELOW_MATERIALITY_FLOOR" | "STRUCTURAL_ANALYSIS_PREFERRED" | "GOVERNED_EVIDENCE_CONFLICT" | null;
   };
   budget: {
     maximumSearchShapes: number;
@@ -88,6 +124,7 @@ export type UnknownFeeResearchStopDecisionV1 = {
     | "S3_TWO_DISTINCT_SHAPES_NO_USABLE_EVIDENCE"
     | "S3_RESEARCH_STAGNATION"
     | "S4_SOURCE_QUALITY_FAILURE"
+    | "GOVERNED_EVIDENCE_CONFLICT"
     | "BUDGET_EXHAUSTED"
     | null;
   reasonCodes: string[];
@@ -132,6 +169,7 @@ export function buildUnknownFeeResearchPlanV1(input: {
   statementYear: string | null;
   statementRole: string | null;
   determinant: OpenWorldFeeDeterminant;
+  reconciliation?: UnknownFeeStage0ReconciliationV1;
 }): UnknownFeeResearchPlanV1 {
   const label = normalize(input.printedLabel);
   const codeTokens = distinctiveCodeTokens(label);
@@ -144,66 +182,88 @@ export function buildUnknownFeeResearchPlanV1(input: {
     input.determinant.d2MechanicAndPopulation.population.state === "unresolved" ||
     input.determinant.d4Actionability.actionClass === "N7"
   );
+  const reconciliation = input.reconciliation ?? fallbackStage0Reconciliation(input.determinant);
   const exactIdentityMateriallyChangesConclusion = input.determinant.exactIdentity.necessaryForUsefulAction ||
-    input.determinant.d4Actionability.actionClass === "N7" ||
-    (input.determinant.exactIdentity.state !== "exact_supported" &&
-      (input.determinant.d2MechanicAndPopulation.mechanic.state === "unresolved" || input.determinant.d2MechanicAndPopulation.population.state === "unresolved") &&
-      ["per_event", "fixed_or_periodic", "conditional_or_exception"].includes(input.determinant.d3Materiality.volumeSensitivity)) ||
-    (input.determinant.d3Materiality.highMateriality && unresolvedMaterialDeterminant);
+    reconciliation.unresolvedFields.some((field) => field.field === "exact_fee_identity" && field.decisionRelevant && !field.requiresMerchantDocument);
   const merchantConclusionAlreadyUsable =
-    input.determinant.exactIdentity.state === "exact_supported" &&
     input.determinant.d1EconomicLayerAndControl.economicLayer.value !== "LAYER_UNRESOLVED" &&
-    input.determinant.d4Actionability.actionClass !== "N7" &&
-    !input.determinant.d3Materiality.highMateriality;
+    input.determinant.d4Actionability.actionClass !== "N7";
   const genericStructuralDefault = primaryType === "B_GENERIC_DESCRIPTIVE" &&
     !input.determinant.d3Materiality.highMateriality &&
     input.determinant.d4Actionability.actionClass !== "N7";
+  const governedConflicts = reconciliation.governedConflicts;
+  const proposedResearchFields = [...new Set(reconciliation.unresolvedFields
+    .filter((field) => field.decisionRelevant && !field.requiresMerchantDocument)
+    .map((field) => field.field))];
+  const whyResearchCouldChangeMerchantDecision = decisionChangeReasons(input.determinant, reconciliation, proposedResearchFields);
+  const researchCouldChangeMerchantDecision = whyResearchCouldChangeMerchantDecision.length > 0;
+  const baseStage0 = {
+    gateVersion: DECISION_RELEVANT_STAGE0_WARRANT_GATE_V1,
+    determinantSufficient,
+    exactIdentityMateriallyChangesConclusion,
+    unresolvedMaterialDeterminant,
+    establishedEvidence: reconciliation.establishedEvidence,
+    unresolvedFields: reconciliation.unresolvedFields,
+    governedConflicts,
+    proposedResearchFields,
+    whyResearchCouldChangeMerchantDecision,
+  };
   const stage0 = !input.determinant.d3Materiality.material
     ? {
+        ...baseStage0,
         decision: "STOP_WITHOUT_EXTERNAL_RESEARCH" as const,
-        determinantSufficient,
-        exactIdentityMateriallyChangesConclusion,
-        unresolvedMaterialDeterminant,
+        researchWarranted: false,
+        adjudicationRequired: false,
         reasonCodes: ["below_governed_merchant_materiality_threshold"],
         stoppingReason: "S2_BELOW_MATERIALITY_FLOOR" as const,
       }
-    : input.determinant.research.disposition !== "ESCALATE_BOUNDED_RESEARCH"
+    : governedConflicts.length > 0
       ? {
+          ...baseStage0,
           decision: "STOP_WITHOUT_EXTERNAL_RESEARCH" as const,
-          determinantSufficient,
-          exactIdentityMateriallyChangesConclusion,
-          unresolvedMaterialDeterminant,
-          reasonCodes: ["governed_open_world_research_not_escalated", ...input.determinant.research.reasonCodes],
-          stoppingReason: "S1_DETERMINANT_SUFFICIENCY" as const,
+          researchWarranted: false,
+          adjudicationRequired: true,
+          reasonCodes: ["governed_evidence_conflict_preserved", "route_to_domain_adjudication"],
+          stoppingReason: "GOVERNED_EVIDENCE_CONFLICT" as const,
         }
-    : (determinantSufficient || merchantConclusionAlreadyUsable) && !exactIdentityMateriallyChangesConclusion
+    : (determinantSufficient || merchantConclusionAlreadyUsable) && !researchCouldChangeMerchantDecision
       ? {
+          ...baseStage0,
           decision: "STOP_WITHOUT_EXTERNAL_RESEARCH" as const,
-          determinantSufficient,
-          exactIdentityMateriallyChangesConclusion,
-          unresolvedMaterialDeterminant,
-          reasonCodes: [determinantSufficient ? "d1_d4_sufficient" : "merchant_conclusion_already_usable", "exact_identity_adds_no_material_merchant_value"],
+          researchWarranted: false,
+          adjudicationRequired: false,
+          reasonCodes: [determinantSufficient ? "d1_d4_sufficient" : "merchant_conclusion_already_usable", "remaining_unknowns_do_not_change_current_merchant_decision"],
           stoppingReason: "S1_DETERMINANT_SUFFICIENCY" as const,
         }
       : genericStructuralDefault
         ? {
+            ...baseStage0,
             decision: "STOP_WITHOUT_EXTERNAL_RESEARCH" as const,
-            determinantSufficient,
-            exactIdentityMateriallyChangesConclusion,
-            unresolvedMaterialDeterminant,
+            researchWarranted: false,
+            adjudicationRequired: false,
             reasonCodes: ["generic_label_prefers_statement_structure", "price_control_and_actionability_already_usable"],
             stoppingReason: "STRUCTURAL_ANALYSIS_PREFERRED" as const,
           }
-        : {
+        : researchCouldChangeMerchantDecision
+          ? {
+            ...baseStage0,
             decision: "RESEARCH" as const,
-            determinantSufficient,
-            exactIdentityMateriallyChangesConclusion,
-            unresolvedMaterialDeterminant,
+            researchWarranted: true,
+            adjudicationRequired: false,
             reasonCodes: [
               exactIdentityMateriallyChangesConclusion ? "identity_or_interpretation_materially_changes_conclusion" : "material_determinant_gap",
+              "perfect_answer_could_change_merchant_decision",
               ...applicableTypes.map((type) => `research_type_${type.toLowerCase()}`),
             ],
             stoppingReason: null,
+          }
+          : {
+            ...baseStage0,
+            decision: "STOP_WITHOUT_EXTERNAL_RESEARCH" as const,
+            researchWarranted: false,
+            adjudicationRequired: false,
+            reasonCodes: ["unresolved_fields_are_not_decision_relevant", "remaining_unknowns_do_not_change_current_merchant_decision"],
+            stoppingReason: "S1_DETERMINANT_SUFFICIENCY" as const,
           };
   const budget = researchBudget(primaryType, stage0.decision);
   const distinctivePhrase = distinctiveLabelPhrase(label);
@@ -243,6 +303,67 @@ export function buildUnknownFeeResearchPlanV1(input: {
       canonicalMutationAllowed: false,
     },
   };
+}
+
+function fallbackStage0Reconciliation(determinant: OpenWorldFeeDeterminant): UnknownFeeStage0ReconciliationV1 {
+  const establishedEvidence: UnknownFeeStage0EvidenceFieldV1[] = [];
+  const add = (field: string, claim: { value: unknown; confidence: string; evidenceRefs: string[] }, sourceLayer: UnknownFeeStage0EvidenceFieldV1["sourceLayer"]) => {
+    if (claim.value === null || claim.value === undefined) return;
+    establishedEvidence.push({ field, value: String(claim.value), confidence: claim.confidence, evidenceRefs: claim.evidenceRefs, sourceLayer });
+  };
+  add("fee_family", determinant.family, "open_world");
+  add("economic_layer", determinant.d1EconomicLayerAndControl.economicLayer, "open_world");
+  add("collector", determinant.d1EconomicLayerAndControl.collector, "open_world");
+  add("merchant_facing_price_controller", determinant.d1EconomicLayerAndControl.merchantFacingPriceController, "open_world");
+  add("assessment_mechanic", determinant.d2MechanicAndPopulation.mechanic, "open_world");
+  add("relevant_population", determinant.d2MechanicAndPopulation.population, "open_world");
+  add("cardinality", determinant.cardinality, "open_world");
+  if (determinant.exactIdentity.value) establishedEvidence.push({ field: "exact_fee_identity", value: determinant.exactIdentity.value, confidence: "STRONG", evidenceRefs: determinant.family.evidenceRefs, sourceLayer: "governed_knowledge" });
+  const unresolvedFields: UnknownFeeStage0UnresolvedFieldV1[] = [];
+  const unresolved = (field: string, decisionRelevant: boolean, requiresMerchantDocument: boolean, rationale: string) => unresolvedFields.push({ field, decisionRelevant, requiresMerchantDocument, rationale });
+  if (!determinant.exactIdentity.value) unresolved("exact_fee_identity", determinant.exactIdentity.necessaryForUsefulAction, false, determinant.exactIdentity.explanation);
+  if (determinant.d1EconomicLayerAndControl.economicLayer.value === "LAYER_UNRESOLVED") unresolved("economic_layer", determinant.d4Actionability.actionClass === "N7", false, determinant.d1EconomicLayerAndControl.economicLayer.explanation);
+  if (!determinant.d1EconomicLayerAndControl.economicBeneficiary.value) unresolved("economic_beneficiary", false, false, determinant.d1EconomicLayerAndControl.economicBeneficiary.explanation);
+  if (!determinant.d1EconomicLayerAndControl.ruleSetter.value) unresolved("rule_setter", false, false, determinant.d1EconomicLayerAndControl.ruleSetter.explanation);
+  if (!determinant.d1EconomicLayerAndControl.priceSetter.value) unresolved("price_setter", determinant.d4Actionability.actionClass === "N7", false, determinant.d1EconomicLayerAndControl.priceSetter.explanation);
+  if (!determinant.d1EconomicLayerAndControl.merchantFacingPriceController.value) unresolved("merchant_facing_price_controller", determinant.d4Actionability.actionClass === "N7", false, determinant.d1EconomicLayerAndControl.merchantFacingPriceController.explanation);
+  if (determinant.d2MechanicAndPopulation.mechanic.state === "unresolved") unresolved("assessment_mechanic", determinant.d4Actionability.actionClass === "N7", false, determinant.d2MechanicAndPopulation.mechanic.explanation);
+  if (determinant.d2MechanicAndPopulation.population.state === "unresolved") unresolved("relevant_population", determinant.d4Actionability.actionClass === "N7", false, determinant.d2MechanicAndPopulation.population.explanation);
+  unresolved("contractual_compliance", false, true, "Merchant-specific compliance, rights, and remedies require the governing merchant documents.");
+  return {
+    establishedEvidence,
+    unresolvedFields,
+    governedConflicts: determinant.research.reasonCodes.includes("competing_interpretations")
+      ? [{ field: "governed_interpretation", interpretations: determinant.retrieval.candidateConceptIds, evidenceRefs: determinant.family.evidenceRefs }]
+      : [],
+    currentMerchantConclusion: {
+      actionClass: determinant.d4Actionability.actionClass,
+      action: determinant.d4Actionability.action,
+      confidence: determinant.d4Actionability.actionClass === "N7" ? "UNRESOLVED" : "STRONG",
+    },
+  };
+}
+
+function decisionChangeReasons(
+  determinant: OpenWorldFeeDeterminant,
+  reconciliation: UnknownFeeStage0ReconciliationV1,
+  proposedResearchFields: string[],
+): string[] {
+  if (proposedResearchFields.length === 0) return [];
+  const reasons: string[] = [];
+  if (determinant.d4Actionability.actionClass === "N7" && proposedResearchFields.some((field) => ["exact_fee_identity", "economic_layer", "price_setter", "merchant_facing_price_controller"].includes(field))) {
+    reasons.push("Could replace verification-only action with a supported network, commercial, service, operational, or contract-routing action.");
+  }
+  if (determinant.exactIdentity.necessaryForUsefulAction && proposedResearchFields.includes("exact_fee_identity")) {
+    reasons.push("Exact identity is necessary here because it could change the applicable price authority, assessed population, or merchant action.");
+  }
+  if (determinant.research.reasonCodes.includes("applicable_dated_value_or_scope_gap")) {
+    reasons.push("A dated scope or value resolution could change the at-par, spread-review, or routing conclusion.");
+  }
+  if (reconciliation.currentMerchantConclusion.actionClass === "N7" && reasons.length === 0) {
+    reasons.push("Resolving the proposed material determinant could change the current verification-only merchant conclusion.");
+  }
+  return [...new Set(reasons)];
 }
 
 export function classifyUnknownFeeResearchTypesV1(input: {

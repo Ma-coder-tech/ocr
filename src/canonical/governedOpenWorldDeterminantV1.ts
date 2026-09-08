@@ -342,13 +342,17 @@ function resolveRow(input: RowInput): OpenWorldFeeDeterminant {
   const priceSetter = nonFee ? notApplicable<"issuer_or_network" | "card_network" | "acquiring_side_program" | "technology_or_service_provider" | "government_or_third_party">("No fee price setter applies.") : determinePriceSetter(family, input, evidenceRefs);
   const action = determineAction(family, economicLayer.value, controller.value, input, label);
   const d1Supported = economicLayer.value !== "LAYER_UNRESOLVED";
-  const d2Supported = mechanic.state === "supported" || mechanic.state === "not_applicable" || family.value === "F1";
+  const d2Supported = mechanic.state !== "unresolved" || family.value === "F1";
   const d4Supported = action.actionClass !== "N7";
   const determinantSufficiency = d1Supported && d2Supported && d4Supported
     ? "DETERMINANT_SUFFICIENT"
     : [d1Supported, d2Supported, d4Supported].filter(Boolean).length >= 2 ? "PARTIAL" : "INSUFFICIENT";
   const highPriorityResearch = input.usNetwork.research.priority === "high" || input.current.research.priority === "high";
   const conflict = input.semantic.status === "unresolved_conflict" || input.usNetwork.sourceConflicts.length > 0 || input.current.reference.conflicts.length > 0;
+  const exactIdentityNecessary = material && !exactIdentity && (
+    action.actionClass === "N7" ||
+    highPriorityResearch
+  );
   const reusable = material && determinantSufficiency !== "DETERMINANT_SUFFICIENT" && (input.semantic.candidateConceptIds.length > 0 || input.semantic.retrievalLeadConceptIds.length > 0);
   const research = !material
     ? { disposition: "STOP" as const, reasonCodes: ["below_materiality_floor"], question: null }
@@ -369,7 +373,7 @@ function resolveRow(input: RowInput): OpenWorldFeeDeterminant {
     exactIdentity: {
       state: nonFee ? "not_applicable" : exactIdentity ? "exact_supported" : family.value ? "family_known_identity_unresolved" : "identity_unresolved",
       value: nonFee ? null : exactIdentity,
-      necessaryForUsefulAction: material && determinantSufficiency !== "DETERMINANT_SUFFICIENT" && (family.value === "F2" || family.value === "F3" || family.value === "F4" || family.value === null),
+      necessaryForUsefulAction: exactIdentityNecessary,
       explanation: exactIdentity ? "Exact identity is inherited only from existing admitted governed knowledge." : family.value ? "The economic family is useful while exact identity remains unresolved." : "Neither exact identity nor a defensible family is established.",
     },
     family,
@@ -397,7 +401,7 @@ function resolveRow(input: RowInput): OpenWorldFeeDeterminant {
       shareOfMaterialFeeDollarsPercent: amountMinor !== null && input.materialDollarTotalMinor > 0 ? round(amountMinor / input.materialDollarTotalMinor * 100, 2) : null,
       shareOfProcessedSalesBasisPoints: processedSalesBps,
       volumeSensitivity: volumeSensitivity(family, mechanic.value),
-      annualizationAllowed: Boolean(material && /MONTHLY|MTHLY|PER MONTH/.test(label)),
+      annualizationAllowed: Boolean(material && mechanic.value === "fixed_periodic_charge" && /MONTHLY|MTHLY|PER MONTH/.test(label)),
     },
     d4Actionability: action,
     determinantSufficiency,
@@ -453,7 +457,11 @@ function determineFamily(input: RowInput, label: string, nonFee: boolean): OpenW
   if (/EQUIP|LEASE|TERMINAL RENT|TERMINAL LEASE|CLOVER.*PLAN|POS.*RENT/.test(label)) return category("F11", refs, "Explicit equipment, terminal, lease, or physical-product wording supports the broad family.");
   if (/GATEWAY|GTWY|SOFTWARE|ONLINE ACCESS|VIRTUAL TERMINAL|HOSTED/.test(label)) return category("F9", refs, "Explicit technology/service wording supports the broad family; provider and price controller remain independently unresolved.");
   if (/CHARGEBACK|CHARGE BACK|RETRIEVAL|ACH REJECT|RETURN FEE|DISPUTE/.test(label)) return category("F8", refs, "Explicit exception/event terminology supports an acquiring/service exception family; exact provider and trigger remain unresolved.");
-  if (/MONTHLY SERVICE|MTHLY SERVICE|STATEMENT FEE|PAPER STATEM|ACCOUNT FEE|ADMIN(?:ISTRATIVE)? FEE/.test(label)) return category("F7", refs, "Explicit fixed/account/administrative wording supports an acquiring administrative family in the processor statement context.");
+  const accountFeeSection = sections.some((section) => section === "ACCOUNT FEES");
+  if (/MONTHLY SERVICE|MTHLY SERVICE|STATEMENT FEE|PAPER STATEM|ACCOUNT FEE|ADMIN(?:ISTRATIVE)? FEE/.test(label) ||
+      (accountFeeSection && /(?:APPLICATION|SETUP|ACTIVATION|ACCESS|SERVICE|PROGRAM|ACCOUNT|ADMIN(?:ISTRATIVE)?)\s+FEE/.test(label))) {
+    return category("F7", refs, "Explicit account/administrative wording or placement in the statement's Account Fees section supports an acquiring administrative family; recurrence and contractual authorization remain unresolved.");
+  }
   if (/\bTAX\b|GOVERNMENT|REGULATORY|SALES TAX/.test(label)) return category("F12", refs, "Explicit tax, government, or regulatory wording supports a non-processing pass-through family.");
   return unresolved<OpenWorldFeeFamilyCode>("No affirmative statement structure or admitted knowledge supports a fee family; unfamiliarity does not imply acquiring-side ownership.");
 }
@@ -478,10 +486,18 @@ function determineMechanic(input: RowInput, family: OpenWorldClaim<OpenWorldFeeF
   if (input.usNetwork.mechanic.state === "supported") return supported(input.usNetwork.mechanic.value!, refs, "Existing dated governed evidence supports this mechanic.");
   if (input.perItem.applicable && input.perItem.unit.state === "supported") return supported(unitLabel(input.perItem.unit.value!), refs, input.perItem.unit.explanation);
   if (input.pricing.assessmentBasis.state === "supported") return supported(input.pricing.assessmentBasis.value!, refs, input.pricing.assessmentBasis.explanation);
+  const arithmetic = canonicalArithmetic(input);
+  if (arithmetic?.formulaBasis === "rate_times_volume") return supported("rate_times_volume", [...new Set([...refs, ...arithmetic.fieldEvidenceRefs.rate, ...arithmetic.fieldEvidenceRefs.volumeBasis])], "Canonical statement operands support a printed rate-times-money-volume mechanic.", "CONFIRMED");
+  if (arithmetic?.formulaBasis === "per_item") return supported("per_item", [...new Set([...refs, ...arithmetic.fieldEvidenceRefs.count, ...arithmetic.fieldEvidenceRefs.chargedAmount])], "Canonical statement operands support a printed per-item mechanic.", "CONFIRMED");
+  if (arithmetic?.formulaBasis === "source_units_times_per_unit") return supported(arithmetic.sourceUnit ?? "source_units_times_per_unit", [...new Set([...refs, ...arithmetic.fieldEvidenceRefs.sourceUnitBasis, ...arithmetic.fieldEvidenceRefs.chargedAmount])], "Canonical statement operands support a printed source-unit mechanic.", "CONFIRMED");
+  const sourceText = sourceTextFor(input);
+  if (arithmetic?.status === "partial" && arithmetic.volumeBasis && /\b\d+(?:\.\d+)?\s+TIMES\s+\$\s*[\d,]+(?:\.\d+)?\b/.test(sourceText)) {
+    return category("rate_times_volume", [...new Set([...refs, ...arithmetic.fieldEvidenceRefs.volumeBasis])], "The printed source exposes a rate-times-money-volume formula, while canonical arithmetic remains unresolved because a complete normalized operand pair is unavailable.");
+  }
   const label = input.row.selectedLabel.toUpperCase();
   if (/MONTHLY|MTHLY|PER MONTH|STATEMENT FEE|ACCOUNT FEE/.test(label)) return category("fixed_periodic_charge", refs, "Explicit periodic/account wording supports a fixed-periodic mechanic; recurrence beyond this period is not inferred.");
   if (/ANNUAL|YEARLY/.test(label)) return category("fixed_annual_charge", refs, "Explicit annual wording supports a fixed-annual mechanic.");
-  if (["F10", "F11", "F12"].includes(family.value ?? "") && input.row.selectedAmount) return category("fixed_or_printed_charge", refs, "The statement supports a fixed/printed charge but not a more specific assessed population.");
+  if (["F7", "F10", "F11", "F12"].includes(family.value ?? "") && input.row.selectedAmount) return category("fixed_or_printed_charge", refs, "The statement supports a current-period printed charge but not a recurring cadence or more specific assessed population.");
   return unresolved("The billed unit or population is not reliably exposed.");
 }
 
@@ -490,8 +506,23 @@ function determinePopulation(input: RowInput, mechanic: OpenWorldClaim<string>):
   if (input.usNetwork.population.state === "supported") return supported(input.usNetwork.population.value!, input.usNetwork.population.evidenceRefs, "Existing dated governed evidence supports this population.");
   if (input.perItem.applicable && input.perItem.population.state !== "unresolved" && input.perItem.population.value) return supported(input.perItem.population.value, input.perItem.population.evidenceRefs, input.perItem.population.explanation);
   if (input.pricing.assessmentBasis.state === "supported") return supported(input.pricing.assessmentBasis.value!, input.pricing.assessmentBasis.evidenceRefs, input.pricing.assessmentBasis.explanation);
+  const arithmetic = canonicalArithmetic(input);
+  if (arithmetic?.formulaBasis === "rate_times_volume" && arithmetic.volumeBasis) return supported("printed_money_volume", arithmetic.fieldEvidenceRefs.volumeBasis, "The canonical statement row preserves the printed money-volume base.", "CONFIRMED");
+  if (arithmetic?.formulaBasis === "per_item" && arithmetic.itemCount !== null) return supported("printed_item_count", arithmetic.fieldEvidenceRefs.count, "The canonical statement row preserves the printed item count without equating it to another statement population.", "CONFIRMED");
+  if (arithmetic?.formulaBasis === "source_units_times_per_unit" && arithmetic.sourceUnitBasis !== null) return supported(`printed_${arithmetic.sourceUnit ?? "source_units"}`, arithmetic.fieldEvidenceRefs.sourceUnitBasis, "The canonical statement row preserves the printed source-unit population.", "CONFIRMED");
+  if (mechanic.value === "rate_times_volume" && arithmetic?.volumeBasis) return category("printed_money_volume", arithmetic.fieldEvidenceRefs.volumeBasis, "The printed money-volume base is preserved, while exact arithmetic remains unresolved.");
+  if (mechanic.value === "fixed_or_printed_charge") return category("current_statement_period_occurrence", mechanic.evidenceRefs, "Only the current statement occurrence is established; recurrence is not inferred.");
   if (mechanic.value?.startsWith("fixed_")) return category("statement_period", mechanic.evidenceRefs, "The current-period charge is known; recurring cadence is not inferred beyond explicit wording.");
   return unresolved("Relevant population is not established.");
+}
+
+function canonicalArithmetic(input: RowInput) {
+  return input.analysis.feeLedger.partitionSourceProvenance.rowArithmetic.find((item) => item.feeRowId === input.row.id) ?? null;
+}
+
+function sourceTextFor(input: RowInput): string {
+  const occurrences = new Map(input.analysis.feeLedger.sourceOccurrences.map((item) => [item.id, item]));
+  return input.row.sourceOccurrenceIds.map((id) => occurrences.get(id)?.normalizedSourceText ?? "").join(" ").toUpperCase();
 }
 
 function determineController(family: OpenWorldClaim<OpenWorldFeeFamilyCode>, input: RowInput, refs: string[]): OpenWorldClaim<"card_network" | "acquiring_side_program" | "technology_or_service_provider" | "government_or_third_party"> {
@@ -536,7 +567,7 @@ function determineAction(family: OpenWorldClaim<OpenWorldFeeFamilyCode>, layer: 
       ? { ...base, actionClass: "N2", action: "Request event-level detail and review the operational incidence; separately ask the processor to explain any merchant-facing spread. No agreement is required for that review.", explanation: "A network-set underlying price can coexist with behaviorally influenceable incidence." }
       : { ...base, actionClass: "N1", action: "Verify the assessed population and ask whether the merchant-facing amount is passed through or includes spread. Do not negotiate the underlying network schedule as though the processor set it.", explanation: "The underlying network price and merchant-facing presentation remain separate." };
   }
-  if (family.value === "F7" && /STATEMENT|ONLINE ACCESS|PAPER/.test(label)) return { ...base, actionClass: "N4", action: "Ask to remove, waive, or reduce this administrative/access charge; the request itself does not require the merchant agreement.", explanation: "Existing governed professional norms support common waivability for this bounded administrative family, not a guaranteed outcome." };
+  if (family.value === "F7" && /STATEMENT|ONLINE ACCESS|PAPER|APPLICATION|SETUP|ACTIVATION|ACCOUNT|ADMIN/.test(label)) return { ...base, actionClass: "N4", action: "Ask to explain, remove, waive, or reduce this administrative/account charge; the request itself does not require the merchant agreement. Use merchant documents only for contractual authorization, rights, or remedies.", explanation: "The supported administrative/account family permits a commercial waiver or reduction request without implying recurrence, a guaranteed outcome, or contractual noncompliance." };
   if (family.value === "F5" || family.value === "F6" || (family.value === "F7" && controller === "acquiring_side_program")) return { ...base, actionClass: "N3", action: "Ask the processor/acquirer/ISO to itemize and review this merchant-facing price; requesting explanation or reduction does not require the merchant agreement.", explanation: "Affirmative evidence supports acquiring-side commercial reviewability without asserting retention or a contractual right." };
   if (family.value === "F8") return { ...base, actionClass: "N3", action: "Request event detail, validate the triggering population, and ask for a pricing review or exception. The review does not require the agreement; contractual entitlement does.", explanation: "Exception incidence and merchant-facing price are separate review paths." };
   if (family.value === "F9" || family.value === "F10") return { ...base, actionClass: "N5", action: "Identify the service/provider, validate usage or compliance status, and ask the processor or vendor to explain, reduce, or remove the charge. No agreement is needed to ask for review.", explanation: "The broad service layer supports a useful verification path while exact identity and controller may remain unresolved." };

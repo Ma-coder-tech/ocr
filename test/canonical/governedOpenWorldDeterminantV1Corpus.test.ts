@@ -46,6 +46,7 @@ describe("Open-World Determinant & Unknown-Fee Analysis v1", () => {
       expect(canonicalFinancialTruthFingerprint(analysis)).toBe(before);
       const rows = report.findings.filter((finding) => finding.sourceFeeRowId && finding.openWorldDeterminants).map((finding) => ({
         file: fixture.file,
+        feeRowId: finding.sourceFeeRowId!,
         label: analysis.feeLedger.rows.find((row) => row.id === finding.sourceFeeRowId)!.selectedLabel,
         amountMinor: finding.observedAmountMinor ?? 0,
         legacyExplained: Boolean(finding.exactFeeIdentity.value || finding.broaderEconomicCategory.value),
@@ -61,6 +62,9 @@ describe("Open-World Determinant & Unknown-Fee Analysis v1", () => {
     const researchEscalations = rows.filter((row) => row.determinant.research.disposition === "ESCALATE_BOUNDED_RESEARCH");
     const queued = corpus.reduce((sum, item) => sum + item.report.coverage.queuedResearchQuestions, 0);
     const calibratedResearchItems = corpus.flatMap((item) => [...item.report.researchQueue.selected, ...item.report.researchQueue.deferred]);
+    const stage0Decisions = corpus.flatMap((item) => item.report.researchQueue.stage0Decisions);
+    const queuedKeys = new Set(corpus.flatMap((item) => [...item.report.researchQueue.selected, ...item.report.researchQueue.deferred].map((queuedItem) => `${item.rows[0]?.file}:${queuedItem.question.feeRowRef}`)));
+    const queuedOpenWorldEscalations = researchEscalations.filter((row) => queuedKeys.has(`${row.file}:${row.feeRowId}`)).length;
     const metrics = {
       statements: corpus.length,
       materialRows: rows.length,
@@ -83,35 +87,40 @@ describe("Open-World Determinant & Unknown-Fee Analysis v1", () => {
       researchStoppedBySufficiency: stopped.length,
       exactIdentityUnresolvedNotQueued: rows.filter((row) => row.determinant.exactIdentity.state !== "exact_supported" && row.determinant.research.disposition === "STOP").length,
       queued,
-      stage0SuppressedExternalResearch: researchEscalations.length - queued,
+      stage0SuppressedExternalResearch: researchEscalations.length - queuedOpenWorldEscalations,
+      newlyWarrantedOutsideOpenWorldProjection: queued - queuedOpenWorldEscalations,
     };
     console.info("OPEN_WORLD_DETERMINANT_CORPUS_METRICS", JSON.stringify(metrics));
     expect(metrics).toEqual({
       statements: 11,
       materialRows: 483,
       materialDollarsMinor: 1_640_090,
-      beforeExplainedRows: 181,
-      beforeExplainedDollarsMinor: 918_720,
-      beforeActionableRows: 153,
-      beforeActionableDollarsMinor: 675_034,
+      beforeExplainedRows: 348,
+      beforeExplainedDollarsMinor: 1_315_954,
+      beforeActionableRows: 157,
+      beforeActionableDollarsMinor: 685_466,
       exactIdentitySupported: 90,
-      familyKnownIdentityUnresolved: 244,
-      identityAndLayerUnresolved: 149,
-      determinantSufficient: 265,
-      actionableClassified: 326,
+      familyKnownIdentityUnresolved: 248,
+      identityAndLayerUnresolved: 145,
+      determinantSufficient: 313,
+      actionableClassified: 330,
       highMaterialityRows: 65,
-      actionableHighMaterialityRows: 49,
-      explainedMaterialDollarsMinor: 1_154_813,
-      actionableClassifiedDollarsMinor: 1_154_813,
-      unexplainedMaterialDollarsMinor: 485_277,
-      researchEscalations: 200,
-      researchStoppedBySufficiency: 247,
-      exactIdentityUnresolvedNotQueued: 206,
-      queued: 168,
+      actionableHighMaterialityRows: 50,
+      explainedMaterialDollarsMinor: 1_165_245,
+      actionableClassifiedDollarsMinor: 1_165_245,
+      unexplainedMaterialDollarsMinor: 474_845,
+      researchEscalations: 166,
+      researchStoppedBySufficiency: 295,
+      exactIdentityUnresolvedNotQueued: 247,
+      queued: 153,
       stage0SuppressedExternalResearch: 32,
+      newlyWarrantedOutsideOpenWorldProjection: 19,
     });
     expect(calibratedResearchItems).toHaveLength(queued);
+    expect(stage0Decisions).toHaveLength(rows.length);
+    expect(stage0Decisions.filter((item) => item.calibration.stage0.researchWarranted)).toHaveLength(queued);
     expect(calibratedResearchItems.every((item) => item.calibration.stage0.decision === "RESEARCH")).toBe(true);
+    expect(stage0Decisions.filter((item) => item.calibration.stage0.adjudicationRequired).every((item) => item.calibration.stage0.stoppingReason === "GOVERNED_EVIDENCE_CONFLICT")).toBe(true);
     expect(calibratedResearchItems.every((item) => item.calibration.budget.maximumExternalOperations <= 8)).toBe(true);
     expect(familyKnown.some((row) => row.determinant.determinantSufficiency === "DETERMINANT_SUFFICIENT" && row.determinant.research.disposition === "STOP")).toBe(true);
     expect(unresolved.length).toBeGreaterThan(0);
