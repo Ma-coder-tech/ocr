@@ -1304,7 +1304,7 @@ function coverage(
     current2026ConfirmedChangeFindings: findings.filter((item) => item.current2026UsCoreNetworkReference?.reference.state === "CURRENT_CONFIRMED_CHANGE").length,
     current2026WorkingStrongFindings: findings.filter((item) => item.current2026UsCoreNetworkReference?.reference.state === "CURRENT_WORKING_REFERENCE_STRONG").length,
     current2026WorkingLikelyFindings: findings.filter((item) => item.current2026UsCoreNetworkReference?.reference.state === "CURRENT_WORKING_REFERENCE_LIKELY").length,
-    current2026UnresolvedFindings: findings.filter((item) => item.current2026UsCoreNetworkReference?.reference.state === "CURRENT_RATE_UNRESOLVED").length,
+    current2026UnresolvedFindings: findings.filter((item) => item.current2026UsCoreNetworkReference?.currentReferenceMaintenance.state === "CURRENT_RATE_UNRESOLVED").length,
     historicalRowsProtectedFromCurrentValues: findings.filter((item) => item.current2026UsCoreNetworkReference?.historicalApplication === "HISTORICAL_VALUE_PRESERVED_BEFORE_CHANGE" || item.current2026UsCoreNetworkReference?.historicalApplication === "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT").length,
     independentlyEvaluatedLocationCases: findings.filter((item) => item.current2026UsCoreNetworkReference?.locationCase?.independentlyEvaluated).length,
     confirmedAtParFindings: 0,

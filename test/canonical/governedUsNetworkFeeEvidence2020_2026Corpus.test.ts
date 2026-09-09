@@ -169,7 +169,7 @@ describe("Product-adjudicated U.S. network fee evidence pack 2020-2026", () => {
     expect(metrics.nabuCorrected).toBe(2);
     expect(metrics.digitalCorrected).toBe(2);
     expect(metrics.dataUsageStrengthened).toBeGreaterThanOrEqual(1);
-    expect(metrics.sourceConflicts).toBe(5);
+    expect(metrics.sourceConflicts).toBe(0);
     expect(metrics.highPriorityResearch).toBe(2);
 
     expect(network.every((finding) => finding.usNetworkFeeEvidence.billedObservation?.establishesOfficialNetworkPar === false)).toBe(true);

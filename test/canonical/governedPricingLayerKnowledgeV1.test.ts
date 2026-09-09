@@ -52,7 +52,7 @@ describe("governed pricing-layer knowledge Batch 1", () => {
       "RR-B1-06",
       "RR-B1-07-PRIORITY-G8",
     ]);
-    expect(rules.every((rule) =>
+    expect(rules.filter((rule) => rule.ruleId !== "RR-B1-03").every((rule) =>
       rule.lifecycle === "active" &&
       rule.admissionStatus === "admitted" &&
       rule.evidenceClass === "G1_product_domain_adjudication" &&
@@ -60,6 +60,11 @@ describe("governed pricing-layer knowledge Batch 1", () => {
       rule.sourceFingerprints.length === 2 &&
       rule.reviewedAt === "2026-09-06"
     )).toBe(true);
+    expect(rules.find((rule) => rule.ruleId === "RR-B1-03")).toMatchObject({
+      sourceRefs: expect.arrayContaining(["RateReveal_Governed_Conflict_Adjudication_FINAL_Product_Adjudicated.md"]),
+      sourceFingerprints: expect.arrayContaining(["f457a284011d031820c8a8b099e26220bf9171149f3595e1c56ae4419c2d483d"]),
+      reviewedAt: "2026-09-09",
+    });
     expect(rules.find((rule) => rule.ruleId === "RR-B1-00")?.priority).toBe(0);
     expect(rules.find((rule) => rule.ruleId === "RR-B1-07-PRIORITY-G8")?.scope).toBe("statement_case_fact");
     expect(JSON.stringify(rules)).not.toMatch(/typicalLow|typicalHigh|elevatedAbove|market benchmark/i);
@@ -151,10 +156,17 @@ describe("governed pricing-layer knowledge Batch 1", () => {
     });
     expect(commercial.competingInterpretations.length).toBeGreaterThan(0);
     expect(underlying).toMatchObject({
-      confidence: "LIKELY",
+      exactFeeIdentity: "amex_program_cost",
+      broaderEconomicCategory: "network_program_cost",
+      confidence: "STRONG",
       amexInterpretation: "likely_underlying_program_cost",
       economicBeneficiary: "card_network",
-      merchantFacingPriceController: null,
+      merchantFacingPriceController: "acquiring_side_program",
+      amexProgramCostReconciliation: {
+        state: "reconciles_within_rounding",
+        differenceMinor: 1,
+        canonicalFinancialMutationAllowed: false,
+      },
     });
     expect(underlying.competingInterpretations.length).toBeGreaterThan(0);
   });

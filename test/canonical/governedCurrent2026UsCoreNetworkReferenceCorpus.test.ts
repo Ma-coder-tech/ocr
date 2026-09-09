@@ -34,14 +34,16 @@ describe("Product-adjudicated current 2026 U.S. core network reference", () => {
     const records = governedCurrent2026ReferenceRecordsV1();
     const rules = governedCurrent2026RulesV1();
     const sources = governedCurrent2026SourcesV1();
-    expect(records).toHaveLength(28);
-    expect(rules.map((item) => item.ruleId)).toEqual(["CUR-26-01", "CUR-26-02"]);
-    expect(sources.every((source) => source.immutable && source.retainedPackageFingerprint === "c56f815e911d6955d0a006e9ccfd24d56c4b4bbb071450489e3e7a7b6c86eecd")).toBe(true);
+    expect(records).toHaveLength(30);
+    expect(rules.map((item) => item.ruleId)).toEqual(["CUR-26-01", "CUR-26-02", "CUR-26-03", "CUR-26-04", "CUR-26-05"]);
+    expect(sources.every((source) => source.immutable && source.retainedPackageFingerprint.length === 64)).toBe(true);
+    expect(sources.find((source) => source.sourceId === "rr_product_governed_conflict_adjudication_final")?.retainedPackageFingerprint).toBe("f457a284011d031820c8a8b099e26220bf9171149f3595e1c56ae4419c2d483d");
     const mixed = sources.find((source) => source.sourceId === "maintained_public_2026_reference_set")!;
     expect(new Set(mixed.rowClaims.map((claim) => claim.currencyState))).toEqual(new Set(["row_specific_current", "stale_or_conflicting"]));
     expect(records.every((record) => record.prohibitedClaims.includes("official_network_par_from_public_reference") && record.prohibitedClaims.includes("merchant_pricing_verdict_from_reference_state"))).toBe(true);
     expect(record(records, "CUR26-UNR-MC-ASSESSMENT").candidateValues.map((item) => item.value)).toEqual([0.0013, 0.001375, 0.0014, 0.001475]);
-    expect(record(records, "CUR26-UNR-VISA-BASE-II").candidateValues).toEqual([{ value: 0.0025, unit: "usd_per_event" }, { value: 0.0027, unit: "usd_per_event" }]);
+    expect(record(records, "CUR26-UNR-VISA-BASE-II-TRANSMISSION").candidateValues).toEqual([{ value: 0.0025, unit: "usd_per_event" }, { value: 0.0027, unit: "usd_per_event" }]);
+    expect(record(records, "CUR26-CHG-DISCOVER-NETWORK-AUTH").rejectedCandidates).toEqual([{ value: 0.025, unit: "usd_per_event", disposition: "unsupported_stale_or_error_candidate", origin: "unresolved" }]);
     expect(record(records, "CUR26-CHG-MC-FALLBACK")).toMatchObject({ effectiveFrom: null, confidence: "CURRENT_CONFIRMED_CHANGE" });
     expect(record(records, "CUR26-CHG-MC-FALLBACK").conflicts.join(" ")).toMatch(/April\/June/);
     expect(record(records, "CUR26-CHG-MC-NABU-NON-US")).toMatchObject({ effectiveFrom: "2024-04-15", confidence: "CURRENT_WORKING_REFERENCE_STRONG" });
@@ -92,7 +94,9 @@ describe("Product-adjudicated current 2026 U.S. core network reference", () => {
     const misuseRow = misuseEntry.analysis.feeLedger.rows.find((row) => /MISUSE/.test(row.selectedLabel))!;
     const misuse2020 = misuseEntry.currentRows[misuseRow.id]!;
     expect(misuse2020).toMatchObject({ historicalApplication: "HISTORICAL_VALUE_PRESERVED_BEFORE_CHANGE", merchantComparisonPermitted: false, reference: { state: "CURRENT_CONFIRMED_CHANGE", officialNetworkParEstablished: false, merchantPricingVerdictEstablished: false } });
-    expect(misuse2020.reference.values.some((value) => value.value === 0.15)).toBe(true);
+    expect(misuse2020.reference.values).toEqual([]);
+    expect(misuse2020.reference.historicalValues.some((value) => value.value === 0.09)).toBe(true);
+    expect(misuse2020.currentReferenceMaintenance.state).toBe("CURRENT_CONFIRMED_CHANGE");
 
     const dcsfEntry = corpus.find((entry) => entry.file.includes("WELLS_FARGO"))!;
     const dcsfRow = dcsfEntry.analysis.feeLedger.rows.find((row) => /DIGITAL COMMERCE (?:SVC|SVCS|SERVICE)/i.test(row.selectedLabel))!;

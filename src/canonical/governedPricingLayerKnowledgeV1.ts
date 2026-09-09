@@ -2,7 +2,7 @@ import { assessCanonicalExactFeeRowArithmetic } from "./exactSourceArithmeticBri
 import type { CanonicalFeeRow, CanonicalStatementAnalysis } from "./types.js";
 
 export const GOVERNED_PRICING_LAYER_KNOWLEDGE_V1 =
-  "governed_pricing_layer_knowledge_batch1_2026_09_06_v1" as const;
+  "governed_pricing_layer_knowledge_batch1_conflict_adjudication_2026_09_09_v1" as const;
 
 export type GovernedPricingLayerRule = {
   ruleId: string;
@@ -21,7 +21,7 @@ export type GovernedPricingLayerRule = {
   evidenceClass: "G1_product_domain_adjudication";
   sourceRefs: string[];
   sourceFingerprints: string[];
-  reviewedAt: "2026-09-06";
+  reviewedAt: "2026-09-06" | "2026-09-09";
   limitations: string[];
 };
 
@@ -60,6 +60,7 @@ export type GovernedPricingLayerRowResolution = {
     | "merchant_facing_acquiring_side_commercial_pricing"
     | "bundled_merchant_facing_pricing"
     | "amex_program_or_network_cost"
+    | "network_program_cost"
     | null;
   confidence: "CONFIRMED" | "STRONG" | "LIKELY" | "CATEGORY_ONLY" | "UNRESOLVED";
   assessmentBasis: GovernedAssessmentBasis;
@@ -82,6 +83,15 @@ export type GovernedPricingLayerRowResolution = {
     | "bundled_not_separable"
     | "unresolved"
     | null;
+  amexProgramCostReconciliation: {
+    state: "reconciles_within_rounding" | "not_reconciled" | "evidence_unavailable";
+    billedProgramFeeAmountMinor: number | null;
+    printedProgramCostTotalMinor: number | null;
+    differenceMinor: number | null;
+    toleranceMinor: 1;
+    evidenceRefs: string[];
+    canonicalFinancialMutationAllowed: false;
+  } | null;
   competingInterpretations: string[];
   evidenceRefs: string[];
   limitations: string[];
@@ -125,6 +135,8 @@ const PRODUCT_ADJUDICATION_REF = "RateReveal_Product_Batch1_Fiserv_Pricing_Seman
 const PRODUCT_ADJUDICATION_SHA256 = "41c7d92566be6648c8a93509abef68040f9b54b3b129cff77cb846474eef3c8f";
 const INDEPENDENT_REVIEW_REF = "CLAUDE_RateReveal_Batch1_Fiserv_Pricing_Semantics_Review.md";
 const INDEPENDENT_REVIEW_SHA256 = "c68f757a29576a9710155da7c8e166ea4f73e4f422b1246e2f3d2101cda6867b";
+const CONFLICT_ADJUDICATION_REF = "RateReveal_Governed_Conflict_Adjudication_FINAL_Product_Adjudicated.md";
+const CONFLICT_ADJUDICATION_SHA256 = "f457a284011d031820c8a8b099e26220bf9171149f3595e1c56ae4419c2d483d";
 
 const COMMON = {
   lifecycle: "active" as const,
@@ -174,6 +186,9 @@ const RULES: GovernedPricingLayerRule[] = [
   },
   {
     ...COMMON,
+    sourceRefs: [...COMMON.sourceRefs, CONFLICT_ADJUDICATION_REF],
+    sourceFingerprints: [...COMMON.sourceFingerprints, CONFLICT_ADJUDICATION_SHA256],
+    reviewedAt: "2026-09-09",
     ruleId: "RR-B1-03",
     priority: 3,
     title: "Amex commercial-charge decision procedure",
@@ -415,6 +430,7 @@ function resolveRow(
     tierRateMechanic: null,
     minimumDiscount: null,
     amexInterpretation: null,
+    amexProgramCostReconciliation: null,
     competingInterpretations: [],
     evidenceRefs,
     limitations: [],
@@ -512,6 +528,7 @@ function resolveAmexRow(
     candidate.id !== row.id && /AMEX.*SALES DISCOUNT/.test(normalized(candidate.selectedLabel)),
   );
   const rowIsInterchangeRepresentation = row.role === "interchange_detail_row" || selectedCanonicalCategory(analysis, row.id) === "interchange";
+  const reconciliation = reconcileAmexProgramFeeToPrintedProgramTotal(analysis, row);
 
   if (separateProgramRows.length > 0 && separateNetwork && !rowIsInterchangeRepresentation) {
     return {
@@ -533,20 +550,27 @@ function resolveAmexRow(
     };
   }
 
-  if (rowIsInterchangeRepresentation && /PROGRAM FEES?/.test(label)) {
+  if (rowIsInterchangeRepresentation && /PROGRAM FEES?/.test(label) && reconciliation.state === "reconciles_within_rounding") {
     return {
       ...empty,
       matchedRuleRefs: unique([...empty.matchedRuleRefs, "RR-B1-00", "RR-B1-03"]),
-      exactFeeIdentity: "amex_program_cost_representation",
-      broaderEconomicCategory: "amex_program_or_network_cost",
-      confidence: "LIKELY",
+      exactFeeIdentity: "amex_program_cost",
+      broaderEconomicCategory: "network_program_cost",
+      confidence: "STRONG",
       collector: "processor_or_acquirer",
       economicBeneficiary: "card_network",
       ruleSetter: "card_network",
       priceSetter: "card_network",
+      merchantFacingPriceController: "acquiring_side_program",
       amexInterpretation: "likely_underlying_program_cost",
-      competingInterpretations: ["bundled_amex_program_cost_and_commercial_uplift_not_excluded"],
-      limitations: ["A near-identical label can denote an acquiring-side commercial charge on another statement; the statement-local representation controls."],
+      amexProgramCostReconciliation: reconciliation,
+      competingInterpretations: ["separate_processor_or_acquirer_uplift_not_established_or_excluded"],
+      evidenceRefs: unique([...empty.evidenceRefs, ...reconciliation.evidenceRefs, CONFLICT_ADJUDICATION_REF]),
+      limitations: [
+        "The identity is conditional on the statement-local one-cent reconciliation to the separately printed Amex program-cost total; the label and section role alone are insufficient.",
+        "American Express is the supported program/network beneficiary and wholesale-cost setter at this scope; ultimate retention or downstream allocation is not inferred.",
+        "The processor/acquirer collects and controls the merchant-facing presentation. Processor retention, uplift, at-par pass-through, and merchant eliminability of the underlying cost are not established.",
+      ],
     };
   }
 
@@ -556,8 +580,43 @@ function resolveAmexRow(
     broaderEconomicCategory: "amex_program_or_network_cost",
     confidence: "CATEGORY_ONLY",
     amexInterpretation: "unresolved",
+    amexProgramCostReconciliation: reconciliation,
     competingInterpretations: ["underlying_amex_program_or_network_cost", "acquiring_side_amex_specific_commercial_charge", "bundled_combination"],
-    limitations: ["The label is not a fixed meaning; dated Amex values and surrounding itemization are insufficient to distinguish the live interpretations."],
+    evidenceRefs: unique([...empty.evidenceRefs, ...reconciliation.evidenceRefs, CONFLICT_ADJUDICATION_REF]),
+    limitations: ["The label is not a fixed meaning. Without statement-local reconciliation to the separately printed Amex acquired-program/program-cost total, the economic layer remains unresolved."],
+  };
+}
+
+function reconcileAmexProgramFeeToPrintedProgramTotal(
+  analysis: CanonicalStatementAnalysis,
+  row: CanonicalFeeRow,
+): NonNullable<GovernedPricingLayerRowResolution["amexProgramCostReconciliation"]> {
+  const billed = row.selectedAmount?.amountMinor ?? null;
+  const subtotalEvidence = analysis.evidence.filter((evidence) =>
+    evidence.parserInterpretations.some((interpretation) => interpretation.interpretedRole === "amex_acquired_program_cost_total"),
+  );
+  const totals = subtotalEvidence.flatMap((evidence) => evidence.parserInterpretations
+    .filter((interpretation) => interpretation.interpretedRole === "amex_acquired_program_cost_total")
+    .map((interpretation) => {
+      const value = interpretation.interpretedValue;
+      return typeof value === "object" && value !== null && "amountMinor" in value
+        ? Number(value.amountMinor)
+        : null;
+    })
+    .filter((value): value is number => value !== null && Number.isFinite(value)));
+  if (billed === null || totals.length !== 1) {
+    return { state: "evidence_unavailable", billedProgramFeeAmountMinor: billed, printedProgramCostTotalMinor: totals[0] ?? null, differenceMinor: null, toleranceMinor: 1, evidenceRefs: subtotalEvidence.map((evidence) => evidence.id), canonicalFinancialMutationAllowed: false };
+  }
+  const printed = totals[0]!;
+  const difference = Math.abs(billed - printed);
+  return {
+    state: difference <= 1 ? "reconciles_within_rounding" : "not_reconciled",
+    billedProgramFeeAmountMinor: billed,
+    printedProgramCostTotalMinor: printed,
+    differenceMinor: difference,
+    toleranceMinor: 1,
+    evidenceRefs: unique([...row.sourceOccurrenceIds, ...subtotalEvidence.map((evidence) => evidence.id), CONFLICT_ADJUDICATION_REF, CONFLICT_ADJUDICATION_SHA256]),
+    canonicalFinancialMutationAllowed: false,
   };
 }
 

@@ -274,8 +274,10 @@ function resolveRow(row: CanonicalFeeRow, analysis: CanonicalStatementAnalysis, 
     residual = evaluateResidualDecomposition({ printedValue: 0.001475, knownComponentValue: 0.0014, candidateComponent: { value: 0.000075, independentlyDocumented: true, sameNetworkAndProgram: true, periodApplicable: true, withinDocumentedRange: true, statementStructureCorroborates: true, acquirerSpecificApplicabilityProven: false } });
     assessment2024 = { structuralExplanation: "STRONGLY_EXPLAINED", baseAcquirerBrandVolumeFee: 0.0014, plausibleAnnualAcquirerLicenseFeeComponent: 0.000075, specificAcquirerComponentConfidence: "LIKELY", aboveReferenceCandidate: false, confirmedAtPar: false, acquiringSideUpliftExcluded: false };
     effective = { ...effective,
+      mechanic: { state: "supported", value: "0.14% Acquirer Brand Volume Fee plus a plausible 0.0075% Annual Acquirer License Fee component", confidence: "STRONG", evidenceRefs: ["MC-FOCUSED-01", "MC-FOCUSED-02", ...row.sourceOccurrenceIds], supersedesEarlierSimplification: true, mechanicChangeInferred: false },
+      population: { state: "supported", value: "September 2024 billed Mastercard assessment population with a plausible bundled license component", confidence: "STRONG", forcedToGatewayAuthorizationCount: false, economicCharacterInferredFromCount: false, evidenceRefs: ["MC-FOCUSED-01", "MC-FOCUSED-02", ...row.sourceOccurrenceIds] },
       reference: { ...effective.reference, state: "period_matched_processor_reference", evidenceClass: "E4_processor_or_acquirer_schedule", matchedRecordIds: ["MC-FOCUSED-01", "MC-FOCUSED-02"], candidateValues: [networkValue("abvf_2024", 0.0014, "decimal_rate", "U.S. Acquirer Brand Volume Fee")], sourceDate: "2024-04-05", effectiveFrom: "2024-04-05", effectiveThrough: null, adjacentPeriodOnly: false, current2026CoreValueEstablished: false },
-      comparison: { ...effective.comparison, state: "population_or_product_scope_unresolved", referenceValue: 0.0014, difference: 0.000075, renderingText: "The 0.1475% line is strongly explained by the 0.14% 2024 Acquirer Brand Volume Fee plus a plausible 0.0075% Annual Acquirer License Fee component. Markup is not required to explain the line, but at-par pass-through and the Wells Fargo/Fiserv-specific ALF component are not proven." },
+      comparison: { ...effective.comparison, state: "population_or_product_scope_unresolved", referenceValue: 0.0014, difference: 0.000075, renderingText: "The 0.1475% line is strongly explained by the 0.14% 2024 Acquirer Brand Volume Fee plus a plausible 0.0075% Annual Acquirer License Fee component. The absence of a separate ALF line supports, but does not prove, the bundled-component hypothesis. Markup is not required to explain the row, but at-par pass-through and a small acquiring-side uplift cannot be fully excluded without acquirer-specific period evidence." },
       sourceConflicts: [], research: { priority: "none", reasonCodes: [], question: null }, matchedRuleRefs: [...new Set([...effective.matchedRuleRefs, "RR-MCF-01", "RR-MCF-02", "RR-MCF-08"])],
       limitations: [...effective.limitations, "April 5 versus April 15, 2024 remains an effective-date conflict for early-April statements; it is immaterial for this September statement.", "A small acquiring-side uplift cannot be fully excluded without the acquirer-specific period schedule."],
     };
@@ -304,7 +306,20 @@ function resolveRow(row: CanonicalFeeRow, analysis: CanonicalStatementAnalysis, 
     };
     matchedRecordRefs.push("MC-FOCUSED-06"); matchedRuleRefs.push("RR-MCF-06");
   }
-  if (isLocation) matchedRecordRefs.push("MC-FOCUSED-04");
+  if (isLocation) {
+    matchedRecordRefs.push("MC-FOCUSED-04");
+    effective = {
+      ...effective,
+      sourceConflicts: [],
+      research: is2025Location
+        ? effective.research
+        : { priority: "none", reasonCodes: [], question: null },
+      limitations: [
+        ...effective.limitations,
+        "Raw 8393 and 8938 source assertions remain immutable provenance, but the canonical 8398 and 8661 exclusions control and the stale assertions do not surface as a governed conflict.",
+      ],
+    };
+  }
   return {
     feeRowId: row.id, applicable: true, effectiveUsNetworkEvidence: effective, lineToFeeCardinality: cardinality, residualDecomposition: residual,
     assessment2024, locationFee2025, nonUsNabu2024,
