@@ -1,0 +1,1075 @@
+{
+  "schemaVersion": "current_reference_maintenance_adjudication_2026_09_09_v1",
+  "authority": {
+    "file": "RateReveal_Current_Reference_Maintenance_Adjudication_FINAL_Product_Adjudicated_v2.md",
+    "sha256": "202fd093c5b4bb0b7771b3c4c90b49e19af77c659a10cebf5cdef2216acec0e4"
+  },
+  "baseline": {
+    "branch": "codex/governed-conflict-resolution-historical-current-firewall-v1",
+    "commit": "7c0308769dbb5488158828bd2c6362996c86ff17",
+    "artifact": "evaluations/governed-conflict-resolution-historical-current-firewall-v1/evaluation-2026-09-09.json"
+  },
+  "corpus": {
+    "statements": 11,
+    "materialFindings": 483,
+    "governedConflicts": 0,
+    "currentReferenceScopeBefore": {
+      "mastercardAssessment": {
+        "unresolved": 9,
+        "workingStrong": 0
+      },
+      "visaBaseIITransmission": {
+        "unresolved": 1,
+        "workingStrong": 0
+      }
+    },
+    "currentReferenceScopeAfter": {
+      "mastercardAssessment": {
+        "unresolved": 0,
+        "workingStrong": 9
+      },
+      "visaBaseIITransmission": {
+        "unresolved": 0,
+        "workingStrong": 1,
+        "lowerWeightCandidatePreserved": 1
+      }
+    },
+    "historicalRowsReopenedByCurrentMaintenance": 0,
+    "researchWarrants": {
+      "before": 153,
+      "after": 153,
+      "changed": false
+    },
+    "determinantSufficientRows": 313,
+    "actionClassDistribution": {
+      "N1": 57,
+      "N2": 167,
+      "N3": 76,
+      "N4": 5,
+      "N5": 25,
+      "N7": 153
+    },
+    "renderingPermissions": {
+      "exactIdentityAllowed": 90,
+      "networkOwnershipLanguageAllowed": 62,
+      "acquiringSideLanguageAllowed": 81,
+      "candidateAsFactAllowed": 0
+    }
+  },
+  "mastercard": {
+    "currentBase": {
+      "recordId": "CUR26-WRK-MC-ABVF-BASE",
+      "kind": "current_working_reference",
+      "network": "Mastercard",
+      "identity": "mastercard_acquirer_brand_volume_fee",
+      "matchPatterns": [
+        "(?:MASTERCARD|MC).*(?:ASSESSMENT|DUES & ASSESSMENTS)"
+      ],
+      "excludePatterns": [],
+      "matchIdentityValues": [
+        "mastercard_assessment"
+      ],
+      "confidence": "CURRENT_WORKING_REFERENCE_STRONG",
+      "values": [
+        {
+          "variantId": "base",
+          "value": 0.0014,
+          "unit": "decimal_rate",
+          "scope": "U.S. debit and base ABVF scope"
+        }
+      ],
+      "candidateValues": [],
+      "rejectedCandidates": [],
+      "priorValues": [
+        {
+          "value": 0.0013,
+          "unit": "decimal_rate",
+          "effectiveFrom": "2023-04-01",
+          "effectiveThrough": "2024-04-14"
+        }
+      ],
+      "effectiveFrom": "2024-04-15",
+      "referenceApplicabilityFrom": "2026-01-01",
+      "geographyScope": "United States merchant acquiring",
+      "productScope": "U.S. Mastercard acquiring base ABVF; large-ticket tier is separately governed",
+      "scopeQualification": null,
+      "componentSemantics": null,
+      "merchantBilledIncidence": "not_evaluated",
+      "sourceRefs": [
+        "rr_product_current_reference_maintenance_adjudication_v2#mastercard_abvf_current",
+        "MC_ABVF_CONTINUITY_REVIEW_2026_09"
+      ],
+      "rowCurrencyEvidenceRefs": [
+        "rr_product_current_reference_maintenance_adjudication_v2#mastercard_abvf_current",
+        "MC_ABVF_CONTINUITY_REVIEW_2026_09"
+      ],
+      "conflicts": [],
+      "limitations": [
+        "No reliable dated reduction from 0.14% to 0.13% was located through September 2026; this absence is not proof that no later change occurred.",
+        "This is a current working reference, not universal Mastercard-published par."
+      ],
+      "prohibitedClaims": [
+        "official_network_par_from_public_reference",
+        "merchant_pricing_verdict_from_reference_state"
+      ],
+      "admissionStatus": "admitted"
+    },
+    "largeTicketTier": {
+      "recordId": "CUR26-WRK-MC-ABVF-LARGE-TICKET",
+      "kind": "current_working_reference",
+      "network": "Mastercard",
+      "identity": "mastercard_acquirer_brand_volume_fee_large_ticket_tier",
+      "matchPatterns": [
+        "(?:MASTERCARD|MC).*(?:ASSESSMENT|DUES & ASSESSMENTS)"
+      ],
+      "excludePatterns": [],
+      "matchIdentityValues": [
+        "mastercard_assessment"
+      ],
+      "confidence": "CURRENT_WORKING_REFERENCE_STRONG",
+      "values": [
+        {
+          "variantId": "large_ticket_result",
+          "value": 0.0015,
+          "unit": "decimal_rate",
+          "scope": "qualifying consumer-credit and commercial sale at or above $1,000"
+        }
+      ],
+      "candidateValues": [],
+      "rejectedCandidates": [],
+      "priorValues": [],
+      "effectiveFrom": "2024-04-15",
+      "referenceApplicabilityFrom": "2026-01-01",
+      "geographyScope": "United States merchant acquiring",
+      "productScope": "U.S. qualifying consumer-credit and commercial sales at or above $1,000; debit excluded",
+      "scopeQualification": {
+        "kind": "mastercard_abvf_large_ticket",
+        "thresholdUsd": 1000,
+        "eligibleProducts": [
+          "consumer_credit",
+          "commercial"
+        ],
+        "increment": 0.0001,
+        "resultingReference": 0.0015,
+        "debitExcluded": true
+      },
+      "componentSemantics": null,
+      "merchantBilledIncidence": "not_evaluated",
+      "sourceRefs": [
+        "rr_product_current_reference_maintenance_adjudication_v2#mastercard_abvf_large_ticket"
+      ],
+      "rowCurrencyEvidenceRefs": [
+        "rr_product_current_reference_maintenance_adjudication_v2#mastercard_abvf_large_ticket"
+      ],
+      "conflicts": [],
+      "limitations": [],
+      "prohibitedClaims": [
+        "official_network_par_from_public_reference",
+        "merchant_pricing_verdict_from_reference_state"
+      ],
+      "admissionStatus": "admitted"
+    },
+    "alf": {
+      "recordId": "CUR26-WRK-MC-ALF",
+      "kind": "current_working_reference",
+      "network": "Mastercard",
+      "identity": "mastercard_annual_acquirer_license_fee",
+      "matchPatterns": [
+        "(?:MASTERCARD|MC).*(?:ANNUAL ACQUIRER LICENSE|ACQUIRER LICENSE|(?:^| )ALF(?: |$))"
+      ],
+      "excludePatterns": [],
+      "matchIdentityValues": [
+        "mastercard_annual_acquirer_license_fee"
+      ],
+      "confidence": "CURRENT_WORKING_REFERENCE_STRONG",
+      "values": [
+        {
+          "variantId": "common_observed_allocation",
+          "value": 0.000075,
+          "unit": "decimal_rate",
+          "scope": "common observed merchant-facing allocation; acquirer/provider allocation may vary"
+        }
+      ],
+      "candidateValues": [],
+      "rejectedCandidates": [],
+      "priorValues": [],
+      "effectiveFrom": "2024-04-15",
+      "referenceApplicabilityFrom": "2026-01-01",
+      "geographyScope": "United States merchant acquiring",
+      "productScope": "Acquirer-level Mastercard licensing/volume charge; merchant-facing allocation varies",
+      "scopeQualification": null,
+      "componentSemantics": {
+        "component": "mastercard_annual_acquirer_license_fee",
+        "economicLevel": "acquirer_level_mastercard_licensing_and_volume_charge",
+        "commonObservedMerchantFacingAllocation": 0.000075,
+        "merchantFacingAllocationMayVaryByAcquirerOrProvider": true,
+        "universalMastercardParEstablished": false,
+        "automaticAtParCertificationAllowed": false,
+        "processorRetentionOrMerchantMarkupInferenceAllowed": false
+      },
+      "merchantBilledIncidence": "not_evaluated",
+      "sourceRefs": [
+        "rr_product_current_reference_maintenance_adjudication_v2#mastercard_alf"
+      ],
+      "rowCurrencyEvidenceRefs": [
+        "rr_product_current_reference_maintenance_adjudication_v2#mastercard_alf"
+      ],
+      "conflicts": [],
+      "limitations": [],
+      "prohibitedClaims": [
+        "official_network_par_from_public_reference",
+        "merchant_pricing_verdict_from_reference_state"
+      ],
+      "admissionStatus": "admitted"
+    },
+    "maintenanceReviews": [
+      {
+        "reviewId": "MC_ABVF_CONTINUITY_REVIEW_2026_09",
+        "subject": "mastercard_us_abvf",
+        "reviewedAt": "2026-09-09",
+        "conclusion": "no_reliable_dated_reduction_or_change_located_through_review",
+        "checkedSources": [
+          {
+            "sourceRef": "dated_2024_2025_processor_change_set",
+            "publicationDate": "2025",
+            "scope": "Retained U.S. processor/platform Mastercard change material",
+            "relevantReductionOrChangeLocated": false
+          },
+          {
+            "sourceRef": "fiserv_2026_card_brand_updates",
+            "publicationDate": "2026-06",
+            "scope": "Fiserv 2026 Mastercard card-brand updates",
+            "relevantReductionOrChangeLocated": false
+          }
+        ],
+        "absenceProvesNoChangeOccurred": false,
+        "recheckStatus": "recheck_at_next_major_mastercard_network_fee_release_cycle",
+        "reviewDueBy": "2026-12-09",
+        "evidenceRefs": [
+          "rr_product_current_reference_maintenance_adjudication_v2#mastercard-negative-current-maintenance-evidence"
+        ]
+      }
+    ],
+    "assessmentRows": [
+      {
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_bd0f1aed5cf3a16a4c37c1e0",
+        "printedLabel": "MASTERCARD - MASTERCARD ASSESSMENT FEE 0.0014 TIMES $12970.74",
+        "statementPeriodState": "NOT_APPLICABLE",
+        "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+        "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+        "maintenanceValues": [
+          {
+            "variantId": "base",
+            "value": 0.0014,
+            "unit": "decimal_rate",
+            "scope": "U.S. debit and base ABVF scope"
+          },
+          {
+            "variantId": "large_ticket_result",
+            "value": 0.0015,
+            "unit": "decimal_rate",
+            "scope": "qualifying consumer-credit and commercial sale at or above $1,000"
+          }
+        ],
+        "maintenanceCandidates": [],
+        "mastercardAbvfScopeSelection": {
+          "state": "SCOPED_REFERENCE_UNRESOLVED",
+          "value": null,
+          "unit": "decimal_rate",
+          "applicablePopulation": null,
+          "comparisonAllowed": false,
+          "evidenceRefs": [
+            "CUR26-WRK-MC-ABVF-BASE",
+            "CUR26-WRK-MC-ABVF-LARGE-TICKET",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard_abvf_large_ticket"
+          ],
+          "explanation": "Product class and ticket amount do not establish whether the 0.14% base or qualifying 0.15% large-ticket reference applies."
+        },
+        "cardinality": {
+          "state": "one_fee_supported",
+          "confidence": "STRONG",
+          "comparisonAllowed": true,
+          "evidenceRefs": [
+            "CUR-26-05",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard-assessment-line-cardinality"
+          ],
+          "explanation": "The printed rate reconciles to the applicable ABVF reference alone. One ABVF component is supported for this line; no hidden ALF is inferred."
+        },
+        "researchPriority": "none",
+        "actionClass": "N1",
+        "renderingPermissions": {
+          "exactIdentityAllowed": true,
+          "familyLanguageAllowed": true,
+          "acquiringSideLanguageAllowed": false,
+          "networkOwnershipLanguageAllowed": true,
+          "negotiationLanguageAllowed": false,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      },
+      {
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_4f2128cf267d131112f92cff",
+        "printedLabel": "MASTERCARD - MASTERCARD ASSESSMENT FEE 0.0014 TIMES $12147.20",
+        "statementPeriodState": "NOT_APPLICABLE",
+        "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+        "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+        "maintenanceValues": [
+          {
+            "variantId": "base",
+            "value": 0.0014,
+            "unit": "decimal_rate",
+            "scope": "U.S. debit and base ABVF scope"
+          },
+          {
+            "variantId": "large_ticket_result",
+            "value": 0.0015,
+            "unit": "decimal_rate",
+            "scope": "qualifying consumer-credit and commercial sale at or above $1,000"
+          }
+        ],
+        "maintenanceCandidates": [],
+        "mastercardAbvfScopeSelection": {
+          "state": "SCOPED_REFERENCE_UNRESOLVED",
+          "value": null,
+          "unit": "decimal_rate",
+          "applicablePopulation": null,
+          "comparisonAllowed": false,
+          "evidenceRefs": [
+            "CUR26-WRK-MC-ABVF-BASE",
+            "CUR26-WRK-MC-ABVF-LARGE-TICKET",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard_abvf_large_ticket"
+          ],
+          "explanation": "Product class and ticket amount do not establish whether the 0.14% base or qualifying 0.15% large-ticket reference applies."
+        },
+        "cardinality": {
+          "state": "one_fee_supported",
+          "confidence": "STRONG",
+          "comparisonAllowed": true,
+          "evidenceRefs": [
+            "CUR-26-05",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard-assessment-line-cardinality"
+          ],
+          "explanation": "The printed rate reconciles to the applicable ABVF reference alone. One ABVF component is supported for this line; no hidden ALF is inferred."
+        },
+        "researchPriority": "none",
+        "actionClass": "N1",
+        "renderingPermissions": {
+          "exactIdentityAllowed": true,
+          "familyLanguageAllowed": true,
+          "acquiringSideLanguageAllowed": false,
+          "networkOwnershipLanguageAllowed": true,
+          "negotiationLanguageAllowed": false,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      },
+      {
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_3ce8d27aaeda422f2edfc6b5",
+        "printedLabel": "MASTERCARD - DUES & ASSESSMENTS",
+        "statementPeriodState": "NOT_APPLICABLE",
+        "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+        "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+        "maintenanceValues": [
+          {
+            "variantId": "base",
+            "value": 0.0014,
+            "unit": "decimal_rate",
+            "scope": "U.S. debit and base ABVF scope"
+          },
+          {
+            "variantId": "large_ticket_result",
+            "value": 0.0015,
+            "unit": "decimal_rate",
+            "scope": "qualifying consumer-credit and commercial sale at or above $1,000"
+          }
+        ],
+        "maintenanceCandidates": [],
+        "mastercardAbvfScopeSelection": {
+          "state": "SCOPED_REFERENCE_UNRESOLVED",
+          "value": null,
+          "unit": "decimal_rate",
+          "applicablePopulation": null,
+          "comparisonAllowed": false,
+          "evidenceRefs": [
+            "CUR26-WRK-MC-ABVF-BASE",
+            "CUR26-WRK-MC-ABVF-LARGE-TICKET",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard_abvf_large_ticket"
+          ],
+          "explanation": "Product class and ticket amount do not establish whether the 0.14% base or qualifying 0.15% large-ticket reference applies."
+        },
+        "cardinality": {
+          "state": "unresolved",
+          "confidence": "UNRESOLVED",
+          "comparisonAllowed": false,
+          "evidenceRefs": [
+            "CUR-26-05",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard-assessment-line-cardinality"
+          ],
+          "explanation": "CARDINALITY_UNRESOLVED: the statement does not establish a comparable printed rate on the applicable ABVF volume base and mechanic."
+        },
+        "researchPriority": "none",
+        "actionClass": "N1",
+        "renderingPermissions": {
+          "exactIdentityAllowed": true,
+          "familyLanguageAllowed": true,
+          "acquiringSideLanguageAllowed": false,
+          "networkOwnershipLanguageAllowed": true,
+          "negotiationLanguageAllowed": false,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      },
+      {
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_174df8c5301cf3e3eb0f0f05",
+        "printedLabel": "MC OFLN DB - DUES & ASSESSMENTS",
+        "statementPeriodState": "NOT_APPLICABLE",
+        "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+        "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+        "maintenanceValues": [
+          {
+            "variantId": "base",
+            "value": 0.0014,
+            "unit": "decimal_rate",
+            "scope": "U.S. debit and base ABVF scope"
+          },
+          {
+            "variantId": "large_ticket_result",
+            "value": 0.0015,
+            "unit": "decimal_rate",
+            "scope": "qualifying consumer-credit and commercial sale at or above $1,000"
+          }
+        ],
+        "maintenanceCandidates": [],
+        "mastercardAbvfScopeSelection": {
+          "state": "SCOPED_REFERENCE_SELECTED",
+          "value": 0.0014,
+          "unit": "decimal_rate",
+          "applicablePopulation": "U.S. debit",
+          "comparisonAllowed": true,
+          "evidenceRefs": [
+            "CUR26-WRK-MC-ABVF-BASE",
+            "CUR26-WRK-MC-ABVF-LARGE-TICKET",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard_abvf_large_ticket"
+          ],
+          "explanation": "Debit remains at the 0.14% base; the large-ticket increment does not apply."
+        },
+        "cardinality": {
+          "state": "unresolved",
+          "confidence": "UNRESOLVED",
+          "comparisonAllowed": false,
+          "evidenceRefs": [
+            "CUR-26-05",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard-assessment-line-cardinality"
+          ],
+          "explanation": "CARDINALITY_UNRESOLVED: the statement does not establish a comparable printed rate on the applicable ABVF volume base and mechanic."
+        },
+        "researchPriority": "none",
+        "actionClass": "N1",
+        "renderingPermissions": {
+          "exactIdentityAllowed": true,
+          "familyLanguageAllowed": true,
+          "acquiringSideLanguageAllowed": false,
+          "networkOwnershipLanguageAllowed": true,
+          "negotiationLanguageAllowed": false,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      },
+      {
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_26f1b3758d39e3ba6523ae8b",
+        "printedLabel": "MASTERCARD - MASTERCARD ASSESSMENT FEE .0012 TIMES $25317.39",
+        "statementPeriodState": "NOT_APPLICABLE",
+        "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+        "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+        "maintenanceValues": [
+          {
+            "variantId": "base",
+            "value": 0.0014,
+            "unit": "decimal_rate",
+            "scope": "U.S. debit and base ABVF scope"
+          },
+          {
+            "variantId": "large_ticket_result",
+            "value": 0.0015,
+            "unit": "decimal_rate",
+            "scope": "qualifying consumer-credit and commercial sale at or above $1,000"
+          }
+        ],
+        "maintenanceCandidates": [],
+        "mastercardAbvfScopeSelection": {
+          "state": "SCOPED_REFERENCE_UNRESOLVED",
+          "value": null,
+          "unit": "decimal_rate",
+          "applicablePopulation": null,
+          "comparisonAllowed": false,
+          "evidenceRefs": [
+            "CUR26-WRK-MC-ABVF-BASE",
+            "CUR26-WRK-MC-ABVF-LARGE-TICKET",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard_abvf_large_ticket"
+          ],
+          "explanation": "Product class and ticket amount do not establish whether the 0.14% base or qualifying 0.15% large-ticket reference applies."
+        },
+        "cardinality": {
+          "state": "unresolved",
+          "confidence": "UNRESOLVED",
+          "comparisonAllowed": false,
+          "evidenceRefs": [
+            "CUR-26-05",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard-assessment-line-cardinality"
+          ],
+          "explanation": "CARDINALITY_UNRESOLVED: the statement does not establish a comparable printed rate on the applicable ABVF volume base and mechanic."
+        },
+        "researchPriority": "none",
+        "actionClass": "N1",
+        "renderingPermissions": {
+          "exactIdentityAllowed": true,
+          "familyLanguageAllowed": true,
+          "acquiringSideLanguageAllowed": false,
+          "networkOwnershipLanguageAllowed": true,
+          "negotiationLanguageAllowed": false,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      },
+      {
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_483f41a24bd9026d43e364da",
+        "printedLabel": "MASTERCARD - DUES & ASSESSMENTS",
+        "statementPeriodState": "NOT_APPLICABLE",
+        "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+        "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+        "maintenanceValues": [
+          {
+            "variantId": "base",
+            "value": 0.0014,
+            "unit": "decimal_rate",
+            "scope": "U.S. debit and base ABVF scope"
+          },
+          {
+            "variantId": "large_ticket_result",
+            "value": 0.0015,
+            "unit": "decimal_rate",
+            "scope": "qualifying consumer-credit and commercial sale at or above $1,000"
+          }
+        ],
+        "maintenanceCandidates": [],
+        "mastercardAbvfScopeSelection": {
+          "state": "SCOPED_REFERENCE_UNRESOLVED",
+          "value": null,
+          "unit": "decimal_rate",
+          "applicablePopulation": null,
+          "comparisonAllowed": false,
+          "evidenceRefs": [
+            "CUR26-WRK-MC-ABVF-BASE",
+            "CUR26-WRK-MC-ABVF-LARGE-TICKET",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard_abvf_large_ticket"
+          ],
+          "explanation": "Product class and ticket amount do not establish whether the 0.14% base or qualifying 0.15% large-ticket reference applies."
+        },
+        "cardinality": {
+          "state": "unresolved",
+          "confidence": "UNRESOLVED",
+          "comparisonAllowed": false,
+          "evidenceRefs": [
+            "CUR-26-05",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard-assessment-line-cardinality"
+          ],
+          "explanation": "CARDINALITY_UNRESOLVED: the statement does not establish a comparable printed rate on the applicable ABVF volume base and mechanic."
+        },
+        "researchPriority": "none",
+        "actionClass": "N1",
+        "renderingPermissions": {
+          "exactIdentityAllowed": true,
+          "familyLanguageAllowed": true,
+          "acquiringSideLanguageAllowed": false,
+          "networkOwnershipLanguageAllowed": true,
+          "negotiationLanguageAllowed": false,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      },
+      {
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_abc2ec347ae5155154668daa",
+        "printedLabel": "MC OFLN DB - DUES & ASSESSMENTS",
+        "statementPeriodState": "NOT_APPLICABLE",
+        "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+        "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+        "maintenanceValues": [
+          {
+            "variantId": "base",
+            "value": 0.0014,
+            "unit": "decimal_rate",
+            "scope": "U.S. debit and base ABVF scope"
+          },
+          {
+            "variantId": "large_ticket_result",
+            "value": 0.0015,
+            "unit": "decimal_rate",
+            "scope": "qualifying consumer-credit and commercial sale at or above $1,000"
+          }
+        ],
+        "maintenanceCandidates": [],
+        "mastercardAbvfScopeSelection": {
+          "state": "SCOPED_REFERENCE_SELECTED",
+          "value": 0.0014,
+          "unit": "decimal_rate",
+          "applicablePopulation": "U.S. debit",
+          "comparisonAllowed": true,
+          "evidenceRefs": [
+            "CUR26-WRK-MC-ABVF-BASE",
+            "CUR26-WRK-MC-ABVF-LARGE-TICKET",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard_abvf_large_ticket"
+          ],
+          "explanation": "Debit remains at the 0.14% base; the large-ticket increment does not apply."
+        },
+        "cardinality": {
+          "state": "unresolved",
+          "confidence": "UNRESOLVED",
+          "comparisonAllowed": false,
+          "evidenceRefs": [
+            "CUR-26-05",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard-assessment-line-cardinality"
+          ],
+          "explanation": "CARDINALITY_UNRESOLVED: the statement does not establish a comparable printed rate on the applicable ABVF volume base and mechanic."
+        },
+        "researchPriority": "none",
+        "actionClass": "N1",
+        "renderingPermissions": {
+          "exactIdentityAllowed": true,
+          "familyLanguageAllowed": true,
+          "acquiringSideLanguageAllowed": false,
+          "networkOwnershipLanguageAllowed": true,
+          "negotiationLanguageAllowed": false,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "feeRowId": "feerow_989715dce0eedc8ba96405a3",
+        "printedLabel": "MASTERCARD - DUES & ASSESSMENTS",
+        "statementPeriodState": "NOT_APPLICABLE",
+        "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+        "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+        "maintenanceValues": [
+          {
+            "variantId": "base",
+            "value": 0.0014,
+            "unit": "decimal_rate",
+            "scope": "U.S. debit and base ABVF scope"
+          },
+          {
+            "variantId": "large_ticket_result",
+            "value": 0.0015,
+            "unit": "decimal_rate",
+            "scope": "qualifying consumer-credit and commercial sale at or above $1,000"
+          }
+        ],
+        "maintenanceCandidates": [],
+        "mastercardAbvfScopeSelection": {
+          "state": "SCOPED_REFERENCE_UNRESOLVED",
+          "value": null,
+          "unit": "decimal_rate",
+          "applicablePopulation": null,
+          "comparisonAllowed": false,
+          "evidenceRefs": [
+            "CUR26-WRK-MC-ABVF-BASE",
+            "CUR26-WRK-MC-ABVF-LARGE-TICKET",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard_abvf_large_ticket"
+          ],
+          "explanation": "Product class and ticket amount do not establish whether the 0.14% base or qualifying 0.15% large-ticket reference applies."
+        },
+        "cardinality": {
+          "state": "unresolved",
+          "confidence": "UNRESOLVED",
+          "comparisonAllowed": false,
+          "evidenceRefs": [
+            "CUR-26-05",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard-assessment-line-cardinality"
+          ],
+          "explanation": "CARDINALITY_UNRESOLVED: the statement does not establish a comparable printed rate on the applicable ABVF volume base and mechanic."
+        },
+        "researchPriority": "none",
+        "actionClass": "N1",
+        "renderingPermissions": {
+          "exactIdentityAllowed": true,
+          "familyLanguageAllowed": true,
+          "acquiringSideLanguageAllowed": false,
+          "networkOwnershipLanguageAllowed": true,
+          "negotiationLanguageAllowed": false,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      },
+      {
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_9e0127ffcb40a190fae065ab",
+        "printedLabel": "MASTERCARD - MASTERCARD ASSESSMENT FEE 0.001475 TIMES $26744.25",
+        "statementPeriodState": "NOT_APPLICABLE",
+        "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+        "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+        "maintenanceValues": [
+          {
+            "variantId": "base",
+            "value": 0.0014,
+            "unit": "decimal_rate",
+            "scope": "U.S. debit and base ABVF scope"
+          },
+          {
+            "variantId": "large_ticket_result",
+            "value": 0.0015,
+            "unit": "decimal_rate",
+            "scope": "qualifying consumer-credit and commercial sale at or above $1,000"
+          }
+        ],
+        "maintenanceCandidates": [],
+        "mastercardAbvfScopeSelection": {
+          "state": "SCOPED_REFERENCE_UNRESOLVED",
+          "value": null,
+          "unit": "decimal_rate",
+          "applicablePopulation": null,
+          "comparisonAllowed": false,
+          "evidenceRefs": [
+            "CUR26-WRK-MC-ABVF-BASE",
+            "CUR26-WRK-MC-ABVF-LARGE-TICKET",
+            "rr_product_current_reference_maintenance_adjudication_v2#mastercard_abvf_large_ticket"
+          ],
+          "explanation": "Product class and ticket amount do not establish whether the 0.14% base or qualifying 0.15% large-ticket reference applies."
+        },
+        "cardinality": {
+          "state": "multiple_legitimate_components_strongly_explained",
+          "confidence": "STRONG",
+          "comparisonAllowed": true,
+          "evidenceRefs": [
+            "MC-FOCUSED-02",
+            "RR-MCF-08"
+          ],
+          "explanation": "The line is strongly explained by two legitimate Mastercard components, while actual bundling and at-par pass-through remain unproven."
+        },
+        "researchPriority": "none",
+        "actionClass": "N1",
+        "renderingPermissions": {
+          "exactIdentityAllowed": true,
+          "familyLanguageAllowed": true,
+          "acquiringSideLanguageAllowed": false,
+          "networkOwnershipLanguageAllowed": true,
+          "negotiationLanguageAllowed": false,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      }
+    ],
+    "historical2024RowsUnchangedByMaintenance": true,
+    "current013Present": false,
+    "wellsSeptember2024Preserved": true
+  },
+  "visaBaseII": {
+    "transmission": {
+      "recordId": "CUR26-CHG-VISA-BASE-II-TRANSMISSION",
+      "kind": "dated_current_change",
+      "network": "Visa",
+      "identity": "visa_base_ii_system_file_transmission_fee",
+      "matchPatterns": [
+        "(?:VISA|VI).*BASE ?II (?:SYSTEM FILE(?: TRANSMISSION)?|TRANSMISSION)(?: FEE)?$"
+      ],
+      "excludePatterns": [],
+      "matchIdentityValues": [
+        "visa_base_ii_system_file_fee",
+        "visa_base_ii_system_file_transmission_fee",
+        "visa_base_ii_transmission_fee"
+      ],
+      "confidence": "CURRENT_WORKING_REFERENCE_STRONG",
+      "values": [
+        {
+          "variantId": "transmission",
+          "value": 0.0025,
+          "unit": "usd_per_event",
+          "scope": "U.S. Base II Transmission/System File from January 1, 2025"
+        }
+      ],
+      "candidateValues": [],
+      "rejectedCandidates": [],
+      "priorValues": [
+        {
+          "value": 0.0018,
+          "unit": "usd_per_event",
+          "effectiveThrough": "2024-12-31"
+        }
+      ],
+      "effectiveFrom": "2025-01-01",
+      "referenceApplicabilityFrom": "2025-01-01",
+      "geographyScope": "United States merchant acquiring",
+      "productScope": "U.S. Visa Base II Transmission/System File family; Network Access is separate",
+      "scopeQualification": null,
+      "componentSemantics": null,
+      "merchantBilledIncidence": "not_evaluated",
+      "sourceRefs": [
+        "rr_product_current_reference_maintenance_adjudication_v2#visa_base_ii_transmission_current"
+      ],
+      "rowCurrencyEvidenceRefs": [
+        "rr_product_current_reference_maintenance_adjudication_v2#visa_base_ii_transmission_current"
+      ],
+      "conflicts": [],
+      "limitations": [
+        "The $0.0025 value is a strong dated U.S. working reference, not universally confirmed Visa-issued par."
+      ],
+      "prohibitedClaims": [
+        "official_network_par_from_public_reference",
+        "merchant_pricing_verdict_from_reference_state"
+      ],
+      "admissionStatus": "admitted"
+    },
+    "candidate0027": {
+      "recordId": "CUR26-CAND-VISA-BASE-II-TRANSMISSION-0027",
+      "kind": "current_conflicting_candidate",
+      "network": "Visa",
+      "identity": "visa_base_ii_system_file_transmission_fee_candidate",
+      "matchPatterns": [
+        "(?:VISA|VI).*BASE ?II (?:SYSTEM FILE(?: TRANSMISSION)?|TRANSMISSION)(?: FEE)?$"
+      ],
+      "excludePatterns": [],
+      "matchIdentityValues": [
+        "visa_base_ii_system_file_fee",
+        "visa_base_ii_system_file_transmission_fee",
+        "visa_base_ii_transmission_fee"
+      ],
+      "confidence": "CURRENT_RATE_UNRESOLVED",
+      "values": [],
+      "candidateValues": [
+        {
+          "value": 0.0027,
+          "unit": "usd_per_event",
+          "status": "UNRESOLVED_CONFLICTING_CANDIDATE",
+          "effectiveFrom": null,
+          "applicableScope": "unresolved",
+          "evidenceWeight": "below_dated_working_reference",
+          "provenanceRefs": [
+            "maintained_public_2026_reference_set#visa_base_ii_conflict",
+            "rr_product_current_reference_maintenance_adjudication_v2#visa_base_ii_0027_candidate"
+          ],
+          "hypothesesOnly": [
+            "possible_later_rate_change",
+            "different_scope",
+            "bundled_line_decomposition",
+            "source_or_transcription_error"
+          ],
+          "promotionTrigger": "Dated applicable source establishes $0.0027 for the same U.S. Transmission/System File family.",
+          "retirementTrigger": "Stronger dated same-scope evidence resolves the discrepancy or establishes continued $0.0025 through the candidate period."
+        }
+      ],
+      "rejectedCandidates": [],
+      "priorValues": [],
+      "effectiveFrom": null,
+      "referenceApplicabilityFrom": "2026-01-01",
+      "geographyScope": "United States merchant acquiring",
+      "productScope": "Unresolved U.S. Base II Transmission/System File assertion",
+      "scopeQualification": null,
+      "componentSemantics": null,
+      "merchantBilledIncidence": "not_evaluated",
+      "sourceRefs": [
+        "rr_product_current_reference_maintenance_adjudication_v2#visa_base_ii_0027_candidate"
+      ],
+      "rowCurrencyEvidenceRefs": [
+        "rr_product_current_reference_maintenance_adjudication_v2#visa_base_ii_0027_candidate"
+      ],
+      "conflicts": [
+        "The $0.0027 assertion has unresolved date and scope and does not create a $0.0025-to-$0.0027 transition."
+      ],
+      "limitations": [],
+      "prohibitedClaims": [
+        "official_network_par_from_public_reference",
+        "merchant_pricing_verdict_from_reference_state"
+      ],
+      "admissionStatus": "admitted"
+    },
+    "networkAccess": {
+      "recordId": "CUR26-WRK-VISA-BASE-II-NETWORK-ACCESS",
+      "kind": "current_working_reference",
+      "network": "Visa",
+      "identity": "visa_base_ii_network_access_fee",
+      "matchPatterns": [
+        "(?:VISA|VI).*BASE ?II NETWORK ACCESS"
+      ],
+      "excludePatterns": [],
+      "matchIdentityValues": [
+        "visa_base_ii_network_access_fee"
+      ],
+      "confidence": "CURRENT_WORKING_REFERENCE_STRONG",
+      "values": [
+        {
+          "variantId": "network_access",
+          "value": 0.0025,
+          "unit": "usd_per_event",
+          "scope": "separate Base II Network Access fee where independently applicable"
+        }
+      ],
+      "candidateValues": [],
+      "rejectedCandidates": [],
+      "priorValues": [],
+      "effectiveFrom": null,
+      "referenceApplicabilityFrom": "2026-01-01",
+      "geographyScope": "United States merchant acquiring",
+      "productScope": "Record-specific scope in the Product-adjudicated package",
+      "scopeQualification": null,
+      "componentSemantics": null,
+      "merchantBilledIncidence": "not_observed_in_supported_fiserv_corpus",
+      "sourceRefs": [
+        "rr_product_current_reference_maintenance_adjudication_v2#visa_base_ii_network_access_incidence"
+      ],
+      "rowCurrencyEvidenceRefs": [
+        "rr_product_current_2026_us_core_network_final#stable-working-references"
+      ],
+      "conflicts": [],
+      "limitations": [
+        "No separately printed Network Access line is established in the supported Fiserv corpus; absence does not prove nonexistence, non-applicability, or universal bundling."
+      ],
+      "prohibitedClaims": [
+        "official_network_par_from_public_reference",
+        "merchant_pricing_verdict_from_reference_state"
+      ],
+      "admissionStatus": "admitted"
+    },
+    "genericComposite": {
+      "recordId": "CUR26-UNR-VISA-BASE-II-COMPOSITE",
+      "kind": "current_unresolved",
+      "network": "Visa",
+      "identity": "visa_base_ii_composite_line",
+      "matchPatterns": [
+        "(?:VISA|VI).*BASE ?II FEES?$"
+      ],
+      "excludePatterns": [],
+      "matchIdentityValues": [],
+      "confidence": "CURRENT_RATE_UNRESOLVED",
+      "values": [],
+      "candidateValues": [],
+      "rejectedCandidates": [],
+      "priorValues": [],
+      "effectiveFrom": null,
+      "referenceApplicabilityFrom": "2026-01-01",
+      "geographyScope": "United States merchant acquiring",
+      "productScope": "Generic merchant-facing Base II line with unresolved component composition",
+      "scopeQualification": null,
+      "componentSemantics": null,
+      "merchantBilledIncidence": "not_evaluated",
+      "sourceRefs": [
+        "rr_product_current_reference_maintenance_adjudication_v2#composite-base-ii-lines"
+      ],
+      "rowCurrencyEvidenceRefs": [
+        "rr_product_current_reference_maintenance_adjudication_v2#composite-base-ii-lines"
+      ],
+      "conflicts": [
+        "A generic Base II line may contain multiple components; subtraction alone cannot establish composition."
+      ],
+      "limitations": [],
+      "prohibitedClaims": [
+        "official_network_par_from_public_reference",
+        "merchant_pricing_verdict_from_reference_state"
+      ],
+      "admissionStatus": "admitted"
+    },
+    "corpusRows": [
+      {
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_1875b7aa339f8f6b731367f4",
+        "printedLabel": "Other - VI BASE II SYSTEM FILE FEE 3362 TRANSACTIONS AT 0.0018",
+        "statementPeriodState": "CURRENT_CONFIRMED_CHANGE",
+        "historicalApplication": "HISTORICAL_VALUE_PRESERVED_BEFORE_CHANGE",
+        "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+        "maintenanceValues": [
+          {
+            "variantId": "transmission",
+            "value": 0.0025,
+            "unit": "usd_per_event",
+            "scope": "U.S. Base II Transmission/System File from January 1, 2025"
+          }
+        ],
+        "maintenanceCandidates": [
+          {
+            "value": 0.0027,
+            "unit": "usd_per_event",
+            "status": "UNRESOLVED_CONFLICTING_CANDIDATE",
+            "effectiveFrom": null,
+            "applicableScope": "unresolved",
+            "evidenceWeight": "below_dated_working_reference",
+            "provenanceRefs": [
+              "maintained_public_2026_reference_set#visa_base_ii_conflict",
+              "rr_product_current_reference_maintenance_adjudication_v2#visa_base_ii_0027_candidate"
+            ],
+            "hypothesesOnly": [
+              "possible_later_rate_change",
+              "different_scope",
+              "bundled_line_decomposition",
+              "source_or_transcription_error"
+            ],
+            "promotionTrigger": "Dated applicable source establishes $0.0027 for the same U.S. Transmission/System File family.",
+            "retirementTrigger": "Stronger dated same-scope evidence resolves the discrepancy or establishes continued $0.0025 through the candidate period."
+          }
+        ],
+        "mastercardAbvfScopeSelection": null,
+        "cardinality": {
+          "state": "one_fee_supported",
+          "confidence": "STRONG",
+          "comparisonAllowed": true,
+          "evidenceRefs": [
+            "CUR-26-05",
+            "rr_product_current_reference_maintenance_adjudication_v2#visa_base_ii_transmission_current",
+            "rr_product_current_reference_maintenance_adjudication_v2#visa_base_ii_0027_candidate"
+          ],
+          "explanation": "System File Transmission and Transmission are supported name variants of one fee family; the separate Base II Network Access family is not merged into this line."
+        },
+        "researchPriority": "none",
+        "actionClass": "N1",
+        "renderingPermissions": {
+          "exactIdentityAllowed": true,
+          "familyLanguageAllowed": true,
+          "acquiringSideLanguageAllowed": false,
+          "networkOwnershipLanguageAllowed": true,
+          "negotiationLanguageAllowed": false,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      }
+    ],
+    "false0025To0027TransitionCreated": false,
+    "matchingValueIdentityMergeCreated": false
+  },
+  "effects": {
+    "currentReferenceCoverageLiftInScope": {
+      "unresolvedToWorkingStrongRows": 10
+    },
+    "researchWarrantChange": 0,
+    "determinantSufficiencyChange": 0,
+    "actionClassificationChange": 0,
+    "merchantRenderingPermissionChange": 0,
+    "reusableKnowledgeCoverage": {
+      "newFirstClassRecords": [
+        "CUR26-WRK-MC-ABVF-BASE",
+        "CUR26-WRK-MC-ABVF-LARGE-TICKET",
+        "CUR26-WRK-MC-ALF"
+      ],
+      "newMaintenanceReviews": [
+        "MC_ABVF_CONTINUITY_REVIEW_2026_09"
+      ],
+      "lowerWeightCandidateRecords": [
+        "CUR26-CAND-VISA-BASE-II-TRANSMISSION-0027"
+      ]
+    }
+  },
+  "invariants": {
+    "canonicalFinancialFingerprintChangedStatements": [],
+    "canonicalFinancialFingerprintsUnchanged": true,
+    "canonicalMutationAllowed": false,
+    "historicalCurrentFirewallPreserved": true,
+    "officialNetworkParCertifiedRows": 0,
+    "confirmedAtParRows": 0,
+    "confirmedMarkupRows": 0,
+    "aiOrWebResearchExecuted": false,
+    "reusableKnowledgeSelfAdmitted": false
+  }
+}

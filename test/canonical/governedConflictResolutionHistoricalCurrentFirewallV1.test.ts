@@ -38,13 +38,13 @@ describe("Governed Conflict Resolution & Historical/Current Firewall v1", () => 
     }
   }, 60_000);
 
-  it("reduces the 18 diagnosed row conflicts to zero without losing current-reference uncertainty", () => {
+  it("keeps the 18 diagnosed row conflicts at zero while retaining current maintenance separately", () => {
     expect(corpus).toHaveLength(11);
     expect(corpus.reduce((total, entry) => total + entry.conflicts, 0)).toBe(0);
-    const assessments = allFindings(corpus).filter(({ finding }) => finding.current2026UsCoreNetworkReference?.currentReferenceMaintenance.matchedRecordIds.includes("CUR26-UNR-MC-ASSESSMENT"));
+    const assessments = allFindings(corpus).filter(({ finding }) => finding.current2026UsCoreNetworkReference?.currentReferenceMaintenance.matchedRecordIds.includes("CUR26-WRK-MC-ABVF-BASE"));
     expect(assessments).toHaveLength(9);
     expect(assessments.every(({ finding }) => finding.current2026UsCoreNetworkReference?.reference.conflicts.length === 0 && finding.current2026UsCoreNetworkReference.research.priority === "none")).toBe(true);
-    expect(assessments.every(({ finding }) => finding.current2026UsCoreNetworkReference?.currentReferenceMaintenance.state === "CURRENT_RATE_UNRESOLVED")).toBe(true);
+    expect(assessments.every(({ finding }) => finding.current2026UsCoreNetworkReference?.currentReferenceMaintenance.state === "CURRENT_WORKING_REFERENCE_STRONG")).toBe(true);
     expect(assessments.every(({ finding }) => finding.current2026UsCoreNetworkReference?.currentReferenceMaintenance.retainedSeparatelyFromHistoricalConclusion)).toBe(true);
   });
 
@@ -104,7 +104,7 @@ describe("Governed Conflict Resolution & Historical/Current Firewall v1", () => 
     expect(row?.finding.current2026UsCoreNetworkReference).toMatchObject({
       historicalApplication: "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
       reference: { state: "NOT_APPLICABLE", conflicts: [] },
-      currentReferenceMaintenance: { state: "CURRENT_RATE_UNRESOLVED" },
+      currentReferenceMaintenance: { state: "CURRENT_WORKING_REFERENCE_STRONG", values: expect.arrayContaining([expect.objectContaining({ value: 0.0014 }), expect.objectContaining({ value: 0.0015 })]) },
       research: { priority: "none" },
     });
     expect(row?.finding.mastercardFocusedEvidence?.effectiveUsNetworkEvidence.comparison.renderingText).toMatch(/Markup is not required/i);
@@ -125,7 +125,7 @@ describe("Governed Conflict Resolution & Historical/Current Firewall v1", () => 
     expect(baseII.current2026UsCoreNetworkReference).toMatchObject({
       historicalApplication: "HISTORICAL_VALUE_PRESERVED_BEFORE_CHANGE",
       reference: { state: "CURRENT_CONFIRMED_CHANGE", historicalValues: [{ value: 0.0018, unit: "usd_per_event" }], conflicts: [] },
-      currentReferenceMaintenance: { state: "CURRENT_RATE_UNRESOLVED", candidateValues: [{ value: 0.0025 }, { value: 0.0027 }] },
+      currentReferenceMaintenance: { state: "CURRENT_WORKING_REFERENCE_STRONG", values: [{ value: 0.0025, unit: "usd_per_event", variantId: "transmission", scope: "U.S. Base II Transmission/System File from January 1, 2025" }], candidateValues: [expect.objectContaining({ value: 0.0027, status: "UNRESOLVED_CONFLICTING_CANDIDATE" })] },
       lineToFeeCardinality: { state: "one_fee_supported", comparisonAllowed: true },
       research: { priority: "none" },
     });

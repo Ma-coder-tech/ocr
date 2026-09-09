@@ -36,15 +36,17 @@ describe("Product-adjudicated focused Mastercard evidence 2024-2026", () => {
     const rules = governedMastercardFocusedRules2024_2026V1();
     expect(records.map((item) => item.recordId)).toEqual(Array.from({ length: 9 }, (_, index) => `MC-FOCUSED-${String(index + 1).padStart(2, "0")}`));
     expect(rules.map((item) => item.ruleId)).toEqual(Array.from({ length: 9 }, (_, index) => `RR-MCF-${String(index + 1).padStart(2, "0")}`));
-    expect(rules.every((item) => item.sourceFingerprints.includes("0de1b4b1a724cf596bf05a0e8beba276c0fa9c1a9e363e7ff363562dbf17614a"))).toBe(true);
-    expect(sources.every((item) => item.immutable && item.retainedPackageFingerprint === "0de1b4b1a724cf596bf05a0e8beba276c0fa9c1a9e363e7ff363562dbf17614a")).toBe(true);
+    expect(rules.every((item) => item.sourceFingerprints.every((fingerprint) => fingerprint.length === 64))).toBe(true);
+    expect(sources.every((item) => item.immutable && item.retainedPackageFingerprint.length === 64)).toBe(true);
+    expect(sources.find((item) => item.sourceId === "rr_product_current_reference_maintenance_adjudication_v2")?.retainedPackageFingerprint).toBe("202fd093c5b4bb0b7771b3c4c90b49e19af77c659a10cebf5cdef2216acec0e4");
     expect(sources.find((item) => item.sourceId === "nuvei_paya_mastercard_location_source")?.rawAssertions).toContain("The source states MCC 8938 and 8661.");
     const rawFiservLocation = governedUsNetworkReferenceRecords2020_2026V1().find((item) => item.recordId === "mastercard_location_2023_04")!;
     expect(rawFiservLocation.conflicts.join(" ")).toMatch(/8393.*8661/);
     expect(record(records, "MC-FOCUSED-04").disposition).toMatch(/8398.*8661/);
-    expect(record(records, "MC-FOCUSED-07")).toMatchObject({ confidence: "UNRESOLVED" });
-    expect(record(records, "MC-FOCUSED-07").prohibitedClaims).toEqual(expect.arrayContaining(["2026_rate_0_001375", "2026_rate_0_001475"]));
-    expect(record(records, "MC-FOCUSED-01").effectiveDates.map((item) => item.value)).toEqual(["2024-04-05", "2024-04-15"]);
+    expect(record(records, "MC-FOCUSED-07")).toMatchObject({ confidence: "STRONG" });
+    expect(record(records, "MC-FOCUSED-07").prohibitedClaims).toEqual(expect.arrayContaining(["single_universal_mastercard_assessment_rate", "automatic_bundled_alf", "confirmed_at_par"]));
+    expect(record(records, "MC-FOCUSED-01").effectiveDates.map((item) => item.value)).toEqual(["2024-04-15"]);
+    expect(record(records, "MC-FOCUSED-07").disposition).toMatch(/0\.14%.*0\.15%.*0\.0075%/);
   });
 
   it("requires the cardinality and residual gates in both directions", () => {

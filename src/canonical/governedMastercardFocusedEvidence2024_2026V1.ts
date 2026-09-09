@@ -7,7 +7,7 @@ import type {
 } from "./governedUsNetworkFeeEvidence2020_2026V1.js";
 
 export const GOVERNED_MASTERCARD_FOCUSED_EVIDENCE_2024_2026_V1 =
-  "governed_mastercard_focused_evidence_2024_2026_product_adjudicated_v2_2026_09_07_v1" as const;
+  "governed_mastercard_focused_evidence_current_reference_maintenance_2026_09_09_v1" as const;
 
 export type MastercardFocusedEvidenceClass =
   | "G1_product_domain_adjudication"
@@ -53,7 +53,7 @@ export type GovernedMastercardFocusedRule = {
   prohibitedClaims: string[];
   sourceRefs: string[];
   sourceFingerprints: string[];
-  reviewedAt: "2026-09-07";
+  reviewedAt: "2026-09-07" | "2026-09-09";
   admissionStatus: "admitted";
 };
 
@@ -135,7 +135,16 @@ export type GovernedMastercardFocusedRowResolution = {
     preservedSourceAssertions: readonly ["Fiserv: 8393 and 8661", "Nuvei/Paya: 8938 and 8661"];
     correctionLayerOnly: true;
   };
-  current2026Assessment: { state: "UNRESOLVED"; valuesNotAdmitted: readonly [0.001375, 0.001475] } | null;
+  current2026Assessment: {
+    state: "CURRENT_WORKING_REFERENCE_STRONG";
+    baseAbvf: 0.0014;
+    largeTicketResult: 0.0015;
+    largeTicketThresholdUsd: 1000;
+    largeTicketDebitExcluded: true;
+    alfCommonObservedAllocation: 0.000075;
+    compositeLineCardinality: "statement_local";
+    officialNetworkParEstablished: false;
+  } | null;
   matchedRecordRefs: string[];
   matchedRuleRefs: string[];
   limitations: string[];
@@ -165,8 +174,26 @@ export type GovernedMastercardFocusedEvidenceResolution = {
 const PRODUCT_PACK_REF = "RateReveal_Mastercard_Focused_Evidence_2024-2026_FINAL_Product_Adjudicated_v2.md";
 const PRODUCT_PACK_SHA256 = "0de1b4b1a724cf596bf05a0e8beba276c0fa9c1a9e363e7ff363562dbf17614a";
 const PRODUCT_REQUEST_SHA256 = "79ffd2869801618e8caa7b5c70dfa2a3a4b4002758e53996314263874c6253b6";
+const CURRENT_MAINTENANCE_PACK_REF = "RateReveal_Current_Reference_Maintenance_Adjudication_FINAL_Product_Adjudicated_v2.md";
+const CURRENT_MAINTENANCE_PACK_SHA256 = "202fd093c5b4bb0b7771b3c4c90b49e19af77c659a10cebf5cdef2216acec0e4";
 
 const SOURCES: GovernedMastercardFocusedSource[] = [
+  {
+    sourceId: "rr_product_current_reference_maintenance_adjudication_v2",
+    title: "RateReveal Current Reference Maintenance Adjudication — Final Product-Adjudicated v2",
+    publisher: "RateReveal Product/domain review",
+    evidenceClass: "G1_product_domain_adjudication",
+    publicationDate: "2026-09-09",
+    publicationDatePrecision: "day",
+    sourceLocator: CURRENT_MAINTENANCE_PACK_REF,
+    retainedThrough: CURRENT_MAINTENANCE_PACK_REF,
+    retainedPackageFingerprint: CURRENT_MAINTENANCE_PACK_SHA256,
+    reviewStatus: "product_adjudicated_admitted",
+    geographyScope: "United States merchant acquiring",
+    immutable: true,
+    rawAssertions: ["0.14% is the current working U.S. ABVF base from April 15, 2024; large-ticket and ALF semantics remain separate and statement-local."],
+    limitations: ["Current working reference is not universal official Mastercard par."],
+  },
   source("rr_product_mastercard_focused_pack_v2", "RateReveal Focused Mastercard Evidence Review — Final Product-Adjudicated Version v2", "RateReveal Product/domain review", "G1_product_domain_adjudication", "2026-09-07", "day", PRODUCT_PACK_REF, [
     "The 2024 0.1475% line is strongly explained by 0.14% ABVF plus a plausible 0.0075% ALF component, without proving at-par pass-through.",
     "The 2025 $3.00 Location Fee is above the $1.25 available reference; acquiring-side uplift is likely while contract violation and excess beneficiary remain unresolved.",
@@ -188,21 +215,21 @@ const SOURCES: GovernedMastercardFocusedSource[] = [
 ];
 
 const RECORDS: GovernedMastercardFocusedRecord[] = [
-  record("MC-FOCUSED-01", "2024 U.S. Acquirer Brand Volume Fee increase", "0.13% increased to 0.14%; April 5 and April 15 effective-date evidence remains conflicted for early-April statements.", ["braintree_paypal_mastercard_update_2024", "optimized_payments_mastercard_reference_2026"], "STRONG", [{ value: "2024-04-05", precision: "day", sourceRef: "braintree_paypal_mastercard_update_2024" }, { value: "2024-04-15", precision: "day", sourceRef: "optimized_payments_mastercard_reference_2026" }], "U.S. Mastercard acquiring", ["The date conflict is immaterial for September 2024 but must remain unresolved for early April."], ["one_global_effective_date_without_conflict"]),
+  record("MC-FOCUSED-01", "2024 U.S. Acquirer Brand Volume Fee increase", "0.13% increased to 0.14%; the Product-adjudicated current working reference uses April 15, 2024.", ["braintree_paypal_mastercard_update_2024", "rr_product_current_reference_maintenance_adjudication_v2"], "STRONG", [{ value: "2024-04-15", precision: "day", sourceRef: "rr_product_current_reference_maintenance_adjudication_v2" }], "U.S. Mastercard acquiring", ["The raw April 5 processor assertion remains immutable provenance but is not used to manufacture an early-April historical conclusion."], ["universal_mastercard_published_par", "historical_conclusion_before_period_evidence"]),
   record("MC-FOCUSED-02", "2024 0.1475% statement Assessment", "Strongly explained by 0.14% ABVF plus a plausible 0.0075% ALF component; remove from above-reference candidates.", ["MC-FOCUSED-01", "rr_product_mastercard_focused_pack_v2"], "STRONG", [], "September 2024 corpus statement", ["The Wells Fargo/Fiserv-specific ALF component remains LIKELY."], ["confirmed_at_par", "universal_0_0075_alf", "no_possible_uplift"]),
   record("MC-FOCUSED-03", "Mastercard Location Fee reference", "$1.25 per qualifying location/month is supported before and after 2025.", ["vantiv_worldpay_mastercard_schedule_2023_10", "new_hampshire_merchant_agreement_2024", "optimized_payments_mastercard_reference_2026", "pay_com_mastercard_location_guidance_2026"], "STRONG", [], "U.S. Mastercard merchant locations", [], ["mastercard_charges_3_00"]),
   record("MC-FOCUSED-04", "Location Fee exclusions", "Canonical exclusions are under $200 monthly Mastercard volume, MCC 8398, and MCC 8661; source variants remain immutable.", ["MC-FOCUSED-03", "nuvei_paya_mastercard_location_source", "fiserv_card_brand_pass_through_guide_2023_04"], "STRONG", [], "U.S. Mastercard merchant locations", ["Fiserv 8393 and Nuvei/Paya 8938 are probable transcription errors retained in raw evidence."], ["rewrite_source_assertion"]),
   record("MC-FOCUSED-05", "2025 $3.00 Location Fee", "Billed above the $1.25 available reference; acquiring-side uplift LIKELY, not confirmed.", ["MC-FOCUSED-03", "rr_product_mastercard_focused_pack_v2"], "LIKELY", [], "Distinct 2025 corpus Location Fee occurrences", ["Contract violation and excess beneficiary are unresolved."], ["confirmed_markup", "processor_profit", "contract_breach"]),
   record("MC-FOCUSED-06", "Non-U.S. NABU", "$0.0295 per transaction effective April 15, 2024 for U.S.-merchant/non-U.S.-issuer scope.", ["braintree_paypal_mastercard_update_2024"], "STRONG", [{ value: "2024-04-15", precision: "day", sourceRef: "braintree_paypal_mastercard_update_2024" }], "U.S. merchant / non-U.S. issuer", [], ["primary_mastercard_publication"]),
-  record("MC-FOCUSED-07", "2026 Mastercard Assessment", "Current 2026 rate remains unresolved; neither 0.1375% nor 0.1475% is admitted.", ["optimized_payments_mastercard_reference_2026", "MC-FOCUSED-01"], "UNRESOLVED", [], "2026 U.S. Mastercard acquiring", ["A current page date does not prove every value on the page is current."], ["2026_rate_0_001375", "2026_rate_0_001475"]),
+  record("MC-FOCUSED-07", "2026 Mastercard ABVF working reference", "The U.S. ABVF base is 0.14% CURRENT_WORKING_REFERENCE_STRONG; large-ticket 0.15% and ALF 0.0075% allocation semantics remain separate and scoped.", ["rr_product_current_reference_maintenance_adjudication_v2", "MC-FOCUSED-01"], "STRONG", [{ value: "2024-04-15", precision: "day", sourceRef: "rr_product_current_reference_maintenance_adjudication_v2" }], "2026 U.S. Mastercard acquiring", ["This does not certify universal Mastercard par, automatic ALF bundling, at-par merchant billing, processor retention, or markup."], ["single_universal_mastercard_assessment_rate", "automatic_bundled_alf", "confirmed_at_par"]),
   record("MC-FOCUSED-08", "Line-to-fee cardinality and residual guardrail", "Determine one fee, combined fees, bounded component, or structural line before comparison; exact residual arithmetic is not proof.", ["rr_product_mastercard_focused_pack_v2"], "STRONG", [], "All reference comparisons", [], ["markup_from_residual_math_alone", "undercharge_from_below_reference_alone"]),
   record("MC-FOCUSED-09", "Duplicate-candidate guardrail", "Count candidates only after verifying distinct statement and fee-row source occurrences.", ["rr_product_mastercard_focused_pack_v2"], "STRONG", [], "Corpus calibration", [], ["alias_counted_as_independent_occurrence"]),
 ];
 
 const RULES: GovernedMastercardFocusedRule[] = RECORDS.map((item, index) => ({
   ruleId: `RR-MCF-0${index + 1}` as GovernedMastercardFocusedRule["ruleId"], title: item.title, admittedClaim: item.disposition,
-  prohibitedClaims: item.prohibitedClaims, sourceRefs: item.evidenceRefs, sourceFingerprints: [PRODUCT_PACK_SHA256, PRODUCT_REQUEST_SHA256],
-  reviewedAt: "2026-09-07", admissionStatus: "admitted",
+  prohibitedClaims: item.prohibitedClaims, sourceRefs: item.evidenceRefs, sourceFingerprints: item.recordId === "MC-FOCUSED-01" || item.recordId === "MC-FOCUSED-07" ? [PRODUCT_PACK_SHA256, PRODUCT_REQUEST_SHA256, CURRENT_MAINTENANCE_PACK_SHA256] : [PRODUCT_PACK_SHA256, PRODUCT_REQUEST_SHA256],
+  reviewedAt: item.recordId === "MC-FOCUSED-01" || item.recordId === "MC-FOCUSED-07" ? "2026-09-09" : "2026-09-07", admissionStatus: "admitted",
 }));
 
 export function governedMastercardFocusedSources2024_2026V1(): GovernedMastercardFocusedSource[] { return structuredClone(SOURCES); }
@@ -237,7 +264,7 @@ export function resolveGovernedMastercardFocusedEvidence2024_2026V1(input: { ana
       distinctLocationCandidateOccurrences, confirmedAtParRows: 0, confirmedMarkupRows: 0,
     },
     canonicalMutationAllowed: false,
-    limitations: ["This Product-adjudicated layer composes the existing U.S. network evidence inside the single governed payment-knowledge authority.", "Raw source assertions are immutable; MCC corrections live only in this derived adjudication layer.", "No 2026 Mastercard assessment value, confirmed at-par pass-through, confirmed markup, contract violation, or excess beneficiary is admitted."],
+    limitations: ["This Product-adjudicated layer composes the existing U.S. network evidence inside the single governed payment-knowledge authority.", "Raw source assertions are immutable; corrections and superseding adjudications live only in derived governed layers.", "The 2026 ABVF working reference does not establish one universal composite assessment rate, confirmed at-par pass-through, confirmed markup, contract violation, or excess beneficiary."],
   });
 }
 
@@ -279,7 +306,7 @@ function resolveRow(row: CanonicalFeeRow, analysis: CanonicalStatementAnalysis, 
       reference: { ...effective.reference, state: "period_matched_processor_reference", evidenceClass: "E4_processor_or_acquirer_schedule", matchedRecordIds: ["MC-FOCUSED-01", "MC-FOCUSED-02"], candidateValues: [networkValue("abvf_2024", 0.0014, "decimal_rate", "U.S. Acquirer Brand Volume Fee")], sourceDate: "2024-04-05", effectiveFrom: "2024-04-05", effectiveThrough: null, adjacentPeriodOnly: false, current2026CoreValueEstablished: false },
       comparison: { ...effective.comparison, state: "population_or_product_scope_unresolved", referenceValue: 0.0014, difference: 0.000075, renderingText: "The 0.1475% line is strongly explained by the 0.14% 2024 Acquirer Brand Volume Fee plus a plausible 0.0075% Annual Acquirer License Fee component. The absence of a separate ALF line supports, but does not prove, the bundled-component hypothesis. Markup is not required to explain the row, but at-par pass-through and a small acquiring-side uplift cannot be fully excluded without acquirer-specific period evidence." },
       sourceConflicts: [], research: { priority: "none", reasonCodes: [], question: null }, matchedRuleRefs: [...new Set([...effective.matchedRuleRefs, "RR-MCF-01", "RR-MCF-02", "RR-MCF-08"])],
-      limitations: [...effective.limitations, "April 5 versus April 15, 2024 remains an effective-date conflict for early-April statements; it is immaterial for this September statement.", "A small acquiring-side uplift cannot be fully excluded without the acquirer-specific period schedule."],
+      limitations: [...effective.limitations, "The Product-adjudicated current working reference uses April 15, 2024; the earlier raw April 5 assertion remains provenance and is not needed for this September conclusion.", "A small acquiring-side uplift cannot be fully excluded without the acquirer-specific period schedule."],
     };
     matchedRecordRefs.push("MC-FOCUSED-01", "MC-FOCUSED-02"); matchedRuleRefs.push("RR-MCF-01", "RR-MCF-02");
   }
@@ -324,7 +351,7 @@ function resolveRow(row: CanonicalFeeRow, analysis: CanonicalStatementAnalysis, 
     feeRowId: row.id, applicable: true, effectiveUsNetworkEvidence: effective, lineToFeeCardinality: cardinality, residualDecomposition: residual,
     assessment2024, locationFee2025, nonUsNabu2024,
     locationMccAdjudication: isLocation ? { canonicalExcludedMccs: [8398, 8661], preservedSourceAssertions: ["Fiserv: 8393 and 8661", "Nuvei/Paya: 8938 and 8661"], correctionLayerOnly: true } : null,
-    current2026Assessment: /ASSESSMENT/.test(text) && Boolean(period?.end.startsWith("2026")) ? { state: "UNRESOLVED", valuesNotAdmitted: [0.001375, 0.001475] } : null,
+    current2026Assessment: /ASSESSMENT/.test(text) && Boolean(period?.end.startsWith("2026")) ? { state: "CURRENT_WORKING_REFERENCE_STRONG", baseAbvf: 0.0014, largeTicketResult: 0.0015, largeTicketThresholdUsd: 1000, largeTicketDebitExcluded: true, alfCommonObservedAllocation: 0.000075, compositeLineCardinality: "statement_local", officialNetworkParEstablished: false } : null,
     matchedRecordRefs: [...new Set(matchedRecordRefs)], matchedRuleRefs: [...new Set(matchedRuleRefs)], limitations: [],
   };
 }
