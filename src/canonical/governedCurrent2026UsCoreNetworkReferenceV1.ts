@@ -459,7 +459,7 @@ export function adjudicateCurrentEvidenceCandidates(candidates: CurrentEvidenceC
 
 export function adjudicateMastercardAssessmentCardinalityV1(input: {
   printedRate: number | null;
-  applicableAbvfReference: 0.0013 | 0.0014 | null;
+  applicableAbvfReference: 0.0013 | 0.0014 | 0.0015 | null;
   sameVolumeBaseAndMechanicSupported: boolean;
   separateAlfLinePresentForScope: boolean;
   strongerCompetingComponentExplanationPresent: boolean;
