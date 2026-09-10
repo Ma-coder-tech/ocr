@@ -121,6 +121,7 @@ export type CommercialPriceComponentVersionV1 = {
     | "per_gateway_transaction"
     | "per_batch"
     | "per_authorization"
+    | "per_card_transaction"
     | "per_successful_update"
     | "per_returned_gateway_billing_debit"
     | "per_late_payment_event"
@@ -128,9 +129,12 @@ export type CommercialPriceComponentVersionV1 = {
     | "per_abandoned_account"
     | "per_billing_cycle"
     | "per_chargeback_case"
+    | "per_ach_reject_or_return"
+    | "per_approved_tap_to_pay_transaction"
     | "per_service_setup"
     | "percent_of_card_charge_volume"
     | "percent_of_volume"
+    | "percent_of_generated_interchange_savings"
     | "other";
   billedPopulation: string;
   sourceFaithfulPopulationWording: string | null;
@@ -140,12 +144,37 @@ export type CommercialPriceComponentVersionV1 = {
   sourceObservationRefs: string[];
   pricePresentation: "exact" | "starting_at" | "indicative";
   directionalBound: "none" | "lower_bound" | "upper_bound";
+  /** Product-admitted applicability only. Absence means the component applies to its whole offer identity. */
+  applicabilityPredicate?: CommercialPredicateV1 | null;
+  /** A conditional adjustment never changes the admitted gross fee into a universal zero. */
+  conditionalAdjustment?: {
+    kind: "full_fee_refund";
+    condition: CommercialPredicateV1;
+    result: "net_zero_for_assessed_component";
+    sourceFaithfulWording: string;
+  } | null;
   admission: CommercialAdmissionV1;
   f3GovernedSemantic: string;
 };
 
 export type CommercialPredicateV1 =
-  | { op: "fact"; field: "monthly_volume_minor" | "annual_volume_minor" | "transaction_count" | "average_ticket_minor" | "merchant_type" | "channel" | "risk_review_required"; comparator: "eq" | "gte" | "gt" | "lte" | "lt"; value: string | number | boolean }
+  | { op: "fact"; field:
+      | "monthly_volume_minor"
+      | "three_month_rolling_card_volume_minor"
+      | "annual_volume_minor"
+      | "transaction_count"
+      | "average_ticket_minor"
+      | "merchant_type"
+      | "channel"
+      | "card_brand"
+      | "transaction_is_recurring"
+      | "chargeback_resolved_in_merchant_favor"
+      | "pci_non_compliant"
+      | "known_high_risk"
+      | "future_delivery_or_custom_deposit_or_open_ended_billing"
+      | "risk_review_required";
+      comparator: "eq" | "gte" | "gt" | "lte" | "lt";
+      value: string | number | boolean }
   | { op: "and" | "or"; conditions: CommercialPredicateV1[] };
 
 export type CommercialPredicateFactFieldV1 = Extract<CommercialPredicateV1, { op: "fact" }>["field"];
@@ -224,6 +253,16 @@ export type CommercialOfferCompositionVersionV1 = {
   effectivePeriod: CommercialEffectivePeriodV1;
   lifecycle: "prospective_future" | "active_available_last_known" | "superseded" | "withdrawn_retired";
   verification: "currently_verified" | "verification_due_or_uncertain" | "unable_to_reverify";
+  qualificationPredicate?: CommercialPredicateV1 | null;
+  qualificationBoundary?: {
+    field: CommercialPredicateFactFieldV1;
+    exactValue: string | number | boolean;
+    state: "UNRESOLVED_QUALIFICATION_BOUNDARY";
+    appliesWhen: CommercialPredicateV1 | null;
+    sourceObservationRefs: string[];
+    reason: string;
+  } | null;
+  disqualifyingPredicate?: CommercialPredicateV1 | null;
   admission: CommercialAdmissionV1;
   f3GovernedSemantic: string;
 };
@@ -281,6 +320,11 @@ export type CommercialSourceChangeClassificationV1 = {
   sourceObservationVersionRequired: boolean;
   productReviewRequired: boolean;
   governedSemanticVersionRequired: boolean;
+};
+
+export type CommercialOfferQualificationEvaluationV1 = {
+  state: "QUALIFIED" | "NOT_QUALIFIED" | "UNRESOLVED_QUALIFICATION_BOUNDARY" | "UNKNOWN" | "NOT_APPLICABLE";
+  reasons: string[];
 };
 
 export type CommercialComponentConflictClassificationV1 =
@@ -352,6 +396,8 @@ export function governedCommercialComponentSemanticFingerprintV1(
     effectivePeriod: input.effectivePeriod,
     pricePresentation: input.pricePresentation,
     directionalBound: input.directionalBound,
+    ...(input.applicabilityPredicate !== undefined ? { applicabilityPredicate: input.applicabilityPredicate } : {}),
+    ...(input.conditionalAdjustment !== undefined ? { conditionalAdjustment: input.conditionalAdjustment } : {}),
   });
 }
 
@@ -365,6 +411,9 @@ export function governedCommercialCompositionSemanticFingerprintV1(
     serviceScopeVersionRefs: input.serviceScopeVersionRefs,
     promotionVersionRefs: input.promotionVersionRefs,
     effectivePeriod: input.effectivePeriod,
+    ...(input.qualificationPredicate !== undefined ? { qualificationPredicate: input.qualificationPredicate } : {}),
+    ...(input.qualificationBoundary !== undefined ? { qualificationBoundary: input.qualificationBoundary } : {}),
+    ...(input.disqualifyingPredicate !== undefined ? { disqualifyingPredicate: input.disqualifyingPredicate } : {}),
   });
 }
 
@@ -447,6 +496,9 @@ export function validateCommercialSourceGovernanceRegistryV1(
     if (component.channelScope !== component.offerIdentity.distributionChannel) {
       issues.push(issue("component_channel_identity_mismatch", component.componentVersionId, "Component channel scope must match its offer price identity."));
     }
+    if (component.conditionalAdjustment?.kind === "full_fee_refund" && component.completeness.state !== "KNOWN") {
+      issues.push(issue("conditional_refund_requires_known_gross_fee", component.componentVersionId, "A conditional full-fee refund must preserve a KNOWN gross assessment."));
+    }
     const expected = governedCommercialComponentSemanticFingerprintV1(component);
     if (expected !== component.f3GovernedSemantic) issues.push(issue("semantic_fingerprint_mismatch", component.componentVersionId, "F3 does not match governed component meaning."));
     if (component.supersedesComponentVersionId !== null) {
@@ -502,6 +554,9 @@ export function validateCommercialSourceGovernanceRegistryV1(
     checkRefs(composition.publicPolicyVersionRefs, policyIds, composition.compositionVersionId, "policy", issues);
     checkRefs(composition.serviceScopeVersionRefs, serviceIds, composition.compositionVersionId, "service", issues);
     checkRefs(composition.promotionVersionRefs, promotionIds, composition.compositionVersionId, "promotion", issues);
+    if (composition.qualificationBoundary) {
+      checkObservationRefs(composition.qualificationBoundary.sourceObservationRefs, observationIds, composition.compositionVersionId, issues);
+    }
     const referencedIdentities = [
       ...composition.componentVersionRefs.map((ref) => registry.priceComponentVersions.find((item) => item.componentVersionId === ref)?.offerIdentity),
       ...composition.publicPolicyVersionRefs.map((ref) => registry.publicPolicyVersions.find((item) => item.policyVersionId === ref)?.offerIdentity),
@@ -644,6 +699,30 @@ export function evaluateCommercialPredicateV1(
     case "lt": return actual < predicate.value ? "satisfied" : "not_satisfied";
   }
   return "unknown";
+}
+
+export function evaluateCommercialOfferQualificationV1(
+  composition: CommercialOfferCompositionVersionV1,
+  facts: Partial<Record<CommercialPredicateFactFieldV1, string | number | boolean>>,
+): CommercialOfferQualificationEvaluationV1 {
+  if (composition.disqualifyingPredicate && evaluateCommercialPredicateV1(composition.disqualifyingPredicate, facts) === "satisfied") {
+    return { state: "NOT_APPLICABLE", reasons: ["A Product-admitted disqualifying condition applies."] };
+  }
+  const boundary = composition.qualificationBoundary;
+  if (boundary && facts[boundary.field] === boundary.exactValue) {
+    const scope = boundary.appliesWhen ? evaluateCommercialPredicateV1(boundary.appliesWhen, facts) : "satisfied";
+    const otherBranches = composition.qualificationPredicate
+      ? evaluateCommercialPredicateV1(composition.qualificationPredicate, facts)
+      : "unknown";
+    if (otherBranches !== "satisfied" && scope === "satisfied") {
+      return { state: "UNRESOLVED_QUALIFICATION_BOUNDARY", reasons: [boundary.reason] };
+    }
+  }
+  if (!composition.qualificationPredicate) return { state: "UNKNOWN", reasons: ["No admitted qualification predicate exists for this offer."] };
+  const result = evaluateCommercialPredicateV1(composition.qualificationPredicate, facts);
+  if (result === "satisfied") return { state: "QUALIFIED", reasons: ["At least one admitted qualification branch is satisfied."] };
+  if (result === "not_satisfied") return { state: "NOT_QUALIFIED", reasons: ["No admitted qualification branch is satisfied."] };
+  return { state: "UNKNOWN", reasons: ["Available facts do not resolve all relevant qualification branches."] };
 }
 
 export function sameOfferIdentity(left: CommercialOfferIdentityV1, right: CommercialOfferIdentityV1): boolean {
