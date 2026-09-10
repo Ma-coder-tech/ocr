@@ -1,0 +1,643 @@
+{
+  "schemaVersion": "commercial_source_governance_contract_evaluation_2026_09_10_v1",
+  "generatedAt": "2026-09-10T00:00:00.000Z",
+  "productAuthority": {
+    "file": "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md",
+    "sha256": "ad2c258fb6f7aaa3ffeee881736d5212776f4b016e4ba5553c1c05dcf53c216e",
+    "status": "final_product_adjudicated_implementation_authority"
+  },
+  "baseline": {
+    "branch": "codex/commercial-comparator-eligibility-validation-v1",
+    "commit": "584ea36efc9a2f25e9302538424aa802725a98fe",
+    "parent": "e5e69f277ee5108cfb8a514c985d9391b54b09d3"
+  },
+  "scope": {
+    "internalSourceGovernanceOnly": true,
+    "authorizeNetBatch1AOnly": true,
+    "aiOrWebResearchUsed": false,
+    "comparatorEngineImplemented": false,
+    "marketJudgmentGenerated": false,
+    "customerFacingOutputGenerated": false
+  },
+  "contract": {
+    "contractVersion": "commercial_source_governance_contract_2026_09_10_v1",
+    "reusedConcepts": [
+      "KnowledgeAuthorityClass/product_owner",
+      "canonicalJson deterministic serialization",
+      "canonical financial truth fingerprint"
+    ],
+    "introducedConcepts": [
+      "commercial offer identity including seller and distribution channel",
+      "source observation history distinct from governed semantic history",
+      "F1 raw, F2 extract, and F3 semantic fingerprints",
+      "component and offer-composition semantic versions",
+      "KNOWN / KNOWN_ABSENT / UNKNOWN completeness",
+      "orthogonal public-policy and merchant-specific availability evidence",
+      "separate lifecycle, verification, and effective-period dimensions",
+      "claim-specific source resolution with historical/current firewall",
+      "preserved commercial-source conflicts and human admission boundary"
+    ],
+    "sourceRecordCounts": {
+      "observations": 2,
+      "componentVersions": 7,
+      "policyVersions": 2,
+      "predicateProposals": 0,
+      "serviceVersions": 4,
+      "promotionVersions": 2,
+      "offerCompositionVersions": 2,
+      "conflicts": 0
+    },
+    "validationIssues": []
+  },
+  "batch1A": {
+    "batchVersion": "authorize_net_direct_gateway_commercial_source_batch_1a_2026_09_10_v1",
+    "identities": [
+      {
+        "providerBrand": "authorize_net",
+        "sellerIdentity": "authorize_net_direct",
+        "distributionChannel": "direct",
+        "namedOffer": "gateway_only_offer_name_not_preserved_in_product_authority",
+        "productScope": "gateway_only",
+        "geography": "US",
+        "currency": "USD",
+        "pricingModel": "gateway_fee_schedule",
+        "sourceNature": "product_adjudicated_source_summary"
+      },
+      {
+        "providerBrand": "authorize_net",
+        "sellerIdentity": "authorize_net_direct",
+        "distributionChannel": "direct",
+        "namedOffer": "account_updater_component_source_value_not_preserved_in_product_authority",
+        "productScope": "ancillary_service",
+        "geography": "US",
+        "currency": "USD",
+        "pricingModel": "ancillary_per_successful_update",
+        "sourceNature": "product_adjudicated_source_summary"
+      }
+    ],
+    "observations": [
+      {
+        "observationId": "commercial_source_obs_authorize_net_direct_gateway_2026_09_10_v1",
+        "observationVersion": 1,
+        "supersedesObservationId": null,
+        "offerIdentity": {
+          "providerBrand": "authorize_net",
+          "sellerIdentity": "authorize_net_direct",
+          "distributionChannel": "direct",
+          "namedOffer": "gateway_only_offer_name_not_preserved_in_product_authority",
+          "productScope": "gateway_only",
+          "geography": "US",
+          "currency": "USD",
+          "pricingModel": "gateway_fee_schedule",
+          "sourceNature": "product_adjudicated_source_summary"
+        },
+        "provenance": {
+          "sourceClass": "product_adjudication",
+          "sourceLocator": "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md#24",
+          "documentIdentity": "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md",
+          "captureMethod": "product_adjudicated_document",
+          "observedAt": "2026-09-10T00:00:00.000Z",
+          "publicationDate": "2026-09-10",
+          "effectivePeriod": {
+            "knowledge": "effective_period_unknown",
+            "effectiveFrom": null,
+            "effectiveTo": null
+          },
+          "lastVerifiedAt": "2026-09-10T00:00:00.000Z",
+          "retrievabilityLimitation": "The governing Product document preserves the adjudicated values but not the underlying first-party URL, exact offer name, publication date, effective date, or names of the zero-valued card-processing fields.",
+          "rawArtifactRef": "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md@sha256:ad2c258fb6f7aaa3ffeee881736d5212776f4b016e4ba5553c1c05dcf53c216e"
+        },
+        "sourceFaithfulExtract": "a gateway-only/direct pricing view can show a $25 monthly gateway charge, $0.10 transaction and batch components, and explicit zero values for some card-processing gateway fields",
+        "calculatorCapture": null,
+        "fingerprints": {
+          "f1RawSourceDocument": "ad2c258fb6f7aaa3ffeee881736d5212776f4b016e4ba5553c1c05dcf53c216e",
+          "f2RelevantCommercialExtract": "752a17a12ecc80d0cc482550d95e97d88fb737e989105441cff8d705041171d9"
+        }
+      },
+      {
+        "observationId": "commercial_source_obs_authorize_net_account_updater_2026_09_10_v1",
+        "observationVersion": 1,
+        "supersedesObservationId": null,
+        "offerIdentity": {
+          "providerBrand": "authorize_net",
+          "sellerIdentity": "authorize_net_direct",
+          "distributionChannel": "direct",
+          "namedOffer": "account_updater_component_source_value_not_preserved_in_product_authority",
+          "productScope": "ancillary_service",
+          "geography": "US",
+          "currency": "USD",
+          "pricingModel": "ancillary_per_successful_update",
+          "sourceNature": "product_adjudicated_source_summary"
+        },
+        "provenance": {
+          "sourceClass": "product_adjudication",
+          "sourceLocator": "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md#24",
+          "documentIdentity": "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md",
+          "captureMethod": "product_adjudicated_document",
+          "observedAt": "2026-09-10T00:00:00.000Z",
+          "publicationDate": "2026-09-10",
+          "effectivePeriod": {
+            "knowledge": "effective_period_unknown",
+            "effectiveFrom": null,
+            "effectiveTo": null
+          },
+          "lastVerifiedAt": "2026-09-10T00:00:00.000Z",
+          "retrievabilityLimitation": "The governing Product document establishes the per-successful-update mechanic but does not preserve the amount, underlying first-party URL, publication date, or effective date.",
+          "rawArtifactRef": "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md@sha256:ad2c258fb6f7aaa3ffeee881736d5212776f4b016e4ba5553c1c05dcf53c216e"
+        },
+        "sourceFaithfulExtract": "Account Updater has its own per-successful-update pricing.",
+        "calculatorCapture": null,
+        "fingerprints": {
+          "f1RawSourceDocument": "ad2c258fb6f7aaa3ffeee881736d5212776f4b016e4ba5553c1c05dcf53c216e",
+          "f2RelevantCommercialExtract": "aa20c160b4981f15aaa12a15226dae6488e062a2c8e6c7da8ecc0622a595fd56"
+        }
+      }
+    ],
+    "components": [
+      {
+        "id": "commercial_component_authorize_net_gateway_monthly_v1",
+        "identity": "monthly_gateway_charge",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 2500,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "population": "gateway_account_month",
+        "f3": "e3e6e7fb1334b4c4d6bdb7f722070f366abde35233365b9474218c3554f92776"
+      },
+      {
+        "id": "commercial_component_authorize_net_gateway_transaction_v1",
+        "identity": "gateway_transaction_charge",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 10,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_gateway_transaction",
+        "population": "gateway_transactions",
+        "f3": "141475dd4eb9240e568c6c0710541d7a80db5785b29327ebd087a06ee3af6798"
+      },
+      {
+        "id": "commercial_component_authorize_net_gateway_batch_v1",
+        "identity": "gateway_batch_charge",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 10,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_batch",
+        "population": "gateway_batches",
+        "f3": "8802eeb12a12bf1a7df4857d0223f2f20193254f70b8a277c21fc5e7812d68c7"
+      },
+      {
+        "id": "commercial_component_authorize_net_card_processing_percentage_v1",
+        "identity": "card_processing_percentage_field",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "unit": "percent_of_volume",
+        "population": "card_processing_volume",
+        "f3": "9785b5ee34d9973d528e73e1bb4c784ab2447264af581ce0bc32a6cbd4516f10"
+      },
+      {
+        "id": "commercial_component_authorize_net_card_processing_per_item_v1",
+        "identity": "card_processing_per_item_field",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "unit": "other",
+        "population": "card_processing_items",
+        "f3": "84b00f55cdf12ed13ee9a1e3ce90239042fa213b810eec89c266644583f5afaf"
+      },
+      {
+        "id": "commercial_component_authorize_net_chargeback_v1",
+        "identity": "chargeback_charge",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "unit": "other",
+        "population": "chargeback_cases",
+        "f3": "5426d84f84316fabf655fbe3fae91bf7b80f1863b74a90003e9960b5f4ea819d"
+      },
+      {
+        "id": "commercial_component_authorize_net_account_updater_v1",
+        "identity": "account_updater_successful_update_charge",
+        "scope": "ancillary_service",
+        "channel": "direct",
+        "completeness": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "unit": "per_successful_update",
+        "population": "successful_account_updates",
+        "f3": "0efcca712e42a9838a6f7ce6081163e2cb72faa094687e8b87dd35ba59c56445"
+      }
+    ],
+    "exactKnownValues": [
+      {
+        "component": "monthly_gateway_charge",
+        "value": {
+          "kind": "money",
+          "amountMinor": 2500,
+          "currency": "USD"
+        },
+        "unit": "per_month",
+        "population": "gateway_account_month"
+      },
+      {
+        "component": "gateway_transaction_charge",
+        "value": {
+          "kind": "money",
+          "amountMinor": 10,
+          "currency": "USD"
+        },
+        "unit": "per_gateway_transaction",
+        "population": "gateway_transactions"
+      },
+      {
+        "component": "gateway_batch_charge",
+        "value": {
+          "kind": "money",
+          "amountMinor": 10,
+          "currency": "USD"
+        },
+        "unit": "per_batch",
+        "population": "gateway_batches"
+      }
+    ],
+    "intentionallyUnknownValues": [
+      {
+        "component": "card_processing_percentage_field",
+        "unit": "percent_of_volume",
+        "population": "card_processing_volume"
+      },
+      {
+        "component": "card_processing_per_item_field",
+        "unit": "other",
+        "population": "card_processing_items"
+      },
+      {
+        "component": "chargeback_charge",
+        "unit": "other",
+        "population": "chargeback_cases"
+      },
+      {
+        "component": "account_updater_successful_update_charge",
+        "unit": "per_successful_update",
+        "population": "successful_account_updates"
+      }
+    ],
+    "evidenceGaps": [
+      "The governing Product document preserves the adjudicated values but not the underlying first-party URL, exact offer name, publication date, effective date, or names of the zero-valued card-processing fields.",
+      "The governing Product document establishes the per-successful-update mechanic but does not preserve the amount, underlying first-party URL, publication date, or effective date."
+    ],
+    "currentResolution": {
+      "status": "resolved",
+      "compositionRef": "commercial_offer_authorize_net_direct_gateway_composition_v1",
+      "componentVersionRefs": [
+        "commercial_component_authorize_net_gateway_monthly_v1",
+        "commercial_component_authorize_net_gateway_transaction_v1",
+        "commercial_component_authorize_net_gateway_batch_v1",
+        "commercial_component_authorize_net_card_processing_percentage_v1",
+        "commercial_component_authorize_net_card_processing_per_item_v1",
+        "commercial_component_authorize_net_chargeback_v1"
+      ],
+      "reasons": [],
+      "publicPolicyStatus": "PUBLIC_POLICY_UNKNOWN",
+      "merchantAvailabilityEvidence": []
+    },
+    "historical2024Resolution": {
+      "status": "unresolved_period",
+      "compositionRef": null,
+      "componentVersionRefs": [],
+      "reasons": [
+        "No period-matched governed offer composition is available."
+      ],
+      "publicPolicyStatus": null,
+      "merchantAvailabilityEvidence": []
+    }
+  },
+  "controls": {
+    "completeness": {
+      "knownComponentSubtotalMinor": null,
+      "subtotalState": "not_calculated_source_layer",
+      "knownComponentRefs": [
+        "commercial_component_authorize_net_gateway_monthly_v1",
+        "commercial_component_authorize_net_gateway_transaction_v1",
+        "commercial_component_authorize_net_gateway_batch_v1"
+      ],
+      "knownAbsentComponentRefs": [],
+      "unknownComponentRefs": [
+        "commercial_component_authorize_net_card_processing_percentage_v1",
+        "commercial_component_authorize_net_card_processing_per_item_v1",
+        "commercial_component_authorize_net_chargeback_v1",
+        "commercial_component_authorize_net_account_updater_v1"
+      ],
+      "completeForRequestedComponents": false,
+      "automaticLowerBoundAllowed": false,
+      "directionalBound": null
+    },
+    "publicPolicyVersusAvailability": {
+      "publicPolicyField": "PUBLIC_POLICY_UNKNOWN",
+      "availabilityStoredSeparately": true,
+      "noKnownPublicBlockIsApproval": false,
+      "restrictedWithMerchantSpecificApprovalRepresentable": true
+    },
+    "channelAndScope": {
+      "directResolution": {
+        "status": "resolved",
+        "compositionRef": "commercial_offer_authorize_net_direct_gateway_composition_v1",
+        "componentVersionRefs": [
+          "commercial_component_authorize_net_gateway_monthly_v1",
+          "commercial_component_authorize_net_gateway_transaction_v1",
+          "commercial_component_authorize_net_gateway_batch_v1",
+          "commercial_component_authorize_net_card_processing_percentage_v1",
+          "commercial_component_authorize_net_card_processing_per_item_v1",
+          "commercial_component_authorize_net_chargeback_v1"
+        ],
+        "reasons": [],
+        "publicPolicyStatus": "PUBLIC_POLICY_UNKNOWN",
+        "merchantAvailabilityEvidence": []
+      },
+      "resellerResolution": {
+        "status": "unresolved_channel_or_identity",
+        "compositionRef": null,
+        "componentVersionRefs": [],
+        "reasons": [
+          "No exact provider/channel/plan/scope identity matched the request."
+        ],
+        "publicPolicyStatus": null,
+        "merchantAvailabilityEvidence": []
+      },
+      "unknownChannelResolution": {
+        "status": "unresolved_channel_or_identity",
+        "compositionRef": null,
+        "componentVersionRefs": [],
+        "reasons": [
+          "No exact provider/channel/plan/scope identity matched the request."
+        ],
+        "publicPolicyStatus": null,
+        "merchantAvailabilityEvidence": []
+      },
+      "acquiringResolution": {
+        "status": "unresolved_channel_or_identity",
+        "compositionRef": null,
+        "componentVersionRefs": [],
+        "reasons": [
+          "No exact provider/channel/plan/scope identity matched the request."
+        ],
+        "publicPolicyStatus": null,
+        "merchantAvailabilityEvidence": []
+      }
+    },
+    "changeFingerprinting": {
+      "cosmeticChange": {
+        "f1RawSourceChanged": true,
+        "f2RelevantExtractChanged": false,
+        "f3GovernedMeaningChanged": false,
+        "sourceObservationVersionRequired": true,
+        "productReviewRequired": false,
+        "governedSemanticVersionRequired": false
+      },
+      "extractChange": {
+        "f1RawSourceChanged": true,
+        "f2RelevantExtractChanged": true,
+        "f3GovernedMeaningChanged": false,
+        "sourceObservationVersionRequired": true,
+        "productReviewRequired": true,
+        "governedSemanticVersionRequired": false
+      },
+      "semanticChange": {
+        "f1RawSourceChanged": false,
+        "f2RelevantExtractChanged": false,
+        "f3GovernedMeaningChanged": true,
+        "sourceObservationVersionRequired": false,
+        "productReviewRequired": true,
+        "governedSemanticVersionRequired": true
+      }
+    },
+    "semanticVersioning": {
+      "priorPriceF3": "141475dd4eb9240e568c6c0710541d7a80db5785b29327ebd087a06ee3af6798",
+      "changedPriceF3": "d293336cee1e485981f7610bf478e22c35cf9cf60a8dec9272ee5509e7ab5c32",
+      "changedPriceVersion": 2,
+      "changedPolicyF3": "87d8e2ead43198cc4dd1b683be466899e4ffd0e6276be263d450494db9b9009f",
+      "changedCompositionVersion": 2
+    },
+    "conflict": {
+      "sameScope": "genuine_same_scope_conflict",
+      "differentChannel": "different_scope_not_conflict",
+      "resolution": {
+        "status": "unresolved_conflict",
+        "compositionRef": null,
+        "componentVersionRefs": [],
+        "reasons": [
+          "Conflict synthetic_same_scope_conflict remains unresolved; no value was averaged or selected."
+        ],
+        "publicPolicyStatus": null,
+        "merchantAvailabilityEvidence": []
+      },
+      "auditRecordRetained": {
+        "conflictId": "synthetic_same_scope_conflict",
+        "sameScopeKey": "authorize_net_direct_gateway_transaction",
+        "componentVersionRefs": [
+          "commercial_component_authorize_net_gateway_transaction_v1",
+          "synthetic_conflicting_gateway_transaction_price"
+        ],
+        "state": "unresolved",
+        "resolution": null
+      }
+    },
+    "startingAt": {
+      "completeness": {
+        "knownComponentSubtotalMinor": null,
+        "subtotalState": "not_calculated_source_layer",
+        "knownComponentRefs": [
+          "synthetic_starting_at_price"
+        ],
+        "knownAbsentComponentRefs": [],
+        "unknownComponentRefs": [],
+        "completeForRequestedComponents": false,
+        "automaticLowerBoundAllowed": true,
+        "directionalBound": "lower_bound"
+      },
+      "presentation": "starting_at"
+    },
+    "promotion": [
+      {
+        "id": "commercial_promotion_authorize_net_gateway_unknown_v1",
+        "status": "unknown",
+        "reversionTerms": null
+      },
+      {
+        "id": "commercial_promotion_authorize_net_updater_unknown_v1",
+        "status": "unknown",
+        "reversionTerms": null
+      }
+    ],
+    "governance": {
+      "candidateResolution": {
+        "status": "unresolved_not_admitted",
+        "compositionRef": null,
+        "componentVersionRefs": [],
+        "reasons": [
+          "Candidate and pending records cannot influence governed consumption."
+        ],
+        "publicPolicyStatus": null,
+        "merchantAvailabilityEvidence": []
+      },
+      "invalidAiIssues": [
+        {
+          "code": "admission_missing_human_authority",
+          "ref": "commercial_offer_authorize_net_direct_gateway_composition_v1",
+          "message": "Admitted commercial truth requires Product/human authority and time."
+        },
+        {
+          "code": "ai_self_admission",
+          "ref": "commercial_offer_authorize_net_direct_gateway_composition_v1",
+          "message": "AI/research cannot self-admit reusable commercial truth."
+        }
+      ]
+    }
+  },
+  "acceptanceCounters": {
+    "unknownTreatedAsZero": 0,
+    "knownAbsentTreatedAsUnknown": 0,
+    "unknownSilentlyOmittedFromTotalCompleteness": 0,
+    "publicProhibitionTreatedAsMerchantApproval": 0,
+    "restrictionTreatedAsPositiveApproval": 0,
+    "noKnownPublicBlockTreatedAsConfirmedApproval": 0,
+    "merchantSpecificApprovalCollapsedIntoPublicPolicy": 0,
+    "directPriceLeaksToReseller": 0,
+    "resellerPriceLeaksToDirect": 0,
+    "unknownChannelDefaultsToDirect": 0,
+    "startingAtBecomesCompleteOffer": 0,
+    "gatewayOnlyBecomesAcquiring": 0,
+    "planSpecificZeroBecomesProviderWideZero": 0,
+    "ancillaryComponentAbsorbedIntoBaseOffer": 0,
+    "unknownEffectiveDateProjectedBackward": 0,
+    "supersededPriceTreatedAsCurrent": 0,
+    "currentPriceRewritesHistoricalAnalysis": 0,
+    "cosmeticRawChangeCreatesFalseSemanticPriceChange": 0,
+    "rawSourceChangeDisappearsFromAuditHistory": 0,
+    "semanticPriceChangeFailsToCreateGovernedVersion": 0,
+    "eligibilitySemanticChangeFailsToCreateOfferVersion": 0,
+    "conflictingPriceValuesAveraged": 0,
+    "recencyResolvesConflictBeforeScopeCheck": 0,
+    "resolvedConflictDisappearsFromAuditTrail": 0,
+    "candidateSourceInfluencesGovernedClaims": 0,
+    "aiAutomaticallyAdmitsSource": 0,
+    "unreviewedPredicateBecomesAuthority": 0,
+    "marketComparisonGenerated": 0,
+    "gradeGenerated": 0,
+    "savingsGenerated": 0,
+    "customerFacingComparatorLanguageGenerated": 0,
+    "canonicalGoldFingerprintChanges": 0
+  },
+  "goldStatements": [
+    {
+      "file": "Nov_2024_Statement.pdf",
+      "canonicalFingerprintBefore": "56b0ff62c801c9de9e97b1a70f573c746061b110abcf2716a110a427c02cd65f",
+      "canonicalFingerprintAfter": "56b0ff62c801c9de9e97b1a70f573c746061b110abcf2716a110a427c02cd65f",
+      "unchanged": true
+    },
+    {
+      "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+      "canonicalFingerprintBefore": "7d2246e0d4bce4298646084b2e1a1c789f9b7391534a40f2953d05e921779b3f",
+      "canonicalFingerprintAfter": "7d2246e0d4bce4298646084b2e1a1c789f9b7391534a40f2953d05e921779b3f",
+      "unchanged": true
+    },
+    {
+      "file": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+      "canonicalFingerprintBefore": "18028f3e7ccb888ff71773dbef6a2e280b3720f761ce278ca91f1dccd78bfddb",
+      "canonicalFingerprintAfter": "18028f3e7ccb888ff71773dbef6a2e280b3720f761ce278ca91f1dccd78bfddb",
+      "unchanged": true
+    },
+    {
+      "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+      "canonicalFingerprintBefore": "7ee9653908e82c5d88d2eece32f52f4f3f498620b98db1e86b985a8e7f2db9db",
+      "canonicalFingerprintAfter": "7ee9653908e82c5d88d2eece32f52f4f3f498620b98db1e86b985a8e7f2db9db",
+      "unchanged": true
+    },
+    {
+      "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+      "canonicalFingerprintBefore": "ea3c34c4bdf01af64aeae37dc84b116deab41f4ebdd88d680728b7b205e70736",
+      "canonicalFingerprintAfter": "ea3c34c4bdf01af64aeae37dc84b116deab41f4ebdd88d680728b7b205e70736",
+      "unchanged": true
+    },
+    {
+      "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+      "canonicalFingerprintBefore": "5cb1fab8c96fc91651796b89b9c6226b6e54f9497989b8eef5ca746743c73cb3",
+      "canonicalFingerprintAfter": "5cb1fab8c96fc91651796b89b9c6226b6e54f9497989b8eef5ca746743c73cb3",
+      "unchanged": true
+    },
+    {
+      "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+      "canonicalFingerprintBefore": "c142d1a29145077b1497650ef2d8db96f9db9cc2570a857f742383b7966568b7",
+      "canonicalFingerprintAfter": "c142d1a29145077b1497650ef2d8db96f9db9cc2570a857f742383b7966568b7",
+      "unchanged": true
+    },
+    {
+      "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+      "canonicalFingerprintBefore": "793fc87b37d7d7274fbd5a17558cee2fe28add358dcdeda5fba8919f7e6ba883",
+      "canonicalFingerprintAfter": "793fc87b37d7d7274fbd5a17558cee2fe28add358dcdeda5fba8919f7e6ba883",
+      "unchanged": true
+    },
+    {
+      "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
+      "canonicalFingerprintBefore": "591fcbf80bc69da3a6d4ca5ff337900872dff676919cb1b26460101fd7f9a3be",
+      "canonicalFingerprintAfter": "591fcbf80bc69da3a6d4ca5ff337900872dff676919cb1b26460101fd7f9a3be",
+      "unchanged": true
+    },
+    {
+      "file": "fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf",
+      "canonicalFingerprintBefore": "088119a8cad2e5b0086d5d9cab4814e83bee91625226adbf1038a695085e8df4",
+      "canonicalFingerprintAfter": "088119a8cad2e5b0086d5d9cab4814e83bee91625226adbf1038a695085e8df4",
+      "unchanged": true
+    },
+    {
+      "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+      "canonicalFingerprintBefore": "e89c0f1a8f2c8b8330d2fa79f9fd98262f3da6296581fdf595eccb0dc51d45a3",
+      "canonicalFingerprintAfter": "e89c0f1a8f2c8b8330d2fa79f9fd98262f3da6296581fdf595eccb0dc51d45a3",
+      "unchanged": true
+    }
+  ],
+  "verification": {
+    "coreTargeted": "23/23 passed across Commercial Source Governance, Comparator Eligibility, and Claim-Specific Commercial Decomposition",
+    "sourceProvenance": "7/7 canonical fee-partition provenance assertions passed",
+    "historicalCurrentRegression": "5/6 passed; the untouched baseline test expected zero governed row conflicts but observed four",
+    "legacyPublicSourceAuthority": "10/10 assertions passed, then the existing process exited with SIGSEGV/139",
+    "typescriptBuild": "passed",
+    "exhaustiveSuite": "terminated with SIGSEGV/139 after publicSourceAuthorityRegistry.test.ts passed; no complete Vitest summary was emitted",
+    "failingOrCrashingFilesTouchedByMilestone": []
+  },
+  "architectureConflicts": [
+    "The earlier comparator diagnostic uses a single eligibilityStatus field; the production source contract now preserves public policy and merchant-specific availability separately. The diagnostic remains unchanged and non-authoritative.",
+    "The governing document does not preserve the underlying Authorize.net first-party locators, exact gateway offer name, effective date, names of zero-valued card-processing fields, or Account Updater amount; the admitted record exposes those gaps instead of filling them."
+  ],
+  "recommendation": "Product should review the Batch 1A scope/evidence gaps and the source-maintenance workflow before Batch 1B. If accepted, admit Helcim and Dharma as separate, versioned sources; do not begin comparator claims or market judgment yet."
+}
