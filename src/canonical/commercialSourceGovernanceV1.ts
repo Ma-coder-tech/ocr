@@ -105,6 +105,23 @@ export type CommercialSourceObservationV1 = {
     f1RawSourceDocument: string;
     f2RelevantCommercialExtract: string;
   };
+  immutableCapture?: {
+    captureRecordRef: string;
+    captureState: "captured" | "capture_unavailable";
+    validationState:
+      | "capture_matches_admitted_observation"
+      | "capture_partial_but_nonconflicting"
+      | "capture_unavailable"
+      | "capture_conflict_requires_product_review";
+    retainedFirstPartyArtifactPath: string | null;
+    retainedFirstPartyArtifactSha256: string | null;
+    failureResponseArtifactPath: string | null;
+    failureResponseArtifactSha256: string | null;
+    priorProvisionalF1Fingerprint: string;
+    adjudicationAuthorityArtifactRef: string;
+    retrievalTimestampUtc: string;
+    relationship: "immutable_capture_to_observation_to_f2_to_f3";
+  };
 };
 
 export type CommercialPriceComponentVersionV1 = {
@@ -472,6 +489,17 @@ export function validateCommercialSourceGovernanceRegistryV1(
     }
     if (!/^[a-f0-9]{64}$/.test(observation.fingerprints.f1RawSourceDocument)) {
       issues.push(issue("invalid_raw_source_fingerprint", observation.observationId, "F1 must be a SHA-256 fingerprint."));
+    }
+    if (observation.immutableCapture?.captureState === "captured") {
+      if (observation.immutableCapture.retainedFirstPartyArtifactPath === null
+        || observation.immutableCapture.retainedFirstPartyArtifactSha256 === null
+        || observation.fingerprints.f1RawSourceDocument !== observation.immutableCapture.retainedFirstPartyArtifactSha256) {
+        issues.push(issue("captured_f1_link_mismatch", observation.observationId, "A captured first-party artifact must have a path and SHA matching the observation F1."));
+      }
+    }
+    if (observation.immutableCapture?.captureState === "capture_unavailable"
+      && observation.fingerprints.f1RawSourceDocument !== observation.immutableCapture.priorProvisionalF1Fingerprint) {
+      issues.push(issue("unavailable_capture_replaced_provisional_f1", observation.observationId, "An unavailable first-party capture must not replace the preserved provisional Product-pack F1."));
     }
     if (observation.supersedesObservationId !== null) {
       const predecessor = registry.sourceObservations.find((item) => item.observationId === observation.supersedesObservationId);

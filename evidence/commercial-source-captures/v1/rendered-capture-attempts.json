@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "immutable_first_party_rendered_capture_attempts_2026_09_10_v1",
+  "observedAtUtc": "2026-09-10T19:57:11Z",
+  "captureMethod": "codex_in_app_browser_rendered_page_validation",
+  "artifactExportSupported": false,
+  "records": [
+    { "captureId": "h1_helcim_fee_disclosures", "finalUrl": "https://legal.helcim.com/us/fee-disclosures/", "title": "Attention Required! | Cloudflare", "renderedTextLength": 687, "expectedAnchorsMatched": false, "result": "rendered_blocked_cloudflare" },
+    { "captureId": "h2_helcim_public_pricing", "finalUrl": "https://www.helcim.com/pricing/", "title": "Attention Required! | Cloudflare", "renderedTextLength": 687, "expectedAnchorsMatched": false, "result": "rendered_blocked_cloudflare" },
+    { "captureId": "h3_helcim_acceptable_use", "finalUrl": "https://legal.helcim.com/us/acceptable-use-policy/", "title": "Attention Required! | Cloudflare", "renderedTextLength": 687, "expectedAnchorsMatched": false, "result": "rendered_blocked_cloudflare" },
+    { "captureId": "h4_helcim_terms", "finalUrl": "https://legal.helcim.com/us/terms-of-service/", "title": "Attention Required! | Cloudflare", "renderedTextLength": 687, "expectedAnchorsMatched": false, "result": "rendered_blocked_cloudflare" },
+    { "captureId": "d1_dharma_retail", "finalUrl": "https://dharmamerchantservices.com/industries/retail-small-business/rates-fees/", "title": "Great Retail Merchant Services Rates from Dharma", "renderedTextLength": 4991, "expectedAnchorsMatched": true, "result": "rendered_content_verified_but_export_unavailable" },
+    { "captureId": "d2_dharma_virtual", "finalUrl": "https://dharmamerchantservices.com/industries/ecommerce-online/rates-fees/", "title": "Your access to this site has been limited", "renderedTextLength": 1036, "expectedAnchorsMatched": false, "result": "rendered_access_limited" },
+    { "captureId": "d3_dharma_high_volume", "finalUrl": "https://dharmamerchantservices.com/pricing/high-volume-pricing/", "title": "Your access to this site has been limited", "renderedTextLength": 1036, "expectedAnchorsMatched": false, "result": "rendered_access_limited" },
+    { "captureId": "d4_dharma_supported_businesses", "finalUrl": "https://dharmamerchantservices.com/faq/supported-businesses/", "title": "Your access to this site has been limited", "renderedTextLength": 1036, "expectedAnchorsMatched": false, "result": "rendered_access_limited" },
+    { "captureId": "d5_dharma_closure", "finalUrl": "https://dharmamerchantservices.com/faq/is-there-a-closure-fee/", "title": "Your access to this site has been limited", "renderedTextLength": 1036, "expectedAnchorsMatched": false, "result": "rendered_access_limited" },
+    { "captureId": "d6_dharma_pci", "finalUrl": "https://dharmamerchantservices.com/resources/pci-compliance/", "title": "PCI Compliance | Dharma", "renderedTextLength": 5627, "expectedAnchorsMatched": true, "result": "rendered_content_verified_but_export_unavailable" },
+    { "captureId": "d7_dharma_calculator", "finalUrl": "https://dharmamerchantservices.com/calculate-costs/cut-the-fat/", "title": "Your access to this site has been limited", "renderedTextLength": 1036, "expectedAnchorsMatched": false, "result": "rendered_access_limited" },
+    { "captureId": "d8_dharma_referral", "finalUrl": "https://dharmamerchantservices.com/getting-started/teghkhuman/", "title": "Your access to this site has been limited", "renderedTextLength": 1036, "expectedAnchorsMatched": false, "result": "rendered_access_limited" }
+  ],
+  "limitations": [
+    "Rendered-page validation was attempted only for the 12 sources whose raw HTTP response was unusable.",
+    "The in-app renderer could display meaningful D1 and D6 content, but did not support exporting a retained rendered artifact; these remain capture_unavailable rather than being promoted to F1.",
+    "No CAPTCHA, security barrier, authentication flow, alternate URL, or secondary source was used."
+  ]
+}
