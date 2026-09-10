@@ -20,6 +20,7 @@ export type CommercialDistributionChannelV1 =
   | "unknown";
 
 export type CommercialSourceNatureV1 =
+  | "first_party_public_offer"
   | "public_provider_offer"
   | "merchant_specific_offer"
   | "reseller_partner_offer"
@@ -30,6 +31,8 @@ export type CommercialSourceNatureV1 =
 export type CommercialSourceClassV1 =
   | "official_provider_pricing"
   | "official_provider_policy"
+  | "official_provider_product_documentation"
+  | "official_provider_support"
   | "merchant_quote_or_proposal"
   | "executed_pricing_schedule"
   | "reseller_rate_sheet"
@@ -39,7 +42,7 @@ export type CommercialSourceClassV1 =
 
 export type CommercialCompletenessV1 =
   | { state: "KNOWN"; value: CommercialComponentValueV1 }
-  | { state: "KNOWN_ABSENT"; value: null }
+  | { state: "KNOWN_ABSENT"; value: null; observedAbsentValue: CommercialComponentValueV1 }
   | { state: "UNKNOWN"; value: null };
 
 export type CommercialComponentValueV1 =
@@ -84,6 +87,7 @@ export type CommercialSourceObservationV1 = {
     captureMethod: "static_document" | "rendered_page" | "dynamic_calculator" | "product_adjudicated_document" | "synthetic_fixture";
     observedAt: string;
     publicationDate: string | null;
+    lastModifiedDate: string | null;
     effectivePeriod: CommercialEffectivePeriodV1;
     lastVerifiedAt: string | null;
     retrievabilityLimitation: string | null;
@@ -110,8 +114,26 @@ export type CommercialPriceComponentVersionV1 = {
   supersedesComponentVersionId: string | null;
   offerIdentity: CommercialOfferIdentityV1;
   completeness: CommercialCompletenessV1;
-  unit: "per_month" | "per_year" | "per_gateway_transaction" | "per_batch" | "per_authorization" | "per_successful_update" | "percent_of_volume" | "other";
+  unit:
+    | "per_month"
+    | "per_year"
+    | "per_gateway_account_setup"
+    | "per_gateway_transaction"
+    | "per_batch"
+    | "per_authorization"
+    | "per_successful_update"
+    | "per_returned_gateway_billing_debit"
+    | "per_late_payment_event"
+    | "per_reactivation"
+    | "per_abandoned_account"
+    | "per_billing_cycle"
+    | "per_chargeback_case"
+    | "per_service_setup"
+    | "percent_of_card_charge_volume"
+    | "percent_of_volume"
+    | "other";
   billedPopulation: string;
+  sourceFaithfulPopulationWording: string | null;
   channelScope: CommercialDistributionChannelV1;
   brandOrProductScope: string | null;
   effectivePeriod: CommercialEffectivePeriodV1;
@@ -198,6 +220,7 @@ export type CommercialOfferCompositionVersionV1 = {
   publicPolicyVersionRefs: string[];
   serviceScopeVersionRefs: string[];
   promotionVersionRefs: string[];
+  sourceObservationRefs: string[];
   effectivePeriod: CommercialEffectivePeriodV1;
   lifecycle: "prospective_future" | "active_available_last_known" | "superseded" | "withdrawn_retired";
   verification: "currently_verified" | "verification_due_or_uncertain" | "unable_to_reverify";
@@ -415,6 +438,9 @@ export function validateCommercialSourceGovernanceRegistryV1(
     if (component.completeness.state !== "KNOWN" && component.completeness.value !== null) {
       issues.push(issue("non_known_component_has_value", component.componentVersionId, "UNKNOWN and KNOWN_ABSENT must not carry a value."));
     }
+    if (component.completeness.state === "KNOWN_ABSENT" && !isZeroCommercialComponentValue(component.completeness.observedAbsentValue)) {
+      issues.push(issue("known_absent_must_preserve_zero_observation", component.componentVersionId, "KNOWN_ABSENT must preserve a source-observed zero money or rate value."));
+    }
     if (component.completeness.state === "KNOWN" && component.completeness.value.kind === "money" && component.completeness.value.amountMinor < 0) {
       issues.push(issue("negative_price_requires_separate_credit_semantics", component.componentVersionId, "Negative prices must be modeled as supported credit/rebate terms, not a fee component."));
     }
@@ -471,6 +497,7 @@ export function validateCommercialSourceGovernanceRegistryV1(
   for (const composition of registry.offerCompositionVersions) {
     checkAdmission(composition.admission, composition.compositionVersionId, issues);
     checkPeriod(composition.effectivePeriod, composition.compositionVersionId, issues);
+    checkObservationRefs(composition.sourceObservationRefs, observationIds, composition.compositionVersionId, issues);
     checkRefs(composition.componentVersionRefs, componentIds, composition.compositionVersionId, "component", issues);
     checkRefs(composition.publicPolicyVersionRefs, policyIds, composition.compositionVersionId, "policy", issues);
     checkRefs(composition.serviceScopeVersionRefs, serviceIds, composition.compositionVersionId, "service", issues);
@@ -684,6 +711,9 @@ function resolution(status: CommercialOfferResolutionV1["status"], reasons: stri
 }
 
 function issue(code: string, ref: string, message: string): CommercialSourceValidationIssueV1 { return { code, ref, message }; }
+function isZeroCommercialComponentValue(value: CommercialComponentValueV1): boolean {
+  return value.kind === "money" ? value.amountMinor === 0 : value.basisPoints === 0;
+}
 function sha256(value: string | Uint8Array): string { return createHash("sha256").update(value).digest("hex"); }
 function unique<T>(values: T[]): T[] { return [...new Set(values)]; }
 function deepFreeze<T>(value: T): T {

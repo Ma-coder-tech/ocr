@@ -2,14 +2,14 @@
   "schemaVersion": "commercial_source_governance_contract_evaluation_2026_09_10_v1",
   "generatedAt": "2026-09-10T00:00:00.000Z",
   "productAuthority": {
-    "file": "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md",
-    "sha256": "ad2c258fb6f7aaa3ffeee881736d5212776f4b016e4ba5553c1c05dcf53c216e",
+    "file": "RateReveal_AuthorizeNet_Evidence_Completion_Pack_FINAL_Product_Adjudicated_v1.md",
+    "sha256": "774f12eb3632df2db56034b406230b41d934222e10202500b3aef8493a9fa210",
     "status": "final_product_adjudicated_implementation_authority"
   },
   "baseline": {
-    "branch": "codex/commercial-comparator-eligibility-validation-v1",
-    "commit": "584ea36efc9a2f25e9302538424aa802725a98fe",
-    "parent": "e5e69f277ee5108cfb8a514c985d9391b54b09d3"
+    "branch": "codex/commercial-source-governance-contract-v1",
+    "commit": "51aef2b0aa8c8dc54c62e748c3a39951194ceaa7",
+    "parent": "584ea36efc9a2f25e9302538424aa802725a98fe"
   },
   "scope": {
     "internalSourceGovernanceOnly": true,
@@ -38,8 +38,8 @@
       "preserved commercial-source conflicts and human admission boundary"
     ],
     "sourceRecordCounts": {
-      "observations": 2,
-      "componentVersions": 7,
+      "observations": 3,
+      "componentVersions": 19,
       "policyVersions": 2,
       "predicateProposals": 0,
       "serviceVersions": 4,
@@ -56,104 +56,164 @@
         "providerBrand": "authorize_net",
         "sellerIdentity": "authorize_net_direct",
         "distributionChannel": "direct",
-        "namedOffer": "gateway_only_offer_name_not_preserved_in_product_authority",
+        "namedOffer": "Gateway only",
         "productScope": "gateway_only",
-        "geography": "US",
+        "geography": "United States",
         "currency": "USD",
-        "pricingModel": "gateway_fee_schedule",
-        "sourceNature": "product_adjudicated_source_summary"
+        "pricingModel": "gateway_fixed_plus_per_event",
+        "sourceNature": "first_party_public_offer"
       },
       {
         "providerBrand": "authorize_net",
         "sellerIdentity": "authorize_net_direct",
         "distributionChannel": "direct",
-        "namedOffer": "account_updater_component_source_value_not_preserved_in_product_authority",
+        "namedOffer": "Account Updater",
         "productScope": "ancillary_service",
-        "geography": "US",
+        "geography": "United States",
         "currency": "USD",
         "pricingModel": "ancillary_per_successful_update",
-        "sourceNature": "product_adjudicated_source_summary"
+        "sourceNature": "first_party_public_offer"
       }
     ],
     "observations": [
       {
-        "observationId": "commercial_source_obs_authorize_net_direct_gateway_2026_09_10_v1",
+        "observationId": "commercial_source_obs_authorize_net_direct_gateway_pricing_2026_09_10_v1",
         "observationVersion": 1,
         "supersedesObservationId": null,
         "offerIdentity": {
           "providerBrand": "authorize_net",
           "sellerIdentity": "authorize_net_direct",
           "distributionChannel": "direct",
-          "namedOffer": "gateway_only_offer_name_not_preserved_in_product_authority",
+          "namedOffer": "Gateway only",
           "productScope": "gateway_only",
-          "geography": "US",
+          "geography": "United States",
           "currency": "USD",
-          "pricingModel": "gateway_fee_schedule",
-          "sourceNature": "product_adjudicated_source_summary"
+          "pricingModel": "gateway_fixed_plus_per_event",
+          "sourceNature": "first_party_public_offer"
         },
         "provenance": {
-          "sourceClass": "product_adjudication",
-          "sourceLocator": "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md#24",
-          "documentIdentity": "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md",
-          "captureMethod": "product_adjudicated_document",
+          "sourceClass": "official_provider_pricing",
+          "sourceLocator": "https://www.authorize.net/sign-up/pricing.html",
+          "documentIdentity": "Authorize.net U.S. pricing page — Gateway only",
+          "captureMethod": "rendered_page",
           "observedAt": "2026-09-10T00:00:00.000Z",
-          "publicationDate": "2026-09-10",
+          "publicationDate": null,
+          "lastModifiedDate": null,
           "effectivePeriod": {
             "knowledge": "effective_period_unknown",
             "effectiveFrom": null,
             "effectiveTo": null
           },
           "lastVerifiedAt": "2026-09-10T00:00:00.000Z",
-          "retrievabilityLimitation": "The governing Product document preserves the adjudicated values but not the underlying first-party URL, exact offer name, publication date, effective date, or names of the zero-valued card-processing fields.",
-          "rawArtifactRef": "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md@sha256:ad2c258fb6f7aaa3ffeee881736d5212776f4b016e4ba5553c1c05dcf53c216e"
+          "retrievabilityLimitation": "Observed current on 2026-09-10. Publication and effective dates were not stated. The repository preserves the Product-adjudicated captured content and its authority-pack fingerprint, not a raw byte snapshot of the mutable web page.",
+          "rawArtifactRef": "RateReveal_AuthorizeNet_Evidence_Completion_Pack_FINAL_Product_Adjudicated_v1.md@sha256:774f12eb3632df2db56034b406230b41d934222e10202500b3aef8493a9fa210"
         },
-        "sourceFaithfulExtract": "a gateway-only/direct pricing view can show a $25 monthly gateway charge, $0.10 transaction and batch components, and explicit zero values for some card-processing gateway fields",
+        "sourceFaithfulExtract": "Named direct offer: Gateway only.\nGateway setup fee: $0.00.\nMonthly gateway fee: $25.\nReturned payment fee: $25 for a returned Authorize.net billing debit.\nLate payment fee: $20.\nService reactivation fee: $0.\nAbandoned account fee: $10.\nGateway transaction fee: $0.10; the relevant population includes charges, refunds, voids, declines, and related gateway credit-card transaction events.\nBatch fee: $0.10 for settled credit-card transaction batches.\nGateway-side credit-card discount-rate field: 0.00%.\nGateway-side monthly minimum: $0 per billing cycle.\nGateway-side chargeback field: $0 per chargeback case.\nAutomated Recurring Billing setup fee: $0; Automated Recurring Billing monthly fee: $0; Customer Information Manager monthly fee: $0; Advanced Fraud Detection Suite monthly fee: $0.\nThe Gateway only offer has no gateway contract requirement, no gateway early-termination fee, and may be cancelled without a gateway cancellation penalty.",
         "calculatorCapture": null,
         "fingerprints": {
-          "f1RawSourceDocument": "ad2c258fb6f7aaa3ffeee881736d5212776f4b016e4ba5553c1c05dcf53c216e",
-          "f2RelevantCommercialExtract": "752a17a12ecc80d0cc482550d95e97d88fb737e989105441cff8d705041171d9"
+          "f1RawSourceDocument": "774f12eb3632df2db56034b406230b41d934222e10202500b3aef8493a9fa210",
+          "f2RelevantCommercialExtract": "0958fb350bf0d9ab5d2233d7d2f264971f8857494fd4191b6240e52094e6fef0"
         }
       },
       {
-        "observationId": "commercial_source_obs_authorize_net_account_updater_2026_09_10_v1",
+        "observationId": "commercial_source_obs_authorize_net_account_updater_datasheet_2026_09_10_v1",
         "observationVersion": 1,
         "supersedesObservationId": null,
         "offerIdentity": {
           "providerBrand": "authorize_net",
           "sellerIdentity": "authorize_net_direct",
           "distributionChannel": "direct",
-          "namedOffer": "account_updater_component_source_value_not_preserved_in_product_authority",
+          "namedOffer": "Account Updater",
           "productScope": "ancillary_service",
-          "geography": "US",
+          "geography": "United States",
           "currency": "USD",
           "pricingModel": "ancillary_per_successful_update",
-          "sourceNature": "product_adjudicated_source_summary"
+          "sourceNature": "first_party_public_offer"
         },
         "provenance": {
-          "sourceClass": "product_adjudication",
-          "sourceLocator": "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md#24",
-          "documentIdentity": "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md",
-          "captureMethod": "product_adjudicated_document",
+          "sourceClass": "official_provider_product_documentation",
+          "sourceLocator": "https://www.authorize.net/content/dam/documents/en/account-updater.pdf",
+          "documentIdentity": "Authorize.net Account Updater product datasheet",
+          "captureMethod": "static_document",
           "observedAt": "2026-09-10T00:00:00.000Z",
-          "publicationDate": "2026-09-10",
+          "publicationDate": null,
+          "lastModifiedDate": null,
           "effectivePeriod": {
             "knowledge": "effective_period_unknown",
             "effectiveFrom": null,
             "effectiveTo": null
           },
           "lastVerifiedAt": "2026-09-10T00:00:00.000Z",
-          "retrievabilityLimitation": "The governing Product document establishes the per-successful-update mechanic but does not preserve the amount, underlying first-party URL, publication date, or effective date.",
-          "rawArtifactRef": "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md@sha256:ad2c258fb6f7aaa3ffeee881736d5212776f4b016e4ba5553c1c05dcf53c216e"
+          "retrievabilityLimitation": "Observed on 2026-09-10. Publication and effective dates were not stated. The repository preserves the Product-adjudicated captured content and its authority-pack fingerprint, not a raw byte snapshot of the PDF.",
+          "rawArtifactRef": "RateReveal_AuthorizeNet_Evidence_Completion_Pack_FINAL_Product_Adjudicated_v1.md@sha256:774f12eb3632df2db56034b406230b41d934222e10202500b3aef8493a9fa210"
         },
-        "sourceFaithfulExtract": "Account Updater has its own per-successful-update pricing.",
+        "sourceFaithfulExtract": "Account Updater is a separately priced ancillary service.\nPrice: $0.25 per successful updated response; only a successful account update is charged.\nSupported card brands stated by the source: Visa and Mastercard.\nStored-card records are supplied through Customer Information Manager or Automated Recurring Billing.",
         "calculatorCapture": null,
         "fingerprints": {
-          "f1RawSourceDocument": "ad2c258fb6f7aaa3ffeee881736d5212776f4b016e4ba5553c1c05dcf53c216e",
-          "f2RelevantCommercialExtract": "aa20c160b4981f15aaa12a15226dae6488e062a2c8e6c7da8ecc0622a595fd56"
+          "f1RawSourceDocument": "774f12eb3632df2db56034b406230b41d934222e10202500b3aef8493a9fa210",
+          "f2RelevantCommercialExtract": "e74945a5390d4ea353881fb04fe99cf6e957beeb68b0a8ce9378d3e00b81bca5"
+        }
+      },
+      {
+        "observationId": "commercial_source_obs_authorize_net_support_ka_07342_2026_09_10_v1",
+        "observationVersion": 1,
+        "supersedesObservationId": null,
+        "offerIdentity": {
+          "providerBrand": "authorize_net",
+          "sellerIdentity": "authorize_net_direct",
+          "distributionChannel": "direct",
+          "namedOffer": "Gateway only",
+          "productScope": "gateway_only",
+          "geography": "United States",
+          "currency": "USD",
+          "pricingModel": "gateway_fixed_plus_per_event",
+          "sourceNature": "first_party_public_offer"
+        },
+        "provenance": {
+          "sourceClass": "official_provider_support",
+          "sourceLocator": "https://support.authorize.net/knowledgebase/Knowledgearticle/?code=KA-07342",
+          "documentIdentity": "Authorize.net Support Center — KA-07342, How to apply for an Authorize.net account?",
+          "captureMethod": "rendered_page",
+          "observedAt": "2026-09-10T00:00:00.000Z",
+          "publicationDate": null,
+          "lastModifiedDate": "2025-04-09",
+          "effectivePeriod": {
+            "knowledge": "partial_interval_known",
+            "effectiveFrom": "2025-04-09",
+            "effectiveTo": null
+          },
+          "lastVerifiedAt": "2026-09-10T00:00:00.000Z",
+          "retrievabilityLimitation": "The 2025-04-09 last-modified date supports direct-versus-partner and plan-taxonomy facts only. It is not evidence that the pricing page's 2026-observed prices applied in 2025.",
+          "rawArtifactRef": "RateReveal_AuthorizeNet_Evidence_Completion_Pack_FINAL_Product_Adjudicated_v1.md@sha256:774f12eb3632df2db56034b406230b41d934222e10202500b3aef8493a9fa210"
+        },
+        "sourceFaithfulExtract": "Authorize.net distinguishes direct accounts from partner-sold accounts.\nThe documented plan taxonomy includes Payment Gateway only as a plan distinct from a merchant account.\nArticle KA-07342 was last modified 2025-04-09; that date supports taxonomy and architecture existence, not the historical effectiveness of the separately observed 2026 prices.",
+        "calculatorCapture": null,
+        "fingerprints": {
+          "f1RawSourceDocument": "774f12eb3632df2db56034b406230b41d934222e10202500b3aef8493a9fa210",
+          "f2RelevantCommercialExtract": "e1f9d41d4ccb76cb02b741fe624a52886821306f2d68aeb836048ad1c67bf642"
         }
       }
     ],
     "components": [
+      {
+        "id": "commercial_component_authorize_net_gateway_setup_v1",
+        "identity": "gateway_setup_charge",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_gateway_account_setup",
+        "population": "gateway_account_setup",
+        "sourceFaithfulPopulationWording": "Gateway setup fee",
+        "f3": "b318a4c87da5f36a8a46a6517ec66f0a99e476799579d837b7f5bb7b0851b305"
+      },
       {
         "id": "commercial_component_authorize_net_gateway_monthly_v1",
         "identity": "monthly_gateway_charge",
@@ -169,7 +229,81 @@
         },
         "unit": "per_month",
         "population": "gateway_account_month",
-        "f3": "e3e6e7fb1334b4c4d6bdb7f722070f366abde35233365b9474218c3554f92776"
+        "sourceFaithfulPopulationWording": "$25 per month",
+        "f3": "eedab92a244a5614a4b24e196dba4147a35b1215602a0971dd02f84e837378a6"
+      },
+      {
+        "id": "commercial_component_authorize_net_returned_payment_v1",
+        "identity": "returned_authorize_net_billing_payment_charge",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 2500,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_returned_gateway_billing_debit",
+        "population": "returned_authorize_net_billing_debits",
+        "sourceFaithfulPopulationWording": "returned Authorize.net billing debit",
+        "f3": "57ee676e93e78d5fc589b4c067a5720a38c383e2a04d05c56c5ef953d14f6958"
+      },
+      {
+        "id": "commercial_component_authorize_net_late_payment_v1",
+        "identity": "late_payment_charge",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 2000,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_late_payment_event",
+        "population": "late_authorize_net_billing_payments",
+        "sourceFaithfulPopulationWording": "late payment",
+        "f3": "163be6ddd51be31e51934d0e8c9462e2bacff1b1e116ba9bdf7d2407d604f380"
+      },
+      {
+        "id": "commercial_component_authorize_net_service_reactivation_v1",
+        "identity": "service_reactivation_charge",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_reactivation",
+        "population": "gateway_service_reactivations",
+        "sourceFaithfulPopulationWording": "service reactivation",
+        "f3": "d327b99157d5ae9fdd884e08ced8b2defef7398d69069bca74ffd698cdb1b422"
+      },
+      {
+        "id": "commercial_component_authorize_net_abandoned_account_v1",
+        "identity": "abandoned_account_charge",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 1000,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_abandoned_account",
+        "population": "abandoned_gateway_accounts",
+        "sourceFaithfulPopulationWording": "abandoned account",
+        "f3": "00e9cf15af21b28004f5a4c33c7f0800d23e826b33156cf054344b25135a388c"
       },
       {
         "id": "commercial_component_authorize_net_gateway_transaction_v1",
@@ -185,8 +319,9 @@
           }
         },
         "unit": "per_gateway_transaction",
-        "population": "gateway_transactions",
-        "f3": "141475dd4eb9240e568c6c0710541d7a80db5785b29327ebd087a06ee3af6798"
+        "population": "gateway_credit_card_transaction_events",
+        "sourceFaithfulPopulationWording": "charges, refunds, voids, declines, and related gateway credit-card transaction events",
+        "f3": "9847a21eefe3c974fc97b61de22e9c45455885463c05fbc3b04a5226b15cd8e2"
       },
       {
         "id": "commercial_component_authorize_net_gateway_batch_v1",
@@ -202,25 +337,160 @@
           }
         },
         "unit": "per_batch",
-        "population": "gateway_batches",
-        "f3": "8802eeb12a12bf1a7df4857d0223f2f20193254f70b8a277c21fc5e7812d68c7"
+        "population": "settled_credit_card_transaction_batches",
+        "sourceFaithfulPopulationWording": "settled credit-card transaction batches",
+        "f3": "6bae2f23d1828610fb3ba75c615266a5820e643c43d89a94beefacab1a46227e"
       },
       {
-        "id": "commercial_component_authorize_net_card_processing_percentage_v1",
-        "identity": "card_processing_percentage_field",
+        "id": "commercial_component_authorize_net_gateway_discount_rate_v1",
+        "identity": "gateway_side_credit_card_discount_rate",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "rate",
+            "basisPoints": 0,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "population": "gateway_side_credit_card_charge_volume",
+        "sourceFaithfulPopulationWording": "gateway-side credit-card discount-rate field",
+        "f3": "d3dae7226f194066c751d10b763b0acada6b4d81b655f1f862e6c92b4f51d123"
+      },
+      {
+        "id": "commercial_component_authorize_net_gateway_monthly_minimum_v1",
+        "identity": "gateway_side_monthly_minimum",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_billing_cycle",
+        "population": "gateway_billing_cycles",
+        "sourceFaithfulPopulationWording": "gateway-side monthly minimum per billing cycle",
+        "f3": "a81598408dc8c2beffdacd6ae381ce14a376094a193e93998a9a501f3b01a305"
+      },
+      {
+        "id": "commercial_component_authorize_net_gateway_chargeback_v1",
+        "identity": "gateway_side_chargeback_charge",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_chargeback_case",
+        "population": "gateway_side_chargeback_cases",
+        "sourceFaithfulPopulationWording": "gateway-side chargeback field per chargeback case",
+        "f3": "abd9741b9c76288ae188f81667a2ae64a445bf0244ff49d12a5f7cb82dd47991"
+      },
+      {
+        "id": "commercial_component_authorize_net_arb_setup_v1",
+        "identity": "automated_recurring_billing_setup_charge",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_service_setup",
+        "population": "automated_recurring_billing_service_setup",
+        "sourceFaithfulPopulationWording": "Automated Recurring Billing setup",
+        "f3": "b94e68d75265ee83399a4c7f9490afac2b634c437dbb0544dee3c398e01e3220"
+      },
+      {
+        "id": "commercial_component_authorize_net_arb_monthly_v1",
+        "identity": "automated_recurring_billing_monthly_charge",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "population": "automated_recurring_billing_service_month",
+        "sourceFaithfulPopulationWording": "Automated Recurring Billing monthly",
+        "f3": "160af6e49b18ee237e6ed1bc68ae7dffc2a29a5d7eb2257d1830baab9f0263a9"
+      },
+      {
+        "id": "commercial_component_authorize_net_cim_monthly_v1",
+        "identity": "customer_information_manager_monthly_charge",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "population": "customer_information_manager_service_month",
+        "sourceFaithfulPopulationWording": "Customer Information Manager monthly",
+        "f3": "3f1d43e1cb99931e07f15a84f6b2f41fbcc313c47bf3d0f5ccc96d7f8596f875"
+      },
+      {
+        "id": "commercial_component_authorize_net_afds_monthly_v1",
+        "identity": "advanced_fraud_detection_suite_monthly_charge",
+        "scope": "gateway_only",
+        "channel": "direct",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "population": "advanced_fraud_detection_suite_service_month",
+        "sourceFaithfulPopulationWording": "Advanced Fraud Detection Suite monthly",
+        "f3": "587ff6d665557595eee04f319bbf5d61b2e0ed45829cd8df3656b3605d8d36c5"
+      },
+      {
+        "id": "commercial_component_authorize_net_acquiring_percentage_v1",
+        "identity": "merchant_account_acquiring_percentage_charge",
         "scope": "gateway_only",
         "channel": "direct",
         "completeness": {
           "state": "UNKNOWN",
           "value": null
         },
-        "unit": "percent_of_volume",
-        "population": "card_processing_volume",
-        "f3": "9785b5ee34d9973d528e73e1bb4c784ab2447264af581ce0bc32a6cbd4516f10"
+        "unit": "percent_of_card_charge_volume",
+        "population": "merchant_account_acquiring_card_charge_volume",
+        "sourceFaithfulPopulationWording": null,
+        "f3": "4e090419cb0e32146bac3916bc40dde3796d231e3968a42c3393128fdcd1761a"
       },
       {
-        "id": "commercial_component_authorize_net_card_processing_per_item_v1",
-        "identity": "card_processing_per_item_field",
+        "id": "commercial_component_authorize_net_acquiring_per_item_v1",
+        "identity": "merchant_account_acquiring_per_item_charge",
         "scope": "gateway_only",
         "channel": "direct",
         "completeness": {
@@ -228,21 +498,23 @@
           "value": null
         },
         "unit": "other",
-        "population": "card_processing_items",
-        "f3": "84b00f55cdf12ed13ee9a1e3ce90239042fa213b810eec89c266644583f5afaf"
+        "population": "merchant_account_acquiring_items",
+        "sourceFaithfulPopulationWording": null,
+        "f3": "18a2ae5b912e54b5faa6bdc0f8149d99648f6026f132041269040eb12e32fe9c"
       },
       {
-        "id": "commercial_component_authorize_net_chargeback_v1",
-        "identity": "chargeback_charge",
+        "id": "commercial_component_authorize_net_acquiring_chargeback_v1",
+        "identity": "merchant_account_acquiring_chargeback_charge",
         "scope": "gateway_only",
         "channel": "direct",
         "completeness": {
           "state": "UNKNOWN",
           "value": null
         },
-        "unit": "other",
-        "population": "chargeback_cases",
-        "f3": "5426d84f84316fabf655fbe3fae91bf7b80f1863b74a90003e9960b5f4ea819d"
+        "unit": "per_chargeback_case",
+        "population": "merchant_account_acquiring_chargeback_cases",
+        "sourceFaithfulPopulationWording": null,
+        "f3": "acbaca7da527c0363298f07a265464917c6672976253714f20c2c337a234f025"
       },
       {
         "id": "commercial_component_authorize_net_account_updater_v1",
@@ -250,12 +522,17 @@
         "scope": "ancillary_service",
         "channel": "direct",
         "completeness": {
-          "state": "UNKNOWN",
-          "value": null
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 25,
+            "currency": "USD"
+          }
         },
         "unit": "per_successful_update",
         "population": "successful_account_updates",
-        "f3": "0efcca712e42a9838a6f7ce6081163e2cb72faa094687e8b87dd35ba59c56445"
+        "sourceFaithfulPopulationWording": "successful updated response; only a successful account update is charged",
+        "f3": "63c153c274ad9a45893d3e99a69164cfd81f67b4f19a7377169f4a81f3f08fcd"
       }
     ],
     "exactKnownValues": [
@@ -270,6 +547,36 @@
         "population": "gateway_account_month"
       },
       {
+        "component": "returned_authorize_net_billing_payment_charge",
+        "value": {
+          "kind": "money",
+          "amountMinor": 2500,
+          "currency": "USD"
+        },
+        "unit": "per_returned_gateway_billing_debit",
+        "population": "returned_authorize_net_billing_debits"
+      },
+      {
+        "component": "late_payment_charge",
+        "value": {
+          "kind": "money",
+          "amountMinor": 2000,
+          "currency": "USD"
+        },
+        "unit": "per_late_payment_event",
+        "population": "late_authorize_net_billing_payments"
+      },
+      {
+        "component": "abandoned_account_charge",
+        "value": {
+          "kind": "money",
+          "amountMinor": 1000,
+          "currency": "USD"
+        },
+        "unit": "per_abandoned_account",
+        "population": "abandoned_gateway_accounts"
+      },
+      {
         "component": "gateway_transaction_charge",
         "value": {
           "kind": "money",
@@ -277,7 +584,7 @@
           "currency": "USD"
         },
         "unit": "per_gateway_transaction",
-        "population": "gateway_transactions"
+        "population": "gateway_credit_card_transaction_events"
       },
       {
         "component": "gateway_batch_charge",
@@ -287,45 +594,155 @@
           "currency": "USD"
         },
         "unit": "per_batch",
-        "population": "gateway_batches"
-      }
-    ],
-    "intentionallyUnknownValues": [
-      {
-        "component": "card_processing_percentage_field",
-        "unit": "percent_of_volume",
-        "population": "card_processing_volume"
-      },
-      {
-        "component": "card_processing_per_item_field",
-        "unit": "other",
-        "population": "card_processing_items"
-      },
-      {
-        "component": "chargeback_charge",
-        "unit": "other",
-        "population": "chargeback_cases"
+        "population": "settled_credit_card_transaction_batches"
       },
       {
         "component": "account_updater_successful_update_charge",
+        "value": {
+          "kind": "money",
+          "amountMinor": 25,
+          "currency": "USD"
+        },
         "unit": "per_successful_update",
         "population": "successful_account_updates"
       }
     ],
+    "exactKnownAbsentValues": [
+      {
+        "component": "gateway_setup_charge",
+        "observedValue": {
+          "kind": "money",
+          "amountMinor": 0,
+          "currency": "USD"
+        },
+        "unit": "per_gateway_account_setup",
+        "population": "gateway_account_setup"
+      },
+      {
+        "component": "service_reactivation_charge",
+        "observedValue": {
+          "kind": "money",
+          "amountMinor": 0,
+          "currency": "USD"
+        },
+        "unit": "per_reactivation",
+        "population": "gateway_service_reactivations"
+      },
+      {
+        "component": "gateway_side_credit_card_discount_rate",
+        "observedValue": {
+          "kind": "rate",
+          "basisPoints": 0,
+          "currency": null
+        },
+        "unit": "percent_of_card_charge_volume",
+        "population": "gateway_side_credit_card_charge_volume"
+      },
+      {
+        "component": "gateway_side_monthly_minimum",
+        "observedValue": {
+          "kind": "money",
+          "amountMinor": 0,
+          "currency": "USD"
+        },
+        "unit": "per_billing_cycle",
+        "population": "gateway_billing_cycles"
+      },
+      {
+        "component": "gateway_side_chargeback_charge",
+        "observedValue": {
+          "kind": "money",
+          "amountMinor": 0,
+          "currency": "USD"
+        },
+        "unit": "per_chargeback_case",
+        "population": "gateway_side_chargeback_cases"
+      },
+      {
+        "component": "automated_recurring_billing_setup_charge",
+        "observedValue": {
+          "kind": "money",
+          "amountMinor": 0,
+          "currency": "USD"
+        },
+        "unit": "per_service_setup",
+        "population": "automated_recurring_billing_service_setup"
+      },
+      {
+        "component": "automated_recurring_billing_monthly_charge",
+        "observedValue": {
+          "kind": "money",
+          "amountMinor": 0,
+          "currency": "USD"
+        },
+        "unit": "per_month",
+        "population": "automated_recurring_billing_service_month"
+      },
+      {
+        "component": "customer_information_manager_monthly_charge",
+        "observedValue": {
+          "kind": "money",
+          "amountMinor": 0,
+          "currency": "USD"
+        },
+        "unit": "per_month",
+        "population": "customer_information_manager_service_month"
+      },
+      {
+        "component": "advanced_fraud_detection_suite_monthly_charge",
+        "observedValue": {
+          "kind": "money",
+          "amountMinor": 0,
+          "currency": "USD"
+        },
+        "unit": "per_month",
+        "population": "advanced_fraud_detection_suite_service_month"
+      }
+    ],
+    "intentionallyUnknownValues": [
+      {
+        "component": "merchant_account_acquiring_percentage_charge",
+        "unit": "percent_of_card_charge_volume",
+        "population": "merchant_account_acquiring_card_charge_volume"
+      },
+      {
+        "component": "merchant_account_acquiring_per_item_charge",
+        "unit": "other",
+        "population": "merchant_account_acquiring_items"
+      },
+      {
+        "component": "merchant_account_acquiring_chargeback_charge",
+        "unit": "per_chargeback_case",
+        "population": "merchant_account_acquiring_chargeback_cases"
+      }
+    ],
     "evidenceGaps": [
-      "The governing Product document preserves the adjudicated values but not the underlying first-party URL, exact offer name, publication date, effective date, or names of the zero-valued card-processing fields.",
-      "The governing Product document establishes the per-successful-update mechanic but does not preserve the amount, underlying first-party URL, publication date, or effective date."
+      "Observed current on 2026-09-10. Publication and effective dates were not stated. The repository preserves the Product-adjudicated captured content and its authority-pack fingerprint, not a raw byte snapshot of the mutable web page.",
+      "Observed on 2026-09-10. Publication and effective dates were not stated. The repository preserves the Product-adjudicated captured content and its authority-pack fingerprint, not a raw byte snapshot of the PDF.",
+      "The 2025-04-09 last-modified date supports direct-versus-partner and plan-taxonomy facts only. It is not evidence that the pricing page's 2026-observed prices applied in 2025."
     ],
     "currentResolution": {
       "status": "resolved",
       "compositionRef": "commercial_offer_authorize_net_direct_gateway_composition_v1",
       "componentVersionRefs": [
+        "commercial_component_authorize_net_gateway_setup_v1",
         "commercial_component_authorize_net_gateway_monthly_v1",
+        "commercial_component_authorize_net_returned_payment_v1",
+        "commercial_component_authorize_net_late_payment_v1",
+        "commercial_component_authorize_net_service_reactivation_v1",
+        "commercial_component_authorize_net_abandoned_account_v1",
         "commercial_component_authorize_net_gateway_transaction_v1",
         "commercial_component_authorize_net_gateway_batch_v1",
-        "commercial_component_authorize_net_card_processing_percentage_v1",
-        "commercial_component_authorize_net_card_processing_per_item_v1",
-        "commercial_component_authorize_net_chargeback_v1"
+        "commercial_component_authorize_net_gateway_discount_rate_v1",
+        "commercial_component_authorize_net_gateway_monthly_minimum_v1",
+        "commercial_component_authorize_net_gateway_chargeback_v1",
+        "commercial_component_authorize_net_arb_setup_v1",
+        "commercial_component_authorize_net_arb_monthly_v1",
+        "commercial_component_authorize_net_cim_monthly_v1",
+        "commercial_component_authorize_net_afds_monthly_v1",
+        "commercial_component_authorize_net_acquiring_percentage_v1",
+        "commercial_component_authorize_net_acquiring_per_item_v1",
+        "commercial_component_authorize_net_acquiring_chargeback_v1"
       ],
       "reasons": [],
       "publicPolicyStatus": "PUBLIC_POLICY_UNKNOWN",
@@ -348,15 +765,28 @@
       "subtotalState": "not_calculated_source_layer",
       "knownComponentRefs": [
         "commercial_component_authorize_net_gateway_monthly_v1",
+        "commercial_component_authorize_net_returned_payment_v1",
+        "commercial_component_authorize_net_late_payment_v1",
+        "commercial_component_authorize_net_abandoned_account_v1",
         "commercial_component_authorize_net_gateway_transaction_v1",
-        "commercial_component_authorize_net_gateway_batch_v1"
-      ],
-      "knownAbsentComponentRefs": [],
-      "unknownComponentRefs": [
-        "commercial_component_authorize_net_card_processing_percentage_v1",
-        "commercial_component_authorize_net_card_processing_per_item_v1",
-        "commercial_component_authorize_net_chargeback_v1",
+        "commercial_component_authorize_net_gateway_batch_v1",
         "commercial_component_authorize_net_account_updater_v1"
+      ],
+      "knownAbsentComponentRefs": [
+        "commercial_component_authorize_net_gateway_setup_v1",
+        "commercial_component_authorize_net_service_reactivation_v1",
+        "commercial_component_authorize_net_gateway_discount_rate_v1",
+        "commercial_component_authorize_net_gateway_monthly_minimum_v1",
+        "commercial_component_authorize_net_gateway_chargeback_v1",
+        "commercial_component_authorize_net_arb_setup_v1",
+        "commercial_component_authorize_net_arb_monthly_v1",
+        "commercial_component_authorize_net_cim_monthly_v1",
+        "commercial_component_authorize_net_afds_monthly_v1"
+      ],
+      "unknownComponentRefs": [
+        "commercial_component_authorize_net_acquiring_percentage_v1",
+        "commercial_component_authorize_net_acquiring_per_item_v1",
+        "commercial_component_authorize_net_acquiring_chargeback_v1"
       ],
       "completeForRequestedComponents": false,
       "automaticLowerBoundAllowed": false,
@@ -373,18 +803,50 @@
         "status": "resolved",
         "compositionRef": "commercial_offer_authorize_net_direct_gateway_composition_v1",
         "componentVersionRefs": [
+          "commercial_component_authorize_net_gateway_setup_v1",
           "commercial_component_authorize_net_gateway_monthly_v1",
+          "commercial_component_authorize_net_returned_payment_v1",
+          "commercial_component_authorize_net_late_payment_v1",
+          "commercial_component_authorize_net_service_reactivation_v1",
+          "commercial_component_authorize_net_abandoned_account_v1",
           "commercial_component_authorize_net_gateway_transaction_v1",
           "commercial_component_authorize_net_gateway_batch_v1",
-          "commercial_component_authorize_net_card_processing_percentage_v1",
-          "commercial_component_authorize_net_card_processing_per_item_v1",
-          "commercial_component_authorize_net_chargeback_v1"
+          "commercial_component_authorize_net_gateway_discount_rate_v1",
+          "commercial_component_authorize_net_gateway_monthly_minimum_v1",
+          "commercial_component_authorize_net_gateway_chargeback_v1",
+          "commercial_component_authorize_net_arb_setup_v1",
+          "commercial_component_authorize_net_arb_monthly_v1",
+          "commercial_component_authorize_net_cim_monthly_v1",
+          "commercial_component_authorize_net_afds_monthly_v1",
+          "commercial_component_authorize_net_acquiring_percentage_v1",
+          "commercial_component_authorize_net_acquiring_per_item_v1",
+          "commercial_component_authorize_net_acquiring_chargeback_v1"
         ],
         "reasons": [],
         "publicPolicyStatus": "PUBLIC_POLICY_UNKNOWN",
         "merchantAvailabilityEvidence": []
       },
       "resellerResolution": {
+        "status": "unresolved_channel_or_identity",
+        "compositionRef": null,
+        "componentVersionRefs": [],
+        "reasons": [
+          "No exact provider/channel/plan/scope identity matched the request."
+        ],
+        "publicPolicyStatus": null,
+        "merchantAvailabilityEvidence": []
+      },
+      "partnerResolution": {
+        "status": "unresolved_channel_or_identity",
+        "compositionRef": null,
+        "componentVersionRefs": [],
+        "reasons": [
+          "No exact provider/channel/plan/scope identity matched the request."
+        ],
+        "publicPolicyStatus": null,
+        "merchantAvailabilityEvidence": []
+      },
+      "gatewayResellerResolution": {
         "status": "unresolved_channel_or_identity",
         "compositionRef": null,
         "componentVersionRefs": [],
@@ -442,10 +904,10 @@
       }
     },
     "semanticVersioning": {
-      "priorPriceF3": "141475dd4eb9240e568c6c0710541d7a80db5785b29327ebd087a06ee3af6798",
-      "changedPriceF3": "d293336cee1e485981f7610bf478e22c35cf9cf60a8dec9272ee5509e7ab5c32",
+      "priorPriceF3": "9847a21eefe3c974fc97b61de22e9c45455885463c05fbc3b04a5226b15cd8e2",
+      "changedPriceF3": "ade97433b079c39ccacfc305dc02718453e0121617fb207a2d1b672577c1a8c3",
       "changedPriceVersion": 2,
-      "changedPolicyF3": "87d8e2ead43198cc4dd1b683be466899e4ffd0e6276be263d450494db9b9009f",
+      "changedPolicyF3": "497349f17d81de34ba4bcbe13ddb0893bc908c9e5fb09e213f2c9e94443e05af",
       "changedCompositionVersion": 2
     },
     "conflict": {
@@ -476,10 +938,10 @@
       "completeness": {
         "knownComponentSubtotalMinor": null,
         "subtotalState": "not_calculated_source_layer",
-        "knownComponentRefs": [
+        "knownComponentRefs": [],
+        "knownAbsentComponentRefs": [
           "synthetic_starting_at_price"
         ],
-        "knownAbsentComponentRefs": [],
         "unknownComponentRefs": [],
         "completeForRequestedComponents": false,
         "automaticLowerBoundAllowed": true,
@@ -533,12 +995,20 @@
     "noKnownPublicBlockTreatedAsConfirmedApproval": 0,
     "merchantSpecificApprovalCollapsedIntoPublicPolicy": 0,
     "directPriceLeaksToReseller": 0,
+    "directPriceLeaksToPartner": 0,
+    "directPriceLeaksToGatewayReseller": 0,
     "resellerPriceLeaksToDirect": 0,
     "unknownChannelDefaultsToDirect": 0,
     "startingAtBecomesCompleteOffer": 0,
     "gatewayOnlyBecomesAcquiring": 0,
+    "gatewaySideDiscountRateZeroBecomesAcquiringZero": 0,
+    "gatewaySideChargebackZeroBecomesMerchantAccountZero": 0,
+    "returnedBillingDebitMisclassifiedAsCardholderReturn": 0,
     "planSpecificZeroBecomesProviderWideZero": 0,
     "ancillaryComponentAbsorbedIntoBaseOffer": 0,
+    "accountUpdaterMultipliedByWrongPopulation": 0,
+    "gatewayTransactionReducedToAuthorizationPopulation": 0,
+    "accountUpdaterIdentityCollapsedIntoGatewayOffer": 0,
     "unknownEffectiveDateProjectedBackward": 0,
     "supersededPriceTreatedAsCurrent": 0,
     "currentPriceRewritesHistoricalAnalysis": 0,
@@ -627,17 +1097,18 @@
     }
   ],
   "verification": {
-    "coreTargeted": "23/23 passed across Commercial Source Governance, Comparator Eligibility, and Claim-Specific Commercial Decomposition",
+    "coreTargeted": "24/24 passed across Commercial Source Governance, Comparator Eligibility, and Claim-Specific Commercial Decomposition",
     "sourceProvenance": "7/7 canonical fee-partition provenance assertions passed",
-    "historicalCurrentRegression": "5/6 passed; the untouched baseline test expected zero governed row conflicts but observed four",
+    "historicalCurrentRegression": "5/6 passed; the untouched baseline assertion at governedConflictResolutionHistoricalCurrentFirewallV1.test.ts:43 expected zero governed row conflicts but observed four",
     "legacyPublicSourceAuthority": "10/10 assertions passed, then the existing process exited with SIGSEGV/139",
     "typescriptBuild": "passed",
-    "exhaustiveSuite": "terminated with SIGSEGV/139 after publicSourceAuthorityRegistry.test.ts passed; no complete Vitest summary was emitted",
+    "exhaustiveSuite": "terminated with SIGSEGV/139 immediately after publicSourceAuthorityRegistry.test.ts passed 10/10; no complete Vitest summary was emitted",
     "failingOrCrashingFilesTouchedByMilestone": []
   },
   "architectureConflicts": [
     "The earlier comparator diagnostic uses a single eligibilityStatus field; the production source contract now preserves public policy and merchant-specific availability separately. The diagnostic remains unchanged and non-authoritative.",
-    "The governing document does not preserve the underlying Authorize.net first-party locators, exact gateway offer name, effective date, names of zero-valued card-processing fields, or Account Updater amount; the admitted record exposes those gaps instead of filling them."
+    "The first-party pages are mutable and their raw response bytes were not bundled with this checkpoint. The registry therefore preserves exact source locators, observed date, Product-adjudicated source-faithful extracts, F2 extract hashes, and the adjudication-pack SHA as the retained document artifact fingerprint; future recapture should add immutable raw snapshots without changing F3 unless meaning changes.",
+    "Public pricing and Account Updater effective dates remain unknown. The 2025-04-09 support-article date scopes only the direct/partner and plan-taxonomy evidence and cannot backdate 2026-observed prices."
   ],
-  "recommendation": "Product should review the Batch 1A scope/evidence gaps and the source-maintenance workflow before Batch 1B. If accepted, admit Helcim and Dharma as separate, versioned sources; do not begin comparator claims or market judgment yet."
+  "recommendation": "Product may proceed to a separately authorized Batch 1B only after accepting this Batch 1A evidence completion and its raw-snapshot limitation. No Batch 1B, comparator claim, market grade, savings claim, switching advice, or customer output should begin from this checkpoint without that review."
 }

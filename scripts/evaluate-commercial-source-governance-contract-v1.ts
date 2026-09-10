@@ -34,9 +34,9 @@ const PRODUCT_AUTHORITY = {
   status: "final_product_adjudicated_implementation_authority",
 };
 const BASELINE = {
-  branch: "codex/commercial-comparator-eligibility-validation-v1",
-  commit: "584ea36efc9a2f25e9302538424aa802725a98fe",
-  parent: "e5e69f277ee5108cfb8a514c985d9391b54b09d3",
+  branch: "codex/commercial-source-governance-contract-v1",
+  commit: "51aef2b0aa8c8dc54c62e748c3a39951194ceaa7",
+  parent: "584ea36efc9a2f25e9302538424aa802725a98fe",
 };
 const GOLD = [
   "Nov_2024_Statement.pdf",
@@ -58,6 +58,8 @@ const completeness = summarizeCommercialComponentCompletenessV1(registry.priceCo
 const directResolution = resolveGovernedCommercialOfferV1({ registry, identity: AUTHORIZE_NET_DIRECT_GATEWAY_IDENTITY_V1, asOf: "2026-09-10", mode: "current" });
 const historicalResolution = resolveGovernedCommercialOfferV1({ registry, identity: AUTHORIZE_NET_DIRECT_GATEWAY_IDENTITY_V1, asOf: "2024-09-01", mode: "historical" });
 const resellerResolution = resolveGovernedCommercialOfferV1({ registry, identity: channelIdentity("reseller", "authorize_net_reseller"), asOf: "2026-09-10", mode: "current" });
+const partnerResolution = resolveGovernedCommercialOfferV1({ registry, identity: channelIdentity("bank_partner", "authorize_net_partner"), asOf: "2026-09-10", mode: "current" });
+const gatewayResellerResolution = resolveGovernedCommercialOfferV1({ registry, identity: channelIdentity("gateway_reseller", "authorize_net_gateway_reseller"), asOf: "2026-09-10", mode: "current" });
 const unknownChannelResolution = resolveGovernedCommercialOfferV1({ registry, identity: channelIdentity("unknown", "seller_not_established"), asOf: "2026-09-10", mode: "current" });
 const acquiringResolution = resolveGovernedCommercialOfferV1({ registry, identity: { ...AUTHORIZE_NET_DIRECT_GATEWAY_IDENTITY_V1, productScope: "acquiring_only" }, asOf: "2026-09-10", mode: "current" });
 
@@ -120,7 +122,7 @@ const extractChange = classifyCommercialSourceChangeV1({
   nextF3: registry.priceComponentVersions[0]!.f3GovernedSemantic,
 });
 
-const priorPrice = registry.priceComponentVersions[1]!;
+const priorPrice = registry.priceComponentVersions.find((item) => item.componentIdentity === "gateway_transaction_charge")!;
 const changedPrice = clone(priorPrice);
 changedPrice.componentVersionId = "synthetic_changed_gateway_transaction_price_v2";
 changedPrice.version = 2;
@@ -181,6 +183,9 @@ const publicPolicyVersusAvailability = {
   restrictedWithMerchantSpecificApprovalRepresentable: true,
 };
 
+const componentByIdentity = new Map(registry.priceComponentVersions.map((item) => [item.componentIdentity, item]));
+const updaterComposition = registry.offerCompositionVersions.find((item) => item.offerIdentity.productScope === "ancillary_service")!;
+
 const goldStatements = [];
 for (const file of GOLD) {
   const document = await parsePdf(`test/fixtures/pdfs/${file}`);
@@ -193,19 +198,27 @@ for (const file of GOLD) {
 
 const acceptanceCounters = {
   unknownTreatedAsZero: completeness.unknownComponentRefs.filter((ref) => registry.priceComponentVersions.find((item) => item.componentVersionId === ref)?.completeness.value !== null).length,
-  knownAbsentTreatedAsUnknown: 0,
+  knownAbsentTreatedAsUnknown: completeness.knownAbsentComponentRefs.some((ref) => completeness.unknownComponentRefs.includes(ref)) ? 1 : 0,
   unknownSilentlyOmittedFromTotalCompleteness: completeness.completeForRequestedComponents ? 1 : 0,
   publicProhibitionTreatedAsMerchantApproval: 0,
   restrictionTreatedAsPositiveApproval: 0,
   noKnownPublicBlockTreatedAsConfirmedApproval: publicPolicyVersusAvailability.noKnownPublicBlockIsApproval ? 1 : 0,
   merchantSpecificApprovalCollapsedIntoPublicPolicy: publicPolicyVersusAvailability.availabilityStoredSeparately ? 0 : 1,
   directPriceLeaksToReseller: resellerResolution.status === "resolved" ? 1 : 0,
+  directPriceLeaksToPartner: partnerResolution.status === "resolved" ? 1 : 0,
+  directPriceLeaksToGatewayReseller: gatewayResellerResolution.status === "resolved" ? 1 : 0,
   resellerPriceLeaksToDirect: 0,
   unknownChannelDefaultsToDirect: unknownChannelResolution.status === "resolved" ? 1 : 0,
   startingAtBecomesCompleteOffer: startingAtCompleteness.completeForRequestedComponents ? 1 : 0,
   gatewayOnlyBecomesAcquiring: acquiringResolution.status === "resolved" ? 1 : 0,
+  gatewaySideDiscountRateZeroBecomesAcquiringZero: componentByIdentity.get("merchant_account_acquiring_percentage_charge")?.completeness.state === "KNOWN_ABSENT" ? 1 : 0,
+  gatewaySideChargebackZeroBecomesMerchantAccountZero: componentByIdentity.get("merchant_account_acquiring_chargeback_charge")?.completeness.state === "KNOWN_ABSENT" ? 1 : 0,
+  returnedBillingDebitMisclassifiedAsCardholderReturn: componentByIdentity.get("returned_authorize_net_billing_payment_charge")?.billedPopulation !== "returned_authorize_net_billing_debits" ? 1 : 0,
   planSpecificZeroBecomesProviderWideZero: 0,
   ancillaryComponentAbsorbedIntoBaseOffer: registry.offerCompositionVersions[0]!.componentVersionRefs.includes("commercial_component_authorize_net_account_updater_v1") ? 1 : 0,
+  accountUpdaterMultipliedByWrongPopulation: componentByIdentity.get("account_updater_successful_update_charge")?.billedPopulation !== "successful_account_updates" ? 1 : 0,
+  gatewayTransactionReducedToAuthorizationPopulation: componentByIdentity.get("gateway_transaction_charge")?.billedPopulation === "authorizations" || componentByIdentity.get("gateway_transaction_charge")?.unit === "per_authorization" ? 1 : 0,
+  accountUpdaterIdentityCollapsedIntoGatewayOffer: updaterComposition.offerIdentity.productScope !== "ancillary_service" ? 1 : 0,
   unknownEffectiveDateProjectedBackward: historicalResolution.status === "resolved" ? 1 : 0,
   supersededPriceTreatedAsCurrent: 0,
   currentPriceRewritesHistoricalAnalysis: 0,
@@ -277,9 +290,11 @@ const evaluation = {
       completeness: item.completeness,
       unit: item.unit,
       population: item.billedPopulation,
+      sourceFaithfulPopulationWording: item.sourceFaithfulPopulationWording,
       f3: item.f3GovernedSemantic,
     })),
     exactKnownValues: registry.priceComponentVersions.filter((item) => item.completeness.state === "KNOWN").map((item) => ({ component: item.componentIdentity, value: item.completeness.value, unit: item.unit, population: item.billedPopulation })),
+    exactKnownAbsentValues: registry.priceComponentVersions.filter((item) => item.completeness.state === "KNOWN_ABSENT").map((item) => ({ component: item.componentIdentity, observedValue: item.completeness.state === "KNOWN_ABSENT" ? item.completeness.observedAbsentValue : null, unit: item.unit, population: item.billedPopulation })),
     intentionallyUnknownValues: registry.priceComponentVersions.filter((item) => item.completeness.state === "UNKNOWN").map((item) => ({ component: item.componentIdentity, unit: item.unit, population: item.billedPopulation })),
     evidenceGaps: registry.sourceObservations.map((item) => item.provenance.retrievabilityLimitation),
     currentResolution: directResolution,
@@ -288,7 +303,7 @@ const evaluation = {
   controls: {
     completeness,
     publicPolicyVersusAvailability,
-    channelAndScope: { directResolution, resellerResolution, unknownChannelResolution, acquiringResolution },
+    channelAndScope: { directResolution, resellerResolution, partnerResolution, gatewayResellerResolution, unknownChannelResolution, acquiringResolution },
     changeFingerprinting: { cosmeticChange, extractChange, semanticChange },
     semanticVersioning: {
       priorPriceF3: priorPrice.f3GovernedSemantic,
@@ -310,19 +325,20 @@ const evaluation = {
   acceptanceCounters,
   goldStatements,
   verification: {
-    coreTargeted: "23/23 passed across Commercial Source Governance, Comparator Eligibility, and Claim-Specific Commercial Decomposition",
+    coreTargeted: "24/24 passed across Commercial Source Governance, Comparator Eligibility, and Claim-Specific Commercial Decomposition",
     sourceProvenance: "7/7 canonical fee-partition provenance assertions passed",
-    historicalCurrentRegression: "5/6 passed; the untouched baseline test expected zero governed row conflicts but observed four",
+    historicalCurrentRegression: "5/6 passed; the untouched baseline assertion at governedConflictResolutionHistoricalCurrentFirewallV1.test.ts:43 expected zero governed row conflicts but observed four",
     legacyPublicSourceAuthority: "10/10 assertions passed, then the existing process exited with SIGSEGV/139",
     typescriptBuild: "passed",
-    exhaustiveSuite: "terminated with SIGSEGV/139 after publicSourceAuthorityRegistry.test.ts passed; no complete Vitest summary was emitted",
+    exhaustiveSuite: "terminated with SIGSEGV/139 immediately after publicSourceAuthorityRegistry.test.ts passed 10/10; no complete Vitest summary was emitted",
     failingOrCrashingFilesTouchedByMilestone: [],
   },
   architectureConflicts: [
     "The earlier comparator diagnostic uses a single eligibilityStatus field; the production source contract now preserves public policy and merchant-specific availability separately. The diagnostic remains unchanged and non-authoritative.",
-    "The governing document does not preserve the underlying Authorize.net first-party locators, exact gateway offer name, effective date, names of zero-valued card-processing fields, or Account Updater amount; the admitted record exposes those gaps instead of filling them.",
+    "The first-party pages are mutable and their raw response bytes were not bundled with this checkpoint. The registry therefore preserves exact source locators, observed date, Product-adjudicated source-faithful extracts, F2 extract hashes, and the adjudication-pack SHA as the retained document artifact fingerprint; future recapture should add immutable raw snapshots without changing F3 unless meaning changes.",
+    "Public pricing and Account Updater effective dates remain unknown. The 2025-04-09 support-article date scopes only the direct/partner and plan-taxonomy evidence and cannot backdate 2026-observed prices.",
   ],
-  recommendation: "Product should review the Batch 1A scope/evidence gaps and the source-maintenance workflow before Batch 1B. If accepted, admit Helcim and Dharma as separate, versioned sources; do not begin comparator claims or market judgment yet.",
+  recommendation: "Product may proceed to a separately authorized Batch 1B only after accepting this Batch 1A evidence completion and its raw-snapshot limitation. No Batch 1B, comparator claim, market grade, savings claim, switching advice, or customer output should begin from this checkpoint without that review.",
 };
 
 const failedCounters = Object.entries(acceptanceCounters).filter(([, value]) => value !== 0);
@@ -360,10 +376,11 @@ function policyFingerprint(policy: CommercialSourceGovernanceRegistryV1["publicP
 
 function report(value: typeof evaluation): string {
   const known = value.batch1A.exactKnownValues.map((item) => `- ${item.component}: ${JSON.stringify(item.value)}; unit=${item.unit}; population=${item.population}`).join("\n");
+  const knownAbsent = value.batch1A.exactKnownAbsentValues.map((item) => `- ${item.component}: KNOWN_ABSENT with observed ${JSON.stringify(item.observedValue)}; unit=${item.unit}; population=${item.population}`).join("\n");
   const unknown = value.batch1A.intentionallyUnknownValues.map((item) => `- ${item.component}: UNKNOWN; unit=${item.unit}; population=${item.population}`).join("\n");
   const counters = Object.entries(value.acceptanceCounters).map(([key, count]) => `- ${key}: ${count}`).join("\n");
   const gold = value.goldStatements.map((item) => `| ${item.file} | ${item.unchanged ? "unchanged" : "CHANGED"} |`).join("\n");
-  return `# Commercial Source Governance Contract v1\n\n## Outcome\n\nImplemented an internal Layer-3 commercial-source authority and admitted only the Product-adjudicated Authorize.net direct gateway Batch 1A scope. No comparator claim, market judgment, grade, savings, switching advice, customer copy, AI research, or web research was created.\n\nProduct authority: \`${value.productAuthority.file}\` (SHA-256 \`${value.productAuthority.sha256}\`).\n\n## Contract behavior\n\n- Brand, seller, distribution channel, named offer, geography, currency, pricing model, product scope, and source nature jointly identify an offer. UNKNOWN channel never defaults to direct.\n- Source observations retain F1 raw-document and F2 commercial-extract history. F3 versions Product-adjudicated commercial meaning independently. Cosmetic F1 changes remain auditable without creating price versions; F2 changes trigger review; F3 changes require a semantic version.\n- Components and offer compositions are independently versioned. Eligibility, service, or promotion changes can re-version an offer without fabricating a price change.\n- Public-policy status and merchant-specific availability evidence are orthogonal. NO_KNOWN_PUBLIC_BLOCK is not approval.\n- KNOWN, KNOWN_ABSENT, and UNKNOWN are discriminated states. UNKNOWN carries no value and never becomes zero. Partial terms remain a known-component set plus unknown remainder, not an automatic lower bound.\n- Lifecycle, verification, and effective-period knowledge are separate. Unknown effective dates fail closed for historical replay.\n- Same-scope conflicts remain unresolved and are never averaged. Different channel/plan/scope records are not conflicts. Candidate or AI-proposed records cannot influence governed resolution until human/Product admission.\n\n## Batch 1A exact admitted values\n\n${known}\n\n## Values intentionally left UNKNOWN\n\n${unknown}\n\nThe Product authority does not preserve the underlying first-party locators, exact gateway offer name, exact effective date, names of the zero-valued card-processing fields, or Account Updater amount. Those gaps remain explicit. Account Updater is a separate ancillary-service identity and is not absorbed into the gateway base offer.\n\n## Temporal, channel, and conflict controls\n\n- Current direct gateway resolution: ${value.controls.channelAndScope.directResolution.status}.\n- 2024 historical replay of the first-observed-2026/unknown-effective record: ${value.batch1A.historical2024Resolution.status}.\n- Reseller request: ${value.controls.channelAndScope.resellerResolution.status}.\n- UNKNOWN-channel request: ${value.controls.channelAndScope.unknownChannelResolution.status}.\n- Acquiring request against gateway-only identity: ${value.controls.channelAndScope.acquiringResolution.status}.\n- Same-scope conflict: ${value.controls.conflict.sameScope}; resolution=${value.controls.conflict.resolution.status}.\n- Different-channel pair: ${value.controls.conflict.differentChannel}.\n\n## Acceptance counters\n\nEvery prohibited outcome is zero.\n\n${counters}\n\n## Gold fingerprint invariance\n\n| Statement | Canonical fingerprint |\n|---|---|\n${gold}\n\nResult: ${value.goldStatements.filter((item) => item.unchanged).length}/${value.goldStatements.length} unchanged.\n\n## Verification\n\n- Core targeted regressions: ${value.verification.coreTargeted}.\n- Source provenance: ${value.verification.sourceProvenance}.\n- Historical/current regression: ${value.verification.historicalCurrentRegression}.\n- Legacy public-source authority: ${value.verification.legacyPublicSourceAuthority}.\n- TypeScript build: ${value.verification.typescriptBuild}.\n- Exhaustive suite: ${value.verification.exhaustiveSuite}.\n- Milestone changes to failing/crashing files: none.\n\n## Architecture conflicts and evidence gaps\n\n${value.architectureConflicts.map((item) => `- ${item}`).join("\n")}\n\n## Recommendation\n\n${value.recommendation}\n`;
+  return `# Authorize.net Batch 1A Evidence Completion\n\n## Outcome\n\nCompleted the existing internal Layer-3 source record for the Product-adjudicated **Authorize.net Direct — Gateway only** offer. The record now retains the three exact first-party locators, scoped prices, zero-price evidence, transaction populations, direct-versus-partner evidence, and Account Updater as a separate ancillary offer. No comparator claim, market judgment, grade, savings, switching advice, customer copy, AI research, or web research was created.\n\nProduct authority: \`${value.productAuthority.file}\` (SHA-256 \`${value.productAuthority.sha256}\`).\n\n## Exact admitted KNOWN values\n\n${known}\n\n## Exact admitted KNOWN_ABSENT values\n\n${knownAbsent}\n\n## Values intentionally left UNKNOWN\n\n${unknown}\n\nGateway-side 0.00% and $0 fields remain scoped to the Gateway only offer. They do not establish a 0% merchant-account rate, zero acquiring per-item price, or zero acquiring chargeback fee. Account Updater is separately composed and bills only successful account updates.\n\n## Temporal, channel, and population controls\n\n- Current direct gateway resolution: ${value.controls.channelAndScope.directResolution.status}.\n- 2024 historical replay of the first-observed-2026/unknown-effective pricing: ${value.batch1A.historical2024Resolution.status}.\n- Reseller request: ${value.controls.channelAndScope.resellerResolution.status}.\n- Partner request: ${value.controls.channelAndScope.partnerResolution.status}.\n- Gateway-reseller request: ${value.controls.channelAndScope.gatewayResellerResolution.status}.\n- UNKNOWN-channel request: ${value.controls.channelAndScope.unknownChannelResolution.status}.\n- Acquiring request against gateway-only identity: ${value.controls.channelAndScope.acquiringResolution.status}.\n- Gateway transactions retain their broad source-supported event population; no authorization-count or sale-count conversion exists.\n- Gateway no-contract/cancellation evidence is retained only in the scoped Gateway only source observation; it is not projected onto acquiring, partner, reseller, equipment, or software agreements.\n- KA-07342's 2025-04-09 date supports taxonomy only and does not backdate pricing.\n\n## Acceptance counters\n\nEvery prohibited outcome is zero.\n\n${counters}\n\n## Gold fingerprint invariance\n\n| Statement | Canonical fingerprint |\n|---|---|\n${gold}\n\nResult: ${value.goldStatements.filter((item) => item.unchanged).length}/${value.goldStatements.length} unchanged.\n\n## Verification\n\n- Core targeted regressions: ${value.verification.coreTargeted}.\n- Source provenance: ${value.verification.sourceProvenance}.\n- Historical/current regression: ${value.verification.historicalCurrentRegression}.\n- Legacy public-source authority: ${value.verification.legacyPublicSourceAuthority}.\n- TypeScript build: ${value.verification.typescriptBuild}.\n- Exhaustive suite: ${value.verification.exhaustiveSuite}.\n- Milestone changes to failing/crashing files or their dependencies: none.\n\n## Architecture conflicts and evidence gaps\n\n${value.architectureConflicts.map((item) => `- ${item}`).join("\n")}\n\n## Recommendation\n\n${value.recommendation}\n`;
 }
 
 function clone<T>(value: T): T { return structuredClone(value); }

@@ -20,7 +20,7 @@ import {
   type CommercialSourceGovernanceRegistryV1,
 } from "../../src/canonical/commercialSourceGovernanceV1.js";
 
-const authority = "RateReveal_Comparator_Claim_and_Commercial_Source_Governance_FINAL_Product_Adjudicated_v1.md#24";
+const authority = "RateReveal_AuthorizeNet_Evidence_Completion_Pack_FINAL_Product_Adjudicated_v1.md#all";
 
 describe("Commercial Source Governance Contract v1", () => {
   it("admits only the exact scoped Authorize.net Batch 1A values and preserves unknowns", () => {
@@ -28,35 +28,70 @@ describe("Commercial Source Governance Contract v1", () => {
     const known = registry.priceComponentVersions.filter((item) => item.completeness.state === "KNOWN");
     expect(known.map((item) => [item.componentIdentity, item.completeness.value])).toEqual([
       ["monthly_gateway_charge", { kind: "money", amountMinor: 2500, currency: "USD" }],
+      ["returned_authorize_net_billing_payment_charge", { kind: "money", amountMinor: 2500, currency: "USD" }],
+      ["late_payment_charge", { kind: "money", amountMinor: 2000, currency: "USD" }],
+      ["abandoned_account_charge", { kind: "money", amountMinor: 1000, currency: "USD" }],
       ["gateway_transaction_charge", { kind: "money", amountMinor: 10, currency: "USD" }],
       ["gateway_batch_charge", { kind: "money", amountMinor: 10, currency: "USD" }],
+      ["account_updater_successful_update_charge", { kind: "money", amountMinor: 25, currency: "USD" }],
     ]);
-    expect(registry.priceComponentVersions.filter((item) => item.completeness.state === "KNOWN_ABSENT")).toHaveLength(0);
+    expect(registry.priceComponentVersions.filter((item) => item.completeness.state === "KNOWN_ABSENT").map((item) => item.componentIdentity)).toEqual([
+      "gateway_setup_charge",
+      "service_reactivation_charge",
+      "gateway_side_credit_card_discount_rate",
+      "gateway_side_monthly_minimum",
+      "gateway_side_chargeback_charge",
+      "automated_recurring_billing_setup_charge",
+      "automated_recurring_billing_monthly_charge",
+      "customer_information_manager_monthly_charge",
+      "advanced_fraud_detection_suite_monthly_charge",
+    ]);
     expect(registry.priceComponentVersions.filter((item) => item.completeness.state === "UNKNOWN").map((item) => item.componentIdentity)).toEqual([
-      "card_processing_percentage_field",
-      "card_processing_per_item_field",
-      "chargeback_charge",
-      "account_updater_successful_update_charge",
+      "merchant_account_acquiring_percentage_charge",
+      "merchant_account_acquiring_per_item_charge",
+      "merchant_account_acquiring_chargeback_charge",
     ]);
-    expect(registry.offerCompositionVersions.every((item) => item.offerIdentity.namedOffer !== "authorize_net_price")).toBe(true);
+    expect(registry.offerCompositionVersions.map((item) => item.offerIdentity.namedOffer)).toEqual(["Gateway only", "Account Updater"]);
+    expect(registry.offerCompositionVersions.every((item) => item.offerIdentity.geography === "United States")).toBe(true);
+    expect(registry.sourceObservations.map((item) => item.provenance.sourceLocator)).toEqual([
+      "https://www.authorize.net/sign-up/pricing.html",
+      "https://www.authorize.net/content/dam/documents/en/account-updater.pdf",
+      "https://support.authorize.net/knowledgebase/Knowledgearticle/?code=KA-07342",
+    ]);
+    expect(registry.sourceObservations[2]?.provenance.publicationDate).toBeNull();
+    expect(registry.sourceObservations[2]?.provenance.lastModifiedDate).toBe("2025-04-09");
+    expect(registry.sourceObservations[0]?.sourceFaithfulExtract).toContain("no gateway contract requirement");
+    expect(registry.sourceObservations[2]?.sourceFaithfulExtract).toContain("partner-sold accounts");
     expect(registry.permissions).toMatchObject({ customerComparatorClaimsAllowed: false, gradesAllowed: false, savingsAllowed: false, canonicalMutationAllowed: false });
   });
 
   it("never treats UNKNOWN as zero, KNOWN_ABSENT as UNKNOWN, or a partial offer as complete", () => {
     const summary = summarizeCommercialComponentCompletenessV1(AUTHORIZE_NET_DIRECT_GATEWAY_COMMERCIAL_SOURCE_REGISTRY_V1.priceComponentVersions);
     expect(summary.knownComponentSubtotalMinor).toBeNull();
-    expect(summary.unknownComponentRefs).toHaveLength(4);
-    expect(summary.knownAbsentComponentRefs).toHaveLength(0);
+    expect(summary.unknownComponentRefs).toHaveLength(3);
+    expect(summary.knownAbsentComponentRefs).toHaveLength(9);
     expect(summary.completeForRequestedComponents).toBe(false);
     expect(summary.automaticLowerBoundAllowed).toBe(false);
 
     const syntheticAbsent = clone(AUTHORIZE_NET_DIRECT_GATEWAY_COMMERCIAL_SOURCE_REGISTRY_V1.priceComponentVersions[0]!);
     syntheticAbsent.componentVersionId = "synthetic_known_absent";
-    syntheticAbsent.completeness = { state: "KNOWN_ABSENT", value: null };
+    syntheticAbsent.completeness = { state: "KNOWN_ABSENT", value: null, observedAbsentValue: { kind: "money", amountMinor: 0, currency: "USD" } };
     syntheticAbsent.f3GovernedSemantic = governedCommercialComponentSemanticFingerprintV1(syntheticAbsent);
     const absentSummary = summarizeCommercialComponentCompletenessV1([syntheticAbsent]);
     expect(absentSummary.knownAbsentComponentRefs).toEqual(["synthetic_known_absent"]);
     expect(absentSummary.unknownComponentRefs).toEqual([]);
+  });
+
+  it("keeps gateway, acquiring, billing-return, chargeback, and Account Updater populations distinct", () => {
+    const registry = AUTHORIZE_NET_DIRECT_GATEWAY_COMMERCIAL_SOURCE_REGISTRY_V1;
+    const byIdentity = new Map(registry.priceComponentVersions.map((item) => [item.componentIdentity, item]));
+    expect(byIdentity.get("gateway_transaction_charge")).toMatchObject({ unit: "per_gateway_transaction", billedPopulation: "gateway_credit_card_transaction_events" });
+    expect(byIdentity.get("gateway_transaction_charge")?.sourceFaithfulPopulationWording).toContain("refunds");
+    expect(byIdentity.get("returned_authorize_net_billing_payment_charge")?.billedPopulation).toBe("returned_authorize_net_billing_debits");
+    expect(byIdentity.get("gateway_side_chargeback_charge")?.completeness.state).toBe("KNOWN_ABSENT");
+    expect(byIdentity.get("merchant_account_acquiring_chargeback_charge")?.completeness.state).toBe("UNKNOWN");
+    expect(byIdentity.get("account_updater_successful_update_charge")).toMatchObject({ unit: "per_successful_update", billedPopulation: "successful_account_updates" });
+    expect(registry.offerCompositionVersions[0]?.componentVersionRefs).not.toContain("commercial_component_authorize_net_account_updater_v1");
   });
 
   it("keeps public policy and merchant-specific availability orthogonal", () => {
@@ -90,9 +125,11 @@ describe("Commercial Source Governance Contract v1", () => {
   it("prevents direct, reseller, unknown-channel, gateway, and acquiring identity leakage", () => {
     const registry = AUTHORIZE_NET_DIRECT_GATEWAY_COMMERCIAL_SOURCE_REGISTRY_V1;
     const reseller = { ...AUTHORIZE_NET_DIRECT_GATEWAY_IDENTITY_V1, distributionChannel: "reseller" as const, sellerIdentity: "some_reseller" };
+    const partner = { ...AUTHORIZE_NET_DIRECT_GATEWAY_IDENTITY_V1, distributionChannel: "bank_partner" as const, sellerIdentity: "some_partner" };
+    const gatewayReseller = { ...AUTHORIZE_NET_DIRECT_GATEWAY_IDENTITY_V1, distributionChannel: "gateway_reseller" as const, sellerIdentity: "some_gateway_reseller" };
     const unknown = { ...AUTHORIZE_NET_DIRECT_GATEWAY_IDENTITY_V1, distributionChannel: "unknown" as const, sellerIdentity: "seller_not_established" };
     const acquiring = { ...AUTHORIZE_NET_DIRECT_GATEWAY_IDENTITY_V1, productScope: "acquiring_only" as const };
-    for (const identity of [reseller, unknown, acquiring]) {
+    for (const identity of [reseller, partner, gatewayReseller, unknown, acquiring]) {
       expect(resolveGovernedCommercialOfferV1({ registry, identity, asOf: "2026-09-10", mode: "current" }).status).toBe("unresolved_channel_or_identity");
     }
     const direct = resolveGovernedCommercialOfferV1({ registry, identity: AUTHORIZE_NET_DIRECT_GATEWAY_IDENTITY_V1, asOf: "2026-09-10", mode: "current" });
@@ -133,7 +170,7 @@ describe("Commercial Source Governance Contract v1", () => {
 
   it("creates distinct F1/F2/F3 behavior and requires semantic re-versioning for a price change", () => {
     const draft = draftRegistry();
-    const prior = draft.priceComponentVersions[1]!;
+    const prior = draft.priceComponentVersions.find((item) => item.componentIdentity === "gateway_transaction_charge")!;
     const successor = clone(prior);
     successor.componentVersionId = "synthetic_gateway_transaction_price_v2";
     successor.version = 2;
@@ -171,7 +208,7 @@ describe("Commercial Source Governance Contract v1", () => {
 
   it("preserves same-scope conflicts without averaging or recency resolution", () => {
     const draft = draftRegistry();
-    const prior = draft.priceComponentVersions[1]!;
+    const prior = draft.priceComponentVersions.find((item) => item.componentIdentity === "gateway_transaction_charge")!;
     const competing = clone(prior);
     competing.componentVersionId = "synthetic_conflicting_gateway_transaction";
     competing.completeness = { state: "KNOWN", value: { kind: "money", amountMinor: 12, currency: "USD" } };
