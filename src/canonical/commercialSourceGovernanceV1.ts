@@ -121,6 +121,28 @@ export type CommercialSourceObservationV1 = {
     adjudicationAuthorityArtifactRef: string;
     retrievalTimestampUtc: string;
     relationship: "immutable_capture_to_observation_to_f2_to_f3";
+    remediation?: {
+      productAuthorityDocument: string;
+      productAuthoritySha256: string;
+      remediationState: "captured" | "immutable_capture_unavailable_after_remediation";
+      comparisonState:
+        | "capture_matches_admitted_observation"
+        | "capture_partial_but_nonconflicting"
+        | "capture_conflict_requires_product_review"
+        | "immutable_capture_unavailable_after_remediation";
+      attempts: Array<{
+        method: string;
+        result: string;
+        attemptedAtUtc: string;
+        status: number | null;
+        artifactPath: string | null;
+        artifactSha256: string | null;
+        artifactRole: "immutable_first_party_F1" | "failure_evidence_not_F1" | "no_artifact";
+      }>;
+      latestArtifactPath: string | null;
+      latestArtifactSha256: string | null;
+      unadjudicatedSourceContent: string[];
+    };
   };
 };
 
@@ -500,6 +522,18 @@ export function validateCommercialSourceGovernanceRegistryV1(
     if (observation.immutableCapture?.captureState === "capture_unavailable"
       && observation.fingerprints.f1RawSourceDocument !== observation.immutableCapture.priorProvisionalF1Fingerprint) {
       issues.push(issue("unavailable_capture_replaced_provisional_f1", observation.observationId, "An unavailable first-party capture must not replace the preserved provisional Product-pack F1."));
+    }
+    if (observation.immutableCapture?.remediation?.remediationState === "captured"
+      && (observation.immutableCapture.captureState !== "captured"
+        || observation.immutableCapture.remediation.latestArtifactPath === null
+        || observation.immutableCapture.remediation.latestArtifactSha256 === null
+        || observation.fingerprints.f1RawSourceDocument !== observation.immutableCapture.remediation.latestArtifactSha256)) {
+      issues.push(issue("remediated_f1_link_mismatch", observation.observationId, "Successful remediation must promote the retained first-party artifact SHA to F1 without changing F2/F3."));
+    }
+    if (observation.immutableCapture?.remediation?.attempts.some((attempt) =>
+      (attempt.artifactPath === null) !== (attempt.artifactSha256 === null)
+      || (attempt.artifactSha256 !== null && !/^[a-f0-9]{64}$/.test(attempt.artifactSha256)))) {
+      issues.push(issue("invalid_remediation_attempt_artifact", observation.observationId, "Each retained remediation attempt requires a valid path/SHA pair."));
     }
     if (observation.supersedesObservationId !== null) {
       const predecessor = registry.sourceObservations.find((item) => item.observationId === observation.supersedesObservationId);
