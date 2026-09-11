@@ -1,0 +1,957 @@
+{
+  "schemaVersion": "runtime_commercial_context_binding_validation_evaluation_2026_09_12_v1",
+  "generatedAt": "2026-09-12T00:00:00.000Z",
+  "productAuthority": {
+    "document": "Runtime Commercial Context-Binding Validation v1",
+    "sha256": "7e012b884dc2a38c8d48f16d52ac8e3504738259ab22f99a61f6217e9d149a6c"
+  },
+  "baseline": {
+    "branch": "codex/commercial-report-set-arbitration-offline-integration-v1",
+    "commit": "d1221649895182b4269bbbb23073511de327abb8",
+    "parent": "69504228a17ff846e87983a0e166b9da6e0bdd8a"
+  },
+  "implementationBranch": "codex/runtime-commercial-context-binding-validation-v1",
+  "architecture": {
+    "validationOnly": true,
+    "normalPath": "ParsedDocument -> supported Fiserv parser -> canonical statement analysis -> governed payment knowledge/commercial decomposition -> internal commercial comparison -> merchant permission -> offline report-set arbitration",
+    "downstreamSyntheticCommercialObjectsUsed": false,
+    "behaviorCorrection": "Explicit settled-transaction, authorization-attempt, approved-authorization, gateway-transaction, and settled-batch populations are compared as distinct identities and fail closed when incompatible.",
+    "normalReportStillUsesFallbackArbitrationContext": true,
+    "customerRoutingChanged": false
+  },
+  "supportMatrix": [
+    {
+      "group": "current_merchant",
+      "field": "current provider-controlled component",
+      "upstreamSource": "canonical fee row plus commercial decomposition",
+      "runtimeStage": "runtime comparison attachment",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Only reproduced per-item authorization/gateway families are extracted today.",
+      "smallestCapabilityNeeded": "Add claim-specific extractors for other component classes."
+    },
+    {
+      "group": "current_merchant",
+      "field": "exact amount/rate",
+      "upstreamSource": "canonical billed amount and printed row arithmetic",
+      "runtimeStage": "runtime current component",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": "Whole-cent per-item prices only; percentage and sub-cent bridges are not implemented.",
+      "smallestCapabilityNeeded": "Add unit-safe rate/basis bindings for non-per-item classes."
+    },
+    {
+      "group": "current_merchant",
+      "field": "exact versus bounded economics",
+      "upstreamSource": "commercial dollar attribution",
+      "runtimeStage": "runtime current component currentAmount.state",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "current_merchant",
+      "field": "economic layer",
+      "upstreamSource": "governed commercial decomposition",
+      "runtimeStage": "runtime current component and merchant permission revalidation",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "current_merchant",
+      "field": "controller/participant role",
+      "upstreamSource": "governed participant and commercial-control evidence",
+      "runtimeStage": "merchant permission controlState",
+      "support": "PARTIAL",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Control state is bound, but collector, beneficiary, rule setter, underlying price setter, and merchant-facing price controller are not all carried into the commercial candidate.",
+      "smallestCapabilityNeeded": "Bind the existing governed participant-role object by fee-row reference."
+    },
+    {
+      "group": "current_merchant",
+      "field": "service identity",
+      "upstreamSource": "component kind plus governed economic layer",
+      "runtimeStage": "merchant permission candidate",
+      "support": "DERIVABLE_WITHOUT_INVENTION",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": "Derivation exists only for authorization and gateway transaction/batch services.",
+      "smallestCapabilityNeeded": "Add governed service mappings for each additional component class."
+    },
+    {
+      "group": "current_merchant",
+      "field": "pricing basis",
+      "upstreamSource": "printed mechanic, normalized unit, and population",
+      "runtimeStage": "runtime current component",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Per-item basis is available; percentage denominator basis is not bound.",
+      "smallestCapabilityNeeded": "Bind the exact canonical volume population and denominator for percentage components."
+    },
+    {
+      "group": "current_merchant",
+      "field": "population identity",
+      "upstreamSource": "printed label, governed population, and unit",
+      "runtimeStage": "runtime and merchant permission population gates",
+      "support": "DERIVABLE_WITHOUT_INVENTION",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Generic authorization populations are safe only against generic authorization populations; explicit settled/attempt/approved populations must remain distinct.",
+      "smallestCapabilityNeeded": "Preserve explicit population subtype through the runtime component."
+    },
+    {
+      "group": "current_merchant",
+      "field": "population quantity",
+      "upstreamSource": "canonical printed row arithmetic",
+      "runtimeStage": "runtime current component",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": "Available only when the row prints and reproduces an exact per-item count.",
+      "smallestCapabilityNeeded": "Add exact event/basis bindings for other classes."
+    },
+    {
+      "group": "current_merchant",
+      "field": "card/program identity",
+      "upstreamSource": "printed row label",
+      "runtimeStage": "runtime current component cardBrandScope",
+      "support": "PARTIAL",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Network brand is derived; product/program identity generally is not.",
+      "smallestCapabilityNeeded": "Bind governed card/program identity when the comparison requires it."
+    },
+    {
+      "group": "current_merchant",
+      "field": "channel",
+      "upstreamSource": "merchant context or explicit row wording",
+      "runtimeStage": "runtime merchant facts and current component",
+      "support": "PARTIAL",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "A statement may establish mixed or unknown activity without the component-level CP/CNP split.",
+      "smallestCapabilityNeeded": "Bind a component-specific CP/CNP population split."
+    },
+    {
+      "group": "current_merchant",
+      "field": "cadence",
+      "upstreamSource": "governed recurrence plus statement occurrence",
+      "runtimeStage": "merchant permission candidate",
+      "support": "PARTIAL",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Monthly/current-period/unknown is available downstream, but current comparison extraction does not support fixed monthly or episodic components.",
+      "smallestCapabilityNeeded": "Carry cadence into a supported fixed/episodic current component."
+    },
+    {
+      "group": "current_merchant",
+      "field": "statement period",
+      "upstreamSource": "canonical statement identity",
+      "runtimeStage": "runtime attachment statement",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": true,
+      "claimSpecific": false,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "current_merchant",
+      "field": "current-component evidence binding",
+      "upstreamSource": "canonical fee-row, arithmetic, and decomposition evidence refs",
+      "runtimeStage": "internal commercial comparison finding",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "exact provider",
+      "upstreamSource": "governed offer identity",
+      "runtimeStage": "commercial component and internal finding",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "exact named offer",
+      "upstreamSource": "governed offer composition",
+      "runtimeStage": "commercial component and internal finding",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "distribution/sales channel",
+      "upstreamSource": "governed offer identity",
+      "runtimeStage": "internal finding alternative.salesChannel",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "product/service scope",
+      "upstreamSource": "governed offer identity productScope",
+      "runtimeStage": "merchant permission presentation group and service identity",
+      "support": "DERIVABLE_WITHOUT_INVENTION",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "commercial component",
+      "upstreamSource": "governed component version",
+      "runtimeStage": "runtime alternative component ref",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "unit",
+      "upstreamSource": "governed component version",
+      "runtimeStage": "merchant permission alternative.unit",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "billing basis",
+      "upstreamSource": "governed unit and billed population",
+      "runtimeStage": "merchant permission alternative.billingBasis",
+      "support": "DERIVABLE_WITHOUT_INVENTION",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Currently mirrors unit; percentage denominator semantics need a stronger bridge.",
+      "smallestCapabilityNeeded": "Bind governed denominator vocabulary to canonical volume basis."
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "population definition",
+      "upstreamSource": "governed billedPopulation",
+      "runtimeStage": "merchant permission alternative.populationIdentity",
+      "support": "DERIVABLE_WITHOUT_INVENTION",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "CP/CNP or other channel scope",
+      "upstreamSource": "governed component/offer identity",
+      "runtimeStage": "runtime alternative channel",
+      "support": "DERIVABLE_WITHOUT_INVENTION",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Some components normalize to unknown channel.",
+      "smallestCapabilityNeeded": "Admit or bind an explicit channel scope for the component."
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "card/program scope",
+      "upstreamSource": "governed component identity and billed population",
+      "runtimeStage": "runtime alternative brand scope",
+      "support": "PARTIAL",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Brand family can be derived for admitted authorization components; finer program scope is not generally represented.",
+      "smallestCapabilityNeeded": "Bind exact governed card/program scope."
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "effective period",
+      "upstreamSource": "governed component/composition effective period plus source observation date",
+      "runtimeStage": "runtime source-period gate",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "public policy status",
+      "upstreamSource": "governed public-policy versions and predicates",
+      "runtimeStage": "merchant permission applicability",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "The status is available, but several predicates require merchant facts the normal merchant context does not yet carry.",
+      "smallestCapabilityNeeded": "Bind the specific admitted policy predicate fact from merchant evidence."
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "qualification predicates",
+      "upstreamSource": "governed offer composition",
+      "runtimeStage": "runtime merchant-fact predicate evaluation",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Missing facts correctly produce unresolved qualification.",
+      "smallestCapabilityNeeded": "Obtain the smallest missing admitted predicate fact."
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "approval/review status",
+      "upstreamSource": "governed public policy and merchant-specific evidence",
+      "runtimeStage": "merchant permission applicability",
+      "support": "PARTIAL",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Public restriction/review is available; merchant-specific approval remains unknown unless independently supplied, and the normal statement path does not supply it.",
+      "smallestCapabilityNeeded": "Bind merchant-specific approval evidence when available."
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "completeness/known/known-absent/unknown",
+      "upstreamSource": "governed component completeness",
+      "runtimeStage": "alternative candidate selection and commercial-fact path",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "alternative_commercial",
+      "field": "governed evidence/source identity",
+      "upstreamSource": "source observation and component version refs",
+      "runtimeStage": "internal comparison evidence binding",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "comparison_arbitration",
+      "field": "current-to-alternative component identity",
+      "upstreamSource": "runtime component kind plus governed component identity",
+      "runtimeStage": "runtime candidate selection and permission service gate",
+      "support": "DERIVABLE_WITHOUT_INVENTION",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Implemented only for authorization and gateway transaction/batch families.",
+      "smallestCapabilityNeeded": "Add an explicit component-class bridge for each new class."
+    },
+    {
+      "group": "comparison_arbitration",
+      "field": "population compatibility",
+      "upstreamSource": "current normalized population and alternative billed population",
+      "runtimeStage": "permission revalidation population gate",
+      "support": "DERIVABLE_WITHOUT_INVENTION",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Explicit population subtypes require preservation; unknown or mismatched bases must fail closed.",
+      "smallestCapabilityNeeded": "Carry exact current population subtype through the runtime component."
+    },
+    {
+      "group": "comparison_arbitration",
+      "field": "channel compatibility",
+      "upstreamSource": "current merchant/component channel and governed alternative channel",
+      "runtimeStage": "runtime and permission channel gates",
+      "support": "DERIVABLE_WITHOUT_INVENTION",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "comparison_arbitration",
+      "field": "billing-basis compatibility",
+      "upstreamSource": "current unit and governed alternative unit",
+      "runtimeStage": "permission unitBillingBasis gate",
+      "support": "DERIVABLE_WITHOUT_INVENTION",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Unit equality is available; percentage denominator compatibility is absent.",
+      "smallestCapabilityNeeded": "Add an exact denominator/basis gate."
+    },
+    {
+      "group": "comparison_arbitration",
+      "field": "offer/scope identity",
+      "upstreamSource": "governed composition and component offer identity",
+      "runtimeStage": "permission presentation group",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "comparison_arbitration",
+      "field": "same-scope offsets",
+      "upstreamSource": "governed offer composition sibling components",
+      "runtimeStage": "merchant permission offsetState",
+      "support": "DERIVABLE_WITHOUT_INVENTION",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "The normal path can identify incomplete scope but cannot infer missing offsets.",
+      "smallestCapabilityNeeded": "Admit complete same-scope commercial components or retain incomplete."
+    },
+    {
+      "group": "comparison_arbitration",
+      "field": "direction of matched comparison",
+      "upstreamSource": "exact matched component arithmetic",
+      "runtimeStage": "internal finding and permission decision",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "comparison_arbitration",
+      "field": "evidence strength/claim ceiling",
+      "upstreamSource": "diagnostic comparison strength, finding evidence, and permission gates",
+      "runtimeStage": "internal finding and merchant permission",
+      "support": "PARTIAL",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "The report-set normal call currently falls back to medium/unresolved context instead of a first-class runtime evidence-strength binding.",
+      "smallestCapabilityNeeded": "Bind claim-specific evidence strength into report-set candidate context."
+    },
+    {
+      "group": "comparison_arbitration",
+      "field": "invalidating VERIFY dependency",
+      "upstreamSource": "relationship between an unresolved merchant fact and a specific review",
+      "runtimeStage": "report-set arbitration input",
+      "support": "ABSENT",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "no",
+      "limitation": "The arbitration accepts this relationship, but the normal runtime does not construct it.",
+      "smallestCapabilityNeeded": "Generate an evidence-bound verifyCandidateId to reviewCandidateId dependency."
+    },
+    {
+      "group": "comparison_arbitration",
+      "field": "dispute/risk overlap",
+      "upstreamSource": "canonical dispute/risk findings plus commercial event identity",
+      "runtimeStage": "report-set arbitration existingRisk input",
+      "support": "PARTIAL",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "no",
+      "limitation": "Canonical risk may exist, but the normal path does not bind it to commercial candidate IDs.",
+      "smallestCapabilityNeeded": "Add a same-event evidence link without creating a new dispute model."
+    },
+    {
+      "group": "comparison_arbitration",
+      "field": "consolidation compatibility",
+      "upstreamSource": "component, population, channel, program, offer, and pricing identity",
+      "runtimeStage": "report-set candidate context",
+      "support": "PARTIAL",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "conditional",
+      "limitation": "Upstream facts exist for supported authorization attempts, but normal report construction uses fallback unresolved channel/program fields.",
+      "smallestCapabilityNeeded": "Build report-set candidate contexts from runtime candidates."
+    },
+    {
+      "group": "comparison_arbitration",
+      "field": "report-level named-offer grouping",
+      "upstreamSource": "provider, named offer, distribution, and product scope",
+      "runtimeStage": "permission presentation group and report-set offer coherence",
+      "support": "DERIVABLE_WITHOUT_INVENTION",
+      "deterministic": false,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": null,
+      "smallestCapabilityNeeded": null
+    },
+    {
+      "group": "comparison_arbitration",
+      "field": "merchant-verifiable smallest unlocker",
+      "upstreamSource": "first failed evidence gate or admitted predicate boundary",
+      "runtimeStage": "runtime attempt and merchant-safe blocker",
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": true,
+      "claimSpecific": true,
+      "safeForCommercialComparison": "yes",
+      "limitation": "Generic fallback wording remains when a predicate does not identify its missing fact.",
+      "smallestCapabilityNeeded": "Emit the exact missing governed predicate field when available."
+    }
+  ],
+  "componentClasses": [
+    {
+      "componentClass": "per_authorization",
+      "support": "PARTIAL",
+      "disposition": "runtime_partial",
+      "comparisonStageReached": "Normal Fiserv parsing can establish exact provider-controlled rows, exact counts, channel/brand scope, governed alternatives, and matched-component arithmetic.",
+      "actionReadiness": "Permission and report arbitration run, but normal-path public-policy facts, complete commercial denominator/offset scope, and first-class arbitration context may still block merchant pricing review.",
+      "failClosedReason": "A matched internal component comparison does not by itself authorize REVIEW_CURRENT_PRICING.",
+      "smallestCapabilityNeeded": "Bind claim-specific public-policy facts, complete same-scope economics/offsets, and report-set context from runtime evidence."
+    },
+    {
+      "componentClass": "gateway_transaction",
+      "support": "PARTIAL",
+      "disposition": "runtime_partial",
+      "comparisonStageReached": "The runtime and governed Authorize.net evidence define the exact gateway transaction unit and enforce gateway-only scope.",
+      "actionReadiness": "No generalized current-period supported Fiserv fixture currently establishes the required gateway service identity and population through the normal extractor.",
+      "failClosedReason": "Gateway evidence cannot be treated as acquiring economics or matched without a current gateway component.",
+      "smallestCapabilityNeeded": "A statement-evidenced gateway transaction component with exact event population and service identity."
+    },
+    {
+      "componentClass": "gateway_batch",
+      "support": "PARTIAL",
+      "disposition": "runtime_partial",
+      "comparisonStageReached": "The runtime and governed Authorize.net evidence define a per-batch component and settled-batch population.",
+      "actionReadiness": "Normal statement extraction has not proven an exact current gateway-batch component and cadence/service binding.",
+      "failClosedReason": "Ordinary acquiring batch fees cannot be assumed to be gateway batch fees.",
+      "smallestCapabilityNeeded": "Exact current gateway service and settled-batch population evidence."
+    },
+    {
+      "componentClass": "percentage_bps",
+      "support": "ABSENT",
+      "disposition": "runtime_not_ready",
+      "comparisonStageReached": "Canonical rows may preserve printed rates and amounts, and governed alternatives contain bps components.",
+      "actionReadiness": "No runtime component extraction or exact denominator/basis bridge exists.",
+      "failClosedReason": "Matching percentage values cannot establish a common gross/net/submitted/refund-adjusted population.",
+      "smallestCapabilityNeeded": "An exact claim-specific denominator and volume-population compatibility bridge."
+    },
+    {
+      "componentClass": "fixed_monthly",
+      "support": "ABSENT",
+      "disposition": "runtime_not_ready",
+      "comparisonStageReached": "Canonical fee identity and some recurrence evidence may exist; governed monthly components exist.",
+      "actionReadiness": "Fixed monthly rows are not emitted as runtime current comparison components.",
+      "failClosedReason": "One observed charge does not establish service identity or recurring cadence.",
+      "smallestCapabilityNeeded": "Bind exact service identity, provider control, and monthly cadence from statement evidence."
+    },
+    {
+      "componentClass": "episodic_chargeback",
+      "support": "ABSENT",
+      "disposition": "runtime_not_ready",
+      "comparisonStageReached": "Canonical dispute counts and fee identity may exist separately; governed chargeback components exist.",
+      "actionReadiness": "No normal-path bridge binds the charged fee to the exact chargeback event population.",
+      "failClosedReason": "Statement-level chargebacks, fee lines, reversals, and dispute-risk findings cannot be assumed to concern the same events.",
+      "smallestCapabilityNeeded": "A same-event fee/count identity link using existing canonical evidence."
+    }
+  ],
+  "currentPeriodFixtures": {
+    "privacySafe": true,
+    "fixtureSource": "An existing supported Fiserv parser fixture was cloned in memory, merchant/account/address fields were replaced, and the period was shifted to September 2026 before normal canonical construction.",
+    "cases": [
+      {
+        "caseId": "exact_per_authorization",
+        "support": "PARTIAL",
+        "pass": true,
+        "normalPath": true,
+        "comparisonPerformed": true,
+        "pricingReviewAction": false,
+        "outcome": "Exact current component, amount, unit price, population count, governed alternative, and all three evidence bindings reached a matched internal comparison; permission remained fail closed.",
+        "smallestUnlocker": null
+      },
+      {
+        "caseId": "channel_matched",
+        "support": "DERIVABLE_WITHOUT_INVENTION",
+        "pass": true,
+        "normalPath": true,
+        "comparisonPerformed": true,
+        "pricingReviewAction": false,
+        "outcome": "Card-present context selected card-present alternatives and rejected card-not-present alternatives.",
+        "smallestUnlocker": "A governed alternative component for the merchant's established channel."
+      },
+      {
+        "caseId": "channel_unknown",
+        "support": "PARTIAL",
+        "pass": true,
+        "normalPath": true,
+        "comparisonPerformed": false,
+        "pricingReviewAction": false,
+        "outcome": "Unknown component channel prevented matching and retained the CP/CNP split unlocker.",
+        "smallestUnlocker": "CP versus CNP transaction and volume split for the current component."
+      },
+      {
+        "caseId": "population_mismatch",
+        "support": "PARTIAL",
+        "pass": true,
+        "normalPath": true,
+        "comparisonPerformed": false,
+        "pricingReviewAction": false,
+        "outcome": "An explicitly settled-transaction population was not substituted for an authorization population.",
+        "smallestUnlocker": "A governed alternative component covering the same billing population."
+      },
+      {
+        "caseId": "upper_bound_current_economics",
+        "support": "DIRECTLY_AVAILABLE",
+        "pass": true,
+        "normalPath": true,
+        "comparisonPerformed": true,
+        "pricingReviewAction": false,
+        "outcome": "A statement-evidenced bundled authorization row remained an upper bound through internal comparison and merchant permission; it never became exact and created no pricing-review action.",
+        "smallestUnlocker": null
+      },
+      {
+        "caseId": "percentage_bps_component",
+        "support": "ABSENT",
+        "pass": true,
+        "normalPath": true,
+        "comparisonPerformed": false,
+        "pricingReviewAction": false,
+        "outcome": "Canonical percentage arithmetic exists, but no exact denominator/population bridge reaches commercial comparison.",
+        "smallestUnlocker": "Exact denominator and canonical volume-population compatibility."
+      },
+      {
+        "caseId": "fixed_monthly_component",
+        "support": "ABSENT",
+        "pass": true,
+        "normalPath": true,
+        "comparisonPerformed": false,
+        "pricingReviewAction": false,
+        "outcome": "Monthly-looking canonical rows exist, but exact cadence plus service identity is not emitted as a current comparison component.",
+        "smallestUnlocker": "Exact monthly cadence, service identity, and provider-control binding."
+      },
+      {
+        "caseId": "episodic_chargeback_component",
+        "support": "ABSENT",
+        "pass": true,
+        "normalPath": true,
+        "comparisonPerformed": false,
+        "pricingReviewAction": false,
+        "outcome": "The runtime does not bind a chargeback fee to the exact matching dispute event/count; no new dispute model was inferred.",
+        "smallestUnlocker": "Same-event chargeback fee/count evidence link."
+      },
+      {
+        "caseId": "gateway_versus_acquiring",
+        "support": "PARTIAL",
+        "pass": true,
+        "normalPath": true,
+        "comparisonPerformed": false,
+        "pricingReviewAction": false,
+        "outcome": "Gateway-only alternatives were not matched to acquiring authorization components.",
+        "smallestUnlocker": "A current gateway component with exact service and gateway-event population evidence."
+      },
+      {
+        "caseId": "offer_and_public_policy",
+        "support": "PARTIAL",
+        "pass": true,
+        "normalPath": true,
+        "comparisonPerformed": false,
+        "pricingReviewAction": false,
+        "outcome": "Governed prohibited/unknown policy states survive normal binding; merchant approval remains unknown.",
+        "smallestUnlocker": "The exact admitted policy predicate fact or merchant-specific approval evidence."
+      },
+      {
+        "caseId": "named_offer_coherence_metadata",
+        "support": "DERIVABLE_WITHOUT_INVENTION",
+        "pass": true,
+        "normalPath": true,
+        "comparisonPerformed": false,
+        "pricingReviewAction": false,
+        "outcome": "Provider, named offer, and product scope survive in the presentation-group identity.",
+        "smallestUnlocker": null
+      },
+      {
+        "caseId": "invalidating_verify_dependency",
+        "support": "ABSENT",
+        "pass": true,
+        "normalPath": true,
+        "comparisonPerformed": false,
+        "pricingReviewAction": false,
+        "outcome": "The arbitration can consume an invalidating VERIFY dependency, but normal runtime construction does not create one.",
+        "smallestUnlocker": "Evidence-bound VERIFY-to-REVIEW relationship construction."
+      }
+    ],
+    "observed": {
+      "currentComponents": 5,
+      "exactCurrentComponents": 5,
+      "boundedCurrentComponents": 0,
+      "matchedComparisons": 9,
+      "blockedComparisons": 9,
+      "comparisonsWithThreeEvidenceBindings": 9,
+      "merchantPermissionDecisions": 18,
+      "pricingReviewActions": 0,
+      "reportSetLedgerEntries": 18,
+      "reportSetPlacedItems": 0,
+      "invalidatingVerifyDependenciesConstructedByNormalPath": 0,
+      "disputeRiskLinksConstructedByNormalPath": 0
+    },
+    "result": "12/12 passed"
+  },
+  "answerByComponentClass": {
+    "runtimeReady": [],
+    "runtimePartial": [
+      "per_authorization",
+      "gateway_transaction",
+      "gateway_batch"
+    ],
+    "runtimeNotReady": [
+      "percentage_bps",
+      "fixed_monthly",
+      "episodic_chargeback"
+    ],
+    "answer": "NO_FULL_COMPONENT_CLASS_YET",
+    "plainLanguage": "No component class yet supplies every merchant-action and report-arbitration binding through the normal path. Per-authorization is closest: matched internal arithmetic is real, but public-policy facts, complete same-scope economics/offsets, and first-class arbitration context still gate action. Gateway families remain partial; percentage, fixed-monthly, and episodic chargeback remain fail closed."
+  },
+  "gold": {
+    "statements": [
+      {
+        "file": "Nov_2024_Statement.pdf",
+        "statementPeriod": {
+          "start": "2024-11-01",
+          "end": "2024-11-30"
+        },
+        "canonicalFingerprintBefore": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+        "canonicalFingerprintAfter": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+        "acceptedBaselineFingerprint": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+        "canonicalInvariant": true,
+        "matchedComparisons": 0,
+        "pricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "statementPeriod": {
+          "start": "2024-10-01",
+          "end": "2024-10-31"
+        },
+        "canonicalFingerprintBefore": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
+        "canonicalFingerprintAfter": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
+        "acceptedBaselineFingerprint": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
+        "canonicalInvariant": true,
+        "matchedComparisons": 0,
+        "pricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+        "statementPeriod": {
+          "start": "2024-06-01",
+          "end": "2024-06-30"
+        },
+        "canonicalFingerprintBefore": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+        "canonicalFingerprintAfter": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+        "acceptedBaselineFingerprint": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+        "canonicalInvariant": true,
+        "matchedComparisons": 0,
+        "pricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "statementPeriod": {
+          "start": "2025-08-01",
+          "end": "2025-08-31"
+        },
+        "canonicalFingerprintBefore": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
+        "canonicalFingerprintAfter": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
+        "acceptedBaselineFingerprint": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
+        "canonicalInvariant": true,
+        "matchedComparisons": 0,
+        "pricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "statementPeriod": {
+          "start": "2020-03-01",
+          "end": "2020-03-31"
+        },
+        "canonicalFingerprintBefore": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
+        "canonicalFingerprintAfter": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
+        "acceptedBaselineFingerprint": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
+        "canonicalInvariant": true,
+        "matchedComparisons": 0,
+        "pricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "statementPeriod": {
+          "start": "2022-09-01",
+          "end": "2022-09-30"
+        },
+        "canonicalFingerprintBefore": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
+        "canonicalFingerprintAfter": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
+        "acceptedBaselineFingerprint": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
+        "canonicalInvariant": true,
+        "matchedComparisons": 0,
+        "pricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "statementPeriod": {
+          "start": "2024-02-01",
+          "end": "2024-02-29"
+        },
+        "canonicalFingerprintBefore": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
+        "canonicalFingerprintAfter": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
+        "acceptedBaselineFingerprint": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
+        "canonicalInvariant": true,
+        "matchedComparisons": 0,
+        "pricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "statementPeriod": {
+          "start": "2025-10-01",
+          "end": "2025-10-31"
+        },
+        "canonicalFingerprintBefore": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+        "canonicalFingerprintAfter": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+        "acceptedBaselineFingerprint": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+        "canonicalInvariant": true,
+        "matchedComparisons": 0,
+        "pricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
+        "statementPeriod": {
+          "start": "2025-09-01",
+          "end": "2025-09-30"
+        },
+        "canonicalFingerprintBefore": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
+        "canonicalFingerprintAfter": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
+        "acceptedBaselineFingerprint": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
+        "canonicalInvariant": true,
+        "matchedComparisons": 0,
+        "pricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf",
+        "statementPeriod": {
+          "start": "2024-12-01",
+          "end": "2024-12-31"
+        },
+        "canonicalFingerprintBefore": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
+        "canonicalFingerprintAfter": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
+        "acceptedBaselineFingerprint": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
+        "canonicalInvariant": true,
+        "matchedComparisons": 0,
+        "pricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "statementPeriod": {
+          "start": "2024-09-01",
+          "end": "2024-09-30"
+        },
+        "canonicalFingerprintBefore": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
+        "canonicalFingerprintAfter": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
+        "acceptedBaselineFingerprint": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
+        "canonicalInvariant": true,
+        "matchedComparisons": 0,
+        "pricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "realCustomerRoutingAllowed": false
+      }
+    ],
+    "canonicalFingerprintInvariant": true,
+    "acceptedBaselineEvaluation": "evaluations/commercial-report-set-arbitration-offline-v1/evaluation-2026-09-12.json",
+    "sourceFingerprintBefore": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "sourceFingerprintAfter": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "sourceFingerprintInvariant": true,
+    "historicalCurrentFirewallUnchanged": true
+  },
+  "safetyCounters": {
+    "failedCurrentPeriodControls": 0,
+    "canonicalFingerprintChanges": 0,
+    "commercialSourceFingerprintChanges": 0,
+    "historicalCurrentComparisonLeaks": 0,
+    "historicalPricingReviewActions": 0,
+    "heroChanges": 0,
+    "primaryExperienceChanges": 0,
+    "customerRoutingEnabled": 0,
+    "explicitPopulationMismatchComparisons": 0,
+    "newCommercialKnowledgeAdmissions": 0,
+    "aiOrWebOperations": 0,
+    "savingsAnnualizationGradesOverpaymentSwitchingOrRankings": 0
+  },
+  "knownUnrelatedIssuesNotRepaired": [
+    "Merchant-attention remains at the accepted pre-existing 62/63 result.",
+    "Historical/current remains at the accepted pre-existing 5/6 result.",
+    "Prior legacy public-source/exhaustive SIGSEGV/139 history was not investigated or repaired."
+  ]
+}

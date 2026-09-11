@@ -430,9 +430,17 @@ function evaluateCandidate(
   merchantFacts: RuntimeCommercialMerchantFactsV1,
 ): RuntimeCommercialComparisonAttemptV1 {
   const channel = channelGate(current.channel, alternative.channel);
-  const population = current.componentKind !== "authorization_fee" || brandCompatible(current.cardBrandScope, alternative.cardBrandScope)
-    ? "matched"
-    : "mismatch";
+  const currentPopulation = runtimeCurrentPopulationIdentity(current);
+  const alternativePopulation = runtimeAlternativePopulationIdentity(alternative.component);
+  const brandPopulationCompatible = current.componentKind !== "authorization_fee"
+    || brandCompatible(current.cardBrandScope, alternative.cardBrandScope);
+  const population = !brandPopulationCompatible
+    ? "mismatch"
+    : currentPopulation === null || alternativePopulation === null
+      ? "unknown"
+      : currentPopulation === alternativePopulation
+        ? "matched"
+        : "mismatch";
   const qualification = evaluateCommercialOfferQualificationV1(alternative.composition, merchantFacts.facts);
   const eligibility = qualificationGate(alternative.composition, qualification.state);
   const period = sourcePeriodGate(statement.statementPeriod, alternative);
@@ -445,7 +453,8 @@ function evaluateCandidate(
     period.state === "mismatch" ? { reason: period.reason, unlocker: "Period-applicable governed commercial evidence for the statement period." } : null,
     channel === "mismatch" ? { reason: "The current merchant activity channel does not match the governed alternative component channel.", unlocker: "A governed alternative component for the merchant's established channel." } : null,
     channel === "unknown" ? { reason: "The current component cannot be assigned to a compatible card-present or card-not-present population.", unlocker: "CP versus CNP transaction and volume split for the current component." } : null,
-    population === "mismatch" ? { reason: "The current card-brand population does not match the governed alternative component population.", unlocker: "A governed alternative component covering the same card-brand population." } : null,
+    population === "mismatch" ? { reason: "The current billing population does not match the governed alternative component population.", unlocker: "A governed alternative component covering the same billing population." } : null,
+    population === "unknown" ? { reason: "The current and alternative billing populations cannot be shown to be the same.", unlocker: "Exact current and alternative billing-population identity." } : null,
     eligibility === "mismatch" ? { reason: "The governed offer is not applicable under the established qualification or risk facts.", unlocker: "A different admitted offer whose qualification rules are satisfied." } : null,
     eligibility === "unknown" ? { reason: qualification.reasons.join(" ") || "Offer qualification remains unresolved.", unlocker: qualificationUnlocker(alternative.composition, merchantFacts) } : null,
     applicabilityGate === "mismatch" ? { reason: "The component's admitted applicability predicate is not satisfied.", unlocker: "A component whose admitted applicability predicate matches the merchant activity." } : null,
@@ -644,7 +653,7 @@ function runtimeDiagnostic(input: {
   current: RuntimeCurrentCommercialComponentV1;
   comparisonStrength: AcceptedComparatorDiagnosticV1["comparisonStrength"];
   channelGate: "matched" | "mismatch" | "unknown";
-  populationGate: "matched" | "mismatch";
+  populationGate: "matched" | "mismatch" | "unknown";
   eligibilityGate: "matched" | "mismatch" | "unknown" | "not_required";
   applicabilityGate: "matched" | "mismatch" | "unknown";
   sourcePeriodGate: "matched" | "mismatch";
@@ -876,6 +885,28 @@ function channelGate(current: RuntimeActivityChannelV1, alternative: RuntimeActi
 function brandCompatible(current: RuntimeCardBrandScopeV1, alternative: RuntimeCardBrandScopeV1): boolean {
   if (alternative === "all_card_brands") return current !== "unknown";
   return current === alternative;
+}
+
+function runtimeCurrentPopulationIdentity(current: RuntimeCurrentCommercialComponentV1): string | null {
+  const text = `${current.printedLabel} ${current.populationLabel}`.toLowerCase().replaceAll("-", "_");
+  if (/settled.*(?:sale|transaction)|(?:sale|transaction).*settled/.test(text)) return "settled_transactions";
+  if (/attempt(?:ed|s)?.*auth|auth.*attempt/.test(text)) return "authorization_attempts";
+  if (/approved.*auth|auth.*approved/.test(text)) return "approved_authorizations";
+  if (current.unit === "per_gateway_transaction") return "gateway_transactions";
+  if (current.unit === "per_batch") return "settled_batches";
+  if (/authorization|\bauth\b|\bwats\b/.test(text) || current.unit === "per_authorization") return "authorizations";
+  return null;
+}
+
+function runtimeAlternativePopulationIdentity(component: CommercialPriceComponentVersionV1): string | null {
+  const text = component.billedPopulation.toLowerCase().replaceAll("-", "_");
+  if (/settled.*(?:sale|transaction)|(?:sale|transaction).*settled/.test(text)) return "settled_transactions";
+  if (/attempt(?:ed|s)?.*auth|auth.*attempt/.test(text)) return "authorization_attempts";
+  if (/approved.*auth|auth.*approved/.test(text)) return "approved_authorizations";
+  if (component.unit === "per_gateway_transaction") return "gateway_transactions";
+  if (component.unit === "per_batch") return "settled_batches";
+  if (/authorization|\bauth\b/.test(text) || component.unit === "per_authorization") return "authorizations";
+  return null;
 }
 
 function qualificationGate(
