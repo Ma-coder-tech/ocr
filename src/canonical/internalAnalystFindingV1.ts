@@ -54,6 +54,11 @@ import {
   buildMerchantCommercialFindingShadowProjectionFromRuntimeV1,
   type MerchantCommercialFindingShadowProjectionV1,
 } from "./merchantCommercialFindingPermissionProjectionV1.js";
+import { buildProductionReportProjection } from "./productionReportProjection.js";
+import {
+  buildCommercialReportSetOfflineIntegrationV1,
+  type CommercialReportSetOfflineIntegrationV1,
+} from "./commercialReportSetArbitrationOfflineV1.js";
 
 export const INTERNAL_ANALYST_FINDING_V1_SCHEMA_VERSION = "internal_analyst_finding_v1" as const;
 
@@ -280,6 +285,7 @@ export type InternalAnalystFindingReportV1 = {
   findings: InternalAnalystFinding[];
   commercialComparisonAttachment: RuntimeCommercialComparisonAttachmentV1;
   merchantCommercialFindingShadowProjection: MerchantCommercialFindingShadowProjectionV1;
+  commercialReportSetOfflineIntegration: CommercialReportSetOfflineIntegrationV1;
   researchQueue: InternalAnalystResearchQueueV1;
   coverage: {
     materialFeeRows: number;
@@ -381,6 +387,10 @@ export function buildInternalAnalystFindingV1(input: {
     attachment: commercialComparisonAttachment,
     decomposition: buildCommercialDecompositionContractV1({ analysis: input.analysis, knowledge }),
   });
+  const commercialReportSetOfflineIntegration = buildCommercialReportSetOfflineIntegrationV1({
+    productionProjection: buildProductionReportProjection(input.analysis),
+    commercialShadowProjection: merchantCommercialFindingShadowProjection,
+  });
   const researchQueue = buildInternalAnalystResearchQueue(input.analysis, findings);
   const after = canonicalFinancialTruthFingerprint(input.analysis);
   if (before !== after) throw new Error("internal_analyst_finding_mutated_canonical_financial_truth");
@@ -426,6 +436,7 @@ export function buildInternalAnalystFindingV1(input: {
     findings,
     commercialComparisonAttachment,
     merchantCommercialFindingShadowProjection,
+    commercialReportSetOfflineIntegration,
     researchQueue,
     coverage: coverage(findings, contributions, researchQueue, knowledge.datedNetworkFeeEvidence.statementNotices.length),
     limitations: [
@@ -450,6 +461,7 @@ export function buildInternalAnalystFindingV1(input: {
       "Research is escalated only for material determinant gaps, conflicts, or applicable dated-value questions; determinant sufficiency is an explicit stopping condition.",
       "Runtime commercial comparison is internal-only and requires independent current-component, governed-alternative, and matched-population evidence; refusals do not imply no savings.",
       "Merchant commercial finding projection is shadow/offline only; its independent validity, visibility, and action permissions are not routed to the real customer report.",
+      "Commercial report-set arbitration is shadow/offline only; it preserves the production hero and experience while producing an un-routed integrated candidate and internal disposition ledger.",
     ],
   };
   return deepFreeze(report);

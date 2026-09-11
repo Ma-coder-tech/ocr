@@ -1,0 +1,460 @@
+{
+  "schemaVersion": "commercial_report_set_arbitration_offline_evaluation_2026_09_12_v1",
+  "generatedAt": "2026-09-12T00:00:00.000Z",
+  "productAuthority": {
+    "document": "RateReveal Commercial Finding Report Integration & Attention Hierarchy v0.2 — Product-Adjudicated",
+    "sha256": "54d59e52654ad5b76c6d63593a21fbc214c5d5813b35ad702510810f728777bc"
+  },
+  "baseline": {
+    "branch": "codex/merchant-commercial-finding-permission-projection-v1",
+    "commit": "69504228a17ff846e87983a0e166b9da6e0bdd8a",
+    "parent": "009d1db5c119eca4fd9feace49066f73140a3792"
+  },
+  "implementationBranch": "codex/commercial-report-set-arbitration-offline-integration-v1",
+  "architecture": {
+    "immutableInputs": [
+      "production report projection",
+      "merchant-safe commercial shadow decisions"
+    ],
+    "output": [
+      "cloned offline integrated report candidate",
+      "internal per-candidate selection/disposition ledger"
+    ],
+    "productionRoutingChanged": false,
+    "heroOrPrimaryStateResolverChanged": false,
+    "explicitRelations": [
+      "VERIFY-to-REVIEW dependencies",
+      "financial-integrity presence",
+      "same-event dispute risk",
+      "conditional-charge evidence",
+      "consolidation scope/evidence context"
+    ],
+    "ordering": [
+      "Product priority classification",
+      "dependency hold",
+      "higher-risk suppression",
+      "exact-scope consolidation",
+      "VERIFY cap",
+      "one-offer coherence",
+      "post-selection directional fairness",
+      "cumulative-claim validation",
+      "offline placement"
+    ]
+  },
+  "productPriorityMapping": {
+    "priority1": "financial integrity, including failed reconciliation",
+    "priority2": "material risk or VERIFY that invalidates/materially changes a strong action or unlocks a material conclusion",
+    "priority3": "eligible REVIEW_CURRENT_PRICING",
+    "priority4": "normal commercial VERIFY",
+    "priority5": "supporting EXPLAIN"
+  },
+  "syntheticControls": {
+    "focusedCases": 17,
+    "assertions": [
+      "Priority-1 suppression",
+      "semantic Product-priority mapping independent of the legacy three-level label",
+      "invalidating and nonblocking VERIFY dependencies",
+      "commercial-only VERIFY without experience change",
+      "unable-to-complete suppression",
+      "difference and scope adjacency",
+      "EXPLAIN without CTA",
+      "conditional charge promotion",
+      "dispute-risk demotion",
+      "three-item VERIFY ceiling",
+      "card-program and alternative-price consolidation boundary",
+      "weakest-strength projection",
+      "unknown consolidation scope fails closed",
+      "post-selection directional fairness",
+      "single named-offer anchor",
+      "order determinism",
+      "neutral limitation and cumulative fail-closed behavior"
+    ],
+    "result": "17/17 passed"
+  },
+  "gold": {
+    "statements": [
+      {
+        "file": "Nov_2024_Statement.pdf",
+        "statementPeriod": {
+          "start": "2024-11-01",
+          "end": "2024-11-30"
+        },
+        "experience": "unable_to_complete",
+        "canonicalFingerprintBefore": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+        "canonicalFingerprintAfter": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+        "canonicalInvariant": true,
+        "internalCommercialDecisions": 18,
+        "dispositions": {
+          "withheld_in_unable_experience": 18
+        },
+        "placed": {
+          "pricingReview": 0,
+          "verify": 0,
+          "explain": 0,
+          "toolkit": 0,
+          "reportLimitation": false
+        },
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "cumulativeClaimSafe": true,
+          "directionalFairnessSafe": true,
+          "namedOfferCoherent": true,
+          "customerCopySafe": true
+        },
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "statementPeriod": {
+          "start": "2024-10-01",
+          "end": "2024-10-31"
+        },
+        "experience": "unable_to_complete",
+        "canonicalFingerprintBefore": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
+        "canonicalFingerprintAfter": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
+        "canonicalInvariant": true,
+        "internalCommercialDecisions": 18,
+        "dispositions": {
+          "withheld_in_unable_experience": 18
+        },
+        "placed": {
+          "pricingReview": 0,
+          "verify": 0,
+          "explain": 0,
+          "toolkit": 0,
+          "reportLimitation": false
+        },
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "cumulativeClaimSafe": true,
+          "directionalFairnessSafe": true,
+          "namedOfferCoherent": true,
+          "customerCopySafe": true
+        },
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+        "statementPeriod": {
+          "start": "2024-06-01",
+          "end": "2024-06-30"
+        },
+        "experience": "unable_to_complete",
+        "canonicalFingerprintBefore": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+        "canonicalFingerprintAfter": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+        "canonicalInvariant": true,
+        "internalCommercialDecisions": 0,
+        "dispositions": {},
+        "placed": {
+          "pricingReview": 0,
+          "verify": 0,
+          "explain": 0,
+          "toolkit": 0,
+          "reportLimitation": false
+        },
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "cumulativeClaimSafe": true,
+          "directionalFairnessSafe": true,
+          "namedOfferCoherent": true,
+          "customerCopySafe": true
+        },
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "statementPeriod": {
+          "start": "2025-08-01",
+          "end": "2025-08-31"
+        },
+        "experience": "unable_to_complete",
+        "canonicalFingerprintBefore": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
+        "canonicalFingerprintAfter": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
+        "canonicalInvariant": true,
+        "internalCommercialDecisions": 0,
+        "dispositions": {},
+        "placed": {
+          "pricingReview": 0,
+          "verify": 0,
+          "explain": 0,
+          "toolkit": 0,
+          "reportLimitation": false
+        },
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "cumulativeClaimSafe": true,
+          "directionalFairnessSafe": true,
+          "namedOfferCoherent": true,
+          "customerCopySafe": true
+        },
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "statementPeriod": {
+          "start": "2020-03-01",
+          "end": "2020-03-31"
+        },
+        "experience": "unable_to_complete",
+        "canonicalFingerprintBefore": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
+        "canonicalFingerprintAfter": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
+        "canonicalInvariant": true,
+        "internalCommercialDecisions": 0,
+        "dispositions": {},
+        "placed": {
+          "pricingReview": 0,
+          "verify": 0,
+          "explain": 0,
+          "toolkit": 0,
+          "reportLimitation": false
+        },
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "cumulativeClaimSafe": true,
+          "directionalFairnessSafe": true,
+          "namedOfferCoherent": true,
+          "customerCopySafe": true
+        },
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "statementPeriod": {
+          "start": "2022-09-01",
+          "end": "2022-09-30"
+        },
+        "experience": "unable_to_complete",
+        "canonicalFingerprintBefore": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
+        "canonicalFingerprintAfter": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
+        "canonicalInvariant": true,
+        "internalCommercialDecisions": 0,
+        "dispositions": {},
+        "placed": {
+          "pricingReview": 0,
+          "verify": 0,
+          "explain": 0,
+          "toolkit": 0,
+          "reportLimitation": false
+        },
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "cumulativeClaimSafe": true,
+          "directionalFairnessSafe": true,
+          "namedOfferCoherent": true,
+          "customerCopySafe": true
+        },
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "statementPeriod": {
+          "start": "2024-02-01",
+          "end": "2024-02-29"
+        },
+        "experience": "unable_to_complete",
+        "canonicalFingerprintBefore": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
+        "canonicalFingerprintAfter": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
+        "canonicalInvariant": true,
+        "internalCommercialDecisions": 0,
+        "dispositions": {},
+        "placed": {
+          "pricingReview": 0,
+          "verify": 0,
+          "explain": 0,
+          "toolkit": 0,
+          "reportLimitation": false
+        },
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "cumulativeClaimSafe": true,
+          "directionalFairnessSafe": true,
+          "namedOfferCoherent": true,
+          "customerCopySafe": true
+        },
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "statementPeriod": {
+          "start": "2025-10-01",
+          "end": "2025-10-31"
+        },
+        "experience": "unable_to_complete",
+        "canonicalFingerprintBefore": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+        "canonicalFingerprintAfter": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+        "canonicalInvariant": true,
+        "internalCommercialDecisions": 0,
+        "dispositions": {},
+        "placed": {
+          "pricingReview": 0,
+          "verify": 0,
+          "explain": 0,
+          "toolkit": 0,
+          "reportLimitation": false
+        },
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "cumulativeClaimSafe": true,
+          "directionalFairnessSafe": true,
+          "namedOfferCoherent": true,
+          "customerCopySafe": true
+        },
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
+        "statementPeriod": {
+          "start": "2025-09-01",
+          "end": "2025-09-30"
+        },
+        "experience": "unable_to_complete",
+        "canonicalFingerprintBefore": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
+        "canonicalFingerprintAfter": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
+        "canonicalInvariant": true,
+        "internalCommercialDecisions": 0,
+        "dispositions": {},
+        "placed": {
+          "pricingReview": 0,
+          "verify": 0,
+          "explain": 0,
+          "toolkit": 0,
+          "reportLimitation": false
+        },
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "cumulativeClaimSafe": true,
+          "directionalFairnessSafe": true,
+          "namedOfferCoherent": true,
+          "customerCopySafe": true
+        },
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf",
+        "statementPeriod": {
+          "start": "2024-12-01",
+          "end": "2024-12-31"
+        },
+        "experience": "unable_to_complete",
+        "canonicalFingerprintBefore": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
+        "canonicalFingerprintAfter": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
+        "canonicalInvariant": true,
+        "internalCommercialDecisions": 0,
+        "dispositions": {},
+        "placed": {
+          "pricingReview": 0,
+          "verify": 0,
+          "explain": 0,
+          "toolkit": 0,
+          "reportLimitation": false
+        },
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "cumulativeClaimSafe": true,
+          "directionalFairnessSafe": true,
+          "namedOfferCoherent": true,
+          "customerCopySafe": true
+        },
+        "realCustomerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "statementPeriod": {
+          "start": "2024-09-01",
+          "end": "2024-09-30"
+        },
+        "experience": "unable_to_complete",
+        "canonicalFingerprintBefore": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
+        "canonicalFingerprintAfter": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
+        "canonicalInvariant": true,
+        "internalCommercialDecisions": 18,
+        "dispositions": {
+          "withheld_in_unable_experience": 18
+        },
+        "placed": {
+          "pricingReview": 0,
+          "verify": 0,
+          "explain": 0,
+          "toolkit": 0,
+          "reportLimitation": false
+        },
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "cumulativeClaimSafe": true,
+          "directionalFairnessSafe": true,
+          "namedOfferCoherent": true,
+          "customerCopySafe": true
+        },
+        "realCustomerRoutingAllowed": false
+      }
+    ],
+    "totals": {
+      "statements": 11,
+      "internalCommercialDecisions": 54,
+      "pricingReview": 0,
+      "verify": 0,
+      "explain": 0,
+      "toolkit": 0,
+      "reportLimitations": 0
+    },
+    "canonicalFingerprintInvariant": true,
+    "sourceFingerprintBefore": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "sourceFingerprintAfter": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "sourceFingerprintInvariant": true,
+    "historicalCurrentFirewall": "unchanged; no historical statement acquired a current-offer pricing review"
+  },
+  "safetyCounters": {
+    "canonicalFingerprintChanges": 0,
+    "commercialSourceFingerprintChanges": 0,
+    "heroChanges": 0,
+    "primaryExperienceChanges": 0,
+    "invalidFinalSets": 0,
+    "realCustomerRoutingEnabled": 0,
+    "historicalCurrentComparisonLeaks": 0,
+    "gradesMarketVerdictsSavingsAnnualizationSwitchingOrRankingOutputs": 0,
+    "webOrAiOperations": 0,
+    "newCommercialKnowledgeAdmissions": 0
+  },
+  "verification": {
+    "focusedArbitration": "17/17 passed",
+    "goldSchemaAndV2Safety": "41/41 passed across 7 Gold suites",
+    "relevantProductionCommercialGovernanceAndAnalyst": "137/137 passed across 9 suites",
+    "build": "passed",
+    "adjacentMerchantAttentionKnownFailure": "not included in the passing relevant-suite group; checked separately and remains the accepted pre-existing 62/63 result",
+    "historicalCurrentKnownRegression": "preserved; accepted pre-existing 5/6 result was not repaired",
+    "legacyExhaustiveSigsegvHistory": "not rerun or investigated"
+  }
+}
