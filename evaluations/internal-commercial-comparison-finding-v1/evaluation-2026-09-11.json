@@ -25,12 +25,19 @@
   "counts": {
     "diagnosticFindings": 38,
     "demonstrations": 5,
-    "statuses": {
-      "VALID_EXACT_COMPONENT_COMPARISON": 6,
-      "VALID_CONDITIONAL_COMPONENT_COMPARISON": 13,
-      "VALID_BOUNDED_COMPONENT_COMPARISON": 3,
-      "COMPARISON_UNAVAILABLE": 16
+    "diagnosticFindingKinds": {
+      "MATCHED_CURRENT_VS_ALTERNATIVE_COMPONENT_COMPARISON": 2,
+      "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE": 12,
+      "COMMERCIAL_FACT_IDENTITY_EVIDENCE": 8,
+      "COMPARISON_UNAVAILABLE_BLOCKER": 16
     },
+    "demonstrationFindingKinds": {
+      "MATCHED_CURRENT_VS_ALTERNATIVE_COMPONENT_COMPARISON": 4,
+      "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE": 0,
+      "COMMERCIAL_FACT_IDENTITY_EVIDENCE": 0,
+      "COMPARISON_UNAVAILABLE_BLOCKER": 1
+    },
+    "reviewCurrentPricingSignalsInDiagnostics": 0,
     "reviewCurrentPricingSignalsInDemonstrations": 2
   },
   "demonstrations": {
@@ -41,9 +48,23 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "X-01",
+      "findingKind": "MATCHED_CURRENT_VS_ALTERNATIVE_COMPONENT_COMPARISON",
+      "comparisonPerformed": true,
       "status": "VALID_EXACT_COMPONENT_COMPARISON",
       "currentProvider": "Wells Fargo/Fiserv family",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": "authorization pricing component",
+      "comparisonEvidenceBinding": {
+        "currentComponentEvidenceRefs": [
+          "statement_component:X-01"
+        ],
+        "alternativeComponentEvidenceRefs": [
+          "governed_alternative_component:X-01"
+        ],
+        "matchedPopulationEvidenceRefs": [
+          "matched_population:X-01"
+        ]
+      },
       "alternative": {
         "provider": "product_matrix_synthetic_control",
         "offer": "claim-specific comparison control",
@@ -93,7 +114,9 @@
         "smallestUnlocker": "Missing total-cost layers only if a complete comparison is requested."
       },
       "evidenceRefs": [
-        "statement_component:X-01"
+        "statement_component:X-01",
+        "governed_alternative_component:X-01",
+        "matched_population:X-01"
       ],
       "limitations": [
         "Conclusion strength is capped at exact_component."
@@ -128,9 +151,23 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "D-01",
+      "findingKind": "MATCHED_CURRENT_VS_ALTERNATIVE_COMPONENT_COMPARISON",
+      "comparisonPerformed": true,
       "status": "VALID_CONDITIONAL_COMPONENT_COMPARISON",
       "currentProvider": "Wells Fargo/Fiserv family",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": "authorization pricing component",
+      "comparisonEvidenceBinding": {
+        "currentComponentEvidenceRefs": [
+          "statement_component:D-01"
+        ],
+        "alternativeComponentEvidenceRefs": [
+          "governed_alternative_component:D-01"
+        ],
+        "matchedPopulationEvidenceRefs": [
+          "matched_population:D-01"
+        ]
+      },
       "alternative": {
         "provider": "dharma_merchant_services",
         "offer": "Standard Retail / Storefront",
@@ -183,7 +220,9 @@
         "obs_dharma_d1_retail_v1",
         "component_dharma_retail_monthly_v1",
         "component_dharma_retail_vmd_margin_v1",
-        "component_dharma_retail_vmd_auth_v1"
+        "component_dharma_retail_vmd_auth_v1",
+        "governed_alternative_component:D-01",
+        "matched_population:D-01"
       ],
       "limitations": [
         "Conclusion strength is capped at conditional_scenario.",
@@ -219,9 +258,23 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "X-02",
+      "findingKind": "MATCHED_CURRENT_VS_ALTERNATIVE_COMPONENT_COMPARISON",
+      "comparisonPerformed": true,
       "status": "VALID_BOUNDED_COMPONENT_COMPARISON",
       "currentProvider": "Wells Fargo/Fiserv family",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": "authorization pricing component",
+      "comparisonEvidenceBinding": {
+        "currentComponentEvidenceRefs": [
+          "statement_component:X-02"
+        ],
+        "alternativeComponentEvidenceRefs": [
+          "governed_alternative_component:X-02"
+        ],
+        "matchedPopulationEvidenceRefs": [
+          "matched_population:X-02"
+        ]
+      },
       "alternative": {
         "provider": "product_matrix_synthetic_control",
         "offer": "claim-specific comparison control",
@@ -271,7 +324,9 @@
         "smallestUnlocker": "Exact current provider-controlled dollars."
       },
       "evidenceRefs": [
-        "statement_component:X-02"
+        "statement_component:X-02",
+        "governed_alternative_component:X-02",
+        "matched_population:X-02"
       ],
       "limitations": [
         "Conclusion strength is capped at bounded_component.",
@@ -307,9 +362,23 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "X-03",
+      "findingKind": "MATCHED_CURRENT_VS_ALTERNATIVE_COMPONENT_COMPARISON",
+      "comparisonPerformed": true,
       "status": "VALID_BOUNDED_COMPONENT_COMPARISON",
       "currentProvider": "Wells Fargo/Fiserv family",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": "authorization pricing component",
+      "comparisonEvidenceBinding": {
+        "currentComponentEvidenceRefs": [
+          "statement_component:X-03"
+        ],
+        "alternativeComponentEvidenceRefs": [
+          "governed_alternative_component:X-03"
+        ],
+        "matchedPopulationEvidenceRefs": [
+          "matched_population:X-03"
+        ]
+      },
       "alternative": {
         "provider": "product_matrix_synthetic_control",
         "offer": "claim-specific comparison control",
@@ -359,7 +428,9 @@
         "smallestUnlocker": "Complete matched economics for a full-provider conclusion."
       },
       "evidenceRefs": [
-        "statement_component:X-03"
+        "statement_component:X-03",
+        "governed_alternative_component:X-03",
+        "matched_population:X-03"
       ],
       "limitations": [
         "Conclusion strength is capped at bounded_component.",
@@ -395,9 +466,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "H-04",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "Wells Fargo/Fiserv family",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "helcim",
         "offer": "Helcim U.S. direct public processing",
@@ -488,9 +563,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "AN-01",
-      "status": "VALID_EXACT_COMPONENT_COMPARISON",
+      "findingKind": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "authorize_net",
         "offer": "Gateway only",
@@ -545,7 +624,8 @@
         "commercial_component_authorize_net_gateway_batch_v1"
       ],
       "limitations": [
-        "Conclusion strength is capped at exact_component."
+        "Conclusion strength is capped at exact_component.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed."
       ],
       "action": {
         "signal": "NONE",
@@ -577,9 +657,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "AN-02",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "authorize_net",
         "offer": "Gateway only",
@@ -667,9 +751,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "AN-03",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "authorize_net",
         "offer": "Account Updater",
@@ -756,9 +844,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "AN-04",
-      "status": "VALID_EXACT_COMPONENT_COMPARISON",
+      "findingKind": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "authorize_net",
         "offer": "Gateway only",
@@ -812,7 +904,8 @@
         "commercial_component_authorize_net_gateway_discount_rate_v1"
       ],
       "limitations": [
-        "Conclusion strength is capped at exact_component."
+        "Conclusion strength is capped at exact_component.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed."
       ],
       "action": {
         "signal": "NONE",
@@ -844,9 +937,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "H-01",
-      "status": "VALID_CONDITIONAL_COMPONENT_COMPARISON",
+      "findingKind": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "helcim",
         "offer": "Helcim U.S. direct public processing",
@@ -902,6 +999,7 @@
       ],
       "limitations": [
         "Conclusion strength is capped at conditional_scenario.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed.",
         "Public relevance is not merchant approval."
       ],
       "action": {
@@ -934,9 +1032,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "H-02",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "helcim",
         "offer": "Helcim U.S. direct public processing",
@@ -1022,9 +1124,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "H-03",
-      "status": "VALID_CONDITIONAL_COMPONENT_COMPARISON",
+      "findingKind": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "helcim",
         "offer": "Helcim U.S. direct public processing",
@@ -1082,6 +1188,7 @@
       ],
       "limitations": [
         "Conclusion strength is capped at conditional_scenario.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed.",
         "Public relevance is not merchant approval."
       ],
       "action": {
@@ -1114,9 +1221,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "H-04",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "helcim",
         "offer": "Helcim U.S. direct public processing",
@@ -1204,9 +1315,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "H-05",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "helcim",
         "offer": "Helcim U.S. direct public processing",
@@ -1292,9 +1407,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "H-06",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "helcim",
         "offer": "Helcim U.S. direct public processing",
@@ -1379,9 +1498,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "H-07",
-      "status": "VALID_CONDITIONAL_COMPONENT_COMPARISON",
+      "findingKind": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "helcim",
         "offer": "Helcim U.S. direct public processing",
@@ -1436,6 +1559,7 @@
       ],
       "limitations": [
         "Conclusion strength is capped at conditional_scenario.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed.",
         "Public relevance is not merchant approval."
       ],
       "action": {
@@ -1468,9 +1592,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "H-08",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "helcim",
         "offer": "Helcim U.S. direct public processing",
@@ -1555,9 +1683,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "H-09",
-      "status": "VALID_CONDITIONAL_COMPONENT_COMPARISON",
+      "findingKind": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "helcim",
         "offer": "Helcim U.S. direct public processing",
@@ -1611,6 +1743,7 @@
       ],
       "limitations": [
         "Conclusion strength is capped at conditional_scenario.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed.",
         "Public relevance is not merchant approval."
       ],
       "action": {
@@ -1643,9 +1776,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "H-10",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "helcim",
         "offer": "Helcim U.S. direct public processing",
@@ -1732,9 +1869,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "H-11",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "helcim",
         "offer": "Helcim U.S. direct public processing",
@@ -1821,9 +1962,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "D-01",
-      "status": "VALID_CONDITIONAL_COMPONENT_COMPARISON",
+      "findingKind": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "dharma_merchant_services",
         "offer": "Standard Retail / Storefront",
@@ -1879,6 +2024,7 @@
       ],
       "limitations": [
         "Conclusion strength is capped at conditional_scenario.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed.",
         "Public relevance is not merchant approval."
       ],
       "action": {
@@ -1911,9 +2057,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "D-02",
-      "status": "VALID_CONDITIONAL_COMPONENT_COMPARISON",
+      "findingKind": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "dharma_merchant_services",
         "offer": "Standard Virtual / Online",
@@ -1969,6 +2119,7 @@
       ],
       "limitations": [
         "Conclusion strength is capped at conditional_scenario.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed.",
         "Public relevance is not merchant approval."
       ],
       "action": {
@@ -2001,9 +2152,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "D-03",
-      "status": "VALID_CONDITIONAL_COMPONENT_COMPARISON",
+      "findingKind": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "dharma_merchant_services",
         "offer": "High Volume",
@@ -2057,6 +2212,7 @@
       ],
       "limitations": [
         "Conclusion strength is capped at conditional_scenario.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed.",
         "Public relevance is not merchant approval."
       ],
       "action": {
@@ -2089,9 +2245,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "D-04",
-      "status": "VALID_CONDITIONAL_COMPONENT_COMPARISON",
+      "findingKind": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "dharma_merchant_services",
         "offer": "High Volume",
@@ -2145,6 +2305,7 @@
       ],
       "limitations": [
         "Conclusion strength is capped at conditional_scenario.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed.",
         "Public relevance is not merchant approval."
       ],
       "action": {
@@ -2177,9 +2338,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "D-05",
-      "status": "VALID_CONDITIONAL_COMPONENT_COMPARISON",
+      "findingKind": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "dharma_merchant_services",
         "offer": "High Volume",
@@ -2233,6 +2398,7 @@
       ],
       "limitations": [
         "Conclusion strength is capped at conditional_scenario.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed.",
         "Public relevance is not merchant approval."
       ],
       "action": {
@@ -2265,9 +2431,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "D-06",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "dharma_merchant_services",
         "offer": "High Volume",
@@ -2353,9 +2523,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "D-07",
-      "status": "VALID_CONDITIONAL_COMPONENT_COMPARISON",
+      "findingKind": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "dharma_merchant_services",
         "offer": "High Volume",
@@ -2409,6 +2583,7 @@
       ],
       "limitations": [
         "Conclusion strength is capped at conditional_scenario.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed.",
         "Public relevance is not merchant approval."
       ],
       "action": {
@@ -2441,9 +2616,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "D-08",
-      "status": "VALID_CONDITIONAL_COMPONENT_COMPARISON",
+      "findingKind": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "dharma_merchant_services",
         "offer": "High Volume",
@@ -2497,6 +2676,7 @@
       ],
       "limitations": [
         "Conclusion strength is capped at conditional_scenario.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed.",
         "Public relevance is not merchant approval."
       ],
       "action": {
@@ -2529,9 +2709,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "D-09",
-      "status": "VALID_BOUNDED_COMPONENT_COMPARISON",
+      "findingKind": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "dharma_merchant_services",
         "offer": "Standard Retail / Storefront",
@@ -2587,6 +2771,7 @@
       ],
       "limitations": [
         "Conclusion strength is capped at bounded_component.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed.",
         "A bound is not an exact current amount."
       ],
       "action": {
@@ -2619,9 +2804,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "D-10",
-      "status": "VALID_EXACT_COMPONENT_COMPARISON",
+      "findingKind": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "dharma_merchant_services",
         "offer": "Standard Retail / Storefront",
@@ -2674,7 +2863,8 @@
         "component_dharma_retail_closure_v1"
       ],
       "limitations": [
-        "Conclusion strength is capped at exact_component."
+        "Conclusion strength is capped at exact_component.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed."
       ],
       "action": {
         "signal": "NONE",
@@ -2706,9 +2896,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "D-11",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "dharma_merchant_services",
         "offer": "Standard Retail / Storefront",
@@ -2797,9 +2991,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "D-12",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "dharma_merchant_services",
         "offer": "Standard Retail / Storefront",
@@ -2885,9 +3083,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "D-13",
-      "status": "VALID_CONDITIONAL_COMPONENT_COMPARISON",
+      "findingKind": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "dharma_merchant_services",
         "offer": "Direct or Teghkhuman referral—identity must be established",
@@ -2943,6 +3145,7 @@
       ],
       "limitations": [
         "Conclusion strength is capped at conditional_scenario.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed.",
         "Public relevance is not merchant approval."
       ],
       "action": {
@@ -2975,9 +3178,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "X-01",
-      "status": "VALID_EXACT_COMPONENT_COMPARISON",
+      "findingKind": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "product_matrix_synthetic_control",
         "offer": "claim-specific comparison control",
@@ -3028,7 +3235,8 @@
       },
       "evidenceRefs": [],
       "limitations": [
-        "Conclusion strength is capped at exact_component."
+        "Conclusion strength is capped at exact_component.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed."
       ],
       "action": {
         "signal": "NONE",
@@ -3060,9 +3268,23 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "X-02",
+      "findingKind": "MATCHED_CURRENT_VS_ALTERNATIVE_COMPONENT_COMPARISON",
+      "comparisonPerformed": true,
       "status": "VALID_BOUNDED_COMPONENT_COMPARISON",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": "claim-specific bounded component",
+      "comparisonEvidenceBinding": {
+        "currentComponentEvidenceRefs": [
+          "accepted_diagnostic:X-02:current_bound"
+        ],
+        "alternativeComponentEvidenceRefs": [
+          "accepted_diagnostic:X-02:candidate_exact"
+        ],
+        "matchedPopulationEvidenceRefs": [
+          "accepted_diagnostic:X-02:matched_scope"
+        ]
+      },
       "alternative": {
         "provider": "product_matrix_synthetic_control",
         "offer": "claim-specific comparison control",
@@ -3079,24 +3301,24 @@
         "comparisonStrength": "bounded_component"
       },
       "economics": {
-        "currency": null,
-        "unitLabel": null,
+        "currency": "USD",
+        "unitLabel": "matched component",
         "matchedPopulationCount": null,
         "currentUnitPriceMinor": null,
         "alternativeUnitPriceMinor": null,
         "unitDifferenceMinor": null,
-        "currentAmountState": "NOT_SUPPLIED",
-        "currentAmountMinor": null,
-        "alternativeAmountState": "NOT_SUPPLIED",
-        "alternativeAmountMinor": null,
+        "currentAmountState": "UPPER_BOUND",
+        "currentAmountMinor": 50000,
+        "alternativeAmountState": "EXACT",
+        "alternativeAmountMinor": 35000,
         "matchedComponentDifference": {
-          "state": "NOT_ESTABLISHED",
+          "state": "DIRECTIONAL_BOUND",
           "currentMinusAlternativeMinor": null,
           "alternativeExceedsCurrentByAtLeastMinor": null
         }
       },
       "conclusion": {
-        "whatThisProves": "Candidate component is $350; current comparable component has a $500 ceiling.",
+        "whatThisProves": "The current component is known only to be at or below $500.00; the evidence does not establish an exact difference or savings amount.",
         "whatThisDoesNotProve": [
           "$150 savings.",
           "This does not establish that the alternative provider is cheaper overall.",
@@ -3111,7 +3333,11 @@
         ],
         "smallestUnlocker": "Exact current provider-controlled dollars."
       },
-      "evidenceRefs": [],
+      "evidenceRefs": [
+        "accepted_diagnostic:X-02:current_bound",
+        "accepted_diagnostic:X-02:candidate_exact",
+        "accepted_diagnostic:X-02:matched_scope"
+      ],
       "limitations": [
         "Conclusion strength is capped at bounded_component.",
         "A bound is not an exact current amount."
@@ -3146,9 +3372,23 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "X-03",
+      "findingKind": "MATCHED_CURRENT_VS_ALTERNATIVE_COMPONENT_COMPARISON",
+      "comparisonPerformed": true,
       "status": "VALID_BOUNDED_COMPONENT_COMPARISON",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": "claim-specific bounded component",
+      "comparisonEvidenceBinding": {
+        "currentComponentEvidenceRefs": [
+          "accepted_diagnostic:X-03:current_bound"
+        ],
+        "alternativeComponentEvidenceRefs": [
+          "accepted_diagnostic:X-03:candidate_exact"
+        ],
+        "matchedPopulationEvidenceRefs": [
+          "accepted_diagnostic:X-03:matched_scope"
+        ]
+      },
       "alternative": {
         "provider": "product_matrix_synthetic_control",
         "offer": "claim-specific comparison control",
@@ -3165,24 +3405,24 @@
         "comparisonStrength": "bounded_component"
       },
       "economics": {
-        "currency": null,
-        "unitLabel": null,
+        "currency": "USD",
+        "unitLabel": "matched component",
         "matchedPopulationCount": null,
         "currentUnitPriceMinor": null,
         "alternativeUnitPriceMinor": null,
         "unitDifferenceMinor": null,
-        "currentAmountState": "NOT_SUPPLIED",
-        "currentAmountMinor": null,
-        "alternativeAmountState": "NOT_SUPPLIED",
-        "alternativeAmountMinor": null,
+        "currentAmountState": "UPPER_BOUND",
+        "currentAmountMinor": 50000,
+        "alternativeAmountState": "EXACT",
+        "alternativeAmountMinor": 60000,
         "matchedComponentDifference": {
-          "state": "NOT_ESTABLISHED",
+          "state": "DIRECTIONAL_BOUND",
           "currentMinusAlternativeMinor": null,
-          "alternativeExceedsCurrentByAtLeastMinor": null
+          "alternativeExceedsCurrentByAtLeastMinor": 10000
         }
       },
       "conclusion": {
-        "whatThisProves": "Candidate component exceeds even the current ceiling by at least $100 on matched scope.",
+        "whatThisProves": "The alternative component is at least $100.00 more expensive than the maximum possible current comparable component on the matched scope.",
         "whatThisDoesNotProve": [
           "Complete provider-economics conclusion.",
           "This does not establish that the alternative provider is cheaper overall.",
@@ -3197,7 +3437,11 @@
         ],
         "smallestUnlocker": "Complete matched economics for a full-provider conclusion."
       },
-      "evidenceRefs": [],
+      "evidenceRefs": [
+        "accepted_diagnostic:X-03:current_bound",
+        "accepted_diagnostic:X-03:candidate_exact",
+        "accepted_diagnostic:X-03:matched_scope"
+      ],
       "limitations": [
         "Conclusion strength is capped at bounded_component.",
         "A bound is not an exact current amount."
@@ -3232,9 +3476,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "X-04",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "product_matrix_synthetic_control",
         "offer": "claim-specific comparison control",
@@ -3318,9 +3566,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "X-05",
-      "status": "VALID_EXACT_COMPONENT_COMPARISON",
+      "findingKind": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "product_matrix_synthetic_control",
         "offer": "claim-specific comparison control",
@@ -3372,7 +3624,8 @@
       },
       "evidenceRefs": [],
       "limitations": [
-        "Conclusion strength is capped at exact_component."
+        "Conclusion strength is capped at exact_component.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed."
       ],
       "action": {
         "signal": "NONE",
@@ -3404,9 +3657,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "X-06",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "product_matrix_synthetic_control",
         "offer": "claim-specific comparison control",
@@ -3490,9 +3747,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "X-07",
-      "status": "VALID_EXACT_COMPONENT_COMPARISON",
+      "findingKind": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "product_matrix_synthetic_control",
         "offer": "claim-specific comparison control",
@@ -3543,7 +3804,8 @@
       },
       "evidenceRefs": [],
       "limitations": [
-        "Conclusion strength is capped at exact_component."
+        "Conclusion strength is capped at exact_component.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed."
       ],
       "action": {
         "signal": "NONE",
@@ -3575,9 +3837,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "X-08",
-      "status": "VALID_CONDITIONAL_COMPONENT_COMPARISON",
+      "findingKind": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
+      "comparisonPerformed": false,
+      "status": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "product_matrix_synthetic_control",
         "offer": "claim-specific comparison control",
@@ -3630,6 +3896,7 @@
       "evidenceRefs": [],
       "limitations": [
         "Conclusion strength is capped at conditional_scenario.",
+        "The diagnostic establishes a claim-specific evidence ceiling; no current-versus-alternative price or cost comparison was performed.",
         "Public relevance is not merchant approval."
       ],
       "action": {
@@ -3662,9 +3929,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "X-09",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "product_matrix_synthetic_control",
         "offer": "direct versus reseller/partner unresolved",
@@ -3748,9 +4019,13 @@
         "sha256": "bfc6366dd61bc9b4e4e3b90f5203151f87716a5ba1e8331bc00757d05232a3ad"
       },
       "diagnosticCaseId": "X-10",
+      "findingKind": "COMPARISON_UNAVAILABLE_BLOCKER",
+      "comparisonPerformed": false,
       "status": "COMPARISON_UNAVAILABLE",
       "currentProvider": "current_provider",
       "statementFamily": "supported_fiserv",
+      "matchedComponentLabel": null,
+      "comparisonEvidenceBinding": null,
       "alternative": {
         "provider": "product_matrix_synthetic_control",
         "offer": "claim-specific comparison control",
@@ -3830,6 +4105,10 @@
   ],
   "prohibitedOutcomeCounters": {
     "conclusionStrengthExceedsDiagnostic": 0,
+    "evidenceOnlyMarkedComparisonPerformed": 0,
+    "evidenceOnlyProducesComparisonStatus": 0,
+    "evidenceOnlyProducesArithmetic": 0,
+    "evidenceOnlyProducesReviewSignal": 0,
     "customerRenderingEnabled": 0,
     "aboveOrBelowMarketVerdicts": 0,
     "expensiveOrCheapLanguage": 0,
@@ -3853,7 +4132,13 @@
   "prohibitedOutcomeCounterTotal": 0,
   "invariants": {
     "allThirtyEightDiagnosticsConsumed": true,
-    "exactStrengthMapping": true,
+    "diagnosticJudgmentsPreserved": true,
+    "findingClassificationComplete": true,
+    "performedComparisonStrengthMapping": true,
+    "qualificationCasesRemainEvidenceOnly": true,
+    "identityAndAbsenceCasesRemainEvidenceOnly": true,
+    "onlyPerformedComparisonsCanReview": true,
+    "performedComparisonsAreEvidenceBound": true,
     "exactDifferenceIsMatchedComponentOnly": true,
     "conditionalDifferencePreservesApproval": true,
     "favorableBoundDoesNotCreateSavings": true,
@@ -3936,11 +4221,11 @@
     "invariantCount": 11
   },
   "tests": {
-    "focusedConsumer": "9/9 passed",
-    "combinedTargeted": "81/81 passed across 9 files",
+    "focusedConsumer": "11/11 passed",
+    "combinedTargeted": "83/83 passed across 9 files",
     "typescriptBuild": "passed",
-    "knownHistoricalRegression": "5/6 passed; unchanged pre-existing assertion expects 0 governed conflicts and observes 4",
-    "legacyPublicSource": "10/10 assertions passed; prior SIGSEGV/139 did not reproduce on this run"
+    "knownHistoricalRegression": "not rerun; preserved known 5/6 pre-existing regression without repair",
+    "legacyPublicSource": "not rerun or investigated; prior SIGSEGV/139 history remains preserved"
   },
   "architectureConflicts": [],
   "recommendation": "Product should review the Internal Commercial Comparison Finding schema and wording before authorizing runtime attachment to real analyst findings. Keep commercial grades, market verdicts, savings claims, switching, and customer rendering out of the next step."

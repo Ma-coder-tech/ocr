@@ -6,9 +6,9 @@ import { applyHelcimDharmaCaptureRemediationV1, loadHelcimDharmaCaptureRemediati
 import { applyImmutableCapturesToCommercialRegistryV1, commercialRegistrySemanticFingerprintSetV1, loadImmutableCommercialSourceCaptureBaselineV1 } from "../src/canonical/commercialImmutableSourceCaptureBaselineV1.js";
 import { HELCIM_DHARMA_COMMERCIAL_SOURCE_BATCH_1B_REGISTRY_V1 } from "../src/canonical/helcimDharmaCommercialSourceBatch1BV1.js";
 import { canonicalFinancialTruthFingerprint } from "../src/canonical/internalAnalystFindingV1.js";
-import { buildInternalCommercialComparisonFindingV1, INTERNAL_COMMERCIAL_COMPARISON_PRODUCT_AUTHORITY_V01, type InternalComparisonEconomicsV1 } from "../src/canonical/internalCommercialComparisonFindingV1.js";
+import { buildInternalCommercialComparisonFindingV1, INTERNAL_COMMERCIAL_COMPARISON_PRODUCT_AUTHORITY_V01, type InternalComparisonEconomicsV1, type MatchedCurrentAlternativeComponentComparisonV1 } from "../src/canonical/internalCommercialComparisonFindingV1.js";
 import { parsePdf } from "../src/parser.js";
-import { comparatorConsumptionProductTestMatrixV01, evaluateComparatorConsumptionDiagnosticV1 } from "./lib/comparatorConsumptionRefusalDiagnosticV1.js";
+import { comparatorConsumptionProductTestMatrixV01, evaluateComparatorConsumptionDiagnosticV1, type ComparatorConsumptionDiagnosticResultV1 } from "./lib/comparatorConsumptionRefusalDiagnosticV1.js";
 
 const OUTPUT_DIR = "evaluations/internal-commercial-comparison-finding-v1";
 const OUTPUT_JSON = `${OUTPUT_DIR}/evaluation-2026-09-11.json`;
@@ -22,11 +22,39 @@ const remediation = await loadHelcimDharmaCaptureRemediationBaselineV1({ priorBa
 const batch1B = applyHelcimDharmaCaptureRemediationV1({ registry: batchBefore, baseline: remediation });
 const diagnostics = comparatorConsumptionProductTestMatrixV01().map((testCase) => evaluateComparatorConsumptionDiagnosticV1({ testCase, registries: [authorize, batch1B] }));
 const diagnostic = (id: string) => diagnostics.find((item) => item.caseId === id)!;
-const build = (id: string, economics: InternalComparisonEconomicsV1 | null = null) => buildInternalCommercialComparisonFindingV1({ acceptedDiagnostic: diagnostic(id), currentProvider: "Wells Fargo/Fiserv family", statementFamily: "supported_fiserv", currentEvidenceRefs: [`statement_component:${id}`], economics });
 const exact: InternalComparisonEconomicsV1 = { currency: "USD", unitLabel: "per authorization", matchedPopulationCount: 5_000, currentUnitPriceMinor: 11, alternativeUnitPriceMinor: 8, currentAmount: { state: "EXACT", amountMinor: 55_000 }, alternativeAmount: { state: "EXACT", amountMinor: 40_000 } };
 const bound = (candidate: number): InternalComparisonEconomicsV1 => ({ currency: "USD", unitLabel: "matched component", matchedPopulationCount: null, currentUnitPriceMinor: null, alternativeUnitPriceMinor: null, currentAmount: { state: "UPPER_BOUND", amountMinor: 50_000 }, alternativeAmount: { state: "EXACT", amountMinor: candidate } });
+const matchedComparison = (id: string, economics: InternalComparisonEconomicsV1): MatchedCurrentAlternativeComponentComparisonV1 => ({
+  componentLabel: "authorization pricing component",
+  economics,
+  currentComponentEvidenceRefs: [`statement_component:${id}`],
+  alternativeComponentEvidenceRefs: [`governed_alternative_component:${id}`],
+  matchedPopulationEvidenceRefs: [`matched_population:${id}`],
+});
+const acceptedDirectionalComparison = (item: ComparatorConsumptionDiagnosticResultV1): MatchedCurrentAlternativeComponentComparisonV1 | null => item.directionalArithmetic ? {
+  componentLabel: "claim-specific bounded component",
+  economics: {
+    currency: "USD",
+    unitLabel: "matched component",
+    matchedPopulationCount: null,
+    currentUnitPriceMinor: null,
+    alternativeUnitPriceMinor: null,
+    currentAmount: { state: "UPPER_BOUND", amountMinor: item.directionalArithmetic.currentRangeMinor.high },
+    alternativeAmount: { state: "EXACT", amountMinor: item.directionalArithmetic.candidateExactMinor },
+  },
+  currentComponentEvidenceRefs: [`accepted_diagnostic:${item.caseId}:current_bound`],
+  alternativeComponentEvidenceRefs: [`accepted_diagnostic:${item.caseId}:candidate_exact`],
+  matchedPopulationEvidenceRefs: [`accepted_diagnostic:${item.caseId}:matched_scope`],
+} : null;
+const build = (id: string, economics: InternalComparisonEconomicsV1 | null = null) => buildInternalCommercialComparisonFindingV1({
+  acceptedDiagnostic: diagnostic(id),
+  currentProvider: "Wells Fargo/Fiserv family",
+  statementFamily: "supported_fiserv",
+  currentEvidenceRefs: [`statement_component:${id}`],
+  matchedComparison: economics ? matchedComparison(id, economics) : null,
+});
 
-const matrixFindings = diagnostics.map((acceptedDiagnostic) => buildInternalCommercialComparisonFindingV1({ acceptedDiagnostic, currentProvider: "current_provider", statementFamily: "supported_fiserv", currentEvidenceRefs: [] }));
+const matrixFindings = diagnostics.map((acceptedDiagnostic) => buildInternalCommercialComparisonFindingV1({ acceptedDiagnostic, currentProvider: "current_provider", statementFamily: "supported_fiserv", currentEvidenceRefs: [], matchedComparison: acceptedDirectionalComparison(acceptedDiagnostic) }));
 const demonstrations = {
   exactComponent: build("X-01", exact),
   conditionalPublicScenario: build("D-01", exact),
@@ -45,23 +73,31 @@ for (const file of GOLD) {
   gold.push({ file, before, after, unchanged: before === after });
 }
 
-const strengthToStatus = { exact_component: "VALID_EXACT_COMPONENT_COMPARISON", conditional_scenario: "VALID_CONDITIONAL_COMPONENT_COMPARISON", bounded_component: "VALID_BOUNDED_COMPONENT_COMPARISON", unavailable: "COMPARISON_UNAVAILABLE" } as const;
+const strengthToStatus = { exact_component: "VALID_EXACT_COMPONENT_COMPARISON", conditional_scenario: "VALID_CONDITIONAL_COMPONENT_COMPARISON", bounded_component: "VALID_BOUNDED_COMPONENT_COMPARISON" } as const;
+const demonstrationFindings = Object.values(demonstrations);
+const evaluatedFindings = [...matrixFindings, ...demonstrationFindings];
+const evidenceOnlyFindings = matrixFindings.filter((item) => item.findingKind === "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE" || item.findingKind === "COMMERCIAL_FACT_IDENTITY_EVIDENCE");
+const performedComparisons = evaluatedFindings.filter((item) => item.comparisonPerformed);
 const prohibitedCounters = {
-  conclusionStrengthExceedsDiagnostic: matrixFindings.filter((item) => item.status !== strengthToStatus[item.scope.comparisonStrength]).length,
-  customerRenderingEnabled: matrixFindings.filter((item) => item.permissions.customerRenderingAllowed).length,
-  aboveOrBelowMarketVerdicts: matrixFindings.filter((item) => item.permissions.aboveOrBelowMarketVerdictAllowed).length,
-  expensiveOrCheapLanguage: matrixFindings.filter((item) => item.permissions.expensiveOrCheapLanguageAllowed).length,
-  processorOrOverallGrades: matrixFindings.filter((item) => item.permissions.processorOrOverallGradeAllowed).length,
-  overpaymentVerdicts: matrixFindings.filter((item) => item.permissions.overpaymentVerdictAllowed).length,
-  savingsClaims: matrixFindings.filter((item) => item.permissions.savingsClaimAllowed).length,
-  annualSavingsProjections: matrixFindings.filter((item) => item.permissions.annualSavingsProjectionAllowed).length,
-  switchingRecommendations: matrixFindings.filter((item) => item.permissions.switchingRecommendationAllowed).length,
-  providerRankings: matrixFindings.filter((item) => item.permissions.bestProviderRankingAllowed).length,
-  approvalAssumptions: matrixFindings.filter((item) => item.permissions.merchantApprovalAssumptionAllowed).length,
-  unknownToZeroConversions: matrixFindings.filter((item) => item.permissions.unknownToZeroAllowed).length,
-  upperBoundToExactConversions: matrixFindings.filter((item) => item.permissions.upperBoundToExactAllowed).length,
-  unrelatedComponentAggregations: matrixFindings.filter((item) => item.permissions.unrelatedComponentAggregationAllowed).length,
-  canonicalMutations: matrixFindings.filter((item) => item.permissions.canonicalMutationAllowed).length,
+  conclusionStrengthExceedsDiagnostic: performedComparisons.filter((item) => item.status !== strengthToStatus[item.scope.comparisonStrength as keyof typeof strengthToStatus]).length,
+  evidenceOnlyMarkedComparisonPerformed: evidenceOnlyFindings.filter((item) => item.comparisonPerformed).length,
+  evidenceOnlyProducesComparisonStatus: evidenceOnlyFindings.filter((item) => item.status.includes("COMPONENT_COMPARISON")).length,
+  evidenceOnlyProducesArithmetic: evidenceOnlyFindings.filter((item) => item.economics.matchedComponentDifference.state !== "NOT_ESTABLISHED").length,
+  evidenceOnlyProducesReviewSignal: evidenceOnlyFindings.filter((item) => item.action.signal !== "NONE").length,
+  customerRenderingEnabled: evaluatedFindings.filter((item) => item.permissions.customerRenderingAllowed).length,
+  aboveOrBelowMarketVerdicts: evaluatedFindings.filter((item) => item.permissions.aboveOrBelowMarketVerdictAllowed).length,
+  expensiveOrCheapLanguage: evaluatedFindings.filter((item) => item.permissions.expensiveOrCheapLanguageAllowed).length,
+  processorOrOverallGrades: evaluatedFindings.filter((item) => item.permissions.processorOrOverallGradeAllowed).length,
+  overpaymentVerdicts: evaluatedFindings.filter((item) => item.permissions.overpaymentVerdictAllowed).length,
+  savingsClaims: evaluatedFindings.filter((item) => item.permissions.savingsClaimAllowed).length,
+  annualSavingsProjections: evaluatedFindings.filter((item) => item.permissions.annualSavingsProjectionAllowed).length,
+  switchingRecommendations: evaluatedFindings.filter((item) => item.permissions.switchingRecommendationAllowed).length,
+  providerRankings: evaluatedFindings.filter((item) => item.permissions.bestProviderRankingAllowed).length,
+  approvalAssumptions: evaluatedFindings.filter((item) => item.permissions.merchantApprovalAssumptionAllowed).length,
+  unknownToZeroConversions: evaluatedFindings.filter((item) => item.permissions.unknownToZeroAllowed).length,
+  upperBoundToExactConversions: evaluatedFindings.filter((item) => item.permissions.upperBoundToExactAllowed).length,
+  unrelatedComponentAggregations: evaluatedFindings.filter((item) => item.permissions.unrelatedComponentAggregationAllowed).length,
+  canonicalMutations: evaluatedFindings.filter((item) => item.permissions.canonicalMutationAllowed).length,
   favorableBoundProducesExactDifference: demonstrations.favorableBoundWithoutSavings.economics.matchedComponentDifference.currentMinusAlternativeMinor === null ? 0 : 1,
   unavailableProducesArithmetic: demonstrations.unavailableWithUnlocker.economics.matchedComponentDifference.state === "NOT_ESTABLISHED" ? 0 : 1,
   conditionalLosesApprovalCondition: demonstrations.conditionalPublicScenario.conclusion.whatThisProves.startsWith("If the merchant qualifies for and is approved") ? 0 : 1,
@@ -70,13 +106,23 @@ const prohibitedCounters = {
 };
 const invariants = {
   allThirtyEightDiagnosticsConsumed: matrixFindings.length === 38,
-  exactStrengthMapping: Object.entries(strengthToStatus).every(([strength, status]) => matrixFindings.filter((item) => item.scope.comparisonStrength === strength).every((item) => item.status === status)),
+  diagnosticJudgmentsPreserved: diagnostics.every((diagnosticItem) => matrixFindings.find((item) => item.diagnosticCaseId === diagnosticItem.caseId)?.scope.comparisonStrength === diagnosticItem.comparisonStrength),
+  findingClassificationComplete: matrixFindings.every((item) => ["MATCHED_CURRENT_VS_ALTERNATIVE_COMPONENT_COMPARISON", "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE", "COMMERCIAL_FACT_IDENTITY_EVIDENCE", "COMPARISON_UNAVAILABLE_BLOCKER"].includes(item.findingKind)),
+  performedComparisonStrengthMapping: performedComparisons.every((item) => item.status === strengthToStatus[item.scope.comparisonStrength as keyof typeof strengthToStatus]),
+  qualificationCasesRemainEvidenceOnly: ["D-03", "D-04", "D-05", "D-07", "D-08"].every((id) => matrixFindings.find((item) => item.diagnosticCaseId === id)?.findingKind === "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE"),
+  identityAndAbsenceCasesRemainEvidenceOnly: ["D-09", "D-10", "X-07"].every((id) => matrixFindings.find((item) => item.diagnosticCaseId === id)?.findingKind === "COMMERCIAL_FACT_IDENTITY_EVIDENCE"),
+  onlyPerformedComparisonsCanReview: evaluatedFindings.every((item) => item.action.signal !== "REVIEW_CURRENT_PRICING" || item.comparisonPerformed),
+  performedComparisonsAreEvidenceBound: performedComparisons.every((item) => item.matchedComponentLabel !== null
+    && item.comparisonEvidenceBinding !== null
+    && item.comparisonEvidenceBinding.currentComponentEvidenceRefs.length > 0
+    && item.comparisonEvidenceBinding.alternativeComponentEvidenceRefs.length > 0
+    && item.comparisonEvidenceBinding.matchedPopulationEvidenceRefs.length > 0),
   exactDifferenceIsMatchedComponentOnly: demonstrations.exactComponent.economics.matchedComponentDifference.currentMinusAlternativeMinor === 15_000 && demonstrations.exactComponent.conclusion.whatThisProves.includes("matched component"),
   conditionalDifferencePreservesApproval: demonstrations.conditionalPublicScenario.economics.matchedComponentDifference.currentMinusAlternativeMinor === 15_000 && demonstrations.conditionalPublicScenario.conclusion.whatThisProves.startsWith("If the merchant qualifies for and is approved"),
   favorableBoundDoesNotCreateSavings: demonstrations.favorableBoundWithoutSavings.economics.matchedComponentDifference.currentMinusAlternativeMinor === null && demonstrations.favorableBoundWithoutSavings.action.signal === "NONE",
   adverseBoundIsDirectionalOnly: demonstrations.adverseDirectionalBound.economics.matchedComponentDifference.alternativeExceedsCurrentByAtLeastMinor === 10_000 && demonstrations.adverseDirectionalBound.permissions.processorOrOverallGradeAllowed === false,
   unavailableExplainsAndUnlocks: demonstrations.unavailableWithUnlocker.conclusion.refusalReasons.length > 0 && demonstrations.unavailableWithUnlocker.conclusion.smallestUnlocker !== null,
-  reviewSignalIsNarrow: demonstrations.conditionalPublicScenario.action.signal === "REVIEW_CURRENT_PRICING" && demonstrations.conditionalPublicScenario.action.possibleMerchantAction === "Ask the current processor whether this pricing component can be reviewed.",
+  reviewSignalIsNarrow: demonstrations.conditionalPublicScenario.comparisonPerformed && demonstrations.conditionalPublicScenario.action.signal === "REVIEW_CURRENT_PRICING" && demonstrations.conditionalPublicScenario.action.possibleMerchantAction === "Ask the current processor whether this pricing component can be reviewed.",
   noF3SemanticMutation: JSON.stringify(commercialRegistrySemanticFingerprintSetV1(batchBefore)) === JSON.stringify(commercialRegistrySemanticFingerprintSetV1(batch1B)),
   goldCanonicalFingerprintInvariant: gold.every((item) => item.unchanged),
 };
@@ -88,7 +134,24 @@ const evaluation = {
   baseline: { branch: "codex/comparator-consumption-refusal-diagnostic-v1", commit: "eb0cf65577aaeeac7cc67b2ff4f535286d316842", parent: "484f1e1bfdf3db45954eabdc98d377e5123d085a" },
   implementationBranch: "codex/internal-commercial-comparison-finding-v1",
   scope: { internalAnalystOnly: true, offerSelectionAdded: false, gradesAdded: false, marketJudgmentAdded: false, savingsClaimsAdded: false, switchingAdviceAdded: false, customerOutputAdded: false, aiOrWebResearchUsed: false, newCommercialKnowledgeAdmitted: false },
-  counts: { diagnosticFindings: matrixFindings.length, demonstrations: Object.keys(demonstrations).length, statuses: Object.fromEntries(Object.values(strengthToStatus).map((status) => [status, matrixFindings.filter((item) => item.status === status).length])), reviewCurrentPricingSignalsInDemonstrations: Object.values(demonstrations).filter((item) => item.action.signal === "REVIEW_CURRENT_PRICING").length },
+  counts: {
+    diagnosticFindings: matrixFindings.length,
+    demonstrations: Object.keys(demonstrations).length,
+    diagnosticFindingKinds: Object.fromEntries([
+      "MATCHED_CURRENT_VS_ALTERNATIVE_COMPONENT_COMPARISON",
+      "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
+      "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
+      "COMPARISON_UNAVAILABLE_BLOCKER",
+    ].map((kind) => [kind, matrixFindings.filter((item) => item.findingKind === kind).length])),
+    demonstrationFindingKinds: Object.fromEntries([
+      "MATCHED_CURRENT_VS_ALTERNATIVE_COMPONENT_COMPARISON",
+      "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE",
+      "COMMERCIAL_FACT_IDENTITY_EVIDENCE",
+      "COMPARISON_UNAVAILABLE_BLOCKER",
+    ].map((kind) => [kind, demonstrationFindings.filter((item) => item.findingKind === kind).length])),
+    reviewCurrentPricingSignalsInDiagnostics: matrixFindings.filter((item) => item.action.signal === "REVIEW_CURRENT_PRICING").length,
+    reviewCurrentPricingSignalsInDemonstrations: demonstrationFindings.filter((item) => item.action.signal === "REVIEW_CURRENT_PRICING").length,
+  },
   demonstrations,
   matrixFindings,
   prohibitedOutcomeCounters: prohibitedCounters,
@@ -97,11 +160,11 @@ const evaluation = {
   commercialSemanticFingerprintsInvariant: invariants.noF3SemanticMutation,
   gold: { statements: gold, invariantCount: gold.filter((item) => item.unchanged).length },
   tests: {
-    focusedConsumer: "9/9 passed",
-    combinedTargeted: "81/81 passed across 9 files",
+    focusedConsumer: "11/11 passed",
+    combinedTargeted: "83/83 passed across 9 files",
     typescriptBuild: "passed",
-    knownHistoricalRegression: "5/6 passed; unchanged pre-existing assertion expects 0 governed conflicts and observes 4",
-    legacyPublicSource: "10/10 assertions passed; prior SIGSEGV/139 did not reproduce on this run",
+    knownHistoricalRegression: "not rerun; preserved known 5/6 pre-existing regression without repair",
+    legacyPublicSource: "not rerun or investigated; prior SIGSEGV/139 history remains preserved",
   },
   architectureConflicts: [],
   recommendation: "Product should review the Internal Commercial Comparison Finding schema and wording before authorizing runtime attachment to real analyst findings. Keep commercial grades, market verdicts, savings claims, switching, and customer rendering out of the next step.",
@@ -115,33 +178,34 @@ await writeFile(OUTPUT_MD, report(evaluation), "utf8");
 console.log(JSON.stringify({ outputs: [OUTPUT_JSON, OUTPUT_MD], counts: evaluation.counts, prohibitedOutcomeCounterTotal: evaluation.prohibitedOutcomeCounterTotal, gold: `${evaluation.gold.invariantCount}/11`, failed }, null, 2));
 
 function report(value: typeof evaluation): string {
-  const demos = Object.entries(value.demonstrations).map(([name, item]) => `| ${name} | ${item.status} | ${cell(item.conclusion.whatThisProves)} | ${item.action.signal} | ${cell(item.conclusion.smallestUnlocker ?? "None")} |`).join("\n");
-  const matrix = value.matrixFindings.map((item) => `| ${item.diagnosticCaseId} | ${item.scope.comparisonStrength} | ${item.status} | ${cell(item.conclusion.whatThisProves)} | ${cell(item.conclusion.whatThisDoesNotProve.join("; "))} | ${cell(item.conclusion.smallestUnlocker ?? "None")} |`).join("\n");
+  const demos = Object.entries(value.demonstrations).map(([name, item]) => `| ${name} | ${item.findingKind} | ${item.comparisonPerformed} | ${item.status} | ${cell(item.conclusion.whatThisProves)} | ${item.action.signal} | ${cell(item.conclusion.smallestUnlocker ?? "None")} |`).join("\n");
+  const matrix = value.matrixFindings.map((item) => `| ${item.diagnosticCaseId} | ${item.scope.comparisonStrength} | ${item.findingKind} | ${item.comparisonPerformed} | ${item.status} | ${cell(item.conclusion.whatThisProves)} | ${cell(item.conclusion.whatThisDoesNotProve.join("; "))} | ${cell(item.conclusion.smallestUnlocker ?? "None")} |`).join("\n");
   const counters = Object.entries(value.prohibitedOutcomeCounters).map(([name, count]) => `| ${name} | ${count} |`).join("\n");
   return `# Internal Commercial Comparison Finding v1
 
 ## Outcome
 
-The first safe internal comparator consumer now translates each accepted diagnostic into a conclusion of exactly the same strength. It performs deterministic matched-component arithmetic only when supplied exact or bounded economics. It does not select offers, invent populations, admit knowledge, or render customer-facing commercial conclusions.
+The first safe internal comparator consumer now distinguishes a performed matched economic comparison from offer/qualification evidence, commercial fact/identity evidence, and a comparison blocker. Diagnostic strength remains the claim-specific evidence ceiling; it no longer means that a current-versus-alternative comparison occurred. Deterministic arithmetic requires an explicit matched-comparison package binding current component, alternative component, and population evidence.
 
 - Product authority SHA-256: \`${value.productAuthority.sha256}\`
 - Exact parent: \`${value.baseline.commit}\`
 - Accepted diagnostic cases consumed: ${value.counts.diagnosticFindings}/38
+- Diagnostic-only classification: ${value.counts.diagnosticFindingKinds.OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE} offer/eligibility/qualification evidence; ${value.counts.diagnosticFindingKinds.COMMERCIAL_FACT_IDENTITY_EVIDENCE} commercial fact/identity evidence; ${value.counts.diagnosticFindingKinds.COMPARISON_UNAVAILABLE_BLOCKER} blockers; ${value.counts.diagnosticFindingKinds.MATCHED_CURRENT_VS_ALTERNATIVE_COMPONENT_COMPARISON} comparisons performed
 - Gold canonical invariance: ${value.gold.invariantCount}/11
 - Prohibited-outcome counters: ${value.prohibitedOutcomeCounterTotal}
 
 ## Required behavior demonstrations
 
-| Demonstration | Status | What it proves | Action signal | Smallest unlocker |
-|---|---|---|---|---|
+| Demonstration | Finding kind | Comparison performed | Status | What it proves | Action signal | Smallest unlocker |
+|---|---|---:|---|---|---|---|
 ${demos}
 
 The exact and conditional demonstrations use 5,000 matching authorizations, $0.11 current unit price, $0.08 alternative unit price, $550 current component cost, and $400 alternative component cost. The resulting $150 is explicitly a matched component difference—not savings, an overall-price conclusion, or an overpayment verdict.
 
 ## Complete 38-case consumption replay
 
-| Case | Diagnostic strength | Finding status | What it proves | What it does not prove | Smallest unlocker |
-|---|---|---|---|---|---|
+| Case | Diagnostic strength | Finding kind | Comparison performed | Finding status | What it proves | What it does not prove | Smallest unlocker |
+|---|---|---|---:|---|---|---|---|
 ${matrix}
 
 ## Safety counters
@@ -160,7 +224,7 @@ All ${Object.keys(value.prohibitedOutcomeCounters).length} counters are zero. No
 - Known historical/current regression: ${value.tests.knownHistoricalRegression}
 - Legacy public-source/SIGSEGV check: ${value.tests.legacyPublicSource}
 
-No architecture conflict was introduced. The consumer reads the accepted diagnostic result through a narrow structural contract and never mutates canonical facts or the governed commercial-source authority.
+No accepted diagnostic judgment changed. No architecture conflict was introduced. The consumer reads the accepted diagnostic result through a narrow structural contract and never mutates canonical facts or the governed commercial-source authority.
 
 Recommendation: ${value.recommendation}
 `;
