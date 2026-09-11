@@ -1,0 +1,1207 @@
+{
+  "schemaVersion": "runtime_commercial_comparison_attachment_evaluation_2026_09_11_v1",
+  "generatedAt": "2026-09-11T00:00:00.000Z",
+  "productAuthority": {
+    "document": "RateReveal Runtime Commercial Comparison Attachment v1",
+    "sha256": "5254a2f8bf0932a6cba2f428b1c30f00de8ff83d9a263abeb9f2ad9031f2fcd8"
+  },
+  "baseline": {
+    "branch": "codex/internal-commercial-comparison-finding-v1",
+    "acceptedCommit": "902ce92c30fcab175b1abc86225f1794205e2b41",
+    "acceptedParent": "beb2cfbb1bd45a179b3aad0d0cc169105796519e",
+    "originalMilestoneParent": "eb0cf65577aaeeac7cc67b2ff4f535286d316842"
+  },
+  "implementationBranch": "codex/runtime-commercial-comparison-attachment-v1",
+  "scope": {
+    "internalOnly": true,
+    "customerOutputAdded": false,
+    "marketJudgmentAdded": false,
+    "gradesAdded": false,
+    "savingsOrAnnualizationAdded": false,
+    "switchingOrRankingAdded": false,
+    "aiOrWebResearchUsed": false,
+    "newCommercialKnowledgeAdmitted": false
+  },
+  "goldCorpus": {
+    "statements": 11,
+    "canonicalFingerprintInvariant": true,
+    "matchedComparisons": 0,
+    "historicalCurrentOnlyComparisons": 0,
+    "qualificationEvidenceOnly": 0,
+    "commercialFactsOnly": 0,
+    "blockedComparisons": 54,
+    "statementsWithoutEstablishedComparableCurrentComponent": 8,
+    "results": [
+      {
+        "file": "Nov_2024_Statement.pdf",
+        "statementPeriod": {
+          "start": "2024-11-01",
+          "end": "2024-11-30"
+        },
+        "processor": "Clover",
+        "channel": "mixed",
+        "feeRowsEvaluated": 134,
+        "pricingModel": {
+          "state": "supported",
+          "model": "interchange_plus",
+          "confidence": "medium",
+          "relevantPopulation": "statement_population_with_separately_itemized_interchange_and_network_costs"
+        },
+        "commercialEconomics": {
+          "totalCanonicalFeesMinor": 133096,
+          "providerControlledMinimumMinor": 25256,
+          "providerControlledUpperBoundMinor": 25256,
+          "providerControlledUpperBoundState": "SAME_AS_MINIMUM",
+          "unresolvedIncludingCanonicalResidualMinor": 33462
+        },
+        "establishedCurrentComponents": [
+          {
+            "feeRowId": "feerow_e84ad0381fe7bdfe112a7701",
+            "printedLabel": "MASTERCARD - MASTERCARD AUTH FEE 437 TRANSACTIONS AT 0.1",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 437,
+            "currentUnitPriceMinor": 10,
+            "amountState": "EXACT"
+          },
+          {
+            "feeRowId": "feerow_730dfdd145f792fc69bb9b38",
+            "printedLabel": "VISA - VISA AUTH FEE 1264 TRANSACTIONS AT 0.1",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 1264,
+            "currentUnitPriceMinor": 10,
+            "amountState": "EXACT"
+          },
+          {
+            "feeRowId": "feerow_6a8a80d7f159f45e4bdccce4",
+            "printedLabel": "DISCOVER - DISCOVER AUTH FEE 28 TRANSACTIONS AT 0.1",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 28,
+            "currentUnitPriceMinor": 10,
+            "amountState": "EXACT"
+          },
+          {
+            "feeRowId": "feerow_81d48be8386ff9ab787813d1",
+            "printedLabel": "AMERICAN EXPRESS - AMEX AUTH FEE 56 TRANSACTIONS AT 0.08",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 56,
+            "currentUnitPriceMinor": 8,
+            "amountState": "EXACT"
+          },
+          {
+            "feeRowId": "feerow_a71646993edd237180d783aa",
+            "printedLabel": "SIGNATURE DEBIT - SIG DEBIT AUTH FEE 32 TRANSACTIONS AT 0.1",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 32,
+            "currentUnitPriceMinor": 10,
+            "amountState": "EXACT"
+          },
+          {
+            "feeRowId": "feerow_039c41dabff430053c1f025a",
+            "printedLabel": "Other - AVS WATS AUTHORIZATION FEE 27 TRANSACTIONS AT 0.02",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 27,
+            "currentUnitPriceMinor": 2,
+            "amountState": "EXACT"
+          }
+        ],
+        "summary": {
+          "governedOffersConsidered": 6,
+          "currentComponentsEstablished": 6,
+          "matchedComparisons": 0,
+          "qualificationEvidenceOnly": 0,
+          "commercialFactsOnly": 0,
+          "blockedComparisons": 18,
+          "result": "COMPARISON_BLOCKED",
+          "explanation": "At least one plausible component alignment was attempted, but a required evidence gate remained unresolved or mismatched."
+        },
+        "attempts": [
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cnp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cnp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cnp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_amex_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_amex_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cnp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          }
+        ],
+        "canonicalFingerprintBefore": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+        "canonicalFingerprintAfter": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+        "canonicalFingerprintInvariant": true
+      },
+      {
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "statementPeriod": {
+          "start": "2024-10-01",
+          "end": "2024-10-31"
+        },
+        "processor": "First Data / Fiserv-style card processing statement",
+        "channel": "mixed",
+        "feeRowsEvaluated": 134,
+        "pricingModel": {
+          "state": "supported",
+          "model": "interchange_plus",
+          "confidence": "medium",
+          "relevantPopulation": "statement_population_with_separately_itemized_interchange_and_network_costs"
+        },
+        "commercialEconomics": {
+          "totalCanonicalFeesMinor": 131255,
+          "providerControlledMinimumMinor": 24989,
+          "providerControlledUpperBoundMinor": 24989,
+          "providerControlledUpperBoundState": "SAME_AS_MINIMUM",
+          "unresolvedIncludingCanonicalResidualMinor": 33077
+        },
+        "establishedCurrentComponents": [
+          {
+            "feeRowId": "feerow_cef342df3b5bb5e3368f2f7f",
+            "printedLabel": "MASTERCARD - MASTERCARD AUTH FEE 428 TRANSACTIONS AT 0.1",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 428,
+            "currentUnitPriceMinor": 10,
+            "amountState": "EXACT"
+          },
+          {
+            "feeRowId": "feerow_1b611e7f620fbddfb2c9619d",
+            "printedLabel": "VISA - VISA AUTH FEE 1248 TRANSACTIONS AT 0.1",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 1248,
+            "currentUnitPriceMinor": 10,
+            "amountState": "EXACT"
+          },
+          {
+            "feeRowId": "feerow_6ec3b9563f3bb87e7477cb19",
+            "printedLabel": "DISCOVER - DISCOVER AUTH FEE 29 TRANSACTIONS AT 0.1",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 29,
+            "currentUnitPriceMinor": 10,
+            "amountState": "EXACT"
+          },
+          {
+            "feeRowId": "feerow_b601b73af6eff17ce68fe28b",
+            "printedLabel": "AMERICAN EXPRESS - AMEX AUTH FEE 57 TRANSACTIONS AT 0.08",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 57,
+            "currentUnitPriceMinor": 8,
+            "amountState": "EXACT"
+          },
+          {
+            "feeRowId": "feerow_72fabce5bbdb89f00fdc6d3b",
+            "printedLabel": "SIGNATURE DEBIT - SIG DEBIT AUTH FEE 33 TRANSACTIONS AT 0.1",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 33,
+            "currentUnitPriceMinor": 10,
+            "amountState": "EXACT"
+          },
+          {
+            "feeRowId": "feerow_2baa0392a61d502162c8d939",
+            "printedLabel": "Other - AVS WATS AUTHORIZATION FEE 26 TRANSACTIONS AT 0.02",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 26,
+            "currentUnitPriceMinor": 2,
+            "amountState": "EXACT"
+          }
+        ],
+        "summary": {
+          "governedOffersConsidered": 6,
+          "currentComponentsEstablished": 6,
+          "matchedComparisons": 0,
+          "qualificationEvidenceOnly": 0,
+          "commercialFactsOnly": 0,
+          "blockedComparisons": 18,
+          "result": "COMPARISON_BLOCKED",
+          "explanation": "At least one plausible component alignment was attempted, but a required evidence gate remained unresolved or mismatched."
+        },
+        "attempts": [
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cnp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cnp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cnp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_amex_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_amex_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cnp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          }
+        ],
+        "canonicalFingerprintBefore": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
+        "canonicalFingerprintAfter": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
+        "canonicalFingerprintInvariant": true
+      },
+      {
+        "file": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+        "statementPeriod": {
+          "start": "2024-06-01",
+          "end": "2024-06-30"
+        },
+        "processor": "First Data / Fiserv-style card processing statement",
+        "channel": "card_not_present",
+        "feeRowsEvaluated": 2,
+        "pricingModel": {
+          "state": "unresolved",
+          "model": "unknown",
+          "confidence": "low",
+          "relevantPopulation": null
+        },
+        "commercialEconomics": {
+          "totalCanonicalFeesMinor": 14131,
+          "providerControlledMinimumMinor": 0,
+          "providerControlledUpperBoundMinor": 0,
+          "providerControlledUpperBoundState": "SAME_AS_MINIMUM",
+          "unresolvedIncludingCanonicalResidualMinor": 4231
+        },
+        "establishedCurrentComponents": [],
+        "summary": {
+          "governedOffersConsidered": 6,
+          "currentComponentsEstablished": 0,
+          "matchedComparisons": 0,
+          "qualificationEvidenceOnly": 0,
+          "commercialFactsOnly": 0,
+          "blockedComparisons": 0,
+          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
+          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
+        },
+        "attempts": [],
+        "canonicalFingerprintBefore": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+        "canonicalFingerprintAfter": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+        "canonicalFingerprintInvariant": true
+      },
+      {
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "statementPeriod": {
+          "start": "2025-08-01",
+          "end": "2025-08-31"
+        },
+        "processor": "Merchant One",
+        "channel": "card_present",
+        "feeRowsEvaluated": 51,
+        "pricingModel": {
+          "state": "supported",
+          "model": "interchange_plus",
+          "confidence": "medium",
+          "relevantPopulation": "statement_population_with_separately_itemized_interchange_and_network_costs"
+        },
+        "commercialEconomics": {
+          "totalCanonicalFeesMinor": 9119,
+          "providerControlledMinimumMinor": 701,
+          "providerControlledUpperBoundMinor": 701,
+          "providerControlledUpperBoundState": "SAME_AS_MINIMUM",
+          "unresolvedIncludingCanonicalResidualMinor": 2239
+        },
+        "establishedCurrentComponents": [],
+        "summary": {
+          "governedOffersConsidered": 6,
+          "currentComponentsEstablished": 0,
+          "matchedComparisons": 0,
+          "qualificationEvidenceOnly": 0,
+          "commercialFactsOnly": 0,
+          "blockedComparisons": 0,
+          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
+          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
+        },
+        "attempts": [],
+        "canonicalFingerprintBefore": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
+        "canonicalFingerprintAfter": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
+        "canonicalFingerprintInvariant": true
+      },
+      {
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "statementPeriod": {
+          "start": "2020-03-01",
+          "end": "2020-03-31"
+        },
+        "processor": "Basys",
+        "channel": "card_present",
+        "feeRowsEvaluated": 105,
+        "pricingModel": {
+          "state": "supported",
+          "model": "interchange_plus",
+          "confidence": "medium",
+          "relevantPopulation": "statement_population_with_separately_itemized_interchange_and_network_costs"
+        },
+        "commercialEconomics": {
+          "totalCanonicalFeesMinor": 355245,
+          "providerControlledMinimumMinor": 37591,
+          "providerControlledUpperBoundMinor": 37591,
+          "providerControlledUpperBoundState": "SAME_AS_MINIMUM",
+          "unresolvedIncludingCanonicalResidualMinor": 175336
+        },
+        "establishedCurrentComponents": [],
+        "summary": {
+          "governedOffersConsidered": 6,
+          "currentComponentsEstablished": 0,
+          "matchedComparisons": 0,
+          "qualificationEvidenceOnly": 0,
+          "commercialFactsOnly": 0,
+          "blockedComparisons": 0,
+          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
+          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
+        },
+        "attempts": [],
+        "canonicalFingerprintBefore": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
+        "canonicalFingerprintAfter": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
+        "canonicalFingerprintInvariant": true
+      },
+      {
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "statementPeriod": {
+          "start": "2022-09-01",
+          "end": "2022-09-30"
+        },
+        "processor": "Nxgen Payment Services",
+        "channel": "card_not_present",
+        "feeRowsEvaluated": 67,
+        "pricingModel": {
+          "state": "supported",
+          "model": "interchange_plus",
+          "confidence": "medium",
+          "relevantPopulation": "statement_population_with_separately_itemized_interchange_and_network_costs"
+        },
+        "commercialEconomics": {
+          "totalCanonicalFeesMinor": 200773,
+          "providerControlledMinimumMinor": 780,
+          "providerControlledUpperBoundMinor": 66028,
+          "providerControlledUpperBoundState": "SUPPORTED_BOUNDED",
+          "unresolvedIncludingCanonicalResidualMinor": 103006
+        },
+        "establishedCurrentComponents": [],
+        "summary": {
+          "governedOffersConsidered": 6,
+          "currentComponentsEstablished": 0,
+          "matchedComparisons": 0,
+          "qualificationEvidenceOnly": 0,
+          "commercialFactsOnly": 0,
+          "blockedComparisons": 0,
+          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
+          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
+        },
+        "attempts": [],
+        "canonicalFingerprintBefore": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
+        "canonicalFingerprintAfter": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
+        "canonicalFingerprintInvariant": true
+      },
+      {
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "statementPeriod": {
+          "start": "2024-02-01",
+          "end": "2024-02-29"
+        },
+        "processor": "Paysafe Payment Processing",
+        "channel": "card_not_present",
+        "feeRowsEvaluated": 28,
+        "pricingModel": {
+          "state": "unresolved",
+          "model": "unknown",
+          "confidence": "low",
+          "relevantPopulation": null
+        },
+        "commercialEconomics": {
+          "totalCanonicalFeesMinor": 156573,
+          "providerControlledMinimumMinor": 673,
+          "providerControlledUpperBoundMinor": 146488,
+          "providerControlledUpperBoundState": "SUPPORTED_BOUNDED",
+          "unresolvedIncludingCanonicalResidualMinor": 150327
+        },
+        "establishedCurrentComponents": [],
+        "summary": {
+          "governedOffersConsidered": 6,
+          "currentComponentsEstablished": 0,
+          "matchedComparisons": 0,
+          "qualificationEvidenceOnly": 0,
+          "commercialFactsOnly": 0,
+          "blockedComparisons": 0,
+          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
+          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
+        },
+        "attempts": [],
+        "canonicalFingerprintBefore": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
+        "canonicalFingerprintAfter": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
+        "canonicalFingerprintInvariant": true
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "statementPeriod": {
+          "start": "2025-10-01",
+          "end": "2025-10-31"
+        },
+        "processor": "Paysafe Payment Processing",
+        "channel": "card_not_present",
+        "feeRowsEvaluated": 50,
+        "pricingModel": {
+          "state": "confirmed",
+          "model": "tiered_pricing",
+          "confidence": "high",
+          "relevantPopulation": "qualification_labeled_bundled_pricing_populations"
+        },
+        "commercialEconomics": {
+          "totalCanonicalFeesMinor": 37855,
+          "providerControlledMinimumMinor": 470,
+          "providerControlledUpperBoundMinor": 31485,
+          "providerControlledUpperBoundState": "SUPPORTED_BOUNDED",
+          "unresolvedIncludingCanonicalResidualMinor": 34171
+        },
+        "establishedCurrentComponents": [],
+        "summary": {
+          "governedOffersConsidered": 6,
+          "currentComponentsEstablished": 0,
+          "matchedComparisons": 0,
+          "qualificationEvidenceOnly": 0,
+          "commercialFactsOnly": 0,
+          "blockedComparisons": 0,
+          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
+          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
+        },
+        "attempts": [],
+        "canonicalFingerprintBefore": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+        "canonicalFingerprintAfter": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+        "canonicalFingerprintInvariant": true
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
+        "statementPeriod": {
+          "start": "2025-09-01",
+          "end": "2025-09-30"
+        },
+        "processor": "Paysafe Payment Processing",
+        "channel": "unknown",
+        "feeRowsEvaluated": 6,
+        "pricingModel": {
+          "state": "unresolved",
+          "model": "unknown",
+          "confidence": "low",
+          "relevantPopulation": null
+        },
+        "commercialEconomics": {
+          "totalCanonicalFeesMinor": 4490,
+          "providerControlledMinimumMinor": 3000,
+          "providerControlledUpperBoundMinor": 3000,
+          "providerControlledUpperBoundState": "SAME_AS_MINIMUM",
+          "unresolvedIncludingCanonicalResidualMinor": 495
+        },
+        "establishedCurrentComponents": [],
+        "summary": {
+          "governedOffersConsidered": 6,
+          "currentComponentsEstablished": 0,
+          "matchedComparisons": 0,
+          "qualificationEvidenceOnly": 0,
+          "commercialFactsOnly": 0,
+          "blockedComparisons": 0,
+          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
+          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
+        },
+        "attempts": [],
+        "canonicalFingerprintBefore": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
+        "canonicalFingerprintAfter": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
+        "canonicalFingerprintInvariant": true
+      },
+      {
+        "file": "fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf",
+        "statementPeriod": {
+          "start": "2024-12-01",
+          "end": "2024-12-31"
+        },
+        "processor": "Priority Payment Systems",
+        "channel": "unknown",
+        "feeRowsEvaluated": 14,
+        "pricingModel": {
+          "state": "confirmed",
+          "model": "flat_rate",
+          "confidence": "high",
+          "relevantPopulation": "gross_sales_before_refunds:priority_g8_statement_case"
+        },
+        "commercialEconomics": {
+          "totalCanonicalFeesMinor": 308282,
+          "providerControlledMinimumMinor": 0,
+          "providerControlledUpperBoundMinor": 306282,
+          "providerControlledUpperBoundState": "SUPPORTED_BOUNDED",
+          "unresolvedIncludingCanonicalResidualMinor": 308282
+        },
+        "establishedCurrentComponents": [],
+        "summary": {
+          "governedOffersConsidered": 6,
+          "currentComponentsEstablished": 0,
+          "matchedComparisons": 0,
+          "qualificationEvidenceOnly": 0,
+          "commercialFactsOnly": 0,
+          "blockedComparisons": 0,
+          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
+          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
+        },
+        "attempts": [],
+        "canonicalFingerprintBefore": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
+        "canonicalFingerprintAfter": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
+        "canonicalFingerprintInvariant": true
+      },
+      {
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "statementPeriod": {
+          "start": "2024-09-01",
+          "end": "2024-09-30"
+        },
+        "processor": "Wells Fargo",
+        "channel": "mixed",
+        "feeRowsEvaluated": 104,
+        "pricingModel": {
+          "state": "supported",
+          "model": "interchange_plus",
+          "confidence": "medium",
+          "relevantPopulation": "statement_population_with_separately_itemized_interchange_and_network_costs"
+        },
+        "commercialEconomics": {
+          "totalCanonicalFeesMinor": 295438,
+          "providerControlledMinimumMinor": 47597,
+          "providerControlledUpperBoundMinor": 47597,
+          "providerControlledUpperBoundState": "SAME_AS_MINIMUM",
+          "unresolvedIncludingCanonicalResidualMinor": 74439
+        },
+        "establishedCurrentComponents": [
+          {
+            "feeRowId": "feerow_a60888ea6014932d75ac8357",
+            "printedLabel": "MASTERCARD - MASTERCARD WATS AUTH FEE 621 TRANSACTIONS AT 0.11",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 621,
+            "currentUnitPriceMinor": 11,
+            "amountState": "EXACT"
+          },
+          {
+            "feeRowId": "feerow_1bdcfc1ee7a1a6caa4910ad8",
+            "printedLabel": "VISA - VISA WATS AUTH FEE 3444 TRANSACTIONS AT 0.11",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 3444,
+            "currentUnitPriceMinor": 11,
+            "amountState": "EXACT"
+          },
+          {
+            "feeRowId": "feerow_43428fb1881ccdb100f65b65",
+            "printedLabel": "DISCOVER - DISCOVER WATS AUTH FEE 62 TRANSACTIONS AT 0.11",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 62,
+            "currentUnitPriceMinor": 11,
+            "amountState": "EXACT"
+          },
+          {
+            "feeRowId": "feerow_73803c61e765e32a4ce3445c",
+            "printedLabel": "AMERICAN EXPRESS - AMEX WATS AUTH FEE 117 TRANSACTIONS AT 0.11",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 117,
+            "currentUnitPriceMinor": 11,
+            "amountState": "EXACT"
+          },
+          {
+            "feeRowId": "feerow_94005b9aa4f79697cec08eec",
+            "printedLabel": "Other - AVS WATS AUTHORIZATION FEE 120 TRANSACTIONS AT 0.05",
+            "componentKind": "authorization_fee",
+            "channel": "mixed",
+            "populationCount": 120,
+            "currentUnitPriceMinor": 5,
+            "amountState": "EXACT"
+          }
+        ],
+        "summary": {
+          "governedOffersConsidered": 6,
+          "currentComponentsEstablished": 5,
+          "matchedComparisons": 0,
+          "qualificationEvidenceOnly": 0,
+          "commercialFactsOnly": 0,
+          "blockedComparisons": 18,
+          "result": "COMPARISON_BLOCKED",
+          "explanation": "At least one plausible component alignment was attempted, but a required evidence gate remained unresolved or mismatched."
+        },
+        "attempts": [
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cnp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cnp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cnp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Retail / Storefront",
+            "alternativeComponentRef": "component_dharma_retail_amex_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_vmd_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "Standard Virtual / Online",
+            "alternativeComponentRef": "component_dharma_virtual_amex_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          },
+          {
+            "alternativeProvider": "dharma_merchant_services",
+            "alternativeOffer": "High Volume",
+            "alternativeComponentRef": "component_dharma_high_volume_cnp_auth_v1",
+            "result": "COMPARISON_UNAVAILABLE",
+            "comparisonPerformed": false,
+            "action": "NONE",
+            "stoppingReason": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period.",
+            "smallestUnlocker": "Period-applicable governed commercial evidence for the statement period."
+          }
+        ],
+        "canonicalFingerprintBefore": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
+        "canonicalFingerprintAfter": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
+        "canonicalFingerprintInvariant": true
+      }
+    ]
+  },
+  "requiredRuntimeControls": {
+    "exactMatched": {
+      "pass": true,
+      "outcome": "VALID_CONDITIONAL_COMPONENT_COMPARISON"
+    },
+    "qualifiesNoCurrentMatch": {
+      "pass": true,
+      "outcome": "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE"
+    },
+    "channelMismatch": {
+      "pass": true,
+      "outcome": "The current merchant activity channel does not match the governed alternative component channel."
+    },
+    "mixedPopulation": {
+      "pass": true,
+      "outcome": "CP versus CNP transaction and volume split for the current component."
+    },
+    "upperBound": {
+      "pass": true,
+      "outcome": "VALID_BOUNDED_COMPONENT_COMPARISON"
+    },
+    "historicalCurrentOnly": {
+      "pass": true,
+      "outcome": "The alternative has current-only or later-observed evidence and cannot be projected backward into this statement period."
+    },
+    "gatewayOnly": {
+      "pass": true,
+      "outcome": "VALID_CONDITIONAL_COMPONENT_COMPARISON"
+    },
+    "noApplicableAlternative": {
+      "pass": true,
+      "outcome": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
+    }
+  },
+  "prohibitedCounters": {
+    "canonicalFingerprintChanges": 0,
+    "historicalCurrentOnlyComparisons": 0,
+    "nonComparisonReviewSignals": 0,
+    "blockedArithmetic": 0,
+    "qualificationArithmetic": 0,
+    "commercialFactArithmetic": 0,
+    "customerRenderingEnabled": 0,
+    "marketVerdictsEnabled": 0,
+    "gradesEnabled": 0,
+    "overpaymentVerdictsEnabled": 0,
+    "savingsOrAnnualizationEnabled": 0,
+    "switchingOrRankingEnabled": 0,
+    "canonicalMutationEnabled": 0
+  },
+  "knownUnrelatedIssuesNotRepaired": [
+    "Historical/current regression remains 5/6 because the pre-existing assertion expects zero governed conflicts but observes four.",
+    "Prior legacy public-source/exhaustive SIGSEGV/139 history was not investigated or repaired."
+  ]
+}
