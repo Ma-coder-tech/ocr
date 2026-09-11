@@ -41,6 +41,15 @@
       "shared/bundled",
       "unresolved controller",
       "upper-bound-only action"
+    ],
+    "blockerProjectionRule": "Preserve every refusal internally. Project at most one comparison-unavailable record per distinct merchant-verifiable unlocker class; suppress equivalent records. Period-only and generic evidence-maintenance refusals use only the report-level limitation.",
+    "merchantVerifiableUnlockerClasses": [
+      "exact billing population",
+      "payment-channel population split",
+      "service use or identity",
+      "exact billing basis",
+      "merchant-specific approval or quote",
+      "exact component amount"
     ]
   },
   "materialityBoundaryVerification": {
@@ -91,12 +100,19 @@
     "sourceFingerprintInvariant": true,
     "totals": {
       "decisions": 54,
-      "merchantVisibleShadowRecords": 54,
-      "reviewCurrentPricingActions": 0,
-      "matchedRuntimeComparisons": 0,
-      "blockedRuntimeComparisons": 54,
-      "qualificationEvidenceOnly": 0,
-      "commercialFactsOnly": 0
+      "merchantVisibleShadowRecords": 0,
+      "reviewCurrentPricingActions": 0
+    },
+    "beforeAfterVisibility": {
+      "beforeCorrectionMerchantVisibleRecords": 54,
+      "afterCorrectionMerchantVisibleRecords": 0,
+      "internalDecisionsAfterCorrection": 54
+    },
+    "representativeHistoricalSuppression": {
+      "statement": "Nov_2024_Statement.pdf",
+      "candidateId": "runtime:doc_725263a9ef928ce4:feerow_e84ad0381fe7bdfe112a7701:component_dharma_retail_vmd_auth_v1",
+      "internalDecisionPreserved": true,
+      "merchantProjection": "report_limitation_only"
     },
     "results": [
       {
@@ -108,27 +124,17 @@
         "canonicalFingerprintBefore": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
         "canonicalFingerprintAfter": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
         "canonicalFingerprintInvariant": true,
-        "runtimeSummary": {
-          "governedOffersConsidered": 6,
-          "currentComponentsEstablished": 6,
-          "matchedComparisons": 0,
-          "qualificationEvidenceOnly": 0,
-          "commercialFactsOnly": 0,
-          "blockedComparisons": 18,
-          "result": "COMPARISON_BLOCKED",
-          "explanation": "At least one plausible component alignment was attempted, but a required evidence gate remained unresolved or mismatched."
-        },
         "shadow": {
           "mode": "shadow_offline",
           "realCustomerRoutingAllowed": false,
           "decisionCount": 18,
-          "visibleCount": 18,
+          "visibleCount": 0,
           "actionCount": 0,
           "comparisonValidity": {
             "unavailable": 18
           },
           "visibilityModes": {
-            "comparison_unavailable": 18
+            "hidden": 18
           },
           "actionTypes": {
             "NONE": 18
@@ -147,27 +153,17 @@
         "canonicalFingerprintBefore": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
         "canonicalFingerprintAfter": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
         "canonicalFingerprintInvariant": true,
-        "runtimeSummary": {
-          "governedOffersConsidered": 6,
-          "currentComponentsEstablished": 6,
-          "matchedComparisons": 0,
-          "qualificationEvidenceOnly": 0,
-          "commercialFactsOnly": 0,
-          "blockedComparisons": 18,
-          "result": "COMPARISON_BLOCKED",
-          "explanation": "At least one plausible component alignment was attempted, but a required evidence gate remained unresolved or mismatched."
-        },
         "shadow": {
           "mode": "shadow_offline",
           "realCustomerRoutingAllowed": false,
           "decisionCount": 18,
-          "visibleCount": 18,
+          "visibleCount": 0,
           "actionCount": 0,
           "comparisonValidity": {
             "unavailable": 18
           },
           "visibilityModes": {
-            "comparison_unavailable": 18
+            "hidden": 18
           },
           "actionTypes": {
             "NONE": 18
@@ -186,16 +182,6 @@
         "canonicalFingerprintBefore": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
         "canonicalFingerprintAfter": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
         "canonicalFingerprintInvariant": true,
-        "runtimeSummary": {
-          "governedOffersConsidered": 6,
-          "currentComponentsEstablished": 0,
-          "matchedComparisons": 0,
-          "qualificationEvidenceOnly": 0,
-          "commercialFactsOnly": 0,
-          "blockedComparisons": 0,
-          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
-          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
-        },
         "shadow": {
           "mode": "shadow_offline",
           "realCustomerRoutingAllowed": false,
@@ -219,16 +205,6 @@
         "canonicalFingerprintBefore": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
         "canonicalFingerprintAfter": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
         "canonicalFingerprintInvariant": true,
-        "runtimeSummary": {
-          "governedOffersConsidered": 6,
-          "currentComponentsEstablished": 0,
-          "matchedComparisons": 0,
-          "qualificationEvidenceOnly": 0,
-          "commercialFactsOnly": 0,
-          "blockedComparisons": 0,
-          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
-          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
-        },
         "shadow": {
           "mode": "shadow_offline",
           "realCustomerRoutingAllowed": false,
@@ -252,16 +228,6 @@
         "canonicalFingerprintBefore": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
         "canonicalFingerprintAfter": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
         "canonicalFingerprintInvariant": true,
-        "runtimeSummary": {
-          "governedOffersConsidered": 6,
-          "currentComponentsEstablished": 0,
-          "matchedComparisons": 0,
-          "qualificationEvidenceOnly": 0,
-          "commercialFactsOnly": 0,
-          "blockedComparisons": 0,
-          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
-          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
-        },
         "shadow": {
           "mode": "shadow_offline",
           "realCustomerRoutingAllowed": false,
@@ -285,16 +251,6 @@
         "canonicalFingerprintBefore": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
         "canonicalFingerprintAfter": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
         "canonicalFingerprintInvariant": true,
-        "runtimeSummary": {
-          "governedOffersConsidered": 6,
-          "currentComponentsEstablished": 0,
-          "matchedComparisons": 0,
-          "qualificationEvidenceOnly": 0,
-          "commercialFactsOnly": 0,
-          "blockedComparisons": 0,
-          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
-          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
-        },
         "shadow": {
           "mode": "shadow_offline",
           "realCustomerRoutingAllowed": false,
@@ -318,16 +274,6 @@
         "canonicalFingerprintBefore": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
         "canonicalFingerprintAfter": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
         "canonicalFingerprintInvariant": true,
-        "runtimeSummary": {
-          "governedOffersConsidered": 6,
-          "currentComponentsEstablished": 0,
-          "matchedComparisons": 0,
-          "qualificationEvidenceOnly": 0,
-          "commercialFactsOnly": 0,
-          "blockedComparisons": 0,
-          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
-          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
-        },
         "shadow": {
           "mode": "shadow_offline",
           "realCustomerRoutingAllowed": false,
@@ -351,16 +297,6 @@
         "canonicalFingerprintBefore": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
         "canonicalFingerprintAfter": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
         "canonicalFingerprintInvariant": true,
-        "runtimeSummary": {
-          "governedOffersConsidered": 6,
-          "currentComponentsEstablished": 0,
-          "matchedComparisons": 0,
-          "qualificationEvidenceOnly": 0,
-          "commercialFactsOnly": 0,
-          "blockedComparisons": 0,
-          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
-          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
-        },
         "shadow": {
           "mode": "shadow_offline",
           "realCustomerRoutingAllowed": false,
@@ -384,16 +320,6 @@
         "canonicalFingerprintBefore": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
         "canonicalFingerprintAfter": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
         "canonicalFingerprintInvariant": true,
-        "runtimeSummary": {
-          "governedOffersConsidered": 6,
-          "currentComponentsEstablished": 0,
-          "matchedComparisons": 0,
-          "qualificationEvidenceOnly": 0,
-          "commercialFactsOnly": 0,
-          "blockedComparisons": 0,
-          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
-          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
-        },
         "shadow": {
           "mode": "shadow_offline",
           "realCustomerRoutingAllowed": false,
@@ -417,16 +343,6 @@
         "canonicalFingerprintBefore": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
         "canonicalFingerprintAfter": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
         "canonicalFingerprintInvariant": true,
-        "runtimeSummary": {
-          "governedOffersConsidered": 6,
-          "currentComponentsEstablished": 0,
-          "matchedComparisons": 0,
-          "qualificationEvidenceOnly": 0,
-          "commercialFactsOnly": 0,
-          "blockedComparisons": 0,
-          "result": "NO_APPLICABLE_GOVERNED_ALTERNATIVE",
-          "explanation": "No admitted alternative component safely matched an established current merchant component; this is not a no-savings conclusion."
-        },
         "shadow": {
           "mode": "shadow_offline",
           "realCustomerRoutingAllowed": false,
@@ -450,27 +366,17 @@
         "canonicalFingerprintBefore": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
         "canonicalFingerprintAfter": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
         "canonicalFingerprintInvariant": true,
-        "runtimeSummary": {
-          "governedOffersConsidered": 6,
-          "currentComponentsEstablished": 5,
-          "matchedComparisons": 0,
-          "qualificationEvidenceOnly": 0,
-          "commercialFactsOnly": 0,
-          "blockedComparisons": 18,
-          "result": "COMPARISON_BLOCKED",
-          "explanation": "At least one plausible component alignment was attempted, but a required evidence gate remained unresolved or mismatched."
-        },
         "shadow": {
           "mode": "shadow_offline",
           "realCustomerRoutingAllowed": false,
           "decisionCount": 18,
-          "visibleCount": 18,
+          "visibleCount": 0,
           "actionCount": 0,
           "comparisonValidity": {
             "unavailable": 18
           },
           "visibilityModes": {
-            "comparison_unavailable": 18
+            "hidden": 18
           },
           "actionTypes": {
             "NONE": 18
@@ -482,20 +388,27 @@
       }
     ]
   },
+  "representativeDistinctUsefulBlocker": {
+    "focusedControl": "merchant-specific approval or quote",
+    "result": "one merchant-safe comparison-unavailable record remains visible",
+    "action": "VERIFY",
+    "namedAlternative": false,
+    "comparisonArithmeticAdded": false
+  },
   "safetyCounters": {
     "canonicalFingerprintChanges": 0,
     "commercialSourceFingerprintChanges": 0,
     "realCustomerRoutingEnabled": 0,
     "prohibitedProjectionPermissionsEnabled": 0,
     "internalSignalIgnoreFailures": 0,
-    "historicalMatchedComparisons": 0,
+    "historicalComparisonLeakDetected": 0,
     "webOrAiOperations": 0,
     "newCommercialKnowledgeAdmissions": 0,
     "gradesMarketSavingsAnnualizationSwitchingOrRankingOutputs": 0
   },
   "verification": {
-    "focusedPermissionProjection": "57/57 passed",
-    "relevantCommercialGovernanceAndAnalyst": "121/121 passed across 8 focused files",
+    "focusedPermissionProjection": "60/60 passed",
+    "relevantCommercialGovernanceAndAnalyst": "124/124 passed across 8 focused files",
     "historicalCurrentKnownRegression": "5/6 passed; the accepted pre-existing assertion expected zero governed conflicts and observed four",
     "typecheckAndBuild": "passed",
     "legacyExhaustiveSigsegvHistory": "not rerun or investigated"

@@ -183,10 +183,11 @@ const DEFAULT_REGISTRIES = [
 export function projectMerchantCommercialCandidatesV1(input: {
   candidates: MerchantCommercialProjectionCandidateV1[];
 }): MerchantCommercialFindingShadowProjectionV1 {
-  const decisions = input.candidates.map(evaluateMerchantCommercialFindingCandidateV1);
+  const evaluatedDecisions = input.candidates.map(evaluateMerchantCommercialFindingCandidateV1);
+  const decisions = applyMerchantBlockerProjectionRule(input.candidates, evaluatedDecisions);
   enforceDirectionalFairness(decisions);
   const safe = decisions.flatMap((decision) => decision.customerSafeRecord ? [decision.customerSafeRecord] : []);
-  const comparisonLimited = decisions.some((decision) => decision.visibility.mode === "comparison_unavailable")
+  const comparisonLimited = evaluatedDecisions.some((decision) => decision.visibility.mode === "comparison_unavailable")
     || input.candidates.some((candidate) => candidate.offsets.state === "incomplete");
   const projection: MerchantCommercialFindingShadowProjectionV1 = {
     projectionVersion: MERCHANT_COMMERCIAL_FINDING_PERMISSION_PROJECTION_V1,
@@ -218,6 +219,56 @@ export function projectMerchantCommercialCandidatesV1(input: {
   const copyErrors = validateMerchantSafeCommercialProjectionV1(projection.customerSafeProjection);
   if (copyErrors.length > 0) throw new Error(`merchant_commercial_copy_invalid:${copyErrors.join(",")}`);
   return deepFreeze(projection);
+}
+
+function applyMerchantBlockerProjectionRule(
+  candidates: MerchantCommercialProjectionCandidateV1[],
+  decisions: MerchantCommercialFindingDecisionV1[],
+): MerchantCommercialFindingDecisionV1[] {
+  const seenUsefulUnlockers = new Set<string>();
+  return decisions.map((decision, index) => {
+    if (decision.visibility.mode !== "comparison_unavailable") return decision;
+    const candidate = candidates[index]!;
+    const usefulUnlockerKey = distinctMerchantUsefulUnlockerKey(candidate, decision);
+    if (usefulUnlockerKey === null) return suppressMerchantBlocker(decision, "merchant_projection_report_limitation_only");
+    if (seenUsefulUnlockers.has(usefulUnlockerKey)) return suppressMerchantBlocker(decision, "merchant_projection_equivalent_blocker_consolidated");
+    seenUsefulUnlockers.add(usefulUnlockerKey);
+    return decision;
+  });
+}
+
+function distinctMerchantUsefulUnlockerKey(
+  candidate: MerchantCommercialProjectionCandidateV1,
+  decision: MerchantCommercialFindingDecisionV1,
+): string | null {
+  const failedGate = Object.entries(candidate.revalidation).find(([, state]) => state !== "matched")?.[0] ?? null;
+  if (failedGate === "population") return "exact_billing_population";
+  if (failedGate === "channel") return "payment_channel_population_split";
+  if (failedGate === "serviceIdentity") return "service_use_or_identity";
+  if (failedGate === "unitBillingBasis") return "exact_billing_basis";
+  if (failedGate !== null) return null;
+  if (decision.reasonCodes.includes("public_policy_unknown")) return "merchant_specific_approval_or_quote";
+  if (decision.reasonCodes.includes("comparison_amount_state_mismatch")) return "exact_component_amount";
+  const unlocker = candidate.internalFinding.conclusion.smallestUnlocker?.toLowerCase() ?? "";
+  if (/cp\/?cnp|card.present|card.not.present|channel split/.test(unlocker)) return "payment_channel_population_split";
+  if (/population|billed activity|transaction split|event count/.test(unlocker)) return "exact_billing_population";
+  if (/approval|approved|merchant.specific quote|account quote/.test(unlocker)) return "merchant_specific_approval_or_quote";
+  if (/billing basis|gross volume|net volume|submitted volume|refund.adjusted/.test(unlocker)) return "exact_billing_basis";
+  if (/service use|service identity/.test(unlocker)) return "service_use_or_identity";
+  return null;
+}
+
+function suppressMerchantBlocker(
+  decision: MerchantCommercialFindingDecisionV1,
+  disposition: "merchant_projection_report_limitation_only" | "merchant_projection_equivalent_blocker_consolidated",
+): MerchantCommercialFindingDecisionV1 {
+  return {
+    ...decision,
+    visibility: { permitted: false, mode: "hidden" },
+    namedAlternativePermitted: false,
+    reasonCodes: unique([...decision.reasonCodes, disposition]),
+    customerSafeRecord: null,
+  };
 }
 
 export function evaluateMerchantCommercialFindingCandidateV1(
@@ -550,6 +601,12 @@ function comparisonUnavailableDetails(
     return {
       blocker: "the current or published amount is not exact enough for the proposed arithmetic.",
       unlocker: "Compatible exact or explicitly bounded amounts for both components.",
+    };
+  }
+  if (decision.reasonCodes.includes("public_policy_unknown")) {
+    return {
+      blocker: "public information does not establish that this offer is available to this merchant.",
+      unlocker: "Merchant-specific approval or a merchant-specific quote for the named offer.",
     };
   }
   return {

@@ -30,6 +30,13 @@ const GOLD: Array<{ file: string; businessType: BusinessTypeId }> = [
 
 const sourceFingerprintBefore = commercialSemanticFingerprintV1(REGISTRIES);
 const statements = [];
+let historicalComparisonLeaks = 0;
+let representativeHistoricalSuppression: {
+  statement: string;
+  candidateId: string;
+  internalDecisionPreserved: true;
+  merchantProjection: "report_limitation_only";
+} | null = null;
 for (const fixture of GOLD) {
   const document = await parsePdf(`test/fixtures/pdfs/${fixture.file}`);
   const analysis = buildCanonicalStatementFactsFromParsedDocument(document, { sourceFileName: fixture.file, businessType: fixture.businessType });
@@ -37,13 +44,22 @@ for (const fixture of GOLD) {
   const report = buildInternalAnalystFindingV1({ analysis, statementContext: US_CONTEXT, asOf: "2026-09-11" });
   const canonicalAfter = canonicalFinancialTruthFingerprint(analysis);
   const projection = report.merchantCommercialFindingShadowProjection;
+  historicalComparisonLeaks += report.commercialComparisonAttachment.attempts.filter((attempt) => attempt.comparisonPerformed).length;
+  const historicalSuppression = projection.decisions.find((item) => item.reasonCodes.includes("merchant_projection_report_limitation_only"));
+  if (representativeHistoricalSuppression === null && historicalSuppression) {
+    representativeHistoricalSuppression = {
+      statement: fixture.file,
+      candidateId: historicalSuppression.candidateId,
+      internalDecisionPreserved: true,
+      merchantProjection: "report_limitation_only",
+    };
+  }
   statements.push({
     file: fixture.file,
     statementPeriod: report.statementPeriod,
     canonicalFingerprintBefore: canonicalBefore,
     canonicalFingerprintAfter: canonicalAfter,
     canonicalFingerprintInvariant: canonicalBefore === canonicalAfter && report.canonicalFinancialTruth.unchanged,
-    runtimeSummary: report.commercialComparisonAttachment.summary,
     shadow: {
       mode: projection.mode,
       realCustomerRoutingAllowed: projection.realCustomerRoutingAllowed,
@@ -64,10 +80,6 @@ const totals = {
   decisions: statements.reduce((sum, item) => sum + item.shadow.decisionCount, 0),
   merchantVisibleShadowRecords: statements.reduce((sum, item) => sum + item.shadow.visibleCount, 0),
   reviewCurrentPricingActions: statements.reduce((sum, item) => sum + item.shadow.actionCount, 0),
-  matchedRuntimeComparisons: statements.reduce((sum, item) => sum + item.runtimeSummary.matchedComparisons, 0),
-  blockedRuntimeComparisons: statements.reduce((sum, item) => sum + item.runtimeSummary.blockedComparisons, 0),
-  qualificationEvidenceOnly: statements.reduce((sum, item) => sum + item.runtimeSummary.qualificationEvidenceOnly, 0),
-  commercialFactsOnly: statements.reduce((sum, item) => sum + item.runtimeSummary.commercialFactsOnly, 0),
 };
 const safetyCounters = {
   canonicalFingerprintChanges: statements.filter((item) => !item.canonicalFingerprintInvariant).length,
@@ -75,7 +87,7 @@ const safetyCounters = {
   realCustomerRoutingEnabled: statements.filter((item) => item.shadow.realCustomerRoutingAllowed).length,
   prohibitedProjectionPermissionsEnabled: statements.reduce((sum, item) => sum + item.shadow.prohibitedPermissionsEnabled.length, 0),
   internalSignalIgnoreFailures: statements.filter((item) => !item.shadow.allInternalSignalsIgnored).length,
-  historicalMatchedComparisons: totals.matchedRuntimeComparisons,
+  historicalComparisonLeakDetected: historicalComparisonLeaks,
   webOrAiOperations: 0,
   newCommercialKnowledgeAdmissions: 0,
   gradesMarketSavingsAnnualizationSwitchingOrRankingOutputs: 0,
@@ -101,6 +113,8 @@ const evaluation = {
     supportedRuntimeComponentClasses: ["provider-controlled per-authorization", "provider-controlled gateway transaction", "provider-controlled batch when exactly reconstructed"],
     directEvaluatorClasses: ["variable", "fixed_monthly", "episodic"],
     intentionallyFailClosedRuntimeClasses: ["percentage without exact denominator/population bridge", "fixed monthly without exact cadence/service bridge", "episodic without matching event support", "network/pass-through", "shared/bundled", "unresolved controller", "upper-bound-only action"],
+    blockerProjectionRule: "Preserve every refusal internally. Project at most one comparison-unavailable record per distinct merchant-verifiable unlocker class; suppress equivalent records. Period-only and generic evidence-maintenance refusals use only the report-level limitation.",
+    merchantVerifiableUnlockerClasses: ["exact billing population", "payment-channel population split", "service use or identity", "exact billing basis", "merchant-specific approval or quote", "exact component amount"],
   },
   materialityBoundaryVerification: {
     focusedTestFile: "test/canonical/merchantCommercialFindingPermissionProjectionV1.test.ts",
@@ -120,12 +134,25 @@ const evaluation = {
     sourceFingerprintAfter,
     sourceFingerprintInvariant: sourceFingerprintBefore === sourceFingerprintAfter,
     totals,
+    beforeAfterVisibility: {
+      beforeCorrectionMerchantVisibleRecords: 54,
+      afterCorrectionMerchantVisibleRecords: totals.merchantVisibleShadowRecords,
+      internalDecisionsAfterCorrection: totals.decisions,
+    },
+    representativeHistoricalSuppression,
     results: statements,
+  },
+  representativeDistinctUsefulBlocker: {
+    focusedControl: "merchant-specific approval or quote",
+    result: "one merchant-safe comparison-unavailable record remains visible",
+    action: "VERIFY",
+    namedAlternative: false,
+    comparisonArithmeticAdded: false,
   },
   safetyCounters,
   verification: {
-    focusedPermissionProjection: "57/57 passed",
-    relevantCommercialGovernanceAndAnalyst: "121/121 passed across 8 focused files",
+    focusedPermissionProjection: "60/60 passed",
+    relevantCommercialGovernanceAndAnalyst: "124/124 passed across 8 focused files",
     historicalCurrentKnownRegression: "5/6 passed; the accepted pre-existing assertion expected zero governed conflicts and observed four",
     typecheckAndBuild: "passed",
     legacyExhaustiveSigsegvHistory: "not rerun or investigated",
@@ -181,18 +208,25 @@ function renderReport(value: typeof evaluation): string {
     "- Public prohibition hides and does not name the alternative. Incomplete or reversing offset scope prevents pricing-review action. Population, basis, layer, channel, period, offer, and control mismatches become comparison unavailable.",
     "- Qualification, commercial fact, and blocker findings never acquire comparison arithmetic or REVIEW_CURRENT_PRICING.",
     "- Directional fairness uses one symmetric selection rule for current-costs-more and current-costs-less results in the same scope.",
+    `- Blocker projection rule: ${value.architecture.blockerProjectionRule}`,
     "",
     "## Full supported Fiserv Gold corpus",
     "",
     `- Statements: ${value.goldCorpus.statements}`,
     `- Canonical fingerprints unchanged: ${value.goldCorpus.canonicalFingerprintInvariant ? "11/11" : "FAIL"}`,
     `- Governed commercial-source fingerprint unchanged: ${value.goldCorpus.sourceFingerprintInvariant ? "PASS" : "FAIL"}`,
-    `- Shadow decisions: ${value.goldCorpus.totals.decisions}`,
-    `- Merchant-visible shadow records: ${value.goldCorpus.totals.merchantVisibleShadowRecords}`,
+    `- Internal shadow decisions preserved: ${value.goldCorpus.beforeAfterVisibility.internalDecisionsAfterCorrection}`,
+    `- Merchant-visible shadow records before correction: ${value.goldCorpus.beforeAfterVisibility.beforeCorrectionMerchantVisibleRecords}`,
+    `- Merchant-visible shadow records after correction: ${value.goldCorpus.beforeAfterVisibility.afterCorrectionMerchantVisibleRecords}`,
     `- Shadow pricing-review actions: ${value.goldCorpus.totals.reviewCurrentPricingActions}`,
-    `- Historical matched comparisons: ${value.goldCorpus.totals.matchedRuntimeComparisons}`,
     "",
     "All 11 Gold statements predate the admitted current commercial offers, so the historical/current firewall correctly prevents matched current-offer comparisons. Any comparison-unavailable shadow explanation remains non-routing and is not evidence that pricing is good or bad.",
+    "",
+    "## Representative consolidation outcomes",
+    "",
+    `- Historical case: ${value.goldCorpus.representativeHistoricalSuppression?.statement ?? "unavailable"} retains candidate \`${value.goldCorpus.representativeHistoricalSuppression?.candidateId ?? "unavailable"}\` internally, while merchant projection uses only the report limitation. Repeated current-offer-versus-historical-period refusals do not create individual notices.`,
+    `- Distinct useful blocker: ${value.representativeDistinctUsefulBlocker.focusedControl} remains one VERIFY record, without naming an unavailable alternative or adding comparison arithmetic.`,
+    "- The merchant-safe projection contains no blocker, comparison, opportunity, or savings tallies.",
     "",
     "## Safety counters",
     "",

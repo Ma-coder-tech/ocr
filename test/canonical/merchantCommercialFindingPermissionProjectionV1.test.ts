@@ -215,6 +215,53 @@ describe("Merchant Commercial Finding Permission & Projection v1", () => {
     expect(validateMerchantSafeCommercialProjectionV1(projection.customerSafeProjection)).toEqual([]);
     expect(projection.realCustomerRoutingAllowed).toBe(false);
   });
+
+  it("preserves repeated historical refusals internally while using only the report-level limitation for merchant projection", () => {
+    const candidates = ["historical-a", "historical-b", "historical-c"].map((candidateId) => {
+      const value = candidate({ finding: exactFinding(5_000), candidateId });
+      value.revalidation.statementPeriod = "mismatch";
+      return value;
+    });
+    const projection = projectMerchantCommercialCandidatesV1({ candidates });
+    expect(projection.decisions).toHaveLength(3);
+    expect(projection.decisions.every((item) => item.comparisonValidity === "unavailable")).toBe(true);
+    expect(projection.decisions.every((item) => item.reasonCodes.includes("statementPeriod_mismatch"))).toBe(true);
+    expect(projection.decisions.every((item) => item.reasonCodes.includes("merchant_projection_report_limitation_only"))).toBe(true);
+    expect(projection.customerSafeProjection.findings).toEqual([]);
+    expect(projection.customerSafeProjection.reportLimitation).toContain("does not mean the pricing is good or bad");
+  });
+
+  it("consolidates equivalent useful blockers but preserves distinct merchant-verifiable unlockers", () => {
+    const populationA = candidate({ finding: exactFinding(5_000), candidateId: "population-a" });
+    const populationB = candidate({ finding: exactFinding(5_000), candidateId: "population-b" });
+    const channel = candidate({ finding: exactFinding(5_000), candidateId: "channel" });
+    populationA.revalidation.population = "mismatch";
+    populationB.revalidation.population = "mismatch";
+    channel.revalidation.channel = "mismatch";
+    const projection = projectMerchantCommercialCandidatesV1({ candidates: [populationA, populationB, channel] });
+    expect(projection.decisions).toHaveLength(3);
+    expect(projection.customerSafeProjection.findings).toHaveLength(2);
+    expect(projection.decisions.find((item) => item.candidateId === "population-b")?.reasonCodes)
+      .toContain("merchant_projection_equivalent_blocker_consolidated");
+    expect(projection.customerSafeProjection.findings.map((item) => item.smallestUnlocker)).toEqual(expect.arrayContaining([
+      "A supported bridge showing that both prices apply to the same billed activity.",
+      "A supported card-present, card-not-present, or gateway activity split.",
+    ]));
+  });
+
+  it("keeps a merchant-specific approval or quote blocker visible as a distinct useful next fact", () => {
+    const projection = projectMerchantCommercialCandidatesV1({
+      candidates: [candidate({ finding: exactFinding(5_000), candidateId: "approval", publicPolicy: "public_policy_unknown" })],
+    });
+    expect(projection.decisions[0]).toMatchObject({
+      comparisonValidity: "valid_exact",
+      visibility: { permitted: true, mode: "comparison_unavailable" },
+      action: { permitted: false, type: "NONE" },
+    });
+    expect(projection.customerSafeProjection.findings[0]?.smallestUnlocker).toMatch(/merchant-specific approval.*quote/i);
+    expect(projection.customerSafeProjection.findings[0]?.alternative).toBeNull();
+    expect(projection.customerSafeProjection.reportLimitation).toContain("does not mean the pricing is good or bad");
+  });
 });
 
 type CandidatePatch = {
