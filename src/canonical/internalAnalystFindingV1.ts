@@ -49,6 +49,11 @@ import {
   buildRuntimeCommercialComparisonAttachmentV1,
   type RuntimeCommercialComparisonAttachmentV1,
 } from "./runtimeCommercialComparisonAttachmentV1.js";
+import { buildCommercialDecompositionContractV1 } from "./commercialDecompositionContractV1.js";
+import {
+  buildMerchantCommercialFindingShadowProjectionFromRuntimeV1,
+  type MerchantCommercialFindingShadowProjectionV1,
+} from "./merchantCommercialFindingPermissionProjectionV1.js";
 
 export const INTERNAL_ANALYST_FINDING_V1_SCHEMA_VERSION = "internal_analyst_finding_v1" as const;
 
@@ -274,6 +279,7 @@ export type InternalAnalystFindingReportV1 = {
   merchantContext: InternalAnalystMerchantContext;
   findings: InternalAnalystFinding[];
   commercialComparisonAttachment: RuntimeCommercialComparisonAttachmentV1;
+  merchantCommercialFindingShadowProjection: MerchantCommercialFindingShadowProjectionV1;
   researchQueue: InternalAnalystResearchQueueV1;
   coverage: {
     materialFeeRows: number;
@@ -371,6 +377,10 @@ export function buildInternalAnalystFindingV1(input: {
     knowledge,
     merchantContext,
   });
+  const merchantCommercialFindingShadowProjection = buildMerchantCommercialFindingShadowProjectionFromRuntimeV1({
+    attachment: commercialComparisonAttachment,
+    decomposition: buildCommercialDecompositionContractV1({ analysis: input.analysis, knowledge }),
+  });
   const researchQueue = buildInternalAnalystResearchQueue(input.analysis, findings);
   const after = canonicalFinancialTruthFingerprint(input.analysis);
   if (before !== after) throw new Error("internal_analyst_finding_mutated_canonical_financial_truth");
@@ -415,6 +425,7 @@ export function buildInternalAnalystFindingV1(input: {
     merchantContext,
     findings,
     commercialComparisonAttachment,
+    merchantCommercialFindingShadowProjection,
     researchQueue,
     coverage: coverage(findings, contributions, researchQueue, knowledge.datedNetworkFeeEvidence.statementNotices.length),
     limitations: [
@@ -438,6 +449,7 @@ export function buildInternalAnalystFindingV1(input: {
       "Open-world determinant analysis treats exact identity as independent from economic family, control, mechanic, materiality, and actionability; unknown is never used as a fee family.",
       "Research is escalated only for material determinant gaps, conflicts, or applicable dated-value questions; determinant sufficiency is an explicit stopping condition.",
       "Runtime commercial comparison is internal-only and requires independent current-component, governed-alternative, and matched-population evidence; refusals do not imply no savings.",
+      "Merchant commercial finding projection is shadow/offline only; its independent validity, visibility, and action permissions are not routed to the real customer report.",
     ],
   };
   return deepFreeze(report);
