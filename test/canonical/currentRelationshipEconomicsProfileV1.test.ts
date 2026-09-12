@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { CommercialDecompositionContractV1, CommercialDecompositionRowV1 } from "../../src/canonical/commercialDecompositionContractV1.js";
 import {
   buildCurrentRelationshipEconomicsProfileV1,
+  type CurrentEconomicsActivityAdmissionV1,
   type CurrentRelationshipEconomicsProfileV1,
 } from "../../src/canonical/currentRelationshipEconomicsProfileV1.js";
 import type { CanonicalEconomicsV2EconomicAnalysis } from "../../src/canonical/v2/economicTypes.js";
@@ -40,6 +41,60 @@ describe("Single-Statement Current Relationship Economics Profile v1", () => {
     const incompatible = profile(incompatibleEconomic);
     expect(incompatible.activity.averageTicket).toMatchObject({ state: "UNKNOWN", value: null });
     expect(incompatible.costStructureSensitivity.averageTicketUsed).toBe(false);
+  });
+
+  it("admits an exact statement-evidenced population into the profile without mutating canonical truth", () => {
+    const economic = cloneEconomic();
+    const canonicalBefore = structuredClone(economic.pricingAnalysis.foundation.financialPopulations.submittedTransactionCount);
+    economic.pricingAnalysis.foundation.financialPopulations.refundTransactionCount = {
+      ...economic.pricingAnalysis.foundation.financialPopulations.refundTransactionCount,
+      status: "unavailable", value: null,
+    };
+    const result = buildCurrentRelationshipEconomicsProfileV1({
+      economic,
+      commercialDecomposition: decomp().contract,
+      activityAdmissions: {
+        transactionCount: activityAdmission("transactionCount", "submitted_transaction_count", 42),
+        refundTransactionCount: activityAdmission("refundTransactionCount", "refund_transaction_count", 0),
+      },
+    });
+    expect(result.activity.transactionCount).toMatchObject({ state: "KNOWN", value: 42, population: "submitted_transaction_count" });
+    expect(result.activity.refundTransactionCount).toMatchObject({ state: "KNOWN_ABSENT", value: 0 });
+    expect(economic.pricingAnalysis.foundation.financialPopulations.submittedTransactionCount).toEqual(canonicalBefore);
+  });
+
+  it("fails closed on a wrong field, population, source, missing control, or canonical conflict", () => {
+    const build = (admission: CurrentEconomicsActivityAdmissionV1<number>) => buildCurrentRelationshipEconomicsProfileV1({
+      economic: cloneEconomic(), commercialDecomposition: decomp().contract,
+      activityAdmissions: { transactionCount: admission },
+    });
+    expect(() => build({ ...activityAdmission("grossSaleTransactionCount", "submitted_transaction_count", 42) }))
+      .toThrow("CURRENT_ECONOMICS_ACTIVITY_ADMISSION_FIELD_MISMATCH");
+    expect(() => build({ ...activityAdmission("transactionCount", "gross_sale_transaction_count", 42) }))
+      .toThrow("CURRENT_ECONOMICS_ACTIVITY_ADMISSION_POPULATION_MISMATCH");
+    expect(() => build({ ...activityAdmission("transactionCount", "submitted_transaction_count", 42), sourceDocumentRef: "other.pdf" }))
+      .toThrow("CURRENT_ECONOMICS_ACTIVITY_ADMISSION_SOURCE_MISMATCH");
+    expect(() => build({ ...activityAdmission("transactionCount", "submitted_transaction_count", 42), controlRefs: [] }))
+      .toThrow("CURRENT_ECONOMICS_ACTIVITY_ADMISSION_EVIDENCE_REQUIRED");
+
+    const economic = cloneEconomic();
+    economic.pricingAnalysis.foundation.financialPopulations.submittedTransactionCount = {
+      ...economic.pricingAnalysis.foundation.financialPopulations.submittedTransactionCount,
+      status: "available", value: 41, provenanceStatus: "authoritative",
+    };
+    expect(() => buildCurrentRelationshipEconomicsProfileV1({
+      economic, commercialDecomposition: decomp().contract,
+      activityAdmissions: { transactionCount: activityAdmission("transactionCount", "submitted_transaction_count", 42) },
+    })).toThrow("CURRENT_ECONOMICS_ACTIVITY_ADMISSION_CONFLICT");
+  });
+
+  it("does not admit a positive activity population into a no-active-processing period", () => {
+    const economic = cloneEconomic();
+    economic.pricingAnalysis.pricingArchitecture.formulaCoverageStatus = "not_applicable_no_active_processing";
+    expect(() => buildCurrentRelationshipEconomicsProfileV1({
+      economic, commercialDecomposition: decomp().contract,
+      activityAdmissions: { transactionCount: activityAdmission("transactionCount", "submitted_transaction_count", 1) },
+    })).toThrow("CURRENT_ECONOMICS_ACTIVITY_ADMISSION_ACTIVE_VALUE_IN_INACTIVE_PERIOD");
   });
 
   it("projects each contributing RD charge into at most one Product-view location and reconciles to RD", () => {
@@ -259,6 +314,29 @@ function profile(
 
 function cloneEconomic(): CanonicalEconomicsV2EconomicAnalysis {
   return structuredClone(buildApprovedEconomics());
+}
+
+function activityAdmission(
+  field: CurrentEconomicsActivityAdmissionV1<number>["field"],
+  population: string,
+  value: number,
+): CurrentEconomicsActivityAdmissionV1<number> {
+  return {
+    admissionRef: `test-${field}`,
+    field,
+    population,
+    value,
+    evidenceAccess: "STATEMENT_DERIVABLE",
+    evidenceRefs: ["document-ir:test-line"],
+    sourceLayer: "fiserv_claim_scoped_activity_population_admission_v1",
+    sourceDocumentRef: "SYNTH-RC-PRICING",
+    exactPopulationIdentityProven: true,
+    reconciliationState: "DIRECT_SOURCE",
+    controlRefs: ["exact_test_population"],
+    canonicalMutationAllowed: false,
+    rdMutationAllowed: false,
+    limitations: [],
+  };
 }
 
 function bindMechanic(

@@ -107,20 +107,24 @@ export type FiservIndependentFundingBatchPopulation = {
 export function extractFiservIndependentCardSummary(ir: DocumentIR): FiservIndependentCardSummary {
   const lines = allLines(ir);
   const headingIndexes = lines.flatMap((line, index) => /\bsummary by card type\b/i.test(line.text) ? [index] : []);
-  if (headingIndexes.length !== 1) return emptyCardSummary(headingIndexes.length === 0
-    ? "DocumentIR has no SUMMARY BY CARD TYPE section."
-    : "DocumentIR has more than one SUMMARY BY CARD TYPE heading; the authority scope is ambiguous.");
+  if (headingIndexes.length === 0) return emptyCardSummary("DocumentIR has no SUMMARY BY CARD TYPE section.");
   const headingIndex = headingIndexes[0]!;
   const endIndex = lines.findIndex((line, index) => index > headingIndex && /\bsummary by batch\b|\bamounts funded by batch\b/i.test(line.text));
   if (endIndex < 0) return emptyCardSummary("DocumentIR could not bound SUMMARY BY CARD TYPE with a following batch section.");
   const section = lines.slice(headingIndex, endIndex);
   const headers = section.filter((line) => /^card type\s*\|/i.test(line.text.trim()));
   const totals = section.filter((line) => /^total\s*\|/i.test(line.text.trim()));
-  if (headers.length !== 1 || totals.length !== 1) {
-    return emptyCardSummary("DocumentIR requires exactly one card-summary header and exactly one total row.");
+  const headerShapes = new Set(headers.map((line) => normalizedCardSummaryHeader(line.text)));
+  const continuationHeadings = headingIndexes.filter((index) => index >= headingIndex && index < endIndex);
+  const continuationHeadingShapes = new Set(continuationHeadings.map((index) => normalizedCardSummaryHeading(lines[index]!.text)));
+  if (headers.length === 0 || totals.length !== 1 || headerShapes.size !== 1 || continuationHeadingShapes.size !== 1) {
+    return emptyCardSummary(
+      "DocumentIR requires one unambiguous card-summary header shape and exactly one total row; repeated identical continuation headings and headers are allowed.",
+    );
   }
-  const header = headers[0]!;
   const total = totals[0]!;
+  const headersBeforeTotal = headers.filter((line) => lines.indexOf(line) < lines.indexOf(total));
+  const header = headersBeforeTotal.at(-1) ?? headers[0]!;
   const cells = cellParts(total.text);
   const itemColumnCount = cellParts(header.text).filter((cell) => /^items$/i.test(cell)).length;
   if (![2, 3].includes(itemColumnCount) || cells.length !== (itemColumnCount === 3 ? 7 : 6)) {
@@ -162,10 +166,23 @@ export function extractFiservIndependentCardSummary(ir: DocumentIR): FiservIndep
     submittedCount: submittedCount === null ? null : value(submittedCount),
     formulaDeltaMinor: delta,
     formulaStatus: Math.abs(delta) <= 1 ? "pass" : "fail",
-    limitations: submittedCount === null
-      ? ["The source card-summary layout does not print a submitted-item total; no submitted-count claim was created."]
-      : [],
+    limitations: [
+      ...(submittedCount === null
+        ? ["The source card-summary layout does not print a submitted-item total; no submitted-count claim was created."]
+        : []),
+      ...(continuationHeadings.length > 1
+        ? ["Repeated identical SUMMARY BY CARD TYPE headings were treated as a continued table only because one header shape and one printed total bounded the population."]
+        : []),
+    ],
   };
+}
+
+function normalizedCardSummaryHeading(text: string): string {
+  return text.toUpperCase().replace(/\s+/g, " ").trim();
+}
+
+function normalizedCardSummaryHeader(text: string): string {
+  return cellParts(text).map((cell) => cell.toUpperCase().replace(/\s+/g, " ").trim()).join("|");
 }
 
 export function extractFiservIndependentAdjustmentChargeback(

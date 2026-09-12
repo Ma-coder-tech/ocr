@@ -76,6 +76,48 @@ export type CurrentEconomicsAuthorizationSettlementCompatibilityV1 = {
   evidenceRefs: string[];
 };
 
+export type CurrentEconomicsActivityAdmissionFieldV1 =
+  | "processedVolume"
+  | "grossSalesVolume"
+  | "refundVolume"
+  | "transactionCount"
+  | "grossSaleTransactionCount"
+  | "refundTransactionCount"
+  | "authorizationCount"
+  | "chargebackCount"
+  | "chargebackFee"
+  | "averageTicket";
+
+export type CurrentEconomicsActivityAdmissionV1<T extends number | MoneyAmount = number | MoneyAmount> = {
+  admissionRef: string;
+  field: CurrentEconomicsActivityAdmissionFieldV1;
+  population: string;
+  value: T;
+  evidenceAccess: "STATEMENT_DERIVABLE";
+  evidenceRefs: string[];
+  sourceLayer: "fiserv_claim_scoped_activity_population_admission_v1";
+  sourceDocumentRef: string;
+  exactPopulationIdentityProven: true;
+  reconciliationState: "DIRECT_SOURCE" | "RECONCILED";
+  controlRefs: string[];
+  canonicalMutationAllowed: false;
+  rdMutationAllowed: false;
+  limitations: string[];
+};
+
+export type CurrentEconomicsActivityAdmissionsV1 = Partial<{
+  processedVolume: CurrentEconomicsActivityAdmissionV1<MoneyAmount>;
+  grossSalesVolume: CurrentEconomicsActivityAdmissionV1<MoneyAmount>;
+  refundVolume: CurrentEconomicsActivityAdmissionV1<MoneyAmount>;
+  transactionCount: CurrentEconomicsActivityAdmissionV1<number>;
+  grossSaleTransactionCount: CurrentEconomicsActivityAdmissionV1<number>;
+  refundTransactionCount: CurrentEconomicsActivityAdmissionV1<number>;
+  authorizationCount: CurrentEconomicsActivityAdmissionV1<number>;
+  chargebackCount: CurrentEconomicsActivityAdmissionV1<number>;
+  chargebackFee: CurrentEconomicsActivityAdmissionV1<MoneyAmount>;
+  averageTicket: CurrentEconomicsActivityAdmissionV1<MoneyAmount>;
+}>;
+
 export type CurrentRelationshipEconomicsProfileV1 = {
   profileVersion: typeof CURRENT_RELATIONSHIP_ECONOMICS_PROFILE_V1;
   productAuthority: typeof CURRENT_RELATIONSHIP_ECONOMICS_PROFILE_PRODUCT_AUTHORITY_V1;
@@ -200,6 +242,7 @@ type V2Fact = CanonicalEconomicsV2EconomicAnalysis["pricingAnalysis"]["foundatio
 export function buildCurrentRelationshipEconomicsProfileV1(input: {
   economic: CanonicalEconomicsV2EconomicAnalysis;
   commercialDecomposition: CommercialDecompositionContractV1;
+  activityAdmissions?: CurrentEconomicsActivityAdmissionsV1 | null;
   channel?: CurrentEconomicsChannelAdmissionV1 | null;
   incidence?: CurrentEconomicsIncidenceAdmissionV1 | null;
   authorizationSettlementCompatibility?: CurrentEconomicsAuthorizationSettlementCompatibilityV1 | null;
@@ -210,15 +253,16 @@ export function buildCurrentRelationshipEconomicsProfileV1(input: {
   const foundation = input.economic.pricingAnalysis.foundation;
   const facts = foundation.financialPopulations;
   const noActiveProcessing = input.economic.pricingAnalysis.pricingArchitecture.formulaCoverageStatus === "not_applicable_no_active_processing";
+  const admissions = input.activityAdmissions ?? {};
 
   const activity = {
-    processedVolume: factValue(facts.canonicalNetSubmittedCardVolume, false),
-    grossSalesVolume: factValue(facts.grossSaleVolume, false),
-    refundVolume: factValue(facts.refundVolume, true),
-    transactionCount: factValue(facts.submittedTransactionCount, false),
-    grossSaleTransactionCount: factValue(facts.grossSaleTransactionCount, false),
-    refundTransactionCount: factValue(facts.refundTransactionCount, true),
-    authorizationCount: factValue(facts.authorizationCount, true, noActiveProcessing),
+    processedVolume: factValueWithAdmission(facts.canonicalNetSubmittedCardVolume, admissions.processedVolume, false, false, foundation.identity.sourceDocumentRef),
+    grossSalesVolume: factValueWithAdmission(facts.grossSaleVolume, admissions.grossSalesVolume, false, false, foundation.identity.sourceDocumentRef),
+    refundVolume: factValueWithAdmission(facts.refundVolume, admissions.refundVolume, true, false, foundation.identity.sourceDocumentRef),
+    transactionCount: factValueWithAdmission(facts.submittedTransactionCount, admissions.transactionCount, false, noActiveProcessing, foundation.identity.sourceDocumentRef),
+    grossSaleTransactionCount: factValueWithAdmission(facts.grossSaleTransactionCount, admissions.grossSaleTransactionCount, false, noActiveProcessing, foundation.identity.sourceDocumentRef),
+    refundTransactionCount: factValueWithAdmission(facts.refundTransactionCount, admissions.refundTransactionCount, true, noActiveProcessing, foundation.identity.sourceDocumentRef),
+    authorizationCount: factValueWithAdmission(facts.authorizationCount, admissions.authorizationCount, true, noActiveProcessing, foundation.identity.sourceDocumentRef),
     approvedAuthorizationCount: unavailableFact<number>(
       "approved_authorization_count",
       noActiveProcessing ? "NOT_APPLICABLE" : "UNKNOWN",
@@ -227,10 +271,10 @@ export function buildCurrentRelationshipEconomicsProfileV1(input: {
     ),
     settledTransactionCount: factValue(facts.settledTransactionCount, true, noActiveProcessing),
     authorizationToSettlement: authorizationToSettlement(input.economic, input.authorizationSettlementCompatibility ?? null, noActiveProcessing),
-    chargebackCount: factValue(facts.chargebackCount, true, noActiveProcessing),
+    chargebackCount: factValueWithAdmission(facts.chargebackCount, admissions.chargebackCount, true, noActiveProcessing, foundation.identity.sourceDocumentRef),
     chargebackPrincipal: factValue(facts.chargebackPrincipalDebitAmount, true, noActiveProcessing),
-    chargebackFee: factValue(facts.chargebackFeeAmount, true, noActiveProcessing),
-    averageTicket: averageTicket(input.economic),
+    chargebackFee: factValueWithAdmission(facts.chargebackFeeAmount, admissions.chargebackFee, true, noActiveProcessing, foundation.identity.sourceDocumentRef),
+    averageTicket: averageTicket(input.economic, admissions.averageTicket, foundation.identity.sourceDocumentRef),
     channel: channelFact(input.channel ?? null, noActiveProcessing),
   } satisfies CurrentRelationshipEconomicsProfileV1["activity"];
 
@@ -362,13 +406,65 @@ function factValue<T>(fact: V2Fact, zeroMeansAbsent: boolean, notApplicable = fa
   };
 }
 
-function averageTicket(economic: CanonicalEconomicsV2EconomicAnalysis): CurrentEconomicsProfileFactV1<MoneyAmount> {
+function factValueWithAdmission<T extends number | MoneyAmount>(
+  fact: V2Fact,
+  admission: CurrentEconomicsActivityAdmissionV1<T> | undefined,
+  zeroMeansAbsent: boolean,
+  notApplicable: boolean,
+  sourceDocumentRef: string,
+): CurrentEconomicsProfileFactV1<T> {
+  const canonical = factValue<T>(fact, zeroMeansAbsent, notApplicable);
+  if (!admission) return canonical;
+  assertActivityAdmission(admission, fact.population, sourceDocumentRef);
+  const admittedNumeric = numericValue(admission.value);
+  const canonicalNumeric = fact.status === "available" && fact.value !== null ? numericValue(fact.value as number | MoneyAmount) : null;
+  if (canonicalNumeric !== null && canonicalNumeric !== admittedNumeric) {
+    throw new Error(`CURRENT_ECONOMICS_ACTIVITY_ADMISSION_CONFLICT:${admission.field}`);
+  }
+  if (canonical.state === "KNOWN" || canonical.state === "KNOWN_ABSENT") return canonical;
+  if (notApplicable && admittedNumeric !== 0) {
+    throw new Error(`CURRENT_ECONOMICS_ACTIVITY_ADMISSION_ACTIVE_VALUE_IN_INACTIVE_PERIOD:${admission.field}`);
+  }
+  return {
+    state: zeroMeansAbsent && admittedNumeric === 0 ? "KNOWN_ABSENT" : "KNOWN",
+    value: structuredClone(admission.value) as T,
+    population: admission.population,
+    canonicalFactRefs: [fact.id],
+    evidenceRefs: unique(admission.evidenceRefs),
+    evidenceAccess: admission.evidenceAccess,
+    limitations: unique([
+      ...admission.limitations,
+      `Profile-only claim-scoped admission ${admission.admissionRef}; Canonical Economics V2 and RD remain unchanged.`,
+    ]),
+  };
+}
+
+function averageTicket(
+  economic: CanonicalEconomicsV2EconomicAnalysis,
+  admission: CurrentEconomicsActivityAdmissionV1<MoneyAmount> | undefined,
+  sourceDocumentRef: string,
+): CurrentEconomicsProfileFactV1<MoneyAmount> {
   const foundation = economic.pricingAnalysis.foundation;
   const metric = foundation.metrics.headlineAverageTicket;
   const numerator = foundation.financialPopulations.grossSaleVolume;
   const denominator = foundation.financialPopulations.grossSaleTransactionCount;
   if (metric.state !== "defined" || !metric.value || numerator.status !== "available" || denominator.status !== "available" ||
       ![numerator.provenanceStatus, denominator.provenanceStatus].every((value) => value === "authoritative" || value === "approved_synthetic")) {
+    if (admission) {
+      assertActivityAdmission(admission, "gross_sale_volume_per_gross_sale_transaction", sourceDocumentRef);
+      return {
+        state: "KNOWN",
+        value: { ...admission.value },
+        population: admission.population,
+        canonicalFactRefs: [metric.numeratorFactRef, metric.denominatorFactRef],
+        evidenceRefs: unique(admission.evidenceRefs),
+        evidenceAccess: admission.evidenceAccess,
+        limitations: unique([
+          ...admission.limitations,
+          `Profile-only claim-scoped admission ${admission.admissionRef}; Canonical Economics V2 and RD remain unchanged.`,
+        ]),
+      };
+    }
     return {
       state: metric.state === "undefined_zero_count" ? "NOT_APPLICABLE" : "UNKNOWN",
       value: null,
@@ -388,6 +484,46 @@ function averageTicket(economic: CanonicalEconomicsV2EconomicAnalysis): CurrentE
     evidenceAccess: "STATEMENT_DERIVABLE",
     limitations: [...metric.limitations],
   };
+}
+
+function assertActivityAdmission(
+  admission: CurrentEconomicsActivityAdmissionV1,
+  population: string,
+  sourceDocumentRef: string,
+): void {
+  const expectedField = ACTIVITY_FIELD_BY_POPULATION[population];
+  if (admission.sourceDocumentRef !== sourceDocumentRef) throw new Error("CURRENT_ECONOMICS_ACTIVITY_ADMISSION_SOURCE_MISMATCH");
+  if (!expectedField || admission.field !== expectedField) throw new Error(`CURRENT_ECONOMICS_ACTIVITY_ADMISSION_FIELD_MISMATCH:${admission.field}`);
+  if (admission.population !== population) throw new Error(`CURRENT_ECONOMICS_ACTIVITY_ADMISSION_POPULATION_MISMATCH:${admission.field}`);
+  if (!admission.admissionRef || admission.evidenceRefs.length === 0 || admission.controlRefs.length === 0) {
+    throw new Error(`CURRENT_ECONOMICS_ACTIVITY_ADMISSION_EVIDENCE_REQUIRED:${admission.field}`);
+  }
+  if (admission.sourceLayer !== "fiserv_claim_scoped_activity_population_admission_v1"
+      || !["DIRECT_SOURCE", "RECONCILED"].includes(admission.reconciliationState)) {
+    throw new Error(`CURRENT_ECONOMICS_ACTIVITY_ADMISSION_AUTHORITY_INVALID:${admission.field}`);
+  }
+  if (!admission.exactPopulationIdentityProven || admission.canonicalMutationAllowed || admission.rdMutationAllowed) {
+    throw new Error(`CURRENT_ECONOMICS_ACTIVITY_ADMISSION_AUTHORITY_INVALID:${admission.field}`);
+  }
+  const value = numericValue(admission.value);
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error(`CURRENT_ECONOMICS_ACTIVITY_ADMISSION_VALUE_INVALID:${admission.field}`);
+}
+
+const ACTIVITY_FIELD_BY_POPULATION: Record<string, CurrentEconomicsActivityAdmissionFieldV1> = {
+  canonical_net_submitted_card_volume: "processedVolume",
+  gross_sale_volume: "grossSalesVolume",
+  refund_volume: "refundVolume",
+  submitted_transaction_count: "transactionCount",
+  gross_sale_transaction_count: "grossSaleTransactionCount",
+  refund_transaction_count: "refundTransactionCount",
+  authorization_count: "authorizationCount",
+  chargeback_count: "chargebackCount",
+  chargeback_fee_amount: "chargebackFee",
+  gross_sale_volume_per_gross_sale_transaction: "averageTicket",
+};
+
+function numericValue(value: number | MoneyAmount): number {
+  return typeof value === "number" ? value : value.amountMinor;
 }
 
 function authorizationToSettlement(
