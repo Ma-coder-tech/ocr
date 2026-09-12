@@ -82,6 +82,7 @@ export type CanonicalEconomicAdmissionSource =
   | "versioned_template"
   | "runtime_capability"
   | "claim_scoped_fee_occurrence"
+  | "claim_scoped_fee_rounding"
   | "observational";
 export type CanonicalEconomicFeeDetailCoverage = "complete" | "incomplete" | "unknown" | "unavailable";
 
@@ -246,6 +247,21 @@ export type CanonicalEconomicCostStack = {
   totalStatementProcessingCost: MoneyAmount | null;
   reconciliationDeltaMinor: number | null;
   reconciliationRef: string | null;
+  roundingResidual?: {
+    policyVersion: "fiserv_fee_total_nonadditive_rounding_residual_max_2_minor_units_v1";
+    state: "accepted_bounded_rounding_nonadditive";
+    printedStatementFeeTotalMinor: number;
+    admittedFeeOccurrenceSumMinor: number;
+    signedResidualMinor: number;
+    absoluteResidualMinor: number;
+    maximumAcceptedAbsoluteResidualMinor: 2;
+    controlRef: string;
+    evidenceRefs: string[];
+    reasonCode: "bounded_rounding_reconciles_complete_fee_population";
+    additiveChargeRef: null;
+    category: null;
+    participantOrOwner: null;
+  } | null;
   completeness: CanonicalEconomicCostStackCompleteness;
   limitations: string[];
 };
@@ -294,6 +310,25 @@ export type CanonicalEconomicAdmissionProfile = {
     authoritativeFeeTotalEvidenceRef: string;
     authoritativeFeeTotal: MoneyAmount;
     exactReconciliationControlId: string;
+    admittedOccurrenceRefs: string[];
+    zeroDollarOccurrenceRefs: string[];
+  } | null;
+  claimScopedFeeRoundingControl?: {
+    sourceDocumentRef: string;
+    boundSourceDigest: string;
+    statementPeriodStart: string;
+    statementPeriodEnd: string;
+    authoritativeFeeFactRef: string;
+    authoritativeFeeTotalOccurrenceRef: string;
+    authoritativeFeeTotalEvidenceRef: string;
+    authoritativeFeeTotal: MoneyAmount;
+    admittedFeeOccurrenceSumMinor: number;
+    signedResidualMinor: number;
+    absoluteResidualMinor: number;
+    maximumAcceptedAbsoluteResidualMinor: 2;
+    reconciliationControlId: string;
+    reconciliationControlResult: "pass_with_rounding";
+    evidenceRefs: string[];
     admittedOccurrenceRefs: string[];
     zeroDollarOccurrenceRefs: string[];
   } | null;

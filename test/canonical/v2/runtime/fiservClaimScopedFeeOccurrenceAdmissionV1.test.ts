@@ -40,11 +40,11 @@ describe("Exact-Control Claim-Scoped Fiserv Fee Occurrence Admission v1", () => 
       nov: ["claim_scoped_fee_occurrence", 134, 133_096],
       clover: ["runtime_capability", 134, 131_255],
       short: ["runtime_capability", 2, 14_131],
-      abdul: ["runtime_capability", 0, 9_119],
+      abdul: ["claim_scoped_fee_rounding", 50, 9_119],
       basys: ["claim_scoped_fee_occurrence", 105, 355_245],
-      nxgen: ["observational", 0, null],
-      paysafeFeb: ["observational", 0, null],
-      paysafeOct: ["observational", 0, null],
+      nxgen: ["claim_scoped_fee_rounding", 61, 200_773],
+      paysafeFeb: ["claim_scoped_fee_rounding", 22, 156_573],
+      paysafeOct: ["claim_scoped_fee_rounding", 42, 37_855],
       zero: ["claim_scoped_fee_occurrence", 5, 4_490],
       priority: ["claim_scoped_fee_occurrence", 8, 308_282],
       wells: ["claim_scoped_fee_occurrence", 104, 295_438],
@@ -77,7 +77,13 @@ describe("Exact-Control Claim-Scoped Fiserv Fee Occurrence Admission v1", () => 
       ]));
       expect(admission.admittedOccurrenceRefs, key).toEqual([]);
     }
-    expect(prepared.get("abdul")!.economic.economicLayer.costStack.unresolvedRemainder?.amountMinor).toBe(9_119);
+    expect(prepared.get("abdul")!.economic.economicLayer.costStack).toMatchObject({
+      classifiedChargeNet: { amountMinor: 9_120 },
+      authoritativeStatementFeeTotal: { amountMinor: 9_119 },
+      reconciliationDeltaMinor: -1,
+      unresolvedRemainder: null,
+      roundingResidual: { signedResidualMinor: -1, additiveChargeRef: null, category: null, participantOrOwner: null },
+    });
   });
 
   it("preserves zero-dollar rows as provenance without creating additive charges", () => {

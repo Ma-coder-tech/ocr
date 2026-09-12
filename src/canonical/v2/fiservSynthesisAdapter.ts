@@ -10,7 +10,7 @@ export function observeFiservEconomicsInCanonicalSynthesisV2(
   economicAnalysis: CanonicalEconomicsV2EconomicAnalysis,
   contractV1?: NonNullable<Parameters<typeof buildCanonicalEconomicsV2SynthesisAnalysis>[0]["contractV1"]>,
 ): CanonicalEconomicsV2SynthesisAnalysis {
-  const capabilityBound = ["runtime_capability", "claim_scoped_fee_occurrence"]
+  const capabilityBound = ["runtime_capability", "claim_scoped_fee_occurrence", "claim_scoped_fee_rounding"]
     .includes(economicAnalysis.economicLayer.admissionProfile.source);
   return buildCanonicalEconomicsV2SynthesisAnalysis({
     economicAnalysis,

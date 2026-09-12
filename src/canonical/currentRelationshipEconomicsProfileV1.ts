@@ -176,6 +176,7 @@ export type CurrentRelationshipEconomicsProfileV1 = {
       rdRemainderIncludedMinor: number;
     }>;
     rdUnresolvedRemainderMinor: number;
+    rdNonAdditiveRoundingResidual?: CanonicalEconomicsV2EconomicAnalysis["economicLayer"]["costStack"]["roundingResidual"];
     mappedNetAmountMinor: number;
     profileReconciliationDeltaMinor: number | null;
     reconcilesToRdTotal: boolean;
@@ -653,7 +654,13 @@ function buildCostProfile(
     rdUnresolvedRemainderMinor: rdRemainder,
     mappedNetAmountMinor,
     profileReconciliationDeltaMinor: delta,
-    reconcilesToRdTotal: delta === 0 && rdTotal !== null,
+    ...(economic.economicLayer.costStack.roundingResidual ? { rdNonAdditiveRoundingResidual: {
+      ...economic.economicLayer.costStack.roundingResidual,
+      evidenceRefs: [...economic.economicLayer.costStack.roundingResidual.evidenceRefs],
+    } } : {}),
+    reconcilesToRdTotal: rdTotal !== null && (delta === 0 ||
+      Boolean(economic.economicLayer.costStack.roundingResidual &&
+        delta === economic.economicLayer.costStack.roundingResidual.signedResidualMinor)),
     duplicateChargeContributionCount,
     nonFeePrincipalContributionCount,
   };

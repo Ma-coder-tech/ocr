@@ -23,6 +23,8 @@ import { buildObservationalCanonicalPricingV2FromFiserv } from "../fiservPricing
 import { buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing } from "../fiservEconomicAdapter.js";
 import { resolveFiservClaimScopedFeeOccurrenceAdmissionV1,
   type FiservClaimScopedFeeOccurrenceAdmissionV1 } from "../fiservClaimScopedFeeOccurrenceAdmissionV1.js";
+import { resolveFiservClaimScopedFeeRoundingResidualV1,
+  type FiservClaimScopedFeeRoundingResidualV1 } from "../fiservClaimScopedFeeRoundingResidualV1.js";
 import { observeFiservEconomicsInCanonicalSynthesisV2 } from "../fiservSynthesisAdapter.js";
 import { composeCanonicalMerchantReportV2 } from "../report/reportHarness.js";
 import { buildSourceReadinessEnvelope } from "../evaluation/sourceReadiness.js";
@@ -217,6 +219,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   let fullFamilyDecision: ReturnType<typeof resolveFiservTemplateAdmission>["fullFamilyDecision"] | null = null;
   let capabilityProof: ReturnType<typeof resolveFiservRuntimeCapabilityAdmission>["proof"] | null = null;
   let feeOccurrenceAdmission: FiservClaimScopedFeeOccurrenceAdmissionV1 | null = null;
+  let feeRoundingResidual: FiservClaimScopedFeeRoundingResidualV1 | null = null;
   let readiness: ReturnType<typeof buildSourceReadinessEnvelope> | null = null;
 
   try {
@@ -254,6 +257,9 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
       parserOutput,
       foundation: observationalFoundation,
       capabilityProof,
+    });
+    feeRoundingResidual = resolveFiservClaimScopedFeeRoundingResidualV1({
+      document: input.document, parserOutput, foundation: observationalFoundation, capabilityProof,
     });
     const capabilityStatus = admission ? "valid" : "unresolved";
     finishStage(input.observer, stageOutcomes, "capability_admission", capabilityStatus, capabilityProof, [], [],
@@ -318,7 +324,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   const economicBuilder: StageBuilders["economic"] = input.stageBuilders?.economic
     ? builders.economic
     : (pricing, applications = []) => buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
-        pricing, applications, [], feeOccurrenceAdmission,
+        pricing, applications, [], feeOccurrenceAdmission, feeRoundingResidual,
       );
   if (artifacts.rb && (artifacts.rb.validation.status === "valid" || input.evaluationContinueInvalidStages)) {
     try {
@@ -478,7 +484,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   return {
     run: terminalRun({ input, fingerprint, status, parser: parserState,
       familyStatus: capabilityProof?.family.status ?? "unresolved", capabilityProof, admission, knownLayoutAdmission,
-      fullFamilyDecision, feeOccurrenceAdmission, readiness, artifacts, stageOutcomes, canonicalTruthHash, financialFoundationHash: financialHash,
+      fullFamilyDecision, feeOccurrenceAdmission, feeRoundingResidual, readiness, artifacts, stageOutcomes, canonicalTruthHash, financialFoundationHash: financialHash,
       semanticHash, canonicalStateHash, limitations }),
     diagnostics: {
       document: input.document,
@@ -515,6 +521,7 @@ function terminalRun(input: {
   knownLayoutAdmission: CanonicalAnalysisRun["knownLayoutAdmission"];
   fullFamilyDecision: CanonicalAnalysisRun["fullFamilyDecision"];
   feeOccurrenceAdmission?: CanonicalAnalysisRun["feeOccurrenceAdmission"];
+  feeRoundingResidual?: CanonicalAnalysisRun["feeRoundingResidual"];
   readiness: CanonicalAnalysisRun["readiness"];
   artifacts: CanonicalAnalysisArtifacts;
   stageOutcomes: CanonicalAnalysisRun["stageOutcomes"];
@@ -562,6 +569,7 @@ function terminalRun(input: {
     knownLayoutAdmission: input.knownLayoutAdmission,
     fullFamilyDecision: input.fullFamilyDecision,
     feeOccurrenceAdmission: input.feeOccurrenceAdmission ?? null,
+    feeRoundingResidual: input.feeRoundingResidual ?? null,
     readiness: input.readiness,
     artifacts: input.artifacts,
     stageOutcomes: input.stageOutcomes,

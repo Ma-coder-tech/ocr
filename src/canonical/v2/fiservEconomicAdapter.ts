@@ -13,9 +13,15 @@ import {
   fiservClaimScopedFeeBoundSourceDigestV1,
   type FiservClaimScopedFeeOccurrenceAdmissionV1,
 } from "./fiservClaimScopedFeeOccurrenceAdmissionV1.js";
+import {
+  fiservClaimScopedFeeRoundingMatchesFoundationV1,
+  fiservClaimScopedFeeRoundingBoundSourceDigestV1,
+  type FiservClaimScopedFeeRoundingResidualV1,
+} from "./fiservClaimScopedFeeRoundingResidualV1.js";
 
 const CAPABILITY_BOUND_LEDGER_ADMISSION_ID = "fiserv_runtime_fee_ledger_capability_v1";
 const CLAIM_SCOPED_FEE_LEDGER_ADMISSION_ID = "fiserv_claim_scoped_fee_occurrence_admission_v1";
+const CLAIM_SCOPED_FEE_ROUNDING_ADMISSION_ID = "fiserv_claim_scoped_fee_rounding_residual_v1";
 
 /**
  * Carries only already-proven RB fee occurrence authority into RD. It can prove
@@ -27,6 +33,7 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
   semanticApplications: readonly CanonicalEconomicSemanticApplicationAdmission[] = [],
   admittedExternalEvidenceRefs: readonly string[] = [],
   claimScopedFeeAdmission: FiservClaimScopedFeeOccurrenceAdmissionV1 | null = null,
+  claimScopedFeeRounding: FiservClaimScopedFeeRoundingResidualV1 | null = null,
 ): CanonicalEconomicsV2EconomicAnalysis {
   const foundation = pricingAnalysis.foundation;
   const feeTotal = capability(foundation, "fee_total");
@@ -46,15 +53,34 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
     claimScopedFeeAdmission.control.authoritativeFeeTotalMinor !== null &&
     claimScopedFeeAdmission.control.controlId !== null;
   const useClaimScoped = !feeTotalSupported && claimScopedSupported;
-
-  if (!feeTotalSupported && !claimScopedSupported) return buildObservationalCanonicalEconomicsV2FromFiservPricing(pricingAnalysis);
-
-  const detailSupported = useClaimScoped || feeDetail?.status === "supported" && feeDetail.proofEvidenceRefs.length > 0;
-  const periodSupported = useClaimScoped || statementPeriod?.status === "supported" && statementPeriod.proofEvidenceRefs.length > 0 &&
+  const roundingSupported = claimScopedFeeRounding?.status === "ADMITTED" &&
+    fiservClaimScopedFeeRoundingMatchesFoundationV1(claimScopedFeeRounding, foundation) &&
+    claimScopedFeeRounding.control.controlResult === "pass_with_rounding" &&
+    claimScopedFeeRounding.control.reconciliationState === "accepted_bounded_rounding_nonadditive" &&
+    claimScopedFeeRounding.control.authoritativeFeeTotalOccurrenceRef !== null &&
+    claimScopedFeeRounding.control.authoritativeFeeTotalEvidenceRef !== null &&
+    claimScopedFeeRounding.control.printedStatementFeeTotalMinor !== null &&
+    claimScopedFeeRounding.control.admittedFeeOccurrenceSumMinor !== null &&
+    claimScopedFeeRounding.control.signedResidualMinor !== null &&
+    claimScopedFeeRounding.control.absoluteResidualMinor !== null &&
+    claimScopedFeeRounding.control.absoluteResidualMinor >= 1 &&
+    claimScopedFeeRounding.control.absoluteResidualMinor <= 2 &&
+    claimScopedFeeRounding.control.controlId !== null;
+  const runtimeDetailAndPeriodSupported = feeDetail?.status === "supported" && feeDetail.proofEvidenceRefs.length > 0 &&
+    statementPeriod?.status === "supported" && statementPeriod.proofEvidenceRefs.length > 0 &&
     foundation.identity.statementPeriod !== null;
-  const claimScopedRefs = new Set(claimScopedFeeAdmission?.admittedOccurrenceRefs ?? []);
+  const useRoundingScoped = !useClaimScoped && roundingSupported && (!feeTotalSupported || !runtimeDetailAndPeriodSupported);
+
+  if (!feeTotalSupported && !claimScopedSupported && !roundingSupported) return buildObservationalCanonicalEconomicsV2FromFiservPricing(pricingAnalysis);
+
+  const detailSupported = useClaimScoped || useRoundingScoped || feeDetail?.status === "supported" && feeDetail.proofEvidenceRefs.length > 0;
+  const periodSupported = useClaimScoped || useRoundingScoped || statementPeriod?.status === "supported" && statementPeriod.proofEvidenceRefs.length > 0 &&
+    foundation.identity.statementPeriod !== null;
+  const claimScopedRefs = new Set(useRoundingScoped
+    ? claimScopedFeeRounding!.admittedOccurrenceRefs
+    : claimScopedFeeAdmission?.admittedOccurrenceRefs ?? []);
   const feeOccurrences = detailSupported && periodSupported
-    ? fiservFeeLedgerOccurrences(foundation).filter((occurrence) => useClaimScoped
+    ? fiservFeeLedgerOccurrences(foundation).filter((occurrence) => useClaimScoped || useRoundingScoped
       ? claimScopedRefs.has(occurrence.id)
       :
       occurrence.printedAmount !== null && occurrence.printedAmount.amountMinor !== 0 &&
@@ -119,7 +145,7 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
       feeOccurrenceProven: true,
       directionProven: true,
       supportingDetailAdmission: {
-        admissionId: `${useClaimScoped ? CLAIM_SCOPED_FEE_LEDGER_ADMISSION_ID : CAPABILITY_BOUND_LEDGER_ADMISSION_ID}:${index + 1}`,
+        admissionId: `${useRoundingScoped ? CLAIM_SCOPED_FEE_ROUNDING_ADMISSION_ID : useClaimScoped ? CLAIM_SCOPED_FEE_LEDGER_ADMISSION_ID : CAPABILITY_BOUND_LEDGER_ADMISSION_ID}:${index + 1}`,
         evidenceRefs: [occurrence.evidenceRef],
         assertionBasis: "source_fact",
       },
@@ -142,11 +168,11 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
   return buildCanonicalEconomicsV2EconomicAnalysis({
     pricingAnalysis,
     admissionProfile: {
-      source: useClaimScoped ? "claim_scoped_fee_occurrence" : "runtime_capability",
-      admissionId: useClaimScoped ? CLAIM_SCOPED_FEE_LEDGER_ADMISSION_ID : CAPABILITY_BOUND_LEDGER_ADMISSION_ID,
+      source: useRoundingScoped ? "claim_scoped_fee_rounding" : useClaimScoped ? "claim_scoped_fee_occurrence" : "runtime_capability",
+      admissionId: useRoundingScoped ? CLAIM_SCOPED_FEE_ROUNDING_ADMISSION_ID : useClaimScoped ? CLAIM_SCOPED_FEE_LEDGER_ADMISSION_ID : CAPABILITY_BOUND_LEDGER_ADMISSION_ID,
       feeDetailCoverage: detailSupported && periodSupported ? "complete" : "incomplete",
       statementPeriodApplicabilityProven: periodSupported,
-      evidenceRefs: useClaimScoped ? unique(claimScopedFeeAdmission!.proofEvidenceRefs) : unique([
+      evidenceRefs: useRoundingScoped ? unique(claimScopedFeeRounding!.proofEvidenceRefs) : useClaimScoped ? unique(claimScopedFeeAdmission!.proofEvidenceRefs) : unique([
         ...(feeTotal?.proofEvidenceRefs ?? []), ...(feeDetail?.proofEvidenceRefs ?? []), ...(statementPeriod?.proofEvidenceRefs ?? []),
       ]),
       ...(useClaimScoped ? { claimScopedFeeControl: {
@@ -164,8 +190,29 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
         admittedOccurrenceRefs: [...claimScopedFeeAdmission!.admittedOccurrenceRefs],
         zeroDollarOccurrenceRefs: [...claimScopedFeeAdmission!.zeroDollarOccurrenceRefs],
       } } : {}),
+      ...(useRoundingScoped ? { claimScopedFeeRoundingControl: {
+        sourceDocumentRef: claimScopedFeeRounding!.sourceDocumentRef,
+        boundSourceDigest: fiservClaimScopedFeeRoundingBoundSourceDigestV1(claimScopedFeeRounding!)!,
+        statementPeriodStart: claimScopedFeeRounding!.statementPeriod!.start,
+        statementPeriodEnd: claimScopedFeeRounding!.statementPeriod!.end,
+        authoritativeFeeFactRef: foundation.financialPopulations.totalStatementProcessingFees.id,
+        authoritativeFeeTotalOccurrenceRef: claimScopedFeeRounding!.control.authoritativeFeeTotalOccurrenceRef!,
+        authoritativeFeeTotalEvidenceRef: claimScopedFeeRounding!.control.authoritativeFeeTotalEvidenceRef!,
+        authoritativeFeeTotal: { amountMinor: claimScopedFeeRounding!.control.printedStatementFeeTotalMinor!, currency: "USD" },
+        admittedFeeOccurrenceSumMinor: claimScopedFeeRounding!.control.admittedFeeOccurrenceSumMinor!,
+        signedResidualMinor: claimScopedFeeRounding!.control.signedResidualMinor!,
+        absoluteResidualMinor: claimScopedFeeRounding!.control.absoluteResidualMinor!,
+        maximumAcceptedAbsoluteResidualMinor: claimScopedFeeRounding!.control.maximumAcceptedAbsoluteResidualMinor,
+        reconciliationControlId: claimScopedFeeRounding!.control.controlId!,
+        reconciliationControlResult: "pass_with_rounding",
+        evidenceRefs: [...claimScopedFeeRounding!.proofEvidenceRefs],
+        admittedOccurrenceRefs: [...claimScopedFeeRounding!.admittedOccurrenceRefs],
+        zeroDollarOccurrenceRefs: [...claimScopedFeeRounding!.zeroDollarOccurrenceRefs],
+      } } : {}),
       limitations: [
-        useClaimScoped
+        useRoundingScoped
+          ? "Bounded-rounding authority is RD-only and claim-scoped to statement-bound fee identity, amount, direction, coverage, and a non-additive residual of at most two minor units."
+          : useClaimScoped
           ? "Exact-control authority is RD-only and claim-scoped to statement-bound fee identity, amount, direction, coverage, and exact reconciliation."
           : "Capability authority is claim-scoped to statement fee identity, amount, direction, coverage, and reconciliation.",
         "Unresolved economic semantics remain unresolved and cannot be inferred from source labels.",
@@ -177,7 +224,9 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
     semanticApplications: [...semanticApplications],
     externalEvidenceRefs: unique([...admittedExternalEvidenceRefs]),
     limitations: [
-      useClaimScoped
+      useRoundingScoped
+        ? "The bounded-rounding claim-scoped ledger proves statement-observed processing cost without allocating or adding its reconciliation residual."
+        : useClaimScoped
         ? "The claim-scoped ledger proves statement-observed processing cost, not total acceptance cost."
         : "The capability-bound ledger proves statement-observed processing cost, not total acceptance cost.",
       "No fee category, participant, ownership, control, actionability, pricing, benchmark, or savings rule was introduced.",
