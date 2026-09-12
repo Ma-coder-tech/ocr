@@ -81,6 +81,7 @@ export type CanonicalEconomicAdmissionSource =
   | "approved_synthetic"
   | "versioned_template"
   | "runtime_capability"
+  | "claim_scoped_fee_occurrence"
   | "observational";
 export type CanonicalEconomicFeeDetailCoverage = "complete" | "incomplete" | "unknown" | "unavailable";
 
@@ -283,6 +284,19 @@ export type CanonicalEconomicAdmissionProfile = {
   feeDetailCoverage: CanonicalEconomicFeeDetailCoverage;
   statementPeriodApplicabilityProven: boolean;
   evidenceRefs: string[];
+  claimScopedFeeControl?: {
+    sourceDocumentRef: string;
+    boundSourceDigest: string;
+    statementPeriodStart: string;
+    statementPeriodEnd: string;
+    authoritativeFeeFactRef: string;
+    authoritativeFeeTotalOccurrenceRef: string;
+    authoritativeFeeTotalEvidenceRef: string;
+    authoritativeFeeTotal: MoneyAmount;
+    exactReconciliationControlId: string;
+    admittedOccurrenceRefs: string[];
+    zeroDollarOccurrenceRefs: string[];
+  } | null;
   limitations: string[];
 };
 

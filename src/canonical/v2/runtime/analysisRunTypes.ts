@@ -17,6 +17,7 @@ import type {
   FiservRuntimeCapabilityAdmissionResolution,
   FiservRuntimeCapabilityProof,
 } from "../fiservRuntimeCapabilityAdmission.js";
+import type { FiservClaimScopedFeeOccurrenceAdmissionV1 } from "../fiservClaimScopedFeeOccurrenceAdmissionV1.js";
 import type { CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
 import type { CanonicalRfClaimResolution } from "./rfClaimResolution.js";
 import type { CanonicalRgWorkLedger } from "./rgWorkLedger.js";
@@ -110,6 +111,7 @@ export type CanonicalAnalysisRun = {
   admission: FiservRuntimeCapabilityAdmissionResolution | null;
   knownLayoutAdmission: FiservTemplateAdmissionResolution | null;
   fullFamilyDecision: FiservFullTemplateAdmissionDecision | null;
+  feeOccurrenceAdmission: FiservClaimScopedFeeOccurrenceAdmissionV1 | null;
   readiness: ReturnTypeOrNull<typeof buildSourceReadinessEnvelope>;
   artifacts: CanonicalAnalysisArtifacts;
   stageOutcomes: Record<AnalysisRunStageId, AnalysisRunStageOutcome>;

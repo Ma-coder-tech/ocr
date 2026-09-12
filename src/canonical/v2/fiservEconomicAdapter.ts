@@ -8,8 +8,14 @@ import {
 import type { CanonicalEconomicsV2EconomicAnalysis } from "./economicTypes.js";
 import type { CanonicalEconomicsV2PricingAnalysis } from "./pricingTypes.js";
 import { fiservFeeLedgerOccurrences } from "./fiservAdapter.js";
+import {
+  fiservClaimScopedFeeAdmissionMatchesFoundationV1,
+  fiservClaimScopedFeeBoundSourceDigestV1,
+  type FiservClaimScopedFeeOccurrenceAdmissionV1,
+} from "./fiservClaimScopedFeeOccurrenceAdmissionV1.js";
 
 const CAPABILITY_BOUND_LEDGER_ADMISSION_ID = "fiserv_runtime_fee_ledger_capability_v1";
+const CLAIM_SCOPED_FEE_LEDGER_ADMISSION_ID = "fiserv_claim_scoped_fee_occurrence_admission_v1";
 
 /**
  * Carries only already-proven RB fee occurrence authority into RD. It can prove
@@ -20,6 +26,7 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
   pricingAnalysis: CanonicalEconomicsV2PricingAnalysis,
   semanticApplications: readonly CanonicalEconomicSemanticApplicationAdmission[] = [],
   admittedExternalEvidenceRefs: readonly string[] = [],
+  claimScopedFeeAdmission: FiservClaimScopedFeeOccurrenceAdmissionV1 | null = null,
 ): CanonicalEconomicsV2EconomicAnalysis {
   const foundation = pricingAnalysis.foundation;
   const feeTotal = capability(foundation, "fee_total");
@@ -31,17 +38,27 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
   const feeTotalSupported = admitted && feeTotal?.status === "supported" && feeTotal.proofEvidenceRefs.length > 0 &&
     foundation.financialPopulations.totalStatementProcessingFees.status === "available" &&
     foundation.financialPopulations.totalStatementProcessingFees.provenanceStatus === "authoritative";
+  const claimScopedSupported = claimScopedFeeAdmission?.status === "ADMITTED" &&
+    fiservClaimScopedFeeAdmissionMatchesFoundationV1(claimScopedFeeAdmission, foundation) &&
+    claimScopedFeeAdmission.control.exactIntegerMinorUnitReconciliation &&
+    claimScopedFeeAdmission.control.authoritativeFeeTotalOccurrenceRef !== null &&
+    claimScopedFeeAdmission.control.authoritativeFeeTotalEvidenceRef !== null &&
+    claimScopedFeeAdmission.control.authoritativeFeeTotalMinor !== null &&
+    claimScopedFeeAdmission.control.controlId !== null;
+  const useClaimScoped = !feeTotalSupported && claimScopedSupported;
 
-  if (!feeTotalSupported) return buildObservationalCanonicalEconomicsV2FromFiservPricing(pricingAnalysis);
+  if (!feeTotalSupported && !claimScopedSupported) return buildObservationalCanonicalEconomicsV2FromFiservPricing(pricingAnalysis);
 
-  const detailSupported = feeDetail?.status === "supported" && feeDetail.proofEvidenceRefs.length > 0;
-  const periodSupported = statementPeriod?.status === "supported" && statementPeriod.proofEvidenceRefs.length > 0 &&
+  const detailSupported = useClaimScoped || feeDetail?.status === "supported" && feeDetail.proofEvidenceRefs.length > 0;
+  const periodSupported = useClaimScoped || statementPeriod?.status === "supported" && statementPeriod.proofEvidenceRefs.length > 0 &&
     foundation.identity.statementPeriod !== null;
+  const claimScopedRefs = new Set(claimScopedFeeAdmission?.admittedOccurrenceRefs ?? []);
   const feeOccurrences = detailSupported && periodSupported
-    ? fiservFeeLedgerOccurrences(foundation).filter((occurrence) =>
+    ? fiservFeeLedgerOccurrences(foundation).filter((occurrence) => useClaimScoped
+      ? claimScopedRefs.has(occurrence.id)
+      :
       occurrence.printedAmount !== null && occurrence.printedAmount.amountMinor !== 0 &&
-      feeDetail.proofEvidenceRefs.includes(occurrence.evidenceRef),
-    )
+      feeDetail!.proofEvidenceRefs.includes(occurrence.evidenceRef))
     : [];
   const participants: CanonicalEconomicParticipantAdmission[] = [];
   const roleClaims: CanonicalEconomicRoleClaimAdmission[] = [];
@@ -102,7 +119,7 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
       feeOccurrenceProven: true,
       directionProven: true,
       supportingDetailAdmission: {
-        admissionId: `${CAPABILITY_BOUND_LEDGER_ADMISSION_ID}:${index + 1}`,
+        admissionId: `${useClaimScoped ? CLAIM_SCOPED_FEE_LEDGER_ADMISSION_ID : CAPABILITY_BOUND_LEDGER_ADMISSION_ID}:${index + 1}`,
         evidenceRefs: [occurrence.evidenceRef],
         assertionBasis: "source_fact",
       },
@@ -125,17 +142,32 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
   return buildCanonicalEconomicsV2EconomicAnalysis({
     pricingAnalysis,
     admissionProfile: {
-      source: "runtime_capability",
-      admissionId: CAPABILITY_BOUND_LEDGER_ADMISSION_ID,
+      source: useClaimScoped ? "claim_scoped_fee_occurrence" : "runtime_capability",
+      admissionId: useClaimScoped ? CLAIM_SCOPED_FEE_LEDGER_ADMISSION_ID : CAPABILITY_BOUND_LEDGER_ADMISSION_ID,
       feeDetailCoverage: detailSupported && periodSupported ? "complete" : "incomplete",
       statementPeriodApplicabilityProven: periodSupported,
-      evidenceRefs: unique([
-        ...(feeTotal?.proofEvidenceRefs ?? []),
-        ...(feeDetail?.proofEvidenceRefs ?? []),
-        ...(statementPeriod?.proofEvidenceRefs ?? []),
+      evidenceRefs: useClaimScoped ? unique(claimScopedFeeAdmission!.proofEvidenceRefs) : unique([
+        ...(feeTotal?.proofEvidenceRefs ?? []), ...(feeDetail?.proofEvidenceRefs ?? []), ...(statementPeriod?.proofEvidenceRefs ?? []),
       ]),
+      ...(useClaimScoped ? { claimScopedFeeControl: {
+        sourceDocumentRef: claimScopedFeeAdmission!.sourceDocumentRef,
+        boundSourceDigest: fiservClaimScopedFeeBoundSourceDigestV1(claimScopedFeeAdmission!)!,
+        statementPeriodStart: claimScopedFeeAdmission!.statementPeriod!.start,
+        statementPeriodEnd: claimScopedFeeAdmission!.statementPeriod!.end,
+        authoritativeFeeFactRef: foundation.financialPopulations.totalStatementProcessingFees.id,
+        authoritativeFeeTotalOccurrenceRef: claimScopedFeeAdmission!.control.authoritativeFeeTotalOccurrenceRef!,
+        authoritativeFeeTotalEvidenceRef: claimScopedFeeAdmission!.control.authoritativeFeeTotalEvidenceRef!,
+        authoritativeFeeTotal: {
+          amountMinor: claimScopedFeeAdmission!.control.authoritativeFeeTotalMinor!, currency: "USD",
+        },
+        exactReconciliationControlId: claimScopedFeeAdmission!.control.controlId!,
+        admittedOccurrenceRefs: [...claimScopedFeeAdmission!.admittedOccurrenceRefs],
+        zeroDollarOccurrenceRefs: [...claimScopedFeeAdmission!.zeroDollarOccurrenceRefs],
+      } } : {}),
       limitations: [
-        "Capability authority is claim-scoped to statement fee identity, amount, direction, coverage, and reconciliation.",
+        useClaimScoped
+          ? "Exact-control authority is RD-only and claim-scoped to statement-bound fee identity, amount, direction, coverage, and exact reconciliation."
+          : "Capability authority is claim-scoped to statement fee identity, amount, direction, coverage, and reconciliation.",
         "Unresolved economic semantics remain unresolved and cannot be inferred from source labels.",
       ],
     },
@@ -145,7 +177,9 @@ export function buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
     semanticApplications: [...semanticApplications],
     externalEvidenceRefs: unique([...admittedExternalEvidenceRefs]),
     limitations: [
-      "The capability-bound ledger proves statement-observed processing cost, not total acceptance cost.",
+      useClaimScoped
+        ? "The claim-scoped ledger proves statement-observed processing cost, not total acceptance cost."
+        : "The capability-bound ledger proves statement-observed processing cost, not total acceptance cost.",
       "No fee category, participant, ownership, control, actionability, pricing, benchmark, or savings rule was introduced.",
     ],
   });

@@ -33,6 +33,8 @@ import type {
 import type { CanonicalEconomicsV2SourceOccurrence } from "./types.js";
 import { validateCanonicalEconomicsV2EconomicAnalysis } from "./economicValidate.js";
 import { canonicalRoleProofRouteSatisfied } from "./economicProofRoutes.js";
+import { FISERV_FEE_LEDGER_OCCURRENCE_MARKER } from "./fiservAdapter.js";
+import { fiservClaimScopedFeeControlIdentityMatchesFoundationV1 } from "./fiservClaimScopedFeeOccurrenceAdmissionV1.js";
 
 export type CanonicalEconomicParticipantAdmission = {
   key: string;
@@ -186,6 +188,8 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
         ? foundation.templateCapability.identityStatus === "proven" &&
           foundation.templateCapability.admissionStatus === "admitted" &&
           foundation.templateCapability.admissionAuthority !== null
+        : input.admissionProfile.source === "claim_scoped_fee_occurrence"
+          ? claimScopedFeeAuthorityAllowed(foundation, input.admissionProfile)
         : false;
   const occurrenceById = new Map(foundation.sourceModel.occurrences.map((item) => [item.id, item]));
   const evidenceIds = new Set(foundation.sourceModel.evidence.map((item) => item.id));
@@ -490,7 +494,8 @@ function chargeFromAdmission(input: {
     .map((ref) => input.semanticApplicationById.get(ref))
     .find((application) => application?.claimClass === "economic_category" && application.value.kind === "mapping" &&
       application.occurrenceRef === contributingOccurrence?.id && application.value.canonicalCode === item.category);
-  const semanticApplicationPermitsCategory = categoryResolution !== "proven" || input.profile.source !== "runtime_capability" ||
+  const semanticApplicationPermitsCategory = categoryResolution !== "proven" ||
+    !["runtime_capability", "claim_scoped_fee_occurrence"].includes(input.profile.source) ||
     item.category === "unresolved_unclassified" || Boolean(categorySemanticApplication);
   const admittedCategoryResolution = categoryResolution === "proven" && !semanticApplicationPermitsCategory
     ? "unresolved" as const
@@ -585,7 +590,10 @@ function buildCostStack(input: {
     addToBucket(bucketByKind.get(kind)!, charge);
   }
   const classifiedNetMinor = sum(buckets.map((bucket) => bucket.netAmount.amountMinor));
-  const authoritativeMinor = feeFact.status === "available" ? feeFact.value?.amountMinor ?? null : null;
+  const claimScopedControl = input.profile.source === "claim_scoped_fee_occurrence"
+    ? input.profile.claimScopedFeeControl ?? null : null;
+  const authoritativeMinor = feeFact.status === "available" ? feeFact.value?.amountMinor ?? null
+    : claimScopedControl?.authoritativeFeeTotal.amountMinor ?? null;
   if (authoritativeMinor === null) {
     return {
       statementFeeFactRef: feeFact.id,
@@ -631,13 +639,14 @@ function buildCostStack(input: {
       : "financially_unreconciled" as const;
   return {
     statementFeeFactRef: feeFact.id,
-    authoritativeStatementFeeTotal: feeFact.value,
+    authoritativeStatementFeeTotal: money(authoritativeMinor),
     buckets,
     classifiedChargeNet: money(classifiedNetMinor),
     unresolvedRemainder,
-    totalStatementProcessingCost: completeness === "financially_unreconciled" ? null : feeFact.value,
+    totalStatementProcessingCost: completeness === "financially_unreconciled" ? null : money(authoritativeMinor),
     reconciliationDeltaMinor: deltaMinor,
-    reconciliationRef: roundingControl?.id ?? findPassingFeeReconciliation(foundation.reconciliation),
+    reconciliationRef: roundingControl?.id ?? claimScopedControl?.exactReconciliationControlId
+      ?? findPassingFeeReconciliation(foundation.reconciliation),
     completeness,
     limitations: unique([
       ...(semanticPartial ? ["The stack is financially reconciled only by preserving unresolved or incomplete economic allocation."] : []),
@@ -645,6 +654,36 @@ function buildCostStack(input: {
       "This stack represents statement-evidenced processing cost, not complete total acceptance cost.",
     ]),
   };
+}
+
+function claimScopedFeeAuthorityAllowed(
+  foundation: CanonicalEconomicsV2PricingAnalysis["foundation"],
+  profile: CanonicalEconomicAdmissionProfile,
+): boolean {
+  const control = profile.claimScopedFeeControl;
+  if (!control || profile.feeDetailCoverage !== "complete" || !profile.statementPeriodApplicabilityProven) return false;
+  if (!fiservClaimScopedFeeControlIdentityMatchesFoundationV1(control, foundation)) return false;
+  const occurrenceById = new Map(foundation.sourceModel.occurrences.map((occurrence) => [occurrence.id, occurrence]));
+  const total = occurrenceById.get(control.authoritativeFeeTotalOccurrenceRef);
+  if (!total || total.evidenceRef !== control.authoritativeFeeTotalEvidenceRef ||
+      total.printedAmount?.amountMinor !== control.authoritativeFeeTotal.amountMinor) return false;
+  if (!control.exactReconciliationControlId.trim() || new Set(control.admittedOccurrenceRefs).size !== control.admittedOccurrenceRefs.length ||
+      new Set(control.zeroDollarOccurrenceRefs).size !== control.zeroDollarOccurrenceRefs.length) return false;
+  const admitted = control.admittedOccurrenceRefs.map((ref) => occurrenceById.get(ref));
+  const zeros = control.zeroDollarOccurrenceRefs.map((ref) => occurrenceById.get(ref));
+  if (admitted.some((occurrence) => !occurrence || occurrence.semanticRole !== "fee_charge" ||
+      occurrence.contributionRole !== "supporting_detail" || occurrence.printedAmount === null ||
+      occurrence.printedAmount.amountMinor <= 0 || !["positive", "unsigned"].includes(occurrence.printedDirection))) return false;
+  if (zeros.some((occurrence) => !occurrence || occurrence.semanticRole !== "fee_charge" ||
+      occurrence.contributionRole !== "supporting_detail" || occurrence.printedAmount?.amountMinor !== 0)) return false;
+  const controlledRefs = [...control.admittedOccurrenceRefs, ...control.zeroDollarOccurrenceRefs].sort();
+  const normalizedFeeRefs = foundation.sourceModel.occurrences
+    .filter((occurrence) => occurrence.limitations.includes(FISERV_FEE_LEDGER_OCCURRENCE_MARKER))
+    .map((occurrence) => occurrence.id).sort();
+  if (JSON.stringify(controlledRefs) !== JSON.stringify(normalizedFeeRefs) ||
+      [...admitted, ...zeros].some((occurrence) => !profile.evidenceRefs.includes(occurrence!.evidenceRef))) return false;
+  return admitted.reduce((sum, occurrence) => sum + occurrence!.printedAmount!.amountMinor, 0) ===
+    control.authoritativeFeeTotal.amountMinor;
 }
 
 function bucketForCharge(

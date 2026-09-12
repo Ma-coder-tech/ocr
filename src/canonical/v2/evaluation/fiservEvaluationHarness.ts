@@ -49,6 +49,8 @@ export async function inspectFiservOneStatementEvaluation(input: InspectFiservOn
   if (!foundation || !pricing || !economic || !synthesis || !rh || !run.readiness || !diagnostics.parserOutput || !diagnostics.decision
     || !diagnostics.observationalFoundation) throw new Error("FISERV_EVALUATION_DETERMINISTIC_STAGE_INCOMPLETE");
   const admission = run.admission;
+  const feeOccurrenceAdmission = run.feeOccurrenceAdmission;
+  const capabilityProof = run.capabilityProof;
   const admissionEvaluation = { resolution: run.knownLayoutAdmission, fullFamilyDecision: run.fullFamilyDecision };
   if (!admissionEvaluation.fullFamilyDecision) throw new Error("FISERV_EVALUATION_FULL_FAMILY_DECISION_MISSING");
   const authority = diagnostics.authority;
@@ -67,7 +69,7 @@ export async function inspectFiservOneStatementEvaluation(input: InspectFiservOn
   const provenance = diagnostics.provenance;
   const validationState = run.parser.validationState;
   assertValidCanonicalMerchantReportProjectionV2(projection);
-  return { admission, admissionEvaluation, authority, decision, document, driver, foundation, identity,
+  return { admission, feeOccurrenceAdmission, capabilityProof, admissionEvaluation, authority, decision, document, driver, foundation, identity,
     observationalFoundation: diagnostics.observationalFoundation,
     observed, parserOutput, pricing, profile, projection, provenance, reportAudit, readiness, selected, statementCompleteness,
     suppliedDocument, synthesis, economic, validationState };
