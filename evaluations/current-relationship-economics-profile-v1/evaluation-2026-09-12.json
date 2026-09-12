@@ -1,0 +1,4226 @@
+{
+  "schemaVersion": "single_statement_current_relationship_economics_profile_evaluation_2026_09_12_v1",
+  "generatedAt": "2026-09-12T00:00:00.000Z",
+  "mode": "internal_offline",
+  "baseline": {
+    "branch": "codex/per-authorization-commercial-runtime-readiness-v1",
+    "commit": "aa408d6b71fccacab7989ac6aef31af636362dca",
+    "parent": "62150c6e8365ce51616701d870ec918c6be4055e"
+  },
+  "productAuthority": {
+    "document": "RateReveal Broader Merchant Economics Model FINAL — Product-Adjudicated v1",
+    "sha256": "4357008f1f32998de5f67f66faa6c732fb6ead45c7880b710438d821733e4cb7"
+  },
+  "governedCommercialSource": {
+    "expectedSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "beforeSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "afterSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "unchanged": true,
+    "consumedByProfile": false
+  },
+  "corpus": {
+    "statementCount": 11,
+    "statementsWithObservedActivity": 4,
+    "statementsWithAvailableRdCost": 3,
+    "statementsWithReconciledProfileCost": 3,
+    "statementsWithAnyComparatorInput": 0,
+    "canonicalFingerprintInvariantCount": 11,
+    "rdFingerprintInvariantCount": 11,
+    "profileStateCounts": {
+      "UNAVAILABLE_CURRENT_STATEMENT": 8,
+      "PARTIAL_CURRENT_STATEMENT": 2,
+      "OBSERVED_RECONCILED": 1
+    },
+    "rdCostStackCounts": {
+      "not_derivable_from_document": 1,
+      "partial_but_financially_reconciled": 3,
+      "financially_unreconciled": 7
+    },
+    "sensitivityCounts": {
+      "UNRESOLVED": 10,
+      "TRANSACTION_COUNT_DRIVEN": 1
+    },
+    "incidenceCounts": {
+      "INCIDENCE_UNRESOLVED": 11
+    }
+  },
+  "statements": [
+    {
+      "file": "Nov_2024_Statement.pdf",
+      "businessType": "restaurant_food_beverage",
+      "period": {
+        "start": "2024-11-01",
+        "end": "2024-11-30"
+      },
+      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "activity": {
+        "processedVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "canonical_net_submitted_card_volume",
+          "canonicalFactRefs": [
+            "fact_v2_canonical_net_submitted_card_volume"
+          ],
+          "limitations": [
+            "Canonical net submitted card volume is unavailable.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSalesVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven gross-sale volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_volume",
+          "canonicalFactRefs": [
+            "fact_v2_refund_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven refund-volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "transactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "submitted_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_submitted_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as submitted transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSaleTransactionCount": {
+          "state": "KNOWN",
+          "value": 1825,
+          "evidenceAccess": "STATEMENT_DERIVABLE",
+          "population": "gross_sale_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": []
+        },
+        "refundTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_refund_transaction_count"
+          ],
+          "limitations": [
+            "No unique refund transaction count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "authorization_count",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count"
+          ],
+          "limitations": [
+            "No unique authorization count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "approvedAuthorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "approved_authorization_count",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "Canonical Economics V2 does not expose approved authorizations as the same fact as authorization events."
+          ]
+        },
+        "settledTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "settled_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as settled transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationToSettlement": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "authorization_to_settlement",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count",
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "Authorization-to-settlement requires independently proven compatible event populations."
+          ]
+        },
+        "chargebackCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_count",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_count"
+          ],
+          "limitations": [
+            "Funding rows and chargeback fee events do not prove a chargeback-principal event count.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackPrincipal": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_principal_debit_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_principal_debit_amount"
+          ],
+          "limitations": [
+            "Gross chargeback principal debits were withheld because batch-net values, signs, and missing rows do not prove the population.",
+            "chargeback_section_not_mapped",
+            "combined_adjustment_chargeback_section_not_mapped",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackFee": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_fee_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_fee_amount"
+          ],
+          "limitations": [
+            "No chargeback-fee occurrence was proven in the fee population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "averageTicket": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume_per_gross_sale_transaction",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume",
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale volume is not proven.",
+            "Average ticket is withheld unless the canonical gross-sales numerator and gross-sale-count denominator are both authoritative and compatible."
+          ]
+        },
+        "channel": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "MERCHANT_INPUT",
+          "population": "processing_channel",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "This statement does not independently establish a current component-level processing channel."
+          ]
+        }
+      },
+      "availableActivityFacts": [
+        "grossSaleTransactionCount"
+      ],
+      "unresolvedActivityFacts": [
+        "processedVolume",
+        "grossSalesVolume",
+        "refundVolume",
+        "transactionCount",
+        "refundTransactionCount",
+        "authorizationCount",
+        "approvedAuthorizationCount",
+        "settledTransactionCount",
+        "authorizationToSettlement",
+        "chargebackCount",
+        "chargebackPrincipal",
+        "chargebackFee",
+        "averageTicket",
+        "channel"
+      ],
+      "observedActivityFieldCount": 1,
+      "unresolvedActivityFieldCount": 14,
+      "rdCostStackCompleteness": "not_derivable_from_document",
+      "rdContributingChargeCount": 0,
+      "deterministicallyMappedChargeCount": 0,
+      "unresolvedMappedChargeCount": 0,
+      "rdTotalStatementProcessingCostMinor": null,
+      "profileMappedNetMinor": 0,
+      "profileReconciliationDeltaMinor": null,
+      "reconcilesToRdTotal": false,
+      "productCostBuckets": [],
+      "duplicateChargeContributionCount": 0,
+      "nonFeePrincipalContributionCount": 0,
+      "sensitivity": {
+        "state": "UNRESOLVED",
+        "countDrivenChargeRefs": [],
+        "volumeDrivenChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [],
+        "unresolvedControllableChargeRefs": [],
+        "pricingPopulationRefs": [],
+        "averageTicketFactRef": null,
+        "averageTicketUsed": false,
+        "additiveDriverContributionMinor": 0,
+        "method": "reproduced_statement_mechanics_only",
+        "limitations": [
+          "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
+          "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
+          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+        ]
+      },
+      "incidence": {
+        "state": "INCIDENCE_UNRESOLVED",
+        "evidenceAccess": "UNRESOLVED",
+        "evidenceRefs": [],
+        "grossProcessingCost": null,
+        "costOffsetRevenue": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "cost_offset_revenue",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Statement silence does not establish the presence or absence of a cost-offset program."
+          ]
+        },
+        "netMerchantBorneProcessingCost": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "net_merchant_borne_processing_cost",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Gross processing cost cannot be equated with net merchant burden while incidence is unresolved."
+          ]
+        },
+        "limitations": [
+          "No surcharge, cash-discount, dual-pricing, or other incidence conclusion is inferred."
+        ]
+      },
+      "evidenceRequirements": [
+        {
+          "fact": "approved authorization count",
+          "access": "DOCUMENT_REQUIRED",
+          "reason": "Authorization events do not prove approval events."
+        },
+        {
+          "fact": "component-level channel mix",
+          "access": "MERCHANT_INPUT",
+          "reason": "Use merchant or gateway evidence when the statement does not establish channel."
+        },
+        {
+          "fact": "fee economic meaning or participant role",
+          "access": "PUBLIC_EVIDENCE",
+          "reason": "Governed public evidence may classify a printed charge without changing its statement amount."
+        },
+        {
+          "fact": "cost incidence or offset",
+          "access": "UNRESOLVED",
+          "reason": "No absence or offset is inferred from statement silence."
+        }
+      ],
+      "completeness": {
+        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "observedActivityFields": [
+          "grossSaleTransactionCount"
+        ],
+        "unresolvedActivityFields": [
+          "processedVolume",
+          "grossSalesVolume",
+          "refundVolume",
+          "transactionCount",
+          "refundTransactionCount",
+          "authorizationCount",
+          "approvedAuthorizationCount",
+          "settledTransactionCount",
+          "authorizationToSettlement",
+          "chargebackCount",
+          "chargebackPrincipal",
+          "chargebackFee",
+          "averageTicket",
+          "channel"
+        ],
+        "costMappingState": "RD_COST_UNAVAILABLE",
+        "pricingFormulaCoverage": "partial_observed_components",
+        "feeLedgerReconciliation": "not_derivable_from_document",
+        "completeMerchantEconomicsClaimAllowed": false,
+        "completeCostOfAcceptanceClaimAllowed": false,
+        "limitations": [
+          "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
+          "One or more RD charges lack a deterministic governed Product-view mapping.",
+          "Unresolved activity fields remain visible and are not converted to zero."
+        ]
+      },
+      "limitations": [
+        "This profile describes observed current-statement relationship economics only.",
+        "It does not establish complete merchant economics, total cost of acceptance, avoidability, savings, overpayment, comparison, or merchant-level advantage.",
+        "Commercial decomposition is used only as governed classification evidence over RD charge references; it is not an additive ledger here.",
+        "Public commercial-source prices and alternative providers are excluded."
+      ],
+      "comparatorInputCount": 0,
+      "opportunityOutputCount": 0,
+      "savingsOutputCount": 0,
+      "annualizationOutputCount": 0,
+      "customerRoutingAllowed": false,
+      "canonicalFingerprintBefore": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+      "canonicalFingerprintAfter": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+      "canonicalFingerprintInvariant": true,
+      "rdFingerprintBefore": "afa19272c973a1d302be9e1f0ac2a853e66e123c04ee76fec5a05dd70b2abe27",
+      "rdFingerprintAfter": "afa19272c973a1d302be9e1f0ac2a853e66e123c04ee76fec5a05dd70b2abe27",
+      "rdFingerprintInvariant": true
+    },
+    {
+      "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+      "businessType": "restaurant_food_beverage",
+      "period": {
+        "start": "2024-10-01",
+        "end": "2024-10-31"
+      },
+      "profileState": "PARTIAL_CURRENT_STATEMENT",
+      "activity": {
+        "processedVolume": {
+          "state": "KNOWN",
+          "value": {
+            "amountMinor": 5246055,
+            "currency": "USD"
+          },
+          "evidenceAccess": "STATEMENT_DERIVABLE",
+          "population": "canonical_net_submitted_card_volume",
+          "canonicalFactRefs": [
+            "fact_v2_canonical_net_submitted_card_volume"
+          ],
+          "limitations": []
+        },
+        "grossSalesVolume": {
+          "state": "KNOWN",
+          "value": {
+            "amountMinor": 5249703,
+            "currency": "USD"
+          },
+          "evidenceAccess": "STATEMENT_DERIVABLE",
+          "population": "gross_sale_volume",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume"
+          ],
+          "limitations": []
+        },
+        "refundVolume": {
+          "state": "KNOWN",
+          "value": {
+            "amountMinor": 3648,
+            "currency": "USD"
+          },
+          "evidenceAccess": "STATEMENT_DERIVABLE",
+          "population": "refund_volume",
+          "canonicalFactRefs": [
+            "fact_v2_refund_volume"
+          ],
+          "limitations": []
+        },
+        "transactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "submitted_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_submitted_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as submitted transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSaleTransactionCount": {
+          "state": "KNOWN",
+          "value": 1797,
+          "evidenceAccess": "STATEMENT_DERIVABLE",
+          "population": "gross_sale_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": []
+        },
+        "refundTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_refund_transaction_count"
+          ],
+          "limitations": [
+            "No unique refund transaction count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "authorization_count",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count"
+          ],
+          "limitations": [
+            "No unique authorization count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "approvedAuthorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "approved_authorization_count",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "Canonical Economics V2 does not expose approved authorizations as the same fact as authorization events."
+          ]
+        },
+        "settledTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "settled_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as settled transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationToSettlement": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "authorization_to_settlement",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count",
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "Authorization-to-settlement requires independently proven compatible event populations."
+          ]
+        },
+        "chargebackCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_count",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_count"
+          ],
+          "limitations": [
+            "Funding rows and chargeback fee events do not prove a chargeback-principal event count.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackPrincipal": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_principal_debit_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_principal_debit_amount"
+          ],
+          "limitations": [
+            "Gross chargeback principal debits were withheld because batch-net values, signs, and missing rows do not prove the population.",
+            "combined_adjustment_chargeback_section_not_mapped",
+            "processor_presented_chargebacks_reversals_absence_preserved_without_principal_or_representment_split",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackFee": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_fee_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_fee_amount"
+          ],
+          "limitations": [
+            "No chargeback-fee occurrence was proven in the fee population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "averageTicket": {
+          "state": "KNOWN",
+          "value": {
+            "amountMinor": 2921,
+            "currency": "USD"
+          },
+          "evidenceAccess": "STATEMENT_DERIVABLE",
+          "population": "gross_sale_volume_per_gross_sale_transaction",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume",
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": []
+        },
+        "channel": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "MERCHANT_INPUT",
+          "population": "processing_channel",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "This statement does not independently establish a current component-level processing channel."
+          ]
+        }
+      },
+      "availableActivityFacts": [
+        "processedVolume",
+        "grossSalesVolume",
+        "refundVolume",
+        "grossSaleTransactionCount",
+        "averageTicket"
+      ],
+      "unresolvedActivityFacts": [
+        "transactionCount",
+        "refundTransactionCount",
+        "authorizationCount",
+        "approvedAuthorizationCount",
+        "settledTransactionCount",
+        "authorizationToSettlement",
+        "chargebackCount",
+        "chargebackPrincipal",
+        "chargebackFee",
+        "channel"
+      ],
+      "observedActivityFieldCount": 5,
+      "unresolvedActivityFieldCount": 10,
+      "rdCostStackCompleteness": "partial_but_financially_reconciled",
+      "rdContributingChargeCount": 134,
+      "deterministicallyMappedChargeCount": 133,
+      "unresolvedMappedChargeCount": 1,
+      "rdTotalStatementProcessingCostMinor": 131255,
+      "profileMappedNetMinor": 131255,
+      "profileReconciliationDeltaMinor": 0,
+      "reconcilesToRdTotal": true,
+      "productCostBuckets": [
+        {
+          "concept": "INTERCHANGE_ISSUER_ECONOMICS",
+          "debitAmountMinor": 54776,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 54776,
+          "rdEconomicChargeRefs": [
+            "economic_charge_002",
+            "economic_charge_003",
+            "economic_charge_004",
+            "economic_charge_005",
+            "economic_charge_007",
+            "economic_charge_008",
+            "economic_charge_009",
+            "economic_charge_010",
+            "economic_charge_011",
+            "economic_charge_012",
+            "economic_charge_014",
+            "economic_charge_015",
+            "economic_charge_016",
+            "economic_charge_017",
+            "economic_charge_018",
+            "economic_charge_019",
+            "economic_charge_020",
+            "economic_charge_021",
+            "economic_charge_022",
+            "economic_charge_024",
+            "economic_charge_025",
+            "economic_charge_026",
+            "economic_charge_027",
+            "economic_charge_035",
+            "economic_charge_036",
+            "economic_charge_037",
+            "economic_charge_038",
+            "economic_charge_039",
+            "economic_charge_045",
+            "economic_charge_048",
+            "economic_charge_049",
+            "economic_charge_050",
+            "economic_charge_051",
+            "economic_charge_054",
+            "economic_charge_056",
+            "economic_charge_059",
+            "economic_charge_060",
+            "economic_charge_062",
+            "economic_charge_083",
+            "economic_charge_085",
+            "economic_charge_086",
+            "economic_charge_088",
+            "economic_charge_089",
+            "economic_charge_090",
+            "economic_charge_091",
+            "economic_charge_092",
+            "economic_charge_093",
+            "economic_charge_094",
+            "economic_charge_096",
+            "economic_charge_098"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "CARD_NETWORK_ECONOMICS",
+          "debitAmountMinor": 13418,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 13418,
+          "rdEconomicChargeRefs": [
+            "economic_charge_006",
+            "economic_charge_013",
+            "economic_charge_028",
+            "economic_charge_033",
+            "economic_charge_034",
+            "economic_charge_043",
+            "economic_charge_044",
+            "economic_charge_047",
+            "economic_charge_070",
+            "economic_charge_076",
+            "economic_charge_078",
+            "economic_charge_080",
+            "economic_charge_084",
+            "economic_charge_087",
+            "economic_charge_104",
+            "economic_charge_106",
+            "economic_charge_128",
+            "economic_charge_131",
+            "economic_charge_134"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "PROVIDER_CONTROLLED_PERCENTAGE_ECONOMICS",
+          "debitAmountMinor": 6117,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 6117,
+          "rdEconomicChargeRefs": [
+            "economic_charge_030",
+            "economic_charge_063",
+            "economic_charge_065",
+            "economic_charge_077",
+            "economic_charge_079",
+            "economic_charge_099",
+            "economic_charge_103",
+            "economic_charge_105"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "PROVIDER_CONTROLLED_PER_ITEM_ECONOMICS",
+          "debitAmountMinor": 18698,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 18698,
+          "rdEconomicChargeRefs": [
+            "economic_charge_032",
+            "economic_charge_068",
+            "economic_charge_081",
+            "economic_charge_082",
+            "economic_charge_101",
+            "economic_charge_108",
+            "economic_charge_109"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "ANCILLARY_SERVICE_ECONOMICS",
+          "debitAmountMinor": 4995,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 4995,
+          "rdEconomicChargeRefs": [
+            "economic_charge_127"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "DISPUTE_CHARGEBACK_ECONOMICS",
+          "debitAmountMinor": 24,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 24,
+          "rdEconomicChargeRefs": [
+            "economic_charge_064"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "UNRESOLVED_SHARED_BUNDLED_ECONOMICS",
+          "debitAmountMinor": 33227,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 33227,
+          "rdEconomicChargeRefs": [
+            "economic_charge_001",
+            "economic_charge_023",
+            "economic_charge_029",
+            "economic_charge_031",
+            "economic_charge_040",
+            "economic_charge_041",
+            "economic_charge_042",
+            "economic_charge_046",
+            "economic_charge_052",
+            "economic_charge_053",
+            "economic_charge_055",
+            "economic_charge_057",
+            "economic_charge_058",
+            "economic_charge_061",
+            "economic_charge_066",
+            "economic_charge_067",
+            "economic_charge_069",
+            "economic_charge_071",
+            "economic_charge_072",
+            "economic_charge_073",
+            "economic_charge_074",
+            "economic_charge_075",
+            "economic_charge_095",
+            "economic_charge_097",
+            "economic_charge_100",
+            "economic_charge_102",
+            "economic_charge_107",
+            "economic_charge_110",
+            "economic_charge_111",
+            "economic_charge_112",
+            "economic_charge_113",
+            "economic_charge_114",
+            "economic_charge_115",
+            "economic_charge_116",
+            "economic_charge_117",
+            "economic_charge_118",
+            "economic_charge_119",
+            "economic_charge_120",
+            "economic_charge_121",
+            "economic_charge_122",
+            "economic_charge_123",
+            "economic_charge_124",
+            "economic_charge_125",
+            "economic_charge_126",
+            "economic_charge_129",
+            "economic_charge_130",
+            "economic_charge_132",
+            "economic_charge_133"
+          ],
+          "rdRemainderIncludedMinor": 0
+        }
+      ],
+      "duplicateChargeContributionCount": 0,
+      "nonFeePrincipalContributionCount": 0,
+      "sensitivity": {
+        "state": "TRANSACTION_COUNT_DRIVEN",
+        "countDrivenChargeRefs": [
+          "economic_charge_032",
+          "economic_charge_068",
+          "economic_charge_081",
+          "economic_charge_082",
+          "economic_charge_101",
+          "economic_charge_108",
+          "economic_charge_109"
+        ],
+        "volumeDrivenChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [],
+        "unresolvedControllableChargeRefs": [
+          "economic_charge_001",
+          "economic_charge_030",
+          "economic_charge_063",
+          "economic_charge_065",
+          "economic_charge_077",
+          "economic_charge_079",
+          "economic_charge_099",
+          "economic_charge_103",
+          "economic_charge_105"
+        ],
+        "pricingPopulationRefs": [
+          "pricing_population_001",
+          "pricing_population_006",
+          "pricing_population_008",
+          "pricing_population_014",
+          "pricing_population_016",
+          "pricing_population_019",
+          "pricing_population_023",
+          "pricing_population_025",
+          "pricing_population_027",
+          "pricing_population_028",
+          "pricing_population_031",
+          "pricing_population_033",
+          "pricing_population_035",
+          "pricing_population_037",
+          "pricing_population_040",
+          "pricing_population_041"
+        ],
+        "averageTicketFactRef": "metric_v2_headline_average_ticket",
+        "averageTicketUsed": false,
+        "additiveDriverContributionMinor": 0,
+        "method": "reproduced_statement_mechanics_only",
+        "limitations": [
+          "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
+          "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
+          "Some exact provider-controlled charges lack a reproduced count, volume, or fixed-period mechanic."
+        ]
+      },
+      "incidence": {
+        "state": "INCIDENCE_UNRESOLVED",
+        "evidenceAccess": "UNRESOLVED",
+        "evidenceRefs": [],
+        "grossProcessingCost": {
+          "amountMinor": 131255,
+          "currency": "USD"
+        },
+        "costOffsetRevenue": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "cost_offset_revenue",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Statement silence does not establish the presence or absence of a cost-offset program."
+          ]
+        },
+        "netMerchantBorneProcessingCost": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "net_merchant_borne_processing_cost",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Gross processing cost cannot be equated with net merchant burden while incidence is unresolved."
+          ]
+        },
+        "limitations": [
+          "No surcharge, cash-discount, dual-pricing, or other incidence conclusion is inferred."
+        ]
+      },
+      "evidenceRequirements": [
+        {
+          "fact": "approved authorization count",
+          "access": "DOCUMENT_REQUIRED",
+          "reason": "Authorization events do not prove approval events."
+        },
+        {
+          "fact": "component-level channel mix",
+          "access": "MERCHANT_INPUT",
+          "reason": "Use merchant or gateway evidence when the statement does not establish channel."
+        },
+        {
+          "fact": "fee economic meaning or participant role",
+          "access": "PUBLIC_EVIDENCE",
+          "reason": "Governed public evidence may classify a printed charge without changing its statement amount."
+        },
+        {
+          "fact": "cost incidence or offset",
+          "access": "UNRESOLVED",
+          "reason": "No absence or offset is inferred from statement silence."
+        }
+      ],
+      "completeness": {
+        "profileState": "PARTIAL_CURRENT_STATEMENT",
+        "observedActivityFields": [
+          "processedVolume",
+          "grossSalesVolume",
+          "refundVolume",
+          "grossSaleTransactionCount",
+          "averageTicket"
+        ],
+        "unresolvedActivityFields": [
+          "transactionCount",
+          "refundTransactionCount",
+          "authorizationCount",
+          "approvedAuthorizationCount",
+          "settledTransactionCount",
+          "authorizationToSettlement",
+          "chargebackCount",
+          "chargebackPrincipal",
+          "chargebackFee",
+          "channel"
+        ],
+        "costMappingState": "PARTIAL_RD_CHARGE_MAPPING",
+        "pricingFormulaCoverage": "partial_observed_components",
+        "feeLedgerReconciliation": "partial_but_financially_reconciled",
+        "completeMerchantEconomicsClaimAllowed": false,
+        "completeCostOfAcceptanceClaimAllowed": false,
+        "limitations": [
+          "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
+          "One or more RD charges lack a deterministic governed Product-view mapping.",
+          "Unresolved activity fields remain visible and are not converted to zero."
+        ]
+      },
+      "limitations": [
+        "This profile describes observed current-statement relationship economics only.",
+        "It does not establish complete merchant economics, total cost of acceptance, avoidability, savings, overpayment, comparison, or merchant-level advantage.",
+        "Commercial decomposition is used only as governed classification evidence over RD charge references; it is not an additive ledger here.",
+        "Public commercial-source prices and alternative providers are excluded."
+      ],
+      "comparatorInputCount": 0,
+      "opportunityOutputCount": 0,
+      "savingsOutputCount": 0,
+      "annualizationOutputCount": 0,
+      "customerRoutingAllowed": false,
+      "canonicalFingerprintBefore": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
+      "canonicalFingerprintAfter": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
+      "canonicalFingerprintInvariant": true,
+      "rdFingerprintBefore": "cbfabe9902c8f711beeedaac9b9195b78ceb5108aec68db29d053e0bc37134ba",
+      "rdFingerprintAfter": "cbfabe9902c8f711beeedaac9b9195b78ceb5108aec68db29d053e0bc37134ba",
+      "rdFingerprintInvariant": true
+    },
+    {
+      "file": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+      "businessType": "other",
+      "period": {
+        "start": "2024-06-01",
+        "end": "2024-06-30"
+      },
+      "profileState": "OBSERVED_RECONCILED",
+      "activity": {
+        "processedVolume": {
+          "state": "KNOWN",
+          "value": {
+            "amountMinor": 240000,
+            "currency": "USD"
+          },
+          "evidenceAccess": "STATEMENT_DERIVABLE",
+          "population": "canonical_net_submitted_card_volume",
+          "canonicalFactRefs": [
+            "fact_v2_canonical_net_submitted_card_volume"
+          ],
+          "limitations": []
+        },
+        "grossSalesVolume": {
+          "state": "KNOWN",
+          "value": {
+            "amountMinor": 290000,
+            "currency": "USD"
+          },
+          "evidenceAccess": "STATEMENT_DERIVABLE",
+          "population": "gross_sale_volume",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume"
+          ],
+          "limitations": []
+        },
+        "refundVolume": {
+          "state": "KNOWN",
+          "value": {
+            "amountMinor": 50000,
+            "currency": "USD"
+          },
+          "evidenceAccess": "STATEMENT_DERIVABLE",
+          "population": "refund_volume",
+          "canonicalFactRefs": [
+            "fact_v2_refund_volume"
+          ],
+          "limitations": []
+        },
+        "transactionCount": {
+          "state": "KNOWN",
+          "value": 10,
+          "evidenceAccess": "STATEMENT_DERIVABLE",
+          "population": "submitted_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_submitted_transaction_count"
+          ],
+          "limitations": []
+        },
+        "grossSaleTransactionCount": {
+          "state": "KNOWN",
+          "value": 8,
+          "evidenceAccess": "STATEMENT_DERIVABLE",
+          "population": "gross_sale_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": []
+        },
+        "refundTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_refund_transaction_count"
+          ],
+          "limitations": [
+            "No unique refund transaction count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "authorization_count",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count"
+          ],
+          "limitations": [
+            "No unique authorization count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "approvedAuthorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "approved_authorization_count",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "Canonical Economics V2 does not expose approved authorizations as the same fact as authorization events."
+          ]
+        },
+        "settledTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "settled_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as settled transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationToSettlement": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "authorization_to_settlement",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count",
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "Authorization-to-settlement requires independently proven compatible event populations."
+          ]
+        },
+        "chargebackCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_count",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_count"
+          ],
+          "limitations": [
+            "Funding rows and chargeback fee events do not prove a chargeback-principal event count.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackPrincipal": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_principal_debit_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_principal_debit_amount"
+          ],
+          "limitations": [
+            "Gross chargeback principal debits were withheld because batch-net values, signs, and missing rows do not prove the population.",
+            "combined_adjustment_chargeback_section_not_mapped",
+            "processor_presented_chargebacks_reversals_absence_preserved_without_principal_or_representment_split",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackFee": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_fee_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_fee_amount"
+          ],
+          "limitations": [
+            "No chargeback-fee occurrence was proven in the fee population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "averageTicket": {
+          "state": "KNOWN",
+          "value": {
+            "amountMinor": 36250,
+            "currency": "USD"
+          },
+          "evidenceAccess": "STATEMENT_DERIVABLE",
+          "population": "gross_sale_volume_per_gross_sale_transaction",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume",
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": []
+        },
+        "channel": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "MERCHANT_INPUT",
+          "population": "processing_channel",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "This statement does not independently establish a current component-level processing channel."
+          ]
+        }
+      },
+      "availableActivityFacts": [
+        "processedVolume",
+        "grossSalesVolume",
+        "refundVolume",
+        "transactionCount",
+        "grossSaleTransactionCount",
+        "averageTicket"
+      ],
+      "unresolvedActivityFacts": [
+        "refundTransactionCount",
+        "authorizationCount",
+        "approvedAuthorizationCount",
+        "settledTransactionCount",
+        "authorizationToSettlement",
+        "chargebackCount",
+        "chargebackPrincipal",
+        "chargebackFee",
+        "channel"
+      ],
+      "observedActivityFieldCount": 6,
+      "unresolvedActivityFieldCount": 9,
+      "rdCostStackCompleteness": "partial_but_financially_reconciled",
+      "rdContributingChargeCount": 2,
+      "deterministicallyMappedChargeCount": 2,
+      "unresolvedMappedChargeCount": 0,
+      "rdTotalStatementProcessingCostMinor": 14131,
+      "profileMappedNetMinor": 14131,
+      "profileReconciliationDeltaMinor": 0,
+      "reconcilesToRdTotal": true,
+      "productCostBuckets": [
+        {
+          "concept": "FIXED_ACCOUNT_SERVICE_ECONOMICS",
+          "debitAmountMinor": 9900,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 9900,
+          "rdEconomicChargeRefs": [
+            "economic_charge_002"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "UNRESOLVED_SHARED_BUNDLED_ECONOMICS",
+          "debitAmountMinor": 4231,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 4231,
+          "rdEconomicChargeRefs": [
+            "economic_charge_001"
+          ],
+          "rdRemainderIncludedMinor": 0
+        }
+      ],
+      "duplicateChargeContributionCount": 0,
+      "nonFeePrincipalContributionCount": 0,
+      "sensitivity": {
+        "state": "UNRESOLVED",
+        "countDrivenChargeRefs": [],
+        "volumeDrivenChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [],
+        "unresolvedControllableChargeRefs": [],
+        "pricingPopulationRefs": [],
+        "averageTicketFactRef": "metric_v2_headline_average_ticket",
+        "averageTicketUsed": false,
+        "additiveDriverContributionMinor": 0,
+        "method": "reproduced_statement_mechanics_only",
+        "limitations": [
+          "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
+          "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
+          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+        ]
+      },
+      "incidence": {
+        "state": "INCIDENCE_UNRESOLVED",
+        "evidenceAccess": "UNRESOLVED",
+        "evidenceRefs": [],
+        "grossProcessingCost": {
+          "amountMinor": 14131,
+          "currency": "USD"
+        },
+        "costOffsetRevenue": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "cost_offset_revenue",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Statement silence does not establish the presence or absence of a cost-offset program."
+          ]
+        },
+        "netMerchantBorneProcessingCost": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "net_merchant_borne_processing_cost",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Gross processing cost cannot be equated with net merchant burden while incidence is unresolved."
+          ]
+        },
+        "limitations": [
+          "No surcharge, cash-discount, dual-pricing, or other incidence conclusion is inferred."
+        ]
+      },
+      "evidenceRequirements": [
+        {
+          "fact": "approved authorization count",
+          "access": "DOCUMENT_REQUIRED",
+          "reason": "Authorization events do not prove approval events."
+        },
+        {
+          "fact": "component-level channel mix",
+          "access": "MERCHANT_INPUT",
+          "reason": "Use merchant or gateway evidence when the statement does not establish channel."
+        },
+        {
+          "fact": "fee economic meaning or participant role",
+          "access": "PUBLIC_EVIDENCE",
+          "reason": "Governed public evidence may classify a printed charge without changing its statement amount."
+        },
+        {
+          "fact": "cost incidence or offset",
+          "access": "UNRESOLVED",
+          "reason": "No absence or offset is inferred from statement silence."
+        }
+      ],
+      "completeness": {
+        "profileState": "OBSERVED_RECONCILED",
+        "observedActivityFields": [
+          "processedVolume",
+          "grossSalesVolume",
+          "refundVolume",
+          "transactionCount",
+          "grossSaleTransactionCount",
+          "averageTicket"
+        ],
+        "unresolvedActivityFields": [
+          "refundTransactionCount",
+          "authorizationCount",
+          "approvedAuthorizationCount",
+          "settledTransactionCount",
+          "authorizationToSettlement",
+          "chargebackCount",
+          "chargebackPrincipal",
+          "chargebackFee",
+          "channel"
+        ],
+        "costMappingState": "ALL_RD_CONTRIBUTING_CHARGES_MAPPED",
+        "pricingFormulaCoverage": "partial_observed_components",
+        "feeLedgerReconciliation": "partial_but_financially_reconciled",
+        "completeMerchantEconomicsClaimAllowed": false,
+        "completeCostOfAcceptanceClaimAllowed": false,
+        "limitations": [
+          "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
+          "Unresolved activity fields remain visible and are not converted to zero."
+        ]
+      },
+      "limitations": [
+        "This profile describes observed current-statement relationship economics only.",
+        "It does not establish complete merchant economics, total cost of acceptance, avoidability, savings, overpayment, comparison, or merchant-level advantage.",
+        "Commercial decomposition is used only as governed classification evidence over RD charge references; it is not an additive ledger here.",
+        "Public commercial-source prices and alternative providers are excluded."
+      ],
+      "comparatorInputCount": 0,
+      "opportunityOutputCount": 0,
+      "savingsOutputCount": 0,
+      "annualizationOutputCount": 0,
+      "customerRoutingAllowed": false,
+      "canonicalFingerprintBefore": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+      "canonicalFingerprintAfter": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+      "canonicalFingerprintInvariant": true,
+      "rdFingerprintBefore": "0acebc825c76c5c34f8ee6d663024c298136397e54009db500246aab3561a327",
+      "rdFingerprintAfter": "0acebc825c76c5c34f8ee6d663024c298136397e54009db500246aab3561a327",
+      "rdFingerprintInvariant": true
+    },
+    {
+      "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+      "businessType": "retail",
+      "period": {
+        "start": "2025-08-01",
+        "end": "2025-08-31"
+      },
+      "profileState": "PARTIAL_CURRENT_STATEMENT",
+      "activity": {
+        "processedVolume": {
+          "state": "KNOWN",
+          "value": {
+            "amountMinor": 271211,
+            "currency": "USD"
+          },
+          "evidenceAccess": "STATEMENT_DERIVABLE",
+          "population": "canonical_net_submitted_card_volume",
+          "canonicalFactRefs": [
+            "fact_v2_canonical_net_submitted_card_volume"
+          ],
+          "limitations": []
+        },
+        "grossSalesVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven gross-sale volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_volume",
+          "canonicalFactRefs": [
+            "fact_v2_refund_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven refund-volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "transactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "submitted_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_submitted_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as submitted transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSaleTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale count requires an admitted claim-specific template capability with population proof; parser success or a card-type subtotal is insufficient.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_refund_transaction_count"
+          ],
+          "limitations": [
+            "No unique refund transaction count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "authorization_count",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count"
+          ],
+          "limitations": [
+            "No unique authorization count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "approvedAuthorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "approved_authorization_count",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "Canonical Economics V2 does not expose approved authorizations as the same fact as authorization events."
+          ]
+        },
+        "settledTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "settled_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as settled transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationToSettlement": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "authorization_to_settlement",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count",
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "Authorization-to-settlement requires independently proven compatible event populations."
+          ]
+        },
+        "chargebackCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_count",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_count"
+          ],
+          "limitations": [
+            "Funding rows and chargeback fee events do not prove a chargeback-principal event count.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackPrincipal": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_principal_debit_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_principal_debit_amount"
+          ],
+          "limitations": [
+            "Gross chargeback principal debits were withheld because batch-net values, signs, and missing rows do not prove the population.",
+            "chargeback_section_not_mapped",
+            "processor_presented_combined_no_activity_preserved_without_split_zero_inference",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackFee": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_fee_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_fee_amount"
+          ],
+          "limitations": [
+            "No chargeback-fee occurrence was proven in the fee population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "averageTicket": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume_per_gross_sale_transaction",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume",
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale volume is not proven.",
+            "Average ticket is withheld unless the canonical gross-sales numerator and gross-sale-count denominator are both authoritative and compatible."
+          ]
+        },
+        "channel": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "MERCHANT_INPUT",
+          "population": "processing_channel",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "This statement does not independently establish a current component-level processing channel."
+          ]
+        }
+      },
+      "availableActivityFacts": [
+        "processedVolume"
+      ],
+      "unresolvedActivityFacts": [
+        "grossSalesVolume",
+        "refundVolume",
+        "transactionCount",
+        "grossSaleTransactionCount",
+        "refundTransactionCount",
+        "authorizationCount",
+        "approvedAuthorizationCount",
+        "settledTransactionCount",
+        "authorizationToSettlement",
+        "chargebackCount",
+        "chargebackPrincipal",
+        "chargebackFee",
+        "averageTicket",
+        "channel"
+      ],
+      "observedActivityFieldCount": 1,
+      "unresolvedActivityFieldCount": 14,
+      "rdCostStackCompleteness": "partial_but_financially_reconciled",
+      "rdContributingChargeCount": 0,
+      "deterministicallyMappedChargeCount": 0,
+      "unresolvedMappedChargeCount": 0,
+      "rdTotalStatementProcessingCostMinor": 9119,
+      "profileMappedNetMinor": 9119,
+      "profileReconciliationDeltaMinor": 0,
+      "reconcilesToRdTotal": true,
+      "productCostBuckets": [
+        {
+          "concept": "UNRESOLVED_SHARED_BUNDLED_ECONOMICS",
+          "debitAmountMinor": 9119,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 9119,
+          "rdEconomicChargeRefs": [],
+          "rdRemainderIncludedMinor": 9119
+        }
+      ],
+      "duplicateChargeContributionCount": 0,
+      "nonFeePrincipalContributionCount": 0,
+      "sensitivity": {
+        "state": "UNRESOLVED",
+        "countDrivenChargeRefs": [],
+        "volumeDrivenChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [],
+        "unresolvedControllableChargeRefs": [],
+        "pricingPopulationRefs": [],
+        "averageTicketFactRef": null,
+        "averageTicketUsed": false,
+        "additiveDriverContributionMinor": 0,
+        "method": "reproduced_statement_mechanics_only",
+        "limitations": [
+          "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
+          "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
+          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+        ]
+      },
+      "incidence": {
+        "state": "INCIDENCE_UNRESOLVED",
+        "evidenceAccess": "UNRESOLVED",
+        "evidenceRefs": [],
+        "grossProcessingCost": {
+          "amountMinor": 9119,
+          "currency": "USD"
+        },
+        "costOffsetRevenue": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "cost_offset_revenue",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Statement silence does not establish the presence or absence of a cost-offset program."
+          ]
+        },
+        "netMerchantBorneProcessingCost": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "net_merchant_borne_processing_cost",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Gross processing cost cannot be equated with net merchant burden while incidence is unresolved."
+          ]
+        },
+        "limitations": [
+          "No surcharge, cash-discount, dual-pricing, or other incidence conclusion is inferred."
+        ]
+      },
+      "evidenceRequirements": [
+        {
+          "fact": "approved authorization count",
+          "access": "DOCUMENT_REQUIRED",
+          "reason": "Authorization events do not prove approval events."
+        },
+        {
+          "fact": "component-level channel mix",
+          "access": "MERCHANT_INPUT",
+          "reason": "Use merchant or gateway evidence when the statement does not establish channel."
+        },
+        {
+          "fact": "fee economic meaning or participant role",
+          "access": "PUBLIC_EVIDENCE",
+          "reason": "Governed public evidence may classify a printed charge without changing its statement amount."
+        },
+        {
+          "fact": "cost incidence or offset",
+          "access": "UNRESOLVED",
+          "reason": "No absence or offset is inferred from statement silence."
+        }
+      ],
+      "completeness": {
+        "profileState": "PARTIAL_CURRENT_STATEMENT",
+        "observedActivityFields": [
+          "processedVolume"
+        ],
+        "unresolvedActivityFields": [
+          "grossSalesVolume",
+          "refundVolume",
+          "transactionCount",
+          "grossSaleTransactionCount",
+          "refundTransactionCount",
+          "authorizationCount",
+          "approvedAuthorizationCount",
+          "settledTransactionCount",
+          "authorizationToSettlement",
+          "chargebackCount",
+          "chargebackPrincipal",
+          "chargebackFee",
+          "averageTicket",
+          "channel"
+        ],
+        "costMappingState": "PARTIAL_RD_CHARGE_MAPPING",
+        "pricingFormulaCoverage": "partial_observed_components",
+        "feeLedgerReconciliation": "partial_but_financially_reconciled",
+        "completeMerchantEconomicsClaimAllowed": false,
+        "completeCostOfAcceptanceClaimAllowed": false,
+        "limitations": [
+          "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
+          "One or more RD charges lack a deterministic governed Product-view mapping.",
+          "Unresolved activity fields remain visible and are not converted to zero."
+        ]
+      },
+      "limitations": [
+        "This profile describes observed current-statement relationship economics only.",
+        "It does not establish complete merchant economics, total cost of acceptance, avoidability, savings, overpayment, comparison, or merchant-level advantage.",
+        "Commercial decomposition is used only as governed classification evidence over RD charge references; it is not an additive ledger here.",
+        "Public commercial-source prices and alternative providers are excluded."
+      ],
+      "comparatorInputCount": 0,
+      "opportunityOutputCount": 0,
+      "savingsOutputCount": 0,
+      "annualizationOutputCount": 0,
+      "customerRoutingAllowed": false,
+      "canonicalFingerprintBefore": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
+      "canonicalFingerprintAfter": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
+      "canonicalFingerprintInvariant": true,
+      "rdFingerprintBefore": "b3dfd4e1237aca42a55d2adc3e0a3da2728de7342a302304e44146c9375453af",
+      "rdFingerprintAfter": "b3dfd4e1237aca42a55d2adc3e0a3da2728de7342a302304e44146c9375453af",
+      "rdFingerprintInvariant": true
+    },
+    {
+      "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+      "businessType": "restaurant_food_beverage",
+      "period": {
+        "start": "2020-03-01",
+        "end": "2020-03-31"
+      },
+      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "activity": {
+        "processedVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "canonical_net_submitted_card_volume",
+          "canonicalFactRefs": [
+            "fact_v2_canonical_net_submitted_card_volume"
+          ],
+          "limitations": [
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSalesVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven gross-sale volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_volume",
+          "canonicalFactRefs": [
+            "fact_v2_refund_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven refund-volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "transactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "submitted_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_submitted_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as submitted transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSaleTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale count requires an admitted claim-specific template capability with population proof; parser success or a card-type subtotal is insufficient.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_refund_transaction_count"
+          ],
+          "limitations": [
+            "No unique refund transaction count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "authorization_count",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count"
+          ],
+          "limitations": [
+            "No unique authorization count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "approvedAuthorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "approved_authorization_count",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "Canonical Economics V2 does not expose approved authorizations as the same fact as authorization events."
+          ]
+        },
+        "settledTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "settled_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as settled transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationToSettlement": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "authorization_to_settlement",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count",
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "Authorization-to-settlement requires independently proven compatible event populations."
+          ]
+        },
+        "chargebackCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_count",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_count"
+          ],
+          "limitations": [
+            "Funding rows and chargeback fee events do not prove a chargeback-principal event count.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackPrincipal": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_principal_debit_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_principal_debit_amount"
+          ],
+          "limitations": [
+            "Gross chargeback principal debits were withheld because batch-net values, signs, and missing rows do not prove the population.",
+            "combined_adjustment_chargeback_section_not_mapped",
+            "processor_presented_chargebacks_reversals_absence_preserved_without_principal_or_representment_split",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackFee": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_fee_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_fee_amount"
+          ],
+          "limitations": [
+            "No chargeback-fee occurrence was proven in the fee population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "averageTicket": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume_per_gross_sale_transaction",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume",
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale volume is not proven.",
+            "Average ticket is withheld unless the canonical gross-sales numerator and gross-sale-count denominator are both authoritative and compatible."
+          ]
+        },
+        "channel": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "MERCHANT_INPUT",
+          "population": "processing_channel",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "This statement does not independently establish a current component-level processing channel."
+          ]
+        }
+      },
+      "availableActivityFacts": [],
+      "unresolvedActivityFacts": [
+        "processedVolume",
+        "grossSalesVolume",
+        "refundVolume",
+        "transactionCount",
+        "grossSaleTransactionCount",
+        "refundTransactionCount",
+        "authorizationCount",
+        "approvedAuthorizationCount",
+        "settledTransactionCount",
+        "authorizationToSettlement",
+        "chargebackCount",
+        "chargebackPrincipal",
+        "chargebackFee",
+        "averageTicket",
+        "channel"
+      ],
+      "observedActivityFieldCount": 0,
+      "unresolvedActivityFieldCount": 15,
+      "rdCostStackCompleteness": "financially_unreconciled",
+      "rdContributingChargeCount": 0,
+      "deterministicallyMappedChargeCount": 0,
+      "unresolvedMappedChargeCount": 0,
+      "rdTotalStatementProcessingCostMinor": null,
+      "profileMappedNetMinor": 0,
+      "profileReconciliationDeltaMinor": null,
+      "reconcilesToRdTotal": false,
+      "productCostBuckets": [],
+      "duplicateChargeContributionCount": 0,
+      "nonFeePrincipalContributionCount": 0,
+      "sensitivity": {
+        "state": "UNRESOLVED",
+        "countDrivenChargeRefs": [],
+        "volumeDrivenChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [],
+        "unresolvedControllableChargeRefs": [],
+        "pricingPopulationRefs": [],
+        "averageTicketFactRef": null,
+        "averageTicketUsed": false,
+        "additiveDriverContributionMinor": 0,
+        "method": "reproduced_statement_mechanics_only",
+        "limitations": [
+          "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
+          "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
+          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+        ]
+      },
+      "incidence": {
+        "state": "INCIDENCE_UNRESOLVED",
+        "evidenceAccess": "UNRESOLVED",
+        "evidenceRefs": [],
+        "grossProcessingCost": null,
+        "costOffsetRevenue": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "cost_offset_revenue",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Statement silence does not establish the presence or absence of a cost-offset program."
+          ]
+        },
+        "netMerchantBorneProcessingCost": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "net_merchant_borne_processing_cost",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Gross processing cost cannot be equated with net merchant burden while incidence is unresolved."
+          ]
+        },
+        "limitations": [
+          "No surcharge, cash-discount, dual-pricing, or other incidence conclusion is inferred."
+        ]
+      },
+      "evidenceRequirements": [
+        {
+          "fact": "approved authorization count",
+          "access": "DOCUMENT_REQUIRED",
+          "reason": "Authorization events do not prove approval events."
+        },
+        {
+          "fact": "component-level channel mix",
+          "access": "MERCHANT_INPUT",
+          "reason": "Use merchant or gateway evidence when the statement does not establish channel."
+        },
+        {
+          "fact": "fee economic meaning or participant role",
+          "access": "PUBLIC_EVIDENCE",
+          "reason": "Governed public evidence may classify a printed charge without changing its statement amount."
+        },
+        {
+          "fact": "cost incidence or offset",
+          "access": "UNRESOLVED",
+          "reason": "No absence or offset is inferred from statement silence."
+        }
+      ],
+      "completeness": {
+        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "observedActivityFields": [],
+        "unresolvedActivityFields": [
+          "processedVolume",
+          "grossSalesVolume",
+          "refundVolume",
+          "transactionCount",
+          "grossSaleTransactionCount",
+          "refundTransactionCount",
+          "authorizationCount",
+          "approvedAuthorizationCount",
+          "settledTransactionCount",
+          "authorizationToSettlement",
+          "chargebackCount",
+          "chargebackPrincipal",
+          "chargebackFee",
+          "averageTicket",
+          "channel"
+        ],
+        "costMappingState": "RD_COST_UNAVAILABLE",
+        "pricingFormulaCoverage": "partial_observed_components",
+        "feeLedgerReconciliation": "financially_unreconciled",
+        "completeMerchantEconomicsClaimAllowed": false,
+        "completeCostOfAcceptanceClaimAllowed": false,
+        "limitations": [
+          "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
+          "One or more RD charges lack a deterministic governed Product-view mapping.",
+          "RD statement processing cost is financially unreconciled and remains unavailable to this profile.",
+          "Unresolved activity fields remain visible and are not converted to zero."
+        ]
+      },
+      "limitations": [
+        "This profile describes observed current-statement relationship economics only.",
+        "It does not establish complete merchant economics, total cost of acceptance, avoidability, savings, overpayment, comparison, or merchant-level advantage.",
+        "Commercial decomposition is used only as governed classification evidence over RD charge references; it is not an additive ledger here.",
+        "Public commercial-source prices and alternative providers are excluded."
+      ],
+      "comparatorInputCount": 0,
+      "opportunityOutputCount": 0,
+      "savingsOutputCount": 0,
+      "annualizationOutputCount": 0,
+      "customerRoutingAllowed": false,
+      "canonicalFingerprintBefore": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
+      "canonicalFingerprintAfter": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
+      "canonicalFingerprintInvariant": true,
+      "rdFingerprintBefore": "f60b87e70dc0a3424bdb33e278d7da24b87b17d1fbcf686d3dbd4f804f16af70",
+      "rdFingerprintAfter": "f60b87e70dc0a3424bdb33e278d7da24b87b17d1fbcf686d3dbd4f804f16af70",
+      "rdFingerprintInvariant": true
+    },
+    {
+      "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+      "businessType": "retail",
+      "period": {
+        "start": "2022-09-01",
+        "end": "2022-09-30"
+      },
+      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "activity": {
+        "processedVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "canonical_net_submitted_card_volume",
+          "canonicalFactRefs": [
+            "fact_v2_canonical_net_submitted_card_volume"
+          ],
+          "limitations": [
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSalesVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven gross-sale volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_volume",
+          "canonicalFactRefs": [
+            "fact_v2_refund_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven refund-volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "transactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "submitted_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_submitted_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as submitted transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSaleTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale count requires an admitted claim-specific template capability with population proof; parser success or a card-type subtotal is insufficient.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_refund_transaction_count"
+          ],
+          "limitations": [
+            "No unique refund transaction count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "authorization_count",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count"
+          ],
+          "limitations": [
+            "No unique authorization count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "approvedAuthorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "approved_authorization_count",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "Canonical Economics V2 does not expose approved authorizations as the same fact as authorization events."
+          ]
+        },
+        "settledTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "settled_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as settled transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationToSettlement": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "authorization_to_settlement",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count",
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "Authorization-to-settlement requires independently proven compatible event populations."
+          ]
+        },
+        "chargebackCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_count",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_count"
+          ],
+          "limitations": [
+            "Funding rows and chargeback fee events do not prove a chargeback-principal event count.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackPrincipal": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_principal_debit_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_principal_debit_amount"
+          ],
+          "limitations": [
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackFee": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_fee_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_fee_amount"
+          ],
+          "limitations": [
+            "No chargeback-fee occurrence was proven in the fee population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "averageTicket": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume_per_gross_sale_transaction",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume",
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale volume is not proven.",
+            "Average ticket is withheld unless the canonical gross-sales numerator and gross-sale-count denominator are both authoritative and compatible."
+          ]
+        },
+        "channel": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "MERCHANT_INPUT",
+          "population": "processing_channel",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "This statement does not independently establish a current component-level processing channel."
+          ]
+        }
+      },
+      "availableActivityFacts": [],
+      "unresolvedActivityFacts": [
+        "processedVolume",
+        "grossSalesVolume",
+        "refundVolume",
+        "transactionCount",
+        "grossSaleTransactionCount",
+        "refundTransactionCount",
+        "authorizationCount",
+        "approvedAuthorizationCount",
+        "settledTransactionCount",
+        "authorizationToSettlement",
+        "chargebackCount",
+        "chargebackPrincipal",
+        "chargebackFee",
+        "averageTicket",
+        "channel"
+      ],
+      "observedActivityFieldCount": 0,
+      "unresolvedActivityFieldCount": 15,
+      "rdCostStackCompleteness": "financially_unreconciled",
+      "rdContributingChargeCount": 0,
+      "deterministicallyMappedChargeCount": 0,
+      "unresolvedMappedChargeCount": 0,
+      "rdTotalStatementProcessingCostMinor": null,
+      "profileMappedNetMinor": 0,
+      "profileReconciliationDeltaMinor": null,
+      "reconcilesToRdTotal": false,
+      "productCostBuckets": [],
+      "duplicateChargeContributionCount": 0,
+      "nonFeePrincipalContributionCount": 0,
+      "sensitivity": {
+        "state": "UNRESOLVED",
+        "countDrivenChargeRefs": [],
+        "volumeDrivenChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [],
+        "unresolvedControllableChargeRefs": [],
+        "pricingPopulationRefs": [],
+        "averageTicketFactRef": null,
+        "averageTicketUsed": false,
+        "additiveDriverContributionMinor": 0,
+        "method": "reproduced_statement_mechanics_only",
+        "limitations": [
+          "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
+          "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
+          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+        ]
+      },
+      "incidence": {
+        "state": "INCIDENCE_UNRESOLVED",
+        "evidenceAccess": "UNRESOLVED",
+        "evidenceRefs": [],
+        "grossProcessingCost": null,
+        "costOffsetRevenue": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "cost_offset_revenue",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Statement silence does not establish the presence or absence of a cost-offset program."
+          ]
+        },
+        "netMerchantBorneProcessingCost": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "net_merchant_borne_processing_cost",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Gross processing cost cannot be equated with net merchant burden while incidence is unresolved."
+          ]
+        },
+        "limitations": [
+          "No surcharge, cash-discount, dual-pricing, or other incidence conclusion is inferred."
+        ]
+      },
+      "evidenceRequirements": [
+        {
+          "fact": "approved authorization count",
+          "access": "DOCUMENT_REQUIRED",
+          "reason": "Authorization events do not prove approval events."
+        },
+        {
+          "fact": "component-level channel mix",
+          "access": "MERCHANT_INPUT",
+          "reason": "Use merchant or gateway evidence when the statement does not establish channel."
+        },
+        {
+          "fact": "fee economic meaning or participant role",
+          "access": "PUBLIC_EVIDENCE",
+          "reason": "Governed public evidence may classify a printed charge without changing its statement amount."
+        },
+        {
+          "fact": "cost incidence or offset",
+          "access": "UNRESOLVED",
+          "reason": "No absence or offset is inferred from statement silence."
+        }
+      ],
+      "completeness": {
+        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "observedActivityFields": [],
+        "unresolvedActivityFields": [
+          "processedVolume",
+          "grossSalesVolume",
+          "refundVolume",
+          "transactionCount",
+          "grossSaleTransactionCount",
+          "refundTransactionCount",
+          "authorizationCount",
+          "approvedAuthorizationCount",
+          "settledTransactionCount",
+          "authorizationToSettlement",
+          "chargebackCount",
+          "chargebackPrincipal",
+          "chargebackFee",
+          "averageTicket",
+          "channel"
+        ],
+        "costMappingState": "RD_COST_UNAVAILABLE",
+        "pricingFormulaCoverage": "partial_observed_components",
+        "feeLedgerReconciliation": "financially_unreconciled",
+        "completeMerchantEconomicsClaimAllowed": false,
+        "completeCostOfAcceptanceClaimAllowed": false,
+        "limitations": [
+          "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
+          "One or more RD charges lack a deterministic governed Product-view mapping.",
+          "RD statement processing cost is financially unreconciled and remains unavailable to this profile.",
+          "Unresolved activity fields remain visible and are not converted to zero."
+        ]
+      },
+      "limitations": [
+        "This profile describes observed current-statement relationship economics only.",
+        "It does not establish complete merchant economics, total cost of acceptance, avoidability, savings, overpayment, comparison, or merchant-level advantage.",
+        "Commercial decomposition is used only as governed classification evidence over RD charge references; it is not an additive ledger here.",
+        "Public commercial-source prices and alternative providers are excluded."
+      ],
+      "comparatorInputCount": 0,
+      "opportunityOutputCount": 0,
+      "savingsOutputCount": 0,
+      "annualizationOutputCount": 0,
+      "customerRoutingAllowed": false,
+      "canonicalFingerprintBefore": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
+      "canonicalFingerprintAfter": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
+      "canonicalFingerprintInvariant": true,
+      "rdFingerprintBefore": "945bc0b7684c1c4f06083f70f8b8d3e602abbfc309bdf91be5f5c969b3f40566",
+      "rdFingerprintAfter": "945bc0b7684c1c4f06083f70f8b8d3e602abbfc309bdf91be5f5c969b3f40566",
+      "rdFingerprintInvariant": true
+    },
+    {
+      "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+      "businessType": "professional_services",
+      "period": {
+        "start": "2024-02-01",
+        "end": "2024-02-29"
+      },
+      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "activity": {
+        "processedVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "canonical_net_submitted_card_volume",
+          "canonicalFactRefs": [
+            "fact_v2_canonical_net_submitted_card_volume"
+          ],
+          "limitations": [
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSalesVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven gross-sale volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_volume",
+          "canonicalFactRefs": [
+            "fact_v2_refund_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven refund-volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "transactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "submitted_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_submitted_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as submitted transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSaleTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale count requires an admitted claim-specific template capability with population proof; parser success or a card-type subtotal is insufficient.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_refund_transaction_count"
+          ],
+          "limitations": [
+            "No unique refund transaction count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "authorization_count",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count"
+          ],
+          "limitations": [
+            "No unique authorization count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "approvedAuthorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "approved_authorization_count",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "Canonical Economics V2 does not expose approved authorizations as the same fact as authorization events."
+          ]
+        },
+        "settledTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "settled_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as settled transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationToSettlement": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "authorization_to_settlement",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count",
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "Authorization-to-settlement requires independently proven compatible event populations."
+          ]
+        },
+        "chargebackCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_count",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_count"
+          ],
+          "limitations": [
+            "Funding rows and chargeback fee events do not prove a chargeback-principal event count.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackPrincipal": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_principal_debit_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_principal_debit_amount"
+          ],
+          "limitations": [
+            "Gross chargeback principal debits were withheld because batch-net values, signs, and missing rows do not prove the population.",
+            "chargeback_section_not_mapped",
+            "processor_presented_combined_no_activity_preserved_without_split_zero_inference",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackFee": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_fee_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_fee_amount"
+          ],
+          "limitations": [
+            "No chargeback-fee occurrence was proven in the fee population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "averageTicket": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume_per_gross_sale_transaction",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume",
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale volume is not proven.",
+            "Average ticket is withheld unless the canonical gross-sales numerator and gross-sale-count denominator are both authoritative and compatible."
+          ]
+        },
+        "channel": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "MERCHANT_INPUT",
+          "population": "processing_channel",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "This statement does not independently establish a current component-level processing channel."
+          ]
+        }
+      },
+      "availableActivityFacts": [],
+      "unresolvedActivityFacts": [
+        "processedVolume",
+        "grossSalesVolume",
+        "refundVolume",
+        "transactionCount",
+        "grossSaleTransactionCount",
+        "refundTransactionCount",
+        "authorizationCount",
+        "approvedAuthorizationCount",
+        "settledTransactionCount",
+        "authorizationToSettlement",
+        "chargebackCount",
+        "chargebackPrincipal",
+        "chargebackFee",
+        "averageTicket",
+        "channel"
+      ],
+      "observedActivityFieldCount": 0,
+      "unresolvedActivityFieldCount": 15,
+      "rdCostStackCompleteness": "financially_unreconciled",
+      "rdContributingChargeCount": 0,
+      "deterministicallyMappedChargeCount": 0,
+      "unresolvedMappedChargeCount": 0,
+      "rdTotalStatementProcessingCostMinor": null,
+      "profileMappedNetMinor": 0,
+      "profileReconciliationDeltaMinor": null,
+      "reconcilesToRdTotal": false,
+      "productCostBuckets": [],
+      "duplicateChargeContributionCount": 0,
+      "nonFeePrincipalContributionCount": 0,
+      "sensitivity": {
+        "state": "UNRESOLVED",
+        "countDrivenChargeRefs": [],
+        "volumeDrivenChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [],
+        "unresolvedControllableChargeRefs": [],
+        "pricingPopulationRefs": [],
+        "averageTicketFactRef": null,
+        "averageTicketUsed": false,
+        "additiveDriverContributionMinor": 0,
+        "method": "reproduced_statement_mechanics_only",
+        "limitations": [
+          "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
+          "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
+          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+        ]
+      },
+      "incidence": {
+        "state": "INCIDENCE_UNRESOLVED",
+        "evidenceAccess": "UNRESOLVED",
+        "evidenceRefs": [],
+        "grossProcessingCost": null,
+        "costOffsetRevenue": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "cost_offset_revenue",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Statement silence does not establish the presence or absence of a cost-offset program."
+          ]
+        },
+        "netMerchantBorneProcessingCost": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "net_merchant_borne_processing_cost",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Gross processing cost cannot be equated with net merchant burden while incidence is unresolved."
+          ]
+        },
+        "limitations": [
+          "No surcharge, cash-discount, dual-pricing, or other incidence conclusion is inferred."
+        ]
+      },
+      "evidenceRequirements": [
+        {
+          "fact": "approved authorization count",
+          "access": "DOCUMENT_REQUIRED",
+          "reason": "Authorization events do not prove approval events."
+        },
+        {
+          "fact": "component-level channel mix",
+          "access": "MERCHANT_INPUT",
+          "reason": "Use merchant or gateway evidence when the statement does not establish channel."
+        },
+        {
+          "fact": "fee economic meaning or participant role",
+          "access": "PUBLIC_EVIDENCE",
+          "reason": "Governed public evidence may classify a printed charge without changing its statement amount."
+        },
+        {
+          "fact": "cost incidence or offset",
+          "access": "UNRESOLVED",
+          "reason": "No absence or offset is inferred from statement silence."
+        }
+      ],
+      "completeness": {
+        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "observedActivityFields": [],
+        "unresolvedActivityFields": [
+          "processedVolume",
+          "grossSalesVolume",
+          "refundVolume",
+          "transactionCount",
+          "grossSaleTransactionCount",
+          "refundTransactionCount",
+          "authorizationCount",
+          "approvedAuthorizationCount",
+          "settledTransactionCount",
+          "authorizationToSettlement",
+          "chargebackCount",
+          "chargebackPrincipal",
+          "chargebackFee",
+          "averageTicket",
+          "channel"
+        ],
+        "costMappingState": "RD_COST_UNAVAILABLE",
+        "pricingFormulaCoverage": "partial_observed_components",
+        "feeLedgerReconciliation": "financially_unreconciled",
+        "completeMerchantEconomicsClaimAllowed": false,
+        "completeCostOfAcceptanceClaimAllowed": false,
+        "limitations": [
+          "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
+          "One or more RD charges lack a deterministic governed Product-view mapping.",
+          "RD statement processing cost is financially unreconciled and remains unavailable to this profile.",
+          "Unresolved activity fields remain visible and are not converted to zero."
+        ]
+      },
+      "limitations": [
+        "This profile describes observed current-statement relationship economics only.",
+        "It does not establish complete merchant economics, total cost of acceptance, avoidability, savings, overpayment, comparison, or merchant-level advantage.",
+        "Commercial decomposition is used only as governed classification evidence over RD charge references; it is not an additive ledger here.",
+        "Public commercial-source prices and alternative providers are excluded."
+      ],
+      "comparatorInputCount": 0,
+      "opportunityOutputCount": 0,
+      "savingsOutputCount": 0,
+      "annualizationOutputCount": 0,
+      "customerRoutingAllowed": false,
+      "canonicalFingerprintBefore": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
+      "canonicalFingerprintAfter": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
+      "canonicalFingerprintInvariant": true,
+      "rdFingerprintBefore": "af19baf0a6562e538c3c2324d0137d425ea957e2295059b71c64b92fb0cf1f5f",
+      "rdFingerprintAfter": "af19baf0a6562e538c3c2324d0137d425ea957e2295059b71c64b92fb0cf1f5f",
+      "rdFingerprintInvariant": true
+    },
+    {
+      "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+      "businessType": "ecommerce",
+      "period": {
+        "start": "2025-10-01",
+        "end": "2025-10-31"
+      },
+      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "activity": {
+        "processedVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "canonical_net_submitted_card_volume",
+          "canonicalFactRefs": [
+            "fact_v2_canonical_net_submitted_card_volume"
+          ],
+          "limitations": [
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSalesVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven gross-sale volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_volume",
+          "canonicalFactRefs": [
+            "fact_v2_refund_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven refund-volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "transactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "submitted_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_submitted_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as submitted transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSaleTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale count requires an admitted claim-specific template capability with population proof; parser success or a card-type subtotal is insufficient.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_refund_transaction_count"
+          ],
+          "limitations": [
+            "No unique refund transaction count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "authorization_count",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count"
+          ],
+          "limitations": [
+            "No unique authorization count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "approvedAuthorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "approved_authorization_count",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "Canonical Economics V2 does not expose approved authorizations as the same fact as authorization events."
+          ]
+        },
+        "settledTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "settled_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as settled transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationToSettlement": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "authorization_to_settlement",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count",
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "Authorization-to-settlement requires independently proven compatible event populations."
+          ]
+        },
+        "chargebackCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_count",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_count"
+          ],
+          "limitations": [
+            "Funding rows and chargeback fee events do not prove a chargeback-principal event count.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackPrincipal": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_principal_debit_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_principal_debit_amount"
+          ],
+          "limitations": [
+            "Gross chargeback principal debits were withheld because batch-net values, signs, and missing rows do not prove the population.",
+            "chargeback_section_not_mapped",
+            "processor_presented_combined_no_activity_preserved_without_split_zero_inference",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackFee": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_fee_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_fee_amount"
+          ],
+          "limitations": [
+            "No chargeback-fee occurrence was proven in the fee population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "averageTicket": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume_per_gross_sale_transaction",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume",
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale volume is not proven.",
+            "Average ticket is withheld unless the canonical gross-sales numerator and gross-sale-count denominator are both authoritative and compatible."
+          ]
+        },
+        "channel": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "MERCHANT_INPUT",
+          "population": "processing_channel",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "This statement does not independently establish a current component-level processing channel."
+          ]
+        }
+      },
+      "availableActivityFacts": [],
+      "unresolvedActivityFacts": [
+        "processedVolume",
+        "grossSalesVolume",
+        "refundVolume",
+        "transactionCount",
+        "grossSaleTransactionCount",
+        "refundTransactionCount",
+        "authorizationCount",
+        "approvedAuthorizationCount",
+        "settledTransactionCount",
+        "authorizationToSettlement",
+        "chargebackCount",
+        "chargebackPrincipal",
+        "chargebackFee",
+        "averageTicket",
+        "channel"
+      ],
+      "observedActivityFieldCount": 0,
+      "unresolvedActivityFieldCount": 15,
+      "rdCostStackCompleteness": "financially_unreconciled",
+      "rdContributingChargeCount": 0,
+      "deterministicallyMappedChargeCount": 0,
+      "unresolvedMappedChargeCount": 0,
+      "rdTotalStatementProcessingCostMinor": null,
+      "profileMappedNetMinor": 0,
+      "profileReconciliationDeltaMinor": null,
+      "reconcilesToRdTotal": false,
+      "productCostBuckets": [],
+      "duplicateChargeContributionCount": 0,
+      "nonFeePrincipalContributionCount": 0,
+      "sensitivity": {
+        "state": "UNRESOLVED",
+        "countDrivenChargeRefs": [],
+        "volumeDrivenChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [],
+        "unresolvedControllableChargeRefs": [],
+        "pricingPopulationRefs": [],
+        "averageTicketFactRef": null,
+        "averageTicketUsed": false,
+        "additiveDriverContributionMinor": 0,
+        "method": "reproduced_statement_mechanics_only",
+        "limitations": [
+          "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
+          "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
+          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+        ]
+      },
+      "incidence": {
+        "state": "INCIDENCE_UNRESOLVED",
+        "evidenceAccess": "UNRESOLVED",
+        "evidenceRefs": [],
+        "grossProcessingCost": null,
+        "costOffsetRevenue": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "cost_offset_revenue",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Statement silence does not establish the presence or absence of a cost-offset program."
+          ]
+        },
+        "netMerchantBorneProcessingCost": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "net_merchant_borne_processing_cost",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Gross processing cost cannot be equated with net merchant burden while incidence is unresolved."
+          ]
+        },
+        "limitations": [
+          "No surcharge, cash-discount, dual-pricing, or other incidence conclusion is inferred."
+        ]
+      },
+      "evidenceRequirements": [
+        {
+          "fact": "approved authorization count",
+          "access": "DOCUMENT_REQUIRED",
+          "reason": "Authorization events do not prove approval events."
+        },
+        {
+          "fact": "component-level channel mix",
+          "access": "MERCHANT_INPUT",
+          "reason": "Use merchant or gateway evidence when the statement does not establish channel."
+        },
+        {
+          "fact": "fee economic meaning or participant role",
+          "access": "PUBLIC_EVIDENCE",
+          "reason": "Governed public evidence may classify a printed charge without changing its statement amount."
+        },
+        {
+          "fact": "cost incidence or offset",
+          "access": "UNRESOLVED",
+          "reason": "No absence or offset is inferred from statement silence."
+        }
+      ],
+      "completeness": {
+        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "observedActivityFields": [],
+        "unresolvedActivityFields": [
+          "processedVolume",
+          "grossSalesVolume",
+          "refundVolume",
+          "transactionCount",
+          "grossSaleTransactionCount",
+          "refundTransactionCount",
+          "authorizationCount",
+          "approvedAuthorizationCount",
+          "settledTransactionCount",
+          "authorizationToSettlement",
+          "chargebackCount",
+          "chargebackPrincipal",
+          "chargebackFee",
+          "averageTicket",
+          "channel"
+        ],
+        "costMappingState": "RD_COST_UNAVAILABLE",
+        "pricingFormulaCoverage": "partial_observed_components",
+        "feeLedgerReconciliation": "financially_unreconciled",
+        "completeMerchantEconomicsClaimAllowed": false,
+        "completeCostOfAcceptanceClaimAllowed": false,
+        "limitations": [
+          "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
+          "One or more RD charges lack a deterministic governed Product-view mapping.",
+          "RD statement processing cost is financially unreconciled and remains unavailable to this profile.",
+          "Unresolved activity fields remain visible and are not converted to zero."
+        ]
+      },
+      "limitations": [
+        "This profile describes observed current-statement relationship economics only.",
+        "It does not establish complete merchant economics, total cost of acceptance, avoidability, savings, overpayment, comparison, or merchant-level advantage.",
+        "Commercial decomposition is used only as governed classification evidence over RD charge references; it is not an additive ledger here.",
+        "Public commercial-source prices and alternative providers are excluded."
+      ],
+      "comparatorInputCount": 0,
+      "opportunityOutputCount": 0,
+      "savingsOutputCount": 0,
+      "annualizationOutputCount": 0,
+      "customerRoutingAllowed": false,
+      "canonicalFingerprintBefore": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+      "canonicalFingerprintAfter": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+      "canonicalFingerprintInvariant": true,
+      "rdFingerprintBefore": "a0553581d3068078168195273fec0b319255665adcb84ae8fc1d63033a45865f",
+      "rdFingerprintAfter": "a0553581d3068078168195273fec0b319255665adcb84ae8fc1d63033a45865f",
+      "rdFingerprintInvariant": true
+    },
+    {
+      "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
+      "businessType": "ecommerce",
+      "period": {
+        "start": "2025-09-01",
+        "end": "2025-09-30"
+      },
+      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "activity": {
+        "processedVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "canonical_net_submitted_card_volume",
+          "canonicalFactRefs": [
+            "fact_v2_canonical_net_submitted_card_volume"
+          ],
+          "limitations": [
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSalesVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven gross-sale volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_volume",
+          "canonicalFactRefs": [
+            "fact_v2_refund_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven refund-volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "transactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "submitted_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_submitted_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as submitted transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSaleTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale count requires an admitted claim-specific template capability with population proof; parser success or a card-type subtotal is insufficient.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_refund_transaction_count"
+          ],
+          "limitations": [
+            "No unique refund transaction count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "authorization_count",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count"
+          ],
+          "limitations": [
+            "No unique authorization count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "approvedAuthorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "approved_authorization_count",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "Canonical Economics V2 does not expose approved authorizations as the same fact as authorization events."
+          ]
+        },
+        "settledTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "settled_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as settled transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationToSettlement": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "authorization_to_settlement",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count",
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "Authorization-to-settlement requires independently proven compatible event populations."
+          ]
+        },
+        "chargebackCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_count",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_count"
+          ],
+          "limitations": [
+            "Funding rows and chargeback fee events do not prove a chargeback-principal event count.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackPrincipal": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_principal_debit_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_principal_debit_amount"
+          ],
+          "limitations": [
+            "Gross chargeback principal debits were withheld because batch-net values, signs, and missing rows do not prove the population.",
+            "chargeback_section_not_mapped",
+            "processor_presented_combined_no_activity_preserved_without_split_zero_inference",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackFee": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_fee_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_fee_amount"
+          ],
+          "limitations": [
+            "No chargeback-fee occurrence was proven in the fee population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "averageTicket": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume_per_gross_sale_transaction",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume",
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale volume is not proven.",
+            "Average ticket is withheld unless the canonical gross-sales numerator and gross-sale-count denominator are both authoritative and compatible."
+          ]
+        },
+        "channel": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "MERCHANT_INPUT",
+          "population": "processing_channel",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "This statement does not independently establish a current component-level processing channel."
+          ]
+        }
+      },
+      "availableActivityFacts": [],
+      "unresolvedActivityFacts": [
+        "processedVolume",
+        "grossSalesVolume",
+        "refundVolume",
+        "transactionCount",
+        "grossSaleTransactionCount",
+        "refundTransactionCount",
+        "authorizationCount",
+        "approvedAuthorizationCount",
+        "settledTransactionCount",
+        "authorizationToSettlement",
+        "chargebackCount",
+        "chargebackPrincipal",
+        "chargebackFee",
+        "averageTicket",
+        "channel"
+      ],
+      "observedActivityFieldCount": 0,
+      "unresolvedActivityFieldCount": 15,
+      "rdCostStackCompleteness": "financially_unreconciled",
+      "rdContributingChargeCount": 0,
+      "deterministicallyMappedChargeCount": 0,
+      "unresolvedMappedChargeCount": 0,
+      "rdTotalStatementProcessingCostMinor": null,
+      "profileMappedNetMinor": 0,
+      "profileReconciliationDeltaMinor": null,
+      "reconcilesToRdTotal": false,
+      "productCostBuckets": [],
+      "duplicateChargeContributionCount": 0,
+      "nonFeePrincipalContributionCount": 0,
+      "sensitivity": {
+        "state": "UNRESOLVED",
+        "countDrivenChargeRefs": [],
+        "volumeDrivenChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [],
+        "unresolvedControllableChargeRefs": [],
+        "pricingPopulationRefs": [],
+        "averageTicketFactRef": null,
+        "averageTicketUsed": false,
+        "additiveDriverContributionMinor": 0,
+        "method": "reproduced_statement_mechanics_only",
+        "limitations": [
+          "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
+          "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
+          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+        ]
+      },
+      "incidence": {
+        "state": "INCIDENCE_UNRESOLVED",
+        "evidenceAccess": "UNRESOLVED",
+        "evidenceRefs": [],
+        "grossProcessingCost": null,
+        "costOffsetRevenue": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "cost_offset_revenue",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Statement silence does not establish the presence or absence of a cost-offset program."
+          ]
+        },
+        "netMerchantBorneProcessingCost": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "net_merchant_borne_processing_cost",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Gross processing cost cannot be equated with net merchant burden while incidence is unresolved."
+          ]
+        },
+        "limitations": [
+          "No surcharge, cash-discount, dual-pricing, or other incidence conclusion is inferred."
+        ]
+      },
+      "evidenceRequirements": [
+        {
+          "fact": "approved authorization count",
+          "access": "DOCUMENT_REQUIRED",
+          "reason": "Authorization events do not prove approval events."
+        },
+        {
+          "fact": "component-level channel mix",
+          "access": "MERCHANT_INPUT",
+          "reason": "Use merchant or gateway evidence when the statement does not establish channel."
+        },
+        {
+          "fact": "fee economic meaning or participant role",
+          "access": "PUBLIC_EVIDENCE",
+          "reason": "Governed public evidence may classify a printed charge without changing its statement amount."
+        },
+        {
+          "fact": "cost incidence or offset",
+          "access": "UNRESOLVED",
+          "reason": "No absence or offset is inferred from statement silence."
+        }
+      ],
+      "completeness": {
+        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "observedActivityFields": [],
+        "unresolvedActivityFields": [
+          "processedVolume",
+          "grossSalesVolume",
+          "refundVolume",
+          "transactionCount",
+          "grossSaleTransactionCount",
+          "refundTransactionCount",
+          "authorizationCount",
+          "approvedAuthorizationCount",
+          "settledTransactionCount",
+          "authorizationToSettlement",
+          "chargebackCount",
+          "chargebackPrincipal",
+          "chargebackFee",
+          "averageTicket",
+          "channel"
+        ],
+        "costMappingState": "RD_COST_UNAVAILABLE",
+        "pricingFormulaCoverage": "unresolved",
+        "feeLedgerReconciliation": "financially_unreconciled",
+        "completeMerchantEconomicsClaimAllowed": false,
+        "completeCostOfAcceptanceClaimAllowed": false,
+        "limitations": [
+          "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
+          "One or more RD charges lack a deterministic governed Product-view mapping.",
+          "RD statement processing cost is financially unreconciled and remains unavailable to this profile.",
+          "Unresolved activity fields remain visible and are not converted to zero."
+        ]
+      },
+      "limitations": [
+        "This profile describes observed current-statement relationship economics only.",
+        "It does not establish complete merchant economics, total cost of acceptance, avoidability, savings, overpayment, comparison, or merchant-level advantage.",
+        "Commercial decomposition is used only as governed classification evidence over RD charge references; it is not an additive ledger here.",
+        "Public commercial-source prices and alternative providers are excluded."
+      ],
+      "comparatorInputCount": 0,
+      "opportunityOutputCount": 0,
+      "savingsOutputCount": 0,
+      "annualizationOutputCount": 0,
+      "customerRoutingAllowed": false,
+      "canonicalFingerprintBefore": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
+      "canonicalFingerprintAfter": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
+      "canonicalFingerprintInvariant": true,
+      "rdFingerprintBefore": "156807a585d3546295fe62cc19c0224ef284f470adf01118f656f7c45826a95b",
+      "rdFingerprintAfter": "156807a585d3546295fe62cc19c0224ef284f470adf01118f656f7c45826a95b",
+      "rdFingerprintInvariant": true
+    },
+    {
+      "file": "fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf",
+      "businessType": "restaurant_food_beverage",
+      "period": {
+        "start": "2024-12-01",
+        "end": "2024-12-31"
+      },
+      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "activity": {
+        "processedVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "canonical_net_submitted_card_volume",
+          "canonicalFactRefs": [
+            "fact_v2_canonical_net_submitted_card_volume"
+          ],
+          "limitations": [
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSalesVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven gross-sale volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_volume",
+          "canonicalFactRefs": [
+            "fact_v2_refund_volume"
+          ],
+          "limitations": [
+            "The deterministic parser did not expose a proven refund-volume population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "transactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "submitted_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_submitted_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as submitted transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSaleTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale count requires an admitted claim-specific template capability with population proof; parser success or a card-type subtotal is insufficient.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_refund_transaction_count"
+          ],
+          "limitations": [
+            "No unique refund transaction count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "authorization_count",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count"
+          ],
+          "limitations": [
+            "No unique authorization count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "approvedAuthorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "approved_authorization_count",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "Canonical Economics V2 does not expose approved authorizations as the same fact as authorization events."
+          ]
+        },
+        "settledTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "settled_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as settled transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationToSettlement": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "authorization_to_settlement",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count",
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "Authorization-to-settlement requires independently proven compatible event populations."
+          ]
+        },
+        "chargebackCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_count",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_count"
+          ],
+          "limitations": [
+            "Funding rows and chargeback fee events do not prove a chargeback-principal event count.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackPrincipal": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_principal_debit_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_principal_debit_amount"
+          ],
+          "limitations": [
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackFee": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_fee_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_fee_amount"
+          ],
+          "limitations": [
+            "No chargeback-fee occurrence was proven in the fee population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "averageTicket": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume_per_gross_sale_transaction",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume",
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale volume is not proven.",
+            "Average ticket is withheld unless the canonical gross-sales numerator and gross-sale-count denominator are both authoritative and compatible."
+          ]
+        },
+        "channel": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "MERCHANT_INPUT",
+          "population": "processing_channel",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "This statement does not independently establish a current component-level processing channel."
+          ]
+        }
+      },
+      "availableActivityFacts": [],
+      "unresolvedActivityFacts": [
+        "processedVolume",
+        "grossSalesVolume",
+        "refundVolume",
+        "transactionCount",
+        "grossSaleTransactionCount",
+        "refundTransactionCount",
+        "authorizationCount",
+        "approvedAuthorizationCount",
+        "settledTransactionCount",
+        "authorizationToSettlement",
+        "chargebackCount",
+        "chargebackPrincipal",
+        "chargebackFee",
+        "averageTicket",
+        "channel"
+      ],
+      "observedActivityFieldCount": 0,
+      "unresolvedActivityFieldCount": 15,
+      "rdCostStackCompleteness": "financially_unreconciled",
+      "rdContributingChargeCount": 0,
+      "deterministicallyMappedChargeCount": 0,
+      "unresolvedMappedChargeCount": 0,
+      "rdTotalStatementProcessingCostMinor": null,
+      "profileMappedNetMinor": 0,
+      "profileReconciliationDeltaMinor": null,
+      "reconcilesToRdTotal": false,
+      "productCostBuckets": [],
+      "duplicateChargeContributionCount": 0,
+      "nonFeePrincipalContributionCount": 0,
+      "sensitivity": {
+        "state": "UNRESOLVED",
+        "countDrivenChargeRefs": [],
+        "volumeDrivenChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [],
+        "unresolvedControllableChargeRefs": [],
+        "pricingPopulationRefs": [],
+        "averageTicketFactRef": null,
+        "averageTicketUsed": false,
+        "additiveDriverContributionMinor": 0,
+        "method": "reproduced_statement_mechanics_only",
+        "limitations": [
+          "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
+          "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
+          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+        ]
+      },
+      "incidence": {
+        "state": "INCIDENCE_UNRESOLVED",
+        "evidenceAccess": "UNRESOLVED",
+        "evidenceRefs": [],
+        "grossProcessingCost": null,
+        "costOffsetRevenue": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "cost_offset_revenue",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Statement silence does not establish the presence or absence of a cost-offset program."
+          ]
+        },
+        "netMerchantBorneProcessingCost": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "net_merchant_borne_processing_cost",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Gross processing cost cannot be equated with net merchant burden while incidence is unresolved."
+          ]
+        },
+        "limitations": [
+          "No surcharge, cash-discount, dual-pricing, or other incidence conclusion is inferred."
+        ]
+      },
+      "evidenceRequirements": [
+        {
+          "fact": "approved authorization count",
+          "access": "DOCUMENT_REQUIRED",
+          "reason": "Authorization events do not prove approval events."
+        },
+        {
+          "fact": "component-level channel mix",
+          "access": "MERCHANT_INPUT",
+          "reason": "Use merchant or gateway evidence when the statement does not establish channel."
+        },
+        {
+          "fact": "fee economic meaning or participant role",
+          "access": "PUBLIC_EVIDENCE",
+          "reason": "Governed public evidence may classify a printed charge without changing its statement amount."
+        },
+        {
+          "fact": "cost incidence or offset",
+          "access": "UNRESOLVED",
+          "reason": "No absence or offset is inferred from statement silence."
+        }
+      ],
+      "completeness": {
+        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "observedActivityFields": [],
+        "unresolvedActivityFields": [
+          "processedVolume",
+          "grossSalesVolume",
+          "refundVolume",
+          "transactionCount",
+          "grossSaleTransactionCount",
+          "refundTransactionCount",
+          "authorizationCount",
+          "approvedAuthorizationCount",
+          "settledTransactionCount",
+          "authorizationToSettlement",
+          "chargebackCount",
+          "chargebackPrincipal",
+          "chargebackFee",
+          "averageTicket",
+          "channel"
+        ],
+        "costMappingState": "RD_COST_UNAVAILABLE",
+        "pricingFormulaCoverage": "partial_observed_components",
+        "feeLedgerReconciliation": "financially_unreconciled",
+        "completeMerchantEconomicsClaimAllowed": false,
+        "completeCostOfAcceptanceClaimAllowed": false,
+        "limitations": [
+          "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
+          "One or more RD charges lack a deterministic governed Product-view mapping.",
+          "RD statement processing cost is financially unreconciled and remains unavailable to this profile.",
+          "Unresolved activity fields remain visible and are not converted to zero."
+        ]
+      },
+      "limitations": [
+        "This profile describes observed current-statement relationship economics only.",
+        "It does not establish complete merchant economics, total cost of acceptance, avoidability, savings, overpayment, comparison, or merchant-level advantage.",
+        "Commercial decomposition is used only as governed classification evidence over RD charge references; it is not an additive ledger here.",
+        "Public commercial-source prices and alternative providers are excluded."
+      ],
+      "comparatorInputCount": 0,
+      "opportunityOutputCount": 0,
+      "savingsOutputCount": 0,
+      "annualizationOutputCount": 0,
+      "customerRoutingAllowed": false,
+      "canonicalFingerprintBefore": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
+      "canonicalFingerprintAfter": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
+      "canonicalFingerprintInvariant": true,
+      "rdFingerprintBefore": "c527ff93a5d844ba614f4cc17fb8cd451bfb8bd25f28e12b2eb8388778b9ce69",
+      "rdFingerprintAfter": "c527ff93a5d844ba614f4cc17fb8cd451bfb8bd25f28e12b2eb8388778b9ce69",
+      "rdFingerprintInvariant": true
+    },
+    {
+      "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+      "businessType": "restaurant_food_beverage",
+      "period": {
+        "start": "2024-09-01",
+        "end": "2024-09-30"
+      },
+      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "activity": {
+        "processedVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "canonical_net_submitted_card_volume",
+          "canonicalFactRefs": [
+            "fact_v2_canonical_net_submitted_card_volume"
+          ],
+          "limitations": [
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSalesVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume"
+          ],
+          "limitations": [
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundVolume": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_volume",
+          "canonicalFactRefs": [
+            "fact_v2_refund_volume"
+          ],
+          "limitations": [
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "transactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "submitted_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_submitted_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as submitted transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "grossSaleTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale count requires an admitted claim-specific template capability with population proof; parser success or a card-type subtotal is insufficient.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "refundTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "refund_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_refund_transaction_count"
+          ],
+          "limitations": [
+            "No unique refund transaction count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "authorization_count",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count"
+          ],
+          "limitations": [
+            "No unique authorization count was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "approvedAuthorizationCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "approved_authorization_count",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "Canonical Economics V2 does not expose approved authorizations as the same fact as authorization events."
+          ]
+        },
+        "settledTransactionCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "settled_transaction_count",
+          "canonicalFactRefs": [
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "No count explicitly identified as settled transactions was proven.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "authorizationToSettlement": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "DOCUMENT_REQUIRED",
+          "population": "authorization_to_settlement",
+          "canonicalFactRefs": [
+            "fact_v2_authorization_count",
+            "fact_v2_settled_transaction_count"
+          ],
+          "limitations": [
+            "Authorization-to-settlement requires independently proven compatible event populations."
+          ]
+        },
+        "chargebackCount": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_count",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_count"
+          ],
+          "limitations": [
+            "Funding rows and chargeback fee events do not prove a chargeback-principal event count.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackPrincipal": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_principal_debit_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_principal_debit_amount"
+          ],
+          "limitations": [
+            "Gross chargeback principal debits were withheld because batch-net values, signs, and missing rows do not prove the population.",
+            "combined_adjustment_chargeback_section_not_mapped",
+            "processor_presented_chargebacks_reversals_absence_preserved_without_principal_or_representment_split",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "chargebackFee": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "chargeback_fee_amount",
+          "canonicalFactRefs": [
+            "fact_v2_chargeback_fee_amount"
+          ],
+          "limitations": [
+            "No chargeback-fee occurrence was proven in the fee population.",
+            "This fact is not an authoritative statement-derived value for the current profile."
+          ]
+        },
+        "averageTicket": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "UNRESOLVED",
+          "population": "gross_sale_volume_per_gross_sale_transaction",
+          "canonicalFactRefs": [
+            "fact_v2_gross_sale_volume",
+            "fact_v2_gross_sale_transaction_count"
+          ],
+          "limitations": [
+            "Gross-sale transaction count is not proven.",
+            "Average ticket is withheld unless the canonical gross-sales numerator and gross-sale-count denominator are both authoritative and compatible."
+          ]
+        },
+        "channel": {
+          "state": "UNKNOWN",
+          "value": null,
+          "evidenceAccess": "MERCHANT_INPUT",
+          "population": "processing_channel",
+          "canonicalFactRefs": [],
+          "limitations": [
+            "This statement does not independently establish a current component-level processing channel."
+          ]
+        }
+      },
+      "availableActivityFacts": [],
+      "unresolvedActivityFacts": [
+        "processedVolume",
+        "grossSalesVolume",
+        "refundVolume",
+        "transactionCount",
+        "grossSaleTransactionCount",
+        "refundTransactionCount",
+        "authorizationCount",
+        "approvedAuthorizationCount",
+        "settledTransactionCount",
+        "authorizationToSettlement",
+        "chargebackCount",
+        "chargebackPrincipal",
+        "chargebackFee",
+        "averageTicket",
+        "channel"
+      ],
+      "observedActivityFieldCount": 0,
+      "unresolvedActivityFieldCount": 15,
+      "rdCostStackCompleteness": "financially_unreconciled",
+      "rdContributingChargeCount": 0,
+      "deterministicallyMappedChargeCount": 0,
+      "unresolvedMappedChargeCount": 0,
+      "rdTotalStatementProcessingCostMinor": null,
+      "profileMappedNetMinor": 0,
+      "profileReconciliationDeltaMinor": null,
+      "reconcilesToRdTotal": false,
+      "productCostBuckets": [],
+      "duplicateChargeContributionCount": 0,
+      "nonFeePrincipalContributionCount": 0,
+      "sensitivity": {
+        "state": "UNRESOLVED",
+        "countDrivenChargeRefs": [],
+        "volumeDrivenChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [],
+        "unresolvedControllableChargeRefs": [],
+        "pricingPopulationRefs": [],
+        "averageTicketFactRef": null,
+        "averageTicketUsed": false,
+        "additiveDriverContributionMinor": 0,
+        "method": "reproduced_statement_mechanics_only",
+        "limitations": [
+          "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
+          "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
+          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+        ]
+      },
+      "incidence": {
+        "state": "INCIDENCE_UNRESOLVED",
+        "evidenceAccess": "UNRESOLVED",
+        "evidenceRefs": [],
+        "grossProcessingCost": null,
+        "costOffsetRevenue": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "cost_offset_revenue",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Statement silence does not establish the presence or absence of a cost-offset program."
+          ]
+        },
+        "netMerchantBorneProcessingCost": {
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "net_merchant_borne_processing_cost",
+          "canonicalFactRefs": [],
+          "evidenceRefs": [],
+          "evidenceAccess": "UNRESOLVED",
+          "limitations": [
+            "Gross processing cost cannot be equated with net merchant burden while incidence is unresolved."
+          ]
+        },
+        "limitations": [
+          "No surcharge, cash-discount, dual-pricing, or other incidence conclusion is inferred."
+        ]
+      },
+      "evidenceRequirements": [
+        {
+          "fact": "approved authorization count",
+          "access": "DOCUMENT_REQUIRED",
+          "reason": "Authorization events do not prove approval events."
+        },
+        {
+          "fact": "component-level channel mix",
+          "access": "MERCHANT_INPUT",
+          "reason": "Use merchant or gateway evidence when the statement does not establish channel."
+        },
+        {
+          "fact": "fee economic meaning or participant role",
+          "access": "PUBLIC_EVIDENCE",
+          "reason": "Governed public evidence may classify a printed charge without changing its statement amount."
+        },
+        {
+          "fact": "cost incidence or offset",
+          "access": "UNRESOLVED",
+          "reason": "No absence or offset is inferred from statement silence."
+        }
+      ],
+      "completeness": {
+        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "observedActivityFields": [],
+        "unresolvedActivityFields": [
+          "processedVolume",
+          "grossSalesVolume",
+          "refundVolume",
+          "transactionCount",
+          "grossSaleTransactionCount",
+          "refundTransactionCount",
+          "authorizationCount",
+          "approvedAuthorizationCount",
+          "settledTransactionCount",
+          "authorizationToSettlement",
+          "chargebackCount",
+          "chargebackPrincipal",
+          "chargebackFee",
+          "averageTicket",
+          "channel"
+        ],
+        "costMappingState": "RD_COST_UNAVAILABLE",
+        "pricingFormulaCoverage": "partial_observed_components",
+        "feeLedgerReconciliation": "financially_unreconciled",
+        "completeMerchantEconomicsClaimAllowed": false,
+        "completeCostOfAcceptanceClaimAllowed": false,
+        "limitations": [
+          "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
+          "One or more RD charges lack a deterministic governed Product-view mapping.",
+          "RD statement processing cost is financially unreconciled and remains unavailable to this profile.",
+          "Unresolved activity fields remain visible and are not converted to zero."
+        ]
+      },
+      "limitations": [
+        "This profile describes observed current-statement relationship economics only.",
+        "It does not establish complete merchant economics, total cost of acceptance, avoidability, savings, overpayment, comparison, or merchant-level advantage.",
+        "Commercial decomposition is used only as governed classification evidence over RD charge references; it is not an additive ledger here.",
+        "Public commercial-source prices and alternative providers are excluded."
+      ],
+      "comparatorInputCount": 0,
+      "opportunityOutputCount": 0,
+      "savingsOutputCount": 0,
+      "annualizationOutputCount": 0,
+      "customerRoutingAllowed": false,
+      "canonicalFingerprintBefore": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
+      "canonicalFingerprintAfter": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
+      "canonicalFingerprintInvariant": true,
+      "rdFingerprintBefore": "45f3d372b31fa933211bc187b09c22c839f91b54570f9526e345be5b5e316c91",
+      "rdFingerprintAfter": "45f3d372b31fa933211bc187b09c22c839f91b54570f9526e345be5b5e316c91",
+      "rdFingerprintInvariant": true
+    }
+  ],
+  "invariants": {
+    "exactElevenGoldStatements": true,
+    "canonicalFinancialTruthInvariant11Of11": true,
+    "rdArtifactInvariant11Of11": true,
+    "availableRdCostsReconcileExactly": true,
+    "commercialSourceCryptographicFingerprintInvariant": true,
+    "rdRemainsSoleAdditiveAuthority": true,
+    "unresolvedActivityNotZeroFilled": true,
+    "noComparatorRequiredForEconomicInformation": true,
+    "noCustomerRouting": true,
+    "historicalCurrentFirewallUntouched": true
+  },
+  "safetyCounters": {
+    "duplicateRdChargeContributions": 0,
+    "nonFeePrincipalContributions": 0,
+    "driverAmountContributions": 0,
+    "comparatorInputs": 0,
+    "alternativeProviders": 0,
+    "opportunities": 0,
+    "savings": 0,
+    "annualizations": 0,
+    "aiOrWebOperations": 0,
+    "newKnowledgeAdmissions": 0,
+    "customerRoutes": 0
+  },
+  "safetyCounterTotal": 0,
+  "verification": {
+    "focusedProfileContract": "17/17 passed",
+    "relevantCanonicalBThroughEAndRbThroughRe": "24 files, 227/227 passed",
+    "historicalCurrentAndAcceptedCommercialRuntime": "3 files passed; accepted historical/current regression reproduced at 5/6 (34/35 aggregate)",
+    "goldContract": "19/20 passed; pre-existing source-privacy assertion matches baseline NXGEN literals and is unrelated to this milestone",
+    "typescriptBuild": "passed"
+  },
+  "knownUnrelatedIssues": [
+    "Historical/current regression remains 5/6 because the untouched assertion expects zero governed conflicts and observes four.",
+    "Merchant-attention regression remains at the accepted 62/63 state and was not repaired or rerun.",
+    "Batch 2 aggregate remains at the accepted stale 149-vs-152 state and was not repaired or rerun.",
+    "The prior legacy public-source/exhaustive SIGSEGV/139 history was not investigated or repaired.",
+    "Gold contract source-privacy test is 19/20 because its existing identifier regex matches baseline NXGEN literals; the milestone adds no matching production identifier."
+  ],
+  "limitations": [
+    "Normal supported Fiserv runtime RD remains financially unreconciled on statements where its capability-bound charge ledger cannot safely contribute all statement fees; this profile does not bypass that gate.",
+    "Statement silence does not establish cost-incidence absence, so the Gold run preserves incidence as unresolved and does not net gross processing cost to merchant burden.",
+    "Authorization and settlement populations remain separate unless an explicit compatibility admission is supplied; no such admission was invented for Gold.",
+    "The profile does not consume public alternative-provider prices, perform comparisons, annualize, estimate savings, or issue customer-facing findings."
+  ]
+}
