@@ -30,6 +30,16 @@ export type CommercialReportCandidateContextV1 = {
   commercialScope: string;
   alternativeOfferIdentity: string;
   evidenceStrength: CommercialReportEvidenceStrengthV1;
+  bindingSource?: "runtime_bound" | "fallback" | "diagnostic_fixture";
+  currentComponentRef?: string | null;
+  alternativeComponentRef?: string | null;
+  populationCount?: number | null;
+  comparisonDirection?: MerchantCommercialFindingDecisionV1["direction"];
+  matchedDifferenceMinor?: number | null;
+  applicabilityState?: string;
+  offsetState?: string;
+  controlState?: string;
+  evidenceRefs?: string[];
   independentlySafeFromCanonicalOpenQuestions?: boolean;
   verify?: {
     impact: "invalidates_or_materially_changes_review" | "material_unlock" | "normal";
@@ -193,6 +203,13 @@ export function buildCommercialReportSetOfflineIntegrationV1(input: {
       entry.disposition = "withheld_in_unable_experience";
       entry.reasonCodes.push("unable_experience_has_no_commercial_projection");
     }
+    for (const dependency of dependencies) {
+      if (!dependency.unresolved || dependency.effect !== "invalidates_or_materially_changes") continue;
+      const reviewEntry = ledger.get(dependency.reviewCandidateId);
+      if (!reviewEntry) continue;
+      reviewEntry.linkedVerifyCandidateId = dependency.verifyCandidateId;
+      reviewEntry.reasonCodes.push("review_path_held_by_unresolved_verify");
+    }
     return finish(input.productionProjection, baseBytes, candidate, [], existingAttentionLedger, ledger, true, true, true);
   }
 
@@ -252,6 +269,16 @@ export function buildCommercialReportSetOfflineIntegrationV1(input: {
     if (!dependency.unresolved || dependency.effect !== "invalidates_or_materially_changes") continue;
     const review = byId.get(dependency.reviewCandidateId);
     const verify = byId.get(dependency.verifyCandidateId);
+    if (dependency.reviewCandidateId === dependency.verifyCandidateId && verify?.action === "VERIFY") {
+      verify.priority = 2;
+      verify.linkedVerifyCandidateId = dependency.verifyCandidateId;
+      verify.reasons.push("review_path_held_by_unresolved_verify");
+      verify.context = {
+        ...verify.context,
+        verify: verify.context.verify ?? defaultVerifyContext(verify.record, "invalidates_or_materially_changes_review"),
+      };
+      continue;
+    }
     if (review?.action !== "REVIEW_CURRENT_PRICING") continue;
     review.disposition = "held_by_verify_dependency";
     review.linkedVerifyCandidateId = dependency.verifyCandidateId;
@@ -328,6 +355,7 @@ function defaultContext(decision: MerchantCommercialFindingDecisionV1, record: M
     commercialScope: decision.presentationGroupId,
     alternativeOfferIdentity: record.alternative ? `${record.alternative.provider}:${record.alternative.offer}` : decision.presentationGroupId,
     evidenceStrength: decision.findingValidity === "valid" ? "medium" : "unresolved",
+    bindingSource: "fallback",
     independentlySafeFromCanonicalOpenQuestions: false,
     ...(record.merchantAction.type === "VERIFY" ? { verify: defaultVerifyContext(record, "normal") } : {}),
   };

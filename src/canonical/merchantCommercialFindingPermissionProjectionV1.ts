@@ -5,6 +5,8 @@ import {
   sameOfferIdentity,
   type CommercialEffectivePeriodV1,
   type CommercialOfferCompositionVersionV1,
+  type CommercialPredicateFactFieldV1,
+  type CommercialPredicateV1,
   type CommercialPriceComponentVersionV1,
   type CommercialPublicPolicyVersionV1,
   type CommercialSourceGovernanceRegistryV1,
@@ -59,6 +61,7 @@ export type MerchantCommercialProjectionCandidateV1 = {
     billingBasis: string | null;
     populationIdentity: string | null;
     channel: string | null;
+    cardProgramScope?: string | null;
     amountState: "exact" | "upper_bound" | "unknown";
     amountMinor: number | null;
     controlState: MerchantCommercialControlStateV1;
@@ -75,6 +78,10 @@ export type MerchantCommercialProjectionCandidateV1 = {
     billingBasis: string | null;
     populationIdentity: string | null;
     channel: string | null;
+    cardProgramScope?: string | null;
+    productScope?: string | null;
+    pricingModel?: string | null;
+    effectivePeriod?: CommercialEffectivePeriodV1 | null;
     amountState: "exact" | "unknown";
     amountMinor: number | null;
     evidenceRefs: string[];
@@ -92,6 +99,8 @@ export type MerchantCommercialProjectionCandidateV1 = {
     statementPeriod: MerchantCommercialGateStateV1;
     offerIdentity: MerchantCommercialGateStateV1;
     decompositionControl: MerchantCommercialGateStateV1;
+    cardProgram?: MerchantCommercialGateStateV1;
+    arbitrationContext?: MerchantCommercialGateStateV1;
   };
   componentClass: MerchantCommercialComponentClassV1;
   cadence: "monthly" | "current_period_only" | "unknown";
@@ -100,6 +109,8 @@ export type MerchantCommercialProjectionCandidateV1 = {
   applicability: {
     publicPolicy: MerchantCommercialPolicyStateV1;
     approval: MerchantCommercialApprovalStateV1;
+    missingPolicyFacts?: CommercialPredicateFactFieldV1[];
+    evidenceRefs?: string[];
   };
   offsets: {
     state: MerchantCommercialOffsetStateV1;
@@ -385,6 +396,7 @@ export function evaluateMerchantCommercialFindingCandidateV1(
       ...candidate.alternative.evidenceRefs,
       ...candidate.matchedPopulationEvidenceRefs,
       ...candidate.offsets.evidenceRefs,
+      ...(candidate.applicability.evidenceRefs ?? []),
     ]),
     customerSafeRecord: null,
   };
@@ -397,6 +409,17 @@ export function buildMerchantCommercialFindingShadowProjectionFromRuntimeV1(inpu
   decomposition: CommercialDecompositionContractV1;
   registries?: CommercialSourceGovernanceRegistryV1[];
 }): MerchantCommercialFindingShadowProjectionV1 {
+  const candidates = buildMerchantCommercialProjectionCandidatesFromRuntimeV1(input);
+  return projectMerchantCommercialCandidatesV1({
+    candidates,
+  });
+}
+
+export function buildMerchantCommercialProjectionCandidatesFromRuntimeV1(input: {
+  attachment: RuntimeCommercialComparisonAttachmentV1;
+  decomposition: CommercialDecompositionContractV1;
+  registries?: CommercialSourceGovernanceRegistryV1[];
+}): MerchantCommercialProjectionCandidateV1[] {
   const registries = input.registries ?? [...DEFAULT_REGISTRIES];
   const candidates = input.attachment.attempts.map((attempt) => candidateFromRuntime(
     attempt,
@@ -404,9 +427,7 @@ export function buildMerchantCommercialFindingShadowProjectionFromRuntimeV1(inpu
     input.decomposition,
     registries,
   ));
-  return projectMerchantCommercialCandidatesV1({
-    candidates,
-  });
+  return applyPerAuthorizationSameScopeOffsets(candidates);
 }
 
 export function validateMerchantSafeCommercialProjectionV1(value: unknown): string[] {
@@ -522,10 +543,15 @@ function customerSafeRecord(
       merchantAction: { type: "VERIFY", text: `Confirm ${lowerFirst(withoutTerminalPunctuation(unlocker))} before relying on a comparison.` },
     };
   }
+  const policyUnlocker = (candidate.applicability.missingPolicyFacts?.length ?? 0) > 0
+    ? `Evidence for ${candidate.applicability.missingPolicyFacts!.join(", ")}.`
+    : candidate.applicability.approval === "approval_unknown"
+      ? "Merchant-specific approval or a merchant-specific quote for the named offer."
+      : null;
   const action = decision.action.permitted
     ? { type: "REVIEW_CURRENT_PRICING" as const, text: "Ask the current provider to review this specific pricing component." }
     : decision.visibility.mode === "verify"
-      ? { type: "VERIFY" as const, text: "Confirm the remaining business or account condition before relying on this information." }
+      ? { type: "VERIFY" as const, text: `Confirm ${lowerFirst(withoutTerminalPunctuation(policyUnlocker ?? "the remaining business or account condition"))} before relying on this information.` }
       : { type: "EXPLAIN" as const, text: "Use this information to understand the specific component; no pricing-review priority is recommended." };
   const summary = decision.comparisonValidity === "not_a_comparison"
     ? merchantSafeText(candidate.internalFinding.conclusion.whatThisProves, candidate, decision.namedAlternativePermitted)
@@ -542,7 +568,7 @@ function customerSafeRecord(
     matchedActivity: evidenceOnly ? null : candidate.current.populationIdentity,
     comparableComponentDifference: evidenceOnly ? null : exact,
     comparisonBlocker: null,
-    smallestUnlocker: null,
+    smallestUnlocker: decision.visibility.mode === "verify" ? policyUnlocker : null,
     conditions,
     scopeNote: evidenceOnly ? "No current-versus-alternative price comparison was performed." : scopeNote,
     merchantAction: action,
@@ -604,9 +630,12 @@ function comparisonUnavailableDetails(
     };
   }
   if (decision.reasonCodes.includes("public_policy_unknown")) {
+    const missing = candidate.applicability.missingPolicyFacts ?? [];
     return {
       blocker: "public information does not establish that this offer is available to this merchant.",
-      unlocker: "Merchant-specific approval or a merchant-specific quote for the named offer.",
+      unlocker: missing.length > 0
+        ? `Evidence for ${missing.join(", ")}.`
+        : "Merchant-specific approval or a merchant-specific quote for the named offer.",
     };
   }
   return {
@@ -671,15 +700,24 @@ function candidateFromRuntime(
   const currentPopulation = current ? populationIdentity(current.populationLabel, current.unit) : null;
   const alternativePopulation = located ? populationIdentity(located.component.billedPopulation, located.component.unit) : null;
   const policy = policyComposition
-    ? evaluateGovernedCommercialPublicPolicyV1({
+    ? evaluateGovernedCommercialPublicPolicyContextV1({
         registry: policyComposition.registry,
         composition: policyComposition.composition,
         facts: attachment.deterministicBaseline.merchantFacts.facts,
       })
-    : "public_policy_unknown";
-  const denominator = denominatorFor(attachment);
+    : { state: "public_policy_unknown" as const, missingFacts: [], evidenceRefs: [] };
+  const denominator = denominatorFor(attachment, current, row);
   const offsetState = located ? offsetStateFor(located.registry, located.composition, located.component) : { state: "incomplete" as const, evidenceRefs: [] };
-  const isEvidenceOnly = !attempt.comparisonPerformed;
+  const approvalEvidence = located ? attachment.deterministicBaseline.merchantFacts.merchantSpecificApprovals.find((item) =>
+    item.providerBrand === located.component.offerIdentity.providerBrand
+      && item.namedOffer === located.component.offerIdentity.namedOffer
+      && item.distributionChannel === located.component.offerIdentity.distributionChannel
+      && item.productScope === located.component.offerIdentity.productScope) : undefined;
+  const approval = approvalEvidence
+    ? "merchant_specific_approved" as const
+    : "approval_unknown" as const;
+  const isEvidenceOnly = finding.findingKind === "OFFER_ELIGIBILITY_QUALIFICATION_EVIDENCE"
+    || finding.findingKind === "COMMERCIAL_FACT_IDENTITY_EVIDENCE";
   const comparisonEvidence = finding.comparisonEvidenceBinding;
   const distribution = located ? [
     located.component.offerIdentity.providerBrand,
@@ -703,10 +741,14 @@ function candidateFromRuntime(
       billingBasis: current?.unit ?? null,
       populationIdentity: currentPopulation,
       channel: current?.channel ?? null,
+      cardProgramScope: current?.cardBrandScope ?? null,
       amountState: current?.currentAmount.state === "EXACT" ? "exact" : current?.currentAmount.state === "UPPER_BOUND" ? "upper_bound" : "unknown",
       amountMinor: current?.currentAmount.amountMinor ?? null,
       controlState: controlStateFor(row),
-      evidenceRefs: comparisonEvidence?.currentComponentEvidenceRefs ?? current?.currentComponentEvidenceRefs ?? [],
+      evidenceRefs: unique([
+        ...(comparisonEvidence?.currentComponentEvidenceRefs ?? current?.currentComponentEvidenceRefs ?? []),
+        ...(current?.providerControlEvidenceRefs ?? []),
+      ]),
     },
     alternative: {
       componentRef: located?.component.componentVersionId ?? null,
@@ -719,13 +761,17 @@ function candidateFromRuntime(
       billingBasis: located?.component.unit ?? null,
       populationIdentity: alternativePopulation,
       channel: located ? alternativeChannel(located.component) : null,
+      cardProgramScope: located ? alternativeCardProgramScope(located.component) : null,
+      productScope: located?.component.offerIdentity.productScope ?? null,
+      pricingModel: located?.component.offerIdentity.pricingModel ?? null,
+      effectivePeriod: located?.component.effectivePeriod ?? null,
       amountState: located?.component.completeness.state === "KNOWN" ? "exact" : "unknown",
       amountMinor: located?.component.completeness.state === "KNOWN" && located.component.completeness.value.kind === "money"
         ? located.component.completeness.value.amountMinor : null,
       evidenceRefs: comparisonEvidence?.alternativeComponentEvidenceRefs ?? located?.component.sourceObservationRefs ?? finding.evidenceRefs,
     },
     matchedPopulationCount: finding.economics.matchedPopulationCount,
-    matchedPopulationEvidenceRefs: comparisonEvidence?.matchedPopulationEvidenceRefs ?? [],
+    matchedPopulationEvidenceRefs: comparisonEvidence?.matchedPopulationEvidenceRefs ?? current?.populationEvidenceRefs ?? [],
     revalidation: {
       currentComponent: current || isEvidenceOnly ? "matched" : "unknown",
       alternativeComponent: located || isEvidenceOnly ? "matched" : "unknown",
@@ -733,7 +779,7 @@ function candidateFromRuntime(
       economicLayer: isEvidenceOnly ? "matched" : gate(Boolean(row?.economicLayer.value) && normalizeLayer(row?.economicLayer.value ?? null) === normalizeLayer(located ? alternativeEconomicLayer(located.component) : null)),
       serviceIdentity: isEvidenceOnly ? "matched" : gate(currentService !== null && currentService === alternativeService),
       unitBillingBasis: isEvidenceOnly ? "matched" : gate(Boolean(current?.unit) && current?.unit === located?.component.unit),
-      channel: isEvidenceOnly ? "matched" : gate(Boolean(current?.channel) && current?.channel === (located ? alternativeChannel(located.component) : null)),
+      channel: isEvidenceOnly ? "matched" : channelRevalidation(current?.channel ?? null, located ? alternativeChannel(located.component) : null),
       statementPeriod: policyComposition
         ? governedEvidencePeriodGate(
             attachment.statement.statementPeriod,
@@ -749,12 +795,29 @@ function candidateFromRuntime(
         ? "matched"
         : "unknown",
       decompositionControl: isEvidenceOnly ? "matched" : gate(controlStateFor(row) !== "unresolved_controller"),
+      cardProgram: isEvidenceOnly ? "matched" : cardProgramGate(current?.cardBrandScope ?? null, located ? alternativeCardProgramScope(located.component) : null),
+      arbitrationContext: isEvidenceOnly ? "matched" : gate(Boolean(
+        current?.componentRef
+        && located?.component.componentVersionId
+        && current.populationCount > 0
+        && current.populationEvidenceRefs.length > 0
+        && located.component.offerIdentity.pricingModel
+        && current.providerControlEvidenceRefs.length > 0
+      )),
     },
     componentClass: current ? componentClassFor(current) : "unsupported",
     cadence: row?.recurrence.cadence === "monthly" ? "monthly" : row?.recurrence.state === "CURRENT_PERIOD_OCCURRENCE_ONLY" ? "current_period_only" : "unknown",
     observedEventCount: current?.populationCount ?? null,
     providerControlledCost: denominator,
-    applicability: { publicPolicy: policy, approval: "approval_unknown" },
+    applicability: {
+      publicPolicy: policy.state,
+      approval,
+      missingPolicyFacts: policy.missingFacts,
+      evidenceRefs: unique([
+        ...policy.evidenceRefs,
+        ...(approvalEvidence?.evidenceRefs ?? []),
+      ]),
+    },
     offsets: offsetState,
     qualitativeDisplayReasonApproved: false,
   };
@@ -788,15 +851,38 @@ export function evaluateGovernedCommercialPublicPolicyV1(input: {
   composition: CommercialOfferCompositionVersionV1;
   facts: Record<string, string | number | boolean | undefined>;
 }): MerchantCommercialPolicyStateV1 {
+  return evaluateGovernedCommercialPublicPolicyContextV1(input).state;
+}
+
+export function evaluateGovernedCommercialPublicPolicyContextV1(input: {
+  registry: CommercialSourceGovernanceRegistryV1;
+  composition: CommercialOfferCompositionVersionV1;
+  facts: Record<string, string | number | boolean | undefined>;
+}): {
+  state: MerchantCommercialPolicyStateV1;
+  missingFacts: CommercialPredicateFactFieldV1[];
+  evidenceRefs: string[];
+} {
   const { registry, composition, facts } = input;
   const applicable = composition.publicPolicyVersionRefs
     .map((ref) => registry.publicPolicyVersions.find((item) => item.policyVersionId === ref))
     .filter((item): item is CommercialPublicPolicyVersionV1 => Boolean(item) && item!.predicateAdmission.lifecycle === "admitted")
     .map((item) => ({ item, result: item.normalizedPredicate ? evaluateCommercialPredicateV1(item.normalizedPredicate, facts) : "unknown" as const }));
-  if (applicable.some(({ item, result }) => item.status === "PUBLICLY_PROHIBITED" && result === "satisfied")) return "publicly_prohibited";
-  if (applicable.some(({ item, result }) => item.status === "PUBLICLY_RESTRICTED_OR_REVIEW_REQUIRED" && result === "satisfied")) return "restricted_or_review_required";
-  if (applicable.some(({ item, result }) => item.status === "NO_KNOWN_PUBLIC_BLOCK" && result === "satisfied")) return "no_known_public_block";
-  return "public_policy_unknown";
+  const evidenceRefs = unique(applicable.flatMap(({ item }) => [item.policyVersionId, ...item.sourceObservationRefs]));
+  if (applicable.some(({ item, result }) => item.status === "PUBLICLY_PROHIBITED" && result === "satisfied")) {
+    return { state: "publicly_prohibited", missingFacts: [], evidenceRefs };
+  }
+  if (applicable.some(({ item, result }) => item.status === "PUBLICLY_RESTRICTED_OR_REVIEW_REQUIRED" && result === "satisfied")) {
+    return { state: "restricted_or_review_required", missingFacts: [], evidenceRefs };
+  }
+  if (applicable.some(({ item, result }) => item.status === "NO_KNOWN_PUBLIC_BLOCK" && result === "satisfied")) {
+    return { state: "no_known_public_block", missingFacts: [], evidenceRefs };
+  }
+  const missingFacts = unique(applicable
+    .filter(({ result }) => result === "unknown")
+    .flatMap(({ item }) => policyPredicateFields(item.normalizedPredicate))
+    .filter((field) => facts[field] === undefined));
+  return { state: "public_policy_unknown", missingFacts, evidenceRefs };
 }
 
 function governedEvidencePeriodGate(
@@ -841,7 +927,63 @@ function offsetStateFor(
   return { state: "incomplete", evidenceRefs: unique(others.flatMap((item) => [item.componentVersionId, ...item.sourceObservationRefs])) };
 }
 
-function denominatorFor(attachment: RuntimeCommercialComparisonAttachmentV1): MerchantCommercialProjectionCandidateV1["providerControlledCost"] {
+/**
+ * This deliberately closes only the authorization-component scope. It does
+ * not combine monthly, percentage, gateway, or episodic components into a
+ * provider-total comparison.
+ */
+function applyPerAuthorizationSameScopeOffsets(
+  candidates: MerchantCommercialProjectionCandidateV1[],
+): MerchantCommercialProjectionCandidateV1[] {
+  const groups = new Map<string, MerchantCommercialProjectionCandidateV1[]>();
+  for (const candidate of candidates) {
+    if (candidate.current.unit !== "per_authorization" || candidate.alternative.unit !== "per_authorization") continue;
+    groups.set(candidate.presentationGroupId, [...(groups.get(candidate.presentationGroupId) ?? []), candidate]);
+  }
+  const replacement = new Map<string, MerchantCommercialProjectionCandidateV1["offsets"]>();
+  for (const group of groups.values()) {
+    const relevantCurrentRefs = unique(group
+      .filter((candidate) => candidate.current.componentRef
+        && candidate.current.cardProgramScope !== "unknown"
+        && candidate.current.channel !== "unknown"
+        && candidate.current.channel !== "mixed"
+        && candidate.current.populationIdentity !== null)
+      .map((candidate) => candidate.current.componentRef!));
+    const exactMatches = group.filter((candidate) => candidate.internalFinding.comparisonPerformed
+      && candidate.internalFinding.economics.matchedComponentDifference.state === "EXACT"
+      && Object.values(candidate.revalidation).every((state) => state === "matched"));
+    const matchedCurrentRefs = new Set(exactMatches.flatMap((candidate) => candidate.current.componentRef ? [candidate.current.componentRef] : []));
+    const complete = relevantCurrentRefs.length > 0 && relevantCurrentRefs.every((ref) => matchedCurrentRefs.has(ref));
+    const reversing = exactMatches.some((candidate) =>
+      (candidate.internalFinding.economics.matchedComponentDifference.currentMinusAlternativeMinor ?? 0) < 0);
+    const evidenceRefs = unique(exactMatches.flatMap((candidate) => [
+      ...candidate.current.evidenceRefs,
+      ...candidate.alternative.evidenceRefs,
+      ...candidate.matchedPopulationEvidenceRefs,
+    ]));
+    for (const candidate of group) {
+      if (!candidate.internalFinding.comparisonPerformed) continue;
+      replacement.set(candidate.candidateId, {
+        state: !complete ? "incomplete" : reversing ? "complete_reversing" : "complete_non_reversing",
+        evidenceRefs,
+      });
+    }
+  }
+  return candidates.map((candidate) => replacement.has(candidate.candidateId)
+    ? { ...candidate, offsets: replacement.get(candidate.candidateId)! }
+    : candidate);
+}
+
+function denominatorFor(
+  attachment: RuntimeCommercialComparisonAttachmentV1,
+  current: RuntimeCurrentCommercialComponentV1 | null,
+  row: CommercialDecompositionRowV1 | null,
+): MerchantCommercialProjectionCandidateV1["providerControlledCost"] {
+  if (current?.componentKind === "authorization_fee"
+    && current.currentAmount.state === "EXACT"
+    && row?.commercialDollarAttribution.kind === "EXACT_PROVIDER_CONTROLLED_MERCHANT_PRICE") {
+    return { state: current.currentAmount.amountMinor === 0 ? "zero" : "exact", amountMinor: current.currentAmount.amountMinor };
+  }
   const economics = attachment.deterministicBaseline.commercialEconomics;
   if (!economics) return { state: "unknown", amountMinor: null };
   if (economics.providerControlledMinimumMinor === 0 && economics.providerControlledUpperBoundMinor === 0) return { state: "zero", amountMinor: 0 };
@@ -893,6 +1035,22 @@ function alternativeChannel(component: CommercialPriceComponentVersionV1): strin
   return "unknown";
 }
 
+function alternativeCardProgramScope(component: CommercialPriceComponentVersionV1): string {
+  const text = `${component.componentIdentity} ${component.billedPopulation}`.toLowerCase();
+  if (text.includes("amex")) return "amex";
+  if (text.includes("visa_mastercard_discover")) return "visa_mastercard_discover";
+  if (text.includes("all_card")) return "all_card_brands";
+  if (component.unit === "per_authorization"
+    && (text.includes("card_present") || text.includes("card_not_present") || text.includes("authorization"))) return "all_card_brands";
+  return "unknown";
+}
+
+function policyPredicateFields(predicate: CommercialPredicateV1 | null): CommercialPredicateFactFieldV1[] {
+  if (!predicate) return [];
+  if (predicate.op === "fact") return [predicate.field];
+  return unique(predicate.conditions.flatMap((condition) => policyPredicateFields(condition)));
+}
+
 function populationIdentity(value: string, unit: string): string | null {
   const text = value.toLowerCase().replaceAll("-", "_");
   if (/approved.*auth|auth.*approved/.test(text)) return "approved_authorizations";
@@ -931,6 +1089,20 @@ function enforceDirectionalFairness(decisions: MerchantCommercialFindingDecision
 }
 
 function gate(condition: boolean): MerchantCommercialGateStateV1 { return condition ? "matched" : "mismatch"; }
+
+function channelRevalidation(current: string | null, alternative: string | null): MerchantCommercialGateStateV1 {
+  if (!current || !alternative || current === "unknown" || current === "mixed" || alternative === "unknown") return "unknown";
+  return current === alternative ? "matched" : "mismatch";
+}
+
+function cardProgramGate(current: string | null, alternative: string | null): MerchantCommercialGateStateV1 {
+  if (!current || !alternative || current === "unknown" || alternative === "unknown") return "unknown";
+  if (alternative === "all_card_brands") return "matched";
+  if (alternative === "visa_mastercard_discover") {
+    return ["visa", "mastercard", "discover"].includes(current) ? "matched" : "mismatch";
+  }
+  return current === alternative ? "matched" : "mismatch";
+}
 function unique<T>(values: T[]): T[] { return [...new Set(values)]; }
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object") {

@@ -1,0 +1,482 @@
+{
+  "schemaVersion": "per_authorization_commercial_runtime_readiness_evaluation_2026_09_12_v1",
+  "generatedAt": "2026-09-12T00:00:00.000Z",
+  "productAuthority": {
+    "document": "Per-Authorization Commercial Runtime Readiness v1",
+    "sha256": "94fae566f48f09831c83c12162603beee6695a4699a6c4d9b2e77a7b6204019d"
+  },
+  "baseline": {
+    "branch": "codex/runtime-commercial-context-binding-validation-v1",
+    "commit": "62150c6e8365ce51616701d870ec918c6be4055e",
+    "parent": "d1221649895182b4269bbbb23073511de327abb8"
+  },
+  "implementationBranch": "codex/per-authorization-commercial-runtime-readiness-v1",
+  "answer": "YES",
+  "normalPath": "ParsedDocument -> supported Fiserv canonical analysis -> governed payment/commercial decomposition -> exact current authorization component -> admitted alternative component -> internal comparison -> merchant permission -> runtime-bound report arbitration",
+  "downstreamSyntheticObjectsUsed": false,
+  "cases": [
+    {
+      "id": "A",
+      "name": "fully_bound_exact_review",
+      "pass": true,
+      "normalPath": true,
+      "outcome": "Exact current and governed alternative authorization components reached Product materiality, permission, and arbitration with real runtime context."
+    },
+    {
+      "id": "B",
+      "name": "below_materiality",
+      "pass": true,
+      "normalPath": true,
+      "outcome": "The exact Mastercard component remained below the pricing-review threshold."
+    },
+    {
+      "id": "C",
+      "name": "channel_mismatch",
+      "pass": true,
+      "normalPath": true,
+      "outcome": "Card-not-present current activity was not compared with a card-present offer component."
+    },
+    {
+      "id": "D",
+      "name": "unknown_channel_invalidates_review",
+      "pass": true,
+      "normalPath": true,
+      "outcome": "Unknown channel produced an evidence-bound invalidating VERIFY dependency and no unconditional review."
+    },
+    {
+      "id": "E",
+      "name": "population_mismatch",
+      "pass": true,
+      "normalPath": true,
+      "outcome": "Settled transactions were not substituted for authorization events."
+    },
+    {
+      "id": "F",
+      "name": "publicly_prohibited",
+      "pass": true,
+      "normalPath": true,
+      "outcome": "The prohibited alternative failed closed before merchant alternative naming."
+    },
+    {
+      "id": "G",
+      "name": "restricted_review_required",
+      "pass": true,
+      "normalPath": true,
+      "outcome": "Restricted/review-required status stayed conditional and did not assume approval."
+    },
+    {
+      "id": "H",
+      "name": "incomplete_same_scope",
+      "pass": true,
+      "normalPath": true,
+      "outcome": "An unmatched relevant authorization population kept same-authorization-scope economics incomplete."
+    },
+    {
+      "id": "I",
+      "name": "reversing_same_scope",
+      "pass": true,
+      "normalPath": true,
+      "outcome": "A countervailing authorization component removed isolated pricing-review framing."
+    },
+    {
+      "id": "J",
+      "name": "directional_fairness",
+      "pass": true,
+      "normalPath": true,
+      "outcome": "Both material directions remained in the same offer/scope candidate set."
+    },
+    {
+      "id": "K",
+      "name": "evidence_strength",
+      "pass": true,
+      "normalPath": true,
+      "outcome": "Exact three-way evidence binding propagated as high claim-specific strength; no fallback strength was used."
+    },
+    {
+      "id": "L",
+      "name": "normal_path_verify_dependency",
+      "pass": true,
+      "normalPath": true,
+      "outcome": "The normal runtime dependency reached report arbitration and held the review path."
+    }
+  ],
+  "exactCase": {
+    "runtimeSummary": {
+      "runtimeBoundCandidates": 16,
+      "exactMatchedComparisons": 8,
+      "reviewActions": 1,
+      "invalidatingVerifyDependencies": 1,
+      "fallbackArbitrationContexts": 0
+    },
+    "decision": {
+      "comparisonValidity": "valid_exact",
+      "materiality": {
+        "state": "review_threshold_met",
+        "absoluteDifferenceMinor": 10332,
+        "relativeBasisPoints": 2727
+      },
+      "action": {
+        "permitted": true,
+        "type": "REVIEW_CURRENT_PRICING"
+      },
+      "direction": "current_costs_more"
+    },
+    "context": {
+      "candidateId": "runtime:doc_92905c6e59a62440:feerow_14dad45f2df9301d96bc2ad6:component_dharma_high_volume_cp_auth_v1",
+      "economicComponent": "authorization_service",
+      "providerPricingLogic": "interchange_plus",
+      "population": "authorizations",
+      "channel": "card_present",
+      "cardProgramTreatment": "visa->all_card_brands",
+      "alternativePricingIdentity": "component_dharma_high_volume_cp_auth_v1:per_authorization:8",
+      "commercialScope": "dharma_merchant_services:High Volume:all_in_one_processing:authorization_service",
+      "alternativeOfferIdentity": "dharma_merchant_services:dharma_direct:direct:High Volume:all_in_one_processing",
+      "evidenceStrength": "high",
+      "bindingSource": "runtime_bound",
+      "currentComponentRef": "canonical_fee_component:feerow_14dad45f2df9301d96bc2ad6",
+      "alternativeComponentRef": "component_dharma_high_volume_cp_auth_v1",
+      "populationCount": 3444,
+      "comparisonDirection": "current_costs_more",
+      "matchedDifferenceMinor": 10332,
+      "applicabilityState": "no_known_public_block:approval_unknown",
+      "offsetState": "complete_non_reversing",
+      "controlState": "exact_provider_controlled",
+      "evidenceRefs": [
+        "canonical_fee_row:feerow_14dad45f2df9301d96bc2ad6",
+        "ev_cf159f614245fe855841",
+        "OWD-01",
+        "OWD-02",
+        "OWD-03",
+        "OWD-04",
+        "OWD-05",
+        "OWD-06",
+        "OWD-07",
+        "RR-B2-00",
+        "RR-B2-01",
+        "RR-B2-02",
+        "RR-B2-03",
+        "RR-B2-04",
+        "RR-B2-11",
+        "RR-B2-13",
+        "RR-B2-15",
+        "obs_dharma_d3_high_volume_v1",
+        "component_dharma_high_volume_cp_auth_v1",
+        "canonical_fee_population:feerow_14dad45f2df9301d96bc2ad6",
+        "commercial_decomposition_control:feerow_14dad45f2df9301d96bc2ad6:EXACT_PROVIDER_CONTROLLED_MERCHANT_PRICE",
+        "canonical_fee_row:feerow_469ecd4bccbb44ee10b651ef",
+        "ev_dc0c00ac06d6b2ee29eb",
+        "commercial_decomposition_control:feerow_469ecd4bccbb44ee10b651ef:EXACT_PROVIDER_CONTROLLED_MERCHANT_PRICE",
+        "canonical_fee_population:feerow_469ecd4bccbb44ee10b651ef",
+        "canonical_fee_row:feerow_c49f1f3215d030c96f4a872c",
+        "ev_6d022919d6685d3321ac",
+        "commercial_decomposition_control:feerow_c49f1f3215d030c96f4a872c:EXACT_PROVIDER_CONTROLLED_MERCHANT_PRICE",
+        "canonical_fee_population:feerow_c49f1f3215d030c96f4a872c",
+        "canonical_fee_row:feerow_25d67784db62d2ebfca6feca",
+        "ev_f7d7eb62a44549e0d8fd",
+        "commercial_decomposition_control:feerow_25d67784db62d2ebfca6feca:EXACT_PROVIDER_CONTROLLED_MERCHANT_PRICE",
+        "canonical_fee_population:feerow_25d67784db62d2ebfca6feca",
+        "policy_dharma_high_risk_not_applicable_v1",
+        "obs_dharma_d4_supported_businesses_v1",
+        "policy_dharma_future_delivery_review_v1",
+        "policy_dharma_no_known_block_v1"
+      ],
+      "independentlySafeFromCanonicalOpenQuestions": true
+    },
+    "reportArbitrationDisposition": {
+      "candidateId": "runtime:doc_92905c6e59a62440:feerow_14dad45f2df9301d96bc2ad6:component_dharma_high_volume_cp_auth_v1",
+      "productPriority": null,
+      "disposition": "withheld_in_unable_experience",
+      "representedByCandidateId": null,
+      "linkedVerifyCandidateId": null,
+      "reasonCodes": [
+        "unable_experience_has_no_commercial_projection"
+      ]
+    },
+    "note": "The approved Gold-derived fixture remains in the existing unable-to-complete production experience, so offline arbitration receives and audits the real candidate but does not route it into a report."
+  },
+  "policyResults": {
+    "prohibitedDecisions": 8,
+    "restrictedMode": "verify",
+    "noKnownBlockAction": {
+      "permitted": true,
+      "type": "REVIEW_CURRENT_PRICING"
+    },
+    "approvalAssumptionMade": false
+  },
+  "offsetResults": {
+    "completeNonReversing": "complete_non_reversing",
+    "incomplete": "incomplete",
+    "reversing": [
+      "complete_reversing"
+    ]
+  },
+  "verifyDependency": {
+    "dependency": {
+      "verifyCandidateId": "runtime:doc_92905c6e59a62440:feerow_469ecd4bccbb44ee10b651ef:component_dharma_retail_vmd_auth_v1",
+      "reviewCandidateId": "runtime:doc_92905c6e59a62440:feerow_469ecd4bccbb44ee10b651ef:component_dharma_retail_vmd_auth_v1",
+      "unresolved": true,
+      "effect": "invalidates_or_materially_changes"
+    },
+    "context": {
+      "candidateId": "runtime:doc_92905c6e59a62440:feerow_469ecd4bccbb44ee10b651ef:component_dharma_retail_vmd_auth_v1",
+      "economicComponent": "authorization_service",
+      "providerPricingLogic": "interchange_plus",
+      "population": "authorizations",
+      "channel": "unknown",
+      "cardProgramTreatment": "mastercard->visa_mastercard_discover",
+      "alternativePricingIdentity": "component_dharma_retail_vmd_auth_v1:per_authorization:8",
+      "commercialScope": "dharma_merchant_services:Standard Retail / Storefront:all_in_one_processing:authorization_service",
+      "alternativeOfferIdentity": "dharma_merchant_services:dharma_direct:direct:Standard Retail / Storefront:all_in_one_processing",
+      "evidenceStrength": "low",
+      "bindingSource": "runtime_bound",
+      "currentComponentRef": "canonical_fee_component:feerow_469ecd4bccbb44ee10b651ef",
+      "alternativeComponentRef": "component_dharma_retail_vmd_auth_v1",
+      "populationCount": null,
+      "comparisonDirection": "unresolved",
+      "matchedDifferenceMinor": null,
+      "applicabilityState": "public_policy_unknown:approval_unknown",
+      "offsetState": "incomplete",
+      "controlState": "exact_provider_controlled",
+      "evidenceRefs": [
+        "canonical_fee_row:feerow_469ecd4bccbb44ee10b651ef",
+        "ev_dc0c00ac06d6b2ee29eb",
+        "OWD-01",
+        "OWD-02",
+        "OWD-03",
+        "OWD-04",
+        "OWD-05",
+        "OWD-06",
+        "OWD-07",
+        "RR-B2-00",
+        "RR-B2-01",
+        "RR-B2-02",
+        "RR-B2-03",
+        "RR-B2-04",
+        "RR-B2-11",
+        "RR-B2-13",
+        "RR-B2-15",
+        "obs_dharma_d1_retail_v1",
+        "component_dharma_retail_vmd_auth_v1",
+        "commercial_decomposition_control:feerow_469ecd4bccbb44ee10b651ef:EXACT_PROVIDER_CONTROLLED_MERCHANT_PRICE",
+        "canonical_fee_population:feerow_469ecd4bccbb44ee10b651ef",
+        "component_dharma_retail_monthly_v1",
+        "component_dharma_retail_vmd_margin_v1",
+        "component_dharma_retail_amex_margin_v1",
+        "component_dharma_retail_amex_auth_v1",
+        "component_dharma_retail_closure_v1",
+        "obs_dharma_d5_closure_v1",
+        "component_dharma_retail_chargeback_v1",
+        "component_dharma_retail_avs_fee_absent_v1",
+        "component_dharma_retail_batch_fee_absent_v1",
+        "component_dharma_retail_pci_compliance_fee_absent_v1",
+        "obs_dharma_d6_pci_v1",
+        "component_dharma_retail_early_termination_fee_absent_v1",
+        "component_dharma_retail_pci_noncompliance_v1",
+        "component_dharma_retail_annual_fee_absent_v1",
+        "component_dharma_retail_monthly_minimum_absent_v1",
+        "component_dharma_retail_account_updater_unknown_v1",
+        "policy_dharma_retail_unknown_v1"
+      ],
+      "independentlySafeFromCanonicalOpenQuestions": true,
+      "verify": {
+        "impact": "invalidates_or_materially_changes_review",
+        "missingFact": "CP/CNP authorization population split",
+        "whyItMatters": "The public authorization price is channel-specific, so the comparison is invalid unless the current billed authorizations use the same channel.",
+        "whoCanConfirm": "Your current provider or gateway activity records",
+        "exactAnswerOrDocument": "The card-present and card-not-present authorization counts for this statement period",
+        "conclusionMayChange": "Whether this authorization component can be compared and reviewed."
+      }
+    },
+    "arbitrationLedger": {
+      "candidateId": "runtime:doc_92905c6e59a62440:feerow_469ecd4bccbb44ee10b651ef:component_dharma_retail_vmd_auth_v1",
+      "productPriority": null,
+      "disposition": "withheld_in_unable_experience",
+      "representedByCandidateId": null,
+      "linkedVerifyCandidateId": "runtime:doc_92905c6e59a62440:feerow_469ecd4bccbb44ee10b651ef:component_dharma_retail_vmd_auth_v1",
+      "reasonCodes": [
+        "unable_experience_has_no_commercial_projection",
+        "review_path_held_by_unresolved_verify"
+      ]
+    }
+  },
+  "gold": {
+    "statements": [
+      {
+        "file": "Nov_2024_Statement.pdf",
+        "canonicalFingerprintBefore": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+        "canonicalFingerprintAfter": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+        "acceptedBaselineFingerprint": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+        "canonicalInvariant": true,
+        "historicalMatchedComparisons": 0,
+        "historicalPricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "customerRoutingAllowed": false
+      },
+      {
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "canonicalFingerprintBefore": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
+        "canonicalFingerprintAfter": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
+        "acceptedBaselineFingerprint": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
+        "canonicalInvariant": true,
+        "historicalMatchedComparisons": 0,
+        "historicalPricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "customerRoutingAllowed": false
+      },
+      {
+        "file": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+        "canonicalFingerprintBefore": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+        "canonicalFingerprintAfter": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+        "acceptedBaselineFingerprint": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+        "canonicalInvariant": true,
+        "historicalMatchedComparisons": 0,
+        "historicalPricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "customerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "canonicalFingerprintBefore": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
+        "canonicalFingerprintAfter": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
+        "acceptedBaselineFingerprint": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
+        "canonicalInvariant": true,
+        "historicalMatchedComparisons": 0,
+        "historicalPricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "customerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "canonicalFingerprintBefore": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
+        "canonicalFingerprintAfter": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
+        "acceptedBaselineFingerprint": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
+        "canonicalInvariant": true,
+        "historicalMatchedComparisons": 0,
+        "historicalPricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "customerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "canonicalFingerprintBefore": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
+        "canonicalFingerprintAfter": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
+        "acceptedBaselineFingerprint": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
+        "canonicalInvariant": true,
+        "historicalMatchedComparisons": 0,
+        "historicalPricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "customerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "canonicalFingerprintBefore": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
+        "canonicalFingerprintAfter": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
+        "acceptedBaselineFingerprint": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
+        "canonicalInvariant": true,
+        "historicalMatchedComparisons": 0,
+        "historicalPricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "customerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "canonicalFingerprintBefore": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+        "canonicalFingerprintAfter": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+        "acceptedBaselineFingerprint": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+        "canonicalInvariant": true,
+        "historicalMatchedComparisons": 0,
+        "historicalPricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "customerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
+        "canonicalFingerprintBefore": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
+        "canonicalFingerprintAfter": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
+        "acceptedBaselineFingerprint": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
+        "canonicalInvariant": true,
+        "historicalMatchedComparisons": 0,
+        "historicalPricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "customerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf",
+        "canonicalFingerprintBefore": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
+        "canonicalFingerprintAfter": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
+        "acceptedBaselineFingerprint": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
+        "canonicalInvariant": true,
+        "historicalMatchedComparisons": 0,
+        "historicalPricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "customerRoutingAllowed": false
+      },
+      {
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "canonicalFingerprintBefore": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
+        "canonicalFingerprintAfter": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
+        "acceptedBaselineFingerprint": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
+        "canonicalInvariant": true,
+        "historicalMatchedComparisons": 0,
+        "historicalPricingReviewActions": 0,
+        "heroByteEquivalent": true,
+        "primaryExperienceUnchanged": true,
+        "customerRoutingAllowed": false
+      }
+    ],
+    "canonicalFingerprintInvariant": true,
+    "historicalCurrentFirewallUnchanged": true
+  },
+  "commercialSource": {
+    "expected": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "before": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "after": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "unchanged": true
+  },
+  "safetyCounters": {
+    "failedProductCases": 0,
+    "currentFixtureCanonicalMutations": 0,
+    "goldCanonicalFingerprintChanges": 0,
+    "governedCommercialSourceFingerprintChanges": 0,
+    "historicalCurrentComparisonLeaks": 0,
+    "historicalPricingReviewActions": 0,
+    "heroChanges": 0,
+    "primaryExperienceChanges": 0,
+    "customerRoutingEnabled": 0,
+    "fallbackContextsForExactAuthorization": 0,
+    "prohibitedAlternativeNamesExposed": 0,
+    "populationMismatchArithmetic": 0,
+    "reversingOffsetReviewActions": 0,
+    "newCommercialKnowledgeAdmissions": 0,
+    "aiOrWebOperations": 0,
+    "savingsAnnualizationGradesOverpaymentSwitchingOrRankings": 0
+  },
+  "componentBoundary": {
+    "runtimeReady": [
+      "provider_controlled_per_authorization"
+    ],
+    "unchangedFailClosed": [
+      "percentage_bps",
+      "fixed_monthly",
+      "gateway_transaction",
+      "gateway_batch",
+      "episodic_chargeback"
+    ]
+  },
+  "knownUnrelatedIssuesNotRepaired": [
+    "Merchant-attention remains at the accepted pre-existing 62/63 result.",
+    "Historical/current remains at the accepted pre-existing 5/6 result.",
+    "Batch 2 aggregate remains at the accepted stale 149-vs-152 expectation.",
+    "Prior SIGSEGV/139 history was not investigated or repaired."
+  ]
+}

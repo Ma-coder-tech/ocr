@@ -111,12 +111,12 @@ export const RUNTIME_COMMERCIAL_CONTEXT_CAPABILITY_MATRIX_V1: RuntimeCommercialC
   cap("comparison_arbitration", "channel compatibility", "current merchant/component channel and governed alternative channel", "runtime and permission channel gates", "DERIVABLE_WITHOUT_INVENTION", true, true, "yes"),
   cap("comparison_arbitration", "billing-basis compatibility", "current unit and governed alternative unit", "permission unitBillingBasis gate", "DERIVABLE_WITHOUT_INVENTION", true, true, "conditional", "Unit equality is available; percentage denominator compatibility is absent.", "Add an exact denominator/basis gate."),
   cap("comparison_arbitration", "offer/scope identity", "governed composition and component offer identity", "permission presentation group", "DIRECTLY_AVAILABLE", false, true, "yes"),
-  cap("comparison_arbitration", "same-scope offsets", "governed offer composition sibling components", "merchant permission offsetState", "DERIVABLE_WITHOUT_INVENTION", false, true, "conditional", "The normal path can identify incomplete scope but cannot infer missing offsets.", "Admit complete same-scope commercial components or retain incomplete."),
+  cap("comparison_arbitration", "same-scope offsets", "governed offer composition plus all exact matched authorization components", "merchant permission offsetState", "DIRECTLY_AVAILABLE", true, true, "yes", "Completeness is closed only inside the per-authorization component scope; other component classes are not aggregated.", "Retain incomplete when any relevant authorization component is not bound."),
   cap("comparison_arbitration", "direction of matched comparison", "exact matched component arithmetic", "internal finding and permission decision", "DIRECTLY_AVAILABLE", true, true, "yes"),
-  cap("comparison_arbitration", "evidence strength/claim ceiling", "diagnostic comparison strength, finding evidence, and permission gates", "internal finding and merchant permission", "PARTIAL", true, true, "conditional", "The report-set normal call currently falls back to medium/unresolved context instead of a first-class runtime evidence-strength binding.", "Bind claim-specific evidence strength into report-set candidate context."),
-  cap("comparison_arbitration", "invalidating VERIFY dependency", "relationship between an unresolved merchant fact and a specific review", "report-set arbitration input", "ABSENT", true, true, "no", "The arbitration accepts this relationship, but the normal runtime does not construct it.", "Generate an evidence-bound verifyCandidateId to reviewCandidateId dependency."),
+  cap("comparison_arbitration", "evidence strength/claim ceiling", "diagnostic comparison strength and three-way runtime evidence binding", "runtime-bound report-set candidate context", "DIRECTLY_AVAILABLE", true, true, "yes", "Implemented for provider-controlled per-authorization candidates only.", "Add the same first-class evidence ceiling when another component class is authorized."),
+  cap("comparison_arbitration", "invalidating VERIFY dependency", "failed runtime channel/population/policy gate and its exact merchant-verifiable fact", "report-set arbitration input", "DIRECTLY_AVAILABLE", true, true, "yes", "Constructed only when the missing fact can invalidate or materially change the authorization review path.", null),
   cap("comparison_arbitration", "dispute/risk overlap", "canonical dispute/risk findings plus commercial event identity", "report-set arbitration existingRisk input", "PARTIAL", true, true, "no", "Canonical risk may exist, but the normal path does not bind it to commercial candidate IDs.", "Add a same-event evidence link without creating a new dispute model."),
-  cap("comparison_arbitration", "consolidation compatibility", "component, population, channel, program, offer, and pricing identity", "report-set candidate context", "PARTIAL", true, true, "conditional", "Upstream facts exist for supported authorization attempts, but normal report construction uses fallback unresolved channel/program fields.", "Build report-set candidate contexts from runtime candidates."),
+  cap("comparison_arbitration", "consolidation compatibility", "component, population, channel, program, offer, and pricing identity", "runtime-bound report-set candidate context", "DIRECTLY_AVAILABLE", true, true, "yes", "Implemented for provider-controlled per-authorization candidates only.", null),
   cap("comparison_arbitration", "report-level named-offer grouping", "provider, named offer, distribution, and product scope", "permission presentation group and report-set offer coherence", "DERIVABLE_WITHOUT_INVENTION", false, true, "yes"),
   cap("comparison_arbitration", "merchant-verifiable smallest unlocker", "first failed evidence gate or admitted predicate boundary", "runtime attempt and merchant-safe blocker", "DIRECTLY_AVAILABLE", true, true, "yes", "Generic fallback wording remains when a predicate does not identify its missing fact.", "Emit the exact missing governed predicate field when available."),
 ];
@@ -124,12 +124,12 @@ export const RUNTIME_COMMERCIAL_CONTEXT_CAPABILITY_MATRIX_V1: RuntimeCommercialC
 export const RUNTIME_COMMERCIAL_COMPONENT_CAPABILITIES_V1: RuntimeCommercialComponentCapabilityV1[] = [
   {
     componentClass: "per_authorization",
-    support: "PARTIAL",
-    disposition: "runtime_partial",
-    comparisonStageReached: "Normal Fiserv parsing can establish exact provider-controlled rows, exact counts, channel/brand scope, governed alternatives, and matched-component arithmetic.",
-    actionReadiness: "Permission and report arbitration run, but normal-path public-policy facts, complete commercial denominator/offset scope, and first-class arbitration context may still block merchant pricing review.",
-    failClosedReason: "A matched internal component comparison does not by itself authorize REVIEW_CURRENT_PRICING.",
-    smallestCapabilityNeeded: "Bind claim-specific public-policy facts, complete same-scope economics/offsets, and report-set context from runtime evidence.",
+    support: "DIRECTLY_AVAILABLE",
+    disposition: "runtime_ready",
+    comparisonStageReached: "The normal Fiserv path establishes exact provider-controlled authorization rows, typed populations and counts, channel/program scope, governed alternatives, policy context, same-authorization-scope offsets, comparison, permission, and report arbitration.",
+    actionReadiness: "REVIEW_CURRENT_PRICING is available only for an exact, material, policy-permitted, non-reversing component comparison; unresolved facts construct a fail-closed VERIFY dependency.",
+    failClosedReason: null,
+    smallestCapabilityNeeded: null,
   },
   {
     componentClass: "gateway_transaction",
@@ -197,7 +197,8 @@ export type RuntimeCommercialContextBindingObservationV1 = {
     pricingReviewActions: number;
     reportSetLedgerEntries: number;
     reportSetPlacedItems: number;
-    invalidatingVerifyDependenciesConstructedByNormalPath: 0;
+    invalidatingVerifyDependenciesConstructedByNormalPath: number;
+    fallbackArbitrationContexts: number;
     disputeRiskLinksConstructedByNormalPath: 0;
   };
   conclusion: {
@@ -249,7 +250,8 @@ export function observeRuntimeCommercialContextBindingV1(
       pricingReviewActions: projection.decisions.filter((item) => item.action.permitted).length,
       reportSetLedgerEntries: arbitration.selectionLedger.length,
       reportSetPlacedItems: placed,
-      invalidatingVerifyDependenciesConstructedByNormalPath: 0,
+      invalidatingVerifyDependenciesConstructedByNormalPath: report.perAuthorizationCommercialRuntimeReadiness.verifyDependencies.length,
+      fallbackArbitrationContexts: report.perAuthorizationCommercialRuntimeReadiness.summary.fallbackArbitrationContexts,
       disputeRiskLinksConstructedByNormalPath: 0,
     },
     conclusion: {

@@ -34,7 +34,7 @@ describe("Runtime Commercial Context-Binding Validation v1", () => {
       && item.runtimeStage
       && item.support
       && item.safeForCommercialComparison)).toBe(true);
-    expect(RUNTIME_COMMERCIAL_CONTEXT_CAPABILITY_MATRIX_V1.find((item) => item.field === "invalidating VERIFY dependency")?.support).toBe("ABSENT");
+    expect(RUNTIME_COMMERCIAL_CONTEXT_CAPABILITY_MATRIX_V1.find((item) => item.field === "invalidating VERIFY dependency")?.support).toBe("DIRECTLY_AVAILABLE");
     expect(RUNTIME_COMMERCIAL_CONTEXT_CAPABILITY_MATRIX_V1.find((item) => item.field === "dispute/risk overlap")?.support).toBe("PARTIAL");
   });
 
@@ -137,14 +137,15 @@ describe("Runtime Commercial Context-Binding Validation v1", () => {
     expect(standard.merchantCommercialFindingShadowProjection.decisions.some((decision) => decision.reasonCodes.includes("merchant_approval_unknown"))).toBe(true);
   });
 
-  it("preserves named-offer group identity but identifies normal-path dependency and risk links as absent", () => {
-    const { report } = normalPathReport({ channel: "card_present" });
+  it("preserves named-offer group identity and constructs invalidating dependencies from missing runtime facts", () => {
+    const { report } = normalPathReport({ channel: "unknown" });
     const observation = observeRuntimeCommercialContextBindingV1(report);
     const groups = new Set(report.merchantCommercialFindingShadowProjection.decisions.map((decision) => decision.presentationGroupId));
     expect([...groups].some((group) => group.includes("Standard Retail / Storefront"))).toBe(true);
-    expect(observation.observed.invalidatingVerifyDependenciesConstructedByNormalPath).toBe(0);
+    expect(observation.observed.invalidatingVerifyDependenciesConstructedByNormalPath).toBeGreaterThan(0);
+    expect(observation.observed.fallbackArbitrationContexts).toBe(0);
     expect(observation.observed.disputeRiskLinksConstructedByNormalPath).toBe(0);
-    expect(observation.conclusion.answer).toBe("NO_FULL_COMPONENT_CLASS_YET");
+    expect(observation.conclusion.answer).toBe("YES_FOR_SOME_NOT_ALL");
   });
 
   it("preserves source authority, offline routing, hero isolation, and canonical truth", () => {

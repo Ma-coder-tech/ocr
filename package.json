@@ -39,6 +39,7 @@
     "evaluate:internal-analyst-finding": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-internal-analyst-finding-v1.ts",
     "evaluate:open-world-determinant": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-open-world-determinant-v1.ts",
     "evaluate:decision-relevant-stage0": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-decision-relevant-stage0-warrant-gate-v1.ts",
+    "evaluate:per-authorization-commercial-runtime": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-per-authorization-commercial-runtime-readiness-v1.ts",
     "evaluate:open-world-live-research": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-open-world-live-research-v1.ts"
   },
   "dependencies": {
