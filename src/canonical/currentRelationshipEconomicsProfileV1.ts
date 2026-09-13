@@ -11,6 +11,10 @@ import {
   buildClaimScopedMixedMinimumCostSensitivityAdmissionV1,
   type ClaimScopedMixedMinimumCostSensitivityAdmissionV1,
 } from "./claimScopedMixedMinimumCostSensitivityAdmissionV1.js";
+import {
+  buildClaimScopedFixedCostSensitivityAdmissionV1,
+  type ClaimScopedFixedCostSensitivityAdmissionV1,
+} from "./claimScopedFixedCostSensitivityAdmissionV1.js";
 import type { CanonicalStatementAnalysis, MoneyAmount } from "./types.js";
 import type { CanonicalEconomicsV2EconomicAnalysis, CanonicalEconomicCharge } from "./v2/economicTypes.js";
 import type { CanonicalPricingComponent } from "./v2/pricingTypes.js";
@@ -199,6 +203,7 @@ export type CurrentRelationshipEconomicsProfileV1 = {
   countDrivenCostSensitivityAdmission: ClaimScopedCountDrivenCostSensitivityAdmissionV1;
   volumeDrivenCostSensitivityAdmission: ClaimScopedVolumeDrivenCostSensitivityAdmissionV1;
   mixedMinimumCostSensitivityAdmission: ClaimScopedMixedMinimumCostSensitivityAdmissionV1;
+  fixedCostSensitivityAdmission: ClaimScopedFixedCostSensitivityAdmissionV1;
   costStructureSensitivity: {
     state: CurrentEconomicsSensitivityV1;
     countDrivenChargeRefs: string[];
@@ -323,7 +328,17 @@ export function buildCurrentRelationshipEconomicsProfileV1(input: {
     countDrivenChargeRefs: volumeExtendedSensitivity.countDrivenChargeRefs,
     volumeDrivenChargeRefs: volumeExtendedSensitivity.volumeDrivenChargeRefs,
   });
-  const costStructureSensitivity = extendMixedMinimumSensitivity(volumeExtendedSensitivity, mixedMinimumCostSensitivityAdmission);
+  const mixedExtendedSensitivity = extendMixedMinimumSensitivity(volumeExtendedSensitivity, mixedMinimumCostSensitivityAdmission);
+  const fixedCostSensitivityAdmission = buildClaimScopedFixedCostSensitivityAdmissionV1({
+    economic: input.economic,
+    commercialDecomposition: input.commercialDecomposition,
+    chargedCostItems: chargedCostProfile.items,
+    existingFixedCostChargeRefs: priorSensitivity.fixedCostDrivenChargeRefs,
+    countDrivenChargeRefs: mixedExtendedSensitivity.countDrivenChargeRefs,
+    volumeDrivenChargeRefs: mixedExtendedSensitivity.volumeDrivenChargeRefs,
+    mixedMinimumChargeRefs: mixedExtendedSensitivity.mixedMinimumChargeRefs,
+  });
+  const costStructureSensitivity = extendFixedCostSensitivity(mixedExtendedSensitivity, fixedCostSensitivityAdmission);
   const costIncidence = buildIncidence(chargedCostProfile.rdTotalStatementProcessingCost, input.incidence ?? null);
   const activityEntries = Object.entries(activity);
   const observedActivityFields = activityEntries.filter(([, fact]) => fact.state === "KNOWN" || fact.state === "KNOWN_ABSENT").map(([key]) => key);
@@ -352,6 +367,7 @@ export function buildCurrentRelationshipEconomicsProfileV1(input: {
     countDrivenCostSensitivityAdmission,
     volumeDrivenCostSensitivityAdmission,
     mixedMinimumCostSensitivityAdmission,
+    fixedCostSensitivityAdmission,
     costStructureSensitivity,
     costIncidence,
     evidenceRequirements: [
@@ -443,6 +459,18 @@ export function assertCurrentRelationshipEconomicsProfileV1(
       profile.costStructureSensitivity.countDrivenChargeRefs.includes(record.rdChargeRef) ||
       profile.costStructureSensitivity.volumeDrivenChargeRefs.includes(record.rdChargeRef))) {
     throw new Error("CURRENT_ECONOMICS_MIXED_MINIMUM_SENSITIVITY_REFERENCE_INVALID");
+  }
+  const fixedAdmission = profile.fixedCostSensitivityAdmission;
+  if (fixedAdmission.aggregate.additiveSensitivityAmountMinor !== 0 ||
+      fixedAdmission.admissions.some((record) => record.additiveContributionMinor !== 0)) {
+    throw new Error("CURRENT_ECONOMICS_FIXED_SENSITIVITY_DUPLICATION");
+  }
+  if (fixedAdmission.admissions.some((record) => !ids.includes(record.rdChargeRef) ||
+      !profile.costStructureSensitivity.fixedCostDrivenChargeRefs.includes(record.rdChargeRef) ||
+      profile.costStructureSensitivity.countDrivenChargeRefs.includes(record.rdChargeRef) ||
+      profile.costStructureSensitivity.volumeDrivenChargeRefs.includes(record.rdChargeRef) ||
+      profile.costStructureSensitivity.mixedMinimumChargeRefs.includes(record.rdChargeRef))) {
+    throw new Error("CURRENT_ECONOMICS_FIXED_SENSITIVITY_REFERENCE_INVALID");
   }
   if (profile.costIncidence.state === "INCIDENCE_UNRESOLVED" && profile.costIncidence.netMerchantBorneProcessingCost.value !== null) {
     throw new Error("CURRENT_ECONOMICS_UNRESOLVED_INCIDENCE_NETTED");
@@ -896,6 +924,41 @@ function extendMixedMinimumSensitivity(
       ...prior.limitations.filter((limitation) => limitation !== "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."),
       admission.aggregate.newlyAdmittedChargeCount > 0
         ? "Claim-scoped mixed/minimum admissions extend sensitivity only where an exact governed minimum-applied-count relationship, operands, arithmetic, control, uniqueness, and non-overlap predicates pass."
+        : null,
+      state === "UNRESOLVED" ? "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion." : null,
+    ]),
+  };
+}
+
+function extendFixedCostSensitivity(
+  prior: CurrentRelationshipEconomicsProfileV1["costStructureSensitivity"],
+  admission: ClaimScopedFixedCostSensitivityAdmissionV1,
+): CurrentRelationshipEconomicsProfileV1["costStructureSensitivity"] {
+  const admittedRefs = admission.admissions.map((record) => record.rdChargeRef);
+  const fixedCostDrivenChargeRefs = unique([...prior.fixedCostDrivenChargeRefs, ...admittedRefs]);
+  const admitted = new Set(admittedRefs);
+  const unresolvedControllableChargeRefs = prior.unresolvedControllableChargeRefs.filter((ref) => !admitted.has(ref));
+  const resolvedClasses = [prior.countDrivenChargeRefs.length > 0, prior.volumeDrivenChargeRefs.length > 0,
+    prior.mixedMinimumChargeRefs.length > 0, fixedCostDrivenChargeRefs.length > 0].filter(Boolean).length;
+  const state = resolvedClasses === 0 ? "UNRESOLVED" as const
+    : resolvedClasses > 1 ? "MIXED" as const
+      : prior.countDrivenChargeRefs.length > 0 ? "TRANSACTION_COUNT_DRIVEN" as const
+        : prior.volumeDrivenChargeRefs.length > 0 ? "VOLUME_DRIVEN" as const
+          : prior.mixedMinimumChargeRefs.length > 0 ? "MIXED_OR_MINIMUM" as const
+            : "FIXED_COST_DRIVEN" as const;
+  return {
+    ...prior,
+    state,
+    fixedCostDrivenChargeRefs,
+    unresolvedControllableChargeRefs,
+    pricingPopulationRefs: unique([
+      ...prior.pricingPopulationRefs,
+      ...admission.admissions.flatMap((record) => record.pricingPopulationRefs),
+    ]),
+    limitations: unique([
+      ...prior.limitations.filter((limitation) => limitation !== "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."),
+      admission.aggregate.newlyAdmittedChargeCount > 0
+        ? "Claim-scoped fixed-cost admissions extend sensitivity only where a known fixed RD amount, statement-explicit cadence, uniqueness, activity-independence, and non-overlap predicates pass; control remains a separate claim."
         : null,
       state === "UNRESOLVED" ? "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion." : null,
     ]),
