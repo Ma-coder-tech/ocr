@@ -17,6 +17,43 @@ export type CanonicalExactFeeRowArithmeticResult = {
   reasonCode: "exact_source_arithmetic_matches_charge" | "exact_source_arithmetic_mismatch" | "source_arithmetic_unavailable";
 };
 
+export type CanonicalExactCountRateArithmeticResult = {
+  status: "reproduces" | "does_not_reproduce" | "unavailable";
+  count: number | null;
+  perEventRateDollars: string | null;
+  exactAmount: CanonicalExactSourceArithmeticAmount | null;
+  chargedAmountMinor: number;
+  roundingMode: "nearest_cent_half_away_from_zero";
+  reasonCode: "exact_count_rate_matches_charge" | "exact_count_rate_mismatch" | "count_rate_arithmetic_unavailable";
+};
+
+/** Reuses the canonical exact-rational, nearest-cent rounding policy for count × dollar rate. */
+export function assessCanonicalExactCountRateArithmetic(input: {
+  count: number | null;
+  perEventRateDollars: string | null;
+  chargedAmountMinor: number;
+}): CanonicalExactCountRateArithmeticResult {
+  const shared = {
+    count: input.count,
+    perEventRateDollars: input.perEventRateDollars,
+    chargedAmountMinor: input.chargedAmountMinor,
+    roundingMode: "nearest_cent_half_away_from_zero" as const,
+  };
+  if (input.count === null || !Number.isSafeInteger(input.count) || input.count < 0 || input.perEventRateDollars === null) {
+    return { ...shared, status: "unavailable", exactAmount: null, reasonCode: "count_rate_arithmetic_unavailable" };
+  }
+  const rate = decimalRational(input.perEventRateDollars);
+  const exactAmount = rate ? serializableAmount(multiply(rate, BigInt(input.count) * 100n)) : null;
+  if (!exactAmount) return { ...shared, status: "unavailable", exactAmount: null, reasonCode: "count_rate_arithmetic_unavailable" };
+  const reproduces = exactAmount.roundedAmountMinor === input.chargedAmountMinor;
+  return {
+    ...shared,
+    status: reproduces ? "reproduces" : "does_not_reproduce",
+    exactAmount,
+    reasonCode: reproduces ? "exact_count_rate_matches_charge" : "exact_count_rate_mismatch",
+  };
+}
+
 /** Reuses the exact rational/rounding policy for a single printed fee row. */
 export function assessCanonicalExactFeeRowArithmetic(
   row: CanonicalFeePartitionSourceProvenance["rowArithmetic"][number] | null,

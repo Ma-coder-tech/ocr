@@ -370,6 +370,7 @@ export function buildFiservCurrentRelationshipEconomicsProfileWithActivityAdmiss
   const profile = buildCurrentRelationshipEconomicsProfileV1({
     economic: input.economic,
     commercialDecomposition: input.commercialDecomposition,
+    canonicalAnalysis: input.canonicalAnalysis,
     activityAdmissions: admission.facts,
     channel: admission.channelAdmission,
   });

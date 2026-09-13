@@ -68,6 +68,7 @@ for (const fixture of GOLD) {
   const profile = buildCurrentRelationshipEconomicsProfileV1({
     economic: inspected.economic,
     commercialDecomposition: decomposition,
+    canonicalAnalysis: analysis,
   });
   const rdAfter = cryptographicFingerprint(inspected.economic);
   const canonicalAfter = canonicalFinancialTruthFingerprint(analysis);

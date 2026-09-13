@@ -77,7 +77,11 @@ for (const fixture of GOLD) {
   const rdBefore = fingerprint(inspected.economic);
   const rdChargeCountBefore = inspected.economic.economicLayer.charges.length;
   const rdFeeTotalBefore = inspected.economic.economicLayer.costStack.authoritativeStatementFeeTotal;
-  const before = buildCurrentRelationshipEconomicsProfileV1({ economic: inspected.economic, commercialDecomposition: decomposition });
+  const before = buildCurrentRelationshipEconomicsProfileV1({
+    economic: inspected.economic,
+    commercialDecomposition: decomposition,
+    canonicalAnalysis: analysis,
+  });
   const attached = buildFiservCurrentRelationshipEconomicsProfileWithActivityAdmissionV1({
     document: inspected.document,
     economic: inspected.economic,

@@ -1,5 +1,9 @@
 import type { CommercialDecompositionContractV1, CommercialDecompositionRowV1 } from "./commercialDecompositionContractV1.js";
-import type { MoneyAmount } from "./types.js";
+import {
+  buildClaimScopedCountDrivenCostSensitivityAdmissionV1,
+  type ClaimScopedCountDrivenCostSensitivityAdmissionV1,
+} from "./claimScopedCountDrivenCostSensitivityAdmissionV1.js";
+import type { CanonicalStatementAnalysis, MoneyAmount } from "./types.js";
 import type { CanonicalEconomicsV2EconomicAnalysis, CanonicalEconomicCharge } from "./v2/economicTypes.js";
 import type { CanonicalPricingComponent } from "./v2/pricingTypes.js";
 import type { CanonicalEconomicsV2Fact } from "./v2/types.js";
@@ -183,6 +187,7 @@ export type CurrentRelationshipEconomicsProfileV1 = {
     duplicateChargeContributionCount: number;
     nonFeePrincipalContributionCount: number;
   };
+  countDrivenCostSensitivityAdmission: ClaimScopedCountDrivenCostSensitivityAdmissionV1;
   costStructureSensitivity: {
     state: CurrentEconomicsSensitivityV1;
     countDrivenChargeRefs: string[];
@@ -243,6 +248,7 @@ type V2Fact = CanonicalEconomicsV2EconomicAnalysis["pricingAnalysis"]["foundatio
 export function buildCurrentRelationshipEconomicsProfileV1(input: {
   economic: CanonicalEconomicsV2EconomicAnalysis;
   commercialDecomposition: CommercialDecompositionContractV1;
+  canonicalAnalysis?: CanonicalStatementAnalysis | null;
   activityAdmissions?: CurrentEconomicsActivityAdmissionsV1 | null;
   channel?: CurrentEconomicsChannelAdmissionV1 | null;
   incidence?: CurrentEconomicsIncidenceAdmissionV1 | null;
@@ -280,7 +286,15 @@ export function buildCurrentRelationshipEconomicsProfileV1(input: {
   } satisfies CurrentRelationshipEconomicsProfileV1["activity"];
 
   const chargedCostProfile = buildCostProfile(input.economic, input.commercialDecomposition);
-  const costStructureSensitivity = buildSensitivity(input.economic, chargedCostProfile.items, input.commercialDecomposition);
+  const priorSensitivity = buildSensitivity(input.economic, chargedCostProfile.items, input.commercialDecomposition);
+  const countDrivenCostSensitivityAdmission = buildClaimScopedCountDrivenCostSensitivityAdmissionV1({
+    economic: input.economic,
+    commercialDecomposition: input.commercialDecomposition,
+    chargedCostItems: chargedCostProfile.items,
+    existingCountDrivenChargeRefs: priorSensitivity.countDrivenChargeRefs,
+    canonicalAnalysis: input.canonicalAnalysis,
+  });
+  const costStructureSensitivity = extendCountDrivenSensitivity(priorSensitivity, countDrivenCostSensitivityAdmission);
   const costIncidence = buildIncidence(chargedCostProfile.rdTotalStatementProcessingCost, input.incidence ?? null);
   const activityEntries = Object.entries(activity);
   const observedActivityFields = activityEntries.filter(([, fact]) => fact.state === "KNOWN" || fact.state === "KNOWN_ABSENT").map(([key]) => key);
@@ -306,6 +320,7 @@ export function buildCurrentRelationshipEconomicsProfileV1(input: {
     statementPeriod: foundation.identity.statementPeriod,
     activity,
     chargedCostProfile,
+    countDrivenCostSensitivityAdmission,
     costStructureSensitivity,
     costIncidence,
     evidenceRequirements: [
@@ -368,6 +383,15 @@ export function assertCurrentRelationshipEconomicsProfileV1(
   const bucketRefs = profile.chargedCostProfile.buckets.flatMap((bucket) => bucket.rdEconomicChargeRefs);
   if (new Set(bucketRefs).size !== bucketRefs.length || bucketRefs.length !== ids.length) throw new Error("CURRENT_ECONOMICS_BUCKET_MEMBERSHIP_INVALID");
   if (profile.costStructureSensitivity.additiveDriverContributionMinor !== 0) throw new Error("CURRENT_ECONOMICS_DRIVER_DUPLICATION");
+  const sensitivityAdmission = profile.countDrivenCostSensitivityAdmission;
+  if (sensitivityAdmission.aggregate.additiveSensitivityAmountMinor !== 0 ||
+      sensitivityAdmission.admissions.some((record) => record.additiveContributionMinor !== 0)) {
+    throw new Error("CURRENT_ECONOMICS_COUNT_SENSITIVITY_DUPLICATION");
+  }
+  if (sensitivityAdmission.admissions.some((record) => !ids.includes(record.rdChargeRef) ||
+      !profile.costStructureSensitivity.countDrivenChargeRefs.includes(record.rdChargeRef))) {
+    throw new Error("CURRENT_ECONOMICS_COUNT_SENSITIVITY_REFERENCE_INVALID");
+  }
   if (profile.costIncidence.state === "INCIDENCE_UNRESOLVED" && profile.costIncidence.netMerchantBorneProcessingCost.value !== null) {
     throw new Error("CURRENT_ECONOMICS_UNRESOLVED_INCIDENCE_NETTED");
   }
@@ -713,6 +737,40 @@ function buildSensitivity(
       "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
       "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
       unresolved.length > 0 ? "Some exact provider-controlled charges lack a reproduced count, volume, or fixed-period mechanic." : null,
+      state === "UNRESOLVED" ? "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion." : null,
+    ]),
+  };
+}
+
+function extendCountDrivenSensitivity(
+  prior: CurrentRelationshipEconomicsProfileV1["costStructureSensitivity"],
+  admission: ClaimScopedCountDrivenCostSensitivityAdmissionV1,
+): CurrentRelationshipEconomicsProfileV1["costStructureSensitivity"] {
+  const admittedRefs = admission.admissions.map((record) => record.rdChargeRef);
+  const countDrivenChargeRefs = unique([...prior.countDrivenChargeRefs, ...admittedRefs]);
+  const admitted = new Set(admittedRefs);
+  const unresolvedControllableChargeRefs = prior.unresolvedControllableChargeRefs.filter((ref) => !admitted.has(ref));
+  const resolvedClasses = [countDrivenChargeRefs.length > 0, prior.volumeDrivenChargeRefs.length > 0, prior.fixedCostDrivenChargeRefs.length > 0]
+    .filter(Boolean).length;
+  const state = resolvedClasses === 0 ? "UNRESOLVED" as const
+    : resolvedClasses > 1 ? "MIXED" as const
+      : countDrivenChargeRefs.length > 0 ? "TRANSACTION_COUNT_DRIVEN" as const
+        : prior.volumeDrivenChargeRefs.length > 0 ? "VOLUME_DRIVEN" as const
+          : "FIXED_COST_DRIVEN" as const;
+  return {
+    ...prior,
+    state,
+    countDrivenChargeRefs,
+    unresolvedControllableChargeRefs,
+    pricingPopulationRefs: unique([
+      ...prior.pricingPopulationRefs,
+      ...admission.admissions.flatMap((record) => record.pricingPopulationRefs),
+    ]),
+    limitations: unique([
+      ...prior.limitations.filter((limitation) => limitation !== "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."),
+      admission.aggregate.newlyAdmittedChargeCount > 0
+        ? "Claim-scoped count admissions extend sensitivity only where exact governed population, count, rate, arithmetic, control, and uniqueness predicates pass."
+        : null,
       state === "UNRESOLVED" ? "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion." : null,
     ]),
   };
