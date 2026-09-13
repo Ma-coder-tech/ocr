@@ -42,6 +42,7 @@
     "evaluate:per-authorization-commercial-runtime": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-per-authorization-commercial-runtime-readiness-v1.ts",
     "evaluate:current-relationship-economics-profile": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-current-relationship-economics-profile-v1.ts",
     "evaluate:claim-scoped-count-driven-cost-sensitivity": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-claim-scoped-count-driven-cost-sensitivity-admission-v1.ts",
+    "evaluate:claim-scoped-volume-driven-cost-sensitivity": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-claim-scoped-volume-driven-cost-sensitivity-admission-v1.ts",
     "evaluate:fiserv-claim-scoped-activity-population-admission": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-fiserv-claim-scoped-activity-population-admission-v1.ts",
     "evaluate:exact-control-fiserv-fee-occurrence-admission": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-exact-control-claim-scoped-fiserv-fee-occurrence-admission-v1.ts",
     "evaluate:open-world-live-research": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-open-world-live-research-v1.ts"

@@ -3,6 +3,10 @@ import {
   buildClaimScopedCountDrivenCostSensitivityAdmissionV1,
   type ClaimScopedCountDrivenCostSensitivityAdmissionV1,
 } from "./claimScopedCountDrivenCostSensitivityAdmissionV1.js";
+import {
+  buildClaimScopedVolumeDrivenCostSensitivityAdmissionV1,
+  type ClaimScopedVolumeDrivenCostSensitivityAdmissionV1,
+} from "./claimScopedVolumeDrivenCostSensitivityAdmissionV1.js";
 import type { CanonicalStatementAnalysis, MoneyAmount } from "./types.js";
 import type { CanonicalEconomicsV2EconomicAnalysis, CanonicalEconomicCharge } from "./v2/economicTypes.js";
 import type { CanonicalPricingComponent } from "./v2/pricingTypes.js";
@@ -188,6 +192,7 @@ export type CurrentRelationshipEconomicsProfileV1 = {
     nonFeePrincipalContributionCount: number;
   };
   countDrivenCostSensitivityAdmission: ClaimScopedCountDrivenCostSensitivityAdmissionV1;
+  volumeDrivenCostSensitivityAdmission: ClaimScopedVolumeDrivenCostSensitivityAdmissionV1;
   costStructureSensitivity: {
     state: CurrentEconomicsSensitivityV1;
     countDrivenChargeRefs: string[];
@@ -294,7 +299,15 @@ export function buildCurrentRelationshipEconomicsProfileV1(input: {
     existingCountDrivenChargeRefs: priorSensitivity.countDrivenChargeRefs,
     canonicalAnalysis: input.canonicalAnalysis,
   });
-  const costStructureSensitivity = extendCountDrivenSensitivity(priorSensitivity, countDrivenCostSensitivityAdmission);
+  const countExtendedSensitivity = extendCountDrivenSensitivity(priorSensitivity, countDrivenCostSensitivityAdmission);
+  const volumeDrivenCostSensitivityAdmission = buildClaimScopedVolumeDrivenCostSensitivityAdmissionV1({
+    economic: input.economic,
+    commercialDecomposition: input.commercialDecomposition,
+    chargedCostItems: chargedCostProfile.items,
+    existingVolumeDrivenChargeRefs: priorSensitivity.volumeDrivenChargeRefs,
+    countDrivenChargeRefs: countExtendedSensitivity.countDrivenChargeRefs,
+  });
+  const costStructureSensitivity = extendVolumeDrivenSensitivity(countExtendedSensitivity, volumeDrivenCostSensitivityAdmission);
   const costIncidence = buildIncidence(chargedCostProfile.rdTotalStatementProcessingCost, input.incidence ?? null);
   const activityEntries = Object.entries(activity);
   const observedActivityFields = activityEntries.filter(([, fact]) => fact.state === "KNOWN" || fact.state === "KNOWN_ABSENT").map(([key]) => key);
@@ -321,6 +334,7 @@ export function buildCurrentRelationshipEconomicsProfileV1(input: {
     activity,
     chargedCostProfile,
     countDrivenCostSensitivityAdmission,
+    volumeDrivenCostSensitivityAdmission,
     costStructureSensitivity,
     costIncidence,
     evidenceRequirements: [
@@ -391,6 +405,16 @@ export function assertCurrentRelationshipEconomicsProfileV1(
   if (sensitivityAdmission.admissions.some((record) => !ids.includes(record.rdChargeRef) ||
       !profile.costStructureSensitivity.countDrivenChargeRefs.includes(record.rdChargeRef))) {
     throw new Error("CURRENT_ECONOMICS_COUNT_SENSITIVITY_REFERENCE_INVALID");
+  }
+  const volumeAdmission = profile.volumeDrivenCostSensitivityAdmission;
+  if (volumeAdmission.aggregate.additiveSensitivityAmountMinor !== 0 ||
+      volumeAdmission.admissions.some((record) => record.additiveContributionMinor !== 0)) {
+    throw new Error("CURRENT_ECONOMICS_VOLUME_SENSITIVITY_DUPLICATION");
+  }
+  if (volumeAdmission.admissions.some((record) => !ids.includes(record.rdChargeRef) ||
+      !profile.costStructureSensitivity.volumeDrivenChargeRefs.includes(record.rdChargeRef) ||
+      profile.costStructureSensitivity.countDrivenChargeRefs.includes(record.rdChargeRef))) {
+    throw new Error("CURRENT_ECONOMICS_VOLUME_SENSITIVITY_REFERENCE_INVALID");
   }
   if (profile.costIncidence.state === "INCIDENCE_UNRESOLVED" && profile.costIncidence.netMerchantBorneProcessingCost.value !== null) {
     throw new Error("CURRENT_ECONOMICS_UNRESOLVED_INCIDENCE_NETTED");
@@ -770,6 +794,40 @@ function extendCountDrivenSensitivity(
       ...prior.limitations.filter((limitation) => limitation !== "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."),
       admission.aggregate.newlyAdmittedChargeCount > 0
         ? "Claim-scoped count admissions extend sensitivity only where exact governed population, count, rate, arithmetic, control, and uniqueness predicates pass."
+        : null,
+      state === "UNRESOLVED" ? "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion." : null,
+    ]),
+  };
+}
+
+function extendVolumeDrivenSensitivity(
+  prior: CurrentRelationshipEconomicsProfileV1["costStructureSensitivity"],
+  admission: ClaimScopedVolumeDrivenCostSensitivityAdmissionV1,
+): CurrentRelationshipEconomicsProfileV1["costStructureSensitivity"] {
+  const admittedRefs = admission.admissions.map((record) => record.rdChargeRef);
+  const volumeDrivenChargeRefs = unique([...prior.volumeDrivenChargeRefs, ...admittedRefs]);
+  const admitted = new Set(admittedRefs);
+  const unresolvedControllableChargeRefs = prior.unresolvedControllableChargeRefs.filter((ref) => !admitted.has(ref));
+  const resolvedClasses = [prior.countDrivenChargeRefs.length > 0, volumeDrivenChargeRefs.length > 0, prior.fixedCostDrivenChargeRefs.length > 0]
+    .filter(Boolean).length;
+  const state = resolvedClasses === 0 ? "UNRESOLVED" as const
+    : resolvedClasses > 1 ? "MIXED" as const
+      : prior.countDrivenChargeRefs.length > 0 ? "TRANSACTION_COUNT_DRIVEN" as const
+        : volumeDrivenChargeRefs.length > 0 ? "VOLUME_DRIVEN" as const
+          : "FIXED_COST_DRIVEN" as const;
+  return {
+    ...prior,
+    state,
+    volumeDrivenChargeRefs,
+    unresolvedControllableChargeRefs,
+    pricingPopulationRefs: unique([
+      ...prior.pricingPopulationRefs,
+      ...admission.admissions.flatMap((record) => record.pricingPopulationRefs),
+    ]),
+    limitations: unique([
+      ...prior.limitations.filter((limitation) => limitation !== "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."),
+      admission.aggregate.newlyAdmittedChargeCount > 0
+        ? "Claim-scoped volume admissions extend sensitivity only where exact governed base, rate, arithmetic, control, economic classification, and uniqueness predicates pass."
         : null,
       state === "UNRESOLVED" ? "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion." : null,
     ]),
