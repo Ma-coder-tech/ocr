@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "full_planner_schema_synthetic_preflight_attempt_guard_2026_09_15_v2",
+  "evaluationCheckpoint": "afc6d070dd445506e932b27938dc489fbeebbf49",
+  "branch": "codex/full-planner-schema-synthetic-preflight-v2-extended-timeout",
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "maximumProviderCalls": 1,
+  "retries": 0,
+  "fallbackAllowed": false,
+  "callReserved": true,
+  "callCompleted": true,
+  "resultStatus": "SUCCESS",
+  "resultSha256": "131cde200c27916ad696f3e7e81931cccff19e6f7d8a4fdbc8aee3cd9bbeb1b1"
+}

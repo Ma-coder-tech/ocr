@@ -48,12 +48,17 @@ export type OpenRouterPreflightTelemetryV2 = Readonly<{
   httpStatus: number | null;
   openRouterRequestId: string | null;
   generationId: string | null;
+  contentType: string | null;
+  headerReportedModel: string | null;
+  headerReportedProvider: string | null;
   retryAfter: string | null;
   routerAttemptCount: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
   totalTokens: number | null;
   latencyMs: number;
+  timeToHeadersMs: number | null;
+  bodyReadLatencyMs: number | null;
   accountedCostUsd: number | null;
   costMetadataAvailable: boolean;
   failureCategory: OpenRouterPreflightFailureCategoryV2 | null;
@@ -210,23 +215,30 @@ export async function sendOpenRouterClaudeJsonSchemaEvaluationRequestV2(input: {
     }));
   }
 
+  const headersReceivedAt = performance.now();
   const safeHeaders = safeResponseHeaders(response.headers);
   let responseBody: unknown;
   try {
     responseBody = await parseResponseBody(response);
   } catch (error) {
+    const bodyReadFailedAt = performance.now();
     throw new OpenRouterClaudePreflightErrorV2(failureTelemetry({
-      latencyMs: performance.now() - started,
+      latencyMs: bodyReadFailedAt - started,
+      timeToHeadersMs: headersReceivedAt - started,
+      bodyReadLatencyMs: bodyReadFailedAt - headersReceivedAt,
       httpStatus: response.status,
       category: classifyThrownError(error),
       headers: safeHeaders,
       message: safeMessage(error),
     }));
   }
+  const bodyCompletedAt = performance.now();
   if (!response.ok) {
     const safeError = safeProviderError(responseBody);
     throw new OpenRouterClaudePreflightErrorV2(failureTelemetry({
-      latencyMs: performance.now() - started,
+      latencyMs: bodyCompletedAt - started,
+      timeToHeadersMs: headersReceivedAt - started,
+      bodyReadLatencyMs: bodyCompletedAt - headersReceivedAt,
       httpStatus: response.status,
       category: classifyHttpFailure(response.status, safeError.message),
       responseBody,
@@ -244,6 +256,8 @@ export async function sendOpenRouterClaudeJsonSchemaEvaluationRequestV2(input: {
   } catch (error) {
     throw new OpenRouterClaudePreflightErrorV2(failureTelemetry({
       latencyMs: performance.now() - started,
+      timeToHeadersMs: headersReceivedAt - started,
+      bodyReadLatencyMs: bodyCompletedAt - headersReceivedAt,
       httpStatus: response.status,
       category: "STRUCTURED_OUTPUT_INCOMPATIBILITY",
       responseBody,
@@ -257,7 +271,11 @@ export async function sendOpenRouterClaudeJsonSchemaEvaluationRequestV2(input: {
       },
     }));
   }
-  const telemetry = successTelemetry(responseBody, safeHeaders, response.status, performance.now() - started);
+  const telemetry = successTelemetry(responseBody, safeHeaders, response.status, {
+    latencyMs: performance.now() - started,
+    timeToHeadersMs: headersReceivedAt - started,
+    bodyReadLatencyMs: bodyCompletedAt - headersReceivedAt,
+  });
   return Object.freeze({ rawOutput, telemetry });
 }
 
@@ -334,7 +352,12 @@ function translateSchemaNode(value: unknown, ancestors: Set<object>): unknown {
   return translated;
 }
 
-function successTelemetry(body: unknown, headers: SafeHeaders, status: number, latencyMs: number): OpenRouterPreflightTelemetryV2 {
+function successTelemetry(
+  body: unknown,
+  headers: SafeHeaders,
+  status: number,
+  timings: Readonly<{ latencyMs: number; timeToHeadersMs: number; bodyReadLatencyMs: number }>,
+): OpenRouterPreflightTelemetryV2 {
   const envelope = asRecord(body);
   const usage = asRecord(envelope?.usage);
   const routing = safeRouting(body);
@@ -342,20 +365,25 @@ function successTelemetry(body: unknown, headers: SafeHeaders, status: number, l
   return Object.freeze({
     provider: "OpenRouter",
     requestedModel: OPENROUTER_CLAUDE_PREFLIGHT_MODEL_V2,
-    returnedModel: safeIdentifier(envelope?.model),
-    selectedProvider: routing.selectedProvider,
+    returnedModel: safeIdentifier(envelope?.model) ?? headers.model,
+    selectedProvider: routing.selectedProvider ?? headers.provider,
     callCount: 1,
     retries: 0,
     requestReachedOpenRouter: true,
     httpStatus: status,
     openRouterRequestId: headers.requestId,
     generationId: headers.generationId ?? safeIdentifier(envelope?.id),
+    contentType: headers.contentType,
+    headerReportedModel: headers.model,
+    headerReportedProvider: headers.provider,
     retryAfter: headers.retryAfter,
     routerAttemptCount: routing.attemptCount,
     inputTokens: safeInteger(usage?.prompt_tokens),
     outputTokens: safeInteger(usage?.completion_tokens),
     totalTokens: safeInteger(usage?.total_tokens),
-    latencyMs: elapsed(latencyMs),
+    latencyMs: elapsed(timings.latencyMs),
+    timeToHeadersMs: elapsed(timings.timeToHeadersMs),
+    bodyReadLatencyMs: elapsed(timings.bodyReadLatencyMs),
     accountedCostUsd: cost,
     costMetadataAvailable: cost !== null,
     failureCategory: null,
@@ -385,6 +413,8 @@ function structuredOutputRejectionTelemetry(
 
 function failureTelemetry(input: {
   latencyMs: number;
+  timeToHeadersMs?: number;
+  bodyReadLatencyMs?: number;
   httpStatus: number | null;
   category: OpenRouterPreflightFailureCategoryV2;
   responseBody?: unknown;
@@ -399,20 +429,25 @@ function failureTelemetry(input: {
   return Object.freeze({
     provider: "OpenRouter",
     requestedModel: OPENROUTER_CLAUDE_PREFLIGHT_MODEL_V2,
-    returnedModel: safeIdentifier(envelope?.model),
-    selectedProvider: routing.selectedProvider,
+    returnedModel: safeIdentifier(envelope?.model) ?? input.headers?.model ?? null,
+    selectedProvider: routing.selectedProvider ?? input.headers?.provider ?? null,
     callCount: 1,
     retries: 0,
     requestReachedOpenRouter: input.httpStatus !== null,
     httpStatus: input.httpStatus,
     openRouterRequestId: input.headers?.requestId ?? null,
     generationId: input.headers?.generationId ?? safeIdentifier(envelope?.id),
+    contentType: input.headers?.contentType ?? null,
+    headerReportedModel: input.headers?.model ?? null,
+    headerReportedProvider: input.headers?.provider ?? null,
     retryAfter: input.headers?.retryAfter ?? null,
     routerAttemptCount: routing.attemptCount,
     inputTokens: safeInteger(usage?.prompt_tokens),
     outputTokens: safeInteger(usage?.completion_tokens),
     totalTokens: safeInteger(usage?.total_tokens),
     latencyMs: elapsed(input.latencyMs),
+    timeToHeadersMs: input.timeToHeadersMs === undefined ? null : elapsed(input.timeToHeadersMs),
+    bodyReadLatencyMs: input.bodyReadLatencyMs === undefined ? null : elapsed(input.bodyReadLatencyMs),
     accountedCostUsd: cost,
     costMetadataAvailable: cost !== null,
     failureCategory: input.category,
@@ -424,7 +459,14 @@ function failureTelemetry(input: {
   });
 }
 
-type SafeHeaders = Readonly<{ requestId: string | null; generationId: string | null; retryAfter: string | null }>;
+type SafeHeaders = Readonly<{
+  requestId: string | null;
+  generationId: string | null;
+  contentType: string | null;
+  model: string | null;
+  provider: string | null;
+  retryAfter: string | null;
+}>;
 type SafeProviderError = Readonly<{
   type: string | null;
   code: string | null;
@@ -437,6 +479,9 @@ function safeResponseHeaders(headers: Headers): SafeHeaders {
   return Object.freeze({
     requestId: safeIdentifier(headers.get("x-request-id")),
     generationId: safeIdentifier(headers.get("x-generation-id")),
+    contentType: safeContentType(headers.get("content-type")),
+    model: safeIdentifier(headers.get("x-openrouter-model")),
+    provider: safeIdentifier(headers.get("x-openrouter-provider")),
     retryAfter: safeRetryAfter(headers.get("retry-after")),
   });
 }
@@ -518,6 +563,14 @@ function safeIdentifier(value: unknown): string | null {
 
 function safeRetryAfter(value: unknown): string | null {
   return typeof value === "string" && /^[A-Za-z0-9,: .+-]{1,120}$/.test(value) ? value : null;
+}
+
+function safeContentType(value: unknown): string | null {
+  if (typeof value !== "string" || value.length > 200) return null;
+  const sanitized = value.trim();
+  return /^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*\/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*(?:\s*;\s*[A-Za-z0-9!#$&^_.+-]+=(?:[A-Za-z0-9!#$&^_.+-]+|"[A-Za-z0-9 ._+-]+"))*$/.test(sanitized)
+    ? sanitized
+    : null;
 }
 
 function safeInteger(value: unknown): number | null {

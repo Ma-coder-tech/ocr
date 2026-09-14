@@ -110,11 +110,14 @@ describe("OpenRouter Claude structured-output preflight v2", () => {
       httpStatus: 200,
       openRouterRequestId: "request-test-1",
       generationId: "generation-test-1",
+      contentType: "application/json",
       routerAttemptCount: 1,
       inputTokens: 80,
       outputTokens: 31,
       totalTokens: 111,
       accountedCostUsd: 0.0042,
+      timeToHeadersMs: expect.any(Number),
+      bodyReadLatencyMs: expect.any(Number),
       failureCategory: null,
     });
   });
@@ -184,7 +187,15 @@ describe("OpenRouter Claude structured-output preflight v2", () => {
             start(controller) {
               controller.error(new DOMException("This operation was aborted", "AbortError"));
             },
-          }), { status: 200, headers: { "x-request-id": "request-body-timeout-1" } });
+          }), {
+            status: 200,
+            headers: {
+              "content-type": "application/json",
+              "x-request-id": "request-body-timeout-1",
+              "x-openrouter-model": "anthropic/claude-opus-4.6",
+              "x-openrouter-provider": "Anthropic",
+            },
+          });
         },
       });
     } catch (error) {
@@ -197,6 +208,11 @@ describe("OpenRouter Claude structured-output preflight v2", () => {
       httpStatus: 200,
       requestReachedOpenRouter: true,
       openRouterRequestId: "request-body-timeout-1",
+      contentType: "application/json",
+      returnedModel: "anthropic/claude-opus-4.6",
+      selectedProvider: "Anthropic",
+      timeToHeadersMs: expect.any(Number),
+      bodyReadLatencyMs: expect.any(Number),
       failureCategory: "TIMEOUT",
       callCount: 1,
       retries: 0,

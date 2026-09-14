@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 
 import { validateShadowAiEconomicResolutionPlanV1 } from "../../src/canonical/shadowAiEconomicResolutionPlannerRuntimeV1.js";
 import { SHADOW_AI_ECONOMIC_RESOLUTION_OUTPUT_SCHEMA_VERSION } from "../../src/canonical/shadowAiEconomicResolutionPlannerTypesV1.js";
@@ -54,6 +55,8 @@ describe("OpenRouter full planner schema synthetic preflight v1", () => {
     });
     expect(body.tools).toBeUndefined();
     expect(body.tool_choice).toBeUndefined();
+    expect(request.bodyBytes).toBe(10_134);
+    expect(createHash("sha256").update(request.body).digest("hex")).toBe("875e4c7fb117078ad9b4cbe2c76a43d9a1cf63ad66804ca016e2caf5acc71a76");
     expect(request.body).not.toMatch(/\bGold\b|\bMID\b|account number|bank account|routing number|tax ID|\.pdf|\/Users\//i);
   });
 
