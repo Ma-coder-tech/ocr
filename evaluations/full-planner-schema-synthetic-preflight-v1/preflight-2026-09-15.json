@@ -1,0 +1,172 @@
+{
+  "schemaVersion": "full_planner_schema_synthetic_preflight_2026_09_15_v1",
+  "generatedAt": "2026-09-14T22:18:24Z",
+  "evaluationCheckpoint": {
+    "branch": "codex/openrouter-claude-structured-output-preflight-v2",
+    "commit": "8655fd73e5efdfdfd3acda9aaa3766e22767922e",
+    "parent": "d6ebcdbe919d11fb29ce73d7155c28848796a20f"
+  },
+  "evaluationBranch": "codex/full-planner-schema-synthetic-preflight-v1",
+  "purpose": "FULL_PLANNER_SCHEMA_SYNTHETIC_PREFLIGHT_ONLY",
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "success": false,
+  "request": {
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "method": "POST",
+    "headerNames": [
+      "Authorization",
+      "Content-Type",
+      "X-OpenRouter-Metadata"
+    ],
+    "bodyBytes": 10134,
+    "bodySha256": "875e4c7fb117078ad9b4cbe2c76a43d9a1cf63ad66804ca016e2caf5acc71a76",
+    "maximumProviderCalls": 1,
+    "providerCallsConsumed": 1,
+    "retries": 0,
+    "fallbackAllowed": false,
+    "store": false,
+    "stream": false
+  },
+  "schemaTranslation": {
+    "localSchemaBytes": 6861,
+    "providerSchemaBytes": 6011,
+    "localConstructCounts": {
+      "type": 71,
+      "properties": 4,
+      "required": 4,
+      "additionalProperties": 4,
+      "const": 15,
+      "enum": 12,
+      "anyOf": 1,
+      "pattern": 1,
+      "minItems": 21,
+      "maxItems": 22,
+      "minLength": 18,
+      "maxLength": 18,
+      "$ref": 0,
+      "$defs": 0,
+      "oneOf": 0,
+      "allOf": 0
+    },
+    "providerConstructCounts": {
+      "type": 71,
+      "properties": 4,
+      "required": 4,
+      "additionalProperties": 4,
+      "const": 15,
+      "enum": 12,
+      "anyOf": 1,
+      "pattern": 1,
+      "minItems": 21,
+      "maxItems": 0,
+      "minLength": 0,
+      "maxLength": 0,
+      "$ref": 0,
+      "$defs": 0,
+      "oneOf": 0,
+      "allOf": 0
+    },
+    "removedGenerationConstraints": {
+      "minLength": 18,
+      "maxLength": 18,
+      "maxItems": 22
+    },
+    "unsupportedProviderKeywordCount": 0,
+    "additionalTranslationRequired": false,
+    "acceptedLocalContractModified": false
+  },
+  "syntheticPacket": {
+    "bytes": 2350,
+    "sha256": "9b11a9b574e172a0070ed1474809d996b599209aef7434d2a4b8e8cefcd34d5c",
+    "privacyValid": true,
+    "privacyReasonCodes": [],
+    "syntheticBoundaryValid": true,
+    "syntheticBoundaryReasonCodes": [],
+    "merchantOrGoldDataTransmitted": false
+  },
+  "telemetry": {
+    "provider": "OpenRouter",
+    "requestedModel": "anthropic/claude-opus-4.6",
+    "returnedModel": null,
+    "selectedProvider": null,
+    "callCount": 1,
+    "retries": 0,
+    "requestReachedOpenRouter": "INFERRED_TRUE_RESPONSE_BODY_PHASE",
+    "responseHeadersReceived": true,
+    "httpStatus": null,
+    "openRouterRequestId": null,
+    "generationId": null,
+    "routerAttemptCount": null,
+    "inputTokens": null,
+    "outputTokens": null,
+    "totalTokens": null,
+    "accountedCostUsd": null,
+    "costMetadataAvailable": false,
+    "usageAccountingState": "UNKNOWN_POSSIBLE_BILLABLE",
+    "timeoutBudgetMs": 20000,
+    "latencyMs": 20000,
+    "latencyBasis": "TIMEOUT_BOUNDARY",
+    "commandWallTimeMs": 21029,
+    "failurePhase": "RESPONSE_BODY_READ",
+    "failureCategory": "TIMEOUT",
+    "safeErrorType": "AbortError",
+    "safeErrorCode": null,
+    "safeErrorParameter": null,
+    "safeErrorMessage": "This operation was aborted",
+    "providerSafeErrorCode": null
+  },
+  "structuredPlannerObject": null,
+  "providerSchemaValidation": {
+    "attempted": false,
+    "valid": false,
+    "errors": []
+  },
+  "strictLocalPlannerValidation": {
+    "attempted": false,
+    "valid": false,
+    "errors": []
+  },
+  "translatedConstraintValidation": {
+    "attempted": false,
+    "valid": false,
+    "errors": []
+  },
+  "referenceGrounding": {
+    "attempted": false,
+    "valid": false,
+    "citedRefs": [],
+    "invalidRefs": []
+  },
+  "qualityReview": {
+    "attempted": false,
+    "summary": "NOT_AVAILABLE_NO_COMPLETED_OUTPUT"
+  },
+  "deterministicRateRevealStatePreserved": true,
+  "safetyCounters": {
+    "providerCalls": 1,
+    "retries": 0,
+    "fallbackCalls": 0,
+    "canonicalChanges": 0,
+    "rdChanges": 0,
+    "commercialChanges": 0,
+    "sensitivityChanges": 0,
+    "participantControlChanges": 0,
+    "savingsConclusions": 0,
+    "annualizationConclusions": 0,
+    "comparisonDecisions": 0,
+    "customerPermissions": 0,
+    "customerRoutingChanges": 0,
+    "researchOperations": 0,
+    "sourceAdmissions": 0,
+    "privateDataSent": 0,
+    "goldEvaluationRuns": 0
+  },
+  "safetyViolationTotal": 0,
+  "additionalSchemaTranslationChange": null,
+  "telemetryCorrection": "Response-body read aborts are now safely classified after this consumed call; no retry was performed.",
+  "recommendation": {
+    "code": "TRANSPORT_FAILURE",
+    "reason": "The only authorized request reached the response-body phase but did not complete before the accepted 20000 ms planner timeout. Full-schema acceptance and model-output validation remain unproven."
+  }
+}

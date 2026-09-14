@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "full_planner_schema_synthetic_preflight_attempt_guard_2026_09_15_v1",
+  "evaluationCheckpoint": "8655fd73e5efdfdfd3acda9aaa3766e22767922e",
+  "branch": "codex/full-planner-schema-synthetic-preflight-v1",
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "maximumProviderCalls": 1,
+  "retries": 0,
+  "fallbackAllowed": false,
+  "callReserved": true,
+  "requestBodyBytes": 10134,
+  "requestBodySha256": "875e4c7fb117078ad9b4cbe2c76a43d9a1cf63ad66804ca016e2caf5acc71a76",
+  "packetBytes": 2350,
+  "packetSha256": "9b11a9b574e172a0070ed1474809d996b599209aef7434d2a4b8e8cefcd34d5c",
+  "syntheticDataOnly": true,
+  "providerCallAttempted": true,
+  "callBudgetConsumed": true,
+  "responseCompleted": false,
+  "resultStatus": "FAILED",
+  "failureCategory": "TIMEOUT",
+  "failurePhase": "RESPONSE_BODY_READ",
+  "resultArtifactSha256": "fe10d2c14182509deeff5fda2c2586b93d74706ecf1ac63b7ded9b98f7dc06fc"
+}

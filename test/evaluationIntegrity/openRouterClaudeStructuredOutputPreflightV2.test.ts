@@ -170,4 +170,36 @@ describe("OpenRouter Claude structured-output preflight v2", () => {
     expect(serialized).not.toContain("do-not-retain");
     expect(serialized).not.toContain("never-retain");
   });
+
+  it("classifies an aborted response-body read as a timeout without retrying", async () => {
+    let calls = 0;
+    let captured: OpenRouterClaudePreflightErrorV2 | null = null;
+    try {
+      await invokeOpenRouterClaudeStructuredOutputPreflightV2({
+        apiKey: "test-only-key",
+        signal: new AbortController().signal,
+        fetchImplementation: async () => {
+          calls += 1;
+          return new Response(new ReadableStream({
+            start(controller) {
+              controller.error(new DOMException("This operation was aborted", "AbortError"));
+            },
+          }), { status: 200, headers: { "x-request-id": "request-body-timeout-1" } });
+        },
+      });
+    } catch (error) {
+      captured = error as OpenRouterClaudePreflightErrorV2;
+    }
+
+    expect(calls).toBe(1);
+    expect(captured).toBeInstanceOf(OpenRouterClaudePreflightErrorV2);
+    expect(captured?.telemetry).toMatchObject({
+      httpStatus: 200,
+      requestReachedOpenRouter: true,
+      openRouterRequestId: "request-body-timeout-1",
+      failureCategory: "TIMEOUT",
+      callCount: 1,
+      retries: 0,
+    });
+  });
 });

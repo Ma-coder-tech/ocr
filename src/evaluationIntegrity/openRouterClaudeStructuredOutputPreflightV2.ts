@@ -159,6 +159,36 @@ export async function invokeOpenRouterClaudeStructuredOutputPreflightV2(input: {
   requestBodyBytes: number;
 }>> {
   const request = buildOpenRouterClaudeStructuredOutputPreflightRequestV2(input.apiKey);
+  const received = await sendOpenRouterClaudeJsonSchemaEvaluationRequestV2({
+    request,
+    signal: input.signal,
+    fetchImplementation: input.fetchImplementation,
+  });
+  const providerValidation = validateProviderFacingSyntheticOutputV2(received.rawOutput);
+  if (!providerValidation.valid) {
+    throw new OpenRouterClaudePreflightErrorV2(structuredOutputRejectionTelemetry(
+      received.telemetry,
+      "provider_schema_validation_failed",
+      providerValidation.errors.join(","),
+    ));
+  }
+  return Object.freeze({
+    output: providerValidation.output,
+    providerSchemaValidation: Object.freeze({ valid: true as const, errors: [] as const }),
+    telemetry: received.telemetry,
+    requestBodyBytes: request.bodyBytes,
+  });
+}
+
+export async function sendOpenRouterClaudeJsonSchemaEvaluationRequestV2(input: {
+  request: OpenRouterClaudePreflightRequestV2;
+  signal: AbortSignal;
+  fetchImplementation?: typeof fetch;
+}): Promise<Readonly<{
+  rawOutput: unknown;
+  telemetry: OpenRouterPreflightTelemetryV2;
+}>> {
+  const request = input.request;
   const fetchImplementation = input.fetchImplementation ?? globalThis.fetch;
   if (typeof fetchImplementation !== "function") throw new Error("openrouter_preflight_transport_unavailable");
   const started = performance.now();
@@ -181,7 +211,18 @@ export async function invokeOpenRouterClaudeStructuredOutputPreflightV2(input: {
   }
 
   const safeHeaders = safeResponseHeaders(response.headers);
-  const responseBody = await parseResponseBody(response);
+  let responseBody: unknown;
+  try {
+    responseBody = await parseResponseBody(response);
+  } catch (error) {
+    throw new OpenRouterClaudePreflightErrorV2(failureTelemetry({
+      latencyMs: performance.now() - started,
+      httpStatus: response.status,
+      category: classifyThrownError(error),
+      headers: safeHeaders,
+      message: safeMessage(error),
+    }));
+  }
   if (!response.ok) {
     const safeError = safeProviderError(responseBody);
     throw new OpenRouterClaudePreflightErrorV2(failureTelemetry({
@@ -216,30 +257,8 @@ export async function invokeOpenRouterClaudeStructuredOutputPreflightV2(input: {
       },
     }));
   }
-  const providerValidation = validateProviderFacingSyntheticOutputV2(rawOutput);
-  if (!providerValidation.valid) {
-    throw new OpenRouterClaudePreflightErrorV2(failureTelemetry({
-      latencyMs: performance.now() - started,
-      httpStatus: response.status,
-      category: "STRUCTURED_OUTPUT_INCOMPATIBILITY",
-      responseBody,
-      headers: safeHeaders,
-      error: {
-        type: "structured_output_validation_error",
-        code: "provider_schema_validation_failed",
-        parameter: null,
-        message: providerValidation.errors.join(","),
-        providerCode: null,
-      },
-    }));
-  }
   const telemetry = successTelemetry(responseBody, safeHeaders, response.status, performance.now() - started);
-  return Object.freeze({
-    output: providerValidation.output,
-    providerSchemaValidation: Object.freeze({ valid: true as const, errors: Object.freeze([]) }),
-    telemetry,
-    requestBodyBytes: request.bodyBytes,
-  });
+  return Object.freeze({ rawOutput, telemetry });
 }
 
 export function validateProviderFacingSyntheticOutputV2(value: unknown):
@@ -258,7 +277,7 @@ export function validateProviderFacingSyntheticOutputV2(value: unknown):
   if (value.customerRenderingAllowed !== false) errors.push("synthetic_customer_rendering_invalid");
   if (value.syntheticEcho !== "synthetic_preflight_only") errors.push("synthetic_echo_invalid");
   if (errors.length > 0) return Object.freeze({ valid: false, output: null, errors: Object.freeze([...new Set(errors)].sort()) });
-  return Object.freeze({ valid: true, output: deepFreeze({
+  const output: SyntheticStructuredOutputV2 = deepFreeze({
     outputType: "AI_INFERENCE_ONLY",
     authority: "NON_AUTHORITATIVE",
     admissionStatus: "NOT_ADMITTED",
@@ -266,7 +285,8 @@ export function validateProviderFacingSyntheticOutputV2(value: unknown):
     financialMutationAllowed: false,
     customerRenderingAllowed: false,
     syntheticEcho: "synthetic_preflight_only",
-  }), errors: Object.freeze([]) });
+  });
+  return Object.freeze({ valid: true as const, output, errors: [] as const });
 }
 
 export function validateFullLocalSyntheticContractV2(value: unknown): Readonly<{ valid: boolean; errors: readonly string[] }> {
@@ -343,6 +363,22 @@ function successTelemetry(body: unknown, headers: SafeHeaders, status: number, l
     safeErrorCode: null,
     safeErrorParameter: null,
     safeErrorMessage: null,
+    providerSafeErrorCode: null,
+  });
+}
+
+function structuredOutputRejectionTelemetry(
+  telemetry: OpenRouterPreflightTelemetryV2,
+  code: string,
+  message: string,
+): OpenRouterPreflightTelemetryV2 {
+  return Object.freeze({
+    ...telemetry,
+    failureCategory: "STRUCTURED_OUTPUT_INCOMPATIBILITY" as const,
+    safeErrorType: "structured_output_validation_error",
+    safeErrorCode: safeIdentifier(code),
+    safeErrorParameter: null,
+    safeErrorMessage: safeProviderMessage(message),
     providerSafeErrorCode: null,
   });
 }
