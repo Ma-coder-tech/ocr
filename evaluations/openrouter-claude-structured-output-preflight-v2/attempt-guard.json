@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "openrouter_claude_structured_output_attempt_guard_2026_09_14_v2",
+  "acceptedBaseline": "d6ebcdbe919d11fb29ce73d7155c28848796a20f",
+  "branch": "codex/openrouter-claude-structured-output-preflight-v2",
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "maximumProviderCalls": 1,
+  "retries": 0,
+  "fallbackAllowed": false,
+  "callReserved": true,
+  "callCompleted": true,
+  "resultStatus": "SUCCESS",
+  "resultSha256": "8de4ea64c651702bdc1c1705d00695e3d880836de065426d939adb861a6aac74"
+}

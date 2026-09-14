@@ -1,0 +1,126 @@
+{
+  "schemaVersion": "openrouter_claude_structured_output_preflight_2026_09_14_v2",
+  "generatedAt": "2026-09-14T20:42:27.415Z",
+  "acceptedPlannerBaseline": {
+    "branch": "codex/shadow-ai-economic-resolution-planner-v1",
+    "commit": "d6ebcdbe919d11fb29ce73d7155c28848796a20f"
+  },
+  "evaluationBranch": "codex/openrouter-claude-structured-output-preflight-v2",
+  "purpose": "SYNTHETIC_STRUCTURED_OUTPUT_TRANSPORT_PREFLIGHT_ONLY",
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "success": true,
+  "request": {
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "method": "POST",
+    "headerNames": [
+      "Authorization",
+      "Content-Type",
+      "X-OpenRouter-Metadata"
+    ],
+    "bodyBytes": 1254,
+    "bodySha256": "8efa6ffad38af06ce71ecfea6ef84c6a24dd873e902e2c3ed0a3bab522c6f4a8",
+    "schemaName": "planner_transport_preflight_v2",
+    "store": false,
+    "stream": false,
+    "maximumProviderCalls": 1,
+    "retries": 0,
+    "fallbackAllowed": false
+  },
+  "schemaTranslation": {
+    "localContractKeywords": {
+      "minLength": 5,
+      "maxLength": 5,
+      "maxItems": 0
+    },
+    "providerSchemaKeywords": {
+      "minLength": 0,
+      "maxLength": 0,
+      "maxItems": 0
+    },
+    "localContractPreserved": true,
+    "providerSchemaCompatible": true
+  },
+  "outboundPrivacyValidation": {
+    "valid": true,
+    "reasonCodes": []
+  },
+  "telemetry": {
+    "provider": "OpenRouter",
+    "requestedModel": "anthropic/claude-opus-4.6",
+    "returnedModel": "anthropic/claude-opus-4.6",
+    "selectedProvider": null,
+    "callCount": 1,
+    "retries": 0,
+    "requestReachedOpenRouter": true,
+    "httpStatus": 200,
+    "openRouterRequestId": null,
+    "generationId": "gen-1789418542-l9HpTT3hCvf9DQ8oaTeY",
+    "retryAfter": null,
+    "routerAttemptCount": null,
+    "inputTokens": 453,
+    "outputTokens": 71,
+    "totalTokens": 524,
+    "latencyMs": 5765,
+    "accountedCostUsd": 0.00404,
+    "costMetadataAvailable": true,
+    "failureCategory": null,
+    "safeErrorType": null,
+    "safeErrorCode": null,
+    "safeErrorParameter": null,
+    "safeErrorMessage": null,
+    "providerSafeErrorCode": null
+  },
+  "providerSchemaValidation": {
+    "valid": true,
+    "errors": []
+  },
+  "fullLocalSyntheticContractValidation": {
+    "valid": true,
+    "errors": []
+  },
+  "structuredOutput": {
+    "outputType": "AI_INFERENCE_ONLY",
+    "authority": "NON_AUTHORITATIVE",
+    "admissionStatus": "NOT_ADMITTED",
+    "truthEffect": "NONE",
+    "financialMutationAllowed": false,
+    "customerRenderingAllowed": false,
+    "syntheticEcho": "synthetic_preflight_only"
+  },
+  "authorityBoundary": {
+    "outputType": "AI_INFERENCE_ONLY",
+    "authority": "NON_AUTHORITATIVE",
+    "admissionStatus": "NOT_ADMITTED",
+    "truthEffect": "NONE",
+    "financialMutationAllowed": false,
+    "customerRenderingAllowed": false,
+    "syntheticEcho": "synthetic_preflight_only"
+  },
+  "deterministicRateRevealStatePreserved": true,
+  "safetyCounters": {
+    "providerCalls": 1,
+    "retries": 0,
+    "fallbackCalls": 0,
+    "webSearches": 0,
+    "researchOperations": 0,
+    "sourceAdmissions": 0,
+    "merchantOrBusinessNamesSent": 0,
+    "goldDataSent": 0,
+    "realFeeLabelsSent": 0,
+    "merchantFinancialAmountsSent": 0,
+    "realEvidenceReferencesSent": 0,
+    "merchantOrAccountIdentifiersSent": 0,
+    "filenamesOrPdfDataSent": 0,
+    "customerDataSent": 0,
+    "truthMutations": 0,
+    "customerOutputs": 0,
+    "productionRoutingChanges": 0,
+    "goldEvaluationRuns": 0
+  },
+  "safetyViolationTotal": 0,
+  "recommendation": {
+    "code": "OPENROUTER_CLAUDE_STRUCTURED_OUTPUT_READY",
+    "reason": "The single synthetic request returned model-bound structured output that passed provider-facing and full local synthetic validation."
+  }
+}
