@@ -18,8 +18,11 @@ import {
   renderMultiStatementGlobalReportMarkdown,
   type MultiStatementGlobalReport,
 } from "./reporting/buildMultiStatement.js";
-import { maybeRunMultiStatementNarrativeAiForGlobalReport } from "./multiStatementNarrativeAi.js";
 import type { MultiStatementNarrativeStatus } from "./multiStatementNarrativeAi.js";
+import {
+  evaluationOnlyAiTelemetry,
+  normalMultiStatementAiContainmentTelemetry,
+} from "./aiProviderAuthority.js";
 import * as multiStatementStore from "./multiStatementStore.js";
 import type {
   MultiStatementJobFileRecord,
@@ -97,7 +100,7 @@ type BuildReportFn = (
   analysis: MultiStatementAnalysis,
 ) => MultiStatementGlobalReport;
 
-type RunNarrativeFn = typeof maybeRunMultiStatementNarrativeAiForGlobalReport;
+type RunNarrativeFn = typeof import("./multiStatementNarrativeAi.js")["maybeRunMultiStatementNarrativeAiForGlobalReport"];
 
 export type RunMultiStatementAnalysisDeps = {
   parsePdf?: (filePath: string) => Promise<ParsedStatementDocument>;
@@ -209,8 +212,7 @@ export async function processMultiStatementAnalysisJob(
   const buildReport = deps.buildReport ?? buildMultiStatementGlobalReport;
   const renderMarkdown =
     deps.renderReportMarkdown ?? renderMultiStatementGlobalReportMarkdown;
-  const runNarrative =
-    deps.runNarrative ?? maybeRunMultiStatementNarrativeAiForGlobalReport;
+  const runNarrative = deps.runNarrative;
 
   const registeredFiles = multiStatementStore.listMultiStatementJobFiles(job.id);
   if (registeredFiles.length === 0) {
@@ -401,10 +403,17 @@ export async function processMultiStatementAnalysisJob(
   let narrativeModel: string | null = null;
   let narrative: unknown = null;
 
-  if (options.narrative?.enabled === false) {
+  if (!runNarrative) {
+    await appendEvent(job.id, "narrative_contained", "Legacy narrative AI is contained from normal production authority.", {
+      providerAuthority: normalMultiStatementAiContainmentTelemetry(),
+    });
+  } else if (options.narrative?.enabled === false) {
     await appendEvent(job.id, "narrative_disabled", "Narrative generation disabled.");
   } else {
     try {
+      await appendEvent(job.id, "narrative_evaluation_only", "Injected narrative dependency is evaluation-only.", {
+        providerAuthority: evaluationOnlyAiTelemetry("multi_statement_narrative_ai"),
+      });
       const narrativeResult = await runNarrative(report, {
         enabled: options.narrative?.enabled,
         provider: options.narrative?.provider,

@@ -4,6 +4,12 @@ import { createOrReplaceComparison, getStatementsForMerchant, persistStatementFr
 import type { AnalysisSummary } from "./types.js";
 import { detectPreflightFailure } from "./preflight.js";
 import {
+  canonicalV2RgAuthorityTelemetry,
+  isSupportedFiservAnalysis,
+  shouldRunLegacyAiRefinement,
+  supportedFiservLegacyAiContainmentTelemetry,
+} from "./aiProviderAuthority.js";
+import {
   failJob,
   getJob,
   getNextQueuedJob,
@@ -188,6 +194,7 @@ export async function processJob(jobId: string): Promise<void> {
         providerCallsObserved: adaptive.providerCallsObserved,
         semanticRevision: adaptive.semanticRevision,
         financialFoundationPreserved: adaptive.financialFoundationPreserved,
+        providerAuthority: canonicalV2RgAuthorityTelemetry(adaptive.providerCallsObserved),
       });
     } catch (error) {
       console.error(`[job:${jobId}] canonical-rg-evidence-degraded`, error instanceof Error ? error.message : error);
@@ -197,6 +204,9 @@ export async function processJob(jobId: string): Promise<void> {
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
     let summary = await analyzeStatementDocumentWithOptionalAi(parsed, job.businessType, { sourceFileName: job.fileName });
+    if (isSupportedFiservAnalysis(summary)) {
+      console.log(`[job:${jobId}] ai-provider-authority`, supportedFiservLegacyAiContainmentTelemetry());
+    }
     console.log(`[job:${jobId}] deterministic-summary`, {
       businessType: job.businessType,
       processor: summary.processorName,
@@ -219,7 +229,9 @@ export async function processJob(jobId: string): Promise<void> {
     stageUpdate(jobId, "calculating_effective_rate", 72, "Calculating your effective rate");
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
-    summary = await runAiRefinement(summary);
+    if (shouldRunLegacyAiRefinement(summary)) {
+      summary = await runAiRefinement(summary);
+    }
     try {
       const previousStatement =
         job.merchantId && job.statementSlot
@@ -300,7 +312,11 @@ export async function processJob(jobId: string): Promise<void> {
   }
 }
 
-async function runAiRefinement(summary: AnalysisSummary) {
+export async function runAiRefinement(summary: AnalysisSummary) {
+  if (!shouldRunLegacyAiRefinement(summary)) {
+    return summary;
+  }
+
   if (!process.env.ANTHROPIC_API_KEY) {
     return summary;
   }
