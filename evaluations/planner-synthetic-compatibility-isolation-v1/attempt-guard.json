@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "planner_synthetic_compatibility_isolation_attempt_guard_2026_09_16_v1",
+  "parent": "e0cd5e959ab610590fcc8ca1472a6572e83fe2d6",
+  "branch": "codex/planner-synthetic-compatibility-isolation-v1",
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "maximumCalls": 3,
+  "retries": 0,
+  "fallbacks": 0,
+  "callsReserved": 3,
+  "callsAttempted": 3,
+  "callsCompleted": 3,
+  "ledger": [
+    {
+      "ordinal": 1,
+      "testType": "HISTORICAL_MINIMAL_SYNTHETIC_CONTROL",
+      "status": "COMPLETED",
+      "requestReachedOpenRouter": true,
+      "httpStatus": 200,
+      "accepted": true,
+      "failureCategory": null
+    },
+    {
+      "ordinal": 2,
+      "testType": "HISTORICAL_FULL_PLANNER_SYNTHETIC_CONTROL",
+      "status": "COMPLETED",
+      "requestReachedOpenRouter": true,
+      "httpStatus": 200,
+      "accepted": true,
+      "failureCategory": null
+    },
+    {
+      "ordinal": 3,
+      "testType": "TYPED_ALIAS_PATTERN_SINGLE_VARIABLE",
+      "status": "COMPLETED",
+      "requestReachedOpenRouter": true,
+      "httpStatus": 200,
+      "accepted": true,
+      "failureCategory": null
+    }
+  ],
+  "completed": true,
+  "resultSha256": "ba46297c6d138c562273414a6a1687f7f1a4ede145f3839a922268711f82720d"
+}

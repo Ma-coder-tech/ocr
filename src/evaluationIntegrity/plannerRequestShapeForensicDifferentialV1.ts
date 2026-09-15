@@ -9,6 +9,10 @@ import {
 import { canonicalJson } from "../canonical/v2/canonicalJson.js";
 import { APPROVED_OPENROUTER_ENDPOINT } from "../canonical/v2/intelligence/providerPreflight.js";
 import {
+  STABLE_PROVIDER_FACT_REFERENCE_PATTERN_V1,
+  STABLE_PROVIDER_SUPPORT_REFERENCE_PATTERN_V1,
+} from "./openRouterFullPlannerSchemaPreflightV1.js";
+import {
   buildOpenRouterClaudeStructuredOutputPreflightRequestV2,
   OPENROUTER_CLAUDE_PREFLIGHT_MODEL_V2,
   translateSchemaForAnthropicStructuredOutputsV2,
@@ -108,6 +112,71 @@ export function buildHistoricalAcceptedFullSyntheticRequestV1(
     },
   });
   return request(body, providerSchema);
+}
+
+/**
+ * Controlled live-isolation variant: starts from the exact historical full-planner
+ * synthetic request and changes only the seven reference item constraints from
+ * packet-specialized enums to Package C's typed alias patterns.
+ */
+export function buildHistoricalFullSyntheticTypedPatternVariantV1(
+  packet: ShadowAiEconomicResolutionPacketV1,
+): OpenRouterClaudePreflightRequestV2 {
+  const historical = buildHistoricalAcceptedFullSyntheticRequestV1(packet);
+  const body = JSON.parse(historical.body) as Record<string, any>;
+  const schema = body.response_format.json_schema.schema as Record<string, any>;
+  const referenceItems: Array<{ node: Record<string, any>; pattern: string }> = [
+    { node: schema.properties.exactCitedFactRefs.items, pattern: STABLE_PROVIDER_FACT_REFERENCE_PATTERN_V1 },
+    { node: schema.properties.primaryHypothesis.properties.supportingFactRefs.items, pattern: STABLE_PROVIDER_SUPPORT_REFERENCE_PATTERN_V1 },
+    { node: schema.properties.primaryHypothesis.properties.contradictingFactRefs.items, pattern: STABLE_PROVIDER_SUPPORT_REFERENCE_PATTERN_V1 },
+    { node: schema.properties.alternativeHypotheses.items.properties.supportingFactRefs.items, pattern: STABLE_PROVIDER_SUPPORT_REFERENCE_PATTERN_V1 },
+    { node: schema.properties.alternativeHypotheses.items.properties.contradictingFactRefs.items, pattern: STABLE_PROVIDER_SUPPORT_REFERENCE_PATTERN_V1 },
+    { node: schema.properties.reconstructionSuspicions.items.properties.exactAcceptedFactOrOccurrenceRefs.items, pattern: STABLE_PROVIDER_SUPPORT_REFERENCE_PATTERN_V1 },
+    { node: schema.properties.reconstructionSuspicions.items.properties.conflictingEvidenceRefs.items, pattern: STABLE_PROVIDER_SUPPORT_REFERENCE_PATTERN_V1 },
+  ];
+  for (const item of referenceItems) {
+    delete item.node.enum;
+    item.node.pattern = item.pattern;
+  }
+  const providerSchema = deepFreeze(schema);
+  return request(canonicalJson(body), providerSchema);
+}
+
+export function compareHistoricalFullSyntheticToTypedPatternVariantV1(
+  historical: OpenRouterClaudePreflightRequestV2,
+  variant: OpenRouterClaudePreflightRequestV2,
+): Readonly<{
+  validSingleVariableChange: boolean;
+  changedPaths: readonly string[];
+  expectedChangedPaths: readonly string[];
+  unexpectedChangedPaths: readonly string[];
+}> {
+  const changedPaths: string[] = [];
+  compareNodes(JSON.parse(historical.body), JSON.parse(variant.body), "$", changedPaths);
+  const expectedChangedPaths = [
+    "$.response_format.json_schema.schema.properties.alternativeHypotheses.items.properties.contradictingFactRefs.items.enum",
+    "$.response_format.json_schema.schema.properties.alternativeHypotheses.items.properties.contradictingFactRefs.items.pattern",
+    "$.response_format.json_schema.schema.properties.alternativeHypotheses.items.properties.supportingFactRefs.items.enum",
+    "$.response_format.json_schema.schema.properties.alternativeHypotheses.items.properties.supportingFactRefs.items.pattern",
+    "$.response_format.json_schema.schema.properties.exactCitedFactRefs.items.enum",
+    "$.response_format.json_schema.schema.properties.exactCitedFactRefs.items.pattern",
+    "$.response_format.json_schema.schema.properties.primaryHypothesis.properties.contradictingFactRefs.items.enum",
+    "$.response_format.json_schema.schema.properties.primaryHypothesis.properties.contradictingFactRefs.items.pattern",
+    "$.response_format.json_schema.schema.properties.primaryHypothesis.properties.supportingFactRefs.items.enum",
+    "$.response_format.json_schema.schema.properties.primaryHypothesis.properties.supportingFactRefs.items.pattern",
+    "$.response_format.json_schema.schema.properties.reconstructionSuspicions.items.properties.conflictingEvidenceRefs.items.enum",
+    "$.response_format.json_schema.schema.properties.reconstructionSuspicions.items.properties.conflictingEvidenceRefs.items.pattern",
+    "$.response_format.json_schema.schema.properties.reconstructionSuspicions.items.properties.exactAcceptedFactOrOccurrenceRefs.items.enum",
+    "$.response_format.json_schema.schema.properties.reconstructionSuspicions.items.properties.exactAcceptedFactOrOccurrenceRefs.items.pattern",
+  ].sort();
+  const actual = [...changedPaths].sort();
+  const unexpectedChangedPaths = actual.filter((path) => !expectedChangedPaths.includes(path));
+  return deepFreeze({
+    validSingleVariableChange: canonicalJson(actual) === canonicalJson(expectedChangedPaths),
+    changedPaths: actual,
+    expectedChangedPaths,
+    unexpectedChangedPaths,
+  });
 }
 
 export function reconstructForensicAnchorsV1(input: {
@@ -311,6 +380,21 @@ function parseRecord(value: unknown): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+function compareNodes(left: unknown, right: unknown, path: string, changes: string[]): void {
+  if (canonicalJson(left) === canonicalJson(right)) return;
+  if (Array.isArray(left) && Array.isArray(right)) {
+    const length = Math.max(left.length, right.length);
+    for (let index = 0; index < length; index += 1) compareNodes(left[index], right[index], `${path}[${index}]`, changes);
+    return;
+  }
+  if (left && right && typeof left === "object" && typeof right === "object" && !Array.isArray(left) && !Array.isArray(right)) {
+    const keys = [...new Set([...Object.keys(left), ...Object.keys(right)])].sort();
+    for (const key of keys) compareNodes((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key], `${path}.${key}`, changes);
+    return;
+  }
+  changes.push(path);
 }
 
 function sha256(value: string): string { return createHash("sha256").update(value).digest("hex"); }
