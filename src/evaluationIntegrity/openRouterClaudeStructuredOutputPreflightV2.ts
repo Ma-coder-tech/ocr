@@ -37,6 +37,17 @@ export type OpenRouterPreflightFailureCategoryV2 =
   | "TRANSPORT_NETWORK_FAILURE"
   | "OTHER_PROVIDER_ERROR";
 
+export type OpenRouterSafeProviderFailureKindV2 =
+  | "JSON_SCHEMA_REJECTED"
+  | "REQUEST_PARAMETER_REJECTED"
+  | "REQUEST_SIZE_REJECTED"
+  | "MODEL_ACCESS_REJECTED"
+  | "AUTHENTICATION_REJECTED"
+  | "PAYMENT_REJECTED"
+  | "RATE_LIMIT_REJECTED"
+  | "PROVIDER_ROUTING_REJECTED"
+  | "OTHER_PROVIDER_ERROR";
+
 export type OpenRouterPreflightTelemetryV2 = Readonly<{
   provider: "OpenRouter";
   requestedModel: typeof OPENROUTER_CLAUDE_PREFLIGHT_MODEL_V2;
@@ -67,6 +78,8 @@ export type OpenRouterPreflightTelemetryV2 = Readonly<{
   safeErrorParameter: string | null;
   safeErrorMessage: string | null;
   providerSafeErrorCode: string | null;
+  providerFailureKind: OpenRouterSafeProviderFailureKindV2 | null;
+  providerDiagnosticSource: "TOP_LEVEL" | "NESTED_METADATA" | null;
 }>;
 
 export type OpenRouterClaudePreflightRequestV2 = Readonly<{
@@ -268,6 +281,8 @@ export async function sendOpenRouterClaudeJsonSchemaEvaluationRequestV2(input: {
         parameter: "choices[0].message.content",
         message: safeMessage(error),
         providerCode: null,
+        failureKind: "OTHER_PROVIDER_ERROR",
+        diagnosticSource: "TOP_LEVEL",
       },
     }));
   }
@@ -392,6 +407,8 @@ function successTelemetry(
     safeErrorParameter: null,
     safeErrorMessage: null,
     providerSafeErrorCode: null,
+    providerFailureKind: null,
+    providerDiagnosticSource: null,
   });
 }
 
@@ -408,6 +425,8 @@ function structuredOutputRejectionTelemetry(
     safeErrorParameter: null,
     safeErrorMessage: safeProviderMessage(message),
     providerSafeErrorCode: null,
+    providerFailureKind: "JSON_SCHEMA_REJECTED" as const,
+    providerDiagnosticSource: null,
   });
 }
 
@@ -456,6 +475,8 @@ function failureTelemetry(input: {
     safeErrorParameter: input.error?.parameter ?? null,
     safeErrorMessage: input.error?.message ?? input.message ?? null,
     providerSafeErrorCode: input.error?.providerCode ?? null,
+    providerFailureKind: input.error?.failureKind ?? null,
+    providerDiagnosticSource: input.error?.diagnosticSource ?? null,
   });
 }
 
@@ -473,6 +494,8 @@ type SafeProviderError = Readonly<{
   parameter: string | null;
   message: string | null;
   providerCode: string | null;
+  failureKind: OpenRouterSafeProviderFailureKindV2;
+  diagnosticSource: "TOP_LEVEL" | "NESTED_METADATA";
 }>;
 
 function safeResponseHeaders(headers: Headers): SafeHeaders {
@@ -490,13 +513,85 @@ function safeProviderError(body: unknown): SafeProviderError {
   const envelope = asRecord(body);
   const error = asRecord(envelope?.error);
   const metadata = asRecord(error?.metadata);
+  const nestedEnvelope = parseNestedProviderDiagnostic(metadata?.raw);
+  const nestedError = asRecord(nestedEnvelope?.error) ?? nestedEnvelope;
+  const combinedText = [
+    error?.type, error?.code, error?.param, error?.message,
+    metadata?.provider_error_code, metadata?.code,
+    nestedError?.type, nestedError?.code, nestedError?.param, nestedError?.parameter, nestedError?.message,
+  ].filter((value): value is string | number => typeof value === "string" || typeof value === "number").join(" ");
+  const failureKind = classifySafeProviderFailureKind(combinedText);
+  const diagnosticSource = nestedError ? "NESTED_METADATA" as const : "TOP_LEVEL" as const;
   return Object.freeze({
-    type: safeIdentifier(error?.type),
-    code: safeIdentifier(error?.code),
-    parameter: safeIdentifier(error?.param),
-    message: safeProviderMessage(error?.message),
-    providerCode: safeIdentifier(metadata?.provider_error_code ?? metadata?.code),
+    type: safeErrorIdentifier(nestedError?.type ?? error?.type),
+    code: safeErrorIdentifier(nestedError?.code ?? error?.code),
+    parameter: safeProviderParameter(nestedError?.param ?? nestedError?.parameter ?? error?.param),
+    message: normalizedSafeProviderMessage(failureKind, combinedText),
+    providerCode: safeErrorIdentifier(metadata?.provider_error_code ?? metadata?.code ?? nestedError?.code),
+    failureKind,
+    diagnosticSource,
   });
+}
+
+function parseNestedProviderDiagnostic(value: unknown): Record<string, unknown> | null {
+  if (isRecord(value)) return value;
+  if (typeof value !== "string" || value.length === 0 || value.length > 100_000) return null;
+  try {
+    return asRecord(JSON.parse(value));
+  } catch {
+    return null;
+  }
+}
+
+function classifySafeProviderFailureKind(value: string): OpenRouterSafeProviderFailureKindV2 {
+  if (/json.?schema|response.?format|structured.?output|invalid.?schema|schema.{0,30}(?:invalid|unsupported|too (?:large|complex)|limit)/i.test(value)) {
+    return "JSON_SCHEMA_REJECTED";
+  }
+  if (/request.{0,20}(?:too large|size|payload)|body.{0,20}too large/i.test(value)) return "REQUEST_SIZE_REJECTED";
+  if (/rate.?limit|too many requests/i.test(value)) return "RATE_LIMIT_REJECTED";
+  if (/credit|balance|payment required|insufficient funds/i.test(value)) return "PAYMENT_REJECTED";
+  if (/auth(?:entication|orization).{0,20}(?:failed|invalid)|invalid.?api.?key|unauthorized/i.test(value)) return "AUTHENTICATION_REJECTED";
+  if (/model.{0,40}(?:unavailable|not found|not supported|not permitted|access)/i.test(value)) return "MODEL_ACCESS_REJECTED";
+  if (/provider.{0,30}(?:route|routing|unavailable)|no endpoints/i.test(value)) return "PROVIDER_ROUTING_REJECTED";
+  if (/invalid.?parameter|invalid.?request|parameter|\bparam\b/i.test(value)) return "REQUEST_PARAMETER_REJECTED";
+  return "OTHER_PROVIDER_ERROR";
+}
+
+function normalizedSafeProviderMessage(kind: OpenRouterSafeProviderFailureKindV2, rawClassificationText: string): string {
+  const messages: Record<OpenRouterSafeProviderFailureKindV2, string> = {
+    JSON_SCHEMA_REJECTED: "Provider rejected the structured-output JSON schema.",
+    REQUEST_PARAMETER_REJECTED: "Provider rejected a request parameter.",
+    REQUEST_SIZE_REJECTED: "Provider rejected the request size.",
+    MODEL_ACCESS_REJECTED: "Provider rejected model access.",
+    AUTHENTICATION_REJECTED: "Provider rejected authentication.",
+    PAYMENT_REJECTED: "Provider rejected the request for account-credit or payment reasons.",
+    RATE_LIMIT_REJECTED: "Provider rejected the request because of rate limiting.",
+    PROVIDER_ROUTING_REJECTED: "Provider routing failed.",
+    OTHER_PROVIDER_ERROR: /^provider returned error\.?$/i.test(rawClassificationText.trim())
+      ? "Provider returned error."
+      : "Provider returned an unclassified error.",
+  };
+  return messages[kind];
+}
+
+function safeErrorIdentifier(value: unknown): string | null {
+  const identifier = safeIdentifier(value)?.toLowerCase() ?? null;
+  if (!identifier) return null;
+  if (/^\d{3}$/.test(identifier)) return identifier;
+  const normalized = identifier.replace(/[./:@-]+/g, "_");
+  if (/^(?:invalid_request_error|invalid_json_schema|invalid_schema|schema_unsupported|unsupported_schema|invalid_parameter|request_too_large|rate_limit(?:ed)?|authentication_error|unauthorized|payment_required|insufficient_credit|model_unavailable|provider_error)$/.test(normalized)) {
+    return normalized;
+  }
+  if (/schema/.test(normalized) && /invalid|unsupported|reject|limit|large|complex/.test(normalized)) return "invalid_json_schema";
+  return null;
+}
+
+function safeProviderParameter(value: unknown): string | null {
+  const identifier = safeIdentifier(value)?.toLowerCase() ?? null;
+  if (!identifier) return null;
+  return /^(?:response_format(?:\.json_schema(?:\.schema)?)?|model|messages|provider|max_tokens|temperature|store|stream)$/.test(identifier)
+    ? identifier
+    : null;
 }
 
 function safeRouting(body: unknown): Readonly<{ selectedProvider: string | null; attemptCount: number | null }> {

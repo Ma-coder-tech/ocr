@@ -52,6 +52,7 @@
     "preflight:openrouter-gold-shaped-single-packet-v1": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/preflight-openrouter-gold-shaped-single-packet-planner-v1.ts",
     "evaluate:issue-grounded-shadow-planner-v1": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-issue-grounded-shadow-ai-planner-prompt-v1.ts",
     "evaluate:issue-diversity-shadow-analyst-v1": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-issue-diversity-shadow-ai-economic-analyst-pilot-v1.ts",
+    "diagnose:planner-provider-compatibility-v1": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/reconstruct-planner-provider-compatibility-diagnostics-v1.ts",
     "evaluate:fiserv-claim-scoped-activity-population-admission": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-fiserv-claim-scoped-activity-population-admission-v1.ts",
     "evaluate:exact-control-fiserv-fee-occurrence-admission": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-exact-control-claim-scoped-fiserv-fee-occurrence-admission-v1.ts",
     "evaluate:open-world-live-research": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluate-open-world-live-research-v1.ts"

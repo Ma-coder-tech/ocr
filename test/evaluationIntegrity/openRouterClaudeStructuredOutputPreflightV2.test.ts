@@ -159,8 +159,10 @@ describe("OpenRouter Claude structured-output preflight v2", () => {
       safeErrorType: "invalid_request_error",
       safeErrorCode: "invalid_schema",
       safeErrorParameter: "response_format",
-      safeErrorMessage: "Invalid schema for [authorization-redacted]",
+      safeErrorMessage: "Provider rejected the structured-output JSON schema.",
       providerSafeErrorCode: "schema_unsupported",
+      providerFailureKind: "JSON_SCHEMA_REJECTED",
+      providerDiagnosticSource: "TOP_LEVEL",
       openRouterRequestId: "request-error-1",
       generationId: "generation-error-1",
       retryAfter: "3",
@@ -172,6 +174,49 @@ describe("OpenRouter Claude structured-output preflight v2", () => {
     expect(serialized).not.toContain("private-raw-diagnostic");
     expect(serialized).not.toContain("do-not-retain");
     expect(serialized).not.toContain("never-retain");
+  });
+
+  it("classifies nested provider schema errors without retaining secrets or merchant-derived text", async () => {
+    let captured: OpenRouterClaudePreflightErrorV2 | null = null;
+    const nestedRaw = JSON.stringify({
+      type: "error",
+      error: {
+        type: "invalid_request_error",
+        code: "invalid_json_schema",
+        parameter: "response_format.json_schema.schema",
+        message: "JSON schema enum rejected for JEFES TACOS & TEQUILA account 998877 and Bearer sk-or-v1-nestedsecret",
+      },
+    });
+    try {
+      await invokeOpenRouterClaudeStructuredOutputPreflightV2({
+        apiKey: "test-only-key",
+        signal: new AbortController().signal,
+        fetchImplementation: async () => new Response(JSON.stringify({
+          error: {
+            code: 400,
+            message: "Provider returned error",
+            metadata: { raw: nestedRaw },
+          },
+        }), { status: 400, headers: { "content-type": "application/json" } }),
+      });
+    } catch (error) {
+      captured = error as OpenRouterClaudePreflightErrorV2;
+    }
+
+    expect(captured?.telemetry).toMatchObject({
+      failureCategory: "STRUCTURED_OUTPUT_INCOMPATIBILITY",
+      safeErrorType: "invalid_request_error",
+      safeErrorCode: "invalid_json_schema",
+      safeErrorParameter: "response_format.json_schema.schema",
+      safeErrorMessage: "Provider rejected the structured-output JSON schema.",
+      providerSafeErrorCode: "invalid_json_schema",
+      providerFailureKind: "JSON_SCHEMA_REJECTED",
+      providerDiagnosticSource: "NESTED_METADATA",
+    });
+    const serialized = JSON.stringify(captured?.telemetry);
+    for (const prohibited of ["JEFES", "TACOS", "998877", "nestedsecret", nestedRaw]) {
+      expect(serialized).not.toContain(prohibited);
+    }
   });
 
   it("classifies an aborted response-body read as a timeout without retrying", async () => {
