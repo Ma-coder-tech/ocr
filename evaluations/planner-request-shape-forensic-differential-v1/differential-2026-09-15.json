@@ -1,0 +1,1316 @@
+{
+  "schemaVersion": "planner_request_shape_forensic_differential_2026_09_15_v1",
+  "parent": "0b969b5647ae77749a68fdea9d9830903ba79cfb",
+  "branch": "codex/planner-request-shape-forensic-differential-v1",
+  "purpose": "OFFLINE_REQUEST_SHAPE_FORENSIC_DIFFERENTIAL_ONLY",
+  "conclusion": {
+    "code": "CURRENT_REJECTION_NOT_EXPLAINED_BY_TOP_LEVEL_TRANSPORT_OR_GENERATION_SETTINGS",
+    "statement": "The last accepted real authorization request and the current rejected authorization request use identical endpoint, method, safe header-name set, model, store, stream, temperature, max_tokens, message-role envelope, provider routing, response-format wrapper, strict mode, root type, root required fields, and additionalProperties policy. Material changes are Package B request-scoped aliasing and Package C provider-schema name/binding/reference constraints. Offline evidence ranks the nine-pattern schema as the strongest construct-level compatibility hypothesis but cannot prove provider causality.",
+    "exactProviderLimitClaimed": false,
+    "compatibilityFixImplemented": false
+  },
+  "anchors": {
+    "historicalAcceptedRealPlanner": {
+      "kind": "REAL_ISSUE_GROUNDED_PLANNER",
+      "source": {
+        "commit": "aa9f377de74dd447545c7a2a2b536f44a3e56bed",
+        "artifact": "evaluations/issue-diversity-shadow-ai-economic-analyst-pilot-v1/evaluation-2026-09-15.json"
+      },
+      "provider": "OpenRouter",
+      "requestedModel": "anthropic/claude-opus-4.6",
+      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+      "method": "POST",
+      "httpResult": 200,
+      "requestBodyBytes": 12427,
+      "requestBodySha256": "a152044d4115cc1b18a1e19c7c42dc4e58d50ea3f4034926ccd3333b38a18bb7",
+      "providerSchemaBytes": 6200,
+      "providerSchemaSha256": "ec1bb57e087be8b31f73e6df7e09a94a7ac38f9a6653ee8ae07ff0f164367114",
+      "generationSettings": {
+        "temperature": 0,
+        "maxTokens": 4000
+      },
+      "transportSettings": {
+        "store": false,
+        "stream": false,
+        "messageRoles": [
+          "system",
+          "user"
+        ]
+      },
+      "responseFormat": {
+        "type": "json_schema",
+        "schemaName": "shadow_ai_economic_resolution_plan_issue_grounded_v1",
+        "strict": true
+      },
+      "providerRouting": {
+        "allow_fallbacks": false,
+        "require_parameters": true
+      },
+      "safeHeaderNames": [
+        "Authorization",
+        "Content-Type",
+        "X-OpenRouter-Metadata"
+      ],
+      "compatibilityMetrics": {
+        "schemaDepth": 8,
+        "schemaNodeCount": 76,
+        "propertyDefinitionCount": 47,
+        "requiredFieldLiteralCount": 47,
+        "enumNodeCount": 12,
+        "maximumEnumCardinality": 8,
+        "totalEnumLiteralCount": 50,
+        "totalEnumLiteralBytes": 1553,
+        "constCount": 15,
+        "arraySchemaNodeCount": 22,
+        "minimumItemsConstraintCount": 21,
+        "maximumItemsConstraintCount": 0,
+        "anyOfCount": 1,
+        "oneOfCount": 0,
+        "allOfCount": 0,
+        "patternCount": 1,
+        "minimumLengthConstraintCount": 0,
+        "maximumLengthConstraintCount": 0
+      },
+      "reconstructedBodyMatchesRecordedArtifact": true
+    },
+    "historicalAcceptedMinimalSynthetic": {
+      "kind": "MINIMAL_SYNTHETIC_STRUCTURED_OUTPUT_PREFLIGHT",
+      "source": {
+        "commit": "8655fd73e5efdfdfd3acda9aaa3766e22767922e",
+        "artifact": "evaluations/openrouter-claude-structured-output-preflight-v2/preflight-2026-09-14.json"
+      },
+      "provider": "OpenRouter",
+      "requestedModel": "anthropic/claude-opus-4.6",
+      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+      "method": "POST",
+      "httpResult": 200,
+      "requestBodyBytes": 1254,
+      "requestBodySha256": "8efa6ffad38af06ce71ecfea6ef84c6a24dd873e902e2c3ed0a3bab522c6f4a8",
+      "providerSchemaBytes": 613,
+      "providerSchemaSha256": "ee999027f3c6fb17e47c34c5d43c7b146d8385709280738d14cfab80b8a26319",
+      "generationSettings": {
+        "temperature": 0,
+        "maxTokens": 256
+      },
+      "transportSettings": {
+        "store": false,
+        "stream": false,
+        "messageRoles": [
+          "system",
+          "user"
+        ]
+      },
+      "responseFormat": {
+        "type": "json_schema",
+        "schemaName": "planner_transport_preflight_v2",
+        "strict": true
+      },
+      "providerRouting": {
+        "allow_fallbacks": false,
+        "require_parameters": true
+      },
+      "safeHeaderNames": [
+        "Authorization",
+        "Content-Type",
+        "X-OpenRouter-Metadata"
+      ],
+      "compatibilityMetrics": {
+        "schemaDepth": 3,
+        "schemaNodeCount": 9,
+        "propertyDefinitionCount": 7,
+        "requiredFieldLiteralCount": 7,
+        "enumNodeCount": 0,
+        "maximumEnumCardinality": 0,
+        "totalEnumLiteralCount": 0,
+        "totalEnumLiteralBytes": 0,
+        "constCount": 7,
+        "arraySchemaNodeCount": 0,
+        "minimumItemsConstraintCount": 0,
+        "maximumItemsConstraintCount": 0,
+        "anyOfCount": 0,
+        "oneOfCount": 0,
+        "allOfCount": 0,
+        "patternCount": 0,
+        "minimumLengthConstraintCount": 0,
+        "maximumLengthConstraintCount": 0
+      },
+      "reconstructedBodyMatchesRecordedArtifact": true
+    },
+    "historicalAcceptedFullPlannerSynthetic": {
+      "kind": "FULL_PLANNER_SYNTHETIC_STRUCTURED_OUTPUT_PREFLIGHT",
+      "source": {
+        "commit": "e489730b188b0349fdf1e8f8e659ce1e12172e99",
+        "artifact": "evaluations/full-planner-schema-synthetic-preflight-v2/preflight-2026-09-15.json"
+      },
+      "provider": "OpenRouter",
+      "requestedModel": "anthropic/claude-opus-4.6",
+      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+      "method": "POST",
+      "httpResult": 200,
+      "requestBodyBytes": 10134,
+      "requestBodySha256": "875e4c7fb117078ad9b4cbe2c76a43d9a1cf63ad66804ca016e2caf5acc71a76",
+      "providerSchemaBytes": 6011,
+      "providerSchemaSha256": "ed7870329ad11ead9af4b6dfa99befd131baf1da63cbae8b061e6a61dbd1aeb9",
+      "generationSettings": {
+        "temperature": 0,
+        "maxTokens": 4000
+      },
+      "transportSettings": {
+        "store": false,
+        "stream": false,
+        "messageRoles": [
+          "system",
+          "user"
+        ]
+      },
+      "responseFormat": {
+        "type": "json_schema",
+        "schemaName": "shadow_ai_economic_resolution_plan_synthetic_preflight_v1",
+        "strict": true
+      },
+      "providerRouting": {
+        "allow_fallbacks": false,
+        "require_parameters": true
+      },
+      "safeHeaderNames": [
+        "Authorization",
+        "Content-Type",
+        "X-OpenRouter-Metadata"
+      ],
+      "compatibilityMetrics": {
+        "schemaDepth": 8,
+        "schemaNodeCount": 76,
+        "propertyDefinitionCount": 47,
+        "requiredFieldLiteralCount": 47,
+        "enumNodeCount": 12,
+        "maximumEnumCardinality": 8,
+        "totalEnumLiteralCount": 49,
+        "totalEnumLiteralBytes": 1378,
+        "constCount": 15,
+        "arraySchemaNodeCount": 22,
+        "minimumItemsConstraintCount": 21,
+        "maximumItemsConstraintCount": 0,
+        "anyOfCount": 1,
+        "oneOfCount": 0,
+        "allOfCount": 0,
+        "patternCount": 1,
+        "minimumLengthConstraintCount": 0,
+        "maximumLengthConstraintCount": 0
+      },
+      "reconstructedBodyMatchesRecordedArtifact": true
+    },
+    "currentRejectedPackageC": {
+      "kind": "REAL_ISSUE_GROUNDED_PLANNER_STABLE_SCHEMA_CONTROL",
+      "source": {
+        "commit": "0b969b5647ae77749a68fdea9d9830903ba79cfb",
+        "artifact": "evaluations/planner-stable-schema-live-compatibility-check-v1/evaluation-2026-09-15.json"
+      },
+      "provider": "OpenRouter",
+      "requestedModel": "anthropic/claude-opus-4.6",
+      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+      "method": "POST",
+      "httpResult": 400,
+      "requestBodyBytes": 11596,
+      "requestBodySha256": "1a73ad76d9d19a4c6f1186ccd2bbe417f4d2be2ecd4138111c5fb6e59bbaa7b0",
+      "providerSchemaBytes": 5472,
+      "providerSchemaSha256": "9d382aab64862b3818e1e46de385170cf3f1cc392b7e335d5d33acf1e334bcb6",
+      "generationSettings": {
+        "temperature": 0,
+        "maxTokens": 4000
+      },
+      "transportSettings": {
+        "store": false,
+        "stream": false,
+        "messageRoles": [
+          "system",
+          "user"
+        ]
+      },
+      "responseFormat": {
+        "type": "json_schema",
+        "schemaName": "shadow_ai_economic_resolution_plan_stable_v1",
+        "strict": true
+      },
+      "providerRouting": {
+        "allow_fallbacks": false,
+        "require_parameters": true
+      },
+      "safeHeaderNames": [
+        "Authorization",
+        "Content-Type",
+        "X-OpenRouter-Metadata"
+      ],
+      "compatibilityMetrics": {
+        "schemaDepth": 7,
+        "schemaNodeCount": 76,
+        "propertyDefinitionCount": 47,
+        "requiredFieldLiteralCount": 47,
+        "enumNodeCount": 5,
+        "maximumEnumCardinality": 8,
+        "totalEnumLiteralCount": 28,
+        "totalEnumLiteralBytes": 675,
+        "constCount": 13,
+        "arraySchemaNodeCount": 22,
+        "minimumItemsConstraintCount": 21,
+        "maximumItemsConstraintCount": 0,
+        "anyOfCount": 1,
+        "oneOfCount": 0,
+        "allOfCount": 0,
+        "patternCount": 9,
+        "minimumLengthConstraintCount": 0,
+        "maximumLengthConstraintCount": 0
+      },
+      "reconstructedBodyMatchesRecordedArtifact": true
+    }
+  },
+  "requestShapeDifferential": [
+    {
+      "path": "endpoint",
+      "historicalAccepted": "https://openrouter.ai/api/v1/chat/completions",
+      "currentRejected": "https://openrouter.ai/api/v1/chat/completions",
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Transport target",
+      "potentialFailureLayer": "A_OPENROUTER_REQUEST"
+    },
+    {
+      "path": "method",
+      "historicalAccepted": "POST",
+      "currentRejected": "POST",
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "HTTP method",
+      "potentialFailureLayer": "A_OPENROUTER_REQUEST"
+    },
+    {
+      "path": "headerNames",
+      "historicalAccepted": [
+        "Authorization",
+        "Content-Type",
+        "X-OpenRouter-Metadata"
+      ],
+      "currentRejected": [
+        "Authorization",
+        "Content-Type",
+        "X-OpenRouter-Metadata"
+      ],
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Safe header-name set; values excluded",
+      "potentialFailureLayer": "A_OPENROUTER_REQUEST"
+    },
+    {
+      "path": "body.keys",
+      "historicalAccepted": [
+        "max_tokens",
+        "messages",
+        "model",
+        "provider",
+        "response_format",
+        "store",
+        "stream",
+        "temperature"
+      ],
+      "currentRejected": [
+        "max_tokens",
+        "messages",
+        "model",
+        "provider",
+        "response_format",
+        "store",
+        "stream",
+        "temperature"
+      ],
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Top-level OpenRouter parameter set",
+      "potentialFailureLayer": "A_OPENROUTER_REQUEST"
+    },
+    {
+      "path": "body.model",
+      "historicalAccepted": "anthropic/claude-opus-4.6",
+      "currentRejected": "anthropic/claude-opus-4.6",
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Model route",
+      "potentialFailureLayer": "A_OPENROUTER_REQUEST"
+    },
+    {
+      "path": "body.store",
+      "historicalAccepted": false,
+      "currentRejected": false,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Generation/retention setting",
+      "potentialFailureLayer": "A_OPENROUTER_REQUEST"
+    },
+    {
+      "path": "body.stream",
+      "historicalAccepted": false,
+      "currentRejected": false,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Transport mode",
+      "potentialFailureLayer": "A_OPENROUTER_REQUEST"
+    },
+    {
+      "path": "body.temperature",
+      "historicalAccepted": 0,
+      "currentRejected": 0,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Generation setting",
+      "potentialFailureLayer": "B_MODEL_STRUCTURED_OUTPUT"
+    },
+    {
+      "path": "body.max_tokens",
+      "historicalAccepted": 4000,
+      "currentRejected": 4000,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Generation budget",
+      "potentialFailureLayer": "B_MODEL_STRUCTURED_OUTPUT"
+    },
+    {
+      "path": "body.messages.roles",
+      "historicalAccepted": [
+        "system",
+        "user"
+      ],
+      "currentRejected": [
+        "system",
+        "user"
+      ],
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Message envelope",
+      "potentialFailureLayer": "A_OPENROUTER_REQUEST"
+    },
+    {
+      "path": "body.messages.byteCounts",
+      "historicalAccepted": [
+        1771,
+        3773
+      ],
+      "currentRejected": [
+        1771,
+        3678
+      ],
+      "changeType": "CHANGED",
+      "diagnosticRelevance": "Content-safe size comparison",
+      "potentialFailureLayer": "A_OR_B"
+    },
+    {
+      "path": "body.messages.contentSha256",
+      "historicalAccepted": [
+        "1f9c2966af9285e6607f3d9f74f927e42585c1fa21935d12af3bc80f0d9d66da",
+        "1d1e91ed3f912e316407e27ce4fc8c7b5087df0de4451576a5aed65fe70b87ca"
+      ],
+      "currentRejected": [
+        "1f9c2966af9285e6607f3d9f74f927e42585c1fa21935d12af3bc80f0d9d66da",
+        "d5251e884470afe8b1f1f7c763a92e55748323d82e31e9d128380ba8de9d9a8d"
+      ],
+      "changeType": "CHANGED",
+      "diagnosticRelevance": "Content-safe identity comparison",
+      "potentialFailureLayer": "C_LOCAL_CONSTRUCTION"
+    },
+    {
+      "path": "body.messages[1].parsedRootKeys",
+      "historicalAccepted": [
+        "issueContext",
+        "packet"
+      ],
+      "currentRejected": [
+        "issueContext",
+        "packet"
+      ],
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "User payload envelope",
+      "potentialFailureLayer": "C_LOCAL_CONSTRUCTION"
+    },
+    {
+      "path": "body.provider",
+      "historicalAccepted": {
+        "allow_fallbacks": false,
+        "require_parameters": true
+      },
+      "currentRejected": {
+        "allow_fallbacks": false,
+        "require_parameters": true
+      },
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Provider routing",
+      "potentialFailureLayer": "A_OPENROUTER_REQUEST"
+    },
+    {
+      "path": "body.response_format.type",
+      "historicalAccepted": "json_schema",
+      "currentRejected": "json_schema",
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Structured-output wrapper",
+      "potentialFailureLayer": "A_OR_B"
+    },
+    {
+      "path": "body.response_format.json_schema.name",
+      "historicalAccepted": "shadow_ai_economic_resolution_plan_issue_grounded_v1",
+      "currentRejected": "shadow_ai_economic_resolution_plan_stable_v1",
+      "changeType": "CHANGED",
+      "diagnosticRelevance": "Provider schema identifier",
+      "potentialFailureLayer": "A_OR_B"
+    },
+    {
+      "path": "body.response_format.json_schema.strict",
+      "historicalAccepted": true,
+      "currentRejected": true,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Strict structured output",
+      "potentialFailureLayer": "A_OR_B"
+    },
+    {
+      "path": "schema.root.type",
+      "historicalAccepted": "object",
+      "currentRejected": "object",
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Root schema type",
+      "potentialFailureLayer": "B_MODEL_STRUCTURED_OUTPUT"
+    },
+    {
+      "path": "schema.root.required",
+      "historicalAccepted": [
+        "schemaVersion",
+        "outputType",
+        "authority",
+        "admissionStatus",
+        "truthEffect",
+        "financialMutationAllowed",
+        "customerRenderingAllowed",
+        "issueId",
+        "inputHash",
+        "exactCitedFactRefs",
+        "unresolvedQuestion",
+        "primaryHypothesis",
+        "alternativeHypotheses",
+        "acknowledgedEvidenceGaps",
+        "recommendedResolutionPath",
+        "requiredEvidenceClasses",
+        "researchQuerySuggestions",
+        "merchantQuestionSuggestions",
+        "documentRequestSuggestions",
+        "operationalDataRequests",
+        "internalExplanationDraft",
+        "unresolvedAfterAnalysis",
+        "limitationCodes",
+        "reconstructionSuspicions"
+      ],
+      "currentRejected": [
+        "schemaVersion",
+        "outputType",
+        "authority",
+        "admissionStatus",
+        "truthEffect",
+        "financialMutationAllowed",
+        "customerRenderingAllowed",
+        "issueId",
+        "inputHash",
+        "exactCitedFactRefs",
+        "unresolvedQuestion",
+        "primaryHypothesis",
+        "alternativeHypotheses",
+        "acknowledgedEvidenceGaps",
+        "recommendedResolutionPath",
+        "requiredEvidenceClasses",
+        "researchQuerySuggestions",
+        "merchantQuestionSuggestions",
+        "documentRequestSuggestions",
+        "operationalDataRequests",
+        "internalExplanationDraft",
+        "unresolvedAfterAnalysis",
+        "limitationCodes",
+        "reconstructionSuspicions"
+      ],
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Root required fields",
+      "potentialFailureLayer": "B_MODEL_STRUCTURED_OUTPUT"
+    },
+    {
+      "path": "schema.root.additionalProperties",
+      "historicalAccepted": false,
+      "currentRejected": false,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Strict object closure",
+      "potentialFailureLayer": "B_MODEL_STRUCTURED_OUTPUT"
+    },
+    {
+      "path": "schema.metrics.providerSchemaBytes",
+      "historicalAccepted": 6200,
+      "currentRejected": 5472,
+      "changeType": "CHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.providerSchemaSha256",
+      "historicalAccepted": "ec1bb57e087be8b31f73e6df7e09a94a7ac38f9a6653ee8ae07ff0f164367114",
+      "currentRejected": "9d382aab64862b3818e1e46de385170cf3f1cc392b7e335d5d33acf1e334bcb6",
+      "changeType": "CHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.schemaDepth",
+      "historicalAccepted": 8,
+      "currentRejected": 7,
+      "changeType": "CHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.schemaNodeCount",
+      "historicalAccepted": 76,
+      "currentRejected": 76,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.enumNodeCount",
+      "historicalAccepted": 12,
+      "currentRejected": 5,
+      "changeType": "CHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.maximumEnumCardinality",
+      "historicalAccepted": 8,
+      "currentRejected": 8,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.totalEnumLiteralCount",
+      "historicalAccepted": 50,
+      "currentRejected": 28,
+      "changeType": "CHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.totalEnumLiteralBytes",
+      "historicalAccepted": 1553,
+      "currentRejected": 675,
+      "changeType": "CHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.constCount",
+      "historicalAccepted": 15,
+      "currentRejected": 13,
+      "changeType": "CHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.arraySchemaNodeCount",
+      "historicalAccepted": 22,
+      "currentRejected": 22,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.minimumItemsConstraintCount",
+      "historicalAccepted": 21,
+      "currentRejected": 21,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.maximumItemsConstraintCount",
+      "historicalAccepted": 0,
+      "currentRejected": 0,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.anyOfCount",
+      "historicalAccepted": 1,
+      "currentRejected": 1,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.oneOfCount",
+      "historicalAccepted": 0,
+      "currentRejected": 0,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.allOfCount",
+      "historicalAccepted": 0,
+      "currentRejected": 0,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.patternCount",
+      "historicalAccepted": 1,
+      "currentRejected": 9,
+      "changeType": "CHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.minimumLengthConstraintCount",
+      "historicalAccepted": 0,
+      "currentRejected": 0,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    },
+    {
+      "path": "schema.metrics.maximumLengthConstraintCount",
+      "historicalAccepted": 0,
+      "currentRejected": 0,
+      "changeType": "UNCHANGED",
+      "diagnosticRelevance": "Translated provider-schema construct",
+      "potentialFailureLayer": "B_OR_C"
+    }
+  ],
+  "schemaConstructDifferential": [
+    {
+      "path": "body.response_format.json_schema.name",
+      "historicalAccepted": "shadow_ai_economic_resolution_plan_issue_grounded_v1",
+      "currentRejected": "shadow_ai_economic_resolution_plan_stable_v1",
+      "changeType": "CHANGED",
+      "privacySafe": true,
+      "potentialFailureLayer": "A_OR_B",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.issueId.const",
+      "historicalAccepted": "packet-specific string",
+      "currentRejected": null,
+      "changeType": "REMOVED",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.issueId.pattern",
+      "historicalAccepted": null,
+      "currentRejected": "stable identifier regex",
+      "changeType": "NEW",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.inputHash.const",
+      "historicalAccepted": "packet-specific 64-hex string",
+      "currentRejected": null,
+      "changeType": "REMOVED",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.inputHash.pattern",
+      "historicalAccepted": "64-hex regex",
+      "currentRejected": "64-hex regex",
+      "changeType": "UNCHANGED",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.exactCitedFactRefs.items.enum",
+      "historicalAccepted": "packet-specific fact references",
+      "currentRejected": null,
+      "changeType": "REMOVED",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.exactCitedFactRefs.items.pattern",
+      "historicalAccepted": null,
+      "currentRejected": "typed FACT alias regex",
+      "changeType": "NEW",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.primaryHypothesis.properties.supportingFactRefs.items.enum",
+      "historicalAccepted": "packet-specific support references",
+      "currentRejected": null,
+      "changeType": "REMOVED",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.primaryHypothesis.properties.supportingFactRefs.items.pattern",
+      "historicalAccepted": null,
+      "currentRejected": "typed support-alias regex",
+      "changeType": "NEW",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.primaryHypothesis.properties.contradictingFactRefs.items.enum",
+      "historicalAccepted": "packet-specific support references",
+      "currentRejected": null,
+      "changeType": "REMOVED",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.primaryHypothesis.properties.contradictingFactRefs.items.pattern",
+      "historicalAccepted": null,
+      "currentRejected": "typed support-alias regex",
+      "changeType": "NEW",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.alternativeHypotheses.items.properties.supportingFactRefs.items.enum",
+      "historicalAccepted": "packet-specific support references",
+      "currentRejected": null,
+      "changeType": "REMOVED",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.alternativeHypotheses.items.properties.supportingFactRefs.items.pattern",
+      "historicalAccepted": null,
+      "currentRejected": "typed support-alias regex",
+      "changeType": "NEW",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.alternativeHypotheses.items.properties.contradictingFactRefs.items.enum",
+      "historicalAccepted": "packet-specific support references",
+      "currentRejected": null,
+      "changeType": "REMOVED",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.alternativeHypotheses.items.properties.contradictingFactRefs.items.pattern",
+      "historicalAccepted": null,
+      "currentRejected": "typed support-alias regex",
+      "changeType": "NEW",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.reconstructionSuspicions.items.properties.exactAcceptedFactOrOccurrenceRefs.items.enum",
+      "historicalAccepted": "packet-specific support references",
+      "currentRejected": null,
+      "changeType": "REMOVED",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.reconstructionSuspicions.items.properties.exactAcceptedFactOrOccurrenceRefs.items.pattern",
+      "historicalAccepted": null,
+      "currentRejected": "typed support-alias regex",
+      "changeType": "NEW",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.reconstructionSuspicions.items.properties.conflictingEvidenceRefs.items.enum",
+      "historicalAccepted": "packet-specific support references",
+      "currentRejected": null,
+      "changeType": "REMOVED",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.reconstructionSuspicions.items.properties.conflictingEvidenceRefs.items.pattern",
+      "historicalAccepted": null,
+      "currentRejected": "typed support-alias regex",
+      "changeType": "NEW",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    },
+    {
+      "path": "schema.properties.requiredEvidenceClasses.items.enum",
+      "historicalAccepted": "authorization packet subset: cardinality 2",
+      "currentRejected": "fixed Product evidence classes: cardinality 8",
+      "changeType": "CHANGED",
+      "privacySafe": true,
+      "potentialFailureLayer": "B_OR_C",
+      "evidenceSource": "exact offline reconstruction of accepted aa9f377 and rejected 0b969b5 bodies"
+    }
+  ],
+  "authorizationEconomicsControlRegression": {
+    "issueFamily": "AUTHORIZATION_ECONOMICS",
+    "statementAlias": "supported-fiserv-gold-01",
+    "historicalHttpStatus": 200,
+    "currentHttpStatus": 400,
+    "historicalRequestBody": {
+      "bytes": 12427,
+      "sha256": "a152044d4115cc1b18a1e19c7c42dc4e58d50ea3f4034926ccd3333b38a18bb7",
+      "providerSchemaBytes": 6200,
+      "providerSchemaSha256": "ec1bb57e087be8b31f73e6df7e09a94a7ac38f9a6653ee8ae07ff0f164367114"
+    },
+    "currentRequestBody": {
+      "bytes": 11596,
+      "sha256": "1a73ad76d9d19a4c6f1186ccd2bbe417f4d2be2ecd4138111c5fb6e59bbaa7b0",
+      "providerSchemaBytes": 5472,
+      "providerSchemaSha256": "9d382aab64862b3818e1e46de385170cf3f1cc392b7e335d5d33acf1e334bcb6"
+    },
+    "unchanged": [
+      "endpoint",
+      "method",
+      "header names",
+      "top-level body keys",
+      "model",
+      "store=false",
+      "stream=false",
+      "temperature=0",
+      "max_tokens=4000",
+      "message roles [system,user]",
+      "system prompt bytes and SHA-256",
+      "provider.allow_fallbacks=false",
+      "provider.require_parameters=true",
+      "response_format.type=json_schema",
+      "json_schema.strict=true",
+      "schema root type=object",
+      "schema root required fields",
+      "schema root additionalProperties=false"
+    ],
+    "changed": [
+      {
+        "construct": "user message content",
+        "historicalBytes": 3773,
+        "currentBytes": 3678,
+        "reason": "Package B replaces internal references with typed request-scoped opaque aliases and recomputes provider-bound input hash; envelope remains {issueContext,packet}."
+      },
+      {
+        "construct": "schema name",
+        "historical": "shadow_ai_economic_resolution_plan_issue_grounded_v1",
+        "current": "shadow_ai_economic_resolution_plan_stable_v1"
+      },
+      {
+        "construct": "issueId constraint",
+        "historical": "packet-specific const",
+        "current": "stable identifier pattern"
+      },
+      {
+        "construct": "inputHash constraint",
+        "historical": "packet-specific const plus hexadecimal pattern",
+        "current": "hexadecimal pattern only"
+      },
+      {
+        "construct": "seven reference-list item constraints",
+        "historical": "packet-specific enum",
+        "current": "typed alias patterns"
+      },
+      {
+        "construct": "requiredEvidenceClasses",
+        "historical": "packet-specific enum subset (2 for authorization)",
+        "current": "fixed complete Product enum (8)"
+      },
+      {
+        "construct": "translated schema metrics",
+        "historical": {
+          "schemaDepth": 8,
+          "schemaNodeCount": 76,
+          "propertyDefinitionCount": 47,
+          "requiredFieldLiteralCount": 47,
+          "enumNodeCount": 12,
+          "maximumEnumCardinality": 8,
+          "totalEnumLiteralCount": 50,
+          "totalEnumLiteralBytes": 1553,
+          "constCount": 15,
+          "arraySchemaNodeCount": 22,
+          "minimumItemsConstraintCount": 21,
+          "maximumItemsConstraintCount": 0,
+          "anyOfCount": 1,
+          "oneOfCount": 0,
+          "allOfCount": 0,
+          "patternCount": 1,
+          "minimumLengthConstraintCount": 0,
+          "maximumLengthConstraintCount": 0
+        },
+        "current": {
+          "schemaDepth": 7,
+          "schemaNodeCount": 76,
+          "propertyDefinitionCount": 47,
+          "requiredFieldLiteralCount": 47,
+          "enumNodeCount": 5,
+          "maximumEnumCardinality": 8,
+          "totalEnumLiteralCount": 28,
+          "totalEnumLiteralBytes": 675,
+          "constCount": 13,
+          "arraySchemaNodeCount": 22,
+          "minimumItemsConstraintCount": 21,
+          "maximumItemsConstraintCount": 0,
+          "anyOfCount": 1,
+          "oneOfCount": 0,
+          "allOfCount": 0,
+          "patternCount": 9,
+          "minimumLengthConstraintCount": 0,
+          "maximumLengthConstraintCount": 0
+        }
+      }
+    ],
+    "whyRegressionCannotBeProvenOffline": "The repository records the accepted and rejected bodies and reproduces both exactly, but the provider returned no structured output or allowlisted parameter path. Multiple schema deltas were introduced across Packages B/C and provider behavior may also have changed between live dates."
+  },
+  "syntheticComparison": {
+    "provenAcceptedIngredients": [
+      "same endpoint and POST method",
+      "same model identifier",
+      "same three safe header names",
+      "store=false",
+      "stream=false",
+      "temperature=0",
+      "provider.allow_fallbacks=false",
+      "provider.require_parameters=true",
+      "response_format.type=json_schema",
+      "strict=true",
+      "object root",
+      "additionalProperties=false",
+      "const",
+      "enum",
+      "arrays",
+      "minItems",
+      "anyOf",
+      "max_tokens=4000 in the full-planner synthetic anchor",
+      "one inputHash pattern in the full-planner synthetic anchor"
+    ],
+    "notProvenAccepted": [
+      "nine-pattern stable provider schema",
+      "typed reference-alias regexes",
+      "stable issueId regex in combination with typed alias regexes",
+      "Package C stable schema name",
+      "current Package B provider-bound real packet combined with Package C schema"
+    ],
+    "sizeFinding": "Request size alone is contradicted: the current rejected request is smaller than the accepted real request, and the accepted Gold-shaped synthetic lineage recorded an 18,830-byte request."
+  },
+  "schemaTranslationAudit": {
+    "translatorBehavior": "Recursively removes only minLength, maxLength, and maxItems; it retains type, properties, required, additionalProperties, const, enum, pattern, arrays, minItems, and anyOf.",
+    "removedInBothHistoricalAndCurrent": [
+      "minLength",
+      "maxLength",
+      "maxItems"
+    ],
+    "retainedInBoth": [
+      "type",
+      "properties",
+      "required",
+      "additionalProperties",
+      "const",
+      "enum",
+      "arrays",
+      "minItems",
+      "anyOf",
+      "pattern"
+    ],
+    "historicalKeywordPaths": {
+      "const": [
+        "$.properties.schemaVersion.const",
+        "$.properties.outputType.const",
+        "$.properties.authority.const",
+        "$.properties.admissionStatus.const",
+        "$.properties.truthEffect.const",
+        "$.properties.financialMutationAllowed.const",
+        "$.properties.customerRenderingAllowed.const",
+        "$.properties.issueId.const",
+        "$.properties.inputHash.const",
+        "$.properties.unresolvedAfterAnalysis.const",
+        "$.properties.reconstructionSuspicions.items.properties.outcomeType.const",
+        "$.properties.reconstructionSuspicions.items.properties.authority.const",
+        "$.properties.reconstructionSuspicions.items.properties.admissionStatus.const",
+        "$.properties.reconstructionSuspicions.items.properties.truthEffect.const",
+        "$.properties.reconstructionSuspicions.items.properties.financialMutationAllowed.const"
+      ],
+      "enum": [
+        "$.properties.exactCitedFactRefs.items.enum",
+        "$.properties.primaryHypothesis.properties.confidence.enum",
+        "$.properties.primaryHypothesis.properties.supportingFactRefs.items.enum",
+        "$.properties.primaryHypothesis.properties.contradictingFactRefs.items.enum",
+        "$.properties.alternativeHypotheses.items.properties.confidence.enum",
+        "$.properties.alternativeHypotheses.items.properties.supportingFactRefs.items.enum",
+        "$.properties.alternativeHypotheses.items.properties.contradictingFactRefs.items.enum",
+        "$.properties.recommendedResolutionPath.enum",
+        "$.properties.requiredEvidenceClasses.items.enum",
+        "$.properties.reconstructionSuspicions.items.properties.exactAcceptedFactOrOccurrenceRefs.items.enum",
+        "$.properties.reconstructionSuspicions.items.properties.conflictingEvidenceRefs.items.enum",
+        "$.properties.reconstructionSuspicions.items.properties.requestedDeterministicRecheckType.enum"
+      ],
+      "pattern": [
+        "$.properties.inputHash.pattern"
+      ],
+      "counts": {
+        "additionalProperties": 4,
+        "anyOf": 1,
+        "const": 15,
+        "enum": 12,
+        "minItems": 21,
+        "pattern": 1,
+        "required": 4,
+        "type": 71
+      }
+    },
+    "currentKeywordPaths": {
+      "const": [
+        "$.properties.schemaVersion.const",
+        "$.properties.outputType.const",
+        "$.properties.authority.const",
+        "$.properties.admissionStatus.const",
+        "$.properties.truthEffect.const",
+        "$.properties.financialMutationAllowed.const",
+        "$.properties.customerRenderingAllowed.const",
+        "$.properties.unresolvedAfterAnalysis.const",
+        "$.properties.reconstructionSuspicions.items.properties.outcomeType.const",
+        "$.properties.reconstructionSuspicions.items.properties.authority.const",
+        "$.properties.reconstructionSuspicions.items.properties.admissionStatus.const",
+        "$.properties.reconstructionSuspicions.items.properties.truthEffect.const",
+        "$.properties.reconstructionSuspicions.items.properties.financialMutationAllowed.const"
+      ],
+      "enum": [
+        "$.properties.primaryHypothesis.properties.confidence.enum",
+        "$.properties.alternativeHypotheses.items.properties.confidence.enum",
+        "$.properties.recommendedResolutionPath.enum",
+        "$.properties.requiredEvidenceClasses.items.enum",
+        "$.properties.reconstructionSuspicions.items.properties.requestedDeterministicRecheckType.enum"
+      ],
+      "pattern": [
+        "$.properties.issueId.pattern",
+        "$.properties.inputHash.pattern",
+        "$.properties.exactCitedFactRefs.items.pattern",
+        "$.properties.primaryHypothesis.properties.supportingFactRefs.items.pattern",
+        "$.properties.primaryHypothesis.properties.contradictingFactRefs.items.pattern",
+        "$.properties.alternativeHypotheses.items.properties.supportingFactRefs.items.pattern",
+        "$.properties.alternativeHypotheses.items.properties.contradictingFactRefs.items.pattern",
+        "$.properties.reconstructionSuspicions.items.properties.exactAcceptedFactOrOccurrenceRefs.items.pattern",
+        "$.properties.reconstructionSuspicions.items.properties.conflictingEvidenceRefs.items.pattern"
+      ],
+      "counts": {
+        "additionalProperties": 4,
+        "anyOf": 1,
+        "const": 13,
+        "enum": 5,
+        "minItems": 21,
+        "pattern": 9,
+        "required": 4,
+        "type": 71
+      }
+    },
+    "materialChanges": [
+      "pattern count increased from 1 to 9",
+      "enum nodes decreased from 12 to 5; packet-specific reference enums were removed",
+      "const count decreased from 15 to 13; issueId and inputHash request-binding consts moved to deterministic local validation",
+      "schema depth decreased from 8 to 7 while node count remained 76",
+      "required fields, object closure, array-schema count, minItems count, and anyOf count are unchanged",
+      "fixed requiredEvidenceClasses enum is broader than the historical authorization-specific subset"
+    ],
+    "unsupportedKeywordFinding": "No repository evidence proves that any retained keyword is categorically unsupported. The newly repeated pattern construct is a compatibility hypothesis, not a finding of an exact provider restriction."
+  },
+  "failureLayerClassification": {
+    "A_OPENROUTER_REQUEST_LEVEL": {
+      "observed": true,
+      "evidence": "OpenRouter returned HTTP 400 before structured output with MALFORMED_REQUEST / REQUEST_PARAMETER_REJECTED / invalid_request_error.",
+      "candidateDifferences": [
+        "schema name",
+        "translated schema constructs",
+        "message/provider-packet content"
+      ]
+    },
+    "B_ROUTED_ANTHROPIC_STRUCTURED_OUTPUT": {
+      "observed": false,
+      "evidence": "No model output or returned model identity was available; a routed provider may have rejected response_format before generation, but that layer is not distinguishable from the safe response.",
+      "candidateDifferences": [
+        "nine pattern nodes",
+        "typed alias regex syntax",
+        "strict-mode interaction with stable patterns"
+      ]
+    },
+    "C_LOCAL_CONSTRUCTION_TRANSLATION": {
+      "observed": true,
+      "evidence": "Local code deterministically constructed a different schema/body and the hashes reproduce repository evidence exactly; local validators passed before transport.",
+      "candidateDifferences": [
+        "Package B alias projection",
+        "Package C stable schema",
+        "translator intentionally retains pattern"
+      ]
+    }
+  },
+  "safeErrorTelemetryAudit": {
+    "currentResult": {
+      "safeErrorType": "invalid_request_error",
+      "safeErrorCode": "400",
+      "safeErrorParameter": null,
+      "providerSafeErrorCode": null,
+      "providerDiagnosticSource": "NESTED_METADATA"
+    },
+    "parsingFinding": "The runtime parses nested error.metadata.raw JSON and inspects nested error.type/code/param/parameter/message, but safeProviderParameter retains only exact allowlisted roots. A more specific dotted or JSON-pointer parameter path is discarded rather than normalized.",
+    "usefulMachineFieldCurrentlyMayBeDiscarded": true,
+    "cannotRecoverFromCommittedEvidence": true,
+    "reason": "The committed safe artifact has null parameter and no raw response. The exact discarded value, if one existed, is intentionally unavailable post hoc.",
+    "candidateNarrowImprovement": "In a separate package, allow a bounded syntax-validated parameter path rooted only at response_format, model, messages, provider, max_tokens, temperature, store, or stream; retain normalized root plus safe schema-keyword class while discarding property/literal values. Add redaction fixtures before any live use.",
+    "implementedHere": false
+  },
+  "rankedHypotheses": [
+    {
+      "rank": 1,
+      "code": "REPEATED_PATTERN_CONSTRUCT_COMPATIBILITY",
+      "exactDifferingConstruct": "Current schema has nine pattern nodes versus one in both accepted real and accepted full-planner synthetic requests; seven patterns constrain typed reference aliases and one newly constrains issueId.",
+      "whyItCouldExplainHttp400": "It is the largest newly introduced schema-keyword-class delta and affects the formerly successful authorization control.",
+      "evidenceSupporting": "It is the largest newly introduced schema-keyword-class delta and affects the formerly successful authorization control.",
+      "evidenceAgainst": "JSON Schema pattern is structurally valid, and one pattern was previously accepted; repository evidence does not prove a pattern count or regex-feature limit.",
+      "affectsHistoricalAuthorizationControl": true,
+      "offlineFalsification": "Not falsifiable offline because local translation/validation accepts it.",
+      "smallestFutureLiveTest": "After exact accepted controls, send one synthetic full-planner request changing only the seven reference item constraints from historical enums to the current typed patterns."
+    },
+    {
+      "rank": 2,
+      "code": "SCHEMA_NAME_OR_SCHEMA_VERSION_BINDING",
+      "exactDifferingConstruct": "Schema name changed from shadow_ai_economic_resolution_plan_issue_grounded_v1 to shadow_ai_economic_resolution_plan_stable_v1.",
+      "whyItCouldExplainHttp400": "The name is part of response_format and therefore request-level validation.",
+      "evidenceSupporting": "The name is part of response_format and therefore request-level validation.",
+      "evidenceAgainst": "Both names are syntax-safe and multiple historical names were accepted; name alone does not explain the construct-focused error.",
+      "affectsHistoricalAuthorizationControl": true,
+      "offlineFalsification": "Offline syntax checks eliminate malformed-character and length concerns, not provider semantics.",
+      "smallestFutureLiveTest": "Only if pattern isolation succeeds, change the accepted synthetic full-planner schema name alone to the stable name."
+    },
+    {
+      "rank": 3,
+      "code": "STRICT_SCHEMA_COMBINATION_AFTER_CONST_TO_PATTERN",
+      "exactDifferingConstruct": "IssueId/inputHash request-binding consts were removed from provider schema and issueId became a pattern under strict=true.",
+      "whyItCouldExplainHttp400": "Provider structured-output validators may reject a valid local combination even when individual keywords are supported.",
+      "evidenceSupporting": "Provider structured-output validators may reject a valid local combination even when individual keywords are supported.",
+      "evidenceAgainst": "Strict mode, const, and the inputHash pattern were accepted before; local schema remains deterministic and closed.",
+      "affectsHistoricalAuthorizationControl": true,
+      "offlineFalsification": "Offline comparison identifies the exact delta but cannot emulate routed Anthropic validation.",
+      "smallestFutureLiveTest": "Use synthetic data and change only issueId const to the current issueId pattern after reference-pattern testing."
+    },
+    {
+      "rank": 4,
+      "code": "PROVIDER_PACKET_ALIAS_CONTENT_INTERACTION",
+      "exactDifferingConstruct": "Package B changes raw internal references to request-scoped typed aliases and changes the provider-bound input hash/user message.",
+      "whyItCouldExplainHttp400": "It affects the control request and is the only major message-content delta.",
+      "evidenceSupporting": "It affects the control request and is the only major message-content delta.",
+      "evidenceAgainst": "Ordinary message strings should not cause request-parameter rejection; privacy aliases passed all local validators and contain no unsupported top-level parameter.",
+      "affectsHistoricalAuthorizationControl": true,
+      "offlineFalsification": "Offline validation eliminates malformed JSON, envelope, reference-class, and binding errors.",
+      "smallestFutureLiveTest": "A synthetic request with the accepted schema and only alias-shaped synthetic reference values would isolate content from schema."
+    },
+    {
+      "rank": 5,
+      "code": "PROVIDER_OR_ROUTE_BEHAVIOR_DRIFT",
+      "exactDifferingConstruct": "A previously accepted control now fails despite identical transport/generation/routing parameters.",
+      "whyItCouldExplainHttp400": "All four current requests failed uniformly, including the control, and no returned model was recorded.",
+      "evidenceSupporting": "All four current requests failed uniformly, including the control, and no returned model was recorded.",
+      "evidenceAgainst": "This is vague and not tied to a repository request delta; accepted historical evidence cannot establish present service behavior.",
+      "affectsHistoricalAuthorizationControl": true,
+      "offlineFalsification": "Not falsifiable offline.",
+      "smallestFutureLiveTest": "First replay the exact minimal accepted synthetic request, then the exact full-planner synthetic request, with zero retries."
+    },
+    {
+      "rank": 6,
+      "code": "REQUEST_SIZE_OR_TOP_LEVEL_PARAMETER",
+      "exactDifferingConstruct": "Request size or a top-level parameter was rejected.",
+      "whyItCouldExplainHttp400": "HTTP 400 classification is request-level.",
+      "evidenceSupporting": "HTTP 400 classification is request-level.",
+      "evidenceAgainst": "Eliminated as a material request-shape delta: top-level keys and values are unchanged, and the rejected request is smaller than accepted planner-shaped requests.",
+      "affectsHistoricalAuthorizationControl": true,
+      "offlineFalsification": "Eliminated offline for the recorded shapes, except for unobserved provider policy drift.",
+      "smallestFutureLiveTest": "No size-specific live test recommended before higher-ranked controls."
+    }
+  ],
+  "eliminatedOffline": [
+    "endpoint change",
+    "HTTP method change",
+    "header-name change",
+    "model identifier change",
+    "store change",
+    "stream change",
+    "temperature change",
+    "max_tokens change for the real control",
+    "provider routing object change",
+    "fallback setting change",
+    "require_parameters change",
+    "response-format wrapper type change",
+    "strict-mode change",
+    "root schema type change",
+    "root required-field change",
+    "root additionalProperties change",
+    "malformed JSON serialization",
+    "request size growth as the recorded control regression mechanism"
+  ],
+  "minimalFutureLiveExperiment": {
+    "authorizedNow": false,
+    "data": "synthetic only; no merchant or Gold data",
+    "route": "OpenRouter / anthropic/claude-opus-4.6",
+    "retriesPerCall": 0,
+    "orderedCalls": [
+      {
+        "ordinal": 1,
+        "request": "byte-exact previously accepted minimal synthetic preflight",
+        "purpose": "current transport/model/account control"
+      },
+      {
+        "ordinal": 2,
+        "condition": "only if call 1 succeeds",
+        "request": "byte-exact previously accepted full-planner synthetic request",
+        "purpose": "current acceptance of historical planner schema"
+      },
+      {
+        "ordinal": 3,
+        "condition": "only if call 2 succeeds",
+        "request": "same full-planner synthetic request with only the reference-item constraint family changed from packet-specific enums to typed alias patterns",
+        "purpose": "isolate dominant repeated-pattern hypothesis"
+      }
+    ],
+    "expectedProviderCalls": "1 to 3, conditionally; stop immediately on the first failed control",
+    "deferredFollowUps": "Schema name, issueId const-to-pattern, and alias-shaped content must each be isolated in later separately authorized calls only if the three-call sequence leaves them unresolved."
+  },
+  "architecture": {
+    "conflictFound": false,
+    "packageBPrivacyPreserved": true,
+    "packageCStabilityPreserved": true,
+    "recommendedDirection": "Retain Packages B/C and improve observability/compatibility evidence incrementally; do not revert privacy containment or stable-schema architecture based on an undifferentiated HTTP 400."
+  },
+  "executionBoundary": {
+    "offlineOnly": true,
+    "providerCalls": 0,
+    "networkCalls": 0,
+    "retries": 0,
+    "fallbacks": 0,
+    "webSearches": 0,
+    "researchOperations": 0,
+    "evidenceAdmissions": 0,
+    "truthMutations": 0,
+    "customerOutputs": 0,
+    "productionRoutingChanges": 0,
+    "plannerChanges": 0,
+    "providerRequestBehaviorChanges": 0
+  },
+  "contentBoundary": {
+    "apiKeysStored": false,
+    "authorizationHeaderValuesStored": false,
+    "rawRequestBodiesStored": false,
+    "rawProviderResponsesStored": false,
+    "merchantPayloadValuesStored": false,
+    "rawInternalReferencesStored": false,
+    "sourceFilenamesStoredInOutboundShape": false,
+    "canonicalShapesContainOnlySafeSettingsMetricsHashesAndRepositoryEvidenceLabels": true
+  }
+}
