@@ -1,0 +1,471 @@
+{
+  "schemaVersion": "planner_stable_schema_live_compatibility_check_2026_09_15_v1",
+  "generatedAt": "2026-09-15T20:44:53.797Z",
+  "parent": "892e897b74e4c9cfc11fc830f8b63093fad4c161",
+  "branch": "codex/planner-stable-schema-live-compatibility-check-v1",
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "executionBoundary": {
+    "maximumCalls": 4,
+    "retries": 0,
+    "fallbacks": 0,
+    "timeoutMs": 90000,
+    "store": false,
+    "stream": false,
+    "temperature": 0,
+    "allowFallbacks": false,
+    "requireParameters": true,
+    "research": false,
+    "evidenceAdmission": false,
+    "truthMutation": false,
+    "customerOutput": false,
+    "productionRouting": false
+  },
+  "testPlan": [
+    {
+      "ordinal": 1,
+      "family": "AUTHORIZATION_ECONOMICS",
+      "statementAlias": "supported-fiserv-gold-01",
+      "historicalHttpStatus": 200,
+      "role": "CONTROL"
+    },
+    {
+      "ordinal": 2,
+      "family": "SHARED_OR_BUNDLED_FEE_SEMANTICS",
+      "statementAlias": "supported-fiserv-gold-02",
+      "historicalHttpStatus": 400,
+      "role": "FORMERLY_FAILING"
+    },
+    {
+      "ordinal": 3,
+      "family": "QUALIFICATION_OR_INTEGRITY",
+      "statementAlias": "supported-fiserv-gold-05",
+      "historicalHttpStatus": 400,
+      "role": "FORMERLY_FAILING"
+    },
+    {
+      "ordinal": 4,
+      "family": "CONTRACT_OR_DOCUMENT",
+      "statementAlias": "supported-fiserv-gold-04",
+      "historicalHttpStatus": 400,
+      "role": "FORMERLY_FAILING"
+    }
+  ],
+  "allFourReached": true,
+  "results": [
+    {
+      "ordinal": 1,
+      "role": "CONTROL",
+      "family": "AUTHORIZATION_ECONOMICS",
+      "statementAlias": "supported-fiserv-gold-01",
+      "historicalHttpStatus": 200,
+      "requestIntegrity": {
+        "callOrdinal": 1,
+        "family": "AUTHORIZATION_ECONOMICS",
+        "statementAlias": "supported-fiserv-gold-01",
+        "providerSchemaSha256": "9d382aab64862b3818e1e46de385170cf3f1cc392b7e335d5d33acf1e334bcb6",
+        "providerSchemaBytes": 5472,
+        "requestBodyBytes": 11596,
+        "requestBodySha256": "1a73ad76d9d19a4c6f1186ccd2bbe417f4d2be2ecd4138111c5fb6e59bbaa7b0",
+        "packetBytes": 3088,
+        "providerPacketBytes": 2993,
+        "providerSafeAliasCounts": {
+          "FACT": 4,
+          "STATEMENT_EVIDENCE": 3,
+          "GOVERNED_EVIDENCE": 0,
+          "ECONOMIC_CHARGE": 0
+        },
+        "expectedReferenceMapBinding": {
+          "issueId": "shadow-issue-fb0c6d195b277fb84e2d10c8efd5846e",
+          "providerInputHash": "d064098794ac776a5cf0d99ef94882be2defaaf65968561dc21c29e806dfe59f",
+          "scopeToken": "188d46766f",
+          "valid": true
+        },
+        "privacy": {
+          "packetPrivacyValid": true,
+          "requestScopedAliasBindingValid": true,
+          "rawInternalReferenceLeakageCount": 0,
+          "sourceIdentityLeakageCount": 0,
+          "reverseMapMaterialLeakageCount": 0,
+          "reverseMapSerializedCount": 0,
+          "prohibitedMerchantPrivateIdentityLeakageCount": 0
+        },
+        "requestConfigurationValid": true,
+        "preflightValid": true
+      },
+      "provider": {
+        "requestReachedOpenRouter": true,
+        "httpStatus": 400,
+        "returnedModel": null,
+        "selectedProvider": null,
+        "openRouterRequestId": null,
+        "generationId": "gen-1789505079-eYXuXwgBif8lsJvXxuCC",
+        "routerAttemptCount": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "totalTokens": null,
+        "accountedCostUsd": null,
+        "costMetadataAvailable": false,
+        "latencyMs": 1999,
+        "timeToHeadersMs": 1996,
+        "bodyReadLatencyMs": 3,
+        "failureCategory": "MALFORMED_REQUEST",
+        "providerFailureKind": "REQUEST_PARAMETER_REJECTED",
+        "safeErrorType": "invalid_request_error",
+        "safeErrorCode": "400",
+        "safeErrorParameter": null,
+        "safeErrorMessage": "Provider rejected a request parameter.",
+        "providerSafeErrorCode": null,
+        "providerDiagnosticSource": "NESTED_METADATA"
+      },
+      "validation": {
+        "structuredOutputReturned": false,
+        "providerFacingStructuralValidationPassed": false,
+        "providerFacingStructuralErrorCodes": [
+          "provider_output_unavailable"
+        ],
+        "packageBAliasMembershipAndReverseMappingPassed": false,
+        "packageBReferenceErrorCodes": [
+          "provider_output_unavailable"
+        ],
+        "restoredReferenceCount": 0,
+        "existingPlannerValidationPassed": false,
+        "plannerErrorCodes": [
+          "provider_output_unavailable"
+        ],
+        "translatedConstraintValidationPassed": false,
+        "referenceGroundingPassed": false,
+        "requestedModelMatched": false,
+        "accepted": false
+      }
+    },
+    {
+      "ordinal": 2,
+      "role": "FORMERLY_FAILING",
+      "family": "SHARED_OR_BUNDLED_FEE_SEMANTICS",
+      "statementAlias": "supported-fiserv-gold-02",
+      "historicalHttpStatus": 400,
+      "requestIntegrity": {
+        "callOrdinal": 2,
+        "family": "SHARED_OR_BUNDLED_FEE_SEMANTICS",
+        "statementAlias": "supported-fiserv-gold-02",
+        "providerSchemaSha256": "9d382aab64862b3818e1e46de385170cf3f1cc392b7e335d5d33acf1e334bcb6",
+        "providerSchemaBytes": 5472,
+        "requestBodyBytes": 15264,
+        "requestBodySha256": "baec12bc19d6e1c17e68686714491f368c743ea6a0fc3f52948d8d1c6519276f",
+        "packetBytes": 7224,
+        "providerPacketBytes": 6411,
+        "providerSafeAliasCounts": {
+          "FACT": 4,
+          "STATEMENT_EVIDENCE": 66,
+          "GOVERNED_EVIDENCE": 66,
+          "ECONOMIC_CHARGE": 1
+        },
+        "expectedReferenceMapBinding": {
+          "issueId": "shadow-issue-1d91e9da8d2432dfaa7aaf1b8377579c",
+          "providerInputHash": "01a11fd691d35c398ccf77f7c0c50ad4f0a0481a29fa73cbb7ff64a44f9c8edf",
+          "scopeToken": "d82610f679",
+          "valid": true
+        },
+        "privacy": {
+          "packetPrivacyValid": true,
+          "requestScopedAliasBindingValid": true,
+          "rawInternalReferenceLeakageCount": 0,
+          "sourceIdentityLeakageCount": 0,
+          "reverseMapMaterialLeakageCount": 0,
+          "reverseMapSerializedCount": 0,
+          "prohibitedMerchantPrivateIdentityLeakageCount": 0
+        },
+        "requestConfigurationValid": true,
+        "preflightValid": true
+      },
+      "provider": {
+        "requestReachedOpenRouter": true,
+        "httpStatus": 400,
+        "returnedModel": null,
+        "selectedProvider": null,
+        "openRouterRequestId": null,
+        "generationId": "gen-1789505080-jp59KOd3q6h2rqMJlWjz",
+        "routerAttemptCount": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "totalTokens": null,
+        "accountedCostUsd": null,
+        "costMetadataAvailable": false,
+        "latencyMs": 838,
+        "timeToHeadersMs": 836,
+        "bodyReadLatencyMs": 1,
+        "failureCategory": "MALFORMED_REQUEST",
+        "providerFailureKind": "REQUEST_PARAMETER_REJECTED",
+        "safeErrorType": "invalid_request_error",
+        "safeErrorCode": "400",
+        "safeErrorParameter": null,
+        "safeErrorMessage": "Provider rejected a request parameter.",
+        "providerSafeErrorCode": null,
+        "providerDiagnosticSource": "NESTED_METADATA"
+      },
+      "validation": {
+        "structuredOutputReturned": false,
+        "providerFacingStructuralValidationPassed": false,
+        "providerFacingStructuralErrorCodes": [
+          "provider_output_unavailable"
+        ],
+        "packageBAliasMembershipAndReverseMappingPassed": false,
+        "packageBReferenceErrorCodes": [
+          "provider_output_unavailable"
+        ],
+        "restoredReferenceCount": 0,
+        "existingPlannerValidationPassed": false,
+        "plannerErrorCodes": [
+          "provider_output_unavailable"
+        ],
+        "translatedConstraintValidationPassed": false,
+        "referenceGroundingPassed": false,
+        "requestedModelMatched": false,
+        "accepted": false
+      }
+    },
+    {
+      "ordinal": 3,
+      "role": "FORMERLY_FAILING",
+      "family": "QUALIFICATION_OR_INTEGRITY",
+      "statementAlias": "supported-fiserv-gold-05",
+      "historicalHttpStatus": 400,
+      "requestIntegrity": {
+        "callOrdinal": 3,
+        "family": "QUALIFICATION_OR_INTEGRITY",
+        "statementAlias": "supported-fiserv-gold-05",
+        "providerSchemaSha256": "9d382aab64862b3818e1e46de385170cf3f1cc392b7e335d5d33acf1e334bcb6",
+        "providerSchemaBytes": 5472,
+        "requestBodyBytes": 15181,
+        "requestBodySha256": "d418efe05c3d25a6d776b0cec04ae8737e56adc9190b9e2e35d22215ff739ba7",
+        "packetBytes": 6192,
+        "providerPacketBytes": 6326,
+        "providerSafeAliasCounts": {
+          "FACT": 4,
+          "STATEMENT_EVIDENCE": 5,
+          "GOVERNED_EVIDENCE": 48,
+          "ECONOMIC_CHARGE": 5
+        },
+        "expectedReferenceMapBinding": {
+          "issueId": "shadow-issue-dba4d926824d27d958f20c0b6ba092ce",
+          "providerInputHash": "71b734616de563fb688a0911846c01fe4392faf1c5482e7ee1243f8011f94e7e",
+          "scopeToken": "37fc5f67f3",
+          "valid": true
+        },
+        "privacy": {
+          "packetPrivacyValid": true,
+          "requestScopedAliasBindingValid": true,
+          "rawInternalReferenceLeakageCount": 0,
+          "sourceIdentityLeakageCount": 0,
+          "reverseMapMaterialLeakageCount": 0,
+          "reverseMapSerializedCount": 0,
+          "prohibitedMerchantPrivateIdentityLeakageCount": 0
+        },
+        "requestConfigurationValid": true,
+        "preflightValid": true
+      },
+      "provider": {
+        "requestReachedOpenRouter": true,
+        "httpStatus": 400,
+        "returnedModel": null,
+        "selectedProvider": null,
+        "openRouterRequestId": null,
+        "generationId": "gen-1789505081-fwY2xZzAI44A5I5v17Mo",
+        "routerAttemptCount": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "totalTokens": null,
+        "accountedCostUsd": null,
+        "costMetadataAvailable": false,
+        "latencyMs": 855,
+        "timeToHeadersMs": 854,
+        "bodyReadLatencyMs": 1,
+        "failureCategory": "MALFORMED_REQUEST",
+        "providerFailureKind": "REQUEST_PARAMETER_REJECTED",
+        "safeErrorType": "invalid_request_error",
+        "safeErrorCode": "400",
+        "safeErrorParameter": null,
+        "safeErrorMessage": "Provider rejected a request parameter.",
+        "providerSafeErrorCode": null,
+        "providerDiagnosticSource": "NESTED_METADATA"
+      },
+      "validation": {
+        "structuredOutputReturned": false,
+        "providerFacingStructuralValidationPassed": false,
+        "providerFacingStructuralErrorCodes": [
+          "provider_output_unavailable"
+        ],
+        "packageBAliasMembershipAndReverseMappingPassed": false,
+        "packageBReferenceErrorCodes": [
+          "provider_output_unavailable"
+        ],
+        "restoredReferenceCount": 0,
+        "existingPlannerValidationPassed": false,
+        "plannerErrorCodes": [
+          "provider_output_unavailable"
+        ],
+        "translatedConstraintValidationPassed": false,
+        "referenceGroundingPassed": false,
+        "requestedModelMatched": false,
+        "accepted": false
+      }
+    },
+    {
+      "ordinal": 4,
+      "role": "FORMERLY_FAILING",
+      "family": "CONTRACT_OR_DOCUMENT",
+      "statementAlias": "supported-fiserv-gold-04",
+      "historicalHttpStatus": 400,
+      "requestIntegrity": {
+        "callOrdinal": 4,
+        "family": "CONTRACT_OR_DOCUMENT",
+        "statementAlias": "supported-fiserv-gold-04",
+        "providerSchemaSha256": "9d382aab64862b3818e1e46de385170cf3f1cc392b7e335d5d33acf1e334bcb6",
+        "providerSchemaBytes": 5472,
+        "requestBodyBytes": 15840,
+        "requestBodySha256": "03078828f5964c93894c95129a9b578388a2c476e9e0ea7adec9cf6320de79f9",
+        "packetBytes": 7434,
+        "providerPacketBytes": 6943,
+        "providerSafeAliasCounts": {
+          "FACT": 4,
+          "STATEMENT_EVIDENCE": 30,
+          "GOVERNED_EVIDENCE": 108,
+          "ECONOMIC_CHARGE": 2
+        },
+        "expectedReferenceMapBinding": {
+          "issueId": "shadow-issue-9853d6ba562afbece26ddcef23925404",
+          "providerInputHash": "01943f1117f7cbea78680a64896a6c4d68c53dad81e0167a6e9680223f07e59d",
+          "scopeToken": "c98af0b77f",
+          "valid": true
+        },
+        "privacy": {
+          "packetPrivacyValid": true,
+          "requestScopedAliasBindingValid": true,
+          "rawInternalReferenceLeakageCount": 0,
+          "sourceIdentityLeakageCount": 0,
+          "reverseMapMaterialLeakageCount": 0,
+          "reverseMapSerializedCount": 0,
+          "prohibitedMerchantPrivateIdentityLeakageCount": 0
+        },
+        "requestConfigurationValid": true,
+        "preflightValid": true
+      },
+      "provider": {
+        "requestReachedOpenRouter": true,
+        "httpStatus": 400,
+        "returnedModel": null,
+        "selectedProvider": null,
+        "openRouterRequestId": null,
+        "generationId": "gen-1789505082-a6gDxdTSmfqw3BCiEjby",
+        "routerAttemptCount": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "totalTokens": null,
+        "accountedCostUsd": null,
+        "costMetadataAvailable": false,
+        "latencyMs": 817,
+        "timeToHeadersMs": 816,
+        "bodyReadLatencyMs": 1,
+        "failureCategory": "MALFORMED_REQUEST",
+        "providerFailureKind": "REQUEST_PARAMETER_REJECTED",
+        "safeErrorType": "invalid_request_error",
+        "safeErrorCode": "400",
+        "safeErrorParameter": null,
+        "safeErrorMessage": "Provider rejected a request parameter.",
+        "providerSafeErrorCode": null,
+        "providerDiagnosticSource": "NESTED_METADATA"
+      },
+      "validation": {
+        "structuredOutputReturned": false,
+        "providerFacingStructuralValidationPassed": false,
+        "providerFacingStructuralErrorCodes": [
+          "provider_output_unavailable"
+        ],
+        "packageBAliasMembershipAndReverseMappingPassed": false,
+        "packageBReferenceErrorCodes": [
+          "provider_output_unavailable"
+        ],
+        "restoredReferenceCount": 0,
+        "existingPlannerValidationPassed": false,
+        "plannerErrorCodes": [
+          "provider_output_unavailable"
+        ],
+        "translatedConstraintValidationPassed": false,
+        "referenceGroundingPassed": false,
+        "requestedModelMatched": false,
+        "accepted": false
+      }
+    }
+  ],
+  "accounting": {
+    "totalCallsReserved": 4,
+    "totalCallsAttempted": 4,
+    "totalCallsCompleted": 4,
+    "totalRetries": 0,
+    "totalFallbacks": 0,
+    "totalInputTokens": 0,
+    "totalOutputTokens": 0,
+    "totalTokens": 0,
+    "totalAccountedCostUsd": null,
+    "costMetadataComplete": false,
+    "insideFourCallCeiling": true
+  },
+  "invariance": {
+    "before": {
+      "statementCount": 11,
+      "canonicalFinancialTruthUnchanged": "11/11",
+      "rdUnchanged": "11/11",
+      "commercialDecompositionUnchanged": "11/11",
+      "sourceFingerprintUnchanged": "11/11",
+      "activityUnchanged": "11/11",
+      "qualificationUnchanged": "11/11",
+      "countSensitivityUnchanged": "11/11",
+      "volumeSensitivityUnchanged": "11/11",
+      "mixedMinimumSensitivityUnchanged": "11/11",
+      "fixedSensitivityUnchanged": "11/11",
+      "chargedCostUnchanged": "11/11",
+      "costStackCategoriesUnchanged": "11/11",
+      "participantControlUnchanged": "11/11",
+      "completenessUnchanged": "11/11",
+      "materialityInputsUnchanged": "11/11",
+      "commercialSourceExpectedSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+      "commercialSourceBeforeSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+      "commercialSourceAfterSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+      "commercialSourceUnchanged": true
+    },
+    "after": {
+      "statementCount": 11,
+      "canonicalFinancialTruthUnchanged": "11/11",
+      "rdUnchanged": "11/11",
+      "commercialDecompositionUnchanged": "11/11",
+      "sourceFingerprintUnchanged": "11/11",
+      "activityUnchanged": "11/11",
+      "qualificationUnchanged": "11/11",
+      "countSensitivityUnchanged": "11/11",
+      "volumeSensitivityUnchanged": "11/11",
+      "mixedMinimumSensitivityUnchanged": "11/11",
+      "fixedSensitivityUnchanged": "11/11",
+      "chargedCostUnchanged": "11/11",
+      "costStackCategoriesUnchanged": "11/11",
+      "participantControlUnchanged": "11/11",
+      "completenessUnchanged": "11/11",
+      "materialityInputsUnchanged": "11/11",
+      "commercialSourceExpectedSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+      "commercialSourceBeforeSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+      "commercialSourceAfterSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+      "commercialSourceUnchanged": true
+    },
+    "byteIdentical": true,
+    "allElevenUnchanged": true
+  },
+  "historicalHttp400Reproduced": true,
+  "allFormerlyFailingProviderAccepted": false,
+  "conclusion": "One or more historical HTTP 400 compatibility failures reproduced under the Package C stable schema.",
+  "architectureIssues": [
+    "AUTHORIZATION_ECONOMICS:MALFORMED_REQUEST",
+    "SHARED_OR_BUNDLED_FEE_SEMANTICS:MALFORMED_REQUEST",
+    "QUALIFICATION_OR_INTEGRITY:MALFORMED_REQUEST",
+    "CONTRACT_OR_DOCUMENT:MALFORMED_REQUEST"
+  ]
+}

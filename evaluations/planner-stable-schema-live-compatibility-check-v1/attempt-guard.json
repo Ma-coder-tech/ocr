@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "planner_stable_schema_live_compatibility_attempt_guard_2026_09_15_v1",
+  "parent": "892e897b74e4c9cfc11fc830f8b63093fad4c161",
+  "branch": "codex/planner-stable-schema-live-compatibility-check-v1",
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "maximumCalls": 4,
+  "retries": 0,
+  "fallbacks": 0,
+  "callsReserved": 4,
+  "callsAttempted": 4,
+  "callsCompleted": 4,
+  "ledger": [
+    {
+      "ordinal": 1,
+      "family": "AUTHORIZATION_ECONOMICS",
+      "statementAlias": "supported-fiserv-gold-01",
+      "status": "COMPLETED",
+      "requestReachedOpenRouter": true,
+      "httpStatus": 400,
+      "accepted": false,
+      "failureCategory": "MALFORMED_REQUEST"
+    },
+    {
+      "ordinal": 2,
+      "family": "SHARED_OR_BUNDLED_FEE_SEMANTICS",
+      "statementAlias": "supported-fiserv-gold-02",
+      "status": "COMPLETED",
+      "requestReachedOpenRouter": true,
+      "httpStatus": 400,
+      "accepted": false,
+      "failureCategory": "MALFORMED_REQUEST"
+    },
+    {
+      "ordinal": 3,
+      "family": "QUALIFICATION_OR_INTEGRITY",
+      "statementAlias": "supported-fiserv-gold-05",
+      "status": "COMPLETED",
+      "requestReachedOpenRouter": true,
+      "httpStatus": 400,
+      "accepted": false,
+      "failureCategory": "MALFORMED_REQUEST"
+    },
+    {
+      "ordinal": 4,
+      "family": "CONTRACT_OR_DOCUMENT",
+      "statementAlias": "supported-fiserv-gold-04",
+      "status": "COMPLETED",
+      "requestReachedOpenRouter": true,
+      "httpStatus": 400,
+      "accepted": false,
+      "failureCategory": "MALFORMED_REQUEST"
+    }
+  ],
+  "completed": true,
+  "resultSha256": "0d11fa91b4fe871a24acbc27f1078435fa79efabbadd7662475eb5ca966326bf"
+}
