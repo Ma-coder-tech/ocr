@@ -63,6 +63,36 @@ describe("Shadow AI provider reference boundary v1", () => {
     expect(validateShadowAiEconomicResolutionPlanV1(restored.output, packet).ok).toBe(true);
   });
 
+  it("keeps issue identity exactly request-bound in trusted local validation", async () => {
+    const packet = createSyntheticFullPlannerPacketV1();
+    const boundary = compileShadowAiProviderReferenceBoundaryV1(packet);
+    const providerPlan = aliasPlan(await offlinePlan(packet), boundary.referenceMap);
+    const other = compileShadowAiProviderReferenceBoundaryV1(changedPacket(packet, "other_shadow_run", "other_issue"));
+
+    expect(restoreShadowAiProviderReferencesV1(providerPlan, boundary.referenceMap).ok).toBe(true);
+    for (const mutation of [
+      { ...providerPlan, issueId: `${packet.issueId}x` },
+      { ...providerPlan, issueId: other.referenceMap.issueId },
+      { ...providerPlan, issueId: "invented_issue_id" },
+      Object.fromEntries(Object.entries(providerPlan).filter(([key]) => key !== "issueId")),
+      { ...providerPlan, issueId: 7 },
+      { ...providerPlan, issueId: packet.issueId, issue_id: "conflicting_issue_id" },
+    ]) {
+      expect(restoreShadowAiProviderReferencesV1(mutation, boundary.referenceMap)).toMatchObject({
+        ok: false,
+        errorCodes: ["shadow_planner_provider_output_binding_invalid"],
+      });
+    }
+
+    const validAliasesWrongIssue = { ...providerPlan, issueId: `${packet.issueId.slice(0, -1)}x` };
+    expect(validAliasesWrongIssue.exactCitedFactRefs).toEqual(providerPlan.exactCitedFactRefs);
+    expect(restoreShadowAiProviderReferencesV1(validAliasesWrongIssue, boundary.referenceMap).ok).toBe(false);
+    expect(restoreShadowAiProviderReferencesV1([], boundary.referenceMap)).toMatchObject({
+      ok: false,
+      errorCodes: ["shadow_planner_provider_output_not_object"],
+    });
+  });
+
   it("fails closed for malformed, unknown, cross-packet, wrong-class, duplicate, and raw references", async () => {
     const packet = createSyntheticFullPlannerPacketV1();
     const boundary = compileShadowAiProviderReferenceBoundaryV1(packet);

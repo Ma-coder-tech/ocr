@@ -15,6 +15,7 @@ import { createSyntheticFullPlannerPacketV1 } from "./openRouterFullPlannerSchem
 import type { OpenRouterClaudePreflightRequestV2 } from "./openRouterClaudeStructuredOutputPreflightV2.js";
 import {
   buildHistoricalFullSyntheticTypedPatternVariantV1,
+  buildHistoricalPackageCRejectedIssueRequestV1,
 } from "./plannerRequestShapeForensicDifferentialV1.js";
 
 const MISSING = Symbol("missing");
@@ -24,7 +25,7 @@ export type DifferentialClassificationV1 = "UNCHANGED" | "CHANGED" | "SYNTHETIC_
 export function reconstructRealVsSyntheticPlannerRequestsV1(realPacket: ShadowAiEconomicResolutionPacketV1) {
   return Object.freeze({
     syntheticCall3: buildHistoricalFullSyntheticTypedPatternVariantV1(createSyntheticFullPlannerPacketV1()),
-    realAuthorization: buildOpenRouterIssueGroundedShadowPlannerRequestV1("offline-placeholder-never-transmitted", realPacket),
+    realAuthorization: buildHistoricalPackageCRejectedIssueRequestV1(realPacket),
   });
 }
 

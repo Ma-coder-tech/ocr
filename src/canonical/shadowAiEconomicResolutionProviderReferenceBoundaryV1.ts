@@ -251,6 +251,10 @@ export function restoreShadowAiProviderReferencesV1(
   if (!isRecord(providerOutput)) {
     return deepFreeze({ ok: false as const, output: null, errorCodes: ["shadow_planner_provider_output_not_object"], restoredReferenceCount: 0 as const });
   }
+  const issueIdentityKeys = Object.keys(providerOutput).filter((key) => key.replace(/[^a-z0-9]/gi, "").toLowerCase() === "issueid");
+  if (issueIdentityKeys.length !== 1 || issueIdentityKeys[0] !== "issueId") {
+    return deepFreeze({ ok: false as const, output: null, errorCodes: ["shadow_planner_provider_output_binding_invalid"], restoredReferenceCount: 0 as const });
+  }
   const rawLeakReasons: string[] = [];
   inspectProviderOutputForRawReferences(providerOutput, referenceMap, new Set(referenceMap.entries.map((entry) => entry.internalReference)), rawLeakReasons);
   if (rawLeakReasons.length > 0) {

@@ -266,7 +266,7 @@ export async function sendOpenRouterClaudeJsonSchemaEvaluationRequestV2(input: {
   const message = asRecord(choice?.message);
   let rawOutput: unknown;
   try {
-    rawOutput = typeof message?.content === "string" ? JSON.parse(stripJsonFence(message.content)) : message?.parsed;
+    rawOutput = typeof message?.content === "string" ? parseJsonRejectingDuplicateTopLevelKeysV2(stripJsonFence(message.content)) : message?.parsed;
   } catch (error) {
     throw new OpenRouterClaudePreflightErrorV2(failureTelemetry({
       latencyMs: performance.now() - started,
@@ -321,6 +321,54 @@ export function validateProviderFacingSyntheticOutputV2(value: unknown):
     syntheticEcho: "synthetic_preflight_only",
   });
   return Object.freeze({ valid: true as const, output, errors: [] as const });
+}
+
+/**
+ * JSON.parse keeps only the last value for a duplicated object key. Provider
+ * output identity is request-bound local state, so reject duplicate top-level
+ * keys before parsing can erase that conflict.
+ */
+export function parseJsonRejectingDuplicateTopLevelKeysV2(text: string): unknown {
+  const keys = topLevelJsonObjectKeys(text);
+  if (keys && new Set(keys).size !== keys.length) throw new Error("structured_output_duplicate_top_level_key");
+  return JSON.parse(text);
+}
+
+function topLevelJsonObjectKeys(text: string): string[] | null {
+  let index = 0;
+  while (/\s/.test(text[index] ?? "")) index += 1;
+  if (text[index] !== "{") return null;
+  let depth = 1;
+  let expectingKey = true;
+  const keys: string[] = [];
+  for (index += 1; index < text.length && depth > 0; index += 1) {
+    const character = text[index]!;
+    if (character === '"') {
+      const start = index;
+      for (index += 1; index < text.length; index += 1) {
+        if (text[index] === "\\") {
+          index += 1;
+          continue;
+        }
+        if (text[index] === '"') break;
+      }
+      if (depth === 1 && expectingKey) {
+        const key = JSON.parse(text.slice(start, index + 1));
+        if (typeof key !== "string") throw new Error("structured_output_object_key_invalid");
+        keys.push(key);
+        let delimiter = index + 1;
+        while (/\s/.test(text[delimiter] ?? "")) delimiter += 1;
+        if (text[delimiter] !== ":") throw new Error("structured_output_object_key_delimiter_invalid");
+        index = delimiter;
+        expectingKey = false;
+      }
+      continue;
+    }
+    if (character === "{" || character === "[") depth += 1;
+    else if (character === "}" || character === "]") depth -= 1;
+    else if (character === "," && depth === 1) expectingKey = true;
+  }
+  return keys;
 }
 
 export function validateFullLocalSyntheticContractV2(value: unknown): Readonly<{ valid: boolean; errors: readonly string[] }> {

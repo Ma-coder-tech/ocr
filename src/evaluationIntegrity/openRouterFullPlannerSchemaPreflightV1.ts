@@ -178,7 +178,7 @@ export function localFullPlannerOutputSchemaV1(
       truthEffect: { type: "string", const: "NONE" },
       financialMutationAllowed: { type: "boolean", const: false },
       customerRenderingAllowed: { type: "boolean", const: false },
-      issueId: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$", minLength: 1, maxLength: 200 },
+      issueId: { type: "string", minLength: 1, maxLength: 200 },
       inputHash: { type: "string", pattern: "^[a-f0-9]{64}$" },
       exactCitedFactRefs: referenceList(STABLE_PROVIDER_FACT_REFERENCE_PATTERN_V1, 1),
       unresolvedQuestion: text(2_000),

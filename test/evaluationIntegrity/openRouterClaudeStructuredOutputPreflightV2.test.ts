@@ -6,6 +6,7 @@ import {
   countSchemaKeywordV2,
   invokeOpenRouterClaudeStructuredOutputPreflightV2,
   localSyntheticStructuredOutputSchemaV2,
+  parseJsonRejectingDuplicateTopLevelKeysV2,
   translateSchemaForAnthropicStructuredOutputsV2,
   validateFullLocalSyntheticContractV2,
 } from "../../src/evaluationIntegrity/openRouterClaudeStructuredOutputPreflightV2.js";
@@ -21,6 +22,16 @@ const expectedOutput = Object.freeze({
 });
 
 describe("OpenRouter Claude structured-output preflight v2", () => {
+  it("rejects duplicated top-level identity keys before JSON parsing can erase the conflict", () => {
+    expect(() => parseJsonRejectingDuplicateTopLevelKeysV2('{"issueId":"issued","issueId":"conflicting"}')).toThrow(
+      "structured_output_duplicate_top_level_key",
+    );
+    expect(parseJsonRejectingDuplicateTopLevelKeysV2('{"issueId":"issued","nested":{"issueId":"nested"}}')).toEqual({
+      issueId: "issued",
+      nested: { issueId: "nested" },
+    });
+  });
+
   it("translates only provider-facing unsupported constraints without mutating the local schema", () => {
     const localSchema = localSyntheticStructuredOutputSchemaV2();
     const translated = translateSchemaForAnthropicStructuredOutputsV2({

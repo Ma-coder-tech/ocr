@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "planner_issue_id_local_binding_fix_regression_delta_2026_09_16_v1",
+  "parentCommit": "ebd928ef506c396485d75ba639d4da367340d504",
+  "parent": {
+    "testsPassed": 2442,
+    "testsTotal": 2526,
+    "testsFailed": 84,
+    "failingFiles": 27
+  },
+  "implementation": {
+    "testsPassed": 2445,
+    "testsTotal": 2528,
+    "testsFailed": 83,
+    "failingFiles": 26
+  },
+  "delta": {
+    "newFailingTests": 0,
+    "newFailingFiles": 0,
+    "commonBaselineFailureSignatures": 83,
+    "baselineFailureNotReproduced": {
+      "testFile": "test/canonical/v2/runtime/productionWorkerAnalysisRun.test.ts",
+      "classification": "BASELINE_RESOURCE_OR_STATE_SENSITIVE",
+      "changedExecutionPath": false,
+      "implementationFixClaimed": false
+    },
+    "unexplainedNewRegressions": 0
+  }
+}

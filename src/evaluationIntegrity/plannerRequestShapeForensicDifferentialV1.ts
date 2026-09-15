@@ -215,6 +215,32 @@ export function compareTypedPatternControlToIssueIdPatternVariantV1(
   });
 }
 
+/** Reconstructs the accepted Package C request shape after later schema evolution. */
+export function buildHistoricalPackageCRejectedIssueRequestV1(
+  packet: ShadowAiEconomicResolutionPacketV1,
+): ReturnType<typeof buildOpenRouterIssueGroundedShadowPlannerRequestV1> {
+  const current = buildOpenRouterIssueGroundedShadowPlannerRequestV1("offline-placeholder-never-transmitted", packet);
+  const body = JSON.parse(current.body) as Record<string, any>;
+  body.response_format.json_schema.schema.properties.issueId.pattern = "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$";
+  const providerSchema = deepFreeze(body.response_format.json_schema.schema as Record<string, unknown>);
+  const serializedBody = canonicalJson(body);
+  const requestValue = {
+    endpoint: current.endpoint,
+    method: current.method,
+    headers: current.headers,
+    body: serializedBody,
+    bodyBytes: Buffer.byteLength(serializedBody, "utf8"),
+    providerSchema,
+  };
+  Object.defineProperty(requestValue, "referenceMap", {
+    value: current.referenceMap,
+    enumerable: false,
+    writable: false,
+    configurable: false,
+  });
+  return Object.freeze(requestValue) as ReturnType<typeof buildOpenRouterIssueGroundedShadowPlannerRequestV1>;
+}
+
 export function reconstructForensicAnchorsV1(input: {
   historicalAuthorizationPacket: ShadowAiEconomicResolutionPacketV1;
   historicalSyntheticPacket: ShadowAiEconomicResolutionPacketV1;
@@ -228,10 +254,7 @@ export function reconstructForensicAnchorsV1(input: {
     historicalReal: buildHistoricalAcceptedIssueRequestV1(input.historicalAuthorizationPacket),
     historicalMinimalSynthetic: buildOpenRouterClaudeStructuredOutputPreflightRequestV2("offline-placeholder-never-transmitted"),
     historicalFullSynthetic: buildHistoricalAcceptedFullSyntheticRequestV1(input.historicalSyntheticPacket),
-    currentRejected: buildOpenRouterIssueGroundedShadowPlannerRequestV1(
-      "offline-placeholder-never-transmitted",
-      input.historicalAuthorizationPacket,
-    ),
+    currentRejected: buildHistoricalPackageCRejectedIssueRequestV1(input.historicalAuthorizationPacket),
   });
 }
 

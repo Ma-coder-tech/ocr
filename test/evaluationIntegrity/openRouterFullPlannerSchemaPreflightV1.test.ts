@@ -35,7 +35,7 @@ describe("OpenRouter full planner schema synthetic preflight v1", () => {
     expect(providerCounts.maxLength).toBe(0);
     expect(providerCounts.maxItems).toBe(0);
     expect(providerCounts.anyOf).toBe(1);
-    expect(providerCounts.pattern).toBe(9);
+    expect(providerCounts.pattern).toBe(8);
     expect(fullPlannerSchemaConstructCountsV1(localSchema)).toEqual(localCounts);
   });
 
@@ -61,8 +61,8 @@ describe("OpenRouter full planner schema synthetic preflight v1", () => {
     });
     expect(body.tools).toBeUndefined();
     expect(body.tool_choice).toBeUndefined();
-    expect(request.bodyBytes).toBe(9_525);
-    expect(createHash("sha256").update(request.body).digest("hex")).toBe("1ab6ce788ac6bc6dc38f8ac361281623fc14ccb431aaab6f8cefd4230e74cd23");
+    expect(request.bodyBytes).toBe(9_477);
+    expect(createHash("sha256").update(request.body).digest("hex")).toBe("8c30df1ce025b8fad4156e8de5836809e1e536570b7299927096ed0b47b210c1");
     expect(request.body).not.toMatch(/\bGold\b|\bMID\b|account number|bank account|routing number|tax ID|\.pdf|\/Users\//i);
     for (const entry of request.referenceMap.entries) {
       expect(request.body).toContain(entry.alias);

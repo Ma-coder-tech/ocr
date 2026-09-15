@@ -47,6 +47,7 @@ describe("Package C stable provider-facing planner schema v1", () => {
 
     expect(schemaText).not.toContain(packet.issueId);
     expect(schemaText).not.toContain(request.referenceMap.providerInputHash);
+    expect((request.providerSchema as any).properties.issueId).toEqual({ type: "string" });
     for (const entry of request.referenceMap.entries) expect(schemaText).not.toContain(entry.alias);
     expect(schemaText).toContain(STABLE_PROVIDER_FACT_REFERENCE_PATTERN_V1);
     expect(schemaText).toContain(STABLE_PROVIDER_SUPPORT_REFERENCE_PATTERN_V1);

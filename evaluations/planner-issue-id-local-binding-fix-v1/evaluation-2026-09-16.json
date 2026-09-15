@@ -1,0 +1,128 @@
+{
+  "schemaVersion": "planner_issue_id_local_binding_compatibility_fix_2026_09_16_v1",
+  "parentCommit": "ebd928ef506c396485d75ba639d4da367340d504",
+  "branch": "codex/planner-issue-id-local-binding-fix-v1",
+  "executionBoundary": {
+    "offlineOnly": true,
+    "providerCalls": 0,
+    "networkCalls": 0,
+    "researchOperations": 0,
+    "evidenceAdmissions": 0,
+    "customerOutputs": 0,
+    "productionRoutingChanges": 0,
+    "truthMutations": 0
+  },
+  "providerSchemaChange": {
+    "path": "response_format.json_schema.schema.properties.issueId",
+    "before": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+    },
+    "after": {
+      "type": "string"
+    },
+    "requestSpecificConstReintroduced": false,
+    "inputHashConstraintChanged": false,
+    "evidenceClassEnumsChanged": false,
+    "typedReferencePatternsChanged": false
+  },
+  "stableSchema": {
+    "providerSchemaBytes": 5424,
+    "providerSchemaSha256": "74144ebf131667591b8b9e1897f6a6585717847c04e0499f1989f2f100dfe08c",
+    "patternCount": 8,
+    "constCount": 13,
+    "enumNodeCount": 5,
+    "schemaDepth": 7,
+    "schemaNodeCount": 76,
+    "identicalAcrossHistoricalSix": true,
+    "identicalAcrossGoldIssues": true,
+    "identicalAcrossStressReferenceCounts": true,
+    "stressReferenceCounts": [0, 1, 8, 64, 128, 256, 512],
+    "packetSpecificReferenceEnums": 0,
+    "packetSpecificIssueIdConstraints": 0
+  },
+  "localIssueBinding": {
+    "expectedRelation": "returned issueId === originating request issueId",
+    "correctIssueIdAccepted": true,
+    "oneCharacterDifferenceRejected": true,
+    "crossRequestIssueIdRejected": true,
+    "inventedIssueIdRejected": true,
+    "missingIssueIdRejected": true,
+    "nonStringIssueIdRejected": true,
+    "validAliasesWithWrongIssueIdRejected": true,
+    "conflictingStructuralIssueKeyRejected": true,
+    "duplicateTopLevelJsonKeyRejectedBeforeParsing": true,
+    "inputHashBindingPreserved": true
+  },
+  "historicalSix": {
+    "requestCount": 6,
+    "stableSchemaCount": 6,
+    "exactLocalRoundTripCount": 6,
+    "acceptedPlannerValidationCount": 6,
+    "packageAHistoricalParityPreservedCount": 6,
+    "rawInternalReferenceLeakageCount": 0,
+    "sourceIdentityLeakageCount": 0,
+    "reverseMapMaterialLeakageCount": 0
+  },
+  "gold": {
+    "statementCount": 11,
+    "issueCount": 60,
+    "stableSchemaCount": 60,
+    "providerPacketReferenceOnlyDiffCount": 60,
+    "exactReferenceRoundTripCount": 60,
+    "acceptedPlannerValidationCount": 60,
+    "plannerSemanticInvarianceCount": 60,
+    "privacy": {
+      "rawInternalReferenceLeakageCount": 0,
+      "sourceIdentityLeakageCount": 0,
+      "reverseMapMaterialLeakageCount": 0,
+      "reverseMapSerializedCount": 0,
+      "unknownAliasAcceptanceCount": 0,
+      "classConfusionAcceptanceCount": 0,
+      "rawReferenceAcceptanceCount": 0
+    },
+    "invariance": {
+      "canonicalFinancialTruthUnchanged": "11/11",
+      "rdUnchanged": "11/11",
+      "commercialDecompositionUnchanged": "11/11",
+      "sourceFingerprintUnchanged": "11/11",
+      "activityUnchanged": "11/11",
+      "qualificationUnchanged": "11/11",
+      "countSensitivityUnchanged": "11/11",
+      "volumeSensitivityUnchanged": "11/11",
+      "mixedMinimumSensitivityUnchanged": "11/11",
+      "fixedSensitivityUnchanged": "11/11",
+      "chargedCostUnchanged": "11/11",
+      "costStackCategoriesUnchanged": "11/11",
+      "participantControlUnchanged": "11/11",
+      "completenessUnchanged": "11/11",
+      "materialityInputsUnchanged": "11/11",
+      "commercialSourceSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+      "commercialSourceUnchanged": true
+    }
+  },
+  "verification": {
+    "focusedParent": { "testFilesPassed": 12, "testsPassed": 54, "testsFailed": 0 },
+    "focusedImplementation": { "testFilesPassed": 12, "testsPassed": 56, "testsFailed": 0 },
+    "typescriptBuildPassed": true,
+    "exhaustiveRegressionDelta": {
+      "parent": { "testsPassed": 2442, "testsTotal": 2526, "testsFailed": 84, "failingFiles": 27 },
+      "implementation": { "testsPassed": 2445, "testsTotal": 2528, "testsFailed": 83, "failingFiles": 26 },
+      "newFailingTests": 0,
+      "newFailingFiles": 0,
+      "commonBaselineFailureSignatures": 83,
+      "baselineResourceSensitiveFailuresNotReproduced": 1,
+      "unexplainedNewRegressions": 0
+    }
+  },
+  "architecture": {
+    "conflictFound": false,
+    "providerSchemaRemainsStable": true,
+    "exactIssueIdentityRemainsLocallyAuthoritative": true,
+    "packageBPrivacyPreserved": true,
+    "packageCStableSchemaPreserved": true,
+    "productReadyForReview": true,
+    "oneMinimalSyntheticLiveVerificationJustifiedAfterSeparateAuthorization": true,
+    "liveCompatibilityProven": false
+  }
+}
