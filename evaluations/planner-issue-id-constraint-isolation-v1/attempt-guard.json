@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "planner_issue_id_constraint_isolation_attempt_guard_2026_09_16_v1",
+  "parent": "02c1e7b9d059997eb119253965c0704460c54b6a",
+  "branch": "codex/planner-issue-id-constraint-isolation-v1",
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "maximumCalls": 1,
+  "callsReserved": 1,
+  "callsAttempted": 1,
+  "callsCompleted": 1,
+  "retries": 0,
+  "fallbacks": 0,
+  "status": "COMPLETED",
+  "httpStatus": 400,
+  "completed": true,
+  "resultSha256": "655c62e18164f0dab44618b725f2119d0244c6406eab3864b175ebef0f985469"
+}

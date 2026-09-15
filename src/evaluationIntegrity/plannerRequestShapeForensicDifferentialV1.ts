@@ -179,6 +179,42 @@ export function compareHistoricalFullSyntheticToTypedPatternVariantV1(
   });
 }
 
+export function buildTypedPatternIssueIdPatternIsolationVariantV1(
+  packet: ShadowAiEconomicResolutionPacketV1,
+): OpenRouterClaudePreflightRequestV2 {
+  const control = buildHistoricalFullSyntheticTypedPatternVariantV1(packet);
+  const body = JSON.parse(control.body) as Record<string, any>;
+  const issueId = body.response_format.json_schema.schema.properties.issueId as Record<string, unknown>;
+  delete issueId.const;
+  issueId.pattern = "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$";
+  const providerSchema = deepFreeze(body.response_format.json_schema.schema as Record<string, unknown>);
+  return request(canonicalJson(body), providerSchema);
+}
+
+export function compareTypedPatternControlToIssueIdPatternVariantV1(
+  control: OpenRouterClaudePreflightRequestV2,
+  variant: OpenRouterClaudePreflightRequestV2,
+): Readonly<{
+  validSingleVariableChange: boolean;
+  changedPaths: readonly string[];
+  expectedChangedPaths: readonly string[];
+  unexpectedChangedPaths: readonly string[];
+}> {
+  const changedPaths: string[] = [];
+  compareNodes(JSON.parse(control.body), JSON.parse(variant.body), "$", changedPaths);
+  const expectedChangedPaths = [
+    "$.response_format.json_schema.schema.properties.issueId.const",
+    "$.response_format.json_schema.schema.properties.issueId.pattern",
+  ].sort();
+  const actual = [...changedPaths].sort();
+  return deepFreeze({
+    validSingleVariableChange: canonicalJson(actual) === canonicalJson(expectedChangedPaths),
+    changedPaths: actual,
+    expectedChangedPaths,
+    unexpectedChangedPaths: actual.filter((path) => !expectedChangedPaths.includes(path)),
+  });
+}
+
 export function reconstructForensicAnchorsV1(input: {
   historicalAuthorizationPacket: ShadowAiEconomicResolutionPacketV1;
   historicalSyntheticPacket: ShadowAiEconomicResolutionPacketV1;

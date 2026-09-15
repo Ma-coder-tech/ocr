@@ -1,0 +1,166 @@
+{
+  "schemaVersion": "planner_issue_id_constraint_isolation_2026_09_16_v1",
+  "generatedAt": "2026-09-15T22:52:14.813Z",
+  "parent": "02c1e7b9d059997eb119253965c0704460c54b6a",
+  "branch": "codex/planner-issue-id-constraint-isolation-v1",
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "purpose": "SYNTHETIC_ISSUE_ID_CONSTRAINT_ISOLATION_ONLY",
+  "executionBoundary": {
+    "maximumProviderCalls": 1,
+    "callsReserved": 1,
+    "callsAttempted": 1,
+    "callsCompleted": 1,
+    "retries": 0,
+    "fallbacks": 0,
+    "timeoutMs": 90000,
+    "merchantData": false,
+    "realStatementData": false,
+    "research": false,
+    "evidenceAdmission": false,
+    "truthMutation": false,
+    "customerOutput": false,
+    "productionRouting": false,
+    "compatibilityFix": false
+  },
+  "successfulCall3Control": {
+    "requestBodyBytes": 9512,
+    "requestBodySha256": "5018a11fe4b71ff28e24668a8d0c273b9e80829f174937224f2fae046b0ab180",
+    "providerSchemaBytes": 5389,
+    "providerSchemaSha256": "45f4b1ec60730727ebc4a1871d008fb27a23414e7353e3ee47403cfb0ad7eb99",
+    "schemaDepth": 7,
+    "schemaNodeCount": 76,
+    "patternCount": 8,
+    "enumNodeCount": 5,
+    "totalEnumLiteralCount": 23,
+    "constCount": 15,
+    "schemaName": "shadow_ai_economic_resolution_plan_synthetic_preflight_v1",
+    "model": "anthropic/claude-opus-4.6",
+    "routing": {
+      "allow_fallbacks": false,
+      "require_parameters": true
+    },
+    "generation": {
+      "store": false,
+      "stream": false,
+      "temperature": 0,
+      "maxTokens": 4000
+    },
+    "responseFormat": {
+      "type": "json_schema",
+      "strict": true
+    },
+    "messageRoles": [
+      "system",
+      "user"
+    ],
+    "messageBytes": [
+      1170,
+      2361
+    ]
+  },
+  "issueIdOnlyDifferential": {
+    "validSingleVariableChange": true,
+    "changedPaths": [
+      "$.response_format.json_schema.schema.properties.issueId.const",
+      "$.response_format.json_schema.schema.properties.issueId.pattern"
+    ],
+    "expectedChangedPaths": [
+      "$.response_format.json_schema.schema.properties.issueId.const",
+      "$.response_format.json_schema.schema.properties.issueId.pattern"
+    ],
+    "unexpectedChangedPaths": []
+  },
+  "result": {
+    "requestIntegrity": {
+      "requestBodyBytes": 9517,
+      "requestBodySha256": "9dd98c60899f35cf359329663dd0b2e4d5c9b49ebcb87b442604cfc86b089a39",
+      "providerSchemaBytes": 5394,
+      "providerSchemaSha256": "16dbb511ff8ca97e456b275bddbf8ee3bde356f7f0dd3074ea5e3a74692a9e01",
+      "schemaDepth": 7,
+      "schemaNodeCount": 76,
+      "patternCount": 9,
+      "enumNodeCount": 5,
+      "totalEnumLiteralCount": 23,
+      "constCount": 14,
+      "schemaName": "shadow_ai_economic_resolution_plan_synthetic_preflight_v1",
+      "model": "anthropic/claude-opus-4.6",
+      "routing": {
+        "allow_fallbacks": false,
+        "require_parameters": true
+      },
+      "generation": {
+        "store": false,
+        "stream": false,
+        "temperature": 0,
+        "maxTokens": 4000
+      },
+      "responseFormat": {
+        "type": "json_schema",
+        "strict": true
+      },
+      "messageRoles": [
+        "system",
+        "user"
+      ],
+      "messageBytes": [
+        1170,
+        2361
+      ]
+    },
+    "provider": {
+      "requestReachedOpenRouter": true,
+      "httpStatus": 400,
+      "returnedModel": null,
+      "selectedProvider": null,
+      "openRouterRequestId": null,
+      "generationId": "gen-1789512732-HkUbvyE8mgLDvzNqdO4Z",
+      "routerAttemptCount": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "totalTokens": null,
+      "accountedCostUsd": null,
+      "costMetadataAvailable": false,
+      "latencyMs": 2466,
+      "timeToHeadersMs": 2463,
+      "bodyReadLatencyMs": 3,
+      "failureCategory": "MALFORMED_REQUEST",
+      "providerFailureKind": "REQUEST_PARAMETER_REJECTED",
+      "safeErrorType": "invalid_request_error",
+      "safeErrorCode": "400",
+      "safeErrorParameter": null,
+      "safeErrorMessage": "Provider rejected a request parameter.",
+      "providerSafeErrorCode": null,
+      "providerDiagnosticSource": "NESTED_METADATA"
+    },
+    "localFailure": null,
+    "validation": {
+      "structuredOutputReturned": false,
+      "providerFacingShapeValid": false,
+      "providerFacingShapeErrors": [
+        "full_planner_output_not_object"
+      ],
+      "requestedModelMatched": false
+    },
+    "accepted": false
+  },
+  "accounting": {
+    "callsReserved": 1,
+    "callsAttempted": 1,
+    "callsCompleted": 1,
+    "retries": 0,
+    "fallbacks": 0,
+    "inputTokens": null,
+    "outputTokens": null,
+    "totalTokens": null,
+    "accountedCostUsd": null,
+    "costMetadataAvailable": false
+  },
+  "hypothesisAssessment": {
+    "issueIdPatternSufficientCause": null,
+    "status": "DIRECTLY_IMPLICATED_NOT_PROVEN"
+  },
+  "conclusion": "The issueId-only variant reproduces HTTP 400 request-parameter rejection; the stable issueId pattern is directly implicated under this controlled synthetic test but is not automatically proven as the sole real-request cause.",
+  "anotherProviderCallNeededNow": false,
+  "recommendedNextProductStep": "Return to Product review without changing the pattern or implementing a fix."
+}
