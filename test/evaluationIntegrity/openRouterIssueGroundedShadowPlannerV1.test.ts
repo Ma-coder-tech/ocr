@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ShadowAiEconomicIssueClassV1, ShadowAiEconomicResolutionPacketV1 } from "../../src/canonical/shadowAiEconomicResolutionPlannerTypesV1.js";
 import { canonicalJson } from "../../src/canonical/v2/canonicalJson.js";
+import { inspectShadowAiProviderBoundRequestPrivacyV1 } from "../../src/canonical/shadowAiEconomicResolutionProviderReferenceBoundaryV1.js";
 import { createSyntheticFullPlannerPacketV1 } from "../../src/evaluationIntegrity/openRouterFullPlannerSchemaPreflightV1.js";
 import {
   buildIssueGroundedPlannerContextV1,
@@ -38,7 +39,21 @@ describe("Issue-Grounded Shadow AI Planner Prompt v1", () => {
       response_format: { type: "json_schema", json_schema: { name: "shadow_ai_economic_resolution_plan_issue_grounded_v1", strict: true } },
     });
     expect(Object.keys(user).sort()).toEqual(["issueContext", "packet"]);
-    expect(user.packet).toEqual(packet);
+    expect(user.packet).not.toEqual(packet);
+    expect(user.packet.issueId).toBe(packet.issueId);
+    expect(user.packet.immutableInputHash).toBe(request.referenceMap.providerInputHash);
+    expect(request.referenceMap.internalInputHash).toBe(packet.immutableInputHash);
+    expect(request.referenceMap.entries.length).toBeGreaterThan(0);
+    for (const entry of request.referenceMap.entries) {
+      expect(request.body).toContain(entry.alias);
+      expect(request.body).not.toContain(entry.internalReference);
+    }
+    expect(inspectShadowAiProviderBoundRequestPrivacyV1(request.body, request.referenceMap)).toMatchObject({
+      valid: true,
+      rawInternalReferenceLeakageCount: 0,
+      rawReverseMapMaterialCount: 0,
+      sourceIdentityLeakageCount: 0,
+    });
     expect(body.outputs).toBeUndefined();
     expect(user.packets).toBeUndefined();
     expect(countSchemaKeywordV2(request.providerSchema, "minLength")).toBe(0);

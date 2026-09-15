@@ -39,6 +39,7 @@ export type OpenRouterPreflightFailureCategoryV2 =
 
 export type OpenRouterSafeProviderFailureKindV2 =
   | "JSON_SCHEMA_REJECTED"
+  | "OUTPUT_REFERENCE_REJECTED"
   | "REQUEST_PARAMETER_REJECTED"
   | "REQUEST_SIZE_REJECTED"
   | "MODEL_ACCESS_REJECTED"
@@ -560,6 +561,7 @@ function classifySafeProviderFailureKind(value: string): OpenRouterSafeProviderF
 function normalizedSafeProviderMessage(kind: OpenRouterSafeProviderFailureKindV2, rawClassificationText: string): string {
   const messages: Record<OpenRouterSafeProviderFailureKindV2, string> = {
     JSON_SCHEMA_REJECTED: "Provider rejected the structured-output JSON schema.",
+    OUTPUT_REFERENCE_REJECTED: "Provider output failed the reference-alias boundary.",
     REQUEST_PARAMETER_REJECTED: "Provider rejected a request parameter.",
     REQUEST_SIZE_REJECTED: "Provider rejected the request size.",
     MODEL_ACCESS_REJECTED: "Provider rejected model access.",

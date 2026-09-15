@@ -1,0 +1,2873 @@
+{
+  "schemaVersion": "gold_planner_source_reference_containment_offline_validation_2026_09_15_v1",
+  "baselineCommit": "e268d6e48823a15996c4c5c401459dab710f1a5a",
+  "providerCalls": 0,
+  "statementCount": 11,
+  "issueCount": 60,
+  "issueClassDistribution": {
+    "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE": 11,
+    "QUALIFICATION_INTEGRITY_ROOT_CAUSE": 7,
+    "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS": 9,
+    "COST_INCIDENCE_UNCERTAINTY": 11,
+    "PARTICIPANT_CONTROL_UNCERTAINTY": 11,
+    "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED": 11
+  },
+  "statements": [
+    {
+      "statementAlias": "supported-fiserv-gold-01",
+      "issueCount": 6,
+      "issueClasses": [
+        "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+        "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+        "COST_INCIDENCE_UNCERTAINTY",
+        "PARTICIPANT_CONTROL_UNCERTAINTY",
+        "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+        "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS"
+      ],
+      "issueResults": [
+        {
+          "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 3,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 3
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11791,
+            "providerSchemaBytes": 5787,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1140,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 52,
+            "GOVERNED_EVIDENCE": 39,
+            "ECONOMIC_CHARGE": 3
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 52,
+            "GOVERNED_EVIDENCE": 39,
+            "ECONOMIC_CHARGE": 3
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 21316,
+            "providerSchemaBytes": 11869,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 46,
+            "totalEnumLiteralCount": 303,
+            "totalEnumLiteralBytes": 6969,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 52,
+            "GOVERNED_EVIDENCE": 66,
+            "ECONOMIC_CHARGE": 1
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 52,
+            "GOVERNED_EVIDENCE": 66,
+            "ECONOMIC_CHARGE": 1
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 24661,
+            "providerSchemaBytes": 15469,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 71,
+            "totalEnumLiteralCount": 453,
+            "totalEnumLiteralBytes": 10419,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 52,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 52
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 12673,
+            "providerSchemaBytes": 5779,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1132,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 52,
+            "GOVERNED_EVIDENCE": 214,
+            "ECONOMIC_CHARGE": 3
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 52,
+            "GOVERNED_EVIDENCE": 214,
+            "ECONOMIC_CHARGE": 3
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 51246,
+            "providerSchemaBytes": 37029,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 221,
+            "totalEnumLiteralCount": 1352,
+            "totalEnumLiteralBytes": 31080,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 52,
+            "GOVERNED_EVIDENCE": 214,
+            "ECONOMIC_CHARGE": 3
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 52,
+            "GOVERNED_EVIDENCE": 214,
+            "ECONOMIC_CHARGE": 3
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 50991,
+            "providerSchemaBytes": 37004,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 221,
+            "totalEnumLiteralCount": 1351,
+            "totalEnumLiteralBytes": 31056,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        }
+      ],
+      "invariance": {
+        "canonical": true,
+        "rd": true,
+        "decomposition": true,
+        "sourceFingerprint": true,
+        "activity": true,
+        "qualification": true,
+        "countSensitivity": true,
+        "volumeSensitivity": true,
+        "mixedMinimumSensitivity": true,
+        "fixedSensitivity": true,
+        "chargedCost": true,
+        "costStackCategories": true,
+        "participantControl": true,
+        "completeness": true,
+        "materialityInputs": true
+      }
+    },
+    {
+      "statementAlias": "supported-fiserv-gold-02",
+      "issueCount": 6,
+      "issueClasses": [
+        "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+        "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+        "COST_INCIDENCE_UNCERTAINTY",
+        "PARTICIPANT_CONTROL_UNCERTAINTY",
+        "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+        "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS"
+      ],
+      "issueResults": [
+        {
+          "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 3,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 3
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11830,
+            "providerSchemaBytes": 5787,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1140,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 66,
+            "GOVERNED_EVIDENCE": 39,
+            "ECONOMIC_CHARGE": 3
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 66,
+            "GOVERNED_EVIDENCE": 39,
+            "ECONOMIC_CHARGE": 3
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 21764,
+            "providerSchemaBytes": 11869,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 46,
+            "totalEnumLiteralCount": 303,
+            "totalEnumLiteralBytes": 6969,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 66,
+            "GOVERNED_EVIDENCE": 66,
+            "ECONOMIC_CHARGE": 1
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 66,
+            "GOVERNED_EVIDENCE": 66,
+            "ECONOMIC_CHARGE": 1
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 25141,
+            "providerSchemaBytes": 15469,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 71,
+            "totalEnumLiteralCount": 453,
+            "totalEnumLiteralBytes": 10419,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 66,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 66
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 13153,
+            "providerSchemaBytes": 5779,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1132,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 66,
+            "GOVERNED_EVIDENCE": 214,
+            "ECONOMIC_CHARGE": 3
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 66,
+            "GOVERNED_EVIDENCE": 214,
+            "ECONOMIC_CHARGE": 3
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 51726,
+            "providerSchemaBytes": 37029,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 221,
+            "totalEnumLiteralCount": 1352,
+            "totalEnumLiteralBytes": 31080,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 66,
+            "GOVERNED_EVIDENCE": 214,
+            "ECONOMIC_CHARGE": 3
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 66,
+            "GOVERNED_EVIDENCE": 214,
+            "ECONOMIC_CHARGE": 3
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 51471,
+            "providerSchemaBytes": 37004,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 221,
+            "totalEnumLiteralCount": 1351,
+            "totalEnumLiteralBytes": 31056,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        }
+      ],
+      "invariance": {
+        "canonical": true,
+        "rd": true,
+        "decomposition": true,
+        "sourceFingerprint": true,
+        "activity": true,
+        "qualification": true,
+        "countSensitivity": true,
+        "volumeSensitivity": true,
+        "mixedMinimumSensitivity": true,
+        "fixedSensitivity": true,
+        "chargedCost": true,
+        "costStackCategories": true,
+        "participantControl": true,
+        "completeness": true,
+        "materialityInputs": true
+      }
+    },
+    {
+      "statementAlias": "supported-fiserv-gold-03",
+      "issueCount": 5,
+      "issueClasses": [
+        "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+        "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+        "COST_INCIDENCE_UNCERTAINTY",
+        "PARTICIPANT_CONTROL_UNCERTAINTY",
+        "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS"
+      ],
+      "issueResults": [
+        {
+          "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 1,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 1
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11769,
+            "providerSchemaBytes": 5787,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1140,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 18,
+            "GOVERNED_EVIDENCE": 8,
+            "ECONOMIC_CHARGE": 1
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 18,
+            "GOVERNED_EVIDENCE": 8,
+            "ECONOMIC_CHARGE": 1
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 14079,
+            "providerSchemaBytes": 7117,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 13,
+            "totalEnumLiteralCount": 105,
+            "totalEnumLiteralBytes": 2415,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 18,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 18
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11907,
+            "providerSchemaBytes": 5779,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1132,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 18,
+            "GOVERNED_EVIDENCE": 9,
+            "ECONOMIC_CHARGE": 2
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 18,
+            "GOVERNED_EVIDENCE": 9,
+            "ECONOMIC_CHARGE": 2
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 14971,
+            "providerSchemaBytes": 7365,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 15,
+            "totalEnumLiteralCount": 116,
+            "totalEnumLiteralBytes": 2652,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 18,
+            "GOVERNED_EVIDENCE": 9,
+            "ECONOMIC_CHARGE": 2
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 18,
+            "GOVERNED_EVIDENCE": 9,
+            "ECONOMIC_CHARGE": 2
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 14716,
+            "providerSchemaBytes": 7340,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 15,
+            "totalEnumLiteralCount": 115,
+            "totalEnumLiteralBytes": 2628,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        }
+      ],
+      "invariance": {
+        "canonical": true,
+        "rd": true,
+        "decomposition": true,
+        "sourceFingerprint": true,
+        "activity": true,
+        "qualification": true,
+        "countSensitivity": true,
+        "volumeSensitivity": true,
+        "mixedMinimumSensitivity": true,
+        "fixedSensitivity": true,
+        "chargedCost": true,
+        "costStackCategories": true,
+        "participantControl": true,
+        "completeness": true,
+        "materialityInputs": true
+      }
+    },
+    {
+      "statementAlias": "supported-fiserv-gold-04",
+      "issueCount": 4,
+      "issueClasses": [
+        "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+        "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+        "COST_INCIDENCE_UNCERTAINTY",
+        "PARTICIPANT_CONTROL_UNCERTAINTY"
+      ],
+      "issueResults": [
+        {
+          "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 0,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11744,
+            "providerSchemaBytes": 5787,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1140,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": false,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 30,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 30
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 12215,
+            "providerSchemaBytes": 5779,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1132,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 30,
+            "GOVERNED_EVIDENCE": 99,
+            "ECONOMIC_CHARGE": 2
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 30,
+            "GOVERNED_EVIDENCE": 99,
+            "ECONOMIC_CHARGE": 2
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 30569,
+            "providerSchemaBytes": 20325,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 105,
+            "totalEnumLiteralCount": 656,
+            "totalEnumLiteralBytes": 15072,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 30,
+            "GOVERNED_EVIDENCE": 108,
+            "ECONOMIC_CHARGE": 2
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 30,
+            "GOVERNED_EVIDENCE": 108,
+            "ECONOMIC_CHARGE": 2
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 31844,
+            "providerSchemaBytes": 21596,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 114,
+            "totalEnumLiteralCount": 709,
+            "totalEnumLiteralBytes": 16290,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        }
+      ],
+      "invariance": {
+        "canonical": true,
+        "rd": true,
+        "decomposition": true,
+        "sourceFingerprint": true,
+        "activity": true,
+        "qualification": true,
+        "countSensitivity": true,
+        "volumeSensitivity": true,
+        "mixedMinimumSensitivity": true,
+        "fixedSensitivity": true,
+        "chargedCost": true,
+        "costStackCategories": true,
+        "participantControl": true,
+        "completeness": true,
+        "materialityInputs": true
+      }
+    },
+    {
+      "statementAlias": "supported-fiserv-gold-05",
+      "issueCount": 6,
+      "issueClasses": [
+        "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+        "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+        "COST_INCIDENCE_UNCERTAINTY",
+        "PARTICIPANT_CONTROL_UNCERTAINTY",
+        "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+        "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS"
+      ],
+      "issueResults": [
+        {
+          "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 3,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 3
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11831,
+            "providerSchemaBytes": 5787,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1140,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 48,
+            "ECONOMIC_CHARGE": 5
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 48,
+            "ECONOMIC_CHARGE": 5
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 23067,
+            "providerSchemaBytes": 13453,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 57,
+            "totalEnumLiteralCount": 369,
+            "totalEnumLiteralBytes": 8487,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 48,
+            "ECONOMIC_CHARGE": 3
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 48,
+            "ECONOMIC_CHARGE": 3
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 21751,
+            "providerSchemaBytes": 13165,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 55,
+            "totalEnumLiteralCount": 357,
+            "totalEnumLiteralBytes": 8211,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11654,
+            "providerSchemaBytes": 5779,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1132,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 176,
+            "ECONOMIC_CHARGE": 8
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 176,
+            "ECONOMIC_CHARGE": 8
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 46794,
+            "providerSchemaBytes": 32277,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 188,
+            "totalEnumLiteralCount": 1154,
+            "totalEnumLiteralBytes": 26526,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 176,
+            "ECONOMIC_CHARGE": 8
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 176,
+            "ECONOMIC_CHARGE": 8
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 46539,
+            "providerSchemaBytes": 32252,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 188,
+            "totalEnumLiteralCount": 1153,
+            "totalEnumLiteralBytes": 26502,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        }
+      ],
+      "invariance": {
+        "canonical": true,
+        "rd": true,
+        "decomposition": true,
+        "sourceFingerprint": true,
+        "activity": true,
+        "qualification": true,
+        "countSensitivity": true,
+        "volumeSensitivity": true,
+        "mixedMinimumSensitivity": true,
+        "fixedSensitivity": true,
+        "chargedCost": true,
+        "costStackCategories": true,
+        "participantControl": true,
+        "completeness": true,
+        "materialityInputs": true
+      }
+    },
+    {
+      "statementAlias": "supported-fiserv-gold-06",
+      "issueCount": 6,
+      "issueClasses": [
+        "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+        "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+        "COST_INCIDENCE_UNCERTAINTY",
+        "PARTICIPANT_CONTROL_UNCERTAINTY",
+        "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+        "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS"
+      ],
+      "issueResults": [
+        {
+          "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 0,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11749,
+            "providerSchemaBytes": 5787,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1140,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": false,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 12,
+            "GOVERNED_EVIDENCE": 65,
+            "ECONOMIC_CHARGE": 8
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 12,
+            "GOVERNED_EVIDENCE": 65,
+            "ECONOMIC_CHARGE": 8
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 27989,
+            "providerSchemaBytes": 16333,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 77,
+            "totalEnumLiteralCount": 489,
+            "totalEnumLiteralBytes": 11247,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 12,
+            "GOVERNED_EVIDENCE": 58,
+            "ECONOMIC_CHARGE": 4
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 12,
+            "GOVERNED_EVIDENCE": 58,
+            "ECONOMIC_CHARGE": 4
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 24266,
+            "providerSchemaBytes": 14749,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 66,
+            "totalEnumLiteralCount": 423,
+            "totalEnumLiteralBytes": 9729,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 12,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 12
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11758,
+            "providerSchemaBytes": 5779,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1132,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 12,
+            "GOVERNED_EVIDENCE": 151,
+            "ECONOMIC_CHARGE": 7
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 12,
+            "GOVERNED_EVIDENCE": 151,
+            "ECONOMIC_CHARGE": 7
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 42050,
+            "providerSchemaBytes": 28533,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 162,
+            "totalEnumLiteralCount": 998,
+            "totalEnumLiteralBytes": 22938,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 12,
+            "GOVERNED_EVIDENCE": 157,
+            "ECONOMIC_CHARGE": 7
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 12,
+            "GOVERNED_EVIDENCE": 157,
+            "ECONOMIC_CHARGE": 7
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 42815,
+            "providerSchemaBytes": 29372,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 168,
+            "totalEnumLiteralCount": 1033,
+            "totalEnumLiteralBytes": 23742,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        }
+      ],
+      "invariance": {
+        "canonical": true,
+        "rd": true,
+        "decomposition": true,
+        "sourceFingerprint": true,
+        "activity": true,
+        "qualification": true,
+        "countSensitivity": true,
+        "volumeSensitivity": true,
+        "mixedMinimumSensitivity": true,
+        "fixedSensitivity": true,
+        "chargedCost": true,
+        "costStackCategories": true,
+        "participantControl": true,
+        "completeness": true,
+        "materialityInputs": true
+      }
+    },
+    {
+      "statementAlias": "supported-fiserv-gold-07",
+      "issueCount": 5,
+      "issueClasses": [
+        "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+        "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+        "COST_INCIDENCE_UNCERTAINTY",
+        "PARTICIPANT_CONTROL_UNCERTAINTY",
+        "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS"
+      ],
+      "issueResults": [
+        {
+          "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 0,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11724,
+            "providerSchemaBytes": 5787,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1140,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": false,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 2,
+            "GOVERNED_EVIDENCE": 28,
+            "ECONOMIC_CHARGE": 4
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 2,
+            "GOVERNED_EVIDENCE": 28,
+            "ECONOMIC_CHARGE": 4
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 18922,
+            "providerSchemaBytes": 10429,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 36,
+            "totalEnumLiteralCount": 243,
+            "totalEnumLiteralBytes": 5589,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 2,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 2
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11436,
+            "providerSchemaBytes": 5779,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1132,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 2,
+            "GOVERNED_EVIDENCE": 81,
+            "ECONOMIC_CHARGE": 4
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 2,
+            "GOVERNED_EVIDENCE": 81,
+            "ECONOMIC_CHARGE": 4
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 28018,
+            "providerSchemaBytes": 18021,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 89,
+            "totalEnumLiteralCount": 560,
+            "totalEnumLiteralBytes": 12864,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 2,
+            "GOVERNED_EVIDENCE": 81,
+            "ECONOMIC_CHARGE": 4
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 2,
+            "GOVERNED_EVIDENCE": 81,
+            "ECONOMIC_CHARGE": 4
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 27763,
+            "providerSchemaBytes": 17996,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 89,
+            "totalEnumLiteralCount": 559,
+            "totalEnumLiteralBytes": 12840,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        }
+      ],
+      "invariance": {
+        "canonical": true,
+        "rd": true,
+        "decomposition": true,
+        "sourceFingerprint": true,
+        "activity": true,
+        "qualification": true,
+        "countSensitivity": true,
+        "volumeSensitivity": true,
+        "mixedMinimumSensitivity": true,
+        "fixedSensitivity": true,
+        "chargedCost": true,
+        "costStackCategories": true,
+        "participantControl": true,
+        "completeness": true,
+        "materialityInputs": true
+      }
+    },
+    {
+      "statementAlias": "supported-fiserv-gold-08",
+      "issueCount": 6,
+      "issueClasses": [
+        "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+        "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+        "COST_INCIDENCE_UNCERTAINTY",
+        "PARTICIPANT_CONTROL_UNCERTAINTY",
+        "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+        "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS"
+      ],
+      "issueResults": [
+        {
+          "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 0,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11752,
+            "providerSchemaBytes": 5787,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1140,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": false,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 45,
+            "ECONOMIC_CHARGE": 2
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 45,
+            "ECONOMIC_CHARGE": 2
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 20627,
+            "providerSchemaBytes": 12589,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 51,
+            "totalEnumLiteralCount": 333,
+            "totalEnumLiteralBytes": 7659,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 35,
+            "ECONOMIC_CHARGE": 2
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 35,
+            "ECONOMIC_CHARGE": 2
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 18983,
+            "providerSchemaBytes": 11149,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 41,
+            "totalEnumLiteralCount": 273,
+            "totalEnumLiteralBytes": 6279,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11578,
+            "providerSchemaBytes": 5779,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1132,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 116,
+            "ECONOMIC_CHARGE": 2
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 116,
+            "ECONOMIC_CHARGE": 2
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 32839,
+            "providerSchemaBytes": 22773,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 122,
+            "totalEnumLiteralCount": 758,
+            "totalEnumLiteralBytes": 17418,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 116,
+            "ECONOMIC_CHARGE": 2
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 5,
+            "GOVERNED_EVIDENCE": 116,
+            "ECONOMIC_CHARGE": 2
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 32584,
+            "providerSchemaBytes": 22748,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 122,
+            "totalEnumLiteralCount": 757,
+            "totalEnumLiteralBytes": 17394,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        }
+      ],
+      "invariance": {
+        "canonical": true,
+        "rd": true,
+        "decomposition": true,
+        "sourceFingerprint": true,
+        "activity": true,
+        "qualification": true,
+        "countSensitivity": true,
+        "volumeSensitivity": true,
+        "mixedMinimumSensitivity": true,
+        "fixedSensitivity": true,
+        "chargedCost": true,
+        "costStackCategories": true,
+        "participantControl": true,
+        "completeness": true,
+        "materialityInputs": true
+      }
+    },
+    {
+      "statementAlias": "supported-fiserv-gold-09",
+      "issueCount": 4,
+      "issueClasses": [
+        "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+        "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+        "COST_INCIDENCE_UNCERTAINTY",
+        "PARTICIPANT_CONTROL_UNCERTAINTY"
+      ],
+      "issueResults": [
+        {
+          "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 0,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11696,
+            "providerSchemaBytes": 5787,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1140,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": false,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 1,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 1
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11344,
+            "providerSchemaBytes": 5779,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1132,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 1,
+            "GOVERNED_EVIDENCE": 45,
+            "ECONOMIC_CHARGE": 1
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 1,
+            "GOVERNED_EVIDENCE": 45,
+            "ECONOMIC_CHARGE": 1
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 19873,
+            "providerSchemaBytes": 12405,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 50,
+            "totalEnumLiteralCount": 326,
+            "totalEnumLiteralBytes": 7482,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 1,
+            "GOVERNED_EVIDENCE": 45,
+            "ECONOMIC_CHARGE": 1
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 1,
+            "GOVERNED_EVIDENCE": 45,
+            "ECONOMIC_CHARGE": 1
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 19618,
+            "providerSchemaBytes": 12380,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 50,
+            "totalEnumLiteralCount": 325,
+            "totalEnumLiteralBytes": 7458,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        }
+      ],
+      "invariance": {
+        "canonical": true,
+        "rd": true,
+        "decomposition": true,
+        "sourceFingerprint": true,
+        "activity": true,
+        "qualification": true,
+        "countSensitivity": true,
+        "volumeSensitivity": true,
+        "mixedMinimumSensitivity": true,
+        "fixedSensitivity": true,
+        "chargedCost": true,
+        "costStackCategories": true,
+        "participantControl": true,
+        "completeness": true,
+        "materialityInputs": true
+      }
+    },
+    {
+      "statementAlias": "supported-fiserv-gold-10",
+      "issueCount": 6,
+      "issueClasses": [
+        "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+        "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+        "COST_INCIDENCE_UNCERTAINTY",
+        "PARTICIPANT_CONTROL_UNCERTAINTY",
+        "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+        "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS"
+      ],
+      "issueResults": [
+        {
+          "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 0,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11750,
+            "providerSchemaBytes": 5787,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1140,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": false,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 4,
+            "GOVERNED_EVIDENCE": 33,
+            "ECONOMIC_CHARGE": 6
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 4,
+            "GOVERNED_EVIDENCE": 33,
+            "ECONOMIC_CHARGE": 6
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 21004,
+            "providerSchemaBytes": 11437,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 43,
+            "totalEnumLiteralCount": 285,
+            "totalEnumLiteralBytes": 6555,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 4,
+            "GOVERNED_EVIDENCE": 38,
+            "ECONOMIC_CHARGE": 6
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 4,
+            "GOVERNED_EVIDENCE": 38,
+            "ECONOMIC_CHARGE": 6
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 21971,
+            "providerSchemaBytes": 12157,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 48,
+            "totalEnumLiteralCount": 315,
+            "totalEnumLiteralBytes": 7245,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 4,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 4
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11518,
+            "providerSchemaBytes": 5779,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1132,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 4,
+            "GOVERNED_EVIDENCE": 38,
+            "ECONOMIC_CHARGE": 6
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 4,
+            "GOVERNED_EVIDENCE": 38,
+            "ECONOMIC_CHARGE": 6
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 22057,
+            "providerSchemaBytes": 12117,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 48,
+            "totalEnumLiteralCount": 314,
+            "totalEnumLiteralBytes": 7206,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 4,
+            "GOVERNED_EVIDENCE": 38,
+            "ECONOMIC_CHARGE": 6
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 4,
+            "GOVERNED_EVIDENCE": 38,
+            "ECONOMIC_CHARGE": 6
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 21802,
+            "providerSchemaBytes": 12092,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 48,
+            "totalEnumLiteralCount": 313,
+            "totalEnumLiteralBytes": 7182,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        }
+      ],
+      "invariance": {
+        "canonical": true,
+        "rd": true,
+        "decomposition": true,
+        "sourceFingerprint": true,
+        "activity": true,
+        "qualification": true,
+        "countSensitivity": true,
+        "volumeSensitivity": true,
+        "mixedMinimumSensitivity": true,
+        "fixedSensitivity": true,
+        "chargedCost": true,
+        "costStackCategories": true,
+        "participantControl": true,
+        "completeness": true,
+        "materialityInputs": true
+      }
+    },
+    {
+      "statementAlias": "supported-fiserv-gold-11",
+      "issueCount": 6,
+      "issueClasses": [
+        "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+        "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+        "COST_INCIDENCE_UNCERTAINTY",
+        "PARTICIPANT_CONTROL_UNCERTAINTY",
+        "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+        "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS"
+      ],
+      "issueResults": [
+        {
+          "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 3,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 3
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11830,
+            "providerSchemaBytes": 5787,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1140,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 10,
+            "GOVERNED_EVIDENCE": 37,
+            "ECONOMIC_CHARGE": 2
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 10,
+            "GOVERNED_EVIDENCE": 37,
+            "ECONOMIC_CHARGE": 2
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 19436,
+            "providerSchemaBytes": 11437,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 43,
+            "totalEnumLiteralCount": 285,
+            "totalEnumLiteralBytes": 6555,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 10,
+            "GOVERNED_EVIDENCE": 64,
+            "ECONOMIC_CHARGE": 1
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 10,
+            "GOVERNED_EVIDENCE": 64,
+            "ECONOMIC_CHARGE": 1
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 23424,
+            "providerSchemaBytes": 15181,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 69,
+            "totalEnumLiteralCount": 441,
+            "totalEnumLiteralBytes": 10143,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 10,
+            "GOVERNED_EVIDENCE": 0,
+            "ECONOMIC_CHARGE": 0
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 10
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 11776,
+            "providerSchemaBytes": 5779,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 8,
+            "totalEnumLiteralCount": 50,
+            "totalEnumLiteralBytes": 1132,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 10,
+            "GOVERNED_EVIDENCE": 179,
+            "ECONOMIC_CHARGE": 9
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 10,
+            "GOVERNED_EVIDENCE": 179,
+            "ECONOMIC_CHARGE": 9
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 48206,
+            "providerSchemaBytes": 32853,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 192,
+            "totalEnumLiteralCount": 1178,
+            "totalEnumLiteralBytes": 27078,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        },
+        {
+          "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+          "internalReferenceCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 10,
+            "GOVERNED_EVIDENCE": 183,
+            "ECONOMIC_CHARGE": 9
+          },
+          "outboundAliasCounts": {
+            "FACT": 4,
+            "STATEMENT_EVIDENCE": 10,
+            "GOVERNED_EVIDENCE": 183,
+            "ECONOMIC_CHARGE": 9
+          },
+          "compatibilityMetrics": {
+            "requestBodyBytes": 48631,
+            "providerSchemaBytes": 33404,
+            "schemaDepth": 8,
+            "schemaNodeCount": 76,
+            "enumNodeCount": 12,
+            "maximumEnumCardinality": 196,
+            "totalEnumLiteralCount": 1201,
+            "totalEnumLiteralBytes": 27606,
+            "constCount": 15,
+            "arraySchemaNodeCount": 22
+          },
+          "privacy": {
+            "rawInternalReferenceLeakageCount": 0,
+            "sourceIdentityLeakageCount": 0,
+            "reverseMapMaterialCount": 0,
+            "reverseMapSerialized": false
+          },
+          "validation": {
+            "providerPacketDiffLimitedToReferenceContainment": true,
+            "exactReferenceRoundTrip": true,
+            "acceptedPlannerValidation": true,
+            "unknownAliasRejected": true,
+            "classConfusionTested": true,
+            "classConfusionRejected": true,
+            "rawInternalReferenceRejected": true
+          }
+        }
+      ],
+      "invariance": {
+        "canonical": true,
+        "rd": true,
+        "decomposition": true,
+        "sourceFingerprint": true,
+        "activity": true,
+        "qualification": true,
+        "countSensitivity": true,
+        "volumeSensitivity": true,
+        "mixedMinimumSensitivity": true,
+        "fixedSensitivity": true,
+        "chargedCost": true,
+        "costStackCategories": true,
+        "participantControl": true,
+        "completeness": true,
+        "materialityInputs": true
+      }
+    }
+  ],
+  "aggregate": {
+    "rawInternalReferenceLeakageCount": 0,
+    "sourceIdentityLeakageCount": 0,
+    "reverseMapMaterialLeakageCount": 0,
+    "reverseMapSerializedCount": 0,
+    "providerPacketReferenceOnlyDiffCount": 60,
+    "exactReferenceRoundTripCount": 60,
+    "acceptedPlannerValidationCount": 60,
+    "unknownAliasAcceptanceCount": 0,
+    "classConfusionTestedCount": 54,
+    "classConfusionAcceptanceCount": 0,
+    "rawReferenceAcceptanceCount": 0
+  },
+  "invariance": {
+    "canonicalFinancialTruthUnchanged": "11/11",
+    "rdUnchanged": "11/11",
+    "commercialDecompositionUnchanged": "11/11",
+    "sourceFingerprintUnchanged": "11/11",
+    "activityUnchanged": "11/11",
+    "qualificationUnchanged": "11/11",
+    "countSensitivityUnchanged": "11/11",
+    "volumeSensitivityUnchanged": "11/11",
+    "mixedMinimumSensitivityUnchanged": "11/11",
+    "fixedSensitivityUnchanged": "11/11",
+    "chargedCostUnchanged": "11/11",
+    "costStackCategoriesUnchanged": "11/11",
+    "participantControlUnchanged": "11/11",
+    "completenessUnchanged": "11/11",
+    "materialityInputsUnchanged": "11/11",
+    "commercialSourceExpectedSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "commercialSourceBeforeSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "commercialSourceAfterSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "commercialSourceUnchanged": true
+  },
+  "executionBoundary": {
+    "offlineOnly": true,
+    "providerCalls": 0,
+    "networkCalls": 0,
+    "researchOperations": 0,
+    "evidenceAdmissions": 0,
+    "customerOutputs": 0,
+    "productionRoutingChanges": 0,
+    "truthMutations": 0
+  },
+  "contentBoundary": {
+    "sourceFilenamesStored": false,
+    "packetContentsStored": false,
+    "reverseMapsStored": false,
+    "internalReferencesStored": false,
+    "merchantDerivedPayloadValuesCopied": false
+  }
+}

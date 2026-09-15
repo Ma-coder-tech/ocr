@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 
 import { validateShadowAiEconomicResolutionPlanV1 } from "../../src/canonical/shadowAiEconomicResolutionPlannerRuntimeV1.js";
+import {
+  inspectShadowAiProviderBoundRequestPrivacyV1,
+  providerAliasForInternalReferenceV1,
+  type ShadowAiProviderReferenceMapV1,
+} from "../../src/canonical/shadowAiEconomicResolutionProviderReferenceBoundaryV1.js";
 import { SHADOW_AI_ECONOMIC_RESOLUTION_OUTPUT_SCHEMA_VERSION } from "../../src/canonical/shadowAiEconomicResolutionPlannerTypesV1.js";
 import {
   buildOpenRouterFullPlannerSchemaPreflightRequestV1,
@@ -13,6 +18,7 @@ import {
   validateProviderFacingFullPlannerShapeV1,
   validateTranslatedConstraintSemanticsV1,
 } from "../../src/evaluationIntegrity/openRouterFullPlannerSchemaPreflightV1.js";
+import { OpenRouterClaudePreflightErrorV2 } from "../../src/evaluationIntegrity/openRouterClaudeStructuredOutputPreflightV2.js";
 
 describe("OpenRouter full planner schema synthetic preflight v1", () => {
   it("translates the actual full planner schema without changing the local schema", () => {
@@ -55,14 +61,25 @@ describe("OpenRouter full planner schema synthetic preflight v1", () => {
     });
     expect(body.tools).toBeUndefined();
     expect(body.tool_choice).toBeUndefined();
-    expect(request.bodyBytes).toBe(10_134);
-    expect(createHash("sha256").update(request.body).digest("hex")).toBe("875e4c7fb117078ad9b4cbe2c76a43d9a1cf63ad66804ca016e2caf5acc71a76");
+    expect(request.bodyBytes).toBe(9_824);
+    expect(createHash("sha256").update(request.body).digest("hex")).toBe("dc511536fef7026e51be0c72585f5212612403bb2423662bcb25bebb25ea4378");
     expect(request.body).not.toMatch(/\bGold\b|\bMID\b|account number|bank account|routing number|tax ID|\.pdf|\/Users\//i);
+    for (const entry of request.referenceMap.entries) {
+      expect(request.body).toContain(entry.alias);
+      expect(request.body).not.toContain(entry.internalReference);
+    }
+    expect(inspectShadowAiProviderBoundRequestPrivacyV1(request.body, request.referenceMap)).toMatchObject({
+      valid: true,
+      rawInternalReferenceLeakageCount: 0,
+      rawReverseMapMaterialCount: 0,
+      sourceIdentityLeakageCount: 0,
+    });
   });
 
   it("returns a complete full planner object that passes provider, local, grounding, and translated-constraint validation", async () => {
     const packet = createSyntheticFullPlannerPacketV1();
-    const output = validOutput(packet.issueId, packet.immutableInputHash);
+    const request = buildOpenRouterFullPlannerSchemaPreflightRequestV1("test-only-key", packet);
+    const output = validOutput(packet.issueId, request.referenceMap);
     let calls = 0;
     const result = await invokeOpenRouterFullPlannerSchemaPreflightV1({
       apiKey: "test-only-key",
@@ -90,9 +107,41 @@ describe("OpenRouter full planner schema synthetic preflight v1", () => {
     expect(inspectFullPlannerReferenceGroundingV1(result.rawOutput, packet)).toMatchObject({ valid: true, invalidRefs: [] });
     expect(result.telemetry).toMatchObject({ callCount: 1, retries: 0, returnedModel: "anthropic/claude-opus-4.6" });
   });
+
+  it("rejects an unknown provider alias before the output reaches accepted planner validation", async () => {
+    const packet = createSyntheticFullPlannerPacketV1();
+    const request = buildOpenRouterFullPlannerSchemaPreflightRequestV1("test-only-key", packet);
+    const output = validOutput(packet.issueId, request.referenceMap);
+    output.exactCitedFactRefs = [`prv_${request.referenceMap.scopeToken}_f_9999`];
+    const invocation = invokeOpenRouterFullPlannerSchemaPreflightV1({
+      apiKey: "test-only-key",
+      packet,
+      signal: new AbortController().signal,
+      fetchImplementation: async () => new Response(JSON.stringify({
+        id: "gen-full-planner-test-rejected",
+        model: "anthropic/claude-opus-4.6",
+        provider: "Anthropic",
+        choices: [{ index: 0, message: { role: "assistant", content: JSON.stringify(output) }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2, cost: 0 },
+      }), { status: 200 }),
+    });
+    await expect(invocation).rejects.toMatchObject({
+      name: OpenRouterClaudePreflightErrorV2.name,
+      telemetry: {
+        failureCategory: "STRUCTURED_OUTPUT_INCOMPATIBILITY",
+        providerFailureKind: "OUTPUT_REFERENCE_REJECTED",
+        safeErrorCode: "shadow_planner_provider_reference_alias_unknown",
+      },
+    });
+  });
 });
 
-function validOutput(issueId: string, inputHash: string) {
+function validOutput(issueId: string, referenceMap: ShadowAiProviderReferenceMapV1) {
+  const alias = (referenceClass: "FACT" | "GOVERNED_EVIDENCE" | "ECONOMIC_CHARGE", internalReference: string): string => {
+    const value = providerAliasForInternalReferenceV1(referenceMap, referenceClass, internalReference);
+    if (!value) throw new Error(`missing test alias ${referenceClass}:${internalReference}`);
+    return value;
+  };
   return {
     schemaVersion: SHADOW_AI_ECONOMIC_RESOLUTION_OUTPUT_SCHEMA_VERSION,
     outputType: "AI_INFERENCE_ONLY",
@@ -102,13 +151,13 @@ function validOutput(issueId: string, inputHash: string) {
     financialMutationAllowed: false,
     customerRenderingAllowed: false,
     issueId,
-    inputHash,
-    exactCitedFactRefs: ["synthetic_fact_fee_label_001", "synthetic_fact_fee_occurrence_001"],
+    inputHash: referenceMap.providerInputHash,
+    exactCitedFactRefs: [alias("FACT", "synthetic_fact_fee_label_001"), alias("FACT", "synthetic_fact_fee_occurrence_001")],
     unresolvedQuestion: "What economic role does the fictitious fee SYNTHETIC SERVICE PROGRAM X represent?",
     primaryHypothesis: {
       hypothesis: "The synthetic label may represent a bundled processor service, but the packet does not establish its components.",
       confidence: "LOW",
-      supportingFactRefs: ["synthetic_fact_fee_label_001", "synthetic_rd_charge_ref_001"],
+      supportingFactRefs: [alias("FACT", "synthetic_fact_fee_label_001"), alias("ECONOMIC_CHARGE", "synthetic_rd_charge_ref_001")],
       contradictingFactRefs: [],
       acknowledgedEvidenceGaps: ["The synthetic governing service schedule is absent."],
       confirmationRequirements: ["A synthetic contract schedule must map the label to bundled services."],
@@ -117,7 +166,7 @@ function validOutput(issueId: string, inputHash: string) {
     alternativeHypotheses: [{
       hypothesis: "The synthetic label may instead represent a gateway or platform program charge separate from processor services.",
       confidence: "LOW",
-      supportingFactRefs: ["synthetic_fact_fee_occurrence_001", "synthetic_governed_evidence_ref_001"],
+      supportingFactRefs: [alias("FACT", "synthetic_fact_fee_occurrence_001"), alias("GOVERNED_EVIDENCE", "synthetic_governed_evidence_ref_001")],
       contradictingFactRefs: [],
       acknowledgedEvidenceGaps: ["No synthetic gateway product-code mapping is present."],
       confirmationRequirements: ["Synthetic operational data must identify the system and product code that originated the charge."],

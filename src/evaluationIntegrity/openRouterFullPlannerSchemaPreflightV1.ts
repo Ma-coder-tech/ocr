@@ -2,6 +2,12 @@ import { createHash } from "node:crypto";
 
 import { inspectShadowAiEconomicResolutionPacketPrivacyV1 } from "../canonical/shadowAiEconomicResolutionIssueSelectionV1.js";
 import {
+  compileShadowAiProviderReferenceBoundaryV1,
+  inspectShadowAiProviderBoundRequestPrivacyV1,
+  restoreShadowAiProviderReferencesV1,
+  type ShadowAiProviderReferenceMapV1,
+} from "../canonical/shadowAiEconomicResolutionProviderReferenceBoundaryV1.js";
+import {
   SHADOW_AI_ECONOMIC_RESOLUTION_OUTPUT_SCHEMA_VERSION,
   SHADOW_AI_ECONOMIC_RESOLUTION_PACKET_SCHEMA_VERSION,
   SHADOW_AI_EVIDENCE_CLASSES,
@@ -14,6 +20,7 @@ import { APPROVED_OPENROUTER_ENDPOINT } from "../canonical/v2/intelligence/provi
 import {
   OPENROUTER_CLAUDE_PREFLIGHT_MODEL_V2,
   countSchemaKeywordV2,
+  OpenRouterClaudePreflightErrorV2,
   sendOpenRouterClaudeJsonSchemaEvaluationRequestV2,
   translateSchemaForAnthropicStructuredOutputsV2,
   type OpenRouterClaudePreflightRequestV2,
@@ -21,6 +28,10 @@ import {
 } from "./openRouterClaudeStructuredOutputPreflightV2.js";
 
 export const FULL_PLANNER_PREFLIGHT_SCHEMA_NAME_V1 = "shadow_ai_economic_resolution_plan_synthetic_preflight_v1" as const;
+
+export type OpenRouterFullPlannerRequestV1 = OpenRouterClaudePreflightRequestV2 & Readonly<{
+  referenceMap: ShadowAiProviderReferenceMapV1;
+}>;
 
 const PLAN_KEYS = Object.freeze([
   "schemaVersion", "outputType", "authority", "admissionStatus", "truthEffect",
@@ -189,9 +200,10 @@ export function localFullPlannerOutputSchemaV1(packet: ShadowAiEconomicResolutio
 export function buildOpenRouterFullPlannerSchemaPreflightRequestV1(
   apiKey: string,
   packet: ShadowAiEconomicResolutionPacketV1,
-): OpenRouterClaudePreflightRequestV2 {
+): OpenRouterFullPlannerRequestV1 {
   if (!apiKey) throw new Error("openrouter_full_planner_preflight_api_key_required");
-  const localSchema = localFullPlannerOutputSchemaV1(packet);
+  const boundary = compileShadowAiProviderReferenceBoundaryV1(packet);
+  const localSchema = localFullPlannerOutputSchemaV1(boundary.providerPacket);
   const providerSchema = translateSchemaForAnthropicStructuredOutputsV2(localSchema);
   for (const keyword of ["minLength", "maxLength", "maxItems"]) {
     if (countSchemaKeywordV2(providerSchema, keyword) !== 0) throw new Error(`full_planner_provider_schema_unsupported_keyword:${keyword}`);
@@ -204,7 +216,7 @@ export function buildOpenRouterFullPlannerSchemaPreflightRequestV1(
     max_tokens: 4_000,
     messages: [
       { role: "system", content: systemPrompt() },
-      { role: "user", content: canonicalJson({ packet }) },
+      { role: "user", content: canonicalJson({ packet: boundary.providerPacket }) },
     ],
     provider: { allow_fallbacks: false, require_parameters: true },
     response_format: {
@@ -212,9 +224,9 @@ export function buildOpenRouterFullPlannerSchemaPreflightRequestV1(
       json_schema: { name: FULL_PLANNER_PREFLIGHT_SCHEMA_NAME_V1, strict: true, schema: providerSchema },
     },
   });
-  return Object.freeze({
+  const requestValue = {
     endpoint: APPROVED_OPENROUTER_ENDPOINT,
-    method: "POST",
+    method: "POST" as const,
     headers: Object.freeze({
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
@@ -223,7 +235,17 @@ export function buildOpenRouterFullPlannerSchemaPreflightRequestV1(
     body,
     bodyBytes: Buffer.byteLength(body, "utf8"),
     providerSchema,
+  };
+  Object.defineProperty(requestValue, "referenceMap", {
+    value: boundary.referenceMap,
+    enumerable: false,
+    writable: false,
+    configurable: false,
   });
+  const request = Object.freeze(requestValue) as unknown as OpenRouterFullPlannerRequestV1;
+  const outboundPrivacy = inspectShadowAiProviderBoundRequestPrivacyV1(body, boundary.referenceMap);
+  if (!outboundPrivacy.valid) throw new Error(`openrouter_full_planner_outbound_reference_privacy_invalid:${outboundPrivacy.reasonCodes.join(",")}`);
+  return request;
 }
 
 export async function invokeOpenRouterFullPlannerSchemaPreflightV1(input: {
@@ -242,7 +264,21 @@ export async function invokeOpenRouterFullPlannerSchemaPreflightV1(input: {
     signal: input.signal,
     fetchImplementation: input.fetchImplementation,
   });
-  return Object.freeze({ rawOutput: result.rawOutput, telemetry: result.telemetry, requestBodyBytes: request.bodyBytes });
+  const restored = restoreShadowAiProviderReferencesV1(result.rawOutput, request.referenceMap);
+  if (!restored.ok) {
+    throw new OpenRouterClaudePreflightErrorV2(Object.freeze({
+      ...result.telemetry,
+      failureCategory: "STRUCTURED_OUTPUT_INCOMPATIBILITY" as const,
+      safeErrorType: "provider_reference_boundary_error",
+      safeErrorCode: restored.errorCodes[0] ?? "provider_reference_alias_validation_failed",
+      safeErrorParameter: null,
+      safeErrorMessage: "Provider output failed the reference-alias boundary.",
+      providerSafeErrorCode: null,
+      providerFailureKind: "OUTPUT_REFERENCE_REJECTED" as const,
+      providerDiagnosticSource: null,
+    }));
+  }
+  return Object.freeze({ rawOutput: restored.output, telemetry: result.telemetry, requestBodyBytes: request.bodyBytes });
 }
 
 export function validateProviderFacingFullPlannerShapeV1(value: unknown): Readonly<{ valid: boolean; errors: readonly string[] }> {

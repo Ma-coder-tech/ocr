@@ -1,0 +1,372 @@
+{
+  "schemaVersion": "planner_outbound_source_reference_privacy_containment_2026_09_15_v1",
+  "baselineCommit": "e268d6e48823a15996c4c5c401459dab710f1a5a",
+  "sourceArtifact": "evaluations/issue-diversity-shadow-ai-economic-analyst-pilot-v1/evaluation-2026-09-15.json",
+  "acceptedPackageAArtifact": "evaluations/planner-provider-compatibility-observability-safe-diagnostics-v1/diagnostics-2026-09-15.json",
+  "providerCalls": 0,
+  "reconstructedHistoricalRequestCount": 6,
+  "requests": [
+    {
+      "family": "AUTHORIZATION_ECONOMICS",
+      "statementAlias": "supported-fiserv-gold-01",
+      "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+      "historicalProviderResult": "ACCEPTED",
+      "previousInternalReferenceCounts": {
+        "FACT": 4,
+        "STATEMENT_EVIDENCE": 3,
+        "GOVERNED_EVIDENCE": 0,
+        "ECONOMIC_CHARGE": 0
+      },
+      "outboundAliasCounts": {
+        "FACT": 4,
+        "STATEMENT_EVIDENCE": 3,
+        "GOVERNED_EVIDENCE": 0,
+        "ECONOMIC_CHARGE": 0
+      },
+      "previousCompatibilityMetrics": {
+        "requestBodyBytes": 12427,
+        "providerSchemaBytes": 6200,
+        "schemaDepth": 8,
+        "schemaNodeCount": 76,
+        "enumNodeCount": 12,
+        "maximumEnumCardinality": 8,
+        "totalEnumLiteralCount": 50,
+        "totalEnumLiteralBytes": 1553,
+        "constCount": 15,
+        "arraySchemaNodeCount": 22
+      },
+      "containedCompatibilityMetrics": {
+        "requestBodyBytes": 11919,
+        "providerSchemaBytes": 5787,
+        "schemaDepth": 8,
+        "schemaNodeCount": 76,
+        "enumNodeCount": 12,
+        "maximumEnumCardinality": 8,
+        "totalEnumLiteralCount": 50,
+        "totalEnumLiteralBytes": 1140,
+        "constCount": 15,
+        "arraySchemaNodeCount": 22
+      },
+      "containment": {
+        "providerPacketHashRebound": true,
+        "providerPacketDiffLimitedToReferenceContainment": true,
+        "internalPacketSerializationUnchanged": true,
+        "rawInternalReferenceLeakageCount": 0,
+        "sourceIdentityLeakageCount": 0,
+        "reverseMapMaterialLeakageCount": 0,
+        "reverseMapSerialized": false,
+        "exactReferenceRoundTrip": true,
+        "acceptedPlannerValidationAfterRestore": true,
+        "unknownAliasRejected": true,
+        "classConfusionRejected": true,
+        "rawInternalReferenceRejected": true
+      }
+    },
+    {
+      "family": "SHARED_OR_BUNDLED_FEE_SEMANTICS",
+      "statementAlias": "supported-fiserv-gold-02",
+      "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+      "historicalProviderResult": "REJECTED_HTTP_400",
+      "previousInternalReferenceCounts": {
+        "FACT": 4,
+        "STATEMENT_EVIDENCE": 66,
+        "GOVERNED_EVIDENCE": 66,
+        "ECONOMIC_CHARGE": 1
+      },
+      "outboundAliasCounts": {
+        "FACT": 4,
+        "STATEMENT_EVIDENCE": 66,
+        "GOVERNED_EVIDENCE": 66,
+        "ECONOMIC_CHARGE": 1
+      },
+      "previousCompatibilityMetrics": {
+        "requestBodyBytes": 25668,
+        "providerSchemaBytes": 15055,
+        "schemaDepth": 8,
+        "schemaNodeCount": 76,
+        "enumNodeCount": 12,
+        "maximumEnumCardinality": 71,
+        "totalEnumLiteralCount": 453,
+        "totalEnumLiteralBytes": 10005,
+        "constCount": 15,
+        "arraySchemaNodeCount": 22
+      },
+      "containedCompatibilityMetrics": {
+        "requestBodyBytes": 25269,
+        "providerSchemaBytes": 15469,
+        "schemaDepth": 8,
+        "schemaNodeCount": 76,
+        "enumNodeCount": 12,
+        "maximumEnumCardinality": 71,
+        "totalEnumLiteralCount": 453,
+        "totalEnumLiteralBytes": 10419,
+        "constCount": 15,
+        "arraySchemaNodeCount": 22
+      },
+      "containment": {
+        "providerPacketHashRebound": true,
+        "providerPacketDiffLimitedToReferenceContainment": true,
+        "internalPacketSerializationUnchanged": true,
+        "rawInternalReferenceLeakageCount": 0,
+        "sourceIdentityLeakageCount": 0,
+        "reverseMapMaterialLeakageCount": 0,
+        "reverseMapSerialized": false,
+        "exactReferenceRoundTrip": true,
+        "acceptedPlannerValidationAfterRestore": true,
+        "unknownAliasRejected": true,
+        "classConfusionRejected": true,
+        "rawInternalReferenceRejected": true
+      }
+    },
+    {
+      "family": "QUALIFICATION_OR_INTEGRITY",
+      "statementAlias": "supported-fiserv-gold-05",
+      "issueClass": "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+      "historicalProviderResult": "REJECTED_HTTP_400",
+      "previousInternalReferenceCounts": {
+        "FACT": 4,
+        "STATEMENT_EVIDENCE": 5,
+        "GOVERNED_EVIDENCE": 48,
+        "ECONOMIC_CHARGE": 5
+      },
+      "outboundAliasCounts": {
+        "FACT": 4,
+        "STATEMENT_EVIDENCE": 5,
+        "GOVERNED_EVIDENCE": 48,
+        "ECONOMIC_CHARGE": 5
+      },
+      "previousCompatibilityMetrics": {
+        "requestBodyBytes": 22160,
+        "providerSchemaBytes": 12577,
+        "schemaDepth": 8,
+        "schemaNodeCount": 76,
+        "enumNodeCount": 12,
+        "maximumEnumCardinality": 57,
+        "totalEnumLiteralCount": 369,
+        "totalEnumLiteralBytes": 7611,
+        "constCount": 15,
+        "arraySchemaNodeCount": 22
+      },
+      "containedCompatibilityMetrics": {
+        "requestBodyBytes": 23170,
+        "providerSchemaBytes": 13453,
+        "schemaDepth": 8,
+        "schemaNodeCount": 76,
+        "enumNodeCount": 12,
+        "maximumEnumCardinality": 57,
+        "totalEnumLiteralCount": 369,
+        "totalEnumLiteralBytes": 8487,
+        "constCount": 15,
+        "arraySchemaNodeCount": 22
+      },
+      "containment": {
+        "providerPacketHashRebound": true,
+        "providerPacketDiffLimitedToReferenceContainment": true,
+        "internalPacketSerializationUnchanged": true,
+        "rawInternalReferenceLeakageCount": 0,
+        "sourceIdentityLeakageCount": 0,
+        "reverseMapMaterialLeakageCount": 0,
+        "reverseMapSerialized": false,
+        "exactReferenceRoundTrip": true,
+        "acceptedPlannerValidationAfterRestore": true,
+        "unknownAliasRejected": true,
+        "classConfusionRejected": true,
+        "rawInternalReferenceRejected": true
+      }
+    },
+    {
+      "family": "PARTICIPANT_OR_CONTROL",
+      "statementAlias": "supported-fiserv-gold-03",
+      "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+      "historicalProviderResult": "ACCEPTED",
+      "previousInternalReferenceCounts": {
+        "FACT": 4,
+        "STATEMENT_EVIDENCE": 18,
+        "GOVERNED_EVIDENCE": 9,
+        "ECONOMIC_CHARGE": 2
+      },
+      "outboundAliasCounts": {
+        "FACT": 4,
+        "STATEMENT_EVIDENCE": 18,
+        "GOVERNED_EVIDENCE": 9,
+        "ECONOMIC_CHARGE": 2
+      },
+      "previousCompatibilityMetrics": {
+        "requestBodyBytes": 15001,
+        "providerSchemaBytes": 7071,
+        "schemaDepth": 8,
+        "schemaNodeCount": 76,
+        "enumNodeCount": 12,
+        "maximumEnumCardinality": 15,
+        "totalEnumLiteralCount": 116,
+        "totalEnumLiteralBytes": 2358,
+        "constCount": 15,
+        "arraySchemaNodeCount": 22
+      },
+      "containedCompatibilityMetrics": {
+        "requestBodyBytes": 15099,
+        "providerSchemaBytes": 7365,
+        "schemaDepth": 8,
+        "schemaNodeCount": 76,
+        "enumNodeCount": 12,
+        "maximumEnumCardinality": 15,
+        "totalEnumLiteralCount": 116,
+        "totalEnumLiteralBytes": 2652,
+        "constCount": 15,
+        "arraySchemaNodeCount": 22
+      },
+      "containment": {
+        "providerPacketHashRebound": true,
+        "providerPacketDiffLimitedToReferenceContainment": true,
+        "internalPacketSerializationUnchanged": true,
+        "rawInternalReferenceLeakageCount": 0,
+        "sourceIdentityLeakageCount": 0,
+        "reverseMapMaterialLeakageCount": 0,
+        "reverseMapSerialized": false,
+        "exactReferenceRoundTrip": true,
+        "acceptedPlannerValidationAfterRestore": true,
+        "unknownAliasRejected": true,
+        "classConfusionRejected": true,
+        "rawInternalReferenceRejected": true
+      }
+    },
+    {
+      "family": "CONTRACT_OR_DOCUMENT",
+      "statementAlias": "supported-fiserv-gold-04",
+      "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+      "historicalProviderResult": "REJECTED_HTTP_400",
+      "previousInternalReferenceCounts": {
+        "FACT": 4,
+        "STATEMENT_EVIDENCE": 30,
+        "GOVERNED_EVIDENCE": 108,
+        "ECONOMIC_CHARGE": 2
+      },
+      "outboundAliasCounts": {
+        "FACT": 4,
+        "STATEMENT_EVIDENCE": 30,
+        "GOVERNED_EVIDENCE": 108,
+        "ECONOMIC_CHARGE": 2
+      },
+      "previousCompatibilityMetrics": {
+        "requestBodyBytes": 33057,
+        "providerSchemaBytes": 22190,
+        "schemaDepth": 8,
+        "schemaNodeCount": 76,
+        "enumNodeCount": 12,
+        "maximumEnumCardinality": 114,
+        "totalEnumLiteralCount": 709,
+        "totalEnumLiteralBytes": 16884,
+        "constCount": 15,
+        "arraySchemaNodeCount": 22
+      },
+      "containedCompatibilityMetrics": {
+        "requestBodyBytes": 31972,
+        "providerSchemaBytes": 21596,
+        "schemaDepth": 8,
+        "schemaNodeCount": 76,
+        "enumNodeCount": 12,
+        "maximumEnumCardinality": 114,
+        "totalEnumLiteralCount": 709,
+        "totalEnumLiteralBytes": 16290,
+        "constCount": 15,
+        "arraySchemaNodeCount": 22
+      },
+      "containment": {
+        "providerPacketHashRebound": true,
+        "providerPacketDiffLimitedToReferenceContainment": true,
+        "internalPacketSerializationUnchanged": true,
+        "rawInternalReferenceLeakageCount": 0,
+        "sourceIdentityLeakageCount": 0,
+        "reverseMapMaterialLeakageCount": 0,
+        "reverseMapSerialized": false,
+        "exactReferenceRoundTrip": true,
+        "acceptedPlannerValidationAfterRestore": true,
+        "unknownAliasRejected": true,
+        "classConfusionRejected": true,
+        "rawInternalReferenceRejected": true
+      }
+    },
+    {
+      "family": "BUSINESS_CONTEXT_SENSITIVE",
+      "statementAlias": "supported-fiserv-gold-06",
+      "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+      "historicalProviderResult": "ACCEPTED",
+      "previousInternalReferenceCounts": {
+        "FACT": 4,
+        "STATEMENT_EVIDENCE": 12,
+        "GOVERNED_EVIDENCE": 0,
+        "ECONOMIC_CHARGE": 0
+      },
+      "outboundAliasCounts": {
+        "FACT": 4,
+        "STATEMENT_EVIDENCE": 12,
+        "GOVERNED_EVIDENCE": 0,
+        "ECONOMIC_CHARGE": 0
+      },
+      "previousCompatibilityMetrics": {
+        "requestBodyBytes": 12302,
+        "providerSchemaBytes": 6115,
+        "schemaDepth": 8,
+        "schemaNodeCount": 76,
+        "enumNodeCount": 12,
+        "maximumEnumCardinality": 8,
+        "totalEnumLiteralCount": 50,
+        "totalEnumLiteralBytes": 1468,
+        "constCount": 15,
+        "arraySchemaNodeCount": 22
+      },
+      "containedCompatibilityMetrics": {
+        "requestBodyBytes": 11886,
+        "providerSchemaBytes": 5779,
+        "schemaDepth": 8,
+        "schemaNodeCount": 76,
+        "enumNodeCount": 12,
+        "maximumEnumCardinality": 8,
+        "totalEnumLiteralCount": 50,
+        "totalEnumLiteralBytes": 1132,
+        "constCount": 15,
+        "arraySchemaNodeCount": 22
+      },
+      "containment": {
+        "providerPacketHashRebound": true,
+        "providerPacketDiffLimitedToReferenceContainment": true,
+        "internalPacketSerializationUnchanged": true,
+        "rawInternalReferenceLeakageCount": 0,
+        "sourceIdentityLeakageCount": 0,
+        "reverseMapMaterialLeakageCount": 0,
+        "reverseMapSerialized": false,
+        "exactReferenceRoundTrip": true,
+        "acceptedPlannerValidationAfterRestore": true,
+        "unknownAliasRejected": true,
+        "classConfusionRejected": true,
+        "rawInternalReferenceRejected": true
+      }
+    }
+  ],
+  "aggregate": {
+    "rawInternalReferenceLeakageCount": 0,
+    "sourceIdentityLeakageCount": 0,
+    "reverseMapMaterialLeakageCount": 0,
+    "reverseMapSerializedCount": 0,
+    "providerPacketReferenceOnlyDiffCount": 6,
+    "exactReferenceRoundTripCount": 6,
+    "acceptedPlannerValidationCount": 6,
+    "unknownAliasAcceptanceCount": 0,
+    "classConfusionAcceptanceCount": 0,
+    "rawInternalReferenceAcceptanceCount": 0
+  },
+  "compatibilityFinding": {
+    "oldHistoricalSuccessFailureAssociationPreservedAsEvidence": true,
+    "containedRequestsProviderTested": false,
+    "exactProviderLimitClaimed": false,
+    "http400ResolutionClaimed": false,
+    "finding": "Opaque aliases remove raw internal reference identity from the provider request while retaining the same enum-node/cardinality topology. Fixed-format aliases reduce packet-specific literal-byte variation, but no provider outcome is inferred because this evaluation made zero provider calls."
+  },
+  "contentBoundary": {
+    "rawRequestBodiesStored": false,
+    "packetContentsStored": false,
+    "reverseMapsStored": false,
+    "internalReferencesStored": false,
+    "merchantDerivedPayloadValuesCopied": false
+  }
+}

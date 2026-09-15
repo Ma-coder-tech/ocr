@@ -1,4 +1,10 @@
 import { inspectShadowAiEconomicResolutionPacketPrivacyV1 } from "../canonical/shadowAiEconomicResolutionIssueSelectionV1.js";
+import {
+  compileShadowAiProviderReferenceBoundaryV1,
+  inspectShadowAiProviderBoundRequestPrivacyV1,
+  restoreShadowAiProviderReferencesV1,
+  type ShadowAiProviderReferenceMapV1,
+} from "../canonical/shadowAiEconomicResolutionProviderReferenceBoundaryV1.js";
 import type { ShadowAiEconomicResolutionPacketV1 } from "../canonical/shadowAiEconomicResolutionPlannerTypesV1.js";
 import { canonicalJson } from "../canonical/v2/canonicalJson.js";
 import { APPROVED_OPENROUTER_ENDPOINT } from "../canonical/v2/intelligence/providerPreflight.js";
@@ -8,6 +14,7 @@ import {
 import {
   OPENROUTER_CLAUDE_PREFLIGHT_MODEL_V2,
   countSchemaKeywordV2,
+  OpenRouterClaudePreflightErrorV2,
   sendOpenRouterClaudeJsonSchemaEvaluationRequestV2,
   translateSchemaForAnthropicStructuredOutputsV2,
   type OpenRouterClaudePreflightRequestV2,
@@ -23,6 +30,10 @@ export type IssueGroundedPlannerContextV1 = Readonly<{
   unresolvedQuestion: string;
   unresolvedFacets: readonly string[];
   unresolvedReasonCodes: readonly string[];
+}>;
+
+export type OpenRouterIssueGroundedPlannerRequestV1 = OpenRouterClaudePreflightRequestV2 & Readonly<{
+  referenceMap: ShadowAiProviderReferenceMapV1;
 }>;
 
 export function issueGroundedPlannerSystemPromptV1(): string {
@@ -59,15 +70,16 @@ export function buildIssueGroundedPlannerUserPayloadV1(packet: ShadowAiEconomicR
 export function buildOpenRouterIssueGroundedShadowPlannerRequestV1(
   apiKey: string,
   packet: ShadowAiEconomicResolutionPacketV1,
-): OpenRouterClaudePreflightRequestV2 {
+): OpenRouterIssueGroundedPlannerRequestV1 {
   if (!apiKey) throw new Error("openrouter_issue_grounded_planner_api_key_required");
   const privacy = inspectShadowAiEconomicResolutionPacketPrivacyV1(packet);
   if (!privacy.valid) throw new Error(`openrouter_issue_grounded_planner_privacy_invalid:${privacy.reasonCodes.join(",")}`);
-  const userPayload = buildIssueGroundedPlannerUserPayloadV1(packet);
+  const boundary = compileShadowAiProviderReferenceBoundaryV1(packet);
+  const userPayload = buildIssueGroundedPlannerUserPayloadV1(boundary.providerPacket);
   if (/\.pdf\b|(?:^|["'\s])\/(?:Users|home|private|tmp)\//i.test(userPayload)) {
     throw new Error("openrouter_issue_grounded_planner_source_identity_present");
   }
-  const localSchema = localFullPlannerOutputSchemaV1(packet);
+  const localSchema = localFullPlannerOutputSchemaV1(boundary.providerPacket);
   const providerSchema = translateSchemaForAnthropicStructuredOutputsV2(localSchema);
   for (const keyword of ["minLength", "maxLength", "maxItems"]) {
     if (countSchemaKeywordV2(providerSchema, keyword) !== 0) {
@@ -94,7 +106,7 @@ export function buildOpenRouterIssueGroundedShadowPlannerRequestV1(
       },
     },
   });
-  return Object.freeze({
+  const requestValue = {
     endpoint: APPROVED_OPENROUTER_ENDPOINT,
     method: "POST" as const,
     headers: Object.freeze({
@@ -105,7 +117,19 @@ export function buildOpenRouterIssueGroundedShadowPlannerRequestV1(
     body,
     bodyBytes: Buffer.byteLength(body, "utf8"),
     providerSchema,
+  };
+  Object.defineProperty(requestValue, "referenceMap", {
+    value: boundary.referenceMap,
+    enumerable: false,
+    writable: false,
+    configurable: false,
   });
+  const request = Object.freeze(requestValue) as unknown as OpenRouterIssueGroundedPlannerRequestV1;
+  const outboundPrivacy = inspectShadowAiProviderBoundRequestPrivacyV1(body, boundary.referenceMap);
+  if (!outboundPrivacy.valid) {
+    throw new Error(`openrouter_issue_grounded_planner_outbound_reference_privacy_invalid:${outboundPrivacy.reasonCodes.join(",")}`);
+  }
+  return request;
 }
 
 export async function invokeOpenRouterIssueGroundedShadowPlannerV1(input: {
@@ -124,5 +148,19 @@ export async function invokeOpenRouterIssueGroundedShadowPlannerV1(input: {
     signal: input.signal,
     fetchImplementation: input.fetchImplementation,
   });
-  return Object.freeze({ rawOutput: result.rawOutput, telemetry: result.telemetry, requestBodyBytes: request.bodyBytes });
+  const restored = restoreShadowAiProviderReferencesV1(result.rawOutput, request.referenceMap);
+  if (!restored.ok) {
+    throw new OpenRouterClaudePreflightErrorV2(Object.freeze({
+      ...result.telemetry,
+      failureCategory: "STRUCTURED_OUTPUT_INCOMPATIBILITY" as const,
+      safeErrorType: "provider_reference_boundary_error",
+      safeErrorCode: restored.errorCodes[0] ?? "provider_reference_alias_validation_failed",
+      safeErrorParameter: null,
+      safeErrorMessage: "Provider output failed the reference-alias boundary.",
+      providerSafeErrorCode: null,
+      providerFailureKind: "OUTPUT_REFERENCE_REJECTED" as const,
+      providerDiagnosticSource: null,
+    }));
+  }
+  return Object.freeze({ rawOutput: restored.output, telemetry: result.telemetry, requestBodyBytes: request.bodyBytes });
 }
