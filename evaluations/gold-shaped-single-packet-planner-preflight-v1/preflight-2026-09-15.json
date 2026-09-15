@@ -1,0 +1,647 @@
+{
+  "schemaVersion": "gold_shaped_single_packet_planner_preflight_2026_09_15_v1",
+  "generatedAt": "2026-09-15T10:35:51.969Z",
+  "acceptedReference": {
+    "branch": "codex/full-planner-schema-synthetic-preflight-v2-extended-timeout",
+    "commit": "e489730b188b0349fdf1e8f8e659ce1e12172e99"
+  },
+  "evaluationBranch": "codex/gold-shaped-single-packet-planner-preflight-v1",
+  "purpose": "GOLD_SHAPED_SINGLE_PACKET_SYNTHETIC_PREFLIGHT_ONLY",
+  "exactAcceptedBuilderReused": true,
+  "prohibitedBuilderUsed": false,
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "success": true,
+  "structuralParity": {
+    "valid": true,
+    "reasonCodes": [],
+    "acceptedReferenceBodySha256": "875e4c7fb117078ad9b4cbe2c76a43d9a1cf63ad66804ca016e2caf5acc71a76",
+    "acceptedReferenceRequestReconstructed": true,
+    "bodyFieldsIdentical": true,
+    "endpointMethodAndHeaderNamesIdentical": true,
+    "promptIdentical": true,
+    "packetWrapperIdentical": true,
+    "responseWrapperIdentical": true,
+    "settingsIdentical": true
+  },
+  "request": {
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "method": "POST",
+    "headerNames": [
+      "Authorization",
+      "Content-Type",
+      "X-OpenRouter-Metadata"
+    ],
+    "bodyFields": [
+      "max_tokens",
+      "messages",
+      "model",
+      "provider",
+      "response_format",
+      "store",
+      "stream",
+      "temperature"
+    ],
+    "bodyBytes": 18830,
+    "bodySha256": "944071c3bc10ba7657594e7828934f45d100219bb1ca5b3c5e0bc8a464f677db",
+    "evaluationTimeoutMs": 60000,
+    "maximumProviderCalls": 1,
+    "retries": 0,
+    "fallbackAllowed": false,
+    "store": false,
+    "stream": false,
+    "temperature": 0,
+    "maxTokens": 4000,
+    "userPayloadRoot": "packet",
+    "responseRoot": "single_planner_object",
+    "schemaName": "shadow_ai_economic_resolution_plan_synthetic_preflight_v1"
+  },
+  "schemaTranslation": {
+    "localSchemaBytes": 11358,
+    "providerSchemaBytes": 10508,
+    "localConstructCounts": {
+      "type": 71,
+      "properties": 4,
+      "required": 4,
+      "additionalProperties": 4,
+      "const": 15,
+      "enum": 12,
+      "anyOf": 1,
+      "pattern": 1,
+      "minItems": 21,
+      "maxItems": 22,
+      "minLength": 18,
+      "maxLength": 18,
+      "$ref": 0,
+      "$defs": 0,
+      "oneOf": 0,
+      "allOf": 0
+    },
+    "providerConstructCounts": {
+      "type": 71,
+      "properties": 4,
+      "required": 4,
+      "additionalProperties": 4,
+      "const": 15,
+      "enum": 12,
+      "anyOf": 1,
+      "pattern": 1,
+      "minItems": 21,
+      "maxItems": 0,
+      "minLength": 0,
+      "maxLength": 0,
+      "$ref": 0,
+      "$defs": 0,
+      "oneOf": 0,
+      "allOf": 0
+    },
+    "removedGenerationConstraints": {
+      "minLength": 18,
+      "maxLength": 18,
+      "maxItems": 22
+    },
+    "unsupportedProviderKeywordCount": 0,
+    "acceptedLocalContractModified": false
+  },
+  "syntheticPacket": {
+    "bytes": 6187,
+    "sha256": "369f0c070ca44d18040e6dbea4a9666003949f35b445f26df6a51ecf14787039",
+    "privacyValid": true,
+    "privacyReasonCodes": [],
+    "syntheticBoundary": {
+      "valid": true,
+      "reasonCodes": []
+    },
+    "structuralCardinality": {
+      "acceptedActivityFacts": 6,
+      "acceptedFactRefs": 8,
+      "rdChargeRefs": 4,
+      "governedEvidenceRefs": 6,
+      "participantControlStates": 4,
+      "unresolvedFacets": 5,
+      "unresolvedReasonCodes": 5,
+      "evidenceClasses": 5
+    },
+    "packet": {
+      "schemaVersion": "shadow_ai_economic_resolution_packet_2026_09_14_v1",
+      "purpose": "SHADOW_ECONOMIC_RESOLUTION_PLANNING_ONLY",
+      "outputAuthorityRequired": "NON_AUTHORITATIVE",
+      "opaqueRunRef": "shadow-run-synthetic-large-shape-0001",
+      "issueId": "synthetic_large_shape_shared_bundle_issue_001",
+      "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+      "processorFamily": "SYNTHETIC_PROCESSOR_FAMILY_X",
+      "processorProgram": "SYNTHETIC_SERVICE_PROGRAM_X",
+      "statementPeriod": {
+        "start": "2099-07-01",
+        "end": "2099-07-31"
+      },
+      "acceptedIssueRelevantActivityFacts": [
+        {
+          "factRef": "synthetic_activity_fact_001",
+          "field": "synthetic_processed_event_count",
+          "state": "KNOWN",
+          "value": 4321,
+          "population": "synthetic_processed_event_population",
+          "evidenceRefs": [
+            "synthetic_evidence_activity_001",
+            "synthetic_evidence_summary_001"
+          ]
+        },
+        {
+          "factRef": "synthetic_activity_fact_002",
+          "field": "synthetic_approved_event_count",
+          "state": "KNOWN",
+          "value": 4087,
+          "population": "synthetic_approved_event_population",
+          "evidenceRefs": [
+            "synthetic_evidence_activity_002"
+          ]
+        },
+        {
+          "factRef": "synthetic_activity_fact_003",
+          "field": "synthetic_settled_event_count",
+          "state": "KNOWN",
+          "value": 3944,
+          "population": "synthetic_settled_event_population",
+          "evidenceRefs": [
+            "synthetic_evidence_activity_003",
+            "synthetic_evidence_summary_001"
+          ]
+        },
+        {
+          "factRef": "synthetic_activity_fact_004",
+          "field": "synthetic_average_ticket",
+          "state": "KNOWN",
+          "value": {
+            "amountMinor": 12345,
+            "currency": "USD"
+          },
+          "population": "synthetic_compatible_sales_population",
+          "evidenceRefs": [
+            "synthetic_evidence_activity_004"
+          ]
+        },
+        {
+          "factRef": "synthetic_activity_fact_005",
+          "field": "synthetic_channel",
+          "state": "KNOWN",
+          "value": "SYNTHETIC_CARD_PRESENT_AND_REMOTE",
+          "population": "synthetic_channel_population",
+          "evidenceRefs": [
+            "synthetic_evidence_activity_005"
+          ]
+        },
+        {
+          "factRef": "synthetic_activity_fact_006",
+          "field": "synthetic_authorization_to_settlement",
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "synthetic_operational_population",
+          "evidenceRefs": [
+            "synthetic_evidence_limitation_001"
+          ]
+        }
+      ],
+      "selectedRdChargeRefs": [
+        "synthetic_rd_charge_ref_001",
+        "synthetic_rd_charge_ref_002",
+        "synthetic_rd_charge_ref_003",
+        "synthetic_rd_charge_ref_004"
+      ],
+      "sanitizedFeeLabels": [
+        "SYNTHETIC SERVICE PROGRAM X",
+        "SYNTHETIC PLATFORM ACCESS COMPONENT Y",
+        "SYNTHETIC SUPPORT COMPONENT Z"
+      ],
+      "acceptedEconomicCategories": [
+        "SHARED_BUNDLED_OR_UNRESOLVED",
+        "PROCESSOR_SERVICE_OR_GATEWAY_UNRESOLVED"
+      ],
+      "acceptedSensitivityStates": [
+        "SYNTHETIC_COUNT_SENSITIVITY_UNKNOWN",
+        "SYNTHETIC_VOLUME_SENSITIVITY_UNKNOWN",
+        "SYNTHETIC_FIXED_COMPONENT_POSSIBLE_NOT_ESTABLISHED"
+      ],
+      "acceptedQualificationIntegrityState": "SYNTHETIC_QUALIFICATION_INTEGRITY_UNRESOLVED",
+      "acceptedParticipantControlStates": [
+        {
+          "rdChargeRef": "synthetic_rd_charge_ref_001",
+          "collector": {
+            "state": "SUPPORTED_SYNTHETIC",
+            "value": "SYNTHETIC_COLLECTOR_ROLE_A"
+          },
+          "economicBeneficiary": {
+            "state": "UNKNOWN",
+            "value": null
+          },
+          "ruleSetter": {
+            "state": "UNKNOWN",
+            "value": null
+          },
+          "priceSetter": {
+            "state": "UNKNOWN",
+            "value": null
+          },
+          "merchantFacingPriceController": {
+            "state": "UNKNOWN",
+            "value": null
+          }
+        },
+        {
+          "rdChargeRef": "synthetic_rd_charge_ref_002",
+          "collector": {
+            "state": "SUPPORTED_SYNTHETIC",
+            "value": "SYNTHETIC_COLLECTOR_ROLE_A"
+          },
+          "economicBeneficiary": {
+            "state": "UNKNOWN",
+            "value": null
+          },
+          "ruleSetter": {
+            "state": "UNKNOWN",
+            "value": null
+          },
+          "priceSetter": {
+            "state": "UNKNOWN",
+            "value": null
+          },
+          "merchantFacingPriceController": {
+            "state": "UNKNOWN",
+            "value": null
+          }
+        },
+        {
+          "rdChargeRef": "synthetic_rd_charge_ref_003",
+          "collector": {
+            "state": "UNKNOWN",
+            "value": null
+          },
+          "economicBeneficiary": {
+            "state": "UNKNOWN",
+            "value": null
+          },
+          "ruleSetter": {
+            "state": "UNKNOWN",
+            "value": null
+          },
+          "priceSetter": {
+            "state": "UNKNOWN",
+            "value": null
+          },
+          "merchantFacingPriceController": {
+            "state": "UNKNOWN",
+            "value": null
+          }
+        },
+        {
+          "rdChargeRef": "synthetic_rd_charge_ref_004",
+          "collector": {
+            "state": "SUPPORTED_SYNTHETIC",
+            "value": "SYNTHETIC_COLLECTOR_ROLE_B"
+          },
+          "economicBeneficiary": {
+            "state": "UNKNOWN",
+            "value": null
+          },
+          "ruleSetter": {
+            "state": "UNKNOWN",
+            "value": null
+          },
+          "priceSetter": {
+            "state": "UNKNOWN",
+            "value": null
+          },
+          "merchantFacingPriceController": {
+            "state": "UNKNOWN",
+            "value": null
+          }
+        }
+      ],
+      "unresolvedClaimFacets": [
+        "synthetic_economic_role",
+        "synthetic_fee_composition",
+        "synthetic_contract_basis",
+        "synthetic_participant_control",
+        "synthetic_population_driver"
+      ],
+      "unresolvedReasonCodes": [
+        "synthetic_composition_not_separable",
+        "synthetic_governing_document_absent",
+        "synthetic_participant_roles_not_established",
+        "synthetic_operational_population_not_reconciled",
+        "synthetic_pricing_mechanic_not_reproduced"
+      ],
+      "acceptedFactRefs": [
+        "synthetic_fact_fee_label_001",
+        "synthetic_fact_fee_label_002",
+        "synthetic_fact_fee_label_003",
+        "synthetic_fact_statement_period_001",
+        "synthetic_fact_processor_family_001",
+        "synthetic_fact_business_context_001",
+        "synthetic_fact_fee_occurrence_001",
+        "synthetic_fact_fee_occurrence_002"
+      ],
+      "currentGovernedEvidenceRefs": [
+        "synthetic_governed_evidence_ref_001",
+        "synthetic_governed_evidence_ref_002",
+        "synthetic_governed_evidence_ref_003",
+        "synthetic_governed_evidence_ref_004",
+        "synthetic_governed_evidence_ref_005",
+        "synthetic_governed_evidence_ref_006"
+      ],
+      "allowedEvidenceClasses": [
+        "ACCEPTED_STATEMENT_FACT",
+        "MERCHANT_ATTESTATION",
+        "MERCHANT_CONTRACT_OR_SCHEDULE",
+        "PROCESSOR_OR_GATEWAY_OPERATIONAL_DATA",
+        "ADDITIONAL_COMPATIBLE_STATEMENT"
+      ],
+      "prohibitedConclusions": [
+        "canonical_fact_change",
+        "rd_change",
+        "fee_amount_change",
+        "population_change",
+        "accepted_reclassification",
+        "participant_or_control_truth",
+        "completeness_change",
+        "materiality_change",
+        "unknown_to_zero",
+        "savings_or_annualization",
+        "avoidability",
+        "merchant_or_processor_blame",
+        "comparison_or_comparator_decision",
+        "customer_action_or_finding"
+      ],
+      "merchantBusinessContext": {
+        "privacyClassification": "PURPOSE_BOUND_BUSINESS_IDENTITY",
+        "businessName": "SYNTHETIC_BUSINESS_ENTITY_ALPHA_LLC",
+        "naturalPersonOrSoleProprietorAmbiguity": "NOT_INDICATED",
+        "admittedBusinessCategory": "SYNTHETIC_MULTI_CHANNEL_SPECIALTY_RETAIL",
+        "businessLocation": {
+          "country": "XZ",
+          "region": "SYNTHETIC_REGION_7",
+          "city": null
+        },
+        "knownChannel": "SYNTHETIC_CARD_PRESENT_AND_REMOTE",
+        "acceptedAverageTicket": {
+          "amountMinor": 12345,
+          "currency": "USD"
+        },
+        "supportedOperatingContext": [
+          "SYNTHETIC_CONTEXT_MIXED_ACCEPTANCE_CHANNELS",
+          "SYNTHETIC_CONTEXT_RECURRING_PLATFORM_ACCESS_POSSIBLE",
+          "SYNTHETIC_CONTEXT_NO_CONTRACT_DOCUMENT_ADMITTED"
+        ]
+      },
+      "competingHypothesisRequired": true,
+      "immutableInputHash": "770c1c2f56a05f38c15481d87d07f910d91a0e8d79ec2592390b30ef2c515941"
+    }
+  },
+  "telemetry": {
+    "provider": "OpenRouter",
+    "requestedModel": "anthropic/claude-opus-4.6",
+    "returnedModel": "anthropic/claude-opus-4.6",
+    "selectedProvider": null,
+    "callCount": 1,
+    "retries": 0,
+    "requestReachedOpenRouter": true,
+    "httpStatus": 200,
+    "openRouterRequestId": null,
+    "generationId": "gen-1789468495-yXhHgKKXTD7kMA3yXsmh",
+    "contentType": "application/json",
+    "headerReportedModel": null,
+    "headerReportedProvider": null,
+    "retryAfter": null,
+    "routerAttemptCount": null,
+    "inputTokens": 6890,
+    "outputTokens": 2338,
+    "totalTokens": 9228,
+    "latencyMs": 56937,
+    "timeToHeadersMs": 14374,
+    "bodyReadLatencyMs": 42563,
+    "accountedCostUsd": 0.0929,
+    "costMetadataAvailable": true,
+    "failureCategory": null,
+    "safeErrorType": null,
+    "safeErrorCode": null,
+    "safeErrorParameter": null,
+    "safeErrorMessage": null,
+    "providerSafeErrorCode": null
+  },
+  "structuredPlannerObject": {
+    "acknowledgedEvidenceGaps": [
+      "No merchant contract, pricing schedule, or processor agreement has been admitted into evidence, so the contractual basis for SYNTHETIC SERVICE PROGRAM X cannot be verified.",
+      "The economic beneficiary, price setter, rule setter, and merchant-facing price controller are all UNKNOWN for every selected RD charge ref, preventing determination of which entity controls or receives the fee.",
+      "The fee composition (whether SYNTHETIC SERVICE PROGRAM X is a single indivisible charge or a bundle of sub-components including SYNTHETIC PLATFORM ACCESS COMPONENT Y and SYNTHETIC SUPPORT COMPONENT Z) has not been established.",
+      "Authorization-to-settlement operational data (synthetic_activity_fact_006) is UNKNOWN, so the population driver and count sensitivity of the fee cannot be reconciled.",
+      "No additional compatible statement periods have been admitted, so trend or recurrence analysis is impossible.",
+      "The pricing mechanic (per-transaction, per-item, flat, tiered, or blended) has not been reproduced from any admitted evidence."
+    ],
+    "admissionStatus": "NOT_ADMITTED",
+    "alternativeHypotheses": [
+      {
+        "acknowledgedEvidenceGaps": [
+          "No gateway or platform service agreement has been admitted that would confirm a separate platform-level program charge distinct from processor-level bundled services.",
+          "The collector for synthetic_rd_charge_ref_003 is UNKNOWN, leaving open whether a separate gateway entity collects part of the fee.",
+          "No operational data links SYNTHETIC PLATFORM ACCESS COMPONENT Y or SYNTHETIC SUPPORT COMPONENT Z to a gateway-specific billing event rather than a processor billing event."
+        ],
+        "confidence": "LOW",
+        "confirmationRequirements": [
+          "Obtain a gateway or platform service agreement that names SYNTHETIC SERVICE PROGRAM X as a platform-level program charge billed independently of processor markup.",
+          "Confirm that the collector for synthetic_rd_charge_ref_003 or synthetic_rd_charge_ref_004 is a gateway or platform entity distinct from SYNTHETIC_PROCESSOR_FAMILY_X.",
+          "Obtain operational billing data showing that the fee amount is calculated on a basis specific to gateway or platform usage metrics rather than card-processing volume or count."
+        ],
+        "contradictingFactRefs": [
+          "synthetic_fact_processor_family_001",
+          "synthetic_rd_charge_ref_001",
+          "synthetic_rd_charge_ref_002"
+        ],
+        "falsificationConditions": [
+          "If the merchant contract or processor schedule explicitly defines SYNTHETIC SERVICE PROGRAM X as a processor-level bundled service fee rather than a gateway or platform program charge, this hypothesis is falsified.",
+          "If all RD charge refs map to a single collector entity that is the processor itself, the gateway/platform distinction collapses.",
+          "If operational data shows the fee is calculated purely on card transaction count or volume with no gateway-specific metric, this hypothesis is falsified."
+        ],
+        "hypothesis": "SYNTHETIC SERVICE PROGRAM X represents a gateway or platform program charge billed by a separate platform entity (potentially SYNTHETIC_COLLECTOR_ROLE_B) for access to a technology or service platform, distinct from processor-level transaction processing fees.",
+        "supportingFactRefs": [
+          "synthetic_fact_fee_label_001",
+          "synthetic_fact_fee_label_002",
+          "synthetic_fact_fee_label_003",
+          "synthetic_rd_charge_ref_004",
+          "synthetic_activity_fact_005",
+          "synthetic_governed_evidence_ref_005"
+        ]
+      }
+    ],
+    "authority": "NON_AUTHORITATIVE",
+    "customerRenderingAllowed": false,
+    "documentRequestSuggestions": [
+      "Request the complete merchant processing agreement or pricing schedule from SYNTHETIC_PROCESSOR_FAMILY_X that governs the statement period 2099-07-01 through 2099-07-31, specifically including any addenda, exhibits, or rate sheets that define SYNTHETIC SERVICE PROGRAM X, SYNTHETIC PLATFORM ACCESS COMPONENT Y, and SYNTHETIC SUPPORT COMPONENT Z, their composition, pricing mechanics, and the identity of the economic beneficiary for each component."
+    ],
+    "exactCitedFactRefs": [
+      "synthetic_fact_fee_label_001",
+      "synthetic_fact_fee_label_002",
+      "synthetic_fact_fee_label_003",
+      "synthetic_fact_statement_period_001",
+      "synthetic_fact_processor_family_001",
+      "synthetic_fact_business_context_001",
+      "synthetic_fact_fee_occurrence_001",
+      "synthetic_fact_fee_occurrence_002",
+      "synthetic_activity_fact_001",
+      "synthetic_activity_fact_002",
+      "synthetic_activity_fact_003",
+      "synthetic_activity_fact_004",
+      "synthetic_activity_fact_005",
+      "synthetic_activity_fact_006"
+    ],
+    "financialMutationAllowed": false,
+    "inputHash": "770c1c2f56a05f38c15481d87d07f910d91a0e8d79ec2592390b30ef2c515941",
+    "internalExplanationDraft": "The fee labeled SYNTHETIC SERVICE PROGRAM X appears on the merchant statement for period 2099-07-01 to 2099-07-31 under SYNTHETIC_PROCESSOR_FAMILY_X. Three related sanitized labels exist (SYNTHETIC SERVICE PROGRAM X, SYNTHETIC PLATFORM ACCESS COMPONENT Y, SYNTHETIC SUPPORT COMPONENT Z), suggesting the fee may be a bundle. However, without a governing contract, the economic role cannot be determined. The primary hypothesis treats it as a bundled processor service fee; the alternative treats it as a gateway/platform program charge. Both remain LOW confidence due to pervasive evidence gaps across participant control states, pricing mechanics, and population drivers. Resolution requires the merchant processing agreement or equivalent governing document.",
+    "issueId": "synthetic_large_shape_shared_bundle_issue_001",
+    "limitationCodes": [
+      "synthetic_composition_not_separable",
+      "synthetic_governing_document_absent",
+      "synthetic_participant_roles_not_established",
+      "synthetic_operational_population_not_reconciled",
+      "synthetic_pricing_mechanic_not_reproduced"
+    ],
+    "merchantQuestionSuggestions": [
+      "Can you confirm whether SYNTHETIC SERVICE PROGRAM X is a single fee or a bundle that includes SYNTHETIC PLATFORM ACCESS COMPONENT Y and SYNTHETIC SUPPORT COMPONENT Z, and do you have a copy of the processor or gateway agreement that defines this program and its pricing terms?"
+    ],
+    "operationalDataRequests": [
+      "Request itemized billing detail from SYNTHETIC_PROCESSOR_FAMILY_X for the statement period 2099-07-01 through 2099-07-31 showing the per-line calculation basis (unit count, volume, or flat), the collecting entity, and the economic beneficiary for each sub-component of SYNTHETIC SERVICE PROGRAM X, including SYNTHETIC PLATFORM ACCESS COMPONENT Y and SYNTHETIC SUPPORT COMPONENT Z."
+    ],
+    "outputType": "AI_INFERENCE_ONLY",
+    "primaryHypothesis": {
+      "acknowledgedEvidenceGaps": [
+        "No merchant contract or pricing schedule has been admitted to confirm that SYNTHETIC SERVICE PROGRAM X is defined as a bundled processor service fee.",
+        "All participant control states (economic beneficiary, price setter, rule setter, merchant-facing price controller) are UNKNOWN for every RD charge ref, so the entity that sets and benefits from the fee is unestablished.",
+        "The pricing mechanic (count-based, volume-based, flat, or hybrid) is not reproduced from any admitted evidence.",
+        "Authorization-to-settlement data is UNKNOWN, preventing reconciliation of the fee population against operational transaction counts."
+      ],
+      "confidence": "LOW",
+      "confirmationRequirements": [
+        "Obtain the merchant processing agreement or pricing schedule from SYNTHETIC_PROCESSOR_FAMILY_X that explicitly defines SYNTHETIC SERVICE PROGRAM X as a bundled processor service fee and enumerates its sub-components.",
+        "Establish the economic beneficiary and price setter for at least synthetic_rd_charge_ref_001 and synthetic_rd_charge_ref_002 from contractual or operational evidence.",
+        "Reproduce the pricing mechanic by matching the fee amount to a known rate applied against an admitted activity metric (e.g., processed event count, settled event count, or volume)."
+      ],
+      "contradictingFactRefs": [
+        "synthetic_activity_fact_006"
+      ],
+      "falsificationConditions": [
+        "If the governing contract defines SYNTHETIC SERVICE PROGRAM X as a gateway or platform access charge rather than a processor-level bundled service, this hypothesis is falsified.",
+        "If operational data reveals that the fee is collected by an entity other than SYNTHETIC_PROCESSOR_FAMILY_X and calculated on a non-transaction basis, the bundled processor service characterization is falsified.",
+        "If the three sanitized labels (SYNTHETIC SERVICE PROGRAM X, SYNTHETIC PLATFORM ACCESS COMPONENT Y, SYNTHETIC SUPPORT COMPONENT Z) are shown to be independently billed by separate entities rather than bundled under one program, this hypothesis is falsified."
+      ],
+      "hypothesis": "SYNTHETIC SERVICE PROGRAM X represents a bundled processor service fee charged by SYNTHETIC_PROCESSOR_FAMILY_X that aggregates multiple service components (potentially including SYNTHETIC PLATFORM ACCESS COMPONENT Y and SYNTHETIC SUPPORT COMPONENT Z) into a single program-level line item, with the composition, pricing mechanic, and participant control roles not yet separable from admitted evidence.",
+      "supportingFactRefs": [
+        "synthetic_fact_fee_label_001",
+        "synthetic_fact_fee_label_002",
+        "synthetic_fact_fee_label_003",
+        "synthetic_fact_processor_family_001",
+        "synthetic_fact_statement_period_001",
+        "synthetic_fact_business_context_001",
+        "synthetic_fact_fee_occurrence_001",
+        "synthetic_fact_fee_occurrence_002",
+        "synthetic_activity_fact_001",
+        "synthetic_activity_fact_002",
+        "synthetic_activity_fact_003",
+        "synthetic_rd_charge_ref_001",
+        "synthetic_rd_charge_ref_002",
+        "synthetic_governed_evidence_ref_001",
+        "synthetic_governed_evidence_ref_002",
+        "synthetic_governed_evidence_ref_003"
+      ]
+    },
+    "recommendedResolutionPath": "DOCUMENT_REQUIRED",
+    "reconstructionSuspicions": [],
+    "requiredEvidenceClasses": [
+      "MERCHANT_CONTRACT_OR_SCHEDULE",
+      "PROCESSOR_OR_GATEWAY_OPERATIONAL_DATA",
+      "ADDITIONAL_COMPATIBLE_STATEMENT"
+    ],
+    "researchQuerySuggestions": [],
+    "schemaVersion": "shadow_ai_economic_resolution_output_2026_09_14_v1",
+    "truthEffect": "NONE",
+    "unresolvedAfterAnalysis": true,
+    "unresolvedQuestion": "What economic role does the fictitious fee SYNTHETIC SERVICE PROGRAM X represent — is it a bundled processor service fee, a gateway or platform program charge, or some other fee category — and what are its composition, pricing mechanic, and participant control relationships?"
+  },
+  "providerSchemaValidation": {
+    "valid": true,
+    "errors": []
+  },
+  "strictLocalPlannerValidation": {
+    "valid": true,
+    "errors": []
+  },
+  "translatedConstraintValidation": {
+    "valid": true,
+    "errors": []
+  },
+  "referenceGrounding": {
+    "valid": true,
+    "citedRefs": [
+      "synthetic_activity_fact_001",
+      "synthetic_activity_fact_002",
+      "synthetic_activity_fact_003",
+      "synthetic_activity_fact_004",
+      "synthetic_activity_fact_005",
+      "synthetic_activity_fact_006",
+      "synthetic_fact_business_context_001",
+      "synthetic_fact_fee_label_001",
+      "synthetic_fact_fee_label_002",
+      "synthetic_fact_fee_label_003",
+      "synthetic_fact_fee_occurrence_001",
+      "synthetic_fact_fee_occurrence_002",
+      "synthetic_fact_processor_family_001",
+      "synthetic_fact_statement_period_001",
+      "synthetic_governed_evidence_ref_001",
+      "synthetic_governed_evidence_ref_002",
+      "synthetic_governed_evidence_ref_003",
+      "synthetic_governed_evidence_ref_005",
+      "synthetic_rd_charge_ref_001",
+      "synthetic_rd_charge_ref_002",
+      "synthetic_rd_charge_ref_004"
+    ],
+    "invalidRefs": []
+  },
+  "qualityReview": {
+    "paymentProcessingReasoningSpecific": true,
+    "hypothesesMateriallyDifferent": true,
+    "missingEvidenceCorrectlyIdentified": true,
+    "confirmationAndFalsificationPresent": true,
+    "resolutionPathSpecificAndUseful": true,
+    "uncertaintyPreserved": true,
+    "contractRequirementsPass": true,
+    "summary": "PASS"
+  },
+  "prohibitedConclusionAudit": {
+    "savings": 0,
+    "annualization": 0,
+    "comparison": 0,
+    "blame": 0,
+    "total": 0
+  },
+  "deterministicRateRevealStatePreserved": true,
+  "safetyCounters": {
+    "providerCalls": 1,
+    "retries": 0,
+    "fallbackCalls": 0,
+    "realMerchantDataSent": 0,
+    "goldDataSent": 0,
+    "researchOperations": 0,
+    "sourceAdmissions": 0,
+    "truthMutations": 0,
+    "financialMutations": 0,
+    "customerRouting": 0,
+    "customerOutput": 0,
+    "savingsConclusions": 0,
+    "annualizationConclusions": 0,
+    "comparisonDecisions": 0,
+    "blameConclusions": 0
+  },
+  "safetyViolationTotal": 0,
+  "recommendation": {
+    "code": "GOLD_SHAPED_SINGLE_PACKET_READY",
+    "reason": "The larger synthetic packet succeeded through the exact accepted single-plan request builder and passed every unchanged validation and safety gate."
+  }
+}

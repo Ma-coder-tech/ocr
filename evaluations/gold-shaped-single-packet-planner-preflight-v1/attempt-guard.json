@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "gold_shaped_single_packet_planner_preflight_attempt_guard_2026_09_15_v1",
+  "acceptedCheckpoint": "e489730b188b0349fdf1e8f8e659ce1e12172e99",
+  "evaluationBranch": "codex/gold-shaped-single-packet-planner-preflight-v1",
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "maximumProviderCalls": 1,
+  "retries": 0,
+  "fallbackAllowed": false,
+  "callReserved": true,
+  "callCompleted": true,
+  "exactAcceptedBuilderReused": true,
+  "resultStatus": "SUCCESS",
+  "resultSha256": "1cb3b48dd3e90cea773c990fec6409a0dbc88fc399fba3027d3e3b74c4d06c12"
+}
