@@ -1,0 +1,614 @@
+{
+  "schemaVersion": "issue_grounded_shadow_ai_planner_prompt_evaluation_2026_09_15_v1",
+  "generatedAt": "2026-09-15T12:42:40.795Z",
+  "baseline": {
+    "branch": "codex/shadow-ai-economic-resolution-planner-v1",
+    "commit": "d6ebcdbe919d11fb29ce73d7155c28848796a20f",
+    "parent": "b30596f2b07f7b1568f1b4a9530fe008eeaba437"
+  },
+  "transportReference": "8d949e9bee9de3b5a993ebda8cef2948b30f6125",
+  "branch": "codex/issue-grounded-shadow-ai-planner-prompt-v1",
+  "architecture": {
+    "syntheticBuilder": "buildOpenRouterFullPlannerSchemaPreflightRequestV1",
+    "realBuilder": "buildOpenRouterIssueGroundedShadowPlannerRequestV1",
+    "separateBuilders": true,
+    "syntheticPromptModified": false,
+    "batchBuilderUsed": false,
+    "productionWiringChanged": false
+  },
+  "deterministicSelection": {
+    "statementOrdinal": 1,
+    "statementAlias": "supported-fiserv-gold-01",
+    "fullPriorityOrder": [
+      {
+        "issueId": "shadow-issue-fb0c6d195b277fb84e2d10c8efd5846e",
+        "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+        "priority": 1
+      },
+      {
+        "issueId": "shadow-issue-7d76133402d4dca669996601d1b6e21e",
+        "issueClass": "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+        "priority": 1
+      },
+      {
+        "issueId": "shadow-issue-0efc69e3e4e56296aa3776fd71a3072a",
+        "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+        "priority": 1
+      },
+      {
+        "issueId": "shadow-issue-1779a78a3ac9ee9e26d6b6bd0e3c8ac7",
+        "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+        "priority": 2
+      },
+      {
+        "issueId": "shadow-issue-7b6cba91f4452bc915e62d2807d2ad3a",
+        "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+        "priority": 2
+      },
+      {
+        "issueId": "shadow-issue-76e3408d721b75e7fa0c4ddecb5589c5",
+        "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+        "priority": 3
+      }
+    ],
+    "selectedIssueId": "shadow-issue-fb0c6d195b277fb84e2d10c8efd5846e",
+    "selectedIssueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+    "deferredEligibleIssues": [
+      {
+        "issueId": "shadow-issue-7d76133402d4dca669996601d1b6e21e",
+        "issueClass": "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+        "priority": 1
+      },
+      {
+        "issueId": "shadow-issue-0efc69e3e4e56296aa3776fd71a3072a",
+        "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+        "priority": 1
+      },
+      {
+        "issueId": "shadow-issue-1779a78a3ac9ee9e26d6b6bd0e3c8ac7",
+        "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+        "priority": 2
+      },
+      {
+        "issueId": "shadow-issue-7b6cba91f4452bc915e62d2807d2ad3a",
+        "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+        "priority": 2
+      },
+      {
+        "issueId": "shadow-issue-76e3408d721b75e7fa0c4ddecb5589c5",
+        "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+        "priority": 3
+      }
+    ]
+  },
+  "promptAudit": {
+    "valid": true,
+    "reasonCodes": [],
+    "systemPromptSha256": "1f9c2966af9285e6607f3d9f74f927e42585c1fa21935d12af3bc80f0d9d66da",
+    "issueContext": {
+      "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+      "issueId": "shadow-issue-fb0c6d195b277fb84e2d10c8efd5846e",
+      "unresolvedFacets": [
+        "authorizationCount",
+        "approvedAuthorizationCount",
+        "settledTransactionCount",
+        "authorizationToSettlement"
+      ],
+      "unresolvedQuestion": "What remains unresolved for issue AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE across packet facets [authorizationCount, approvedAuthorizationCount, settledTransactionCount, authorizationToSettlement] given reason codes [authorization_attempt_approval_settlement_populations_not_interchangeable]?",
+      "unresolvedReasonCodes": [
+        "authorization_attempt_approval_settlement_populations_not_interchangeable"
+      ]
+    },
+    "preflightPromptContentPresent": false
+  },
+  "packet": {
+    "bytes": 3088,
+    "sha256": "afaeae3c0d1d54560d603acac6c72edca20b672a55142fbe0d5bf6cb4e5492d6",
+    "privacy": {
+      "valid": true,
+      "reasonCodes": []
+    },
+    "businessNamePrivacySuppressed": true,
+    "transmitted": {
+      "schemaVersion": "shadow_ai_economic_resolution_packet_2026_09_14_v1",
+      "purpose": "SHADOW_ECONOMIC_RESOLUTION_PLANNING_ONLY",
+      "outputAuthorityRequired": "NON_AUTHORITATIVE",
+      "opaqueRunRef": "shadow-run-1a3df3171080b28d1bcf60ee",
+      "issueId": "shadow-issue-fb0c6d195b277fb84e2d10c8efd5846e",
+      "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+      "processorFamily": "Fiserv / First Data",
+      "processorProgram": null,
+      "statementPeriod": {
+        "start": "2024-11-01",
+        "end": "2024-11-30"
+      },
+      "acceptedIssueRelevantActivityFacts": [
+        {
+          "factRef": "fact_v2_authorization_count",
+          "field": "authorizationCount",
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "authorization_count",
+          "evidenceRefs": []
+        },
+        {
+          "factRef": "accepted_profile_fact:approvedAuthorizationCount",
+          "field": "approvedAuthorizationCount",
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "approved_authorization_count",
+          "evidenceRefs": []
+        },
+        {
+          "factRef": "fact_v2_settled_transaction_count",
+          "field": "settledTransactionCount",
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "settled_transaction_count",
+          "evidenceRefs": []
+        },
+        {
+          "factRef": "fact_v2_authorization_count",
+          "field": "authorizationToSettlement",
+          "state": "UNKNOWN",
+          "value": null,
+          "population": "authorization_to_settlement",
+          "evidenceRefs": []
+        },
+        {
+          "factRef": "fact_v2_submitted_transaction_count",
+          "field": "transactionCount",
+          "state": "KNOWN",
+          "value": 1828,
+          "population": "submitted_transaction_count",
+          "evidenceRefs": [
+            "document-ir:pdfjs-line-81",
+            "document-ir:pdfjs-line-83",
+            "document-ir:pdfjs-line-91"
+          ]
+        }
+      ],
+      "selectedRdChargeRefs": [],
+      "sanitizedFeeLabels": [],
+      "acceptedEconomicCategories": [],
+      "acceptedSensitivityStates": [
+        "UNRESOLVED_OR_NOT_APPLICABLE"
+      ],
+      "acceptedQualificationIntegrityState": "NOT_ISSUE_PRIMARY",
+      "acceptedParticipantControlStates": [],
+      "unresolvedClaimFacets": [
+        "authorizationCount",
+        "approvedAuthorizationCount",
+        "settledTransactionCount",
+        "authorizationToSettlement"
+      ],
+      "unresolvedReasonCodes": [
+        "authorization_attempt_approval_settlement_populations_not_interchangeable"
+      ],
+      "acceptedFactRefs": [
+        "fact_v2_authorization_count",
+        "fact_v2_settled_transaction_count"
+      ],
+      "currentGovernedEvidenceRefs": [],
+      "allowedEvidenceClasses": [
+        "PROCESSOR_OR_GATEWAY_OPERATIONAL_DATA",
+        "MERCHANT_ATTESTATION"
+      ],
+      "prohibitedConclusions": [
+        "canonical_fact_change",
+        "rd_change",
+        "fee_amount_change",
+        "population_change",
+        "accepted_reclassification",
+        "participant_or_control_truth",
+        "completeness_change",
+        "materiality_change",
+        "unknown_to_zero",
+        "savings_or_annualization",
+        "avoidability",
+        "merchant_or_processor_blame",
+        "comparison_or_comparator_decision",
+        "customer_action_or_finding"
+      ],
+      "merchantBusinessContext": {
+        "privacyClassification": "PURPOSE_BOUND_BUSINESS_IDENTITY",
+        "businessName": "Opaque Business 01",
+        "naturalPersonOrSoleProprietorAmbiguity": "POSSIBLE",
+        "admittedBusinessCategory": "restaurant_food_beverage",
+        "businessLocation": {
+          "country": "US",
+          "region": null,
+          "city": null
+        },
+        "knownChannel": "mixed",
+        "acceptedAverageTicket": null,
+        "supportedOperatingContext": [
+          "Business name was privacy-suppressed because natural-person or sole-proprietor ambiguity could not be excluded."
+        ]
+      },
+      "competingHypothesisRequired": true,
+      "immutableInputHash": "8784c9254f109483dcc64221b297fdcc27e4e4175a623c82c37938f4cf6ff320"
+    }
+  },
+  "request": {
+    "bodyBytes": 12427,
+    "bodySha256": "e550a8132bb0940f3051c1ff623b9b840aca57c1828065d703f72b455ef68baf",
+    "settings": {
+      "maxTokens": 4000,
+      "temperature": 0,
+      "store": false,
+      "stream": false,
+      "allowFallbacks": false,
+      "requireParameters": true
+    },
+    "localSchemaBytes": 7050,
+    "providerSchemaBytes": 6200,
+    "providerSchemaCounts": {
+      "type": 71,
+      "properties": 4,
+      "required": 4,
+      "additionalProperties": 4,
+      "const": 15,
+      "enum": 12,
+      "anyOf": 1,
+      "pattern": 1,
+      "minItems": 21,
+      "maxItems": 0,
+      "minLength": 0,
+      "maxLength": 0,
+      "$ref": 0,
+      "$defs": 0,
+      "oneOf": 0,
+      "allOf": 0
+    }
+  },
+  "providerExecution": {
+    "provider": "OpenRouter",
+    "requestedModel": "anthropic/claude-opus-4.6",
+    "callCount": 1,
+    "retries": 0,
+    "fallbacks": 0,
+    "timeoutMs": 90000,
+    "accepted": true,
+    "failure": null,
+    "telemetry": {
+      "provider": "OpenRouter",
+      "requestedModel": "anthropic/claude-opus-4.6",
+      "returnedModel": "anthropic/claude-opus-4.6",
+      "selectedProvider": null,
+      "callCount": 1,
+      "retries": 0,
+      "requestReachedOpenRouter": true,
+      "httpStatus": 200,
+      "openRouterRequestId": null,
+      "generationId": "gen-1789476112-yFUwNyZ40q5G9zR5Y6u3",
+      "contentType": "application/json",
+      "headerReportedModel": null,
+      "headerReportedProvider": null,
+      "retryAfter": null,
+      "routerAttemptCount": null,
+      "inputTokens": 4674,
+      "outputTokens": 1878,
+      "totalTokens": 6552,
+      "latencyMs": 49383,
+      "timeToHeadersMs": 11915,
+      "bodyReadLatencyMs": 37461,
+      "accountedCostUsd": 0.07032,
+      "costMetadataAvailable": true,
+      "failureCategory": null,
+      "safeErrorType": null,
+      "safeErrorCode": null,
+      "safeErrorParameter": null,
+      "safeErrorMessage": null,
+      "providerSafeErrorCode": null
+    }
+  },
+  "validation": {
+    "providerShape": {
+      "valid": true,
+      "errors": []
+    },
+    "strictLocal": {
+      "valid": true,
+      "errors": []
+    },
+    "translatedConstraints": {
+      "valid": true,
+      "errors": []
+    },
+    "grounding": {
+      "valid": true,
+      "citedRefs": [
+        "accepted_profile_fact:approvedAuthorizationCount",
+        "fact_v2_authorization_count",
+        "fact_v2_settled_transaction_count",
+        "fact_v2_submitted_transaction_count"
+      ],
+      "invalidRefs": []
+    },
+    "usageValid": true
+  },
+  "plan": {
+    "schemaVersion": "shadow_ai_economic_resolution_output_2026_09_14_v1",
+    "outputType": "AI_INFERENCE_ONLY",
+    "authority": "NON_AUTHORITATIVE",
+    "admissionStatus": "NOT_ADMITTED",
+    "truthEffect": "NONE",
+    "financialMutationAllowed": false,
+    "customerRenderingAllowed": false,
+    "issueId": "shadow-issue-fb0c6d195b277fb84e2d10c8efd5846e",
+    "inputHash": "8784c9254f109483dcc64221b297fdcc27e4e4175a623c82c37938f4cf6ff320",
+    "exactCitedFactRefs": [
+      "fact_v2_authorization_count",
+      "fact_v2_settled_transaction_count",
+      "accepted_profile_fact:approvedAuthorizationCount",
+      "fact_v2_submitted_transaction_count"
+    ],
+    "unresolvedQuestion": "What are the actual authorization attempt count, approved authorization count, and settled transaction count for this merchant's Fiserv / First Data account during the November 2024 statement period, and how do these distinct populations relate to the known submitted transaction count of 1,828?",
+    "primaryHypothesis": {
+      "hypothesis": "The authorization count, approved authorization count, and settled transaction count are three distinct populations that cannot be derived from the known submitted transaction count of 1,828 without processor operational data. The submitted count likely represents items sent for clearing but does not confirm how many authorization attempts were made, how many were approved, or how many ultimately settled.",
+      "confidence": "MEDIUM",
+      "supportingFactRefs": [
+        "fact_v2_submitted_transaction_count",
+        "fact_v2_authorization_count",
+        "fact_v2_settled_transaction_count",
+        "accepted_profile_fact:approvedAuthorizationCount"
+      ],
+      "contradictingFactRefs": [],
+      "acknowledgedEvidenceGaps": [
+        "No authorization count data (attempts or approvals) exists in the packet.",
+        "No settled transaction count is independently confirmed; only submitted transaction count (1,828) is known.",
+        "No processor or gateway operational data has been supplied to disambiguate the populations."
+      ],
+      "confirmationRequirements": [
+        "Processor operational data (authorization log) from Fiserv / First Data for Nov 2024 showing authorization attempts and approval counts.",
+        "Independent settlement count from clearing files to compare against the submitted transaction count of 1,828."
+      ],
+      "falsificationConditions": [
+        "If processor data shows authorization attempts, approvals, and settlements are all identical in count, the non-interchangeability concern would be moot for this merchant/period.",
+        "If the merchant or processor confirms that submitted transaction count is definitionally identical to settled transaction count in their system, one UNKNOWN facet could be resolved."
+      ]
+    },
+    "alternativeHypotheses": [
+      {
+        "hypothesis": "The submitted transaction count of 1,828 may approximate the settled transaction count, but authorization attempts (including declines and reversals) likely form a larger population, meaning the populations are not interchangeable.",
+        "confidence": "LOW",
+        "supportingFactRefs": [
+          "fact_v2_submitted_transaction_count"
+        ],
+        "contradictingFactRefs": [],
+        "acknowledgedEvidenceGaps": [
+          "No processor operational data breaking out authorization attempts vs. approvals vs. declines is available.",
+          "No evidence confirms whether the submitted transaction count of 1,828 equals, exceeds, or is less than the settled count."
+        ],
+        "confirmationRequirements": [
+          "Processor or gateway authorization log showing total authorization attempts, approved authorizations, and declined authorizations for the Nov 2024 period.",
+          "Clearing/settlement file from Fiserv/First Data confirming the settled transaction count independently of the submitted count."
+        ],
+        "falsificationConditions": [
+          "If processor data shows authorization attempts significantly exceeding 1,828, the populations are clearly not equivalent.",
+          "If settled transaction count differs materially from 1,828, the submitted count cannot serve as a proxy for settlements."
+        ]
+      },
+      {
+        "hypothesis": "The restaurant/food-beverage mixed-channel context may produce meaningful divergence between authorization attempts and settlements due to tip adjustments, partial authorizations, or online-order declines, making the populations materially non-interchangeable.",
+        "confidence": "LOW",
+        "supportingFactRefs": [
+          "fact_v2_submitted_transaction_count"
+        ],
+        "contradictingFactRefs": [],
+        "acknowledgedEvidenceGaps": [
+          "No data on decline rates, void rates, or reversal rates is available for this merchant.",
+          "Restaurant/food-beverage channel-specific authorization behavior (e.g., tip-adjust authorizations) is not evidenced in the packet."
+        ],
+        "confirmationRequirements": [
+          "Merchant attestation or processor report detailing authorization decline rate and void/reversal frequency.",
+          "Clarification of whether the mixed channel includes online ordering, which may have different decline profiles than in-store."
+        ],
+        "falsificationConditions": [
+          "If the merchant's decline and reversal rate is effectively zero, authorization attempts would equal approvals would approximately equal settlements, undermining the non-interchangeability concern.",
+          "If processor data shows tip-adjust authorizations are counted separately, the authorization count could be substantially higher than 1,828."
+        ]
+      }
+    ],
+    "acknowledgedEvidenceGaps": [
+      "Authorization count (total attempts) is UNKNOWN — no processor or gateway data provides this figure for the statement period.",
+      "Approved authorization count is UNKNOWN — no evidence in the packet quantifies approvals distinct from total attempts or settled transactions.",
+      "Settled transaction count is UNKNOWN — despite a known submitted transaction count of 1,828, the settled population has not been independently confirmed.",
+      "Authorization-to-settlement ratio cannot be derived because both the numerator (authorizations) and denominator (settlements) are UNKNOWN.",
+      "The reason code 'authorization_attempt_approval_settlement_populations_not_interchangeable' indicates these populations are conceptually distinct, yet no evidence disambiguates them for this merchant."
+    ],
+    "recommendedResolutionPath": "PROCESSOR_OR_GATEWAY_DATA_REQUIRED",
+    "requiredEvidenceClasses": [
+      "PROCESSOR_OR_GATEWAY_OPERATIONAL_DATA",
+      "MERCHANT_ATTESTATION"
+    ],
+    "researchQuerySuggestions": [],
+    "merchantQuestionSuggestions": [
+      "Can you provide or request from your Fiserv / First Data representative a monthly authorization summary that shows total authorization attempts and approved authorizations separately from settled transactions for November 2024?",
+      "Do you have access to a gateway or terminal dashboard that reports declined transactions or authorization-only transactions (not settled) for the same period?",
+      "Are tip adjustments processed as separate authorization events on your system, or are they handled as settlement-level modifications?"
+    ],
+    "documentRequestSuggestions": [
+      "Fiserv / First Data monthly authorization summary report for the Nov 2024 statement period showing total authorization attempts, approved authorizations, and declined authorizations.",
+      "Fiserv / First Data clearing and settlement detail report for Nov 2024 showing the count of settled (funded) transactions.",
+      "Any merchant-facing dashboard export from the processor or gateway that separately reports authorization volume and settlement volume."
+    ],
+    "operationalDataRequests": [
+      "Fiserv / First Data authorization log or summary for merchant account covering 2024-11-01 through 2024-11-30, including total attempts, approvals, and declines.",
+      "Fiserv / First Data settlement/clearing file or summary for the same period showing count of settled transactions independently.",
+      "If available, a reconciliation report that maps authorization attempts to their final settlement or non-settlement disposition."
+    ],
+    "internalExplanationDraft": "All four facets of authorization economics (authorization count, approved authorization count, settled transaction count, and authorization-to-settlement ratio) are UNKNOWN. The only known transaction population is the submitted transaction count of 1,828, sourced from document evidence. The reason code indicates that authorization attempts, approvals, and settlements are conceptually distinct populations that cannot be treated as interchangeable. Without processor operational data (authorization logs, clearing files), none of the UNKNOWN facets can be resolved. The merchant operates in the restaurant/food-beverage category on a mixed channel via Fiserv/First Data, which may introduce tip-adjustment and decline dynamics that further separate these populations. Resolution requires processor or gateway operational data or merchant attestation.",
+    "unresolvedAfterAnalysis": true,
+    "limitationCodes": [
+      "NO_AUTHORIZATION_DATA",
+      "NO_SETTLEMENT_DATA",
+      "POPULATIONS_NOT_DISAMBIGUATED",
+      "PROCESSOR_DATA_REQUIRED"
+    ],
+    "reconstructionSuspicions": []
+  },
+  "offlineStubPlan": {
+    "schemaVersion": "shadow_ai_economic_resolution_output_2026_09_14_v1",
+    "outputType": "AI_INFERENCE_ONLY",
+    "authority": "NON_AUTHORITATIVE",
+    "admissionStatus": "NOT_ADMITTED",
+    "truthEffect": "NONE",
+    "financialMutationAllowed": false,
+    "customerRenderingAllowed": false,
+    "issueId": "shadow-issue-fb0c6d195b277fb84e2d10c8efd5846e",
+    "inputHash": "8784c9254f109483dcc64221b297fdcc27e4e4175a623c82c37938f4cf6ff320",
+    "exactCitedFactRefs": [
+      "fact_v2_authorization_count",
+      "fact_v2_settled_transaction_count"
+    ],
+    "unresolvedQuestion": "Which defined authorization, approval, and settlement populations apply to the period?",
+    "primaryHypothesis": {
+      "hypothesis": "The available activity populations may use different definitions and therefore cannot yet be compared.",
+      "confidence": "MEDIUM",
+      "supportingFactRefs": [
+        "fact_v2_authorization_count",
+        "fact_v2_settled_transaction_count"
+      ],
+      "contradictingFactRefs": [],
+      "acknowledgedEvidenceGaps": [
+        "Comparable authorization, approval, and settlement population definitions are missing."
+      ],
+      "confirmationRequirements": [
+        "Processor or gateway data must define each population and bind it to the statement period."
+      ],
+      "falsificationConditions": [
+        "Period-matched governed evidence assigning a different state to authorization economics missing evidence would falsify this hypothesis."
+      ]
+    },
+    "alternativeHypotheses": [
+      {
+        "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
+        "confidence": "LOW",
+        "supportingFactRefs": [
+          "fact_v2_authorization_count"
+        ],
+        "contradictingFactRefs": [],
+        "acknowledgedEvidenceGaps": [
+          "Comparable authorization, approval, and settlement population definitions are missing."
+        ],
+        "confirmationRequirements": [
+          "Independent processor or gateway data required evidence must support the alternative explanation."
+        ],
+        "falsificationConditions": [
+          "Complete period-matched evidence resolving authorization economics missing evidence without the proposed gap would falsify the alternative."
+        ]
+      }
+    ],
+    "acknowledgedEvidenceGaps": [
+      "Comparable authorization, approval, and settlement population definitions are missing."
+    ],
+    "recommendedResolutionPath": "PROCESSOR_OR_GATEWAY_DATA_REQUIRED",
+    "requiredEvidenceClasses": [
+      "PROCESSOR_OR_GATEWAY_OPERATIONAL_DATA"
+    ],
+    "researchQuerySuggestions": [],
+    "merchantQuestionSuggestions": [],
+    "documentRequestSuggestions": [],
+    "operationalDataRequests": [
+      "Request the period-matched authorization, approval, settlement, and qualification detail with documented population definitions."
+    ],
+    "internalExplanationDraft": "This is an internal, non-authoritative planning inference. The accepted economics remain unchanged until governed evidence resolves the stated gap.",
+    "unresolvedAfterAnalysis": true,
+    "limitationCodes": [
+      "offline_evaluation_stub",
+      "no_new_evidence_admitted",
+      "deterministic_inputs_unchanged"
+    ],
+    "reconstructionSuspicions": []
+  },
+  "quality": {
+    "evaluable": true,
+    "actualIssueAnalyzed": true,
+    "absentFictitiousContentIntroduced": false,
+    "primaryRelevant": true,
+    "alternativesDistinct": true,
+    "routeAppropriate": true,
+    "evidenceRequestsSpecific": true,
+    "unknownPreserved": true,
+    "blameAvoided": true,
+    "prohibitedConclusionsAvoided": true,
+    "valueAddBeyondStub": true,
+    "exactCitedReferenceCount": 4,
+    "allNarrativeCitedReferencesAvailable": true,
+    "providerRequestCount": 9,
+    "stubRequestCount": 1,
+    "providerRoute": "PROCESSOR_OR_GATEWAY_DATA_REQUIRED",
+    "stubRoute": "PROCESSOR_OR_GATEWAY_DATA_REQUIRED",
+    "rationale": [
+      "The response analyzes the selected authorization-population issue.",
+      "Evidence requests name distinct authorization and settlement populations.",
+      "The provider adds materially more specific evidence detail than the stub."
+    ]
+  },
+  "invariance": {
+    "before": {
+      "canonical": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+      "rd": "d1d3300a5c1b69ed35f527c68531c866f0bcb2f81e5c9fbf75bb166f66557cb7",
+      "decomposition": "cb06bf8723df83f727eeb6a543529c88c1cf68ec6fbceea253c465097d724edf",
+      "activity": "b610c4e8b2ad7a5365ff977d3c5b6ef91a1772a4dc712adc96dc00482db467af",
+      "qualification": "f6e6b5b98c13e6fcb293ebc451d84a65906047582f0154bdd86878733a9d4951",
+      "sensitivity": "b09980a091ef6cc0486a4479f64cd0b8a599619ef66853b541b26947c36cfcef",
+      "participantControl": "b8188ed8a32cd634d38005ee65c9cf5f1d4e6404daa1ec046d6284819c31838c",
+      "completeness": "0556af7b6b367d6702b33d49b2d556d1302dc4c8ed201a291b839da2f4dde977",
+      "materiality": "bbc8af8062563aafb539a2fdb7fee3cdc0d196dc27df5e30a154c7057dabcbb3"
+    },
+    "after": {
+      "canonical": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+      "rd": "d1d3300a5c1b69ed35f527c68531c866f0bcb2f81e5c9fbf75bb166f66557cb7",
+      "decomposition": "cb06bf8723df83f727eeb6a543529c88c1cf68ec6fbceea253c465097d724edf",
+      "activity": "b610c4e8b2ad7a5365ff977d3c5b6ef91a1772a4dc712adc96dc00482db467af",
+      "qualification": "f6e6b5b98c13e6fcb293ebc451d84a65906047582f0154bdd86878733a9d4951",
+      "sensitivity": "b09980a091ef6cc0486a4479f64cd0b8a599619ef66853b541b26947c36cfcef",
+      "participantControl": "b8188ed8a32cd634d38005ee65c9cf5f1d4e6404daa1ec046d6284819c31838c",
+      "completeness": "0556af7b6b367d6702b33d49b2d556d1302dc4c8ed201a291b839da2f4dde977",
+      "materiality": "bbc8af8062563aafb539a2fdb7fee3cdc0d196dc27df5e30a154c7057dabcbb3"
+    },
+    "commercialSourceSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "commercialSourceUnchanged": true
+  },
+  "safetyCounters": {
+    "canonicalFinancialFingerprintChanges": 0,
+    "rdChanges": 0,
+    "commercialClassificationChanges": 0,
+    "activityChanges": 0,
+    "qualificationChanges": 0,
+    "sensitivityChanges": 0,
+    "participantControlChanges": 0,
+    "completenessChanges": 0,
+    "materialityChanges": 0,
+    "savingsCreated": 0,
+    "annualizationCreated": 0,
+    "comparisonDecisionCreated": 0,
+    "customerFindingPermissionCreated": 0,
+    "customerRoutingCreated": 0,
+    "aiInferencePromotedToFact": 0,
+    "invalidFactRefsAdmitted": 0,
+    "invalidEvidenceRefsAdmitted": 0,
+    "unsupportedClaimsAdmitted": 0,
+    "privateAccountFieldsSent": 0,
+    "researchOperations": 0,
+    "sourceAdmissions": 0,
+    "legacyAiFallbacks": 0
+  },
+  "safetyCounterTotal": 0,
+  "executionBoundary": {
+    "researchExecuted": false,
+    "sourceAdmission": false,
+    "truthMutation": false,
+    "financialMutation": false,
+    "customerOutput": false,
+    "productionRouting": false,
+    "legacyAiFallback": false
+  },
+  "recommendation": {
+    "code": "ISSUE_GROUNDED_PLANNER_READY_TO_SCALE",
+    "reason": "The single real plan remained grounded and safe while adding specific resolution value beyond the offline stub."
+  }
+}

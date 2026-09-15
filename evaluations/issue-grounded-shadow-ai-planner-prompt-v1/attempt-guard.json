@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "issue_grounded_shadow_ai_planner_prompt_attempt_guard_2026_09_15_v1",
+  "baseline": {
+    "branch": "codex/shadow-ai-economic-resolution-planner-v1",
+    "commit": "d6ebcdbe919d11fb29ce73d7155c28848796a20f",
+    "parent": "b30596f2b07f7b1568f1b4a9530fe008eeaba437"
+  },
+  "transportReference": "8d949e9bee9de3b5a993ebda8cef2948b30f6125",
+  "branch": "codex/issue-grounded-shadow-ai-planner-prompt-v1",
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "maximumCalls": 1,
+  "retries": 0,
+  "fallbacks": 0,
+  "statementAlias": "supported-fiserv-gold-01",
+  "selectedIssueId": "shadow-issue-fb0c6d195b277fb84e2d10c8efd5846e",
+  "selectedIssueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+  "callReserved": true,
+  "callCompleted": true,
+  "result": "ACCEPTED",
+  "httpStatus": 200,
+  "generationId": "gen-1789476112-yFUwNyZ40q5G9zR5Y6u3",
+  "resultSha256": "e5689b530cad529433cdfecbbebb11897467189db35c7e12af91651fc72d5f67"
+}
