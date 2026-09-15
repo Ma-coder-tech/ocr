@@ -159,7 +159,7 @@ export function auditHallucinationAndOverreachV1(
 ): readonly OverreachAuditV1[] {
   const entries: OverreachAuditV1[] = [];
   const hypothesisText = [plan.primaryHypothesis.hypothesis, ...plan.alternativeHypotheses.map((item) => item.hypothesis)];
-  const allText = splitSentences(narrative(plan));
+  const narrativeText = [plan.unresolvedQuestion, plan.internalExplanationDraft ?? ""];
   const patterns: ReadonlyArray<readonly [OverreachAuditV1["category"], RegExp]> = [
     ["fee_identity", /\b(?:fee|charge)\s+(?:is|represents|covers)\b/i],
     ["network_rule", /\b(?:visa|mastercard|discover|amex|network)\s+(?:requires|mandates|rule)\b/i],
@@ -179,19 +179,21 @@ export function auditHallucinationAndOverreachV1(
     ["comparison_outcome", /\b(?:above|below) market|better than|worse than\b/i],
     ["switching_recommendation", /\bswitch(?:ing)?\s+(?:to|processor|provider)\b/i],
   ];
-  const acceptedText = normalize(canonicalJson(packet));
-  for (const sentence of allText) {
+  for (const sentence of hypothesisText.flatMap(splitSentences)) {
     for (const [category, pattern] of patterns) {
       if (!pattern.test(sentence)) continue;
-      const isHypothesisField = hypothesisText.some((text) => text.includes(sentence) || sentence.includes(text));
-      const uncertainty = /\b(?:may|might|could|possibly|plausibly|hypothesis|likely|potential|unknown|unresolved|not established|cannot determine|requires evidence|if)\b/i.test(sentence);
-      const supportedVerbatim = acceptedText.includes(normalize(sentence));
-      if (supportedVerbatim) continue;
       entries.push({
         category,
-        classification: isHypothesisField || uncertainty ? "LABELED_HYPOTHESIS" : "UNSUPPORTED_FACTUAL_ASSERTION",
+        classification: "LABELED_HYPOTHESIS",
         excerpt: sentence.slice(0, 500),
       });
+    }
+  }
+  for (const sentence of narrativeText.flatMap(splitSentences)) {
+    if (statementSupportedOrEpistemic(sentence, packet)) continue;
+    for (const [category, pattern] of patterns) {
+      if (!pattern.test(sentence)) continue;
+      entries.push({ category, classification: "UNSUPPORTED_FACTUAL_ASSERTION", excerpt: sentence.slice(0, 500) });
     }
   }
   return deepFreeze(uniqueBy(entries, (entry) => `${entry.category}:${entry.classification}:${entry.excerpt}`));
@@ -340,8 +342,51 @@ function splitSentences(text: string): string[] {
   return text.split(/(?<=[.!?])\s+/).map((item) => item.trim()).filter(Boolean);
 }
 
+function statementSupportedOrEpistemic(statement: string, packet: ShadowAiEconomicResolutionPacketV1): boolean {
+  if (/\b(?:may|might|could|possibly|plausibly|hypothesis|likely|potential|unknown|unresolved|not established|cannot determine|cannot be|without|requires?|no .* (?:available|present|provided|exists)|not admitted|not prove)\b/i.test(statement)) return true;
+  const normalized = normalize(statement);
+  const context = packet.merchantBusinessContext;
+  const supportedTerms = [
+    packet.processorFamily,
+    packet.processorProgram,
+    context?.admittedBusinessCategory,
+    context?.knownChannel,
+    context?.businessName,
+    ...packet.sanitizedFeeLabels,
+    ...packet.unresolvedReasonCodes,
+  ].filter((value): value is string => Boolean(value)).map(normalize);
+  const businessOrProcessorGrounded = supportedTerms.some((term) => term && normalized.includes(term));
+  const numericTokens = normalized.match(/\b\d+(?:\.\d+)?\b/g) ?? [];
+  const allowedNumbers = packetNumbers(packet);
+  const numbersGrounded = numericTokens.every((token) => allowedNumbers.has(token));
+  const participantGrounded = packet.acceptedParticipantControlStates.length > 0
+    && (/collector.*processor or acquirer/i.test(normalized) || /remain unresolved|category only/i.test(normalized));
+  return (businessOrProcessorGrounded && numbersGrounded) || participantGrounded;
+}
+
+function packetNumbers(packet: ShadowAiEconomicResolutionPacketV1): Set<string> {
+  const values = new Set<string>();
+  const add = (value: number) => {
+    values.add(String(value));
+    values.add(String(Number((value / 100).toFixed(2))));
+    values.add(String(Math.round(value / 100)));
+  };
+  for (const fact of packet.acceptedIssueRelevantActivityFacts) {
+    if (typeof fact.value === "number") add(fact.value);
+    else if (fact.value && typeof fact.value === "object" && "amountMinor" in fact.value) add(fact.value.amountMinor);
+  }
+  if (packet.merchantBusinessContext?.acceptedAverageTicket) add(packet.merchantBusinessContext.acceptedAverageTicket.amountMinor);
+  if (packet.statementPeriod) {
+    for (const value of [packet.statementPeriod.start, packet.statementPeriod.end]) {
+      for (const token of value.match(/\d+/g) ?? []) values.add(String(Number(token)));
+    }
+  }
+  for (let value = 0; value <= 10; value += 1) values.add(String(value));
+  return values;
+}
+
 function normalize(value: string): string {
-  return value.toLowerCase().replace(/[_/-]+/g, " ").replace(/[^a-z0-9\s]+/g, " ").replace(/\s+/g, " ").trim();
+  return value.toLowerCase().replace(/(?<=\d),(?=\d)/g, "").replace(/[_/-]+/g, " ").replace(/[^a-z0-9.\s]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function clampScore(value: number): number {

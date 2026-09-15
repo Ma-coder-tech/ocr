@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "issue_diversity_shadow_ai_economic_analyst_attempt_guard_2026_09_15_v1",
+  "acceptedCheckpoint": {
+    "branch": "codex/issue-grounded-shadow-ai-planner-prompt-v1",
+    "commit": "21dd92049a5e169b8a306c41380d8ac29c1fea11"
+  },
+  "lineage": {
+    "planner": "d6ebcdbe919d11fb29ce73d7155c28848796a20f",
+    "containmentParent": "b30596f2b07f7b1568f1b4a9530fe008eeaba437"
+  },
+  "branch": "codex/issue-diversity-shadow-ai-economic-analyst-pilot-v1",
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "maximumCalls": 7,
+  "selectedCallCount": 6,
+  "retries": 0,
+  "fallbacks": 0,
+  "callsReserved": 6,
+  "callsCompleted": 6,
+  "callLedger": [
+    {
+      "callNumber": 1,
+      "family": "AUTHORIZATION_ECONOMICS",
+      "statementAlias": "supported-fiserv-gold-01",
+      "issueId": "shadow-issue-fb0c6d195b277fb84e2d10c8efd5846e",
+      "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+      "status": "ACCEPTED",
+      "httpStatus": 200,
+      "generationId": "gen-1789477646-wGWd1VkS6YCVtjdTqBAU",
+      "failureCategory": null
+    },
+    {
+      "callNumber": 2,
+      "family": "SHARED_OR_BUNDLED_FEE_SEMANTICS",
+      "statementAlias": "supported-fiserv-gold-02",
+      "issueId": "shadow-issue-1d91e9da8d2432dfaa7aaf1b8377579c",
+      "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+      "status": "REJECTED",
+      "httpStatus": 400,
+      "generationId": "gen-1789477697-5gD6zOXqsk2gE5RwDdZ2",
+      "failureCategory": "MALFORMED_REQUEST"
+    },
+    {
+      "callNumber": 3,
+      "family": "QUALIFICATION_OR_INTEGRITY",
+      "statementAlias": "supported-fiserv-gold-05",
+      "issueId": "shadow-issue-dba4d926824d27d958f20c0b6ba092ce",
+      "issueClass": "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+      "status": "REJECTED",
+      "httpStatus": 400,
+      "generationId": "gen-1789477702-8Ait9Y1UwiwvLnCRCxIO",
+      "failureCategory": "MALFORMED_REQUEST"
+    },
+    {
+      "callNumber": 4,
+      "family": "PARTICIPANT_OR_CONTROL",
+      "statementAlias": "supported-fiserv-gold-03",
+      "issueId": "shadow-issue-879d506d9cec0ce764460760d951237c",
+      "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+      "status": "ACCEPTED",
+      "httpStatus": 200,
+      "generationId": "gen-1789477706-ZYUoPgXZwX4t24CSt003",
+      "failureCategory": null
+    },
+    {
+      "callNumber": 5,
+      "family": "CONTRACT_OR_DOCUMENT",
+      "statementAlias": "supported-fiserv-gold-04",
+      "issueId": "shadow-issue-9853d6ba562afbece26ddcef23925404",
+      "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+      "status": "REJECTED",
+      "httpStatus": 400,
+      "generationId": "gen-1789477762-ql55X7dMHypBBCVc777t",
+      "failureCategory": "MALFORMED_REQUEST"
+    },
+    {
+      "callNumber": 6,
+      "family": "BUSINESS_CONTEXT_SENSITIVE",
+      "statementAlias": "supported-fiserv-gold-06",
+      "issueId": "shadow-issue-b4df4d28d0942d10353d7db142bcffc9",
+      "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+      "status": "ACCEPTED",
+      "httpStatus": 200,
+      "generationId": "gen-1789477767-GLHzqYangFFMJexmQ5H5",
+      "failureCategory": null
+    }
+  ],
+  "pilotCompleted": true,
+  "resultSha256": "922695c5d91b4239b7658235205ee4de0a2a55edb405fdcb3256cf35c967f68f",
+  "recommendation": "INCONCLUSIVE",
+  "offlineFinalizationOnly": true
+}

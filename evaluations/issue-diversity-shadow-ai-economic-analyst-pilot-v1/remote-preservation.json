@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "accepted_issue_grounded_planner_remote_preservation_2026_09_15_v1",
+  "remote": "origin",
+  "branch": "codex/issue-grounded-shadow-ai-planner-prompt-v1",
+  "acceptedCommit": "21dd92049a5e169b8a306c41380d8ac29c1fea11",
+  "remoteCommit": "21dd92049a5e169b8a306c41380d8ac29c1fea11",
+  "localRemoteMatch": true,
+  "plannerAncestor": "d6ebcdbe919d11fb29ce73d7155c28848796a20f",
+  "plannerLineageIntact": true,
+  "containmentAncestor": "b30596f2b07f7b1568f1b4a9530fe008eeaba437",
+  "containmentLineageIntact": true,
+  "acceptedWorktreeCleanAfterPush": true,
+  "amended": false,
+  "squashed": false,
+  "merged": false,
+  "pullRequestOpened": false,
+  "deployed": false
+}

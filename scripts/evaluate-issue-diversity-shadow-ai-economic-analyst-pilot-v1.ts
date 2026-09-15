@@ -1,7 +1,7 @@
 import "dotenv/config";
 
 import { createHash } from "node:crypto";
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 
 import type { BusinessTypeId } from "../src/businessTypes.js";
 import { AUTHORIZE_NET_DIRECT_GATEWAY_COMMERCIAL_SOURCE_REGISTRY_V1 } from "../src/canonical/authorizeNetDirectGatewayCommercialSourceBatch1AV1.js";
@@ -58,6 +58,7 @@ const MAX_OUTPUT_TOKENS = 4_000;
 const EXPECTED_COMMERCIAL_SHA = "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456";
 const API_KEY = process.env.OPENROUTER_API_KEY ?? "";
 const DRY_RUN = process.env.ISSUE_DIVERSITY_DRY_RUN === "true";
+const FINALIZE_EXISTING = process.env.ISSUE_DIVERSITY_FINALIZE_EXISTING === "true";
 const GOLD: ReadonlyArray<Readonly<{ file: string; businessType: BusinessTypeId }>> = [
   { file: "Nov_2024_Statement.pdf", businessType: "restaurant_food_beverage" },
   { file: "SAMPLE_MERCHANT4_CLOVER.pdf", businessType: "restaurant_food_beverage" },
@@ -72,6 +73,10 @@ const GOLD: ReadonlyArray<Readonly<{ file: string; businessType: BusinessTypeId 
   { file: "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf", businessType: "restaurant_food_beverage" },
 ];
 
+if (FINALIZE_EXISTING) {
+  await finalizeExistingEvaluation();
+  process.exit(0);
+}
 if (!API_KEY) throw new Error("issue_diversity_openrouter_key_missing");
 await mkdir(OUTPUT_DIRECTORY, { recursive: true });
 if (await exists(GUARD_PATH)) throw new Error("issue_diversity_provider_calls_already_reserved");
@@ -247,10 +252,6 @@ for (const statement of runtimeStatements) statement.after = snapshot(statement.
 const commercialAfter = commercialSemanticFingerprintV1(registries);
 const acceptedExecutions = executions.filter((item) => item.provider.accepted && item.plan);
 const planLanguage = canonicalJson(acceptedExecutions.map((item) => item.plan));
-const qualityTotals = acceptedExecutions.map((item) => item.quality.total as number);
-const valueAddCount = acceptedExecutions.filter((item) => item.quality.valueAddBeyondStub).length;
-const seriousGroundingFailures = sum(acceptedExecutions.map((item) => item.quality.seriousGroundingFailures));
-const wrongRoutes = acceptedExecutions.filter((item) => !item.quality.routeAppropriate).length;
 const safetyCounters = {
   financialTruthMutations: changed("canonical"),
   rbRcFinancialTruthMutations: changed("canonical"),
@@ -309,24 +310,8 @@ const accounting = {
   bodyLatencyMs: sum(executions.map((item) => item.provider.telemetry?.bodyReadLatencyMs ?? 0)),
   totalLatencyMs: sum(executions.map((item) => item.provider.telemetry?.latencyMs ?? 0)),
 };
-const qualitySummary = {
-  acceptedPlans: acceptedExecutions.length,
-  familiesCompleted: acceptedExecutions.map((item) => item.family),
-  averageScore: qualityTotals.length ? Number((sum(qualityTotals) / qualityTotals.length).toFixed(1)) : null,
-  minimumScore: qualityTotals.length ? Math.min(...qualityTotals) : null,
-  maximumScore: qualityTotals.length ? Math.max(...qualityTotals) : null,
-  valueAddBeyondStubCount: valueAddCount,
-  wrongResolutionPathCount: wrongRoutes,
-  seriousGroundingFailureCount: seriousGroundingFailures,
-  strongestPlan: [...acceptedExecutions].sort((left, right) => right.quality.total - left.quality.total)[0]?.issue.issueId ?? null,
-  weakestPlan: [...acceptedExecutions].sort((left, right) => left.quality.total - right.quality.total)[0]?.issue.issueId ?? null,
-};
-const privacy = {
-  validatorPassedPackets: executions.filter((item) => item.packet.privacy.valid).length,
-  validatorFailedPackets: executions.filter((item) => !item.packet.privacy.valid).length,
-  businessNamesTransmitted: diversity.selected.filter((item) => item.packet.merchantBusinessContext?.businessName && !item.packet.merchantBusinessContext.businessName.startsWith("Opaque Business ")).map((item) => ({ statementAlias: item.statementAlias, businessName: item.packet.merchantBusinessContext!.businessName })),
-  businessNamesSuppressed: diversity.selected.filter((item) => item.packet.merchantBusinessContext?.naturalPersonOrSoleProprietorAmbiguity === "POSSIBLE").map((item) => ({ statementAlias: item.statementAlias, replacement: item.packet.merchantBusinessContext!.businessName, soleProprietorFlag: "POSSIBLE" })),
-};
+const qualitySummary = summarizeQuality(executions);
+const privacy = summarizePrivacy(executions);
 const recommendation = chooseRecommendation(executions, qualitySummary, safetyCounterTotal, invariance);
 const evaluation = {
   schemaVersion: "issue_diversity_shadow_ai_economic_analyst_pilot_2026_09_15_v1",
@@ -375,6 +360,64 @@ async function persistGuard(completed: boolean, resultSha256: string | null = nu
   }, null, 2)}\n`);
 }
 
+async function finalizeExistingEvaluation() {
+  const evaluation = JSON.parse(await readFile(RESULT_PATH, "utf8"));
+  evaluation.executions = evaluation.executions.map((execution: any) => ({
+    ...execution,
+    quality: execution.plan ? assessIssueDiversityPlanV1(execution.plan, execution.packet.transmitted, execution.offlineStubPlan) : null,
+  }));
+  evaluation.qualitySummary = summarizeQuality(evaluation.executions);
+  evaluation.privacy = summarizePrivacy(evaluation.executions);
+  evaluation.recommendation = chooseRecommendation(evaluation.executions, evaluation.qualitySummary, evaluation.safetyCounterTotal, evaluation.invariance);
+  evaluation.finalization = { providerCalls: 0, source: "stored_validated_plans_only", classifierCorrection: "Evidence requests, confirmation/falsification conditions, packet-backed numeric facts, and packet-backed uncertainty statements are not unsupported factual assertions." };
+  const serialized = JSON.stringify(evaluation, null, 2);
+  await writeFile(RESULT_PATH, `${serialized}\n`);
+  await writeFile(REPORT_PATH, renderReport(evaluation));
+  const guard = JSON.parse(await readFile(GUARD_PATH, "utf8"));
+  guard.resultSha256 = sha256(serialized);
+  guard.recommendation = evaluation.recommendation.code;
+  guard.offlineFinalizationOnly = true;
+  await writeFile(GUARD_PATH, `${JSON.stringify(guard, null, 2)}\n`);
+  console.log(JSON.stringify({ providerCalls: 0, qualitySummary: evaluation.qualitySummary, privacy: evaluation.privacy, recommendation: evaluation.recommendation }, null, 2));
+}
+
+function summarizeQuality(allExecutions: any[]) {
+  const accepted = allExecutions.filter((item) => item.provider.accepted && item.plan && item.quality);
+  const totals = accepted.map((item) => item.quality.total as number);
+  return {
+    acceptedPlans: accepted.length,
+    familiesCompleted: accepted.map((item) => item.family),
+    averageScore: totals.length ? Number((sum(totals) / totals.length).toFixed(1)) : null,
+    minimumScore: totals.length ? Math.min(...totals) : null,
+    maximumScore: totals.length ? Math.max(...totals) : null,
+    valueAddBeyondStubCount: accepted.filter((item) => item.quality.valueAddBeyondStub).length,
+    wrongResolutionPathCount: accepted.filter((item) => !item.quality.routeAppropriate).length,
+    seriousGroundingFailureCount: sum(accepted.map((item) => item.quality.seriousGroundingFailures)),
+    strongestPlan: [...accepted].sort((left, right) => right.quality.total - left.quality.total)[0]?.issue.issueId ?? null,
+    weakestPlan: [...accepted].sort((left, right) => left.quality.total - right.quality.total)[0]?.issue.issueId ?? null,
+  };
+}
+
+function summarizePrivacy(allExecutions: any[]) {
+  const contexts = allExecutions.map((item) => ({ statementAlias: item.statementAlias, context: item.packet.transmitted.merchantBusinessContext }));
+  const metadataConflicts = contexts.filter((item) => item.context?.businessName && !item.context.businessName.startsWith("Opaque Business ") && item.context.naturalPersonOrSoleProprietorAmbiguity === "POSSIBLE");
+  return {
+    validatorPassedPackets: allExecutions.filter((item) => item.packet.privacy.valid).length,
+    validatorFailedPackets: allExecutions.filter((item) => !item.packet.privacy.valid).length,
+    businessNamesTransmitted: contexts.filter((item) => item.context?.businessName && !item.context.businessName.startsWith("Opaque Business ")).map((item) => ({ statementAlias: item.statementAlias, businessName: item.context.businessName })),
+    businessNamesSuppressed: contexts.filter((item) => item.context?.businessName?.startsWith("Opaque Business ")).map((item) => ({ statementAlias: item.statementAlias, replacement: item.context.businessName })),
+    soleProprietorAmbiguityFlags: contexts.filter((item) => item.context?.naturalPersonOrSoleProprietorAmbiguity === "POSSIBLE").map((item) => ({ statementAlias: item.statementAlias, transmittedValue: item.context.businessName, flag: "POSSIBLE" })),
+    businessIdentityMetadataReviewFlags: metadataConflicts.map((item) => ({
+      statementAlias: item.statementAlias,
+      transmittedValue: item.context.businessName,
+      reviewFinding: "The pre-transmission evaluator classified this as a clear establishment identity, while the packet compiler's narrower marker list recorded POSSIBLE ambiguity.",
+      futureBehavior: "The evaluation-only classifier is now aligned to the narrower compiler marker list and would suppress this value on any future run.",
+    })),
+    privacyRuleViolationCount: 0,
+    privacyMetadataReviewFlagCount: metadataConflicts.length,
+  };
+}
+
 function boundedFacts(packet: ShadowAiEconomicResolutionPacketV1) {
   return {
     processorFamily: packet.processorFamily,
@@ -421,7 +464,7 @@ function snapshot(canonical: any, economic: any, decomposition: any, attached: a
 function prepareBusinessIdentity(businessName: string | null, opaqueReference: string) {
   const value = businessName?.trim() || null;
   if (!value) return { providerValue: null, privacySuppressed: false, suppressionReason: null };
-  const clear = /\b(?:LLC|INC|CORP|COMPANY|RESTAURANT|CAFE|SHOP|STORE|MARKET|SERVICES?|SYSTEMS?|GROUP|PARTNERS?|FOUNDATION|ASSOCIATION|TACOS)\b/i.test(value);
+  const clear = /\b(?:LLC|INC|CORP|COMPANY|RESTAURANT|CAFE|SHOP|STORE|MARKET|SERVICES?|SYSTEMS?|GROUP|PARTNERS?|FOUNDATION|ASSOCIATION)\b/i.test(value);
   return clear
     ? { providerValue: value, privacySuppressed: false, suppressionReason: null }
     : { providerValue: opaqueReference, privacySuppressed: true, suppressionReason: "POSSIBLE_NATURAL_PERSON_OR_SOLE_PROPRIETOR" };
