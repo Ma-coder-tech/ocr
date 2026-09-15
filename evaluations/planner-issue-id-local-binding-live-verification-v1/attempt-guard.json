@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "planner_issue_id_local_binding_live_verification_attempt_guard_2026_09_16_v1",
+  "parent": "137ba156e72495a2ea9521178c4247b16d969d75",
+  "branch": "codex/planner-issue-id-local-binding-live-verification-v1",
+  "provider": "OpenRouter",
+  "requestedModel": "anthropic/claude-opus-4.6",
+  "maximumCalls": 1,
+  "callsReserved": 1,
+  "callsAttempted": 0,
+  "callsCompleted": 0,
+  "retries": 0,
+  "fallbacks": 0,
+  "status": "BLOCKED_PRE_TRANSPORT",
+  "requestReachedOpenRouter": false,
+  "httpStatus": null,
+  "completed": false,
+  "blockReason": "AUTHORIZED_REQUEST_CONSTRAINTS_NOT_SIMULTANEOUSLY_SATISFIABLE"
+}
