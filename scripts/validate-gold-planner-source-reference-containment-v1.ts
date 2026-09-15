@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 
 import type { BusinessTypeId } from "../src/businessTypes.js";
 import { AUTHORIZE_NET_DIRECT_GATEWAY_COMMERCIAL_SOURCE_REGISTRY_V1 } from "../src/canonical/authorizeNetDirectGatewayCommercialSourceBatch1AV1.js";
@@ -39,6 +40,7 @@ const GOLD: Array<{ file: string; businessType: BusinessTypeId }> = [
   { file: "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf", businessType: "restaurant_food_beverage" },
 ];
 
+export async function evaluateGoldPlannerSourceReferenceContainmentOfflineV1() {
 // Reading this accepted artifact is a guard that the same 11-statement Gold corpus is in scope.
 const accepted = JSON.parse(await readFile("evaluations/shadow-ai-economic-resolution-planner-v1/evaluation-2026-09-14.json", "utf8"));
 if (accepted.corpus.statementCount !== 11) throw new Error("accepted_gold_corpus_guard_invalid");
@@ -175,7 +177,8 @@ if (artifact.aggregate.rawInternalReferenceLeakageCount !== 0 || artifact.aggreg
   || Object.values(artifact.invariance).filter((value) => typeof value === "string" && /^\d+\/11$/.test(value)).some((value) => value !== "11/11")) {
   throw new Error("gold_containment_validation_failed");
 }
-console.log(JSON.stringify(artifact, null, 2));
+return artifact;
+}
 
 function validatePacket(packet: ShadowAiEconomicResolutionPacketV1, plan: any, issueClass: string | undefined) {
   if (!plan || !issueClass) throw new Error("gold_packet_plan_binding_missing");
@@ -211,7 +214,9 @@ function validatePacket(packet: ShadowAiEconomicResolutionPacketV1, plan: any, i
     outboundAliasCounts: countAliasClasses(request.referenceMap.entries),
     compatibilityMetrics: {
       requestBodyBytes: diagnostic.requestBodyBytes,
+      requestBodySha256: diagnostic.requestBodySha256,
       providerSchemaBytes: diagnostic.providerSchemaBytes,
+      providerSchemaSha256: diagnostic.providerSchemaSha256,
       schemaDepth: diagnostic.schemaDepth,
       schemaNodeCount: diagnostic.schemaNodeCount,
       enumNodeCount: diagnostic.enumNodeCount,
@@ -282,3 +287,7 @@ function deterministicPricing(document: ParsedDocument, file: string, businessTy
 function fingerprint(value: unknown): string { return createHash("sha256").update(canonicalJson(value)).digest("hex"); }
 function counts(values: string[]): Record<string, number> { return values.reduce<Record<string, number>>((out, value) => ({ ...out, [value]: (out[value] ?? 0) + 1 }), {}); }
 function sum(values: readonly number[]): number { return values.reduce((total, value) => total + value, 0); }
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  console.log(JSON.stringify(await evaluateGoldPlannerSourceReferenceContainmentOfflineV1(), null, 2));
+}

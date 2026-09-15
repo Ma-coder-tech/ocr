@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "planner_stable_provider_facing_schema_historical_reconstruction_2026_09_15_v1",
+  "providerSchemaVersion": "shadow_ai_economic_resolution_provider_schema_2026_09_15_v1",
+  "baselineCommit": "95894841a9cb09487bbcfd26565a35ea2e1f3761",
+  "providerCalls": 0,
+  "reconstructedHistoricalRequestCount": 6,
+  "providerSchema": {
+    "bytes": 5472,
+    "sha256": "9d382aab64862b3818e1e46de385170cf3f1cc392b7e335d5d33acf1e334bcb6",
+    "schemaDepth": 7,
+    "schemaNodeCount": 76,
+    "enumNodeCount": 5,
+    "maximumEnumCardinality": 8,
+    "totalEnumLiteralCount": 28,
+    "totalEnumLiteralBytes": 675,
+    "constCount": 13,
+    "arraySchemaNodeCount": 22,
+    "packetSpecificReferenceEnumCount": 0
+  },
+  "requests": [
+    {
+      "family": "AUTHORIZATION_ECONOMICS",
+      "historicalProviderResult": "ACCEPTED",
+      "references": { "FACT": 4, "STATEMENT_EVIDENCE": 3, "GOVERNED_EVIDENCE": 0, "ECONOMIC_CHARGE": 0 },
+      "aliases": { "FACT": 4, "STATEMENT_EVIDENCE": 3, "GOVERNED_EVIDENCE": 0, "ECONOMIC_CHARGE": 0 },
+      "packageA": { "requestBodyBytes": 12427, "providerSchemaBytes": 6200, "maximumEnumCardinality": 8, "totalEnumLiteralBytes": 1553, "packetBytes": 3088 },
+      "packageB": { "requestBodyBytes": 11919, "providerSchemaBytes": 5787, "maximumEnumCardinality": 8, "totalEnumLiteralBytes": 1140, "providerPacketBytes": 2993 },
+      "packageC": { "requestBodyBytes": 11596, "providerSchemaBytes": 5472, "maximumEnumCardinality": 8, "totalEnumLiteralBytes": 675, "providerPacketBytes": 2993 }
+    },
+    {
+      "family": "SHARED_OR_BUNDLED_FEE_SEMANTICS",
+      "historicalProviderResult": "REJECTED_HTTP_400",
+      "references": { "FACT": 4, "STATEMENT_EVIDENCE": 66, "GOVERNED_EVIDENCE": 66, "ECONOMIC_CHARGE": 1 },
+      "aliases": { "FACT": 4, "STATEMENT_EVIDENCE": 66, "GOVERNED_EVIDENCE": 66, "ECONOMIC_CHARGE": 1 },
+      "packageA": { "requestBodyBytes": 25668, "providerSchemaBytes": 15055, "maximumEnumCardinality": 71, "totalEnumLiteralBytes": 10005, "packetBytes": 7224 },
+      "packageB": { "requestBodyBytes": 25269, "providerSchemaBytes": 15469, "maximumEnumCardinality": 71, "totalEnumLiteralBytes": 10419, "providerPacketBytes": 6411 },
+      "packageC": { "requestBodyBytes": 15264, "providerSchemaBytes": 5472, "maximumEnumCardinality": 8, "totalEnumLiteralBytes": 675, "providerPacketBytes": 6411 }
+    },
+    {
+      "family": "QUALIFICATION_OR_INTEGRITY",
+      "historicalProviderResult": "REJECTED_HTTP_400",
+      "references": { "FACT": 4, "STATEMENT_EVIDENCE": 5, "GOVERNED_EVIDENCE": 48, "ECONOMIC_CHARGE": 5 },
+      "aliases": { "FACT": 4, "STATEMENT_EVIDENCE": 5, "GOVERNED_EVIDENCE": 48, "ECONOMIC_CHARGE": 5 },
+      "packageA": { "requestBodyBytes": 22160, "providerSchemaBytes": 12577, "maximumEnumCardinality": 57, "totalEnumLiteralBytes": 7611, "packetBytes": 6192 },
+      "packageB": { "requestBodyBytes": 23170, "providerSchemaBytes": 13453, "maximumEnumCardinality": 57, "totalEnumLiteralBytes": 8487, "providerPacketBytes": 6326 },
+      "packageC": { "requestBodyBytes": 15181, "providerSchemaBytes": 5472, "maximumEnumCardinality": 8, "totalEnumLiteralBytes": 675, "providerPacketBytes": 6326 }
+    },
+    {
+      "family": "PARTICIPANT_OR_CONTROL",
+      "historicalProviderResult": "ACCEPTED",
+      "references": { "FACT": 4, "STATEMENT_EVIDENCE": 18, "GOVERNED_EVIDENCE": 9, "ECONOMIC_CHARGE": 2 },
+      "aliases": { "FACT": 4, "STATEMENT_EVIDENCE": 18, "GOVERNED_EVIDENCE": 9, "ECONOMIC_CHARGE": 2 },
+      "packageA": { "requestBodyBytes": 15001, "providerSchemaBytes": 7071, "maximumEnumCardinality": 15, "totalEnumLiteralBytes": 2358, "packetBytes": 4584 },
+      "packageB": { "requestBodyBytes": 15099, "providerSchemaBytes": 7365, "maximumEnumCardinality": 15, "totalEnumLiteralBytes": 2652, "providerPacketBytes": 4388 },
+      "packageC": { "requestBodyBytes": 13198, "providerSchemaBytes": 5472, "maximumEnumCardinality": 8, "totalEnumLiteralBytes": 675, "providerPacketBytes": 4388 }
+    },
+    {
+      "family": "CONTRACT_OR_DOCUMENT",
+      "historicalProviderResult": "REJECTED_HTTP_400",
+      "references": { "FACT": 4, "STATEMENT_EVIDENCE": 30, "GOVERNED_EVIDENCE": 108, "ECONOMIC_CHARGE": 2 },
+      "aliases": { "FACT": 4, "STATEMENT_EVIDENCE": 30, "GOVERNED_EVIDENCE": 108, "ECONOMIC_CHARGE": 2 },
+      "packageA": { "requestBodyBytes": 33057, "providerSchemaBytes": 22190, "maximumEnumCardinality": 114, "totalEnumLiteralBytes": 16884, "packetBytes": 7434 },
+      "packageB": { "requestBodyBytes": 31972, "providerSchemaBytes": 21596, "maximumEnumCardinality": 114, "totalEnumLiteralBytes": 16290, "providerPacketBytes": 6943 },
+      "packageC": { "requestBodyBytes": 15840, "providerSchemaBytes": 5472, "maximumEnumCardinality": 8, "totalEnumLiteralBytes": 675, "providerPacketBytes": 6943 }
+    },
+    {
+      "family": "BUSINESS_CONTEXT_SENSITIVE",
+      "historicalProviderResult": "ACCEPTED",
+      "references": { "FACT": 4, "STATEMENT_EVIDENCE": 12, "GOVERNED_EVIDENCE": 0, "ECONOMIC_CHARGE": 0 },
+      "aliases": { "FACT": 4, "STATEMENT_EVIDENCE": 12, "GOVERNED_EVIDENCE": 0, "ECONOMIC_CHARGE": 0 },
+      "packageA": { "requestBodyBytes": 12302, "providerSchemaBytes": 6115, "maximumEnumCardinality": 8, "totalEnumLiteralBytes": 1468, "packetBytes": 3137 },
+      "packageB": { "requestBodyBytes": 11886, "providerSchemaBytes": 5779, "maximumEnumCardinality": 8, "totalEnumLiteralBytes": 1132, "providerPacketBytes": 3057 },
+      "packageC": { "requestBodyBytes": 11571, "providerSchemaBytes": 5472, "maximumEnumCardinality": 8, "totalEnumLiteralBytes": 675, "providerPacketBytes": 3057 }
+    }
+  ],
+  "aggregate": {
+    "identicalProviderSchemaAcrossSix": true,
+    "uniqueProviderSchemaShaCount": 1,
+    "uniqueProviderSchemaByteCount": 1,
+    "exactLocalRoundTripCount": 6,
+    "acceptedPlannerValidationCount": 6,
+    "rawInternalReferenceLeakageCount": 0,
+    "sourceIdentityLeakageCount": 0,
+    "reverseMapMaterialLeakageCount": 0,
+    "governedReferenceCountToSchemaByteRelationshipRemoved": true,
+    "governedReferenceCountToPacketDerivedEnumRelationshipRemoved": true
+  },
+  "stress": {
+    "referenceCounts": [0, 1, 8, 64, 128, 256, 512],
+    "requestBodyByteRange": { "minimum": 8863, "maximum": 36529 },
+    "providerSchemaBytes": 5472,
+    "providerSchemaSha256": "9d382aab64862b3818e1e46de385170cf3f1cc392b7e335d5d33acf1e334bcb6",
+    "identicalSchemaBytesShaAndMetrics": true
+  },
+  "liveCompatibilityClaims": {
+    "openRouterFixed": false,
+    "anthropicAcceptanceProven": false,
+    "historicalHttp400Solved": false,
+    "providerLimitClaimed": false
+  }
+}

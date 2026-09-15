@@ -9,6 +9,7 @@ import type { ShadowAiEconomicResolutionPacketV1 } from "../canonical/shadowAiEc
 import { canonicalJson } from "../canonical/v2/canonicalJson.js";
 import { APPROVED_OPENROUTER_ENDPOINT } from "../canonical/v2/intelligence/providerPreflight.js";
 import {
+  STABLE_PROVIDER_FACING_PLANNER_SCHEMA_NAME_V1,
   localFullPlannerOutputSchemaV1,
 } from "./openRouterFullPlannerSchemaPreflightV1.js";
 import {
@@ -22,7 +23,7 @@ import {
 } from "./openRouterClaudeStructuredOutputPreflightV2.js";
 
 export const ISSUE_GROUNDED_SHADOW_PLANNER_SCHEMA_NAME_V1 =
-  "shadow_ai_economic_resolution_plan_issue_grounded_v1" as const;
+  STABLE_PROVIDER_FACING_PLANNER_SCHEMA_NAME_V1;
 
 export type IssueGroundedPlannerContextV1 = Readonly<{
   issueId: string;

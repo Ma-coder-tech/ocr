@@ -27,7 +27,16 @@ import {
   type OpenRouterPreflightTelemetryV2,
 } from "./openRouterClaudeStructuredOutputPreflightV2.js";
 
-export const FULL_PLANNER_PREFLIGHT_SCHEMA_NAME_V1 = "shadow_ai_economic_resolution_plan_synthetic_preflight_v1" as const;
+export const STABLE_PROVIDER_FACING_PLANNER_SCHEMA_NAME_V1 =
+  "shadow_ai_economic_resolution_plan_stable_v1" as const;
+export const FULL_PLANNER_PREFLIGHT_SCHEMA_NAME_V1 = STABLE_PROVIDER_FACING_PLANNER_SCHEMA_NAME_V1;
+export const STABLE_PROVIDER_FACING_PLANNER_SCHEMA_VERSION_V1 =
+  "shadow_ai_economic_resolution_provider_schema_2026_09_15_v1" as const;
+
+export const STABLE_PROVIDER_FACT_REFERENCE_PATTERN_V1 =
+  "^prv_[a-f0-9]{10}_f_[0-9]{4}$" as const;
+export const STABLE_PROVIDER_SUPPORT_REFERENCE_PATTERN_V1 =
+  "^prv_[a-f0-9]{10}_[fgc]_[0-9]{4}$" as const;
 
 export type OpenRouterFullPlannerRequestV1 = OpenRouterClaudePreflightRequestV2 & Readonly<{
   referenceMap: ShadowAiProviderReferenceMapV1;
@@ -107,21 +116,20 @@ export function createSyntheticFullPlannerPacketV1(): ShadowAiEconomicResolution
   return packet;
 }
 
-export function localFullPlannerOutputSchemaV1(packet: ShadowAiEconomicResolutionPacketV1): Readonly<Record<string, unknown>> {
+/**
+ * Stable provider-facing output contract. The optional packet parameter is retained only
+ * for source compatibility with accepted evaluation scripts; no packet value is read.
+ * Exact request binding, alias membership, and reference-class authorization remain in
+ * the deterministic Package B reverse-mapping and planner-validation boundary.
+ */
+export function localFullPlannerOutputSchemaV1(
+  _packet?: ShadowAiEconomicResolutionPacketV1,
+): Readonly<Record<string, unknown>> {
   const text = (maximum: number) => ({ type: "string", minLength: 1, maxLength: maximum });
   const stringList = (minimum = 0) => ({ type: "array", items: text(500), minItems: minimum, maxItems: 16 });
-  const allowedFactRefs = [...new Set([
-    ...packet.acceptedFactRefs,
-    ...packet.acceptedIssueRelevantActivityFacts.map((fact) => fact.factRef),
-  ])];
-  const allowedSupportRefs = [...new Set([
-    ...allowedFactRefs,
-    ...packet.currentGovernedEvidenceRefs,
-    ...packet.selectedRdChargeRefs,
-  ])];
-  const referenceList = (allowed: readonly string[], minimum = 0) => ({
+  const referenceList = (pattern: string, minimum = 0) => ({
     type: "array",
-    items: { type: "string", enum: [...allowed] },
+    items: { type: "string", pattern },
     minItems: minimum,
     maxItems: 16,
   });
@@ -131,8 +139,8 @@ export function localFullPlannerOutputSchemaV1(packet: ShadowAiEconomicResolutio
     properties: {
       hypothesis: text(2_000),
       confidence: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
-      supportingFactRefs: referenceList(allowedSupportRefs, 1),
-      contradictingFactRefs: referenceList(allowedSupportRefs),
+      supportingFactRefs: referenceList(STABLE_PROVIDER_SUPPORT_REFERENCE_PATTERN_V1, 1),
+      contradictingFactRefs: referenceList(STABLE_PROVIDER_SUPPORT_REFERENCE_PATTERN_V1),
       acknowledgedEvidenceGaps: stringList(1),
       confirmationRequirements: stringList(1),
       falsificationConditions: stringList(1),
@@ -148,9 +156,9 @@ export function localFullPlannerOutputSchemaV1(packet: ShadowAiEconomicResolutio
       admissionStatus: { type: "string", const: "NOT_ADMITTED" },
       truthEffect: { type: "string", const: "NONE" },
       financialMutationAllowed: { type: "boolean", const: false },
-      exactAcceptedFactOrOccurrenceRefs: referenceList(allowedSupportRefs, 1),
+      exactAcceptedFactOrOccurrenceRefs: referenceList(STABLE_PROVIDER_SUPPORT_REFERENCE_PATTERN_V1, 1),
       reasonForSuspicion: text(2_000),
-      conflictingEvidenceRefs: referenceList(allowedSupportRefs),
+      conflictingEvidenceRefs: referenceList(STABLE_PROVIDER_SUPPORT_REFERENCE_PATTERN_V1),
       requestedDeterministicRecheckType: {
         type: "string",
         enum: ["PARSER_SOURCE_OCCURRENCE_RECHECK", "RD_RECONCILIATION_RECHECK", "POPULATION_IDENTITY_RECHECK",
@@ -170,9 +178,9 @@ export function localFullPlannerOutputSchemaV1(packet: ShadowAiEconomicResolutio
       truthEffect: { type: "string", const: "NONE" },
       financialMutationAllowed: { type: "boolean", const: false },
       customerRenderingAllowed: { type: "boolean", const: false },
-      issueId: { type: "string", const: packet.issueId, minLength: 1, maxLength: 200 },
-      inputHash: { type: "string", const: packet.immutableInputHash, pattern: "^[a-f0-9]{64}$" },
-      exactCitedFactRefs: referenceList(allowedFactRefs, 1),
+      issueId: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$", minLength: 1, maxLength: 200 },
+      inputHash: { type: "string", pattern: "^[a-f0-9]{64}$" },
+      exactCitedFactRefs: referenceList(STABLE_PROVIDER_FACT_REFERENCE_PATTERN_V1, 1),
       unresolvedQuestion: text(2_000),
       primaryHypothesis: hypothesis,
       alternativeHypotheses: { type: "array", items: hypothesis, minItems: 1, maxItems: 5 },
@@ -180,7 +188,7 @@ export function localFullPlannerOutputSchemaV1(packet: ShadowAiEconomicResolutio
       recommendedResolutionPath: { type: "string", enum: [...SHADOW_AI_RESOLUTION_PATHS] },
       requiredEvidenceClasses: {
         type: "array",
-        items: { type: "string", enum: [...packet.allowedEvidenceClasses] },
+        items: { type: "string", enum: [...SHADOW_AI_EVIDENCE_CLASSES] },
         minItems: 1,
         maxItems: SHADOW_AI_EVIDENCE_CLASSES.length,
       },

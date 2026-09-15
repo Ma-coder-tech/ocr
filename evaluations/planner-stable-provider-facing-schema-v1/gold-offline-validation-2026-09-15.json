@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "gold_planner_stable_provider_facing_schema_offline_validation_2026_09_15_v1",
+  "providerSchemaVersion": "shadow_ai_economic_resolution_provider_schema_2026_09_15_v1",
+  "baselineCommit": "95894841a9cb09487bbcfd26565a35ea2e1f3761",
+  "providerCalls": 0,
+  "statementCount": 11,
+  "issueCount": 60,
+  "issueClassDistribution": {
+    "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE": 11,
+    "QUALIFICATION_INTEGRITY_ROOT_CAUSE": 7,
+    "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS": 9,
+    "COST_INCIDENCE_UNCERTAINTY": 11,
+    "PARTICIPANT_CONTROL_UNCERTAINTY": 11,
+    "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED": 11
+  },
+  "statementIssueCounts": [6, 6, 5, 4, 6, 6, 5, 6, 4, 6, 6],
+  "stableSchema": {
+    "identicalProviderSchemaAcrossAllIssues": true,
+    "uniqueProviderSchemaShaCount": 1,
+    "uniqueProviderSchemaByteCount": 1,
+    "uniqueStructuralMetricSignatureCount": 1,
+    "providerSchemaBytes": 5472,
+    "providerSchemaSha256": "9d382aab64862b3818e1e46de385170cf3f1cc392b7e335d5d33acf1e334bcb6",
+    "schemaDepth": 7,
+    "schemaNodeCount": 76,
+    "enumNodeCount": 5,
+    "maximumEnumCardinality": 8,
+    "totalEnumLiteralCount": 28,
+    "totalEnumLiteralBytes": 675,
+    "constCount": 13,
+    "arraySchemaNodeCount": 22,
+    "packetSpecificReferenceEnumCount": 0
+  },
+  "requestBodyBytes": { "minimum": 11029, "maximum": 20817 },
+  "grounding": {
+    "providerPacketReferenceOnlyDiffCount": 60,
+    "exactReferenceRoundTripCount": 60,
+    "acceptedPlannerValidationCount": 60,
+    "plannerSemanticInvarianceCount": 60
+  },
+  "privacy": {
+    "rawInternalReferenceLeakageCount": 0,
+    "sourceIdentityLeakageCount": 0,
+    "reverseMapMaterialLeakageCount": 0,
+    "reverseMapSerializedCount": 0,
+    "unknownAliasAcceptanceCount": 0,
+    "classConfusionAcceptanceCount": 0,
+    "rawReferenceAcceptanceCount": 0
+  },
+  "invariance": {
+    "canonicalFinancialTruthUnchanged": "11/11",
+    "rdUnchanged": "11/11",
+    "commercialDecompositionUnchanged": "11/11",
+    "sourceFingerprintUnchanged": "11/11",
+    "activityUnchanged": "11/11",
+    "qualificationUnchanged": "11/11",
+    "countSensitivityUnchanged": "11/11",
+    "volumeSensitivityUnchanged": "11/11",
+    "mixedMinimumSensitivityUnchanged": "11/11",
+    "fixedSensitivityUnchanged": "11/11",
+    "chargedCostUnchanged": "11/11",
+    "costStackCategoriesUnchanged": "11/11",
+    "participantControlUnchanged": "11/11",
+    "completenessUnchanged": "11/11",
+    "materialityInputsUnchanged": "11/11",
+    "commercialSourceSha256": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456"
+  },
+  "executionBoundary": {
+    "offlineOnly": true,
+    "providerCalls": 0,
+    "networkCalls": 0,
+    "researchOperations": 0,
+    "evidenceAdmissions": 0,
+    "customerOutputs": 0,
+    "productionRoutingChanges": 0,
+    "truthMutations": 0
+  }
+}

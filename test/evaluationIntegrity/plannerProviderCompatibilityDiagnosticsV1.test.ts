@@ -25,10 +25,10 @@ describe("Planner provider compatibility diagnostics v1", () => {
     expect(canonicalJson(packet)).toBe(packetBefore);
     expect(first.requestBodyBytes).toBe(Buffer.byteLength(bodyBefore, "utf8"));
     expect(first).toMatchObject({
-      schemaDepth: 8,
+      schemaDepth: 7,
       schemaNodeCount: 76,
-      enumNodeCount: 12,
-      constCount: 15,
+      enumNodeCount: 5,
+      constCount: 13,
       maximumItemsConstraintCount: 0,
       minimumLengthConstraintCount: 0,
       maximumLengthConstraintCount: 0,

@@ -35,7 +35,7 @@ describe("Gold-shaped single-packet planner preflight v1", () => {
       response_format: {
         type: "json_schema",
         json_schema: {
-          name: "shadow_ai_economic_resolution_plan_synthetic_preflight_v1",
+          name: "shadow_ai_economic_resolution_plan_stable_v1",
           strict: true,
         },
       },

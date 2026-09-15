@@ -76,8 +76,10 @@ const CODE_CLASS: Readonly<Record<string, ShadowAiProviderReferenceClassV1>> = O
 );
 
 const ALIAS_PATTERN = /^prv_([a-f0-9]{10})_([fsgc])_([0-9]{4})$/;
+const ALIAS_TOKEN_IN_TEXT = /\bprv_[a-f0-9]{10}_[fsgc]_[0-9]{4}\b/g;
 const SOURCE_IDENTITY = /(?:\/Users\/|\/private\/|[A-Za-z]:\\|\b\S+\.(?:pdf|md|markdown|csv|xlsx?|docx?|txt|json|ya?ml|xml|html?|png|jpe?g|tiff?)(?:#[^\s"']*)?\b|\bdocument-ir:|\bpdfjs-line-|\bsrcocc_)/i;
 const RAW_INTERNAL_REFERENCE = /^(?:fact_v2_|accepted_profile_fact:|economic_charge_|document-ir:|evidence_v2_|ev_|srcocc_|OWD-|RR-|[a-f0-9]{64}$)/i;
+const RAW_INTERNAL_REFERENCE_NAMESPACE = /(?:\bfact_v2_|accepted_profile_fact:|economic_charge_|document-ir:|evidence_v2_|\bev_|srcocc_|\bOWD-|\bRR-)/i;
 const REVERSE_MAP_KEY = /^(?:referenceMap|reverseMap|internalReference|internalInputHash|entries|scopeToken)$/i;
 const CLEAR_BUSINESS_ENTITY_MARKER = /\b(?:LLC|INC|CORP|COMPANY|CO\.?|RESTAURANT|CAFE|SHOP|STORE|MARKET|SERVICES?|SYSTEMS?|GROUP|PARTNERS?|FOUNDATION|ASSOCIATION|TACOS)\b/i;
 
@@ -419,7 +421,9 @@ function inspectOutboundValue(
   }
   const approvedBindingValue = value === referenceMap.providerInputHash || value === referenceMap.issueId
     || /^shadow-run-[a-f0-9]{16,64}$/.test(value) || (aliasMatch && referenceMap.entries.some((entry) => entry.alias === value));
-  if (!approvedBindingValue && (referenceMap.entries.some((entry) => entry.internalReference === value) || RAW_INTERNAL_REFERENCE.test(value))) {
+  if (!approvedBindingValue && (referenceMap.entries.some((entry) => value === entry.internalReference
+      || (entry.internalReference.length >= 8 && value.includes(entry.internalReference)))
+    || RAW_INTERNAL_REFERENCE.test(value) || RAW_INTERNAL_REFERENCE_NAMESPACE.test(value))) {
     counters.rawInternalReferenceLeakageCount += 1;
     reasons.push("shadow_planner_provider_raw_internal_reference_present");
   }
@@ -444,6 +448,10 @@ function inspectProviderOutputForRawReferences(
     Object.values(value).forEach((item) => inspectProviderOutputForRawReferences(item, referenceMap, internalReferences, errors));
     return;
   }
+  const embeddedAliases = typeof value === "string" ? value.match(ALIAS_TOKEN_IN_TEXT) ?? [] : [];
+  if (typeof value === "string" && embeddedAliases.length > 0 && !ALIAS_PATTERN.test(value)) {
+    errors.push("shadow_planner_provider_reference_alias_embedded_in_prose");
+  }
   const aliasMatch = typeof value === "string" ? ALIAS_PATTERN.exec(value) : null;
   if (aliasMatch && !referenceMap.entries.some((entry) => entry.alias === value)) {
     errors.push(aliasMatch[1] === referenceMap.scopeToken
@@ -454,7 +462,8 @@ function inspectProviderOutputForRawReferences(
     && (value === referenceMap.providerInputHash || value === referenceMap.issueId
       || Boolean(aliasMatch && referenceMap.entries.some((entry) => entry.alias === value)));
   if (typeof value === "string" && !approvedProviderValue
-    && (internalReferences.has(value) || RAW_INTERNAL_REFERENCE.test(value) || SOURCE_IDENTITY.test(value))) {
+    && ([...internalReferences].some((reference) => value === reference || (reference.length >= 8 && value.includes(reference)))
+      || RAW_INTERNAL_REFERENCE.test(value) || RAW_INTERNAL_REFERENCE_NAMESPACE.test(value) || SOURCE_IDENTITY.test(value))) {
     errors.push("shadow_planner_provider_output_raw_internal_reference_rejected");
   }
 }

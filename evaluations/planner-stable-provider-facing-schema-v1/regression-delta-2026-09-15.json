@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "planner_stable_provider_facing_schema_regression_delta_2026_09_15_v1",
+  "baselineCommit": "95894841a9cb09487bbcfd26565a35ea2e1f3761",
+  "packageBParent": {
+    "testFiles": { "passed": 214, "failed": 28, "total": 242 },
+    "tests": { "passed": 2417, "failed": 87, "total": 2504 },
+    "uniqueFailureFiles": 28,
+    "uniqueFailureSignatures": 86,
+    "unhandledRejections": 0
+  },
+  "packageC": {
+    "testFiles": { "passed": 215, "failed": 28, "total": 243 },
+    "tests": { "passed": 2425, "failed": 86, "total": 2511 },
+    "uniqueFailureFiles": 28,
+    "uniqueFailureSignatures": 85,
+    "unhandledRejections": 0
+  },
+  "signatureDelta": {
+    "sharedUniqueSignatures": 83,
+    "parentOnly": [
+      "test/evaluationPackage5BIntegration.test.ts > Package 5B manifest-driven admission > preserves a completed candidate when a later semantic request times out",
+      "test/evaluationPackage5BIntegration.test.ts > Package 5B manifest-driven admission > uses the canonical support partition verbatim and rejects a recomputed projection disagreement",
+      "test/evaluationRunIntegrity.test.ts > evaluation-run integrity > runs the repository one-time evaluation chain through fakes using only the exact verified packet"
+    ],
+    "packageCOnly": [
+      "test/evaluationPackage5BIntegration.test.ts > Package 5B manifest-driven admission > maps structured retrieval terminal values to exact research, lifecycle, admission, and run states",
+      "test/evaluationRunIntegrity.test.ts > evaluation-run integrity > persists required-tool failure without provider response text"
+    ],
+    "failureFileSetIdentical": true,
+    "parentOnlyFailureCount": 3,
+    "packageCOnlyFailureCount": 2
+  },
+  "deltaClassification": {
+    "classification": "BASELINE_FLAKY_RESOURCE_SENSITIVE",
+    "reason": "Every exchanged signature was a 30000ms timeout in one of two long-running evaluation files; neither file imports the changed planner-schema execution path, and an immediate isolated rerun of both files passed 114/114 at both the exact parent and Package C revisions.",
+    "isolatedParentRerun": { "testFilesPassed": 2, "testsPassed": 114, "failures": 0 },
+    "isolatedPackageCRerun": { "testFilesPassed": 2, "testsPassed": 114, "failures": 0 },
+    "unexplainedNewRegressionAttributableToPackageC": 0
+  }
+}

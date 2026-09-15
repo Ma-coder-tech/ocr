@@ -36,7 +36,7 @@ describe("Issue-Grounded Shadow AI Planner Prompt v1", () => {
       temperature: 0,
       max_tokens: 4_000,
       provider: { allow_fallbacks: false, require_parameters: true },
-      response_format: { type: "json_schema", json_schema: { name: "shadow_ai_economic_resolution_plan_issue_grounded_v1", strict: true } },
+      response_format: { type: "json_schema", json_schema: { name: "shadow_ai_economic_resolution_plan_stable_v1", strict: true } },
     });
     expect(Object.keys(user).sort()).toEqual(["issueContext", "packet"]);
     expect(user.packet).not.toEqual(packet);

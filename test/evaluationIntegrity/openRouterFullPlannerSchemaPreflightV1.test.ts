@@ -35,7 +35,7 @@ describe("OpenRouter full planner schema synthetic preflight v1", () => {
     expect(providerCounts.maxLength).toBe(0);
     expect(providerCounts.maxItems).toBe(0);
     expect(providerCounts.anyOf).toBe(1);
-    expect(providerCounts.pattern).toBe(1);
+    expect(providerCounts.pattern).toBe(9);
     expect(fullPlannerSchemaConstructCountsV1(localSchema)).toEqual(localCounts);
   });
 
@@ -56,13 +56,13 @@ describe("OpenRouter full planner schema synthetic preflight v1", () => {
       provider: { allow_fallbacks: false, require_parameters: true },
       response_format: {
         type: "json_schema",
-        json_schema: { name: "shadow_ai_economic_resolution_plan_synthetic_preflight_v1", strict: true },
+        json_schema: { name: "shadow_ai_economic_resolution_plan_stable_v1", strict: true },
       },
     });
     expect(body.tools).toBeUndefined();
     expect(body.tool_choice).toBeUndefined();
-    expect(request.bodyBytes).toBe(9_824);
-    expect(createHash("sha256").update(request.body).digest("hex")).toBe("dc511536fef7026e51be0c72585f5212612403bb2423662bcb25bebb25ea4378");
+    expect(request.bodyBytes).toBe(9_525);
+    expect(createHash("sha256").update(request.body).digest("hex")).toBe("1ab6ce788ac6bc6dc38f8ac361281623fc14ccb431aaab6f8cefd4230e74cd23");
     expect(request.body).not.toMatch(/\bGold\b|\bMID\b|account number|bank account|routing number|tax ID|\.pdf|\/Users\//i);
     for (const entry of request.referenceMap.entries) {
       expect(request.body).toContain(entry.alias);
