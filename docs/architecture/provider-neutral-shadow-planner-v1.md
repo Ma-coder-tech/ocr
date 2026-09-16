@@ -823,3 +823,52 @@ session per call, and safe telemetry only. A family must stop after its first
 failure; any privacy, protected-state, or unconfirmed-cleanup failure must halt
 all further network dispatch. Success would qualify shadow behavior for Product
 review only and would not authorize customer-facing use.
+
+## Phase 3 contract-v5 live shadow qualification — 2026-09-16
+
+Product authorized the complete Direct OpenAI-only contract-v5 cohort against
+the exact `gpt-5.2-2025-12-11` snapshot. The run retained the validated isolated
+transport: seven issue families, two repetitions per family, maximum 14 calls,
+60-second network deadline, 15-second connection-establishment deadline, up to
+two seconds solely for abort-cleanup confirmation, 4,000 output tokens,
+reasoning `none`, low verbosity, `store: false`, no retry, no fallback, USD 0.25
+per-call and USD 3.50 aggregate ceilings, and safe telemetry only.
+
+The result is **passed**. All seven issue families passed both repetitions.
+All 14 provider calls returned HTTP 200 from the exact requested snapshot, all
+14 drafts passed local deterministic validation, all semantic signatures were
+repeatable within their issue family, and every response matched the offline
+baseline for deterministic route, exact evidence class, exact guidance channel,
+required alternative, exact-reference grounding, and complete epistemic
+boundaries. The previously failing `QUALIFICATION_INTEGRITY_ROOT_CAUSE` family
+passed both repetitions with the same semantic signature and no error code.
+
+Transport remained healthy without further change. No connection was reused;
+every isolated session reported confirmed cleanup; no timeout, connection,
+header, body, cleanup, network, quarantine, or dispatch-halt event occurred.
+Maximum observed connection, response-header, response-body, cleanup, and total
+call times were respectively 764 ms, 41,001 ms, 470 ms, 5 ms, and 41,106 ms.
+
+Observed usage was 137,062 input tokens and 14,267 output tokens, with USD
+0.439602 total estimated cost. The largest call used 1,337 output tokens and
+cost USD 0.053731, below the approved 4,000-token and USD 0.25 per-call limits.
+
+All seven packet and provider-payload privacy inspections passed. No filename,
+business name, account identifier, credential, raw statement, prompt, response,
+packet, or provider draft was persisted. Canonical financial truth, RD,
+reconciliation, commercial truth, governed knowledge, permissions, and customer
+output remained invariant across all 14 attempts. Truth mutations, source
+admissions, research operations, customer outputs, retries, fallbacks, and
+OpenRouter calls were all zero. The completed exclusive attempt guard records
+all 14 calls and its SHA-256 matches the safe result artifact.
+
+Engineering assessment: Direct OpenAI contract v5 is Phase 3 shadow-qualified
+for Product review. This qualification is limited to the provider-neutral,
+non-authoritative shadow boundary tested here. It does not authorize
+customer-facing output, evidence admission, truth mutation, provider fallback,
+or OpenRouter use. The recommended next Product decision is whether to authorize
+a separately scoped, default-off internal shadow integration with the same
+frozen adapter, contract-v5 instruction, isolated transport, local validation,
+protected-state invariants, safe telemetry, and immediate kill switch. Any
+customer-facing behavior remains a separate future qualification and approval
+gate.
