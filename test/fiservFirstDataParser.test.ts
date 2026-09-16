@@ -321,6 +321,14 @@ describe("Fiserv First Data full statement parser", () => {
         }),
       ]),
     );
+    expect(actual.reconciliationResults.length).toBeGreaterThan(0);
+    expect(actual.decision.validationState).toMatchObject({
+      topLevelTotals: "validated",
+      feeLedger: "validated",
+      batchLedger: "validated",
+      feeClassification: "validated",
+      customerFacingTotalsAllowed: true,
+    });
   });
 
   it("extracts selected financials from the short June statement without using the distorted card-type total", async () => {
@@ -329,6 +337,14 @@ describe("Fiserv First Data full statement parser", () => {
 
     expect(fiservFirstDataFullStatementDriver.supports(doc)).toBe(false);
     expect(fiservFirstDataShortStatementDriver.supports(doc)).toBe(true);
+    expect(doc.suppliedDocumentIntegrity).toEqual({
+      openedSuccessfully: true,
+      enumeratedPageCount: 2,
+      processedPageCount: 2,
+      fatalPageErrorCount: 0,
+      extractionLineageComplete: true,
+      localIngestionTruncated: false,
+    });
 
     expect(() => parseFiservFirstDataFullStatement(doc, { sourceFileName: expected.statementIdentity.sourceFileName })).toThrow(
       "Document does not match the Fiserv / First Data full statement layout.",
@@ -490,6 +506,10 @@ describe("Fiserv First Data full statement parser", () => {
     expect(actual.decision).toMatchObject({
       status: "needs_review",
       reportable: false,
+      validationState: {
+        topLevelTotals: "failed",
+        customerFacingTotalsAllowed: false,
+      },
     });
   });
 

@@ -1,0 +1,25 @@
+{
+  "schema_version": "ratereveal_gold_metadata_clarification_v1",
+  "clarification_version": "gold-v0.3-metadata-clarification-v0.1",
+  "applies_to": "RateReveal Gold Answer Tables v0.3",
+  "decision_ref": "product-owner-gold-finalization-D15-2026-08-22",
+  "original_frozen_artifacts_rewritten": false,
+  "fields": {
+    "confidence": {
+      "missing_value": null,
+      "missing_status": "not_explicitly_supplied_requires_review",
+      "rule": "Missing authoring is not a substantive confidence conclusion."
+    },
+    "effective_period": {
+      "real_case_rule": "Use only an authoritatively frozen statement period; never infer from a filename.",
+      "not_time_sensitive_status": "not_time_sensitive"
+    },
+    "applicability_scope": {
+      "rule": "Preserve the scope frozen by the authoritative source without narrowing or broadening it."
+    },
+    "evidence_mapping_status": {
+      "pending_status": "pending_authoritative_mapping",
+      "rule": "An empty evidence reference list with pending status is not proof that evidence is unnecessary."
+    }
+  }
+}
