@@ -195,7 +195,9 @@ export function compareShadowAiPhase3PlanToOfflineBaselineV1(
     requiredAlternativePresent: !packet.competingHypothesisRequired || plan.alternativeHypotheses.length > 0,
     exactReferenceGroundingPresent: eligibleFactReferenceCount(packet) === 0 || plan.exactCitedFactRefs.length > 0,
     epistemicBoundariesComplete: allHypotheses.every((hypothesis) =>
-      hypothesis.supportingFactRefs.length > 0
+      (eligibleIssueSupportingReferenceCount(packet) > 0
+        ? hypothesis.supportingFactRefs.length > 0
+        : hypothesis.supportingFactRefs.length === 0 && hypothesis.confidence === "LOW")
       && hypothesis.acknowledgedEvidenceGaps.length > 0
       && hypothesis.confirmationRequirements.length > 0
       && hypothesis.falsificationConditions.length > 0),
@@ -212,9 +214,15 @@ function guidanceChannels(plan: ShadowAiEconomicResolutionPlanV1) {
 }
 
 function eligibleFactReferenceCount(packet: ShadowAiEconomicResolutionPacketV1): number {
+  return new Set(packet.acceptedFactRefs).size;
+}
+
+function eligibleIssueSupportingReferenceCount(packet: ShadowAiEconomicResolutionPacketV1): number {
   return new Set([
     ...packet.acceptedFactRefs,
-    ...packet.acceptedIssueRelevantActivityFacts.map((fact) => fact.factRef),
+    ...packet.currentGovernedEvidenceRefs,
+    ...packet.selectedRdChargeRefs,
+    ...packet.acceptedParticipantControlStates.map((state) => state.rdChargeRef),
   ]).size;
 }
 

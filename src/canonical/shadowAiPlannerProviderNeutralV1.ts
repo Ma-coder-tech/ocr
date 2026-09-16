@@ -13,9 +13,14 @@ import {
   type ShadowAiResolutionPathV1,
 } from "./shadowAiEconomicResolutionPlannerTypesV1.js";
 import { canonicalJson } from "./v2/canonicalJson.js";
+import {
+  shadowAiIssueSemanticContractV1,
+  type ShadowAiGuidanceChannelV1,
+  type ShadowAiIssueSemanticContractV1,
+} from "./shadowAiPlannerSemanticContractV1.js";
 
 export const SHADOW_AI_PROVIDER_NEUTRAL_REQUEST_SCHEMA_VERSION_V1 =
-  "shadow_ai_provider_neutral_request_2026_09_16_v3" as const;
+  "shadow_ai_provider_neutral_request_2026_09_16_v4" as const;
 export const SHADOW_AI_PROVIDER_NEUTRAL_DRAFT_SCHEMA_VERSION_V1 =
   "shadow_ai_provider_neutral_draft_2026_09_16_v1" as const;
 export const SHADOW_AI_PROVIDER_NEUTRAL_SCHEMA_NAME_V1 =
@@ -32,10 +37,25 @@ export const SHADOW_AI_REFERENCE_CLASSES_V1 = [
 ] as const;
 export type ShadowAiReferenceClassV1 = typeof SHADOW_AI_REFERENCE_CLASSES_V1[number];
 
+export const SHADOW_AI_REFERENCE_ROLES_V1 = [
+  "ISSUE_SUPPORTING",
+  "CONTEXT_ONLY",
+  "INPUT_PROVENANCE_ONLY",
+] as const;
+export type ShadowAiReferenceRoleV1 = typeof SHADOW_AI_REFERENCE_ROLES_V1[number];
+
 export type ShadowAiReferenceAliasEntryV1 = Readonly<{
   token: string;
   referenceClass: ShadowAiReferenceClassV1;
+  semanticRole: ShadowAiReferenceRoleV1;
   internalReference: string;
+}>;
+
+export type ShadowAiPlannerLocalSemanticContractV1 = Readonly<{
+  issue: ShadowAiIssueSemanticContractV1;
+  issueSupportingReferenceTokens: readonly string[];
+  issueSupportingFactTokens: readonly string[];
+  reconstructionSuspicionAllowed: false;
 }>;
 
 export type ShadowAiPlannerLocalBindingV1 = Readonly<{
@@ -43,6 +63,7 @@ export type ShadowAiPlannerLocalBindingV1 = Readonly<{
   inputHash: string;
   packet: ShadowAiEconomicResolutionPacketV1;
   referenceAliases: readonly ShadowAiReferenceAliasEntryV1[];
+  semanticContract: ShadowAiPlannerLocalSemanticContractV1;
 }>;
 
 export type ShadowAiPlannerProviderRequestV1 = Readonly<{
@@ -173,14 +194,14 @@ export function providerNeutralPlannerSystemInstructionV1(): string {
 Analyze only the unresolved issue and bounded context in the user payload. Accepted facts are authoritative inputs; UNKNOWN, CONFLICTING, and UNAVAILABLE remain unresolved.
 Return only an untrusted inference draft matching the supplied JSON schema. RateReveal, not you, owns issue identity, authority, permissions, financial truth, reference admission, and final validation.
 Never invent a merchant-specific fee, participant, population, amount, rate, program, document, operational event, or reference token. Cite only opaque reference tokens present in the payload.
-The payload's referenceTokenContract is the complete reference-class guide for this request. Copy tokens only from its catalog and obey its allowedClassesByOutputField exactly. Do not infer a token's class from its spelling or from where it appears elsewhere in the packet.
-exactCitedReferenceTokens accepts FACT tokens only. Hypothesis supportingReferenceTokens and contradictingReferenceTokens accept FACT, GOVERNED_EVIDENCE, or ECONOMIC_CHARGE tokens only. Reconstruction-suspicion exactAcceptedReferenceTokens and conflictingReferenceTokens accept the same three classes. STATEMENT_EVIDENCE tokens are input provenance only and must never be emitted in any output reference-token array.
-When no eligible token supports an output field, return an empty array where the schema permits it and state the evidence gap. Never substitute a token from another class.
-The payload's evidenceClassContract is the complete request-specific authority for requiredEvidenceClasses. Output one or more values and copy every value exactly from evidenceClassContract.allowedRequiredEvidenceClasses. Never emit a value listed in evidenceClassContract.prohibitedRequiredEvidenceClasses, even when that value appears in the JSON schema's global enum or seems appropriate for the issue or resolution path. The global enum exists only to keep one portable structural schema; it does not grant request-specific permission. Do not infer permission from the recommendedResolutionPath or any other packet field.
+The payload's referenceTokenContract is the complete reference-class and semantic-role guide for this request. Copy tokens only from its catalog and obey its allowedClassesByOutputField and eligibility rules exactly. Do not infer a token's class or role from its spelling or location elsewhere in the packet.
+exactCitedReferenceTokens accepts ISSUE_SUPPORTING FACT tokens only. Hypothesis supportingReferenceTokens and contradictingReferenceTokens accept ISSUE_SUPPORTING FACT, GOVERNED_EVIDENCE, or ECONOMIC_CHARGE tokens only. CONTEXT_ONLY tokens may inform framing but must never be cited as support or contradiction. STATEMENT_EVIDENCE tokens are INPUT_PROVENANCE_ONLY and must never be emitted in any output reference-token array.
+If issueSupportingReferenceTokens is non-empty, every hypothesis must cite at least one eligible token. If it is empty, every hypothesis must use LOW confidence, an empty supportingReferenceTokens array, and non-empty evidence gaps, confirmation requirements, and falsification conditions. Never substitute a context-only or provenance token.
+The payload's resolutionContract is deterministic and mandatory. Copy its requiredResolutionPath exactly, copy its requiredEvidenceClasses exactly with no additions, populate only its requiredGuidanceChannel, and keep every other guidance channel empty. The JSON schema's global enums are structural only and grant no request-specific authority.
+The payload's reconstructionSuspicionContract is mandatory. Emit reconstructionSuspicions only when allowed is true and an accepted conflict relationship is supplied. Missing evidence, population uncertainty, or a desire to recheck is not conflicting evidence. When allowed is false, return an empty reconstructionSuspicions array.
 Use low verbosity: keep every free-text field concise, factual, and limited to what is needed to express the unresolved hypothesis, evidence gap, confirmation requirement, or falsification condition. Do not add narrative outside the required JSON fields.
 Generate hypotheses only for the selected issue. State evidence gaps, confirmation requirements, and falsification conditions. Provide materially distinct alternatives where meaningful.
-Choose the most appropriate resolution path from the schema. Do not browse, call tools, admit evidence, mutate truth, calculate savings, make comparisons, assign blame, or create customer output.
-Use researchQuerySuggestions only for PUBLIC_RESEARCH_REQUIRED. Keep it empty for every other route.`;
+Do not browse, call tools, admit evidence, mutate truth, calculate savings, make comparisons, assign blame, or create customer output.`;
 }
 
 export function providerNeutralPlannerDraftSchemaV1(): Readonly<Record<string, unknown>> {
@@ -241,6 +262,12 @@ export function compileShadowAiPlannerProviderRequestV1(
   if (!privacy.valid) throw new Error(`shadow_planner_provider_neutral_packet_privacy_invalid:${privacy.reasonCodes.join(",")}`);
 
   const referenceAliases = buildReferenceAliases(packet);
+  const issueContract = shadowAiIssueSemanticContractV1(packet.issueClass);
+  if (!issueContract.requiredEvidenceClasses.every((value) => packet.allowedEvidenceClasses.includes(value))) {
+    throw new Error("shadow_planner_provider_neutral_resolution_contract_not_allowed");
+  }
+  const issueSupportingAliases = referenceAliases.filter((entry) => entry.semanticRole === "ISSUE_SUPPORTING");
+  const issueSupportingFactAliases = issueSupportingAliases.filter((entry) => entry.referenceClass === "FACT");
   const byInternal = new Map(referenceAliases.map((entry) => [`${entry.referenceClass}\u0000${entry.internalReference}`, entry.token] as const));
   const token = (referenceClass: ShadowAiReferenceClassV1, internalReference: string): string => {
     const value = byInternal.get(`${referenceClass}\u0000${internalReference}`);
@@ -256,6 +283,8 @@ export function compileShadowAiPlannerProviderRequestV1(
     acceptedIssueRelevantActivityFacts: packet.acceptedIssueRelevantActivityFacts.map((fact) => ({
       ...deepClone(fact),
       factRef: token("FACT", fact.factRef),
+      semanticRole: issueSupportingFactAliases.some((entry) => entry.internalReference === fact.factRef)
+        ? "ISSUE_SUPPORTING" : "CONTEXT_ONLY",
       evidenceRefs: fact.evidenceRefs.map((reference) => token("STATEMENT_EVIDENCE", reference)),
     })),
     selectedRdChargeRefs: packet.selectedRdChargeRefs.map((reference) => token("ECONOMIC_CHARGE", reference)),
@@ -283,9 +312,10 @@ export function compileShadowAiPlannerProviderRequestV1(
     unresolvedReasonCodes: [...packet.unresolvedReasonCodes],
   };
   const referenceTokenContract = {
-    catalog: referenceAliases.map(({ token: opaqueToken, referenceClass }) => ({
+    catalog: referenceAliases.map(({ token: opaqueToken, referenceClass, semanticRole }) => ({
       token: opaqueToken,
       referenceClass,
+      semanticRole,
     })),
     allowedClassesByOutputField: {
       exactCitedReferenceTokens: [...EXACT_CITATION_REFERENCE_CLASSES],
@@ -295,17 +325,41 @@ export function compileShadowAiPlannerProviderRequestV1(
       reconstructionSuspicionConflictingReferenceTokens: [...ANALYTIC_REFERENCE_CLASSES],
     },
     prohibitedOutputClasses: [...NON_OUTPUT_REFERENCE_CLASSES],
-    missingEligibleReferenceBehavior: "USE_EMPTY_ARRAY_AND_STATE_EVIDENCE_GAP",
+    issueSupportingReferenceTokens: issueSupportingAliases.map((entry) => entry.token),
+    issueSupportingFactTokens: issueSupportingFactAliases.map((entry) => entry.token),
+    contextOnlyReferenceTokens: referenceAliases
+      .filter((entry) => entry.semanticRole === "CONTEXT_ONLY")
+      .map((entry) => entry.token),
+    emptySupportRule: issueSupportingAliases.length === 0
+      ? "REQUIRED_EMPTY_WITH_LOW_CONFIDENCE_AND_COMPLETE_EPISTEMIC_BOUNDARY"
+      : "PROHIBITED_EACH_HYPOTHESIS_MUST_CITE_ISSUE_SUPPORTING_TOKEN",
+    exactCitationRule: issueSupportingFactAliases.length === 0
+      ? "EMPTY_ALLOWED_NO_ISSUE_SUPPORTING_FACT_EXISTS"
+      : "NON_EMPTY_ISSUE_SUPPORTING_FACT_TOKEN_REQUIRED",
   };
-  const evidenceClassContract = {
-    outputField: "requiredEvidenceClasses",
-    selectionRule: "NON_EMPTY_SUBSET_OF_ALLOWED_VALUES_ONLY",
-    allowedRequiredEvidenceClasses: [...packet.allowedEvidenceClasses],
-    prohibitedRequiredEvidenceClasses: SHADOW_AI_EVIDENCE_CLASSES
-      .filter((value) => !packet.allowedEvidenceClasses.includes(value)),
+  const resolutionContract = {
+    requiredResolutionPath: issueContract.resolutionPath,
+    requiredEvidenceClasses: [...issueContract.requiredEvidenceClasses],
+    requiredGuidanceChannel: issueContract.guidanceChannel,
+    guidanceOutputFields: guidanceOutputFields(),
+    otherGuidanceChannelsMustBeEmpty: true,
+    packetAllowedEvidenceClasses: [...packet.allowedEvidenceClasses],
+    prohibitedRequiredEvidenceClasses: SHADOW_AI_EVIDENCE_CLASSES.filter((value) =>
+      !issueContract.requiredEvidenceClasses.includes(value as never)),
     globalSchemaEnumPurpose: "STRUCTURAL_PORTABILITY_ONLY_NOT_REQUEST_AUTHORITY",
   };
-  const userPayload = canonicalJson({ evidenceClassContract, issueContext, referenceTokenContract, packet: providerPacket });
+  const reconstructionSuspicionContract = {
+    allowed: false,
+    reason: "NO_ACCEPTED_CONFLICT_RELATIONSHIP_PRESENT_IN_PACKET_CONTRACT",
+    requiredBehavior: "RETURN_EMPTY_RECONSTRUCTION_SUSPICIONS",
+  };
+  const userPayload = canonicalJson({
+    issueContext,
+    reconstructionSuspicionContract,
+    referenceTokenContract,
+    resolutionContract,
+    packet: providerPacket,
+  });
   inspectProviderPayload(userPayload, referenceAliases);
   return deepFreeze({
     request: {
@@ -320,6 +374,12 @@ export function compileShadowAiPlannerProviderRequestV1(
       inputHash: packet.immutableInputHash,
       packet,
       referenceAliases,
+      semanticContract: {
+        issue: issueContract,
+        issueSupportingReferenceTokens: issueSupportingAliases.map((entry) => entry.token),
+        issueSupportingFactTokens: issueSupportingFactAliases.map((entry) => entry.token),
+        reconstructionSuspicionAllowed: false,
+      },
     },
   });
 }
@@ -338,19 +398,33 @@ export function validateAndBindShadowAiPlannerDraftV1(
       const entry = aliases.get(value);
       if (!entry) errors.push(`${path}_unknown_reference_token`);
       else if (!classes.includes(entry.referenceClass)) errors.push(`${path}_wrong_reference_class`);
+      else if (entry.semanticRole !== "ISSUE_SUPPORTING") errors.push(`${path}_ineligible_reference_role`);
       else restored.push(entry.internalReference);
     }
     return restored;
   };
-  const hypothesis = (value: ShadowAiPlannerDraftHypothesisV1) => ({
-    hypothesis: value.hypothesis,
-    confidence: value.confidence,
-    supportingFactRefs: restore(value.supportingReferenceTokens, ANALYTIC_REFERENCE_CLASSES, "hypothesis.supportingReferenceTokens"),
-    contradictingFactRefs: restore(value.contradictingReferenceTokens, ANALYTIC_REFERENCE_CLASSES, "hypothesis.contradictingReferenceTokens"),
-    acknowledgedEvidenceGaps: [...value.acknowledgedEvidenceGaps],
-    confirmationRequirements: [...value.confirmationRequirements],
-    falsificationConditions: [...value.falsificationConditions],
-  });
+  const hypothesis = (value: ShadowAiPlannerDraftHypothesisV1, path: string) => {
+    const supportingFactRefs = restore(value.supportingReferenceTokens, ANALYTIC_REFERENCE_CLASSES, `${path}.supportingReferenceTokens`);
+    const contradictingFactRefs = restore(value.contradictingReferenceTokens, ANALYTIC_REFERENCE_CLASSES, `${path}.contradictingReferenceTokens`);
+    validateHypothesisReferenceContract(value, binding.semanticContract, path, errors);
+    return {
+      hypothesis: value.hypothesis,
+      confidence: value.confidence,
+      supportingFactRefs,
+      contradictingFactRefs,
+      acknowledgedEvidenceGaps: [...value.acknowledgedEvidenceGaps],
+      confirmationRequirements: [...value.confirmationRequirements],
+      falsificationConditions: [...value.falsificationConditions],
+    };
+  };
+  validateDraftResolutionContract(parsed.draft, binding.semanticContract.issue, errors);
+  if (!binding.semanticContract.reconstructionSuspicionAllowed && parsed.draft.reconstructionSuspicions.length > 0) {
+    errors.push("shadow_planner_reconstruction_suspicion_not_allowed_without_accepted_conflict");
+  }
+  if (binding.semanticContract.issueSupportingFactTokens.length > 0
+      && parsed.draft.exactCitedReferenceTokens.length === 0) {
+    errors.push("shadow_planner_missing_issue_supporting_fact_citation");
+  }
   const candidate = {
     schemaVersion: SHADOW_AI_ECONOMIC_RESOLUTION_OUTPUT_SCHEMA_VERSION,
     outputType: "AI_INFERENCE_ONLY",
@@ -363,8 +437,9 @@ export function validateAndBindShadowAiPlannerDraftV1(
     inputHash: binding.inputHash,
     exactCitedFactRefs: restore(parsed.draft.exactCitedReferenceTokens, EXACT_CITATION_REFERENCE_CLASSES, "exactCitedReferenceTokens"),
     unresolvedQuestion: parsed.draft.unresolvedQuestion,
-    primaryHypothesis: hypothesis(parsed.draft.primaryHypothesis),
-    alternativeHypotheses: parsed.draft.alternativeHypotheses.map(hypothesis),
+    primaryHypothesis: hypothesis(parsed.draft.primaryHypothesis, "primaryHypothesis"),
+    alternativeHypotheses: parsed.draft.alternativeHypotheses.map((value, index) =>
+      hypothesis(value, `alternativeHypotheses[${index}]`)),
     acknowledgedEvidenceGaps: [...parsed.draft.acknowledgedEvidenceGaps],
     recommendedResolutionPath: parsed.draft.recommendedResolutionPath,
     requiredEvidenceClasses: [...parsed.draft.requiredEvidenceClasses],
@@ -392,6 +467,62 @@ export function validateAndBindShadowAiPlannerDraftV1(
   return validated.ok
     ? deepFreeze({ ok: true as const, plan: validated.plan, errors: [] as const })
     : invalid(validated.errors);
+}
+
+function validateHypothesisReferenceContract(
+  value: ShadowAiPlannerDraftHypothesisV1,
+  contract: ShadowAiPlannerLocalSemanticContractV1,
+  path: string,
+  errors: string[],
+): void {
+  if (contract.issueSupportingReferenceTokens.length > 0) {
+    if (value.supportingReferenceTokens.length === 0) {
+      errors.push(`${path}_issue_supporting_reference_required`);
+    }
+    return;
+  }
+  if (value.supportingReferenceTokens.length > 0) errors.push(`${path}_support_forbidden_without_issue_supporting_reference`);
+  if (value.confidence !== "LOW") errors.push(`${path}_low_confidence_required_without_issue_supporting_reference`);
+  if (value.acknowledgedEvidenceGaps.length === 0
+      || value.confirmationRequirements.length === 0
+      || value.falsificationConditions.length === 0) {
+    errors.push(`${path}_complete_epistemic_boundary_required_without_support`);
+  }
+}
+
+function validateDraftResolutionContract(
+  draft: ShadowAiPlannerDraftV1,
+  contract: ShadowAiIssueSemanticContractV1,
+  errors: string[],
+): void {
+  if (draft.recommendedResolutionPath !== contract.resolutionPath) {
+    errors.push("shadow_planner_resolution_path_contract_mismatch");
+  }
+  if (canonicalJson([...draft.requiredEvidenceClasses].sort())
+      !== canonicalJson([...contract.requiredEvidenceClasses].sort())) {
+    errors.push("shadow_planner_required_evidence_contract_mismatch");
+  }
+  const channels: Readonly<Record<Exclude<ShadowAiGuidanceChannelV1, "NONE">, readonly string[]>> = {
+    PUBLIC_RESEARCH: draft.researchQuerySuggestions,
+    MERCHANT_INPUT: draft.merchantQuestionSuggestions,
+    DOCUMENT_REQUEST: draft.documentRequestSuggestions,
+    OPERATIONAL_DATA: draft.operationalDataRequests,
+  };
+  for (const [channel, values] of Object.entries(channels)) {
+    const selected = channel === contract.guidanceChannel;
+    if (selected && values.length === 0) errors.push("shadow_planner_required_guidance_channel_empty");
+    if (!selected && values.length > 0) errors.push("shadow_planner_cross_channel_guidance_forbidden");
+  }
+}
+
+function guidanceOutputFields(): Readonly<Record<ShadowAiGuidanceChannelV1, string | null>> {
+  return {
+    NONE: null,
+    PUBLIC_RESEARCH: "researchQuerySuggestions",
+    MERCHANT_INPUT: "merchantQuestionSuggestions",
+    DOCUMENT_REQUEST: "documentRequestSuggestions",
+    OPERATIONAL_DATA: "operationalDataRequests",
+  };
 }
 
 function parseDraft(rawDraft: unknown):
@@ -460,7 +591,7 @@ function parseHypothesis(value: unknown, path: string, errors: string[]): Shadow
   const gaps = stringList(value.acknowledgedEvidenceGaps, `${path}.acknowledgedEvidenceGaps`, 16, errors);
   const confirmations = stringList(value.confirmationRequirements, `${path}.confirmationRequirements`, 16, errors);
   const falsifiers = stringList(value.falsificationConditions, `${path}.falsificationConditions`, 16, errors);
-  if (supporting.length === 0 || gaps.length === 0 || confirmations.length === 0 || falsifiers.length === 0) {
+  if (gaps.length === 0 || confirmations.length === 0 || falsifiers.length === 0) {
     errors.push(`${path}_epistemic_boundary_incomplete`);
   }
   return hypothesis && confidence ? { hypothesis, confidence, supportingReferenceTokens: supporting,
@@ -477,6 +608,8 @@ function parseSuspicion(value: unknown, path: string, errors: string[]): ShadowA
   const recheck = RECHECK_TYPES.has(String(value.requestedDeterministicRecheckType))
     ? value.requestedDeterministicRecheckType as ShadowAiPlannerDraftReconstructionSuspicionV1["requestedDeterministicRecheckType"] : null;
   if (refs.length === 0) errors.push(`${path}.exactAcceptedReferenceTokens_required`);
+  if (conflicting.length === 0) errors.push(`${path}.conflictingReferenceTokens_required`);
+  if (refs.some((reference) => conflicting.includes(reference))) errors.push(`${path}.conflict_references_must_be_distinct`);
   if (!recheck) errors.push(`${path}.requestedDeterministicRecheckType_invalid`);
   return reason && recheck ? { exactAcceptedReferenceTokens: refs, reasonForSuspicion: reason,
     conflictingReferenceTokens: conflicting, requestedDeterministicRecheckType: recheck } : null;
@@ -484,21 +617,37 @@ function parseSuspicion(value: unknown, path: string, errors: string[]): ShadowA
 
 function buildReferenceAliases(packet: ShadowAiEconomicResolutionPacketV1): readonly ShadowAiReferenceAliasEntryV1[] {
   const scope = createHash("sha256").update(`${packet.issueId}\u0000${packet.immutableInputHash}`).digest("hex").slice(0, 12);
-  const references: Array<readonly [ShadowAiReferenceClassV1, string]> = [
-    ...packet.acceptedFactRefs.map((value) => ["FACT", value] as const),
-    ...packet.acceptedIssueRelevantActivityFacts.map((fact) => ["FACT", fact.factRef] as const),
-    ...packet.acceptedIssueRelevantActivityFacts.flatMap((fact) => fact.evidenceRefs.map((value) => ["STATEMENT_EVIDENCE", value] as const)),
-    ...packet.currentGovernedEvidenceRefs.map((value) => ["GOVERNED_EVIDENCE", value] as const),
-    ...packet.selectedRdChargeRefs.map((value) => ["ECONOMIC_CHARGE", value] as const),
-    ...packet.acceptedParticipantControlStates.map((state) => ["ECONOMIC_CHARGE", state.rdChargeRef] as const),
+  const issueFactRefs = new Set(packet.acceptedFactRefs);
+  const references: Array<readonly [ShadowAiReferenceClassV1, string, ShadowAiReferenceRoleV1]> = [
+    ...packet.acceptedFactRefs.map((value) => ["FACT", value, "ISSUE_SUPPORTING"] as const),
+    ...packet.acceptedIssueRelevantActivityFacts.map((fact) => [
+      "FACT", fact.factRef, issueFactRefs.has(fact.factRef) ? "ISSUE_SUPPORTING" : "CONTEXT_ONLY",
+    ] as const),
+    ...packet.acceptedIssueRelevantActivityFacts.flatMap((fact) => fact.evidenceRefs.map((value) =>
+      ["STATEMENT_EVIDENCE", value, "INPUT_PROVENANCE_ONLY"] as const)),
+    ...packet.currentGovernedEvidenceRefs.map((value) => ["GOVERNED_EVIDENCE", value, "ISSUE_SUPPORTING"] as const),
+    ...packet.selectedRdChargeRefs.map((value) => ["ECONOMIC_CHARGE", value, "ISSUE_SUPPORTING"] as const),
+    ...packet.acceptedParticipantControlStates.map((state) =>
+      ["ECONOMIC_CHARGE", state.rdChargeRef, "ISSUE_SUPPORTING"] as const),
   ];
-  const unique = [...new Map(references.map(([referenceClass, value]) => [`${referenceClass}\u0000${value}`, [referenceClass, value] as const])).values()]
+  const byIdentity = new Map<string, readonly [ShadowAiReferenceClassV1, string, ShadowAiReferenceRoleV1]>();
+  for (const entry of references) {
+    const key = `${entry[0]}\u0000${entry[1]}`;
+    const existing = byIdentity.get(key);
+    if (!existing || referenceRolePriority(entry[2]) < referenceRolePriority(existing[2])) byIdentity.set(key, entry);
+  }
+  const unique = [...byIdentity.values()]
     .sort(([leftClass, left], [rightClass, right]) => leftClass.localeCompare(rightClass) || left.localeCompare(right));
-  return deepFreeze(unique.map(([referenceClass, internalReference], index) => ({
+  return deepFreeze(unique.map(([referenceClass, internalReference, semanticRole], index) => ({
     token: `rr_${scope}_${REFERENCE_CLASS_CODE[referenceClass]}_${String(index + 1).padStart(4, "0")}`,
     referenceClass,
+    semanticRole,
     internalReference,
   })));
+}
+
+function referenceRolePriority(value: ShadowAiReferenceRoleV1): number {
+  return value === "ISSUE_SUPPORTING" ? 0 : value === "CONTEXT_ONLY" ? 1 : 2;
 }
 
 function providerBusinessContext(context: ShadowAiEconomicResolutionPacketV1["merchantBusinessContext"]): unknown {

@@ -45,7 +45,7 @@ describe("Shadow planner Phase 3 evaluator v1", () => {
     expect(calls).toBe(2);
   });
 
-  it("rejects locally valid but non-repeatable and baseline-divergent routing", async () => {
+  it("rejects baseline-divergent routing locally and stops before a retry", async () => {
     const inputPacket = packet("phase3-divergent");
     const baseline = baselinePlan(inputPacket);
     let calls = 0;
@@ -73,8 +73,9 @@ describe("Shadow planner Phase 3 evaluator v1", () => {
     expect(result.repeatableSemanticSignature).toBe(false);
     expect(result.baselineQualityMatched).toBe(false);
     expect(result.errorCodes).toEqual(expect.arrayContaining([
-      "shadow_planner_phase3_semantic_signature_not_repeatable",
-      "shadow_planner_phase3_offline_baseline_quality_mismatch",
+      "shadow_planner_resolution_path_contract_mismatch",
+      "shadow_planner_required_evidence_contract_mismatch",
+      "shadow_planner_cross_channel_guidance_forbidden",
     ]));
   });
 

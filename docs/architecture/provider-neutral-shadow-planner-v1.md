@@ -536,3 +536,52 @@ provider-specific schema patch:
 Direct OpenAI remains transport-qualified from Phase 2, but Phase 3 product
 quality is not qualified. OpenRouter remains disabled and is not implicated in
 or permitted to substitute for this work.
+
+## Phase 3 offline semantic-contract hardening — 2026-09-16
+
+The failed live run exposed four contract defects rather than a provider schema
+incompatibility: context-only activity facts were eligible as issue support;
+the instruction allowed an empty support list while the parser rejected it;
+route, evidence-class, and guidance-channel selection were not one deterministic
+envelope; and missing evidence could produce a reconstruction suspicion without
+an accepted conflict relationship.
+
+The provider-neutral request contract is now version 4. Every opaque reference
+has both a structural class and one of three semantic roles:
+`ISSUE_SUPPORTING`, `CONTEXT_ONLY`, or `INPUT_PROVENANCE_ONLY`. Only
+issue-supporting references can be cited as support or contradiction. Context
+may frame a hypothesis but cannot satisfy grounding. When no issue-supporting
+reference exists, every hypothesis must instead be low confidence, use an empty
+support list, and provide a non-empty evidence gap, confirmation requirement,
+and falsification condition. Local validation enforces all of these rules and
+continues to restore only locally bound opaque tokens.
+
+A deterministic seven-family semantic policy now fixes one resolution path,
+one required evidence class, and one corresponding guidance channel per issue
+family. Provider output must copy that envelope exactly; extra evidence classes,
+cross-channel guidance, missing required guidance, and route drift all fail
+closed. The model still drafts hypotheses and concise guidance, but no longer
+selects the authority envelope. Reconstruction suspicion is prohibited for the
+current packet contract because it carries no accepted conflict relationship;
+missing evidence alone cannot enable it.
+
+Offline validation passed the focused provider-neutral planner suite: 48 of 48
+tests across five files. The failure matrix covers every issue family plus
+context-as-support, conditional empty support, confidence and epistemic-boundary
+requirements, route drift, extra evidence, cross-channel or missing guidance,
+and reconstruction suspicion without accepted conflict. The TypeScript build
+also passed. The deterministic Gold replay processed all 11 statements and 60
+selected issues with 60 valid plans, 100% applicable exact grounding, 100%
+complete epistemic boundaries, 100% route/evidence/guidance conformance, zero
+safety-counter events, and invariant canonical, RD, commercial,
+governed-knowledge, permission, and customer-output state.
+
+The full corpus regression remains red in unrelated baseline areas: 1,690 of
+1,772 tests passed, with 82 failures across 25 reconstruction, limited-authority,
+and template/guidance suites. None of those failing files imports or overlaps
+the provider-neutral planner changes. They are not treated as planner
+qualification evidence and were not changed in this phase.
+
+This offline result is ready for one more bounded Direct OpenAI Phase 3 shadow
+run. It does not itself qualify product quality or authorize Phase 3 wiring.
+OpenRouter remains disabled, with no substitution or fallback path.

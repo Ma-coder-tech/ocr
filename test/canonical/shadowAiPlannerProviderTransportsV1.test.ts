@@ -357,8 +357,9 @@ describe("Provider-neutral planner transports v1", () => {
         calls += 1;
         const payload = JSON.parse(request.userPayload);
         const token = payload.referenceTokenContract.catalog
-          .find((entry: { referenceClass: string }) => entry.referenceClass === "FACT")?.token;
-        const evidenceClass = payload.evidenceClassContract.allowedRequiredEvidenceClasses?.[0];
+          .find((entry: { referenceClass: string; semanticRole: string }) =>
+            entry.referenceClass === "FACT" && entry.semanticRole === "ISSUE_SUPPORTING")?.token;
+        const evidenceClass = payload.resolutionContract.requiredEvidenceClasses?.[0];
         if (!token) throw new Error("qualification semantic fixture fact token missing");
         if (!evidenceClass) throw new Error("qualification semantic fixture evidence class missing");
         return {

@@ -83,15 +83,17 @@ describe("Provider-neutral shadow planner v1", () => {
       reconstructionSuspicionConflictingReferenceTokens: ["FACT", "GOVERNED_EVIDENCE", "ECONOMIC_CHARGE"],
     });
     expect(contract.prohibitedOutputClasses).toEqual(["STATEMENT_EVIDENCE"]);
-    expect(contract.missingEligibleReferenceBehavior).toBe("USE_EMPTY_ARRAY_AND_STATE_EVIDENCE_GAP");
-    expect(contract.catalog).toEqual(compiled.localBinding.referenceAliases.map(({ token, referenceClass }) => ({
+    expect(contract.emptySupportRule).toBe("PROHIBITED_EACH_HYPOTHESIS_MUST_CITE_ISSUE_SUPPORTING_TOKEN");
+    expect(contract.exactCitationRule).toBe("NON_EMPTY_ISSUE_SUPPORTING_FACT_TOKEN_REQUIRED");
+    expect(contract.catalog).toEqual(compiled.localBinding.referenceAliases.map(({ token, referenceClass, semanticRole }) => ({
       token,
       referenceClass,
+      semanticRole,
     })));
     expect(contract.catalog.map((entry: { referenceClass: string }) => entry.referenceClass))
       .toEqual(expect.arrayContaining(["FACT", "STATEMENT_EVIDENCE", "GOVERNED_EVIDENCE", "ECONOMIC_CHARGE"]));
     expect(compiled.request.systemInstruction).toContain("referenceTokenContract");
-    expect(compiled.request.systemInstruction).toContain("STATEMENT_EVIDENCE tokens are input provenance only");
+    expect(compiled.request.systemInstruction).toContain("STATEMENT_EVIDENCE tokens are INPUT_PROVENANCE_ONLY");
     expect(compiled.request.userPayload).not.toContain("fact_v2_submitted_transaction_count");
     expect(compiled.request.userPayload).not.toContain("evidence_v2_statement_occurrence_001");
   });
@@ -122,18 +124,27 @@ describe("Provider-neutral shadow planner v1", () => {
       },
     }, compiled.localBinding);
     expect(wrongClass.ok).toBe(false);
-    if (!wrongClass.ok) expect(wrongClass.errors).toContain("hypothesis.supportingReferenceTokens_wrong_reference_class");
+    if (!wrongClass.ok) expect(wrongClass.errors).toContain("primaryHypothesis.supportingReferenceTokens_wrong_reference_class");
   });
 
   it("makes the packet-specific required-evidence subset explicit and keeps local admission fail closed", () => {
     const compiled = compileShadowAiPlannerProviderRequestV1(packet("issue-evidence-contract", "run-evidence-contract"));
     const payload = JSON.parse(compiled.request.userPayload);
-    const contract = payload.evidenceClassContract;
+    const contract = payload.resolutionContract;
 
     expect(contract).toEqual({
-      outputField: "requiredEvidenceClasses",
-      selectionRule: "NON_EMPTY_SUBSET_OF_ALLOWED_VALUES_ONLY",
-      allowedRequiredEvidenceClasses: [
+      requiredResolutionPath: "PROCESSOR_OR_GATEWAY_DATA_REQUIRED",
+      requiredEvidenceClasses: ["PROCESSOR_OR_GATEWAY_OPERATIONAL_DATA"],
+      requiredGuidanceChannel: "OPERATIONAL_DATA",
+      guidanceOutputFields: {
+        NONE: null,
+        PUBLIC_RESEARCH: "researchQuerySuggestions",
+        MERCHANT_INPUT: "merchantQuestionSuggestions",
+        DOCUMENT_REQUEST: "documentRequestSuggestions",
+        OPERATIONAL_DATA: "operationalDataRequests",
+      },
+      otherGuidanceChannelsMustBeEmpty: true,
+      packetAllowedEvidenceClasses: [
         "PROCESSOR_OR_GATEWAY_OPERATIONAL_DATA",
         "MERCHANT_CONTRACT_OR_SCHEDULE",
       ],
@@ -141,18 +152,19 @@ describe("Provider-neutral shadow planner v1", () => {
         "ACCEPTED_STATEMENT_FACT",
         "GOVERNED_PUBLIC_SOURCE",
         "MERCHANT_ATTESTATION",
+        "MERCHANT_CONTRACT_OR_SCHEDULE",
         "ADDITIONAL_COMPATIBLE_STATEMENT",
         "COMPARATOR_SOURCE_EVIDENCE",
         "DETERMINISTIC_RECONSTRUCTION_RECHECK",
       ],
       globalSchemaEnumPurpose: "STRUCTURAL_PORTABILITY_ONLY_NOT_REQUEST_AUTHORITY",
     });
-    expect(compiled.request.systemInstruction).toContain("evidenceClassContract.allowedRequiredEvidenceClasses");
-    expect(compiled.request.systemInstruction).toContain("global enum exists only to keep one portable structural schema");
+    expect(compiled.request.systemInstruction).toContain("resolutionContract");
+    expect(compiled.request.systemInstruction).toContain("global enums are structural only");
 
     const guided = validateAndBindShadowAiPlannerDraftV1({
       ...validDraft(compiled),
-      requiredEvidenceClasses: [contract.allowedRequiredEvidenceClasses[0]],
+      requiredEvidenceClasses: [...contract.requiredEvidenceClasses],
     }, compiled.localBinding);
     expect(guided.ok).toBe(true);
 
@@ -162,7 +174,7 @@ describe("Provider-neutral shadow planner v1", () => {
     }, compiled.localBinding);
     expect(globallyValidButPacketProhibited.ok).toBe(false);
     if (!globallyValidButPacketProhibited.ok) {
-      expect(globallyValidButPacketProhibited.errors).toContain("shadow_planner_required_evidence_class_invalid");
+      expect(globallyValidButPacketProhibited.errors).toContain("shadow_planner_required_evidence_contract_mismatch");
     }
   });
 

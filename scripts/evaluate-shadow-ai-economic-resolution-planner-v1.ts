@@ -99,6 +99,7 @@ for (const [index, fixture] of GOLD.entries()) {
       issueId: issue.issueId, issueClass: issue.issueClass, priority: issue.selectionPriority,
       materiality: issue.decisionMaterialityTier, amountUnderReviewMinor: issue.amountUnderReviewMinor,
       selectedRdChargeRefs: issue.selectedRdChargeRefs, reasonCodes: issue.selectionReasonCodes,
+      issueSupportingFactCount: issue.acceptedFactRefs.length,
       competingHypothesisRequired: issue.competingHypothesisRequired,
     })),
     suppressedIssues: selection.suppressedIssues,
@@ -195,6 +196,8 @@ const safetyCounterTotal = sum(Object.values(safetyCounters));
 const issueClassDistribution = counts(allSelected.map((issue: any) => issue.issueClass));
 const suppressionDistribution = counts(allSuppressed.map((issue: any) => issue.reasonCode));
 const routeDistribution = counts(allPlans.map((plan: any) => plan.recommendedResolutionPath));
+const plansRequiringExactFactCitation = allPlans.filter((plan: any) =>
+  allSelected.find((issue: any) => issue.issueId === plan.issueId)?.issueSupportingFactCount > 0);
 const quality = {
   selectedIssueCount: allSelected.length,
   suppressedIssueCount: allSuppressed.length,
@@ -203,7 +206,10 @@ const quality = {
   plansWithCompetingAlternative: allPlans.filter((plan: any) => plan.alternativeHypotheses.length > 0).length,
   plansWithExplicitEvidenceGap: allPlans.filter((plan: any) => plan.acknowledgedEvidenceGaps.length > 0).length,
   plansWithActionableResolutionPath: allPlans.filter((plan: any) => plan.requiredEvidenceClasses.length > 0).length,
-  exactReferenceGroundingRate: ratio(allPlans.filter((plan: any) => plan.exactCitedFactRefs.length > 0).length, allPlans.length),
+  exactReferenceGroundingRate: ratio(
+    plansRequiringExactFactCitation.filter((plan: any) => plan.exactCitedFactRefs.length > 0).length,
+    plansRequiringExactFactCitation.length,
+  ),
   epistemicBoundaryRate: ratio(allPlans.filter((plan: any) => plan.primaryHypothesis.confirmationRequirements.length > 0 && plan.primaryHypothesis.falsificationConditions.length > 0).length, allPlans.length),
   selectedIssuesWithClearResolutionPathPercent: percent(allPlans.filter((plan: any) => Boolean(plan.recommendedResolutionPath)).length, allSelected.length),
   selectedIssuesWithUsefulEvidenceRequestsPercent: percent(allPlans.filter((plan: any) => plan.requiredEvidenceClasses.length > 0).length, allSelected.length),
@@ -215,7 +221,7 @@ const quality = {
   duplicateOrUnnecessaryInvestigationRatePercent: percent(sum(statements.map((statement) => statement.duplicateInvestigationCount)), allSelected.length),
 };
 const strongestPlan = allPlans.find((plan: any) => plan.alternativeHypotheses.length > 0 && plan.requiredEvidenceClasses.length > 0) ?? allPlans[0] ?? null;
-const weakestPlan = allPlans.find((plan: any) => plan.exactCitedFactRefs.length === 0) ?? allPlans.at(-1) ?? null;
+const weakestPlan = allPlans.find((plan: any) => plan.alternativeHypotheses.length === 0) ?? allPlans.at(-1) ?? null;
 const invariants = {
   exactElevenGoldStatements: statements.length === 11,
   deterministicGeneralizedSelection: operationalValidationCounters.nondeterministicSelections === 0,

@@ -174,7 +174,7 @@ describe("Shadow AI Economic Resolution Planner v1", () => {
     }
 
     const validPlan = generated.outputs[0] as Record<string, any>;
-    const acceptedRef = validPlan.exactCitedFactRefs[0];
+    const acceptedRef = validPlan.primaryHypothesis.supportingFactRefs[0];
     const diagnosticOnly = validateShadowAiEconomicResolutionPlanV1({
       ...validPlan,
       reconstructionSuspicions: [{
@@ -185,17 +185,14 @@ describe("Shadow AI Economic Resolution Planner v1", () => {
         financialMutationAllowed: false,
         exactAcceptedFactOrOccurrenceRefs: [acceptedRef],
         reasonForSuspicion: "Two accepted occurrence references may warrant a deterministic duplicate-occurrence control recheck.",
-        conflictingEvidenceRefs: [],
+        conflictingEvidenceRefs: [acceptedRef],
         requestedDeterministicRecheckType: "DUPLICATE_OCCURRENCE_RECHECK",
       }],
     }, packets[0]);
-    expect(diagnosticOnly.ok).toBe(true);
-    if (diagnosticOnly.ok) {
-      expect(diagnosticOnly.plan.reconstructionSuspicions[0]).toMatchObject({
-        outcomeType: "FINANCIAL_RECONSTRUCTION_SUSPICION",
-        truthEffect: "NONE",
-        financialMutationAllowed: false,
-      });
+    expect(diagnosticOnly.ok).toBe(false);
+    if (!diagnosticOnly.ok) {
+      expect(diagnosticOnly.errors).toContain("shadow_planner_reconstruction_suspicion_not_allowed_without_accepted_conflict");
+      expect(diagnosticOnly.errors).toContain("shadow_planner_reconstruction_suspicion_conflict_refs_not_distinct");
     }
   });
 
