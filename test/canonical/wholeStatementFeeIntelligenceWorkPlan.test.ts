@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
 import { buildFeeKnowledgeSourcePacket } from "../../src/canonical/feeKnowledgeRegistry.js";
@@ -30,13 +30,15 @@ import {
   ONE_TIME_PAID_STAGE_ORDER,
   oneTimeLiveCostPolicyTemplate,
   oneTimeSlotExpandedCostEnvelope,
-  verifyEvaluationRunIntegrityArtifactV2,
 } from "../../src/evaluationIntegrity/index.js";
 import { analyzeStatementDocument } from "../../src/statementParserOrchestrator.js";
 import { buildCanonicalRuntimeAnalysis } from "../../src/canonical/runtimeAdapter.js";
 
-const LIVE_ARTIFACT_PATH = "/private/tmp/ratereveal-five-statement-live-final-20260808T220413Z/evaluation-run-integrity-artifact.json";
 const LIVE_ARTIFACT_SHA256 = "c3e286e20f3d2a8235d6d721873f2f0be8703288ac224b1002674db152ce494a";
+const RECORDED_LIVE_OBSERVATION_PATH = path.resolve(
+  process.cwd(),
+  "test/fixtures/evaluation/five-statement-live-work-plan-observation-v1.json",
+);
 const REAL_134_ROW_STATEMENT_PATH = "test/fixtures/pdfs/SAMPLE_MERCHANT4_CLOVER.pdf";
 const REAL_STATEMENT_1_PATH = "test/fixtures/pdfs/fiserv_PAYSAFE_Febr_2024.pdf";
 const FULL_INTEGRATED_STAGES = [
@@ -204,63 +206,39 @@ describe("whole-statement fee intelligence work plan", () => {
     expect(singleCopyStageSum).toBeLessThan(slotExpandedEnvelope.totalEstimatedEnvelopeUsd);
   }, 30_000);
 
-  it("uses the exact latest five-statement live artifact row counts as offline sizing fixtures", async () => {
-    const artifact = await latestLiveArtifact();
-    const rowCounts = artifact.canonicalAdmissionResults
-      .map((result: any) => result.canonicalReferenceProof.canonicalFeeRowRefs.length)
-      .sort((left: number, right: number) => left - right);
+  it("uses the recorded five-statement observation as a hermetic non-authoritative sizing fixture", async () => {
+    const observation = await recordedLiveObservation();
 
-    expect(rowCounts).toEqual([28, 50, 51, 105, 134]);
-    expect(artifact.providerCallOutcomes.filter((outcome: any) => outcome.stage === "whole_statement_ai_review").map((outcome: any) => outcome.status).sort())
+    expect(observation.observedFeeRowCounts).toEqual([28, 50, 51, 105, 134]);
+    expect(observation.observedWholeStatementReviewOutcomes)
       .toEqual(["failure", "failure", "failure", "failure", "success"]);
   });
 
-  it("projects the exact latest five-statement live artifact with separated deterministic and intelligence semantics", async () => {
-    const artifact = await latestLiveArtifact();
+  it("keeps recorded live observations explicitly separate from repository evidence and authority", async () => {
+    const observation = await recordedLiveObservation();
 
-    expect(verifyEvaluationRunIntegrityArtifactV2(artifact)).toBe(true);
-    expect(artifact.canonicalAdmissionResults).toHaveLength(5);
-    expect(artifact.packageFinancialInvariance).toHaveLength(5);
-    expect(artifact.packageFinancialInvariance.every((entry: any) =>
-      entry.result.invariant === true
-      && entry.result.packages.map((pkg: any) => pkg.beforeHash === pkg.afterHash).every(Boolean)
-    )).toBe(true);
-
-    const rowCounts = artifact.canonicalAdmissionResults
-      .map((result: any) => result.canonicalReferenceProof.canonicalFeeRowRefs.length)
-      .sort((left: number, right: number) => left - right);
-    expect(rowCounts).toEqual([28, 50, 51, 105, 134]);
-
-    for (const result of artifact.canonicalAdmissionResults) {
-      expect(result.canonicalReferenceProof.canonicalFeeRowRefs.length).toBeGreaterThan(0);
-      expect(result.researchEvidence.attempts.filter((attempt: any) => attempt.status === "completed")).toHaveLength(2);
-      expect(result.researchEvidence.candidates).toHaveLength(5);
-      expect(result.researchEvidence.candidates.every((candidate: any) =>
-        candidate.retrievalStatus === "failed"
-        && candidate.semanticVerificationStatus === "not_started"
-        && candidate.verificationStatus === "rejected"
-      )).toBe(true);
-      expect(result.researchEvidence.candidates.flatMap((candidate: any) => candidate.reasonCodes).sort()).toContain("fee_knowledge_retrieval_fetch_failed");
-      expect(result.researchEvidence.candidates.flatMap((candidate: any) => candidate.reasonCodes).sort()).toContain("fee_knowledge_semantic_support_not_run");
-      expect(result.researchEvidence.claimSupports).toEqual([]);
-      expect(result.admissionDisposition).toBe("rejected");
-      expect(result.packageF).toBeNull();
-    }
-
-    const wholeStatementOutcomes = artifact.providerCallOutcomes.filter((outcome: any) => outcome.stage === "whole_statement_ai_review");
-    expect(wholeStatementOutcomes.map((outcome: any) => outcome.status).sort()).toEqual(["failure", "failure", "failure", "failure", "success"]);
-    const succeeded = wholeStatementOutcomes.find((outcome: any) => outcome.status === "success");
-    expect(succeeded?.sourceDocumentId).toBe("doc_fiserv_paysafe_febr_2024_pdf");
-    expect(artifact.providerCallOutcomes.filter((outcome: any) => outcome.stage === "web_search_discovery" && outcome.status === "success")).toHaveLength(10);
-    expect(artifact.providerCallOutcomes.filter((outcome: any) => outcome.stage === "document_retrieval")).toHaveLength(25);
-    expect(artifact.providerCallOutcomes.filter((outcome: any) => outcome.stage === "semantic_verification")).toHaveLength(25);
+    expect(observation).toMatchObject({
+      type: "five_statement_live_work_plan_observation_v1",
+      authority: "non_authoritative_forensic_observation",
+      sourceArtifactSha256: LIVE_ARTIFACT_SHA256,
+      sourceArtifactAvailability: "external_not_repository_fixture",
+      selectedStatementCount: 5,
+      observedCompletedResearchAttemptsPerStatement: 2,
+      observedResearchCandidatesPerStatement: 5,
+      observedWebSearchSuccessCount: 10,
+      observedDocumentRetrievalOutcomeCount: 25,
+      observedSemanticVerificationOutcomeCount: 25,
+      observedFinancialInvarianceStatementCount: 5,
+    });
+    expect(observation.limitations).toEqual(expect.arrayContaining([
+      expect.stringMatching(/not the source evaluation artifact/i),
+      expect.stringMatching(/grants no evidence or product authority/i),
+    ]));
   });
 
   it("plans bounded comprehensive work units for the real five-statement shapes", async () => {
-    const artifact = await latestLiveArtifact();
-    const rowCounts = artifact.canonicalAdmissionResults
-      .map((result: any) => result.canonicalReferenceProof.canonicalFeeRowRefs.length)
-      .sort((left: number, right: number) => left - right);
+    const observation = await recordedLiveObservation();
+    const rowCounts = observation.observedFeeRowCounts;
 
     const projections = rowCounts.map((rowCount) => {
       const analysis = expandedAnalysis(rowCount);
@@ -439,10 +417,26 @@ describe("whole-statement fee intelligence work plan", () => {
   }, 30_000);
 });
 
-async function latestLiveArtifact(): Promise<any> {
-  const bytes = await readFile(LIVE_ARTIFACT_PATH);
-  expect(createHash("sha256").update(bytes).digest("hex")).toBe(LIVE_ARTIFACT_SHA256);
-  return JSON.parse(bytes.toString("utf8"));
+type RecordedLiveObservation = {
+  type: string;
+  authority: string;
+  sourceArtifactSha256: string;
+  sourceArtifactAvailability: string;
+  selectedStatementCount: number;
+  observedFeeRowCounts: number[];
+  observedWholeStatementReviewOutcomes: string[];
+  observedCompletedResearchAttemptsPerStatement: number;
+  observedResearchCandidatesPerStatement: number;
+  observedWebSearchSuccessCount: number;
+  observedDocumentRetrievalOutcomeCount: number;
+  observedSemanticVerificationOutcomeCount: number;
+  observedFinancialInvarianceStatementCount: number;
+  limitations: string[];
+};
+
+async function recordedLiveObservation(): Promise<RecordedLiveObservation> {
+  const bytes = await readFile(RECORDED_LIVE_OBSERVATION_PATH);
+  return JSON.parse(bytes.toString("utf8")) as RecordedLiveObservation;
 }
 
 function completedResults(

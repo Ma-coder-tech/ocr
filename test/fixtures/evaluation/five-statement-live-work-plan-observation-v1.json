@@ -1,0 +1,23 @@
+{
+  "type": "five_statement_live_work_plan_observation_v1",
+  "authority": "non_authoritative_forensic_observation",
+  "sourceArtifactSha256": "c3e286e20f3d2a8235d6d721873f2f0be8703288ac224b1002674db152ce494a",
+  "sourceArtifactAvailability": "external_not_repository_fixture",
+  "sourceRunTimestamp": "2026-08-08T22:04:13Z",
+  "selectedStatementCount": 5,
+  "observedFeeRowCounts": [28, 50, 51, 105, 134],
+  "observedWholeStatementReviewOutcomes": ["failure", "failure", "failure", "failure", "success"],
+  "observedSuccessfulSourceDocumentId": "doc_fiserv_paysafe_febr_2024_pdf",
+  "observedCompletedResearchAttemptsPerStatement": 2,
+  "observedResearchCandidatesPerStatement": 5,
+  "observedWebSearchSuccessCount": 10,
+  "observedDocumentRetrievalOutcomeCount": 25,
+  "observedSemanticVerificationOutcomeCount": 25,
+  "observedFinancialInvarianceStatementCount": 5,
+  "limitations": [
+    "This fixture records sizing and failure-shape observations already asserted by the repository test suite.",
+    "It is not the source evaluation artifact and cannot verify, admit, or supersede evidence.",
+    "It grants no evidence or product authority.",
+    "Exact source-artifact verification remains an explicitly supplied forensic check."
+  ]
+}
