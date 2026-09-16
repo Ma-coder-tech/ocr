@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   compileShadowAiPlannerProviderRequestV1,
+  providerNeutralPlannerSystemInstructionV1,
   validateAndBindShadowAiPlannerDraftV1,
   type CompiledShadowAiPlannerProviderRequestV1,
   type ShadowAiPlannerDraftV1,
@@ -49,6 +50,27 @@ const EXPECTED: Readonly<Record<ShadowAiEconomicIssueClassV1, Expected>> = {
 };
 
 describe("Provider-neutral planner semantic contract hardening v1", () => {
+  it("states the forbidden conclusion boundary for every free-text planner field", () => {
+    const instruction = providerNeutralPlannerSystemInstructionV1();
+    const compiled = compileShadowAiPlannerProviderRequestV1(packet("QUALIFICATION_INTEGRITY_ROOT_CAUSE"));
+
+    expect(compiled.request.schemaVersion).toBe("shadow_ai_provider_neutral_request_2026_09_16_v5");
+    expect(instruction).toContain("every free-text value anywhere in the draft");
+    expect(instruction).toContain("confirmationRequirements");
+    expect(instruction).toContain("falsificationConditions");
+    expect(instruction).toContain("limitationCodes");
+    expect(instruction).toContain("even as a hypothetical, negation, example, confirmation target, or falsification condition");
+    for (const phrase of [
+      "savings or save-$ conclusion",
+      "overpaid or overpaying",
+      "annualize, annualized, or annualization",
+      "merchant or processor fault, blame, or responsibility",
+      "should-switch or better-provider recommendation",
+      "guaranteed conclusion",
+      "definitely means, is, or caused",
+    ]) expect(instruction).toContain(phrase);
+  });
+
   it.each(SHADOW_AI_ISSUE_CLASSES)("binds the deterministic route envelope for %s", (issueClass) => {
     const compiled = compileShadowAiPlannerProviderRequestV1(packet(issueClass));
     const payload = JSON.parse(compiled.request.userPayload);
@@ -158,6 +180,59 @@ describe("Provider-neutral planner semantic contract hardening v1", () => {
     expect(invalid.ok).toBe(false);
     if (!invalid.ok) expect(invalid.errors)
       .toContain("shadow_planner_reconstruction_suspicion_not_allowed_without_accepted_conflict");
+  });
+
+  it.each(SHADOW_AI_ISSUE_CLASSES)("rejects forbidden conclusions in every admitted free-text field for %s", (issueClass) => {
+    const compiled = compileShadowAiPlannerProviderRequestV1(packet(issueClass));
+    const base = validDraft(compiled);
+    const alternative = base.alternativeHypotheses[0] ?? {
+      ...base.primaryHypothesis,
+      hypothesis: "A distinct bounded alternative remains unresolved.",
+      confidence: "LOW" as const,
+    };
+    const activeGuidanceField = EXPECTED[issueClass].channel === "PUBLIC_RESEARCH"
+      ? "researchQuerySuggestions" as const
+      : EXPECTED[issueClass].channel === "MERCHANT_INPUT"
+        ? "merchantQuestionSuggestions" as const
+        : EXPECTED[issueClass].channel === "DOCUMENT_REQUEST"
+          ? "documentRequestSuggestions" as const
+          : "operationalDataRequests" as const;
+    const invalidDrafts: Array<readonly [string, ShadowAiPlannerDraftV1]> = [
+      ["unresolvedQuestion", { ...base, unresolvedQuestion: "Was the merchant overpaid?" }],
+      ["primaryHypothesis.hypothesis", { ...base, primaryHypothesis: { ...base.primaryHypothesis, hypothesis: "This definitely caused the issue." } }],
+      ["primaryHypothesis.acknowledgedEvidenceGaps", { ...base, primaryHypothesis: { ...base.primaryHypothesis, acknowledgedEvidenceGaps: ["The amount may be avoidable."] } }],
+      ["primaryHypothesis.confirmationRequirements", { ...base, primaryHypothesis: { ...base.primaryHypothesis, confirmationRequirements: ["Confirm the merchant responsible conclusion."] } }],
+      ["primaryHypothesis.falsificationConditions", { ...base, primaryHypothesis: { ...base.primaryHypothesis, falsificationConditions: ["The merchant should switch."] } }],
+      ["alternativeHypotheses.hypothesis", { ...base, alternativeHypotheses: [{ ...alternative, hypothesis: "A better provider resolves the issue." }] }],
+      ["alternativeHypotheses.acknowledgedEvidenceGaps", { ...base, alternativeHypotheses: [{ ...alternative, acknowledgedEvidenceGaps: ["Savings remain unknown."] }] }],
+      ["alternativeHypotheses.confirmationRequirements", { ...base, alternativeHypotheses: [{ ...alternative, confirmationRequirements: ["Annualize the amount."] }] }],
+      ["alternativeHypotheses.falsificationConditions", { ...base, alternativeHypotheses: [{ ...alternative, falsificationConditions: ["The outcome is guaranteed."] }] }],
+      ["acknowledgedEvidenceGaps", { ...base, acknowledgedEvidenceGaps: ["The processor blame conclusion lacks evidence."] }],
+      [activeGuidanceField, { ...base, [activeGuidanceField]: ["Determine how much the merchant can save $100."] }],
+      ["internalExplanationDraft", { ...base, internalExplanationDraft: "A processor responsible conclusion was emitted." }],
+      ["limitationCodes", { ...base, limitationCodes: ["guaranteed"] }],
+    ];
+
+    for (const [field, invalidDraft] of invalidDrafts) {
+      const validation = validateAndBindShadowAiPlannerDraftV1(invalidDraft, compiled.localBinding);
+      expect(validation.ok, field).toBe(false);
+      if (!validation.ok) expect(validation.errors, field).toContain("shadow_planner_forbidden_conclusion");
+    }
+  });
+
+  it("keeps customer-facing language fail closed inside nested epistemic fields", () => {
+    const compiled = compileShadowAiPlannerProviderRequestV1(packet("QUALIFICATION_INTEGRITY_ROOT_CAUSE"));
+    const base = validDraft(compiled);
+    const validation = validateAndBindShadowAiPlannerDraftV1({
+      ...base,
+      primaryHypothesis: {
+        ...base.primaryHypothesis,
+        confirmationRequirements: ["We recommend that you contact the processor now."],
+      },
+    }, compiled.localBinding);
+
+    expect(validation.ok).toBe(false);
+    if (!validation.ok) expect(validation.errors).toContain("shadow_planner_customer_facing_language_forbidden");
   });
 });
 

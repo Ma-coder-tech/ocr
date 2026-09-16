@@ -107,8 +107,25 @@ export function validateShadowAiEconomicResolutionPlanV1(
     .filter((item): item is ShadowAiFinancialReconstructionSuspicionV1 => item !== null);
   if (suspicions.length > 0) errors.push("shadow_planner_reconstruction_suspicion_not_allowed_without_accepted_conflict");
 
-  const language = [unresolvedQuestion, internalExplanationDraft,
-    primary?.hypothesis, ...alternatives.map((item) => item.hypothesis), ...research, ...merchant, ...documents, ...operational]
+  const hypothesisLanguage = (item: ShadowAiHypothesisV1): string[] => [
+    item.hypothesis,
+    ...item.acknowledgedEvidenceGaps,
+    ...item.confirmationRequirements,
+    ...item.falsificationConditions,
+  ];
+  const language = [
+    unresolvedQuestion,
+    internalExplanationDraft,
+    ...evidenceGaps,
+    ...limitationCodes,
+    ...(primary ? hypothesisLanguage(primary) : []),
+    ...alternatives.flatMap(hypothesisLanguage),
+    ...research,
+    ...merchant,
+    ...documents,
+    ...operational,
+    ...suspicions.map((item) => item.reasonForSuspicion),
+  ]
     .filter((value): value is string => Boolean(value)).join(" ");
   if (FORBIDDEN_CONCLUSION.test(language)) errors.push("shadow_planner_forbidden_conclusion");
   if (CUSTOMER_LANGUAGE.test(language)) errors.push("shadow_planner_customer_facing_language_forbidden");

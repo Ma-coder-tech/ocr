@@ -20,7 +20,7 @@ import {
 } from "./shadowAiPlannerSemanticContractV1.js";
 
 export const SHADOW_AI_PROVIDER_NEUTRAL_REQUEST_SCHEMA_VERSION_V1 =
-  "shadow_ai_provider_neutral_request_2026_09_16_v4" as const;
+  "shadow_ai_provider_neutral_request_2026_09_16_v5" as const;
 export const SHADOW_AI_PROVIDER_NEUTRAL_DRAFT_SCHEMA_VERSION_V1 =
   "shadow_ai_provider_neutral_draft_2026_09_16_v1" as const;
 export const SHADOW_AI_PROVIDER_NEUTRAL_SCHEMA_NAME_V1 =
@@ -209,6 +209,9 @@ The payload's resolutionContract is deterministic and mandatory. Copy its requir
 The payload's reconstructionSuspicionContract is mandatory. Emit reconstructionSuspicions only when allowed is true and an accepted conflict relationship is supplied. Missing evidence, population uncertainty, or a desire to recheck is not conflicting evidence. When allowed is false, return an empty reconstructionSuspicions array.
 Use low verbosity: keep every free-text field concise, factual, and limited to what is needed to express the unresolved hypothesis, evidence gap, confirmation requirement, or falsification condition. Do not add narrative outside the required JSON fields.
 Generate hypotheses only for the selected issue. State evidence gaps, confirmation requirements, and falsification conditions. Provide materially distinct alternatives where meaningful.
+The forbidden financial/commercial conclusion boundary applies to every free-text value anywhere in the draft: unresolvedQuestion; primary and alternative hypothesis text; every acknowledgedEvidenceGaps, confirmationRequirements, and falsificationConditions entry; every research, merchant, document, and operational suggestion; internalExplanationDraft; limitationCodes; and any reconstruction-suspicion reason.
+Never emit or imply, even as a hypothetical, negation, example, confirmation target, or falsification condition: a savings or save-$ conclusion; overpaid or overpaying; annualize, annualized, or annualization; an avoidable conclusion; merchant or processor fault, blame, or responsibility; a should-switch or better-provider recommendation; a guaranteed conclusion; or a statement that something definitely means, is, or caused something.
+Use neutral unresolved phrasing instead: describe the missing evidence, request only the contract-required evidence, and state that amount impact, causation, responsibility, provider choice, and outcome remain unestablished.
 Do not browse, call tools, admit evidence, mutate truth, calculate savings, make comparisons, assign blame, or create customer output.`;
 }
 

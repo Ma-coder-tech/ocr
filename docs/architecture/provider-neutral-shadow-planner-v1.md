@@ -755,3 +755,71 @@ financial/commercial conclusion class explicit, including inside hypotheses,
 confirmation requirements, and falsification conditions, followed by the full
 failure matrix and deterministic Gold replay. Phase 3 wiring and all
 customer-facing use remain blocked, and OpenRouter remains disabled.
+
+## Phase 3 forbidden-conclusion contract v5 — offline hardening
+
+The strongest supported cause of the remaining
+`QUALIFICATION_INTEGRITY_ROOT_CAUSE` failure is a prompt-to-validator contract
+gap. The local validator correctly rejected one live draft under the existing
+forbidden financial/commercial conclusion rule, but the provider instruction
+previously expressed that rule only as the general direction not to calculate
+savings, make comparisons, or assign blame. It did not enumerate the broader
+locally enforced classes: overpayment, annualization, avoidability, fault or
+responsibility, switching or provider-superiority recommendations, guarantees,
+and definite causal conclusions. It also did not explicitly say that the rule
+applies inside hypotheses, epistemic conditions, guidance, and every other
+free-text field. The exact rejected wording is unavailable by design because
+provider drafts were not persisted.
+
+The provider-neutral request contract is now version 5. Its shared instruction
+states that the forbidden conclusion boundary applies to every free-text value
+in the draft, including unresolved questions, primary and alternative
+hypotheses, evidence gaps, confirmation requirements, falsification conditions,
+all four guidance channels, internal explanations, limitation codes, and any
+reconstruction-suspicion reason. It enumerates every existing locally forbidden
+conclusion class, prohibits emitting them as hypotheticals, negations, examples,
+confirmation targets, or falsification conditions, and directs the model to use
+neutral unresolved language about missing evidence and unestablished impact,
+causation, responsibility, provider choice, and outcome.
+
+Test-first review also established a deterministic validation coverage gap:
+the existing forbidden-conclusion predicate was applied to unresolved questions,
+hypothesis text, guidance, and the internal explanation, but not to nested
+evidence gaps, confirmation requirements, falsification conditions, top-level
+evidence gaps, limitation codes, or suspicion reasons. The predicate, forbidden
+classes, error code, and fail-closed decision were not weakened or redefined.
+Only the free-text traversal was completed so the same local rule now covers
+every planner field. The same complete traversal also preserves the existing
+customer-language rejection boundary.
+
+Offline validation passed the TypeScript build and all 60 focused planner tests
+across five files. The full seven-family matrix now exercises 13 forbidden-
+conclusion placements per family (91 negative cases) in addition to the prior
+route, evidence-class, guidance-channel, grounding, privacy, authority,
+reconstruction, timeout, quarantine, retry, and fallback controls. Transport
+implementation and settings were unchanged.
+
+The deterministic offline Gold replay passed all 11 statements and all 60
+selected issues with 60 valid plans. Exact-reference grounding, epistemic
+boundaries, clear resolution paths, useful evidence requests, meaningful
+alternatives, and operational/private-data routing were all 100%. Every
+canonical, RD, reconciliation, commercial, governed-knowledge, permission, and
+customer-output invariant passed. All safety counters were zero, including
+savings, annualization, comparisons, avoidability, unsupported causal and
+participant claims, blame, hallucinated references, private fields, admissions,
+research operations, provider calls, and customer output. The synthetic
+gateway/processor terminology family remains covered by the seven-family
+failure matrix because it is not present in the statement-derived Gold corpus.
+
+All seven families are ready for another bounded Direct OpenAI Phase 3 shadow
+run for Product review. Because the shared instruction changed, the recommended
+live validation is the complete cohort: Direct OpenAI only, exact
+`gpt-5.2-2025-12-11` snapshot, seven families, two repetitions per family,
+maximum 14 calls, 60-second network deadline, 15-second connection deadline,
+up to two additional seconds only for abort-cleanup confirmation, 4,000 maximum
+output tokens, reasoning `none`, low verbosity, `store: false`, USD 0.25 maximum
+per call and USD 3.50 aggregate ceiling, no retries, no fallback, fresh isolated
+session per call, and safe telemetry only. A family must stop after its first
+failure; any privacy, protected-state, or unconfirmed-cleanup failure must halt
+all further network dispatch. Success would qualify shadow behavior for Product
+review only and would not authorize customer-facing use.
