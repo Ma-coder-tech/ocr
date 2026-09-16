@@ -449,3 +449,90 @@ operations remained zero. Direct OpenAI's qualification does not itself enable
 customer-facing output or truth mutation. OpenRouter remains blocked pending a
 separate offline semantic-contract assessment and a newly authorized bounded
 qualification; it must never be substituted automatically for Direct OpenAI.
+
+## Phase 3 Direct OpenAI shadow-validation result — 2026-09-16
+
+Product authorized a Direct OpenAI-only shadow evaluation covering all seven
+defined issue families, with two repetitions per family, a 14-call maximum,
+USD 0.25 per call, USD 3.50 aggregate ceiling, 60-second deadlines, no retries,
+no fallback, and safe telemetry only. Six packets came from deterministic issue
+selection over one non-customer Gold fixture. Because
+`GATEWAY_PROCESSOR_TERMINOLOGY` is correctly suppressed in every Gold statement
+as immaterial or lacking accepted unresolved input, that family used one
+synthetic non-customer contract control rather than promoting a suppressed
+financial issue.
+
+The Phase 3 result is **failed**. All seven families were exercised, but none
+satisfied the combined local-admission, offline-baseline quality, and semantic
+repeatability criteria. The first-failure rule limited execution to 9 of 14
+possible calls. Eight calls returned HTTP 200 from the exact
+`gpt-5.2-2025-12-11` snapshot; one second-repetition gateway call reached the
+60-second deadline without an accepted provider response. The eight completed
+responses produced three locally valid plans and five locally rejected drafts.
+
+Four Gold families—shared/bundled semantics, qualification/integrity root
+cause, participant/control uncertainty, and contract-off-statement evidence—
+were rejected with `shadow_planner_missing_fact_citation`. Their packets have
+contextual accepted activity facts but no issue-specific accepted fact ref.
+The provider left exact citations empty rather than citing unrelated volume,
+count, average-ticket, or channel context. The offline adapter currently cites
+the first contextual activity fact in this situation, and the local validator
+requires a citation whenever any contextual fact exists. Phase 3 therefore
+exposed that the contract does not distinguish issue-supporting facts from
+context-only facts.
+
+The cost-incidence family was rejected because the primary and all three
+alternative hypotheses had incomplete epistemic boundaries. The system
+instruction says that a hypothesis with no eligible support token may use an
+empty array and state the evidence gap, while the parser unconditionally
+requires every hypothesis to contain a supporting reference. The offline
+adapter again satisfies that rule by citing contextual activity facts. This is
+an internal semantic-contract contradiction, not evidence that financial
+authority should be weakened.
+
+The first synthetic gateway draft passed local validation but diverged from
+the offline baseline: it chose `DOCUMENT_REQUIRED`, returned all three allowed
+evidence classes, and populated merchant, document, and operational guidance
+channels. The offline baseline chooses `PUBLIC_RESEARCH_REQUIRED`, one governed
+public-source evidence class, and only the research channel. Its second
+repetition timed out, so the family also failed transport repeatability.
+
+Both authorization-economics repetitions passed local validation and chose the
+offline baseline's processor/gateway-data route. They nevertheless returned
+both allowed evidence classes rather than the baseline's single operational
+class, populated extra guidance channels, and differed on document guidance
+and reconstruction-recheck presence. The family therefore failed both
+baseline quality and safe semantic-signature repeatability.
+
+The run used 52,799 input tokens and 9,016 returned output tokens, with observed
+estimated cost of USD 0.218625. The timed-out call has no returned usage record,
+so actual provider billing may be higher but remains inside the approved
+worst-case ceiling. Every observed completed call stayed below its output-token
+and cost caps. All seven protected-state components were invariant around every
+attempt. Retries, fallbacks, customer outputs, truth mutations, source
+admissions, and research operations remained zero. Privacy inspection passed
+for all seven packets and provider payloads; no business name, filename,
+account identifier, credential, raw statement, or internal RateReveal reference
+was sent or persisted. Raw prompts, responses, and drafts were not persisted.
+
+Phase 3 must remain blocked from customer-facing or production wiring. The next
+engineering step is an offline semantic-contract hardening pass, not a
+provider-specific schema patch:
+
+1. Deterministically mark reference tokens as issue-supporting or context-only,
+   and require exact citation only when an issue-supporting fact exists.
+2. Reconcile unsupported-hypothesis semantics: an empty support list may be
+   admitted only when no eligible issue-supporting reference exists, confidence
+   remains low, and evidence-gap, confirmation, and falsification fields are
+   all non-empty. Every supplied reference remains locally bound and validated.
+3. Add a provider-neutral route contract mapping each chosen route to its
+   permitted evidence-class set and exactly corresponding guidance channel;
+   reject cross-channel guidance and unjustified multi-class requests.
+4. Gate reconstruction suspicions on accepted conflicting evidence rather than
+   missing evidence alone.
+5. Prove these rules offline against all seven families and the existing
+   failure matrix before requesting another bounded Direct OpenAI Phase 3 run.
+
+Direct OpenAI remains transport-qualified from Phase 2, but Phase 3 product
+quality is not qualified. OpenRouter remains disabled and is not implicated in
+or permitted to substitute for this work.
