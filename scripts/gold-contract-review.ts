@@ -140,13 +140,13 @@ ${groupIds(assertions.filter((item) => item.evidence_mapping_status === "source_
 | \`npm run gold:test\` | 20/20 tests pass. |
 | \`npm run gold:audit\` | \`${audit.gateStatus}\`; 0 regressions, 0 unexpected passes. |
 | \`npm run gold:review\` | This review artifact generated. |
-| \`npm run gold:scope-check\` | Reported \`isolated_and_preserved\`; tracked and untracked WIP preserved, no unexpected paths, no production violations. |
+| \`npm run repo:clean-check\` | Verifies repository cleanliness without branch, base-SHA, or developer-worktree assumptions. |
 | \`npm run gold:secure\` | Secure mapping remains unavailable unless the private corpus environment is explicitly supplied. |
 
 ## 11. Isolation, B-E invariance, and limitations
 
-- Scope isolation is enforced by path allowlisting plus production-source scans for Gold identifiers/data.
-- The scope check compares the frozen hashes of pre-existing tracked and untracked WIP, which includes the in-progress production and Package B-E-adjacent files; unchanged hashes are the B-E/WIP invariance evidence.
+- Gold isolation is enforced by test-only fixture placement, validator privacy checks, production import prohibitions, and repository hygiene tests.
+- The historical branch/SHA/developer-worktree scope checker is retired; it is not evidence of current repository or Product invariance.
 - Gold expected values remain test-only and are not imported into production source.
 - Current fixture observations remain provisional and cannot promote source identity.
 - PDF parsing emits noisy missing-Type3-font warnings during audit but completes; this is an observation-runner noise limitation, not a Gold result change.
