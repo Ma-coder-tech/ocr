@@ -23,7 +23,7 @@ import type {
 const MAXIMUM_PROVIDER_RESPONSE_BYTES = 512_000;
 const MAXIMUM_DRAFT_TEXT_BYTES = 128_000;
 const OPENAI_DIRECT_ORIGIN = "https://api.openai.com";
-const OPENAI_DIRECT_CONNECT_TIMEOUT_MS = 15_000;
+export const OPENAI_DIRECT_CONNECT_TIMEOUT_MS_V1 = 15_000 as const;
 
 export type ShadowAiPlannerTokenPricingV1 = Readonly<{
   inputUsdMicrosPerMillionTokens: number;
@@ -535,7 +535,7 @@ function assertPreflightCost(
 export function createIsolatedOpenAiDirectSessionV1(): ShadowAiPlannerTransportSessionV1 {
   const client = new Client(OPENAI_DIRECT_ORIGIN, {
     pipelining: 1,
-    connectTimeout: OPENAI_DIRECT_CONNECT_TIMEOUT_MS,
+    connectTimeout: OPENAI_DIRECT_CONNECT_TIMEOUT_MS_V1,
     headersTimeout: 0,
     bodyTimeout: 0,
     maxCachedSessions: 0,

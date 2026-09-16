@@ -39,16 +39,20 @@ import {
   SHADOW_AI_PHASE_3_REPETITIONS_V1,
   SHADOW_AI_PHASE_3_TIMEOUT_MS_V1,
 } from "../src/canonical/shadowAiPlannerPhase3EvaluationV1.js";
-import { createOpenAiDirectPlannerAdapterV1 } from "../src/canonical/shadowAiPlannerProviderTransportsV1.js";
+import {
+  createOpenAiDirectPlannerAdapterV1,
+  OPENAI_DIRECT_CONNECT_TIMEOUT_MS_V1,
+} from "../src/canonical/shadowAiPlannerProviderTransportsV1.js";
+import { SHADOW_AI_PROVIDER_ABORT_CLEANUP_GRACE_MS_V1 } from "../src/canonical/shadowAiPlannerProviderNeutralRuntimeV1.js";
 import { canonicalJson } from "../src/canonical/v2/canonicalJson.js";
 import { inspectFiservOneStatementEvaluation } from "../src/canonical/v2/evaluation/fiservEvaluationHarness.js";
 import { analyzeStatementDocument } from "../src/statementParserOrchestrator.js";
 import type { ParsedDocument } from "../src/parser.js";
 
 const OUT = "evaluations/provider-neutral-shadow-planner-phase3-v1";
-const RESULT_PATH = `${OUT}/revalidation-contract-v4-2026-09-16.json`;
-const REPORT_PATH = `${OUT}/revalidation-contract-v4-report-2026-09-16.md`;
-const ATTEMPT_GUARD_PATH = `${OUT}/revalidation-contract-v4-attempt-guard-2026-09-16.json`;
+const RESULT_PATH = `${OUT}/revalidation-transport-v2-2026-09-16.json`;
+const REPORT_PATH = `${OUT}/revalidation-transport-v2-report-2026-09-16.md`;
+const ATTEMPT_GUARD_PATH = `${OUT}/revalidation-transport-v2-attempt-guard-2026-09-16.json`;
 const GENERATED_AT = new Date().toISOString();
 const MODEL = OPENAI_DIRECT_GPT_5_2_SNAPSHOT_MODEL_V1;
 const GENERATION = Object.freeze({
@@ -80,18 +84,25 @@ const adapter = createOpenAiDirectPlannerAdapterV1({
   pricing: PRICE,
 });
 const familyResults = [];
+let transportDispatchHalted = false;
 
 for (const issueClass of SHADOW_AI_ISSUE_CLASSES) {
   const item = corpus.byIssueClass.get(issueClass);
   if (!item) throw new Error(`shadow_planner_phase3_corpus_missing:${issueClass}`);
-  familyResults.push(await evaluateShadowAiPhase3IssueFamilyV1({
+  const familyResult = await evaluateShadowAiPhase3IssueFamilyV1({
     issueClass,
     corpusKind: item.corpusKind,
     packet: item.packet,
     offlineBaselinePlan: item.offlineBaselinePlan,
     adapter,
     captureDeterministicState: corpus.captureDeterministicState,
-  }));
+  });
+  familyResults.push(familyResult);
+  if (familyResult.errorCodes.includes("shadow_planner_provider_abort_cleanup_unconfirmed")
+    || familyResult.errorCodes.includes("shadow_planner_provider_transport_quarantined")) {
+    transportDispatchHalted = true;
+    break;
+  }
 }
 
 const totalProviderCalls = sum(familyResults.map((item) => item.providerCalls));
@@ -117,14 +128,15 @@ const summary = {
   truthMutations: 0,
   sourceAdmissions: 0,
   researchOperations: 0,
+  transportDispatchHalted,
 };
 const result = {
-  schemaVersion: "provider_neutral_shadow_planner_phase3_evaluation_2026_09_16_v2",
+  schemaVersion: "provider_neutral_shadow_planner_phase3_evaluation_2026_09_16_v3",
   generatedAt: GENERATED_AT,
   mode: "DIRECT_OPENAI_NON_CUSTOMER_SHADOW_EVALUATION",
   baseline: {
     branch: "codex/planner-provider-neutral-consolidation-v1",
-    qualificationCommit: "70a7676",
+    qualificationCommit: "3659b03",
   },
   executionBoundary: {
     adapter: adapter.adapterId,
@@ -148,6 +160,11 @@ const result = {
       SHADOW_AI_ISSUE_CLASSES.length * SHADOW_AI_PHASE_3_REPETITIONS_V1
       * SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumEstimatedCostUsdMicros,
     timeoutMsPerCall: SHADOW_AI_PHASE_3_TIMEOUT_MS_V1,
+    connectionEstablishmentTimeoutMs: OPENAI_DIRECT_CONNECT_TIMEOUT_MS_V1,
+    abortCleanupGraceMs: SHADOW_AI_PROVIDER_ABORT_CLEANUP_GRACE_MS_V1,
+    freshTransportSessionPerCall: true,
+    connectionReuseAllowed: false,
+    stopNetworkDispatchWhenCleanupUnconfirmed: true,
     maximumOutputTokensPerCall: GENERATION.maximumOutputTokens,
     reasoningEffort: GENERATION.reasoningEffort,
     verbosity: GENERATION.verbosity,
@@ -176,7 +193,7 @@ const result = {
 await writeFile(RESULT_PATH, `${JSON.stringify(result, null, 2)}\n`, { flag: "wx" });
 await writeFile(REPORT_PATH, report(result), { flag: "wx" });
 await writeFile(ATTEMPT_GUARD_PATH, `${JSON.stringify({
-  schemaVersion: "provider_neutral_shadow_planner_phase3_attempt_guard_2026_09_16_v2",
+  schemaVersion: "provider_neutral_shadow_planner_phase3_attempt_guard_2026_09_16_v3",
   state: "COMPLETED",
   startedAt: GENERATED_AT,
   completedAt: new Date().toISOString(),
@@ -402,7 +419,7 @@ function requiredEnvironment(name: string): string {
 
 async function acquireAttemptGuard(): Promise<void> {
   await writeFile(ATTEMPT_GUARD_PATH, `${JSON.stringify({
-    schemaVersion: "provider_neutral_shadow_planner_phase3_attempt_guard_2026_09_16_v2",
+    schemaVersion: "provider_neutral_shadow_planner_phase3_attempt_guard_2026_09_16_v3",
     state: "STARTED",
     startedAt: GENERATED_AT,
     maximumProviderCalls: SHADOW_AI_ISSUE_CLASSES.length * SHADOW_AI_PHASE_3_REPETITIONS_V1,
@@ -414,9 +431,9 @@ async function acquireAttemptGuard(): Promise<void> {
 
 function report(value: typeof result): string {
   const rows = value.familyResults.flatMap((family) => family.trials.map((trial) =>
-    `| ${family.issueClass} | ${family.corpusKind} | ${trial.repetition} | ${trial.status} | ${trial.runStatus ?? "—"} | ${trial.accounting?.inputTokens ?? 0} | ${trial.accounting?.outputTokens ?? 0} | ${trial.accounting?.estimatedCostUsdMicros ?? 0} | ${trial.accounting?.latencyMs ?? 0} | ${trial.deterministicStatePreserved ? "yes" : "NO"} | ${trial.quality ? Object.values(trial.quality).every(Boolean) ? "yes" : "NO" : "—"} | ${family.repeatableSemanticSignature ? "yes" : family.trials.some((item) => item.status === "SKIPPED") ? "—" : "NO"} | ${trial.errorCodes.join(", ") || "—"} |`
+    `| ${family.issueClass} | ${family.corpusKind} | ${trial.repetition} | ${trial.status} | ${trial.runStatus ?? "—"} | ${trial.accounting?.inputTokens ?? 0} | ${trial.accounting?.outputTokens ?? 0} | ${trial.accounting?.estimatedCostUsdMicros ?? 0} | ${trial.accounting?.latencyMs ?? 0} | ${trial.provider?.connectionMs ?? "—"} | ${trial.provider?.responseHeadersMs ?? "—"} | ${trial.provider?.responseBodyMs ?? "—"} | ${trial.provider?.cleanupMs ?? "—"} | ${trial.provider?.cleanupStatus ?? "—"} | ${trial.provider?.failureStage ?? "—"} | ${trial.deterministicStatePreserved ? "yes" : "NO"} | ${trial.quality ? Object.values(trial.quality).every(Boolean) ? "yes" : "NO" : "—"} | ${family.repeatableSemanticSignature ? "yes" : family.trials.some((item) => item.status === "SKIPPED") ? "—" : "NO"} | ${trial.errorCodes.join(", ") || "—"} |`
   )).join("\n");
-  return `# Direct OpenAI provider-neutral planner — Phase 3 shadow evaluation\n\nMode: non-customer, non-authoritative shadow evaluation. Model: \`${MODEL}\`. OpenRouter disabled. Raw prompts, provider responses, and drafts were not persisted.\n\n| Issue family | Corpus | Repeat | Result | Runtime | Input tokens | Output tokens | Cost µUSD | Latency ms | Protected state unchanged | Offline baseline quality | Semantic repeatability | Safe errors |\n|---|---|---:|---|---|---:|---:|---:|---:|---|---|---|---|\n${rows}\n\n## Result\n\n- Phase 3 status: **${value.summary.status}**.\n- Issue-family coverage: ${value.summary.issueFamilyCoverage}; passed: ${value.summary.passedIssueFamilies.length}; failed: ${value.summary.failedIssueFamilies.length}.\n- Provider calls: ${value.summary.totalProviderCalls}/${value.summary.maximumProviderCalls}; retries: 0; fallback attempts: 0.\n- Tokens: ${value.summary.totalInputTokens} input / ${value.summary.totalOutputTokens} output. Estimated cost: $${(value.summary.totalEstimatedCostUsdMicros / 1_000_000).toFixed(6)}.\n- Repeatable semantic signatures: ${value.summary.allSemanticSignaturesRepeatable}. Offline-baseline quality matched: ${value.summary.allOfflineBaselineQualityMatched}.\n- Protected state unchanged: ${value.summary.allProtectedStatePreserved}. Customer outputs: 0. Truth mutations: 0. Source admissions: 0. Research operations: 0.\n`;
+  return `# Direct OpenAI provider-neutral planner — Phase 3 shadow evaluation\n\nMode: non-customer, non-authoritative shadow evaluation. Model: \`${MODEL}\`. OpenRouter disabled. Each call used a fresh transport session. Raw prompts, provider responses, and drafts were not persisted.\n\n| Issue family | Corpus | Repeat | Result | Runtime | Input tokens | Output tokens | Cost µUSD | Latency ms | Connect ms | Headers ms | Body ms | Cleanup ms | Cleanup | Failure stage | Protected state unchanged | Offline baseline quality | Semantic repeatability | Safe errors |\n|---|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|---|---|---|\n${rows}\n\n## Result\n\n- Phase 3 status: **${value.summary.status}**.\n- Issue-family coverage: ${value.summary.issueFamilyCoverage}; passed: ${value.summary.passedIssueFamilies.length}; failed: ${value.summary.failedIssueFamilies.length}.\n- Provider calls: ${value.summary.totalProviderCalls}/${value.summary.maximumProviderCalls}; retries: 0; fallback attempts: 0.\n- Tokens: ${value.summary.totalInputTokens} input / ${value.summary.totalOutputTokens} output. Estimated cost: $${(value.summary.totalEstimatedCostUsdMicros / 1_000_000).toFixed(6)}.\n- Repeatable semantic signatures: ${value.summary.allSemanticSignaturesRepeatable}. Offline-baseline quality matched: ${value.summary.allOfflineBaselineQualityMatched}.\n- Protected state unchanged: ${value.summary.allProtectedStatePreserved}. Transport dispatch halted: ${value.summary.transportDispatchHalted}. Customer outputs: 0. Truth mutations: 0. Source admissions: 0. Research operations: 0.\n`;
 }
 
 function fingerprint(value: unknown): string {

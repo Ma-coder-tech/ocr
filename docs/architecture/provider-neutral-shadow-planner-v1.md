@@ -700,3 +700,58 @@ no fallback, safe telemetry only, and the existing privacy and protected-state
 controls. Any privacy, protected-state, local-validation, or unconfirmed-cleanup
 failure must stop further network dispatch. A successful shadow run would still
 require Product review and would not authorize customer-facing use.
+
+## Phase 3 isolated-transport live shadow revalidation — 2026-09-16
+
+Product authorized the complete Direct OpenAI-only Phase 3 cohort against the
+exact `gpt-5.2-2025-12-11` snapshot after the offline transport correction.
+The runner used seven issue families, two repetitions per family, at most 14
+calls, a 60-second network deadline, a 15-second connection-establishment
+sub-deadline, up to two seconds solely to confirm abort cleanup, 4,000 maximum
+output tokens, reasoning `none`, low verbosity, `store: false`, no retry, no
+fallback, one fresh Direct OpenAI transport session per call, and safe
+transport-phase telemetry only.
+
+The transport result passed. All 14 calls returned HTTP 200 from the exact
+requested snapshot and completed inside the 60-second deadline. No connection
+was reused, every isolated session reported confirmed cleanup, no abort-cleanup
+quarantine was entered, and the global dispatch halt was not triggered. The
+largest observed connection, response-header, response-body, and cleanup times
+were respectively 478 ms, 21,715 ms, 272 ms, and 21 ms. The largest total call
+latency was 21,982 ms. This run produced no timeout, connection, header, body,
+cleanup, or generic network failure.
+
+The overall Phase 3 product-quality result nevertheless remains **failed**.
+Six of seven issue families passed both repetitions with repeatable semantic
+signatures and complete offline-baseline quality matches. Thirteen of fourteen
+provider drafts passed all local deterministic validation. The second
+`QUALIFICATION_INTEGRITY_ROOT_CAUSE` draft returned successfully but was
+rejected fail-closed by the local validator with
+`shadow_planner_forbidden_conclusion`. The first repetition for that family
+passed every quality check. Because the second draft was rejected, that family
+cannot establish two-run repeatability or a complete baseline-quality match.
+The rejected provider draft was not persisted, so the safe evidence identifies
+the violated policy class but intentionally does not retain its exact wording.
+
+Observed usage was 134,318 input tokens and 14,343 output tokens, with USD
+0.435864 total estimated cost. The largest call used 1,428 output tokens and
+cost USD 0.054662, remaining below the approved per-call and aggregate ceilings.
+All seven packet and provider-payload privacy inspections passed. No filename,
+business name, account identifier, credential, raw statement, prompt, response,
+or provider draft was persisted. Canonical financial truth, RD, reconciliation,
+commercial truth, governed knowledge, permissions, and customer output remained
+invariant for all 14 attempts. Truth mutations, source admissions, research
+operations, customer outputs, retries, and fallbacks were all zero. The
+completed attempt guard records all 14 calls and binds the safe result by
+SHA-256.
+
+Engineering assessment: the isolated-session transport and cleanup correction
+is validated by this bounded cohort; transport is no longer the current Phase 3
+blocker. The remaining blocker is one nondeterministic semantic safety failure
+in the qualification-integrity family. Local fail-closed validation behaved as
+designed and must not be weakened. Before another live run, the provider-neutral
+instruction should be hardened offline to make the already-enforced forbidden
+financial/commercial conclusion class explicit, including inside hypotheses,
+confirmation requirements, and falsification conditions, followed by the full
+failure matrix and deterministic Gold replay. Phase 3 wiring and all
+customer-facing use remain blocked, and OpenRouter remains disabled.
