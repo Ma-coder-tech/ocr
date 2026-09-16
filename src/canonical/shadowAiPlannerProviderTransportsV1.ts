@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { performance } from "node:perf_hooks";
+
+import { Client } from "undici";
 
 import { SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1 } from "./shadowAiEconomicResolutionPlannerTypesV1.js";
 import {
@@ -19,6 +22,8 @@ import type {
 
 const MAXIMUM_PROVIDER_RESPONSE_BYTES = 512_000;
 const MAXIMUM_DRAFT_TEXT_BYTES = 128_000;
+const OPENAI_DIRECT_ORIGIN = "https://api.openai.com";
+const OPENAI_DIRECT_CONNECT_TIMEOUT_MS = 15_000;
 
 export type ShadowAiPlannerTokenPricingV1 = Readonly<{
   inputUsdMicrosPerMillionTokens: number;
@@ -42,12 +47,31 @@ export type ShadowAiPlannerFetchV1 = (
   }>,
 ) => Promise<ShadowAiPlannerFetchResponseV1>;
 
+export type ShadowAiPlannerTransportTimingsV1 = Readonly<{
+  connectionReused: boolean | null;
+  connectionMs: number | null;
+  responseHeadersMs: number | null;
+  responseBodyMs: number | null;
+  cleanupMs: number | null;
+  failureElapsedMs: number | null;
+}>;
+
+export type ShadowAiPlannerTransportSessionV1 = Readonly<{
+  fetch: ShadowAiPlannerFetchV1;
+  connectionEstablished(): boolean | null;
+  connectionMs(): number | null;
+  close(input: Readonly<{ aborted: boolean }>): Promise<number>;
+}>;
+
+export type ShadowAiPlannerTransportSessionFactoryV1 = () => ShadowAiPlannerTransportSessionV1;
+
 export class ShadowAiPlannerTransportErrorV1 extends Error {
   constructor(
     public readonly kind: "UNAVAILABLE" | "SAFETY_BLOCKED",
     public readonly safeCode: string,
     public readonly sendState: "BEFORE_SEND" | "AFTER_SEND" | "RESPONSE_RECEIVED",
     public readonly callCompleted: boolean,
+    public readonly transportTimings?: ShadowAiPlannerTransportTimingsV1,
   ) {
     super(safeCode);
   }
@@ -59,6 +83,7 @@ type AdapterConfiguration = Readonly<{
   generation: ShadowAiPlannerGenerationSettingsV1;
   pricing: ShadowAiPlannerTokenPricingV1;
   fetchImpl?: ShadowAiPlannerFetchV1;
+  transportSessionFactory?: ShadowAiPlannerTransportSessionFactoryV1;
   clock?: Readonly<{ nowMs(): number }>;
 }>;
 
@@ -70,7 +95,9 @@ export function createOpenAiDirectPlannerAdapterV1(
   configuration: AdapterConfiguration,
 ): ShadowAiPlannerTransportAdapterV1 {
   validateAdapterConfiguration(configuration, "openai");
-  const fetchImpl = configuration.fetchImpl ?? defaultFetch();
+  if (configuration.fetchImpl && configuration.transportSessionFactory) {
+    throw new Error("shadow_planner_openai_transport_configuration_ambiguous");
+  }
   const clock = configuration.clock ?? { nowMs: () => Date.now() };
   return Object.freeze({
     adapterId: "openai-direct-responses-v1",
@@ -92,7 +119,42 @@ export function createOpenAiDirectPlannerAdapterV1(
         generation: configuration.generation,
       });
       assertPreflightCost(compiled, configuration.pricing, configuration.generation.maximumOutputTokens);
-      const response = await sendOnce(compiled, signal, fetchImpl, clock);
+      const session = configuration.transportSessionFactory?.()
+        ?? (configuration.fetchImpl
+          ? injectedFetchSession(configuration.fetchImpl)
+          : createIsolatedOpenAiDirectSessionV1());
+      let response: Awaited<ReturnType<typeof sendOnce>> | null = null;
+      let failure: unknown = null;
+      try {
+        response = await sendOnce(compiled, signal, session, clock);
+      } catch (error) {
+        failure = error;
+      }
+      let cleanupMs: number;
+      try {
+        cleanupMs = await session.close({ aborted: signal.aborted || failure !== null });
+      } catch {
+        throw new ShadowAiPlannerTransportErrorV1(
+          "UNAVAILABLE", "shadow_planner_provider_session_cleanup_failed", "AFTER_SEND", false,
+        );
+      }
+      if (failure !== null) {
+        if (failure instanceof ShadowAiPlannerTransportErrorV1) {
+          throw new ShadowAiPlannerTransportErrorV1(
+            failure.kind,
+            failure.safeCode,
+            failure.sendState,
+            failure.callCompleted,
+            failure.transportTimings ? { ...failure.transportTimings, cleanupMs } : undefined,
+          );
+        }
+        throw failure;
+      }
+      if (response === null) {
+        throw new ShadowAiPlannerTransportErrorV1(
+          "UNAVAILABLE", "shadow_planner_provider_transport_result_missing", "AFTER_SEND", false,
+        );
+      }
       return normalizeOpenAiPlannerResponseV1({
         responseText: response.text,
         httpStatus: response.status,
@@ -101,6 +163,14 @@ export function createOpenAiDirectPlannerAdapterV1(
         pricing: configuration.pricing,
         requestSha256: sha256(compiled.body),
         schemaSha256: compiled.schemaSha256,
+        transportTimings: {
+          connectionReused: false,
+          connectionMs: session.connectionMs(),
+          responseHeadersMs: response.responseHeadersMs,
+          responseBodyMs: response.responseBodyMs,
+          cleanupMs,
+          failureElapsedMs: null,
+        },
       });
     },
   });
@@ -133,7 +203,7 @@ export function createOpenRouterPlannerAdapterV1(
         routing: configuration.routing,
       });
       assertPreflightCost(compiled, configuration.pricing, configuration.generation.maximumOutputTokens);
-      const response = await sendOnce(compiled, signal, fetchImpl, clock);
+      const response = await sendOnce(compiled, signal, injectedFetchSession(fetchImpl), clock);
       return normalizeOpenRouterPlannerResponseV1({
         responseText: response.text,
         httpStatus: response.status,
@@ -155,6 +225,7 @@ export function normalizeOpenAiPlannerResponseV1(input: Readonly<{
   pricing: ShadowAiPlannerTokenPricingV1;
   requestSha256: string;
   schemaSha256: string;
+  transportTimings?: ShadowAiPlannerTransportTimingsV1;
 }>): ShadowAiPlannerTransportResultV1 {
   const envelope = strictEnvelope(input.responseText, "openai");
   if (envelope.object !== "response" || envelope.status !== "completed" || envelope.error !== null && envelope.error !== undefined) {
@@ -183,7 +254,7 @@ export function normalizeOpenAiPlannerResponseV1(input: Readonly<{
     usage,
     providerRequestId: safeIdentifier(input.headerRequestId) ?? safeIdentifier(envelope.id),
     returnedModel: stringOrNull(envelope.model),
-    safeTelemetry: telemetry(input, null, null),
+    safeTelemetry: telemetry(input, null, null, input.transportTimings),
   });
 }
 
@@ -195,6 +266,7 @@ export function normalizeOpenRouterPlannerResponseV1(input: Readonly<{
   pricing: ShadowAiPlannerTokenPricingV1;
   requestSha256: string;
   schemaSha256: string;
+  transportTimings?: ShadowAiPlannerTransportTimingsV1;
 }>): ShadowAiPlannerTransportResultV1 {
   const envelope = strictEnvelope(input.responseText, "openrouter");
   if (envelope.object !== "response" || envelope.status !== "completed"
@@ -229,21 +301,28 @@ export function normalizeOpenRouterPlannerResponseV1(input: Readonly<{
     usage,
     providerRequestId: safeIdentifier(input.headerRequestId) ?? safeIdentifier(envelope.id),
     returnedModel: stringOrNull(envelope.model),
-    safeTelemetry: telemetry(input, "completed", routedProvider),
+    safeTelemetry: telemetry(input, "completed", routedProvider, input.transportTimings),
   });
 }
 
 async function sendOnce(
   request: ShadowAiPlannerHttpRequestV1,
   signal: AbortSignal,
-  fetchImpl: ShadowAiPlannerFetchV1,
+  session: ShadowAiPlannerTransportSessionV1,
   clock: Readonly<{ nowMs(): number }>,
-): Promise<{ status: number; text: string; requestId: string | null; latencyMs: number }> {
+): Promise<{
+  status: number;
+  text: string;
+  requestId: string | null;
+  latencyMs: number;
+  responseHeadersMs: number;
+  responseBodyMs: number;
+}> {
   if (signal.aborted) unavailable("shadow_planner_provider_cancelled_before_send", "BEFORE_SEND", false);
   const started = clock.nowMs();
   let response: ShadowAiPlannerFetchResponseV1;
   try {
-    response = await fetchImpl(request.endpoint, {
+    response = await session.fetch(request.endpoint, {
       method: request.method,
       headers: request.headers,
       body: request.body,
@@ -251,8 +330,23 @@ async function sendOnce(
       signal,
     });
   } catch {
-    unavailable(signal.aborted ? "shadow_planner_provider_cancelled" : "shadow_planner_provider_network_failed", "AFTER_SEND", false);
+    const safeCode = signal.aborted
+      ? "shadow_planner_provider_cancelled"
+      : session.connectionEstablished() === false
+        ? "shadow_planner_provider_connection_establishment_failed"
+        : session.connectionEstablished() === true
+          ? "shadow_planner_provider_response_headers_failed"
+          : "shadow_planner_provider_connection_or_response_headers_failed";
+    unavailable(safeCode, "AFTER_SEND", false, {
+      connectionReused: false,
+      connectionMs: session.connectionMs(),
+      responseHeadersMs: null,
+      responseBodyMs: null,
+      cleanupMs: null,
+      failureElapsedMs: elapsed(clock.nowMs(), started),
+    });
   }
+  const headersReceived = clock.nowMs();
   const status = response.status;
   const requestId = safeIdentifier(response.headers?.get("x-request-id") ?? null);
   if (!Number.isSafeInteger(status) || status < 100 || status > 599) {
@@ -264,14 +358,31 @@ async function sendOnce(
   }
   let text: string;
   try { text = await response.text(); }
-  catch { unavailable("shadow_planner_provider_response_read_failed", "RESPONSE_RECEIVED", true); }
+  catch {
+    unavailable("shadow_planner_provider_response_read_failed", "RESPONSE_RECEIVED", true, {
+      connectionReused: false,
+      connectionMs: session.connectionMs(),
+      responseHeadersMs: elapsed(headersReceived, started),
+      responseBodyMs: null,
+      cleanupMs: null,
+      failureElapsedMs: elapsed(clock.nowMs(), started),
+    });
+  }
+  const bodyReceived = clock.nowMs();
   if (Buffer.byteLength(text, "utf8") > MAXIMUM_PROVIDER_RESPONSE_BYTES) {
     safety("shadow_planner_provider_response_too_large");
   }
   if (status < 200 || status >= 300) {
     unavailable(httpFailureCode(request.providerKind, status), "RESPONSE_RECEIVED", true);
   }
-  return { status, text, requestId, latencyMs: elapsed(clock.nowMs(), started) };
+  return {
+    status,
+    text,
+    requestId,
+    latencyMs: elapsed(bodyReceived, started),
+    responseHeadersMs: elapsed(headersReceived, started),
+    responseBodyMs: elapsed(bodyReceived, headersReceived),
+  };
 }
 
 function strictEnvelope(text: string, provider: "openai" | "openrouter"): Record<string, unknown> {
@@ -373,6 +484,7 @@ function telemetry(
   input: Readonly<{ httpStatus: number; requestSha256: string; schemaSha256: string }>,
   finishReason: string | null,
   routedProvider: string | null,
+  transportTimings?: ShadowAiPlannerTransportTimingsV1,
 ): ShadowAiPlannerTransportResultV1["safeTelemetry"] {
   return Object.freeze({
     httpStatus: input.httpStatus,
@@ -380,6 +492,7 @@ function telemetry(
     schemaSha256: input.schemaSha256,
     finishReason: safeIdentifier(finishReason),
     routedProvider: safeIdentifier(routedProvider),
+    transportTimings: transportTimings ? Object.freeze({ ...transportTimings }) : undefined,
   });
 }
 
@@ -414,6 +527,78 @@ function assertPreflightCost(
   }
 }
 
+/**
+ * Direct OpenAI gets an isolated, single-request connection owner. A completed
+ * call closes its client; an aborted or failed call destroys it and awaits the
+ * socket shutdown. No connection or TLS session is shared with the next call.
+ */
+export function createIsolatedOpenAiDirectSessionV1(): ShadowAiPlannerTransportSessionV1 {
+  const client = new Client(OPENAI_DIRECT_ORIGIN, {
+    pipelining: 1,
+    connectTimeout: OPENAI_DIRECT_CONNECT_TIMEOUT_MS,
+    headersTimeout: 0,
+    bodyTimeout: 0,
+    maxCachedSessions: 0,
+  });
+  let requestStartedAt: number | null = null;
+  let connectedAt: number | null = null;
+  let connectionFailed = false;
+  client.once("connect", () => { connectedAt = performance.now(); });
+  client.once("connectionError", () => { connectionFailed = true; });
+
+  const fetch: ShadowAiPlannerFetchV1 = async (url, init) => {
+    const target = new URL(url);
+    if (target.origin !== OPENAI_DIRECT_ORIGIN || target.pathname !== "/v1/responses" || target.search) {
+      throw new Error("shadow_planner_openai_direct_endpoint_invalid");
+    }
+    requestStartedAt = performance.now();
+    const response = await client.request({
+      path: target.pathname,
+      method: init.method,
+      headers: init.headers,
+      body: init.body,
+      signal: init.signal,
+      idempotent: false,
+      blocking: true,
+      headersTimeout: 0,
+      bodyTimeout: 0,
+    });
+    return {
+      status: response.statusCode,
+      headers: {
+        get(name: string): string | null {
+          const value = response.headers[name.toLowerCase()];
+          if (Array.isArray(value)) return value.join(",");
+          return typeof value === "string" ? value : null;
+        },
+      },
+      text: async () => response.body.text(),
+    };
+  };
+
+  return Object.freeze({
+    fetch,
+    connectionEstablished: () => connectedAt !== null ? true : connectionFailed ? false : null,
+    connectionMs: () => requestStartedAt !== null && connectedAt !== null
+      ? elapsed(connectedAt, requestStartedAt) : null,
+    async close({ aborted }) {
+      const started = performance.now();
+      if (aborted) await client.destroy();
+      else await client.close();
+      return elapsed(performance.now(), started);
+    },
+  });
+}
+
+function injectedFetchSession(fetch: ShadowAiPlannerFetchV1): ShadowAiPlannerTransportSessionV1 {
+  return Object.freeze({
+    fetch,
+    connectionEstablished: () => null,
+    connectionMs: () => null,
+    close: async () => 0,
+  });
+}
+
 function defaultFetch(): ShadowAiPlannerFetchV1 {
   if (typeof globalThis.fetch !== "function") throw new Error("shadow_planner_provider_fetch_unavailable");
   return globalThis.fetch as unknown as ShadowAiPlannerFetchV1;
@@ -437,8 +622,13 @@ function httpFailureCode(provider: "OPENAI_DIRECT" | "OPENROUTER", status: numbe
   return `shadow_planner_${name}_http_failure`;
 }
 
-function unavailable(code: string, sendState: ShadowAiPlannerTransportErrorV1["sendState"], completed: boolean): never {
-  throw new ShadowAiPlannerTransportErrorV1("UNAVAILABLE", code, sendState, completed);
+function unavailable(
+  code: string,
+  sendState: ShadowAiPlannerTransportErrorV1["sendState"],
+  completed: boolean,
+  transportTimings?: ShadowAiPlannerTransportTimingsV1,
+): never {
+  throw new ShadowAiPlannerTransportErrorV1("UNAVAILABLE", code, sendState, completed, transportTimings);
 }
 
 function safety(code: string): never {

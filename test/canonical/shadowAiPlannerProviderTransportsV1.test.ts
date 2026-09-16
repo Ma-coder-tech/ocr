@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   compileShadowAiPlannerProviderRequestV1,
   type ShadowAiPlannerDraftV1,
+  type ShadowAiPlannerTransportAdapterV1,
 } from "../../src/canonical/shadowAiPlannerProviderNeutralV1.js";
 import { runShadowAiProviderNeutralPlannerV1 } from "../../src/canonical/shadowAiPlannerProviderNeutralRuntimeV1.js";
 import { qualifyShadowAiPlannerProviderV1 } from "../../src/canonical/shadowAiPlannerProviderQualificationV1.js";
@@ -15,6 +16,7 @@ import {
   normalizeOpenRouterPlannerResponseV1,
   ShadowAiPlannerTransportErrorV1,
   type ShadowAiPlannerFetchV1,
+  type ShadowAiPlannerTransportSessionV1,
 } from "../../src/canonical/shadowAiPlannerProviderTransportsV1.js";
 import {
   parseShadowAiPlannerStrictJsonObjectV1,
@@ -280,11 +282,173 @@ describe("Provider-neutral planner transports v1", () => {
 
     expect(run.status).toBe("UNAVAILABLE");
     expect(run.plan).toBeNull();
-    expect(run.errorCodes).toEqual(["shadow_planner_provider_network_failed"]);
+    expect(run.errorCodes).toEqual(["shadow_planner_provider_connection_or_response_headers_failed"]);
+    expect(run.provider).toMatchObject({
+      failureStage: "CONNECTION_OR_RESPONSE_HEADERS",
+      cleanupStatus: "CONFIRMED",
+    });
     expect(run.accounting).toMatchObject({ providerCallAttempts: 1, providerCallCompleted: 0, retries: 0 });
     expect(JSON.stringify(run)).not.toContain("socket closed");
     expect(JSON.stringify(run)).not.toContain("openai-secret");
     expect(calls).toBe(1);
+  });
+
+  it("classifies connection, response-header, and response-body failures without retaining raw errors", async () => {
+    const cases = [
+      {
+        name: "connection",
+        connected: false,
+        fetch: async () => { throw new Error("dns secret"); },
+        code: "shadow_planner_provider_connection_establishment_failed",
+        stage: "CONNECTION_ESTABLISHMENT",
+      },
+      {
+        name: "headers",
+        connected: true,
+        fetch: async () => { throw new Error("header secret"); },
+        code: "shadow_planner_provider_response_headers_failed",
+        stage: "RESPONSE_HEADERS",
+      },
+      {
+        name: "body",
+        connected: true,
+        fetch: async () => ({
+          status: 200,
+          headers: { get: () => null },
+          text: async () => { throw new Error("body secret"); },
+        }),
+        code: "shadow_planner_provider_response_read_failed",
+        stage: "RESPONSE_BODY",
+      },
+    ] as const;
+
+    for (const item of cases) {
+      let closed = false;
+      const adapter = createOpenAiDirectPlannerAdapterV1({
+        apiKey: "test-key",
+        model: "test-openai-model",
+        generation,
+        pricing,
+        transportSessionFactory: () => ({
+          fetch: item.fetch as ShadowAiPlannerFetchV1,
+          connectionEstablished: () => item.connected,
+          connectionMs: () => item.connected ? 4 : null,
+          close: async () => { closed = true; return 2; },
+        }),
+      });
+
+      const run = await runShadowAiProviderNeutralPlannerV1({ packet: packet(`stage-${item.name}`), adapter });
+
+      expect(run.status).toBe("UNAVAILABLE");
+      expect(run.errorCodes).toEqual([item.code]);
+      expect(run.provider).toMatchObject({ failureStage: item.stage, cleanupStatus: "CONFIRMED" });
+      expect(run.provider.failureElapsedMs).not.toBeNull();
+      expect(run.provider.cleanupMs).toBe(2);
+      if (item.name === "body") expect(run.provider.responseHeadersMs).not.toBeNull();
+      expect(JSON.stringify(run)).not.toContain(`${item.name} secret`);
+      expect(closed).toBe(true);
+    }
+  });
+
+  it("uses one isolated Direct OpenAI transport session per call and records safe phase timings", async () => {
+    const inputPacket = packet("isolated-session-timings");
+    const compiled = compileShadowAiPlannerProviderRequestV1(inputPacket);
+    let sessions = 0;
+    let closedSessions = 0;
+    const sessionFactory = (): ShadowAiPlannerTransportSessionV1 => {
+      sessions += 1;
+      return {
+        fetch: async () => response(JSON.stringify(openAiEnvelope(
+          JSON.stringify(validDraft(compiled)), "test-openai-model",
+        ))),
+        connectionEstablished: () => true,
+        connectionMs: () => 4,
+        close: async () => { closedSessions += 1; return 3; },
+      };
+    };
+    const adapter = createOpenAiDirectPlannerAdapterV1({
+      apiKey: "test-key",
+      model: "test-openai-model",
+      generation,
+      pricing,
+      transportSessionFactory: sessionFactory,
+      clock: sequenceClock(100, 110, 115, 200, 208, 212),
+    });
+
+    const first = await runShadowAiProviderNeutralPlannerV1({ packet: inputPacket, adapter });
+    const second = await runShadowAiProviderNeutralPlannerV1({ packet: inputPacket, adapter });
+
+    expect(first.status).toBe("COMPLETED");
+    expect(second.status).toBe("COMPLETED");
+    expect(sessions).toBe(2);
+    expect(closedSessions).toBe(2);
+    expect(first.provider).toMatchObject({
+      connectionReused: false,
+      connectionMs: 4,
+      responseHeadersMs: 10,
+      responseBodyMs: 5,
+      cleanupMs: 3,
+      cleanupStatus: "CONFIRMED",
+      failureStage: "NONE",
+    });
+    expect(second.provider).toMatchObject({
+      connectionReused: false,
+      responseHeadersMs: 8,
+      responseBodyMs: 4,
+      cleanupStatus: "CONFIRMED",
+    });
+  });
+
+  it("waits for abort cleanup and quarantines a transport whose cancellation never settles", async () => {
+    const settledPacket = packet("abort-cleanup-settled");
+    let cleanupFinished = false;
+    const settledAdapter = plannerAdapter(async ({ signal }) => await new Promise((_, reject) => {
+      signal.addEventListener("abort", () => {
+        setTimeout(() => {
+          cleanupFinished = true;
+          reject(new Error("safe abort completion"));
+        }, 10);
+      }, { once: true });
+    }));
+
+    const settled = await runShadowAiProviderNeutralPlannerV1({
+      packet: settledPacket,
+      adapter: settledAdapter,
+      timeoutMs: 5,
+      abortCleanupGraceMs: 50,
+    });
+    expect(cleanupFinished).toBe(true);
+    expect(settled.errorCodes).toEqual(["shadow_planner_provider_timeout"]);
+    expect(settled.provider).toMatchObject({ cleanupStatus: "CONFIRMED", failureStage: "TIMEOUT_ABORT" });
+
+    const stuckPacket = packet("abort-cleanup-stuck");
+    let stuckCalls = 0;
+    const stuckAdapter = plannerAdapter(async () => {
+      stuckCalls += 1;
+      return await new Promise(() => undefined);
+    });
+    const stuck = await runShadowAiProviderNeutralPlannerV1({
+      packet: stuckPacket,
+      adapter: stuckAdapter,
+      timeoutMs: 5,
+      abortCleanupGraceMs: 5,
+    });
+    const quarantined = await runShadowAiProviderNeutralPlannerV1({
+      packet: stuckPacket,
+      adapter: stuckAdapter,
+      timeoutMs: 5,
+      abortCleanupGraceMs: 5,
+    });
+
+    expect(stuck.errorCodes).toEqual([
+      "shadow_planner_provider_abort_cleanup_unconfirmed",
+      "shadow_planner_provider_timeout",
+    ]);
+    expect(stuck.provider).toMatchObject({ cleanupStatus: "UNCONFIRMED", failureStage: "SESSION_CLEANUP" });
+    expect(quarantined.errorCodes).toEqual(["shadow_planner_provider_transport_quarantined"]);
+    expect(quarantined.provider).toMatchObject({ cleanupStatus: "UNCONFIRMED", failureStage: "TRANSPORT_QUARANTINED" });
+    expect(quarantined.accounting.providerNetworkCalls).toBe(0);
+    expect(stuckCalls).toBe(1);
   });
 
   it("blocks a conservatively over-budget request before any network attempt", async () => {
@@ -643,5 +807,24 @@ function deterministicStateFixture() {
     governedKnowledge: "same",
     permissions: "same",
     customerOutput: false,
+  };
+}
+
+function plannerAdapter(
+  invoke: ShadowAiPlannerTransportAdapterV1["invoke"],
+): ShadowAiPlannerTransportAdapterV1 {
+  return {
+    adapterId: "transport-cleanup-fixture-v1",
+    transport: "PROVIDER",
+    providerKind: "OPENAI_DIRECT",
+    model: "test-openai-model",
+    safeConfiguration: {
+      ...generation,
+      verbosityControl: "NATIVE_PARAMETER",
+      providerFallbackAllowed: false,
+      routedProviderConstraint: null,
+      dataCollection: "DIRECT_STORE_DISABLED",
+    },
+    invoke,
   };
 }

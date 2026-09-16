@@ -640,3 +640,63 @@ particular, the timeout path currently aborts and returns without observing
 completion of the cancelled fetch, so connection cleanup between sequential
 calls must be verified. Phase 3 wiring and all customer-facing use remain
 blocked; OpenRouter remains disabled and cannot substitute.
+
+## Direct OpenAI offline transport diagnosis — 2026-09-16
+
+The prior safe telemetry cannot prove whether its two generic network failures
+occurred during DNS/TCP/TLS establishment, request upload, or the wait for
+response headers. It can, however, prove a local lifecycle defect: on each
+60-second timeout the runtime called `AbortController.abort()` and immediately
+returned while deliberately discarding the unresolved adapter promise. The next
+sequential request could therefore begin before the cancelled fetch and its
+pooled socket had acknowledged termination. The same adapter used Node's global
+fetch pool for every call. Three timeouts followed by two later network failures
+is consistent with cleanup or pool contamination, although the old telemetry is
+not sufficient to claim that as the exclusive external cause.
+
+Direct OpenAI now uses one explicit Undici client and one new connection owner
+per call. The client is restricted to `https://api.openai.com/v1/responses`,
+does not pipeline across calls, does not share a connection or TLS session with
+the next call, and has a 15-second connection-establishment sub-deadline inside
+the unchanged 60-second total request deadline. A successful call consumes the
+bounded response body and gracefully closes its client. A failed or aborted call
+destroys the client and awaits socket shutdown before its adapter promise
+settles. OpenRouter's adapter was not changed to use this transport and remains
+disabled.
+
+The runtime now observes abort cleanup for up to two seconds after the network
+deadline. This cleanup interval does not extend provider generation: the
+request signal is aborted at 60 seconds. If cleanup settles, the timeout is
+reported with `cleanupStatus: CONFIRMED`. If it does not settle, the adapter
+instance is quarantined and every subsequent invocation is rejected before
+network dispatch. The previous fire-and-forget operation path no longer exists.
+
+Safe transport telemetry now separates connection establishment, time to
+response headers, response-body consumption, and session cleanup. It records
+only bounded millisecond durations, whether a connection was reused, cleanup
+status, and a fixed failure-stage enum. It never records exception messages,
+headers, request bodies, response bodies, prompts, credentials, or provider
+drafts. Connection, header, body, cleanup, timeout, and quarantine failures have
+distinct safe codes. The provider-neutral run schema was bumped to version 2;
+the planner semantic request and response contracts were unchanged.
+
+Offline validation passed the repository TypeScript build and all 51 focused
+planner tests across five files. The transport matrix proves connection-stage,
+header-stage, and body-stage classification; fresh session creation for every
+call; phase timing validation; cleanup before return; confirmed cancellation;
+quarantine after unconfirmed cancellation; zero subsequent network dispatch
+from a quarantined adapter; one call per attempt; and unchanged no-retry and
+no-fallback behavior. The dependency installation audit reported zero known
+vulnerabilities.
+
+Direct OpenAI is ready for another bounded Phase 3 live run, subject to Product
+authorization. Because the transport implementation changed, the recommended
+run is the complete seven-family, two-repetition cohort rather than only the
+previously incomplete cases: maximum 14 calls, exact
+`gpt-5.2-2025-12-11` snapshot, 60-second network deadline plus cleanup
+observation, 4,000 output tokens, reasoning `none`, low verbosity,
+`store: false`, USD 0.25 per call and USD 3.50 aggregate ceilings, no retry,
+no fallback, safe telemetry only, and the existing privacy and protected-state
+controls. Any privacy, protected-state, local-validation, or unconfirmed-cleanup
+failure must stop further network dispatch. A successful shadow run would still
+require Product review and would not authorize customer-facing use.

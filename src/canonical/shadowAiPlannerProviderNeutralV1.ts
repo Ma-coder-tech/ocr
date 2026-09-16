@@ -90,6 +90,14 @@ export type ShadowAiPlannerTransportResultV1 = Readonly<{
     schemaSha256: string;
     finishReason: string | null;
     routedProvider: string | null;
+    transportTimings?: Readonly<{
+      connectionReused: boolean | null;
+      connectionMs: number | null;
+      responseHeadersMs: number | null;
+      responseBodyMs: number | null;
+      cleanupMs: number | null;
+      failureElapsedMs: number | null;
+    }>;
   }>;
 }>;
 
