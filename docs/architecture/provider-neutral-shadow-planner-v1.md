@@ -872,3 +872,40 @@ frozen adapter, contract-v5 instruction, isolated transport, local validation,
 protected-state invariants, safe telemetry, and immediate kill switch. Any
 customer-facing behavior remains a separate future qualification and approval
 gate.
+
+## Default-off internal shadow integration
+
+The approved internal integration is implemented as an explicit non-customer
+seam in `shadowAiPlannerInternalIntegrationV1.ts`. It is intentionally absent
+from the production customer-job graph. Calling it requires all of the
+following: `SHADOW_AI_PLANNER_INTERNAL_ENABLED=true`, an inactive emergency
+kill switch, an OpenAI credential, the exact
+`NON_CUSTOMER_INTERNAL_FIXTURE` data classification, exactly one already
+compiled privacy-valid packet, and a protected-state capture callback. This
+does not authorize customer-derived input transmission.
+
+The integration pins Direct OpenAI, `gpt-5.2-2025-12-11`, 4,000 maximum output
+tokens, reasoning `none`, low verbosity, `store: false`, USD 0.25 maximum
+estimated cost, a 60-second network deadline, the validated isolated-session
+transport, zero retry, and zero fallback. OpenRouter cannot be selected through
+the interface. The kill switch is evaluated both before adapter construction
+and immediately before dispatch.
+
+The existing provider-neutral runtime still performs privacy compilation,
+strict response extraction, local binding, reference validation, semantic
+validation, budget validation, timeout cleanup, and transport quarantine. The
+integration fingerprints the caller-supplied protected state before and after
+the call and changes the result to `SAFETY_BLOCKED` if any component changes.
+It discards the locally bound plan and returns only bounded telemetry: adapter
+and model identity, issue family, counts, usage, cost, latency, safe transport
+phase, fingerprints, fixed error codes, and the invariance result. No packet,
+prompt, provider response, provider draft, plan text, internal issue ID, source
+reference, or customer output is returned or persisted by this seam.
+
+The per-invocation budget is one packet and one provider call, matching the
+existing per-statement manifest ceiling. Offline tests prove default-off
+behavior, both kill-switch checks, classification and credential rejection,
+one-call budget enforcement, exact adapter configuration, protected-state
+failure, safe telemetry projection, and zero OpenRouter/fallback authority.
+No live provider request was made while implementing or validating this
+integration.
