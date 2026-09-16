@@ -227,3 +227,51 @@ inside token and USD 0.25 ceilings, the entire draft passes strict local
 binding and semantic validation, the cross-request replay is rejected, and
 all seven protected-state fingerprints remain unchanged. Any other outcome is
 `REJECTED`; a partial pass is not qualification.
+
+## Bounded requalification result — 2026-09-16
+
+The approved run stopped after the first failed control for each independent
+adapter. It made two provider calls total, with zero retries and zero automatic
+fallbacks. The unused four-call allowance was not consumed.
+
+Direct OpenAI returned HTTP 200 from the exact pinned
+`gpt-5.2-2025-12-11` snapshot in 22,234 ms. The response used 1,395 input
+tokens and 1,294 output tokens, with an estimated cost of 20,558 microdollars.
+The structured draft passed the transport and schema boundary but failed local
+semantic admission because both `exactCitedReferenceTokens` and a hypothesis
+`supportingReferenceTokens` value named the wrong reference class. The runtime
+therefore returned `SAFETY_BLOCKED`, discarded the draft, and skipped the
+remaining controls. This is evidence of an instruction/semantic-contract
+failure, not schema incompatibility or a deadline failure.
+
+OpenRouter failed its first schema control with HTTP 404 before a provider
+response envelope was available. The configured
+`openai/gpt-5.2-20251211` slug therefore did not qualify at the Chat
+Completions endpoint under the pinned routing contract. The runtime recorded
+no response tokens or cost and skipped the remaining controls. The safe
+telemetry intentionally does not retain the provider error body, so this run
+establishes only model-or-endpoint rejection; it does not distinguish which
+part OpenRouter rejected.
+
+Every before/after fingerprint matched for canonical financial truth, RD
+artifacts, reconciliation, commercial truth, governed knowledge, permissions,
+and customer-output state. No customer output, truth mutation, research
+operation, or source admission occurred. The privacy scan found no prohibited
+filename, account, filesystem-path, internal-reference, synthetic-fact, or
+credential pattern in the persisted artifacts.
+
+Neither adapter is qualified. Phase 3 and customer-facing wiring remain
+blocked. The evidence supports two separate offline changes before any future
+live authorization: strengthen the provider-neutral instruction/semantic
+fixture so reference classes are unambiguous without encoding request-specific
+values, and replace the OpenRouter request model with a documented callable
+model identifier while retaining the OpenAI-only routing assertion. These are
+adapter/contract corrections; they do not change the deterministic authority
+boundary. A future live run requires a new bounded authorization and must not
+reuse or remove this run's attempt guard.
+
+Safe artifacts:
+
+- `evaluations/provider-neutral-shadow-planner-v1/requalification-2026-09-16.json`
+- `evaluations/provider-neutral-shadow-planner-v1/requalification-report-2026-09-16.md`
+- `evaluations/provider-neutral-shadow-planner-v1/requalification-attempt-guard-2026-09-16.json`
