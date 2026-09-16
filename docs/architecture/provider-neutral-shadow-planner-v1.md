@@ -315,3 +315,37 @@ and failed 83 tests across 26 files in unrelated reconstruction, template, and
 canonical baseline areas; none of the failures were in the provider-neutral
 planner suites changed here. No live provider request was made during this
 correction phase.
+
+## Bounded live requalification result — 2026-09-16 (attempt 2)
+
+Product authorized the corrected adapters under the unchanged bounded contract.
+The run made two provider calls total and stopped each adapter after its first
+failed schema control. No retries or fallbacks were attempted. Both adapters
+remain rejected; the adversarial-reference and Gold controls were skipped.
+
+Direct OpenAI returned HTTP 200 from the exact
+`gpt-5.2-2025-12-11` snapshot in 19,288 ms. It used 1,802 input tokens and
+1,312 output tokens, with an estimated cost of 21,522 microdollars. The response
+passed transport, model-identity, structured-schema, and reference-token
+binding checks, then failed deterministic semantic admission with
+`shadow_planner_required_evidence_class_invalid`. The validator sequence proves
+that the draft selected a globally recognized evidence class that was not in
+the packet's allowed evidence-class subset. Raw provider content was not
+persisted, so the safe evidence intentionally cannot identify the exact class
+the provider selected. This is a provider-instruction/packet-semantics failure,
+not a transport, schema, timeout, reference-token, or budget failure.
+
+OpenRouter requested the documented public model identifier
+`openai/gpt-5.2`, restricted routing to the OpenAI upstream, denied
+data-collection routing, required support for every parameter, and disabled
+fallback. OpenRouter returned HTTP 404 before a provider response envelope;
+there were no response tokens or cost. Current OpenRouter documentation lists
+the public model as served by OpenAI and Azure, while each configured routing
+policy filters eligible endpoints. The evidence therefore establishes that no
+route qualified under the combined request and account policy at run time; it
+does not establish that the public model identifier is invalid or identify
+which routing constraint excluded the OpenAI endpoint.
+
+All seven protected-state fingerprints were identical before and after both
+calls. Customer outputs, source admissions, research operations, and truth
+mutations remained zero. Phase 3 and customer-facing wiring remain blocked.

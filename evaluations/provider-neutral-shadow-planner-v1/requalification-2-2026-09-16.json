@@ -1,0 +1,279 @@
+{
+  "schemaVersion": "provider_neutral_shadow_planner_requalification_2026_09_16_v2",
+  "generatedAt": "2026-09-16T12:35:27.090Z",
+  "mode": "BOUNDED_NON_CUSTOMER_LIVE_REQUALIFICATION",
+  "baseline": {
+    "branch": "codex/planner-provider-neutral-consolidation-v1",
+    "phase1Commit": "e347b588d1bd6ae1bb54463dbe5b672a30aae490",
+    "phase2Commit": "95cf153",
+    "firstRequalificationCommit": "09b24a1",
+    "selectedParent": "d6ebcdbe919d11fb29ce73d7155c28848796a20f"
+  },
+  "controls": {
+    "schemaControl": "SYNTHETIC_NON_CUSTOMER",
+    "adversarialReferenceControl": "SYNTHETIC_CROSS_REQUEST_REPLAY",
+    "goldControl": "EXISTING_NON_CUSTOMER_GOLD_FIXTURE",
+    "maximumCallsPerAdapter": 3,
+    "retries": 0,
+    "automaticProviderFallback": false,
+    "qualificationTimeoutMsPerCall": 60000,
+    "maximumOutputTokensPerCall": 4000,
+    "reasoningEffort": "none",
+    "verbosity": "low",
+    "maximumEstimatedCostUsdMicrosPerCall": 250000,
+    "configuredPricingUsdPerMillionTokens": {
+      "input": 1.75,
+      "output": 14
+    },
+    "openRouterRouting": {
+      "onlyProvider": "openai",
+      "allowFallbacks": false,
+      "requireParameters": true,
+      "dataCollection": "deny",
+      "maximumPromptPriceUsdPerMillionTokens": 1.75,
+      "maximumCompletionPriceUsdPerMillionTokens": 14
+    }
+  },
+  "persistenceBoundary": {
+    "rawPrompts": false,
+    "rawProviderResponses": false,
+    "providerDrafts": false,
+    "customerOutput": false,
+    "safeFingerprintsAndTelemetryOnly": true
+  },
+  "qualifications": [
+    {
+      "schemaVersion": "shadow_ai_provider_qualification_2026_09_16_v1",
+      "status": "REJECTED",
+      "adapterId": "openai-direct-responses-v1",
+      "providerKind": "OPENAI_DIRECT",
+      "pinnedModel": "gpt-5.2-2025-12-11",
+      "adapterConfiguration": {
+        "maximumOutputTokens": 4000,
+        "reasoningEffort": "none",
+        "verbosity": "low",
+        "providerFallbackAllowed": false,
+        "routedProviderConstraint": null,
+        "dataCollection": "DIRECT_STORE_DISABLED"
+      },
+      "providerCalls": 1,
+      "maximumProviderCalls": 3,
+      "maximumOutputTokens": 4000,
+      "maximumEstimatedCostUsdMicrosPerCall": 250000,
+      "timeoutMsPerCall": 60000,
+      "retries": 0,
+      "fallbackAttempts": 0,
+      "rawProviderContentPersisted": false,
+      "customerOutputCreated": false,
+      "deterministicStatePreserved": true,
+      "stages": [
+        {
+          "stage": "SCHEMA_CONTROL",
+          "status": "FAILED",
+          "runStatus": "SAFETY_BLOCKED",
+          "stateBeforeSha256": "176ca27835708ca5b93e6ae6db05fcc8bdeee2fdbe1871046a4634baf467523f",
+          "stateAfterSha256": "176ca27835708ca5b93e6ae6db05fcc8bdeee2fdbe1871046a4634baf467523f",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "edbf5fad5dadbba6162adc2335ee9c176518f35bccf6feca25c7a8a91270575a",
+            "rdArtifacts": "d17f6a64e6c03fc3baf72c89df7cbb943f4661c23e8bb929b0b100f58c60db6f",
+            "reconciliation": "8087a4eb5bda049f15f1dba2a67cda8765a2a5b0fa6a56d9e396d58370345b32",
+            "commercialTruth": "25c64e0be1c608d2fe0e4ee909ca93e1078d028b6c6718c47195f8cdd979dd66",
+            "governedKnowledge": "bce947bbd9c5b0ea2b3fd1d54672a18aef5c0dd32c63a3c6924fe65a001cfb6f",
+            "permissions": "410ad36b45adebe20f512a9952b60fe6a5505e126397e44c0b01c336f4fa8d4a",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "edbf5fad5dadbba6162adc2335ee9c176518f35bccf6feca25c7a8a91270575a",
+            "rdArtifacts": "d17f6a64e6c03fc3baf72c89df7cbb943f4661c23e8bb929b0b100f58c60db6f",
+            "reconciliation": "8087a4eb5bda049f15f1dba2a67cda8765a2a5b0fa6a56d9e396d58370345b32",
+            "commercialTruth": "25c64e0be1c608d2fe0e4ee909ca93e1078d028b6c6718c47195f8cdd979dd66",
+            "governedKnowledge": "bce947bbd9c5b0ea2b3fd1d54672a18aef5c0dd32c63a3c6924fe65a001cfb6f",
+            "permissions": "410ad36b45adebe20f512a9952b60fe6a5505e126397e44c0b01c336f4fa8d4a",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "deterministicStatePreserved": true,
+          "crossRequestReplayRejected": null,
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_22ac745d2439446e89eabc71662bad9c",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "906e6991cc0caf3eb14062cf27d38008437e3b8e0913005e3ddc9ff818931cee",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 9104,
+            "inputTokens": 1802,
+            "outputTokens": 1312,
+            "estimatedCostUsdMicros": 21522,
+            "latencyMs": 19288,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "errorCodes": [
+            "shadow_planner_required_evidence_class_invalid"
+          ]
+        },
+        {
+          "stage": "ADVERSARIAL_REFERENCE_CONTROL",
+          "status": "SKIPPED",
+          "runStatus": null,
+          "stateBeforeSha256": null,
+          "stateAfterSha256": null,
+          "stateComponentSha256Before": null,
+          "stateComponentSha256After": null,
+          "deterministicStatePreserved": true,
+          "crossRequestReplayRejected": null,
+          "provider": null,
+          "accounting": null,
+          "errorCodes": []
+        },
+        {
+          "stage": "GOLD_CONTROL",
+          "status": "SKIPPED",
+          "runStatus": null,
+          "stateBeforeSha256": null,
+          "stateAfterSha256": null,
+          "stateComponentSha256Before": null,
+          "stateComponentSha256After": null,
+          "deterministicStatePreserved": true,
+          "crossRequestReplayRejected": null,
+          "provider": null,
+          "accounting": null,
+          "errorCodes": []
+        }
+      ]
+    },
+    {
+      "schemaVersion": "shadow_ai_provider_qualification_2026_09_16_v1",
+      "status": "REJECTED",
+      "adapterId": "openrouter-chat-completions-v1",
+      "providerKind": "OPENROUTER",
+      "pinnedModel": "openai/gpt-5.2",
+      "adapterConfiguration": {
+        "maximumOutputTokens": 4000,
+        "reasoningEffort": "none",
+        "verbosity": "low",
+        "providerFallbackAllowed": false,
+        "routedProviderConstraint": "openai",
+        "dataCollection": "deny"
+      },
+      "providerCalls": 1,
+      "maximumProviderCalls": 3,
+      "maximumOutputTokens": 4000,
+      "maximumEstimatedCostUsdMicrosPerCall": 250000,
+      "timeoutMsPerCall": 60000,
+      "retries": 0,
+      "fallbackAttempts": 0,
+      "rawProviderContentPersisted": false,
+      "customerOutputCreated": false,
+      "deterministicStatePreserved": true,
+      "stages": [
+        {
+          "stage": "SCHEMA_CONTROL",
+          "status": "FAILED",
+          "runStatus": "UNAVAILABLE",
+          "stateBeforeSha256": "176ca27835708ca5b93e6ae6db05fcc8bdeee2fdbe1871046a4634baf467523f",
+          "stateAfterSha256": "176ca27835708ca5b93e6ae6db05fcc8bdeee2fdbe1871046a4634baf467523f",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "edbf5fad5dadbba6162adc2335ee9c176518f35bccf6feca25c7a8a91270575a",
+            "rdArtifacts": "d17f6a64e6c03fc3baf72c89df7cbb943f4661c23e8bb929b0b100f58c60db6f",
+            "reconciliation": "8087a4eb5bda049f15f1dba2a67cda8765a2a5b0fa6a56d9e396d58370345b32",
+            "commercialTruth": "25c64e0be1c608d2fe0e4ee909ca93e1078d028b6c6718c47195f8cdd979dd66",
+            "governedKnowledge": "bce947bbd9c5b0ea2b3fd1d54672a18aef5c0dd32c63a3c6924fe65a001cfb6f",
+            "permissions": "410ad36b45adebe20f512a9952b60fe6a5505e126397e44c0b01c336f4fa8d4a",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "edbf5fad5dadbba6162adc2335ee9c176518f35bccf6feca25c7a8a91270575a",
+            "rdArtifacts": "d17f6a64e6c03fc3baf72c89df7cbb943f4661c23e8bb929b0b100f58c60db6f",
+            "reconciliation": "8087a4eb5bda049f15f1dba2a67cda8765a2a5b0fa6a56d9e396d58370345b32",
+            "commercialTruth": "25c64e0be1c608d2fe0e4ee909ca93e1078d028b6c6718c47195f8cdd979dd66",
+            "governedKnowledge": "bce947bbd9c5b0ea2b3fd1d54672a18aef5c0dd32c63a3c6924fe65a001cfb6f",
+            "permissions": "410ad36b45adebe20f512a9952b60fe6a5505e126397e44c0b01c336f4fa8d4a",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "deterministicStatePreserved": true,
+          "crossRequestReplayRejected": null,
+          "provider": {
+            "adapterId": "openrouter-chat-completions-v1",
+            "providerKind": "OPENROUTER",
+            "requestedModel": "openai/gpt-5.2",
+            "returnedModel": null,
+            "providerRequestId": null,
+            "routedProvider": null,
+            "httpStatus": null,
+            "requestSha256": null,
+            "schemaSha256": null,
+            "finishReason": null
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 9104,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "estimatedCostUsdMicros": 0,
+            "latencyMs": 0,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "errorCodes": [
+            "shadow_planner_openrouter_model_or_endpoint_rejected"
+          ]
+        },
+        {
+          "stage": "ADVERSARIAL_REFERENCE_CONTROL",
+          "status": "SKIPPED",
+          "runStatus": null,
+          "stateBeforeSha256": null,
+          "stateAfterSha256": null,
+          "stateComponentSha256Before": null,
+          "stateComponentSha256After": null,
+          "deterministicStatePreserved": true,
+          "crossRequestReplayRejected": null,
+          "provider": null,
+          "accounting": null,
+          "errorCodes": []
+        },
+        {
+          "stage": "GOLD_CONTROL",
+          "status": "SKIPPED",
+          "runStatus": null,
+          "stateBeforeSha256": null,
+          "stateAfterSha256": null,
+          "stateComponentSha256Before": null,
+          "stateComponentSha256After": null,
+          "deterministicStatePreserved": true,
+          "crossRequestReplayRejected": null,
+          "provider": null,
+          "accounting": null,
+          "errorCodes": []
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "qualifiedAdapters": [],
+    "rejectedAdapters": [
+      "openai-direct-responses-v1",
+      "openrouter-chat-completions-v1"
+    ],
+    "totalProviderCalls": 2,
+    "allProtectedStatePreserved": true,
+    "customerOutputsCreated": 0,
+    "truthMutations": 0
+  }
+}
