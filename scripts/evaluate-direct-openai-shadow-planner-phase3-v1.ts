@@ -46,9 +46,9 @@ import { analyzeStatementDocument } from "../src/statementParserOrchestrator.js"
 import type { ParsedDocument } from "../src/parser.js";
 
 const OUT = "evaluations/provider-neutral-shadow-planner-phase3-v1";
-const RESULT_PATH = `${OUT}/evaluation-2026-09-16.json`;
-const REPORT_PATH = `${OUT}/report-2026-09-16.md`;
-const ATTEMPT_GUARD_PATH = `${OUT}/attempt-guard-2026-09-16.json`;
+const RESULT_PATH = `${OUT}/revalidation-contract-v4-2026-09-16.json`;
+const REPORT_PATH = `${OUT}/revalidation-contract-v4-report-2026-09-16.md`;
+const ATTEMPT_GUARD_PATH = `${OUT}/revalidation-contract-v4-attempt-guard-2026-09-16.json`;
 const GENERATED_AT = new Date().toISOString();
 const MODEL = OPENAI_DIRECT_GPT_5_2_SNAPSHOT_MODEL_V1;
 const GENERATION = Object.freeze({
@@ -119,12 +119,12 @@ const summary = {
   researchOperations: 0,
 };
 const result = {
-  schemaVersion: "provider_neutral_shadow_planner_phase3_evaluation_2026_09_16_v1",
+  schemaVersion: "provider_neutral_shadow_planner_phase3_evaluation_2026_09_16_v2",
   generatedAt: GENERATED_AT,
   mode: "DIRECT_OPENAI_NON_CUSTOMER_SHADOW_EVALUATION",
   baseline: {
     branch: "codex/planner-provider-neutral-consolidation-v1",
-    qualificationCommit: "f8d1883",
+    qualificationCommit: "70a7676",
   },
   executionBoundary: {
     adapter: adapter.adapterId,
@@ -176,7 +176,7 @@ const result = {
 await writeFile(RESULT_PATH, `${JSON.stringify(result, null, 2)}\n`, { flag: "wx" });
 await writeFile(REPORT_PATH, report(result), { flag: "wx" });
 await writeFile(ATTEMPT_GUARD_PATH, `${JSON.stringify({
-  schemaVersion: "provider_neutral_shadow_planner_phase3_attempt_guard_2026_09_16_v1",
+  schemaVersion: "provider_neutral_shadow_planner_phase3_attempt_guard_2026_09_16_v2",
   state: "COMPLETED",
   startedAt: GENERATED_AT,
   completedAt: new Date().toISOString(),
@@ -402,7 +402,7 @@ function requiredEnvironment(name: string): string {
 
 async function acquireAttemptGuard(): Promise<void> {
   await writeFile(ATTEMPT_GUARD_PATH, `${JSON.stringify({
-    schemaVersion: "provider_neutral_shadow_planner_phase3_attempt_guard_2026_09_16_v1",
+    schemaVersion: "provider_neutral_shadow_planner_phase3_attempt_guard_2026_09_16_v2",
     state: "STARTED",
     startedAt: GENERATED_AT,
     maximumProviderCalls: SHADOW_AI_ISSUE_CLASSES.length * SHADOW_AI_PHASE_3_REPETITIONS_V1,

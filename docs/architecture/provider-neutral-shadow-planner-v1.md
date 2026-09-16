@@ -585,3 +585,58 @@ qualification evidence and were not changed in this phase.
 This offline result is ready for one more bounded Direct OpenAI Phase 3 shadow
 run. It does not itself qualify product quality or authorize Phase 3 wiring.
 OpenRouter remains disabled, with no substitution or fallback path.
+
+## Phase 3 contract-v4 live shadow revalidation — 2026-09-16
+
+Product authorized a second Direct OpenAI-only Phase 3 run against the exact
+`gpt-5.2-2025-12-11` snapshot: seven families, two repetitions per family,
+14-call maximum, 60-second deadlines, 4,000 output tokens, reasoning `none`,
+low verbosity, `store: false`, no retry, no fallback, USD 0.25 per-call and
+USD 3.50 aggregate ceilings, and safe telemetry only. A fresh exclusive
+attempt guard prevented the earlier evidence from being overwritten.
+
+The overall result is **failed**. The runner made 12 of 14 possible calls.
+Seven calls completed with HTTP 200 from the exact requested snapshot, three
+second-repetition calls reached the 60-second deadline, and two subsequent
+first attempts failed at the network transport before a provider response was
+available. The first failure stopped each of those last two families, so their
+second repetitions were skipped. There were no retries or fallback attempts.
+
+Every one of the seven completed responses passed the strengthened local
+validator and every Phase 3 quality control: deterministic route, exact
+evidence class, exact guidance channel, required alternative, exact-reference
+grounding, and complete epistemic boundaries. Shared/bundled semantics and
+qualification/integrity root cause completed both repetitions with repeatable
+semantic signatures and therefore passed. Participant/control uncertainty,
+gateway/processor terminology, and authorization economics each passed their
+first response completely but failed qualification when their second response
+timed out. Cost-incidence uncertainty and contract-off-statement evidence did
+not produce a response because their first attempts ended in network failure.
+No completed response exhibited the former semantic-contract defects.
+
+Observed completed-response usage was 60,053 input tokens and 8,309 output
+tokens, with USD 0.221422 estimated cost. The largest completed call used 1,394
+output tokens, cost USD 0.052310, and completed in 22.406 seconds. Provider
+usage for timed-out calls is unavailable, so actual billing can be higher than
+the observed completed-response estimate; 12 attempts still remain inside the
+approved USD 3.00 attempted-call worst case and the USD 3.50 aggregate ceiling.
+
+All seven packet and provider-payload privacy inspections passed. No filename,
+business name, account identifier, credential, raw statement, prompt, response,
+or provider draft was persisted in the result. Canonical financial truth, RD,
+reconciliation, commercial truth, governed knowledge, permissions, and
+customer output remained invariant for every attempt. Truth mutations, source
+admissions, research operations, customer outputs, retries, and fallbacks were
+all zero. The completed attempt guard binds the safe result by SHA-256.
+
+Engineering assessment: the contract-v4 semantic hardening succeeded for every
+observable provider response, but Phase 3 remains unqualified because the
+adapter did not complete both repetitions for all seven families under the
+approved latency contract. No further schema or semantic patch is justified by
+this run. Before another live run, the transport should be diagnosed offline to
+distinguish connection establishment, response-header, response-body, and
+abort-cleanup failure stages without recording unsafe provider content. In
+particular, the timeout path currently aborts and returns without observing
+completion of the cancelled fetch, so connection cleanup between sequential
+calls must be verified. Phase 3 wiring and all customer-facing use remain
+blocked; OpenRouter remains disabled and cannot substitute.
