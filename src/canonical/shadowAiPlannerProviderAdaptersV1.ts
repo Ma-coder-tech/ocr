@@ -8,7 +8,7 @@ import type {
 } from "./shadowAiPlannerProviderNeutralV1.js";
 
 export const OPENAI_RESPONSES_ENDPOINT_V1 = "https://api.openai.com/v1/responses" as const;
-export const OPENROUTER_CHAT_COMPLETIONS_ENDPOINT_V1 = "https://openrouter.ai/api/v1/chat/completions" as const;
+export const OPENROUTER_RESPONSES_ENDPOINT_V1 = "https://openrouter.ai/api/v1/responses" as const;
 export const OPENAI_DIRECT_GPT_5_2_SNAPSHOT_MODEL_V1 = "gpt-5.2-2025-12-11" as const;
 export const OPENROUTER_GPT_5_2_CALLABLE_MODEL_V1 = "openai/gpt-5.2" as const;
 
@@ -77,8 +77,11 @@ export function compileOpenAiDirectPlannerHttpRequestV1(input: Readonly<{
 }
 
 /**
- * OpenRouter compiler. Provider fallback is deliberately disabled so a model
- * or provider change cannot silently alter a financial-analysis evaluation.
+ * OpenRouter Responses compiler. This uses OpenRouter's documented Responses
+ * fields so require_parameters can remain fail closed without excluding the
+ * selected upstream because of Chat Completions-incompatible fields. Provider
+ * fallback remains disabled so a route change cannot silently alter an
+ * evaluation.
  */
 export function compileOpenRouterPlannerHttpRequestV1(input: Readonly<{
   apiKey: string;
@@ -95,13 +98,18 @@ export function compileOpenRouterPlannerHttpRequestV1(input: Readonly<{
     model: input.model,
     store: false,
     stream: false,
-    max_tokens: input.generation.maximumOutputTokens,
-    messages: [
-      { role: "system", content: input.request.systemInstruction },
-      { role: "user", content: input.request.userPayload },
-    ],
+    max_output_tokens: input.generation.maximumOutputTokens,
+    instructions: input.request.systemInstruction,
+    input: [{ role: "user", content: input.request.userPayload }],
     reasoning: { effort: input.generation.reasoningEffort },
-    verbosity: input.generation.verbosity,
+    text: {
+      format: {
+        type: "json_schema",
+        name: input.request.schemaName,
+        strict: true,
+        schema: input.request.outputSchema,
+      },
+    },
     provider: {
       allow_fallbacks: false,
       data_collection: input.routing.dataCollection,
@@ -112,22 +120,15 @@ export function compileOpenRouterPlannerHttpRequestV1(input: Readonly<{
       only: [input.routing.onlyProvider],
       require_parameters: true,
     },
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: input.request.schemaName,
-        strict: true,
-        schema: input.request.outputSchema,
-      },
-    },
   });
   return Object.freeze({
     providerKind: "OPENROUTER" as const,
-    endpoint: OPENROUTER_CHAT_COMPLETIONS_ENDPOINT_V1,
+    endpoint: OPENROUTER_RESPONSES_ENDPOINT_V1,
     method: "POST" as const,
     headers: Object.freeze({
       Authorization: `Bearer ${input.apiKey}`,
       "Content-Type": "application/json",
+      "X-OpenRouter-Metadata": "enabled",
     }),
     body,
     bodyBytes: Buffer.byteLength(body, "utf8"),

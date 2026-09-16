@@ -8,6 +8,7 @@ import {
   inspectPortableDraftSchemaV1,
   OPENAI_DIRECT_GPT_5_2_SNAPSHOT_MODEL_V1,
   OPENROUTER_GPT_5_2_CALLABLE_MODEL_V1,
+  OPENROUTER_RESPONSES_ENDPOINT_V1,
 } from "../../src/canonical/shadowAiPlannerProviderAdaptersV1.js";
 import {
   compileShadowAiPlannerProviderRequestV1,
@@ -124,6 +125,47 @@ describe("Provider-neutral shadow planner v1", () => {
     if (!wrongClass.ok) expect(wrongClass.errors).toContain("hypothesis.supportingReferenceTokens_wrong_reference_class");
   });
 
+  it("makes the packet-specific required-evidence subset explicit and keeps local admission fail closed", () => {
+    const compiled = compileShadowAiPlannerProviderRequestV1(packet("issue-evidence-contract", "run-evidence-contract"));
+    const payload = JSON.parse(compiled.request.userPayload);
+    const contract = payload.evidenceClassContract;
+
+    expect(contract).toEqual({
+      outputField: "requiredEvidenceClasses",
+      selectionRule: "NON_EMPTY_SUBSET_OF_ALLOWED_VALUES_ONLY",
+      allowedRequiredEvidenceClasses: [
+        "PROCESSOR_OR_GATEWAY_OPERATIONAL_DATA",
+        "MERCHANT_CONTRACT_OR_SCHEDULE",
+      ],
+      prohibitedRequiredEvidenceClasses: [
+        "ACCEPTED_STATEMENT_FACT",
+        "GOVERNED_PUBLIC_SOURCE",
+        "MERCHANT_ATTESTATION",
+        "ADDITIONAL_COMPATIBLE_STATEMENT",
+        "COMPARATOR_SOURCE_EVIDENCE",
+        "DETERMINISTIC_RECONSTRUCTION_RECHECK",
+      ],
+      globalSchemaEnumPurpose: "STRUCTURAL_PORTABILITY_ONLY_NOT_REQUEST_AUTHORITY",
+    });
+    expect(compiled.request.systemInstruction).toContain("evidenceClassContract.allowedRequiredEvidenceClasses");
+    expect(compiled.request.systemInstruction).toContain("global enum exists only to keep one portable structural schema");
+
+    const guided = validateAndBindShadowAiPlannerDraftV1({
+      ...validDraft(compiled),
+      requiredEvidenceClasses: [contract.allowedRequiredEvidenceClasses[0]],
+    }, compiled.localBinding);
+    expect(guided.ok).toBe(true);
+
+    const globallyValidButPacketProhibited = validateAndBindShadowAiPlannerDraftV1({
+      ...validDraft(compiled),
+      requiredEvidenceClasses: ["GOVERNED_PUBLIC_SOURCE"],
+    }, compiled.localBinding);
+    expect(globallyValidButPacketProhibited.ok).toBe(false);
+    if (!globallyValidButPacketProhibited.ok) {
+      expect(globallyValidButPacketProhibited.errors).toContain("shadow_planner_required_evidence_class_invalid");
+    }
+  });
+
   it("stamps authority and identity locally after restoring issued aliases", () => {
     const compiled = compileShadowAiPlannerProviderRequestV1(packet("issue-bind", "run-bind"));
     const result = validateAndBindShadowAiPlannerDraftV1(validDraft(compiled), compiled.localBinding);
@@ -215,11 +257,21 @@ describe("Provider-neutral shadow planner v1", () => {
     expect(openAi.body).not.toContain("allow_fallbacks");
 
     expect(openRouter.providerKind).toBe("OPENROUTER");
+    expect(openRouter.endpoint).toBe(OPENROUTER_RESPONSES_ENDPOINT_V1);
+    expect(openRouter.headers["X-OpenRouter-Metadata"]).toBe("enabled");
     expect(openRouterBody.model).toBe("openai/gpt-5.2");
-    expect(openRouterBody.response_format.json_schema.schema).toEqual(compiled.request.outputSchema);
-    expect(openRouterBody.max_tokens).toBe(4_000);
+    expect(openRouterBody.store).toBe(false);
+    expect(openRouterBody.text.format.schema).toEqual(compiled.request.outputSchema);
+    expect(openRouterBody.max_output_tokens).toBe(4_000);
     expect(openRouterBody.reasoning).toEqual({ effort: "none" });
-    expect(openRouterBody.verbosity).toBe("low");
+    expect(openRouterBody.text).not.toHaveProperty("verbosity");
+    expect(openRouterBody.instructions).toBe(compiled.request.systemInstruction);
+    expect(openRouterBody.instructions).toContain("Use low verbosity");
+    expect(openRouterBody.input).toEqual([{ role: "user", content: compiled.request.userPayload }]);
+    expect(openRouterBody).not.toHaveProperty("messages");
+    expect(openRouterBody).not.toHaveProperty("response_format");
+    expect(openRouterBody).not.toHaveProperty("verbosity");
+    expect(openRouterBody).not.toHaveProperty("max_tokens");
     expect(openRouter.schemaSha256).toBe(openAi.schemaSha256);
     expect(openRouterBody.provider).toEqual({
       allow_fallbacks: false,
@@ -457,6 +509,7 @@ function stubAdapter(
     model: "test-model",
     safeConfiguration: {
       ...generation,
+      verbosityControl: "NATIVE_PARAMETER",
       providerFallbackAllowed: false,
       routedProviderConstraint: null,
       dataCollection: "DIRECT_STORE_DISABLED",

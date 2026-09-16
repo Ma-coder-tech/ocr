@@ -349,3 +349,65 @@ which routing constraint excluded the OpenAI endpoint.
 All seven protected-state fingerprints were identical before and after both
 calls. Customer outputs, source admissions, research operations, and truth
 mutations remained zero. Phase 3 and customer-facing wiring remain blocked.
+
+## Offline correction after attempt 2 — 2026-09-16
+
+The adapters were corrected independently and no additional provider call was
+made.
+
+Direct OpenAI failed because the portable output schema necessarily exposed the
+global evidence-class enum while the request-specific allowed subset appeared
+only as one packet field. The provider selected a globally valid value outside
+that subset. Request contract v3 now adds an `evidenceClassContract` beside the
+packet. It names `requiredEvidenceClasses` as the governed output field,
+requires a non-empty subset copied only from
+`allowedRequiredEvidenceClasses`, enumerates every prohibited value, and states
+that the global schema enum provides structural portability rather than
+request-specific authority. The system instruction repeats the rule and
+forbids inference from issue class or resolution path. Local deterministic
+validation remains unchanged and still rejects any globally valid but
+packet-prohibited value.
+
+OpenRouter failed because the adapter used the Chat Completions endpoint while
+sending `store: false` and top-level `verbosity`. Those fields are absent from
+OpenRouter's documented Chat Completions request schema. Read-only control-plane
+metadata confirmed that the account-filtered catalog still exposes
+`openai/gpt-5.2` when restricted to the OpenAI provider, while its OpenAI
+endpoints advertise reasoning, token-limit, and structured-output parameters
+but not verbosity. This rules out the model identifier, account privacy filter,
+and OpenAI allowlist as the observed exclusion and identifies
+`require_parameters: true` acting on the unsupported verbosity field as the
+routing constraint. The privacy, parameter-enforcement, upstream-identity, and
+no-fallback controls were correct; the endpoint/envelope pairing and requested
+parameter surface were not.
+
+The safe control-plane observations are recorded in
+`evaluations/provider-neutral-shadow-planner-v1/openrouter-routing-diagnostic-2026-09-16.json`;
+the diagnostic contains no prompt, credential, account identifier, or provider
+inference response.
+
+The OpenRouter adapter now targets the documented OpenRouter Responses endpoint
+and uses its native fields: `store: false`, `max_output_tokens`, `instructions`,
+`input`, `reasoning`, and `text` containing the strict JSON schema. Because the
+selected endpoint does not advertise native verbosity support, the OpenRouter
+adapter omits that unsupported knob while the provider-neutral instruction and
+bounded JSON contract require low-verbosity field content. Direct OpenAI keeps
+its documented native `text.verbosity: low` setting, and qualification telemetry
+records which mechanism each adapter uses. The same provider routing object still restricts service to OpenAI,
+denies data-collection routing, requires every parameter, enforces price caps,
+and disables fallback. Routing metadata is explicitly requested and the local
+normalizer fails closed on a missing or conflicting selected provider, more
+than one attempt, an incomplete response, a refusal, unexpected output items,
+model mismatch, or an upstream other than OpenAI. The adapter id is now
+`openrouter-responses-v1`.
+
+Offline validation passed: the three focused planner suites passed 33 of 33
+tests and the TypeScript build passed. The tests cover request-specific evidence
+selection and rejection, portable schema stability, OpenRouter Responses field
+shape, one-attempt execution, response normalization, route identity,
+missing-route metadata, fallback evidence, privacy, and local authority
+binding. The next runner uses new `requalification-3` evidence and guard paths
+so the completed prior attempts cannot be overwritten. Both adapters are ready
+for another independently bounded qualification under the same three-control,
+60-second, 4,000-output-token, USD 0.25-per-call, zero-retry, and zero-fallback
+contract. Neither adapter is qualified until all three controls pass.

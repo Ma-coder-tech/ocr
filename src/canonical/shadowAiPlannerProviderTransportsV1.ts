@@ -79,6 +79,7 @@ export function createOpenAiDirectPlannerAdapterV1(
     model: configuration.model,
     safeConfiguration: Object.freeze({
       ...configuration.generation,
+      verbosityControl: "NATIVE_PARAMETER" as const,
       providerFallbackAllowed: false as const,
       routedProviderConstraint: null,
       dataCollection: "DIRECT_STORE_DISABLED" as const,
@@ -112,12 +113,13 @@ export function createOpenRouterPlannerAdapterV1(
   const fetchImpl = configuration.fetchImpl ?? defaultFetch();
   const clock = configuration.clock ?? { nowMs: () => Date.now() };
   return Object.freeze({
-    adapterId: "openrouter-chat-completions-v1",
+    adapterId: "openrouter-responses-v1",
     transport: "PROVIDER" as const,
     providerKind: "OPENROUTER" as const,
     model: configuration.model,
     safeConfiguration: Object.freeze({
       ...configuration.generation,
+      verbosityControl: "PROVIDER_NEUTRAL_INSTRUCTION" as const,
       providerFallbackAllowed: false as const,
       routedProviderConstraint: configuration.routing.onlyProvider,
       dataCollection: configuration.routing.dataCollection,
@@ -195,39 +197,39 @@ export function normalizeOpenRouterPlannerResponseV1(input: Readonly<{
   schemaSha256: string;
 }>): ShadowAiPlannerTransportResultV1 {
   const envelope = strictEnvelope(input.responseText, "openrouter");
-  if (envelope.object !== undefined && envelope.object !== "chat.completion") {
-    safety("shadow_planner_openrouter_response_malformed");
-  }
-  const attempts = objectOrNull(envelope.openrouter_metadata)?.attempts;
-  if (attempts !== undefined && (!Array.isArray(attempts) || attempts.length > 1)) {
-    safety("shadow_planner_openrouter_fallback_detected");
-  }
-  const choices = array(envelope.choices, "shadow_planner_openrouter_response_malformed");
-  if (choices.length !== 1) safety("shadow_planner_openrouter_output_coverage_invalid");
-  const choice = object(choices[0], "shadow_planner_openrouter_response_malformed");
-  if (choice.index !== 0) safety("shadow_planner_openrouter_response_malformed");
-  const finishReason = stringOrNull(choice.finish_reason);
-  if (finishReason !== "stop") {
-    safety(finishReason === "length"
+  if (envelope.object !== "response" || envelope.status !== "completed"
+    || envelope.error !== null && envelope.error !== undefined) {
+    safety(envelope.status === "incomplete"
       ? "shadow_planner_openrouter_response_truncated"
-      : "shadow_planner_openrouter_finish_reason_invalid");
+      : "shadow_planner_openrouter_response_not_completed");
   }
-  const message = object(choice.message, "shadow_planner_openrouter_response_malformed");
-  if (message.role !== "assistant" || typeof message.content !== "string") {
-    safety("shadow_planner_openrouter_response_malformed");
+  const routedProvider = openRouterRoutedProvider(envelope);
+  const output = array(envelope.output, "shadow_planner_openrouter_response_malformed");
+  const outputTexts: string[] = [];
+  let refusal = false;
+  for (const item of output) {
+    const record = object(item, "shadow_planner_openrouter_response_malformed");
+    if (record.type === "reasoning") continue;
+    if (record.type !== "message" || record.role !== "assistant") {
+      safety("shadow_planner_openrouter_unexpected_output_item");
+    }
+    for (const content of array(record.content, "shadow_planner_openrouter_response_malformed")) {
+      const part = object(content, "shadow_planner_openrouter_response_malformed");
+      if (part.type === "refusal") refusal = true;
+      else if (part.type === "output_text" && typeof part.text === "string") outputTexts.push(part.text);
+      else safety("shadow_planner_openrouter_unexpected_content_item");
+    }
   }
-  if (typeof message.refusal === "string" && message.refusal.length > 0) {
-    safety("shadow_planner_openrouter_refusal");
-  }
-  if (message.tool_calls !== undefined) safety("shadow_planner_openrouter_unexpected_tool_call");
-  const rawDraft = strictDraft(message.content);
-  const usage = openRouterUsage(envelope.usage, input.pricing, input.latencyMs);
+  if (refusal) safety("shadow_planner_openrouter_refusal");
+  if (outputTexts.length !== 1) safety("shadow_planner_openrouter_output_coverage_invalid");
+  const rawDraft = strictDraft(outputTexts[0]);
+  const usage = openRouterResponsesUsage(envelope.usage, input.pricing, input.latencyMs);
   return Object.freeze({
     rawDraft,
     usage,
     providerRequestId: safeIdentifier(input.headerRequestId) ?? safeIdentifier(envelope.id),
     returnedModel: stringOrNull(envelope.model),
-    safeTelemetry: telemetry(input, finishReason, stringOrNull(envelope.provider)),
+    safeTelemetry: telemetry(input, "completed", routedProvider),
   });
 }
 
@@ -307,10 +309,10 @@ function openAiUsage(value: unknown, pricing: ShadowAiPlannerTokenPricingV1, lat
   });
 }
 
-function openRouterUsage(value: unknown, pricing: ShadowAiPlannerTokenPricingV1, latencyMs: number) {
+function openRouterResponsesUsage(value: unknown, pricing: ShadowAiPlannerTokenPricingV1, latencyMs: number) {
   const usage = object(value, "shadow_planner_openrouter_usage_missing");
-  const inputTokens = nonnegativeInteger(usage.prompt_tokens, "shadow_planner_openrouter_usage_invalid");
-  const outputTokens = nonnegativeInteger(usage.completion_tokens, "shadow_planner_openrouter_usage_invalid");
+  const inputTokens = nonnegativeInteger(usage.input_tokens, "shadow_planner_openrouter_usage_invalid");
+  const outputTokens = nonnegativeInteger(usage.output_tokens, "shadow_planner_openrouter_usage_invalid");
   const estimated = estimatedCost(inputTokens, outputTokens, pricing);
   const actualCost = typeof usage.cost === "number" && Number.isFinite(usage.cost) && usage.cost >= 0
     ? Math.ceil(usage.cost * 1_000_000) : 0;
@@ -320,6 +322,51 @@ function openRouterUsage(value: unknown, pricing: ShadowAiPlannerTokenPricingV1,
     estimatedCostUsdMicros: Math.max(estimated, actualCost),
     latencyMs,
   });
+}
+
+function openRouterRoutedProvider(envelope: Record<string, unknown>): string {
+  const metadata = objectOrNull(envelope.openrouter_metadata);
+  if (metadata !== null) {
+    const attempt = metadata.attempt;
+    if (attempt !== undefined) {
+      if (!Number.isSafeInteger(attempt) || (attempt as number) < 1) {
+        safety("shadow_planner_openrouter_routing_metadata_invalid");
+      }
+      if ((attempt as number) > 1) safety("shadow_planner_openrouter_fallback_detected");
+    }
+    const attempts = metadata.attempts;
+    if (attempts !== undefined) {
+      if (!Array.isArray(attempts)) safety("shadow_planner_openrouter_routing_metadata_invalid");
+      if (attempts.length > 1) safety("shadow_planner_openrouter_fallback_detected");
+    }
+  }
+
+  const topLevelProvider = safeIdentifier(envelope.provider);
+  const selectedProvider = selectedOpenRouterProvider(metadata);
+  if (topLevelProvider !== null && selectedProvider !== null
+    && topLevelProvider.toLowerCase() !== selectedProvider.toLowerCase()) {
+    safety("shadow_planner_openrouter_routing_metadata_conflict");
+  }
+  const routedProvider = selectedProvider ?? topLevelProvider;
+  if (routedProvider === null) safety("shadow_planner_openrouter_routing_metadata_missing");
+  return routedProvider;
+}
+
+function selectedOpenRouterProvider(metadata: Record<string, unknown> | null): string | null {
+  if (metadata === null) return null;
+  const endpoints = objectOrNull(metadata.endpoints);
+  if (endpoints === null) return null;
+  const available = endpoints.available;
+  if (!Array.isArray(available) || available.length > 32) {
+    safety("shadow_planner_openrouter_routing_metadata_invalid");
+  }
+  const selected = available
+    .map((value) => object(value, "shadow_planner_openrouter_routing_metadata_invalid"))
+    .filter((value) => value.selected === true);
+  if (selected.length !== 1) safety("shadow_planner_openrouter_routing_metadata_invalid");
+  const provider = safeIdentifier(selected[0].provider);
+  if (provider === null) safety("shadow_planner_openrouter_routing_metadata_invalid");
+  return provider;
 }
 
 function telemetry(

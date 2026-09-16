@@ -70,7 +70,7 @@ describe("Provider-neutral planner transports v1", () => {
     expect(normalized.returnedModel).toBe("test-openai-model");
   });
 
-  it("normalizes one OpenRouter choice and preserves only safe routing telemetry", () => {
+  it("normalizes one completed OpenRouter Responses envelope and preserves only safe routing telemetry", () => {
     const compiled = compileShadowAiPlannerProviderRequestV1(packet("openrouter-normalize"));
     const normalized = normalizeOpenRouterPlannerResponseV1({
       responseText: JSON.stringify(openRouterEnvelope(JSON.stringify(validDraft(compiled)), "test/openrouter-model")),
@@ -83,9 +83,9 @@ describe("Provider-neutral planner transports v1", () => {
     });
 
     expect(normalized.rawDraft).toEqual(validDraft(compiled));
-    expect(normalized.providerRequestId).toBe("chatcmpl_openrouter_test");
+    expect(normalized.providerRequestId).toBe("resp_openrouter_test");
     expect(normalized.safeTelemetry).toMatchObject({
-      finishReason: "stop",
+      finishReason: "completed",
       routedProvider: "test-provider",
       httpStatus: 200,
     });
@@ -121,6 +121,58 @@ describe("Provider-neutral planner transports v1", () => {
     expect(calls[0].authorization).toBe("Bearer openai-test-secret");
   });
 
+  it("executes OpenRouter Responses exactly once with pinned routing and binds locally", async () => {
+    const inputPacket = packet("openrouter-responses-runtime");
+    const compiled = compileShadowAiPlannerProviderRequestV1(inputPacket);
+    const calls: Array<{ url: string; body: string; metadata: string | undefined }> = [];
+    const fetchImpl: ShadowAiPlannerFetchV1 = async (url, init) => {
+      calls.push({ url, body: init.body, metadata: init.headers["X-OpenRouter-Metadata"] });
+      return response(JSON.stringify(openRouterEnvelope(
+        JSON.stringify(validDraft(compiled)),
+        "test/openrouter-model",
+        "openai",
+      )), "req_openrouter_runtime");
+    };
+    const adapter = createOpenRouterPlannerAdapterV1({
+      apiKey: "openrouter-test-secret",
+      model: "test/openrouter-model",
+      generation,
+      routing: openRouterRouting,
+      pricing,
+      fetchImpl,
+      clock: sequenceClock(200, 227),
+    });
+
+    const run = await runShadowAiProviderNeutralPlannerV1({ packet: inputPacket, adapter });
+
+    expect(run.status, JSON.stringify(run)).toBe("COMPLETED");
+    expect(run.plan).toMatchObject({
+      issueId: "openrouter-responses-runtime",
+      authority: "NON_AUTHORITATIVE",
+      truthEffect: "NONE",
+    });
+    expect(run.provider).toMatchObject({
+      adapterId: "openrouter-responses-v1",
+      requestedModel: "test/openrouter-model",
+      returnedModel: "test/openrouter-model",
+      routedProvider: "openai",
+      httpStatus: 200,
+    });
+    expect(adapter.safeConfiguration).toMatchObject({
+      verbosity: "low",
+      verbosityControl: "PROVIDER_NEUTRAL_INSTRUCTION",
+      providerFallbackAllowed: false,
+      routedProviderConstraint: "openai",
+      dataCollection: "deny",
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("https://openrouter.ai/api/v1/responses");
+    expect(calls[0].metadata).toBe("enabled");
+    expect(calls[0].body).not.toContain("openrouter-responses-runtime");
+    expect(calls[0].body).not.toContain(inputPacket.immutableInputHash);
+    expect(calls[0].body).not.toContain("openrouter-test-secret");
+  });
+
   it("rejects a duplicate draft key from a completed provider response", async () => {
     const inputPacket = packet("duplicate-draft-runtime");
     const compiled = compileShadowAiPlannerProviderRequestV1(inputPacket);
@@ -149,14 +201,19 @@ describe("Provider-neutral planner transports v1", () => {
       "shadow_planner_openai_refusal");
 
     const truncated = openRouterEnvelope("{}", "test/openrouter-model");
-    truncated.choices[0].finish_reason = "length";
+    truncated.status = "incomplete";
     expectTransportSafety(() => normalizeOpenRouterPlannerResponseV1(normalizeInput(JSON.stringify(truncated))),
       "shadow_planner_openrouter_response_truncated");
 
     const fallback = openRouterEnvelope("{}", "test/openrouter-model");
-    fallback.openrouter_metadata = { attempts: [{ provider: "first" }, { provider: "second" }] };
+    fallback.openrouter_metadata.attempt = 2;
     expectTransportSafety(() => normalizeOpenRouterPlannerResponseV1(normalizeInput(JSON.stringify(fallback))),
       "shadow_planner_openrouter_fallback_detected");
+
+    const missingRoute = openRouterEnvelope("{}", "test/openrouter-model");
+    (missingRoute as any).openrouter_metadata = undefined;
+    expectTransportSafety(() => normalizeOpenRouterPlannerResponseV1(normalizeInput(JSON.stringify(missingRoute))),
+      "shadow_planner_openrouter_routing_metadata_missing");
   });
 
   it("returns only a safe classification for provider HTTP rejection", async () => {
@@ -188,8 +245,7 @@ describe("Provider-neutral planner transports v1", () => {
   it("rejects an OpenRouter response from an upstream outside the pinned route", async () => {
     const inputPacket = packet("openrouter-route-mismatch");
     const compiled = compileShadowAiPlannerProviderRequestV1(inputPacket);
-    const envelope = openRouterEnvelope(JSON.stringify(validDraft(compiled)), "test/openrouter-model");
-    envelope.provider = "azure";
+    const envelope = openRouterEnvelope(JSON.stringify(validDraft(compiled)), "test/openrouter-model", "azure");
     const adapter = createOpenRouterPlannerAdapterV1({
       apiKey: "router-secret",
       model: "test/openrouter-model",
@@ -292,6 +348,7 @@ describe("Provider-neutral planner transports v1", () => {
       model: "qualification-model",
       safeConfiguration: {
         ...generation,
+        verbosityControl: "NATIVE_PARAMETER" as const,
         providerFallbackAllowed: false as const,
         routedProviderConstraint: null,
         dataCollection: "DIRECT_STORE_DISABLED" as const,
@@ -301,9 +358,11 @@ describe("Provider-neutral planner transports v1", () => {
         const payload = JSON.parse(request.userPayload);
         const token = payload.referenceTokenContract.catalog
           .find((entry: { referenceClass: string }) => entry.referenceClass === "FACT")?.token;
+        const evidenceClass = payload.evidenceClassContract.allowedRequiredEvidenceClasses?.[0];
         if (!token) throw new Error("qualification semantic fixture fact token missing");
+        if (!evidenceClass) throw new Error("qualification semantic fixture evidence class missing");
         return {
-          rawDraft: validDraftForToken(token),
+          rawDraft: validDraftForToken(token, evidenceClass),
           usage: { inputTokens: 100, outputTokens: 200, estimatedCostUsdMicros: 3_000, latencyMs: 5 },
           providerRequestId: `req_qualification_${calls}`,
           returnedModel: "qualification-model",
@@ -353,6 +412,7 @@ describe("Provider-neutral planner transports v1", () => {
       model: "qualification-model",
       safeConfiguration: {
         ...generation,
+        verbosityControl: "PROVIDER_NEUTRAL_INSTRUCTION" as const,
         providerFallbackAllowed: false as const,
         routedProviderConstraint: "openai",
         dataCollection: "deny" as const,
@@ -418,15 +478,23 @@ function openAiEnvelope(draftText: string, model: string) {
   };
 }
 
-function openRouterEnvelope(draftText: string, model: string) {
+function openRouterEnvelope(draftText: string, model: string, provider = "test-provider") {
   return {
-    id: "chatcmpl_openrouter_test",
-    object: "chat.completion",
+    id: "resp_openrouter_test",
+    object: "response",
+    status: "completed",
+    error: null,
     model,
-    provider: "test-provider",
-    choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content: draftText } }],
-    usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30, cost: 0.00004 },
-    openrouter_metadata: { attempts: [{ provider: "test-provider" }] },
+    output: [
+      { id: "reasoning_router_test", type: "reasoning", summary: [] },
+      { id: "message_router_test", type: "message", role: "assistant", status: "completed",
+        content: [{ type: "output_text", text: draftText, annotations: [] }] },
+    ],
+    usage: { input_tokens: 10, output_tokens: 20, total_tokens: 30, cost: 0.00004 },
+    openrouter_metadata: {
+      attempt: 1,
+      endpoints: { available: [{ model, provider, selected: true }], total: 1 },
+    },
   };
 }
 
@@ -527,7 +595,10 @@ function validDraft(compiled: ReturnType<typeof compileShadowAiPlannerProviderRe
   };
 }
 
-function validDraftForToken(fact: string): ShadowAiPlannerDraftV1 {
+function validDraftForToken(
+  fact: string,
+  evidenceClass: ShadowAiPlannerDraftV1["requiredEvidenceClasses"][number],
+): ShadowAiPlannerDraftV1 {
   return {
     exactCitedReferenceTokens: [fact],
     unresolvedQuestion: "Which accepted population definition applies to the unresolved issue?",
@@ -551,7 +622,7 @@ function validDraftForToken(fact: string): ShadowAiPlannerDraftV1 {
     }],
     acknowledgedEvidenceGaps: ["Operational population evidence is unavailable."],
     recommendedResolutionPath: "PROCESSOR_OR_GATEWAY_DATA_REQUIRED",
-    requiredEvidenceClasses: ["PROCESSOR_OR_GATEWAY_OPERATIONAL_DATA"],
+    requiredEvidenceClasses: [evidenceClass],
     researchQuerySuggestions: [],
     merchantQuestionSuggestions: [],
     documentRequestSuggestions: [],

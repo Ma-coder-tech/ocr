@@ -15,7 +15,7 @@ import {
 import { canonicalJson } from "./v2/canonicalJson.js";
 
 export const SHADOW_AI_PROVIDER_NEUTRAL_REQUEST_SCHEMA_VERSION_V1 =
-  "shadow_ai_provider_neutral_request_2026_09_16_v2" as const;
+  "shadow_ai_provider_neutral_request_2026_09_16_v3" as const;
 export const SHADOW_AI_PROVIDER_NEUTRAL_DRAFT_SCHEMA_VERSION_V1 =
   "shadow_ai_provider_neutral_draft_2026_09_16_v1" as const;
 export const SHADOW_AI_PROVIDER_NEUTRAL_SCHEMA_NAME_V1 =
@@ -81,6 +81,7 @@ export type ShadowAiPlannerTransportAdapterV1 = Readonly<{
     maximumOutputTokens: number;
     reasoningEffort: "none";
     verbosity: "low";
+    verbosityControl: "NATIVE_PARAMETER" | "PROVIDER_NEUTRAL_INSTRUCTION";
     providerFallbackAllowed: false;
     routedProviderConstraint: string | null;
     dataCollection: "DIRECT_STORE_DISABLED" | "deny";
@@ -175,6 +176,8 @@ Never invent a merchant-specific fee, participant, population, amount, rate, pro
 The payload's referenceTokenContract is the complete reference-class guide for this request. Copy tokens only from its catalog and obey its allowedClassesByOutputField exactly. Do not infer a token's class from its spelling or from where it appears elsewhere in the packet.
 exactCitedReferenceTokens accepts FACT tokens only. Hypothesis supportingReferenceTokens and contradictingReferenceTokens accept FACT, GOVERNED_EVIDENCE, or ECONOMIC_CHARGE tokens only. Reconstruction-suspicion exactAcceptedReferenceTokens and conflictingReferenceTokens accept the same three classes. STATEMENT_EVIDENCE tokens are input provenance only and must never be emitted in any output reference-token array.
 When no eligible token supports an output field, return an empty array where the schema permits it and state the evidence gap. Never substitute a token from another class.
+The payload's evidenceClassContract is the complete request-specific authority for requiredEvidenceClasses. Output one or more values and copy every value exactly from evidenceClassContract.allowedRequiredEvidenceClasses. Never emit a value listed in evidenceClassContract.prohibitedRequiredEvidenceClasses, even when that value appears in the JSON schema's global enum or seems appropriate for the issue or resolution path. The global enum exists only to keep one portable structural schema; it does not grant request-specific permission. Do not infer permission from the recommendedResolutionPath or any other packet field.
+Use low verbosity: keep every free-text field concise, factual, and limited to what is needed to express the unresolved hypothesis, evidence gap, confirmation requirement, or falsification condition. Do not add narrative outside the required JSON fields.
 Generate hypotheses only for the selected issue. State evidence gaps, confirmation requirements, and falsification conditions. Provide materially distinct alternatives where meaningful.
 Choose the most appropriate resolution path from the schema. Do not browse, call tools, admit evidence, mutate truth, calculate savings, make comparisons, assign blame, or create customer output.
 Use researchQuerySuggestions only for PUBLIC_RESEARCH_REQUIRED. Keep it empty for every other route.`;
@@ -294,7 +297,15 @@ export function compileShadowAiPlannerProviderRequestV1(
     prohibitedOutputClasses: [...NON_OUTPUT_REFERENCE_CLASSES],
     missingEligibleReferenceBehavior: "USE_EMPTY_ARRAY_AND_STATE_EVIDENCE_GAP",
   };
-  const userPayload = canonicalJson({ issueContext, referenceTokenContract, packet: providerPacket });
+  const evidenceClassContract = {
+    outputField: "requiredEvidenceClasses",
+    selectionRule: "NON_EMPTY_SUBSET_OF_ALLOWED_VALUES_ONLY",
+    allowedRequiredEvidenceClasses: [...packet.allowedEvidenceClasses],
+    prohibitedRequiredEvidenceClasses: SHADOW_AI_EVIDENCE_CLASSES
+      .filter((value) => !packet.allowedEvidenceClasses.includes(value)),
+    globalSchemaEnumPurpose: "STRUCTURAL_PORTABILITY_ONLY_NOT_REQUEST_AUTHORITY",
+  };
+  const userPayload = canonicalJson({ evidenceClassContract, issueContext, referenceTokenContract, packet: providerPacket });
   inspectProviderPayload(userPayload, referenceAliases);
   return deepFreeze({
     request: {

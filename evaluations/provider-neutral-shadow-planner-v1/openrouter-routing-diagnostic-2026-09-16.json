@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "openrouter_planner_routing_diagnostic_2026_09_16_v1",
+  "mode": "READ_ONLY_CONTROL_PLANE_NO_INFERENCE",
+  "model": "openai/gpt-5.2",
+  "evidence": {
+    "documentedChatCompletionsFieldsIncludeStore": false,
+    "documentedChatCompletionsFieldsIncludeVerbosity": false,
+    "documentedResponsesFieldsIncludeStore": true,
+    "documentedResponsesFieldsIncludeTextConfiguration": true,
+    "accountFilteredCatalogListsModel": true,
+    "accountFilteredCatalogListsModelWithOpenAiProviderFilter": true,
+    "openAiEndpointAdvertisedParameters": [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "reasoning_effort",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
+    "openAiEndpointAdvertisesVerbosity": false
+  },
+  "diagnosis": {
+    "excludedByModelIdentifier": false,
+    "excludedByAccountPrivacyOrOpenAiAllowlist": false,
+    "excludingConstraint": "REQUIRE_PARAMETERS_WITH_UNSUPPORTED_VERBOSITY",
+    "chatEnvelopeMismatchAlsoPresent": true
+  },
+  "correction": {
+    "endpoint": "https://openrouter.ai/api/v1/responses",
+    "nativeVerbosityParameterSent": false,
+    "verbosityControl": "PROVIDER_NEUTRAL_INSTRUCTION",
+    "requireParameters": true,
+    "dataCollection": "deny",
+    "onlyProvider": "openai",
+    "allowFallbacks": false,
+    "routingMetadataRequired": true
+  },
+  "providerInferenceCalls": 0,
+  "rateRevealPacketSent": false,
+  "credentialsPersisted": false,
+  "rawProviderContentPersisted": false
+}
