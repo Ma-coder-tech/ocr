@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1 } from "./shadowAiEconomicResolutionPlannerTypesV1.js";
 import { canonicalJson } from "./v2/canonicalJson.js";
 import type {
   ShadowAiPlannerProviderRequestV1,
@@ -33,6 +34,7 @@ export function compileOpenAiDirectPlannerHttpRequestV1(input: Readonly<{
   const body = canonicalJson({
     model: input.model,
     store: false,
+    max_output_tokens: SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumOutputTokens,
     instructions: input.request.systemInstruction,
     input: [{ role: "user", content: input.request.userPayload }],
     text: {
@@ -70,6 +72,7 @@ export function compileOpenRouterPlannerHttpRequestV1(input: Readonly<{
     model: input.model,
     store: false,
     stream: false,
+    max_tokens: SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumOutputTokens,
     messages: [
       { role: "system", content: input.request.systemInstruction },
       { role: "user", content: input.request.userPayload },

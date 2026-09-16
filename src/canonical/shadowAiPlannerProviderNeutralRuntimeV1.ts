@@ -10,6 +10,7 @@ import {
   type ShadowAiPlannerTransportAdapterV1,
   type ShadowAiProviderKindV1,
 } from "./shadowAiPlannerProviderNeutralV1.js";
+import { ShadowAiPlannerTransportErrorV1 } from "./shadowAiPlannerProviderTransportsV1.js";
 import { canonicalJson } from "./v2/canonicalJson.js";
 
 export const SHADOW_AI_PROVIDER_NEUTRAL_RUN_SCHEMA_VERSION_V1 =
@@ -29,6 +30,11 @@ export type ShadowAiProviderNeutralPlannerRunV1 = Readonly<{
     requestedModel: string;
     returnedModel: string | null;
     providerRequestId: string | null;
+    routedProvider: string | null;
+    httpStatus: number | null;
+    requestSha256: string | null;
+    schemaSha256: string | null;
+    finishReason: string | null;
   }>;
   accounting: Readonly<{
     plannerOperationCount: 1;
@@ -59,7 +65,7 @@ export async function runShadowAiProviderNeutralPlannerV1(input: Readonly<{
   packet: ShadowAiEconomicResolutionPacketV1;
   adapter: ShadowAiPlannerTransportAdapterV1;
 }>): Promise<ShadowAiProviderNeutralPlannerRunV1> {
-  const provider = providerIdentity(input.adapter, null, null);
+  const provider = providerIdentity(input.adapter, null);
   let compiled: ReturnType<typeof compileShadowAiPlannerProviderRequestV1>;
   try {
     compiled = compileShadowAiPlannerProviderRequestV1(input.packet);
@@ -79,7 +85,7 @@ export async function runShadowAiProviderNeutralPlannerV1(input: Readonly<{
   const operation = Promise.resolve()
     .then(() => input.adapter.invoke({ request: compiled.request, signal: controller.signal }))
     .then((value) => ({ kind: "value" as const, value }))
-    .catch(() => ({ kind: "error" as const }));
+    .catch((error: unknown) => ({ kind: "error" as const, error }));
   const timeout = new Promise<{ kind: "timeout" }>((resolve) => {
     timer = setTimeout(() => {
       controller.abort();
@@ -96,15 +102,20 @@ export async function runShadowAiProviderNeutralPlannerV1(input: Readonly<{
       ["shadow_planner_provider_timeout"], ["planner_timed_out"]);
   }
   if (completed.kind === "error") {
-    return result(input.packet, provider, "UNAVAILABLE", null, attempted,
-      ["shadow_planner_provider_failed"], ["planner_provider_failed"]);
+    const transportError = completed.error instanceof ShadowAiPlannerTransportErrorV1 ? completed.error : null;
+    const failureAccounting = accounting(
+      input.adapter,
+      requestBytes,
+      null,
+      transportError?.callCompleted ?? false,
+      transportError?.sendState !== "BEFORE_SEND",
+    );
+    return result(input.packet, provider, transportError?.kind ?? "UNAVAILABLE", null, failureAccounting,
+      [transportError?.safeCode ?? "shadow_planner_provider_failed"],
+      [transportError?.kind === "SAFETY_BLOCKED" ? "planner_provider_response_rejected" : "planner_provider_failed"]);
   }
 
-  const completedProvider = providerIdentity(
-    input.adapter,
-    boundedMetadata(completed.value.returnedModel),
-    boundedMetadata(completed.value.providerRequestId),
-  );
+  const completedProvider = providerIdentity(input.adapter, completed.value);
   const completedAccounting = accounting(input.adapter, requestBytes, completed.value.usage, true);
   const usageErrors = validateUsage(completed.value.usage);
   const metadataErrors = validateProviderMetadata(input.adapter, completed.value);
@@ -138,7 +149,7 @@ function validateUsage(usage: ShadowAiPlannerProviderUsageV1): string[] {
 
 function validateProviderMetadata(
   adapter: ShadowAiPlannerTransportAdapterV1,
-  response: Readonly<{ returnedModel: string | null; providerRequestId: string | null }>,
+  response: Awaited<ReturnType<ShadowAiPlannerTransportAdapterV1["invoke"]>>,
 ): string[] {
   const errors: string[] = [];
   if (response.returnedModel !== null && (response.returnedModel.length > 200 || response.returnedModel !== adapter.model)) {
@@ -147,20 +158,34 @@ function validateProviderMetadata(
   if (response.providerRequestId !== null && (response.providerRequestId.length === 0 || response.providerRequestId.length > 256)) {
     errors.push("shadow_planner_provider_request_id_invalid");
   }
+  if (!Number.isSafeInteger(response.safeTelemetry.httpStatus) || response.safeTelemetry.httpStatus < 200 || response.safeTelemetry.httpStatus > 299) {
+    errors.push("shadow_planner_provider_http_status_invalid");
+  }
+  if (![response.safeTelemetry.requestSha256, response.safeTelemetry.schemaSha256].every((value) => /^[a-f0-9]{64}$/.test(value))) {
+    errors.push("shadow_planner_provider_fingerprint_invalid");
+  }
+  if ([response.safeTelemetry.finishReason, response.safeTelemetry.routedProvider]
+    .some((value) => value !== null && (value.length === 0 || value.length > 200))) {
+    errors.push("shadow_planner_provider_telemetry_invalid");
+  }
   return errors;
 }
 
 function providerIdentity(
   adapter: ShadowAiPlannerTransportAdapterV1,
-  returnedModel: string | null,
-  providerRequestId: string | null,
+  response: Awaited<ReturnType<ShadowAiPlannerTransportAdapterV1["invoke"]>> | null,
 ): ShadowAiProviderNeutralPlannerRunV1["provider"] {
   return Object.freeze({
     adapterId: adapter.adapterId,
     providerKind: adapter.providerKind,
     requestedModel: adapter.model,
-    returnedModel,
-    providerRequestId,
+    returnedModel: boundedMetadata(response?.returnedModel ?? null),
+    providerRequestId: boundedMetadata(response?.providerRequestId ?? null),
+    routedProvider: boundedMetadata(response?.safeTelemetry.routedProvider ?? null),
+    httpStatus: response?.safeTelemetry.httpStatus ?? null,
+    requestSha256: response?.safeTelemetry.requestSha256 ?? null,
+    schemaSha256: response?.safeTelemetry.schemaSha256 ?? null,
+    finishReason: boundedMetadata(response?.safeTelemetry.finishReason ?? null),
   });
 }
 
@@ -197,8 +222,9 @@ function accounting(
   requestBytes: number,
   usage: ShadowAiPlannerProviderUsageV1 | null,
   completed: boolean,
+  networkAttempted = true,
 ): ShadowAiProviderNeutralPlannerRunV1["accounting"] {
-  const provider = adapter.transport === "PROVIDER";
+  const provider = adapter.transport === "PROVIDER" && networkAttempted;
   return Object.freeze({
     plannerOperationCount: 1 as const,
     providerCallAttempts: provider ? 1 as const : 0 as const,

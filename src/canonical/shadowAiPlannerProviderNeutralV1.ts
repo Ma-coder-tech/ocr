@@ -63,6 +63,13 @@ export type ShadowAiPlannerTransportResultV1 = Readonly<{
   usage: ShadowAiPlannerProviderUsageV1;
   providerRequestId: string | null;
   returnedModel: string | null;
+  safeTelemetry: Readonly<{
+    httpStatus: number;
+    requestSha256: string;
+    schemaSha256: string;
+    finishReason: string | null;
+    routedProvider: string | null;
+  }>;
 }>;
 
 export type ShadowAiPlannerTransportAdapterV1 = Readonly<{

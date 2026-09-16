@@ -18,6 +18,7 @@ import {
 import { runShadowAiProviderNeutralPlannerV1 } from "../../src/canonical/shadowAiPlannerProviderNeutralRuntimeV1.js";
 import type { ShadowAiEconomicResolutionPacketV1 } from "../../src/canonical/shadowAiEconomicResolutionPlannerTypesV1.js";
 import { SHADOW_AI_ECONOMIC_RESOLUTION_PACKET_SCHEMA_VERSION } from "../../src/canonical/shadowAiEconomicResolutionPlannerTypesV1.js";
+import { SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1 } from "../../src/canonical/shadowAiEconomicResolutionPlannerTypesV1.js";
 import { canonicalJson } from "../../src/canonical/v2/canonicalJson.js";
 
 describe("Provider-neutral shadow planner v1", () => {
@@ -132,6 +133,7 @@ describe("Provider-neutral shadow planner v1", () => {
 
     expect(openAi.providerKind).toBe("OPENAI_DIRECT");
     expect(openAiBody.text.format.schema).toEqual(compiled.request.outputSchema);
+    expect(openAiBody.max_output_tokens).toBe(SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumOutputTokens);
     expect(openAi.schemaSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(openAi.body).not.toContain(compiled.localBinding.issueId);
     expect(openAi.body).not.toContain(compiled.localBinding.inputHash);
@@ -139,6 +141,7 @@ describe("Provider-neutral shadow planner v1", () => {
 
     expect(openRouter.providerKind).toBe("OPENROUTER");
     expect(openRouterBody.response_format.json_schema.schema).toEqual(compiled.request.outputSchema);
+    expect(openRouterBody.max_tokens).toBe(SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumOutputTokens);
     expect(openRouter.schemaSha256).toBe(openAi.schemaSha256);
     expect(openRouterBody.provider).toEqual({ allow_fallbacks: false, require_parameters: true });
     expect(openRouter.body).not.toContain(compiled.localBinding.issueId);
@@ -358,5 +361,12 @@ function providerResult(rawDraft: unknown) {
     usage: { inputTokens: 100, outputTokens: 200, estimatedCostUsdMicros: 300, latencyMs: 400 },
     providerRequestId: "request-test",
     returnedModel: "test-model",
+    safeTelemetry: {
+      httpStatus: 200,
+      requestSha256: "a".repeat(64),
+      schemaSha256: "b".repeat(64),
+      finishReason: "stop",
+      routedProvider: null,
+    },
   };
 }

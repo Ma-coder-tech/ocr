@@ -151,3 +151,50 @@ Phase one must remain fully credential-free and prove:
    explicit configuration.
 5. Retire the legacy batched provider path only after every issue family passes
    shadow evaluation and deterministic invariance is demonstrated.
+
+## Phase 2 implementation result — 2026-09-16
+
+Phase 2 adds independent direct-OpenAI Responses and OpenRouter Chat
+Completions transports behind the provider port. Both transports perform one
+HTTP send, expose only bounded telemetry, enforce response-size limits, parse
+the provider envelope and draft with duplicate-key rejection, normalize usage
+and cost, and return an untrusted draft to the existing local binder. HTTP
+fixtures cover success, malformed and duplicate JSON, refusal, truncation,
+fallback evidence, model substitution, HTTP rejection, oversized response,
+ambiguous send failure, and pre-send cost rejection. Provider pricing is
+pinned per adapter and a conservative byte-based token upper bound rejects
+requests that could breach the per-call cost ceiling before any network
+attempt. The focused provider-neutral suite passes 23/23 and the repository
+TypeScript build passes.
+
+The qualification runner enforces three ordered controls per adapter: schema,
+cross-request reference replay, and one existing non-customer Gold packet. It
+stops an adapter on the first failure, permits no retry or fallback, and stores
+no prompt, raw provider response, or draft. Before and after each call it
+fingerprints canonical financial truth, RD artifacts, reconciliation,
+commercial truth, governed knowledge, permissions, and customer-output state.
+
+The bounded live run pinned direct OpenAI to `gpt-5.2` and OpenRouter to
+`openai/gpt-5.2`, with the manifest ceiling of 12,000 output tokens and USD
+0.25 per call. Both adapters exceeded the inherited 20-second
+deadline on their first schema control. Each was therefore rejected and its
+remaining controls were skipped. The run made two provider attempts total,
+with zero retries and zero fallback attempts. Every protected-state fingerprint
+was unchanged; no customer output, truth mutation, research, or source admission
+occurred.
+
+This result does not establish schema incompatibility: neither provider
+returned an accepted or rejected response envelope before the local deadline.
+It establishes that neither adapter is qualified under the current 20-second
+operational contract. Neither adapter may be wired into shadow evaluation yet.
+The safe qualification artifact is
+`evaluations/provider-neutral-shadow-planner-v1/qualification-2026-09-16.json`.
+
+The next engineering decision is a latency-contract change, not a schema or
+field patch: explicitly pin provider reasoning effort, define a measured
+qualification timeout distinct from interactive/customer latency, then run a
+new separately authorized bounded qualification. OpenAI documents `none` as
+the GPT-5.2 default and recommends pinning reasoning effort during migration;
+OpenRouter exposes the analogous `reasoning.effort` control. Any requalification
+must remain independently budgeted and must not reinterpret these failed calls
+as passes.
