@@ -198,3 +198,32 @@ the GPT-5.2 default and recommends pinning reasoning effort during migration;
 OpenRouter exposes the analogous `reasoning.effort` control. Any requalification
 must remain independently budgeted and must not reinterpret these failed calls
 as passes.
+
+## Requalification contract — 2026-09-16
+
+The qualification-only deadline is 60 seconds per call. This is supported by
+the repository's prior forensic evidence: a provider successfully completed a
+full-planner structured response in 38,268 ms under a 60-second envelope. The
+normal planner runtime still defaults to the original 20 seconds; only the
+non-customer qualification runner can select the bounded 60-second maximum.
+
+Both adapters use a 4,000-token output cap, `reasoning.effort: none`, and low
+verbosity. Direct OpenAI pins the documented snapshot
+`gpt-5.2-2025-12-11`. OpenRouter pins the corresponding canonical slug
+`openai/gpt-5.2-20251211`, restricts the initial upstream to `openai`, disables
+fallback, requires every request parameter, denies data-collection routing,
+and sets prompt/completion price ceilings. A response with a missing or
+different OpenRouter upstream fails local validation.
+
+The requalification is protected by an exclusive attempt guard. Each adapter
+still receives, in order, at most one schema control, one cross-request replay
+control, and one non-customer Gold control. It stops on its first failure.
+There are no retries and failure of one adapter does not select or suppress the
+other adapter.
+
+An adapter qualifies only when all three controls complete inside 60 seconds,
+the exact snapshot and (for OpenRouter) upstream identity match, usage remains
+inside token and USD 0.25 ceilings, the entire draft passes strict local
+binding and semantic validation, the cross-request replay is rejected, and
+all seven protected-state fingerprints remain unchanged. Any other outcome is
+`REJECTED`; a partial pass is not qualification.

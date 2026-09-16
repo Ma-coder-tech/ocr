@@ -23,6 +23,7 @@ import {
 } from "../src/canonical/shadowAiEconomicResolutionPlannerTypesV1.js";
 import {
   qualifyShadowAiPlannerProviderV1,
+  SHADOW_AI_PROVIDER_QUALIFICATION_TIMEOUT_MS_V1,
   type ShadowAiPlannerDeterministicStateV1,
 } from "../src/canonical/shadowAiPlannerProviderQualificationV1.js";
 import {
@@ -35,18 +36,32 @@ import type { ParsedDocument } from "../src/parser.js";
 import { analyzeStatementDocument } from "../src/statementParserOrchestrator.js";
 
 const OUT = "evaluations/provider-neutral-shadow-planner-v1";
+const RESULT_PATH = `${OUT}/requalification-2026-09-16.json`;
+const REPORT_PATH = `${OUT}/requalification-report-2026-09-16.md`;
+const ATTEMPT_GUARD_PATH = `${OUT}/requalification-attempt-guard-2026-09-16.json`;
 const GENERATED_AT = new Date().toISOString();
+const OPENAI_MODEL = "gpt-5.2-2025-12-11";
+const OPENROUTER_MODEL = "openai/gpt-5.2-20251211";
 const PRICE = Object.freeze({
   inputUsdMicrosPerMillionTokens: 1_750_000,
   outputUsdMicrosPerMillionTokens: 14_000_000,
+});
+const GENERATION = Object.freeze({
+  maximumOutputTokens: 4_000,
+  reasoningEffort: "none" as const,
+  verbosity: "low" as const,
+});
+const OPENROUTER_ROUTING = Object.freeze({
+  onlyProvider: "openai",
+  dataCollection: "deny" as const,
+  maximumPromptPriceUsdPerMillionTokens: 1.75,
+  maximumCompletionPriceUsdPerMillionTokens: 14,
 });
 
 loadEnvironment({ path: process.env.RATEREVEAL_ENV_PATH ?? ".env", quiet: true });
 
 const openAiApiKey = requiredEnvironment("OPENAI_API_KEY");
 const openRouterApiKey = requiredEnvironment("OPENROUTER_API_KEY");
-const openAiModel = requiredEnvironment("OPENAI_INTERNAL_ANALYSIS_MODEL");
-const openRouterModel = requiredEnvironment("OPENROUTER_SEARCH_MODEL");
 
 const gold = await buildGoldControl();
 const schemaControlPacket = syntheticPacket("provider-qualification-schema-control");
@@ -69,10 +84,14 @@ const protectedState = (): ShadowAiPlannerDeterministicStateV1 => ({
   customerOutput: fingerprint({ created: false, routed: false }),
 });
 
+await mkdir(OUT, { recursive: true });
+await acquireAttemptGuard();
+
 const openAi = await qualifyShadowAiPlannerProviderV1({
   adapter: createOpenAiDirectPlannerAdapterV1({
     apiKey: openAiApiKey,
-    model: openAiModel,
+    model: OPENAI_MODEL,
+    generation: GENERATION,
     pricing: PRICE,
   }),
   schemaControlPacket,
@@ -84,7 +103,9 @@ const openAi = await qualifyShadowAiPlannerProviderV1({
 const openRouter = await qualifyShadowAiPlannerProviderV1({
   adapter: createOpenRouterPlannerAdapterV1({
     apiKey: openRouterApiKey,
-    model: openRouterModel,
+    model: OPENROUTER_MODEL,
+    generation: GENERATION,
+    routing: OPENROUTER_ROUTING,
     pricing: PRICE,
   }),
   schemaControlPacket,
@@ -95,12 +116,13 @@ const openRouter = await qualifyShadowAiPlannerProviderV1({
 
 const qualifications = [openAi, openRouter];
 const result = {
-  schemaVersion: "provider_neutral_shadow_planner_phase_2_qualification_2026_09_16_v1",
+  schemaVersion: "provider_neutral_shadow_planner_requalification_2026_09_16_v1",
   generatedAt: GENERATED_AT,
-  mode: "BOUNDED_NON_CUSTOMER_LIVE_QUALIFICATION",
+  mode: "BOUNDED_NON_CUSTOMER_LIVE_REQUALIFICATION",
   baseline: {
     branch: "codex/planner-provider-neutral-consolidation-v1",
     phase1Commit: "e347b588d1bd6ae1bb54463dbe5b672a30aae490",
+    phase2Commit: "95cf153",
     selectedParent: "d6ebcdbe919d11fb29ce73d7155c28848796a20f",
   },
   controls: {
@@ -110,10 +132,23 @@ const result = {
     maximumCallsPerAdapter: 3,
     retries: 0,
     automaticProviderFallback: false,
-    maximumOutputTokensPerCall: SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumOutputTokens,
+    qualificationTimeoutMsPerCall: SHADOW_AI_PROVIDER_QUALIFICATION_TIMEOUT_MS_V1,
+    maximumOutputTokensPerCall: GENERATION.maximumOutputTokens,
+    reasoningEffort: GENERATION.reasoningEffort,
+    verbosity: GENERATION.verbosity,
     maximumEstimatedCostUsdMicrosPerCall:
       SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumEstimatedCostUsdMicros,
     configuredPricingUsdPerMillionTokens: { input: 1.75, output: 14 },
+    openRouterRouting: {
+      onlyProvider: OPENROUTER_ROUTING.onlyProvider,
+      allowFallbacks: false,
+      requireParameters: true,
+      dataCollection: OPENROUTER_ROUTING.dataCollection,
+      maximumPromptPriceUsdPerMillionTokens:
+        OPENROUTER_ROUTING.maximumPromptPriceUsdPerMillionTokens,
+      maximumCompletionPriceUsdPerMillionTokens:
+        OPENROUTER_ROUTING.maximumCompletionPriceUsdPerMillionTokens,
+    },
   },
   persistenceBoundary: {
     rawPrompts: false,
@@ -133,9 +168,17 @@ const result = {
   },
 };
 
-await mkdir(OUT, { recursive: true });
-await writeFile(`${OUT}/qualification-2026-09-16.json`, `${JSON.stringify(result, null, 2)}\n`);
-await writeFile(`${OUT}/report-2026-09-16.md`, report(result));
+await writeFile(RESULT_PATH, `${JSON.stringify(result, null, 2)}\n`, { flag: "wx" });
+await writeFile(REPORT_PATH, report(result), { flag: "wx" });
+await writeFile(ATTEMPT_GUARD_PATH, `${JSON.stringify({
+  schemaVersion: "provider_neutral_shadow_planner_requalification_attempt_guard_2026_09_16_v1",
+  state: "COMPLETED",
+  startedAt: GENERATED_AT,
+  completedAt: new Date().toISOString(),
+  maximumCallsPerAdapter: 3,
+  adapterCallCounts: Object.fromEntries(qualifications.map((item) => [item.adapterId, item.providerCalls])),
+  resultSha256: fingerprint(result),
+}, null, 2)}\n`);
 console.log(JSON.stringify(result.summary, null, 2));
 if (result.summary.rejectedAdapters.length > 0) process.exitCode = 1;
 
@@ -275,6 +318,17 @@ function requiredEnvironment(name: string): string {
   return value;
 }
 
+async function acquireAttemptGuard(): Promise<void> {
+  await writeFile(ATTEMPT_GUARD_PATH, `${JSON.stringify({
+    schemaVersion: "provider_neutral_shadow_planner_requalification_attempt_guard_2026_09_16_v1",
+    state: "STARTED",
+    startedAt: GENERATED_AT,
+    maximumCallsPerAdapter: 3,
+    retriesAllowed: 0,
+    automaticProviderFallbackAllowed: false,
+  }, null, 2)}\n`, { flag: "wx" });
+}
+
 function fingerprint(value: unknown): string {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
@@ -283,5 +337,5 @@ function report(value: typeof result): string {
   const rows = value.qualifications.flatMap((qualification) => qualification.stages.map((stage) =>
     `| ${qualification.providerKind} | ${qualification.pinnedModel} | ${stage.stage} | ${stage.status} | ${stage.runStatus ?? "—"} | ${stage.accounting?.inputTokens ?? 0} | ${stage.accounting?.outputTokens ?? 0} | ${stage.accounting?.estimatedCostUsdMicros ?? 0} | ${stage.accounting?.latencyMs ?? 0} | ${stage.deterministicStatePreserved ? "yes" : "NO"} | ${stage.crossRequestReplayRejected === null ? "—" : stage.crossRequestReplayRejected ? "yes" : "NO"} | ${stage.errorCodes.join(", ") || "—"} |`
   )).join("\n");
-  return `# Provider-neutral shadow planner — Phase 2 qualification\n\nMode: bounded non-customer live qualification. Raw prompts, provider responses, and drafts were not persisted.\n\n| Adapter | Pinned model | Stage | Result | Runtime | Input tokens | Output tokens | Cost µUSD | Latency ms | Protected state unchanged | Cross-request replay rejected | Safe errors |\n|---|---|---|---|---|---:|---:|---:|---:|---|---|---|\n${rows}\n\n## Result\n\n- Qualified adapters: ${value.summary.qualifiedAdapters.join(", ") || "none"}.\n- Rejected adapters: ${value.summary.rejectedAdapters.join(", ") || "none"}.\n- Provider calls: ${value.summary.totalProviderCalls}; maximum permitted was six across two independent adapters.\n- Retries: 0. Automatic provider fallback: disabled.\n- Protected state unchanged: ${value.summary.allProtectedStatePreserved}. Customer outputs: 0. Truth mutations: 0.\n`;
+  return `# Provider-neutral shadow planner — bounded requalification\n\nMode: bounded non-customer live requalification. Deadline: ${value.controls.qualificationTimeoutMsPerCall} ms per call. Reasoning: \`${value.controls.reasoningEffort}\`; verbosity: \`${value.controls.verbosity}\`. Raw prompts, provider responses, and drafts were not persisted.\n\n| Adapter | Pinned model | Stage | Result | Runtime | Input tokens | Output tokens | Cost µUSD | Latency ms | Protected state unchanged | Cross-request replay rejected | Safe errors |\n|---|---|---|---|---|---:|---:|---:|---:|---|---|---|\n${rows}\n\n## Result\n\n- Qualified adapters: ${value.summary.qualifiedAdapters.join(", ") || "none"}.\n- Rejected adapters: ${value.summary.rejectedAdapters.join(", ") || "none"}.\n- Provider calls: ${value.summary.totalProviderCalls}; maximum permitted was six across two independent adapters.\n- Retries: 0. Automatic provider fallback: disabled.\n- Protected state unchanged: ${value.summary.allProtectedStatePreserved}. Customer outputs: 0. Truth mutations: 0.\n`;
 }

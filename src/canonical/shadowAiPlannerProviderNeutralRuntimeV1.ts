@@ -15,6 +15,7 @@ import { canonicalJson } from "./v2/canonicalJson.js";
 
 export const SHADOW_AI_PROVIDER_NEUTRAL_RUN_SCHEMA_VERSION_V1 =
   "shadow_ai_provider_neutral_run_2026_09_16_v1" as const;
+export const SHADOW_AI_PROVIDER_NEUTRAL_MAXIMUM_TIMEOUT_MS_V1 = 60_000 as const;
 
 export type ShadowAiProviderNeutralPlannerRunV1 = Readonly<{
   schemaVersion: typeof SHADOW_AI_PROVIDER_NEUTRAL_RUN_SCHEMA_VERSION_V1;
@@ -64,8 +65,15 @@ export type ShadowAiProviderNeutralPlannerRunV1 = Readonly<{
 export async function runShadowAiProviderNeutralPlannerV1(input: Readonly<{
   packet: ShadowAiEconomicResolutionPacketV1;
   adapter: ShadowAiPlannerTransportAdapterV1;
+  timeoutMs?: number;
 }>): Promise<ShadowAiProviderNeutralPlannerRunV1> {
   const provider = providerIdentity(input.adapter, null);
+  const timeoutMs = input.timeoutMs ?? SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.timeoutMs;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1
+    || timeoutMs > SHADOW_AI_PROVIDER_NEUTRAL_MAXIMUM_TIMEOUT_MS_V1) {
+    return result(input.packet, provider, "SAFETY_BLOCKED", null, emptyAccounting(0),
+      ["shadow_planner_timeout_contract_invalid"], ["planner_request_rejected"]);
+  }
   let compiled: ReturnType<typeof compileShadowAiPlannerProviderRequestV1>;
   try {
     compiled = compileShadowAiPlannerProviderRequestV1(input.packet);
@@ -90,7 +98,7 @@ export async function runShadowAiProviderNeutralPlannerV1(input: Readonly<{
     timer = setTimeout(() => {
       controller.abort();
       resolve({ kind: "timeout" });
-    }, SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.timeoutMs);
+    }, timeoutMs);
     timer.unref?.();
   });
   const completed = await Promise.race([operation, timeout]);
@@ -167,6 +175,11 @@ function validateProviderMetadata(
   if ([response.safeTelemetry.finishReason, response.safeTelemetry.routedProvider]
     .some((value) => value !== null && (value.length === 0 || value.length > 200))) {
     errors.push("shadow_planner_provider_telemetry_invalid");
+  }
+  const routedProviderConstraint = adapter.safeConfiguration.routedProviderConstraint;
+  if (routedProviderConstraint !== null
+    && response.safeTelemetry.routedProvider?.toLowerCase() !== routedProviderConstraint.toLowerCase()) {
+    errors.push("shadow_planner_routed_provider_mismatch");
   }
   return errors;
 }

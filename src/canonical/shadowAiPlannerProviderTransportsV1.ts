@@ -4,6 +4,8 @@ import { SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1 } from "./shadowAiEconomicRes
 import {
   compileOpenAiDirectPlannerHttpRequestV1,
   compileOpenRouterPlannerHttpRequestV1,
+  type OpenRouterPlannerRoutingSettingsV1,
+  type ShadowAiPlannerGenerationSettingsV1,
   type ShadowAiPlannerHttpRequestV1,
 } from "./shadowAiPlannerProviderAdaptersV1.js";
 import {
@@ -54,9 +56,14 @@ export class ShadowAiPlannerTransportErrorV1 extends Error {
 type AdapterConfiguration = Readonly<{
   apiKey: string;
   model: string;
+  generation: ShadowAiPlannerGenerationSettingsV1;
   pricing: ShadowAiPlannerTokenPricingV1;
   fetchImpl?: ShadowAiPlannerFetchV1;
   clock?: Readonly<{ nowMs(): number }>;
+}>;
+
+type OpenRouterAdapterConfiguration = AdapterConfiguration & Readonly<{
+  routing: OpenRouterPlannerRoutingSettingsV1;
 }>;
 
 export function createOpenAiDirectPlannerAdapterV1(
@@ -70,13 +77,20 @@ export function createOpenAiDirectPlannerAdapterV1(
     transport: "PROVIDER" as const,
     providerKind: "OPENAI_DIRECT" as const,
     model: configuration.model,
+    safeConfiguration: Object.freeze({
+      ...configuration.generation,
+      providerFallbackAllowed: false as const,
+      routedProviderConstraint: null,
+      dataCollection: "DIRECT_STORE_DISABLED" as const,
+    }),
     async invoke({ request, signal }) {
       const compiled = compileOpenAiDirectPlannerHttpRequestV1({
         apiKey: configuration.apiKey,
         model: configuration.model,
         request,
+        generation: configuration.generation,
       });
-      assertPreflightCost(compiled, configuration.pricing);
+      assertPreflightCost(compiled, configuration.pricing, configuration.generation.maximumOutputTokens);
       const response = await sendOnce(compiled, signal, fetchImpl, clock);
       return normalizeOpenAiPlannerResponseV1({
         responseText: response.text,
@@ -92,7 +106,7 @@ export function createOpenAiDirectPlannerAdapterV1(
 }
 
 export function createOpenRouterPlannerAdapterV1(
-  configuration: AdapterConfiguration,
+  configuration: OpenRouterAdapterConfiguration,
 ): ShadowAiPlannerTransportAdapterV1 {
   validateAdapterConfiguration(configuration, "openrouter");
   const fetchImpl = configuration.fetchImpl ?? defaultFetch();
@@ -102,13 +116,21 @@ export function createOpenRouterPlannerAdapterV1(
     transport: "PROVIDER" as const,
     providerKind: "OPENROUTER" as const,
     model: configuration.model,
+    safeConfiguration: Object.freeze({
+      ...configuration.generation,
+      providerFallbackAllowed: false as const,
+      routedProviderConstraint: configuration.routing.onlyProvider,
+      dataCollection: configuration.routing.dataCollection,
+    }),
     async invoke({ request, signal }) {
       const compiled = compileOpenRouterPlannerHttpRequestV1({
         apiKey: configuration.apiKey,
         model: configuration.model,
         request,
+        generation: configuration.generation,
+        routing: configuration.routing,
       });
-      assertPreflightCost(compiled, configuration.pricing);
+      assertPreflightCost(compiled, configuration.pricing, configuration.generation.maximumOutputTokens);
       const response = await sendOnce(compiled, signal, fetchImpl, clock);
       return normalizeOpenRouterPlannerResponseV1({
         responseText: response.text,
@@ -325,13 +347,14 @@ function validateAdapterConfiguration(configuration: AdapterConfiguration, provi
 function assertPreflightCost(
   request: ShadowAiPlannerHttpRequestV1,
   pricing: ShadowAiPlannerTokenPricingV1,
+  maximumOutputTokens: number,
 ): void {
   // Tokenizers cannot emit more tokens than the UTF-8 bytes supplied. Treating
   // body bytes as input tokens is conservative and makes the configured cost
   // ceiling a pre-send control rather than only post-response telemetry.
   const upperBound = estimatedCost(
     request.bodyBytes,
-    SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumOutputTokens,
+    maximumOutputTokens,
     pricing,
   );
   if (upperBound > SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumEstimatedCostUsdMicros) {

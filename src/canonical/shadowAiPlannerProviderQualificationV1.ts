@@ -12,12 +12,15 @@ import {
 } from "./shadowAiPlannerProviderNeutralV1.js";
 import {
   runShadowAiProviderNeutralPlannerV1,
+  SHADOW_AI_PROVIDER_NEUTRAL_MAXIMUM_TIMEOUT_MS_V1,
   type ShadowAiProviderNeutralPlannerRunV1,
 } from "./shadowAiPlannerProviderNeutralRuntimeV1.js";
 import { canonicalJson } from "./v2/canonicalJson.js";
 
 export const SHADOW_AI_PROVIDER_QUALIFICATION_SCHEMA_VERSION_V1 =
   "shadow_ai_provider_qualification_2026_09_16_v1" as const;
+export const SHADOW_AI_PROVIDER_QUALIFICATION_TIMEOUT_MS_V1 =
+  SHADOW_AI_PROVIDER_NEUTRAL_MAXIMUM_TIMEOUT_MS_V1;
 
 export type ShadowAiPlannerQualificationStageV1 = Readonly<{
   stage: "SCHEMA_CONTROL" | "ADVERSARIAL_REFERENCE_CONTROL" | "GOLD_CONTROL";
@@ -50,10 +53,12 @@ export type ShadowAiPlannerProviderQualificationV1 = Readonly<{
   adapterId: string;
   providerKind: ShadowAiPlannerTransportAdapterV1["providerKind"];
   pinnedModel: string;
+  adapterConfiguration: ShadowAiPlannerTransportAdapterV1["safeConfiguration"];
   providerCalls: number;
   maximumProviderCalls: 3;
   maximumOutputTokens: number;
   maximumEstimatedCostUsdMicrosPerCall: number;
+  timeoutMsPerCall: typeof SHADOW_AI_PROVIDER_QUALIFICATION_TIMEOUT_MS_V1;
   retries: 0;
   fallbackAttempts: 0;
   rawProviderContentPersisted: false;
@@ -99,7 +104,11 @@ export async function qualifyShadowAiPlannerProviderV1(input: Readonly<{
     const stateBefore = input.captureDeterministicState();
     const stateComponentSha256Before = componentFingerprints(stateBefore);
     const stateBeforeSha256 = fingerprint(stateComponentSha256Before);
-    const run = await runShadowAiProviderNeutralPlannerV1({ packet, adapter });
+    const run = await runShadowAiProviderNeutralPlannerV1({
+      packet,
+      adapter,
+      timeoutMs: SHADOW_AI_PROVIDER_QUALIFICATION_TIMEOUT_MS_V1,
+    });
     const stateAfter = input.captureDeterministicState();
     const stateComponentSha256After = componentFingerprints(stateAfter);
     const stateAfterSha256 = fingerprint(stateComponentSha256After);
@@ -148,11 +157,13 @@ export async function qualifyShadowAiPlannerProviderV1(input: Readonly<{
     adapterId: input.adapter.adapterId,
     providerKind: input.adapter.providerKind,
     pinnedModel: input.adapter.model,
+    adapterConfiguration: input.adapter.safeConfiguration,
     providerCalls,
     maximumProviderCalls: 3 as const,
-    maximumOutputTokens: SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumOutputTokens,
+    maximumOutputTokens: input.adapter.safeConfiguration.maximumOutputTokens,
     maximumEstimatedCostUsdMicrosPerCall:
       SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumEstimatedCostUsdMicros,
+    timeoutMsPerCall: SHADOW_AI_PROVIDER_QUALIFICATION_TIMEOUT_MS_V1,
     retries: 0 as const,
     fallbackAttempts: 0 as const,
     rawProviderContentPersisted: false as const,

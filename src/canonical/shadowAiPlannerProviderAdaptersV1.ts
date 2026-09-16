@@ -20,6 +20,19 @@ export type ShadowAiPlannerHttpRequestV1 = Readonly<{
   schemaSha256: string;
 }>;
 
+export type ShadowAiPlannerGenerationSettingsV1 = Readonly<{
+  maximumOutputTokens: number;
+  reasoningEffort: "none";
+  verbosity: "low";
+}>;
+
+export type OpenRouterPlannerRoutingSettingsV1 = Readonly<{
+  onlyProvider: string;
+  dataCollection: "deny";
+  maximumPromptPriceUsdPerMillionTokens: number;
+  maximumCompletionPriceUsdPerMillionTokens: number;
+}>;
+
 /**
  * Direct OpenAI Responses API compiler. It accepts the provider-neutral draft
  * contract without adding provider authority, binding values, or fallback.
@@ -28,16 +41,20 @@ export function compileOpenAiDirectPlannerHttpRequestV1(input: Readonly<{
   apiKey: string;
   model: string;
   request: ShadowAiPlannerProviderRequestV1;
+  generation: ShadowAiPlannerGenerationSettingsV1;
 }>): ShadowAiPlannerHttpRequestV1 {
   requireConfiguration(input.apiKey, input.model, "openai");
+  assertGenerationSettings(input.generation, "openai");
   assertPortableDraftSchema(input.request.outputSchema);
   const body = canonicalJson({
     model: input.model,
     store: false,
-    max_output_tokens: SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumOutputTokens,
+    max_output_tokens: input.generation.maximumOutputTokens,
+    reasoning: { effort: input.generation.reasoningEffort },
     instructions: input.request.systemInstruction,
     input: [{ role: "user", content: input.request.userPayload }],
     text: {
+      verbosity: input.generation.verbosity,
       format: {
         type: "json_schema",
         name: input.request.schemaName,
@@ -65,19 +82,34 @@ export function compileOpenRouterPlannerHttpRequestV1(input: Readonly<{
   apiKey: string;
   model: string;
   request: ShadowAiPlannerProviderRequestV1;
+  generation: ShadowAiPlannerGenerationSettingsV1;
+  routing: OpenRouterPlannerRoutingSettingsV1;
 }>): ShadowAiPlannerHttpRequestV1 {
   requireConfiguration(input.apiKey, input.model, "openrouter");
+  assertGenerationSettings(input.generation, "openrouter");
+  assertOpenRouterRoutingSettings(input.routing);
   assertPortableDraftSchema(input.request.outputSchema);
   const body = canonicalJson({
     model: input.model,
     store: false,
     stream: false,
-    max_tokens: SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumOutputTokens,
+    max_tokens: input.generation.maximumOutputTokens,
     messages: [
       { role: "system", content: input.request.systemInstruction },
       { role: "user", content: input.request.userPayload },
     ],
-    provider: { allow_fallbacks: false, require_parameters: true },
+    reasoning: { effort: input.generation.reasoningEffort },
+    verbosity: input.generation.verbosity,
+    provider: {
+      allow_fallbacks: false,
+      data_collection: input.routing.dataCollection,
+      max_price: {
+        completion: input.routing.maximumCompletionPriceUsdPerMillionTokens,
+        prompt: input.routing.maximumPromptPriceUsdPerMillionTokens,
+      },
+      only: [input.routing.onlyProvider],
+      require_parameters: true,
+    },
     response_format: {
       type: "json_schema",
       json_schema: {
@@ -155,6 +187,29 @@ function assertPortableDraftSchema(schema: unknown): void {
 function requireConfiguration(apiKey: string, model: string, provider: string): void {
   if (!apiKey) throw new Error(`shadow_planner_${provider}_api_key_required`);
   if (!model.trim()) throw new Error(`shadow_planner_${provider}_model_required`);
+}
+
+function assertGenerationSettings(settings: ShadowAiPlannerGenerationSettingsV1, provider: string): void {
+  if (!Number.isSafeInteger(settings.maximumOutputTokens)
+    || settings.maximumOutputTokens < 1
+    || settings.maximumOutputTokens > SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumOutputTokens
+    || settings.reasoningEffort !== "none"
+    || settings.verbosity !== "low") {
+    throw new Error(`shadow_planner_${provider}_generation_settings_invalid`);
+  }
+}
+
+function assertOpenRouterRoutingSettings(settings: OpenRouterPlannerRoutingSettingsV1): void {
+  if (!/^[a-z0-9][a-z0-9._/-]{0,99}$/.test(settings.onlyProvider)
+    || settings.dataCollection !== "deny"
+    || !validPrice(settings.maximumPromptPriceUsdPerMillionTokens)
+    || !validPrice(settings.maximumCompletionPriceUsdPerMillionTokens)) {
+    throw new Error("shadow_planner_openrouter_routing_settings_invalid");
+  }
+}
+
+function validPrice(value: number): boolean {
+  return Number.isFinite(value) && value >= 0 && value <= 10_000;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

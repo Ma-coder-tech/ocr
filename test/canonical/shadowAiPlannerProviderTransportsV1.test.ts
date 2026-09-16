@@ -30,6 +30,17 @@ const pricing = {
   inputUsdMicrosPerMillionTokens: 1_000_000,
   outputUsdMicrosPerMillionTokens: 2_000_000,
 };
+const generation = {
+  maximumOutputTokens: 4_000,
+  reasoningEffort: "none" as const,
+  verbosity: "low" as const,
+};
+const openRouterRouting = {
+  onlyProvider: "openai",
+  dataCollection: "deny" as const,
+  maximumPromptPriceUsdPerMillionTokens: 1.75,
+  maximumCompletionPriceUsdPerMillionTokens: 14,
+};
 
 describe("Provider-neutral planner transports v1", () => {
   it("rejects duplicate JSON object keys before materialization", () => {
@@ -91,6 +102,7 @@ describe("Provider-neutral planner transports v1", () => {
     const adapter = createOpenAiDirectPlannerAdapterV1({
       apiKey: "openai-test-secret",
       model: "test-openai-model",
+      generation,
       pricing,
       fetchImpl,
       clock: sequenceClock(100, 125),
@@ -117,6 +129,7 @@ describe("Provider-neutral planner transports v1", () => {
     const adapter = createOpenAiDirectPlannerAdapterV1({
       apiKey: "test-key",
       model: "test-openai-model",
+      generation,
       pricing,
       fetchImpl: async () => response(JSON.stringify(openAiEnvelope(duplicate, "test-openai-model"))),
     });
@@ -152,6 +165,8 @@ describe("Provider-neutral planner transports v1", () => {
     const adapter = createOpenRouterPlannerAdapterV1({
       apiKey: "router-secret",
       model: "test/openrouter-model",
+      generation,
+      routing: openRouterRouting,
       pricing,
       fetchImpl: async () => {
         calls += 1;
@@ -170,12 +185,34 @@ describe("Provider-neutral planner transports v1", () => {
     expect(calls).toBe(1);
   });
 
+  it("rejects an OpenRouter response from an upstream outside the pinned route", async () => {
+    const inputPacket = packet("openrouter-route-mismatch");
+    const compiled = compileShadowAiPlannerProviderRequestV1(inputPacket);
+    const envelope = openRouterEnvelope(JSON.stringify(validDraft(compiled)), "test/openrouter-model");
+    envelope.provider = "azure";
+    const adapter = createOpenRouterPlannerAdapterV1({
+      apiKey: "router-secret",
+      model: "test/openrouter-model",
+      generation,
+      routing: openRouterRouting,
+      pricing,
+      fetchImpl: async () => response(JSON.stringify(envelope)),
+    });
+
+    const run = await runShadowAiProviderNeutralPlannerV1({ packet: inputPacket, adapter });
+
+    expect(run.status).toBe("SAFETY_BLOCKED");
+    expect(run.plan).toBeNull();
+    expect(run.errorCodes).toEqual(["shadow_planner_routed_provider_mismatch"]);
+  });
+
   it("treats an ambiguous send failure as one non-retriable attempt", async () => {
     const inputPacket = packet("openai-network-failure");
     let calls = 0;
     const adapter = createOpenAiDirectPlannerAdapterV1({
       apiKey: "openai-secret",
       model: "test-openai-model",
+      generation,
       pricing,
       fetchImpl: async () => {
         calls += 1;
@@ -200,6 +237,7 @@ describe("Provider-neutral planner transports v1", () => {
     const adapter = createOpenAiDirectPlannerAdapterV1({
       apiKey: "test-key",
       model: "test-openai-model",
+      generation,
       pricing: {
         inputUsdMicrosPerMillionTokens: 100_000_000,
         outputUsdMicrosPerMillionTokens: 100_000_000,
@@ -229,6 +267,7 @@ describe("Provider-neutral planner transports v1", () => {
     const adapter = createOpenAiDirectPlannerAdapterV1({
       apiKey: "test-key",
       model: "test-openai-model",
+      generation,
       pricing,
       fetchImpl: async () => ({
         status: 200,
@@ -251,6 +290,12 @@ describe("Provider-neutral planner transports v1", () => {
       transport: "PROVIDER" as const,
       providerKind: "OPENAI_DIRECT" as const,
       model: "qualification-model",
+      safeConfiguration: {
+        ...generation,
+        providerFallbackAllowed: false as const,
+        routedProviderConstraint: null,
+        dataCollection: "DIRECT_STORE_DISABLED" as const,
+      },
       async invoke({ request }: { request: any; signal: AbortSignal }) {
         calls += 1;
         const payload = JSON.parse(request.userPayload);
@@ -282,6 +327,13 @@ describe("Provider-neutral planner transports v1", () => {
 
     expect(result.status).toBe("QUALIFIED");
     expect(result.providerCalls).toBe(3);
+    expect(result.timeoutMsPerCall).toBe(60_000);
+    expect(result.maximumOutputTokens).toBe(4_000);
+    expect(result.adapterConfiguration).toMatchObject({
+      reasoningEffort: "none",
+      verbosity: "low",
+      providerFallbackAllowed: false,
+    });
     expect(result.retries).toBe(0);
     expect(result.fallbackAttempts).toBe(0);
     expect(result.rawProviderContentPersisted).toBe(false);
@@ -297,6 +349,12 @@ describe("Provider-neutral planner transports v1", () => {
       transport: "PROVIDER" as const,
       providerKind: "OPENROUTER" as const,
       model: "qualification-model",
+      safeConfiguration: {
+        ...generation,
+        providerFallbackAllowed: false as const,
+        routedProviderConstraint: "openai",
+        dataCollection: "deny" as const,
+      },
       async invoke(): Promise<never> {
         calls += 1;
         throw new ShadowAiPlannerTransportErrorV1(

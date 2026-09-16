@@ -77,6 +77,14 @@ export type ShadowAiPlannerTransportAdapterV1 = Readonly<{
   transport: "PROVIDER" | "EVALUATION_STUB";
   providerKind: ShadowAiProviderKindV1;
   model: string;
+  safeConfiguration: Readonly<{
+    maximumOutputTokens: number;
+    reasoningEffort: "none";
+    verbosity: "low";
+    providerFallbackAllowed: false;
+    routedProviderConstraint: string | null;
+    dataCollection: "DIRECT_STORE_DISABLED" | "deny";
+  }>;
   invoke(input: Readonly<{
     request: ShadowAiPlannerProviderRequestV1;
     signal: AbortSignal;

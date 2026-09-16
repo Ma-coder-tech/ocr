@@ -21,6 +21,18 @@ import { SHADOW_AI_ECONOMIC_RESOLUTION_PACKET_SCHEMA_VERSION } from "../../src/c
 import { SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1 } from "../../src/canonical/shadowAiEconomicResolutionPlannerTypesV1.js";
 import { canonicalJson } from "../../src/canonical/v2/canonicalJson.js";
 
+const generation = {
+  maximumOutputTokens: 4_000,
+  reasoningEffort: "none" as const,
+  verbosity: "low" as const,
+};
+const openRouterRouting = {
+  onlyProvider: "openai",
+  dataCollection: "deny" as const,
+  maximumPromptPriceUsdPerMillionTokens: 1.75,
+  maximumCompletionPriceUsdPerMillionTokens: 14,
+};
+
 describe("Provider-neutral shadow planner v1", () => {
   it("uses one request-independent structural schema with no provider-fragile binding constraints", () => {
     const first = compileShadowAiPlannerProviderRequestV1(packet("issue-one", "run-one"));
@@ -122,18 +134,23 @@ describe("Provider-neutral shadow planner v1", () => {
       apiKey: "test-openai-key",
       model: "test-openai-model",
       request: compiled.request,
+      generation,
     });
     const openRouter = compileOpenRouterPlannerHttpRequestV1({
       apiKey: "test-openrouter-key",
       model: "test-openrouter-model",
       request: compiled.request,
+      generation,
+      routing: openRouterRouting,
     });
     const openAiBody = JSON.parse(openAi.body);
     const openRouterBody = JSON.parse(openRouter.body);
 
     expect(openAi.providerKind).toBe("OPENAI_DIRECT");
     expect(openAiBody.text.format.schema).toEqual(compiled.request.outputSchema);
-    expect(openAiBody.max_output_tokens).toBe(SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumOutputTokens);
+    expect(openAiBody.max_output_tokens).toBe(4_000);
+    expect(openAiBody.reasoning).toEqual({ effort: "none" });
+    expect(openAiBody.text.verbosity).toBe("low");
     expect(openAi.schemaSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(openAi.body).not.toContain(compiled.localBinding.issueId);
     expect(openAi.body).not.toContain(compiled.localBinding.inputHash);
@@ -141,9 +158,17 @@ describe("Provider-neutral shadow planner v1", () => {
 
     expect(openRouter.providerKind).toBe("OPENROUTER");
     expect(openRouterBody.response_format.json_schema.schema).toEqual(compiled.request.outputSchema);
-    expect(openRouterBody.max_tokens).toBe(SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumOutputTokens);
+    expect(openRouterBody.max_tokens).toBe(4_000);
+    expect(openRouterBody.reasoning).toEqual({ effort: "none" });
+    expect(openRouterBody.verbosity).toBe("low");
     expect(openRouter.schemaSha256).toBe(openAi.schemaSha256);
-    expect(openRouterBody.provider).toEqual({ allow_fallbacks: false, require_parameters: true });
+    expect(openRouterBody.provider).toEqual({
+      allow_fallbacks: false,
+      data_collection: "deny",
+      max_price: { completion: 14, prompt: 1.75 },
+      only: ["openai"],
+      require_parameters: true,
+    });
     expect(openRouter.body).not.toContain(compiled.localBinding.issueId);
     expect(openRouter.body).not.toContain(compiled.localBinding.inputHash);
   });
@@ -187,6 +212,26 @@ describe("Provider-neutral shadow planner v1", () => {
     expect(invocations).toBe(1);
     expect(receivedPayload).not.toContain(inputPacket.issueId);
     expect(receivedPayload).not.toContain(inputPacket.immutableInputHash);
+  });
+
+  it("rejects a timeout outside the bounded runtime contract before invoking an adapter", async () => {
+    const inputPacket = packet("issue-timeout-contract", "run-timeout-contract");
+    let invocations = 0;
+    const adapter = stubAdapter(async () => {
+      invocations += 1;
+      throw new Error("must not invoke");
+    }, "PROVIDER");
+
+    const run = await runShadowAiProviderNeutralPlannerV1({
+      packet: inputPacket,
+      adapter,
+      timeoutMs: 60_001,
+    });
+
+    expect(run.status).toBe("SAFETY_BLOCKED");
+    expect(run.errorCodes).toEqual(["shadow_planner_timeout_contract_invalid"]);
+    expect(run.accounting).toMatchObject({ providerCallAttempts: 0, providerNetworkCalls: 0 });
+    expect(invocations).toBe(0);
   });
 
   it("fails closed when the provider draft is invalid", async () => {
@@ -351,6 +396,12 @@ function stubAdapter(
     transport,
     providerKind: "OPENAI_DIRECT",
     model: "test-model",
+    safeConfiguration: {
+      ...generation,
+      providerFallbackAllowed: false,
+      routedProviderConstraint: null,
+      dataCollection: "DIRECT_STORE_DISABLED",
+    },
     invoke,
   };
 }
