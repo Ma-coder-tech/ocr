@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "provider_neutral_shadow_planner_requalification_attempt_guard_2026_09_16_v3",
+  "state": "COMPLETED",
+  "startedAt": "2026-09-16T13:00:55.791Z",
+  "completedAt": "2026-09-16T13:02:04.348Z",
+  "maximumCallsPerAdapter": 3,
+  "adapterCallCounts": {
+    "openai-direct-responses-v1": 3,
+    "openrouter-responses-v1": 1
+  },
+  "resultSha256": "7b88a0b4cfb6840243e377d60ad5f9102b3e7c1020da62c4dbb42852033942aa"
+}

@@ -411,3 +411,41 @@ so the completed prior attempts cannot be overwritten. Both adapters are ready
 for another independently bounded qualification under the same three-control,
 60-second, 4,000-output-token, USD 0.25-per-call, zero-retry, and zero-fallback
 contract. Neither adapter is qualified until all three controls pass.
+
+## Bounded live requalification result — 2026-09-16 (attempt 3)
+
+Product authorized both corrected adapters under the unchanged bounded
+contract. The run made four provider calls total. Direct OpenAI completed all
+three controls; OpenRouter stopped after its first failed control. There were
+zero retries and zero fallback attempts.
+
+Direct OpenAI is qualified for the provider-neutral planner boundary. The exact
+`gpt-5.2-2025-12-11` snapshot passed the schema control, cross-request replay
+control, and non-customer Gold control. The replayed draft was rejected under
+the other request's local binding as required. All responses returned HTTP 200
+from the requested snapshot, and every locally validated draft stayed within
+the packet-specific reference and evidence-class contracts. The three calls
+used 6,446 input tokens and 3,083 output tokens, cost an estimated 54,443
+microdollars in total, and completed in 46,114 ms of provider latency.
+
+OpenRouter is not qualified. Its corrected Responses request returned HTTP 200
+from the required OpenAI upstream with the exact `openai/gpt-5.2` model in
+20,487 ms. This proves that the corrected endpoint, model identifier, OpenAI
+route restriction, parameter-eligibility policy, privacy policy, and no-fallback
+policy admitted a route. The response used 2,072 input tokens and 1,161 output
+tokens at an estimated cost of 19,880 microdollars. It passed transport,
+provider identity, model identity, usage, and structured-envelope checks, then
+failed local deterministic semantic validation because both alternative
+hypotheses had incomplete epistemic boundaries. Each hypothesis must contain
+non-empty support, acknowledged evidence gaps, confirmation requirements, and
+falsification conditions. Raw provider content was intentionally not persisted,
+so the safe evidence cannot identify which required component was empty. The
+adversarial-reference and Gold controls were skipped under the first-failure
+stop rule.
+
+All seven protected-state fingerprints were identical before and after all
+four calls. Customer outputs, truth mutations, source admissions, and research
+operations remained zero. Direct OpenAI's qualification does not itself enable
+customer-facing output or truth mutation. OpenRouter remains blocked pending a
+separate offline semantic-contract assessment and a newly authorized bounded
+qualification; it must never be substituted automatically for Direct OpenAI.
