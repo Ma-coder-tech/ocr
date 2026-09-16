@@ -1,0 +1,254 @@
+import {
+  SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1,
+  type ShadowAiEconomicResolutionPacketV1,
+  type ShadowAiEconomicResolutionPlanV1,
+  type ShadowAiPlannerProviderUsageV1,
+} from "./shadowAiEconomicResolutionPlannerTypesV1.js";
+import {
+  compileShadowAiPlannerProviderRequestV1,
+  validateAndBindShadowAiPlannerDraftV1,
+  type ShadowAiPlannerTransportAdapterV1,
+  type ShadowAiProviderKindV1,
+} from "./shadowAiPlannerProviderNeutralV1.js";
+import { canonicalJson } from "./v2/canonicalJson.js";
+
+export const SHADOW_AI_PROVIDER_NEUTRAL_RUN_SCHEMA_VERSION_V1 =
+  "shadow_ai_provider_neutral_run_2026_09_16_v1" as const;
+
+export type ShadowAiProviderNeutralPlannerRunV1 = Readonly<{
+  schemaVersion: typeof SHADOW_AI_PROVIDER_NEUTRAL_RUN_SCHEMA_VERSION_V1;
+  mode: "SHADOW";
+  authority: "EVALUATION_ONLY";
+  status: "COMPLETED" | "UNAVAILABLE" | "SAFETY_BLOCKED";
+  issueId: string;
+  inputHash: string;
+  plan: ShadowAiEconomicResolutionPlanV1 | null;
+  provider: Readonly<{
+    adapterId: string;
+    providerKind: ShadowAiProviderKindV1;
+    requestedModel: string;
+    returnedModel: string | null;
+    providerRequestId: string | null;
+  }>;
+  accounting: Readonly<{
+    plannerOperationCount: 1;
+    providerCallAttempts: 0 | 1;
+    providerCallCompleted: 0 | 1;
+    providerNetworkCalls: 0 | 1;
+    requestBytes: number;
+    inputTokens: number;
+    outputTokens: number;
+    estimatedCostUsdMicros: number;
+    latencyMs: number;
+    retries: 0;
+    researchOperations: 0;
+    sourceAdmissions: 0;
+  }>;
+  deterministicResultPreserved: true;
+  customerOutputCreated: false;
+  errorCodes: readonly string[];
+  limitationCodes: readonly string[];
+}>;
+
+/**
+ * Executes exactly one explicitly selected adapter for exactly one issue.
+ * It never retries and has no fallback input, so provider switching cannot
+ * occur inside the financial-analysis path.
+ */
+export async function runShadowAiProviderNeutralPlannerV1(input: Readonly<{
+  packet: ShadowAiEconomicResolutionPacketV1;
+  adapter: ShadowAiPlannerTransportAdapterV1;
+}>): Promise<ShadowAiProviderNeutralPlannerRunV1> {
+  const provider = providerIdentity(input.adapter, null, null);
+  let compiled: ReturnType<typeof compileShadowAiPlannerProviderRequestV1>;
+  try {
+    compiled = compileShadowAiPlannerProviderRequestV1(input.packet);
+  } catch (error) {
+    return result(input.packet, provider, "SAFETY_BLOCKED", null, emptyAccounting(0),
+      [safeCompilationError(error)], ["planner_request_rejected"]);
+  }
+
+  const requestBytes = Buffer.byteLength(canonicalJson(compiled.request), "utf8");
+  if (requestBytes > SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumInputBytes) {
+    return result(input.packet, provider, "SAFETY_BLOCKED", null, emptyAccounting(requestBytes),
+      ["shadow_planner_input_budget_exceeded"], ["input_budget_exceeded"]);
+  }
+
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const operation = Promise.resolve()
+    .then(() => input.adapter.invoke({ request: compiled.request, signal: controller.signal }))
+    .then((value) => ({ kind: "value" as const, value }))
+    .catch(() => ({ kind: "error" as const }));
+  const timeout = new Promise<{ kind: "timeout" }>((resolve) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      resolve({ kind: "timeout" });
+    }, SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.timeoutMs);
+    timer.unref?.();
+  });
+  const completed = await Promise.race([operation, timeout]);
+  if (completed.kind !== "timeout" && timer) clearTimeout(timer);
+  const attempted = accounting(input.adapter, requestBytes, null, false);
+  if (completed.kind === "timeout") {
+    void operation;
+    return result(input.packet, provider, "UNAVAILABLE", null, attempted,
+      ["shadow_planner_provider_timeout"], ["planner_timed_out"]);
+  }
+  if (completed.kind === "error") {
+    return result(input.packet, provider, "UNAVAILABLE", null, attempted,
+      ["shadow_planner_provider_failed"], ["planner_provider_failed"]);
+  }
+
+  const completedProvider = providerIdentity(
+    input.adapter,
+    boundedMetadata(completed.value.returnedModel),
+    boundedMetadata(completed.value.providerRequestId),
+  );
+  const completedAccounting = accounting(input.adapter, requestBytes, completed.value.usage, true);
+  const usageErrors = validateUsage(completed.value.usage);
+  const metadataErrors = validateProviderMetadata(input.adapter, completed.value);
+  if (usageErrors.length > 0 || metadataErrors.length > 0) {
+    return result(input.packet, completedProvider, "SAFETY_BLOCKED", null, completedAccounting,
+      [...usageErrors, ...metadataErrors], ["planner_provider_response_rejected"]);
+  }
+
+  const bound = validateAndBindShadowAiPlannerDraftV1(completed.value.rawDraft, compiled.localBinding);
+  if (!bound.ok) {
+    return result(input.packet, completedProvider, "SAFETY_BLOCKED", null, completedAccounting,
+      bound.errors, ["planner_output_rejected"]);
+  }
+  return result(input.packet, completedProvider, "COMPLETED", bound.plan, completedAccounting, [], []);
+}
+
+function validateUsage(usage: ShadowAiPlannerProviderUsageV1): string[] {
+  if (!isRecord(usage)) return ["shadow_planner_usage_missing"];
+  const errors: string[] = [];
+  for (const key of ["inputTokens", "outputTokens", "estimatedCostUsdMicros", "latencyMs"] as const) {
+    if (!Number.isSafeInteger(usage[key]) || usage[key] < 0) errors.push(`shadow_planner_usage_${key}_invalid`);
+  }
+  if (usage.outputTokens > SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumOutputTokens) {
+    errors.push("shadow_planner_output_token_budget_exceeded");
+  }
+  if (usage.estimatedCostUsdMicros > SHADOW_AI_ECONOMIC_RESOLUTION_MANIFEST_V1.maximumEstimatedCostUsdMicros) {
+    errors.push("shadow_planner_cost_budget_exceeded");
+  }
+  return errors;
+}
+
+function validateProviderMetadata(
+  adapter: ShadowAiPlannerTransportAdapterV1,
+  response: Readonly<{ returnedModel: string | null; providerRequestId: string | null }>,
+): string[] {
+  const errors: string[] = [];
+  if (response.returnedModel !== null && (response.returnedModel.length > 200 || response.returnedModel !== adapter.model)) {
+    errors.push("shadow_planner_returned_model_mismatch");
+  }
+  if (response.providerRequestId !== null && (response.providerRequestId.length === 0 || response.providerRequestId.length > 256)) {
+    errors.push("shadow_planner_provider_request_id_invalid");
+  }
+  return errors;
+}
+
+function providerIdentity(
+  adapter: ShadowAiPlannerTransportAdapterV1,
+  returnedModel: string | null,
+  providerRequestId: string | null,
+): ShadowAiProviderNeutralPlannerRunV1["provider"] {
+  return Object.freeze({
+    adapterId: adapter.adapterId,
+    providerKind: adapter.providerKind,
+    requestedModel: adapter.model,
+    returnedModel,
+    providerRequestId,
+  });
+}
+
+function boundedMetadata(value: string | null): string | null {
+  return value !== null && value.length <= 256 ? value : null;
+}
+
+function safeCompilationError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  return /^shadow_planner_[a-z0-9_,:-]+$/i.test(message)
+    ? message
+    : "shadow_planner_request_compilation_failed";
+}
+
+function emptyAccounting(requestBytes: number): ShadowAiProviderNeutralPlannerRunV1["accounting"] {
+  return Object.freeze({
+    plannerOperationCount: 1 as const,
+    providerCallAttempts: 0 as const,
+    providerCallCompleted: 0 as const,
+    providerNetworkCalls: 0 as const,
+    requestBytes,
+    inputTokens: 0,
+    outputTokens: 0,
+    estimatedCostUsdMicros: 0,
+    latencyMs: 0,
+    retries: 0 as const,
+    researchOperations: 0 as const,
+    sourceAdmissions: 0 as const,
+  });
+}
+
+function accounting(
+  adapter: ShadowAiPlannerTransportAdapterV1,
+  requestBytes: number,
+  usage: ShadowAiPlannerProviderUsageV1 | null,
+  completed: boolean,
+): ShadowAiProviderNeutralPlannerRunV1["accounting"] {
+  const provider = adapter.transport === "PROVIDER";
+  return Object.freeze({
+    plannerOperationCount: 1 as const,
+    providerCallAttempts: provider ? 1 as const : 0 as const,
+    providerCallCompleted: provider && completed ? 1 as const : 0 as const,
+    providerNetworkCalls: provider ? 1 as const : 0 as const,
+    requestBytes,
+    inputTokens: usage?.inputTokens ?? 0,
+    outputTokens: usage?.outputTokens ?? 0,
+    estimatedCostUsdMicros: usage?.estimatedCostUsdMicros ?? 0,
+    latencyMs: usage?.latencyMs ?? 0,
+    retries: 0 as const,
+    researchOperations: 0 as const,
+    sourceAdmissions: 0 as const,
+  });
+}
+
+function result(
+  packet: ShadowAiEconomicResolutionPacketV1,
+  provider: ShadowAiProviderNeutralPlannerRunV1["provider"],
+  status: ShadowAiProviderNeutralPlannerRunV1["status"],
+  plan: ShadowAiEconomicResolutionPlanV1 | null,
+  runAccounting: ShadowAiProviderNeutralPlannerRunV1["accounting"],
+  errorCodes: readonly string[],
+  limitationCodes: readonly string[],
+): ShadowAiProviderNeutralPlannerRunV1 {
+  return deepFreeze({
+    schemaVersion: SHADOW_AI_PROVIDER_NEUTRAL_RUN_SCHEMA_VERSION_V1,
+    mode: "SHADOW" as const,
+    authority: "EVALUATION_ONLY" as const,
+    status,
+    issueId: packet.issueId,
+    inputHash: packet.immutableInputHash,
+    plan,
+    provider,
+    accounting: runAccounting,
+    deterministicResultPreserved: true as const,
+    customerOutputCreated: false as const,
+    errorCodes: [...new Set(errorCodes)].sort(),
+    limitationCodes: [...new Set(limitationCodes)].sort(),
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    Object.values(value as Record<string, unknown>).forEach((child) => deepFreeze(child));
+  }
+  return value;
+}
