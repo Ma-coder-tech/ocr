@@ -6,6 +6,8 @@ import {
   compileOpenAiDirectPlannerHttpRequestV1,
   compileOpenRouterPlannerHttpRequestV1,
   inspectPortableDraftSchemaV1,
+  OPENAI_DIRECT_GPT_5_2_SNAPSHOT_MODEL_V1,
+  OPENROUTER_GPT_5_2_CALLABLE_MODEL_V1,
 } from "../../src/canonical/shadowAiPlannerProviderAdaptersV1.js";
 import {
   compileShadowAiPlannerProviderRequestV1,
@@ -65,6 +67,61 @@ describe("Provider-neutral shadow planner v1", () => {
     expect(payload).toContain("rr_");
     expect(compiled.localBinding.issueId).toBe("issue-private");
     expect(compiled.localBinding.referenceAliases.length).toBeGreaterThan(0);
+  });
+
+  it("provides an explicit provider-neutral reference-class contract without internal references", () => {
+    const compiled = compileShadowAiPlannerProviderRequestV1(packet("issue-reference-contract", "run-reference-contract"));
+    const payload = JSON.parse(compiled.request.userPayload);
+    const contract = payload.referenceTokenContract;
+
+    expect(contract.allowedClassesByOutputField).toEqual({
+      exactCitedReferenceTokens: ["FACT"],
+      hypothesisSupportingReferenceTokens: ["FACT", "GOVERNED_EVIDENCE", "ECONOMIC_CHARGE"],
+      hypothesisContradictingReferenceTokens: ["FACT", "GOVERNED_EVIDENCE", "ECONOMIC_CHARGE"],
+      reconstructionSuspicionExactAcceptedReferenceTokens: ["FACT", "GOVERNED_EVIDENCE", "ECONOMIC_CHARGE"],
+      reconstructionSuspicionConflictingReferenceTokens: ["FACT", "GOVERNED_EVIDENCE", "ECONOMIC_CHARGE"],
+    });
+    expect(contract.prohibitedOutputClasses).toEqual(["STATEMENT_EVIDENCE"]);
+    expect(contract.missingEligibleReferenceBehavior).toBe("USE_EMPTY_ARRAY_AND_STATE_EVIDENCE_GAP");
+    expect(contract.catalog).toEqual(compiled.localBinding.referenceAliases.map(({ token, referenceClass }) => ({
+      token,
+      referenceClass,
+    })));
+    expect(contract.catalog.map((entry: { referenceClass: string }) => entry.referenceClass))
+      .toEqual(expect.arrayContaining(["FACT", "STATEMENT_EVIDENCE", "GOVERNED_EVIDENCE", "ECONOMIC_CHARGE"]));
+    expect(compiled.request.systemInstruction).toContain("referenceTokenContract");
+    expect(compiled.request.systemInstruction).toContain("STATEMENT_EVIDENCE tokens are input provenance only");
+    expect(compiled.request.userPayload).not.toContain("fact_v2_submitted_transaction_count");
+    expect(compiled.request.userPayload).not.toContain("evidence_v2_statement_occurrence_001");
+  });
+
+  it("admits contract-guided reference selection and still rejects an ineligible class locally", () => {
+    const compiled = compileShadowAiPlannerProviderRequestV1(packet("issue-semantic-fixture", "run-semantic-fixture"));
+    const payload = JSON.parse(compiled.request.userPayload);
+    const catalog = payload.referenceTokenContract.catalog as Array<{ token: string; referenceClass: string }>;
+    const fact = catalog.find((entry) => entry.referenceClass === "FACT")?.token;
+    const statementEvidence = catalog.find((entry) => entry.referenceClass === "STATEMENT_EVIDENCE")?.token;
+    if (!fact || !statementEvidence) throw new Error("semantic fixture references missing");
+
+    const guided = validateAndBindShadowAiPlannerDraftV1({
+      ...validDraft(compiled),
+      exactCitedReferenceTokens: [fact],
+      primaryHypothesis: {
+        ...validDraft(compiled).primaryHypothesis,
+        supportingReferenceTokens: [fact],
+      },
+    }, compiled.localBinding);
+    expect(guided.ok).toBe(true);
+
+    const wrongClass = validateAndBindShadowAiPlannerDraftV1({
+      ...validDraft(compiled),
+      primaryHypothesis: {
+        ...validDraft(compiled).primaryHypothesis,
+        supportingReferenceTokens: [statementEvidence],
+      },
+    }, compiled.localBinding);
+    expect(wrongClass.ok).toBe(false);
+    if (!wrongClass.ok) expect(wrongClass.errors).toContain("hypothesis.supportingReferenceTokens_wrong_reference_class");
   });
 
   it("stamps authority and identity locally after restoring issued aliases", () => {
@@ -132,13 +189,13 @@ describe("Provider-neutral shadow planner v1", () => {
     const compiled = compileShadowAiPlannerProviderRequestV1(packet("issue-adapters", "run-adapters"));
     const openAi = compileOpenAiDirectPlannerHttpRequestV1({
       apiKey: "test-openai-key",
-      model: "test-openai-model",
+      model: OPENAI_DIRECT_GPT_5_2_SNAPSHOT_MODEL_V1,
       request: compiled.request,
       generation,
     });
     const openRouter = compileOpenRouterPlannerHttpRequestV1({
       apiKey: "test-openrouter-key",
-      model: "test-openrouter-model",
+      model: OPENROUTER_GPT_5_2_CALLABLE_MODEL_V1,
       request: compiled.request,
       generation,
       routing: openRouterRouting,
@@ -147,6 +204,7 @@ describe("Provider-neutral shadow planner v1", () => {
     const openRouterBody = JSON.parse(openRouter.body);
 
     expect(openAi.providerKind).toBe("OPENAI_DIRECT");
+    expect(openAiBody.model).toBe("gpt-5.2-2025-12-11");
     expect(openAiBody.text.format.schema).toEqual(compiled.request.outputSchema);
     expect(openAiBody.max_output_tokens).toBe(4_000);
     expect(openAiBody.reasoning).toEqual({ effort: "none" });
@@ -157,6 +215,7 @@ describe("Provider-neutral shadow planner v1", () => {
     expect(openAi.body).not.toContain("allow_fallbacks");
 
     expect(openRouter.providerKind).toBe("OPENROUTER");
+    expect(openRouterBody.model).toBe("openai/gpt-5.2");
     expect(openRouterBody.response_format.json_schema.schema).toEqual(compiled.request.outputSchema);
     expect(openRouterBody.max_tokens).toBe(4_000);
     expect(openRouterBody.reasoning).toEqual({ effort: "none" });

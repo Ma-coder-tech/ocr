@@ -9,6 +9,8 @@ import type {
 
 export const OPENAI_RESPONSES_ENDPOINT_V1 = "https://api.openai.com/v1/responses" as const;
 export const OPENROUTER_CHAT_COMPLETIONS_ENDPOINT_V1 = "https://openrouter.ai/api/v1/chat/completions" as const;
+export const OPENAI_DIRECT_GPT_5_2_SNAPSHOT_MODEL_V1 = "gpt-5.2-2025-12-11" as const;
+export const OPENROUTER_GPT_5_2_CALLABLE_MODEL_V1 = "openai/gpt-5.2" as const;
 
 export type ShadowAiPlannerHttpRequestV1 = Readonly<{
   providerKind: ShadowAiProviderKindV1;

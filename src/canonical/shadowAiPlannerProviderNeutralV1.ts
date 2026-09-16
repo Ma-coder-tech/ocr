@@ -15,7 +15,7 @@ import {
 import { canonicalJson } from "./v2/canonicalJson.js";
 
 export const SHADOW_AI_PROVIDER_NEUTRAL_REQUEST_SCHEMA_VERSION_V1 =
-  "shadow_ai_provider_neutral_request_2026_09_16_v1" as const;
+  "shadow_ai_provider_neutral_request_2026_09_16_v2" as const;
 export const SHADOW_AI_PROVIDER_NEUTRAL_DRAFT_SCHEMA_VERSION_V1 =
   "shadow_ai_provider_neutral_draft_2026_09_16_v1" as const;
 export const SHADOW_AI_PROVIDER_NEUTRAL_SCHEMA_NAME_V1 =
@@ -163,12 +163,18 @@ const REFERENCE_CLASS_CODE: Readonly<Record<ShadowAiReferenceClassV1, string>> =
   GOVERNED_EVIDENCE: "g",
   ECONOMIC_CHARGE: "c",
 });
+const EXACT_CITATION_REFERENCE_CLASSES = ["FACT"] as const;
+const ANALYTIC_REFERENCE_CLASSES = ["FACT", "GOVERNED_EVIDENCE", "ECONOMIC_CHARGE"] as const;
+const NON_OUTPUT_REFERENCE_CLASSES = ["STATEMENT_EVIDENCE"] as const;
 
 export function providerNeutralPlannerSystemInstructionV1(): string {
   return `You are a non-authoritative payment-economics resolution planner operating in shadow mode.
 Analyze only the unresolved issue and bounded context in the user payload. Accepted facts are authoritative inputs; UNKNOWN, CONFLICTING, and UNAVAILABLE remain unresolved.
 Return only an untrusted inference draft matching the supplied JSON schema. RateReveal, not you, owns issue identity, authority, permissions, financial truth, reference admission, and final validation.
 Never invent a merchant-specific fee, participant, population, amount, rate, program, document, operational event, or reference token. Cite only opaque reference tokens present in the payload.
+The payload's referenceTokenContract is the complete reference-class guide for this request. Copy tokens only from its catalog and obey its allowedClassesByOutputField exactly. Do not infer a token's class from its spelling or from where it appears elsewhere in the packet.
+exactCitedReferenceTokens accepts FACT tokens only. Hypothesis supportingReferenceTokens and contradictingReferenceTokens accept FACT, GOVERNED_EVIDENCE, or ECONOMIC_CHARGE tokens only. Reconstruction-suspicion exactAcceptedReferenceTokens and conflictingReferenceTokens accept the same three classes. STATEMENT_EVIDENCE tokens are input provenance only and must never be emitted in any output reference-token array.
+When no eligible token supports an output field, return an empty array where the schema permits it and state the evidence gap. Never substitute a token from another class.
 Generate hypotheses only for the selected issue. State evidence gaps, confirmation requirements, and falsification conditions. Provide materially distinct alternatives where meaningful.
 Choose the most appropriate resolution path from the schema. Do not browse, call tools, admit evidence, mutate truth, calculate savings, make comparisons, assign blame, or create customer output.
 Use researchQuerySuggestions only for PUBLIC_RESEARCH_REQUIRED. Keep it empty for every other route.`;
@@ -273,7 +279,22 @@ export function compileShadowAiPlannerProviderRequestV1(
     unresolvedFacets: [...packet.unresolvedClaimFacets],
     unresolvedReasonCodes: [...packet.unresolvedReasonCodes],
   };
-  const userPayload = canonicalJson({ issueContext, packet: providerPacket });
+  const referenceTokenContract = {
+    catalog: referenceAliases.map(({ token: opaqueToken, referenceClass }) => ({
+      token: opaqueToken,
+      referenceClass,
+    })),
+    allowedClassesByOutputField: {
+      exactCitedReferenceTokens: [...EXACT_CITATION_REFERENCE_CLASSES],
+      hypothesisSupportingReferenceTokens: [...ANALYTIC_REFERENCE_CLASSES],
+      hypothesisContradictingReferenceTokens: [...ANALYTIC_REFERENCE_CLASSES],
+      reconstructionSuspicionExactAcceptedReferenceTokens: [...ANALYTIC_REFERENCE_CLASSES],
+      reconstructionSuspicionConflictingReferenceTokens: [...ANALYTIC_REFERENCE_CLASSES],
+    },
+    prohibitedOutputClasses: [...NON_OUTPUT_REFERENCE_CLASSES],
+    missingEligibleReferenceBehavior: "USE_EMPTY_ARRAY_AND_STATE_EVIDENCE_GAP",
+  };
+  const userPayload = canonicalJson({ issueContext, referenceTokenContract, packet: providerPacket });
   inspectProviderPayload(userPayload, referenceAliases);
   return deepFreeze({
     request: {
@@ -313,8 +334,8 @@ export function validateAndBindShadowAiPlannerDraftV1(
   const hypothesis = (value: ShadowAiPlannerDraftHypothesisV1) => ({
     hypothesis: value.hypothesis,
     confidence: value.confidence,
-    supportingFactRefs: restore(value.supportingReferenceTokens, ["FACT", "GOVERNED_EVIDENCE", "ECONOMIC_CHARGE"], "hypothesis.supportingReferenceTokens"),
-    contradictingFactRefs: restore(value.contradictingReferenceTokens, ["FACT", "GOVERNED_EVIDENCE", "ECONOMIC_CHARGE"], "hypothesis.contradictingReferenceTokens"),
+    supportingFactRefs: restore(value.supportingReferenceTokens, ANALYTIC_REFERENCE_CLASSES, "hypothesis.supportingReferenceTokens"),
+    contradictingFactRefs: restore(value.contradictingReferenceTokens, ANALYTIC_REFERENCE_CLASSES, "hypothesis.contradictingReferenceTokens"),
     acknowledgedEvidenceGaps: [...value.acknowledgedEvidenceGaps],
     confirmationRequirements: [...value.confirmationRequirements],
     falsificationConditions: [...value.falsificationConditions],
@@ -329,7 +350,7 @@ export function validateAndBindShadowAiPlannerDraftV1(
     customerRenderingAllowed: false,
     issueId: binding.issueId,
     inputHash: binding.inputHash,
-    exactCitedFactRefs: restore(parsed.draft.exactCitedReferenceTokens, ["FACT"], "exactCitedReferenceTokens"),
+    exactCitedFactRefs: restore(parsed.draft.exactCitedReferenceTokens, EXACT_CITATION_REFERENCE_CLASSES, "exactCitedReferenceTokens"),
     unresolvedQuestion: parsed.draft.unresolvedQuestion,
     primaryHypothesis: hypothesis(parsed.draft.primaryHypothesis),
     alternativeHypotheses: parsed.draft.alternativeHypotheses.map(hypothesis),
@@ -349,9 +370,9 @@ export function validateAndBindShadowAiPlannerDraftV1(
       admissionStatus: "NOT_ADMITTED",
       truthEffect: "NONE",
       financialMutationAllowed: false,
-      exactAcceptedFactOrOccurrenceRefs: restore(suspicion.exactAcceptedReferenceTokens, ["FACT", "GOVERNED_EVIDENCE", "ECONOMIC_CHARGE"], "reconstructionSuspicion.exactAcceptedReferenceTokens"),
+      exactAcceptedFactOrOccurrenceRefs: restore(suspicion.exactAcceptedReferenceTokens, ANALYTIC_REFERENCE_CLASSES, "reconstructionSuspicion.exactAcceptedReferenceTokens"),
       reasonForSuspicion: suspicion.reasonForSuspicion,
-      conflictingEvidenceRefs: restore(suspicion.conflictingReferenceTokens, ["FACT", "GOVERNED_EVIDENCE", "ECONOMIC_CHARGE"], "reconstructionSuspicion.conflictingReferenceTokens"),
+      conflictingEvidenceRefs: restore(suspicion.conflictingReferenceTokens, ANALYTIC_REFERENCE_CLASSES, "reconstructionSuspicion.conflictingReferenceTokens"),
       requestedDeterministicRecheckType: suspicion.requestedDeterministicRecheckType,
     })),
   };

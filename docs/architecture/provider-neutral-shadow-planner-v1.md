@@ -275,3 +275,43 @@ Safe artifacts:
 - `evaluations/provider-neutral-shadow-planner-v1/requalification-2026-09-16.json`
 - `evaluations/provider-neutral-shadow-planner-v1/requalification-report-2026-09-16.md`
 - `evaluations/provider-neutral-shadow-planner-v1/requalification-attempt-guard-2026-09-16.json`
+
+## Offline correction result — 2026-09-16
+
+The two failed adapters were corrected independently without changing the
+deterministic authority boundary or making another provider call.
+
+For Direct OpenAI, request contract v2 adds a `referenceTokenContract` to every
+privacy-contained provider payload. The contract contains only opaque tokens
+and their explicit classes, defines the eligible classes for each output
+reference field, identifies `STATEMENT_EVIDENCE` as input provenance that must
+never be emitted, and directs the provider to leave a field empty rather than
+substitute an ineligible class. The system instruction repeats these rules and
+forbids inferring a class from token spelling or packet position. The local
+binder continues to enforce the same class allowlists and still rejects
+unknown, wrong-class, and cross-request tokens. No local validation rule was
+relaxed.
+
+For OpenRouter, the request model is now the documented callable identifier
+`openai/gpt-5.2`. The adapter still targets Chat Completions, restricts routing
+to the `openai` provider, disables fallback, requires parameter support, denies
+data-collection routing, and retains the existing price ceilings. Returned
+model and routed-provider identity checks remain fail closed.
+
+The next live runner writes only to new `requalification-2` result, report, and
+attempt-guard paths; the completed first-run guard and evidence remain
+immutable. The recommended next qualification keeps the existing contract:
+three ordered controls per adapter, at most three calls per adapter, 60 seconds
+per call, 4,000 maximum output tokens, reasoning effort `none`, low verbosity,
+zero retries, zero automatic fallback, adapter-independent stop conditions,
+and safe fingerprints/telemetry only. Direct OpenAI remains pinned to
+`gpt-5.2-2025-12-11`; OpenRouter uses `openai/gpt-5.2` with OpenAI-only
+routing. A new explicit live authorization is required before running it.
+
+Offline validation passed for the corrected boundary: the three focused planner
+test files passed 31 of 31 tests, the TypeScript build passed, and the diff
+passed whitespace/error checks. A repository-wide test run passed 2,414 tests
+and failed 83 tests across 26 files in unrelated reconstruction, template, and
+canonical baseline areas; none of the failures were in the provider-neutral
+planner suites changed here. No live provider request was made during this
+correction phase.

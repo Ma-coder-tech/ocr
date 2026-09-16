@@ -299,7 +299,9 @@ describe("Provider-neutral planner transports v1", () => {
       async invoke({ request }: { request: any; signal: AbortSignal }) {
         calls += 1;
         const payload = JSON.parse(request.userPayload);
-        const token = payload.packet.acceptedFactRefs[0];
+        const token = payload.referenceTokenContract.catalog
+          .find((entry: { referenceClass: string }) => entry.referenceClass === "FACT")?.token;
+        if (!token) throw new Error("qualification semantic fixture fact token missing");
         return {
           rawDraft: validDraftForToken(token),
           usage: { inputTokens: 100, outputTokens: 200, estimatedCostUsdMicros: 3_000, latencyMs: 5 },

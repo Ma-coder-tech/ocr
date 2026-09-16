@@ -30,18 +30,22 @@ import {
   createOpenAiDirectPlannerAdapterV1,
   createOpenRouterPlannerAdapterV1,
 } from "../src/canonical/shadowAiPlannerProviderTransportsV1.js";
+import {
+  OPENAI_DIRECT_GPT_5_2_SNAPSHOT_MODEL_V1,
+  OPENROUTER_GPT_5_2_CALLABLE_MODEL_V1,
+} from "../src/canonical/shadowAiPlannerProviderAdaptersV1.js";
 import { canonicalJson } from "../src/canonical/v2/canonicalJson.js";
 import { inspectFiservOneStatementEvaluation } from "../src/canonical/v2/evaluation/fiservEvaluationHarness.js";
 import type { ParsedDocument } from "../src/parser.js";
 import { analyzeStatementDocument } from "../src/statementParserOrchestrator.js";
 
 const OUT = "evaluations/provider-neutral-shadow-planner-v1";
-const RESULT_PATH = `${OUT}/requalification-2026-09-16.json`;
-const REPORT_PATH = `${OUT}/requalification-report-2026-09-16.md`;
-const ATTEMPT_GUARD_PATH = `${OUT}/requalification-attempt-guard-2026-09-16.json`;
+const RESULT_PATH = `${OUT}/requalification-2-2026-09-16.json`;
+const REPORT_PATH = `${OUT}/requalification-2-report-2026-09-16.md`;
+const ATTEMPT_GUARD_PATH = `${OUT}/requalification-2-attempt-guard-2026-09-16.json`;
 const GENERATED_AT = new Date().toISOString();
-const OPENAI_MODEL = "gpt-5.2-2025-12-11";
-const OPENROUTER_MODEL = "openai/gpt-5.2-20251211";
+const OPENAI_MODEL = OPENAI_DIRECT_GPT_5_2_SNAPSHOT_MODEL_V1;
+const OPENROUTER_MODEL = OPENROUTER_GPT_5_2_CALLABLE_MODEL_V1;
 const PRICE = Object.freeze({
   inputUsdMicrosPerMillionTokens: 1_750_000,
   outputUsdMicrosPerMillionTokens: 14_000_000,
@@ -116,13 +120,14 @@ const openRouter = await qualifyShadowAiPlannerProviderV1({
 
 const qualifications = [openAi, openRouter];
 const result = {
-  schemaVersion: "provider_neutral_shadow_planner_requalification_2026_09_16_v1",
+  schemaVersion: "provider_neutral_shadow_planner_requalification_2026_09_16_v2",
   generatedAt: GENERATED_AT,
   mode: "BOUNDED_NON_CUSTOMER_LIVE_REQUALIFICATION",
   baseline: {
     branch: "codex/planner-provider-neutral-consolidation-v1",
     phase1Commit: "e347b588d1bd6ae1bb54463dbe5b672a30aae490",
     phase2Commit: "95cf153",
+    firstRequalificationCommit: "09b24a1",
     selectedParent: "d6ebcdbe919d11fb29ce73d7155c28848796a20f",
   },
   controls: {
@@ -171,7 +176,7 @@ const result = {
 await writeFile(RESULT_PATH, `${JSON.stringify(result, null, 2)}\n`, { flag: "wx" });
 await writeFile(REPORT_PATH, report(result), { flag: "wx" });
 await writeFile(ATTEMPT_GUARD_PATH, `${JSON.stringify({
-  schemaVersion: "provider_neutral_shadow_planner_requalification_attempt_guard_2026_09_16_v1",
+  schemaVersion: "provider_neutral_shadow_planner_requalification_attempt_guard_2026_09_16_v2",
   state: "COMPLETED",
   startedAt: GENERATED_AT,
   completedAt: new Date().toISOString(),
@@ -320,7 +325,7 @@ function requiredEnvironment(name: string): string {
 
 async function acquireAttemptGuard(): Promise<void> {
   await writeFile(ATTEMPT_GUARD_PATH, `${JSON.stringify({
-    schemaVersion: "provider_neutral_shadow_planner_requalification_attempt_guard_2026_09_16_v1",
+    schemaVersion: "provider_neutral_shadow_planner_requalification_attempt_guard_2026_09_16_v2",
     state: "STARTED",
     startedAt: GENERATED_AT,
     maximumCallsPerAdapter: 3,
