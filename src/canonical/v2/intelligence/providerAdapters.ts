@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { IntelligencePorts, InvestigativeObservation, SearchRequest, SearchResponse, SemanticVerificationInput,
+import type { IntelligencePorts, InvestigativeObservation, SearchCitationAdmissionV1, SearchRequest, SearchResponse, SemanticVerificationInput,
   StructuredBatchRequest, StructuredBatchResponse, CandidateClaimSupport, SemanticModelJudgment } from "./intelligenceTypes.js";
 import { RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET } from "./budgetLedger.js";
 import type { ProviderOperationReceiptV1 } from "../internalAnalysis/internalAnalysisTypes.js";
@@ -12,6 +12,14 @@ import { asSemanticModelJudgment, validateSemanticModelJudgment } from "./struct
 
 const OPENROUTER_SEARCH_MAX_OUTPUT_TOKENS = 512;
 const OPENAI_STRUCTURED_CONFIGURATION_CODE = "openai_responses_structured_output_v2";
+
+export class LiveSearchResponseAdmissionError extends Error {
+  constructor(reasonCode: string, public readonly admission: SearchCitationAdmissionV1) { super(reasonCode); }
+}
+
+class LiveJsonResponseBodyAdmissionError extends Error {
+  constructor(reasonCode: string) { super(reasonCode); }
+}
 
 export class ProviderOperationAuditLog {
   private readonly values = new Map<string, ProviderOperationReceiptV1>();
@@ -28,7 +36,7 @@ export class ProviderOperationAuditLog {
 }
 
 type LiveJsonRequest = { url: string; method: "GET" | "POST"; headers: Record<string, string>; body: string | null; timeoutMs: number; cancellationSignal: AbortSignal | null };
-type SafeHttpMetadata = { status: number; providerRequestId: string | null };
+type SafeHttpMetadata = { status: number; providerRequestId: string | null; retryAfterAt: string | null };
 
 async function sendLiveJson(request: LiveJsonRequest, onSend: () => void, onResponse: (metadata: SafeHttpMetadata) => void): Promise<{ status: number; body: unknown; providerRequestId: string | null }> {
   const controller = new AbortController(); let timedOut = false; let externallyCancelled = false; let sent = false;
@@ -41,9 +49,24 @@ async function sendLiveJson(request: LiveJsonRequest, onSend: () => void, onResp
     onSend(); sent = true;
     const response = await fetch(request.url, { method: request.method, headers: request.headers, body: request.body, redirect: "error", signal: controller.signal });
     const providerRequestId = safeIdentifier(response.headers?.get?.("x-request-id"));
-    onResponse({ status: response.status, providerRequestId });
-    return { status: response.status, body: await response.json() as unknown, providerRequestId };
+    onResponse({ status: response.status, providerRequestId,
+      retryAfterAt: safeRetryAfterAt(response.headers?.get?.("retry-after")) });
+    let responseBody: unknown;
+    try { responseBody = await response.json() as unknown; }
+    catch (error) {
+      if (response.status >= 200 && response.status < 300) {
+        // A SyntaxError means the response body was received but was not valid JSON. Keep
+        // stream/abort failures transport-ambiguous because body completion is not proven.
+        if (error instanceof SyntaxError) {
+          throw new LiveJsonResponseBodyAdmissionError("provider_response_json_invalid");
+        }
+        throw error;
+      }
+      responseBody = {};
+    }
+    return { status: response.status, body: responseBody, providerRequestId };
   } catch (error) {
+    if (error instanceof LiveJsonResponseBodyAdmissionError) throw error;
     throw new LiveOperationTransportError(timedOut ? "timed_out" : externallyCancelled ? "cancelled" : sent ? "after_send" : "before_send", safeError(error));
   } finally { clearTimeout(timer); request.cancellationSignal?.removeEventListener("abort", cancel); }
 }
@@ -80,18 +103,34 @@ export function createLiveOpenRouterSearchAdapter(capability: LiveExecutionCapab
         "Content-Type": "application/json", "X-OpenRouter-Metadata": "enabled" }, body,
         timeoutMs: RG_FREE_V1_INTERNAL_LIVE_TIMING_V2_BUDGET.searchTimeoutMs, cancellationSignal: binding.cancellationSignal },
         () => audit.settle(receiptId, { actualSendCount: 1, sendState: "sent" }),
-        (metadata) => audit.settle(receiptId, { httpStatus: metadata.status, providerRequestId: metadata.providerRequestId }));
+        (metadata) => audit.settle(receiptId, { httpStatus: metadata.status,
+          providerRequestId: metadata.providerRequestId, retryAfterAt: metadata.retryAfterAt }));
       if (response.status < 200 || response.status >= 300) {
         audit.settle(receiptId, safeProviderError(response.body));
-        if (response.status === 429) throw new LiveOperationTransportError("after_send", "openrouter_search_rate_limited");
+        if (response.status === 429) throw new LiveOperationTransportError("provider_rejected", "openrouter_search_rate_limited");
+        const rejection = knownOpenRouterRejection(response.status);
+        if (rejection) throw new LiveOperationTransportError("provider_rejected", rejection);
         throw new LiveOperationTransportError("after_send", "openrouter_search_http_failure");
       }
       audit.settle(receiptId, openRouterEnvelopeDiagnostics(response.body));
-      const normalized = normalizeOpenRouterSearchResponse(response.body, { request, expectedModel: binding.openRouterSearchModel });
+      let normalized: ReturnType<typeof normalizeOpenRouterSearchResponse>;
+      try {
+        normalized = normalizeOpenRouterSearchResponse(response.body, { request, expectedModel: binding.openRouterSearchModel });
+      } catch (error) {
+        const reasonCode = safeError(error);
+        const diagnostics = openRouterEnvelopeDiagnostics(response.body);
+        audit.settle(receiptId, { ...diagnostics, completionState: "completed",
+          elapsedMs: elapsed(binding.clock.nowMs(), started), safeReasonCode: reasonCode });
+        throw new LiveSearchResponseAdmissionError(reasonCode,
+          rejectedSearchBatchAdmission(response.body, reasonCode));
+      }
       const toolReason = normalized.providerMetadata.finishReason === "length" ? "openrouter_search_response_truncated"
         : normalized.providerMetadata.toolExecutionState === "verified" ? "search_completed"
           : normalized.providerMetadata.toolExecutionState === "not_executed" ? "search_tool_not_executed" : "search_tool_execution_unverified";
-      audit.settle(receiptId, { completionState: normalized.providerMetadata.toolExecutionState === "verified" ? "completed" : "failed",
+      // Response transport completion and search-material usability are independent. A
+      // normalized 2xx envelope was completely received even when the requested search
+      // tool was not executed or its output cannot be trusted after truncation.
+      audit.settle(receiptId, { completionState: "completed",
         elapsedMs: elapsed(binding.clock.nowMs(), started), usageState: normalized.usageKnown ? "known" : "unknown_possible_billable",
         outputTokens: normalized.outputTokens, providerRequestCount: normalized.providerRequestCount, usageCostUsd: normalized.usageCostUsd,
         providerResponseId: normalized.providerMetadata.providerResponseId,
@@ -103,14 +142,27 @@ export function createLiveOpenRouterSearchAdapter(capability: LiveExecutionCapab
         safeReasonCode: toolReason });
       const candidates = normalized.candidates;
       return { attemptId: request.attemptId, questionId: request.questionId, candidates, suggestedAdaptiveReason: null,
+        citationAdmission: normalized.citationAdmission,
         providerMetadata: normalized.providerMetadata, outputAccounting: "search_discovery_not_model_generation" };
-    } catch (error) { settleFailure(audit, receiptId, error, elapsed(binding.clock.nowMs(), started)); throw error; }
+    } catch (error) {
+      if (error instanceof LiveJsonResponseBodyAdmissionError) {
+        const reasonCode = "openrouter_search_response_json_invalid";
+        const admission = rejectedSearchBatchAdmission({}, reasonCode);
+        audit.settle(receiptId, { completionState: "completed", elapsedMs: elapsed(binding.clock.nowMs(), started),
+          usageState: "unknown_possible_billable", safeReasonCode: reasonCode });
+        throw new LiveSearchResponseAdmissionError(reasonCode, admission);
+      }
+      if (!(error instanceof LiveSearchResponseAdmissionError)) {
+        settleFailure(audit, receiptId, error, elapsed(binding.clock.nowMs(), started));
+      }
+      throw error;
+    }
   } };
 }
 
 export function normalizeOpenRouterSearchResponse(body: unknown, context: { request: SearchRequest; expectedModel: string }): {
   candidates: SearchResponse["candidates"]; providerRequestCount: number | null; outputTokens: number | null; usageCostUsd: number | null; usageKnown: boolean;
-  providerMetadata: SearchResponse["providerMetadata"];
+  providerMetadata: SearchResponse["providerMetadata"]; citationAdmission: SearchCitationAdmissionV1;
 } {
   const envelope = record(body);
   if (typeof envelope.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(envelope.id) || envelope.model !== context.expectedModel) {
@@ -129,28 +181,32 @@ export function normalizeOpenRouterSearchResponse(body: unknown, context: { requ
   if (message.annotations !== undefined && !Array.isArray(message.annotations)) throw new Error("openrouter_search_response_malformed");
   const annotations = asArray(message.annotations);
   if (annotations.length > context.request.maximumCandidates) throw new Error("openrouter_search_result_cap_exceeded");
-  const seenUrls = new Set<string>();
-  const candidates = annotations.map((raw, index) => {
+  const seenUrls = new Set<string>(); const rejectionReasonCodes: string[] = [];
+  const candidates = annotations.flatMap((raw, index) => {
     const annotation = record(raw); const citation = record(annotation.url_citation);
     if (annotation.type !== "url_citation" || typeof citation.url !== "string" || typeof citation.title !== "string" || citation.title.length === 0) {
-      throw new Error("openrouter_search_result_malformed");
+      rejectionReasonCodes.push("openrouter_search_result_malformed"); return [];
     }
     let url: URL;
-    try { url = new URL(citation.url); } catch { throw new Error("openrouter_search_result_url_invalid"); }
-    if (url.protocol !== "https:" || url.username || url.password) throw new Error("openrouter_search_result_url_invalid");
+    try { url = new URL(citation.url); } catch {
+      rejectionReasonCodes.push("openrouter_search_result_url_invalid"); return [];
+    }
+    if (url.protocol !== "https:" || url.username || url.password) {
+      rejectionReasonCodes.push("openrouter_search_result_url_invalid"); return [];
+    }
     const normalizedUrl = url.toString();
-    if (seenUrls.has(normalizedUrl)) throw new Error("openrouter_search_duplicate_url");
+    if (seenUrls.has(normalizedUrl)) { rejectionReasonCodes.push("openrouter_search_duplicate_url"); return []; }
     seenUrls.add(normalizedUrl);
     const title = citation.title.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 200);
-    if (!title) throw new Error("openrouter_search_result_malformed");
+    if (!title) { rejectionReasonCodes.push("openrouter_search_result_malformed"); return []; }
     const claimedAuthority = context.request.allowedAuthorities[0]!;
-    return { candidateId: `candidate-${createHash("sha256").update(`${context.request.questionId}\0${normalizedUrl}`).digest("hex").slice(0, 20)}`,
+    return [{ candidateId: `candidate-${createHash("sha256").update(`${context.request.questionId}\0${normalizedUrl}`).digest("hex").slice(0, 20)}`,
       questionId: context.request.questionId, attemptId: context.request.attemptId, url: normalizedUrl, title, claimedAuthority,
       sourceTypeCode: claimedAuthority === "processor_publication" ? "official_processor_terminology" : "official_network_publication",
       rank: index + 1, publicationDate: null, effectiveFrom: null, effectiveTo: null, locatorHint: null,
       selectionReasonCode: "provider_neutral_public_discovery",
       discoveryMetadata: { providerCode: "openrouter_web_search", configurationCode: OPENROUTER_SEARCH_CONFIGURATION_CODE,
-        sourceDomain: url.hostname.toLowerCase(), providerRank: index + 1, providerSnippetUsedAsEvidence: false as const } };
+        sourceDomain: url.hostname.toLowerCase(), providerRank: index + 1, providerSnippetUsedAsEvidence: false as const } }];
   });
   const usage = record(envelope.usage); const serverToolUse = record(usage.server_tool_use);
   const requestCount = Number.isSafeInteger(serverToolUse.web_search_requests) && Number(serverToolUse.web_search_requests) >= 0 ? Number(serverToolUse.web_search_requests) : null;
@@ -161,6 +217,7 @@ export function normalizeOpenRouterSearchResponse(body: unknown, context: { requ
     : requestCount === 1 || candidates.length > 0 ? "verified" : requestCount === 0 ? "not_executed" : "unverified";
   return { candidates, providerRequestCount: requestCount, outputTokens, usageCostUsd,
     usageKnown: requestCount !== null && outputTokens !== null && usageCostUsd !== null,
+    citationAdmission: searchCitationAdmission(annotations.length, candidates.length, rejectionReasonCodes),
     providerMetadata: { providerResponseId: envelope.id, modelIdentifier: envelope.model, finishReason,
       webSearchRequestCount: requestCount, annotationCount: annotations.length, normalizedCandidateCount: candidates.length,
       providerCompletionState: "completed", toolExecutionState } };
@@ -207,7 +264,8 @@ async function sendOpenAiStructured<TRequest extends { batchId: string; attemptI
     assertProviderOutboundPacketSafe({ provider: "openai_responses_api", url: APPROVED_OPENAI_ENDPOINT, method: "POST", headerNames: ["Authorization", "Content-Type"], body });
     const response = await sendLiveJson({ url: APPROVED_OPENAI_ENDPOINT, method: "POST", headers: { Authorization: `Bearer ${binding.openAiApiKey}`, "Content-Type": "application/json" }, body, timeoutMs: 20_000, cancellationSignal: binding.cancellationSignal },
       () => audit.settle(receiptId, { actualSendCount: 1, sendState: "sent" }),
-      (metadata) => audit.settle(receiptId, { httpStatus: metadata.status, providerRequestId: metadata.providerRequestId }));
+      (metadata) => audit.settle(receiptId, { httpStatus: metadata.status,
+        providerRequestId: metadata.providerRequestId, retryAfterAt: metadata.retryAfterAt }));
     if (response.status < 200 || response.status >= 300) {
       audit.settle(receiptId, { ...safeProviderError(response.body), structuredOutputValidation: "not_reached" });
       throw new LiveOperationTransportError("after_send", "openai_responses_http_failure");
@@ -311,6 +369,7 @@ function baseReceipt(receiptId: string, reservationId: string, operationId: stri
     httpStatus: null, localRequestId: null, providerRequestId: null, providerResponseId: null,
     requestedModelIdentifier: null, returnedModelIdentifier: null, finishReason: null, toolExecutionState: null,
     annotationCount: null, normalizedCandidateCount: null, providerErrorType: null, providerErrorCode: null, providerErrorParam: null,
+    retryAfterAt: null,
     structuredOutputValidation: operation === "investigative_model" || operation === "semantic_model" ? "not_reached" : "not_applicable",
     safeReasonCode: "reserved" };
 }
@@ -318,7 +377,10 @@ function settleFailure(audit: ProviderOperationAuditLog, receiptId: string, erro
   const state = error instanceof LiveOperationTransportError ? error.transportState : "before_send";
   const sent = audit.snapshot().find((item) => item.receiptId === receiptId)?.actualSendCount === 1;
   const completionState = !sent ? "not_sent" : state === "timed_out" ? "timed_out" : state === "cancelled" ? "cancelled" : "failed";
-  audit.settle(receiptId, { completionState, elapsedMs, usageState: sent ? "unknown_possible_billable" : "known", safeReasonCode: safeError(error) });
+  const rejected = state === "provider_rejected";
+  audit.settle(receiptId, { completionState, elapsedMs, usageState: sent && !rejected ? "unknown_possible_billable" : "known",
+    ...(rejected ? { outputTokens: 0, providerRequestCount: 0, usageCostUsd: 0 } : {}),
+    safeReasonCode: safeError(error) });
 }
 function openRouterEnvelopeDiagnostics(body: unknown): Partial<ProviderOperationReceiptV1> {
   const envelope = record(body); const choices = asArray(envelope.choices); const choice = record(choices[0]); const message = record(choice.message);
@@ -326,21 +388,63 @@ function openRouterEnvelopeDiagnostics(body: unknown): Partial<ProviderOperation
   const usage = record(envelope.usage); const serverToolUse = record(usage.server_tool_use);
   const requestCount = Number.isSafeInteger(serverToolUse.web_search_requests) && Number(serverToolUse.web_search_requests) >= 0
     ? Number(serverToolUse.web_search_requests) : null;
+  const outputTokens = Number.isSafeInteger(usage.completion_tokens) && Number(usage.completion_tokens) >= 0
+    ? Number(usage.completion_tokens) : null;
+  const usageCostUsd = typeof usage.cost === "number" && Number.isFinite(usage.cost) && usage.cost >= 0 ? usage.cost : null;
   const finishReason = safeDiagnostic(choice.finish_reason);
   const toolExecutionState = finishReason === "length" ? "unverified"
     : requestCount === 1 || annotations.length > 0 ? "verified" : requestCount === 0 ? "not_executed" : "unverified";
   return { providerResponseId: safeIdentifier(envelope.id), returnedModelIdentifier: safeModel(envelope.model), finishReason,
-    providerRequestCount: requestCount, toolExecutionState, annotationCount: annotations.length, normalizedCandidateCount: 0 };
+    providerRequestCount: requestCount, outputTokens, usageCostUsd,
+    usageState: requestCount !== null && outputTokens !== null && usageCostUsd !== null ? "known" : "unknown_possible_billable",
+    toolExecutionState, annotationCount: annotations.length, normalizedCandidateCount: 0 };
+}
+
+function searchCitationAdmission(
+  annotationCount: number,
+  admittedCitationCount: number,
+  rejectionReasonCodes: string[],
+): SearchCitationAdmissionV1 {
+  const rejectedCitationCount = rejectionReasonCodes.length;
+  const outcome = annotationCount === 0 ? "no_citations"
+    : rejectedCitationCount === 0 ? "all_citations_admitted"
+      : admittedCitationCount === 0 ? "no_usable_citations" : "partially_admitted";
+  return { schemaVersion: "openrouter_search_citation_admission_v1", outcome, annotationCount,
+    admittedCitationCount, rejectedCitationCount, reasonCodes: [...new Set(rejectionReasonCodes)].sort(),
+    evidenceAdmissionEffect: "none", analyticalCompletionEffect: "none" };
+}
+
+function rejectedSearchBatchAdmission(body: unknown, reasonCode: string): SearchCitationAdmissionV1 {
+  const envelope = record(body); const choices = asArray(envelope.choices); const message = record(record(choices[0]).message);
+  const annotationCount = Array.isArray(message.annotations) ? message.annotations.length : 0;
+  return { schemaVersion: "openrouter_search_citation_admission_v1", outcome: "batch_rejected", annotationCount,
+    admittedCitationCount: 0, rejectedCitationCount: annotationCount, reasonCodes: [reasonCode],
+    evidenceAdmissionEffect: "none", analyticalCompletionEffect: "none" };
 }
 function safeProviderError(body: unknown): Pick<ProviderOperationReceiptV1, "providerErrorType" | "providerErrorCode" | "providerErrorParam"> {
   const error = record(record(body).error);
   return { providerErrorType: safeDiagnostic(error.type), providerErrorCode: safeDiagnostic(error.code), providerErrorParam: safeDiagnostic(error.param) };
+}
+function knownOpenRouterRejection(status: number): string | null {
+  if (status === 400 || status === 415 || status === 422) return "openrouter_search_request_rejected";
+  if (status === 401) return "openrouter_search_authentication_rejected";
+  if (status === 402) return "openrouter_search_account_rejected";
+  if (status === 403) return "openrouter_search_authorization_rejected";
+  if (status === 404) return "openrouter_search_model_or_endpoint_rejected";
+  if (status === 405 || status === 406) return "openrouter_search_request_contract_rejected";
+  return null;
 }
 function safeIdentifier(value: unknown): string | null { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(value) ? value : null; }
 function safeModel(value: unknown): string | null { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:\/-]{0,255}$/.test(value) ? value : null; }
 function safeDiagnostic(value: unknown): string | null {
   const text = typeof value === "number" && Number.isSafeInteger(value) ? String(value) : typeof value === "string" ? value : "";
   return /^[A-Za-z0-9][A-Za-z0-9_.:\[\]-]{0,127}$/.test(text) ? text : null;
+}
+function safeRetryAfterAt(value: unknown): string | null {
+  if (typeof value !== "string" || value.length > 128) return null;
+  if (/^\d{1,10}$/.test(value)) return new Date(Date.now() + (Number(value) * 1_000)).toISOString();
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
 }
 function extractOutputText(body: Record<string, unknown>): string { if (typeof body.output_text === "string") return body.output_text;
   for (const output of asArray(body.output)) for (const content of asArray(record(output).content)) { const text = record(content).text; if (typeof text === "string") return text; }

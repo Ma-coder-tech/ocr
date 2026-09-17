@@ -3,6 +3,7 @@ import { makeEvidenceRecord, attachParserInterpretation, normalizeEvidenceText }
 import { occurrenceFromEvidence, semanticFeeRowId } from "./feeLedgerIdentity.js";
 import { addMoney, moneyFromNumber } from "./money.js";
 import { parsePrintedRate, printedMonetaryControl } from "./feeLedgerReconciliation.js";
+import { buildCanonicalFeePartitionSourceProvenance } from "./feePartitionSourceProvenance.js";
 import type { ParsedDocument } from "../parser.js";
 import type {
   CanonicalCalculationRecord,
@@ -109,6 +110,12 @@ export function buildCanonicalFeeLedger(input: {
     sourceOccurrences,
     controls: parserControls,
   });
+  const partitionSourceProvenance = buildCanonicalFeePartitionSourceProvenance({
+    rows: canonicalRows,
+    interpretations,
+    sourceOccurrences: [...sourceOccurrences.values()],
+    controls: parserControls,
+  });
   const contributingRows = canonicalRows.filter((row) => row.contributesToUniqueTotal && row.signedAmount !== null);
   const uniqueChargeTotal = contributingRows.length > 0 ? addMoney(contributingRows.map((row) => row.signedAmount!)) : null;
   const calculationRef = uniqueChargeTotal ? "calc_canonical_fee_unique_total" : undefined;
@@ -141,7 +148,6 @@ export function buildCanonicalFeeLedger(input: {
           expectedAmount: printedTotal,
           actualAmount: uniqueChargeTotal,
           derivationGroupId: "canonical_fee_rows_vs_printed_control",
-          documentedOneCentRounding: Math.abs(numberOrNull(feeLedger.delta) ?? 0) === 0.01,
           coveredFeeRowIds: contributingRows.map((row) => row.id),
           basis: "grand_control",
           amountBasis: "signed_net",
@@ -167,6 +173,7 @@ export function buildCanonicalFeeLedger(input: {
     uniqueChargeTotal,
     uniqueChargeCalculationRef: calculationRef,
     controls: reconciliationControls,
+    partitionSourceProvenance,
     limitations: [
       ...(hasBlockingControl ? ["Canonical fee rows do not reconcile to the printed fee control under Package C tolerance policy."] : []),
       ...(hasUnresolved ? ["One or more fee rows remain unresolved or limited."] : []),
@@ -226,6 +233,18 @@ function unavailableLedger(reason: string): CanonicalFeeLedger {
     rows: [],
     uniqueChargeTotal: null,
     controls: [],
+    partitionSourceProvenance: {
+      policyVersion: "fee_partition_source_provenance_v1",
+      authority: "diagnostic_relationship_only",
+      status: "unavailable",
+      assignmentMode: "unavailable",
+      eligibleFeeRowIds: [],
+      sectionControlRefs: [],
+      arithmeticControlRefs: [],
+      assignments: [],
+      rowArithmetic: [],
+      limitations: [],
+    },
     limitations: [reason],
   };
 }
@@ -262,7 +281,6 @@ function parserReconciliationControls(input: {
     const coveredFeeRowIds = coveredRowsForControl(label, input.rows, input.interpretations, hasExplicitGrandControl);
     const amountBasis = controlAmountBasisForLabel(label, basis);
     const actualAmount = reconstructedCoveredRowAmount(input.rows, coveredFeeRowIds, amountBasis);
-    const delta = numberOrNull(control.delta);
     return [
       printedMonetaryControl({
         id: `ctrl_parser_${stableControlId(label, index)}`,
@@ -271,7 +289,6 @@ function parserReconciliationControls(input: {
         expectedAmount: printedTotal,
         actualAmount,
         derivationGroupId: "parser_printed_fee_controls",
-        documentedOneCentRounding: Math.abs(delta ?? Number.NaN) === 0.01,
         coveredFeeRowIds,
         basis,
         amountBasis,

@@ -5,6 +5,9 @@ import type { CanonicalPricingAssertionBasis, CanonicalPricingDerivabilityTier }
 import type { CanonicalSynthesisEvidenceClass } from "./synthesisTypes.js";
 
 export const CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1 = "canonical_synthesis_admission_contract_v1" as const;
+export const CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1 = "canonical_synthesis_admission_contract_v1_1" as const;
+export type CanonicalSynthesisAdmissionContractId = typeof CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1
+  | typeof CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1;
 
 export type CanonicalSynthesisContractV1Application = {
   applicationId: string;
@@ -87,7 +90,7 @@ export type CanonicalContractV1Action = {
 };
 
 export type CanonicalSynthesisContractV1State = {
-  contractId: typeof CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1;
+  contractId: CanonicalSynthesisAdmissionContractId;
   authority: "internal_canonical_analysis_run_only";
   customerReportAuthority: "unchanged";
   providerExecution: "not_executed_during_convergence";

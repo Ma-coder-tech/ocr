@@ -229,6 +229,6 @@ describe("Statement 1 live-search failure recovery", () => {
     ]);
     const projection = await readFile(path.join(outputDirectory, "rh-projection.json"));
     expect(createHash("sha256").update(projection).digest("hex"))
-      .toBe("aca1c2d06383ef42bf93c2dca91ad4e6819cd6ddfb2ad1bd91079333aea9a92c");
+      .toBe("ee3a313c3f4c99f4909a4f45c5e3f5f18d6f3af587cbaacc75e9aeb254b5f4c8");
   }, 30_000);
 });

@@ -23,8 +23,8 @@ describe("one-statement Fiserv pre-UAT harness", () => {
     expect(result.audit).toMatchObject({ rf: { state: "not_applicable_no_admitted_knowledge" }, rg: { state: "disabled_no_provider" },
       integrity: { suppliedDocumentStatus: "complete_supplied_document", statementCompleteness: "unknown" },
       stageValidation: { rb: "valid", rc: "valid", rd: "valid", re: "valid", rh: "valid" },
-      readiness: { source: { templateAdmission: "admitted" }, outcome: { analysisCompletionPermitted: false } },
-      admission: { mappingId: "fiserv_first_data_full_statement", mappingVersion: "1.0.0",
+      readiness: { source: { templateAdmission: "admitted" }, outcome: { analysisCompletionPermitted: true } },
+      admission: { mappingId: "fiserv_statement_level_dynamic_capability_policy", mappingVersion: "2.0.0",
         feeDetailCoverage: "complete_observed_occurrences" },
       familyAdmissionDecision: { matched: true, reasonCodes: [
         "full_admission_accepted_cross_section_structure",
@@ -32,8 +32,8 @@ describe("one-statement Fiserv pre-UAT harness", () => {
         "full_admission_scope_limited_to_enumerated_capabilities",
       ] },
       reviewSummary: { detectedTemplate: "fiserv_first_data_full_statement",
-        matchedAdmissionMappingId: "fiserv_first_data_full_statement",
-        admissionLifecycle: "admitted_with_conditions", evidenceAuthority: "product_owner", parserReportable: true,
+        matchedAdmissionMappingId: "fiserv_statement_level_dynamic_capability_policy",
+        admissionLifecycle: "admitted_with_conditions", evidenceAuthority: "deterministic_capability_policy", parserReportable: true,
         feeDetailCoverage: "complete_observed_occurrences" } });
     expect(result.audit.issueClassifications).not.toContainEqual(expect.objectContaining({ primaryType: "systemic canonical defect" }));
     expect(result.audit.templateAdmissionAudit).toEqual(expect.arrayContaining([
@@ -76,9 +76,10 @@ describe("one-statement Fiserv pre-UAT harness", () => {
     expect(result.audit).toMatchObject({
       schemaVersion: "fiserv_pre_uat_run_audit_v5",
       harnessVersion: "fiserv_pre_uat_one_statement_v5",
-      admission: { mappingId: "fiserv_first_data_short_structural_mapping", mappingVersion: "1.0.0", authorityClass: "product_owner" },
+      admission: { mappingId: "fiserv_statement_level_dynamic_capability_policy", mappingVersion: "2.0.0",
+        authorityClass: "deterministic_capability_policy" },
       readiness: { source: { templateAdmission: "admitted", statementCompleteness: "unknown" },
-        outcome: { state: "statement_completeness_unknown", analysisCompletionPermitted: false,
+        outcome: { state: "statement_completeness_unknown", analysisCompletionPermitted: true,
           reasonCodes: ["statement_completeness_not_proven"] } },
       stageValidation: { rb: "valid", rc: "valid", rd: "valid", re: "valid", rh: "valid" },
       finalPublicExperience: "analysis_with_open_questions",
@@ -101,7 +102,7 @@ describe("one-statement Fiserv pre-UAT harness", () => {
     expect(projection.pricing).toMatchObject({ status: "not_confirmed", underlyingCost: { state: "unknown" },
       schedule: { state: "unknown" }, scope: { state: "unresolved" } });
     const review = await readFile(path.join(outputDirectory, "review.md"), "utf8");
-    expect(review).toContain("fiserv_first_data_short_structural_mapping@1.0.0");
+    expect(review).toContain("fiserv_statement_level_dynamic_capability_policy@2.0.0");
     expect(review).toContain("canonical_derived_from_admitted_inputs");
   }, 30_000);
 });

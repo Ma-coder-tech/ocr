@@ -1,0 +1,1013 @@
+{
+  "createdUtc": "2026-09-05T11:25:55.753596+00:00",
+  "method": "Single-reviewer literal source-cell expectations recorded before semantic output; includes clear phrases outside supported grammar",
+  "statements": [
+    {
+      "id": "holdout-7",
+      "feeRows": [
+        {
+          "descriptionRefs": [
+            "p275-f161"
+          ],
+          "rawDescription": "MC-REG INCENT FRF ADJ POS (DB)",
+          "chargeRefs": [
+            "p275-f165"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f166"
+          ],
+          "rawDescription": "MC-EMRG MKT EDU/GOVT(DB)CAP",
+          "chargeRefs": [
+            "p275-f170"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f171"
+          ],
+          "rawDescription": "MC-REGULATED FRD ADJ COMM (DB)",
+          "chargeRefs": [
+            "p275-f175"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f176"
+          ],
+          "rawDescription": "MC-EMRG MKT EDU/GOVT(DB)",
+          "chargeRefs": [
+            "p275-f180"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f181"
+          ],
+          "rawDescription": "MC-WORLD ELITE PUBLIC SECTOR",
+          "chargeRefs": [
+            "p275-f185"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f186"
+          ],
+          "rawDescription": "MC-ENHANCED PUBLIC SECTOR",
+          "chargeRefs": [
+            "p275-f190"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f191"
+          ],
+          "rawDescription": "MASTERCARD ASSESSMENT FEE 0.0013 TIMES $10013.64",
+          "chargeRefs": [
+            "p275-f195"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "rate": "0.0013",
+            "amount": "10013.64"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p275-f196"
+          ],
+          "rawDescription": "MC ASSESSMNT TRAN AMT >=$1K 0 X TRNS $1448.00",
+          "chargeRefs": [
+            "p275-f200"
+          ],
+          "expectedStatus": "ambiguous",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f201"
+          ],
+          "rawDescription": "MC-AUTH DIGITAL ENABLEMENT MAX 1 TRANSACTIONS AT 0.2",
+          "chargeRefs": [
+            "p275-f205"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "count": "1",
+            "rate": "0.2"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p275-f206"
+          ],
+          "rawDescription": "MC-AUTH DIGITAL ENABLEMENT MIN 4 TRANSACTIONS AT 0.02",
+          "chargeRefs": [
+            "p275-f210"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "count": "4",
+            "rate": "0.02"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p275-f214"
+          ],
+          "rawDescription": "VI-US REGULATED COMM (DB)",
+          "chargeRefs": [
+            "p275-f218"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f219"
+          ],
+          "rawDescription": "VI-SUPER PREMIUM LAC ISS US AC",
+          "chargeRefs": [
+            "p275-f223"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f224"
+          ],
+          "rawDescription": "VI-BUSINESS CARD TR4 LEVEL 2",
+          "chargeRefs": [
+            "p275-f228"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f229"
+          ],
+          "rawDescription": "VI-BUSINESS CARD TR1 LEVEL 2",
+          "chargeRefs": [
+            "p275-f233"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f234"
+          ],
+          "rawDescription": "VISA ASSESSMENT FEE CR 0.0014 TIMES $3472.25",
+          "chargeRefs": [
+            "p275-f238"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "rate": "0.0014",
+            "amount": "3472.25"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p275-f239"
+          ],
+          "rawDescription": "VISA ASSESSMENT FEE DB 0.0013 TIMES $14531.40",
+          "chargeRefs": [
+            "p275-f243"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "rate": "0.0013",
+            "amount": "14531.40"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p275-f244"
+          ],
+          "rawDescription": "VI-CPS GOVERNMENT DEBIT",
+          "chargeRefs": [
+            "p275-f248"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f249"
+          ],
+          "rawDescription": "VI-CPS GOVERNMENT DEBIT (CAP)",
+          "chargeRefs": [
+            "p275-f253"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f254"
+          ],
+          "rawDescription": "VI-BUSINESS CARD TR3 LEVEL 2",
+          "chargeRefs": [
+            "p275-f258"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f259"
+          ],
+          "rawDescription": "VI-CPS GOVERNMENT ALL",
+          "chargeRefs": [
+            "p275-f263"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f264"
+          ],
+          "rawDescription": "VI-US REGULATED (DB)",
+          "chargeRefs": [
+            "p275-f268"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f269"
+          ],
+          "rawDescription": "VI-ADDRESS VER SVC FEE 10 TRANSACTIONS AT 0.001",
+          "chargeRefs": [
+            "p275-f273"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "count": "10",
+            "rate": "0.001"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p275-f277"
+          ],
+          "rawDescription": "DSCVR PSL PUBLIC SVC RW",
+          "chargeRefs": [
+            "p275-f281"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p275-f282"
+          ],
+          "rawDescription": "DISCOVER ASSESSMENT FEE 0.0014 TIMES $548.00",
+          "chargeRefs": [
+            "p275-f286"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "rate": "0.0014",
+            "amount": "548.00"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p276-f31"
+          ],
+          "rawDescription": "ADDRS VERIFICATION SERVICE FEE 1 TRANSACTIONS AT 0.005",
+          "chargeRefs": [
+            "p276-f35"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "count": "1",
+            "rate": "0.005"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p276-f39"
+          ],
+          "rawDescription": "VI COMM CARD I/C SAVINGS ADJ 0.5 DISC RATE TIMES $8.12",
+          "chargeRefs": [
+            "p276-f43"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "rate": "0.5",
+            "amount": "8.12"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p276-f44"
+          ],
+          "rawDescription": "DIGITAL INVESTMENT FEE $548.00 AT0.0001",
+          "chargeRefs": [
+            "p276-f48"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "amount": "548.00",
+            "rate": "0.0001"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p276-f49"
+          ],
+          "rawDescription": "MC-AUTH DIGITAL ENABLEMENT FEE $8313.64 AT0.0002",
+          "chargeRefs": [
+            "p276-f53"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "amount": "8313.64",
+            "rate": "0.0002"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p276-f64"
+          ],
+          "rawDescription": "MC MONTHLY LOCATION FEE",
+          "chargeRefs": [
+            "p276-f68"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p276-f69"
+          ],
+          "rawDescription": "VISA NETWORK FEE CNP 2-06",
+          "chargeRefs": [
+            "p276-f73"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p276-f74"
+          ],
+          "rawDescription": "VISA INTL SERVICE FEE - BASE 0 TRANS TOTALING $162.25",
+          "chargeRefs": [
+            "p276-f78"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "count": "0",
+            "amount": "162.25"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p276-f79"
+          ],
+          "rawDescription": "VS INTL ACQUIRER FEE 0 TRANS TOTALING $162.25",
+          "chargeRefs": [
+            "p276-f83"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "count": "0",
+            "amount": "162.25"
+          }
+        }
+      ]
+    },
+    {
+      "id": "holdout-8",
+      "feeRows": [
+        {
+          "descriptionRefs": [
+            "p279-f144"
+          ],
+          "rawDescription": "MC-REG INCENT FRF ADJ POS (DB)",
+          "chargeRefs": [
+            "p279-f148"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p279-f149"
+          ],
+          "rawDescription": "MASTERCARD ASSESSMENT FEE 0.0013 TIMES $6787.71",
+          "chargeRefs": [
+            "p279-f153"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "rate": "0.0013",
+            "amount": "6787.71"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p279-f154"
+          ],
+          "rawDescription": "MC-WORLDCARD PUBLIC SECTOR",
+          "chargeRefs": [
+            "p279-f158"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p279-f159"
+          ],
+          "rawDescription": "MC ASSESSMNT TRAN AMT >=$1K 0 X TRNS $1418.00",
+          "chargeRefs": [
+            "p279-f163"
+          ],
+          "expectedStatus": "ambiguous",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p279-f164"
+          ],
+          "rawDescription": "MC-WORLD ELITE PUBLIC SECTOR",
+          "chargeRefs": [
+            "p279-f168"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p279-f169"
+          ],
+          "rawDescription": "MC-ENHANCED PUBLIC SECTOR",
+          "chargeRefs": [
+            "p279-f173"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p279-f174"
+          ],
+          "rawDescription": "MC-REGULATED FRD ADJ COMM (DB)",
+          "chargeRefs": [
+            "p279-f178"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p279-f179"
+          ],
+          "rawDescription": "MC-PUBLIC SECTOR",
+          "chargeRefs": [
+            "p279-f183"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p279-f184"
+          ],
+          "rawDescription": "MC-AUTH DIGITAL ENABLEMENT MAX 1 TRANSACTIONS AT 0.2",
+          "chargeRefs": [
+            "p279-f188"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "count": "1",
+            "rate": "0.2"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p279-f189"
+          ],
+          "rawDescription": "MC-AUTH DIGITAL ENABLEMENT MIN 6 TRANSACTIONS AT 0.02",
+          "chargeRefs": [
+            "p279-f193"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "count": "6",
+            "rate": "0.02"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p279-f197"
+          ],
+          "rawDescription": "VI-US REGULATED COMM (DB)",
+          "chargeRefs": [
+            "p279-f201"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p279-f202"
+          ],
+          "rawDescription": "VI-GOVERNMENT PREPAID(CAP)",
+          "chargeRefs": [
+            "p279-f206"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p279-f207"
+          ],
+          "rawDescription": "VISA ASSESSMENT FEE DB 0.0013 TIMES $11571.47",
+          "chargeRefs": [
+            "p279-f211"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "rate": "0.0013",
+            "amount": "11571.47"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p279-f212"
+          ],
+          "rawDescription": "VISA ASSESSMENT FEE CR 0.0014 TIMES $5494.00",
+          "chargeRefs": [
+            "p279-f216"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "rate": "0.0014",
+            "amount": "5494.00"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p279-f217"
+          ],
+          "rawDescription": "VI-CPS GOVERNMENT ALL",
+          "chargeRefs": [
+            "p279-f221"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p279-f222"
+          ],
+          "rawDescription": "VI-CPS GOVERNMENT PREPAID",
+          "chargeRefs": [
+            "p279-f226"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p279-f227"
+          ],
+          "rawDescription": "VI-CPS GOVERNMENT DEBIT",
+          "chargeRefs": [
+            "p279-f231"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p279-f232"
+          ],
+          "rawDescription": "VI-US REGULATED (DB)",
+          "chargeRefs": [
+            "p279-f236"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p279-f240"
+          ],
+          "rawDescription": "MC-AUTH DIGITAL ENABLEMENT FEE $4546.71 AT0.0002",
+          "chargeRefs": [
+            "p279-f244"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "amount": "4546.71",
+            "rate": "0.0002"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p279-f255"
+          ],
+          "rawDescription": "VISA NETWORK FEE CNP 2-06",
+          "chargeRefs": [
+            "p279-f259"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p280-f31"
+          ],
+          "rawDescription": "MC MONTHLY LOCATION FEE",
+          "chargeRefs": [
+            "p280-f35"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        }
+      ]
+    },
+    {
+      "id": "holdout-9",
+      "feeRows": [
+        {
+          "descriptionRefs": [
+            "p283-f480"
+          ],
+          "rawDescription": "MC-WORLD ELITE PUBLIC SECTOR",
+          "chargeRefs": [
+            "p283-f484"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p283-f485"
+          ],
+          "rawDescription": "MC-ENHANCED PUBLIC SECTOR",
+          "chargeRefs": [
+            "p283-f489"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f31"
+          ],
+          "rawDescription": "MC-REG INCENT FRF ADJ POS (DB)",
+          "chargeRefs": [
+            "p284-f35"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f36"
+          ],
+          "rawDescription": "MC-REGULATED FRD ADJ COMM (DB)",
+          "chargeRefs": [
+            "p284-f40"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f41"
+          ],
+          "rawDescription": "MC ASSESSMNT TRAN AMT >=$1K 0 X TRNS $5044.00",
+          "chargeRefs": [
+            "p284-f45"
+          ],
+          "expectedStatus": "ambiguous",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f46"
+          ],
+          "rawDescription": "MASTERCARD ASSESSMENT FEE 0.0013 TIMES $13365.38",
+          "chargeRefs": [
+            "p284-f50"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "rate": "0.0013",
+            "amount": "13365.38"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p284-f51"
+          ],
+          "rawDescription": "MC-WORLDCARD PUBLIC SECTOR",
+          "chargeRefs": [
+            "p284-f55"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f56"
+          ],
+          "rawDescription": "MC-EMRG MKT EDU/GOVT(DB)",
+          "chargeRefs": [
+            "p284-f60"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f61"
+          ],
+          "rawDescription": "MC-EMRG MKT EDU/GOVT(DB)CAP",
+          "chargeRefs": [
+            "p284-f65"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f66"
+          ],
+          "rawDescription": "MC-AUTH DIGITAL ENABLEMENT MIN 2 TRANSACTIONS AT 0.02",
+          "chargeRefs": [
+            "p284-f70"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "count": "2",
+            "rate": "0.02"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p284-f71"
+          ],
+          "rawDescription": "MC-AUTH DIGITAL ENABLEMENT MAX 6 TRANSACTIONS AT 0.2",
+          "chargeRefs": [
+            "p284-f75"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "count": "6",
+            "rate": "0.2"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p284-f79"
+          ],
+          "rawDescription": "VISA ASSESSMENT FEE DB 0.0013 TIMES $7539.50",
+          "chargeRefs": [
+            "p284-f83"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "rate": "0.0013",
+            "amount": "7539.50"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p284-f84"
+          ],
+          "rawDescription": "VI-CPS GOVERNMENT DEBIT",
+          "chargeRefs": [
+            "p284-f88"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f89"
+          ],
+          "rawDescription": "VISA ASSESSMENT FEE CR 0.0014 TIMES $5367.25",
+          "chargeRefs": [
+            "p284-f93"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "rate": "0.0014",
+            "amount": "5367.25"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p284-f94"
+          ],
+          "rawDescription": "VI-CPS GOVERNMENT DEBIT (CAP)",
+          "chargeRefs": [
+            "p284-f98"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f99"
+          ],
+          "rawDescription": "VI-CPS GOVERNMENT PREPAID",
+          "chargeRefs": [
+            "p284-f103"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f104"
+          ],
+          "rawDescription": "VI-CPS GOVERNMENT ALL",
+          "chargeRefs": [
+            "p284-f108"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f109"
+          ],
+          "rawDescription": "VI-US REGULATED COMM (DB)",
+          "chargeRefs": [
+            "p284-f113"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f114"
+          ],
+          "rawDescription": "VI-SUPER PREMIUM LAC ISS US AC",
+          "chargeRefs": [
+            "p284-f118"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f119"
+          ],
+          "rawDescription": "VI-US REGULATED (DB)",
+          "chargeRefs": [
+            "p284-f123"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f127"
+          ],
+          "rawDescription": "DSCVR PSL PUBLIC SVC RW",
+          "chargeRefs": [
+            "p284-f131"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f132"
+          ],
+          "rawDescription": "DISCOVER ASSESSMENT FEE 0.0014 TIMES $788.00",
+          "chargeRefs": [
+            "p284-f136"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "rate": "0.0014",
+            "amount": "788.00"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p284-f137"
+          ],
+          "rawDescription": "ADDRS VERIFICATION SERVICE FEE 1 TRANSACTIONS AT 0.005",
+          "chargeRefs": [
+            "p284-f141"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "count": "1",
+            "rate": "0.005"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p284-f145"
+          ],
+          "rawDescription": "DIGITAL INVESTMENT FEE $788.00 AT0.0001",
+          "chargeRefs": [
+            "p284-f149"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "amount": "788.00",
+            "rate": "0.0001"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p284-f150"
+          ],
+          "rawDescription": "MC-AUTH DIGITAL ENABLEMENT FEE $5512.38 AT0.0002",
+          "chargeRefs": [
+            "p284-f154"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "amount": "5512.38",
+            "rate": "0.0002"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p284-f165"
+          ],
+          "rawDescription": "MC MONTHLY LOCATION FEE",
+          "chargeRefs": [
+            "p284-f169"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f170"
+          ],
+          "rawDescription": "VISA NETWORK FEE CNP 2-06",
+          "chargeRefs": [
+            "p284-f174"
+          ],
+          "expectedStatus": "not_explicit",
+          "values": null
+        },
+        {
+          "descriptionRefs": [
+            "p284-f175"
+          ],
+          "rawDescription": "VISA INTL SERVICE FEE - BASE 0 TRANS TOTALING $162.25",
+          "chargeRefs": [
+            "p284-f179"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "count": "0",
+            "amount": "162.25"
+          }
+        },
+        {
+          "descriptionRefs": [
+            "p284-f180"
+          ],
+          "rawDescription": "VS INTL ACQUIRER FEE 0 TRANS TOTALING $162.25",
+          "chargeRefs": [
+            "p284-f184"
+          ],
+          "expectedStatus": "clear_basis",
+          "values": {
+            "count": "0",
+            "amount": "162.25"
+          }
+        }
+      ]
+    }
+  ]
+}

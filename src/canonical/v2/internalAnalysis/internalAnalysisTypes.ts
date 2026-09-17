@@ -1,4 +1,5 @@
-import type { BudgetSnapshot, IntelligenceDiagnostic, RuntimeDocumentResult, SearchAttempt, SemanticVerificationStatus } from "../intelligence/intelligenceTypes.js";
+import type { BudgetSnapshot, IntelligenceDiagnostic, PublicRetrievalTransportDiagnosticsV1,
+  RuntimeDocumentResult, SearchAttempt, SemanticVerificationStatus } from "../intelligence/intelligenceTypes.js";
 export type { ProviderSafeQuestionContextV1 } from "../intelligence/intelligenceTypes.js";
 import type { KnowledgeClaimValue, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
 import type { ObservationPlanningAuditV1 } from "./observationOrigins.js";
@@ -255,9 +256,9 @@ export type ProviderOperationReceiptV1 = {
   operationId: string;
   operation: "search" | "retrieval" | "investigative_model" | "semantic_model";
   providerCode: string;
-  logicalAttempt: 1;
+  logicalAttempt: number;
   actualSendCount: 0 | 1;
-  retryCount: 0;
+  retryCount: number;
   sendState: "not_sent" | "sent";
   completionState: "reserved" | "not_sent" | "completed" | "timed_out" | "cancelled" | "failed" | "unknown_possible_billable";
   elapsedMs: number;
@@ -279,6 +280,8 @@ export type ProviderOperationReceiptV1 = {
   providerErrorType: string | null;
   providerErrorCode: string | null;
   providerErrorParam: string | null;
+  retryAfterAt?: string | null;
   structuredOutputValidation: "not_applicable" | "not_reached" | "passed" | "failed";
   safeReasonCode: string;
+  retrievalTransportDiagnostics?: PublicRetrievalTransportDiagnosticsV1 | null;
 };

@@ -89,7 +89,10 @@ export function buildCanonicalMerchantReportProjectionV2(
       .map((charge) => charge.contributingOccurrenceRef)
       .filter((value): value is string => value !== null),
   );
-  const hardReadinessBlock = ["unsupported_source", "parser_not_reportable", "incomplete_document", "incomplete_statement"].includes(readiness.outcome.state);
+  const capabilitySupport = readiness.source.capabilitySupport;
+  const hardReadinessBlock = capabilitySupport
+    ? !["supported_limited", "supported_full"].includes(capabilitySupport.state)
+    : ["unsupported_source", "parser_not_reportable", "incomplete_document", "incomplete_statement"].includes(readiness.outcome.state);
   const foundationalUnsafe = hardReadinessBlock ||
     synthesis.validation.status !== "valid"
     || synthesis.economicAnalysis.validation.status !== "valid"
@@ -139,7 +142,7 @@ export function buildCanonicalMerchantReportProjectionV2(
             : "unresolved_material_items" as const;
   const priority: RhPriority = foundationalUnsafe ? "review" : maxPriority(attention.map((item) => item.priority), openQuestionState);
   const evidenceStrength = foundationalUnsafe ? "unresolved" as const : determineEvidenceStrength(synthesis, questions.length);
-  const permissions = buildPermissions({
+  const permissions = applyCapabilityPermissionCeilings(buildPermissions({
     foundationalUnsafe,
     pricing,
     synthesis,
@@ -151,12 +154,13 @@ export function buildCanonicalMerchantReportProjectionV2(
     hasActions: actions.length > 0,
     comparisonAvailable: false,
     continuationAvailable: !foundationalUnsafe,
-  });
+  }), readiness);
 
   const identity = safeIdentity(input);
   const snapshot = foundationalUnsafe ? null : buildSnapshot(context);
-  const composition = foundationalUnsafe ? null : buildComposition(context);
-  const inventory = foundationalUnsafe ? null : buildInventory(context);
+  const composition = foundationalUnsafe || permissions.composition.state === "denied" ? null
+    : buildComposition(context, permissions.composition_percentages.state === "permitted");
+  const inventory = foundationalUnsafe || permissions.inventory.state === "denied" ? null : buildInventory(context);
   const pricingProjection = foundationalUnsafe ? null : buildPricing(pricing);
   const verdictCopy = experience === "unable_to_complete"
     ? ["unable_title", "unable_body"] as const
@@ -375,7 +379,7 @@ function pricingScopeCopy(axis: CanonicalPricingAxisConclusion<unknown>): RhCust
   return rhCopy(map[String(axis.value)] ?? "pricing_unknown");
 }
 
-function buildComposition(context: Context): CanonicalMerchantReportProjectionV2["composition"] {
+function buildComposition(context: Context, percentagesPermitted: boolean): CanonicalMerchantReportProjectionV2["composition"] {
   const stack = context.synthesis.economicAnalysis.economicLayer.costStack;
   const unreconciled = stack.completeness === "financially_unreconciled" || stack.completeness === "not_derivable_from_document";
   const partial = stack.completeness === "partial_but_financially_reconciled";
@@ -389,7 +393,8 @@ function buildComposition(context: Context): CanonicalMerchantReportProjectionV2
         code,
         label: rhCopy(categoryCopy(code)),
         amount: bucket.debitAmount,
-        percentageOfPositiveCosts: unreconciled || positive === 0 ? null : ratio(bucket.debitAmount.amountMinor, positive),
+        percentageOfPositiveCosts: !percentagesPermitted || unreconciled || positive === 0
+          ? null : ratio(bucket.debitAmount.amountMinor, positive),
       };
     });
   const creditOffsets: RhFeeCreditOffset[] = stack.buckets
@@ -412,7 +417,7 @@ function buildComposition(context: Context): CanonicalMerchantReportProjectionV2
     unresolvedDifference: unreconciled
       ? differenceMinor ? { state: "known", amount: money(differenceMinor) } : { state: "unknown", amount: null }
       : { state: "none", amount: null },
-    percentagesPermitted: !unreconciled,
+    percentagesPermitted: percentagesPermitted && !unreconciled,
   };
 }
 
@@ -612,6 +617,43 @@ function buildPermissions(input: {
   permissions.external_source = permission("external_source", "denied", "external_citations_disabled", "denied");
   permissions.methodology = permission("methodology", input.foundationalUnsafe ? "denied" : "permitted", input.foundationalUnsafe ? "foundational_reporting_unsafe" : "methodology_available", input.foundationalUnsafe ? "denied" : "presentation_only");
   permissions.continuation = permission("continuation", input.continuationAvailable ? "permitted" : "denied", input.continuationAvailable ? "continuation_available" : "continuation_hidden_for_unable", input.continuationAvailable ? "presentation_only" : "denied");
+  return permissions;
+}
+
+function applyCapabilityPermissionCeilings(
+  permissions: Record<RhPermissionCategory, RhVisibilityPermission>,
+  readiness: SourceReadinessEnvelope,
+): Record<RhPermissionCategory, RhVisibilityPermission> {
+  const upstream = readiness.source.capabilitySupport?.outputPermissions;
+  if (!upstream) return permissions;
+  const state = (output: string) => upstream.find((item) => item.output === output)?.state ?? "withheld";
+  const deny = (category: RhPermissionCategory) => {
+    permissions[category] = permission(category, "denied", "population_unproven", "denied");
+  };
+  const limit = (category: RhPermissionCategory) => {
+    if (permissions[category].state === "permitted") {
+      permissions[category] = permission(category, "limited", "population_unproven", "upstream_canonical_only");
+    }
+  };
+  if (state("net_submitted_volume") === "withheld" || state("total_processing_fees") === "withheld") {
+    deny("financial_metrics");
+  }
+  if (state("headline_effective_rate") === "withheld") deny("effective_rate");
+  if (state("transaction_count") === "withheld") deny("transaction_count");
+  if (state("complete_fee_inventory") === "withheld") {
+    if (state("partial_fee_inventory") === "withheld") deny("inventory"); else limit("inventory");
+  }
+  if (state("complete_fee_composition") === "withheld") {
+    if (state("partial_fee_composition") === "withheld") {
+      deny("composition");
+      deny("partial_composition");
+      deny("composition_percentages");
+    } else {
+      limit("composition");
+      deny("composition_percentages");
+    }
+  }
+  if (state("statement_period_source_identity") === "withheld") deny("statement_evidence");
   return permissions;
 }
 

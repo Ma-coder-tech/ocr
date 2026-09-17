@@ -23,6 +23,8 @@ export function financialFoundationHash(input: {
     sourceSections: rb.sourceModel.sections,
     occurrences: rb.sourceModel.occurrences,
     representationGroups: rb.sourceModel.representationGroups,
+    processorPresentedCategories: rb.sourceModel.processorPresentedCategories,
+    processorPresentedCategoryControls: rb.sourceModel.processorPresentedCategoryControls,
     financialPopulations: rb.financialPopulations,
     metrics: rb.metrics,
     reconciliation: rb.reconciliation,

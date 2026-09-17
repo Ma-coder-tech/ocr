@@ -1,0 +1,33 @@
+{
+  "frozen_utc": "2026-09-05T09:54:55.477963+00:00",
+  "files": {
+    "structure.py": "bafc72e1a1e8fd8793fd0009f820b59a8c7b74a0b7cc476a66a78ee4b0cf2e1b",
+    "coverage.py": "32c3014dfe01f8eb9dabb4ccbc7d551fb38b4180a60dad2cfc9dd40fb4bf81d0",
+    "test_structure.py": "dab18d181ae2246067249a5ec6d12649d41c92e9c71ba9e56b60d8796ee72354",
+    "test_revision.py": "3f917f3572b6510b332e9c404485713117aad5138ea17a6b872d0a224e540a84",
+    "test_coverage.py": "41cbb6dc9505559fe8363b7bd37303b72f50cabcff5b91a1305cdfeb3437531d",
+    "protocol.md": "db47a7ba0444dab7a5fa35dad4533b6eeef57eb063ade92b013e051a24c8bb93"
+  },
+  "reserved_source_pages": [
+    [
+      273,
+      274,
+      275,
+      276
+    ],
+    [
+      277,
+      278,
+      279,
+      280
+    ],
+    [
+      281,
+      282,
+      283,
+      284,
+      285
+    ]
+  ],
+  "note": "Before opening reserved statement table contents or renders. Do not tune after unblinding."
+}

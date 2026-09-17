@@ -1,0 +1,261 @@
+{
+  "schema": "printed-structure-preservation-v1",
+  "publicSourceUrl": "https://monroe-clerk.com/uploads/documents/Questions_Answers_-_Monroe_County_Clerk_BOCC_RFP_Banking_Services_1.pdf",
+  "files": [
+    {
+      "file": "basys-native.json.gz",
+      "restorePath": "artifacts/printed-membership-v1/basys-native.json",
+      "sha256": "ff226f4a1e5f1d4d7ff96eb7066ef72ac0f1d13839e0dbdd59f4983520224f9d"
+    },
+    {
+      "file": "basys-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/basys-inventory.json",
+      "sha256": "48563d5fe765f32d50803504f9751dd5e2bc96d4dbe006bb032a4a788f37774b"
+    },
+    {
+      "file": "basys-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/basys-structure.json",
+      "sha256": "973be64f6143e0c4d6acddc923c3c2aa0532edd2cc806328e07f796fc7831570"
+    },
+    {
+      "file": "clover-november-native.json.gz",
+      "restorePath": "artifacts/printed-membership-v1/clover-november-native.json",
+      "sha256": "3d839732477903c323599df57584e679f2068dbcc26314f2b3f16fb9de946af6"
+    },
+    {
+      "file": "clover-november-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/clover-november-inventory.json",
+      "sha256": "dfd8443bd0f34d98f67788ef40ec143f01f435de3eff78add7d93a073dd19497"
+    },
+    {
+      "file": "clover-november-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/clover-november-structure.json",
+      "sha256": "78a8bd0cb861406f9d11485eeeb3064e332f3abaca34eb8506cebda6458bf6b8"
+    },
+    {
+      "file": "clover-october-native.json.gz",
+      "restorePath": "artifacts/printed-membership-v1/clover-october-native.json",
+      "sha256": "451dc2c0f6a9be1b81a7f26937ec0225bb2baf8aaf7f8d71a76167481c1157b5"
+    },
+    {
+      "file": "clover-october-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/clover-october-inventory.json",
+      "sha256": "7426008eae3290a8c2345f31a96d0209e9fcf7d4eff787fdbbb75a5e5c6f87bd"
+    },
+    {
+      "file": "clover-october-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/clover-october-structure.json",
+      "sha256": "637a859b5932eab77d45e6f38eb5c696038c67a3468b33e9c08ae14de53a3dbf"
+    },
+    {
+      "file": "holdout-1-native.json.gz",
+      "restorePath": "artifacts/printed-membership-v1/holdout-sealed/holdout-1-native.json",
+      "sha256": "cbaa6a10fd8c3650684e03bc1c43a62a80c2c81d531ccb2dfcb30a538f18459e"
+    },
+    {
+      "file": "holdout-1-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-1-inventory.json",
+      "sha256": "5d916ed9349adbedeede3a0762de98d6a4fe90526ab36d40cc68af8ea12b8fb5"
+    },
+    {
+      "file": "holdout-1-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-1-structure.json",
+      "sha256": "0a3bc9db171b98fd140e87411c0a8f79ff8f0a9477ef12118f927d4e29fe8a23"
+    },
+    {
+      "file": "holdout-2-native.json.gz",
+      "restorePath": "artifacts/printed-membership-v1/holdout-sealed/holdout-2-native.json",
+      "sha256": "1c33acea1534887b848613f0b289fc94f399d430fd60e33de7a5f0446879cefd"
+    },
+    {
+      "file": "holdout-2-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-2-inventory.json",
+      "sha256": "ea69eb23761bc512a6a0e0d9bf82b2f8522b2d369892ae7fc262348104bdd0be"
+    },
+    {
+      "file": "holdout-2-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-2-structure.json",
+      "sha256": "65bfc1a8ad90c454298391708d72f5310e4594a33511230970f829e31d1966e2"
+    },
+    {
+      "file": "holdout-3-native.json.gz",
+      "restorePath": "artifacts/printed-membership-v1/holdout-sealed/holdout-3-native.json",
+      "sha256": "c8f5d481fe2ab641a2ba148fc834f4bc894ad62000faa2b845ea7f030911c9af"
+    },
+    {
+      "file": "holdout-3-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-3-inventory.json",
+      "sha256": "60827cf8ad4335ffd99ccabc548374ac10fb6e477585d1514971c66566f13fcc"
+    },
+    {
+      "file": "holdout-3-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-3-structure.json",
+      "sha256": "766fb5032b067201b35379fd7674513e28cbb0f47218e9b44345fc7e09f0e2b4"
+    },
+    {
+      "file": "holdout-4-native.json.gz",
+      "restorePath": "artifacts/printed-membership-v1/holdout-sealed/holdout-4-native.json",
+      "sha256": "516a35f04972c9286f9b21c1c19b1b21cecdab8f74b4c690576fa1e2cd4a4fbb"
+    },
+    {
+      "file": "holdout-4-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-4-inventory.json",
+      "sha256": "11861c712fd13583ef16daa04713fa5b2bf7f899c5afe0bfae076e9ba11d05b9"
+    },
+    {
+      "file": "holdout-4-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-4-structure.json",
+      "sha256": "b686c20d785a159f883c293bbbe3879c5735335030284041ea2ebd8f13b472ad"
+    },
+    {
+      "file": "holdout-5-native.json.gz",
+      "restorePath": "artifacts/printed-membership-v1/holdout-sealed/holdout-5-native.json",
+      "sha256": "5ffb12477cf28572448c815d4f222be4047139ce5cee49b2dd1593e2f94c68bf"
+    },
+    {
+      "file": "holdout-5-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-5-inventory.json",
+      "sha256": "a022af0072a4de6fa811ee37c5eb24f399e9f2ae86a55f9b2d27231e1df8eb25"
+    },
+    {
+      "file": "holdout-5-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-5-structure.json",
+      "sha256": "2918804810f16b13d1bf9eeb8ae1dd808967d452e39c0f48fefac680a8aecebb"
+    },
+    {
+      "file": "holdout-6-native.json.gz",
+      "restorePath": "artifacts/printed-membership-v1/holdout-sealed/holdout-6-native.json",
+      "sha256": "6141b804923e06f06f5e67e350b1a61a931c46361f9dbcd7661afeb13b092e8c"
+    },
+    {
+      "file": "holdout-6-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-6-inventory.json",
+      "sha256": "b0f0b47e6cee1183c8dde75a7f3a20054a4fac426e50d8ef9a736de0e30c824a"
+    },
+    {
+      "file": "holdout-6-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-6-structure.json",
+      "sha256": "d73635d431f03619dba98f86ec26375415f094de4efc8f1903b2272b74e2bc75"
+    },
+    {
+      "file": "holdout-7-native.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-7-native.json",
+      "sha256": "483023393fa812f7e5b1c2950aa5eca665f4cdc73376fed168951723f558fe65"
+    },
+    {
+      "file": "holdout-7-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-7-inventory.json",
+      "sha256": "62f4881bdd38f9c86b849855398a0e4380d4d5903f05b240aa2356cd94a79a4c"
+    },
+    {
+      "file": "holdout-7-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-7-structure.json",
+      "sha256": "cf96877e07dc085f2160fe799dbcba5f75e1dbd2fd6bf2eafcec2b181307e38b"
+    },
+    {
+      "file": "holdout-8-native.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-8-native.json",
+      "sha256": "642862b885b06120ce8c8c1934936f5cc1dcba6aa8e37b73e2e272fc8a64b575"
+    },
+    {
+      "file": "holdout-8-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-8-inventory.json",
+      "sha256": "b5663e70ae834f59ee5df06df347fd144a5ba85baece1a6819eda48d0a3574d9"
+    },
+    {
+      "file": "holdout-8-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-8-structure.json",
+      "sha256": "faad235437c2de4ad5db6feb83984f76abd50a86556d9a650c1431b1df0bd799"
+    },
+    {
+      "file": "holdout-9-native.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-9-native.json",
+      "sha256": "1b22538936094b445d4ebfdef09a2db878a6de627630db32c93aa9c6eb74b23f"
+    },
+    {
+      "file": "holdout-9-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-9-inventory.json",
+      "sha256": "cdc78061b38f0a91c72d876849a500822ead5a94474fd0aaaac34119b89b7cec"
+    },
+    {
+      "file": "holdout-9-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-9-structure.json",
+      "sha256": "774a1c28cee4fe1b2ba746fa78aafc2cb623db4feda9883ed4099279d10aeb16"
+    },
+    {
+      "file": "paysafe-native.json.gz",
+      "restorePath": "artifacts/printed-membership-v1/paysafe-native.json",
+      "sha256": "d08455a1ec35f633d63b6781c106f9f62bcf40e743e7a21ec768347c5e1b3d9a"
+    },
+    {
+      "file": "paysafe-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/paysafe-inventory.json",
+      "sha256": "2120d4ee1bbb93f0d5d31c2df51dd002507572cea0fed6f59b7564a13ec56d73"
+    },
+    {
+      "file": "paysafe-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/paysafe-structure.json",
+      "sha256": "c0f6025ceb4a0bb108abf81254a5d106bee43795bb60bc12cbc717170ae587e7"
+    },
+    {
+      "file": "paysafe-zero-native.json.gz",
+      "restorePath": "artifacts/printed-membership-v1/paysafe-zero-native.json",
+      "sha256": "ff81d5db19b7c90877e244c8fece68c88ae7ae7ec824c6ec11ce716ad9a1a3a8"
+    },
+    {
+      "file": "paysafe-zero-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/paysafe-zero-inventory.json",
+      "sha256": "358cf9d6c273c685e0907e7bb26743c162c631c755c39b662f285975fff09c14"
+    },
+    {
+      "file": "paysafe-zero-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/paysafe-zero-structure.json",
+      "sha256": "9c0265ed3a69b343d656f022e6e9570fcc1c74ace4539b92596cdefb827b4c05"
+    },
+    {
+      "file": "priority-native.json.gz",
+      "restorePath": "artifacts/printed-membership-v1/priority-native.json",
+      "sha256": "d3a669729b849afa1049a28c52b42c3c141f684cfcbb25473620c19abfb43bc0"
+    },
+    {
+      "file": "priority-inventory.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/priority-inventory.json",
+      "sha256": "975680506ebb2de9757c83af2562f388f2f5d2f7cb4f42d7127814a5186ebf51"
+    },
+    {
+      "file": "priority-structure.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/priority-structure.json",
+      "sha256": "d77d01ba2e9d4cc77ea3e0d26fa5d53275fc292d4ede052bf21c7f15bac0d0bf"
+    },
+    {
+      "file": "scores.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/scores.json",
+      "sha256": "f3db6cb1492b76d0aee0080a2bcfc923b9d0107551900072cff23eff36487dd9"
+    },
+    {
+      "file": "holdout-challenges.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/holdout-challenges.json",
+      "sha256": "60eed1f5ee891081a5f1a08852d02a93cfb6cd965ea0c1c6109a1251c2ae17bb"
+    },
+    {
+      "file": "boundary-audit.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/boundary-audit.json",
+      "sha256": "5b8ef251c9a33dafb62cde6616a9bde381d6e5bf8fb6bce8660bf7904ace2816"
+    },
+    {
+      "file": "tests.log.gz",
+      "restorePath": "artifacts/printed-coverage-v1/tests.log",
+      "sha256": "ecf891df1dd7567975ec24c8281099aef11332763409b1e2ad305665232d5553"
+    },
+    {
+      "file": "record-tests.log.gz",
+      "restorePath": "artifacts/printed-coverage-v1/record-tests.log",
+      "sha256": "dc9ba6c1bfbfddedf8d9a6f0cb98aad4c324bec643195a429eb4477f42847318"
+    },
+    {
+      "file": "selection.json.gz",
+      "restorePath": "artifacts/printed-coverage-v1/selection.json",
+      "sha256": "3d283cc749094ff8274f6e93a287d61a9165aa96705abbd4179592d2443e28be"
+    }
+  ]
+}

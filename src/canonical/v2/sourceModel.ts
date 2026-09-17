@@ -9,6 +9,8 @@ import type {
   CanonicalEconomicsV2OccurrenceRole,
   CanonicalEconomicsV2PopulationSemantic,
   CanonicalEconomicsV2PrintedDirection,
+  CanonicalEconomicsV2ProcessorPresentedCategoryIdentity,
+  CanonicalEconomicsV2ProcessorPresentedCategoryRepresentation,
   CanonicalEconomicsV2RepresentationGroup,
   CanonicalEconomicsV2SectionKind,
   CanonicalEconomicsV2SourceModel,
@@ -55,14 +57,28 @@ export type CanonicalEconomicsV2RepresentationAdmission = {
   limitations?: string[];
 };
 
+export type CanonicalEconomicsV2ProcessorPresentedCategoryAdmission = {
+  key: string;
+  categoryIdentity: CanonicalEconomicsV2ProcessorPresentedCategoryIdentity;
+  processorPresentedLabel: CanonicalEconomicsV2ProcessorPresentedCategoryRepresentation["processorPresentedLabel"];
+  preservedMeaning: CanonicalEconomicsV2ProcessorPresentedCategoryRepresentation["preservedMeaning"];
+  observationStatus: CanonicalEconomicsV2ProcessorPresentedCategoryRepresentation["observationStatus"];
+  observedAmountMinor: number | null;
+  coverageStatus: CanonicalEconomicsV2ProcessorPresentedCategoryRepresentation["coverageStatus"];
+  occurrenceKeys: string[];
+  limitations?: string[];
+};
+
 export function buildCanonicalEconomicsV2SourceModel(input: {
   documentIr: DocumentIR;
   sourceDocumentRef: string;
+  sourceFingerprint: string;
   parserId: string;
   parserVersion: string | null;
   sectionAdmissions?: CanonicalEconomicsV2SectionAdmission[];
   occurrences: CanonicalEconomicsV2OccurrenceInput[];
   representationAdmissions?: CanonicalEconomicsV2RepresentationAdmission[];
+  processorPresentedCategoryAdmissions?: CanonicalEconomicsV2ProcessorPresentedCategoryAdmission[];
 }): { sourceModel: CanonicalEconomicsV2SourceModel; occurrenceRefByKey: Map<string, string> } {
   const sectionAdmissions = new Map(
     (input.sectionAdmissions ?? []).map((admission) => [normalize(admission.sourceSection), admission]),
@@ -190,6 +206,54 @@ export function buildCanonicalEconomicsV2SourceModel(input: {
         : "repeated_representation";
     }
   }
+  const processorPresentedCategories = (input.processorPresentedCategoryAdmissions ?? []).map((admission) => {
+    const occurrenceRefs = unique(admission.occurrenceKeys
+      .map((key) => occurrenceRefByKey.get(key))
+      .filter((value): value is string => Boolean(value)));
+    const evidenceRefs = unique(occurrenceRefs
+      .map((occurrenceRef) => occurrenceById.get(occurrenceRef)?.evidenceRef)
+      .filter((value): value is string => Boolean(value)));
+    return {
+      id: stableId("processor-presented-category", input.sourceDocumentRef, admission.key),
+      categoryIdentity: admission.categoryIdentity,
+      processorPresentedLabel: admission.processorPresentedLabel,
+      preservedMeaning: admission.preservedMeaning,
+      observationStatus: admission.observationStatus,
+      observedAmount: admission.observedAmountMinor === null
+        ? null : moneyFromNumber(admission.observedAmountMinor / 100),
+      coverageStatus: admission.coverageStatus,
+      completenessState: {
+        suppliedDocumentStatus: "unknown" as const,
+        statementCompletenessStatus: "unknown" as const,
+        proofEvidenceRefs: [],
+      },
+      contradictionState: "not_comparable" as const,
+      sourceProvenance: {
+        documentRef: input.sourceDocumentRef,
+        sourceFingerprint: input.sourceFingerprint,
+        occurrenceRefs,
+        evidenceRefs,
+      },
+      independentlyProvenSplitFactRefs: [],
+      controlRefs: [],
+      contributionPermission: "prohibited_observation_only" as const,
+      prohibitedDerivedSemantics: [
+        "settlement_adjustment",
+        "chargeback_principal",
+        "representment",
+        "reversal",
+        "lifecycle",
+        "net_funded",
+        "fee",
+        "downstream_economics",
+      ] as const,
+      limitations: unique([
+        "This source representation preserves the processor's category label and amount without granting financial contribution authority.",
+        "Stronger subtype semantics require independent statement evidence and claim-specific controls.",
+        ...(admission.limitations ?? []),
+      ]),
+    };
+  });
   for (const section of outputSections) {
     section.declaredControlOccurrenceRefs = occurrences
       .filter((occurrence) => occurrence.sectionRef === section.id && occurrence.contributionRole === "control_only")
@@ -201,6 +265,8 @@ export function buildCanonicalEconomicsV2SourceModel(input: {
       sections: outputSections,
       occurrences,
       representationGroups,
+      processorPresentedCategories,
+      processorPresentedCategoryControls: [],
       evidence,
       parserInterpretations,
     },

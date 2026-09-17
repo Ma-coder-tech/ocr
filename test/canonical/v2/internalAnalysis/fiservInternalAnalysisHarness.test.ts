@@ -36,7 +36,7 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
       finalPublicExperience: "analysis_with_open_questions",
       stageValidation: { rb: "valid", rc: "valid", rd: "valid", re: "valid", rh: "valid" },
       readiness: { outcome: { state: "statement_completeness_unknown" } },
-      admission: { mappingId: "fiserv_first_data_short_structural_mapping" },
+      admission: { mappingId: "fiserv_statement_level_dynamic_capability_policy" },
     });
     expect(result.investigationOrigins.origins).toHaveLength(2);
     expect(result.investigationOrigins.origins.map((item) => item.questionClass)).toEqual([
@@ -180,7 +180,7 @@ describe("Statement 1 end-to-end internal analysis vertical slice", () => {
     expect(internalReview).toContain("Research outcome: **source_rejected_by_authority_policy**");
     const projection = await readFile(path.join(outputDirectory, "rh-projection.json"));
     expect(createHash("sha256").update(projection).digest("hex"))
-      .toBe("aca1c2d06383ef42bf93c2dca91ad4e6819cd6ddfb2ad1bd91079333aea9a92c");
+      .toBe("ee3a313c3f4c99f4909a4f45c5e3f5f18d6f3af587cbaacc75e9aeb254b5f4c8");
   }, 30_000);
 
   it("fails a changed known-source fingerprint closed before investigation", async () => {

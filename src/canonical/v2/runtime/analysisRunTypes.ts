@@ -1,5 +1,9 @@
 import type { ParserDecision, ParserDriver } from "../../../parserFoundation.js";
 import type { ParsedDocument } from "../../../parser.js";
+import type { CanonicalRbLimitedAuthorityResult } from "../../../reconstructionKernel/canonicalRbLimitedAuthority.js";
+import type { CanonicalRbLimitedAuthorityRegenerationResult } from "../../../reconstructionKernel/canonicalRbLimitedAuthorityRegeneration.js";
+import type { CanonicalRbReconstructionShadowResult } from "../../../reconstructionKernel/canonicalRbShadow.js";
+import type { CombinedAdjustmentChargebackQualificationResult } from "../../../reconstructionKernel/combinedAdjustmentChargebackQualification.js";
 import type { ReturnTypeOrNull } from "./typeUtilities.js";
 import type { buildCanonicalEconomicsV2FromFiserv } from "../fiservAdapter.js";
 import type { buildObservationalCanonicalPricingV2FromFiserv } from "../fiservPricingAdapter.js";
@@ -18,9 +22,11 @@ import type { CanonicalRfClaimResolution } from "./rfClaimResolution.js";
 import type { CanonicalRgWorkLedger } from "./rgWorkLedger.js";
 import type { CanonicalAnalysisRunAutonomousLifecycle } from "./adaptiveContinuationTypes.js";
 import { ATOMIC_RESEARCH_CONTROL_POLICY_VERSION } from "./researchControl.js";
+import type { CanonicalSynthesisAdmissionContractId } from "../synthesisContractV1Types.js";
+import { FISERV_CAPABILITY_CONTRACT_VERSION } from "../fiservCapabilityContract.js";
 
-export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v10";
-export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "atomic_research_control_and_saturation_v1";
+export const ANALYSIS_RUN_SCHEMA_VERSION = "canonical_analysis_run_v11";
+export const ANALYSIS_RUN_IMPLEMENTATION_VERSION = "rb_dynamic_capability_contract_v1_1_and_atomic_research_control_v1";
 export const ANALYSIS_RUN_POLICY_VERSION = "frozen_product_model_runtime_policy_v0_2";
 
 export const ANALYSIS_RUN_STAGE_IDS = [
@@ -61,11 +67,14 @@ export type AnalysisRunManifest = {
   rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled";
   rgPlanning: "durable_claim_scoped_execution_eligible";
   semanticConvergence: "current_run_exact_claim_revisioned";
-  synthesisAdmissionContract: "canonical_synthesis_admission_contract_v1";
+  synthesisAdmissionContract: CanonicalSynthesisAdmissionContractId;
   adaptiveContinuation: "durable_deterministic_delta_admission";
   regeneratedPlanExecution: "continuation_authorized_existing_executor";
   researchControlPolicy: typeof ATOMIC_RESEARCH_CONTROL_POLICY_VERSION;
   researchControlBoundary: "internal_rh_ready_disposition_only";
+  fiservCapabilityContract: typeof FISERV_CAPABILITY_CONTRACT_VERSION;
+  supportAuthority: "statement_level_capability_adjudication_only";
+  adapterAndMappingAuthority: "candidate_generation_and_diagnostics_only";
   benchmarkExecution: "disabled";
   savingsExecution: "disabled";
   businessContextAuthority: "excluded_from_canonical_economics";
@@ -143,6 +152,10 @@ export type CanonicalAnalysisRunDiagnostics = {
   provenance: "observational";
   authority: "observational";
   observationalFoundation: ReturnTypeOrNull<typeof buildCanonicalEconomicsV2FromFiserv>;
+  reconstructionShadow?: CanonicalRbReconstructionShadowResult | null;
+  reconstructionLimitedAuthority?: CanonicalRbLimitedAuthorityResult | null;
+  reconstructionLimitedAuthorityRegeneration?: CanonicalRbLimitedAuthorityRegenerationResult | null;
+  combinedAdjustmentChargebackQualification?: CombinedAdjustmentChargebackQualificationResult | null;
 };
 
 export type CanonicalAnalysisRunExecution = {

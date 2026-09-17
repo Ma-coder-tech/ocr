@@ -9,6 +9,7 @@ import type {
   RedirectHop,
   RetrievalResponse,
 } from "./intelligenceTypes.js";
+import { validatePublicDocumentLocatorTextDerivation } from "./publicDocumentTextNormalization.js";
 
 function ipv4Number(address: string): number {
   return address.split(".").reduce((value, octet) => (value << 8) + Number(octet), 0) >>> 0;
@@ -150,9 +151,16 @@ export function validateExtractionResponse(params: {
   documentId: string;
   documentFingerprint: string;
   maximumOutputBytes: number;
+  mimeType?: string;
 }): { issues: string[]; locators: ExtractedLocator[] } {
   const { extraction } = params;
   const issues: string[] = [];
+  if (Array.isArray(extraction.reasonCodes)) {
+    for (const reasonCode of extraction.reasonCodes) {
+      if (typeof reasonCode === "string" && /^[a-z][a-z0-9_]{0,127}$/.test(reasonCode)) issues.push(reasonCode);
+      else issues.push("document_extraction_reason_code_invalid");
+    }
+  }
   if (extraction.questionId !== params.questionId || extraction.candidateId !== params.candidateId || extraction.documentId !== params.documentId
     || extraction.documentFingerprint !== params.documentFingerprint) issues.push("document_extraction_identity_mismatch");
   if (!Array.isArray(extraction.locators)) return { issues: [...issues, "document_locator_collection_malformed"], locators: [] };
@@ -164,6 +172,10 @@ export function validateExtractionResponse(params: {
       || (locator.sectionCode !== null && !isSafeStructuredString(locator.sectionCode)) || !Number.isInteger(locator.lineStart)
       || !Number.isInteger(locator.lineEnd) || locator.lineStart < 1 || locator.lineEnd < locator.lineStart || typeof locator.text !== "string") {
       issues.push("document_locator_structure_invalid");
+    } else if (locator.textDerivation) {
+      const derivationIssue = validatePublicDocumentLocatorTextDerivation({ text: locator.text,
+        mimeType: params.mimeType ?? "text/plain", derivation: locator.textDerivation });
+      if (derivationIssue) issues.push(derivationIssue);
     }
   }
   const totalBytes = Buffer.byteLength(extraction.text ?? "", "utf8")

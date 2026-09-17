@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 
 import type { ParsedDocument } from "../../../parser.js";
+import { grantCanonicalRbLimitedAuthority } from "../../../reconstructionKernel/canonicalRbLimitedAuthority.js";
+import { evaluateCanonicalRbLimitedAuthorityRegeneration } from "../../../reconstructionKernel/canonicalRbLimitedAuthorityRegeneration.js";
+import { runCanonicalRbReconstructionShadow } from "../../../reconstructionKernel/canonicalRbShadow.js";
+import { qualifyCombinedAdjustmentChargebackAmount } from "../../../reconstructionKernel/combinedAdjustmentChargebackQualification.js";
+import { assessStatementCompleteness } from "../../../reconstructionKernel/statementCompleteness.js";
 import type { ParserDecision, ParserDriver, ParserValidationState } from "../../../parserFoundation.js";
 import {
   fiservFirstDataFullStatementDriver,
@@ -12,6 +17,8 @@ import { canonicalJson } from "../canonicalJson.js";
 import { buildCanonicalEconomicsV2FromFiserv } from "../fiservAdapter.js";
 import { resolveFiservTemplateAdmission } from "../fiservTemplateAdmission.js";
 import { resolveFiservRuntimeCapabilityAdmission } from "../fiservRuntimeCapabilityAdmission.js";
+import { addNormalizedFiservProtocolEvidence, adjudicateSupportedFiservProtocolIdentity,
+  assessFiservCandidateExtraction, FISERV_CAPABILITY_CONTRACT_VERSION } from "../fiservCapabilityContract.js";
 import { buildObservationalCanonicalPricingV2FromFiserv } from "../fiservPricingAdapter.js";
 import { buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing } from "../fiservEconomicAdapter.js";
 import { observeFiservEconomicsInCanonicalSynthesisV2 } from "../fiservSynthesisAdapter.js";
@@ -44,6 +51,8 @@ import {
 } from "./analysisRunTypes.js";
 import { initialAutonomousLifecycle } from "./adaptiveContinuationTypes.js";
 import { ATOMIC_RESEARCH_CONTROL_POLICY_VERSION } from "./researchControl.js";
+import { CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1,
+  type CanonicalSynthesisAdmissionContractId } from "../synthesisContractV1Types.js";
 
 const DRIVERS: ParserDriver[] = [
   fiservFirstDataProcessorStatementDriver,
@@ -94,11 +103,28 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   observer?: AnalysisRunStageObserver;
   stageBuilders?: Partial<StageBuilders>;
   rfKnowledge?: CanonicalRfKnowledgeInput;
+  reconstructionShadow?: { enabled: true };
+  reconstructionLimitedAuthority?: { enabled: true };
+  reconstructionLimitedAuthorityRegeneration?: { enabled: true };
+  combinedAdjustmentChargebackQualification?: { enabled: true };
+  synthesisAdmissionContract?: CanonicalSynthesisAdmissionContractId;
 }): CanonicalAnalysisRunExecution {
   const fingerprint = sourceFingerprintForAnalysisRun(input.document);
   const executionContext = input.executionContext ?? "production";
   if (input.evaluationContinueInvalidStages && executionContext !== "evaluation_compatibility") {
     throw new Error("INVALID_ANALYSIS_RUN_EXECUTION_CONTEXT");
+  }
+  if (input.reconstructionShadow?.enabled && executionContext !== "evaluation_compatibility") {
+    throw new Error("RECONSTRUCTION_SHADOW_REQUIRES_EVALUATION_CONTEXT");
+  }
+  if (input.reconstructionLimitedAuthority?.enabled && executionContext !== "evaluation_compatibility") {
+    throw new Error("RECONSTRUCTION_LIMITED_AUTHORITY_REQUIRES_EVALUATION_CONTEXT");
+  }
+  if (input.reconstructionLimitedAuthorityRegeneration?.enabled && executionContext !== "evaluation_compatibility") {
+    throw new Error("RECONSTRUCTION_AUTHORITY_REGENERATION_REQUIRES_EVALUATION_CONTEXT");
+  }
+  if (input.combinedAdjustmentChargebackQualification?.enabled && executionContext !== "evaluation_compatibility") {
+    throw new Error("COMBINED_ADJUSTMENT_CHARGEBACK_QUALIFICATION_REQUIRES_EVALUATION_CONTEXT");
   }
   const stageOutcomes = emptyStageOutcomes();
   const artifacts: CanonicalAnalysisArtifacts = {
@@ -119,7 +145,12 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
     suppliedDocumentIntegrity: suppliedDocument.status,
   }, [], [], []);
 
-  const driverCandidates = DRIVERS.filter((candidate) => candidate.supports(input.document));
+  const candidateExtraction = assessFiservCandidateExtraction(input.document);
+  const protocolIdentity = adjudicateSupportedFiservProtocolIdentity(input.document);
+  const supportedCandidates = DRIVERS.filter((candidate) => candidate.supports(input.document));
+  const driverCandidates = candidateExtraction.eligible && !supportedCandidates.includes(genericFiservStatementDriver)
+    ? [...supportedCandidates, genericFiservStatementDriver]
+    : supportedCandidates;
   if (driverCandidates.length === 0) {
     const limitation = "No supported Fiserv-family parser could be selected from source evidence.";
     finishStage(input.observer, stageOutcomes, "capability_admission", "unsupported", null, [], [], [limitation]);
@@ -140,7 +171,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   const parserFailures: string[] = [];
   for (const candidate of driverCandidates) {
     try {
-      parserOutput = addRuntimeFamilyEvidence(input.document, record(candidate.parse(input.document)));
+      parserOutput = addNormalizedFiservProtocolEvidence(input.document, record(candidate.parse(input.document)));
       if (input.privacySafePersistence) parserOutput = stripMerchantIdentityEvidence(parserOutput);
       driver = candidate;
       break;
@@ -179,6 +210,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   };
   const provenance = "observational" as const;
   let observationalFoundation: ReturnType<typeof buildCanonicalEconomicsV2FromFiserv> | null = null;
+  let diagnosticObservationalFoundation: ReturnType<typeof buildCanonicalEconomicsV2FromFiserv> | null = null;
   let admission: ReturnType<typeof resolveFiservRuntimeCapabilityAdmission>["resolution"] = null;
   let knownLayoutAdmission: ReturnType<typeof resolveFiservTemplateAdmission>["resolution"] = null;
   let fullFamilyDecision: ReturnType<typeof resolveFiservTemplateAdmission>["fullFamilyDecision"] | null = null;
@@ -195,31 +227,47 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
       templateAdmission: { admissionStatus: "unknown", completenessStatus: "unknown", identityStatus: "observed" },
       documentIntegrity,
     });
+    const independentStatementCompleteness = assessStatementCompleteness({
+      document: input.document,
+      foundation: observationalFoundation,
+      sourceDocumentRef: input.sourceDocumentRef,
+    }).statementCompleteness.status;
     const knownEvaluation = resolveFiservTemplateAdmission({ driverId: driver.id, parserOutput, observationalFoundation });
     knownLayoutAdmission = knownEvaluation.resolution;
     fullFamilyDecision = knownEvaluation.fullFamilyDecision;
     const runtimeAdmission = resolveFiservRuntimeCapabilityAdmission({
+      document: input.document,
       driverId: driver.id,
       parserOutput,
       observationalFoundation,
       knownLayoutResolution: knownLayoutAdmission,
-      dynamicAdmissionAllowed: ![
-        "fiserv_first_data_full_statement",
-        "fiserv_first_data_short_statement",
-      ].includes(driver.id) || knownLayoutAdmission !== null,
+      candidateExtraction,
+      protocolIdentity,
+      statementCompleteness: independentStatementCompleteness,
     });
     admission = runtimeAdmission.resolution;
     capabilityProof = runtimeAdmission.proof;
+    diagnosticObservationalFoundation = knownLayoutAdmission ? buildCanonicalEconomicsV2FromFiserv({
+      document: input.document,
+      parserOutput,
+      sourceDocumentRef: input.sourceDocumentRef,
+      parserId: driver.id,
+      provenanceStatus: provenance,
+      templateAdmission: knownLayoutAdmission.templateAdmission,
+      sectionAdmissions: knownLayoutAdmission.sectionAdmissions,
+      documentIntegrity,
+    }) : observationalFoundation;
     const capabilityStatus = admission ? "valid" : "unresolved";
     finishStage(input.observer, stageOutcomes, "capability_admission", capabilityStatus, capabilityProof, [], [],
       admission ? capabilityProof.limitations : [...capabilityProof.limitations,
         capabilityProof.family.status === "proven"
-          ? "Claim capabilities were not admitted; an exact-layout admission failed or claim proof was insufficient."
+          ? "Claim capabilities were not admitted because statement-level proof was insufficient."
           : "Fiserv-family identity was not proven."]);
   } catch (error) {
     const limitation = `Capability admission failed closed: ${errorMessage(error)}`;
     finishStage(input.observer, stageOutcomes, "capability_admission", "failed", capabilityProof, [limitation], [], [limitation]);
   }
+  diagnosticObservationalFoundation ??= observationalFoundation;
 
   const parserState = {
     matched: true,
@@ -242,6 +290,10 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
       statementCompleteness,
       authority: "observational",
       humanReviewRequired: profile.humanReviewRequired ?? false,
+      capabilitySupport: capabilityProof ? {
+        state: capabilityProof.supportState,
+        outputPermissions: capabilityProof.outputPermissions,
+      } : undefined,
     },
   });
 
@@ -322,7 +374,12 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
 
   if (artifacts.rd && (artifacts.rd.validation.status === "valid" || input.evaluationContinueInvalidStages)) {
     try {
-      artifacts.re = buildSemanticTailRe({ economic: artifacts.rd, builder: builders.synthesis });
+      artifacts.re = buildSemanticTailRe({ economic: artifacts.rd, builder: builders.synthesis, contractV1: {
+        contractId: input.synthesisAdmissionContract ?? CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1,
+        applications: [], applicationHash: hashCanonical([]), rfPrecedenceChecked: true,
+        boundRfSnapshotHash: artifacts.rfResolution?.snapshot.snapshotHash ?? "",
+        evidenceRegistry: { registryHash: hashCanonical([]), validation: { status: "valid", errors: [] }, evidence: [] },
+      } });
       finishValidatedStage(input.observer, stageOutcomes, "re", artifacts.re, artifacts.re.validation);
     } catch (error) { failStage(input.observer, stageOutcomes, "re", error); }
   } else dependencyWithheld(input.observer, stageOutcomes, "re", "RD");
@@ -373,6 +430,49 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   const semanticHash = artifacts.rb ? semanticStateHash(artifacts) : null;
   const canonicalStateHash = semanticHash ? buildCanonicalStateHash({ financialFoundationHash: financialHash,
     semanticHash, rfSnapshotHash: artifacts.rfResolution?.snapshot.snapshotHash ?? "" }) : null;
+  const reconstructionShadow = input.reconstructionShadow?.enabled && diagnosticObservationalFoundation
+    ? runCanonicalRbReconstructionShadow({
+      document: structuredClone(input.document),
+      sourceDocumentRef: input.sourceDocumentRef,
+      foundation: structuredClone(diagnosticObservationalFoundation),
+    })
+    : null;
+  const limitedAuthorityRequested = input.reconstructionLimitedAuthority?.enabled
+    || input.reconstructionLimitedAuthorityRegeneration?.enabled;
+  const reconstructionLimitedAuthority = limitedAuthorityRequested && artifacts.rb
+    ? grantCanonicalRbLimitedAuthority({
+      document: structuredClone(input.document),
+      sourceDocumentRef: input.sourceDocumentRef,
+      foundation: structuredClone(artifacts.rb),
+      executionContext: "evaluation_compatibility",
+    })
+    : null;
+  const reconstructionLimitedAuthorityRegeneration = input.reconstructionLimitedAuthorityRegeneration?.enabled
+    && artifacts.rb && reconstructionLimitedAuthority
+    ? evaluateCanonicalRbLimitedAuthorityRegeneration({
+      foundation: artifacts.rb,
+      authority: reconstructionLimitedAuthority,
+      protectedDownstreamArtifacts: {
+        rc: artifacts.rc,
+        rfResolution: artifacts.rfResolution,
+        rd: artifacts.rd,
+        re: artifacts.re,
+        unresolvedClaims: artifacts.unresolvedClaims,
+        rgWorkLedger: artifacts.rgWorkLedger,
+        rh: artifacts.rh,
+      },
+      executionContext: "evaluation_compatibility",
+    })
+    : null;
+  const combinedAdjustmentChargebackQualification = input.combinedAdjustmentChargebackQualification?.enabled
+    && diagnosticObservationalFoundation
+    ? qualifyCombinedAdjustmentChargebackAmount({
+      document: structuredClone(input.document),
+      sourceDocumentRef: input.sourceDocumentRef,
+      foundation: structuredClone(diagnosticObservationalFoundation),
+      executionContext: "evaluation_compatibility",
+    })
+    : null;
   return {
     run: terminalRun({ input, fingerprint, status, parser: parserState,
       familyStatus: capabilityProof?.family.status ?? "unresolved", capabilityProof, admission, knownLayoutAdmission,
@@ -391,7 +491,13 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
       profile,
       provenance,
       authority: "observational",
-      observationalFoundation,
+      observationalFoundation: diagnosticObservationalFoundation,
+      ...(input.reconstructionShadow?.enabled ? { reconstructionShadow } : {}),
+      ...(limitedAuthorityRequested ? { reconstructionLimitedAuthority } : {}),
+      ...(input.reconstructionLimitedAuthorityRegeneration?.enabled
+        ? { reconstructionLimitedAuthorityRegeneration } : {}),
+      ...(input.combinedAdjustmentChargebackQualification?.enabled
+        ? { combinedAdjustmentChargebackQualification } : {}),
     },
   };
 }
@@ -429,11 +535,14 @@ function terminalRun(input: {
       rfProductionKnowledge: "governed_catalog_snapshot_resolution_enabled",
       rgPlanning: "durable_claim_scoped_execution_eligible",
       semanticConvergence: "current_run_exact_claim_revisioned",
-      synthesisAdmissionContract: "canonical_synthesis_admission_contract_v1",
+      synthesisAdmissionContract: input.input.synthesisAdmissionContract ?? CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1,
       adaptiveContinuation: "durable_deterministic_delta_admission",
       regeneratedPlanExecution: "continuation_authorized_existing_executor",
       researchControlPolicy: ATOMIC_RESEARCH_CONTROL_POLICY_VERSION,
       researchControlBoundary: "internal_rh_ready_disposition_only",
+      fiservCapabilityContract: FISERV_CAPABILITY_CONTRACT_VERSION,
+      supportAuthority: "statement_level_capability_adjudication_only",
+      adapterAndMappingAuthority: "candidate_generation_and_diagnostics_only",
       benchmarkExecution: "disabled",
       savingsExecution: "disabled",
       businessContextAuthority: "excluded_from_canonical_economics",
@@ -463,26 +572,6 @@ function terminalRun(input: {
   };
 }
 
-function addRuntimeFamilyEvidence(document: ParsedDocument, parserOutput: Record<string, any>): Record<string, any> {
-  const evidence = Array.isArray(parserOutput.evidence) ? [...parserOutput.evidence] : [];
-  const rows = document.rows.map((row, index) => ({ row, index, content: String(row.content ?? "").trim() }));
-  const identityRow = rows.find((item) => /\b(?:fiserv|first data|clover|basys(?:pro)?)\b/i.test(item.content));
-  if (identityRow) evidence.push(evidenceEntry("processorIdentity", identityRow, "Fiserv-family source marker"));
-  const structuralPatterns = [
-    /\byour card processing statement\b/i,
-    /\btotal amount submitted\b/i,
-    /\btotal amount funded(?: to your bank)?\b/i,
-    /\binterchange charges(?:\/program fees)?\b/i,
-    /\bservice charges\b/i,
-    /\bfees charged\b/i,
-  ];
-  for (const pattern of structuralPatterns) {
-    const row = rows.find((item) => pattern.test(item.content));
-    if (row) evidence.push(evidenceEntry("processorStructure", row, "Fiserv-family structural marker"));
-  }
-  return { ...parserOutput, evidence };
-}
-
 function stripMerchantIdentityEvidence(parserOutput: Record<string, any>): Record<string, any> {
   const evidence = Array.isArray(parserOutput.evidence)
     ? parserOutput.evidence.filter((item: unknown) => {
@@ -491,12 +580,6 @@ function stripMerchantIdentityEvidence(parserOutput: Record<string, any>): Recor
     })
     : parserOutput.evidence;
   return { ...parserOutput, evidence };
-}
-
-function evidenceEntry(field: string, item: { row: Record<string, string | number>; index: number; content: string }, value: string) {
-  const match = String(item.row.page ?? "").match(/page-(\d+)/i);
-  return { field, sourceSection: "HEADER", pageNumber: match ? Number(match[1]) : null,
-    lineIndex: item.index, evidenceLine: item.content, value };
 }
 
 function finishValidatedStage(

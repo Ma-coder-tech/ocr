@@ -37,6 +37,9 @@ import {
   type CanonicalAnalysisArtifacts,
   type CanonicalAnalysisRun,
 } from "./analysisRunTypes.js";
+import { CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1,
+  CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1,
+  type CanonicalSynthesisAdmissionContractId } from "../synthesisContractV1Types.js";
 
 export type PersistedAnalysisRunStage = {
   stage: AnalysisRunStageId;
@@ -71,6 +74,7 @@ export type PersistedAnalysisRunRecord = {
   schemaVersion: string;
   implementationVersion: string;
   policyVersion: string;
+  synthesisContractId: CanonicalSynthesisAdmissionContractId;
   status: AnalysisRunStatus;
   familyStatus: CanonicalAnalysisRun["familyStatus"] | "unresolved";
   parserDriverId: string | null;
@@ -291,6 +295,7 @@ export function executeDurableCanonicalAnalysisRun(input: {
     throw new Error("ANALYSIS_RUN_SOURCE_FINGERPRINT_MISMATCH");
   }
   const runId = existing?.id ?? randomUUID();
+  const synthesisContractId = existing?.synthesisContractId ?? CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1;
   const priorBinding = existing?.rfCatalogBinding?.availability === "available" ? existing.rfCatalogBinding : null;
   const catalogSnapshot = priorBinding
     ? reloadGovernedRfCatalogBinding(priorBinding)
@@ -307,6 +312,10 @@ export function executeDurableCanonicalAnalysisRun(input: {
   };
   const rfSnapshotHash = bindingToPersist.snapshotHash ?? "";
   const rfContextHash = canonicalRfExecutionContextHash(rfKnowledge);
+  if (existing?.result && existing.synthesisContractId === CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1
+    && ["completed", "completed_with_limitations", "unsupported"].includes(existing.status)) {
+    return existing.result;
+  }
   if (existing?.result
     && existing.schemaVersion === ANALYSIS_RUN_SCHEMA_VERSION
     && existing.implementationVersion === ANALYSIS_RUN_IMPLEMENTATION_VERSION
@@ -318,7 +327,7 @@ export function executeDurableCanonicalAnalysisRun(input: {
   }
 
   const sourceDocumentRef = existing?.sourceDocumentRef ?? input.sourceDocumentRef ?? `job_${input.jobId}`;
-  beginRun({ runId, jobId: input.jobId, sourceDocumentRef, fingerprint, rfSnapshotHash,
+  beginRun({ runId, jobId: input.jobId, sourceDocumentRef, fingerprint, rfSnapshotHash, synthesisContractId,
     rfContextHash, rfCatalogBinding: bindingToPersist, rfCatalogExecutionStatus: catalogSnapshot.availability,
     existingAttemptCount: existing?.attemptCount ?? 0 });
   const stageStartedAt = new Map<AnalysisRunStageId, number>();
@@ -332,6 +341,7 @@ export function executeDurableCanonicalAnalysisRun(input: {
       privacySafePersistence: true,
       stageBuilders: input.stageBuilders,
       rfKnowledge,
+      synthesisAdmissionContract: synthesisContractId,
       observer: {
         stageStarted(stage, work) {
           stageStartedAt.set(stage, Date.now());
@@ -357,6 +367,7 @@ function beginRun(input: {
   sourceDocumentRef: string;
   fingerprint: string;
   rfSnapshotHash: string;
+  synthesisContractId: CanonicalSynthesisAdmissionContractId;
   rfContextHash: string;
   rfCatalogBinding: GovernedRfCatalogBinding;
   rfCatalogExecutionStatus: "available" | "unavailable";
@@ -367,19 +378,21 @@ function beginRun(input: {
     db.prepare(`
       INSERT INTO canonical_analysis_runs (
         id, job_id, source_document_ref, source_fingerprint, schema_version, implementation_version, policy_version,
+        synthesis_contract_id,
         status, family_status, parser_driver_id, attempt_count, canonical_truth_hash, financial_foundation_hash,
         semantic_hash, canonical_state_hash, semantic_revision, rg_plan_hash, rg_plan_generation,
         continuation_revision, continuation_lifecycle,
         continuation_state_hash, rf_snapshot_hash, rf_context_hash,
         rf_catalog_status, rf_catalog_binding_json, limitations_json, result_json,
         created_at, started_at, completed_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'running', 'unresolved', NULL, ?, NULL, NULL, NULL, NULL, 0, NULL, 0, 0,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'running', 'unresolved', NULL, ?, NULL, NULL, NULL, NULL, 0, NULL, 0, 0,
         'awaiting_first_pass_outcome', NULL, ?, ?, ?, ?, '[]', NULL, ?, ?, NULL, ?)
       ON CONFLICT(job_id) DO UPDATE SET
         source_document_ref = excluded.source_document_ref,
         schema_version = excluded.schema_version,
         implementation_version = excluded.implementation_version,
         policy_version = excluded.policy_version,
+        synthesis_contract_id = canonical_analysis_runs.synthesis_contract_id,
         status = 'running',
         family_status = 'unresolved',
         parser_driver_id = NULL,
@@ -406,6 +419,7 @@ function beginRun(input: {
         updated_at = excluded.updated_at
     `).run(input.runId, input.jobId, input.sourceDocumentRef, input.fingerprint,
       ANALYSIS_RUN_SCHEMA_VERSION, ANALYSIS_RUN_IMPLEMENTATION_VERSION, ANALYSIS_RUN_POLICY_VERSION,
+      input.synthesisContractId,
       input.existingAttemptCount + 1, input.rfSnapshotHash, input.rfContextHash,
       input.rfCatalogExecutionStatus, JSON.stringify(input.rfCatalogBinding), now, now, now);
     const insertStage = db.prepare(`
@@ -672,6 +686,7 @@ function mapRun(row: Record<string, unknown>): PersistedAnalysisRunRecord {
     schemaVersion: String(row.schema_version),
     implementationVersion: String(row.implementation_version),
     policyVersion: String(row.policy_version),
+    synthesisContractId: normalizeSynthesisContractId(row.synthesis_contract_id),
     status: String(row.status) as AnalysisRunStatus,
     familyStatus: String(row.family_status) as PersistedAnalysisRunRecord["familyStatus"],
     parserDriverId: row.parser_driver_id ? String(row.parser_driver_id) : null,
@@ -1114,6 +1129,11 @@ function emptyContinuationResource(): CanonicalContinuationResourceAccounting {
 
 function nullableString(value: unknown): string | null {
   return value === null || value === undefined || value === "" ? null : String(value);
+}
+
+function normalizeSynthesisContractId(value: unknown): CanonicalSynthesisAdmissionContractId {
+  return value === CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1
+    ? CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1 : CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1;
 }
 
 function emptyResource(elapsedMs: number | null): PersistedAnalysisRunStage["resource"] {

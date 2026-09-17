@@ -13,7 +13,7 @@ const neutralTerm = {
   },
 } as const;
 
-export const OPENROUTER_SEARCH_RESPONSE_CONTRACT_ID = "openrouter_search_response_contract_v1" as const;
+export const OPENROUTER_SEARCH_RESPONSE_CONTRACT_V1_ID = "openrouter_search_response_contract_v1" as const;
 export const OPENROUTER_SEARCH_RESPONSE_CONTRACT_V1 = Object.freeze({
   transportBinding: "synchronous_local_operation",
   requiredEnvelopeFields: ["id", "model", "choices"],
@@ -24,6 +24,15 @@ export const OPENROUTER_SEARCH_RESPONSE_CONTRACT_V1 = Object.freeze({
   providerContentAuthority: "none",
   fallbackAllowed: false,
   maximumProviderAttempts: 1,
+} as const);
+
+export const OPENROUTER_SEARCH_RESPONSE_CONTRACT_ID = "openrouter_search_response_contract_v2" as const;
+export const OPENROUTER_SEARCH_RESPONSE_CONTRACT_V2 = Object.freeze({
+  ...OPENROUTER_SEARCH_RESPONSE_CONTRACT_V1,
+  citationAdmission: "independent_local_validation_per_annotation",
+  invalidCitationEffect: "citation_rejected_no_evidence_or_completion_effect",
+  validCitationEffect: "independently_admitted_candidate_may_continue",
+  fullyReceivedUnusableOutput: "settled_deterministic_search_outcome",
 } as const);
 
 const investigativeItem = {
@@ -69,6 +78,6 @@ export const SEMANTIC_RESPONSE_SCHEMA_V1 = Object.freeze({
     },
   },
 } as const);
-export const OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH = createHash("sha256").update(canonicalJson(OPENROUTER_SEARCH_RESPONSE_CONTRACT_V1)).digest("hex");
+export const OPENROUTER_SEARCH_RESPONSE_CONTRACT_HASH = createHash("sha256").update(canonicalJson(OPENROUTER_SEARCH_RESPONSE_CONTRACT_V2)).digest("hex");
 export const INVESTIGATIVE_RESPONSE_SCHEMA_HASH = createHash("sha256").update(canonicalJson(INVESTIGATIVE_RESPONSE_SCHEMA_V1)).digest("hex");
 export const SEMANTIC_RESPONSE_SCHEMA_HASH = createHash("sha256").update(canonicalJson(SEMANTIC_RESPONSE_SCHEMA_V1)).digest("hex");

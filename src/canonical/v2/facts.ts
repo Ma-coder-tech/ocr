@@ -21,7 +21,7 @@ export const V2_POPULATION_DEFINITIONS = {
   chargeback_fee_amount: "Fees for chargeback handling proven in an authoritative fee population, excluding dispute principal.",
   net_funded_amount: "Net amount funded or processed after the admitted family-specific funding equation.",
   unresolved_adjustment_chargeback_amount:
-    "A source amount combining adjustments and chargebacks that cannot be safely decomposed into canonical populations.",
+    "A processor-presented combined adjustments/chargebacks amount preserved at its source meaning without asserting a stronger split population.",
   gross_sale_transaction_count: "Count of gross sale transactions compatible with gross sale volume.",
   refund_transaction_count: "Count of statement-recognized refund transactions.",
   submitted_transaction_count: "Count explicitly identified as submitted transactions.",

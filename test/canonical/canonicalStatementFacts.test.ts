@@ -193,6 +193,46 @@ describe("canonical statement facts", () => {
     brokenRef.financialFacts.totalFees.evidenceRefs = ["ev_missing"];
     expect(() => validateCanonicalStatementAnalysis(brokenRef)).toThrow(/broken/);
 
+    const authorityExpansion = structuredClone(valid) as CanonicalStatementAnalysis;
+    authorityExpansion.crossSummaryLinkEvidence.authority = "financial_authority" as never;
+    expect(() => validateCanonicalStatementAnalysis(authorityExpansion)).toThrow(/diagnostic-only/);
+
+    const unsupportedAdjudication = structuredClone(valid) as CanonicalStatementAnalysis;
+    unsupportedAdjudication.crossSummaryLinkEvidence.adjudicationPolicyVersion = "unsupported" as never;
+    expect(() => validateCanonicalStatementAnalysis(unsupportedAdjudication)).toThrow(/adjudication policy/);
+
+    const unsupportedFeeRollup = structuredClone(valid) as CanonicalStatementAnalysis;
+    unsupportedFeeRollup.crossSummaryLinkEvidence.feeRollupPolicyVersion = "unsupported" as never;
+    expect(() => validateCanonicalStatementAnalysis(unsupportedFeeRollup)).toThrow(/roll-up completeness/);
+
+    const unsupportedFeeRollupManifest = structuredClone(valid) as CanonicalStatementAnalysis;
+    unsupportedFeeRollupManifest.versionManifest.feeRollupCompletenessPolicyVersion = "unsupported" as never;
+    expect(() => validateCanonicalStatementAnalysis(unsupportedFeeRollupManifest)).toThrow(/fee_rollup_completeness/);
+
+    const unsupportedFeePartitionManifest = structuredClone(valid) as CanonicalStatementAnalysis;
+    unsupportedFeePartitionManifest.versionManifest.feePartitionSourceProvenancePolicyVersion = "unsupported" as never;
+    expect(() => validateCanonicalStatementAnalysis(unsupportedFeePartitionManifest)).toThrow(/fee_partition_source_provenance/);
+
+    const unsupportedExactSourceArithmeticManifest = structuredClone(valid) as CanonicalStatementAnalysis;
+    unsupportedExactSourceArithmeticManifest.versionManifest.exactSourceArithmeticBridgePolicyVersion = "unsupported" as never;
+    expect(() => validateCanonicalStatementAnalysis(unsupportedExactSourceArithmeticManifest)).toThrow(/exact_source_arithmetic_bridge/);
+
+    const unsupportedFeeOperandManifest = structuredClone(valid) as CanonicalStatementAnalysis;
+    unsupportedFeeOperandManifest.versionManifest.feeBasisOperandCoveragePolicyVersion = "unsupported" as never;
+    expect(() => validateCanonicalStatementAnalysis(unsupportedFeeOperandManifest)).toThrow(/fee_basis_operand_coverage/);
+
+    const unsupportedFeePartition = structuredClone(valid) as CanonicalStatementAnalysis;
+    unsupportedFeePartition.feeLedger.partitionSourceProvenance.policyVersion = "unsupported" as never;
+    expect(() => validateCanonicalStatementAnalysis(unsupportedFeePartition)).toThrow(/partition source provenance/);
+
+    const missingFeePartition = structuredClone(valid) as CanonicalStatementAnalysis;
+    delete (missingFeePartition.feeLedger as Partial<typeof missingFeePartition.feeLedger>).partitionSourceProvenance;
+    expect(() => validateCanonicalStatementAnalysis(missingFeePartition)).toThrow(/partition source provenance is missing or unsupported/i);
+
+    const feePartitionAuthorityExpansion = structuredClone(valid) as CanonicalStatementAnalysis;
+    feePartitionAuthorityExpansion.feeLedger.partitionSourceProvenance.authority = "financial_authority" as never;
+    expect(() => validateCanonicalStatementAnalysis(feePartitionAuthorityExpansion)).toThrow(/diagnostic-only/);
+
     const contradictoryCandidate = structuredClone(valid) as CanonicalStatementAnalysis;
     contradictoryCandidate.financialFacts.processedSales.candidates.push(
       {

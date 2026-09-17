@@ -13,7 +13,7 @@ import {
 import { v2SyntheticStatement } from "./fixtures.js";
 
 describe("Canonical Economics V2 finalized Gold observation compatibility", () => {
-  it("matches G1 financial facts and emits opposing-activity preservation only from decomposed evidence", async () => {
+  it("matches G1 proven financial facts while withholding unproven split activity", async () => {
     const fixture = v2SyntheticStatement({
       grossSales: 43_498.06,
       refunds: 859.98,
@@ -55,14 +55,14 @@ describe("Canonical Economics V2 finalized Gold observation compatibility", () =
       "G1-FIN-REFUND-COUNT",
       "G1-FIN-NET-SUBMITTED",
       "G1-FIN-FEES",
-      "G1-FIN-ADJUSTMENTS",
       "G1-FIN-FUNDED",
       "G1-RATE",
-      "G1-GROSS-ACTIVITY-PRESERVED",
       "G1-NO-NET-DISPUTE",
       "G1-NO-DOUBLE-COUNT",
     ], observation);
-    expect(observation.claims).toContain("OPPOSING_ADJUSTMENT_ACTIVITY_PRESERVED");
+    expect(observation.states).not.toHaveProperty("financial.settlement_adjustment");
+    expect(observation.values).not.toHaveProperty("financial.settlement_adjustment");
+    expect(observation.claims).not.toContain("OPPOSING_ADJUSTMENT_ACTIVITY_PRESERVED");
   });
 
   it("matches the G3 zero-volume financial state without a numeric rate", async () => {
@@ -109,12 +109,13 @@ describe("Canonical Economics V2 finalized Gold observation compatibility", () =
       "G4-FIN-REFUNDS",
       "G4-FIN-REFUND-COUNT",
       "G4-FIN-NET-SUBMITTED",
-      "G4-FIN-ADJUSTMENT",
       "G4-FIN-FEES",
       "G4-FIN-ITEMS",
       "G4-RATE-OPTIONS",
       "G4-NO-RATE-VERDICT",
     ], observation);
+    expect(observation.states).not.toHaveProperty("financial.settlement_adjustment");
+    expect(observation.values).not.toHaveProperty("financial.settlement_adjustment");
     expect(observation.values["financial.effective_rate_options"]).toEqual([
       { rate_decimal: 0.016654, denominator: "canonical_net_submitted_card_volume" },
       { rate_decimal: 0.016652, denominator: "gross_card_sales" },

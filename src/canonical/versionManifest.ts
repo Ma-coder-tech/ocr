@@ -16,6 +16,15 @@ import {
   CUSTOMER_WORDING_POLICY_VERSION,
 } from "./customerStateTypes.js";
 import type { CanonicalAnalysisVersionManifest } from "./types.js";
+import {
+  CROSS_SUMMARY_LINK_EVIDENCE_POLICY_VERSION,
+  CROSS_SUMMARY_RECONCILIATION_ADJUDICATION_POLICY_VERSION,
+} from "./crossSummaryLinkEvidence.js";
+import { FEE_ROLLUP_COMPLETENESS_POLICY_VERSION } from "./feeRollupEvidence.js";
+import { FEE_PARTITION_SOURCE_PROVENANCE_POLICY_VERSION } from "./feePartitionSourceProvenance.js";
+import { EXACT_SOURCE_ARITHMETIC_BRIDGE_POLICY_VERSION } from "./exactSourceArithmeticBridge.js";
+import { FEE_BASIS_OPERAND_COVERAGE_POLICY_VERSION } from "./feeOperandRecovery.js";
+import { FEE_OPERAND_UNIT_SEMANTICS_POLICY_VERSION } from "./feeOperandUnitSemantics.js";
 
 export const CANONICAL_SCHEMA_VERSION = "canonical_statement_analysis_v1" as const;
 export const CANONICAL_BUILDER_VERSION = "canonical_fact_builder_package_c_v1" as const;
@@ -63,6 +72,13 @@ export function buildVersionManifest(input: {
     customerActionGuidancePolicyVersion: CUSTOMER_ACTION_GUIDANCE_POLICY_VERSION,
     customerWordingPolicyVersion: CUSTOMER_WORDING_POLICY_VERSION,
     merchantAttentionPolicyVersion: MERCHANT_ATTENTION_POLICY_VERSION,
+    crossSummaryLinkEvidencePolicyVersion: CROSS_SUMMARY_LINK_EVIDENCE_POLICY_VERSION,
+    crossSummaryReconciliationAdjudicationPolicyVersion: CROSS_SUMMARY_RECONCILIATION_ADJUDICATION_POLICY_VERSION,
+    feeRollupCompletenessPolicyVersion: FEE_ROLLUP_COMPLETENESS_POLICY_VERSION,
+    feePartitionSourceProvenancePolicyVersion: FEE_PARTITION_SOURCE_PROVENANCE_POLICY_VERSION,
+    exactSourceArithmeticBridgePolicyVersion: EXACT_SOURCE_ARITHMETIC_BRIDGE_POLICY_VERSION,
+    feeBasisOperandCoveragePolicyVersion: FEE_BASIS_OPERAND_COVERAGE_POLICY_VERSION,
+    feeOperandUnitSemanticsPolicyVersion: FEE_OPERAND_UNIT_SEMANTICS_POLICY_VERSION,
     parserId: input.parserId,
     parserVersion: input.parserVersion ?? CANONICAL_PARSER_VERSION,
     extractionVersion: input.extractionVersion ?? "pdfjs_text_rows_v1",

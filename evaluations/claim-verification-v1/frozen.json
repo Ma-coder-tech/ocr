@@ -1,0 +1,31 @@
+{
+  "frozenUtc": "2026-09-05T12:15:30.443581+00:00",
+  "testsPassed": 28,
+  "untouchedHoldout": false,
+  "sha256": {
+    "verification.py": "b394ab4ccc93c80fabee259fddbe3612be4437d852488b51336cf7da854e91d3",
+    "test_verification.py": "1218cff20da6a0fb5133c69089bef8127e07c22ab7087f18b15e5d24f5cc7027",
+    "evidence.py": "bf609d05813dbdfc627848916adc28567fb7cf04a2a36c8d65abcf2f0af468d2",
+    "protocol.md": "57e4aceef91d3118008fce7f4c32b4d5b75e5daf29443cf92e051b399b3dfe4f",
+    "prepare.py": "76b8ecec4810ed7801773e7dd2a9dbd9777a10b43dd956c332c2fb0a07632a14",
+    "run.py": "a22d9619d7bf6775cf5525d039717b6ca1b33cd6fcacaac6a4e85b03a60faedd",
+    "control-relationship-gold.json": "90be60bf9932443b348d4dc8563578d813c8810f236bddeaaf6224958a7e619d"
+  },
+  "requestHashes": {
+    "holdout-8": "612619d729bef53ae82b96f12f533dcda230d69d7de9da350223d7a1df63ab1d",
+    "clover-october": "06be5ac51a06f8d9045107d6dc86d1e14e1b15ba37993082384bef5240d577e9",
+    "clover-november": "9ecb134c158d5ca7911415c1c5c9884d1bdf3963b59a44777b2904ad7058e9e3",
+    "holdout-2": "107766715e97d663d186d311fb50a3331eb0b34d4fd8437d932b94970a28f074",
+    "holdout-6": "4ce6f3eca66835fec92f361827af3667ea0a48397aa363b68e50ef8d28eb125b",
+    "holdout-1": "5dafcd4d9b6cbba39f5b93e1ca998e773530f15f55a12da3a4b9c08de1e955cf",
+    "basys": "c2a8450c39f3ba62a38f3e2d1fa10293f26fc464bea743137cd6b63256275ec3",
+    "holdout-5": "5901dc15a3133d15af354924b34bc412d6ebb9a958448dc39959581afe5bd3cf",
+    "holdout-4": "a8b1c213716f069eb1b940b34be1d1169db5cc4c46c698e5fb3c436da0843ff3",
+    "priority": "cc4587d0cb93be9ca0273abeb942e7b85b98c25fc4f738b89eccf68f08f2b8d0",
+    "holdout-7": "e15ef0115f82114a9f7042e3d4e6c3d316532e3b4850a9f60c48096c339a77df",
+    "holdout-3": "0c69707c75f4304b7d0bba2a4478893ab1490c5ddbebe5a7376f488ce1de29ee",
+    "paysafe-zero": "02b6ea2699d3a5975aad8c9f646b730291c0fa6ae5884dae926ca73680e6b6ee",
+    "holdout-9": "c59811a6bb3e9349aaa42bf710e3ef8b58e2bb69f606371dda1071a235c15a13",
+    "paysafe": "fabf9146ae81cc553890fb457c9c7a451285ac581ff58838e20417d88ae45ea6"
+  }
+}

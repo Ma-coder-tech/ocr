@@ -3,10 +3,37 @@ import { describe, expect, it } from "vitest";
 import { canonicalContractV1QuestionScopeFingerprint,
   compileCanonicalSynthesisContractV1 } from "../../../src/canonical/v2/synthesisContractV1.js";
 import type { CanonicalSynthesisContractV1Application } from "../../../src/canonical/v2/synthesisContractV1Types.js";
+import { CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1 } from "../../../src/canonical/v2/synthesisContractV1Types.js";
 import { validateCanonicalSynthesisContractV1Envelope } from "../../../src/canonical/v2/synthesisContractV1Admission.js";
 import { economicWithNegotiator } from "./synthesisFixtures.js";
 
 describe("Canonical Synthesis Admission Contract v1", () => {
+  it("activates the v1.1 pricing-application review only as an exact verification request", () => {
+    const economic = contractEconomic();
+    const review = app(economic, "pricing-application-review", "merchant_lever", {
+      kind: "synthesis_safe_action", safeActionCode: "request_pricing_application_review", requiredInfluence: "none",
+      mechanismCode: "observed_pricing_application_explanation", verificationRequirementCode: "explain_observed_application",
+      requestTargetCode: "processor_pricing_support", implementationDependencyCodes: [],
+    });
+    const recurrence = app(economic, "review-recurrence", "recurrence", {
+      kind: "synthesis_recurrence", recurrenceBasis: "verified_schedule", occurrencesPerYear: 12,
+    });
+    const built = compileCanonicalSynthesisContractV1({ economic,
+      contractId: CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1, applications: [review, recurrence] });
+    expect(built.state.validation.status).toBe("valid");
+    expect(built.state.actions[0]).toMatchObject({ safeActionCode: "request_pricing_application_review",
+      class: "candidate_verification", state: "documentation_or_monitoring_only", requiredInfluence: "none",
+      permissionCeiling: "verification_or_document_request", counterfactualApplicationRef: null,
+      recurrenceApplicationRef: null });
+    expect(built.merchantLevers[0]).toMatchObject({ leverType: "documentation_verification" });
+
+    const legacy = { ...review, atomicClaimId: "legacy-action", applicationId: "app-legacy-action",
+      value: { ...review.value, safeActionCode: "request_pricing_term_review" as const,
+        requiredInfluence: "merchant_change_right" as const } };
+    expect(compileCanonicalSynthesisContractV1({ economic,
+      contractId: CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1, applications: [legacy] }).state.validation.errors)
+      .toContain("contract_action_not_active_for_bound_version:legacy-action:request_pricing_term_review");
+  });
   it("keeps constraint identity independent from effects, actionability, and impact", () => {
     const economic = contractEconomic();
     const constraint = app(economic, "constraint-a", "constraint", {

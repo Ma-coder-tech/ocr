@@ -41,7 +41,7 @@ describe("Canonical Economics V2 metric states and financial direction", () => {
     expect(foundation.metrics.headlineAverageTicket.state).toBe("undefined_zero_count");
   });
 
-  it("preserves fee credits, settlement adjustments, chargeback principal, and chargeback fees as distinct populations", () => {
+  it("preserves independently supported fees while withholding split flows that only appear in funding rows", () => {
     const fixture = v2SyntheticStatement();
     const foundation = buildCanonicalEconomicsV2FromFiserv({
       ...fixture,
@@ -53,9 +53,13 @@ describe("Canonical Economics V2 metric states and financial direction", () => {
 
     expect(facts.totalStatementProcessingFees.value).toEqual({ amountMinor: 4_500, currency: "USD" });
     expect(facts.feeCreditAmount.value).toEqual({ amountMinor: 100, currency: "USD" });
-    expect(facts.settlementAdjustmentAmount.value).toEqual({ amountMinor: -400, currency: "USD" });
-    expect(facts.chargebackPrincipalDebitAmount.value).toEqual({ amountMinor: 600, currency: "USD" });
-    expect(facts.chargebackRepresentmentAmount.value).toEqual({ amountMinor: 0, currency: "USD" });
+    expect(facts.settlementAdjustmentAmount).toMatchObject({ status: "unavailable", value: null });
+    expect(facts.chargebackPrincipalDebitAmount).toMatchObject({ status: "unavailable", value: null });
+    expect(facts.chargebackRepresentmentAmount).toMatchObject({ status: "unavailable", value: null });
+    expect(facts.settlementAdjustmentAmount.limitations.join(" ")).toMatch(/no independently exhaustive reconciled/i);
+    expect(facts.chargebackPrincipalDebitAmount.limitations.join(" ")).toMatch(
+      /batch-net values, signs, and missing rows do not prove/i,
+    );
     expect(facts.chargebackFeeAmount.value).toEqual({ amountMinor: 1_500, currency: "USD" });
     expect(facts.unresolvedAdjustmentChargebackAmount.status).toBe("unavailable");
     expect(facts.chargebackCount.status).toBe("unavailable");

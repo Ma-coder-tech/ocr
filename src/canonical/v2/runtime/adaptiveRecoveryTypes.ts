@@ -26,7 +26,7 @@ export type CanonicalAnalysisRecoveryIntent = {
     facet: string;
     disposition: "operationally_degraded_retry_eligible";
     continuationPermission: "bounded_retry_eligible";
-    degradationSubtype: "provider_unavailable_before_send" | "before_send_failure_retry_eligible"
+    degradationSubtype: "provider_unavailable_before_send" | "provider_rejection" | "before_send_failure_retry_eligible"
       | "resource_or_runtime_exhaustion";
   };
   analyticalCompletionEffect: "none";
@@ -34,7 +34,8 @@ export type CanonicalAnalysisRecoveryIntent = {
   createdAt: string;
 };
 
-export type CanonicalAnalysisRecoveryIntentState = "scheduled" | "leased" | "completed" | "superseded";
+export type CanonicalAnalysisRecoveryIntentState = "scheduled" | "waiting_for_operational_reset" | "leased"
+  | "completed" | "superseded";
 
 export type CanonicalAnalysisRecoveryRecord = {
   intent: CanonicalAnalysisRecoveryIntent;
@@ -47,6 +48,18 @@ export type CanonicalAnalysisRecoveryRecord = {
   latestEventHash: string;
   createdAt: string;
   updatedAt: string;
+  waitGate: CanonicalAnalysisRecoveryWaitGate | null;
+};
+
+export type CanonicalAnalysisRecoveryWaitGate = {
+  schemaVersion: "canonical_analysis_recovery_wait_gate_v1";
+  kind: "operational_allowance" | "provider_cooldown" | "provider_readiness_change"
+    | "exceptional_runaway_hold";
+  nextEligibleAt: string | null;
+  operationalPolicyHash: string;
+  providerConfigurationHash: string | null;
+  reasonCode: string;
+  analyticalCompletionEffect: "none";
 };
 
 export type CanonicalAnalysisRecoveryEvent = {
@@ -54,12 +67,14 @@ export type CanonicalAnalysisRecoveryEvent = {
   intentId: string;
   eventSequence: number;
   parentEventHash: string | null;
-  eventType: "scheduled" | "leased" | "lease_recovered" | "lease_renewed" | "rescheduled_retry_eligible"
-    | "completed" | "superseded" | "released_after_failure";
+  eventType: "scheduled" | "waiting_for_operational_reset" | "operational_reset_admitted" | "leased"
+    | "lease_recovered" | "lease_renewed" | "rescheduled_retry_eligible" | "completed" | "superseded"
+    | "released_after_failure";
   fromState: CanonicalAnalysisRecoveryIntentState | null;
   toState: CanonicalAnalysisRecoveryIntentState;
   workerId: string | null;
   reasonCode: string;
+  waitGate?: CanonicalAnalysisRecoveryWaitGate | null;
   occurredAt: string;
   eventHash: string;
 };

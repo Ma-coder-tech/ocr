@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildCanonicalAiCapabilities, type CanonicalAiCapabilityHarnessInput } from "../../src/canonical/buildCanonicalAiCapabilities.js";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
 import { buildCanonicalCustomerState } from "../../src/canonical/customerStateResolver.js";
+import { buildCanonicalCrossSummaryLinkEvidence } from "../../src/canonical/crossSummaryLinkEvidence.js";
 import { buildFeeKnowledgeIntelligenceRecord } from "../../src/canonical/feeKnowledgeIntelligence.js";
 import { buildCanonicalFeeLedger } from "../../src/canonical/feeLedger.js";
 import { buildCanonicalFeeOwnershipActionability } from "../../src/canonical/feeOwnershipActionability.js";
@@ -688,6 +689,12 @@ function analysisWithRows(rows: TestRow[]): CanonicalStatementAnalysis {
   });
   analysis.evidence = [...analysis.evidence, ...evidence.values()];
   analysis.calculations = [...analysis.calculations, ...calculations];
+  const evidenceById = new Map(analysis.evidence.map((item) => [item.id, item]));
+  analysis.crossSummaryLinkEvidence = buildCanonicalCrossSummaryLinkEvidence({
+    doc, documentId: analysis.identity.sourceDocumentRef, identity: analysis.identity,
+    financialFacts: analysis.financialFacts, feeLedger: analysis.feeLedger, parserOutput: null, evidence: evidenceById,
+  });
+  analysis.evidence = [...evidenceById.values()];
   analysis.feeOwnershipActionability = buildCanonicalFeeOwnershipActionability(analysis.feeLedger, {
     processorFamily: "fiserv",
     statementPeriodStart: "2026-08-01",

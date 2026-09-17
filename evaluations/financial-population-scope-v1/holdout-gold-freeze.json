@@ -1,0 +1,8 @@
+{
+  "recordedUtc": "2026-09-05T11:25:55.761659+00:00",
+  "semanticOutputsExisted": false,
+  "sha256": {
+    "holdout-semantic-gold.json": "7b894a2032f5d589ecb4843ecedaefd7c21f099783430d402f5a6b23ddd10f45",
+    "holdout-basis-gold.json": "28e029698e9fe1bc84d9605f7dec76343199d3c8b09e9a08e5245793455637b7"
+  }
+}

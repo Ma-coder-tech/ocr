@@ -246,9 +246,11 @@ describe("Canonical Economics V2 bounded RD corrections", () => {
     expect(observation.states["cost.processor_markup"]).toBe("unresolved_requires_positive_mapping");
   });
 
-  it("matches the finalized RD-owned S6, S10, and G9 Gold assertions directly", async () => {
+  it("reconciles the stale S6 split assertion by withholding it while retaining other Gold safety assertions", async () => {
     const s6 = observeCanonicalEconomicsV2ForGold(buildApprovedEconomics(), { caseId: "S6" });
-    await expectGoldMatches("S6", ["S6-ADJUSTMENT", "S6-NO-CONTAMINATION"], s6);
+    expect(s6.states["financial.settlement_adjustment"]).toBe("not_observed");
+    expect(s6.values).not.toHaveProperty("financial.settlement_adjustment");
+    await expectGoldMatches("S6", ["S6-NO-CONTAMINATION"], s6);
 
     const s10Input = approvedEconomicInput(economicPricing({ totalFees: 100, chargebackFee: 20, feeCredit: -5 }));
     proveProcessorBillingForEveryCharge(s10Input);

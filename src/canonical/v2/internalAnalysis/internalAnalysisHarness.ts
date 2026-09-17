@@ -46,8 +46,10 @@ export async function runFiservInternalAnalysisEvaluationV1(input: RunFiservInte
     deterministic.deterministic.synthesis].some((stage) => stage.validation.status !== "valid")) {
     throw new Error("internal_analysis_deterministic_stage_invalid");
   }
-  if (!deterministic.audit.admission) throw new Error("internal_analysis_template_admission_required");
-  const origins = buildStatementObservationInvestigationOrigins({ foundation: deterministic.deterministic.foundation,
+  if (!deterministic.audit.admission) throw new Error("internal_analysis_dynamic_evidence_admission_required");
+  // This inventory drives internal diagnostic research only. Canonical truth below
+  // remains the dynamic-proof foundation and is protected by before/after hashes.
+  const origins = buildStatementObservationInvestigationOrigins({ foundation: deterministic.deterministic.observationalFoundation,
     admittedKnowledge: input.admittedKnowledge, tenantRef: input.tenantRef, accountRef: input.accountRef });
   if (input.providerPreflight.executionMode === "external_provider") {
     if (!input.liveCapability) throw new Error("internal_live_execution_capability_required");

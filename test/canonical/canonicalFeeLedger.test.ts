@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildCanonicalAiCapabilities } from "../../src/canonical/buildCanonicalAiCapabilities.js";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
+import { buildCanonicalCrossSummaryLinkEvidence } from "../../src/canonical/crossSummaryLinkEvidence.js";
 import { buildCanonicalFeeLedger, mergeInterpretations } from "../../src/canonical/feeLedger.js";
 import { buildCanonicalFeeOwnershipActionability } from "../../src/canonical/feeOwnershipActionability.js";
 import { buildCanonicalCustomerState } from "../../src/canonical/customerStateResolver.js";
@@ -559,7 +560,7 @@ describe("canonical fee ledger", () => {
     expect(ledger.status).toBe("partial");
   });
 
-  it("allows documented one-cent rounding but keeps unexplained two-cent differences partial", () => {
+  it("keeps one-cent and two-cent differences unresolved when no exact rounding evidence exists", () => {
     const oneCent = ledgerFromRows({
       documentId: "doc_one_cent_rounding",
       lines: ["Monthly Fee | -$10.00", "Total Fees | -$9.99"],
@@ -577,14 +578,14 @@ describe("canonical fee ledger", () => {
       delta: -0.02,
     });
 
-    expect(oneCent.controls.at(-1)).toMatchObject({ status: "pass_with_rounding", deltaMinor: 1 });
+    expect(oneCent.controls.at(-1)).toMatchObject({ status: "verification_required", deltaMinor: 1, toleranceMinor: 0 });
     expect(oneCent.controls[0]).toMatchObject({
-      status: "pass_with_rounding",
+      status: "verification_required",
       actualAmount: { amountMinor: 1000, currency: "USD" },
       parserReportedActualAmount: { amountMinor: 1000, currency: "USD" },
       reconstructionFormula: "covered_rows_signed_net",
     });
-    expect(oneCent.status).toBe("available");
+    expect(oneCent.status).toBe("partial");
     expect(twoCent.controls.at(-1)).toMatchObject({ status: "verification_required", deltaMinor: 2 });
     expect(twoCent.status).toBe("partial");
   });
@@ -640,7 +641,6 @@ describe("canonical fee ledger", () => {
       expectedAmount: { amountMinor: 1000, currency: "USD" },
       actualAmount: { amountMinor: 1001, currency: "USD" },
       derivationGroupId: "test",
-      documentedOneCentRounding: true,
     });
     const greaterThanOneCent = printedMonetaryControl({
       id: "ctrl_bad",
@@ -649,11 +649,10 @@ describe("canonical fee ledger", () => {
       expectedAmount: { amountMinor: 1000, currency: "USD" },
       actualAmount: { amountMinor: 1002, currency: "USD" },
       derivationGroupId: "test",
-      documentedOneCentRounding: true,
     });
 
     expect(exact.status).toBe("pass");
-    expect(oneCent.status).toBe("pass_with_rounding");
+    expect(oneCent.status).toBe("verification_required");
     expect(greaterThanOneCent.status).toBe("verification_required");
 
     const rateControl = diagnosticRateVolumeControl({
@@ -827,13 +826,25 @@ function buildLedgerFixture(input: {
 }
 
 function analysisWithLedger(input: { ledger: CanonicalFeeLedger; evidence: Map<string, CanonicalEvidenceRecord>; calculations: CanonicalCalculationRecord[] }): CanonicalStatementAnalysis {
-  const analysis = buildCanonicalStatementFactsFromParsedDocument(validationSummaryDocument(), {
+  const doc = validationSummaryDocument();
+  const analysis = buildCanonicalStatementFactsFromParsedDocument(doc, {
     sourceFileName: "synthetic-fee-ledger-validation.pdf",
     businessType: "restaurant",
     preferExtractedRows: true,
   });
   analysis.feeLedger = input.ledger;
   analysis.evidence = [...analysis.evidence, ...input.evidence.values()];
+  const evidence = new Map(analysis.evidence.map((item) => [item.id, item]));
+  analysis.crossSummaryLinkEvidence = buildCanonicalCrossSummaryLinkEvidence({
+    doc,
+    documentId: analysis.identity.sourceDocumentRef,
+    identity: analysis.identity,
+    financialFacts: analysis.financialFacts,
+    feeLedger: input.ledger,
+    parserOutput: null,
+    evidence,
+  });
+  analysis.evidence = [...evidence.values()];
   analysis.calculations = [...analysis.calculations, ...input.calculations];
   analysis.feeOwnershipActionability = buildCanonicalFeeOwnershipActionability(input.ledger, {
     processorFamily: "fiserv",

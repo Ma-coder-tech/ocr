@@ -1,0 +1,20 @@
+{
+  "frozenUtc": "2026-09-05T11:24:34.105618+00:00",
+  "preservationSha": "f5e89d4e3afd63a7f687d1359f801fe62136b6fe",
+  "testsPassed": 27,
+  "reservedSemanticHoldout": [
+    "holdout-7",
+    "holdout-8",
+    "holdout-9"
+  ],
+  "untouchedDocuments": false,
+  "sha256": {
+    "semantics.py": "bbfef278911a907d62f693c8d9ee31a39549045f69a1ca463e8ba4c860e255f3",
+    "test_semantics.py": "49d3e86ebf83a6a147c3b973bfb92f5acbd6b847f6af25618e5678240f77e64e",
+    "protocol.md": "245f3be1408be8b135ff8894bc5481513ca9fcaeed5adc02fba563cfeb4fb0f7",
+    "io_evidence.py": "3047182a7f621573ec68af0354c8b2c8cccb5163757ef929cd28e0618299ae34",
+    "run.py": "7641e41113c7f85fdf7207e45d99f071edee3b694bb9e8a2a4cff15d0eb0329f",
+    "annotate_semantic_gold.py": "409045d9c7b7edf2963d31a17eb46b2ac74fb13ddc8e188a215291965e56704c",
+    "development-semantic-gold.json": "1db629a64b018aef51e15fa6947238b4aff625f309af5e9c1419f2b8000f0b63"
+  }
+}

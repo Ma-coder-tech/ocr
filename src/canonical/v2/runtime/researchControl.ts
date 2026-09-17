@@ -164,7 +164,10 @@ type ResearchAdmission =
   | "unresolved_materiality"
   | "withheld_rf_catalog_unavailable"
   | "withheld_no_authorized_research_mapping"
-  | "withheld_non_public_evidence_required";
+  | "withheld_non_public_evidence_required"
+  | "withheld_merchant_document_evidence_required"
+  | "withheld_additional_statement_history_required"
+  | "withheld_evidence_route_unresolved";
 
 export function researchClaimFamilyForFacet(facet: CanonicalAtomicClaimFacet): CanonicalResearchClaimFamily {
   if (["economic_beneficiary", "economic_owner"].includes(facet)) return "economic_ownership";

@@ -4,6 +4,7 @@ import type {
   CanonicalEconomicsV2SuppliedDocumentIntegrityStatus,
   CanonicalEconomicsV2TemplateAdmissionStatus,
 } from "../types.js";
+import type { FiservOutputPermission, FiservSupportState } from "../fiservCapabilityContract.js";
 
 export const SOURCE_READINESS_STATES = [
   "authoritative_admitted",
@@ -45,6 +46,10 @@ export type SourceReadinessEnvelope = {
     statementCompleteness: CanonicalEconomicsV2CompletenessStatus;
     authority: "authoritative" | "observational" | "withheld";
     humanReviewRequired: boolean;
+    capabilitySupport?: {
+      state: FiservSupportState;
+      outputPermissions: FiservOutputPermission[];
+    };
   };
   outcome: {
     state: SourceReadinessState;
@@ -97,7 +102,9 @@ export function buildSourceReadinessEnvelope(input: BuildSourceReadinessInput): 
     source: { ...input.source },
     outcome: {
       state,
-      analysisCompletionPermitted: state === "authoritative_admitted",
+      analysisCompletionPermitted: input.source.capabilitySupport
+        ? ["supported_limited", "supported_full"].includes(input.source.capabilitySupport.state)
+        : state === "authoritative_admitted",
       reasonCodes: reasons,
     },
   };

@@ -67,8 +67,8 @@ function admittedTerm(subjectCode: string): KnowledgeEntry {
       admittedAt: "2026-08-24T00:00:00Z", conditions: [] }, supersedes: [], limitations: [], confidence: "high" };
 }
 
-describe("reusable Fiserv / First Data full-layout admission", () => {
-  it("admits the real full-layout fixture from cross-section structure and reconciliation", () => {
+describe("non-authoritative Fiserv / First Data full-layout diagnostic planning", () => {
+  it("recognizes the real full-layout fixture as diagnostic context from cross-section structure and reconciliation", () => {
     const result = evaluate(full.parserOutput);
     expect(result.resolution).toMatchObject({
       mappingId: "fiserv_first_data_full_statement",
@@ -105,7 +105,7 @@ describe("reusable Fiserv / First Data full-layout admission", () => {
 
   it("maps a bounded registered subset and keeps every other full-layout observation auditable", () => {
     const planner = buildStatementObservationInvestigationOrigins({
-      foundation: full.foundation,
+      foundation: full.observationalFoundation,
       admittedKnowledge: [],
       tenantRef: "full-admission-test",
       accountRef: "full-admission-test",
@@ -150,7 +150,7 @@ describe("reusable Fiserv / First Data full-layout admission", () => {
   });
 
   it("plans four bounded RF-first questions with exact multi-observation lineage and no amount ranking", () => {
-    const first = buildAndPlan(full.foundation);
+    const first = buildAndPlan(full.observationalFoundation);
     expect(first.origins.planningInventory.subjects).toEqual([
       expect.objectContaining({ subjectCode: "fiserv_multi_network_assessment_fee_historical_presentation", occurrenceCount: 5,
         aggregateAmountMinor: 6887, priority: "material_operational_action" }),
@@ -180,7 +180,7 @@ describe("reusable Fiserv / First Data full-layout admission", () => {
         "requires_locator_coverage_american_express_assessment_presentation",
       ]));
 
-    const changedAmounts = structuredClone(full.foundation);
+    const changedAmounts = structuredClone(full.observationalFoundation);
     changedAmounts.sourceModel.occurrences.forEach((occurrence, index) => {
       if (occurrence.semanticRole === "fee_charge" && occurrence.printedAmount?.amountMinor) {
         occurrence.printedAmount.amountMinor = (index % 17) + 1;
@@ -195,8 +195,8 @@ describe("reusable Fiserv / First Data full-layout admission", () => {
   });
 
   it("cross-generalizes the same subject model to the Wells Fargo fixture", () => {
-    const statementTwo = buildAndPlan(full.foundation);
-    const result = buildAndPlan(otherFull.foundation);
+    const statementTwo = buildAndPlan(full.observationalFoundation);
+    const result = buildAndPlan(otherFull.observationalFoundation);
     expect(result.origins.planningInventory).toMatchObject({ rawNonzeroObservationCount: 108,
       normalizedObservationIdentityCount: 108, mappedSubjectCount: 4, suppressedObservationCount: 100,
       suppressedCountsByReason: { observation_control_total_not_research_subject: 4,
@@ -230,7 +230,7 @@ describe("reusable Fiserv / First Data full-layout admission", () => {
 
   it("applies RF before research selection and reports the corrected exact public authority", () => {
     const knowledge = [admittedTerm("fiserv_multi_network_assessment_fee_historical_presentation")];
-    const result = buildAndPlan(full.foundation, knowledge);
+    const result = buildAndPlan(full.observationalFoundation, knowledge);
     expect(result.questions.find((item) => item.subjectCode === "fiserv_multi_network_assessment_fee_historical_presentation"))
       .toMatchObject({ rfResolution: { status: "resolved_single" }, eligibility: "rf_resolved", selection: "not_eligible" });
     expect(result.questions.filter((item) => item.selection === "selected")).toHaveLength(3);
@@ -246,7 +246,7 @@ describe("reusable Fiserv / First Data full-layout admission", () => {
   });
 
   it("produces provider-safe controlled queries without fixture, merchant, amount, or lineage material", () => {
-    const result = buildAndPlan(full.foundation);
+    const result = buildAndPlan(full.observationalFoundation);
     result.origins.providerContexts.forEach((context) => {
       expect(inspectProviderSafeQuestionContext(context)).toEqual({ valid: true, reasonCodes: [] });
       const question = result.questions.find((item) => item.subjectCode === context.subjectCode)!;
@@ -283,7 +283,7 @@ describe("reusable Fiserv / First Data full-layout admission", () => {
       "full_admission_failed_gross_minus_refunds_equals_net_submitted",
       "full_admission_failed_required_procedural_reconciliations",
     ]));
-    expect(() => buildAndPlan(unreconciledFull.foundation)).toThrow("observation_planning_requires_admitted_template");
+    expect(() => buildAndPlan(unreconciledFull.observationalFoundation)).toThrow("observation_planning_requires_admitted_template");
   });
 
   it("rejects the short layout even when full-layout fixture metadata is copied onto it", () => {
