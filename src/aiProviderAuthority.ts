@@ -34,6 +34,7 @@ export const EVALUATION_ONLY_AI_OPERATIONS = [
   "legacy_fee_knowledge_research",
   "legacy_fee_knowledge_investigation",
   "reconstruction_live_hypothesis",
+  "shadow_ai_economic_resolution_planner",
 ] as const;
 
 export type AiProviderOperation =

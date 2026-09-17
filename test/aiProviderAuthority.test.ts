@@ -54,6 +54,11 @@ describe("AI provider authority telemetry", () => {
       providerCallAttempts: 0,
       disposition: "evaluation_dependency_only",
     });
+    expect(evaluationOnlyAiTelemetry("shadow_ai_economic_resolution_planner")).toMatchObject({
+      authority: "EVALUATION_ONLY",
+      providerCallAttempts: 0,
+      disposition: "evaluation_dependency_only",
+    });
   });
 
   it("recognizes only the supported Fiserv driver set for legacy containment", () => {
