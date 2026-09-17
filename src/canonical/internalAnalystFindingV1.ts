@@ -1266,7 +1266,7 @@ function stage0Value(value: unknown): string {
 
 function researchProcessorContext(analysis: CanonicalStatementAnalysis): string | null {
   const processorName = analysis.identity.processorName.value;
-  if (processorName && /FISERV|FIRST DATA|CLOVER|PAYSAFE|BASYS|NXGEN|PRIORITY|WELLS FARGO/i.test(processorName)) return processorName;
+  if (processorName && /FISERV|FIRST DATA|CLOVER|PAYSAFE|BASYS|PRIORITY|WELLS FARGO/i.test(processorName)) return processorName;
   return analysis.identity.processorFamily.value ?? processorName;
 }
 

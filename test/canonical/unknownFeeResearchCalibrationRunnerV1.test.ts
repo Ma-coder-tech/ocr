@@ -46,7 +46,16 @@ describe("Unknown-Fee Research Calibration & Retrieval Strategy v1 runner", () =
 
   it("stops after two genuinely different empty shapes and never spends retrieval budget", async () => {
     const { report, analysis } = await reportFor("Nov_2024_Statement.pdf", "restaurant_food_beverage");
-    const plan = planFor(report, analysis, "BATCH SETTLEMENT");
+    const batchRow = analysis.feeLedger.rows.find((item) => item.selectedLabel.includes("BATCH SETTLEMENT"))!;
+    const batchFinding = report.findings.find((item) => item.sourceFeeRowId === batchRow.id)!;
+    expect(batchFinding.openWorldDeterminants?.research).toMatchObject({
+      disposition: "STOP",
+      reasonCodes: ["determinants_sufficient_exact_identity_not_required"],
+    });
+    expect([...report.researchQueue.selected, ...report.researchQueue.deferred]
+      .some((candidate) => candidate.question.feeRowRef === batchRow.id)).toBe(false);
+
+    const plan = planFor(report, analysis, "MONTHLY ADVANTAGE");
     const search = vi.fn(async () => []);
     const retrieve = vi.fn();
     const result = await runCalibratedUnknownFeeResearchV1({ plan, adapters: { search, retrieve } });

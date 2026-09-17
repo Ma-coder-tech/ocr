@@ -81,17 +81,24 @@ describe("governed pricing-layer Batch 1 full Fiserv corpus", () => {
     const ambiguousExact = exact.filter((finding) => finding.competingInterpretations.length > 0 || finding.exactFeeIdentity.state === "conflicting");
 
     expect(findings).toHaveLength(483);
-    // Later admitted knowledge may strengthen identity without changing the
-    // Batch 1 pricing-layer semantics or canonical financial truth.
+    // Later admitted knowledge may strengthen category-level classification
+    // without changing Batch 1 pricing semantics or canonical financial truth.
     expect(exact).toHaveLength(89);
-    expect(categoryOnly).toHaveLength(92);
-    expect(unresolved).toHaveLength(302);
-    // The current-2026 adjudication intentionally adds 11 material, explicitly
-    // unresolved rate conflicts without changing the Batch 1 identity counts.
-    expect(ambiguous).toHaveLength(104);
+    expect(categoryOnly).toHaveLength(259);
+    expect(unresolved).toHaveLength(135);
+    // Current-reference conflicts remain in their governed evidence layer and
+    // do not inflate the pricing-layer identity ambiguity count.
+    expect(ambiguous).toHaveLength(90);
     expect(ambiguousExact.filter((finding) => finding.exactFeeIdentity.value?.startsWith("amex_"))).toHaveLength(3);
-    expect(ambiguousExact.some((finding) => (finding.usNetworkFeeEvidence?.sourceConflicts.length ?? 0) > 0)).toBe(true);
-    expect(reports.reduce((sum, report) => sum + report.researchQueued, 0)).toBe(200);
+    const historicallyProtected = findings.filter((finding) => [
+      "HISTORICAL_VALUE_PRESERVED_BEFORE_CHANGE",
+      "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+    ].includes(finding.current2026UsCoreNetworkReference?.historicalApplication ?? ""));
+    expect(historicallyProtected.length).toBeGreaterThan(0);
+    expect(findings.filter((finding) => finding.current2026UsCoreNetworkReference)
+      .every((finding) => finding.current2026UsCoreNetworkReference!
+        .currentReferenceMaintenance.retainedSeparatelyFromHistoricalConclusion)).toBe(true);
+    expect(reports.reduce((sum, report) => sum + report.researchQueued, 0)).toBe(149);
 
     const priority = reports.find((report) => report.file.includes("PRIORITY_PAYMENT_SYSTEMS"))!;
     expect(priority.pricingModel).toBe("flat_rate");
