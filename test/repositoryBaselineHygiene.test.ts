@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 
 describe("repository baseline hygiene", () => {
-  it("uses a process-isolated Vitest pool for native-backed suites", async () => {
+  it("uses bounded process and database isolation for native-backed suites", async () => {
     const [config, packageJsonText, baselineRunner] = await Promise.all([
       readFile(path.resolve(root, "vitest.config.ts"), "utf8"),
       readFile(path.resolve(root, "package.json"), "utf8"),
@@ -17,8 +17,13 @@ describe("repository baseline hygiene", () => {
     expect(config).toMatch(/pool:\s*["']forks["']/);
     expect(config).not.toMatch(/pool:\s*["']threads["']/);
     expect(packageJson.scripts.test).toBe("node scripts/check-toolchain.mjs && node scripts/run-test-baseline.mjs");
-    expect(baselineRunner).toContain("--exclude");
-    expect(baselineRunner.match(/test\/evaluationPackage5BIntegration\.test\.ts/g)).toHaveLength(2);
+    expect(baselineRunner).toContain("const batchSize = 12");
+    expect(baselineRunner).toContain('fs.mkdtempSync(path.join(os.tmpdir(), "ratereveal-test-")');
+    expect(baselineRunner).toContain("FEECLEAR_DB_PATH: dbPath");
+    expect(baselineRunner).toContain('readPositiveInteger("RATEREVEAL_TEST_SHARD_COUNT", 1)');
+    expect(baselineRunner).toContain('readPositiveInteger("RATEREVEAL_TEST_SHARD_INDEX", 1)');
+    expect(baselineRunner).toContain('batches.push(["test/evaluationPackage5BIntegration.test.ts"])');
+    expect(baselineRunner).toContain('runVitest(["--silent", ...filesInBatch])');
   });
 
   it("keeps the historical dirty-worktree Gold scope checker retired", async () => {

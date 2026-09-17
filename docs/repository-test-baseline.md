@@ -3,10 +3,15 @@
 The supported repository test command is `npm test`. Vitest uses the `forks`
 pool with serial file execution because the suite repeatedly loads and closes
 native SQLite and PDF-parser state. Worker-thread execution is not a supported
-baseline path for these native-backed suites. The high-volume Package 5B
-integration file runs in a second fresh Vitest process after the remaining
-repository suite. This keeps its native/PDF lifecycle and local liveness timers
-isolated without skipping tests or relaxing any assertion or timeout.
+baseline path for these native-backed suites. The runner deterministically
+partitions the test files into small, fresh Vitest processes, assigns each
+process an isolated temporary SQLite database, and runs the high-volume
+Package 5B integration file alone. This bounds native/PDF and worker-RPC
+lifecycle state without skipping tests or relaxing any assertion or timeout.
+
+CI distributes the same deterministic inventory across independent shards.
+`RATEREVEAL_TEST_SHARD_INDEX` and `RATEREVEAL_TEST_SHARD_COUNT` are reserved
+for that orchestration; an ordinary local `npm test` still executes every test.
 
 The whole-statement work-plan tests use
 `test/fixtures/evaluation/five-statement-live-work-plan-observation-v1.json`.

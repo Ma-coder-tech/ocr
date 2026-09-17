@@ -1,0 +1,197 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  OPENAI_API_KEY: ""
+  OPENROUTER_API_KEY: ""
+  ANTHROPIC_API_KEY: ""
+  SHADOW_AI_PLANNER_INTERNAL_KILL_SWITCH: "true"
+
+jobs:
+  baseline-tests:
+    name: baseline-tests-${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    env:
+      RATEREVEAL_TEST_SHARD_INDEX: ${{ matrix.shard }}
+      RATEREVEAL_TEST_SHARD_COUNT: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run repo:clean-check
+
+  full-test-suite:
+    name: full-test-suite
+    runs-on: ubuntu-latest
+    needs: baseline-tests
+    if: always()
+    steps:
+      - name: Require every isolated test shard
+        env:
+          SHARD_RESULT: ${{ needs.baseline-tests.result }}
+        run: test "$SHARD_RESULT" = "success"
+
+  build-typecheck:
+    name: build-typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck:web
+      - run: npm run build:web:check
+      - run: npm run repo:clean-check
+
+  authority-containment:
+    name: authority-containment
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FEECLEAR_DB_PATH: ${{ runner.temp }}/authority-containment.sqlite
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - name: Run authority, privacy, financial invariance, and provider containment tests
+        run: >-
+          node scripts/run-node-tool.mjs ./node_modules/vitest/vitest.mjs run
+          test/aiProviderAuthority.test.ts
+          test/supportedFiservLegacyAiContainment.test.ts
+          test/canonical/canonicalAiFinancialInvariance.test.ts
+          test/canonical/canonicalRuntimeEvidenceLineage.test.ts
+          test/canonical/shadowAiEconomicResolutionPlannerV1.test.ts
+          test/canonical/shadowAiPlannerContractHardeningV1.test.ts
+          test/canonical/shadowAiPlannerInternalIntegrationV1.test.ts
+          test/canonical/shadowAiPlannerProviderNeutralV1.test.ts
+          test/canonical/shadowAiPlannerProviderTransportsV1.test.ts
+          test/canonical/v2/runtime/rgLiveEvidencePrivacy.test.ts
+      - run: npm run repo:clean-check
+
+  corpus-gold-integrity:
+    name: corpus-gold-integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      FEECLEAR_DB_PATH: ${{ runner.temp }}/corpus-gold.sqlite
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run corpus:test
+      - run: npm run gold:validate
+      - run: npm run gold:test
+      - run: npm run gold:audit
+      - run: npm run evaluation:integrity:dry-run
+      - run: npm run repo:clean-check
+
+  foundation-fiserv:
+    name: foundation-fiserv
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FEECLEAR_DB_PATH: ${{ runner.temp }}/foundation-fiserv.sqlite
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run validate:foundation
+      - name: Run portable Fiserv regression coverage
+        run: >-
+          node scripts/run-node-tool.mjs ./node_modules/vitest/vitest.mjs run
+          test/fiservFirstDataParser.test.ts
+          test/fiservParserOutputSchema.test.ts
+          test/fiservIndependentPopulationsFromDocumentIr.test.ts
+          test/fiservProcessorBatchFundingFromDocumentIr.test.ts
+          test/fiservProcessorFeeLedgerFromDocumentIr.test.ts
+          test/fiservProcessorRateFingerprint.test.ts
+          test/fiservProcessorResidualAnalysis.test.ts
+          test/fiservTieredRules.test.ts
+          test/fiservTopLevelFromDocumentIr.test.ts
+          test/genericFiservStatementParser.test.ts
+      - run: npm run fiserv:coverage:check
+      - run: npm run repo:clean-check
+
+  repository-cleanliness:
+    name: repository-cleanliness
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run ci:cleanliness:generated
+
+  dependency-delta:
+    name: dependency-delta
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run ci:dependency-delta
+      - run: npm run repo:clean-check
+
+  private-corpus-policy:
+    name: private-corpus-policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RATEREVEAL_POLICY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+      RATEREVEAL_POLICY_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      RATEREVEAL_PRIVATE_CORPUS_DIR: ${{ vars.RATEREVEAL_PRIVATE_CORPUS_DIR }}
+      RATEREVEAL_PRIVATE_CORPUS_WAIVER_ID: ${{ vars.RATEREVEAL_PRIVATE_CORPUS_WAIVER_ID }}
+      RATEREVEAL_PRIVATE_CORPUS_WAIVER_SHA: ${{ vars.RATEREVEAL_PRIVATE_CORPUS_WAIVER_SHA }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run ci:private-corpus-policy
+      - run: npm run repo:clean-check

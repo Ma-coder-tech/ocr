@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "ratereveal_dependency_advisory_baseline_v1",
+  "sourceCommit": "ed9f259f1759bbe7c99f7a51935e18397f9c0619",
+  "capturedAt": "2026-09-17",
+  "policy": "Inherited advisories are temporarily allowlisted by package, maximum severity, directness, production scope, and advisory source. New or worsened exposure fails closed.",
+  "vulnerabilities": {
+    "@ai-sdk/anthropic": { "severity": "low", "isDirect": true, "advisorySources": [] },
+    "@ai-sdk/gateway": { "severity": "low", "isDirect": false, "advisorySources": [] },
+    "@ai-sdk/openai": { "severity": "low", "isDirect": true, "advisorySources": [] },
+    "@ai-sdk/provider-utils": { "severity": "low", "isDirect": false, "advisorySources": [1193659] },
+    "@vitest/mocker": { "severity": "moderate", "isDirect": false, "advisorySources": [1193684] },
+    "ai": { "severity": "low", "isDirect": true, "advisorySources": [] },
+    "baseline-browser-mapping": { "severity": "moderate", "isDirect": false, "advisorySources": [1193686] },
+    "browserslist": { "severity": "high", "isDirect": false, "advisorySources": [1153171, 1153172] },
+    "csv-parse": { "severity": "moderate", "isDirect": true, "advisorySources": [1193670] },
+    "esbuild": { "severity": "moderate", "isDirect": false, "advisorySources": [1102341] },
+    "nanoid": { "severity": "high", "isDirect": false, "advisorySources": [1138811, 1139427, 1153189] },
+    "pdfjs-dist": { "severity": "high", "isDirect": true, "advisorySources": [1138116] },
+    "postcss": { "severity": "high", "isDirect": false, "advisorySources": [1124252, 1130709, 1139510] },
+    "vite": { "severity": "high", "isDirect": true, "advisorySources": [1116229, 1120784, 1123525] },
+    "vite-node": { "severity": "moderate", "isDirect": false, "advisorySources": [] },
+    "vitest": { "severity": "critical", "isDirect": true, "advisorySources": [1139528, 1193683] }
+  },
+  "productionVulnerabilities": {
+    "@ai-sdk/anthropic": "low",
+    "@ai-sdk/gateway": "low",
+    "@ai-sdk/openai": "low",
+    "@ai-sdk/provider-utils": "low",
+    "ai": "low",
+    "csv-parse": "moderate",
+    "pdfjs-dist": "high"
+  }
+}
