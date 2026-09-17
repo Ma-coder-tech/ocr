@@ -1,0 +1,3118 @@
+{
+  "schemaVersion": "commercial_source_batch_1b_helcim_dharma_evaluation_2026_09_10_v1",
+  "generatedAt": "2026-09-10T00:00:00.000Z",
+  "productAuthority": {
+    "document": "RateReveal_Helcim_Dharma_Batch_1B_Evidence_Pack_FINAL_Product_Adjudicated_v1.md",
+    "sha256": "391c4c1ee04a511baf029a58b30dd45c6d1d9c5d72bdf3c0e363ae7b10b62e6d",
+    "section": "all",
+    "verifiedSha256": true
+  },
+  "baseline": {
+    "branch": "codex/commercial-source-governance-contract-v1",
+    "commit": "d2b23cb756251fac39594523d15f7dcee070efad",
+    "parent": "51aef2b0aa8c8dc54c62e748c3a39951194ceaa7"
+  },
+  "implementationBranch": "codex/commercial-source-batch-1b-helcim-dharma-v1",
+  "scope": {
+    "layer3SourceAdmissionOnly": true,
+    "aiOrWebResearchUsed": false,
+    "comparatorEngineImplemented": false,
+    "marketJudgmentGenerated": false,
+    "customerFacingOutputGenerated": false,
+    "otherProvidersAdmitted": []
+  },
+  "registry": {
+    "validationIssues": [],
+    "sourceObservations": 12,
+    "admittedPriceComponents": 73,
+    "candidatePriceComponents": 3,
+    "offerCompositions": 4,
+    "retainedConflicts": [
+      {
+        "conflictId": "conflict_dharma_retail_monthly_calculator_v1",
+        "sameScopeKey": "conflict_dharma_retail_monthly_calculator_v1",
+        "componentVersionRefs": [
+          "component_dharma_retail_monthly_v1",
+          "candidate_dharma_calculator_retail_monthly_v1"
+        ],
+        "state": "resolved",
+        "resolution": {
+          "selectedComponentVersionRef": "component_dharma_retail_monthly_v1",
+          "authorityRef": "RateReveal_Helcim_Dharma_Batch_1B_Evidence_Pack_FINAL_Product_Adjudicated_v1.md#calculator-conflict",
+          "resolvedAt": "2026-09-10T00:00:00.000Z",
+          "reason": "Product selected the plan-specific current rate page for governed direct-plan consumption while retaining the calculator value as a conflicting maintenance candidate; no averaging or source-count voting."
+        }
+      },
+      {
+        "conflictId": "conflict_dharma_virtual_monthly_calculator_v1",
+        "sameScopeKey": "conflict_dharma_virtual_monthly_calculator_v1",
+        "componentVersionRefs": [
+          "component_dharma_virtual_monthly_v1",
+          "candidate_dharma_calculator_virtual_monthly_v1"
+        ],
+        "state": "resolved",
+        "resolution": {
+          "selectedComponentVersionRef": "component_dharma_virtual_monthly_v1",
+          "authorityRef": "RateReveal_Helcim_Dharma_Batch_1B_Evidence_Pack_FINAL_Product_Adjudicated_v1.md#calculator-conflict",
+          "resolvedAt": "2026-09-10T00:00:00.000Z",
+          "reason": "Product selected the plan-specific current rate page for governed direct-plan consumption while retaining the calculator value as a conflicting maintenance candidate; no averaging or source-count voting."
+        }
+      },
+      {
+        "conflictId": "conflict_dharma_high_volume_monthly_calculator_v1",
+        "sameScopeKey": "conflict_dharma_high_volume_monthly_calculator_v1",
+        "componentVersionRefs": [
+          "component_dharma_high_volume_monthly_v1",
+          "candidate_dharma_calculator_high_volume_monthly_v1"
+        ],
+        "state": "resolved",
+        "resolution": {
+          "selectedComponentVersionRef": "component_dharma_high_volume_monthly_v1",
+          "authorityRef": "RateReveal_Helcim_Dharma_Batch_1B_Evidence_Pack_FINAL_Product_Adjudicated_v1.md#calculator-conflict",
+          "resolvedAt": "2026-09-10T00:00:00.000Z",
+          "reason": "Product selected the plan-specific current rate page for governed direct-plan consumption while retaining the calculator value as a conflicting maintenance candidate; no averaging or source-count voting."
+        }
+      }
+    ],
+    "uniqueF1Fingerprints": [
+      "391c4c1ee04a511baf029a58b30dd45c6d1d9c5d72bdf3c0e363ae7b10b62e6d"
+    ],
+    "uniqueF2FingerprintCount": 12,
+    "uniqueF3FingerprintCount": 76,
+    "rawSnapshotLimitation": "The Product-adjudicated authority-pack fingerprint is preserved as F1 for each source observation; immutable raw first-party page bytes are not present, matching the accepted disclosed Batch 1A limitation."
+  },
+  "helcim": {
+    "observations": [
+      {
+        "observationId": "obs_helcim_h1_fee_disclosures_v1",
+        "sourceLocator": "https://legal.helcim.com/us/fee-disclosures/",
+        "lastModifiedDate": "2026-02-02",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "observedAt": "2026-09-10T00:00:00.000Z",
+        "f1": "391c4c1ee04a511baf029a58b30dd45c6d1d9c5d72bdf3c0e363ae7b10b62e6d",
+        "f2": "2872cff82abfd45c48bb40a5f83729f1fb5865f03536c056ffd21a5e73cec6e6"
+      },
+      {
+        "observationId": "obs_helcim_h2_public_pricing_v1",
+        "sourceLocator": "https://www.helcim.com/pricing/",
+        "lastModifiedDate": null,
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "observedAt": "2026-09-10T00:00:00.000Z",
+        "f1": "391c4c1ee04a511baf029a58b30dd45c6d1d9c5d72bdf3c0e363ae7b10b62e6d",
+        "f2": "171e7f5916131ed3d5edfe6004482d6044b2cb31f9e9eb829b0bfeb5dc1d4f56"
+      },
+      {
+        "observationId": "obs_helcim_h3_acceptable_use_v1",
+        "sourceLocator": "https://legal.helcim.com/us/acceptable-use-policy/",
+        "lastModifiedDate": "2025-08-15",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "observedAt": "2026-09-10T00:00:00.000Z",
+        "f1": "391c4c1ee04a511baf029a58b30dd45c6d1d9c5d72bdf3c0e363ae7b10b62e6d",
+        "f2": "0335506aff00a7aa3f29dc7e17eb50bb8d03d2b761ce1b87edbda107891fb186"
+      },
+      {
+        "observationId": "obs_helcim_h4_terms_v1",
+        "sourceLocator": "https://legal.helcim.com/us/terms-of-service/",
+        "lastModifiedDate": "2025-06-30",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2025-07-31",
+          "effectiveTo": null
+        },
+        "observedAt": "2026-09-10T00:00:00.000Z",
+        "f1": "391c4c1ee04a511baf029a58b30dd45c6d1d9c5d72bdf3c0e363ae7b10b62e6d",
+        "f2": "4585236275a1b4a4f62bca7a130786d636dfd9d895c0848c121c2df35017a31b"
+      }
+    ],
+    "known": [
+      {
+        "componentVersionId": "component_helcim_t1_card_present_rate_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t1_card_present_rate",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 40,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "card_present_card_charge_volume_in_t1",
+        "sourceFaithfulPopulationWording": "$0-$50,000; card_present; percentage margin",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 5000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "ae3b46abf5c769405a28dd30eb0cc2ece5750222547a0c65c833496b55c99e8f"
+      },
+      {
+        "componentVersionId": "component_helcim_t1_card_present_item_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t1_card_present_per_transaction",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 8,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_card_transaction",
+        "billedPopulation": "card_present_card_transactions_in_t1",
+        "sourceFaithfulPopulationWording": "$0-$50,000; card_present; per transaction",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 5000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "fe3074ea4f54b430e8c719d42a6b126b700b791af3952f4b788035c22dffed89"
+      },
+      {
+        "componentVersionId": "component_helcim_t1_card_not_present_rate_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t1_card_not_present_rate",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 50,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "card_not_present_card_charge_volume_in_t1",
+        "sourceFaithfulPopulationWording": "$0-$50,000; card_not_present; percentage margin",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 5000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_not_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "1e7bd6cc79349c751e73b7c1473ce261cb2e1cb49f494a07543962683c20519f"
+      },
+      {
+        "componentVersionId": "component_helcim_t1_card_not_present_item_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t1_card_not_present_per_transaction",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 25,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_card_transaction",
+        "billedPopulation": "card_not_present_card_transactions_in_t1",
+        "sourceFaithfulPopulationWording": "$0-$50,000; card_not_present; per transaction",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 5000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_not_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "4ee63ccee49c7f7a75e0bd83e536953e70f1722496b0240b76ec459466c7468d"
+      },
+      {
+        "componentVersionId": "component_helcim_t2_card_present_rate_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t2_card_present_rate",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 35,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "card_present_card_charge_volume_in_t2",
+        "sourceFaithfulPopulationWording": "$50,001-$100,000; card_present; percentage margin",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 5000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 10000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "2d166aafaf4aaaf4e1b7900e91896b006f651cc6b7dafa31fee46aaa0b09145d"
+      },
+      {
+        "componentVersionId": "component_helcim_t2_card_present_item_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t2_card_present_per_transaction",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 7,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_card_transaction",
+        "billedPopulation": "card_present_card_transactions_in_t2",
+        "sourceFaithfulPopulationWording": "$50,001-$100,000; card_present; per transaction",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 5000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 10000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "72dd6fdb3fa624ac61753ec42206ae706d922f66a186866e091889d4ca3a745c"
+      },
+      {
+        "componentVersionId": "component_helcim_t2_card_not_present_rate_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t2_card_not_present_rate",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 45,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "card_not_present_card_charge_volume_in_t2",
+        "sourceFaithfulPopulationWording": "$50,001-$100,000; card_not_present; percentage margin",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 5000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 10000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_not_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "ec095d5ed5ef203e9480cd8009a70de274dea6418706976beacda8ff142ce42a"
+      },
+      {
+        "componentVersionId": "component_helcim_t2_card_not_present_item_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t2_card_not_present_per_transaction",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 20,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_card_transaction",
+        "billedPopulation": "card_not_present_card_transactions_in_t2",
+        "sourceFaithfulPopulationWording": "$50,001-$100,000; card_not_present; per transaction",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 5000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 10000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_not_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "0197f7ae9ee5da38b9ca4ec2b8aee0615b7e3436e4c286410b76841ce669506c"
+      },
+      {
+        "componentVersionId": "component_helcim_t3_card_present_rate_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t3_card_present_rate",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 25,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "card_present_card_charge_volume_in_t3",
+        "sourceFaithfulPopulationWording": "$100,001-$500,000; card_present; percentage margin",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 10000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 50000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "79bf47340fdceba45996cf1885492578601d050429bc41ae741d2de0ca602072"
+      },
+      {
+        "componentVersionId": "component_helcim_t3_card_present_item_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t3_card_present_per_transaction",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 7,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_card_transaction",
+        "billedPopulation": "card_present_card_transactions_in_t3",
+        "sourceFaithfulPopulationWording": "$100,001-$500,000; card_present; per transaction",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 10000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 50000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "871680ef2807fa3de1a842660d2c623cdd7938e0eed502c354389cdfaa55d54f"
+      },
+      {
+        "componentVersionId": "component_helcim_t3_card_not_present_rate_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t3_card_not_present_rate",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 35,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "card_not_present_card_charge_volume_in_t3",
+        "sourceFaithfulPopulationWording": "$100,001-$500,000; card_not_present; percentage margin",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 10000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 50000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_not_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "ece56b9f1b14df059121d903b99ccc10642e77d35b89adce172cebfec6f78f88"
+      },
+      {
+        "componentVersionId": "component_helcim_t3_card_not_present_item_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t3_card_not_present_per_transaction",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 20,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_card_transaction",
+        "billedPopulation": "card_not_present_card_transactions_in_t3",
+        "sourceFaithfulPopulationWording": "$100,001-$500,000; card_not_present; per transaction",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 10000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 50000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_not_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "0acf7495310ba98eddbf13bab1b356c01d161ab15fd46b62a451dc21cb2c79a7"
+      },
+      {
+        "componentVersionId": "component_helcim_t4_card_present_rate_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t4_card_present_rate",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 20,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "card_present_card_charge_volume_in_t4",
+        "sourceFaithfulPopulationWording": "$500,001-$1,000,000; card_present; percentage margin",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 50000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 100000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "3b4fb33798f91717562b218b9c6861f7af9f91a8bcebd3a287b6ee5cf0a1c892"
+      },
+      {
+        "componentVersionId": "component_helcim_t4_card_present_item_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t4_card_present_per_transaction",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 6,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_card_transaction",
+        "billedPopulation": "card_present_card_transactions_in_t4",
+        "sourceFaithfulPopulationWording": "$500,001-$1,000,000; card_present; per transaction",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 50000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 100000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "2c628703ae47c1c4bff790c70dbbaa79fe0bbf5861e868b750b602ec75c5750f"
+      },
+      {
+        "componentVersionId": "component_helcim_t4_card_not_present_rate_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t4_card_not_present_rate",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 25,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "card_not_present_card_charge_volume_in_t4",
+        "sourceFaithfulPopulationWording": "$500,001-$1,000,000; card_not_present; percentage margin",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 50000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 100000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_not_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "5ce9a23e97353aa03fbc6c08a34a98a7c291a1f942034c538b2a39bd19483c1b"
+      },
+      {
+        "componentVersionId": "component_helcim_t4_card_not_present_item_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t4_card_not_present_per_transaction",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 15,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_card_transaction",
+        "billedPopulation": "card_not_present_card_transactions_in_t4",
+        "sourceFaithfulPopulationWording": "$500,001-$1,000,000; card_not_present; per transaction",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 50000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 100000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_not_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1"
+        ],
+        "f3": "c2b5be1e10b20f1451987e4811acca92b5292fd5dd3fef363acb3dba053e263c"
+      },
+      {
+        "componentVersionId": "component_helcim_t5_card_present_rate_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t5_card_present_rate",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 15,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "card_present_card_charge_volume_in_t5",
+        "sourceFaithfulPopulationWording": "H1 $1,000,001+; current H2 public scope limited to $1M-$5M; card_present; percentage margin",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 100000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 500000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1",
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "956da13b5e102b46bdae766367d607d477481358cbfc74c47c66c3b508d4a84d"
+      },
+      {
+        "componentVersionId": "component_helcim_t5_card_present_item_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t5_card_present_per_transaction",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 6,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_card_transaction",
+        "billedPopulation": "card_present_card_transactions_in_t5",
+        "sourceFaithfulPopulationWording": "H1 $1,000,001+; current H2 public scope limited to $1M-$5M; card_present; per transaction",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 100000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 500000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1",
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "1dda358406c59391729075ba2f73ae09620bf1e240022a2768ce605c8b231c34"
+      },
+      {
+        "componentVersionId": "component_helcim_t5_card_not_present_rate_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t5_card_not_present_rate",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 15,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "card_not_present_card_charge_volume_in_t5",
+        "sourceFaithfulPopulationWording": "H1 $1,000,001+; current H2 public scope limited to $1M-$5M; card_not_present; percentage margin",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 100000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 500000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_not_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1",
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "5ba60eb0438ef50b34990f8893403ec7eb0466e192ffa6fd480c7f40e8c5f253"
+      },
+      {
+        "componentVersionId": "component_helcim_t5_card_not_present_item_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "processing_margin_t5_card_not_present_per_transaction",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 15,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_card_transaction",
+        "billedPopulation": "card_not_present_card_transactions_in_t5",
+        "sourceFaithfulPopulationWording": "H1 $1,000,001+; current H2 public scope limited to $1M-$5M; card_not_present; per transaction",
+        "effectivePeriod": {
+          "knowledge": "partial_interval_known",
+          "effectiveFrom": "2026-04-01",
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "gt",
+              "value": 100000000
+            },
+            {
+              "op": "fact",
+              "field": "three_month_rolling_card_volume_minor",
+              "comparator": "lte",
+              "value": 500000000
+            },
+            {
+              "op": "fact",
+              "field": "channel",
+              "comparator": "eq",
+              "value": "card_not_present"
+            }
+          ]
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h1_fee_disclosures_v1",
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "3f13fce8fc16901d33fed3818389d6ba4d870c4e7b27c40471e93754013eeb34"
+      },
+      {
+        "componentVersionId": "component_helcim_chargeback_gross_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "chargeback_assessment",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 1500,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_chargeback_case",
+        "billedPopulation": "chargeback_occurrences",
+        "sourceFaithfulPopulationWording": "$15 per occurrence; fully refunded when resolved in merchant favor",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": {
+          "kind": "full_fee_refund",
+          "condition": {
+            "op": "fact",
+            "field": "chargeback_resolved_in_merchant_favor",
+            "comparator": "eq",
+            "value": true
+          },
+          "result": "net_zero_for_assessed_component",
+          "sourceFaithfulWording": "Full fee refund / net zero when resolved in merchant favor."
+        },
+        "sourceObservationRefs": [
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "bc57b887de341029f9fb9b0b34b5b99d709f57bc0f214fbd1f9dd99334bf1f83"
+      },
+      {
+        "componentVersionId": "component_helcim_recurring_surcharge_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "recurring_payment_additional_margin",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 40,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "applicable_recurring_payment_transaction_volume",
+        "sourceFaithfulPopulationWording": "+0.4% for applicable recurring-payment transactions",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "fact",
+          "field": "transaction_is_recurring",
+          "comparator": "eq",
+          "value": true
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "cd7a6eb1f7e67364fe3873fe771abf86ac69bead50249698ea1f828078ac0fdd"
+      },
+      {
+        "componentVersionId": "component_helcim_ach_return_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "ach_reject_return_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 500,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_ach_reject_or_return",
+        "billedPopulation": "rejected_or_returned_ach_transactions",
+        "sourceFaithfulPopulationWording": "$5 per rejected or returned bank-network transaction",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "f43b18c435cad60f7aacfa0dffffbbb45c347f10132551f84947845a50211859"
+      },
+      {
+        "componentVersionId": "component_helcim_tap_to_pay_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "tap_to_pay_on_iphone_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 10,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_approved_tap_to_pay_transaction",
+        "billedPopulation": "approved_tap_to_pay_on_iphone_transactions",
+        "sourceFaithfulPopulationWording": "$0.10 per approved transaction",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "7f2bbaa0e3f9fcc491474814ff68ede21ac17c6f27e67094955aa1bd788d722f"
+      },
+      {
+        "componentVersionId": "component_helcim_mobile_data_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "mobile_data_service_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 700,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "subscribed_mobile_data_service_months",
+        "sourceFaithfulPopulationWording": "$7 per month with the stated allowance",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "1e5c3d024a88988bbe1771f928d61ad028a550cdbc67ae4f0d5808fecec9d4e4"
+      },
+      {
+        "componentVersionId": "component_helcim_level23_retention_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "level_2_3_optimization_retained_savings",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 3000,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_generated_interchange_savings",
+        "billedPopulation": "generated_level_2_3_interchange_savings",
+        "sourceFaithfulPopulationWording": "Helcim retains 30% of generated interchange savings",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "b5181ba2828e16b380f53b6c458b62d1168c73d86e1240d8da3f448132cc502c"
+      }
+    ],
+    "knownAbsent": [
+      {
+        "componentVersionId": "component_helcim_account_monthly_fee_absent_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "account_monthly_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "helcim_direct_account_monthly_fee",
+        "sourceFaithfulPopulationWording": "No account monthly fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "b34ba122ae45963db969d4e3901c127dd49267ad93407664db1f05ea96a34003"
+      },
+      {
+        "componentVersionId": "component_helcim_monthly_minimum_absent_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "monthly_minimum",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "helcim_direct_monthly_minimum",
+        "sourceFaithfulPopulationWording": "No monthly minimum",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "6a64a469a71cfce635b4a838ea867867fecfe5146df30dbd47b568f9a92bfcd4"
+      },
+      {
+        "componentVersionId": "component_helcim_statement_fee_absent_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "statement_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "helcim_direct_statement_fee",
+        "sourceFaithfulPopulationWording": "No statement fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "8eaa083ae48ff2a4089e85e894df4d4b6ae57866ce0d6c4f8a8d9f61c2b09a68"
+      },
+      {
+        "componentVersionId": "component_helcim_signup_setup_fee_absent_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "signup_setup_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "helcim_direct_signup_setup_fee",
+        "sourceFaithfulPopulationWording": "No signup setup fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "a354e6c27ce916ec077cc0cfe13a15bcf9d40b17160daa95df997cc7077e18f9"
+      },
+      {
+        "componentVersionId": "component_helcim_pci_compliance_fee_absent_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "pci_compliance_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "helcim_direct_pci_compliance_fee",
+        "sourceFaithfulPopulationWording": "No pci compliance fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "4ed154602cf74b366f2e535d0392905b55d6fadee9d0320a38ef24f352b7e5e5"
+      },
+      {
+        "componentVersionId": "component_helcim_cancellation_termination_fee_absent_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "cancellation_termination_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "helcim_direct_cancellation_termination_fee",
+        "sourceFaithfulPopulationWording": "No cancellation termination fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "c012e691d3aee6029835a12fabc8979ce70b9a98fa16c4fcf2c12a6c92dd15a1"
+      },
+      {
+        "componentVersionId": "component_helcim_card_customer_data_migration_fee_absent_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "card_customer_data_migration_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "helcim_direct_card_customer_data_migration_fee",
+        "sourceFaithfulPopulationWording": "No card customer data migration fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "950fa4d04db8f5288da75652a36c732baee9f56ebfa0b43fec058f103e2854bc"
+      },
+      {
+        "componentVersionId": "component_helcim_annual_fee_absent_v1",
+        "offer": "Helcim U.S. direct public processing",
+        "componentIdentity": "annual_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_year",
+        "billedPopulation": "helcim_direct_annual_fee",
+        "sourceFaithfulPopulationWording": "No annual fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_helcim_h2_public_pricing_v1"
+        ],
+        "f3": "c42b1f927f6891270caba3eaf20291ba77084811a8c8861b531828db552bb438"
+      }
+    ],
+    "unknownOrBounded": [
+      "H2 effective-from is unknown and H2-only values cannot replay historically.",
+      "H3 has dated last-modified metadata but no proved effective-from date.",
+      "The current posted public tier stops at $5M; pricing above $5M is custom and requires merchant-specific confirmation.",
+      "Unlisted optional-service prices remain unadmitted/unknown rather than inferred free.",
+      "Public pricing provides no merchant-specific approval or availability evidence."
+    ],
+    "tier5At2m": "satisfied",
+    "tier5Above5m": "not_satisfied",
+    "policies": [
+      {
+        "status": "PUBLICLY_PROHIBITED",
+        "wording": "Product-adjudicated prohibited categories remain the enumerated H3 categories; prohibited is not a synonym for generic high-risk.",
+        "predicate": {
+          "op": "or",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "specified_delayed_delivery"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "major_airline_cruise_car_rental_travel_tour_timeshare"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "specified_gambling"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "cannabis"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "crypto_or_nft"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "specified_financial_debt_or_money_service"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "certain_weapon_or_firearm"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "online_mail_or_telephone_tobacco_or_vape"
+            }
+          ]
+        }
+      },
+      {
+        "status": "PUBLICLY_RESTRICTED_OR_REVIEW_REQUIRED",
+        "wording": "Product-adjudicated restricted categories require review and are not rejected by this public-policy state.",
+        "predicate": {
+          "op": "or",
+          "conditions": [
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "charity"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "crowdfunding"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "licensed_telemedicine"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "gym_or_membership"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "auction_art_collectible_luxury_or_jewelry"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "hardware_or_software"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "event_or_advance_ticketing"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "lodging_or_hotel"
+            },
+            {
+              "op": "fact",
+              "field": "merchant_type",
+              "comparator": "eq",
+              "value": "marketplace_or_payment_facilitator"
+            }
+          ]
+        }
+      },
+      {
+        "status": "NO_KNOWN_PUBLIC_BLOCK",
+        "wording": "No matched public block is not approval; Helcim may still reject an application.",
+        "predicate": {
+          "op": "fact",
+          "field": "merchant_type",
+          "comparator": "eq",
+          "value": "no_listed_h3_issue"
+        }
+      }
+    ],
+    "merchantAvailabilityEvidence": []
+  },
+  "dharma": {
+    "observations": [
+      {
+        "observationId": "obs_dharma_d1_retail_v1",
+        "sourceLocator": "https://dharmamerchantservices.com/industries/retail-small-business/rates-fees/",
+        "lastModifiedDate": null,
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "observedAt": "2026-09-10T00:00:00.000Z",
+        "f1": "391c4c1ee04a511baf029a58b30dd45c6d1d9c5d72bdf3c0e363ae7b10b62e6d",
+        "f2": "aa30cec415eaf05d2d5e32ac285f77d88a834d24fa0aeb25a35bd9a957fd7b7e"
+      },
+      {
+        "observationId": "obs_dharma_d2_virtual_v1",
+        "sourceLocator": "https://dharmamerchantservices.com/industries/ecommerce-online/rates-fees/",
+        "lastModifiedDate": null,
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "observedAt": "2026-09-10T00:00:00.000Z",
+        "f1": "391c4c1ee04a511baf029a58b30dd45c6d1d9c5d72bdf3c0e363ae7b10b62e6d",
+        "f2": "6edb950726024b71deeda4e50babdd68dedfe2c626cb61d5e9ff2088b31f5159"
+      },
+      {
+        "observationId": "obs_dharma_d3_high_volume_v1",
+        "sourceLocator": "https://dharmamerchantservices.com/pricing/high-volume-pricing/",
+        "lastModifiedDate": null,
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "observedAt": "2026-09-10T00:00:00.000Z",
+        "f1": "391c4c1ee04a511baf029a58b30dd45c6d1d9c5d72bdf3c0e363ae7b10b62e6d",
+        "f2": "a46ecc050dc2e4ef1cb5a747b46daa80f097117442fccf88ce4a249582c2e3d0"
+      },
+      {
+        "observationId": "obs_dharma_d4_supported_businesses_v1",
+        "sourceLocator": "https://dharmamerchantservices.com/faq/supported-businesses/",
+        "lastModifiedDate": null,
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "observedAt": "2026-09-10T00:00:00.000Z",
+        "f1": "391c4c1ee04a511baf029a58b30dd45c6d1d9c5d72bdf3c0e363ae7b10b62e6d",
+        "f2": "657d67ed15f74d4a81efc41437eec84330122304ca15a9fd33b1e2ec7f123766"
+      },
+      {
+        "observationId": "obs_dharma_d5_closure_v1",
+        "sourceLocator": "https://dharmamerchantservices.com/faq/is-there-a-closure-fee/",
+        "lastModifiedDate": null,
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "observedAt": "2026-09-10T00:00:00.000Z",
+        "f1": "391c4c1ee04a511baf029a58b30dd45c6d1d9c5d72bdf3c0e363ae7b10b62e6d",
+        "f2": "5965f79248c2e74d5555d4a7b779f554626e6c25d1260b4a9f5ce43959c2228e"
+      },
+      {
+        "observationId": "obs_dharma_d6_pci_v1",
+        "sourceLocator": "https://dharmamerchantservices.com/resources/pci-compliance/",
+        "lastModifiedDate": null,
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "observedAt": "2026-09-10T00:00:00.000Z",
+        "f1": "391c4c1ee04a511baf029a58b30dd45c6d1d9c5d72bdf3c0e363ae7b10b62e6d",
+        "f2": "8cf4e90205b49bac031f1ad5ef10b0e614f53a184b2724a8dd1689f5897d3f74"
+      },
+      {
+        "observationId": "obs_dharma_calculator_conflict_v1",
+        "sourceLocator": "https://dharmamerchantservices.com/calculate-costs/cut-the-fat/",
+        "lastModifiedDate": null,
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "observedAt": "2026-09-10T00:00:00.000Z",
+        "f1": "391c4c1ee04a511baf029a58b30dd45c6d1d9c5d72bdf3c0e363ae7b10b62e6d",
+        "f2": "d5e222a24448c38b1fa7708a9beb40dc6ee5a44f650ba2d3bad99c0a365e0850"
+      },
+      {
+        "observationId": "obs_dharma_referral_isolation_v1",
+        "sourceLocator": "https://dharmamerchantservices.com/getting-started/teghkhuman/",
+        "lastModifiedDate": null,
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "observedAt": "2026-09-10T00:00:00.000Z",
+        "f1": "391c4c1ee04a511baf029a58b30dd45c6d1d9c5d72bdf3c0e363ae7b10b62e6d",
+        "f2": "b9ae940d8c4f51962fb05e112137de3b5b4a746d05a28e5e0858fb9b3682b757"
+      }
+    ],
+    "standardRetail": [
+      {
+        "componentVersionId": "component_dharma_retail_monthly_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "monthly_plan_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 2000,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "account_months",
+        "sourceFaithfulPopulationWording": "$20.00 monthly",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d1_retail_v1"
+        ],
+        "f3": "b8cf9a80552370fee056f36dc447a33b3c328931fad80a35d6672001ea1faa78"
+      },
+      {
+        "componentVersionId": "component_dharma_retail_vmd_margin_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "visa_mastercard_discover_processing_margin",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 15,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "visa_mastercard_discover_card_charge_volume",
+        "sourceFaithfulPopulationWording": "0.15% provider margin; stated pass-through-at-cost is provider-offer representation only",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d1_retail_v1"
+        ],
+        "f3": "730c88ca7ceef7ef9adcb1bc59c916debf9f27f9c15aeaf9abe3e68e2edb4d06"
+      },
+      {
+        "componentVersionId": "component_dharma_retail_amex_margin_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "amex_processing_margin",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 25,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "amex_card_charge_volume",
+        "sourceFaithfulPopulationWording": "0.25% provider margin",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d1_retail_v1"
+        ],
+        "f3": "f3725a4418f4bb6e3068079fd5d151b2e61d17433bb71c1bfb93fa03492668a6"
+      },
+      {
+        "componentVersionId": "component_dharma_retail_vmd_auth_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "visa_mastercard_discover_authorization_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 8,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_authorization",
+        "billedPopulation": "visa_mastercard_discover_authorizations",
+        "sourceFaithfulPopulationWording": "$0.08 per authorization",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d1_retail_v1"
+        ],
+        "f3": "8d9c95be419c3ea708b8f25fbbd3ce665cb163b0ca26557d5026107da89dab42"
+      },
+      {
+        "componentVersionId": "component_dharma_retail_amex_auth_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "amex_authorization_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 8,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_authorization",
+        "billedPopulation": "amex_authorizations",
+        "sourceFaithfulPopulationWording": "$0.08 per authorization",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d1_retail_v1"
+        ],
+        "f3": "6394b07296d502e5e958317aa7cc1f5045a37d8d91a39fb9f4f2792478a760ea"
+      },
+      {
+        "componentVersionId": "component_dharma_retail_closure_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "account_closure_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 4900,
+            "currency": "USD"
+          }
+        },
+        "unit": "other",
+        "billedPopulation": "account_closure_events",
+        "sourceFaithfulPopulationWording": "$49 account closure fee; not an early termination fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d1_retail_v1",
+          "obs_dharma_d5_closure_v1"
+        ],
+        "f3": "291fdea4ad6781f417cce08127eebd2b0df67f69c8ed369a1c5d6340fb52a913"
+      },
+      {
+        "componentVersionId": "component_dharma_retail_chargeback_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "chargeback_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 2500,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_chargeback_case",
+        "billedPopulation": "chargeback_instances",
+        "sourceFaithfulPopulationWording": "$25 per chargeback instance",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d1_retail_v1"
+        ],
+        "f3": "1776cdb0f4559a3ebde31f3b8724f55caa5d321dc2e9717d3c23e3207b4a67c8"
+      },
+      {
+        "componentVersionId": "component_dharma_retail_avs_fee_absent_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "avs_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "other",
+        "billedPopulation": "retail_avs_fee",
+        "sourceFaithfulPopulationWording": "No avs fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d1_retail_v1"
+        ],
+        "f3": "e8e86464989251b0f25f1a50f292e04989a989a2a31352a19e95c8c0627b432e"
+      },
+      {
+        "componentVersionId": "component_dharma_retail_batch_fee_absent_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "batch_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_batch",
+        "billedPopulation": "retail_batch_fee",
+        "sourceFaithfulPopulationWording": "No batch fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d1_retail_v1"
+        ],
+        "f3": "5477148ce98d0699c30d96755f4c39a1a0c013b77f069d2528832f2c2b33bfb6"
+      },
+      {
+        "componentVersionId": "component_dharma_retail_pci_compliance_fee_absent_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "pci_compliance_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "other",
+        "billedPopulation": "retail_pci_compliance_fee",
+        "sourceFaithfulPopulationWording": "No pci compliance fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d1_retail_v1",
+          "obs_dharma_d6_pci_v1"
+        ],
+        "f3": "7908b48abbe550bed30af661e86bf417f2d4f8981abc001a057dd55bcdddef69"
+      },
+      {
+        "componentVersionId": "component_dharma_retail_early_termination_fee_absent_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "early_termination_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "other",
+        "billedPopulation": "retail_early_termination_fee",
+        "sourceFaithfulPopulationWording": "No early termination fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d1_retail_v1"
+        ],
+        "f3": "c77e72443494b0adb0a94012496b51fae096cd7fde792d7152cc7647ea52623e"
+      },
+      {
+        "componentVersionId": "component_dharma_retail_pci_noncompliance_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "pci_noncompliance_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 3995,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "months_while_source_defined_pci_noncompliance_applies",
+        "sourceFaithfulPopulationWording": "$39.95 monthly when the source-defined PCI non-compliance condition applies",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "fact",
+          "field": "pci_non_compliant",
+          "comparator": "eq",
+          "value": true
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d6_pci_v1"
+        ],
+        "f3": "d1adece62dc3a4aaad82066950a82dc79e60d216a1d35882aa541beeb6389be6"
+      },
+      {
+        "componentVersionId": "component_dharma_retail_annual_fee_absent_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "annual_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_year",
+        "billedPopulation": "retail_annual_fee",
+        "sourceFaithfulPopulationWording": "No annual fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d1_retail_v1"
+        ],
+        "f3": "8786ab181eb3b75a81fb3a9c836b6519a3193ae8d2228d936ad851c81409dddf"
+      },
+      {
+        "componentVersionId": "component_dharma_retail_monthly_minimum_absent_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "monthly_minimum",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "retail_monthly_minimum",
+        "sourceFaithfulPopulationWording": "No monthly minimum",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d1_retail_v1"
+        ],
+        "f3": "b4ef79d9c68d0be6fb8c518820ba19e85cc937635ede65437957d5c641d574b2"
+      },
+      {
+        "componentVersionId": "component_dharma_retail_account_updater_unknown_v1",
+        "offer": "Standard Retail / Storefront",
+        "componentIdentity": "normalized_account_updater_service_price",
+        "completeness": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "unit": "other",
+        "billedPopulation": "unresolved_account_updater_construct",
+        "sourceFaithfulPopulationWording": "Source says 'Account Update Fee: No'; construct match to a governed Account Updater product/mechanic is unresolved",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d1_retail_v1"
+        ],
+        "f3": "1b7107287bb46982daa58b49a8e0e61442642142ecd92e7a320b0796e63a2761"
+      }
+    ],
+    "standardVirtual": [
+      {
+        "componentVersionId": "component_dharma_virtual_monthly_v1",
+        "offer": "Standard Virtual / Online",
+        "componentIdentity": "monthly_plan_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 2000,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "account_months",
+        "sourceFaithfulPopulationWording": "$20.00 monthly",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d2_virtual_v1"
+        ],
+        "f3": "61f03292665bff0dcecc79fe9fdad15676321140501248137165dca61612f5a1"
+      },
+      {
+        "componentVersionId": "component_dharma_virtual_vmd_margin_v1",
+        "offer": "Standard Virtual / Online",
+        "componentIdentity": "visa_mastercard_discover_processing_margin",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 20,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "visa_mastercard_discover_card_charge_volume",
+        "sourceFaithfulPopulationWording": "0.20% provider margin; stated pass-through-at-cost is provider-offer representation only",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d2_virtual_v1"
+        ],
+        "f3": "a584bcef05ed922461edb7873bfcf2145f109118d5459928d2e44a68fc7aa3ab"
+      },
+      {
+        "componentVersionId": "component_dharma_virtual_amex_margin_v1",
+        "offer": "Standard Virtual / Online",
+        "componentIdentity": "amex_processing_margin",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 30,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "amex_card_charge_volume",
+        "sourceFaithfulPopulationWording": "0.30% provider margin",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d2_virtual_v1"
+        ],
+        "f3": "81e243eda6f5740537689c50d28e47e40fbb0bd92b13ba8f9035cd33ea4614b7"
+      },
+      {
+        "componentVersionId": "component_dharma_virtual_vmd_auth_v1",
+        "offer": "Standard Virtual / Online",
+        "componentIdentity": "visa_mastercard_discover_authorization_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 11,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_authorization",
+        "billedPopulation": "visa_mastercard_discover_authorizations",
+        "sourceFaithfulPopulationWording": "$0.11 per authorization",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d2_virtual_v1"
+        ],
+        "f3": "878d0f11d956fa187c61fc81dff7bf1c97a4e6415b5616699d1c1d862649d6d9"
+      },
+      {
+        "componentVersionId": "component_dharma_virtual_amex_auth_v1",
+        "offer": "Standard Virtual / Online",
+        "componentIdentity": "amex_authorization_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 11,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_authorization",
+        "billedPopulation": "amex_authorizations",
+        "sourceFaithfulPopulationWording": "$0.11 per authorization",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d2_virtual_v1"
+        ],
+        "f3": "6b472372c4f05adcc3e535e41f82b8dac34de4089d2c9b644ddab169398befc6"
+      },
+      {
+        "componentVersionId": "component_dharma_virtual_closure_v1",
+        "offer": "Standard Virtual / Online",
+        "componentIdentity": "account_closure_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 4900,
+            "currency": "USD"
+          }
+        },
+        "unit": "other",
+        "billedPopulation": "account_closure_events",
+        "sourceFaithfulPopulationWording": "$49 account closure fee; not an early termination fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d2_virtual_v1",
+          "obs_dharma_d5_closure_v1"
+        ],
+        "f3": "c1f2e31564a6cb97b8e1fc5290e95f23087ca54bd85d76dccbb9f2a0c8374d83"
+      },
+      {
+        "componentVersionId": "component_dharma_virtual_chargeback_v1",
+        "offer": "Standard Virtual / Online",
+        "componentIdentity": "chargeback_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 2500,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_chargeback_case",
+        "billedPopulation": "chargeback_instances",
+        "sourceFaithfulPopulationWording": "$25 per chargeback instance",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d2_virtual_v1"
+        ],
+        "f3": "b0ac8e1ab5e3c58ca5ab5dd4601d69c39384c7b2d318844e08232fd343d06b46"
+      },
+      {
+        "componentVersionId": "component_dharma_virtual_avs_fee_absent_v1",
+        "offer": "Standard Virtual / Online",
+        "componentIdentity": "avs_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "other",
+        "billedPopulation": "virtual_avs_fee",
+        "sourceFaithfulPopulationWording": "No avs fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d2_virtual_v1"
+        ],
+        "f3": "034bf0413192d4564ba88342ad6d36b04b98428151e49c60ae286e04b826887f"
+      },
+      {
+        "componentVersionId": "component_dharma_virtual_batch_fee_absent_v1",
+        "offer": "Standard Virtual / Online",
+        "componentIdentity": "batch_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_batch",
+        "billedPopulation": "virtual_batch_fee",
+        "sourceFaithfulPopulationWording": "No batch fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d2_virtual_v1"
+        ],
+        "f3": "344cd191edf37d29dbc564b042f15fb4479ae91f7fb96ecd706bd795f7038bdf"
+      },
+      {
+        "componentVersionId": "component_dharma_virtual_pci_compliance_fee_absent_v1",
+        "offer": "Standard Virtual / Online",
+        "componentIdentity": "pci_compliance_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "other",
+        "billedPopulation": "virtual_pci_compliance_fee",
+        "sourceFaithfulPopulationWording": "No pci compliance fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d2_virtual_v1",
+          "obs_dharma_d6_pci_v1"
+        ],
+        "f3": "1bda112583c6d0dbe56704be809b7d3642632abfc6e29fc20b016ca7f6b7c2f1"
+      },
+      {
+        "componentVersionId": "component_dharma_virtual_early_termination_fee_absent_v1",
+        "offer": "Standard Virtual / Online",
+        "componentIdentity": "early_termination_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "other",
+        "billedPopulation": "virtual_early_termination_fee",
+        "sourceFaithfulPopulationWording": "No early termination fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d2_virtual_v1"
+        ],
+        "f3": "47c9c2d5fd484d75805a9a373881397eabf67f635bc4e1badf6accb726676804"
+      },
+      {
+        "componentVersionId": "component_dharma_virtual_pci_noncompliance_v1",
+        "offer": "Standard Virtual / Online",
+        "componentIdentity": "pci_noncompliance_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 3995,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "months_while_source_defined_pci_noncompliance_applies",
+        "sourceFaithfulPopulationWording": "$39.95 monthly when the source-defined PCI non-compliance condition applies",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "fact",
+          "field": "pci_non_compliant",
+          "comparator": "eq",
+          "value": true
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d6_pci_v1"
+        ],
+        "f3": "ed2978c354566f993ceb003ddffe4c081f3e3e6c742caebad873ccac7d585f2b"
+      }
+    ],
+    "highVolume": [
+      {
+        "componentVersionId": "component_dharma_high_volume_monthly_v1",
+        "offer": "High Volume",
+        "componentIdentity": "monthly_plan_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 1500,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "account_months",
+        "sourceFaithfulPopulationWording": "$15.00 monthly",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d3_high_volume_v1"
+        ],
+        "f3": "d66df8bc9e596311a6db90d8108563126dcac21d4e3575ecbbd518308eef69f6"
+      },
+      {
+        "componentVersionId": "component_dharma_high_volume_vmd_margin_v1",
+        "offer": "High Volume",
+        "componentIdentity": "visa_mastercard_discover_processing_margin",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 10,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "visa_mastercard_discover_card_charge_volume",
+        "sourceFaithfulPopulationWording": "0.10% provider margin; stated pass-through-at-cost is provider-offer representation only",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d3_high_volume_v1"
+        ],
+        "f3": "a9d413bbd608d1638606f6ed6f391fad46fbd9d665b0cb106fa8ee0a6d4f4ac7"
+      },
+      {
+        "componentVersionId": "component_dharma_high_volume_amex_margin_v1",
+        "offer": "High Volume",
+        "componentIdentity": "amex_processing_margin",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "rate",
+            "basisPoints": 20,
+            "currency": null
+          }
+        },
+        "unit": "percent_of_card_charge_volume",
+        "billedPopulation": "amex_card_charge_volume",
+        "sourceFaithfulPopulationWording": "0.20% provider margin",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d3_high_volume_v1"
+        ],
+        "f3": "6427a750dc14f7fb3e8f538b8a6ba80e95f98bea82e628ceb9fb0d6c121b5575"
+      },
+      {
+        "componentVersionId": "component_dharma_high_volume_cp_auth_v1",
+        "offer": "High Volume",
+        "componentIdentity": "card_present_authorization_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 8,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_authorization",
+        "billedPopulation": "card_present_authorizations",
+        "sourceFaithfulPopulationWording": "$0.08 per card-present authorization",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d3_high_volume_v1"
+        ],
+        "f3": "ad5f6199fc813d1755183f221fdfbf2bb914db5730b88dc9d58186486d3730a8"
+      },
+      {
+        "componentVersionId": "component_dharma_high_volume_cnp_auth_v1",
+        "offer": "High Volume",
+        "componentIdentity": "card_not_present_authorization_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 11,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_authorization",
+        "billedPopulation": "card_not_present_authorizations",
+        "sourceFaithfulPopulationWording": "$0.11 per card-not-present authorization",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d3_high_volume_v1"
+        ],
+        "f3": "14af096efb82a99c3e83c89840dd96a5405ba20823db9d64a6148a6692a01d71"
+      },
+      {
+        "componentVersionId": "component_dharma_high_volume_closure_v1",
+        "offer": "High Volume",
+        "componentIdentity": "account_closure_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 4900,
+            "currency": "USD"
+          }
+        },
+        "unit": "other",
+        "billedPopulation": "account_closure_events",
+        "sourceFaithfulPopulationWording": "$49 account closure fee; not an early termination fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d3_high_volume_v1",
+          "obs_dharma_d5_closure_v1"
+        ],
+        "f3": "b73c386430e33a932278325eb00b5fa1c24d0e3e26673912d4c0149a8a0716ba"
+      },
+      {
+        "componentVersionId": "component_dharma_high_volume_chargeback_v1",
+        "offer": "High Volume",
+        "componentIdentity": "chargeback_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 2500,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_chargeback_case",
+        "billedPopulation": "chargeback_instances",
+        "sourceFaithfulPopulationWording": "$25 per chargeback instance",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d3_high_volume_v1"
+        ],
+        "f3": "f73263c887c7069594107776498c70f186b83551b6a36a9868454a23968129ce"
+      },
+      {
+        "componentVersionId": "component_dharma_high_volume_avs_fee_absent_v1",
+        "offer": "High Volume",
+        "componentIdentity": "avs_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "other",
+        "billedPopulation": "high_volume_avs_fee",
+        "sourceFaithfulPopulationWording": "No avs fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d3_high_volume_v1"
+        ],
+        "f3": "9761a50056d8c4de2cb336a16d61a6c8503cd2cbea1c71e2e917f0f2bb68ddf6"
+      },
+      {
+        "componentVersionId": "component_dharma_high_volume_batch_fee_absent_v1",
+        "offer": "High Volume",
+        "componentIdentity": "batch_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_batch",
+        "billedPopulation": "high_volume_batch_fee",
+        "sourceFaithfulPopulationWording": "No batch fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d3_high_volume_v1"
+        ],
+        "f3": "4ec9a8e26fb5698551059ec81e07892912773169b578df9f306f53af2f00b97e"
+      },
+      {
+        "componentVersionId": "component_dharma_high_volume_pci_compliance_fee_absent_v1",
+        "offer": "High Volume",
+        "componentIdentity": "pci_compliance_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "other",
+        "billedPopulation": "high_volume_pci_compliance_fee",
+        "sourceFaithfulPopulationWording": "No pci compliance fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d3_high_volume_v1",
+          "obs_dharma_d6_pci_v1"
+        ],
+        "f3": "4324b7e502994146f267d3a8ed1ad9f9ff60c2264a48c0f315f5c7bb2576249b"
+      },
+      {
+        "componentVersionId": "component_dharma_high_volume_early_termination_fee_absent_v1",
+        "offer": "High Volume",
+        "componentIdentity": "early_termination_fee",
+        "completeness": {
+          "state": "KNOWN_ABSENT",
+          "value": null,
+          "observedAbsentValue": {
+            "kind": "money",
+            "amountMinor": 0,
+            "currency": "USD"
+          }
+        },
+        "unit": "other",
+        "billedPopulation": "high_volume_early_termination_fee",
+        "sourceFaithfulPopulationWording": "No early termination fee",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": null,
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d3_high_volume_v1"
+        ],
+        "f3": "05535005fe925fb795b97056e944e46c240dd30bad36534bf14a01981eefdf0c"
+      },
+      {
+        "componentVersionId": "component_dharma_high_volume_pci_noncompliance_v1",
+        "offer": "High Volume",
+        "componentIdentity": "pci_noncompliance_fee",
+        "completeness": {
+          "state": "KNOWN",
+          "value": {
+            "kind": "money",
+            "amountMinor": 3995,
+            "currency": "USD"
+          }
+        },
+        "unit": "per_month",
+        "billedPopulation": "months_while_source_defined_pci_noncompliance_applies",
+        "sourceFaithfulPopulationWording": "$39.95 monthly when the source-defined PCI non-compliance condition applies",
+        "effectivePeriod": {
+          "knowledge": "effective_period_unknown",
+          "effectiveFrom": null,
+          "effectiveTo": null
+        },
+        "applicabilityPredicate": {
+          "op": "fact",
+          "field": "pci_non_compliant",
+          "comparator": "eq",
+          "value": true
+        },
+        "conditionalAdjustment": null,
+        "sourceObservationRefs": [
+          "obs_dharma_d6_pci_v1"
+        ],
+        "f3": "c8754d71ac33d779e49bbff952dacd3dac62a08a8331bd157c835bff7da6e51d"
+      }
+    ],
+    "qualification": {
+      "volumeBranch": {
+        "state": "QUALIFIED",
+        "reasons": [
+          "At least one admitted qualification branch is satisfied."
+        ]
+      },
+      "countBranch": {
+        "state": "QUALIFIED",
+        "reasons": [
+          "At least one admitted qualification branch is satisfied."
+        ]
+      },
+      "lowTicketRestaurant": {
+        "state": "QUALIFIED",
+        "reasons": [
+          "At least one admitted qualification branch is satisfied."
+        ]
+      },
+      "exact25": {
+        "state": "UNRESOLVED_QUALIFICATION_BOUNDARY",
+        "reasons": [
+          "First-party wording conflicts between 'less than $25' and '$25 or less'; exactly $25 remains unresolved unless another OR branch independently qualifies."
+        ]
+      },
+      "exact25WithIndependentVolumeBranch": {
+        "state": "QUALIFIED",
+        "reasons": [
+          "At least one admitted qualification branch is satisfied."
+        ]
+      },
+      "over25": {
+        "state": "NOT_QUALIFIED",
+        "reasons": [
+          "No admitted qualification branch is satisfied."
+        ]
+      },
+      "knownHighRisk": {
+        "state": "NOT_APPLICABLE",
+        "reasons": [
+          "A Product-admitted disqualifying condition applies."
+        ]
+      }
+    },
+    "policies": [
+      {
+        "status": "PUBLICLY_PROHIBITED",
+        "wording": "Known high-risk account: High-Volume offer is not applicable; this is offer applicability, not a universal rejection claim.",
+        "predicate": {
+          "op": "fact",
+          "field": "known_high_risk",
+          "comparator": "eq",
+          "value": true
+        }
+      },
+      {
+        "status": "PUBLICLY_RESTRICTED_OR_REVIEW_REQUIRED",
+        "wording": "Future-delivery/custom-built/deposit/recurring/open-ended billing conditions may require review; they are not automatic rejection.",
+        "predicate": {
+          "op": "fact",
+          "field": "future_delivery_or_custom_deposit_or_open_ended_billing",
+          "comparator": "eq",
+          "value": true
+        }
+      },
+      {
+        "status": "NO_KNOWN_PUBLIC_BLOCK",
+        "wording": "No listed issue means no known public block, not merchant approval.",
+        "predicate": {
+          "op": "fact",
+          "field": "risk_review_required",
+          "comparator": "eq",
+          "value": false
+        }
+      }
+    ],
+    "exactUnknowns": [
+      "D1 normalized Account Updater service price (source phrase 'Account Update Fee: No' has ambiguous construct mapping).",
+      "Effective-from dates for D1-D6, calculator, and referral observations.",
+      "Exactly-$25 low-ticket restaurant qualification branch, unless another OR branch qualifies.",
+      "Reason for calculator/plan-page monthly-price divergence.",
+      "Merchant-specific approval and availability."
+    ],
+    "calculatorConflicts": [
+      {
+        "conflictId": "conflict_dharma_retail_monthly_calculator_v1",
+        "sameScopeKey": "conflict_dharma_retail_monthly_calculator_v1",
+        "componentVersionRefs": [
+          "component_dharma_retail_monthly_v1",
+          "candidate_dharma_calculator_retail_monthly_v1"
+        ],
+        "state": "resolved",
+        "resolution": {
+          "selectedComponentVersionRef": "component_dharma_retail_monthly_v1",
+          "authorityRef": "RateReveal_Helcim_Dharma_Batch_1B_Evidence_Pack_FINAL_Product_Adjudicated_v1.md#calculator-conflict",
+          "resolvedAt": "2026-09-10T00:00:00.000Z",
+          "reason": "Product selected the plan-specific current rate page for governed direct-plan consumption while retaining the calculator value as a conflicting maintenance candidate; no averaging or source-count voting."
+        }
+      },
+      {
+        "conflictId": "conflict_dharma_virtual_monthly_calculator_v1",
+        "sameScopeKey": "conflict_dharma_virtual_monthly_calculator_v1",
+        "componentVersionRefs": [
+          "component_dharma_virtual_monthly_v1",
+          "candidate_dharma_calculator_virtual_monthly_v1"
+        ],
+        "state": "resolved",
+        "resolution": {
+          "selectedComponentVersionRef": "component_dharma_virtual_monthly_v1",
+          "authorityRef": "RateReveal_Helcim_Dharma_Batch_1B_Evidence_Pack_FINAL_Product_Adjudicated_v1.md#calculator-conflict",
+          "resolvedAt": "2026-09-10T00:00:00.000Z",
+          "reason": "Product selected the plan-specific current rate page for governed direct-plan consumption while retaining the calculator value as a conflicting maintenance candidate; no averaging or source-count voting."
+        }
+      },
+      {
+        "conflictId": "conflict_dharma_high_volume_monthly_calculator_v1",
+        "sameScopeKey": "conflict_dharma_high_volume_monthly_calculator_v1",
+        "componentVersionRefs": [
+          "component_dharma_high_volume_monthly_v1",
+          "candidate_dharma_calculator_high_volume_monthly_v1"
+        ],
+        "state": "resolved",
+        "resolution": {
+          "selectedComponentVersionRef": "component_dharma_high_volume_monthly_v1",
+          "authorityRef": "RateReveal_Helcim_Dharma_Batch_1B_Evidence_Pack_FINAL_Product_Adjudicated_v1.md#calculator-conflict",
+          "resolvedAt": "2026-09-10T00:00:00.000Z",
+          "reason": "Product selected the plan-specific current rate page for governed direct-plan consumption while retaining the calculator value as a conflicting maintenance candidate; no averaging or source-count voting."
+        }
+      }
+    ],
+    "referralCurrentResolution": {
+      "status": "unresolved_channel_or_identity",
+      "compositionRef": null,
+      "componentVersionRefs": [],
+      "reasons": [
+        "No exact provider/channel/plan/scope identity matched the request."
+      ],
+      "publicPolicyStatus": null,
+      "merchantAvailabilityEvidence": []
+    }
+  },
+  "temporal": {
+    "helcimCurrent": "resolved",
+    "helcimHistoricalBeforeH1": "unresolved_period",
+    "dharmaCurrent": [
+      "resolved",
+      "resolved",
+      "resolved"
+    ],
+    "dharmaHistorical": [
+      "unresolved_period",
+      "unresolved_period",
+      "unresolved_period"
+    ]
+  },
+  "acceptanceCounters": {
+    "helcimPostedTierExtrapolatedAbove5m": 0,
+    "helcimH1OneMillionPlusWordingLost": 0,
+    "helcimProhibitedRestrictedCollapsed": 0,
+    "helcimNoKnownBlockTreatedAsApproval": 0,
+    "helcimChargebackRefundFlattenedToUniversalZero": 0,
+    "helcimRecurringAppliedToNonRecurring": 0,
+    "dharmaPricingBecameTsysFiservPricing": 0,
+    "dharmaAuthorizationConvertedToPerSale": 0,
+    "dharmaQualificationReducedToVolumeOnly": 0,
+    "dharmaOrBranchesCombinedWithAnd": 0,
+    "dharmaExact25SilentlyResolved": 0,
+    "dharmaMayApplyTreatedAsRejection": 0,
+    "dharmaClosureTreatedAsEtf": 0,
+    "dharmaPciZeroErasedNoncompliance": 0,
+    "dharmaCalculatorOverwrotePlanPages": 0,
+    "dharmaReferralLeakedIntoDirect": 0,
+    "dharmaAccountUpdateAutoMapped": 0,
+    "unknownTreatedAsZero": 0,
+    "currentDharmaProjectedHistorically": 0,
+    "sourceAdmissionGeneratedComparatorClaims": 0
+  },
+  "acceptanceCounterTotal": 0,
+  "batch1A": {
+    "validationIssues": [],
+    "currentDirectResolution": "resolved",
+    "historicalResolution": "unresolved_period",
+    "unknownAcquiringComponents": [
+      "commercial_component_authorize_net_acquiring_percentage_v1",
+      "commercial_component_authorize_net_acquiring_per_item_v1",
+      "commercial_component_authorize_net_acquiring_chargeback_v1"
+    ],
+    "accountUpdaterSeparate": true
+  },
+  "gold": {
+    "statements": [
+      {
+        "file": "Nov_2024_Statement.pdf",
+        "canonicalFingerprintBefore": "56b0ff62c801c9de9e97b1a70f573c746061b110abcf2716a110a427c02cd65f",
+        "canonicalFingerprintAfter": "56b0ff62c801c9de9e97b1a70f573c746061b110abcf2716a110a427c02cd65f",
+        "unchanged": true
+      },
+      {
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "canonicalFingerprintBefore": "7d2246e0d4bce4298646084b2e1a1c789f9b7391534a40f2953d05e921779b3f",
+        "canonicalFingerprintAfter": "7d2246e0d4bce4298646084b2e1a1c789f9b7391534a40f2953d05e921779b3f",
+        "unchanged": true
+      },
+      {
+        "file": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+        "canonicalFingerprintBefore": "18028f3e7ccb888ff71773dbef6a2e280b3720f761ce278ca91f1dccd78bfddb",
+        "canonicalFingerprintAfter": "18028f3e7ccb888ff71773dbef6a2e280b3720f761ce278ca91f1dccd78bfddb",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "canonicalFingerprintBefore": "7ee9653908e82c5d88d2eece32f52f4f3f498620b98db1e86b985a8e7f2db9db",
+        "canonicalFingerprintAfter": "7ee9653908e82c5d88d2eece32f52f4f3f498620b98db1e86b985a8e7f2db9db",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "canonicalFingerprintBefore": "ea3c34c4bdf01af64aeae37dc84b116deab41f4ebdd88d680728b7b205e70736",
+        "canonicalFingerprintAfter": "ea3c34c4bdf01af64aeae37dc84b116deab41f4ebdd88d680728b7b205e70736",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "canonicalFingerprintBefore": "5cb1fab8c96fc91651796b89b9c6226b6e54f9497989b8eef5ca746743c73cb3",
+        "canonicalFingerprintAfter": "5cb1fab8c96fc91651796b89b9c6226b6e54f9497989b8eef5ca746743c73cb3",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "canonicalFingerprintBefore": "c142d1a29145077b1497650ef2d8db96f9db9cc2570a857f742383b7966568b7",
+        "canonicalFingerprintAfter": "c142d1a29145077b1497650ef2d8db96f9db9cc2570a857f742383b7966568b7",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "canonicalFingerprintBefore": "793fc87b37d7d7274fbd5a17558cee2fe28add358dcdeda5fba8919f7e6ba883",
+        "canonicalFingerprintAfter": "793fc87b37d7d7274fbd5a17558cee2fe28add358dcdeda5fba8919f7e6ba883",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
+        "canonicalFingerprintBefore": "591fcbf80bc69da3a6d4ca5ff337900872dff676919cb1b26460101fd7f9a3be",
+        "canonicalFingerprintAfter": "591fcbf80bc69da3a6d4ca5ff337900872dff676919cb1b26460101fd7f9a3be",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf",
+        "canonicalFingerprintBefore": "088119a8cad2e5b0086d5d9cab4814e83bee91625226adbf1038a695085e8df4",
+        "canonicalFingerprintAfter": "088119a8cad2e5b0086d5d9cab4814e83bee91625226adbf1038a695085e8df4",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "canonicalFingerprintBefore": "e89c0f1a8f2c8b8330d2fa79f9fd98262f3da6296581fdf595eccb0dc51d45a3",
+        "canonicalFingerprintAfter": "e89c0f1a8f2c8b8330d2fa79f9fd98262f3da6296581fdf595eccb0dc51d45a3",
+        "unchanged": true
+      }
+    ],
+    "invariantCount": 11,
+    "fingerprintChanges": 0
+  },
+  "testResults": {
+    "batch1BTargeted": "14/14 passed",
+    "crossRegression": "38/38 passed across Commercial Source Governance, Batch 1B, Comparator Eligibility, and Claim-Specific Decomposition",
+    "sourceProvenanceIntegrity": "7/7 passed",
+    "typescriptBuild": "passed",
+    "knownHistoricalFirewall": "5/6; unchanged failure at line 43 expects zero governed conflicts and observes four",
+    "legacyPublicSourceExhaustive": "publicSourceAuthorityRegistry 10/10 assertions passed, then process reproduced SIGSEGV/139"
+  },
+  "architectureConflicts": [],
+  "knownPreExistingIssues": [
+    "Historical/current regression is expected to remain 5/6 because an untouched assertion expects zero governed conflicts but observes four.",
+    "Legacy public-source/exhaustive testing is expected to reproduce SIGSEGV/139 after its public-source assertions pass."
+  ]
+}
