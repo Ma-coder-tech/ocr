@@ -519,7 +519,9 @@ async function retrieveCandidate(params: {
     return { result: { ...base, ...retrievalProvenance, state: extracted.status === "timeout" ? "retrieval_timeout" : "extraction_failed", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: [extracted.status === "timeout" ? "document_extraction_timeout" : safeReasonCode(extracted.reasonCode)] }, internal: null };
   }
   params.ledger.settle(`${extractionOperation}:call`, { state: "completed", actualAmount: 1 });
-  const validatedExtraction = validateExtractionResponse({ extraction: extracted.value, questionId: params.candidate.questionId, candidateId: params.candidate.candidateId, documentId, documentFingerprint: contentFingerprint, maximumOutputBytes: 1_048_576 });
+  const validatedExtraction = validateExtractionResponse({ extraction: extracted.value, questionId: params.candidate.questionId,
+    candidateId: params.candidate.candidateId, documentId, documentFingerprint: contentFingerprint,
+    maximumOutputBytes: 1_048_576, mimeType: response.mimeType! });
   if (validatedExtraction.issues.length > 0) {
     response.content.fill(0);
     return { result: { ...base, ...retrievalProvenance, state: "extraction_failed", mimeType: response.mimeType, byteLength: response.byteLength, reasonCodes: validatedExtraction.issues }, internal: null };

@@ -37,13 +37,34 @@ const CYCLE_LEASE_MS = 10 * 60_000;
 const CYCLE_HEARTBEAT_MS = 60_000;
 
 export function productionAdaptiveOperationalPolicy(): CanonicalAdaptiveOperationalPolicy {
+  const providerCallBurstCapacity = positiveOperationalInteger("RG_ADAPTIVE_MAX_PROVIDER_CALLS", 96);
+  const retrievalByteBurstCapacity = positiveOperationalInteger("RG_ADAPTIVE_MAX_RETRIEVAL_BYTES", 52_428_800);
+  const activeElapsedMsBurstCapacity = positiveOperationalInteger("RG_ADAPTIVE_MAX_ELAPSED_MS", 2_700_000);
   return {
     authority: "deployment_emergency_circuit_breaker_only",
     analyticalCompletionAuthority: "none",
-    maximumCumulativeProviderCalls: positiveOperationalInteger("RG_ADAPTIVE_MAX_PROVIDER_CALLS", 96),
-    maximumCumulativeRetrievalBytes: positiveOperationalInteger("RG_ADAPTIVE_MAX_RETRIEVAL_BYTES", 52_428_800),
-    maximumCumulativeElapsedMs: positiveOperationalInteger("RG_ADAPTIVE_MAX_ELAPSED_MS", 2_700_000),
+    maximumCumulativeProviderCalls: providerCallBurstCapacity,
+    maximumCumulativeRetrievalBytes: retrievalByteBurstCapacity,
+    maximumCumulativeElapsedMs: activeElapsedMsBurstCapacity,
     maximumConcurrentWork: 1,
+    operationalAllowance: {
+      schemaVersion: "canonical_operational_allowance_policy_v1",
+      semantics: "dispatch_permission_only_not_analytical_completion",
+      providerCallBurstCapacity,
+      providerCallRefillPerMinute: positiveOperationalInteger("RG_ALLOWANCE_PROVIDER_CALL_REFILL_PER_MINUTE", 12),
+      retrievalByteBurstCapacity,
+      retrievalByteRefillPerMinute: positiveOperationalInteger("RG_ALLOWANCE_RETRIEVAL_BYTE_REFILL_PER_MINUTE", 10_485_760),
+      activeElapsedMsBurstCapacity,
+      activeElapsedMsRefillPerMinute: positiveOperationalInteger("RG_ALLOWANCE_ACTIVE_ELAPSED_MS_REFILL_PER_MINUTE", 60_000),
+      providerCostUsdBurstCapacity: positiveOperationalNumber("RG_ALLOWANCE_PROVIDER_COST_USD", 25),
+      providerCostUsdRefillPerMinute: positiveOperationalNumber("RG_ALLOWANCE_PROVIDER_COST_USD_REFILL_PER_MINUTE", 0.5),
+      providerCostUsdMinimumDispatchAllowance: positiveOperationalNumber("RG_ALLOWANCE_PROVIDER_COST_USD_MINIMUM_DISPATCH", 0.01),
+      exceptionalMaximumHistoricalProviderCalls: positiveOperationalInteger("RG_EXCEPTIONAL_MAX_PROVIDER_CALLS", 960),
+      exceptionalMaximumHistoricalRetrievalBytes: positiveOperationalInteger("RG_EXCEPTIONAL_MAX_RETRIEVAL_BYTES", 524_288_000),
+      exceptionalMaximumHistoricalElapsedMs: positiveOperationalInteger("RG_EXCEPTIONAL_MAX_ELAPSED_MS", 28_800_000),
+      exceptionalMaximumHistoricalProviderCostUsd: positiveOperationalNumber("RG_EXCEPTIONAL_MAX_PROVIDER_COST_USD", 250),
+      providerConfigurationRevision: operationalConfigurationRevision(),
+    },
   };
 }
 
@@ -485,6 +506,19 @@ function assertHeartbeatHealthy(failure: Error | null): void {
 function positiveOperationalInteger(name: string, fallback: number): number {
   const parsed = Number(process.env[name]);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function positiveOperationalNumber(name: string, fallback: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function operationalConfigurationRevision(): string {
+  const value = process.env.RG_PROVIDER_CONFIGURATION_REVISION?.trim() || "default";
+  if (!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(value)) {
+    throw new Error("adaptive_execution_provider_configuration_revision_invalid");
+  }
+  return value;
 }
 
 function appendExecutionEvent(runId: string, workItemId: string, eventType: string, event: unknown): void {

@@ -6,6 +6,9 @@ import type {
 } from "./synthesisTypes.js";
 import { RE_SEMANTIC_AMENDMENT_IDS } from "./synthesisVersionManifest.js";
 import { isCanonicalSynthesisCalculationSemanticallyValid } from "./synthesisSemantics.js";
+import { CONTRACT_V1_1_SAFE_ACTION_CODES, CONTRACT_V1_SAFE_ACTION_CODES } from "./knowledge/knowledgeTypes.js";
+import { CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1,
+  CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1 } from "./synthesisContractV1Types.js";
 
 const POSITIVE_BASES = new Set(["source_fact", "deterministic_math", "rule_application", "external_verified"]);
 const POSITIVE_TIERS = new Set([
@@ -50,7 +53,8 @@ export function validateCanonicalEconomicsV2SynthesisAnalysis(
   if (manifest.counterfactualPolicyVersion !== "canonical_economic_counterfactual_v2_v1") errors.push("Unsupported RE counterfactual policy.");
   if (manifest.leverPolicyVersion !== "canonical_merchant_lever_v2_v1") errors.push("Unsupported RE merchant-lever policy.");
   if (manifest.themePolicyVersion !== "canonical_economic_theme_v2_v1") errors.push("Unsupported RE theme policy.");
-  const contractActive = layer.contractV1?.contractId === "canonical_synthesis_admission_contract_v1";
+  const contractActive = layer.contractV1 !== null && [CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1,
+    CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1].includes(layer.contractV1.contractId);
   if (contractActive ? manifest.authority !== "internal_canonical_analysis_run" : manifest.authority !== "shadow_non_authoritative") {
     errors.push("RE authority does not match its Contract-v1 activation state.");
   }
@@ -297,7 +301,8 @@ export function validateCanonicalEconomicsV2SynthesisAnalysis(
   }
 
   if (layer.contractV1) {
-    if (layer.contractV1.contractId !== "canonical_synthesis_admission_contract_v1"
+    if (![CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1, CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1]
+      .includes(layer.contractV1.contractId)
       || layer.contractV1.authority !== "internal_canonical_analysis_run_only"
       || layer.contractV1.customerReportAuthority !== "unchanged"
       || layer.contractV1.providerExecution !== "not_executed_during_convergence"
@@ -310,9 +315,8 @@ export function validateCanonicalEconomicsV2SynthesisAnalysis(
     if (layer.themes.some((item) => item.economicQuestionCode === "pricing_structure" || item.themeType === "pricing_structure")) {
       errors.push("Contract-v1 cannot add a pricing-structure theme.");
     }
-    const allowedActions = new Set(["request_governing_documentation", "verify_account_capability_or_configuration",
-      "request_pricing_term_review", "review_supported_configuration_change", "review_supported_operational_process_change",
-      "establish_monitoring_baseline"]);
+    const allowedActions = new Set<string>(layer.contractV1.contractId === CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1
+      ? CONTRACT_V1_1_SAFE_ACTION_CODES : CONTRACT_V1_SAFE_ACTION_CODES);
     for (const application of layer.contractV1.applications) {
       if (application.value.kind !== "synthesis_recurrence") continue;
       const truthfulRoute = application.assertionBasis === "external_verified" && (
@@ -339,6 +343,13 @@ export function validateCanonicalEconomicsV2SynthesisAnalysis(
       }
       if (action.safeActionCode === "request_pricing_term_review" && action.requiredInfluence !== "merchant_change_right") {
         errors.push(`Contract-v1 pricing review ${action.actionId} lacks exact merchant change-right.`);
+      }
+      if (action.safeActionCode === "request_pricing_application_review"
+        && (layer.contractV1.contractId !== CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1
+          || action.requiredInfluence !== "none" || action.class !== "candidate_verification"
+          || !["verification_or_document_request", "none"].includes(action.permissionCeiling)
+          || action.counterfactualApplicationRef !== null || action.recurrenceApplicationRef !== null)) {
+        errors.push(`Contract-v1.1 pricing application review ${action.actionId} exceeds its verification-only contract.`);
       }
       if (action.safeActionCode === "review_supported_operational_process_change"
         && !["merchant_operational_controllability", "both"].includes(action.requiredInfluence)) {

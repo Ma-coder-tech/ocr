@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 
 import { canonicalJson } from "./canonicalJson.js";
 import type { CanonicalEconomicsV2EconomicAnalysis } from "./economicTypes.js";
-import type { ContractV1SafeActionCode } from "./knowledge/knowledgeTypes.js";
+import { CONTRACT_V1_1_SAFE_ACTION_CODES, CONTRACT_V1_SAFE_ACTION_CODES,
+  type ContractV1SafeActionCode } from "./knowledge/knowledgeTypes.js";
 import type {
   BuildCanonicalEconomicsV2SynthesisInput,
   CanonicalEconomicCounterfactualAdmission,
@@ -14,6 +15,8 @@ import type {
 import type { CanonicalSynthesisCalculationAdmission, CanonicalSynthesisSemanticClaimAdmission } from "./synthesisSemantics.js";
 import {
   CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1,
+  CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1,
+  type CanonicalSynthesisAdmissionContractId,
   type CanonicalContractV1Action,
   type CanonicalContractV1Constraint,
   type CanonicalContractV1ConstraintActionEffect,
@@ -27,13 +30,17 @@ export type CanonicalSynthesisContractV1Build = Pick<BuildCanonicalEconomicsV2Sy
 };
 
 const VERIFICATION_ACTIONS = new Set<ContractV1SafeActionCode>([
-  "request_governing_documentation", "verify_account_capability_or_configuration",
+  "request_governing_documentation", "verify_account_capability_or_configuration", "request_pricing_application_review",
 ]);
 
 export function compileCanonicalSynthesisContractV1(input: {
   economic: CanonicalEconomicsV2EconomicAnalysis;
+  contractId?: CanonicalSynthesisAdmissionContractId;
   applications: readonly CanonicalSynthesisContractV1Application[];
 }): CanonicalSynthesisContractV1Build {
+  const contractId = input.contractId ?? CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1;
+  const activeActions = new Set<ContractV1SafeActionCode>(contractId === CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1
+    ? CONTRACT_V1_1_SAFE_ACTION_CODES : CONTRACT_V1_SAFE_ACTION_CODES);
   const apps = [...input.applications].sort((a, b) => a.atomicClaimId.localeCompare(b.atomicClaimId));
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -46,6 +53,9 @@ export function compileCanonicalSynthesisContractV1(input: {
     if (app.sourceKind === "current_run_verified_rg_evidence" && app.assertionBasis !== "external_verified") errors.push(`contract_v1_external_basis_mismatch:${app.atomicClaimId}`);
     if (app.value.kind === "synthesis_recurrence" && !recurrenceProofRouteMatches(app)) {
       errors.push(`contract_v1_recurrence_evidence_route_mismatch:${app.atomicClaimId}`);
+    }
+    if ("safeActionCode" in app.value && !activeActions.has(app.value.safeActionCode)) {
+      errors.push(`contract_action_not_active_for_bound_version:${app.atomicClaimId}:${app.value.safeActionCode}`);
     }
   }
 
@@ -212,7 +222,7 @@ export function compileCanonicalSynthesisContractV1(input: {
     const candidate = VERIFICATION_ACTIONS.has(actionCode);
     const monitoring = actionCode === "establish_monitoring_baseline";
     const materialVerificationSubject = app.materiality === "material";
-    const actionContractValid = requiredInfluenceAllowed(actionCode, app.value.requiredInfluence)
+    const actionContractValid = requiredInfluenceAllowed(contractId, actionCode, app.value.requiredInfluence)
       && (!candidate || app.value.verificationRequirementCode !== null);
     const prerequisitesReady = actionContractValid && influenceReady && driverReady && conditionsSatisfied && effectDependenciesReady
       && app.value.implementationDependencyCodes.length === 0 && (!candidate && !monitoring || materialVerificationSubject);
@@ -221,8 +231,9 @@ export function compileCanonicalSynthesisContractV1(input: {
       : prerequisitesReady ? "eligible_supported" as const : "candidate_requires_verification" as const;
     const counterfactual = counterfactualByChargeAndAction.get(actionScopeKey(app.chargeRefs, app.scopeFingerprint,
       app.statementPeriod, actionCode));
-    const recurrence = app.chargeRefs.flatMap((ref) => recurrenceByCharge.get(ref) ?? [])
-      .find((candidate) => sameApplicationScope(candidate, app));
+    const recurrence = actionCode === "request_pricing_application_review" ? undefined
+      : app.chargeRefs.flatMap((ref) => recurrenceByCharge.get(ref) ?? [])
+        .find((candidate) => sameApplicationScope(candidate, app));
     const counterfactualDependenciesReady = counterfactual?.value.kind !== "synthesis_counterfactual"
       || counterfactual.value.implementationDependencyCodes.length === 0;
     const permissionCeiling = candidate ? state === "documentation_or_monitoring_only"
@@ -285,7 +296,7 @@ export function compileCanonicalSynthesisContractV1(input: {
   }
 
   const state: CanonicalSynthesisContractV1State = {
-    contractId: CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1, authority: "internal_canonical_analysis_run_only",
+    contractId, authority: "internal_canonical_analysis_run_only",
     customerReportAuthority: "unchanged", providerExecution: "not_executed_during_convergence", specializedFamilies: "inactive",
     applications: apps, constraints, constraintActionEffects: effects, actions: actions.sort(byId),
     validation: { status: errors.length === 0 ? "valid" : "invalid", errors: unique(errors), warnings: unique(warnings) },
@@ -383,12 +394,14 @@ function actionScopeKey(chargeRefs: string[], scopeFingerprint: string, statemen
   safeActionCode: ContractV1SafeActionCode) {
   return canonicalJson({ chargeRefs: unique(chargeRefs), scopeFingerprint, statementPeriod, safeActionCode });
 }
-function requiredInfluenceAllowed(code: ContractV1SafeActionCode,
+function requiredInfluenceAllowed(contractId: CanonicalSynthesisAdmissionContractId, code: ContractV1SafeActionCode,
   influence: CanonicalContractV1Action["requiredInfluence"]): boolean {
-  if (["request_governing_documentation", "verify_account_capability_or_configuration", "establish_monitoring_baseline"].includes(code)) {
+  if (["request_governing_documentation", "verify_account_capability_or_configuration", "establish_monitoring_baseline",
+    "request_pricing_application_review"].includes(code)) {
     return influence === "none";
   }
-  if (code === "request_pricing_term_review") return influence === "merchant_change_right";
+  if (code === "request_pricing_term_review") return contractId === CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1
+    && influence === "merchant_change_right";
   if (code === "review_supported_operational_process_change") {
     return influence === "merchant_operational_controllability" || influence === "both";
   }

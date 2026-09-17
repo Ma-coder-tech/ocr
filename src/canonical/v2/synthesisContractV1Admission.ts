@@ -2,11 +2,20 @@ import { digestCanonical } from "./runtime/integrityHashes.js";
 import { persistedVerifiedEvidenceIntegrityValid } from "./runtime/rgEvidenceIntegrity.js";
 import type { BuildCanonicalEconomicsV2SynthesisInput } from "./synthesisAnalysis.js";
 import { canonicalJson } from "./canonicalJson.js";
+import { CONTRACT_V1_1_SAFE_ACTION_CODES, CONTRACT_V1_SAFE_ACTION_CODES } from "./knowledge/knowledgeTypes.js";
+import { CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1,
+  CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1 } from "./synthesisContractV1Types.js";
 
 export type CanonicalSynthesisContractV1Envelope = NonNullable<BuildCanonicalEconomicsV2SynthesisInput["contractV1"]>;
 
 export function validateCanonicalSynthesisContractV1Envelope(envelope: CanonicalSynthesisContractV1Envelope): string[] {
   const errors: string[] = [];
+  const contractId = envelope.contractId ?? CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1;
+  const activeActions = contractId === CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1
+    ? new Set<string>(CONTRACT_V1_SAFE_ACTION_CODES)
+    : contractId === CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1
+      ? new Set<string>(CONTRACT_V1_1_SAFE_ACTION_CODES) : null;
+  if (!activeActions) errors.push("contract_binding_unknown");
   if (envelope.rfPrecedenceChecked !== true || !/^[a-f0-9]{64}$/.test(envelope.boundRfSnapshotHash)) {
     errors.push("contract_v1_rf_precedence_binding_invalid");
   }
@@ -29,6 +38,16 @@ export function validateCanonicalSynthesisContractV1Envelope(envelope: Canonical
       || application.occurrenceRefs.length === 0) errors.push(`contract_v1_application_binding_invalid:${application.applicationId}`);
     if (!facetValueMatches(application.facet, application.value.kind)) {
       errors.push(`contract_v1_application_facet_value_mismatch:${application.applicationId}`);
+    }
+    if ("safeActionCode" in application.value && !activeActions?.has(application.value.safeActionCode)) {
+      errors.push(`contract_action_not_active_for_bound_version:${application.applicationId}`);
+    }
+    if (contractId === CANONICAL_SYNTHESIS_ADMISSION_CONTRACT_V1_1
+      && application.value.kind === "synthesis_safe_action"
+      && application.value.safeActionCode === "request_pricing_application_review"
+      && (application.value.requiredInfluence !== "none" || application.value.verificationRequirementCode === null
+        || application.value.implementationDependencyCodes.length > 0)) {
+      errors.push(`contract_v1_1_pricing_application_review_invalid:${application.applicationId}`);
     }
     if (application.sourceKind === "current_run_verified_rg_evidence") {
       if (application.assertionBasis !== "external_verified" || application.rfEntryRefs.length > 0 || application.evidenceRefs.length === 0) {

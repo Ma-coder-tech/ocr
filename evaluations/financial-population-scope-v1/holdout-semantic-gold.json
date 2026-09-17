@@ -1,0 +1,3856 @@
+{
+  "cohort": "holdout",
+  "method": "Single-reviewer role assignment to source-first structural gold; not independent dual annotation",
+  "limit": "This is not economic transaction identity gold. Holdout PDFs were studied structurally before this milestone.",
+  "statements": [
+    {
+      "id": "holdout-7",
+      "tables": [
+        {
+          "kind": "batch",
+          "totalFragmentRefs": [
+            "p275-f94",
+            "p275-f96",
+            "p275-f98",
+            "p275-f100",
+            "p275-f102",
+            "p275-f104",
+            "p275-f106"
+          ],
+          "rows": [
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f434"
+                  ],
+                  "rawText": "$155.43"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f436"
+                  ],
+                  "rawText": "7"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f438"
+                  ],
+                  "rawText": "$1,088.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f440"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f442"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f444"
+                  ],
+                  "rawText": "7"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f446"
+                  ],
+                  "rawText": "$1,088.00"
+                }
+              ]
+            },
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f451"
+                  ],
+                  "rawText": "$714.00"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f453"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f455"
+                  ],
+                  "rawText": "$1,428.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f457"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f459"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f461"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f463"
+                  ],
+                  "rawText": "$1,428.00"
+                }
+              ]
+            },
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f468"
+                  ],
+                  "rawText": "$740.33"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f470"
+                  ],
+                  "rawText": "3"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f472"
+                  ],
+                  "rawText": "$2,221.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f474"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f476"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f478"
+                  ],
+                  "rawText": "3"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f480"
+                  ],
+                  "rawText": "$2,221.00"
+                }
+              ]
+            },
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f485"
+                  ],
+                  "rawText": "$356.84"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f487"
+                  ],
+                  "rawText": "17"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f489"
+                  ],
+                  "rawText": "$6,066.20"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f491"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f493"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f495"
+                  ],
+                  "rawText": "17"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f497"
+                  ],
+                  "rawText": "$6,066.20"
+                }
+              ]
+            },
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f502"
+                  ],
+                  "rawText": "$314.56"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f504"
+                  ],
+                  "rawText": "9"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f506"
+                  ],
+                  "rawText": "$2,831.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f508"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f510"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f512"
+                  ],
+                  "rawText": "9"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f514"
+                  ],
+                  "rawText": "$2,831.00"
+                }
+              ]
+            },
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f519"
+                  ],
+                  "rawText": "$472.21"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f521"
+                  ],
+                  "rawText": "6"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f523"
+                  ],
+                  "rawText": "$2,833.25"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f525"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f527"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f529"
+                  ],
+                  "rawText": "6"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f531"
+                  ],
+                  "rawText": "$2,833.25"
+                }
+              ]
+            },
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f536"
+                  ],
+                  "rawText": "$105.67"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f538"
+                  ],
+                  "rawText": "3"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f540"
+                  ],
+                  "rawText": "$317.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f542"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f544"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f546"
+                  ],
+                  "rawText": "3"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f548"
+                  ],
+                  "rawText": "$317.00"
+                }
+              ]
+            },
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f553"
+                  ],
+                  "rawText": "$87.50"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f555"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f557"
+                  ],
+                  "rawText": "$350.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f559"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f561"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f563"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f565"
+                  ],
+                  "rawText": "$350.00"
+                }
+              ]
+            },
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f570"
+                  ],
+                  "rawText": "$140.00"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f572"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f574"
+                  ],
+                  "rawText": "$560.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f576"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f578"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f580"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f582"
+                  ],
+                  "rawText": "$560.00"
+                }
+              ]
+            },
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f587"
+                  ],
+                  "rawText": "$270.32"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f589"
+                  ],
+                  "rawText": "5"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f591"
+                  ],
+                  "rawText": "$1,351.60"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f593"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f595"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f597"
+                  ],
+                  "rawText": "5"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f599"
+                  ],
+                  "rawText": "$1,351.60"
+                }
+              ]
+            },
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f604"
+                  ],
+                  "rawText": "$288.00"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f606"
+                  ],
+                  "rawText": "1"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f608"
+                  ],
+                  "rawText": "$288.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f610"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f612"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f614"
+                  ],
+                  "rawText": "1"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f616"
+                  ],
+                  "rawText": "$288.00"
+                }
+              ]
+            },
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f621"
+                  ],
+                  "rawText": "$257.07"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f623"
+                  ],
+                  "rawText": "3"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f625"
+                  ],
+                  "rawText": "$771.20"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f627"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f629"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f631"
+                  ],
+                  "rawText": "3"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f633"
+                  ],
+                  "rawText": "$771.20"
+                }
+              ]
+            },
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f638"
+                  ],
+                  "rawText": "$563.00"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f640"
+                  ],
+                  "rawText": "1"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f642"
+                  ],
+                  "rawText": "$563.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f644"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f646"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f648"
+                  ],
+                  "rawText": "1"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f650"
+                  ],
+                  "rawText": "$563.00"
+                }
+              ]
+            },
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f655"
+                  ],
+                  "rawText": "$566.50"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f657"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f659"
+                  ],
+                  "rawText": "$1,133.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f661"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f663"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f665"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f667"
+                  ],
+                  "rawText": "$1,133.00"
+                }
+              ]
+            },
+            {
+              "page": 274,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p274-f672"
+                  ],
+                  "rawText": "$137.92"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p274-f674"
+                  ],
+                  "rawText": "6"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p274-f676"
+                  ],
+                  "rawText": "$827.54"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p274-f678"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p274-f680"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p274-f682"
+                  ],
+                  "rawText": "6"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p274-f684"
+                  ],
+                  "rawText": "$827.54"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p275-f63"
+                  ],
+                  "rawText": "$313.69"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p275-f65"
+                  ],
+                  "rawText": "13"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p275-f67"
+                  ],
+                  "rawText": "$4,078.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p275-f69"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p275-f71"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p275-f73"
+                  ],
+                  "rawText": "13"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p275-f75"
+                  ],
+                  "rawText": "$4,078.00"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p275-f80"
+                  ],
+                  "rawText": "$371.70"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p275-f82"
+                  ],
+                  "rawText": "5"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p275-f84"
+                  ],
+                  "rawText": "$1,858.50"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p275-f86"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p275-f88"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p275-f90"
+                  ],
+                  "rawText": "5"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p275-f92"
+                  ],
+                  "rawText": "$1,858.50"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "transaction",
+          "totalFragmentRefs": [
+            "p276-f55",
+            "p276-f57"
+          ],
+          "rows": [
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f165"
+                  ],
+                  "rawText": "-$5.80"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f170"
+                  ],
+                  "rawText": "-$2.00"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f175"
+                  ],
+                  "rawText": "-$0.48"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f180"
+                  ],
+                  "rawText": "-$3.94"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f185"
+                  ],
+                  "rawText": "-$40.06"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f190"
+                  ],
+                  "rawText": "-$9.32"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f195"
+                  ],
+                  "rawText": "-$13.02"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f200"
+                  ],
+                  "rawText": "-$0.14"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f205"
+                  ],
+                  "rawText": "-$0.20"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f210"
+                  ],
+                  "rawText": "-$0.08"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f218"
+                  ],
+                  "rawText": "-$2.58"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f223"
+                  ],
+                  "rawText": "-$3.20"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f228"
+                  ],
+                  "rawText": "-$10.48"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f233"
+                  ],
+                  "rawText": "-$9.79"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f238"
+                  ],
+                  "rawText": "-$4.86"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f243"
+                  ],
+                  "rawText": "-$18.89"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f248"
+                  ],
+                  "rawText": "-$6.00"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f253"
+                  ],
+                  "rawText": "-$4.00"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f258"
+                  ],
+                  "rawText": "-$2.20"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f263"
+                  ],
+                  "rawText": "-$35.54"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f268"
+                  ],
+                  "rawText": "-$12.78"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f273"
+                  ],
+                  "rawText": "-$0.02"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f281"
+                  ],
+                  "rawText": "-$8.59"
+                }
+              ]
+            },
+            {
+              "page": 275,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p275-f286"
+                  ],
+                  "rawText": "-$0.77"
+                }
+              ]
+            },
+            {
+              "page": 276,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p276-f35"
+                  ],
+                  "rawText": "-$0.01"
+                }
+              ]
+            },
+            {
+              "page": 276,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p276-f43"
+                  ],
+                  "rawText": "-$4.06"
+                }
+              ]
+            },
+            {
+              "page": 276,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p276-f48"
+                  ],
+                  "rawText": "-$0.05"
+                }
+              ]
+            },
+            {
+              "page": 276,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p276-f53"
+                  ],
+                  "rawText": "-$1.65"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "account",
+          "totalFragmentRefs": [
+            "p276-f85",
+            "p276-f87"
+          ],
+          "rows": [
+            {
+              "page": 276,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p276-f68"
+                  ],
+                  "rawText": "-$1.25"
+                }
+              ]
+            },
+            {
+              "page": 276,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p276-f73"
+                  ],
+                  "rawText": "-$7.40"
+                }
+              ]
+            },
+            {
+              "page": 276,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p276-f78"
+                  ],
+                  "rawText": "-$1.62"
+                }
+              ]
+            },
+            {
+              "page": 276,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p276-f83"
+                  ],
+                  "rawText": "-$0.73"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "holdout-8",
+      "tables": [
+        {
+          "kind": "batch",
+          "totalFragmentRefs": [
+            "p279-f77",
+            "p279-f79",
+            "p279-f81",
+            "p279-f83",
+            "p279-f85",
+            "p279-f87",
+            "p279-f89"
+          ],
+          "rows": [
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f419"
+                  ],
+                  "rawText": "$275.00"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f421"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f423"
+                  ],
+                  "rawText": "$550.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f425"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f427"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f429"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f431"
+                  ],
+                  "rawText": "$550.00"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f436"
+                  ],
+                  "rawText": "$125.00"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f438"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f440"
+                  ],
+                  "rawText": "$250.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f442"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f444"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f446"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f448"
+                  ],
+                  "rawText": "$250.00"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f453"
+                  ],
+                  "rawText": "$284.50"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f455"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f457"
+                  ],
+                  "rawText": "$1,138.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f459"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f461"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f463"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f465"
+                  ],
+                  "rawText": "$1,138.00"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f470"
+                  ],
+                  "rawText": "$148.71"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f472"
+                  ],
+                  "rawText": "6"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f474"
+                  ],
+                  "rawText": "$892.25"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f476"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f478"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f480"
+                  ],
+                  "rawText": "6"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f482"
+                  ],
+                  "rawText": "$892.25"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f487"
+                  ],
+                  "rawText": "$110.50"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f489"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f491"
+                  ],
+                  "rawText": "$220.99"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f493"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f495"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f497"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f499"
+                  ],
+                  "rawText": "$220.99"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f504"
+                  ],
+                  "rawText": "$169.25"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f506"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f508"
+                  ],
+                  "rawText": "$677.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f510"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f512"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f514"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f516"
+                  ],
+                  "rawText": "$677.00"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f521"
+                  ],
+                  "rawText": "$323.00"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f523"
+                  ],
+                  "rawText": "1"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f525"
+                  ],
+                  "rawText": "$323.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f527"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f529"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f531"
+                  ],
+                  "rawText": "1"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f533"
+                  ],
+                  "rawText": "$323.00"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f538"
+                  ],
+                  "rawText": "$208.64"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f540"
+                  ],
+                  "rawText": "11"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f542"
+                  ],
+                  "rawText": "$2,295.05"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f544"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f546"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f548"
+                  ],
+                  "rawText": "11"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f550"
+                  ],
+                  "rawText": "$2,295.05"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f555"
+                  ],
+                  "rawText": "$285.54"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f557"
+                  ],
+                  "rawText": "11"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f559"
+                  ],
+                  "rawText": "$3,140.90"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f561"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f563"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f565"
+                  ],
+                  "rawText": "11"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f567"
+                  ],
+                  "rawText": "$3,140.90"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f572"
+                  ],
+                  "rawText": "$338.00"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f574"
+                  ],
+                  "rawText": "6"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f576"
+                  ],
+                  "rawText": "$2,028.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f578"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f580"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f582"
+                  ],
+                  "rawText": "6"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f584"
+                  ],
+                  "rawText": "$2,028.00"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f589"
+                  ],
+                  "rawText": "$90.96"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f591"
+                  ],
+                  "rawText": "5"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f593"
+                  ],
+                  "rawText": "$454.82"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f595"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f597"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f599"
+                  ],
+                  "rawText": "5"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f601"
+                  ],
+                  "rawText": "$454.82"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f606"
+                  ],
+                  "rawText": "$1,448.00"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f608"
+                  ],
+                  "rawText": "1"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f610"
+                  ],
+                  "rawText": "$1,448.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f612"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f614"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f616"
+                  ],
+                  "rawText": "1"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f618"
+                  ],
+                  "rawText": "$1,448.00"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f623"
+                  ],
+                  "rawText": "$365.50"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f625"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f627"
+                  ],
+                  "rawText": "$731.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f629"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f631"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f633"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f635"
+                  ],
+                  "rawText": "$731.00"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f640"
+                  ],
+                  "rawText": "$100.00"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f642"
+                  ],
+                  "rawText": "1"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f644"
+                  ],
+                  "rawText": "$100.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f646"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f648"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f650"
+                  ],
+                  "rawText": "1"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f652"
+                  ],
+                  "rawText": "$100.00"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f657"
+                  ],
+                  "rawText": "$233.17"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f659"
+                  ],
+                  "rawText": "11"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f661"
+                  ],
+                  "rawText": "$2,564.92"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f663"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f665"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f667"
+                  ],
+                  "rawText": "11"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f669"
+                  ],
+                  "rawText": "$2,564.92"
+                }
+              ]
+            },
+            {
+              "page": 278,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p278-f674"
+                  ],
+                  "rawText": "$838.81"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p278-f676"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p278-f678"
+                  ],
+                  "rawText": "$3,355.25"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p278-f680"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p278-f682"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p278-f684"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p278-f686"
+                  ],
+                  "rawText": "$3,355.25"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p279-f63"
+                  ],
+                  "rawText": "$526.29"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p279-f65"
+                  ],
+                  "rawText": "7"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p279-f67"
+                  ],
+                  "rawText": "$3,684.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p279-f69"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p279-f71"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p279-f73"
+                  ],
+                  "rawText": "7"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p279-f75"
+                  ],
+                  "rawText": "$3,684.00"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "transaction",
+          "totalFragmentRefs": [
+            "p279-f246",
+            "p279-f248"
+          ],
+          "rows": [
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f148"
+                  ],
+                  "rawText": "-$2.50"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f153"
+                  ],
+                  "rawText": "-$8.84"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f158"
+                  ],
+                  "rawText": "-$11.31"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f163"
+                  ],
+                  "rawText": "-$0.14"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f168"
+                  ],
+                  "rawText": "-$42.52"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f173"
+                  ],
+                  "rawText": "-$8.21"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f178"
+                  ],
+                  "rawText": "-$0.63"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f183"
+                  ],
+                  "rawText": "-$2.50"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f188"
+                  ],
+                  "rawText": "-$0.20"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f193"
+                  ],
+                  "rawText": "-$0.12"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f201"
+                  ],
+                  "rawText": "-$0.99"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f206"
+                  ],
+                  "rawText": "-$2.00"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f211"
+                  ],
+                  "rawText": "-$15.07"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f216"
+                  ],
+                  "rawText": "-$7.70"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f221"
+                  ],
+                  "rawText": "-$86.67"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f226"
+                  ],
+                  "rawText": "-$0.29"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f231"
+                  ],
+                  "rawText": "-$2.89"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f236"
+                  ],
+                  "rawText": "-$12.54"
+                }
+              ]
+            },
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f244"
+                  ],
+                  "rawText": "-$0.91"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "account",
+          "totalFragmentRefs": [
+            "p280-f37",
+            "p280-f39"
+          ],
+          "rows": [
+            {
+              "page": 279,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p279-f259"
+                  ],
+                  "rawText": "-$8.51"
+                }
+              ]
+            },
+            {
+              "page": 280,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p280-f35"
+                  ],
+                  "rawText": "-$1.25"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "holdout-9",
+      "tables": [
+        {
+          "kind": "batch",
+          "totalFragmentRefs": [
+            "p283-f413",
+            "p283-f415",
+            "p283-f417",
+            "p283-f419",
+            "p283-f421",
+            "p283-f423",
+            "p283-f425"
+          ],
+          "rows": [
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f127"
+                  ],
+                  "rawText": "$576.16"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f129"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f131"
+                  ],
+                  "rawText": "$2,304.64"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f133"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f135"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f137"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f139"
+                  ],
+                  "rawText": "$2,304.64"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f144"
+                  ],
+                  "rawText": "$104.08"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f146"
+                  ],
+                  "rawText": "3"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f148"
+                  ],
+                  "rawText": "$312.25"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f150"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f152"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f154"
+                  ],
+                  "rawText": "3"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f156"
+                  ],
+                  "rawText": "$312.25"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f161"
+                  ],
+                  "rawText": "$68.33"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f163"
+                  ],
+                  "rawText": "3"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f165"
+                  ],
+                  "rawText": "$205.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f167"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f169"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f171"
+                  ],
+                  "rawText": "3"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f173"
+                  ],
+                  "rawText": "$205.00"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f178"
+                  ],
+                  "rawText": "$519.25"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f180"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f182"
+                  ],
+                  "rawText": "$2,077.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f184"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f186"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f188"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f190"
+                  ],
+                  "rawText": "$2,077.00"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f195"
+                  ],
+                  "rawText": "$175.20"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f197"
+                  ],
+                  "rawText": "5"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f199"
+                  ],
+                  "rawText": "$876.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f201"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f203"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f205"
+                  ],
+                  "rawText": "5"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f207"
+                  ],
+                  "rawText": "$876.00"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f212"
+                  ],
+                  "rawText": "$319.00"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f214"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f216"
+                  ],
+                  "rawText": "$638.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f218"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f220"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f222"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f224"
+                  ],
+                  "rawText": "$638.00"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f229"
+                  ],
+                  "rawText": "$300.00"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f231"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f233"
+                  ],
+                  "rawText": "$600.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f235"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f237"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f239"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f241"
+                  ],
+                  "rawText": "$600.00"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f246"
+                  ],
+                  "rawText": "$183.33"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f248"
+                  ],
+                  "rawText": "3"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f250"
+                  ],
+                  "rawText": "$550.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f252"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f254"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f256"
+                  ],
+                  "rawText": "3"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f258"
+                  ],
+                  "rawText": "$550.00"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f263"
+                  ],
+                  "rawText": "$933.50"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f265"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f267"
+                  ],
+                  "rawText": "$3,734.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f269"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f271"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f273"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f275"
+                  ],
+                  "rawText": "$3,734.00"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f280"
+                  ],
+                  "rawText": "$455.66"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f282"
+                  ],
+                  "rawText": "7"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f284"
+                  ],
+                  "rawText": "$3,189.60"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f286"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f288"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f290"
+                  ],
+                  "rawText": "7"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f292"
+                  ],
+                  "rawText": "$3,189.60"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f297"
+                  ],
+                  "rawText": "$450.25"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f299"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f301"
+                  ],
+                  "rawText": "$1,801.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f303"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f305"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f307"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f309"
+                  ],
+                  "rawText": "$1,801.00"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f314"
+                  ],
+                  "rawText": "$607.90"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f316"
+                  ],
+                  "rawText": "5"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f318"
+                  ],
+                  "rawText": "$3,039.50"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f320"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f322"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f324"
+                  ],
+                  "rawText": "5"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f326"
+                  ],
+                  "rawText": "$3,039.50"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f331"
+                  ],
+                  "rawText": "$260.75"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f333"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f335"
+                  ],
+                  "rawText": "$1,043.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f337"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f339"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f341"
+                  ],
+                  "rawText": "4"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f343"
+                  ],
+                  "rawText": "$1,043.00"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f348"
+                  ],
+                  "rawText": "$608.53"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f350"
+                  ],
+                  "rawText": "5"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f352"
+                  ],
+                  "rawText": "$3,042.64"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f354"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f356"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f358"
+                  ],
+                  "rawText": "5"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f360"
+                  ],
+                  "rawText": "$3,042.64"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f365"
+                  ],
+                  "rawText": "$113.33"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f367"
+                  ],
+                  "rawText": "3"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f369"
+                  ],
+                  "rawText": "$340.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f371"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f373"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f375"
+                  ],
+                  "rawText": "3"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f377"
+                  ],
+                  "rawText": "$340.00"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f382"
+                  ],
+                  "rawText": "$467.92"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f384"
+                  ],
+                  "rawText": "6"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f386"
+                  ],
+                  "rawText": "$2,807.50"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f388"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f390"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f392"
+                  ],
+                  "rawText": "6"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f394"
+                  ],
+                  "rawText": "$2,807.50"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "average_ticket",
+                  "fragmentRefs": [
+                    "p283-f399"
+                  ],
+                  "rawText": "$250.00"
+                },
+                {
+                  "role": "gross_sales_count",
+                  "fragmentRefs": [
+                    "p283-f401"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "gross_sales_amount",
+                  "fragmentRefs": [
+                    "p283-f403"
+                  ],
+                  "rawText": "$500.00"
+                },
+                {
+                  "role": "refunds_count",
+                  "fragmentRefs": [
+                    "p283-f405"
+                  ],
+                  "rawText": "0"
+                },
+                {
+                  "role": "refunds_amount",
+                  "fragmentRefs": [
+                    "p283-f407"
+                  ],
+                  "rawText": "0.00"
+                },
+                {
+                  "role": "submitted_count",
+                  "fragmentRefs": [
+                    "p283-f409"
+                  ],
+                  "rawText": "2"
+                },
+                {
+                  "role": "submitted_amount",
+                  "fragmentRefs": [
+                    "p283-f411"
+                  ],
+                  "rawText": "$500.00"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "transaction",
+          "totalFragmentRefs": [
+            "p284-f156",
+            "p284-f158"
+          ],
+          "rows": [
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p283-f484"
+                  ],
+                  "rawText": "-$59.91"
+                }
+              ]
+            },
+            {
+              "page": 283,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p283-f489"
+                  ],
+                  "rawText": "-$27.29"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f35"
+                  ],
+                  "rawText": "-$5.12"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f40"
+                  ],
+                  "rawText": "-$0.98"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f45"
+                  ],
+                  "rawText": "-$0.49"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f50"
+                  ],
+                  "rawText": "-$17.38"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f55"
+                  ],
+                  "rawText": "-$14.10"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f60"
+                  ],
+                  "rawText": "-$0.80"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f65"
+                  ],
+                  "rawText": "-$2.00"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f70"
+                  ],
+                  "rawText": "-$0.04"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f75"
+                  ],
+                  "rawText": "-$1.20"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f83"
+                  ],
+                  "rawText": "-$9.82"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f88"
+                  ],
+                  "rawText": "-$1.76"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f93"
+                  ],
+                  "rawText": "-$7.51"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f98"
+                  ],
+                  "rawText": "-$4.00"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f103"
+                  ],
+                  "rawText": "-$2.79"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f108"
+                  ],
+                  "rawText": "-$81.89"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f113"
+                  ],
+                  "rawText": "-$0.25"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f118"
+                  ],
+                  "rawText": "-$3.20"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f123"
+                  ],
+                  "rawText": "-$7.52"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f131"
+                  ],
+                  "rawText": "-$12.31"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f136"
+                  ],
+                  "rawText": "-$1.10"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f141"
+                  ],
+                  "rawText": "-$0.01"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f149"
+                  ],
+                  "rawText": "-$0.08"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f154"
+                  ],
+                  "rawText": "-$1.12"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "account",
+          "totalFragmentRefs": [
+            "p284-f186",
+            "p284-f188"
+          ],
+          "rows": [
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f169"
+                  ],
+                  "rawText": "-$1.25"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f174"
+                  ],
+                  "rawText": "-$8.69"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f179"
+                  ],
+                  "rawText": "-$1.62"
+                }
+              ]
+            },
+            {
+              "page": 284,
+              "cells": [
+                {
+                  "role": "fee_charge",
+                  "fragmentRefs": [
+                    "p284-f184"
+                  ],
+                  "rawText": "-$0.73"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

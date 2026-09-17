@@ -44,6 +44,7 @@ describe("production worker canonical AnalysisRun integration", () => {
     expect(completed?.summary).not.toHaveProperty("canonicalAnalysisRun");
     expect(canonical).toMatchObject({
       jobId: job.id, status: "completed_with_limitations", familyStatus: "proven", rfCatalogStatus: "available",
+      synthesisContractId: "canonical_synthesis_admission_contract_v1_1",
       rfCatalogBinding: {
         source: "governed_catalog", availability: "available", entryRefs: [],
         visibility: { mode: "anonymous_run", accountPrivateKnowledge: "excluded", tenantPrivateKnowledge: "disabled" },
@@ -60,6 +61,7 @@ describe("production worker canonical AnalysisRun integration", () => {
     });
     expect(JSON.stringify(canonical?.result?.artifacts)).not.toContain('"businessType"');
     expect(canonical?.result?.artifacts.rgWorkLedger).toMatchObject({
+      synthesisContractId: "canonical_synthesis_admission_contract_v1_1",
       authority: "claim_admission_and_planning_only",
       providerExecution: "durable_claim_bound_executor_after_planning",
       searchExecution: "typed_privacy_safe_search_intent_only",
@@ -108,7 +110,9 @@ describe("production worker canonical AnalysisRun integration", () => {
     expect(degradedDecisions.every((item) => item.degradation?.subtype === "provider_unavailable_before_send"
       && item.degradation.continuationPermission === "bounded_retry_eligible")).toBe(true);
     expect(recoveryStore.listCanonicalAnalysisRecoveryIntents(canonical!.id)).toEqual([
-      expect.objectContaining({ state: "scheduled", dispatchCount: 0,
+      expect.objectContaining({ state: "waiting_for_operational_reset", dispatchCount: 0,
+        waitGate: expect.objectContaining({ kind: "provider_readiness_change", nextEligibleAt: null,
+          analyticalCompletionEffect: "none" }),
         intent: expect.objectContaining({
           runId: canonical!.id,
           authorization: expect.objectContaining({

@@ -6,7 +6,10 @@ import type {
   CanonicalEconomicsV2EconomicAnalysis,
 } from "../economicTypes.js";
 import type { CanonicalEconomicsV2SynthesisAnalysis } from "../synthesisTypes.js";
-import type { ContractV1SafeActionCode, KnowledgeClaimType, KnowledgeQuery, KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
+import { CONTRACT_V1_1_SAFE_ACTION_CODES, CONTRACT_V1_SAFE_ACTION_CODES,
+  type KnowledgeClaimType, type KnowledgeQuery, type KnowledgeSourceAuthority } from "../knowledge/knowledgeTypes.js";
+import type { CanonicalSynthesisAdmissionContractId } from "../synthesisContractV1Types.js";
+import type { PublicRetrievalTransportDiagnosticsV1 } from "../intelligence/intelligenceTypes.js";
 import { KNOWLEDGE_CLAIM_POLICIES } from "../knowledge/knowledgePolicy.js";
 import type { CanonicalRfClaimDecision, CanonicalRfClaimResolution } from "./rfClaimResolution.js";
 import type { CanonicalUnresolvedClaim, CanonicalUnresolvedClaimClass, CanonicalUnresolvedClaimInventory } from "./unresolvedClaims.js";
@@ -24,6 +27,7 @@ import {
   compileCanonicalAtomicClaimSeeds,
   type CanonicalAtomicClaimSeed,
   type CanonicalAtomicClaimFacet,
+  type CanonicalRgExpectedKnowledgeValueConstraint,
 } from "./atomicClaims.js";
 import {
   buildCanonicalClaimResearchControlPlan,
@@ -35,7 +39,7 @@ import {
   type CanonicalResearchControlTelemetry,
 } from "./researchControl.js";
 
-export const RG_WORK_LEDGER_SCHEMA_VERSION = "canonical_rg_work_ledger_v1_1_research_control" as const;
+export const RG_WORK_LEDGER_SCHEMA_VERSION = "canonical_rg_work_ledger_v2_research_control" as const;
 
 export type { CanonicalAtomicClaimFacet } from "./atomicClaims.js";
 
@@ -73,26 +77,12 @@ export type CanonicalRgClaimAdmission = {
     | "unresolved_materiality"
     | "withheld_rf_catalog_unavailable"
     | "withheld_no_authorized_research_mapping"
-    | "withheld_non_public_evidence_required";
+    | "withheld_non_public_evidence_required"
+    | "withheld_merchant_document_evidence_required"
+    | "withheld_additional_statement_history_required"
+    | "withheld_evidence_route_unresolved";
   knowledgeQuery: KnowledgeQuery | null;
-  expectedKnowledgeValueConstraint:
-    | { kind: "mapping"; sourceCode: string }
-    | { kind: "role"; controlDimension: Extract<CanonicalAtomicClaimFacet,
-      "economic_beneficiary" | "economic_owner" | "collector" | "billing_intermediary" | "rule_setter" | "price_setter"
-      | "negotiator_change_authority" | "contractual_controller"> }
-    | { kind: "boolean" }
-    | { kind: "synthesis_constraint_identity" }
-    | { kind: "synthesis_economic_driver" }
-    | { kind: "synthesis_recurrence"; recurrenceBasis: "verified_schedule" }
-    | { kind: "synthesis_counterfactual" }
-    | { kind: "synthesis_safe_action" }
-    | { kind: "synthesis_merchant_influence"; safeActionCode: ContractV1SafeActionCode;
-      influenceKind: "merchant_change_right" | "merchant_operational_controllability" }
-    | { kind: "synthesis_constraint_action_effect"; safeActionCode: ContractV1SafeActionCode;
-      constraintAtomicClaimId: string }
-    | { kind: "synthesis_condition_state"; safeActionCode: ContractV1SafeActionCode;
-      constraintAtomicClaimId: string; conditionCode: string }
-    | null;
+  expectedKnowledgeValueConstraint: CanonicalRgExpectedKnowledgeValueConstraint | null;
   requiredSourceAuthorities: KnowledgeSourceAuthority[];
   evidenceObjective: string;
   expectedDecisionEffects: CanonicalUnresolvedClaim["possibleDecisionEffects"];
@@ -156,23 +146,71 @@ export type CanonicalRgOperation = {
   kind: "public_search" | "public_retrieval" | "investigation" | "independent_verification";
   attempt: number;
   candidateId: string | null;
-  state: "reserved" | "sent" | "completed" | "failed_before_send" | "indeterminate_after_send";
+  state: "reserved" | "sent" | "completed" | "failed_before_send" | "provider_rejected"
+    | "public_read_transport_outcome_unknown" | "indeterminate_after_send";
   reservation: { reservationId: string; workerId: string; reservedAt: string; expiresAt: string };
   receipt: {
     sendState: "not_sent" | "sent";
-    completionState: "reserved" | "completed" | "failed" | "indeterminate";
+    completionState: "reserved" | "completed" | "failed" | "provider_rejected"
+      | "public_read_transport_outcome_unknown" | "indeterminate";
     providerCode: string;
     providerRequestId: string | null;
     calls: number;
     tokens: number | null;
     retrievalBytes: number;
     reasonCode: string;
+    providerDiagnostics?: CanonicalRgProviderDiagnostics | null;
+    retrievalTransportDiagnostics?: PublicRetrievalTransportDiagnosticsV1 | null;
   };
   input: unknown;
   inputHash: string;
+  phaseReplay?: {
+    schemaVersion: "canonical_rg_completed_phase_replay_binding_v1";
+    objectiveHash: string;
+    workContractFingerprint: string;
+    disposition: "original_execution" | "replayed_completed_phase";
+    sourceOperationId: string | null;
+    sourceOperationInputHash: string | null;
+    sourceOperationResultHash: string | null;
+    sourceCompletedAt: string | null;
+    reuseAuthority: "same_analysis_run_exact_claim_completed_phase_only";
+    semanticReuse: "prohibited";
+    evidenceAdmissionEffect: "none";
+    analyticalCompletionEffect: "none";
+  };
   result: unknown | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type CanonicalRgProviderDiagnostics = {
+  schemaVersion: "canonical_rg_provider_diagnostics_v1";
+  responseDisposition: "completed" | "known_provider_rejection" | "indeterminate_after_send";
+  httpStatus: number | null;
+  localRequestId: string | null;
+  providerRequestId: string | null;
+  providerResponseId: string | null;
+  requestedModelIdentifier: string | null;
+  returnedModelIdentifier: string | null;
+  providerErrorType: string | null;
+  providerErrorCode: string | null;
+  providerErrorParam: string | null;
+  retryAfterAt?: string | null;
+  usageState: "known" | "unknown_possible_billable";
+  outputTokens: number | null;
+  providerRequestCount: number | null;
+  usageCostUsd: number | null;
+  searchOutputAdmission?: {
+    schemaVersion: "openrouter_search_citation_admission_v1";
+    outcome: "all_citations_admitted" | "partially_admitted" | "no_usable_citations" | "no_citations"
+      | "batch_rejected";
+    annotationCount: number;
+    admittedCitationCount: number;
+    rejectedCitationCount: number;
+    reasonCodes: string[];
+    evidenceAdmissionEffect: "none";
+    analyticalCompletionEffect: "none";
+  } | null;
 };
 
 export type CanonicalRgWorkLedger = {
@@ -187,6 +225,7 @@ export type CanonicalRgWorkLedger = {
   contextualResearchDefault: "opportunistic_only_no_independent_initiation";
   businessContextAuthority: "excluded_from_canonical_materiality";
   benchmarkAuthority: "excluded_from_canonical_materiality";
+  synthesisContractId: CanonicalSynthesisAdmissionContractId;
   rfBinding: {
     availability: "available" | "unavailable";
     snapshotHash: string;
@@ -236,8 +275,11 @@ export function buildCanonicalRgWorkLedger(input: {
     categoryQuery: claim.canonicalRefs.map((ref) => categoryDecisionByCharge.get(ref)?.query ?? null).find(Boolean) ?? null,
   }));
   const groups = groupSeeds(seeds, period);
+  const synthesisContractId = input.synthesis?.synthesisLayer.contractV1?.contractId
+    ?? "canonical_synthesis_admission_contract_v1";
   const admissions = [...groups.values()].map((group) => admissionForGroup({
     group, authoritativeCost, period, rfAvailability, economic: input.economic, synthesis: input.synthesis,
+    synthesisContractId,
   })).sort((left, right) => left.atomicClaimId.localeCompare(right.atomicClaimId));
   const workItems = admissions.flatMap((admission) => admission.researchAdmission === "admitted_to_rg_work_ledger"
     && admission.knowledgeQuery ? [workItem(admission)] : [])
@@ -268,7 +310,7 @@ export function buildCanonicalRgWorkLedger(input: {
     zeroSendClaimCount: zeroSendResearchTelemetry.length,
     operationCount: 0 as const,
   };
-  const planHash = digest({ materialityContract: MATERIALITY_CONTRACT_V1.version, rfAvailability,
+  const planHash = digest({ materialityContract: MATERIALITY_CONTRACT_V1.version, synthesisContractId, rfAvailability,
     rfSnapshotHash: input.rfResolution?.snapshot.snapshotHash ?? "", authoritativeCost, admissions, workItems });
   return {
     schemaVersion: RG_WORK_LEDGER_SCHEMA_VERSION,
@@ -282,6 +324,7 @@ export function buildCanonicalRgWorkLedger(input: {
     contextualResearchDefault: "opportunistic_only_no_independent_initiation",
     businessContextAuthority: "excluded_from_canonical_materiality",
     benchmarkAuthority: "excluded_from_canonical_materiality",
+    synthesisContractId,
     rfBinding: {
       availability: rfAvailability,
       snapshotHash: input.rfResolution?.snapshot.snapshotHash ?? "",
@@ -328,6 +371,7 @@ function admissionForGroup(input: {
   rfAvailability: "available" | "unavailable";
   economic: CanonicalEconomicsV2EconomicAnalysis | null;
   synthesis: CanonicalEconomicsV2SynthesisAnalysis | null;
+  synthesisContractId: CanonicalSynthesisAdmissionContractId;
 }): CanonicalRgClaimAdmission {
   const first = input.group[0]!;
   const parentClaimIds = unique(input.group.map((seed) => seed.parent.claimId));
@@ -339,7 +383,7 @@ function admissionForGroup(input: {
   const magnitude = evaluateEconomicMateriality({ amountMinor, authoritativeStatementCostMinor: input.authoritativeCost });
   const decision = decisionTier(first, input.economic, input.synthesis);
   const materiality = combineMaterialityAxes(magnitude.tier, decision.tier);
-  const research = researchRoute(first, materiality, input.rfAvailability);
+  const research = researchRoute(first, materiality, input.rfAvailability, input.synthesisContractId);
   const atomicClaimId = atomicClaimIdForSeed(first, input.period);
   const researchControl = buildCanonicalClaimResearchControlPlan({
     atomicClaimId,
@@ -370,7 +414,8 @@ function admissionForGroup(input: {
     materiality,
     researchAdmission: research.admission,
     knowledgeQuery: research.query,
-    expectedKnowledgeValueConstraint: expectedKnowledgeValueConstraint(first.facet, research.query),
+    expectedKnowledgeValueConstraint: expectedKnowledgeValueConstraint(first.facet, research.query, first,
+      input.synthesisContractId),
     requiredSourceAuthorities: research.authorities,
     evidenceObjective: evidenceObjective(first.facet),
     expectedDecisionEffects: unique(input.group.flatMap((seed) => seed.parent.possibleDecisionEffects)),
@@ -408,6 +453,20 @@ function decisionTier(
   economic: CanonicalEconomicsV2EconomicAnalysis | null,
   synthesis: CanonicalEconomicsV2SynthesisAnalysis | null,
 ): CanonicalAtomicDecisionEvaluation {
+  if (seed.prerequisite) {
+    const effect = seed.parent.possibleDecisionEffects.includes("merchant_lever")
+      ? "merchant_lever" as const : seed.parent.possibleDecisionEffects[0]!;
+    if (seed.prerequisite.decisionTier === "D2") return permissionDecision(seed.facet, effect,
+      `contract_prerequisite:${seed.prerequisite.sourceAtomicClaimId}:${seed.prerequisite.safeActionCode}`, [
+        { outcomeClass: `${seed.prerequisite.kind}_proven_for_exact_action`,
+          merchantFacingStateCode: `${seed.prerequisite.safeActionCode}_permission_reachable` },
+        { outcomeClass: `${seed.prerequisite.kind}_not_proven_or_not_applicable_for_exact_action`,
+          merchantFacingStateCode: `${seed.prerequisite.safeActionCode}_permission_withheld` },
+      ]);
+    return { tier: "D1", reasonCodes: ["exact_prerequisite_interpretation_relevant_but_other_independent_blockers_remain"],
+      basis: { ...emptyDecisionBasis(seed.facet),
+        independentBlockingPrerequisiteCodes: seed.prerequisite.independentBlockingPrerequisiteCodes } };
+  }
   const direct = directFacetDecision(seed.facet);
   if (direct) return direct;
 
@@ -463,21 +522,6 @@ function directFacetDecision(facet: CanonicalAtomicClaimFacet): CanonicalAtomicD
       return decisive("cost_stack_completeness", [
         { outcomeClass: "fee_detail_complete", merchantFacingStateCode: "cost_stack_detail_complete" },
         { outcomeClass: "fee_detail_incomplete", merchantFacingStateCode: "cost_stack_detail_partial" },
-      ]);
-    case "economic_category":
-      return decisive("composition_permission", [
-        { outcomeClass: "processor_or_service_category", merchantFacingStateCode: "composition_processor_or_service" },
-        { outcomeClass: "network_or_issuer_category", merchantFacingStateCode: "composition_network_or_issuer" },
-      ]);
-    case "economic_beneficiary":
-      return decisive("economic_interpretation", [
-        { outcomeClass: "processor_or_acquirer_beneficiary", merchantFacingStateCode: "beneficiary_processor_or_acquirer" },
-        { outcomeClass: "network_issuer_or_third_party_beneficiary", merchantFacingStateCode: "beneficiary_network_issuer_or_third_party" },
-      ]);
-    case "economic_owner":
-      return decisive("economic_interpretation", [
-        { outcomeClass: "processor_or_acquirer_owner", merchantFacingStateCode: "owner_processor_or_acquirer" },
-        { outcomeClass: "network_issuer_or_third_party_owner", merchantFacingStateCode: "owner_network_issuer_or_third_party" },
       ]);
     default:
       return null;
@@ -570,12 +614,26 @@ function allRequiredDimensionsProven(
   return required.every((dimension) => proven.has(dimension));
 }
 
-function researchRoute(seed: CanonicalAtomicClaimSeed, materiality: CanonicalClaimMateriality, rfAvailability: "available" | "unavailable") {
+function researchRoute(seed: CanonicalAtomicClaimSeed, materiality: CanonicalClaimMateriality,
+  rfAvailability: "available" | "unavailable", synthesisContractId: CanonicalSynthesisAdmissionContractId) {
   const query = seed.knowledgeQuery;
   if (rfAvailability === "unavailable") return route("withheld_rf_catalog_unavailable", null, []);
   if (materiality === "contextual") return route("contextual_opportunistic_only", query, authoritiesFor(query?.claimType));
   if (materiality === "immaterial") return route("immaterial_no_research", query, authoritiesFor(query?.claimType));
   if (materiality === "unresolved") return route("unresolved_materiality", query, authoritiesFor(query?.claimType));
+  if (!seed.prerequisite && synthesisContractId === "canonical_synthesis_admission_contract_v1_1"
+    && seed.facet === "counterfactual") {
+    return route("withheld_no_authorized_research_mapping", null, []);
+  }
+  if (seed.prerequisite?.evidenceRoute === "merchant_document") {
+    return route("withheld_merchant_document_evidence_required", null, []);
+  }
+  if (seed.prerequisite?.evidenceRoute === "additional_statement_history") {
+    return route("withheld_additional_statement_history_required", null, []);
+  }
+  if (seed.prerequisite?.evidenceRoute === "route_unresolved") {
+    return route("withheld_evidence_route_unresolved", null, []);
+  }
   if (!query) {
     const privateEvidence = ["pricing_underlying_cost", "pricing_schedule", "pricing_scope", "fee_detail_coverage", "merchant_actionability"]
       .includes(seed.parent.claimClass);
@@ -604,7 +662,10 @@ function evidenceObjective(facet: CanonicalAtomicClaimFacet): string {
 function expectedKnowledgeValueConstraint(
   facet: CanonicalAtomicClaimFacet,
   query: KnowledgeQuery | null,
+  seed?: CanonicalAtomicClaimSeed,
+  synthesisContractId: CanonicalSynthesisAdmissionContractId = "canonical_synthesis_admission_contract_v1",
 ): CanonicalRgClaimAdmission["expectedKnowledgeValueConstraint"] {
+  if (seed?.prerequisite) return seed.prerequisite.expectedKnowledgeValueConstraint;
   if (!query) return null;
   if (facet === "economic_category") return { kind: "mapping", sourceCode: query.subjectCode };
   if (["economic_beneficiary", "economic_owner", "collector", "billing_intermediary", "rule_setter", "price_setter",
@@ -620,7 +681,9 @@ function expectedKnowledgeValueConstraint(
   // compatible private/document-history evidence routes and must never be provider-selected here.
   if (facet === "recurrence") return { kind: "synthesis_recurrence", recurrenceBasis: "verified_schedule" };
   if (facet === "counterfactual") return { kind: "synthesis_counterfactual" };
-  if (facet === "merchant_lever") return { kind: "synthesis_safe_action" };
+  if (facet === "merchant_lever") return { kind: "synthesis_safe_action",
+    allowedSafeActionCodes: [...(synthesisContractId === "canonical_synthesis_admission_contract_v1_1"
+      ? CONTRACT_V1_1_SAFE_ACTION_CODES : CONTRACT_V1_SAFE_ACTION_CODES)] };
   return null;
 }
 

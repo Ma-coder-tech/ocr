@@ -1692,8 +1692,138 @@ export type CanonicalFeeLedgerControl = {
   parserReportedActualAmount?: MoneyAmount | null;
   reconstructedFromCoveredRows?: boolean;
   reconstructionFormula?: "covered_rows_fee_charge_gross" | "covered_rows_signed_net" | "not_reconstructed";
+  roundingBridge?: CanonicalFeeRollupRoundingBridge | null;
   reasonCode: string;
   explanation: string;
+};
+
+export type CanonicalFeeRowSectionAssignment = {
+  feeRowId: string;
+  status: "assigned" | "unassigned" | "ambiguous";
+  sectionControlRef: string | null;
+  candidateSectionControlRefs: string[];
+  printedSectionLabel: string | null;
+  sourceSection: string | null;
+  evidenceRefs: string[];
+  ruleId: "explicit_source_section_label_v1" | "unique_control_coverage_fallback_v1" | null;
+};
+
+export type CanonicalFeeRowArithmeticProvenance = {
+  feeRowId: string;
+  status: "complete" | "partial" | "charged_amount_only" | "ambiguous";
+  formulaBasis: "rate_times_volume" | "per_item" | "source_units_times_per_unit" | "unknown" | "ambiguous";
+  printedRate: CanonicalPrintedRate | null;
+  volumeBasis: MoneyAmount | null;
+  printedPerItemRate: CanonicalPrintedRate | null;
+  itemCount: CountValue | null;
+  printedPerUnitRate: CanonicalPrintedRate | null;
+  sourceUnitBasis: DecimalString | null;
+  sourceUnit: CanonicalFeeSourceUnit | null;
+  chargedAmount: MoneyAmount | null;
+  fieldEvidenceRefs: {
+    rate: string[];
+    volumeBasis: string[];
+    count: string[];
+    perUnitRate: string[];
+    sourceUnitBasis: string[];
+    chargedAmount: string[];
+  };
+  operandRecovery: CanonicalFeeOperandRecovery;
+  missingFields: string[];
+};
+
+export type CanonicalFeeSourceUnit = "kilobytes" | "batches" | "authorization_events" | "rejection_events" | "verification_events";
+
+export type CanonicalFeeOperandCandidate = {
+  id: string;
+  formulaBasis: "rate_times_volume" | "per_item" | "source_units_times_per_unit";
+  basisKind: "money_volume" | "transaction_count" | "other_source_units";
+  printedRate: CanonicalPrintedRate;
+  volumeBasis: MoneyAmount | null;
+  itemCount: CountValue | null;
+  sourceUnitBasis: DecimalString | null;
+  sourceUnit: CanonicalFeeSourceUnit | null;
+  evidenceRefs: string[];
+  unitEvidenceBasis: "printed_fee_description" | "printed_source_format" | "printed_description_and_source_format";
+  ruleId:
+    | "integer_count_column_v1"
+    | "explicit_count_description_v1"
+    | "explicit_money_volume_description_v1"
+    | "explicit_source_unit_description_v1"
+    | "explicit_batch_unit_description_v1"
+    | "explicit_authorization_unit_description_v1"
+    | "explicit_rejection_unit_description_v1"
+    | "explicit_verification_unit_description_v1"
+    | "fractional_volume_column_v1"
+    | "ambiguous_decimal_integer_basis_v1";
+};
+
+export type CanonicalFeeOperandRecovery = {
+  policyVersion: "fee_basis_operand_coverage_conflict_resolution_v1";
+  unitSemanticsPolicyVersion: "fee_operand_unit_semantics_adjudication_v1";
+  status: "not_needed_existing" | "recovered" | "ambiguous" | "conflicting" | "unavailable";
+  selectedCandidateId: string | null;
+  candidates: CanonicalFeeOperandCandidate[];
+  reasonCodes: string[];
+};
+
+export type CanonicalFeePartitionSourceProvenance = {
+  policyVersion: "fee_partition_source_provenance_v1";
+  authority: "diagnostic_relationship_only";
+  status: "available" | "partial" | "unavailable";
+  assignmentMode: "explicit_source_section_labels" | "unique_control_coverage_fallback" | "unavailable";
+  eligibleFeeRowIds: string[];
+  sectionControlRefs: string[];
+  arithmeticControlRefs: string[];
+  assignments: CanonicalFeeRowSectionAssignment[];
+  rowArithmetic: CanonicalFeeRowArithmeticProvenance[];
+  limitations: string[];
+};
+
+export type CanonicalFeeRollupRoundingBridge = {
+  policyVersion: "fee_rollup_rounding_bridge_v1";
+  method: "exact_unrounded_partition_bridge";
+  sectionAmountsMicros: Array<{ controlRef: string; amountMicros: number }>;
+  grandAmountMicros: number;
+  roundingMode: "nearest_cent_half_away_from_zero";
+  evidenceRefs: string[];
+};
+
+export type CanonicalExactSourceArithmeticAmount = {
+  numeratorMinorUnits: string;
+  denominator: string;
+  roundedAmountMinor: number;
+};
+
+export type CanonicalExactSourceArithmeticAssessment = {
+  policyVersion: "exact_source_arithmetic_bridge_v1";
+  authority: "diagnostic_relationship_only";
+  roundingMode: "nearest_cent_half_away_from_zero";
+  status: "not_needed_exact" | "proven_rounding" | "unresolved";
+  reasonCode:
+    | "printed_totals_exact"
+    | "exact_source_arithmetic_proves_rounding"
+    | "printed_totals_not_comparable"
+    | "incomplete_partition_membership"
+    | "incomplete_source_arithmetic"
+    | "ambiguous_source_arithmetic"
+    | "unsupported_source_arithmetic"
+    | "source_arithmetic_row_mismatch"
+    | "source_arithmetic_section_mismatch"
+    | "source_arithmetic_grand_mismatch";
+  reconstructedFeeRowIds: string[];
+  incompleteFeeRowIds: string[];
+  ambiguousFeeRowIds: string[];
+  mismatchedFeeRowIds: string[];
+  sectionAmounts: Array<{
+    controlRef: string;
+    feeRowIds: string[];
+    exactAmount: CanonicalExactSourceArithmeticAmount;
+    printedAmountMinor: number;
+    reproducesPrintedTotal: boolean;
+  }>;
+  grandAmount: CanonicalExactSourceArithmeticAmount | null;
+  evidenceRefs: string[];
 };
 
 export type CanonicalFeeLedger = {
@@ -1705,6 +1835,118 @@ export type CanonicalFeeLedger = {
   uniqueChargeTotal: MoneyAmount | null;
   uniqueChargeCalculationRef?: string;
   controls: CanonicalFeeLedgerControl[];
+  partitionSourceProvenance: CanonicalFeePartitionSourceProvenance;
+  limitations: string[];
+};
+
+export type CanonicalCrossSummaryMeasure = "submitted_amount" | "fee_amount" | "funded_amount";
+
+export type CanonicalCrossSummaryGrain =
+  | "statement_period_total"
+  | "fee_section_total"
+  | "funding_batch_period_total"
+  | "unknown";
+
+export type CanonicalCrossSummaryNode = {
+  id: string;
+  summaryRef: string;
+  sourceKind: "selected_financial_fact" | "printed_fee_control" | "funding_batch_control";
+  printedLabel: string;
+  measure: CanonicalCrossSummaryMeasure;
+  grain: CanonicalCrossSummaryGrain;
+  period: { start: string; end: string } | null;
+  sourceDocumentRef: string;
+  identifierBasis: Array<"source_document_ref" | "merchant_identifier">;
+  amount: MoneyAmount | null;
+  evidenceRefs: string[];
+};
+
+export type CanonicalCrossSummaryRelationshipCandidate =
+  | "same_measure_same_population"
+  | "component_rollup";
+
+export type CanonicalCrossSummaryAdjudicationClass =
+  | "resolved_independent_printed_totals"
+  | "resolved_measure_scoped_funding_warning"
+  | "resolved_passing_component_controls"
+  | "resolved_complete_fee_partition"
+  | "resolved_rounding_attributed_fee_partition"
+  | "unresolved_period"
+  | "unresolved_grain"
+  | "unresolved_amount_conflict"
+  | "unresolved_fee_partition_membership"
+  | "unresolved_fee_rollup_residual"
+  | "unresolved_incomplete_or_conflicting_controls"
+  | "unresolved_missing_explicit_link_evidence";
+
+export type CanonicalCrossSummaryReusableRule =
+  | "independent_printed_total_identity_v1"
+  | "measure_scoped_funding_warning_v1"
+  | "passing_covered_component_rollup_v1"
+  | "complete_non_overlapping_fee_partition_v1"
+  | "exact_rounding_bridge_fee_partition_v1";
+
+export type CanonicalCrossSummaryRelationship = {
+  id: string;
+  leftSummaryId: string;
+  rightSummaryId: string;
+  evaluatedCandidateType: CanonicalCrossSummaryRelationshipCandidate;
+  relationshipType: CanonicalCrossSummaryRelationshipCandidate | "unknown";
+  status: "proven" | "unknown";
+  comparison: {
+    measure: "compatible" | "incompatible" | "unknown";
+    period: "same_statement_period" | "incompatible" | "unknown";
+    grain: "compatible" | "incompatible" | "unknown";
+    identifiers: "matched" | "incompatible" | "unknown";
+    explicitLinkEvidence: "present" | "absent";
+    amount: "corroborates" | "conflicts" | "not_comparable";
+  };
+  evidenceRefs: string[];
+  countingTreatment: "reference_only_no_addition";
+  reasonCodes: string[];
+  limitations: string[];
+  adjudication: {
+    policyVersion: "cross_summary_reconciliation_adjudication_v1";
+    outcome: "resolved_by_reusable_rule" | "remain_unknown";
+    relationshipClass: CanonicalCrossSummaryAdjudicationClass;
+    reusableRuleId: CanonicalCrossSummaryReusableRule | null;
+  };
+};
+
+export type CanonicalFeeRollupAssessment = {
+  id: string;
+  policyVersion: "fee_rollup_completeness_rounding_attribution_v1";
+  grandControlRef: string;
+  sectionControlRefs: string[];
+  status: "proven_complete_exact" | "proven_complete_with_rounding" | "unresolved";
+  membershipStatus: "complete_non_overlapping" | "missing_members" | "overlapping_members" | "incomplete_controls";
+  grandCoveredFeeRowIds: string[];
+  sectionCoveredFeeRowIds: string[];
+  missingFeeRowIds: string[];
+  uncoveredByGrandFeeRowIds: string[];
+  uncoveredBySectionsFeeRowIds: string[];
+  overlappingFeeRowIds: string[];
+  outsideGrandFeeRowIds: string[];
+  sectionPrintedTotal: MoneyAmount | null;
+  grandPrintedTotal: MoneyAmount | null;
+  residualMinor: number | null;
+  residualAttribution: "not_needed_exact" | "proven_exact_rounding_bridge" | "unresolved";
+  sourceArithmetic: CanonicalExactSourceArithmeticAssessment;
+  roundingEvidenceRefs: string[];
+  countingTreatment: "reference_only_no_addition";
+  reasonCodes: string[];
+  limitations: string[];
+};
+
+export type CanonicalCrossSummaryLinkEvidence = {
+  policyVersion: "cross_summary_link_evidence_v2";
+  adjudicationPolicyVersion: "cross_summary_reconciliation_adjudication_v1";
+  feeRollupPolicyVersion: "fee_rollup_completeness_rounding_attribution_v1";
+  authority: "diagnostic_relationship_only";
+  status: "available" | "partial" | "unavailable";
+  nodes: CanonicalCrossSummaryNode[];
+  relationships: CanonicalCrossSummaryRelationship[];
+  feeRollups: CanonicalFeeRollupAssessment[];
   limitations: string[];
 };
 
@@ -1763,6 +2005,13 @@ export type CanonicalAnalysisVersionManifest = {
   customerActionGuidancePolicyVersion: "canonical_customer_action_guidance_v1";
   customerWordingPolicyVersion: "canonical_customer_wording_v1";
   merchantAttentionPolicyVersion: "canonical_merchant_attention_v1";
+  crossSummaryLinkEvidencePolicyVersion: "cross_summary_link_evidence_v2";
+  crossSummaryReconciliationAdjudicationPolicyVersion: "cross_summary_reconciliation_adjudication_v1";
+  feeRollupCompletenessPolicyVersion: "fee_rollup_completeness_rounding_attribution_v1";
+  feePartitionSourceProvenancePolicyVersion: "fee_partition_source_provenance_v1";
+  exactSourceArithmeticBridgePolicyVersion: "exact_source_arithmetic_bridge_v1";
+  feeBasisOperandCoveragePolicyVersion: "fee_basis_operand_coverage_conflict_resolution_v1";
+  feeOperandUnitSemanticsPolicyVersion: "fee_operand_unit_semantics_adjudication_v1";
   parserId: string | null;
   parserVersion: string | null;
   extractionVersion: string;
@@ -1783,6 +2032,7 @@ export type CanonicalStatementAnalysis = {
   financialFacts: CanonicalFinancialFacts;
   businessQualification: CanonicalBusinessQualification;
   feeLedger: CanonicalFeeLedger;
+  crossSummaryLinkEvidence: CanonicalCrossSummaryLinkEvidence;
   feeOwnershipActionability: CanonicalFeeOwnershipActionability;
   opportunityEngine: CanonicalOpportunityEngine;
   aiCapabilities: CanonicalAiCapabilityLayer;

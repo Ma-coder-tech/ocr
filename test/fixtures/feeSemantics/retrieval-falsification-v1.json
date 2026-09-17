@@ -1,0 +1,51 @@
+{
+  "evaluationId": "fee_semantics_retrieval_falsification_v1",
+  "evaluatedLibrary": "rapidfuzz",
+  "evaluatedVersion": "3.14.6",
+  "runtimeDisposition": "evaluation_only_not_added_as_project_dependency",
+  "cases": [
+    {
+      "label": "DCVR ACQ - DUES & ASSESSMENTS",
+      "expectedUse": "candidate_recall_helpful",
+      "currentDeterministicBestPercent": 76.9,
+      "rapidFuzzTokenSetBestPercent": 100
+    },
+    {
+      "label": "DCVR ACQ - ADDR VERIFICATION SRV FEE",
+      "expectedUse": "candidate_recall_helpful",
+      "currentDeterministicBestPercent": 84.2,
+      "rapidFuzzTokenSetBestPercent": 100
+    },
+    {
+      "label": "VISA MISUSE OF AUTH FEE",
+      "expectedUse": "candidate_recall_helpful_after_abbreviation_expansion",
+      "currentDeterministicBestPercent": 44.4,
+      "rapidFuzzTokenSetBestPercent": 81.5
+    },
+    {
+      "label": "ADDRS VERIFICATION SERVICE FEE",
+      "expectedUse": "candidate_recall_helpful_after_abbreviation_expansion",
+      "currentDeterministicBestPercent": 47.1,
+      "rapidFuzzTokenSetBestPercent": 80
+    },
+    {
+      "label": "AVS WATS AUTHORIZATION FEE",
+      "expectedUse": "conflict_must_not_auto_resolve",
+      "rapidFuzzTokenSetBestPercent": 100,
+      "observedCollision": "address_verification_and_authorization_candidates_tie"
+    },
+    {
+      "label": "DISC NETWORK AUTH FEE",
+      "expectedUse": "misleading_near_match_must_be_context_gated",
+      "rapidFuzzTokenSetBestPercent": 80,
+      "observedCollision": "short_DISC_pricing_alias_ranked_above_authorization_alias"
+    },
+    {
+      "label": "AMEX SYSTEM PROCESSING FEE",
+      "expectedUse": "false_positive_must_be_rejected",
+      "rapidFuzzWRatioBestPercent": 85.5,
+      "observedCollision": "unrelated_short_alias_partial_match"
+    }
+  ],
+  "finding": "Token-set similarity improves recall after structural cleanup, but unrestricted WRatio and partial matching reduce precision. Use deterministic normalization, scoped context gates, meaningful-token requirements, and candidate-only output; do not add RapidFuzz as a runtime dependency yet."
+}

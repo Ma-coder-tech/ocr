@@ -1,0 +1,12 @@
+{
+  "frozen_utc": "2026-09-05T02:42:58.059824+00:00",
+  "files": {
+    "structure.py": "ecd8b4d4c07deb4813d9d5b66feee8e60072c3977641bf567c8115767daddf34",
+    "native.mts": "f26718c67e1bf6cc673b96c98f26fd1e6ecd783d5db7535772425600d456489a",
+    "test_structure.py": "dab18d181ae2246067249a5ec6d12649d41c92e9c71ba9e56b60d8796ee72354",
+    "test_revision.py": "3f917f3572b6510b332e9c404485713117aad5138ea17a6b872d0a224e540a84",
+    "protocol.md": "824de1b4c55380aff62467666d39229814693e667f58c016010bef7d0e19687f",
+    "round-2-protocol.md": "3f3bf2c5df765f578ba33446f34eccfa26c0ba7c0d058fe1d8006a810f312d21"
+  },
+  "note": "Before opening supplemental holdout contents. Round 1 source gold and tests now regression evidence."
+}

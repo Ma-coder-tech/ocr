@@ -1,0 +1,10 @@
+{
+  "frozen_utc": "2026-09-05T02:27:36.265948+00:00",
+  "files": {
+    "structure.py": "b22148d811dd5c5ffaa115f863cb106d791f97a33be5edf41baf3f8864355229",
+    "native.mts": "f26718c67e1bf6cc673b96c98f26fd1e6ecd783d5db7535772425600d456489a",
+    "test_structure.py": "dab18d181ae2246067249a5ec6d12649d41c92e9c71ba9e56b60d8796ee72354",
+    "protocol.md": "824de1b4c55380aff62467666d39229814693e667f58c016010bef7d0e19687f"
+  },
+  "note": "Before examining sealed holdout contents. No changes to these files after holdout unblinding."
+}
