@@ -62,7 +62,10 @@ describe("Decision-Relevant Stage-0 Warrant Gate v1", () => {
     const nqual = control(paysafe, "AMEXCT043 - NQUAL DISC");
     expect(nqual.finding.openWorldDeterminants).toMatchObject({
       family: { value: "F5" },
-      d2MechanicAndPopulation: { mechanic: { value: "rate_times_volume" }, population: { value: "printed_money_volume" } },
+      d2MechanicAndPopulation: {
+        mechanic: { value: "ad valorem merchant-facing tier price" },
+        population: { value: "printed tier-qualified merchant sales volume" },
+      },
       d4Actionability: { actionClass: "N3" },
       determinantSufficiency: "DETERMINANT_SUFFICIENT",
     });

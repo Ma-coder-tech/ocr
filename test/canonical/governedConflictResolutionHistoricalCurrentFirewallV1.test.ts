@@ -21,7 +21,13 @@ const FIXTURES: Array<{ file: string; businessType: BusinessTypeId }> = [
   { file: "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf", businessType: "restaurant_food_beverage" },
 ];
 
-type CorpusEntry = { file: string; analysis: CanonicalStatementAnalysis; findings: InternalAnalystFinding[]; conflicts: number };
+type CorpusEntry = {
+  file: string;
+  analysis: CanonicalStatementAnalysis;
+  findings: InternalAnalystFinding[];
+  conflicts: Array<{ field: string; interpretations: string[] }>;
+  failClosedConflictStops: number;
+};
 
 describe("Governed Conflict Resolution & Historical/Current Firewall v1", () => {
   let corpus: CorpusEntry[];
@@ -32,15 +38,39 @@ describe("Governed Conflict Resolution & Historical/Current Firewall v1", () => 
       const analysis = buildCanonicalStatementFactsFromParsedDocument(await parsePdf(`${PDF_ROOT}/${fixture.file}`), { sourceFileName: fixture.file, businessType: fixture.businessType });
       const fingerprint = canonicalFinancialTruthFingerprint(analysis);
       const report = buildInternalAnalystFindingV1({ analysis, statementContext: US_CONTEXT });
-      corpus.push({ file: fixture.file, analysis, findings: report.findings.filter((finding) => finding.sourceFeeRowId), conflicts: report.researchQueue.stage0Decisions.reduce((total, decision) => total + decision.calibration.stage0.governedConflicts.length, 0) });
+      const conflictDecisions = report.researchQueue.stage0Decisions.filter((decision) => decision.calibration.stage0.governedConflicts.length > 0);
+      corpus.push({
+        file: fixture.file,
+        analysis,
+        findings: report.findings.filter((finding) => finding.sourceFeeRowId),
+        conflicts: conflictDecisions.flatMap((decision) => decision.calibration.stage0.governedConflicts),
+        failClosedConflictStops: conflictDecisions.filter((decision) =>
+          decision.calibration.stage0.decision === "STOP_WITHOUT_EXTERNAL_RESEARCH" &&
+          decision.calibration.stage0.researchWarranted === false &&
+          decision.calibration.stage0.adjudicationRequired === true &&
+          decision.calibration.budget.maximumExternalOperations === 0
+        ).length,
+      });
       expect(report.canonicalFinancialTruth).toMatchObject({ beforeFingerprint: fingerprint, afterFingerprint: fingerprint, unchanged: true, mutationAllowed: false });
       expect(canonicalFinancialTruthFingerprint(analysis)).toBe(fingerprint);
     }
   }, 60_000);
 
-  it("keeps the 18 diagnosed row conflicts at zero while retaining current maintenance separately", () => {
+  it("preserves the two commercial authority conflicts fail-closed while retaining current maintenance separately", () => {
     expect(corpus).toHaveLength(11);
-    expect(corpus.reduce((total, entry) => total + entry.conflicts, 0)).toBe(0);
+    const conflicts = corpus.flatMap((entry) => entry.conflicts);
+    expect(conflicts).toHaveLength(4);
+    expect(conflicts.map((conflict) => conflict.field).sort()).toEqual([
+      "price_setter",
+      "price_setter",
+      "rule_setter",
+      "rule_setter",
+    ]);
+    expect(conflicts.every((conflict) =>
+      conflict.interpretations.includes("card_network") &&
+      conflict.interpretations.includes("acquiring_side_program")
+    )).toBe(true);
+    expect(corpus.reduce((total, entry) => total + entry.failClosedConflictStops, 0)).toBe(2);
     const assessments = allFindings(corpus).filter(({ finding }) => finding.current2026UsCoreNetworkReference?.currentReferenceMaintenance.matchedRecordIds.includes("CUR26-WRK-MC-ABVF-BASE"));
     expect(assessments).toHaveLength(9);
     expect(assessments.every(({ finding }) => finding.current2026UsCoreNetworkReference?.reference.conflicts.length === 0 && finding.current2026UsCoreNetworkReference.research.priority === "none")).toBe(true);

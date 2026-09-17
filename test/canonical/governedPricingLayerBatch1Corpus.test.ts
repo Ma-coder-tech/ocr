@@ -98,7 +98,9 @@ describe("governed pricing-layer Batch 1 full Fiserv corpus", () => {
     expect(findings.filter((finding) => finding.current2026UsCoreNetworkReference)
       .every((finding) => finding.current2026UsCoreNetworkReference!
         .currentReferenceMaintenance.retainedSeparatelyFromHistoricalConclusion)).toBe(true);
-    expect(reports.reduce((sum, report) => sum + report.researchQueued, 0)).toBe(149);
+    // Stage 4 commercial adjudication changes the reviewed queue composition;
+    // Batch 1 financial fingerprints and pricing semantics remain unchanged.
+    expect(reports.reduce((sum, report) => sum + report.researchQueued, 0)).toBe(152);
 
     const priority = reports.find((report) => report.file.includes("PRIORITY_PAYMENT_SYSTEMS"))!;
     expect(priority.pricingModel).toBe("flat_rate");

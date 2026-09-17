@@ -110,7 +110,9 @@ describe("Governed Knowledge Batch 2 full Fiserv corpus", () => {
       categoryOnly: 259,
       fullyUnresolved: 135,
       ambiguousOrCompeting: 90,
-      researchQueueQuestions: 149,
+      // Stage 4 commercial adjudication changes which rows require bounded
+      // follow-up while preserving zero external operations at this layer.
+      researchQueueQuestions: 152,
       perItemMaterial: 90,
       perItemUnitSupported: 65,
       perItemUnitUnresolved: 25,
