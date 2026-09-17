@@ -7,10 +7,18 @@ const root = process.cwd();
 
 describe("repository baseline hygiene", () => {
   it("uses a process-isolated Vitest pool for native-backed suites", async () => {
-    const config = await readFile(path.resolve(root, "vitest.config.ts"), "utf8");
+    const [config, packageJsonText, baselineRunner] = await Promise.all([
+      readFile(path.resolve(root, "vitest.config.ts"), "utf8"),
+      readFile(path.resolve(root, "package.json"), "utf8"),
+      readFile(path.resolve(root, "scripts/run-test-baseline.mjs"), "utf8"),
+    ]);
+    const packageJson = JSON.parse(packageJsonText);
 
     expect(config).toMatch(/pool:\s*["']forks["']/);
     expect(config).not.toMatch(/pool:\s*["']threads["']/);
+    expect(packageJson.scripts.test).toBe("node scripts/check-toolchain.mjs && node scripts/run-test-baseline.mjs");
+    expect(baselineRunner).toContain("--exclude");
+    expect(baselineRunner.match(/test\/evaluationPackage5BIntegration\.test\.ts/g)).toHaveLength(2);
   });
 
   it("keeps the historical dirty-worktree Gold scope checker retired", async () => {

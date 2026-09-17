@@ -1,0 +1,17 @@
+default_permissions = "ratereveal-live"
+
+[features]
+network_proxy = true
+
+[permissions.ratereveal-live]
+description = "RateReveal internal live evaluation with exact required destinations only."
+extends = ":workspace"
+
+[permissions.ratereveal-live.network]
+enabled = true
+
+[permissions.ratereveal-live.network.domains]
+"openrouter.ai" = "allow"
+"api.openai.com" = "allow"
+"merchants.fiserv.com" = "allow"
+"support.cardpointe.com" = "allow"

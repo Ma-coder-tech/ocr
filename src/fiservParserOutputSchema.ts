@@ -71,6 +71,9 @@ export const supportingTransactionCountSchema = z
     role: z.string().min(1),
     value: z.number().int().nonnegative(),
     reason: z.string().min(1),
+    sourceSection: z.string().min(1).optional(),
+    pageNumber: z.number().int().positive().nullable().optional(),
+    evidenceLine: z.string().min(1).nullable().optional(),
   })
   .strict();
 
@@ -1207,6 +1210,8 @@ export const interchangeDetailSchema = z
 export const totalRoleCandidateSchema = z.enum([
   "total_volume",
   "gross_sales",
+  "refund_volume",
+  "settlement_adjustment",
   "amount_funded",
   "total_fees",
   "interchange_detail_total",

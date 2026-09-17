@@ -1,0 +1,30 @@
+{
+  "lockVersion": 1,
+  "contractId": "canonical_synthesis_admission_contract_v1",
+  "contractVersion": "v1",
+  "status": "authoritative_frozen_contract",
+  "approved": "2026-08-29",
+  "repositoryPath": "docs/product-model/amendments",
+  "artifact": {
+    "file": "RateReveal_Canonical_Synthesis_Admission_Contract_v1.md",
+    "bytes": 35993,
+    "sha256": "da79028cc231ad28e2daa186e4c9b23091c1185ee863b13afbb51c891f9316ec"
+  },
+  "normativeBaseline": {
+    "frozenPackageLock": {
+      "file": "../frozen/v0.1/frozen-product-model.lock.json",
+      "sha256": "c4e715d0c6f45c87dec5558c84a73d5456251919ef120ebfbece530a4bb23c0a"
+    },
+    "runtimePolicyAmendment": {
+      "file": "RateReveal_Runtime_Intelligence_Policy_Amendment_v0_2.md",
+      "sha256": "ce8dbdef6f41741ba0cefac867a97f8036ced2fe5f0c102bd0c2ba14a32d5e7e"
+    },
+    "materialityContract": {
+      "file": "RateReveal_Materiality_Contract_v1.md",
+      "sha256": "0004dc1eb7320071ecea79f049893505265cbd0f62ad6bd4b12def73eda990c5"
+    }
+  },
+  "implementationAuthority": "none",
+  "customerReportAuthority": "unchanged",
+  "integrityRule": "The contract Markdown artifact is immutable at this identity. Verify its byte count and SHA-256 value before relying on it. Changes or expansions require a separate versioned contract or amendment, a new integrity identity, and an updated RA-RH traceability record. Frozen Product Model originals and historical contracts must never be rewritten in place."
+}

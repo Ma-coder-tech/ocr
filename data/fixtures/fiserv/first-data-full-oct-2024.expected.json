@@ -25,7 +25,10 @@
         {
           "role": "gross_sale_items",
           "value": 1797,
-          "reason": "Summary by card type shows 1,797 gross sale items before 3 refund items."
+          "reason": "Summary by card type identifies the gross-sale item population before refund items.",
+          "sourceSection": "SUMMARY BY CARD TYPE",
+          "pageNumber": 2,
+          "evidenceLine": "Total | 1,797 | $52,497.03 | 3 | -$36.48 | 1,800 | $52,460.55"
         }
       ]
     }
@@ -5606,6 +5609,18 @@
       "confidence": "high"
     },
     {
+      "roleCandidate": "refund_volume",
+      "label": "Total Refunds You Submitted",
+      "amount": 36.48,
+      "sourceSection": "SUMMARY BY CARD TYPE",
+      "pageNumber": 2,
+      "evidenceLine": "Total | 1,797 | $52,497.03 | 3 | -$36.48 | 1,800 | $52,460.55",
+      "selected": false,
+      "selectionReason": null,
+      "rejectionReason": "Refund volume is a separately signed population used to reconcile gross sales to net submitted volume.",
+      "confidence": "high"
+    },
+    {
       "roleCandidate": "total_volume",
       "label": "Summary By Card Type Total Amount You Submitted",
       "amount": 52460.55,
@@ -5746,7 +5761,20 @@
     "status": "accepted_with_warnings",
     "reason": "Accepted with parser caveat(s): supportingFeeAgreement, interchange_detail_total_differs_from_fee_summary, reportable_sales_excluded.",
     "confidence": "high",
-    "reportable": true
+    "reportable": true,
+    "validationState": {
+      "topLevelTotals": "validated",
+      "feeLedger": "validated",
+      "batchLedger": "validated",
+      "feeClassification": "validated",
+      "orphanTotals": "none",
+      "customerFacingTotalsAllowed": true,
+      "feeLedgerAllowed": true,
+      "batchDetailAllowed": true,
+      "feeClassificationAllowed": true,
+      "blockingReasons": [],
+      "warningReasons": []
+    }
   },
   "confidence": {
     "overall": "high",

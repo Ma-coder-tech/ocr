@@ -1,0 +1,48 @@
+{
+  "lockVersion": 1,
+  "packageId": "ratereveal-frozen-product-model-v0.1",
+  "status": "authoritative_frozen_package",
+  "repositoryPath": "docs/product-model/frozen/v0.1",
+  "manifest": {
+    "file": "RateReveal_Frozen_Product_Model_Manifest_v0_1.md",
+    "bytes": 1695,
+    "sha256": "8f5bf54b0406e074c58e354a1ac7ba425fa459d7b5c1f7afd59ed2948cacbecc"
+  },
+  "governedArtifacts": [
+    {
+      "file": "RateReveal_Merchant_Processing_Economics_Schema_v0_7.md",
+      "bytes": 40823,
+      "sha256": "dc624808c9a9d52a17ddcab6802e94d43ab92bb40d15aa92261b1ff7657f34f2"
+    },
+    {
+      "file": "RateReveal_Decision_Procedures_v0_2.md",
+      "bytes": 21856,
+      "sha256": "ffc9cab731aeb39d82412c453a93dea9fe0e204217dddcd934b8d4c86d76d690"
+    },
+    {
+      "file": "RateReveal_Gold_Answer_Tables_v0_3.md",
+      "bytes": 39353,
+      "sha256": "738a5309451966ceeb7a412013939e84d466f67cec4ac5ee9a16d20df0dc76a3"
+    },
+    {
+      "file": "RateReveal_Payments_Knowledge_Library_Spec_v0_2.md",
+      "bytes": 31059,
+      "sha256": "d7c8e9073b2644bb107543aa4e2fe43ad19fb178c7232edc0e13db39df2e95d8"
+    },
+    {
+      "file": "RateReveal_Runtime_Intelligence_Policy_v0_1.md",
+      "bytes": 18558,
+      "sha256": "b3c1a36ed97ac0f51640789405f8188a1f4fe5ea0652fdbcfe82e534f5106494"
+    },
+    {
+      "file": "RateReveal_Product_Model_Freeze_Review_v0_1.md",
+      "bytes": 10616,
+      "sha256": "f39b49ad8280f668466d5a509b8951c0d7dd4605f23a24da710ebc50a481ec63"
+    }
+  ],
+  "acceptedImplementationBaseline": {
+    "branch": "codex/e2e-internal-analysis-v1",
+    "commit": "38bd5e8036c8329fda8ad7224961bc25ca23da25"
+  },
+  "integrityRule": "The seven frozen Markdown files are immutable. Verify every byte count and SHA-256 value before relying on this package. Changes require a new versioned package; amendments must be separate versioned artifacts."
+}
