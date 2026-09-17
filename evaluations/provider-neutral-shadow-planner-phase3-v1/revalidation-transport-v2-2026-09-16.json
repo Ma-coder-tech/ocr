@@ -1,0 +1,1356 @@
+{
+  "schemaVersion": "provider_neutral_shadow_planner_phase3_evaluation_2026_09_16_v3",
+  "generatedAt": "2026-09-16T16:54:16.616Z",
+  "mode": "DIRECT_OPENAI_NON_CUSTOMER_SHADOW_EVALUATION",
+  "baseline": {
+    "branch": "codex/planner-provider-neutral-consolidation-v1",
+    "qualificationCommit": "3659b03"
+  },
+  "executionBoundary": {
+    "adapter": "openai-direct-responses-v1",
+    "providerKind": "OPENAI_DIRECT",
+    "model": "gpt-5.2-2025-12-11",
+    "openRouterEnabled": false,
+    "productionWiring": false,
+    "customerOutput": false,
+    "evidenceAdmission": false,
+    "truthMutation": false
+  },
+  "controls": {
+    "issueFamilies": [
+      "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+      "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+      "PARTICIPANT_CONTROL_UNCERTAINTY",
+      "GATEWAY_PROCESSOR_TERMINOLOGY",
+      "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+      "COST_INCIDENCE_UNCERTAINTY",
+      "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED"
+    ],
+    "deterministicGoldFamilies": [
+      "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+      "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+      "PARTICIPANT_CONTROL_UNCERTAINTY",
+      "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+      "COST_INCIDENCE_UNCERTAINTY",
+      "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED"
+    ],
+    "syntheticContractControlFamilies": [
+      "GATEWAY_PROCESSOR_TERMINOLOGY"
+    ],
+    "repetitionsPerFamily": 2,
+    "stopFamilyAfterFirstExecutionFailure": true,
+    "maximumProviderCalls": 14,
+    "maximumEstimatedCostUsdMicrosPerCall": 250000,
+    "maximumEstimatedCostUsdMicrosTotal": 3500000,
+    "timeoutMsPerCall": 60000,
+    "connectionEstablishmentTimeoutMs": 15000,
+    "abortCleanupGraceMs": 2000,
+    "freshTransportSessionPerCall": true,
+    "connectionReuseAllowed": false,
+    "stopNetworkDispatchWhenCleanupUnconfirmed": true,
+    "maximumOutputTokensPerCall": 4000,
+    "reasoningEffort": "none",
+    "verbosity": "low",
+    "retries": 0,
+    "automaticProviderFallback": false,
+    "rawPromptsPersisted": false,
+    "rawProviderResponsesPersisted": false,
+    "providerDraftsPersisted": false,
+    "safeSemanticSignaturesAndTelemetryOnly": true
+  },
+  "corpus": {
+    "deterministicGoldStatementCount": 1,
+    "deterministicSelectedPacketCount": 6,
+    "syntheticNonCustomerPacketCount": 1,
+    "privacyInspectionsPassed": 7,
+    "providerPayloadInspectionsPassed": 7,
+    "fileNamesSent": 0,
+    "privateAccountIdentifiersSent": 0,
+    "businessNamesSent": 0,
+    "credentialsPersisted": 0
+  },
+  "familyResults": [
+    {
+      "issueClass": "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+      "corpusKind": "DETERMINISTIC_GOLD_SELECTION",
+      "status": "PASSED",
+      "providerCalls": 2,
+      "maximumProviderCalls": 2,
+      "repeatableSemanticSignature": true,
+      "baselineQualityMatched": true,
+      "deterministicStatePreserved": true,
+      "trials": [
+        {
+          "repetition": 1,
+          "status": "PASSED",
+          "runStatus": "COMPLETED",
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_ac39894a251f43eda6f9d90a5d2d8b86",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "725efeaf299f99271ced9fe203b2e9ea76e37fb11c70d50de258a4acd83a3aa5",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null,
+            "connectionReused": false,
+            "connectionMs": 330,
+            "responseHeadersMs": 21715,
+            "responseBodyMs": 267,
+            "cleanupMs": 9,
+            "failureElapsedMs": null,
+            "cleanupStatus": "CONFIRMED",
+            "failureStage": "NONE"
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 32463,
+            "inputTokens": 9046,
+            "outputTokens": 1223,
+            "estimatedCostUsdMicros": 32953,
+            "latencyMs": 21982,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "deterministicStatePreserved": true,
+          "stateBeforeSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateAfterSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "semanticSignature": {
+            "recommendedResolutionPath": "PUBLIC_RESEARCH_REQUIRED",
+            "requiredEvidenceClasses": [
+              "GOVERNED_PUBLIC_SOURCE"
+            ],
+            "guidanceChannels": {
+              "publicResearch": true,
+              "merchantInput": false,
+              "documentRequest": false,
+              "operationalData": false
+            },
+            "competingAlternativePresent": true,
+            "reconstructionRecheckTypes": []
+          },
+          "semanticSignatureSha256": "db35ac517fa966aeb2d8089c5c1fbb706a255b01e0f77cd1c94f981780f8ab3b",
+          "quality": {
+            "resolutionPathMatchesBaseline": true,
+            "evidenceClassesMatchBaseline": true,
+            "guidanceChannelsMatchBaseline": true,
+            "requiredAlternativePresent": true,
+            "exactReferenceGroundingPresent": true,
+            "epistemicBoundariesComplete": true
+          },
+          "errorCodes": []
+        },
+        {
+          "repetition": 2,
+          "status": "PASSED",
+          "runStatus": "COMPLETED",
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_912d370f466d4e86bddd5d1079f3e17e",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "725efeaf299f99271ced9fe203b2e9ea76e37fb11c70d50de258a4acd83a3aa5",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null,
+            "connectionReused": false,
+            "connectionMs": 185,
+            "responseHeadersMs": 13799,
+            "responseBodyMs": 262,
+            "cleanupMs": 2,
+            "failureElapsedMs": null,
+            "cleanupStatus": "CONFIRMED",
+            "failureStage": "NONE"
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 32463,
+            "inputTokens": 9046,
+            "outputTokens": 936,
+            "estimatedCostUsdMicros": 28935,
+            "latencyMs": 14061,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "deterministicStatePreserved": true,
+          "stateBeforeSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateAfterSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "semanticSignature": {
+            "recommendedResolutionPath": "PUBLIC_RESEARCH_REQUIRED",
+            "requiredEvidenceClasses": [
+              "GOVERNED_PUBLIC_SOURCE"
+            ],
+            "guidanceChannels": {
+              "publicResearch": true,
+              "merchantInput": false,
+              "documentRequest": false,
+              "operationalData": false
+            },
+            "competingAlternativePresent": true,
+            "reconstructionRecheckTypes": []
+          },
+          "semanticSignatureSha256": "db35ac517fa966aeb2d8089c5c1fbb706a255b01e0f77cd1c94f981780f8ab3b",
+          "quality": {
+            "resolutionPathMatchesBaseline": true,
+            "evidenceClassesMatchBaseline": true,
+            "guidanceChannelsMatchBaseline": true,
+            "requiredAlternativePresent": true,
+            "exactReferenceGroundingPresent": true,
+            "epistemicBoundariesComplete": true
+          },
+          "errorCodes": []
+        }
+      ],
+      "errorCodes": []
+    },
+    {
+      "issueClass": "QUALIFICATION_INTEGRITY_ROOT_CAUSE",
+      "corpusKind": "DETERMINISTIC_GOLD_SELECTION",
+      "status": "FAILED",
+      "providerCalls": 2,
+      "maximumProviderCalls": 2,
+      "repeatableSemanticSignature": false,
+      "baselineQualityMatched": false,
+      "deterministicStatePreserved": true,
+      "trials": [
+        {
+          "repetition": 1,
+          "status": "PASSED",
+          "runStatus": "COMPLETED",
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_2f54ec1ce5b24cf4ab51af6e962d9b8a",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "e998fbad30991246c08be1399168372f306478e13f79c2f3e9c39dfa487df027",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null,
+            "connectionReused": false,
+            "connectionMs": 195,
+            "responseHeadersMs": 15342,
+            "responseBodyMs": 232,
+            "cleanupMs": 2,
+            "failureElapsedMs": null,
+            "cleanupStatus": "CONFIRMED",
+            "failureStage": "NONE"
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 29077,
+            "inputTokens": 8462,
+            "outputTokens": 952,
+            "estimatedCostUsdMicros": 28137,
+            "latencyMs": 15574,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "deterministicStatePreserved": true,
+          "stateBeforeSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateAfterSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "semanticSignature": {
+            "recommendedResolutionPath": "PROCESSOR_OR_GATEWAY_DATA_REQUIRED",
+            "requiredEvidenceClasses": [
+              "PROCESSOR_OR_GATEWAY_OPERATIONAL_DATA"
+            ],
+            "guidanceChannels": {
+              "publicResearch": false,
+              "merchantInput": false,
+              "documentRequest": false,
+              "operationalData": true
+            },
+            "competingAlternativePresent": true,
+            "reconstructionRecheckTypes": []
+          },
+          "semanticSignatureSha256": "6e83184c5a2a83fbc8984269af15c1a8f1ca8c6dbd362bcd9480750bab315517",
+          "quality": {
+            "resolutionPathMatchesBaseline": true,
+            "evidenceClassesMatchBaseline": true,
+            "guidanceChannelsMatchBaseline": true,
+            "requiredAlternativePresent": true,
+            "exactReferenceGroundingPresent": true,
+            "epistemicBoundariesComplete": true
+          },
+          "errorCodes": []
+        },
+        {
+          "repetition": 2,
+          "status": "FAILED",
+          "runStatus": "SAFETY_BLOCKED",
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_eec46626e064477facf575753a82d691",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "e998fbad30991246c08be1399168372f306478e13f79c2f3e9c39dfa487df027",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null,
+            "connectionReused": false,
+            "connectionMs": 164,
+            "responseHeadersMs": 14919,
+            "responseBodyMs": 260,
+            "cleanupMs": 21,
+            "failureElapsedMs": null,
+            "cleanupStatus": "CONFIRMED",
+            "failureStage": "NONE"
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 29077,
+            "inputTokens": 8462,
+            "outputTokens": 996,
+            "estimatedCostUsdMicros": 28753,
+            "latencyMs": 15179,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "deterministicStatePreserved": true,
+          "stateBeforeSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateAfterSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "semanticSignature": null,
+          "semanticSignatureSha256": null,
+          "quality": null,
+          "errorCodes": [
+            "shadow_planner_forbidden_conclusion"
+          ]
+        }
+      ],
+      "errorCodes": [
+        "shadow_planner_forbidden_conclusion"
+      ]
+    },
+    {
+      "issueClass": "PARTICIPANT_CONTROL_UNCERTAINTY",
+      "corpusKind": "DETERMINISTIC_GOLD_SELECTION",
+      "status": "PASSED",
+      "providerCalls": 2,
+      "maximumProviderCalls": 2,
+      "repeatableSemanticSignature": true,
+      "baselineQualityMatched": true,
+      "deterministicStatePreserved": true,
+      "trials": [
+        {
+          "repetition": 1,
+          "status": "PASSED",
+          "runStatus": "COMPLETED",
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_d9959519a3564590ad9f59e21de46aac",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "d09ae87dfdc7d97b3a77d7ead8b74f69186889afe97e8636225ccba327c0b750",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null,
+            "connectionReused": false,
+            "connectionMs": 173,
+            "responseHeadersMs": 17506,
+            "responseBodyMs": 260,
+            "cleanupMs": 14,
+            "failureElapsedMs": null,
+            "cleanupStatus": "CONFIRMED",
+            "failureStage": "NONE"
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 59344,
+            "inputTokens": 19811,
+            "outputTokens": 1266,
+            "estimatedCostUsdMicros": 52394,
+            "latencyMs": 17766,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "deterministicStatePreserved": true,
+          "stateBeforeSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateAfterSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "semanticSignature": {
+            "recommendedResolutionPath": "PUBLIC_RESEARCH_REQUIRED",
+            "requiredEvidenceClasses": [
+              "GOVERNED_PUBLIC_SOURCE"
+            ],
+            "guidanceChannels": {
+              "publicResearch": true,
+              "merchantInput": false,
+              "documentRequest": false,
+              "operationalData": false
+            },
+            "competingAlternativePresent": true,
+            "reconstructionRecheckTypes": []
+          },
+          "semanticSignatureSha256": "db35ac517fa966aeb2d8089c5c1fbb706a255b01e0f77cd1c94f981780f8ab3b",
+          "quality": {
+            "resolutionPathMatchesBaseline": true,
+            "evidenceClassesMatchBaseline": true,
+            "guidanceChannelsMatchBaseline": true,
+            "requiredAlternativePresent": true,
+            "exactReferenceGroundingPresent": true,
+            "epistemicBoundariesComplete": true
+          },
+          "errorCodes": []
+        },
+        {
+          "repetition": 2,
+          "status": "PASSED",
+          "runStatus": "COMPLETED",
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_09a2738dccac4abda01a313cfb8aabea",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "d09ae87dfdc7d97b3a77d7ead8b74f69186889afe97e8636225ccba327c0b750",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null,
+            "connectionReused": false,
+            "connectionMs": 388,
+            "responseHeadersMs": 19290,
+            "responseBodyMs": 270,
+            "cleanupMs": 4,
+            "failureElapsedMs": null,
+            "cleanupStatus": "CONFIRMED",
+            "failureStage": "NONE"
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 59344,
+            "inputTokens": 19811,
+            "outputTokens": 1428,
+            "estimatedCostUsdMicros": 54662,
+            "latencyMs": 19560,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "deterministicStatePreserved": true,
+          "stateBeforeSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateAfterSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "semanticSignature": {
+            "recommendedResolutionPath": "PUBLIC_RESEARCH_REQUIRED",
+            "requiredEvidenceClasses": [
+              "GOVERNED_PUBLIC_SOURCE"
+            ],
+            "guidanceChannels": {
+              "publicResearch": true,
+              "merchantInput": false,
+              "documentRequest": false,
+              "operationalData": false
+            },
+            "competingAlternativePresent": true,
+            "reconstructionRecheckTypes": []
+          },
+          "semanticSignatureSha256": "db35ac517fa966aeb2d8089c5c1fbb706a255b01e0f77cd1c94f981780f8ab3b",
+          "quality": {
+            "resolutionPathMatchesBaseline": true,
+            "evidenceClassesMatchBaseline": true,
+            "guidanceChannelsMatchBaseline": true,
+            "requiredAlternativePresent": true,
+            "exactReferenceGroundingPresent": true,
+            "epistemicBoundariesComplete": true
+          },
+          "errorCodes": []
+        }
+      ],
+      "errorCodes": []
+    },
+    {
+      "issueClass": "GATEWAY_PROCESSOR_TERMINOLOGY",
+      "corpusKind": "SYNTHETIC_NON_CUSTOMER_CONTRACT_CONTROL",
+      "status": "PASSED",
+      "providerCalls": 2,
+      "maximumProviderCalls": 2,
+      "repeatableSemanticSignature": true,
+      "baselineQualityMatched": true,
+      "deterministicStatePreserved": true,
+      "trials": [
+        {
+          "repetition": 1,
+          "status": "PASSED",
+          "runStatus": "COMPLETED",
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_95c9606c07b14e9e9676e4c13253d74e",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "74cbf14039f0e32d3a052b89692f3b402654204631b6db99b7193f1d69f4c334",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null,
+            "connectionReused": false,
+            "connectionMs": 166,
+            "responseHeadersMs": 12756,
+            "responseBodyMs": 263,
+            "cleanupMs": 2,
+            "failureElapsedMs": null,
+            "cleanupStatus": "CONFIRMED",
+            "failureStage": "NONE"
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 11795,
+            "inputTokens": 2376,
+            "outputTokens": 985,
+            "estimatedCostUsdMicros": 17948,
+            "latencyMs": 13019,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "deterministicStatePreserved": true,
+          "stateBeforeSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateAfterSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "semanticSignature": {
+            "recommendedResolutionPath": "PUBLIC_RESEARCH_REQUIRED",
+            "requiredEvidenceClasses": [
+              "GOVERNED_PUBLIC_SOURCE"
+            ],
+            "guidanceChannels": {
+              "publicResearch": true,
+              "merchantInput": false,
+              "documentRequest": false,
+              "operationalData": false
+            },
+            "competingAlternativePresent": true,
+            "reconstructionRecheckTypes": []
+          },
+          "semanticSignatureSha256": "db35ac517fa966aeb2d8089c5c1fbb706a255b01e0f77cd1c94f981780f8ab3b",
+          "quality": {
+            "resolutionPathMatchesBaseline": true,
+            "evidenceClassesMatchBaseline": true,
+            "guidanceChannelsMatchBaseline": true,
+            "requiredAlternativePresent": true,
+            "exactReferenceGroundingPresent": true,
+            "epistemicBoundariesComplete": true
+          },
+          "errorCodes": []
+        },
+        {
+          "repetition": 2,
+          "status": "PASSED",
+          "runStatus": "COMPLETED",
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_b1665b66e4a74aabaca655dbe95c665d",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "74cbf14039f0e32d3a052b89692f3b402654204631b6db99b7193f1d69f4c334",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null,
+            "connectionReused": false,
+            "connectionMs": 170,
+            "responseHeadersMs": 13512,
+            "responseBodyMs": 272,
+            "cleanupMs": 2,
+            "failureElapsedMs": null,
+            "cleanupStatus": "CONFIRMED",
+            "failureStage": "NONE"
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 11795,
+            "inputTokens": 2376,
+            "outputTokens": 974,
+            "estimatedCostUsdMicros": 17794,
+            "latencyMs": 13784,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "deterministicStatePreserved": true,
+          "stateBeforeSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateAfterSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "semanticSignature": {
+            "recommendedResolutionPath": "PUBLIC_RESEARCH_REQUIRED",
+            "requiredEvidenceClasses": [
+              "GOVERNED_PUBLIC_SOURCE"
+            ],
+            "guidanceChannels": {
+              "publicResearch": true,
+              "merchantInput": false,
+              "documentRequest": false,
+              "operationalData": false
+            },
+            "competingAlternativePresent": true,
+            "reconstructionRecheckTypes": []
+          },
+          "semanticSignatureSha256": "db35ac517fa966aeb2d8089c5c1fbb706a255b01e0f77cd1c94f981780f8ab3b",
+          "quality": {
+            "resolutionPathMatchesBaseline": true,
+            "evidenceClassesMatchBaseline": true,
+            "guidanceChannelsMatchBaseline": true,
+            "requiredAlternativePresent": true,
+            "exactReferenceGroundingPresent": true,
+            "epistemicBoundariesComplete": true
+          },
+          "errorCodes": []
+        }
+      ],
+      "errorCodes": []
+    },
+    {
+      "issueClass": "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+      "corpusKind": "DETERMINISTIC_GOLD_SELECTION",
+      "status": "PASSED",
+      "providerCalls": 2,
+      "maximumProviderCalls": 2,
+      "repeatableSemanticSignature": true,
+      "baselineQualityMatched": true,
+      "deterministicStatePreserved": true,
+      "trials": [
+        {
+          "repetition": 1,
+          "status": "PASSED",
+          "runStatus": "COMPLETED",
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_3ed3672f861949c28349342bf8bf4b92",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "3dea3a31041430c7d7d28a407a405ef713cd7fb14c60f5b0af88d6d6b71b2608",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null,
+            "connectionReused": false,
+            "connectionMs": 170,
+            "responseHeadersMs": 12534,
+            "responseBodyMs": 270,
+            "cleanupMs": 4,
+            "failureElapsedMs": null,
+            "cleanupStatus": "CONFIRMED",
+            "failureStage": "NONE"
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 13455,
+            "inputTokens": 2850,
+            "outputTokens": 944,
+            "estimatedCostUsdMicros": 18204,
+            "latencyMs": 12804,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "deterministicStatePreserved": true,
+          "stateBeforeSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateAfterSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "semanticSignature": {
+            "recommendedResolutionPath": "PROCESSOR_OR_GATEWAY_DATA_REQUIRED",
+            "requiredEvidenceClasses": [
+              "PROCESSOR_OR_GATEWAY_OPERATIONAL_DATA"
+            ],
+            "guidanceChannels": {
+              "publicResearch": false,
+              "merchantInput": false,
+              "documentRequest": false,
+              "operationalData": true
+            },
+            "competingAlternativePresent": true,
+            "reconstructionRecheckTypes": []
+          },
+          "semanticSignatureSha256": "6e83184c5a2a83fbc8984269af15c1a8f1ca8c6dbd362bcd9480750bab315517",
+          "quality": {
+            "resolutionPathMatchesBaseline": true,
+            "evidenceClassesMatchBaseline": true,
+            "guidanceChannelsMatchBaseline": true,
+            "requiredAlternativePresent": true,
+            "exactReferenceGroundingPresent": true,
+            "epistemicBoundariesComplete": true
+          },
+          "errorCodes": []
+        },
+        {
+          "repetition": 2,
+          "status": "PASSED",
+          "runStatus": "COMPLETED",
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_b3ee6ebf0e994d44be1de0dcf2d918d6",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "3dea3a31041430c7d7d28a407a405ef713cd7fb14c60f5b0af88d6d6b71b2608",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null,
+            "connectionReused": false,
+            "connectionMs": 165,
+            "responseHeadersMs": 18942,
+            "responseBodyMs": 254,
+            "cleanupMs": 2,
+            "failureElapsedMs": null,
+            "cleanupStatus": "CONFIRMED",
+            "failureStage": "NONE"
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 13455,
+            "inputTokens": 2850,
+            "outputTokens": 1282,
+            "estimatedCostUsdMicros": 22936,
+            "latencyMs": 19196,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "deterministicStatePreserved": true,
+          "stateBeforeSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateAfterSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "semanticSignature": {
+            "recommendedResolutionPath": "PROCESSOR_OR_GATEWAY_DATA_REQUIRED",
+            "requiredEvidenceClasses": [
+              "PROCESSOR_OR_GATEWAY_OPERATIONAL_DATA"
+            ],
+            "guidanceChannels": {
+              "publicResearch": false,
+              "merchantInput": false,
+              "documentRequest": false,
+              "operationalData": true
+            },
+            "competingAlternativePresent": true,
+            "reconstructionRecheckTypes": []
+          },
+          "semanticSignatureSha256": "6e83184c5a2a83fbc8984269af15c1a8f1ca8c6dbd362bcd9480750bab315517",
+          "quality": {
+            "resolutionPathMatchesBaseline": true,
+            "evidenceClassesMatchBaseline": true,
+            "guidanceChannelsMatchBaseline": true,
+            "requiredAlternativePresent": true,
+            "exactReferenceGroundingPresent": true,
+            "epistemicBoundariesComplete": true
+          },
+          "errorCodes": []
+        }
+      ],
+      "errorCodes": []
+    },
+    {
+      "issueClass": "COST_INCIDENCE_UNCERTAINTY",
+      "corpusKind": "DETERMINISTIC_GOLD_SELECTION",
+      "status": "PASSED",
+      "providerCalls": 2,
+      "maximumProviderCalls": 2,
+      "repeatableSemanticSignature": true,
+      "baselineQualityMatched": true,
+      "deterministicStatePreserved": true,
+      "trials": [
+        {
+          "repetition": 1,
+          "status": "PASSED",
+          "runStatus": "COMPLETED",
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_3150f7e543034bc59fca9c09493994d2",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "b8405f2de983ff2a9e686a0416a37696940e2358ee36a6efa40d6193d6b0ba65",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null,
+            "connectionReused": false,
+            "connectionMs": 478,
+            "responseHeadersMs": 15609,
+            "responseBodyMs": 1,
+            "cleanupMs": 2,
+            "failureElapsedMs": null,
+            "cleanupStatus": "CONFIRMED",
+            "failureStage": "NONE"
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 20346,
+            "inputTokens": 4885,
+            "outputTokens": 1104,
+            "estimatedCostUsdMicros": 24005,
+            "latencyMs": 15610,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "deterministicStatePreserved": true,
+          "stateBeforeSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateAfterSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "semanticSignature": {
+            "recommendedResolutionPath": "MERCHANT_INPUT_REQUIRED",
+            "requiredEvidenceClasses": [
+              "MERCHANT_ATTESTATION"
+            ],
+            "guidanceChannels": {
+              "publicResearch": false,
+              "merchantInput": true,
+              "documentRequest": false,
+              "operationalData": false
+            },
+            "competingAlternativePresent": true,
+            "reconstructionRecheckTypes": []
+          },
+          "semanticSignatureSha256": "801ab2af2052c4e3dcd3873d4499045aca7a68023a81eb242b08381fac359c86",
+          "quality": {
+            "resolutionPathMatchesBaseline": true,
+            "evidenceClassesMatchBaseline": true,
+            "guidanceChannelsMatchBaseline": true,
+            "requiredAlternativePresent": true,
+            "exactReferenceGroundingPresent": true,
+            "epistemicBoundariesComplete": true
+          },
+          "errorCodes": []
+        },
+        {
+          "repetition": 2,
+          "status": "PASSED",
+          "runStatus": "COMPLETED",
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_789e8e9ebece480796f5cde75afe1068",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "b8405f2de983ff2a9e686a0416a37696940e2358ee36a6efa40d6193d6b0ba65",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null,
+            "connectionReused": false,
+            "connectionMs": 175,
+            "responseHeadersMs": 20087,
+            "responseBodyMs": 2,
+            "cleanupMs": 1,
+            "failureElapsedMs": null,
+            "cleanupStatus": "CONFIRMED",
+            "failureStage": "NONE"
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 20346,
+            "inputTokens": 4885,
+            "outputTokens": 1275,
+            "estimatedCostUsdMicros": 26399,
+            "latencyMs": 20089,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "deterministicStatePreserved": true,
+          "stateBeforeSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateAfterSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "semanticSignature": {
+            "recommendedResolutionPath": "MERCHANT_INPUT_REQUIRED",
+            "requiredEvidenceClasses": [
+              "MERCHANT_ATTESTATION"
+            ],
+            "guidanceChannels": {
+              "publicResearch": false,
+              "merchantInput": true,
+              "documentRequest": false,
+              "operationalData": false
+            },
+            "competingAlternativePresent": true,
+            "reconstructionRecheckTypes": []
+          },
+          "semanticSignatureSha256": "801ab2af2052c4e3dcd3873d4499045aca7a68023a81eb242b08381fac359c86",
+          "quality": {
+            "resolutionPathMatchesBaseline": true,
+            "evidenceClassesMatchBaseline": true,
+            "guidanceChannelsMatchBaseline": true,
+            "requiredAlternativePresent": true,
+            "exactReferenceGroundingPresent": true,
+            "epistemicBoundariesComplete": true
+          },
+          "errorCodes": []
+        }
+      ],
+      "errorCodes": []
+    },
+    {
+      "issueClass": "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED",
+      "corpusKind": "DETERMINISTIC_GOLD_SELECTION",
+      "status": "PASSED",
+      "providerCalls": 2,
+      "maximumProviderCalls": 2,
+      "repeatableSemanticSignature": true,
+      "baselineQualityMatched": true,
+      "deterministicStatePreserved": true,
+      "trials": [
+        {
+          "repetition": 1,
+          "status": "PASSED",
+          "runStatus": "COMPLETED",
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_0bb190f7126e47ffbfe0715e2c70549d",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "807930e80bfb39dbc0b7b50a3a60c8688a86e2e3d8397c580824b49a8c262213",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null,
+            "connectionReused": false,
+            "connectionMs": 228,
+            "responseHeadersMs": 7573,
+            "responseBodyMs": 144,
+            "cleanupMs": 1,
+            "failureElapsedMs": null,
+            "cleanupStatus": "CONFIRMED",
+            "failureStage": "NONE"
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 59081,
+            "inputTokens": 19729,
+            "outputTokens": 501,
+            "estimatedCostUsdMicros": 41540,
+            "latencyMs": 7717,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "deterministicStatePreserved": true,
+          "stateBeforeSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateAfterSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "semanticSignature": {
+            "recommendedResolutionPath": "DOCUMENT_REQUIRED",
+            "requiredEvidenceClasses": [
+              "MERCHANT_CONTRACT_OR_SCHEDULE"
+            ],
+            "guidanceChannels": {
+              "publicResearch": false,
+              "merchantInput": false,
+              "documentRequest": true,
+              "operationalData": false
+            },
+            "competingAlternativePresent": false,
+            "reconstructionRecheckTypes": []
+          },
+          "semanticSignatureSha256": "667fcb81fcc9af2c9555c0d44f875b2f9ca76f7a0dd61f77379b4e468a91b670",
+          "quality": {
+            "resolutionPathMatchesBaseline": true,
+            "evidenceClassesMatchBaseline": true,
+            "guidanceChannelsMatchBaseline": true,
+            "requiredAlternativePresent": true,
+            "exactReferenceGroundingPresent": true,
+            "epistemicBoundariesComplete": true
+          },
+          "errorCodes": []
+        },
+        {
+          "repetition": 2,
+          "status": "PASSED",
+          "runStatus": "COMPLETED",
+          "provider": {
+            "adapterId": "openai-direct-responses-v1",
+            "providerKind": "OPENAI_DIRECT",
+            "requestedModel": "gpt-5.2-2025-12-11",
+            "returnedModel": "gpt-5.2-2025-12-11",
+            "providerRequestId": "req_a5d40f77674249d7be82b20c856a6aa8",
+            "routedProvider": null,
+            "httpStatus": 200,
+            "requestSha256": "807930e80bfb39dbc0b7b50a3a60c8688a86e2e3d8397c580824b49a8c262213",
+            "schemaSha256": "cd9ed526f939f5685c497501807b27bf77b4eec6a0c3b51a0ef2822cac232757",
+            "finishReason": null,
+            "connectionReused": false,
+            "connectionMs": 168,
+            "responseHeadersMs": 7978,
+            "responseBodyMs": 218,
+            "cleanupMs": 2,
+            "failureElapsedMs": null,
+            "cleanupStatus": "CONFIRMED",
+            "failureStage": "NONE"
+          },
+          "accounting": {
+            "plannerOperationCount": 1,
+            "providerCallAttempts": 1,
+            "providerCallCompleted": 1,
+            "providerNetworkCalls": 1,
+            "requestBytes": 59081,
+            "inputTokens": 19729,
+            "outputTokens": 477,
+            "estimatedCostUsdMicros": 41204,
+            "latencyMs": 8196,
+            "retries": 0,
+            "researchOperations": 0,
+            "sourceAdmissions": 0
+          },
+          "deterministicStatePreserved": true,
+          "stateBeforeSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateAfterSha256": "fa702ecdc14722bf260451b7886e3c5073f480669f4576eaeac5d3c6ab266bde",
+          "stateComponentSha256Before": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "stateComponentSha256After": {
+            "canonicalFinancialTruth": "cf2a45b23db222dab9f4b22701822a9dec8f22052946ed95286e806ee66cfa01",
+            "rdArtifacts": "28ea517b8e6f6160bd4f4b1fe13b45975d784a639d67890a9032c7ef88853bfe",
+            "reconciliation": "2e3806d7dbae526553a788ea14d62c29e37492f8c96ba9f061bef8b5621f13ea",
+            "commercialTruth": "c113857aaef462ef316c4ea00213e9b4ee2e99204445be2bf63c2ea9e943993f",
+            "governedKnowledge": "dbc2c7827e592970e6c478ab02300a382259738dfc0c00f24a90b8c364e63de4",
+            "permissions": "5853f1a08ce11da8e894f3991c4fd8e60819ea3679e2fe0353938624cd47a35f",
+            "customerOutput": "71cf73f65d57f077b57fe9d8311bd68d268ad2534f936e31583c540ffe99de35"
+          },
+          "semanticSignature": {
+            "recommendedResolutionPath": "DOCUMENT_REQUIRED",
+            "requiredEvidenceClasses": [
+              "MERCHANT_CONTRACT_OR_SCHEDULE"
+            ],
+            "guidanceChannels": {
+              "publicResearch": false,
+              "merchantInput": false,
+              "documentRequest": true,
+              "operationalData": false
+            },
+            "competingAlternativePresent": false,
+            "reconstructionRecheckTypes": []
+          },
+          "semanticSignatureSha256": "667fcb81fcc9af2c9555c0d44f875b2f9ca76f7a0dd61f77379b4e468a91b670",
+          "quality": {
+            "resolutionPathMatchesBaseline": true,
+            "evidenceClassesMatchBaseline": true,
+            "guidanceChannelsMatchBaseline": true,
+            "requiredAlternativePresent": true,
+            "exactReferenceGroundingPresent": true,
+            "epistemicBoundariesComplete": true
+          },
+          "errorCodes": []
+        }
+      ],
+      "errorCodes": []
+    }
+  ],
+  "summary": {
+    "status": "FAILED",
+    "passedIssueFamilies": [
+      "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS",
+      "PARTICIPANT_CONTROL_UNCERTAINTY",
+      "GATEWAY_PROCESSOR_TERMINOLOGY",
+      "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE",
+      "COST_INCIDENCE_UNCERTAINTY",
+      "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED"
+    ],
+    "failedIssueFamilies": [
+      "QUALIFICATION_INTEGRITY_ROOT_CAUSE"
+    ],
+    "issueFamilyCoverage": "7/7",
+    "totalProviderCalls": 14,
+    "maximumProviderCalls": 14,
+    "totalInputTokens": 134318,
+    "totalOutputTokens": 14343,
+    "totalEstimatedCostUsdMicros": 435864,
+    "totalProviderLatencyMs": 214537,
+    "allSemanticSignaturesRepeatable": false,
+    "allOfflineBaselineQualityMatched": false,
+    "allProtectedStatePreserved": true,
+    "retries": 0,
+    "fallbackAttempts": 0,
+    "customerOutputsCreated": 0,
+    "truthMutations": 0,
+    "sourceAdmissions": 0,
+    "researchOperations": 0,
+    "transportDispatchHalted": false
+  }
+}

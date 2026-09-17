@@ -15,6 +15,7 @@ import {
   type ShadowAiPlannerProviderUsageV1,
 } from "./shadowAiEconomicResolutionPlannerTypesV1.js";
 import { inspectShadowAiEconomicResolutionPacketPrivacyV1 } from "./shadowAiEconomicResolutionIssueSelectionV1.js";
+import { shadowAiIssueSemanticContractV1 } from "./shadowAiPlannerSemanticContractV1.js";
 
 const PLAN_KEYS = new Set([
   "schemaVersion", "outputType", "authority", "admissionStatus", "truthEffect",
@@ -54,22 +55,20 @@ export function validateShadowAiEconomicResolutionPlanV1(
   if (raw.issueId !== packet.issueId || raw.inputHash !== packet.immutableInputHash) errors.push("shadow_planner_output_binding_invalid");
   if (raw.unresolvedAfterAnalysis !== true) errors.push("shadow_planner_output_must_remain_unresolved");
 
-  const allowedFactRefs = new Set([
-    ...packet.acceptedFactRefs,
-    ...packet.acceptedIssueRelevantActivityFacts.map((fact) => fact.factRef),
-  ]);
+  const allowedFactRefs = new Set(packet.acceptedFactRefs);
   const allowedSupportRefs = new Set([
     ...allowedFactRefs,
     ...packet.currentGovernedEvidenceRefs,
     ...packet.selectedRdChargeRefs,
+    ...packet.acceptedParticipantControlStates.map((state) => state.rdChargeRef),
   ]);
   const cited = strings(raw.exactCitedFactRefs, "exactCitedFactRefs", errors);
   if (cited.some((ref) => !allowedFactRefs.has(ref))) errors.push("shadow_planner_hallucinated_fact_ref");
   if (cited.length === 0 && allowedFactRefs.size > 0) errors.push("shadow_planner_missing_fact_citation");
 
-  const primary = hypothesis(raw.primaryHypothesis, "primaryHypothesis", allowedSupportRefs, errors);
+  const primary = hypothesis(raw.primaryHypothesis, "primaryHypothesis", allowedSupportRefs, allowedSupportRefs.size > 0, errors);
   const alternatives = array(raw.alternativeHypotheses, "alternativeHypotheses", errors)
-    .map((item, index) => hypothesis(item, `alternativeHypotheses[${index}]`, allowedSupportRefs, errors))
+    .map((item, index) => hypothesis(item, `alternativeHypotheses[${index}]`, allowedSupportRefs, allowedSupportRefs.size > 0, errors))
     .filter((item): item is ShadowAiHypothesisV1 => item !== null);
   if (packet.competingHypothesisRequired && alternatives.length === 0) errors.push("shadow_planner_competing_hypothesis_required");
   if (primary && primary.acknowledgedEvidenceGaps.length === 0) errors.push("shadow_planner_primary_evidence_gap_required");
@@ -87,11 +86,17 @@ export function validateShadowAiEconomicResolutionPlanV1(
   const merchant = strings(raw.merchantQuestionSuggestions, "merchantQuestionSuggestions", errors);
   const documents = strings(raw.documentRequestSuggestions, "documentRequestSuggestions", errors);
   const operational = strings(raw.operationalDataRequests, "operationalDataRequests", errors);
-  if (resolutionPath === "PUBLIC_RESEARCH_REQUIRED" && research.length === 0) errors.push("shadow_planner_public_research_query_required");
-  if (resolutionPath === "MERCHANT_INPUT_REQUIRED" && merchant.length === 0) errors.push("shadow_planner_merchant_question_required");
-  if (resolutionPath === "DOCUMENT_REQUIRED" && documents.length === 0) errors.push("shadow_planner_document_request_required");
-  if (resolutionPath === "PROCESSOR_OR_GATEWAY_DATA_REQUIRED" && operational.length === 0) errors.push("shadow_planner_operational_data_request_required");
-  if (resolutionPath !== "PUBLIC_RESEARCH_REQUIRED" && research.length > 0) errors.push("shadow_planner_unnecessary_public_research");
+  const semanticContract = shadowAiIssueSemanticContractV1(packet.issueClass);
+  if (resolutionPath !== semanticContract.resolutionPath) errors.push("shadow_planner_resolution_path_contract_mismatch");
+  if (canonicalJson([...evidenceClasses].sort()) !== canonicalJson([...semanticContract.requiredEvidenceClasses].sort())) {
+    errors.push("shadow_planner_required_evidence_contract_mismatch");
+  }
+  const guidance = { PUBLIC_RESEARCH: research, MERCHANT_INPUT: merchant, DOCUMENT_REQUEST: documents, OPERATIONAL_DATA: operational } as const;
+  for (const [channel, values] of Object.entries(guidance)) {
+    const selected = channel === semanticContract.guidanceChannel;
+    if (selected && values.length === 0) errors.push("shadow_planner_required_guidance_channel_empty");
+    if (!selected && values.length > 0) errors.push("shadow_planner_cross_channel_guidance_forbidden");
+  }
 
   const internalExplanationDraft = raw.internalExplanationDraft === null
     ? null : text(raw.internalExplanationDraft, "internalExplanationDraft", errors);
@@ -100,9 +105,27 @@ export function validateShadowAiEconomicResolutionPlanV1(
   const suspicions = array(raw.reconstructionSuspicions, "reconstructionSuspicions", errors)
     .map((item, index) => suspicion(item, `reconstructionSuspicions[${index}]`, allowedSupportRefs, errors))
     .filter((item): item is ShadowAiFinancialReconstructionSuspicionV1 => item !== null);
+  if (suspicions.length > 0) errors.push("shadow_planner_reconstruction_suspicion_not_allowed_without_accepted_conflict");
 
-  const language = [unresolvedQuestion, internalExplanationDraft,
-    primary?.hypothesis, ...alternatives.map((item) => item.hypothesis), ...research, ...merchant, ...documents, ...operational]
+  const hypothesisLanguage = (item: ShadowAiHypothesisV1): string[] => [
+    item.hypothesis,
+    ...item.acknowledgedEvidenceGaps,
+    ...item.confirmationRequirements,
+    ...item.falsificationConditions,
+  ];
+  const language = [
+    unresolvedQuestion,
+    internalExplanationDraft,
+    ...evidenceGaps,
+    ...limitationCodes,
+    ...(primary ? hypothesisLanguage(primary) : []),
+    ...alternatives.flatMap(hypothesisLanguage),
+    ...research,
+    ...merchant,
+    ...documents,
+    ...operational,
+    ...suspicions.map((item) => item.reasonForSuspicion),
+  ]
     .filter((value): value is string => Boolean(value)).join(" ");
   if (FORBIDDEN_CONCLUSION.test(language)) errors.push("shadow_planner_forbidden_conclusion");
   if (CUSTOMER_LANGUAGE.test(language)) errors.push("shadow_planner_customer_facing_language_forbidden");
@@ -196,7 +219,13 @@ export async function runShadowAiEconomicResolutionPlannerV1(input: {
     accounting(input, inputBytes, completed.value.usage, true), invalid.length > 0 ? ["planner_output_rejected"] : []);
 }
 
-function hypothesis(value: unknown, path: string, allowedRefs: Set<string>, errors: string[]): ShadowAiHypothesisV1 | null {
+function hypothesis(
+  value: unknown,
+  path: string,
+  allowedRefs: Set<string>,
+  supportRequired: boolean,
+  errors: string[],
+): ShadowAiHypothesisV1 | null {
   if (!isRecord(value)) { errors.push(`${path}_invalid`); return null; }
   exactKeys(value, HYPOTHESIS_KEYS, path, errors);
   const hypothesisText = text(value.hypothesis, `${path}.hypothesis`, errors);
@@ -210,6 +239,9 @@ function hypothesis(value: unknown, path: string, allowedRefs: Set<string>, erro
   const confirmations = strings(value.confirmationRequirements, `${path}.confirmationRequirements`, errors);
   const falsifiers = strings(value.falsificationConditions, `${path}.falsificationConditions`, errors);
   if (gaps.length === 0 || confirmations.length === 0 || falsifiers.length === 0) errors.push(`${path}_epistemic_boundary_incomplete`);
+  if (supportRequired && supporting.length === 0) errors.push(`${path}_issue_supporting_reference_required`);
+  if (!supportRequired && supporting.length > 0) errors.push(`${path}_support_forbidden_without_issue_supporting_reference`);
+  if (!supportRequired && confidence !== "LOW") errors.push(`${path}_low_confidence_required_without_issue_supporting_reference`);
   if (!hypothesisText || !confidence) return null;
   return { hypothesis: hypothesisText, confidence, supportingFactRefs: supporting, contradictingFactRefs: contradicting,
     acknowledgedEvidenceGaps: gaps, confirmationRequirements: confirmations, falsificationConditions: falsifiers };
@@ -225,6 +257,8 @@ function suspicion(value: unknown, path: string, allowedRefs: Set<string>, error
   const refs = strings(value.exactAcceptedFactOrOccurrenceRefs, `${path}.exactAcceptedFactOrOccurrenceRefs`, errors);
   if (refs.length === 0) errors.push("shadow_planner_reconstruction_suspicion_exact_ref_required");
   const evidence = strings(value.conflictingEvidenceRefs, `${path}.conflictingEvidenceRefs`, errors);
+  if (evidence.length === 0) errors.push("shadow_planner_reconstruction_suspicion_conflicting_ref_required");
+  if (refs.some((reference) => evidence.includes(reference))) errors.push("shadow_planner_reconstruction_suspicion_conflict_refs_not_distinct");
   if ([...refs, ...evidence].some((ref) => !allowedRefs.has(ref))) errors.push("shadow_planner_reconstruction_suspicion_reference_invalid");
   const reason = text(value.reasonForSuspicion, `${path}.reasonForSuspicion`, errors);
   const recheck = ["PARSER_SOURCE_OCCURRENCE_RECHECK", "RD_RECONCILIATION_RECHECK", "POPULATION_IDENTITY_RECHECK",
