@@ -61,9 +61,15 @@ import {
   resolveGovernedOpenWorldDeterminantV1,
   type GovernedOpenWorldDeterminantResolution,
 } from "./governedOpenWorldDeterminantV1.js";
+import {
+  GOVERNED_COMMERCIAL_CLASSIFICATION_ADJUDICATION_V1,
+  governedCommercialClassificationAdjudicationRulesV1,
+  resolveGovernedCommercialClassificationAdjudicationV1,
+  type GovernedCommercialClassificationAdjudicationResolutionV1,
+} from "./governedCommercialClassificationAdjudicationV1.js";
 
 export const GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION =
-  "governed_payment_knowledge_authority_2026_09_08_open_world_determinant_v1" as const;
+  "governed_payment_knowledge_authority_2026_09_10_commercial_classification_adjudication_v1" as const;
 
 export type GovernedNormUnit =
   | "usd_per_event"
@@ -110,6 +116,7 @@ export type GovernedKnowledgeResolution = {
   usNetworkFeeEvidence: GovernedUsNetworkFeeEvidenceResolution;
   mastercardFocusedEvidence: GovernedMastercardFocusedEvidenceResolution;
   current2026UsCoreNetworkReference: GovernedCurrent2026UsCoreNetworkResolution;
+  commercialClassificationAdjudication: GovernedCommercialClassificationAdjudicationResolutionV1;
   openWorldDeterminants: GovernedOpenWorldDeterminantResolution;
   authorityVersion: typeof GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION;
   semanticCatalogVersion: string;
@@ -309,6 +316,10 @@ export class GovernedPaymentKnowledgeAuthority {
       mastercardFocusedRowsByFeeRowId: mastercardFocusedEvidence.rowsByFeeRowId,
       asOf,
     });
+    const commercialClassificationAdjudication = resolveGovernedCommercialClassificationAdjudicationV1({
+      analysis: input.analysis,
+      geography: input.context.geography.value,
+    });
     const openWorldDeterminants = resolveGovernedOpenWorldDeterminantV1({
       analysis: input.analysis,
       semanticRows: semantics.rows,
@@ -322,6 +333,7 @@ export class GovernedPaymentKnowledgeAuthority {
         ),
       },
       current2026UsCoreNetworkReference,
+      commercialClassificationAdjudication,
     });
     return deepFreeze({
       semantics,
@@ -333,6 +345,7 @@ export class GovernedPaymentKnowledgeAuthority {
       usNetworkFeeEvidence,
       mastercardFocusedEvidence,
       current2026UsCoreNetworkReference,
+      commercialClassificationAdjudication,
       openWorldDeterminants,
       authorityVersion: this.authorityVersion,
       semanticCatalogVersion: semantics.catalogVersion,
@@ -378,6 +391,8 @@ export class GovernedPaymentKnowledgeAuthority {
       current2026UsCoreNetworkReferenceSources: governedCurrent2026SourcesV1(),
       current2026UsCoreNetworkReferenceRecords: governedCurrent2026ReferenceRecordsV1(),
       current2026UsCoreNetworkReferenceRules: governedCurrent2026RulesV1(),
+      commercialClassificationAdjudicationCatalogVersion: GOVERNED_COMMERCIAL_CLASSIFICATION_ADJUDICATION_V1,
+      commercialClassificationAdjudicationRules: governedCommercialClassificationAdjudicationRulesV1(),
       openWorldDeterminantCatalogVersion: GOVERNED_OPEN_WORLD_DETERMINANT_V1,
       openWorldDeterminantFamilies: governedOpenWorldFeeFamiliesV1(),
       openWorldDeterminantActionClasses: governedOpenWorldActionClassesV1(),

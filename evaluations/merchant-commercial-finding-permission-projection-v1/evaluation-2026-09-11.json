@@ -1,0 +1,420 @@
+{
+  "schemaVersion": "merchant_commercial_finding_permission_projection_evaluation_2026_09_11_v1",
+  "generatedAt": "2026-09-11T00:00:00.000Z",
+  "productAuthority": {
+    "document": "RateReveal Merchant-Facing Commercial Finding Boundary FINAL — Product-Adjudicated v1",
+    "sha256": "f9315f96ef56b0a52ce60750c9e1ea2b27cc6566624a5da3a0c49e95ffc83093"
+  },
+  "baseline": {
+    "branch": "codex/runtime-commercial-comparison-attachment-v1",
+    "acceptedCommit": "19140769e6d1bb81adb53c2413896295cced48c5",
+    "acceptedParent": "902ce92c30fcab175b1abc86225f1794205e2b41"
+  },
+  "implementationBranch": "codex/merchant-commercial-finding-permission-projection-v1",
+  "architecture": {
+    "downstreamOfInternalComparison": true,
+    "attachedToInternalAnalystReport": true,
+    "shadowOfflineOnly": true,
+    "realCustomerRoutingAdded": false,
+    "independentPermissions": [
+      "finding_validity",
+      "comparison_validity",
+      "merchant_visibility",
+      "merchant_action"
+    ],
+    "internalReviewSignalTrustedForAction": false,
+    "supportedRuntimeComponentClasses": [
+      "provider-controlled per-authorization",
+      "provider-controlled gateway transaction",
+      "provider-controlled batch when exactly reconstructed"
+    ],
+    "directEvaluatorClasses": [
+      "variable",
+      "fixed_monthly",
+      "episodic"
+    ],
+    "intentionallyFailClosedRuntimeClasses": [
+      "percentage without exact denominator/population bridge",
+      "fixed monthly without exact cadence/service bridge",
+      "episodic without matching event support",
+      "network/pass-through",
+      "shared/bundled",
+      "unresolved controller",
+      "upper-bound-only action"
+    ],
+    "blockerProjectionRule": "Preserve every refusal internally. Project at most one comparison-unavailable record per distinct merchant-verifiable unlocker class; suppress equivalent records. Period-only and generic evidence-maintenance refusals use only the report-level limitation.",
+    "merchantVerifiableUnlockerClasses": [
+      "exact billing population",
+      "payment-channel population split",
+      "service use or identity",
+      "exact billing basis",
+      "merchant-specific approval or quote",
+      "exact component amount"
+    ]
+  },
+  "materialityBoundaryVerification": {
+    "focusedTestFile": "test/canonical/merchantCommercialFindingPermissionProjectionV1.test.ts",
+    "variable": [
+      "$9.99 hidden",
+      "$10 explain",
+      "$39.99 explain",
+      "$40 requires 6%",
+      "5.99% explain",
+      "6% review when $40 also passes"
+    ],
+    "fixedMonthly": [
+      "$10 hidden",
+      "$10.01 explain",
+      "$29.99 explain",
+      "$30 requires 2%",
+      "1.99% explain",
+      "2% review when $30 also passes"
+    ],
+    "episodic": [
+      "14 events explain",
+      "15 events still requires 10%",
+      "9.99% explain",
+      "10% review when 15 events also pass"
+    ]
+  },
+  "governedPolicyVerification": {
+    "helcim": [
+      "publicly prohibited",
+      "restricted/review required",
+      "no known public block",
+      "unknown"
+    ],
+    "dharmaHighVolume": [
+      "publicly prohibited",
+      "restricted/review required",
+      "no known public block",
+      "unknown"
+    ],
+    "merchantSpecificApprovalPreservedSeparately": true
+  },
+  "goldCorpus": {
+    "statements": 11,
+    "canonicalFingerprintInvariant": true,
+    "sourceFingerprintBefore": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "sourceFingerprintAfter": "a204de0fa0bf4cedfb852ff32327b22f43d5b38c7f6eeb8bea4a26bf417bf456",
+    "sourceFingerprintInvariant": true,
+    "totals": {
+      "decisions": 54,
+      "merchantVisibleShadowRecords": 0,
+      "reviewCurrentPricingActions": 0
+    },
+    "beforeAfterVisibility": {
+      "beforeCorrectionMerchantVisibleRecords": 54,
+      "afterCorrectionMerchantVisibleRecords": 0,
+      "internalDecisionsAfterCorrection": 54
+    },
+    "representativeHistoricalSuppression": {
+      "statement": "Nov_2024_Statement.pdf",
+      "candidateId": "runtime:doc_725263a9ef928ce4:feerow_e84ad0381fe7bdfe112a7701:component_dharma_retail_vmd_auth_v1",
+      "internalDecisionPreserved": true,
+      "merchantProjection": "report_limitation_only"
+    },
+    "results": [
+      {
+        "file": "Nov_2024_Statement.pdf",
+        "statementPeriod": {
+          "start": "2024-11-01",
+          "end": "2024-11-30"
+        },
+        "canonicalFingerprintBefore": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+        "canonicalFingerprintAfter": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+        "canonicalFingerprintInvariant": true,
+        "shadow": {
+          "mode": "shadow_offline",
+          "realCustomerRoutingAllowed": false,
+          "decisionCount": 18,
+          "visibleCount": 0,
+          "actionCount": 0,
+          "comparisonValidity": {
+            "unavailable": 18
+          },
+          "visibilityModes": {
+            "hidden": 18
+          },
+          "actionTypes": {
+            "NONE": 18
+          },
+          "allInternalSignalsIgnored": true,
+          "reportLimitation": "Public-price comparison was limited for this statement. Where RateReveal could not make a reliable comparison, that does not mean the pricing is good or bad.",
+          "prohibitedPermissionsEnabled": []
+        }
+      },
+      {
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "statementPeriod": {
+          "start": "2024-10-01",
+          "end": "2024-10-31"
+        },
+        "canonicalFingerprintBefore": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
+        "canonicalFingerprintAfter": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
+        "canonicalFingerprintInvariant": true,
+        "shadow": {
+          "mode": "shadow_offline",
+          "realCustomerRoutingAllowed": false,
+          "decisionCount": 18,
+          "visibleCount": 0,
+          "actionCount": 0,
+          "comparisonValidity": {
+            "unavailable": 18
+          },
+          "visibilityModes": {
+            "hidden": 18
+          },
+          "actionTypes": {
+            "NONE": 18
+          },
+          "allInternalSignalsIgnored": true,
+          "reportLimitation": "Public-price comparison was limited for this statement. Where RateReveal could not make a reliable comparison, that does not mean the pricing is good or bad.",
+          "prohibitedPermissionsEnabled": []
+        }
+      },
+      {
+        "file": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+        "statementPeriod": {
+          "start": "2024-06-01",
+          "end": "2024-06-30"
+        },
+        "canonicalFingerprintBefore": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+        "canonicalFingerprintAfter": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+        "canonicalFingerprintInvariant": true,
+        "shadow": {
+          "mode": "shadow_offline",
+          "realCustomerRoutingAllowed": false,
+          "decisionCount": 0,
+          "visibleCount": 0,
+          "actionCount": 0,
+          "comparisonValidity": {},
+          "visibilityModes": {},
+          "actionTypes": {},
+          "allInternalSignalsIgnored": true,
+          "reportLimitation": null,
+          "prohibitedPermissionsEnabled": []
+        }
+      },
+      {
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "statementPeriod": {
+          "start": "2025-08-01",
+          "end": "2025-08-31"
+        },
+        "canonicalFingerprintBefore": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
+        "canonicalFingerprintAfter": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
+        "canonicalFingerprintInvariant": true,
+        "shadow": {
+          "mode": "shadow_offline",
+          "realCustomerRoutingAllowed": false,
+          "decisionCount": 0,
+          "visibleCount": 0,
+          "actionCount": 0,
+          "comparisonValidity": {},
+          "visibilityModes": {},
+          "actionTypes": {},
+          "allInternalSignalsIgnored": true,
+          "reportLimitation": null,
+          "prohibitedPermissionsEnabled": []
+        }
+      },
+      {
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "statementPeriod": {
+          "start": "2020-03-01",
+          "end": "2020-03-31"
+        },
+        "canonicalFingerprintBefore": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
+        "canonicalFingerprintAfter": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
+        "canonicalFingerprintInvariant": true,
+        "shadow": {
+          "mode": "shadow_offline",
+          "realCustomerRoutingAllowed": false,
+          "decisionCount": 0,
+          "visibleCount": 0,
+          "actionCount": 0,
+          "comparisonValidity": {},
+          "visibilityModes": {},
+          "actionTypes": {},
+          "allInternalSignalsIgnored": true,
+          "reportLimitation": null,
+          "prohibitedPermissionsEnabled": []
+        }
+      },
+      {
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "statementPeriod": {
+          "start": "2022-09-01",
+          "end": "2022-09-30"
+        },
+        "canonicalFingerprintBefore": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
+        "canonicalFingerprintAfter": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
+        "canonicalFingerprintInvariant": true,
+        "shadow": {
+          "mode": "shadow_offline",
+          "realCustomerRoutingAllowed": false,
+          "decisionCount": 0,
+          "visibleCount": 0,
+          "actionCount": 0,
+          "comparisonValidity": {},
+          "visibilityModes": {},
+          "actionTypes": {},
+          "allInternalSignalsIgnored": true,
+          "reportLimitation": null,
+          "prohibitedPermissionsEnabled": []
+        }
+      },
+      {
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "statementPeriod": {
+          "start": "2024-02-01",
+          "end": "2024-02-29"
+        },
+        "canonicalFingerprintBefore": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
+        "canonicalFingerprintAfter": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
+        "canonicalFingerprintInvariant": true,
+        "shadow": {
+          "mode": "shadow_offline",
+          "realCustomerRoutingAllowed": false,
+          "decisionCount": 0,
+          "visibleCount": 0,
+          "actionCount": 0,
+          "comparisonValidity": {},
+          "visibilityModes": {},
+          "actionTypes": {},
+          "allInternalSignalsIgnored": true,
+          "reportLimitation": null,
+          "prohibitedPermissionsEnabled": []
+        }
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "statementPeriod": {
+          "start": "2025-10-01",
+          "end": "2025-10-31"
+        },
+        "canonicalFingerprintBefore": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+        "canonicalFingerprintAfter": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+        "canonicalFingerprintInvariant": true,
+        "shadow": {
+          "mode": "shadow_offline",
+          "realCustomerRoutingAllowed": false,
+          "decisionCount": 0,
+          "visibleCount": 0,
+          "actionCount": 0,
+          "comparisonValidity": {},
+          "visibilityModes": {},
+          "actionTypes": {},
+          "allInternalSignalsIgnored": true,
+          "reportLimitation": null,
+          "prohibitedPermissionsEnabled": []
+        }
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
+        "statementPeriod": {
+          "start": "2025-09-01",
+          "end": "2025-09-30"
+        },
+        "canonicalFingerprintBefore": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
+        "canonicalFingerprintAfter": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
+        "canonicalFingerprintInvariant": true,
+        "shadow": {
+          "mode": "shadow_offline",
+          "realCustomerRoutingAllowed": false,
+          "decisionCount": 0,
+          "visibleCount": 0,
+          "actionCount": 0,
+          "comparisonValidity": {},
+          "visibilityModes": {},
+          "actionTypes": {},
+          "allInternalSignalsIgnored": true,
+          "reportLimitation": null,
+          "prohibitedPermissionsEnabled": []
+        }
+      },
+      {
+        "file": "fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf",
+        "statementPeriod": {
+          "start": "2024-12-01",
+          "end": "2024-12-31"
+        },
+        "canonicalFingerprintBefore": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
+        "canonicalFingerprintAfter": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
+        "canonicalFingerprintInvariant": true,
+        "shadow": {
+          "mode": "shadow_offline",
+          "realCustomerRoutingAllowed": false,
+          "decisionCount": 0,
+          "visibleCount": 0,
+          "actionCount": 0,
+          "comparisonValidity": {},
+          "visibilityModes": {},
+          "actionTypes": {},
+          "allInternalSignalsIgnored": true,
+          "reportLimitation": null,
+          "prohibitedPermissionsEnabled": []
+        }
+      },
+      {
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "statementPeriod": {
+          "start": "2024-09-01",
+          "end": "2024-09-30"
+        },
+        "canonicalFingerprintBefore": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
+        "canonicalFingerprintAfter": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
+        "canonicalFingerprintInvariant": true,
+        "shadow": {
+          "mode": "shadow_offline",
+          "realCustomerRoutingAllowed": false,
+          "decisionCount": 18,
+          "visibleCount": 0,
+          "actionCount": 0,
+          "comparisonValidity": {
+            "unavailable": 18
+          },
+          "visibilityModes": {
+            "hidden": 18
+          },
+          "actionTypes": {
+            "NONE": 18
+          },
+          "allInternalSignalsIgnored": true,
+          "reportLimitation": "Public-price comparison was limited for this statement. Where RateReveal could not make a reliable comparison, that does not mean the pricing is good or bad.",
+          "prohibitedPermissionsEnabled": []
+        }
+      }
+    ]
+  },
+  "representativeDistinctUsefulBlocker": {
+    "focusedControl": "merchant-specific approval or quote",
+    "result": "one merchant-safe comparison-unavailable record remains visible",
+    "action": "VERIFY",
+    "namedAlternative": false,
+    "comparisonArithmeticAdded": false
+  },
+  "safetyCounters": {
+    "canonicalFingerprintChanges": 0,
+    "commercialSourceFingerprintChanges": 0,
+    "realCustomerRoutingEnabled": 0,
+    "prohibitedProjectionPermissionsEnabled": 0,
+    "internalSignalIgnoreFailures": 0,
+    "historicalComparisonLeakDetected": 0,
+    "webOrAiOperations": 0,
+    "newCommercialKnowledgeAdmissions": 0,
+    "gradesMarketSavingsAnnualizationSwitchingOrRankingOutputs": 0
+  },
+  "verification": {
+    "focusedPermissionProjection": "60/60 passed",
+    "relevantCommercialGovernanceAndAnalyst": "124/124 passed across 8 focused files",
+    "historicalCurrentKnownRegression": "5/6 passed; the accepted pre-existing assertion expected zero governed conflicts and observed four",
+    "typecheckAndBuild": "passed",
+    "legacyExhaustiveSigsegvHistory": "not rerun or investigated"
+  },
+  "knownUnrelatedIssuesNotRepaired": [
+    "Historical/current regression remains 5/6 because the pre-existing assertion expects zero governed conflicts but observes four.",
+    "Prior legacy public-source/exhaustive SIGSEGV/139 history was not investigated or repaired."
+  ]
+}

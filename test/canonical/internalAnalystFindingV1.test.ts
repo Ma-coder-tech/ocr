@@ -47,6 +47,11 @@ describe("Internal Analyst Finding v1", () => {
       mode: "internal_analyst_only",
       customerFacingAuthority: "none",
       canonicalFinancialTruth: { unchanged: true, mutationAllowed: false },
+      merchantCommercialFindingShadowProjection: {
+        mode: "shadow_offline",
+        realCustomerRoutingAllowed: false,
+        permissions: { customerReportRoutingAllowed: false, canonicalMutationAllowed: false, sourceMutationAllowed: false },
+      },
       knowledgeAuthority: {
         legacyFeeCatalog: "retrieval_only_not_governing",
         feeKnowledgeResearchSystem: "research_transport_not_governing",

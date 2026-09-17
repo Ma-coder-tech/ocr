@@ -1,0 +1,839 @@
+{
+  "schemaVersion": "helcim_dharma_immutable_capture_remediation_evaluation_2026_09_10_v1",
+  "generatedAt": "2026-09-10T00:00:00.000Z",
+  "productAuthority": {
+    "document": "RateReveal_Helcim_Dharma_Immutable_Capture_Remediation_Product_Authority_v1.md",
+    "sha256": "fdce0458e370b0ac9c532e5abd187c1470801e22fec8292036ca00de85eb3658",
+    "section": "all",
+    "verifiedSha256": true
+  },
+  "repositoryBaseline": {
+    "branch": "codex/commercial-source-immutable-capture-baseline-v1",
+    "commit": "ad33214ab99253c1fe5bfa151e1c6e7e99d8c642",
+    "parent": "3434443959f8fb9a7af98377383e93a88a92bbad"
+  },
+  "implementationBranch": "codex/commercial-source-capture-remediation-helcim-dharma-v1",
+  "scope": {
+    "exactTwelveUrlsOnly": true,
+    "generalSearchUsed": false,
+    "alternativeSourcesUsed": false,
+    "credentialsUsed": false,
+    "antiBotBypassUsed": false,
+    "semanticAdmissionPerformed": false,
+    "comparatorConsumptionPerformed": false,
+    "marketJudgmentGenerated": false,
+    "customerFacingOutputGenerated": false
+  },
+  "totals": {
+    "authorizedUrlsAttempted": 12,
+    "rawCaptures": 0,
+    "renderedPageCaptures": 5,
+    "pdfCaptures": 5,
+    "otherImmutableCaptures": 0,
+    "partialCaptures": 0,
+    "unavailableAfterRemediation": 7,
+    "matchesToAdmittedObservation": 5,
+    "materialConflicts": 0,
+    "unadjudicatedAdditionalContentSources": 3,
+    "newF1Corrections": 5
+  },
+  "captures": [
+    {
+      "captureId": "h1_helcim_fee_disclosures",
+      "provider": "helcim",
+      "requestedUrl": "https://legal.helcim.com/us/fee-disclosures/",
+      "finalUrl": "https://legal.helcim.com/us/fee-disclosures/",
+      "sourceObservationId": "obs_helcim_h1_fee_disclosures_v1",
+      "method": "browser_rendered_print_to_pdf",
+      "httpStatus": 403,
+      "pageTitle": "Attention Required! | Cloudflare",
+      "remediationState": "immutable_capture_unavailable_after_remediation",
+      "comparisonState": "immutable_capture_unavailable_after_remediation",
+      "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/failure-artifacts/h1_helcim_fee_disclosures.rendered.pdf",
+      "artifactSha256": "2d37ac4fbe8ca057b3eef94d4c75943f766e9c58bc912475a55234109539b1f7",
+      "artifactRole": "remediation_failure_evidence_not_F1",
+      "matchedAnchors": [],
+      "missingAnchors": [
+        "$1,000,001",
+        "April 1, 2026",
+        "Interchange Plus"
+      ],
+      "attemptHistory": [
+        {
+          "method": "original_http_response_body",
+          "result": "capture_unavailable",
+          "attemptedAtUtc": "2026-09-10T19:49:40.272Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-captures/v1/artifacts/h1_helcim_fee_disclosures.html",
+          "artifactSha256": "1395d1116a18a36291e6fc7b563be2fdc9777979bec72e13e71f50b2164cb442",
+          "artifactRole": "failure_evidence_not_F1"
+        },
+        {
+          "method": "codex_in_app_browser_rendered_page_validation",
+          "result": "rendered_blocked_cloudflare",
+          "attemptedAtUtc": "2026-09-10T19:57:11.000Z",
+          "status": null,
+          "artifactPath": null,
+          "artifactSha256": null,
+          "artifactRole": "no_artifact"
+        },
+        {
+          "method": "browser_rendered_print_to_pdf",
+          "result": "immutable_capture_unavailable_after_remediation",
+          "attemptedAtUtc": "2026-09-10T21:05:39.818Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/failure-artifacts/h1_helcim_fee_disclosures.rendered.pdf",
+          "artifactSha256": "2d37ac4fbe8ca057b3eef94d4c75943f766e9c58bc912475a55234109539b1f7",
+          "artifactRole": "failure_evidence_not_F1"
+        }
+      ],
+      "unadjudicatedSourceContent": []
+    },
+    {
+      "captureId": "h2_helcim_public_pricing",
+      "provider": "helcim",
+      "requestedUrl": "https://www.helcim.com/pricing/",
+      "finalUrl": "https://www.helcim.com/pricing/",
+      "sourceObservationId": "obs_helcim_h2_public_pricing_v1",
+      "method": "browser_rendered_print_to_pdf",
+      "httpStatus": 403,
+      "pageTitle": "Attention Required! | Cloudflare",
+      "remediationState": "immutable_capture_unavailable_after_remediation",
+      "comparisonState": "immutable_capture_unavailable_after_remediation",
+      "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/failure-artifacts/h2_helcim_public_pricing.rendered.pdf",
+      "artifactSha256": "054fd6982b08093889f0d2fa74153de62f872d27100e1f7b0b0e2110ef60cb6a",
+      "artifactRole": "remediation_failure_evidence_not_F1",
+      "matchedAnchors": [],
+      "missingAnchors": [
+        "$1M",
+        "$5M",
+        "custom"
+      ],
+      "attemptHistory": [
+        {
+          "method": "original_http_response_body",
+          "result": "capture_unavailable",
+          "attemptedAtUtc": "2026-09-10T19:49:40.617Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-captures/v1/artifacts/h2_helcim_public_pricing.html",
+          "artifactSha256": "1c5bf3f16eb49a82c0473e0146c853c8105636ba12de1cd371180248cdba4fb3",
+          "artifactRole": "failure_evidence_not_F1"
+        },
+        {
+          "method": "codex_in_app_browser_rendered_page_validation",
+          "result": "rendered_blocked_cloudflare",
+          "attemptedAtUtc": "2026-09-10T19:57:11.000Z",
+          "status": null,
+          "artifactPath": null,
+          "artifactSha256": null,
+          "artifactRole": "no_artifact"
+        },
+        {
+          "method": "browser_rendered_print_to_pdf",
+          "result": "immutable_capture_unavailable_after_remediation",
+          "attemptedAtUtc": "2026-09-10T21:05:44.102Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/failure-artifacts/h2_helcim_public_pricing.rendered.pdf",
+          "artifactSha256": "054fd6982b08093889f0d2fa74153de62f872d27100e1f7b0b0e2110ef60cb6a",
+          "artifactRole": "failure_evidence_not_F1"
+        }
+      ],
+      "unadjudicatedSourceContent": []
+    },
+    {
+      "captureId": "h3_helcim_acceptable_use",
+      "provider": "helcim",
+      "requestedUrl": "https://legal.helcim.com/us/acceptable-use-policy/",
+      "finalUrl": "https://legal.helcim.com/us/acceptable-use-policy/",
+      "sourceObservationId": "obs_helcim_h3_acceptable_use_v1",
+      "method": "browser_rendered_print_to_pdf",
+      "httpStatus": 403,
+      "pageTitle": "Attention Required! | Cloudflare",
+      "remediationState": "immutable_capture_unavailable_after_remediation",
+      "comparisonState": "immutable_capture_unavailable_after_remediation",
+      "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/failure-artifacts/h3_helcim_acceptable_use.rendered.pdf",
+      "artifactSha256": "30b9e1ebe6230e61b30a5d36cdc610c9fe7ef0d203bd05aef0da852961d1e95e",
+      "artifactRole": "remediation_failure_evidence_not_F1",
+      "matchedAnchors": [],
+      "missingAnchors": [
+        "Prohibited",
+        "Restricted",
+        "August 15, 2025"
+      ],
+      "attemptHistory": [
+        {
+          "method": "original_http_response_body",
+          "result": "capture_unavailable",
+          "attemptedAtUtc": "2026-09-10T19:49:41.784Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-captures/v1/artifacts/h3_helcim_acceptable_use.html",
+          "artifactSha256": "3fce186cf12a12b4eea01a36c5e44d4a841655c44a96ccf7783576511a35c6e8",
+          "artifactRole": "failure_evidence_not_F1"
+        },
+        {
+          "method": "codex_in_app_browser_rendered_page_validation",
+          "result": "rendered_blocked_cloudflare",
+          "attemptedAtUtc": "2026-09-10T19:57:11.000Z",
+          "status": null,
+          "artifactPath": null,
+          "artifactSha256": null,
+          "artifactRole": "no_artifact"
+        },
+        {
+          "method": "browser_rendered_print_to_pdf",
+          "result": "immutable_capture_unavailable_after_remediation",
+          "attemptedAtUtc": "2026-09-10T21:05:48.496Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/failure-artifacts/h3_helcim_acceptable_use.rendered.pdf",
+          "artifactSha256": "30b9e1ebe6230e61b30a5d36cdc610c9fe7ef0d203bd05aef0da852961d1e95e",
+          "artifactRole": "failure_evidence_not_F1"
+        }
+      ],
+      "unadjudicatedSourceContent": []
+    },
+    {
+      "captureId": "h4_helcim_terms",
+      "provider": "helcim",
+      "requestedUrl": "https://legal.helcim.com/us/terms-of-service/",
+      "finalUrl": "https://legal.helcim.com/us/terms-of-service/",
+      "sourceObservationId": "obs_helcim_h4_terms_v1",
+      "method": "browser_rendered_print_to_pdf",
+      "httpStatus": 403,
+      "pageTitle": "Attention Required! | Cloudflare",
+      "remediationState": "immutable_capture_unavailable_after_remediation",
+      "comparisonState": "immutable_capture_unavailable_after_remediation",
+      "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/failure-artifacts/h4_helcim_terms.rendered.pdf",
+      "artifactSha256": "c5abe1e6123f8eb5f83e8f431244aad5e43ea86a5e956bdede6a8434d0fcc9d0",
+      "artifactRole": "remediation_failure_evidence_not_F1",
+      "matchedAnchors": [],
+      "missingAnchors": [
+        "application",
+        "reject"
+      ],
+      "attemptHistory": [
+        {
+          "method": "original_http_response_body",
+          "result": "capture_unavailable",
+          "attemptedAtUtc": "2026-09-10T19:49:41.870Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-captures/v1/artifacts/h4_helcim_terms.html",
+          "artifactSha256": "a6298bef5eb423b17a5c614ac2473e274b10849b49534b6a376e6d66f47e92a2",
+          "artifactRole": "failure_evidence_not_F1"
+        },
+        {
+          "method": "codex_in_app_browser_rendered_page_validation",
+          "result": "rendered_blocked_cloudflare",
+          "attemptedAtUtc": "2026-09-10T19:57:11.000Z",
+          "status": null,
+          "artifactPath": null,
+          "artifactSha256": null,
+          "artifactRole": "no_artifact"
+        },
+        {
+          "method": "browser_rendered_print_to_pdf",
+          "result": "immutable_capture_unavailable_after_remediation",
+          "attemptedAtUtc": "2026-09-10T21:05:51.959Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/failure-artifacts/h4_helcim_terms.rendered.pdf",
+          "artifactSha256": "c5abe1e6123f8eb5f83e8f431244aad5e43ea86a5e956bdede6a8434d0fcc9d0",
+          "artifactRole": "failure_evidence_not_F1"
+        }
+      ],
+      "unadjudicatedSourceContent": []
+    },
+    {
+      "captureId": "d1_dharma_retail",
+      "provider": "dharma_merchant_services",
+      "requestedUrl": "https://dharmamerchantservices.com/industries/retail-small-business/rates-fees/",
+      "finalUrl": "https://dharmamerchantservices.com/industries/retail-small-business/rates-fees/",
+      "sourceObservationId": "obs_dharma_d1_retail_v1",
+      "method": "browser_rendered_print_to_pdf",
+      "httpStatus": 200,
+      "pageTitle": "Great Retail Merchant Services Rates from Dharma",
+      "remediationState": "captured",
+      "comparisonState": "capture_matches_admitted_observation",
+      "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/artifacts/d1_dharma_retail.rendered.pdf",
+      "artifactSha256": "b89fb723c292b7daf4d8f9851318d010507170856d0065b07d5137e263402f45",
+      "artifactRole": "immutable_first_party_rendered_F1",
+      "matchedAnchors": [
+        "$20/month",
+        "0.15% + $0.08/authorization",
+        "0.25% + $0.08/authorization"
+      ],
+      "missingAnchors": [],
+      "attemptHistory": [
+        {
+          "method": "original_http_response_body",
+          "result": "capture_unavailable",
+          "attemptedAtUtc": "2026-09-10T19:49:41.955Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-captures/v1/artifacts/d1_dharma_retail.html",
+          "artifactSha256": "f261423d1da97890ff6bfccd31ff4ee0b74f69351cf75095fbe791cb16cbf5bd",
+          "artifactRole": "failure_evidence_not_F1"
+        },
+        {
+          "method": "codex_in_app_browser_rendered_page_validation",
+          "result": "rendered_content_verified_but_export_unavailable",
+          "attemptedAtUtc": "2026-09-10T19:57:11.000Z",
+          "status": null,
+          "artifactPath": null,
+          "artifactSha256": null,
+          "artifactRole": "no_artifact"
+        },
+        {
+          "method": "browser_rendered_print_to_pdf",
+          "result": "captured",
+          "attemptedAtUtc": "2026-09-10T21:05:55.389Z",
+          "status": 200,
+          "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/artifacts/d1_dharma_retail.rendered.pdf",
+          "artifactSha256": "b89fb723c292b7daf4d8f9851318d010507170856d0065b07d5137e263402f45",
+          "artifactRole": "immutable_first_party_F1"
+        }
+      ],
+      "unadjudicatedSourceContent": [
+        "Current rendered page includes illustrative card-specific interchange, assessment, and total-cost examples outside the already-admitted direct-plan component scope; preserved but not normalized or admitted."
+      ]
+    },
+    {
+      "captureId": "d2_dharma_virtual",
+      "provider": "dharma_merchant_services",
+      "requestedUrl": "https://dharmamerchantservices.com/industries/ecommerce-online/rates-fees/",
+      "finalUrl": "https://dharmamerchantservices.com/industries/ecommerce-online/rates-fees/",
+      "sourceObservationId": "obs_dharma_d2_virtual_v1",
+      "method": "browser_rendered_print_to_pdf",
+      "httpStatus": 200,
+      "pageTitle": "Ecommerce & Online | Fees & Rates | Dharma",
+      "remediationState": "captured",
+      "comparisonState": "capture_matches_admitted_observation",
+      "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/artifacts/d2_dharma_virtual.rendered.pdf",
+      "artifactSha256": "fa779be43b352be87e8907ea7283b77a3c818ba01a501c9f41572b93fc422249",
+      "artifactRole": "immutable_first_party_rendered_F1",
+      "matchedAnchors": [
+        "$20/month",
+        "0.20% + $0.11/authorization",
+        "0.30% + $0.11/authorization"
+      ],
+      "missingAnchors": [],
+      "attemptHistory": [
+        {
+          "method": "original_http_response_body",
+          "result": "capture_unavailable",
+          "attemptedAtUtc": "2026-09-10T19:49:42.748Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-captures/v1/artifacts/d2_dharma_virtual.html",
+          "artifactSha256": "f261423d1da97890ff6bfccd31ff4ee0b74f69351cf75095fbe791cb16cbf5bd",
+          "artifactRole": "failure_evidence_not_F1"
+        },
+        {
+          "method": "codex_in_app_browser_rendered_page_validation",
+          "result": "rendered_access_limited",
+          "attemptedAtUtc": "2026-09-10T19:57:11.000Z",
+          "status": null,
+          "artifactPath": null,
+          "artifactSha256": null,
+          "artifactRole": "no_artifact"
+        },
+        {
+          "method": "browser_rendered_print_to_pdf",
+          "result": "captured",
+          "attemptedAtUtc": "2026-09-10T21:06:00.981Z",
+          "status": 200,
+          "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/artifacts/d2_dharma_virtual.rendered.pdf",
+          "artifactSha256": "fa779be43b352be87e8907ea7283b77a3c818ba01a501c9f41572b93fc422249",
+          "artifactRole": "immutable_first_party_F1"
+        }
+      ],
+      "unadjudicatedSourceContent": [
+        "Current rendered page includes illustrative card-specific cost examples and broader promotional content outside the already-admitted Virtual/Online component scope; preserved but not normalized or admitted."
+      ]
+    },
+    {
+      "captureId": "d3_dharma_high_volume",
+      "provider": "dharma_merchant_services",
+      "requestedUrl": "https://dharmamerchantservices.com/pricing/high-volume-pricing/",
+      "finalUrl": "https://dharmamerchantservices.com/pricing/high-volume-pricing/",
+      "sourceObservationId": "obs_dharma_d3_high_volume_v1",
+      "method": "browser_rendered_print_to_pdf",
+      "httpStatus": 200,
+      "pageTitle": "High Volume Credit Card Processing | Low IC+ Rates | Dharma",
+      "remediationState": "captured",
+      "comparisonState": "capture_matches_admitted_observation",
+      "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/artifacts/d3_dharma_high_volume.rendered.pdf",
+      "artifactSha256": "03d81c88ef0c5d44d1fd2dca442f88eb5b473a9d27e38a3f7e53f91709de8db1",
+      "artifactRole": "immutable_first_party_rendered_F1",
+      "matchedAnchors": [
+        "$15/month",
+        "0.10%",
+        "0.20%",
+        "$0.08 / authorization",
+        "$0.11 / authorization"
+      ],
+      "missingAnchors": [],
+      "attemptHistory": [
+        {
+          "method": "original_http_response_body",
+          "result": "capture_unavailable",
+          "attemptedAtUtc": "2026-09-10T19:49:42.842Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-captures/v1/artifacts/d3_dharma_high_volume.html",
+          "artifactSha256": "f261423d1da97890ff6bfccd31ff4ee0b74f69351cf75095fbe791cb16cbf5bd",
+          "artifactRole": "failure_evidence_not_F1"
+        },
+        {
+          "method": "codex_in_app_browser_rendered_page_validation",
+          "result": "rendered_access_limited",
+          "attemptedAtUtc": "2026-09-10T19:57:11.000Z",
+          "status": null,
+          "artifactPath": null,
+          "artifactSha256": null,
+          "artifactRole": "no_artifact"
+        },
+        {
+          "method": "browser_rendered_print_to_pdf",
+          "result": "captured",
+          "attemptedAtUtc": "2026-09-10T21:06:07.042Z",
+          "status": 200,
+          "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/artifacts/d3_dharma_high_volume.rendered.pdf",
+          "artifactSha256": "03d81c88ef0c5d44d1fd2dca442f88eb5b473a9d27e38a3f7e53f91709de8db1",
+          "artifactRole": "immutable_first_party_F1"
+        }
+      ],
+      "unadjudicatedSourceContent": []
+    },
+    {
+      "captureId": "d4_dharma_supported_businesses",
+      "provider": "dharma_merchant_services",
+      "requestedUrl": "https://dharmamerchantservices.com/faq/supported-businesses/",
+      "finalUrl": "https://dharmamerchantservices.com/faq/supported-businesses/",
+      "sourceObservationId": "obs_dharma_d4_supported_businesses_v1",
+      "method": "browser_rendered_print_to_pdf",
+      "httpStatus": 503,
+      "pageTitle": "Your access to this site has been limited",
+      "remediationState": "immutable_capture_unavailable_after_remediation",
+      "comparisonState": "immutable_capture_unavailable_after_remediation",
+      "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/failure-artifacts/d4_dharma_supported_businesses.rendered.pdf",
+      "artifactSha256": "5a395d7d0e73686a8e645333e477d27b0a4fe8e96ad69f60138ca899f3383884",
+      "artifactRole": "remediation_failure_evidence_not_F1",
+      "matchedAnchors": [],
+      "missingAnchors": [
+        "high-risk",
+        "refer"
+      ],
+      "attemptHistory": [
+        {
+          "method": "original_http_response_body",
+          "result": "capture_unavailable",
+          "attemptedAtUtc": "2026-09-10T19:49:42.937Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-captures/v1/artifacts/d4_dharma_supported_businesses.html",
+          "artifactSha256": "f261423d1da97890ff6bfccd31ff4ee0b74f69351cf75095fbe791cb16cbf5bd",
+          "artifactRole": "failure_evidence_not_F1"
+        },
+        {
+          "method": "codex_in_app_browser_rendered_page_validation",
+          "result": "rendered_access_limited",
+          "attemptedAtUtc": "2026-09-10T19:57:11.000Z",
+          "status": null,
+          "artifactPath": null,
+          "artifactSha256": null,
+          "artifactRole": "no_artifact"
+        },
+        {
+          "method": "browser_rendered_print_to_pdf",
+          "result": "immutable_capture_unavailable_after_remediation",
+          "attemptedAtUtc": "2026-09-10T21:06:11.824Z",
+          "status": 503,
+          "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/failure-artifacts/d4_dharma_supported_businesses.rendered.pdf",
+          "artifactSha256": "5a395d7d0e73686a8e645333e477d27b0a4fe8e96ad69f60138ca899f3383884",
+          "artifactRole": "failure_evidence_not_F1"
+        }
+      ],
+      "unadjudicatedSourceContent": []
+    },
+    {
+      "captureId": "d5_dharma_closure",
+      "provider": "dharma_merchant_services",
+      "requestedUrl": "https://dharmamerchantservices.com/faq/is-there-a-closure-fee/",
+      "finalUrl": "https://dharmamerchantservices.com/faq/is-there-a-closure-fee/",
+      "sourceObservationId": "obs_dharma_d5_closure_v1",
+      "method": "browser_rendered_print_to_pdf",
+      "httpStatus": 503,
+      "pageTitle": "Your access to this site has been limited",
+      "remediationState": "immutable_capture_unavailable_after_remediation",
+      "comparisonState": "immutable_capture_unavailable_after_remediation",
+      "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/failure-artifacts/d5_dharma_closure.rendered.pdf",
+      "artifactSha256": "d05bc83b9561c9834addaa5f920c38aece20fd2e8f9ecaa04d0e1363125faebc",
+      "artifactRole": "remediation_failure_evidence_not_F1",
+      "matchedAnchors": [],
+      "missingAnchors": [
+        "$49",
+        "closure",
+        "early termination"
+      ],
+      "attemptHistory": [
+        {
+          "method": "original_http_response_body",
+          "result": "capture_unavailable",
+          "attemptedAtUtc": "2026-09-10T19:49:43.028Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-captures/v1/artifacts/d5_dharma_closure.html",
+          "artifactSha256": "f261423d1da97890ff6bfccd31ff4ee0b74f69351cf75095fbe791cb16cbf5bd",
+          "artifactRole": "failure_evidence_not_F1"
+        },
+        {
+          "method": "codex_in_app_browser_rendered_page_validation",
+          "result": "rendered_access_limited",
+          "attemptedAtUtc": "2026-09-10T19:57:11.000Z",
+          "status": null,
+          "artifactPath": null,
+          "artifactSha256": null,
+          "artifactRole": "no_artifact"
+        },
+        {
+          "method": "browser_rendered_print_to_pdf",
+          "result": "immutable_capture_unavailable_after_remediation",
+          "attemptedAtUtc": "2026-09-10T21:06:15.707Z",
+          "status": 503,
+          "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/failure-artifacts/d5_dharma_closure.rendered.pdf",
+          "artifactSha256": "d05bc83b9561c9834addaa5f920c38aece20fd2e8f9ecaa04d0e1363125faebc",
+          "artifactRole": "failure_evidence_not_F1"
+        }
+      ],
+      "unadjudicatedSourceContent": []
+    },
+    {
+      "captureId": "d6_dharma_pci",
+      "provider": "dharma_merchant_services",
+      "requestedUrl": "https://dharmamerchantservices.com/resources/pci-compliance/",
+      "finalUrl": "https://dharmamerchantservices.com/resources/pci-compliance/",
+      "sourceObservationId": "obs_dharma_d6_pci_v1",
+      "method": "browser_rendered_print_to_pdf",
+      "httpStatus": 200,
+      "pageTitle": "PCI Compliance | Dharma",
+      "remediationState": "captured",
+      "comparisonState": "capture_matches_admitted_observation",
+      "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/artifacts/d6_dharma_pci.rendered.pdf",
+      "artifactSha256": "a14490291761c6790ede20141ca780b458f06826e9d9134bcf4b941b5ea107f7",
+      "artifactRole": "immutable_first_party_rendered_F1",
+      "matchedAnchors": [
+        "$39.95",
+        "non-compliance",
+        "PCI"
+      ],
+      "missingAnchors": [],
+      "attemptHistory": [
+        {
+          "method": "original_http_response_body",
+          "result": "capture_unavailable",
+          "attemptedAtUtc": "2026-09-10T19:49:43.118Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-captures/v1/artifacts/d6_dharma_pci.html",
+          "artifactSha256": "f261423d1da97890ff6bfccd31ff4ee0b74f69351cf75095fbe791cb16cbf5bd",
+          "artifactRole": "failure_evidence_not_F1"
+        },
+        {
+          "method": "codex_in_app_browser_rendered_page_validation",
+          "result": "rendered_content_verified_but_export_unavailable",
+          "attemptedAtUtc": "2026-09-10T19:57:11.000Z",
+          "status": null,
+          "artifactPath": null,
+          "artifactSha256": null,
+          "artifactRole": "no_artifact"
+        },
+        {
+          "method": "browser_rendered_print_to_pdf",
+          "result": "captured",
+          "attemptedAtUtc": "2026-09-10T21:06:19.507Z",
+          "status": 200,
+          "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/artifacts/d6_dharma_pci.rendered.pdf",
+          "artifactSha256": "a14490291761c6790ede20141ca780b458f06826e9d9134bcf4b941b5ea107f7",
+          "artifactRole": "immutable_first_party_F1"
+        }
+      ],
+      "unadjudicatedSourceContent": []
+    },
+    {
+      "captureId": "d7_dharma_calculator",
+      "provider": "dharma_merchant_services",
+      "requestedUrl": "https://dharmamerchantservices.com/calculate-costs/cut-the-fat/",
+      "finalUrl": "https://dharmamerchantservices.com/calculate-costs/cut-the-fat/",
+      "sourceObservationId": "obs_dharma_calculator_conflict_v1",
+      "method": "browser_rendered_print_to_pdf",
+      "httpStatus": 503,
+      "pageTitle": "Your access to this site has been limited",
+      "remediationState": "immutable_capture_unavailable_after_remediation",
+      "comparisonState": "immutable_capture_unavailable_after_remediation",
+      "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/failure-artifacts/d7_dharma_calculator.rendered.pdf",
+      "artifactSha256": "986f2ca757315abb8d15b235b5ea446465976ebdd020901fe6f04c814e70dfae",
+      "artifactRole": "remediation_failure_evidence_not_F1",
+      "matchedAnchors": [],
+      "missingAnchors": [
+        "$25",
+        "$20",
+        "$15"
+      ],
+      "attemptHistory": [
+        {
+          "method": "original_http_response_body",
+          "result": "capture_unavailable",
+          "attemptedAtUtc": "2026-09-10T19:49:43.212Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-captures/v1/artifacts/d7_dharma_calculator.html",
+          "artifactSha256": "f261423d1da97890ff6bfccd31ff4ee0b74f69351cf75095fbe791cb16cbf5bd",
+          "artifactRole": "failure_evidence_not_F1"
+        },
+        {
+          "method": "codex_in_app_browser_rendered_page_validation",
+          "result": "rendered_access_limited",
+          "attemptedAtUtc": "2026-09-10T19:57:11.000Z",
+          "status": null,
+          "artifactPath": null,
+          "artifactSha256": null,
+          "artifactRole": "no_artifact"
+        },
+        {
+          "method": "browser_rendered_print_to_pdf",
+          "result": "immutable_capture_unavailable_after_remediation",
+          "attemptedAtUtc": "2026-09-10T21:06:23.854Z",
+          "status": 503,
+          "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/failure-artifacts/d7_dharma_calculator.rendered.pdf",
+          "artifactSha256": "986f2ca757315abb8d15b235b5ea446465976ebdd020901fe6f04c814e70dfae",
+          "artifactRole": "failure_evidence_not_F1"
+        }
+      ],
+      "unadjudicatedSourceContent": []
+    },
+    {
+      "captureId": "d8_dharma_referral",
+      "provider": "dharma_merchant_services",
+      "requestedUrl": "https://dharmamerchantservices.com/getting-started/teghkhuman/",
+      "finalUrl": "https://dharmamerchantservices.com/getting-started/teghkhuman/",
+      "sourceObservationId": "obs_dharma_referral_isolation_v1",
+      "method": "browser_rendered_print_to_pdf",
+      "httpStatus": 200,
+      "pageTitle": "Tegh Khuman and Dharma Merchant Services",
+      "remediationState": "captured",
+      "comparisonState": "capture_matches_admitted_observation",
+      "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/artifacts/d8_dharma_referral.rendered.pdf",
+      "artifactSha256": "63a59250aac71a3fa69571ef6ba9e4759dbe24218aaa3166a00c1d060d890db2",
+      "artifactRole": "immutable_first_party_rendered_F1",
+      "matchedAnchors": [
+        "Tegh Khuman",
+        "$12",
+        "0.10%"
+      ],
+      "missingAnchors": [],
+      "attemptHistory": [
+        {
+          "method": "original_http_response_body",
+          "result": "capture_unavailable",
+          "attemptedAtUtc": "2026-09-10T19:49:43.306Z",
+          "status": 403,
+          "artifactPath": "evidence/commercial-source-captures/v1/artifacts/d8_dharma_referral.html",
+          "artifactSha256": "f261423d1da97890ff6bfccd31ff4ee0b74f69351cf75095fbe791cb16cbf5bd",
+          "artifactRole": "failure_evidence_not_F1"
+        },
+        {
+          "method": "codex_in_app_browser_rendered_page_validation",
+          "result": "rendered_access_limited",
+          "attemptedAtUtc": "2026-09-10T19:57:11.000Z",
+          "status": null,
+          "artifactPath": null,
+          "artifactSha256": null,
+          "artifactRole": "no_artifact"
+        },
+        {
+          "method": "browser_rendered_print_to_pdf",
+          "result": "captured",
+          "attemptedAtUtc": "2026-09-10T21:06:27.671Z",
+          "status": 200,
+          "artifactPath": "evidence/commercial-source-capture-remediation-helcim-dharma-v1/artifacts/d8_dharma_referral.rendered.pdf",
+          "artifactSha256": "63a59250aac71a3fa69571ef6ba9e4759dbe24218aaa3166a00c1d060d890db2",
+          "artifactRole": "immutable_first_party_F1"
+        }
+      ],
+      "unadjudicatedSourceContent": [
+        "Current rendered referral page includes additional referral-channel terms, terminal pricing, gateway pricing, rate components, and application language beyond the Product-admitted $12 channel-isolation control; preserved but not normalized or admitted."
+      ]
+    }
+  ],
+  "validation": {
+    "remediationValidationIssues": [],
+    "registryValidationIssues": []
+  },
+  "sourceAssessment": {
+    "capturedMatches": [
+      "d1_dharma_retail",
+      "d2_dharma_virtual",
+      "d3_dharma_high_volume",
+      "d6_dharma_pci",
+      "d8_dharma_referral"
+    ],
+    "unavailableAfterRemediation": [
+      "h1_helcim_fee_disclosures",
+      "h2_helcim_public_pricing",
+      "h3_helcim_acceptable_use",
+      "h4_helcim_terms",
+      "d4_dharma_supported_businesses",
+      "d5_dharma_closure",
+      "d7_dharma_calculator"
+    ],
+    "materialSemanticConflicts": [],
+    "candidateConflictRecordsCreated": [],
+    "drift": "No captured page materially conflicts with its admitted observation. D3 currently displays both 'less than $25' and '$25 or less', affirming rather than resolving the governed exact-$25 uncertainty.",
+    "unadjudicatedSourceContent": [
+      {
+        "captureId": "d1_dharma_retail",
+        "content": "Current rendered page includes illustrative card-specific interchange, assessment, and total-cost examples outside the already-admitted direct-plan component scope; preserved but not normalized or admitted."
+      },
+      {
+        "captureId": "d2_dharma_virtual",
+        "content": "Current rendered page includes illustrative card-specific cost examples and broader promotional content outside the already-admitted Virtual/Online component scope; preserved but not normalized or admitted."
+      },
+      {
+        "captureId": "d8_dharma_referral",
+        "content": "Current rendered referral page includes additional referral-channel terms, terminal pricing, gateway pricing, rate components, and application language beyond the Product-admitted $12 channel-isolation control; preserved but not normalized or admitted."
+      }
+    ]
+  },
+  "fingerprints": {
+    "f2Unchanged": true,
+    "f3Unchanged": true,
+    "semanticArraysUnchanged": true
+  },
+  "controls": {
+    "authorizeNetRegression": {
+      "validationIssues": [],
+      "historicalReplay": "unresolved_period"
+    },
+    "helcim": {
+      "h1WordingPreserved": true,
+      "h2CustomBoundaryPreserved": true,
+      "currentResolution": "resolved",
+      "historical2025Resolution": "unresolved_period"
+    },
+    "dharma": {
+      "directCurrentResolution": "resolved",
+      "historical2025Resolution": "unresolved_period",
+      "exact25Boundary": "UNRESOLVED_QUALIFICATION_BOUNDARY",
+      "qualificationOperator": "or",
+      "calculatorConflicts": 3,
+      "referralResolution": "unresolved_channel_or_identity"
+    }
+  },
+  "prohibitedOutcomeCounters": {
+    "immutableArtifactWithBytesButNoSha": 0,
+    "wrongObservationLinkage": 0,
+    "redirectSilentlyChangesSourceIdentity": 0,
+    "liveSourceChangeAutomaticallyMutatesF3": 0,
+    "sourceOnlyChangeCreatesFalsePriceVersion": 0,
+    "rawSourceHistoryDisappears": 0,
+    "captureTimestampBecomesEffectiveDate": 0,
+    "helcimH1OneMillionPlusLost": 0,
+    "helcimAbove5mPublicPriceExtrapolated": 0,
+    "helcimRestrictedTreatedAsRejected": 0,
+    "helcimNoKnownBlockTreatedAsApproval": 0,
+    "dharmaCalculatorOverwritesDirectPlans": 0,
+    "dharmaReferralLeaksToDirect": 0,
+    "dharmaExact25BoundarySilentlyResolved": 0,
+    "dharmaOrQualificationBecomesAnd": 0,
+    "closureFeeBecomesEtf": 0,
+    "pciComplianceZeroErasesNoncomplianceFee": 0,
+    "unknownBecomesZero": 0,
+    "capturedNewContentSelfAdmitsCommercialTruth": 0,
+    "comparatorClaimGenerated": 0,
+    "commercialGradeGenerated": 0,
+    "savingsGenerated": 0,
+    "customerFacingComparatorLanguageGenerated": 0,
+    "canonicalGoldFingerprintChanges": 0
+  },
+  "prohibitedOutcomeCounterTotal": 0,
+  "gold": {
+    "statements": [
+      {
+        "file": "Nov_2024_Statement.pdf",
+        "canonicalFingerprintBefore": "56b0ff62c801c9de9e97b1a70f573c746061b110abcf2716a110a427c02cd65f",
+        "canonicalFingerprintAfter": "56b0ff62c801c9de9e97b1a70f573c746061b110abcf2716a110a427c02cd65f",
+        "unchanged": true
+      },
+      {
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "canonicalFingerprintBefore": "7d2246e0d4bce4298646084b2e1a1c789f9b7391534a40f2953d05e921779b3f",
+        "canonicalFingerprintAfter": "7d2246e0d4bce4298646084b2e1a1c789f9b7391534a40f2953d05e921779b3f",
+        "unchanged": true
+      },
+      {
+        "file": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+        "canonicalFingerprintBefore": "18028f3e7ccb888ff71773dbef6a2e280b3720f761ce278ca91f1dccd78bfddb",
+        "canonicalFingerprintAfter": "18028f3e7ccb888ff71773dbef6a2e280b3720f761ce278ca91f1dccd78bfddb",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "canonicalFingerprintBefore": "7ee9653908e82c5d88d2eece32f52f4f3f498620b98db1e86b985a8e7f2db9db",
+        "canonicalFingerprintAfter": "7ee9653908e82c5d88d2eece32f52f4f3f498620b98db1e86b985a8e7f2db9db",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "canonicalFingerprintBefore": "ea3c34c4bdf01af64aeae37dc84b116deab41f4ebdd88d680728b7b205e70736",
+        "canonicalFingerprintAfter": "ea3c34c4bdf01af64aeae37dc84b116deab41f4ebdd88d680728b7b205e70736",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "canonicalFingerprintBefore": "5cb1fab8c96fc91651796b89b9c6226b6e54f9497989b8eef5ca746743c73cb3",
+        "canonicalFingerprintAfter": "5cb1fab8c96fc91651796b89b9c6226b6e54f9497989b8eef5ca746743c73cb3",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "canonicalFingerprintBefore": "c142d1a29145077b1497650ef2d8db96f9db9cc2570a857f742383b7966568b7",
+        "canonicalFingerprintAfter": "c142d1a29145077b1497650ef2d8db96f9db9cc2570a857f742383b7966568b7",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "canonicalFingerprintBefore": "793fc87b37d7d7274fbd5a17558cee2fe28add358dcdeda5fba8919f7e6ba883",
+        "canonicalFingerprintAfter": "793fc87b37d7d7274fbd5a17558cee2fe28add358dcdeda5fba8919f7e6ba883",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
+        "canonicalFingerprintBefore": "591fcbf80bc69da3a6d4ca5ff337900872dff676919cb1b26460101fd7f9a3be",
+        "canonicalFingerprintAfter": "591fcbf80bc69da3a6d4ca5ff337900872dff676919cb1b26460101fd7f9a3be",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf",
+        "canonicalFingerprintBefore": "088119a8cad2e5b0086d5d9cab4814e83bee91625226adbf1038a695085e8df4",
+        "canonicalFingerprintAfter": "088119a8cad2e5b0086d5d9cab4814e83bee91625226adbf1038a695085e8df4",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "canonicalFingerprintBefore": "e89c0f1a8f2c8b8330d2fa79f9fd98262f3da6296581fdf595eccb0dc51d45a3",
+        "canonicalFingerprintAfter": "e89c0f1a8f2c8b8330d2fa79f9fd98262f3da6296581fdf595eccb0dc51d45a3",
+        "unchanged": true
+      }
+    ],
+    "invariantCount": 11,
+    "fingerprintChanges": 0
+  },
+  "limitationStatus": {
+    "fullyClosed": false,
+    "formallyBounded": true,
+    "successfulImmutableSources": 5,
+    "explicitlyUnavailableSources": 7,
+    "explanation": "All 12 records now have either a valid first-party rendered PDF or a three-method audit trail ending in an immutable denial PDF. Product's acceptance boundary permits this formally bounded outcome."
+  },
+  "tests": {
+    "remediationFocused": "9/9 passed (included in combined targeted suite)",
+    "targetedGovernance": "63/63 passed across 7 files",
+    "typescriptBuild": "passed",
+    "knownHistoricalRegression": "5/6 passed; unchanged pre-existing assertion expects 0 governed conflicts and observes 4",
+    "legacyPublicSource": "10/10 assertions passed; prior SIGSEGV/139 did not reproduce on this run"
+  },
+  "architectureConflicts": [],
+  "recommendation": "Product may now accept the commercial-source capture foundation as formally bounded and authorize a diagnostic-only comparator-consumption/refusal mapping. Keep market judgments, grades, savings, switching, and customer-facing language out of that next step."
+}

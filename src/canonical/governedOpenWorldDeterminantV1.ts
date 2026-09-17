@@ -1,5 +1,6 @@
 import type { FeeSemanticsShadowRowResult } from "./feeSemanticsShadowStatementIntegration.js";
 import type { GovernedCurrent2026UsCoreNetworkResolution } from "./governedCurrent2026UsCoreNetworkReferenceV1.js";
+import type { GovernedCommercialClassificationAdjudicationResolutionV1 } from "./governedCommercialClassificationAdjudicationV1.js";
 import type { GovernedDatedNetworkFeeEvidenceResolution } from "./governedDatedNetworkFeeEvidenceV1.js";
 import type { GovernedPerItemResolution, GovernedPerItemUnit } from "./governedPerItemKnowledgeV1.js";
 import type { GovernedPricingLayerResolution } from "./governedPricingLayerKnowledgeV1.js";
@@ -261,6 +262,7 @@ export function resolveGovernedOpenWorldDeterminantV1(input: {
   datedNetworkFeeEvidence: GovernedDatedNetworkFeeEvidenceResolution;
   usNetworkFeeEvidence: GovernedUsNetworkFeeEvidenceResolution;
   current2026UsCoreNetworkReference: GovernedCurrent2026UsCoreNetworkResolution;
+  commercialClassificationAdjudication: GovernedCommercialClassificationAdjudicationResolutionV1;
 }): GovernedOpenWorldDeterminantResolution {
   const semanticById = new Map(input.semanticRows.map((row) => [row.feeRowId, row]));
   const materialDollarTotalMinor = input.analysis.feeLedger.rows
@@ -275,6 +277,7 @@ export function resolveGovernedOpenWorldDeterminantV1(input: {
     datedNetwork: input.datedNetworkFeeEvidence.rowsByFeeRowId[row.id]!,
     usNetwork: input.usNetworkFeeEvidence.rowsByFeeRowId[row.id]!,
     current: input.current2026UsCoreNetworkReference.rowsByFeeRowId[row.id]!,
+    commercialAdjudication: input.commercialClassificationAdjudication.rowsByFeeRowId[row.id]!,
     materialDollarTotalMinor,
   }));
   const materialRows = rows.filter((row) => row.d3Materiality.material);
@@ -316,14 +319,17 @@ type RowInput = {
   datedNetwork: GovernedDatedNetworkFeeEvidenceResolution["rowsByFeeRowId"][string];
   usNetwork: GovernedUsNetworkFeeEvidenceResolution["rowsByFeeRowId"][string];
   current: GovernedCurrent2026UsCoreNetworkResolution["rowsByFeeRowId"][string];
+  commercialAdjudication: GovernedCommercialClassificationAdjudicationResolutionV1["rowsByFeeRowId"][string];
   materialDollarTotalMinor: number;
 };
 
 function resolveRow(input: RowInput): OpenWorldFeeDeterminant {
   const label = input.row.selectedLabel.toUpperCase();
-  const evidenceRefs = [...new Set([...input.semantic.feeRowEvidenceRefs, ...input.pricing.evidenceRefs, ...input.perItem.evidenceRefs])];
+  const evidenceRefs = [...new Set([...input.semantic.feeRowEvidenceRefs, ...input.pricing.evidenceRefs, ...input.perItem.evidenceRefs, ...input.commercialAdjudication.evidenceRefs])];
   const nonFee = !input.row.contributesToUniqueTotal || ["section_subtotal", "fee_bucket_total", "statement_control_total", "informational_rate_row", "zero_dollar_reference_row", "duplicate_representation", "supporting_evidence_only"].includes(input.row.role);
-  const exactIdentity = input.usNetwork.identity.state === "supported"
+  const exactIdentity = input.commercialAdjudication.applicable
+    ? input.commercialAdjudication.exactIdentity
+    : input.usNetwork.identity.state === "supported"
     ? input.usNetwork.identity.value
     : input.pricing.exactFeeIdentity ?? (input.semantic.status === "resolved_exact_trusted" && input.perItem.exactIdentityDisposition !== "suppress_as_unresolved" ? input.semantic.semanticAxes?.identity.value ?? input.semantic.conceptId : null);
   const family = determineFamily(input, label, nonFee);
@@ -347,8 +353,8 @@ function resolveRow(input: RowInput): OpenWorldFeeDeterminant {
   const determinantSufficiency = d1Supported && d2Supported && d4Supported
     ? "DETERMINANT_SUFFICIENT"
     : [d1Supported, d2Supported, d4Supported].filter(Boolean).length >= 2 ? "PARTIAL" : "INSUFFICIENT";
-  const highPriorityResearch = input.usNetwork.research.priority === "high" || input.current.research.priority === "high";
-  const conflict = input.semantic.status === "unresolved_conflict" || input.usNetwork.sourceConflicts.length > 0 || input.current.reference.conflicts.length > 0;
+  const highPriorityResearch = !input.commercialAdjudication.applicable && (input.usNetwork.research.priority === "high" || input.current.research.priority === "high");
+  const conflict = !input.commercialAdjudication.applicable && (input.semantic.status === "unresolved_conflict" || input.usNetwork.sourceConflicts.length > 0 || input.current.reference.conflicts.length > 0);
   const exactIdentityNecessary = material && !exactIdentity && (
     action.actionClass === "N7" ||
     highPriorityResearch
@@ -356,6 +362,8 @@ function resolveRow(input: RowInput): OpenWorldFeeDeterminant {
   const reusable = material && determinantSufficiency !== "DETERMINANT_SUFFICIENT" && (input.semantic.candidateConceptIds.length > 0 || input.semantic.retrievalLeadConceptIds.length > 0);
   const research = !material
     ? { disposition: "STOP" as const, reasonCodes: ["below_materiality_floor"], question: null }
+    : input.commercialAdjudication.applicable && !input.commercialAdjudication.researchWarrantRequired
+      ? { disposition: "STOP" as const, reasonCodes: ["product_adjudicated_no_new_public_research_required"], question: null }
     : highPriorityResearch || conflict
       ? { disposition: "ESCALATE_BOUNDED_RESEARCH" as const, reasonCodes: compactStrings([highPriorityResearch ? "applicable_dated_value_or_scope_gap" : null, conflict ? "competing_interpretations" : null]), question: input.current.research.question ?? input.usNetwork.research.question ?? determinantQuestion(input, family, economicLayer.value, exactIdentity) }
       : determinantSufficiency === "DETERMINANT_SUFFICIENT"
@@ -410,13 +418,13 @@ function resolveRow(input: RowInput): OpenWorldFeeDeterminant {
     renderingPermissions: {
       exactIdentityAllowed: Boolean(exactIdentity),
       familyLanguageAllowed: family.value !== null,
-      acquiringSideLanguageAllowed: economicLayer.value === "acquiring_commercial" && family.confidence !== "UNRESOLVED",
-      networkOwnershipLanguageAllowed: economicLayer.value === "card_network" && (input.datedNetwork.applicable || input.usNetwork.applicable || input.pricing.broaderEconomicCategory === "network_program_cost"),
+      acquiringSideLanguageAllowed: economicLayer.value === "acquiring_commercial" && family.confidence !== "UNRESOLVED" && (!input.commercialAdjudication.applicable || input.commercialAdjudication.renderingPermissions.acquiringSideLanguageAllowed),
+      networkOwnershipLanguageAllowed: economicLayer.value === "card_network" && (input.commercialAdjudication.renderingPermissions.networkRelatedLanguageAllowed || input.datedNetwork.applicable || input.usNetwork.applicable || input.pricing.broaderEconomicCategory === "network_program_cost"),
       negotiationLanguageAllowed: ["N3", "N4"].includes(action.actionClass),
       contractComplianceLanguageAllowed: false,
       candidateAsFactAllowed: false,
     },
-    matchedRuleRefs: ["OWD-01", "OWD-02", "OWD-03", "OWD-04", "OWD-05", "OWD-06", "OWD-07"],
+    matchedRuleRefs: [...new Set(["OWD-01", "OWD-02", "OWD-03", "OWD-04", "OWD-05", "OWD-06", "OWD-07", ...input.commercialAdjudication.evidenceRefs.filter((ref) => ref.startsWith("RR-GCCA-"))])],
     limitations: [
       "This determinant analysis cannot change fee membership, statement amounts, arithmetic, or canonical financial truth.",
       "Family classification does not establish exact identity, ultimate retention, contract compliance, or a market benchmark.",
@@ -426,10 +434,13 @@ function resolveRow(input: RowInput): OpenWorldFeeDeterminant {
 }
 
 function determineFamily(input: RowInput, label: string, nonFee: boolean): OpenWorldClaim<OpenWorldFeeFamilyCode> {
-  const refs = [...new Set([...input.semantic.feeRowEvidenceRefs, ...input.pricing.matchedRuleRefs, ...input.perItem.matchedRuleRefs, ...input.datedNetwork.matchedRuleRefs, ...input.usNetwork.matchedRuleRefs])];
+  const refs = [...new Set([...input.semantic.feeRowEvidenceRefs, ...input.pricing.matchedRuleRefs, ...input.perItem.matchedRuleRefs, ...input.datedNetwork.matchedRuleRefs, ...input.usNetwork.matchedRuleRefs, ...input.commercialAdjudication.evidenceRefs])];
   const sections = input.row.sourceOccurrenceIds.map((id) => input.analysis.feeLedger.sourceOccurrences.find((item) => item.id === id)?.section?.toUpperCase() ?? "");
   const separateExplicitPricingRows = input.analysis.feeLedger.rows.some((row) => row.id !== input.row.id && /ASSESSMENT|ACCESS FEE|AUTH FEE|SALES DISC(?:OUNT)?/.test(row.selectedLabel.toUpperCase()));
   if (nonFee) return supported("F13", refs, "Canonical contribution structure identifies this as a control, subtotal, informational, duplicate, supporting, or zero-dollar row rather than a fee.", "CONFIRMED");
+  if (input.commercialAdjudication.applicable && input.commercialAdjudication.openWorldFamily) {
+    return supported(input.commercialAdjudication.openWorldFamily, refs, input.commercialAdjudication.explanation, input.commercialAdjudication.confidence);
+  }
   if (input.pricing.exactFeeIdentity === "amex_program_cost" && input.pricing.broaderEconomicCategory === "network_program_cost") {
     return supported("F2", refs, "Statement-local reconciliation and governed Amex pricing knowledge support an Amex network/program-cost family; interchange is not inferred from the section role.", "STRONG");
   }
@@ -474,6 +485,11 @@ function determineFamily(input: RowInput, label: string, nonFee: boolean): OpenW
 
 function layerFor(family: OpenWorldClaim<OpenWorldFeeFamilyCode>, input: RowInput): OpenWorldClaim<OpenWorldEconomicLayer> {
   const refs = family.evidenceRefs;
+  if (input.commercialAdjudication.applicable) {
+    return input.commercialAdjudication.economicLayer
+      ? supported(input.commercialAdjudication.economicLayer, refs, input.commercialAdjudication.explanation, input.commercialAdjudication.confidence)
+      : unresolvedLayer(input.commercialAdjudication.explanation);
+  }
   if (!family.value) return unresolvedLayer("Economic layer remains unresolved; collection and catalog failure are insufficient.");
   if (family.value === "F1") return supported("issuer_interchange", refs, "Interchange is an issuer/network-governed economic layer.");
   if (["F2", "F3", "F4"].includes(family.value)) return supported("card_network", refs, "Admitted evidence supports the underlying network economic layer.");
@@ -487,8 +503,9 @@ function layerFor(family: OpenWorldClaim<OpenWorldFeeFamilyCode>, input: RowInpu
 }
 
 function determineMechanic(input: RowInput, family: OpenWorldClaim<OpenWorldFeeFamilyCode>): OpenWorldClaim<string> {
-  const refs = [...new Set([...input.semantic.feeRowEvidenceRefs, ...input.perItem.unit.evidenceRefs, ...input.pricing.assessmentBasis.evidenceRefs, ...input.usNetwork.mechanic.evidenceRefs])];
+  const refs = [...new Set([...input.semantic.feeRowEvidenceRefs, ...input.perItem.unit.evidenceRefs, ...input.pricing.assessmentBasis.evidenceRefs, ...input.usNetwork.mechanic.evidenceRefs, ...input.commercialAdjudication.evidenceRefs])];
   if (family.value === "F13") return notApplicable("No fee assessment mechanic applies.");
+  if (input.commercialAdjudication.applicable && input.commercialAdjudication.mechanic) return supported(input.commercialAdjudication.mechanic, refs, input.commercialAdjudication.explanation, input.commercialAdjudication.confidence);
   if (input.pricing.amexProgramCostReconciliation?.state === "reconciles_within_rounding") return supported("reconciled_program_cost_total", [...new Set([...refs, ...input.pricing.amexProgramCostReconciliation.evidenceRefs])], "The billed Program Fees amount reconciles within one cent to the separately printed Amex program-cost total; no component allocation is inferred.", "STRONG");
   if (input.usNetwork.mechanic.state === "supported") return supported(input.usNetwork.mechanic.value!, refs, "Existing dated governed evidence supports this mechanic.");
   if (input.perItem.applicable && input.perItem.unit.state === "supported") return supported(unitLabel(input.perItem.unit.value!), refs, input.perItem.unit.explanation);
@@ -510,6 +527,7 @@ function determineMechanic(input: RowInput, family: OpenWorldClaim<OpenWorldFeeF
 
 function determinePopulation(input: RowInput, mechanic: OpenWorldClaim<string>): OpenWorldClaim<string> {
   if (mechanic.state === "not_applicable") return notApplicable("No assessed population applies.");
+  if (input.commercialAdjudication.applicable && input.commercialAdjudication.population) return supported(input.commercialAdjudication.population, input.commercialAdjudication.evidenceRefs, input.commercialAdjudication.explanation, input.commercialAdjudication.confidence);
   if (input.pricing.amexProgramCostReconciliation?.state === "reconciles_within_rounding") return supported("statement_printed_amex_program_cost_total", input.pricing.amexProgramCostReconciliation.evidenceRefs, "The applicable population is the statement's separately printed Amex program-cost total; underlying program components remain unallocated.", "STRONG");
   if (input.usNetwork.population.state === "supported") return supported(input.usNetwork.population.value!, input.usNetwork.population.evidenceRefs, "Existing dated governed evidence supports this population.");
   if (input.perItem.applicable && input.perItem.population.state !== "unresolved" && input.perItem.population.value) return supported(input.perItem.population.value, input.perItem.population.evidenceRefs, input.perItem.population.explanation);
@@ -534,6 +552,11 @@ function sourceTextFor(input: RowInput): string {
 }
 
 function determineController(family: OpenWorldClaim<OpenWorldFeeFamilyCode>, input: RowInput, refs: string[]): OpenWorldClaim<"card_network" | "acquiring_side_program" | "technology_or_service_provider" | "government_or_third_party"> {
+  if (input.commercialAdjudication.applicable) {
+    return input.commercialAdjudication.merchantFacingPriceController
+      ? supported(input.commercialAdjudication.merchantFacingPriceController, input.commercialAdjudication.evidenceRefs, input.commercialAdjudication.explanation, input.commercialAdjudication.confidence)
+      : unresolved("The Product adjudication intentionally leaves the merchant-facing billed-price controller or any spread unresolved.");
+  }
   if (input.pricing.merchantFacingPriceController || input.perItem.merchantFacingPriceController) return supported("acquiring_side_program", refs, "Admitted knowledge affirmatively supports acquiring-side control of the merchant-facing price; retention remains unresolved.");
   if (family.value === "F1" || family.value === "F2" || family.value === "F3" || family.value === "F4") return unresolved("The underlying schedule may be network-set, but the merchant-facing billed amount or spread controller is not established.");
   if (family.value === "F12") return category("government_or_third_party", refs, "The external rule setter may control the underlying amount; statement presentation does not prove pass-through at par.");
@@ -542,6 +565,11 @@ function determineController(family: OpenWorldClaim<OpenWorldFeeFamilyCode>, inp
 }
 
 function determineBeneficiary(family: OpenWorldClaim<OpenWorldFeeFamilyCode>, input: RowInput, refs: string[]): OpenWorldClaim<"issuer" | "card_network" | "acquiring_side_program" | "technology_or_service_provider" | "government_or_third_party"> {
+  if (input.commercialAdjudication.applicable) {
+    return input.commercialAdjudication.economicBeneficiary
+      ? supported(input.commercialAdjudication.economicBeneficiary, input.commercialAdjudication.evidenceRefs, input.commercialAdjudication.explanation, input.commercialAdjudication.confidence)
+      : unresolved("The Product adjudication intentionally leaves economic beneficiary and ultimate retention unresolved.");
+  }
   if (input.pricing.economicBeneficiary === "card_network") return supported("card_network", refs, "Statement-local reconciliation and governed Amex knowledge support the program/network beneficiary at this scope; ultimate downstream retention is not inferred.", input.pricing.confidence);
   if (family.value === "F1") return supported("issuer", refs, "Interchange economics primarily benefit issuing-side participants; exact allocation is not inferred.");
   if (["F2", "F3", "F4"].includes(family.value ?? "") && (input.datedNetwork.applicable || input.usNetwork.applicable)) return supported("card_network", refs, "Admitted evidence supports an underlying card-network beneficiary.");
@@ -551,6 +579,11 @@ function determineBeneficiary(family: OpenWorldClaim<OpenWorldFeeFamilyCode>, in
 }
 
 function determineRuleSetter(family: OpenWorldClaim<OpenWorldFeeFamilyCode>, input: RowInput, refs: string[]): OpenWorldClaim<"issuer_or_network" | "card_network" | "acquiring_side_program" | "technology_or_service_provider" | "government_or_third_party"> {
+  if (input.commercialAdjudication.applicable) {
+    return input.commercialAdjudication.ruleSetter
+      ? supported(input.commercialAdjudication.ruleSetter, input.commercialAdjudication.evidenceRefs, input.commercialAdjudication.explanation, input.commercialAdjudication.confidence)
+      : unresolved("The Product adjudication intentionally leaves the rule setter unresolved.");
+  }
   if (input.pricing.ruleSetter === "card_network") return supported("card_network", refs, "Governed Amex program evidence supports card-network/program rule setting, separate from collection and merchant-facing price control.", input.pricing.confidence);
   if (family.value === "F1") return supported("issuer_or_network", refs, "Interchange rule setting belongs to the issuing/network system, separate from statement collection.");
   if (["F2", "F3", "F4"].includes(family.value ?? "") && (input.datedNetwork.applicable || input.usNetwork.applicable)) return supported("card_network", refs, "Admitted evidence supports card-network rule setting.");
@@ -560,6 +593,11 @@ function determineRuleSetter(family: OpenWorldClaim<OpenWorldFeeFamilyCode>, inp
 }
 
 function determinePriceSetter(family: OpenWorldClaim<OpenWorldFeeFamilyCode>, input: RowInput, refs: string[]): OpenWorldClaim<"issuer_or_network" | "card_network" | "acquiring_side_program" | "technology_or_service_provider" | "government_or_third_party"> {
+  if (input.commercialAdjudication.applicable) {
+    return input.commercialAdjudication.priceSetter
+      ? supported(input.commercialAdjudication.priceSetter, input.commercialAdjudication.evidenceRefs, input.commercialAdjudication.explanation, input.commercialAdjudication.confidence)
+      : unresolved("The Product adjudication intentionally leaves the price setter unresolved.");
+  }
   if (input.pricing.priceSetter === "card_network") return supported("card_network", refs, "Governed Amex program evidence supports the underlying wholesale-cost price setter; the acquiring side separately controls the merchant-facing presentation.", input.pricing.confidence);
   if (family.value === "F1") return supported("issuer_or_network", refs, "The interchange schedule is set within the issuing/network system; qualification incidence remains separate.");
   if (["F2", "F3", "F4"].includes(family.value ?? "") && (input.datedNetwork.applicable || input.usNetwork.applicable)) return supported("card_network", refs, "Admitted evidence supports the underlying network price setter; merchant-facing spread control remains separate.");
@@ -570,6 +608,16 @@ function determinePriceSetter(family: OpenWorldClaim<OpenWorldFeeFamilyCode>, in
 
 function determineAction(family: OpenWorldClaim<OpenWorldFeeFamilyCode>, layer: OpenWorldEconomicLayer | null, controller: string | null, input: RowInput, label: string): OpenWorldFeeDeterminant["d4Actionability"] {
   const base = { merchantAgreementRequiredForAction: false as const, merchantAgreementRequiredForContractConclusion: true };
+  if (input.commercialAdjudication.applicable && input.commercialAdjudication.actionClass) {
+    const actions: Record<"N1" | "N2" | "N3" | "N5" | "N7", { action: string; explanation: string }> = {
+      N1: { action: "Verify the assessed population and ask whether the merchant-facing amount is passed through or includes spread; do not negotiate the underlying network schedule as processor-set.", explanation: "The scoped network identity is supported while official par and any acquiring uplift remain separate claims." },
+      N2: { action: "Request event detail and review operational incidence; separately ask the processor to explain any merchant-facing spread.", explanation: "A network-related underlying price can coexist with behaviorally influenceable incidence without proving merchant fault or full avoidability." },
+      N3: { action: "Ask the processor/acquirer/ISO to itemize and commercially review the merchant-facing price without asserting provider retention or a contractual right.", explanation: "Acquiring-side merchant-facing price control is supported; allocation, retention, and contract compliance remain separate." },
+      N5: { action: "Request the source authority, recipient, and computation and verify that the billed amount is properly characterized.", explanation: "The broad external/non-processing lane is supported while exact recipient remains unresolved." },
+      N7: { action: "Request provider or merchant documentation to identify component composition, beneficiary, and merchant-facing price control before attributing dollars.", explanation: "The event and broad family may be known while economic composition remains unresolved." },
+    };
+    return { ...base, actionClass: input.commercialAdjudication.actionClass, ...actions[input.commercialAdjudication.actionClass] };
+  }
   if (family.value === "F13") return { ...base, actionClass: "NOT_APPLICABLE", action: "No merchant fee action; treat this row as a control or supporting representation.", explanation: "Canonical contribution structure identifies a non-fee row." };
   if (family.value === "F1") return { ...base, actionClass: "N2", action: "Request the interchange category, transaction population, and qualification detail, then review avoidable downgrade or data-quality drivers where supported. Do not describe the underlying interchange schedule as processor-negotiable.", explanation: "Interchange price setting and qualification incidence are separate; exact program identity is not required to request supporting detail." };
   if (["F2", "F3", "F4"].includes(family.value ?? "")) {
@@ -589,8 +637,10 @@ function determineAction(family: OpenWorldClaim<OpenWorldFeeFamilyCode>, layer: 
 }
 
 function determineAttributes(input: RowInput, label: string, family: OpenWorldClaim<OpenWorldFeeFamilyCode>, layer: OpenWorldClaim<OpenWorldEconomicLayer>, exactIdentity: string | null): OpenWorldAttribute[] {
+  const genericBundlingSignal = /BUNDLE|PACKAGE|COMPOSITE|PROGRAM/.test(label) &&
+    input.commercialAdjudication.commercialDollarPolicy !== "EXACT_PROVIDER_CONTROLLED_MERCHANT_FACING_PRICE";
   return compactStrings([
-    /BUNDLE|PACKAGE|COMPOSITE|PROGRAM/.test(label) || input.pricing.broaderEconomicCategory === "bundled_merchant_facing_pricing" ? "bundled_or_composite" : null,
+    input.commercialAdjudication.cardinality === "multiple_components" || genericBundlingSignal || input.pricing.broaderEconomicCategory === "bundled_merchant_facing_pricing" ? "bundled_or_composite" : null,
     input.usNetwork.reference.candidateValues.length > 1 ? "component_of_bounded_fee" : null,
     /\*\*|ADDITIONAL FEES|OTHER FEES|MISC/.test(label) ? "undescribed" : null,
     family.value === "F9" || family.value === "F11" ? "third_party_possible" : null,
@@ -604,6 +654,7 @@ function determineAttributes(input: RowInput, label: string, family: OpenWorldCl
 
 function determineCardinality(input: RowInput, nonFee: boolean, label: string, refs: string[]): OpenWorldFeeDeterminant["cardinality"] {
   if (nonFee) return supported("not_a_fee", refs, "Canonical structure identifies a non-fee row.", "CONFIRMED");
+  if (input.commercialAdjudication.applicable && input.commercialAdjudication.cardinality) return supported(input.commercialAdjudication.cardinality, input.commercialAdjudication.evidenceRefs, input.commercialAdjudication.explanation, input.commercialAdjudication.confidence);
   if (/BUNDLE|PACKAGE|COMPOSITE|ADDITIONAL FEES|OTHER FEES/.test(label) || input.pricing.broaderEconomicCategory === "bundled_merchant_facing_pricing") return category("multiple_components", refs, "The printed row can contain multiple economic components; one line is not assumed to be one fee.");
   if (input.datedNetwork.applicable && input.usNetwork.reference.candidateValues.length > 1) return category("bounded_component", refs, "Governed evidence bounds a component or product variant without proving one-to-one line cardinality.");
   return category("single_fee", refs, "The statement presents one charge row; hidden economic allocation is not inferred.");
