@@ -1,4 +1,5 @@
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   EvaluationCostBudgetLedger,
@@ -17,7 +18,7 @@ import {
   type EvaluationExecutionStage,
 } from "../src/evaluationIntegrity/index.js";
 
-const outputDir = "/private/tmp/ratereveal-evaluation-run-integrity";
+const outputDir = path.join(tmpdir(), "ratereveal-evaluation-run-integrity");
 const manifestPath = path.join(outputDir, "evaluation-source-manifest-v1.json");
 const artifactPath = path.join(outputDir, "evaluation-run-integrity-dry-run.json");
 const fullStages: EvaluationExecutionStage[] = [

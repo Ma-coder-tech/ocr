@@ -13,7 +13,7 @@ import type { ParserDriver } from "../src/parserFoundation.js";
 type AuditSample = {
   label: string;
   path: string;
-  source: "repo_fixture" | "downloads_sample";
+  source: "repo_fixture" | "private_sample";
 };
 
 type AuditResult = {
@@ -28,7 +28,10 @@ type AuditResult = {
 };
 
 const root = process.cwd();
-const downloads = "/Users/martialmahougnonamoussou/Downloads";
+const configuredPrivateSampleDir = process.env.RATEREVEAL_FISERV_PRIVATE_SAMPLE_DIR?.trim();
+const privateSampleDir = configuredPrivateSampleDir
+  ? path.resolve(configuredPrivateSampleDir)
+  : null;
 
 const samples: AuditSample[] = [
   {
@@ -57,60 +60,28 @@ const samples: AuditSample[] = [
     path: path.resolve(root, "test/fixtures/pdfs/Nov_2024_Statement.pdf"),
   },
   {
-    label: "Basys Processing March 2020",
-    source: "downloads_sample",
-    path: path.resolve(downloads, "Fiserv_BasysProcessing_March_2020.pdf"),
-  },
-  {
-    label: "Clover January 2024",
-    source: "downloads_sample",
-    path: path.resolve(downloads, "fiserv_Clover_Jan_2024.pdf"),
-  },
-  {
-    label: "Clover June 2024 original",
-    source: "downloads_sample",
-    path: path.resolve(downloads, "fiserv_Clover_June_2024.pdf"),
-  },
-  {
     label: "NXGEN January 2022",
     source: "repo_fixture",
     path: path.resolve(root, "test/fixtures/pdfs/fiserv_NXGEN_PAYMENT_SERVICES_jan_2022.pdf"),
   },
-  {
-    label: "Paysafe February original",
-    source: "downloads_sample",
-    path: path.resolve(downloads, "fiserv_PAYSAFE_Febr_2024.pdf"),
-  },
-  {
-    label: "Priority December original",
-    source: "downloads_sample",
-    path: path.resolve(downloads, "Fiser_PRIORITY PAYMENT SYSTEMS_2024pdf.pdf"),
-  },
-  {
-    label: "December 2024 statement",
-    source: "downloads_sample",
-    path: path.resolve(downloads, "Dec_2024_Statement.pdf"),
-  },
-  {
-    label: "Philip Futuremarket October 2025 original",
-    source: "downloads_sample",
-    path: path.resolve(downloads, "Fiserv_2025_PHILIP FUTURMARKET LLC.pdf"),
-  },
-  {
-    label: "Philip Futuremarket September 2025 zero-volume original",
-    source: "downloads_sample",
-    path: path.resolve(downloads, "Fiserv_PHILIP FUTUREMARKET1_ LLC.pdf"),
-  },
-  {
-    label: "Karen ReneeWert December 2024",
-    source: "downloads_sample",
-    path: path.resolve(downloads, "Fiserv_Karen_ReneeWert_Statement_Dec_2024.pdf"),
-  },
-  {
-    label: "Abdul Basher August 2025",
-    source: "downloads_sample",
-    path: path.resolve(downloads, "Fiserv_ABDUL BASHER_Aug_2025.pdf"),
-  },
+  ...(privateSampleDir
+    ? [
+        "Fiserv_BasysProcessing_March_2020.pdf",
+        "fiserv_Clover_Jan_2024.pdf",
+        "fiserv_Clover_June_2024.pdf",
+        "fiserv_PAYSAFE_Febr_2024.pdf",
+        "Fiser_PRIORITY PAYMENT SYSTEMS_2024pdf.pdf",
+        "Dec_2024_Statement.pdf",
+        "Fiserv_2025_PHILIP FUTURMARKET LLC.pdf",
+        "Fiserv_PHILIP FUTUREMARKET1_ LLC.pdf",
+        "Fiserv_Karen_ReneeWert_Statement_Dec_2024.pdf",
+        "Fiserv_ABDUL BASHER_Aug_2025.pdf",
+      ].map((fileName, index) => ({
+        label: `Private Fiserv sample ${String(index + 1).padStart(2, "0")}`,
+        source: "private_sample" as const,
+        path: path.resolve(privateSampleDir, fileName),
+      }))
+    : []),
 ];
 
 const drivers: Array<ParserDriver<FiservParserOutput>> = [
@@ -250,10 +221,13 @@ async function auditSample(sample: AuditSample): Promise<AuditResult> {
 
 function row(result: AuditResult): string {
   const output = result.output;
+  const displayedFile = result.sample.source === "private_sample"
+    ? "<private sample filename omitted>"
+    : path.basename(result.sample.path);
   return [
     cell(result.sample.label),
     cell(result.sample.source),
-    cell(path.basename(result.sample.path)),
+    cell(displayedFile),
     cell(result.parserStatus),
     cell(result.driverId),
     cell(output?.statementIdentity.visibleBrand),
@@ -277,7 +251,7 @@ function row(result: AuditResult): string {
 function recommendations(results: AuditResult[]): string[] {
   const unsupported = results.filter((result) => result.parserStatus === "unsupported");
   const failed = results.filter((result) => result.parserStatus === "failed" && result.exists);
-  const downloadsOnlyParsed = results.filter((result) => result.sample.source === "downloads_sample" && result.parserStatus === "parsed");
+  const privateSamplesParsed = results.filter((result) => result.sample.source === "private_sample" && result.parserStatus === "parsed");
   const indeterminateAtCost = results.filter((result) =>
     result.output?.feeLedger.rows.some((feeRow) => feeRow.classification.atCostStatus === "indeterminate"),
   );
@@ -289,11 +263,9 @@ function recommendations(results: AuditResult[]): string[] {
   if (failed.length > 0) {
     notes.push(`Fix matched-but-failing parser paths before broadening reports: ${failed.map((result) => `${result.sample.label} (${result.error})`).join(", ")}.`);
   }
-  if (downloadsOnlyParsed.length > 0) {
+  if (privateSamplesParsed.length > 0) {
     notes.push(
-      `Move parsed Downloads-only samples into repo fixtures once we trust them: ${downloadsOnlyParsed
-        .map((result) => result.sample.label)
-        .join(", ")}.`,
+      `${privateSamplesParsed.length} configured private sample(s) parsed; their identities and filenames remain omitted from this report.`,
     );
   }
   if (indeterminateAtCost.length > 0) {
@@ -311,11 +283,11 @@ const failedCount = results.filter((result) => result.parserStatus === "failed")
 const lines = [
   "# Fiserv / First Data Parser Coverage Audit",
   "",
-  `Generated: ${new Date().toISOString()}`,
+  `Generated: ${process.env.RATEREVEAL_FISERV_COVERAGE_GENERATED_AT?.trim() || new Date().toISOString()}`,
   "",
   "## Scope",
   "",
-  "This audit checks the current Fiserv / First Data parser drivers against the Fiserv-related PDFs currently available in repo fixtures and the known local Downloads samples. It is a parser coverage audit, not a merchant-facing accuracy report.",
+  "This audit checks the current Fiserv / First Data parser drivers against repository fixtures and, only when explicitly configured, a private sample directory. It is a parser coverage audit, not a merchant-facing accuracy report.",
   "",
   "## Summary",
   "",
@@ -381,10 +353,19 @@ const lines = [
   "- PASS means the parser produced internally reconciled output for that specific layer; it does not mean every economic claim is fully proven.",
   "- WARN means the parser intentionally preserved a known issue, such as row-level batch anomaly, fee-ledger rounding, or unresolved classification.",
   "- `indeterminate` at-cost statuses are expected until approved, period-backed reference rates are available.",
-  "- Downloads-only samples are useful for exploration but are not regression-safe until copied into repo fixtures and covered by tests.",
+  "- Private samples are optional, privacy-contained inputs and are not a substitute for portable repository fixtures.",
   "",
 ];
 
-const outputPath = path.resolve(root, "data/fiserv-parser-coverage-audit.md");
+const configuredOutputPath = process.env.RATEREVEAL_FISERV_COVERAGE_OUTPUT?.trim();
+const outputPath = configuredOutputPath
+  ? path.resolve(configuredOutputPath)
+  : path.resolve(root, "data/fiserv-parser-coverage-audit.md");
+await fs.mkdir(path.dirname(outputPath), { recursive: true });
 await fs.writeFile(outputPath, `${lines.join("\n")}\n`);
 console.log(outputPath);
+
+const requiredFixtureFailures = results.filter(
+  (result) => result.sample.source === "repo_fixture" && result.parserStatus !== "parsed",
+);
+if (requiredFixtureFailures.length > 0) process.exitCode = 1;
