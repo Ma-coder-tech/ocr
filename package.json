@@ -20,7 +20,7 @@
     "repo:clean-check": "node scripts/check-clean-checkout.mjs",
     "evaluation:five-statement-artifact:verify": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/verify-five-statement-live-artifact.ts",
     "parser:audit": "tsx scripts/parser-audit.ts",
-    "corpus:test": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs ./node_modules/vitest/vitest.mjs run test/canonical",
+    "corpus:test": "node scripts/check-toolchain.mjs && node scripts/run-test-baseline.mjs --repository-prefix test/canonical/",
     "corpus:audit": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/canonical-forensic-harness.ts",
     "corpus:secure": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/canonical-secure-corpus-runner.ts",
     "evaluation:integrity:dry-run": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/evaluation-run-integrity-dry-run.ts",

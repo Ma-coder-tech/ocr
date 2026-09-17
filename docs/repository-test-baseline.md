@@ -12,6 +12,8 @@ lifecycle state without skipping tests or relaxing any assertion or timeout.
 CI distributes the same deterministic inventory across independent shards.
 `RATEREVEAL_TEST_SHARD_INDEX` and `RATEREVEAL_TEST_SHARD_COUNT` are reserved
 for that orchestration; an ordinary local `npm test` still executes every test.
+The portable `npm run corpus:test` gate selects `test/canonical/` through the
+same inventory, process, and temporary-database isolation path.
 
 The whole-statement work-plan tests use
 `test/fixtures/evaluation/five-statement-live-work-plan-observation-v1.json`.

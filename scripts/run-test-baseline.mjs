@@ -5,11 +5,12 @@ import path from "node:path";
 
 const requestedArgs = process.argv.slice(2);
 const batchSize = 12;
+const repositoryPrefix = parseRepositoryPrefix(requestedArgs);
 
-if (requestedArgs.length > 0) {
+if (requestedArgs.length > 0 && !repositoryPrefix) {
   runVitest(requestedArgs);
 } else {
-  const files = discoverTestFiles();
+  const files = discoverTestFiles().filter((file) => !repositoryPrefix || file.startsWith(repositoryPrefix));
   const shardCount = readPositiveInteger("RATEREVEAL_TEST_SHARD_COUNT", 1);
   const shardIndex = readPositiveInteger("RATEREVEAL_TEST_SHARD_INDEX", 1);
   if (shardIndex > shardCount) {
@@ -85,4 +86,12 @@ function readPositiveInteger(name, fallback) {
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`${name} must be a positive integer.`);
   return parsed;
+}
+
+function parseRepositoryPrefix(args) {
+  if (args[0] !== "--repository-prefix") return null;
+  if (args.length !== 2 || !/^(?:test|web\/src)\/[A-Za-z0-9_./-]+\/$/.test(args[1]) || args[1].includes("..")) {
+    throw new Error("--repository-prefix requires one repository-relative test/ or web/src/ directory ending in '/'.");
+  }
+  return args[1];
 }

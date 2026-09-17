@@ -17,6 +17,9 @@ describe("repository baseline hygiene", () => {
     expect(config).toMatch(/pool:\s*["']forks["']/);
     expect(config).not.toMatch(/pool:\s*["']threads["']/);
     expect(packageJson.scripts.test).toBe("node scripts/check-toolchain.mjs && node scripts/run-test-baseline.mjs");
+    expect(packageJson.scripts["corpus:test"]).toBe(
+      "node scripts/check-toolchain.mjs && node scripts/run-test-baseline.mjs --repository-prefix test/canonical/",
+    );
     expect(baselineRunner).toContain("const batchSize = 12");
     expect(baselineRunner).toContain('fs.mkdtempSync(path.join(os.tmpdir(), "ratereveal-test-")');
     expect(baselineRunner).toContain("FEECLEAR_DB_PATH: dbPath");
