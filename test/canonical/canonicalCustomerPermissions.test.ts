@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildCanonicalAiCapabilities } from "../../src/canonical/buildCanonicalAiCapabilities.js";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
 import { buildCanonicalCustomerState } from "../../src/canonical/customerStateResolver.js";
+import { buildCanonicalCrossSummaryLinkEvidence } from "../../src/canonical/crossSummaryLinkEvidence.js";
 import { buildCanonicalFeeLedger } from "../../src/canonical/feeLedger.js";
 import { buildCanonicalFeeOwnershipActionability } from "../../src/canonical/feeOwnershipActionability.js";
 import { buildCanonicalOpportunityEngine } from "../../src/canonical/opportunityEngine.js";
@@ -95,6 +96,12 @@ function analysisWithLedger(): CanonicalStatementAnalysis {
   });
   analysis.evidence = [...analysis.evidence, ...evidence.values()];
   analysis.calculations = [...analysis.calculations, ...calculations];
+  const evidenceById = new Map(analysis.evidence.map((item) => [item.id, item]));
+  analysis.crossSummaryLinkEvidence = buildCanonicalCrossSummaryLinkEvidence({
+    doc: statement(), documentId: analysis.identity.sourceDocumentRef, identity: analysis.identity,
+    financialFacts: analysis.financialFacts, feeLedger: analysis.feeLedger, parserOutput: null, evidence: evidenceById,
+  });
+  analysis.evidence = [...evidenceById.values()];
   analysis.feeOwnershipActionability = buildCanonicalFeeOwnershipActionability(analysis.feeLedger, { processorFamily: "fiserv", statementPeriodStart: "2026-01-01" });
   analysis.opportunityEngine = buildCanonicalOpportunityEngine({ feeLedger: analysis.feeLedger, feeOwnershipActionability: analysis.feeOwnershipActionability, evidence: analysis.evidence, statementPeriodVerified: true });
   return analysis;

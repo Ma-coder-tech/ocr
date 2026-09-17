@@ -11,6 +11,7 @@ import { parsePdf, type ParsedDocument } from "../../../../src/parser.js";
 import { rescueSourceFiles } from "../../../fixtures/reconstructionKernel/rescueSourceManifest.js";
 
 const additionalFiles = {
+  "proof-qualified-full": "test/fixtures/pdfs/SAMPLE_MERCHANT4_CLOVER.pdf",
   "paysafe-february-2024": "test/fixtures/pdfs/fiserv_PAYSAFE_Febr_2024.pdf",
   "priority-payment-systems-december-2024": "test/fixtures/pdfs/fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf",
   "paysafe-zero-volume-september-2025": "test/fixtures/pdfs/fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
@@ -36,9 +37,9 @@ beforeAll(async () => {
 }, 30_000);
 
 describe("isolated RB dependency regeneration from limited Kernel authority", () => {
-  it("regenerates the BASYS average-ticket dependency and local controls without changing the analysis run", () => {
-    const baseline = execute("basys-march-2020", false);
-    const evaluated = execute("basys-march-2020", true);
+  it("regenerates proof-qualified average-ticket dependencies and local controls without changing the analysis run", () => {
+    const baseline = execute("proof-qualified-full", false);
+    const evaluated = execute("proof-qualified-full", true);
     const result = evaluated.diagnostics.reconstructionLimitedAuthorityRegeneration!;
 
     expect(evaluated.run).toEqual(baseline.run);
@@ -51,8 +52,8 @@ describe("isolated RB dependency regeneration from limited Kernel authority", ()
       authorityScope: CANONICAL_RB_LIMITED_AUTHORITY_POPULATIONS,
       application: {
         appliedPopulationKeys: CANONICAL_RB_LIMITED_AUTHORITY_POPULATIONS,
-        changedPopulationKeys: CANONICAL_RB_LIMITED_AUTHORITY_POPULATIONS,
-        confirmedPopulationKeys: [],
+        changedPopulationKeys: ["refundTransactionCount", "submittedTransactionCount"],
+        confirmedPopulationKeys: ["grossSaleVolume", "refundVolume", "grossSaleTransactionCount"],
       },
       integrity: {
         baseFoundationUnchanged: true,
@@ -67,27 +68,23 @@ describe("isolated RB dependency regeneration from limited Kernel authority", ()
     });
     expect(result.projection.metrics.headlineAverageTicket).toMatchObject({
       state: "defined",
-      value: { amountMinor: 5_175, currency: "USD" },
+      value: { amountMinor: 2_921, currency: "USD" },
       calculationRef: "calc_v2_headline_average_ticket",
     });
     expect(result.projection.calculations).toContainEqual(expect.objectContaining({
       id: "calc_v2_headline_average_ticket",
       formula: "gross_sales_divided_by_gross_sale_count",
     }));
-    expect(result.changes).toContainEqual(expect.objectContaining({
-      kind: "calculation",
-      nodeId: "calc_v2_headline_average_ticket",
-    }));
     expect(result.projection.calculationPermissions.headlineAverageTicket).toMatchObject({
-      before: { state: "withheld" },
+      before: { state: "permitted" },
       after: { state: "permitted" },
     });
-    expect(controlStates(result, "gross_refund_equals_net_submitted")).toEqual(["unresolved", "pass"]);
+    expect(controlStates(result, "gross_refund_equals_net_submitted")).toEqual(["pass", "pass"]);
     expect(controlStates(result, "gross_refund_count_equals_submitted_count")).toEqual(["unresolved", "pass"]);
   });
 
   it("keeps the gross-rate configuration gate closed and preserves non-dependent headline rate", () => {
-    const evaluated = execute("basys-march-2020", true);
+    const evaluated = execute("proof-qualified-full", true);
     const rb = evaluated.run.artifacts.rb!;
     const result = evaluated.diagnostics.reconstructionLimitedAuthorityRegeneration!;
 
@@ -103,16 +100,14 @@ describe("isolated RB dependency regeneration from limited Kernel authority", ()
     expect(result.changes.map((item) => item.nodeId)).not.toContain("metric_v2_gross_based_rate_diagnostic");
   });
 
-  const expected = {
-    "basys-march-2020": { applied: 5, changed: 5, averageState: "defined", amountControl: "pass", countControl: "pass" },
-    "paysafe-october-2025": { applied: 2, changed: 2, averageState: "unavailable_denominator", amountControl: "pass", countControl: "unresolved" },
-    "wells-fargo-september-2024": { applied: 5, changed: 2, averageState: "defined", amountControl: "pass", countControl: "pass" },
-    "clover-duplicate-resubmission": { applied: 3, changed: 1, averageState: "defined", amountControl: "pass", countControl: "pass" },
-    "vortax-september-2022": { applied: 2, changed: 2, averageState: "unavailable_denominator", amountControl: "pass", countControl: "unresolved" },
-    "paysafe-february-2024": { applied: 0, changed: 0, averageState: "unavailable_numerator", amountControl: "unresolved", countControl: "unresolved" },
-    "priority-payment-systems-december-2024": { applied: 2, changed: 2, averageState: "unavailable_denominator", amountControl: "pass", countControl: "unresolved" },
-    "paysafe-zero-volume-september-2025": { applied: 0, changed: 0, averageState: "unavailable_numerator", amountControl: "unresolved", countControl: "unresolved" },
-  } as const;
+  const expected = Object.fromEntries(Object.keys(files).map((caseId) => [caseId, caseId === "proof-qualified-full"
+    ? { applied: 5, changed: 2, averageState: "defined", amountControl: "pass", countControl: "pass" }
+    : caseId === "clover-duplicate-resubmission"
+      ? { applied: 3, changed: 1, averageState: "defined", amountControl: "pass", countControl: "pass" }
+      : caseId === "wells-fargo-september-2024"
+        ? { applied: 0, changed: 0, averageState: "unavailable_denominator", amountControl: "pass", countControl: "unresolved" }
+    : { applied: 0, changed: 0, averageState: "unavailable_numerator", amountControl: "unresolved", countControl: "unresolved" }])) as
+    Record<CaseId, { applied: number; changed: number; averageState: string; amountControl: string; countControl: string }>;
 
   for (const caseId of Object.keys(expected) as CaseId[]) {
     it(`regenerates only declared RB-local dependencies for ${caseId}`, () => {
@@ -148,8 +143,8 @@ describe("isolated RB dependency regeneration from limited Kernel authority", ()
   }
 
   it("does not execute or mutate RC through RH, permissions, attention, actions, or reports", () => {
-    const baseline = execute("basys-march-2020", false);
-    const evaluated = execute("basys-march-2020", true);
+    const baseline = execute("proof-qualified-full", false);
+    const evaluated = execute("proof-qualified-full", true);
 
     expect(evaluated.run.artifacts.rc).toEqual(baseline.run.artifacts.rc);
     expect(evaluated.run.artifacts.rfResolution).toEqual(baseline.run.artifacts.rfResolution);
@@ -173,7 +168,7 @@ describe("isolated RB dependency regeneration from limited Kernel authority", ()
       reconstructionLimitedAuthorityRegeneration: { enabled: true },
     })).toThrow("RECONSTRUCTION_AUTHORITY_REGENERATION_REQUIRES_EVALUATION_CONTEXT");
 
-    const basys = execute("basys-march-2020", false).run.artifacts.rb!;
+    const basys = execute("proof-qualified-full", false).run.artifacts.rb!;
     const mismatchedAuthority = grantCanonicalRbLimitedAuthority({
       document: documents.get("wells-fargo-september-2024")!,
       sourceDocumentRef: basys.identity.sourceDocumentRef,
@@ -230,15 +225,24 @@ describe("isolated RB dependency regeneration from limited Kernel authority", ()
   });
 
   it("regenerates a pre-configured gross-rate diagnostic but does not create the permission itself", () => {
-    const baselineExecution = execute("basys-march-2020", false);
+    const baselineExecution = execute("proof-qualified-full", false);
     const foundation = structuredClone(baselineExecution.run.artifacts.rb!);
+    foundation.financialPopulations.grossSaleVolume = {
+      ...foundation.financialPopulations.grossSaleVolume,
+      status: "unavailable",
+      value: null,
+      confidence: null,
+      evidenceRefs: [],
+      occurrenceRefs: [],
+      authorityBasis: null,
+    };
     const configured = buildGrossBasedRateDiagnostic({
       fees: foundation.financialPopulations.totalStatementProcessingFees,
       grossSales: foundation.financialPopulations.grossSaleVolume,
     });
     foundation.metrics.grossBasedRateDiagnostic = configured.metric;
     const authority = grantCanonicalRbLimitedAuthority({
-      document: documents.get("basys-march-2020")!,
+      document: documents.get("proof-qualified-full")!,
       sourceDocumentRef: foundation.identity.sourceDocumentRef,
       foundation,
       executionContext: "evaluation_compatibility",

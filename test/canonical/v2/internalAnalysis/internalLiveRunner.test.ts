@@ -54,7 +54,7 @@ describe("durable internal live runner", () => {
       "researchOutcome: not_started",
       "Provider sends: 0",
       "Keychain accesses: 0",
-      "Safe failure code: internal_live_deterministic_family_research_model_expansion_required",
+      "Safe failure code: internal_live_deterministic_family_admission_failed",
     ]));
     expect(await readdir(outputRoot)).toEqual([]);
     expect(STATEMENT_TWO_DETERMINISTIC_FAMILY_PROFILE).toMatchObject({
@@ -92,7 +92,7 @@ describe("durable internal live runner", () => {
       "Provider sends: 0",
       "Keychain accesses: 0",
       "executionStatus: failed",
-      "Safe failure code: internal_live_deterministic_family_research_model_expansion_required",
+      "Safe failure code: internal_live_deterministic_family_admission_failed",
     ]));
   });
 

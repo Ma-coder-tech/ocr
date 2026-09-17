@@ -42,9 +42,9 @@ beforeAll(async () => {
 
 describe("Statement-observation origin eligibility and RF-first wiring", () => {
   it("is stable, material only for nonzero charges, deduplicated by occurrence, and rejects unregistered labels", () => {
-    const first = buildStatementObservationInvestigationOrigins({ foundation: deterministic.foundation, admittedKnowledge: [],
+    const first = buildStatementObservationInvestigationOrigins({ foundation: deterministic.observationalFoundation, admittedKnowledge: [],
       tenantRef: "tenant-a", accountRef: "account-a" });
-    const second = buildStatementObservationInvestigationOrigins({ foundation: deterministic.foundation, admittedKnowledge: [],
+    const second = buildStatementObservationInvestigationOrigins({ foundation: deterministic.observationalFoundation, admittedKnowledge: [],
       tenantRef: "tenant-a", accountRef: "account-a" });
     expect(first.origins).toEqual(second.origins);
     expect(first.origins).toHaveLength(2);
@@ -53,7 +53,7 @@ describe("Statement-observation origin eligibility and RF-first wiring", () => {
     expect(first.rejected.length).toBeGreaterThan(0);
     expect(first.rejected.every((item) => item.reasonCode === "observation_label_not_registered")).toBe(true);
 
-    const duplicated = structuredClone(deterministic.foundation);
+    const duplicated = structuredClone(deterministic.observationalFoundation);
     const application = duplicated.sourceModel.occurrences.find((item) => item.sourceLabel.toLowerCase().includes("application fee"))!;
     duplicated.sourceModel.occurrences.push(structuredClone(application));
     const deduplicated = buildStatementObservationInvestigationOrigins({ foundation: duplicated, admittedKnowledge: [],
@@ -61,7 +61,7 @@ describe("Statement-observation origin eligibility and RF-first wiring", () => {
     expect(deduplicated.origins.find((item) => item.questionClass === "application_fee_public_definition")!.occurrenceRefs)
       .toEqual(first.origins.find((item) => item.questionClass === "application_fee_public_definition")!.occurrenceRefs);
 
-    const zeroed = structuredClone(deterministic.foundation);
+    const zeroed = structuredClone(deterministic.observationalFoundation);
     for (const occurrence of zeroed.sourceModel.occurrences) if (occurrence.sourceLabel.toLowerCase().includes("application fee")) {
       occurrence.printedAmount = occurrence.printedAmount ? { ...occurrence.printedAmount, amountMinor: 0 } : null;
     }
@@ -71,7 +71,7 @@ describe("Statement-observation origin eligibility and RF-first wiring", () => {
 
   it("does not search an RF-resolved question and preserves an RF conflict as non-eligible", async () => {
     const run = async (entries: KnowledgeEntry[]) => {
-      const origins = buildStatementObservationInvestigationOrigins({ foundation: deterministic.foundation, admittedKnowledge: entries,
+      const origins = buildStatementObservationInvestigationOrigins({ foundation: deterministic.observationalFoundation, admittedKnowledge: entries,
         tenantRef: "tenant-a", accountRef: "account-a" });
       let searches = 0;
       const result = await runBoundedIntelligenceRuntime({ runId: `rf-wiring-${entries.length}-${entries.map((item) => item.id).join("-")}`,

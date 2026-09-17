@@ -26,6 +26,8 @@ export type InspectFiservOneStatementInput = Omit<RunFiservOneStatementInput, "r
 
 export type FiservDeterministicEvaluationContext = {
   foundation: ReturnType<typeof buildCanonicalEconomicsV2FromFiserv>;
+  /** Non-authoritative known-layout view for internal diagnostic planning only. */
+  observationalFoundation: ReturnType<typeof buildCanonicalEconomicsV2FromFiserv>;
   pricing: ReturnType<typeof buildObservationalCanonicalPricingV2FromFiserv>;
   economic: ReturnType<typeof buildObservationalCanonicalEconomicsV2FromFiservPricing>;
   synthesis: ReturnType<typeof observeFiservEconomicsInCanonicalSynthesisV2>;
@@ -79,7 +81,7 @@ export async function runFiservOneStatementEvaluation(input: RunFiservOneStateme
 }> {
   if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(input.runVersion) || input.runVersion.length > 80) throw new Error("INVALID_RUN_VERSION");
   const prepared = await inspectFiservOneStatementEvaluation(input);
-  const { admission, admissionEvaluation, authority, decision, driver, foundation, identity, observed, parserOutput, pricing,
+  const { admission, admissionEvaluation, authority, decision, driver, foundation, observationalFoundation, identity, observed, parserOutput, pricing,
     profile, projection, reportAudit, readiness, selected, statementCompleteness, suppliedDocument, synthesis, economic,
     validationState } = prepared;
   const rhPricingContradiction = [projection.pricing?.underlyingCost, projection.pricing?.schedule, projection.pricing?.scope]
@@ -173,7 +175,7 @@ export async function runFiservOneStatementEvaluation(input: RunFiservOneStateme
     warnings: unique([...foundation.validation.warnings, ...pricing.validation.warnings,
       ...economic.validation.warnings, ...synthesis.validation.warnings, ...reportAudit.validation.warnings]),
   });
-  return { audit, deterministic: { foundation, pricing, economic, synthesis, projection, readiness } };
+  return { audit, deterministic: { foundation, observationalFoundation, pricing, economic, synthesis, projection, readiness } };
 }
 
 function record(value: unknown): Record<string, any> { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {}; }

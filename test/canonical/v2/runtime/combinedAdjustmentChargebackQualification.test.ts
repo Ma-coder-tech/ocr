@@ -42,7 +42,7 @@ beforeAll(async () => {
 }, 30_000);
 
 describe("explicit combined adjustment/chargeback shadow qualification", () => {
-  const positiveCases = {
+  const unsupportedObservedCases = {
     "paysafe-october-2025": 0,
     "vortax-september-2022": 21_176,
     "paysafe-february-2024": 0,
@@ -50,8 +50,8 @@ describe("explicit combined adjustment/chargeback shadow qualification", () => {
     "paysafe-zero-volume-september-2025": 0,
   } as const;
 
-  for (const [caseId, expectedMinor] of Object.entries(positiveCases) as Array<[keyof typeof positiveCases, number]>) {
-    it(`qualifies the exact direct combined field without granting authority for ${caseId}`, () => {
+  for (const caseId of Object.keys(unsupportedObservedCases) as Array<keyof typeof unsupportedObservedCases>) {
+    it(`preserves the direct combined field as diagnostic context without granting authority for ${caseId}`, () => {
       const baseline = execute(caseId, false);
       const evaluated = execute(caseId, true);
       const result = evaluated.diagnostics.combinedAdjustmentChargebackQualification!;
@@ -62,7 +62,7 @@ describe("explicit combined adjustment/chargeback shadow qualification", () => {
         canonicalMutation: "none",
         dependencyPropagation: "prohibited",
         providerAuthority: "prohibited",
-        status: "qualified",
+        status: "withheld",
         currentAuthorityScope: [
           "grossSaleVolume",
           "refundVolume",
@@ -72,43 +72,20 @@ describe("explicit combined adjustment/chargeback shadow qualification", () => {
         ],
         categoryIdentity: "adjustments_chargebacks",
         processorPresentedLabel: "Adjustments/Chargebacks",
-        candidate: {
-          value: { amountMinor: expectedMinor, currency: "USD" },
-          meaning: "processor_presented_combined_adjustments_chargebacks",
-          support: "first_class_processor_presented_category_with_passing_claim_control",
-          prohibitedInterpretations: [
-            "settlement_adjustment",
-            "chargeback_principal",
-            "chargeback_representment",
-            "reversal",
-            "chargeback_fee",
-            "lifecycle_conclusion",
-            "net_funded_authority",
-          ],
-        },
-        reasonCodes: [
-          "first_class_processor_presented_category_source_bound",
-          "processor_presented_meaning_preserved_without_subtype_inference",
-          "claim_specific_category_control_passes",
-          "all_exclusion_conditions_satisfied",
-        ],
+        candidate: null,
+        sourceBinding: { admittedFiservFamily: false, directCombinedFieldObserved: true },
+        reasonCodes: ["fiserv_family_not_admitted"],
         errors: [],
       });
       expect(result.currentAuthorityScope).not.toContain("unresolvedAdjustmentChargebackAmount");
       expect(result.qualificationHash).toMatch(/^[a-f0-9]{64}$/);
-      const representation = evaluated.run.artifacts.rb!.sourceModel.processorPresentedCategories.find((item) =>
+      const representation = evaluated.diagnostics.observationalFoundation!.sourceModel.processorPresentedCategories.find((item) =>
         item.categoryIdentity === "adjustments_chargebacks")!;
-      const control = evaluated.run.artifacts.rb!.sourceModel.processorPresentedCategoryControls.find((item) =>
+      const control = evaluated.diagnostics.observationalFoundation!.sourceModel.processorPresentedCategoryControls.find((item) =>
         item.categoryIdentity === "adjustments_chargebacks")!;
-      expect(result.candidate).toMatchObject({
-        representationRef: representation.id,
-        categoryControlRef: control.id,
-        sourceProvenance: representation.sourceProvenance,
-      });
       expect(control).toMatchObject({ status: "pass", representationRef: representation.id,
         authorityEffect: "none_observation_only" });
-      expect(result.exclusionConditions.every((item) => item.state === "satisfied")).toBe(true);
-      expect(result.futureAuthorityBlockers).toContain("nonzero_third_party_transaction_source_evidence_not_in_current_corpus");
+      expect(result.futureAuthorityBlockers).toEqual(["source_candidate_not_qualified"]);
       if (caseId === "vortax-september-2022") {
         expect(result.statementCompleteness).toMatchObject({
           suppliedPageProcessing: { status: "all_supplied_pages_processed", provesStatementCompleteness: false },
@@ -120,10 +97,8 @@ describe("explicit combined adjustment/chargeback shadow qualification", () => {
             authorityEligible: false,
           },
         });
-        expect(result.futureAuthorityBlockers).toContain("processor_statement_proven_incomplete");
       } else {
         expect(result.statementCompleteness.statementCompleteness.status).toBe("proven_complete");
-        expect(result.futureAuthorityBlockers).not.toContain("processor_statement_completeness_unproven");
       }
       expect(result.futureAuthorityAssessment).toMatchObject({ status: "withheld", grantsAuthority: false });
     });
@@ -147,16 +122,16 @@ describe("explicit combined adjustment/chargeback shadow qualification", () => {
     const evaluated = executeDocument("paysafe-october-2025", document, true);
     const result = evaluated.diagnostics.combinedAdjustmentChargebackQualification!;
 
-    expect(result.status).toBe("qualified");
-    expect(result.candidate?.support)
-      .toBe("first_class_processor_presented_category_with_passing_claim_control");
+    expect(result.status).toBe("withheld");
+    expect(result.sourceBinding.directCombinedFieldObserved).toBe(true);
+    expect(result.reasonCodes).toContain("fiserv_family_not_admitted");
     expect(result.reasonCodes).not.toContain("funding_control_did_not_reconstruct_as_passing");
   });
 
   it("fails closed on duplicated source scope, incomplete source, and source mismatch while surfacing RB split selections", () => {
     const caseId = "vortax-september-2022" as const;
     const document = documents.get(caseId)!;
-    const base = execute(caseId, false).run.artifacts.rb!;
+    const base = execute(caseId, false).diagnostics.observationalFoundation!;
 
     const duplicated = structuredClone(document);
     const combinedRow = duplicated.rows.find((row) =>
@@ -191,9 +166,10 @@ describe("explicit combined adjustment/chargeback shadow qualification", () => {
     };
     const splitResult = qualifyCombinedAdjustmentChargebackAmount({ document,
       sourceDocumentRef: files[caseId], foundation: split, executionContext: "evaluation_compatibility" });
-    expect(splitResult.status).toBe("qualified");
+    expect(splitResult.status).toBe("withheld");
     expect(splitResult.rbComparison.selectedSplitPopulationKeys).toContain("settlementAdjustmentAmount");
-    expect(splitResult.candidate?.prohibitedInterpretations).toContain("settlement_adjustment");
+    expect(splitResult.candidate).toBeNull();
+    expect(splitResult.sourceBinding.directCombinedFieldObserved).toBe(true);
     expect(splitResult.representationPolicy).toMatchObject({
       collision: "none",
       resolution: "preserve_processor_combined_observation_and_proven_splits",
@@ -201,8 +177,7 @@ describe("explicit combined adjustment/chargeback shadow qualification", () => {
       sourceRepresentationRelationship: "combined_and_split",
       authorityEligible: false,
     });
-    expect(splitResult.futureAuthorityBlockers)
-      .toContain("combined_contribution_authority_withheld_while_split_facts_selected");
+    expect(splitResult.futureAuthorityBlockers).toEqual(["source_candidate_not_qualified"]);
   });
 
   it("distinguishes complete supplied-page processing from complete processor-statement pagination", () => {

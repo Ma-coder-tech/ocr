@@ -142,8 +142,8 @@ describe("canonical RB reconstruction shadow integration", () => {
       kernel_rejected_rb_value: 0, kernel_diverged_value: 0, kernel_proposed_rb_withheld: 2 },
     "clover-duplicate-resubmission": { agree_value: 8, agree_withheld: 9, kernel_withheld_ambiguity: 1,
       kernel_rejected_rb_value: 0, kernel_diverged_value: 0, kernel_proposed_rb_withheld: 1 },
-    "vortax-september-2022": { agree_value: 1, agree_withheld: 9, kernel_withheld_ambiguity: 0,
-      kernel_rejected_rb_value: 0, kernel_diverged_value: 0, kernel_proposed_rb_withheld: 9 },
+    "vortax-september-2022": { agree_value: 4, agree_withheld: 6, kernel_withheld_ambiguity: 3,
+      kernel_rejected_rb_value: 0, kernel_diverged_value: 0, kernel_proposed_rb_withheld: 6 },
   } as const;
 
   for (const caseId of Object.keys(rescueSourceFiles) as Array<keyof typeof rescueSourceFiles>) {
@@ -151,8 +151,9 @@ describe("canonical RB reconstruction shadow integration", () => {
       const execution = execute(caseId, true);
       const shadow = execution.diagnostics.reconstructionShadow!;
 
-      expect(execution.run.familyStatus).toBe("proven");
-      expect(execution.run.artifacts.rb?.templateCapability.admissionStatus).toBe("admitted");
+      const dynamicallyAdmitted = caseId === "clover-duplicate-resubmission";
+      expect(execution.run.familyStatus).toBe(dynamicallyAdmitted ? "proven" : "unresolved");
+      expect(execution.run.artifacts.rb?.templateCapability.admissionStatus).toBe(dynamicallyAdmitted ? "admitted" : "unknown");
       expect(shadow.status).toBe("compared");
       expect(shadow.errors).toEqual([]);
       expect(shadow.sourceEvidence.topLevelExtraction).toBe("complete");
@@ -229,8 +230,8 @@ describe("canonical RB reconstruction shadow integration", () => {
   });
 
   const expectedAdditionalSummaries = {
-    "paysafe-february-2024": { agree_value: 1, agree_withheld: 13, kernel_withheld_ambiguity: 0,
-      kernel_rejected_rb_value: 0, kernel_diverged_value: 0, kernel_proposed_rb_withheld: 5 },
+    "paysafe-february-2024": { agree_value: 4, agree_withheld: 13, kernel_withheld_ambiguity: 0,
+      kernel_rejected_rb_value: 0, kernel_diverged_value: 0, kernel_proposed_rb_withheld: 2 },
     "priority-payment-systems-december-2024": { agree_value: 4, agree_withheld: 6, kernel_withheld_ambiguity: 3,
       kernel_rejected_rb_value: 0, kernel_diverged_value: 0, kernel_proposed_rb_withheld: 6 },
     "paysafe-zero-volume-september-2025": { agree_value: 4, agree_withheld: 13, kernel_withheld_ambiguity: 0,

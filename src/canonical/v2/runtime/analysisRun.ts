@@ -210,6 +210,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   };
   const provenance = "observational" as const;
   let observationalFoundation: ReturnType<typeof buildCanonicalEconomicsV2FromFiserv> | null = null;
+  let diagnosticObservationalFoundation: ReturnType<typeof buildCanonicalEconomicsV2FromFiserv> | null = null;
   let admission: ReturnType<typeof resolveFiservRuntimeCapabilityAdmission>["resolution"] = null;
   let knownLayoutAdmission: ReturnType<typeof resolveFiservTemplateAdmission>["resolution"] = null;
   let fullFamilyDecision: ReturnType<typeof resolveFiservTemplateAdmission>["fullFamilyDecision"] | null = null;
@@ -246,6 +247,16 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
     });
     admission = runtimeAdmission.resolution;
     capabilityProof = runtimeAdmission.proof;
+    diagnosticObservationalFoundation = knownLayoutAdmission ? buildCanonicalEconomicsV2FromFiserv({
+      document: input.document,
+      parserOutput,
+      sourceDocumentRef: input.sourceDocumentRef,
+      parserId: driver.id,
+      provenanceStatus: provenance,
+      templateAdmission: knownLayoutAdmission.templateAdmission,
+      sectionAdmissions: knownLayoutAdmission.sectionAdmissions,
+      documentIntegrity,
+    }) : observationalFoundation;
     const capabilityStatus = admission ? "valid" : "unresolved";
     finishStage(input.observer, stageOutcomes, "capability_admission", capabilityStatus, capabilityProof, [], [],
       admission ? capabilityProof.limitations : [...capabilityProof.limitations,
@@ -256,6 +267,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
     const limitation = `Capability admission failed closed: ${errorMessage(error)}`;
     finishStage(input.observer, stageOutcomes, "capability_admission", "failed", capabilityProof, [limitation], [], [limitation]);
   }
+  diagnosticObservationalFoundation ??= observationalFoundation;
 
   const parserState = {
     matched: true,
@@ -418,11 +430,11 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
   const semanticHash = artifacts.rb ? semanticStateHash(artifacts) : null;
   const canonicalStateHash = semanticHash ? buildCanonicalStateHash({ financialFoundationHash: financialHash,
     semanticHash, rfSnapshotHash: artifacts.rfResolution?.snapshot.snapshotHash ?? "" }) : null;
-  const reconstructionShadow = input.reconstructionShadow?.enabled && artifacts.rb
+  const reconstructionShadow = input.reconstructionShadow?.enabled && diagnosticObservationalFoundation
     ? runCanonicalRbReconstructionShadow({
       document: structuredClone(input.document),
       sourceDocumentRef: input.sourceDocumentRef,
-      foundation: structuredClone(artifacts.rb),
+      foundation: structuredClone(diagnosticObservationalFoundation),
     })
     : null;
   const limitedAuthorityRequested = input.reconstructionLimitedAuthority?.enabled
@@ -453,11 +465,11 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
     })
     : null;
   const combinedAdjustmentChargebackQualification = input.combinedAdjustmentChargebackQualification?.enabled
-    && artifacts.rb
+    && diagnosticObservationalFoundation
     ? qualifyCombinedAdjustmentChargebackAmount({
       document: structuredClone(input.document),
       sourceDocumentRef: input.sourceDocumentRef,
-      foundation: structuredClone(artifacts.rb),
+      foundation: structuredClone(diagnosticObservationalFoundation),
       executionContext: "evaluation_compatibility",
     })
     : null;
@@ -479,7 +491,7 @@ export function executeDeterministicCanonicalAnalysisRun(input: {
       profile,
       provenance,
       authority: "observational",
-      observationalFoundation,
+      observationalFoundation: diagnosticObservationalFoundation,
       ...(input.reconstructionShadow?.enabled ? { reconstructionShadow } : {}),
       ...(limitedAuthorityRequested ? { reconstructionLimitedAuthority } : {}),
       ...(input.reconstructionLimitedAuthorityRegeneration?.enabled

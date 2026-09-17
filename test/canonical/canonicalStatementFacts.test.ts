@@ -225,6 +225,10 @@ describe("canonical statement facts", () => {
     unsupportedFeePartition.feeLedger.partitionSourceProvenance.policyVersion = "unsupported" as never;
     expect(() => validateCanonicalStatementAnalysis(unsupportedFeePartition)).toThrow(/partition source provenance/);
 
+    const missingFeePartition = structuredClone(valid) as CanonicalStatementAnalysis;
+    delete (missingFeePartition.feeLedger as Partial<typeof missingFeePartition.feeLedger>).partitionSourceProvenance;
+    expect(() => validateCanonicalStatementAnalysis(missingFeePartition)).toThrow(/partition source provenance is missing or unsupported/i);
+
     const feePartitionAuthorityExpansion = structuredClone(valid) as CanonicalStatementAnalysis;
     feePartitionAuthorityExpansion.feeLedger.partitionSourceProvenance.authority = "financial_authority" as never;
     expect(() => validateCanonicalStatementAnalysis(feePartitionAuthorityExpansion)).toThrow(/diagnostic-only/);

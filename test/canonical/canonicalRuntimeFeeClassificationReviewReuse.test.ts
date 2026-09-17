@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { buildCanonicalAiCapabilities } from "../../src/canonical/buildCanonicalAiCapabilities.js";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../../src/canonical/buildCanonicalFacts.js";
 import { buildCanonicalCustomerState } from "../../src/canonical/customerStateResolver.js";
+import { buildCanonicalCrossSummaryLinkEvidence } from "../../src/canonical/crossSummaryLinkEvidence.js";
+import { buildCanonicalFeePartitionSourceProvenance } from "../../src/canonical/feePartitionSourceProvenance.js";
 import { buildFeeKnowledgeSourcePacket } from "../../src/canonical/feeKnowledgeRegistry.js";
 import {
   buildCanonicalAiAdmissionAudit,
@@ -605,20 +607,24 @@ function materialAnalysis(options: { anomalyReviewSatisfied?: boolean } = {}): C
   const analysis = noMaterialAnalysis();
   const feeOne = feeRow(FEE_ROW_A, EVIDENCE_A, "src_fee_a", 1000);
   const feeTwo = feeRow(FEE_ROW_B, EVIDENCE_B, "src_fee_b", 2000);
+  const sourceOccurrences = [
+    { id: "src_fee_a", evidenceRef: EVIDENCE_A, documentId: "doc_synthetic", pageNumber: 1, section: "fees", lineId: "l1", rowIndex: 1, normalizedSourceText: null },
+    { id: "src_fee_b", evidenceRef: EVIDENCE_B, documentId: "doc_synthetic", pageNumber: 1, section: "fees", lineId: "l2", rowIndex: 2, normalizedSourceText: null },
+  ];
   const material = {
     ...analysis,
     evidence: [...analysis.evidence, evidenceRecord(EVIDENCE_A), evidenceRecord(EVIDENCE_B)],
     feeLedger: {
       policyVersion: "canonical_fee_ledger_v1",
       status: "partial",
-      sourceOccurrences: [
-        { id: "src_fee_a", evidenceRef: EVIDENCE_A, documentId: "doc_synthetic", pageNumber: 1, section: "fees", lineId: "l1", rowIndex: 1, normalizedSourceText: null },
-        { id: "src_fee_b", evidenceRef: EVIDENCE_B, documentId: "doc_synthetic", pageNumber: 1, section: "fees", lineId: "l2", rowIndex: 2, normalizedSourceText: null },
-      ],
+      sourceOccurrences,
       parserInterpretations: [],
       rows: [feeOne, feeTwo],
       uniqueChargeTotal: money(3000),
       controls: [],
+      partitionSourceProvenance: buildCanonicalFeePartitionSourceProvenance({
+        rows: [feeOne, feeTwo], interpretations: [], sourceOccurrences, controls: [],
+      }),
       limitations: ["Synthetic unresolved fixture."],
     },
     feeOwnershipActionability: {
@@ -635,6 +641,12 @@ function materialAnalysis(options: { anomalyReviewSatisfied?: boolean } = {}): C
       limitations: ["Synthetic unresolved fixture."],
     },
   };
+  const evidenceById = new Map(material.evidence.map((item) => [item.id, item]));
+  material.crossSummaryLinkEvidence = buildCanonicalCrossSummaryLinkEvidence({
+    doc: syntheticStatement(), documentId: material.identity.sourceDocumentRef, identity: material.identity,
+    financialFacts: material.financialFacts, feeLedger: material.feeLedger, parserOutput: null, evidence: evidenceById,
+  });
+  material.evidence = [...evidenceById.values()];
   const aiCapabilities = buildCanonicalAiCapabilities({
     identity: material.identity,
     financialFacts: material.financialFacts,

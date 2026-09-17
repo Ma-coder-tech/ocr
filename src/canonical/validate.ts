@@ -343,45 +343,50 @@ export function validateCanonicalStatementAnalysis(analysis: CanonicalStatementA
       sourceOccurrences: analysis.feeLedger.sourceOccurrences,
       controls: analysis.feeLedger.controls,
     });
-    if (JSON.stringify(analysis.feeLedger.partitionSourceProvenance) !== JSON.stringify(expectedPartitionProvenance)) {
+    const partitionSourceProvenance = analysis.feeLedger.partitionSourceProvenance;
+    if (JSON.stringify(partitionSourceProvenance) !== JSON.stringify(expectedPartitionProvenance)) {
       errors.push("Fee partition source provenance does not reconstruct from fee rows, interpretations, occurrences, and controls.");
     }
-    if (analysis.feeLedger.partitionSourceProvenance.policyVersion !== FEE_PARTITION_SOURCE_PROVENANCE_POLICY_VERSION) {
+    if (!partitionSourceProvenance) {
       errors.push("Fee partition source provenance is missing or unsupported.");
-    }
-    if (analysis.feeLedger.partitionSourceProvenance.authority !== "diagnostic_relationship_only") {
-      errors.push("Fee partition source provenance must remain diagnostic-only.");
-    }
-    for (const assignment of analysis.feeLedger.partitionSourceProvenance.assignments) {
-      for (const evidenceRef of assignment.evidenceRefs) {
-        if (!evidenceIds.has(evidenceRef)) errors.push(`Fee section assignment ${assignment.feeRowId} evidence ref ${evidenceRef} is broken.`);
+    } else {
+      if (partitionSourceProvenance.policyVersion !== FEE_PARTITION_SOURCE_PROVENANCE_POLICY_VERSION) {
+        errors.push("Fee partition source provenance is missing or unsupported.");
       }
-    }
-    for (const arithmetic of analysis.feeLedger.partitionSourceProvenance.rowArithmetic) {
-      if (arithmetic.operandRecovery.policyVersion !== FEE_BASIS_OPERAND_COVERAGE_POLICY_VERSION) {
-        errors.push(`Fee arithmetic provenance ${arithmetic.feeRowId} uses an unsupported operand-recovery policy.`);
+      if (partitionSourceProvenance.authority !== "diagnostic_relationship_only") {
+        errors.push("Fee partition source provenance must remain diagnostic-only.");
       }
-      if (arithmetic.operandRecovery.unitSemanticsPolicyVersion !== FEE_OPERAND_UNIT_SEMANTICS_POLICY_VERSION) {
-        errors.push(`Fee arithmetic provenance ${arithmetic.feeRowId} uses an unsupported unit-semantics policy.`);
-      }
-      if (arithmetic.formulaBasis === "source_units_times_per_unit" && arithmetic.sourceUnit === null) {
-        errors.push(`Fee arithmetic provenance ${arithmetic.feeRowId} has source-unit arithmetic without a resolved source unit.`);
-      }
-      if (arithmetic.formulaBasis !== "source_units_times_per_unit" && arithmetic.sourceUnit !== null) {
-        errors.push(`Fee arithmetic provenance ${arithmetic.feeRowId} carries a source unit outside source-unit arithmetic.`);
-      }
-      for (const evidenceRef of Object.values(arithmetic.fieldEvidenceRefs).flat()) {
-        if (!evidenceIds.has(evidenceRef)) errors.push(`Fee arithmetic provenance ${arithmetic.feeRowId} evidence ref ${evidenceRef} is broken.`);
-      }
-      for (const candidate of arithmetic.operandRecovery.candidates) {
-        if (candidate.formulaBasis === "source_units_times_per_unit" && candidate.sourceUnit === null) {
-          errors.push(`Fee operand candidate ${candidate.id} has source-unit arithmetic without a resolved source unit.`);
+      for (const assignment of partitionSourceProvenance.assignments) {
+        for (const evidenceRef of assignment.evidenceRefs) {
+          if (!evidenceIds.has(evidenceRef)) errors.push(`Fee section assignment ${assignment.feeRowId} evidence ref ${evidenceRef} is broken.`);
         }
-        if (candidate.formulaBasis !== "source_units_times_per_unit" && candidate.sourceUnit !== null) {
-          errors.push(`Fee operand candidate ${candidate.id} carries a source unit outside source-unit arithmetic.`);
+      }
+      for (const arithmetic of partitionSourceProvenance.rowArithmetic) {
+        if (arithmetic.operandRecovery.policyVersion !== FEE_BASIS_OPERAND_COVERAGE_POLICY_VERSION) {
+          errors.push(`Fee arithmetic provenance ${arithmetic.feeRowId} uses an unsupported operand-recovery policy.`);
         }
-        for (const evidenceRef of candidate.evidenceRefs) {
-          if (!evidenceIds.has(evidenceRef)) errors.push(`Fee operand candidate ${candidate.id} evidence ref ${evidenceRef} is broken.`);
+        if (arithmetic.operandRecovery.unitSemanticsPolicyVersion !== FEE_OPERAND_UNIT_SEMANTICS_POLICY_VERSION) {
+          errors.push(`Fee arithmetic provenance ${arithmetic.feeRowId} uses an unsupported unit-semantics policy.`);
+        }
+        if (arithmetic.formulaBasis === "source_units_times_per_unit" && arithmetic.sourceUnit === null) {
+          errors.push(`Fee arithmetic provenance ${arithmetic.feeRowId} has source-unit arithmetic without a resolved source unit.`);
+        }
+        if (arithmetic.formulaBasis !== "source_units_times_per_unit" && arithmetic.sourceUnit !== null) {
+          errors.push(`Fee arithmetic provenance ${arithmetic.feeRowId} carries a source unit outside source-unit arithmetic.`);
+        }
+        for (const evidenceRef of Object.values(arithmetic.fieldEvidenceRefs).flat()) {
+          if (!evidenceIds.has(evidenceRef)) errors.push(`Fee arithmetic provenance ${arithmetic.feeRowId} evidence ref ${evidenceRef} is broken.`);
+        }
+        for (const candidate of arithmetic.operandRecovery.candidates) {
+          if (candidate.formulaBasis === "source_units_times_per_unit" && candidate.sourceUnit === null) {
+            errors.push(`Fee operand candidate ${candidate.id} has source-unit arithmetic without a resolved source unit.`);
+          }
+          if (candidate.formulaBasis !== "source_units_times_per_unit" && candidate.sourceUnit !== null) {
+            errors.push(`Fee operand candidate ${candidate.id} carries a source unit outside source-unit arithmetic.`);
+          }
+          for (const evidenceRef of candidate.evidenceRefs) {
+            if (!evidenceIds.has(evidenceRef)) errors.push(`Fee operand candidate ${candidate.id} evidence ref ${evidenceRef} is broken.`);
+          }
         }
       }
     }
@@ -720,7 +725,9 @@ function validateCrossSummaryLinkEvidence(
       .flatMap((relationship) => [relationship.leftSummaryId, relationship.rightSummaryId]),
   );
   const statementPeriod = analysis.identity.statementPeriod.status === "selected" ? analysis.identity.statementPeriod.value : null;
-  const expectedFeeRollups = buildCanonicalFeeRollupAssessments(analysis.feeLedger);
+  const expectedFeeRollups = analysis.feeLedger.partitionSourceProvenance
+    ? buildCanonicalFeeRollupAssessments(analysis.feeLedger)
+    : [];
   if (JSON.stringify(layer.feeRollups) !== JSON.stringify(expectedFeeRollups)) {
     errors.push("Fee roll-up assessments do not reconstruct from canonical fee controls.");
   }

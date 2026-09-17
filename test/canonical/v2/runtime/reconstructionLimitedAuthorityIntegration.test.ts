@@ -9,6 +9,7 @@ import { parsePdf, type ParsedDocument } from "../../../../src/parser.js";
 import { rescueSourceFiles } from "../../../fixtures/reconstructionKernel/rescueSourceManifest.js";
 
 const additionalFiles = {
+  "proof-qualified-full": "test/fixtures/pdfs/SAMPLE_MERCHANT4_CLOVER.pdf",
   "paysafe-february-2024": "test/fixtures/pdfs/fiserv_PAYSAFE_Febr_2024.pdf",
   "priority-payment-systems-december-2024": "test/fixtures/pdfs/fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf",
   "paysafe-zero-volume-september-2025": "test/fixtures/pdfs/fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
@@ -35,8 +36,8 @@ beforeAll(async () => {
 
 describe("limited canonical authority for direct card-summary populations", () => {
   it("creates a canonical population overlay without mutating RB or any downstream artifact", () => {
-    const baseline = execute("basys-march-2020", false);
-    const authorized = execute("basys-march-2020", true);
+    const baseline = execute("proof-qualified-full", false);
+    const authorized = execute("proof-qualified-full", true);
     const result = authorized.diagnostics.reconstructionLimitedAuthority!;
 
     expect(authorized.run).toEqual(baseline.run);
@@ -72,33 +73,17 @@ describe("limited canonical authority for direct card-summary populations", () =
     })).toThrow("RECONSTRUCTION_LIMITED_AUTHORITY_REQUIRES_EVALUATION_CONTEXT");
   });
 
-  const expected = {
-    "basys-march-2020": {
-      grants: ["grossSaleVolume", "refundVolume", "grossSaleTransactionCount", "refundTransactionCount", "submittedTransactionCount"],
-      changed: 5,
-    },
-    "paysafe-october-2025": { grants: ["grossSaleVolume", "refundVolume"], changed: 2 },
-    "wells-fargo-september-2024": {
-      grants: ["grossSaleVolume", "refundVolume", "grossSaleTransactionCount", "refundTransactionCount", "submittedTransactionCount"],
-      changed: 2,
-    },
-    "clover-duplicate-resubmission": {
-      grants: ["grossSaleTransactionCount", "refundTransactionCount", "submittedTransactionCount"],
-      changed: 1,
-    },
-    "vortax-september-2022": { grants: ["grossSaleVolume", "refundVolume"], changed: 2 },
-    "paysafe-february-2024": { grants: [], changed: 0 },
-    "priority-payment-systems-december-2024": { grants: ["grossSaleVolume", "refundVolume"], changed: 2 },
-    "paysafe-zero-volume-september-2025": { grants: [], changed: 0 },
-  } as const;
-
-  for (const caseId of Object.keys(expected) as CaseId[]) {
-    it(`enforces the same claim-local authority policy for ${caseId}`, () => {
+  const unsupportedCases = Object.keys(files).filter((caseId) =>
+    caseId !== "proof-qualified-full" && caseId !== "clover-duplicate-resubmission") as CaseId[];
+  for (const caseId of unsupportedCases) {
+    it(`keeps observational reconstruction non-authoritative for ${caseId}`, () => {
       const result = execute(caseId, true).diagnostics.reconstructionLimitedAuthority!;
       const grants = result.decisions.filter((item) => item.decision !== "withheld");
-      expect(grants.map((item) => item.populationKey)).toEqual(expected[caseId].grants);
-      expect(grants.filter((item) => item.decision === "granted_changes_rb")).toHaveLength(expected[caseId].changed);
-      expect(Object.keys(result.canonicalFacts)).toEqual(expected[caseId].grants);
+      expect(grants).toEqual([]);
+      expect(Object.keys(result.canonicalFacts)).toEqual([]);
+      expect(result.status).toBe("withheld");
+      expect(result.sourceBinding.admittedFiservFamily).toBe(false);
+      expect(result.decisions.every((item) => item.reasonCodes.includes("fiserv_family_not_admitted"))).toBe(true);
       expect(result.decisions).toHaveLength(CANONICAL_RB_LIMITED_AUTHORITY_POPULATIONS.length);
       expect(result.errors).toEqual([]);
       expect(result.decisions.every((item) =>
@@ -106,7 +91,7 @@ describe("limited canonical authority for direct card-summary populations", () =
     });
   }
 
-  it("keeps Clover's contradictory amount claims non-authoritative while admitting independently reconciled counts", () => {
+  it("keeps Clover's contradictory amounts withheld while admitting only independently proof-qualified counts", () => {
     const result = execute("clover-duplicate-resubmission", true).diagnostics.reconstructionLimitedAuthority!;
     for (const populationKey of ["grossSaleVolume", "refundVolume"] as const) {
       expect(result.decisions).toContainEqual(expect.objectContaining({
@@ -119,27 +104,27 @@ describe("limited canonical authority for direct card-summary populations", () =
       }));
       expect(result.canonicalFacts[populationKey]).toBeUndefined();
     }
-    expect(result.canonicalFacts.refundTransactionCount?.value).toBe(2);
+    expect(Object.keys(result.canonicalFacts)).toEqual([
+      "grossSaleTransactionCount", "refundTransactionCount", "submittedTransactionCount",
+    ]);
   });
 
   it("withholds counts when the source does not explicitly print and reconcile a submitted count", () => {
     const result = execute("vortax-september-2022", true).diagnostics.reconstructionLimitedAuthority!;
-    expect(result.canonicalFacts.grossSaleVolume).toBeDefined();
-    expect(result.canonicalFacts.refundVolume).toBeDefined();
+    expect(result.canonicalFacts.grossSaleVolume).toBeUndefined();
+    expect(result.canonicalFacts.refundVolume).toBeUndefined();
     for (const key of ["grossSaleTransactionCount", "refundTransactionCount", "submittedTransactionCount"] as const) {
       expect(result.decisions).toContainEqual(expect.objectContaining({
         populationKey: key,
         decision: "withheld",
-        reasonCodes: expect.arrayContaining([
-          "required_control_not_passing:document-ir.control.card-summary-count-formula",
-        ]),
+        reasonCodes: expect.arrayContaining(["fiserv_family_not_admitted"]),
       }));
     }
   });
 
   it("fails closed on source mismatch, incomplete provenance, and RB disagreement", () => {
-    const document = documents.get("basys-march-2020")!;
-    const foundation = execute("basys-march-2020", false).run.artifacts.rb!;
+    const document = documents.get("proof-qualified-full")!;
+    const foundation = execute("proof-qualified-full", false).run.artifacts.rb!;
 
     const mismatched = grantCanonicalRbLimitedAuthority({
       document: documents.get("wells-fargo-september-2024")!,
@@ -177,7 +162,7 @@ describe("limited canonical authority for direct card-summary populations", () =
   });
 
   it("withholds every claim when duplicate section structure makes the source scope ambiguous", () => {
-    const document = structuredClone(documents.get("basys-march-2020")!);
+    const document = structuredClone(documents.get("proof-qualified-full")!);
     const heading = document.rows.find((row) => /summary by card type/i.test(String(row.content ?? "")))!;
     document.rows.push({ ...heading });
     const execution = executeDeterministicCanonicalAnalysisRun({

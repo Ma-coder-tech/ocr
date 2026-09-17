@@ -8,7 +8,7 @@ import {
 import { executeDeterministicCanonicalAnalysisRun } from "../../../../src/canonical/v2/runtime/analysisRun.js";
 import { parsePdf, type ParsedDocument } from "../../../../src/parser.js";
 
-const sourceDocumentRef = "test/fixtures/pdfs/fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf";
+const sourceDocumentRef = "test/fixtures/pdfs/SAMPLE_MERCHANT4_CLOVER.pdf";
 let document: ParsedDocument;
 
 beforeAll(async () => {
