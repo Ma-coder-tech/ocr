@@ -1106,9 +1106,16 @@ function isTieredDiscountDescription(description: string): boolean {
   return /^(?:MQUAL|NQUAL)\s+DISC$/i.test(description.trim());
 }
 
+function hasItemizedInterchangeRows(feeLedger: FeeLedgerForPricingModel): boolean {
+  return feeLedger.rows.some((row) =>
+    row.type === "Interchange charges" || normalizeFiservFeeReferenceText(row.description) === "INTERCHANGE",
+  );
+}
+
 function detectTieredPricingModelFromFeeLedger(feeLedger: FeeLedgerForPricingModel) {
   const tieredRows = feeLedger.rows.filter((row) => isTieredDiscountDescription(row.description) && row.volumeBasis !== null && row.volumeBasis > 0 && row.amount > 0);
-  if (tieredRows.length < 2) {
+  const distinctRates = new Set(tieredRows.map((row) => round8(row.amount / (row.volumeBasis ?? 1))).filter((rate) => rate > 0).map((rate) => rate.toFixed(8)));
+  if (tieredRows.length < 2 || distinctRates.size < 2 || hasItemizedInterchangeRows(feeLedger)) {
     return null;
   }
 
@@ -1135,8 +1142,8 @@ function detectTieredPricingModelFromFeeLedger(feeLedger: FeeLedgerForPricingMod
     evidenceType: "fee_math_inferred",
     evidence,
     notes: [
-      "Tiered pricing inferred from visible MQUAL/NQUAL discount buckets with statement-level volume and fee math.",
-      "Tiered discount buckets are processor-controlled blended fees; the statement exposes the charged amounts but not the interchange-versus-processor-margin split.",
+      "Tiered pricing inferred from multiple distinct applied MQUAL/NQUAL rates, statement-level volume/fee math, and the absence of separately itemized interchange for those visible populations.",
+      "Tiered discount buckets are merchant-facing acquiring-side bundled prices; the statement exposes the charged amounts but not the interchange-versus-commercial-price split or ultimate retention.",
       "These rows are structurally unprovable at cost from this statement and must remain excluded from clean pass-through/markup split reporting unless external contract detail or explicit processor data exposes the split.",
     ],
   };
@@ -1195,7 +1202,7 @@ function detectFlatRatePricingModelFromFeeLedger(feeLedger: FeeLedgerForPricingM
   const discountRows = feeLedger.rows.filter(
     (row) => /\bDISCOUNT\b/i.test(row.description) && row.volumeBasis !== null && row.volumeBasis > 0 && row.rate !== null && row.rate > 0 && row.amount > 0,
   );
-  if (discountRows.length < 1) {
+  if (discountRows.length < 1 || hasItemizedInterchangeRows(feeLedger)) {
     return null;
   }
 
@@ -1271,14 +1278,15 @@ function detectPricingModelFromFeeLedger(feeLedger: FeeLedgerForPricingModel) {
   }
 
   return {
-    pricingModel: "flat_discount_pricing",
+    pricingModel: "flat_rate",
     confidence: "high",
     cashDiscountStatus: "not_confirmed",
     flatDiscountRate: firstRate,
     evidenceType: "fee_math_inferred",
     evidence,
     notes: [
-      "Flat discount pricing inferred from repeated QUAL DISC rows with the same rate and row-level volume times rate math.",
+      "Flat bundled pricing inferred from repeated QUAL DISC rows with the same applied rate, row-level volume-times-rate math, and no separately itemized interchange.",
+      "QUAL is treated as a printed pricing-population label, not evidence of tiered pricing, processor profit, economic beneficiary, or an avoidable network downgrade.",
       "Cash discount is not confirmed because the uploaded statement text does not explicitly identify a cash discount or non-cash adjustment program.",
     ],
   };

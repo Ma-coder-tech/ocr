@@ -859,7 +859,7 @@ describe("Fiserv First Data full statement parser", () => {
     expect(actual.pricingModel.evidence.find((row: any) => row.description === "NQUAL DISC" && row.network === "VS OFLN DB")?.rate).toBeCloseTo(0.06, 5);
     expect(actual.pricingModel.notes).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("processor-controlled blended fees"),
+        expect.stringContaining("merchant-facing acquiring-side bundled prices"),
         expect.stringContaining("structurally unprovable at cost"),
       ]),
     );
@@ -1354,7 +1354,7 @@ describe("Fiserv First Data full statement parser", () => {
       ]),
     );
     expect(actual.pricingModel).toMatchObject({
-      pricingModel: "flat_discount_pricing",
+      pricingModel: "flat_rate",
       confidence: "high",
       cashDiscountStatus: "not_confirmed",
       flatDiscountRate: 0.038,
@@ -1376,7 +1376,7 @@ describe("Fiserv First Data full statement parser", () => {
     );
     expect(actual.fiservFeeAnalysisV2).toMatchObject({
       pricingModel: {
-        pricingModel: "single_tier_qualified",
+        pricingModel: "flat_rate",
         confidence: "high",
         analysisStatus: "universal_only_pending_model_rules",
       },

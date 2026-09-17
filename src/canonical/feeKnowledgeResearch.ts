@@ -605,6 +605,7 @@ export function openAiWebSearchAdapter(options: {
         body: JSON.stringify({
           model,
           input,
+          store: false,
           tools: [{ type: "web_search" }],
           tool_choice: "required",
           include: ["web_search_call.action.sources"],
@@ -722,6 +723,7 @@ export function openAiSemanticSupportAdapter(options: {
         body: JSON.stringify({
           model: options.modelName ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_WEB_SEARCH_MODEL,
           input,
+          store: false,
           max_output_tokens: maximumOutputTokens,
           reasoning: { effort: "low" },
           text: { format: semanticSupportOutputJsonSchema() },

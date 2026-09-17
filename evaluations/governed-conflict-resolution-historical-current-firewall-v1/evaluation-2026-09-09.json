@@ -1,0 +1,1462 @@
+{
+  "schemaVersion": "governed_conflict_resolution_historical_current_firewall_2026_09_09_v1",
+  "baseline": {
+    "branch": "codex/governed-conflict-diagnostic-v1",
+    "commit": "25b2be2e79963a3e5c6b9218d99c45b41432a4f5",
+    "governedConflictCount": 18
+  },
+  "corpus": {
+    "statements": 11,
+    "materialFindings": 483,
+    "governedConflictsBefore": 18,
+    "governedConflictsAfter": 0,
+    "conflictRowsAfter": [],
+    "resolvedByFamily": {
+      "mastercardAssessment": 9,
+      "mastercardLocationFee": 5,
+      "amexProgramFees": 2,
+      "discoverNetworkAuthorization": 1,
+      "visaBaseII": 1
+    },
+    "warrantedResearchRows": 153
+  },
+  "outcomes": {
+    "amexProgramFees": [
+      {
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_5c137d2bc67e4a16325df13d",
+        "printedLabel": "AMEXCT043 - PROGRAM FEES",
+        "exactIdentity": "amex_program_cost",
+        "broaderCategory": "network_program_cost",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": "acquiring_side_program"
+        },
+        "determinant": {
+          "family": "F2",
+          "economicLayer": "card_network",
+          "mechanic": "reconciled_program_cost_total",
+          "population": "statement_printed_amex_program_cost_total",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": null,
+        "focusedMastercard": null
+      },
+      {
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_4cb07059bb71bd0b9a4a6dd9",
+        "printedLabel": "AMEXCT043 - PROGRAM FEES",
+        "exactIdentity": "amex_program_cost",
+        "broaderCategory": "network_program_cost",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": "acquiring_side_program"
+        },
+        "determinant": {
+          "family": "F2",
+          "economicLayer": "card_network",
+          "mechanic": "reconciled_program_cost_total",
+          "population": "statement_printed_amex_program_cost_total",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": null,
+        "focusedMastercard": null
+      }
+    ],
+    "mastercardAssessment": [
+      {
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_bd0f1aed5cf3a16a4c37c1e0",
+        "printedLabel": "MASTERCARD - MASTERCARD ASSESSMENT FEE 0.0014 TIMES $12970.74",
+        "exactIdentity": "mastercard_assessment",
+        "broaderCategory": "network_or_pass_through",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F2",
+          "economicLayer": "card_network",
+          "mechanic": "0.13% base plus 0.01% on transactions at or above $1,000",
+          "population": "applicable Mastercard volume with a separately scoped high-ticket component",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+          "statementPeriodState": "NOT_APPLICABLE",
+          "statementPeriodValues": [],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_RATE_UNRESOLVED",
+          "maintenanceCandidates": [
+            {
+              "value": 0.0013,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001375,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.0014,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001475,
+              "unit": "decimal_rate"
+            }
+          ],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "unresolved",
+            "confidence": "UNRESOLVED",
+            "comparisonAllowed": false,
+            "evidenceRefs": [
+              "RR-MCF-08"
+            ],
+            "explanation": "The statement does not establish whether the assessment line contains one component or multiple scoped assessment components, so naive above/below-reference comparison is blocked."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": {
+          "assessment2024": null,
+          "locationMccAdjudication": null,
+          "sourceConflicts": [],
+          "comparison": {
+            "statementValue": 0.0014,
+            "referenceValue": 0.0013,
+            "unit": "decimal_rate",
+            "difference": 0.00010000000000000005,
+            "passThroughAtParEstablished": false,
+            "confirmedMarkupEstablished": false,
+            "state": "population_or_product_scope_unresolved",
+            "renderingText": "The April 2023 Fiserv guide has a base and separately scoped high-ticket component; the statement population does not permit a confirmed comparison."
+          }
+        }
+      },
+      {
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_4f2128cf267d131112f92cff",
+        "printedLabel": "MASTERCARD - MASTERCARD ASSESSMENT FEE 0.0014 TIMES $12147.20",
+        "exactIdentity": "mastercard_assessment",
+        "broaderCategory": "network_or_pass_through",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F2",
+          "economicLayer": "card_network",
+          "mechanic": "0.13% base plus 0.01% on transactions at or above $1,000",
+          "population": "applicable Mastercard volume with a separately scoped high-ticket component",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+          "statementPeriodState": "NOT_APPLICABLE",
+          "statementPeriodValues": [],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_RATE_UNRESOLVED",
+          "maintenanceCandidates": [
+            {
+              "value": 0.0013,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001375,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.0014,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001475,
+              "unit": "decimal_rate"
+            }
+          ],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "unresolved",
+            "confidence": "UNRESOLVED",
+            "comparisonAllowed": false,
+            "evidenceRefs": [
+              "RR-MCF-08"
+            ],
+            "explanation": "The statement does not establish whether the assessment line contains one component or multiple scoped assessment components, so naive above/below-reference comparison is blocked."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": {
+          "assessment2024": null,
+          "locationMccAdjudication": null,
+          "sourceConflicts": [],
+          "comparison": {
+            "statementValue": 0.0014,
+            "referenceValue": 0.0013,
+            "unit": "decimal_rate",
+            "difference": 0.00010000000000000005,
+            "passThroughAtParEstablished": false,
+            "confirmedMarkupEstablished": false,
+            "state": "population_or_product_scope_unresolved",
+            "renderingText": "The April 2023 Fiserv guide has a base and separately scoped high-ticket component; the statement population does not permit a confirmed comparison."
+          }
+        }
+      },
+      {
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_3ce8d27aaeda422f2edfc6b5",
+        "printedLabel": "MASTERCARD - DUES & ASSESSMENTS",
+        "exactIdentity": "mastercard_assessment",
+        "broaderCategory": "network_or_pass_through",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F2",
+          "economicLayer": "card_network",
+          "mechanic": "0.13% base plus 0.01% on transactions at or above $1,000",
+          "population": "applicable Mastercard volume with a separately scoped high-ticket component",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+          "statementPeriodState": "NOT_APPLICABLE",
+          "statementPeriodValues": [],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_RATE_UNRESOLVED",
+          "maintenanceCandidates": [
+            {
+              "value": 0.0013,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001375,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.0014,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001475,
+              "unit": "decimal_rate"
+            }
+          ],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "unresolved",
+            "confidence": "UNRESOLVED",
+            "comparisonAllowed": false,
+            "evidenceRefs": [
+              "RR-MCF-08"
+            ],
+            "explanation": "The statement does not establish whether the assessment line contains one component or multiple scoped assessment components, so naive above/below-reference comparison is blocked."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": {
+          "assessment2024": null,
+          "locationMccAdjudication": null,
+          "sourceConflicts": [],
+          "comparison": {
+            "statementValue": null,
+            "referenceValue": null,
+            "unit": null,
+            "difference": null,
+            "passThroughAtParEstablished": false,
+            "confirmedMarkupEstablished": false,
+            "state": "not_comparable",
+            "renderingText": "No safely comparable statement value and dated reference variant are both available."
+          }
+        }
+      },
+      {
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_174df8c5301cf3e3eb0f0f05",
+        "printedLabel": "MC OFLN DB - DUES & ASSESSMENTS",
+        "exactIdentity": "mastercard_assessment",
+        "broaderCategory": "network_or_pass_through",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F2",
+          "economicLayer": "card_network",
+          "mechanic": "0.13% base plus 0.01% on transactions at or above $1,000",
+          "population": "applicable Mastercard volume with a separately scoped high-ticket component",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+          "statementPeriodState": "NOT_APPLICABLE",
+          "statementPeriodValues": [],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_RATE_UNRESOLVED",
+          "maintenanceCandidates": [
+            {
+              "value": 0.0013,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001375,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.0014,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001475,
+              "unit": "decimal_rate"
+            }
+          ],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "unresolved",
+            "confidence": "UNRESOLVED",
+            "comparisonAllowed": false,
+            "evidenceRefs": [
+              "RR-MCF-08"
+            ],
+            "explanation": "The statement does not establish whether the assessment line contains one component or multiple scoped assessment components, so naive above/below-reference comparison is blocked."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": {
+          "assessment2024": null,
+          "locationMccAdjudication": null,
+          "sourceConflicts": [],
+          "comparison": {
+            "statementValue": null,
+            "referenceValue": null,
+            "unit": null,
+            "difference": null,
+            "passThroughAtParEstablished": false,
+            "confirmedMarkupEstablished": false,
+            "state": "not_comparable",
+            "renderingText": "No safely comparable statement value and dated reference variant are both available."
+          }
+        }
+      },
+      {
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_26f1b3758d39e3ba6523ae8b",
+        "printedLabel": "MASTERCARD - MASTERCARD ASSESSMENT FEE .0012 TIMES $25317.39",
+        "exactIdentity": "mastercard_assessment",
+        "broaderCategory": "network_or_pass_through",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F2",
+          "economicLayer": "card_network",
+          "mechanic": "0.13% base plus 0.01% on transactions at or above $1,000",
+          "population": "applicable Mastercard volume with a separately scoped high-ticket component",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+          "statementPeriodState": "NOT_APPLICABLE",
+          "statementPeriodValues": [],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_RATE_UNRESOLVED",
+          "maintenanceCandidates": [
+            {
+              "value": 0.0013,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001375,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.0014,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001475,
+              "unit": "decimal_rate"
+            }
+          ],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "unresolved",
+            "confidence": "UNRESOLVED",
+            "comparisonAllowed": false,
+            "evidenceRefs": [
+              "RR-MCF-08"
+            ],
+            "explanation": "The statement does not establish whether the assessment line contains one component or multiple scoped assessment components, so naive above/below-reference comparison is blocked."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": {
+          "assessment2024": null,
+          "locationMccAdjudication": null,
+          "sourceConflicts": [],
+          "comparison": {
+            "statementValue": 0.0012,
+            "referenceValue": 0.0013,
+            "unit": "decimal_rate",
+            "difference": -0.00010000000000000005,
+            "passThroughAtParEstablished": false,
+            "confirmedMarkupEstablished": false,
+            "state": "population_or_product_scope_unresolved",
+            "renderingText": "The April 2023 Fiserv guide has a base and separately scoped high-ticket component; the statement population does not permit a confirmed comparison."
+          }
+        }
+      },
+      {
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_483f41a24bd9026d43e364da",
+        "printedLabel": "MASTERCARD - DUES & ASSESSMENTS",
+        "exactIdentity": "mastercard_assessment",
+        "broaderCategory": "network_or_pass_through",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F2",
+          "economicLayer": "card_network",
+          "mechanic": "0.13% base plus 0.01% on transactions at or above $1,000",
+          "population": "applicable Mastercard volume with a separately scoped high-ticket component",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+          "statementPeriodState": "NOT_APPLICABLE",
+          "statementPeriodValues": [],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_RATE_UNRESOLVED",
+          "maintenanceCandidates": [
+            {
+              "value": 0.0013,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001375,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.0014,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001475,
+              "unit": "decimal_rate"
+            }
+          ],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "unresolved",
+            "confidence": "UNRESOLVED",
+            "comparisonAllowed": false,
+            "evidenceRefs": [
+              "RR-MCF-08"
+            ],
+            "explanation": "The statement does not establish whether the assessment line contains one component or multiple scoped assessment components, so naive above/below-reference comparison is blocked."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": {
+          "assessment2024": null,
+          "locationMccAdjudication": null,
+          "sourceConflicts": [],
+          "comparison": {
+            "statementValue": null,
+            "referenceValue": null,
+            "unit": null,
+            "difference": null,
+            "passThroughAtParEstablished": false,
+            "confirmedMarkupEstablished": false,
+            "state": "not_comparable",
+            "renderingText": "No safely comparable statement value and dated reference variant are both available."
+          }
+        }
+      },
+      {
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_abc2ec347ae5155154668daa",
+        "printedLabel": "MC OFLN DB - DUES & ASSESSMENTS",
+        "exactIdentity": "mastercard_assessment",
+        "broaderCategory": "network_or_pass_through",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F2",
+          "economicLayer": "card_network",
+          "mechanic": "0.13% base plus 0.01% on transactions at or above $1,000",
+          "population": "applicable Mastercard volume with a separately scoped high-ticket component",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+          "statementPeriodState": "NOT_APPLICABLE",
+          "statementPeriodValues": [],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_RATE_UNRESOLVED",
+          "maintenanceCandidates": [
+            {
+              "value": 0.0013,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001375,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.0014,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001475,
+              "unit": "decimal_rate"
+            }
+          ],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "unresolved",
+            "confidence": "UNRESOLVED",
+            "comparisonAllowed": false,
+            "evidenceRefs": [
+              "RR-MCF-08"
+            ],
+            "explanation": "The statement does not establish whether the assessment line contains one component or multiple scoped assessment components, so naive above/below-reference comparison is blocked."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": {
+          "assessment2024": null,
+          "locationMccAdjudication": null,
+          "sourceConflicts": [],
+          "comparison": {
+            "statementValue": null,
+            "referenceValue": null,
+            "unit": null,
+            "difference": null,
+            "passThroughAtParEstablished": false,
+            "confirmedMarkupEstablished": false,
+            "state": "not_comparable",
+            "renderingText": "No safely comparable statement value and dated reference variant are both available."
+          }
+        }
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "feeRowId": "feerow_989715dce0eedc8ba96405a3",
+        "printedLabel": "MASTERCARD - DUES & ASSESSMENTS",
+        "exactIdentity": "mastercard_assessment",
+        "broaderCategory": "network_or_pass_through",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F2",
+          "economicLayer": "card_network",
+          "mechanic": "0.13% base plus 0.01% on transactions at or above $1,000",
+          "population": "applicable Mastercard volume with a separately scoped high-ticket component",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+          "statementPeriodState": "NOT_APPLICABLE",
+          "statementPeriodValues": [],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_RATE_UNRESOLVED",
+          "maintenanceCandidates": [
+            {
+              "value": 0.0013,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001375,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.0014,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001475,
+              "unit": "decimal_rate"
+            }
+          ],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "unresolved",
+            "confidence": "UNRESOLVED",
+            "comparisonAllowed": false,
+            "evidenceRefs": [
+              "RR-MCF-08"
+            ],
+            "explanation": "The statement does not establish whether the assessment line contains one component or multiple scoped assessment components, so naive above/below-reference comparison is blocked."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": {
+          "assessment2024": null,
+          "locationMccAdjudication": null,
+          "sourceConflicts": [],
+          "comparison": {
+            "statementValue": null,
+            "referenceValue": null,
+            "unit": null,
+            "difference": null,
+            "passThroughAtParEstablished": false,
+            "confirmedMarkupEstablished": false,
+            "state": "not_comparable",
+            "renderingText": "No safely comparable statement value and dated reference variant are both available."
+          }
+        }
+      },
+      {
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_9e0127ffcb40a190fae065ab",
+        "printedLabel": "MASTERCARD - MASTERCARD ASSESSMENT FEE 0.001475 TIMES $26744.25",
+        "exactIdentity": "mastercard_assessment",
+        "broaderCategory": "network_or_pass_through",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F2",
+          "economicLayer": "card_network",
+          "mechanic": "0.14% Acquirer Brand Volume Fee plus a plausible 0.0075% Annual Acquirer License Fee component",
+          "population": "September 2024 billed Mastercard assessment population with a plausible bundled license component",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+          "statementPeriodState": "NOT_APPLICABLE",
+          "statementPeriodValues": [],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_RATE_UNRESOLVED",
+          "maintenanceCandidates": [
+            {
+              "value": 0.0013,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001375,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.0014,
+              "unit": "decimal_rate"
+            },
+            {
+              "value": 0.001475,
+              "unit": "decimal_rate"
+            }
+          ],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "multiple_legitimate_components_strongly_explained",
+            "confidence": "STRONG",
+            "comparisonAllowed": true,
+            "evidenceRefs": [
+              "MC-FOCUSED-02",
+              "RR-MCF-08"
+            ],
+            "explanation": "The line is strongly explained by two legitimate Mastercard components, while actual bundling and at-par pass-through remain unproven."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": {
+          "assessment2024": {
+            "structuralExplanation": "STRONGLY_EXPLAINED",
+            "baseAcquirerBrandVolumeFee": 0.0014,
+            "plausibleAnnualAcquirerLicenseFeeComponent": 0.000075,
+            "specificAcquirerComponentConfidence": "LIKELY",
+            "aboveReferenceCandidate": false,
+            "confirmedAtPar": false,
+            "acquiringSideUpliftExcluded": false
+          },
+          "locationMccAdjudication": null,
+          "sourceConflicts": [],
+          "comparison": {
+            "statementValue": 0.001475,
+            "referenceValue": 0.0014,
+            "unit": "decimal_rate",
+            "difference": 0.000075,
+            "passThroughAtParEstablished": false,
+            "confirmedMarkupEstablished": false,
+            "state": "population_or_product_scope_unresolved",
+            "renderingText": "The 0.1475% line is strongly explained by the 0.14% 2024 Acquirer Brand Volume Fee plus a plausible 0.0075% Annual Acquirer License Fee component. The absence of a separate ALF line supports, but does not prove, the bundled-component hypothesis. Markup is not required to explain the row, but at-par pass-through and a small acquiring-side uplift cannot be fully excluded without acquirer-specific period evidence."
+          }
+        }
+      }
+    ],
+    "discoverNetworkAuthorization": [
+      {
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_2ca86e68c5b49944f07e91a3",
+        "printedLabel": "DISCOVER - NETWORK AUTHORIZATION FEE 62 TRANSACTIONS AT 0.019",
+        "exactIdentity": "discover_network_authorization_fee",
+        "broaderCategory": "network_authorization_or_access",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F3",
+          "economicLayer": "card_network",
+          "mechanic": "per authorization",
+          "population": "Discover authorization records",
+          "actionClass": "N2",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "DATED_CHANGE_APPLIES_TO_STATEMENT_PERIOD",
+          "statementPeriodState": "CURRENT_CONFIRMED_CHANGE",
+          "statementPeriodValues": [
+            {
+              "variantId": "authorization",
+              "value": 0.019,
+              "unit": "usd_per_event",
+              "scope": "post-April-17-2021 network authorization"
+            }
+          ],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_CONFIRMED_CHANGE",
+          "maintenanceCandidates": [],
+          "rejectedCandidates": [
+            {
+              "value": 0.025,
+              "unit": "usd_per_event",
+              "disposition": "unsupported_stale_or_error_candidate",
+              "origin": "unresolved"
+            }
+          ],
+          "cardinality": {
+            "state": "one_fee_supported",
+            "confidence": "STRONG",
+            "comparisonAllowed": true,
+            "evidenceRefs": [
+              "CUR-26-05",
+              "discover_network_authorization_2023_04",
+              "fiserv_card_brand_pass_through_guide_2023_04",
+              "RateReveal_US_Network_Fee_Evidence_Pack_2020-2026_FINAL_Product_Adjudicated.md#discover_network_authorization_2023_04"
+            ],
+            "explanation": "The existing governed identity supports one fee for this row; hidden economic allocation is not inferred."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": null
+      }
+    ],
+    "visaBaseII": [
+      {
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_1875b7aa339f8f6b731367f4",
+        "printedLabel": "Other - VI BASE II SYSTEM FILE FEE 3362 TRANSACTIONS AT 0.0018",
+        "exactIdentity": "visa_base_ii_system_file_fee",
+        "broaderCategory": "clearing_or_data_record",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": null,
+          "ruleSetter": null,
+          "underlyingPriceSetter": null,
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F3",
+          "economicLayer": "card_network",
+          "mechanic": "per system-file/data record",
+          "population": "qualified Base II system-file records",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "HISTORICAL_VALUE_PRESERVED_BEFORE_CHANGE",
+          "statementPeriodState": "CURRENT_CONFIRMED_CHANGE",
+          "statementPeriodValues": [],
+          "historicalValues": [
+            {
+              "value": 0.0018,
+              "unit": "usd_per_event",
+              "effectiveThrough": "2024-12-31"
+            }
+          ],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_RATE_UNRESOLVED",
+          "maintenanceCandidates": [
+            {
+              "value": 0.0025,
+              "unit": "usd_per_event"
+            },
+            {
+              "value": 0.0027,
+              "unit": "usd_per_event"
+            }
+          ],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "one_fee_supported",
+            "confidence": "STRONG",
+            "comparisonAllowed": true,
+            "evidenceRefs": [
+              "CUR-26-05",
+              "rr_product_governed_conflict_adjudication_final#visa_base_ii_identity",
+              "rr_product_current_2026_us_core_network_final#unresolved-values"
+            ],
+            "explanation": "System File Transmission and Transmission are supported name variants of one fee family; the separate Base II Network Access family is not merged into this line."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": null
+      }
+    ],
+    "mastercardLocationFee": [
+      {
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_000220f34e5aac766fe8c834",
+        "printedLabel": "MASTERCARD - LOCATION FEE",
+        "exactIdentity": "mastercard_location_fee",
+        "broaderCategory": "network_fixed_or_periodic",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F4",
+          "economicLayer": "card_network",
+          "mechanic": "monthly per qualifying merchant location",
+          "population": "location accepts at least one Mastercard transaction and has at least $200 monthly gross Mastercard volume",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+          "statementPeriodState": "NOT_APPLICABLE",
+          "statementPeriodValues": [],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+          "maintenanceCandidates": [],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "one_fee_supported",
+            "confidence": "STRONG",
+            "comparisonAllowed": true,
+            "evidenceRefs": [
+              "RR-MCF-08"
+            ],
+            "explanation": "Available identity and mechanic evidence support one fee for reference comparison."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": {
+          "assessment2024": null,
+          "locationMccAdjudication": {
+            "canonicalExcludedMccs": [
+              8398,
+              8661
+            ],
+            "preservedSourceAssertions": [
+              "Fiserv: 8393 and 8661",
+              "Nuvei/Paya: 8938 and 8661"
+            ],
+            "correctionLayerOnly": true
+          },
+          "sourceConflicts": [],
+          "comparison": {
+            "statementValue": 0.62,
+            "referenceValue": 1.25,
+            "unit": "usd_per_location_month",
+            "difference": -0.63,
+            "passThroughAtParEstablished": false,
+            "confirmedMarkupEstablished": false,
+            "state": "population_or_product_scope_unresolved",
+            "renderingText": "A dated reference exists, but product, population, mechanic, or period scope is insufficient for a responsible price conclusion."
+          }
+        }
+      },
+      {
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_b2c0ace0944e56d4c810f9f5",
+        "printedLabel": "MASTERCARD - MC MONTHLY LOCATION FEE",
+        "exactIdentity": "mastercard_location_fee",
+        "broaderCategory": "network_fixed_or_periodic",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F4",
+          "economicLayer": "card_network",
+          "mechanic": "monthly per qualifying merchant location",
+          "population": "location accepts at least one Mastercard transaction and has at least $200 monthly gross Mastercard volume",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+          "statementPeriodState": "NOT_APPLICABLE",
+          "statementPeriodValues": [],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+          "maintenanceCandidates": [],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "one_fee_supported",
+            "confidence": "STRONG",
+            "comparisonAllowed": true,
+            "evidenceRefs": [
+              "RR-MCF-08"
+            ],
+            "explanation": "Available identity and mechanic evidence support one fee for reference comparison."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": {
+          "assessment2024": null,
+          "locationMccAdjudication": {
+            "canonicalExcludedMccs": [
+              8398,
+              8661
+            ],
+            "preservedSourceAssertions": [
+              "Fiserv: 8393 and 8661",
+              "Nuvei/Paya: 8938 and 8661"
+            ],
+            "correctionLayerOnly": true
+          },
+          "sourceConflicts": [],
+          "comparison": {
+            "statementValue": 1.25,
+            "referenceValue": 1.25,
+            "unit": "usd_per_location_month",
+            "difference": 0,
+            "passThroughAtParEstablished": false,
+            "confirmedMarkupEstablished": false,
+            "state": "consistent_with_adjacent_period_reference",
+            "renderingText": "The billed value is consistent with the available April 2023 Fiserv reference, but no period-matched source is held and confirmed at-par language is prohibited."
+          }
+        }
+      },
+      {
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_c761d8b71b35e0bf92e085e2",
+        "printedLabel": "MASTERCARD - LOCATION FEE",
+        "exactIdentity": "mastercard_location_fee",
+        "broaderCategory": "network_fixed_or_periodic",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F4",
+          "economicLayer": "card_network",
+          "mechanic": "monthly per qualifying merchant location",
+          "population": "location accepts at least one Mastercard transaction and has at least $200 monthly gross Mastercard volume",
+          "actionClass": "N1",
+          "researchDisposition": "STOP",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+          "statementPeriodState": "NOT_APPLICABLE",
+          "statementPeriodValues": [],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+          "maintenanceCandidates": [],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "one_fee_supported",
+            "confidence": "STRONG",
+            "comparisonAllowed": true,
+            "evidenceRefs": [
+              "RR-MCF-08"
+            ],
+            "explanation": "Available identity and mechanic evidence support one fee for reference comparison."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": {
+          "assessment2024": null,
+          "locationMccAdjudication": {
+            "canonicalExcludedMccs": [
+              8398,
+              8661
+            ],
+            "preservedSourceAssertions": [
+              "Fiserv: 8393 and 8661",
+              "Nuvei/Paya: 8938 and 8661"
+            ],
+            "correctionLayerOnly": true
+          },
+          "sourceConflicts": [],
+          "comparison": {
+            "statementValue": 1.25,
+            "referenceValue": 1.25,
+            "unit": "usd_per_location_month",
+            "difference": 0,
+            "passThroughAtParEstablished": false,
+            "confirmedMarkupEstablished": false,
+            "state": "consistent_with_adjacent_period_reference",
+            "renderingText": "The billed value is consistent with the available April 2023 Fiserv reference, but no period-matched source is held and confirmed at-par language is prohibited."
+          }
+        }
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "feeRowId": "feerow_207eaed065066bddbb8d05b6",
+        "printedLabel": "MASTERCARD - MC LOCATION FEE",
+        "exactIdentity": "mastercard_location_fee",
+        "broaderCategory": "network_fixed_or_periodic",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F4",
+          "economicLayer": "card_network",
+          "mechanic": "monthly per qualifying merchant location",
+          "population": "location accepts at least one Mastercard transaction and has at least $200 monthly gross Mastercard volume",
+          "actionClass": "N1",
+          "researchDisposition": "ESCALATE_BOUNDED_RESEARCH",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+          "statementPeriodState": "NOT_APPLICABLE",
+          "statementPeriodValues": [],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+          "maintenanceCandidates": [],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "unresolved",
+            "confidence": "UNRESOLVED",
+            "comparisonAllowed": false,
+            "evidenceRefs": [
+              "MC-FOCUSED-05",
+              "RR-MCF-08"
+            ],
+            "explanation": "The $3.00 billed line may include only the Location Fee or an additional bundled service. Its numeric amount is above the available $1.25 fee reference, but cardinality blocks a confirmed markup or retention inference."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": {
+          "assessment2024": null,
+          "locationMccAdjudication": {
+            "canonicalExcludedMccs": [
+              8398,
+              8661
+            ],
+            "preservedSourceAssertions": [
+              "Fiserv: 8393 and 8661",
+              "Nuvei/Paya: 8938 and 8661"
+            ],
+            "correctionLayerOnly": true
+          },
+          "sourceConflicts": [],
+          "comparison": {
+            "statementValue": 3,
+            "referenceValue": 1.25,
+            "unit": "usd_per_location_month",
+            "difference": 1.75,
+            "passThroughAtParEstablished": false,
+            "confirmedMarkupEstablished": false,
+            "state": "candidate_above_reference",
+            "renderingText": "The merchant was billed $3.00 per month, above the strongest available $1.25 Mastercard Location Fee reference. Acquiring-side uplift is LIKELY, while contract violation, the exact nature of the excess, and its economic beneficiary remain unresolved."
+          }
+        }
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
+        "feeRowId": "feerow_c0d7e771a2f97fc06b9eb588",
+        "printedLabel": "MASTERCARD - MC LOCATION FEE",
+        "exactIdentity": "mastercard_location_fee",
+        "broaderCategory": "network_fixed_or_periodic",
+        "participantRoles": {
+          "collector": "processor_or_acquirer",
+          "economicBeneficiary": "card_network",
+          "ruleSetter": "card_network",
+          "underlyingPriceSetter": "card_network",
+          "merchantFacingPriceController": null
+        },
+        "determinant": {
+          "family": "F4",
+          "economicLayer": "card_network",
+          "mechanic": "monthly per qualifying merchant location",
+          "population": "location accepts at least one Mastercard transaction and has at least $200 monthly gross Mastercard volume",
+          "actionClass": "N1",
+          "researchDisposition": "ESCALATE_BOUNDED_RESEARCH",
+          "renderingPermissions": {
+            "exactIdentityAllowed": true,
+            "familyLanguageAllowed": true,
+            "acquiringSideLanguageAllowed": false,
+            "networkOwnershipLanguageAllowed": true,
+            "negotiationLanguageAllowed": false,
+            "contractComplianceLanguageAllowed": false,
+            "candidateAsFactAllowed": false
+          }
+        },
+        "currentReference": {
+          "historicalApplication": "CURRENT_REFERENCE_ONLY_NOT_APPLIED_TO_HISTORICAL_STATEMENT",
+          "statementPeriodState": "NOT_APPLICABLE",
+          "statementPeriodValues": [],
+          "historicalValues": [],
+          "statementPeriodConflicts": [],
+          "maintenanceState": "CURRENT_WORKING_REFERENCE_STRONG",
+          "maintenanceCandidates": [],
+          "rejectedCandidates": [],
+          "cardinality": {
+            "state": "unresolved",
+            "confidence": "UNRESOLVED",
+            "comparisonAllowed": false,
+            "evidenceRefs": [
+              "MC-FOCUSED-05",
+              "RR-MCF-08"
+            ],
+            "explanation": "The $3.00 billed line may include only the Location Fee or an additional bundled service. Its numeric amount is above the available $1.25 fee reference, but cardinality blocks a confirmed markup or retention inference."
+          },
+          "research": {
+            "priority": "none",
+            "question": null,
+            "reasonCodes": []
+          }
+        },
+        "focusedMastercard": {
+          "assessment2024": null,
+          "locationMccAdjudication": {
+            "canonicalExcludedMccs": [
+              8398,
+              8661
+            ],
+            "preservedSourceAssertions": [
+              "Fiserv: 8393 and 8661",
+              "Nuvei/Paya: 8938 and 8661"
+            ],
+            "correctionLayerOnly": true
+          },
+          "sourceConflicts": [],
+          "comparison": {
+            "statementValue": 3,
+            "referenceValue": 1.25,
+            "unit": "usd_per_location_month",
+            "difference": 1.75,
+            "passThroughAtParEstablished": false,
+            "confirmedMarkupEstablished": false,
+            "state": "candidate_above_reference",
+            "renderingText": "The merchant was billed $3.00 per month, above the strongest available $1.25 Mastercard Location Fee reference. Acquiring-side uplift is LIKELY, while contract violation, the exact nature of the excess, and its economic beneficiary remain unresolved."
+          }
+        }
+      }
+    ]
+  },
+  "intentionallyUnresolved": {
+    "current2026MastercardAssessmentRows": 9,
+    "current2026VisaBaseIITransmissionRows": 1,
+    "amexProcessorUpliftOrRetention": "not_established_or_excluded",
+    "mastercard2024SmallAcquiringSideUplift": "not_fully_excluded_without_acquirer_specific_period_evidence",
+    "discoverRejected025Origin": "unresolved"
+  },
+  "effects": {
+    "amexRowsMovedFromGenericInterchangeProjectionToNetworkProgramCost": 2,
+    "amexRowsWithNetworkRenderingPermission": 2,
+    "historicalRowsReopenedByCurrentEvidence": 0,
+    "currentUncertaintyRetainedSeparately": 10,
+    "newConflictsIntroduced": 0
+  },
+  "invariants": {
+    "canonicalFinancialFingerprintChangedStatements": [],
+    "canonicalFinancialFingerprintsUnchanged": true,
+    "canonicalMutationAllowed": false,
+    "aiOrWebResearchExecuted": false,
+    "sourceFactsRewritten": false
+  }
+}

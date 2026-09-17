@@ -1,0 +1,2132 @@
+{
+  "schemaVersion": "unknown_fee_research_diagnosis_e1_e2_2026_09_08_v1",
+  "evaluationOnly": true,
+  "baseline": {
+    "branch": "codex/unknown-fee-research-calibration-retrieval-strategy-v1",
+    "commit": "a0be0bef1eb81742e655e3c99e7621213a99bdf4"
+  },
+  "constraints": {
+    "newKnowledgeAdmitted": false,
+    "runtimeTriageRulesChanged": false,
+    "curatedSourceLibraryBuilt": false,
+    "retrievalMemoryBuilt": false,
+    "processorPackBuilt": false,
+    "model": "gpt-5.6-sol",
+    "store": false,
+    "automaticRetries": 0,
+    "fallbackProvidersAllowed": false,
+    "perArmBudget": {
+      "maximumSearches": 4,
+      "maximumDocumentFetches": 3,
+      "maximumSynthesisCalls": 1,
+      "maximumExternalOperations": 8
+    },
+    "externallySentFields": [
+      "processor_name",
+      "statement_year",
+      "statement_role",
+      "sanitized_fee_label",
+      "amount_free_query_hypothesis_or_mechanic",
+      "document_genre",
+      "retrieved_public_source_excerpt"
+    ],
+    "prohibitedFieldsSent": false
+  },
+  "e1": {
+    "decisions": [
+      {
+        "caseId": "monthly_advantage",
+        "file": "Nov_2024_Statement.pdf",
+        "printedLabel": "Other - MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $47996.83",
+        "priorStage0Decision": "RESEARCH",
+        "e1Decision": "RESEARCH_WARRANTED",
+        "d1D4SufficientForMerchantConclusion": false,
+        "exactIdentityMateriallyChangesConclusion": true,
+        "statementKnowledge": [
+          "Clover / A First Data Company statement context",
+          "the printed row contains the proprietary-looking MCVDB token",
+          "the row is presented under Other as a service charge",
+          "the printed row exposes a proportional rate-times-volume mechanic"
+        ],
+        "governedKnowledge": [
+          "the statement is interchange-plus",
+          "the processor/acquirer is the collector, without proving economic ownership",
+          "no admitted fee family, beneficiary, rule setter, or price controller resolves this label"
+        ],
+        "unresolvedAfterE1": [
+          "whether MCVDB identifies a proprietary acquiring program or another economic layer",
+          "who controls the merchant-facing price",
+          "whether a commercial price-review action is better supported than verification alone"
+        ],
+        "merchantConclusion": "Targeted verification is currently safe, but resolving the economic layer could materially improve the price-review recommendation.",
+        "rationale": "Unlike the other cases, the unresolved family and price-control question can change the merchant action; the exact/program identity is therefore decision-relevant.",
+        "currentDeterminantProjection": {
+          "exactIdentity": {
+            "state": "identity_unresolved",
+            "value": null,
+            "necessaryForUsefulAction": true,
+            "explanation": "Neither exact identity nor a defensible family is established."
+          },
+          "family": {
+            "state": "unresolved",
+            "value": null,
+            "confidence": "UNRESOLVED",
+            "evidenceRefs": [],
+            "explanation": "No affirmative statement structure or admitted knowledge supports a fee family; unfamiliarity does not imply acquiring-side ownership."
+          },
+          "d1": {
+            "economicLayer": {
+              "state": "unresolved",
+              "value": "LAYER_UNRESOLVED",
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Economic layer remains unresolved; collection and catalog failure are insufficient."
+            },
+            "collector": {
+              "state": "supported",
+              "value": "processor_or_acquirer",
+              "confidence": "STRONG",
+              "evidenceRefs": [
+                "ev_987fdcc26780adcd35fb"
+              ],
+              "explanation": "The processor/acquirer presents or collects the statement charge; collection does not prove economic ownership."
+            },
+            "economicBeneficiary": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Economic beneficiary and ultimate retention are not inferred from collection or price control."
+            },
+            "ruleSetter": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Rule setter is not established by the printed label alone."
+            },
+            "priceSetter": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Price setter is not established by collection, catalog failure, or a broad family alone."
+            },
+            "merchantFacingPriceController": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Price controller remains unresolved."
+            }
+          },
+          "d2": {
+            "mechanic": {
+              "state": "category_only",
+              "value": "fixed_periodic_charge",
+              "confidence": "CATEGORY_ONLY",
+              "evidenceRefs": [
+                "ev_987fdcc26780adcd35fb"
+              ],
+              "explanation": "Explicit periodic/account wording supports a fixed-periodic mechanic; recurrence beyond this period is not inferred."
+            },
+            "population": {
+              "state": "category_only",
+              "value": "statement_period",
+              "confidence": "CATEGORY_ONLY",
+              "evidenceRefs": [
+                "ev_987fdcc26780adcd35fb"
+              ],
+              "explanation": "The current-period charge is known; recurring cadence is not inferred beyond explicit wording."
+            }
+          },
+          "d3": {
+            "material": true,
+            "highMateriality": false,
+            "currentPeriodAmountMinor": 1440,
+            "shareOfMaterialFeeDollarsPercent": 1.1,
+            "shareOfProcessedSalesBasisPoints": 2.7,
+            "volumeSensitivity": "fixed_or_periodic",
+            "annualizationAllowed": true
+          },
+          "d4": {
+            "merchantAgreementRequiredForAction": false,
+            "merchantAgreementRequiredForContractConclusion": true,
+            "actionClass": "N7",
+            "action": "Ask the processor to identify the charge, billed unit, population, beneficiary, and merchant-facing price controller before making a negotiation or operational recommendation.",
+            "explanation": "Economic layer or price control is unresolved, so the safe action is targeted verification."
+          },
+          "sufficiency": "INSUFFICIENT"
+        },
+        "analystFindingProjection": {
+          "category": {
+            "state": "industry_judgment",
+            "value": "administrative_and_account",
+            "confidence": "CATEGORY_ONLY",
+            "evidence": [
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_987fdcc26780adcd35fb"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "Category is supported by printed mechanics/position even though exact identity remains unresolved.",
+            "limitations": []
+          },
+          "mechanic": {
+            "state": "supported",
+            "value": "fixed_periodic_charge",
+            "confidence": "LIKELY",
+            "evidence": [
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_987fdcc26780adcd35fb"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "Assessment mechanic is kept separate from identity and commercial judgment.",
+            "limitations": []
+          },
+          "population": {
+            "state": "supported",
+            "value": "statement_population_with_separately_itemized_interchange_and_network_costs",
+            "confidence": "LIKELY",
+            "evidence": [
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_987fdcc26780adcd35fb"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "The fee line's supported assessment basis takes precedence over a broader pricing-model population; no statement-wide basis is inferred.",
+            "limitations": []
+          },
+          "arithmetic": {
+            "state": "unresolved",
+            "value": null,
+            "confidence": "UNRESOLVED",
+            "evidence": [
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_987fdcc26780adcd35fb"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "The deterministic exact-source arithmetic bridge lacks a complete printed rate/base pair for this row.",
+            "limitations": []
+          },
+          "action": {
+            "state": "supported",
+            "value": "Ask the processor to identify the charge, billed unit, population, beneficiary, and merchant-facing price controller before making a negotiation or operational recommendation.",
+            "confidence": "STRONG",
+            "evidence": [
+              {
+                "evidenceClass": "G1_governed_payment_knowledge",
+                "refs": [
+                  "OWD-01",
+                  "OWD-02",
+                  "OWD-03",
+                  "OWD-04",
+                  "OWD-05",
+                  "OWD-06",
+                  "OWD-07"
+                ],
+                "characterization": "governed_knowledge"
+              },
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "Economic layer or price control is unresolved, so the safe action is targeted verification.",
+            "limitations": [
+              "This action does not establish a contractual promise, violation, right, remedy, or ultimate revenue retention."
+            ]
+          }
+        },
+        "priorResearch": {
+          "operations": 7,
+          "stoppingDecision": {
+            "stop": true,
+            "stoppingReason": "S4_SOURCE_QUALITY_FAILURE",
+            "reasonCodes": [
+              "retrieved_evidence_low_quality_duplicative_or_inapplicable"
+            ]
+          },
+          "determinantLift": [],
+          "actionLift": false,
+          "evidenceTierImproved": false,
+          "governedD1D4Changed": false,
+          "governedConfidenceChanged": false
+        },
+        "suppressionLoss": {
+          "determinantQuality": false,
+          "actionability": false,
+          "commercialUsefulness": false,
+          "confidenceDiscipline": false,
+          "merchantFacingRecommendation": false
+        }
+      },
+      {
+        "caseId": "batch_settlement",
+        "file": "Nov_2024_Statement.pdf",
+        "printedLabel": "Other - BATCH SETTLEMENT FEE 56 TRANSACTIONS AT 0.15",
+        "priorStage0Decision": "RESEARCH",
+        "e1Decision": "SUPPRESS_RESEARCH",
+        "d1D4SufficientForMerchantConclusion": true,
+        "exactIdentityMateriallyChangesConclusion": false,
+        "statementKnowledge": [
+          "the label directly identifies a batch-settlement charge",
+          "the printed row exposes a per-transaction unit and population",
+          "printed arithmetic reproduces",
+          "the row is presented under Other on the processor statement"
+        ],
+        "governedKnowledge": [
+          "Batch 2 supports the F6 acquiring-side batch/per-item family",
+          "the acquiring-side program controls the merchant-facing price without proving ultimate retention",
+          "commercial review and operational batch validation are already allowed without the merchant agreement"
+        ],
+        "unresolvedAfterE1": [
+          "ultimate beneficiary/retention",
+          "merchant-specific contractual compliance"
+        ],
+        "merchantConclusion": "Validate the billed batch population, review operational batch frequency, and request an acquiring-side price review.",
+        "rationale": "The unresolved exact identity and beneficiary do not change the supported mechanic, acquiring-side price-control conclusion, or action.",
+        "currentDeterminantProjection": {
+          "exactIdentity": {
+            "state": "family_known_identity_unresolved",
+            "value": null,
+            "necessaryForUsefulAction": false,
+            "explanation": "The economic family is useful while exact identity remains unresolved."
+          },
+          "family": {
+            "state": "supported",
+            "value": "F6",
+            "confidence": "LIKELY",
+            "evidenceRefs": [
+              "ev_70ae35af669b621ff627",
+              "RR-B2-00",
+              "RR-B2-01",
+              "RR-B2-02",
+              "RR-B2-03",
+              "RR-B2-11",
+              "RR-B2-12",
+              "RR-B2-13",
+              "RR-B2-15"
+            ],
+            "explanation": "Admitted per-item knowledge affirmatively supports acquiring-side per-item economics."
+          },
+          "d1": {
+            "economicLayer": {
+              "state": "supported",
+              "value": "acquiring_commercial",
+              "confidence": "LIKELY",
+              "evidenceRefs": [
+                "ev_70ae35af669b621ff627",
+                "RR-B2-00",
+                "RR-B2-01",
+                "RR-B2-02",
+                "RR-B2-03",
+                "RR-B2-11",
+                "RR-B2-12",
+                "RR-B2-13",
+                "RR-B2-15"
+              ],
+              "explanation": "Affirmative pricing, per-item, or explicit statement evidence supports an acquiring/service commercial layer."
+            },
+            "collector": {
+              "state": "supported",
+              "value": "processor_or_acquirer",
+              "confidence": "STRONG",
+              "evidenceRefs": [
+                "ev_70ae35af669b621ff627"
+              ],
+              "explanation": "The processor/acquirer presents or collects the statement charge; collection does not prove economic ownership."
+            },
+            "economicBeneficiary": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Economic beneficiary and ultimate retention are not inferred from collection or price control."
+            },
+            "ruleSetter": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Rule setter is not established by the printed label alone."
+            },
+            "priceSetter": {
+              "state": "supported",
+              "value": "acquiring_side_program",
+              "confidence": "STRONG",
+              "evidenceRefs": [
+                "ev_70ae35af669b621ff627"
+              ],
+              "explanation": "Admitted pricing/per-item evidence supports acquiring-side price setting without establishing ultimate retention."
+            },
+            "merchantFacingPriceController": {
+              "state": "supported",
+              "value": "acquiring_side_program",
+              "confidence": "STRONG",
+              "evidenceRefs": [
+                "ev_70ae35af669b621ff627"
+              ],
+              "explanation": "Admitted knowledge affirmatively supports acquiring-side control of the merchant-facing price; retention remains unresolved."
+            }
+          },
+          "d2": {
+            "mechanic": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "The billed unit or population is not reliably exposed."
+            },
+            "population": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Relevant population is not established."
+            }
+          },
+          "d3": {
+            "material": true,
+            "highMateriality": false,
+            "currentPeriodAmountMinor": 840,
+            "shareOfMaterialFeeDollarsPercent": 0.64,
+            "shareOfProcessedSalesBasisPoints": 1.58,
+            "volumeSensitivity": "per_event",
+            "annualizationAllowed": false
+          },
+          "d4": {
+            "merchantAgreementRequiredForAction": false,
+            "merchantAgreementRequiredForContractConclusion": true,
+            "actionClass": "N3",
+            "action": "Ask the processor/acquirer/ISO to itemize and review this merchant-facing price; requesting explanation or reduction does not require the merchant agreement.",
+            "explanation": "Affirmative evidence supports acquiring-side commercial reviewability without asserting retention or a contractual right."
+          },
+          "sufficiency": "PARTIAL"
+        },
+        "analystFindingProjection": {
+          "category": {
+            "state": "supported",
+            "value": "acquiring_side_batch",
+            "confidence": "LIKELY",
+            "evidence": [
+              {
+                "evidenceClass": "G1_governed_payment_knowledge",
+                "refs": [
+                  "RR-B2-00",
+                  "RR-B2-01",
+                  "RR-B2-02",
+                  "RR-B2-03",
+                  "RR-B2-11",
+                  "RR-B2-12",
+                  "RR-B2-13",
+                  "RR-B2-15"
+                ],
+                "characterization": "governed_knowledge"
+              },
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_70ae35af669b621ff627"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "Economic layer follows the admitted Batch 2 per-item decision procedure; population evidence remains separate from ownership and price control.",
+            "limitations": [
+              "The collector is not presumed to be the economic beneficiary.",
+              "A broader acquiring-side category does not establish the exact provider, system architecture, or ultimate retention.",
+              "Merchant-specific rate compliance, entitlement, breach, and remedy remain contract-dependent."
+            ]
+          },
+          "mechanic": {
+            "state": "supported",
+            "value": "per_item",
+            "confidence": "LIKELY",
+            "evidence": [
+              {
+                "evidenceClass": "G1_governed_payment_knowledge",
+                "refs": [
+                  "RR-B2-00",
+                  "RR-B2-01",
+                  "RR-B2-02",
+                  "RR-B2-03",
+                  "RR-B2-11",
+                  "RR-B2-12",
+                  "RR-B2-13",
+                  "RR-B2-15"
+                ],
+                "characterization": "governed_knowledge"
+              },
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_70ae35af669b621ff627"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "Assessment mechanic is kept separate from identity and commercial judgment.",
+            "limitations": []
+          },
+          "population": {
+            "state": "supported",
+            "value": "statement_population_with_separately_itemized_interchange_and_network_costs",
+            "confidence": "LIKELY",
+            "evidence": [
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_70ae35af669b621ff627"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "The fee line's supported assessment basis takes precedence over a broader pricing-model population; no statement-wide basis is inferred.",
+            "limitations": []
+          },
+          "arithmetic": {
+            "state": "confirmed",
+            "value": "reproduces",
+            "confidence": "CONFIRMED",
+            "evidence": [
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_70ae35af669b621ff627"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "The existing exact rational reconstruction reproduces the printed charged amount under the canonical rounding policy.",
+            "limitations": []
+          },
+          "action": {
+            "state": "industry_judgment",
+            "value": "Verify the charge against the actual settlement-batch table and review batch operations before changing frequency. Ask the acquiring side to explain or review the merchant-facing price; no agreement is needed to request that review.",
+            "confidence": "LIKELY",
+            "evidence": [
+              {
+                "evidenceClass": "G1_governed_payment_knowledge",
+                "refs": [
+                  "RR-B2-00",
+                  "RR-B2-01",
+                  "RR-B2-02",
+                  "RR-B2-03",
+                  "RR-B2-11",
+                  "RR-B2-12",
+                  "RR-B2-13",
+                  "RR-B2-15"
+                ],
+                "characterization": "governed_knowledge"
+              },
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_70ae35af669b621ff627"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "Reducing batch frequency is not recommended without considering funding timing, controls, and operations.",
+            "limitations": []
+          }
+        },
+        "priorResearch": {
+          "operations": 6,
+          "stoppingDecision": {
+            "stop": true,
+            "stoppingReason": "S4_SOURCE_QUALITY_FAILURE",
+            "reasonCodes": [
+              "retrieved_evidence_low_quality_duplicative_or_inapplicable"
+            ]
+          },
+          "determinantLift": [],
+          "actionLift": false,
+          "evidenceTierImproved": false,
+          "governedD1D4Changed": false,
+          "governedConfidenceChanged": false
+        },
+        "suppressionLoss": {
+          "determinantQuality": false,
+          "actionability": false,
+          "commercialUsefulness": false,
+          "confidenceDiscipline": false,
+          "merchantFacingRecommendation": false
+        }
+      },
+      {
+        "caseId": "application_fee_generic",
+        "file": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+        "printedLabel": "APPLICATION FEE",
+        "priorStage0Decision": "RESEARCH",
+        "e1Decision": "SUPPRESS_RESEARCH",
+        "d1D4SufficientForMerchantConclusion": true,
+        "exactIdentityMateriallyChangesConclusion": false,
+        "statementKnowledge": [
+          "the row is explicitly labeled Application Fee",
+          "the statement places it in the Account Fees section",
+          "it is a single current-period account charge collected on the processor statement"
+        ],
+        "governedKnowledge": [
+          "collection does not establish beneficiary or retention",
+          "an explanation, reduction, or waiver review can be requested without a merchant agreement",
+          "contractual compliance remains document-dependent"
+        ],
+        "unresolvedAfterE1": [
+          "exact beneficiary/retention",
+          "whether the fee is contractually authorized",
+          "whether it will recur"
+        ],
+        "merchantConclusion": "Treat it as a processor-presented account/application charge and request explanation plus reduction or waiver review; obtain the agreement only for a contractual conclusion.",
+        "rationale": "The ordinary-language label and Account Fees placement support the useful category and action; public web research is not needed merely to restate that conclusion.",
+        "currentDeterminantProjection": {
+          "exactIdentity": {
+            "state": "identity_unresolved",
+            "value": null,
+            "necessaryForUsefulAction": true,
+            "explanation": "Neither exact identity nor a defensible family is established."
+          },
+          "family": {
+            "state": "unresolved",
+            "value": null,
+            "confidence": "UNRESOLVED",
+            "evidenceRefs": [],
+            "explanation": "No affirmative statement structure or admitted knowledge supports a fee family; unfamiliarity does not imply acquiring-side ownership."
+          },
+          "d1": {
+            "economicLayer": {
+              "state": "unresolved",
+              "value": "LAYER_UNRESOLVED",
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Economic layer remains unresolved; collection and catalog failure are insufficient."
+            },
+            "collector": {
+              "state": "supported",
+              "value": "processor_or_acquirer",
+              "confidence": "STRONG",
+              "evidenceRefs": [
+                "ev_77b1937d89ea01a4f9e0"
+              ],
+              "explanation": "The processor/acquirer presents or collects the statement charge; collection does not prove economic ownership."
+            },
+            "economicBeneficiary": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Economic beneficiary and ultimate retention are not inferred from collection or price control."
+            },
+            "ruleSetter": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Rule setter is not established by the printed label alone."
+            },
+            "priceSetter": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Price setter is not established by collection, catalog failure, or a broad family alone."
+            },
+            "merchantFacingPriceController": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Price controller remains unresolved."
+            }
+          },
+          "d2": {
+            "mechanic": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "The billed unit or population is not reliably exposed."
+            },
+            "population": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Relevant population is not established."
+            }
+          },
+          "d3": {
+            "material": true,
+            "highMateriality": true,
+            "currentPeriodAmountMinor": 9900,
+            "shareOfMaterialFeeDollarsPercent": 70.06,
+            "shareOfProcessedSalesBasisPoints": 412.5,
+            "volumeSensitivity": "unresolved",
+            "annualizationAllowed": false
+          },
+          "d4": {
+            "merchantAgreementRequiredForAction": false,
+            "merchantAgreementRequiredForContractConclusion": true,
+            "actionClass": "N7",
+            "action": "Ask the processor to identify the charge, billed unit, population, beneficiary, and merchant-facing price controller before making a negotiation or operational recommendation.",
+            "explanation": "Economic layer or price control is unresolved, so the safe action is targeted verification."
+          },
+          "sufficiency": "INSUFFICIENT"
+        },
+        "analystFindingProjection": {
+          "category": {
+            "state": "unresolved",
+            "value": null,
+            "confidence": "UNRESOLVED",
+            "evidence": [
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_77b1937d89ea01a4f9e0"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "Neither an exact identity nor a defensible broader category is established.",
+            "limitations": []
+          },
+          "mechanic": {
+            "state": "unresolved",
+            "value": null,
+            "confidence": "UNRESOLVED",
+            "evidence": [
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_77b1937d89ea01a4f9e0"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "The statement does not expose a reliable assessment base.",
+            "limitations": []
+          },
+          "population": {
+            "state": "unresolved",
+            "value": null,
+            "confidence": "UNRESOLVED",
+            "evidence": [
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_77b1937d89ea01a4f9e0"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "Relevant transaction or volume population is not established.",
+            "limitations": []
+          },
+          "arithmetic": {
+            "state": "unresolved",
+            "value": null,
+            "confidence": "UNRESOLVED",
+            "evidence": [
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_77b1937d89ea01a4f9e0"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "The deterministic exact-source arithmetic bridge lacks a complete printed rate/base pair for this row.",
+            "limitations": []
+          },
+          "action": {
+            "state": "supported",
+            "value": "Ask the processor to identify the charge, billed unit, population, beneficiary, and merchant-facing price controller before making a negotiation or operational recommendation.",
+            "confidence": "STRONG",
+            "evidence": [
+              {
+                "evidenceClass": "G1_governed_payment_knowledge",
+                "refs": [
+                  "OWD-01",
+                  "OWD-02",
+                  "OWD-03",
+                  "OWD-04",
+                  "OWD-05",
+                  "OWD-06",
+                  "OWD-07"
+                ],
+                "characterization": "governed_knowledge"
+              },
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "Economic layer or price control is unresolved, so the safe action is targeted verification.",
+            "limitations": [
+              "This action does not establish a contractual promise, violation, right, remedy, or ultimate revenue retention."
+            ]
+          }
+        },
+        "priorResearch": {
+          "operations": 5,
+          "stoppingDecision": {
+            "stop": true,
+            "stoppingReason": "S3_RESEARCH_STAGNATION",
+            "reasonCodes": [
+              "further_research_did_not_improve_evidence_or_confidence_tier"
+            ]
+          },
+          "determinantLift": [],
+          "actionLift": false,
+          "evidenceTierImproved": false,
+          "governedD1D4Changed": false,
+          "governedConfidenceChanged": false
+        },
+        "suppressionLoss": {
+          "determinantQuality": false,
+          "actionability": false,
+          "commercialUsefulness": false,
+          "confidenceDiscipline": false,
+          "merchantFacingRecommendation": false
+        }
+      },
+      {
+        "caseId": "amexct043_nqual_coded",
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "printedLabel": "AMEXCT043 - NQUAL DISC",
+        "priorStage0Decision": "RESEARCH",
+        "e1Decision": "SUPPRESS_RESEARCH",
+        "d1D4SufficientForMerchantConclusion": true,
+        "exactIdentityMateriallyChangesConclusion": false,
+        "statementKnowledge": [
+          "AMEXCT043 is the statement card-type section and NQUAL DISC is the fee label",
+          "the row exposes a rate-times-volume mechanic and population",
+          "the NQUAL pricing ladder recurs across card-type sections"
+        ],
+        "governedKnowledge": [
+          "Batch 1 supports F5 bundled merchant-facing pricing",
+          "the acquiring-side program sets and controls the merchant-facing price without proving retention",
+          "itemization and commercial review are already supported without the merchant agreement"
+        ],
+        "unresolvedAfterE1": [
+          "component allocation inside the bundled price",
+          "ultimate beneficiary/retention",
+          "merchant-specific contractual compliance"
+        ],
+        "merchantConclusion": "Request itemization and commercial review of the bundled NQUAL price while preserving the unresolved component allocation.",
+        "rationale": "The code is a section/card-type token rather than a missing fee identity; exact component decomposition is not required for the existing commercial action.",
+        "currentDeterminantProjection": {
+          "exactIdentity": {
+            "state": "family_known_identity_unresolved",
+            "value": null,
+            "necessaryForUsefulAction": false,
+            "explanation": "The economic family is useful while exact identity remains unresolved."
+          },
+          "family": {
+            "state": "supported",
+            "value": "F5",
+            "confidence": "CATEGORY_ONLY",
+            "evidenceRefs": [
+              "ev_cc64ad9dfdd6bf06d3d6",
+              "RR-B1-00",
+              "RR-B1-01",
+              "RR-B1-05"
+            ],
+            "explanation": "Admitted pricing knowledge supports a bundled merchant-facing acquiring price; component identity remains unresolved."
+          },
+          "d1": {
+            "economicLayer": {
+              "state": "supported",
+              "value": "acquiring_commercial",
+              "confidence": "CATEGORY_ONLY",
+              "evidenceRefs": [
+                "ev_cc64ad9dfdd6bf06d3d6",
+                "RR-B1-00",
+                "RR-B1-01",
+                "RR-B1-05"
+              ],
+              "explanation": "Affirmative pricing, per-item, or explicit statement evidence supports an acquiring/service commercial layer."
+            },
+            "collector": {
+              "state": "supported",
+              "value": "processor_or_acquirer",
+              "confidence": "STRONG",
+              "evidenceRefs": [
+                "ev_cc64ad9dfdd6bf06d3d6"
+              ],
+              "explanation": "The processor/acquirer presents or collects the statement charge; collection does not prove economic ownership."
+            },
+            "economicBeneficiary": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Economic beneficiary and ultimate retention are not inferred from collection or price control."
+            },
+            "ruleSetter": {
+              "state": "supported",
+              "value": "acquiring_side_program",
+              "confidence": "STRONG",
+              "evidenceRefs": [
+                "ev_cc64ad9dfdd6bf06d3d6"
+              ],
+              "explanation": "Admitted pricing-layer evidence supports acquiring-side price setting."
+            },
+            "priceSetter": {
+              "state": "supported",
+              "value": "acquiring_side_program",
+              "confidence": "STRONG",
+              "evidenceRefs": [
+                "ev_cc64ad9dfdd6bf06d3d6"
+              ],
+              "explanation": "Admitted pricing/per-item evidence supports acquiring-side price setting without establishing ultimate retention."
+            },
+            "merchantFacingPriceController": {
+              "state": "supported",
+              "value": "acquiring_side_program",
+              "confidence": "STRONG",
+              "evidenceRefs": [
+                "ev_cc64ad9dfdd6bf06d3d6"
+              ],
+              "explanation": "Admitted knowledge affirmatively supports acquiring-side control of the merchant-facing price; retention remains unresolved."
+            }
+          },
+          "d2": {
+            "mechanic": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "The billed unit or population is not reliably exposed."
+            },
+            "population": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Relevant population is not established."
+            }
+          },
+          "d3": {
+            "material": true,
+            "highMateriality": true,
+            "currentPeriodAmountMinor": 24682,
+            "shareOfMaterialFeeDollarsPercent": 65.4,
+            "shareOfProcessedSalesBasisPoints": 308.11,
+            "volumeSensitivity": "proportional",
+            "annualizationAllowed": false
+          },
+          "d4": {
+            "merchantAgreementRequiredForAction": false,
+            "merchantAgreementRequiredForContractConclusion": true,
+            "actionClass": "N3",
+            "action": "Ask the processor/acquirer/ISO to itemize and review this merchant-facing price; requesting explanation or reduction does not require the merchant agreement.",
+            "explanation": "Affirmative evidence supports acquiring-side commercial reviewability without asserting retention or a contractual right."
+          },
+          "sufficiency": "PARTIAL"
+        },
+        "analystFindingProjection": {
+          "category": {
+            "state": "supported",
+            "value": "bundled_merchant_facing_pricing",
+            "confidence": "STRONG",
+            "evidence": [
+              {
+                "evidenceClass": "G1_governed_payment_knowledge",
+                "refs": [
+                  "RR-B1-00",
+                  "RR-B1-01",
+                  "RR-B1-05"
+                ],
+                "characterization": "governed_knowledge"
+              },
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_cc64ad9dfdd6bf06d3d6"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "Economic category follows admitted Batch 1 pricing-layer knowledge without asserting profit, retention, or contract compliance.",
+            "limitations": [
+              "QUAL/MQUAL/NQUAL does not by itself prove tiered pricing, processor markup, economic beneficiary, avoidable network downgrade, or merchant error.",
+              "Bundled merchant-facing price is not decomposed into interchange, network cost, processor/acquirer/ISO economics, or retention."
+            ]
+          },
+          "mechanic": {
+            "state": "supported",
+            "value": "rate_times_volume",
+            "confidence": "LIKELY",
+            "evidence": [
+              {
+                "evidenceClass": "G1_governed_payment_knowledge",
+                "refs": [
+                  "RR-B1-00",
+                  "RR-B1-01",
+                  "RR-B1-05"
+                ],
+                "characterization": "governed_knowledge"
+              },
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_cc64ad9dfdd6bf06d3d6"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "Assessment mechanic is kept separate from identity and commercial judgment.",
+            "limitations": []
+          },
+          "population": {
+            "state": "supported",
+            "value": "qualification_labeled_bundled_pricing_populations",
+            "confidence": "LIKELY",
+            "evidence": [
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_cc64ad9dfdd6bf06d3d6"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "The fee line's supported assessment basis takes precedence over a broader pricing-model population; no statement-wide basis is inferred.",
+            "limitations": []
+          },
+          "arithmetic": {
+            "state": "confirmed",
+            "value": "reproduces_with_rounding",
+            "confidence": "CONFIRMED",
+            "evidence": [
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_cc64ad9dfdd6bf06d3d6"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "The existing exact rational reconstruction reproduces the printed charged amount under the canonical rounding policy.",
+            "limitations": []
+          },
+          "action": {
+            "state": "industry_judgment",
+            "value": "Ask the processor/acquirer/ISO to itemize and review this merchant-facing price; requesting explanation or reduction does not require the merchant agreement.",
+            "confidence": "STRONG",
+            "evidence": [
+              {
+                "evidenceClass": "G1_governed_payment_knowledge",
+                "refs": [
+                  "OWD-01",
+                  "OWD-02",
+                  "OWD-03",
+                  "OWD-04",
+                  "OWD-05",
+                  "OWD-06",
+                  "OWD-07"
+                ],
+                "characterization": "governed_knowledge"
+              },
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "RR-B1-00",
+                  "RR-B1-01",
+                  "RR-B1-05",
+                  "ev_cc64ad9dfdd6bf06d3d6"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "Affirmative evidence supports acquiring-side commercial reviewability without asserting retention or a contractual right.",
+            "limitations": [
+              "This action does not establish a contractual promise, violation, right, remedy, or ultimate revenue retention."
+            ]
+          }
+        },
+        "priorResearch": {
+          "operations": 6,
+          "stoppingDecision": {
+            "stop": true,
+            "stoppingReason": "S4_SOURCE_QUALITY_FAILURE",
+            "reasonCodes": [
+              "retrieved_evidence_low_quality_duplicative_or_inapplicable"
+            ]
+          },
+          "determinantLift": [],
+          "actionLift": false,
+          "evidenceTierImproved": false,
+          "governedD1D4Changed": false,
+          "governedConfidenceChanged": false
+        },
+        "suppressionLoss": {
+          "determinantQuality": false,
+          "actionability": false,
+          "commercialUsefulness": false,
+          "confidenceDiscipline": false,
+          "merchantFacingRecommendation": false
+        }
+      },
+      {
+        "caseId": "cpu_gateway_stage0_control",
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "printedLabel": "MASTERCARD - CPU GTWY",
+        "priorStage0Decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "e1Decision": "SUPPRESS_RESEARCH",
+        "d1D4SufficientForMerchantConclusion": true,
+        "exactIdentityMateriallyChangesConclusion": false,
+        "statementKnowledge": [
+          "the row is in AUTHS & AVS and exposes an event count and per-event rate"
+        ],
+        "governedKnowledge": [
+          "Batch 2 supports a technology/gateway commercial family and authorization/access-event population",
+          "the acquiring-side price can be reviewed without establishing the exact provider"
+        ],
+        "unresolvedAfterE1": [
+          "exact gateway/provider",
+          "ultimate beneficiary/retention"
+        ],
+        "merchantConclusion": "Validate usage and ask the processor or vendor to explain, reduce, or remove the charge.",
+        "rationale": "This is the determinant-sufficient zero-operation control.",
+        "currentDeterminantProjection": {
+          "exactIdentity": {
+            "state": "family_known_identity_unresolved",
+            "value": null,
+            "necessaryForUsefulAction": false,
+            "explanation": "The economic family is useful while exact identity remains unresolved."
+          },
+          "family": {
+            "state": "supported",
+            "value": "F9",
+            "confidence": "CATEGORY_ONLY",
+            "evidenceRefs": [
+              "ev_4420f6587e36bc064bfa",
+              "RR-B2-00",
+              "RR-B2-01",
+              "RR-B2-02",
+              "RR-B2-03",
+              "RR-B2-04",
+              "RR-B2-05",
+              "RR-B2-11",
+              "RR-B2-13",
+              "RR-B2-15"
+            ],
+            "explanation": "Cross-brand statement structure and admitted knowledge support a technology/gateway commercial family while provider identity remains unresolved."
+          },
+          "d1": {
+            "economicLayer": {
+              "state": "supported",
+              "value": "technology_or_service",
+              "confidence": "CATEGORY_ONLY",
+              "evidenceRefs": [
+                "ev_4420f6587e36bc064bfa",
+                "RR-B2-00",
+                "RR-B2-01",
+                "RR-B2-02",
+                "RR-B2-03",
+                "RR-B2-04",
+                "RR-B2-05",
+                "RR-B2-11",
+                "RR-B2-13",
+                "RR-B2-15"
+              ],
+              "explanation": "The broad technology/service layer is supported without asserting the provider or price controller."
+            },
+            "collector": {
+              "state": "supported",
+              "value": "processor_or_acquirer",
+              "confidence": "STRONG",
+              "evidenceRefs": [
+                "ev_4420f6587e36bc064bfa"
+              ],
+              "explanation": "The processor/acquirer presents or collects the statement charge; collection does not prove economic ownership."
+            },
+            "economicBeneficiary": {
+              "state": "category_only",
+              "value": "technology_or_service_provider",
+              "confidence": "CATEGORY_ONLY",
+              "evidenceRefs": [
+                "ev_4420f6587e36bc064bfa"
+              ],
+              "explanation": "A technology/service provider is the likely broad beneficiary; exact provider and revenue sharing remain unresolved."
+            },
+            "ruleSetter": {
+              "state": "unresolved",
+              "value": null,
+              "confidence": "UNRESOLVED",
+              "evidenceRefs": [],
+              "explanation": "Rule setter is not established by the printed label alone."
+            },
+            "priceSetter": {
+              "state": "supported",
+              "value": "acquiring_side_program",
+              "confidence": "STRONG",
+              "evidenceRefs": [
+                "ev_4420f6587e36bc064bfa"
+              ],
+              "explanation": "Admitted pricing/per-item evidence supports acquiring-side price setting without establishing ultimate retention."
+            },
+            "merchantFacingPriceController": {
+              "state": "supported",
+              "value": "acquiring_side_program",
+              "confidence": "STRONG",
+              "evidenceRefs": [
+                "ev_4420f6587e36bc064bfa"
+              ],
+              "explanation": "Admitted knowledge affirmatively supports acquiring-side control of the merchant-facing price; retention remains unresolved."
+            }
+          },
+          "d2": {
+            "mechanic": {
+              "state": "supported",
+              "value": "authorization_events",
+              "confidence": "STRONG",
+              "evidenceRefs": [
+                "ev_4420f6587e36bc064bfa"
+              ],
+              "explanation": "The label/source unit supports an authorization/access event population without equating it to settled transactions. The unit is supported, while the statement quantity is unavailable."
+            },
+            "population": {
+              "state": "supported",
+              "value": "printed_authorization_or_access_events",
+              "confidence": "STRONG",
+              "evidenceRefs": [
+                "ev_4420f6587e36bc064bfa"
+              ],
+              "explanation": "The supported unit is retained as its own population and is not forced into a settlement-count comparison."
+            }
+          },
+          "d3": {
+            "material": true,
+            "highMateriality": false,
+            "currentPeriodAmountMinor": 240,
+            "shareOfMaterialFeeDollarsPercent": 0.64,
+            "shareOfProcessedSalesBasisPoints": 3,
+            "volumeSensitivity": "per_event",
+            "annualizationAllowed": false
+          },
+          "d4": {
+            "merchantAgreementRequiredForAction": false,
+            "merchantAgreementRequiredForContractConclusion": true,
+            "actionClass": "N5",
+            "action": "Identify the service/provider, validate usage or compliance status, and ask the processor or vendor to explain, reduce, or remove the charge. No agreement is needed to ask for review.",
+            "explanation": "The broad service layer supports a useful verification path while exact identity and controller may remain unresolved."
+          },
+          "sufficiency": "DETERMINANT_SUFFICIENT"
+        },
+        "analystFindingProjection": {
+          "category": {
+            "state": "supported",
+            "value": "acquiring_side_gateway_commercial",
+            "confidence": "CATEGORY_ONLY",
+            "evidence": [
+              {
+                "evidenceClass": "G1_governed_payment_knowledge",
+                "refs": [
+                  "RR-B2-00",
+                  "RR-B2-01",
+                  "RR-B2-02",
+                  "RR-B2-03",
+                  "RR-B2-04",
+                  "RR-B2-05",
+                  "RR-B2-11",
+                  "RR-B2-13",
+                  "RR-B2-15"
+                ],
+                "characterization": "governed_knowledge"
+              },
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_4420f6587e36bc064bfa"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "Economic layer follows the admitted Batch 2 per-item decision procedure; population evidence remains separate from ownership and price control.",
+            "limitations": [
+              "The collector is not presumed to be the economic beneficiary.",
+              "A broader acquiring-side category does not establish the exact provider, system architecture, or ultimate retention.",
+              "Merchant-specific rate compliance, entitlement, breach, and remedy remain contract-dependent."
+            ]
+          },
+          "mechanic": {
+            "state": "supported",
+            "value": "authorization_events",
+            "confidence": "STRONG",
+            "evidence": [
+              {
+                "evidenceClass": "G1_governed_payment_knowledge",
+                "refs": [
+                  "RR-B2-00",
+                  "RR-B2-01",
+                  "RR-B2-02",
+                  "RR-B2-03",
+                  "RR-B2-04",
+                  "RR-B2-05",
+                  "RR-B2-11",
+                  "RR-B2-13",
+                  "RR-B2-15"
+                ],
+                "characterization": "governed_knowledge"
+              },
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_4420f6587e36bc064bfa"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "The label/source unit supports an authorization/access event population without equating it to settled transactions. The unit is supported, while the statement quantity is unavailable.",
+            "limitations": []
+          },
+          "population": {
+            "state": "supported",
+            "value": "printed_authorization_or_access_events",
+            "confidence": "LIKELY",
+            "evidence": [
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_4420f6587e36bc064bfa"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "The fee line's supported assessment basis takes precedence over a broader pricing-model population; no statement-wide basis is inferred.",
+            "limitations": []
+          },
+          "arithmetic": {
+            "state": "unresolved",
+            "value": null,
+            "confidence": "UNRESOLVED",
+            "evidence": [
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_4420f6587e36bc064bfa"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "The deterministic exact-source arithmetic bridge lacks a complete printed rate/base pair for this row.",
+            "limitations": []
+          },
+          "action": {
+            "state": "industry_judgment",
+            "value": "Ask the processor/acquirer/ISO to explain and commercially review the acquiring-side per-item price. This request does not require the merchant agreement; the agreement is needed only for an exact contractual-rate, breach, right, or remedy conclusion.",
+            "confidence": "LIKELY",
+            "evidence": [
+              {
+                "evidenceClass": "G1_governed_payment_knowledge",
+                "refs": [
+                  "RR-B2-00",
+                  "RR-B2-01",
+                  "RR-B2-02",
+                  "RR-B2-03",
+                  "RR-B2-04",
+                  "RR-B2-05",
+                  "RR-B2-11",
+                  "RR-B2-13",
+                  "RR-B2-15"
+                ],
+                "characterization": "governed_knowledge"
+              },
+              {
+                "evidenceClass": "E1_statement",
+                "refs": [
+                  "ev_4420f6587e36bc064bfa"
+                ],
+                "characterization": "statement_fact"
+              }
+            ],
+            "explanation": "Commercial review is supported without claiming which party ultimately retains the charge.",
+            "limitations": []
+          }
+        },
+        "priorResearch": {
+          "operations": 0,
+          "stoppingDecision": {
+            "stop": true,
+            "stoppingReason": "S1_DETERMINANT_SUFFICIENCY",
+            "reasonCodes": [
+              "governed_open_world_research_not_escalated",
+              "determinants_sufficient_exact_identity_not_required"
+            ]
+          },
+          "determinantLift": [],
+          "actionLift": false,
+          "evidenceTierImproved": false,
+          "governedD1D4Changed": false,
+          "governedConfidenceChanged": false
+        },
+        "suppressionLoss": {
+          "determinantQuality": false,
+          "actionability": false,
+          "commercialUsefulness": false,
+          "confidenceDiscipline": false,
+          "merchantFacingRecommendation": false
+        }
+      }
+    ],
+    "priorResearchCallsSuppressed": [
+      "batch_settlement",
+      "application_fee_generic",
+      "amexct043_nqual_coded"
+    ],
+    "suppressionsWithQualityLoss": [],
+    "diagnosis": "The prior Stage-0 gate overweights unresolved exact identity/D2 fields even when governed layer, price control, printed mechanics, and a useful merchant action are already available."
+  },
+  "e2": {
+    "selectedCase": "monthly_advantage",
+    "selectionReason": "Unlike the other cases, the unresolved family and price-control question can change the merchant action; the exact/program identity is therefore decision-relevant.",
+    "armA": {
+      "arm": "A_CURRENT_AUTOMATED",
+      "queryShapes": [
+        {
+          "shapeId": "shape_01_exact_quoted_label",
+          "kind": "EXACT_QUOTED_LABEL",
+          "exactQuery": "\"MONTHLY ADVANTAGE FEE MCVDB\" fee",
+          "hypothesis": "The exact phrase appears in public documentation or a public statement.",
+          "documentGenres": [
+            "exact_document"
+          ]
+        },
+        {
+          "shapeId": "shape_02_processor_exact_label",
+          "kind": "PROCESSOR_EXACT_LABEL",
+          "exactQuery": "\"Clover\" \"MONTHLY ADVANTAGE FEE MCVDB\"",
+          "hypothesis": "The label is proprietary processor, ISO, or program nomenclature.",
+          "documentGenres": [
+            "processor_documentation"
+          ]
+        },
+        {
+          "shapeId": "shape_03_code_processor_document_genre",
+          "kind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+          "exactQuery": "\"MCVDB OR AMDS\" \"Clover\" \"fee schedule\" OR \"merchant application\" OR \"statement guide\" filetype:pdf",
+          "hypothesis": "The distinctive code is defined in a processor-specific document genre.",
+          "documentGenres": [
+            "fee_schedule",
+            "merchant_application",
+            "statement_guide"
+          ]
+        },
+        {
+          "shapeId": "shape_04_same_platform_public_statement",
+          "kind": "SAME_PLATFORM_PUBLIC_STATEMENT",
+          "exactQuery": "\"MCVDB OR AMDS\" \"Clover\" \"processing statement\" OR \"merchant statement\"",
+          "hypothesis": "The code recurs on same-platform statements with clearer headings or descriptions.",
+          "documentGenres": [
+            "same_platform_public_statement"
+          ]
+        }
+      ],
+      "discovery": [
+        {
+          "shapeId": "shape_01_exact_quoted_label",
+          "exactQueryShape": "\"MONTHLY ADVANTAGE FEE MCVDB\" fee",
+          "candidates": [
+            {
+              "url": "https://www.ccrta.org/wp-content/uploads/2023/09/Addendum-No.-1.pdf",
+              "title": null,
+              "publisher": null
+            },
+            {
+              "url": "https://southwest.tn.edu/financial-and-administrative-services/purchasing/bids/Merchant%20Statements%20from%20SWTCC.pdf",
+              "title": null,
+              "publisher": null
+            }
+          ]
+        },
+        {
+          "shapeId": "shape_02_processor_exact_label",
+          "exactQueryShape": "\"Clover\" \"MONTHLY ADVANTAGE FEE MCVDB\"",
+          "candidates": [
+            {
+              "url": "https://southwest.tn.edu/financial-and-administrative-services/purchasing/bids/Merchant%20Statements%20from%20SWTCC.pdf",
+              "title": null,
+              "publisher": null
+            },
+            {
+              "url": "https://www.scribd.com/document/977727479/Adobe-Acrobat-Sign-Agreement-Unsigned",
+              "title": null,
+              "publisher": null
+            }
+          ]
+        },
+        {
+          "shapeId": "shape_03_code_processor_document_genre",
+          "exactQueryShape": "\"MCVDB OR AMDS\" \"Clover\" \"fee schedule\" OR \"merchant application\" OR \"statement guide\" filetype:pdf",
+          "candidates": [
+            {
+              "url": "https://southwest.tn.edu/financial-and-administrative-services/purchasing/bids/Merchant%20Statements%20from%20SWTCC.pdf",
+              "title": null,
+              "publisher": null
+            },
+            {
+              "url": "https://nppagents.com/wp-content/uploads/2025/07/PCS2705_Editable.pdf",
+              "title": null,
+              "publisher": null
+            }
+          ]
+        },
+        {
+          "shapeId": "shape_04_same_platform_public_statement",
+          "exactQueryShape": "\"MCVDB OR AMDS\" \"Clover\" \"processing statement\" OR \"merchant statement\"",
+          "candidates": [
+            {
+              "url": "https://southwest.tn.edu/financial-and-administrative-services/purchasing/bids/Merchant%20Statements%20from%20SWTCC.pdf",
+              "title": null,
+              "publisher": null
+            },
+            {
+              "url": "https://www.scribd.com/document/977727479/Adobe-Acrobat-Sign-Agreement-Unsigned",
+              "title": null,
+              "publisher": null
+            }
+          ]
+        }
+      ],
+      "retrieval": [
+        {
+          "url": "https://southwest.tn.edu/financial-and-administrative-services/purchasing/bids/Merchant%20Statements%20from%20SWTCC.pdf",
+          "status": "retrieved_text",
+          "reasonCodes": [
+            "fee_knowledge_pdf_text_retrieved"
+          ],
+          "boundedPublicExcerpt": "Page 1 SOUTHWEST TENNESSEE COM Page 1 of 7 THIS IS NOT A BILL ANITA LOCKRIDGE/SCH ONL 5983 MACON CV MEMPHIS TN 38134-7693 Statement Period Merchant Number Customer Service 09/01/25 - 09/30/25 3888 SUMMARY An overview of account activity for the statement period. Total Amount Submitted $368,349.96 Chargebacks/Reversals 0.00 Adjustments 0.00 Fees Total Amount Processed $ Page 2 Page 4 Page 4 Page 4 IMPORTANT INFORMATION ABOUT YOUR ACCOUNT YOUR CARD PROCESSING STATEMENT Page 2 Merchant Number 3888 Page 2 of 7 Customer Service - Statement Period 09/01/25 - 09/30/25 IMPORTANT INFORMATION ABOUT YOUR ACCOUNT YOUR CARD PROCESSING STATEMENT SUMMARY BY DAY Date Submitted ðù/ðñ/òõ ðù/ðò/òõ ðù/ðó/òõ ðù/ðô/òõ ðù/ðõ/òõ ðù/ðö/òõ ðù/ð÷/òõ ðù/ðø/òõ ðù/ðù/òõ ðù/ñð/òõ ðù/ññ/òõ ðù/ñò/òõ ðù/ñó/òõ ðù/ñô/òõ ðù/ñõ/òõ ðù/ñö/òõ ðù/ñ÷/òõ ðù/ñø/òõ ðù/ñù/òõ ðù/òð/òõ ðù/òñ/òõ ðù/òó/òõ ðù/òô/òõ ðù/òõ/òõ ðù/òö/òõ ðù/ò÷/òõ ðù/òø/òõ ðù/òù/òõ ðù/óð/òõ Submitted Amount $÷,õ÷ñ.øõ $ø,ùôñ.ù÷ $ö,ñöñ.õó $ñó,ðôö.óó $ôõ,ö÷ø.òù $ñðñ,ñðó.öó $øò,ô÷ó.ù÷ $õó,ñ÷ð.òð $ñò,øøò.öø $õ,ðøð.öò $ò,òöð.ôò $ó,ùñö.ðø $õ,õóò.÷ð $ó,øô÷.ôø $ò,õóö.ùù -$ññ,ñðõ.öñ -$òó,òóó.ñ÷ $÷ôò.ðð $õ,ñ÷ó.öó $ò,ñðò.øð $ùòø.ðð $ùöø.ñø $ù,ôùô.ñù $ñ,öùò.ò÷ $ö,óôø.÷ö $õ,øõø.ðõ $ó,ôðð.ðø $õ,õòù.õö $ö,òôö.ôø Chargebacks/ Reversals ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð Adjustments ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð Fees ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð Amount Processed $÷,õ÷ñ.øõ $ø,ùôñ.ù÷ $ö,ñöñ.õó $ñó,ðôö.óó $ôõ,ö÷ø.òù $ñðñ,ñðó.öó $øò,ô÷ó.ù÷ $õó,ñ÷ð.òð $ñò,øøò.öø $õ,ðøð.öò $ò,òöð.ôò $ó,ùñö.ðø $õ,õóò.÷ð $ó,øô÷.ôø $ò,õóö.ùù -$ññ,ñðõ.öñ -$òó,òóó.ñ÷ $÷ôò.ðð $õ,ñ÷ó.öó $ò,ñðò.øð $ùòø.ðð $ùöø.ñø $ù,ôùô.ñù $ñ,öùò.ò÷ $ö,óôø.÷ö $õ,øõø.ðõ "
+        },
+        {
+          "url": "https://www.ccrta.org/wp-content/uploads/2023/09/Addendum-No.-1.pdf",
+          "status": "unavailable",
+          "reasonCodes": [
+            "fee_knowledge_http_429"
+          ],
+          "boundedPublicExcerpt": null
+        },
+        {
+          "url": "https://www.scribd.com/document/977727479/Adobe-Acrobat-Sign-Agreement-Unsigned",
+          "status": "retrieved_text",
+          "reasonCodes": [
+            "fee_knowledge_text_retrieved"
+          ],
+          "boundedPublicExcerpt": "Skip to main content Open navigation menu Close suggestions Search Search en Change Language , English 0 ratings 0% found this document useful (0 votes) Merchant Processing Application Form The document is a merchant processing application for Greens Auto, detailing the business&#x27;s information, owner details, financial data, and equipment specifications. It includes information on sales volume, transaction types, and pricing structures for credit card processing. The application is filled out by Paul Green, the owner, and includes various sections for compliance and operational details. Uploaded by trackstargang AI-enhanced title and description Copyright © All Rights Reserved We take content rights seriously. If you suspect this is your content, claim it here . Available Formats Download as PDF, TXT or read online on Scribd Download Save Save Adobe Acrobat Sign Agreement - Unsigned For Later 0% 0% found this document useful, Mark this document as useful 0% 0% found this document not useful, Mark this document as not useful 0 ratings 0% found this document useful (0 votes) Merchant Processing Application Form The document is a merchant processing application for Greens Auto, detailing the business&#x27;s information, owner details, financial data, and equipment specifications. It includes information on sales volume, transaction types, and pricing structures for credit card processing. The application is filled out by Paul Green, the owner, and includes various sections for compliance and operational details. Uploaded by trackstargang AI-enhanced title and description Copyright © All Rights Reserved We take content rights seriously. If you suspect this is your content, claim it here . Available Formats Download as PDF, TXT or read online on Scribd Go to previous items Download Save Save Adobe Acrobat Sign Agreement - Unsigned For Later Share 0% 0% found this document useful, Mark this document as useful 0% 0% found this document not useful, Mark this document as"
+        }
+      ],
+      "result": {
+        "feeRowId": "feerow_6221ff8d432f60c4ec066763",
+        "stage0Decision": "RESEARCH",
+        "stoppingDecision": {
+          "stop": true,
+          "stoppingReason": "S3_RESEARCH_STAGNATION",
+          "reasonCodes": [
+            "further_research_did_not_improve_evidence_or_confidence_tier"
+          ]
+        },
+        "operations": [
+          {
+            "ordinal": 1,
+            "type": "search",
+            "shapeKind": "EXACT_QUOTED_LABEL",
+            "status": "completed",
+            "reasonCodes": [
+              "search_candidates_discovered"
+            ]
+          },
+          {
+            "ordinal": 2,
+            "type": "search",
+            "shapeKind": "PROCESSOR_EXACT_LABEL",
+            "status": "completed",
+            "reasonCodes": [
+              "search_candidates_discovered"
+            ]
+          },
+          {
+            "ordinal": 3,
+            "type": "search",
+            "shapeKind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+            "status": "completed",
+            "reasonCodes": [
+              "search_candidates_discovered"
+            ]
+          },
+          {
+            "ordinal": 4,
+            "type": "search",
+            "shapeKind": "SAME_PLATFORM_PUBLIC_STATEMENT",
+            "status": "completed",
+            "reasonCodes": [
+              "search_candidates_discovered"
+            ]
+          },
+          {
+            "ordinal": 5,
+            "type": "document_fetch",
+            "shapeKind": null,
+            "status": "completed",
+            "reasonCodes": [
+              "fee_knowledge_pdf_text_retrieved"
+            ]
+          },
+          {
+            "ordinal": 6,
+            "type": "document_fetch",
+            "shapeKind": null,
+            "status": "completed",
+            "reasonCodes": [
+              "fee_knowledge_http_429"
+            ]
+          },
+          {
+            "ordinal": 7,
+            "type": "document_fetch",
+            "shapeKind": null,
+            "status": "completed",
+            "reasonCodes": [
+              "fee_knowledge_text_retrieved"
+            ]
+          },
+          {
+            "ordinal": 8,
+            "type": "candidate_synthesis",
+            "shapeKind": null,
+            "status": "completed",
+            "reasonCodes": [
+              "candidate_interpretations_generated_not_admitted"
+            ]
+          }
+        ],
+        "queryShapeResults": [
+          {
+            "shapeId": "shape_01_exact_quoted_label",
+            "kind": "EXACT_QUOTED_LABEL",
+            "candidateCount": 2,
+            "usefulCandidateCount": 1,
+            "reasonCodes": [
+              "candidate_utility_pending_retrieval"
+            ]
+          },
+          {
+            "shapeId": "shape_02_processor_exact_label",
+            "kind": "PROCESSOR_EXACT_LABEL",
+            "candidateCount": 2,
+            "usefulCandidateCount": 1,
+            "reasonCodes": [
+              "candidate_utility_pending_retrieval"
+            ]
+          },
+          {
+            "shapeId": "shape_03_code_processor_document_genre",
+            "kind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+            "candidateCount": 2,
+            "usefulCandidateCount": 1,
+            "reasonCodes": [
+              "candidate_utility_pending_retrieval"
+            ]
+          },
+          {
+            "shapeId": "shape_04_same_platform_public_statement",
+            "kind": "SAME_PLATFORM_PUBLIC_STATEMENT",
+            "candidateCount": 2,
+            "usefulCandidateCount": 1,
+            "reasonCodes": [
+              "candidate_utility_pending_retrieval"
+            ]
+          }
+        ],
+        "sources": [
+          {
+            "url": "https://southwest.tn.edu/financial-and-administrative-services/purchasing/bids/Merchant%20Statements%20from%20SWTCC.pdf",
+            "title": null,
+            "publisher": null,
+            "lane": "same_platform_statement",
+            "discoveredByShapeIds": [
+              "shape_01_exact_quoted_label",
+              "shape_02_processor_exact_label",
+              "shape_03_code_processor_document_genre",
+              "shape_04_same_platform_public_statement"
+            ],
+            "retrievalStatus": "retrieved_text",
+            "searchUseful": true,
+            "evidenceUseful": true,
+            "authorityState": "candidate_not_admitted",
+            "reasonCodes": [
+              "retrieved_text_applies_to_fee_candidate"
+            ]
+          },
+          {
+            "url": "https://www.ccrta.org/wp-content/uploads/2023/09/Addendum-No.-1.pdf",
+            "title": null,
+            "publisher": null,
+            "lane": "procurement_or_institutional",
+            "discoveredByShapeIds": [
+              "shape_01_exact_quoted_label"
+            ],
+            "retrievalStatus": "unavailable",
+            "searchUseful": false,
+            "evidenceUseful": false,
+            "authorityState": "candidate_not_admitted",
+            "reasonCodes": [
+              "fee_knowledge_http_429"
+            ]
+          },
+          {
+            "url": "https://www.scribd.com/document/977727479/Adobe-Acrobat-Sign-Agreement-Unsigned",
+            "title": null,
+            "publisher": null,
+            "lane": "generic_or_ai_navigation",
+            "discoveredByShapeIds": [
+              "shape_02_processor_exact_label",
+              "shape_04_same_platform_public_statement"
+            ],
+            "retrievalStatus": "retrieved_text",
+            "searchUseful": true,
+            "evidenceUseful": false,
+            "authorityState": "candidate_not_admitted",
+            "reasonCodes": [
+              "retrieved_text_not_specific_enough"
+            ]
+          }
+        ],
+        "synthesis": {
+          "candidateInterpretations": [],
+          "determinantLift": [],
+          "actionLift": false,
+          "evidenceTierImproved": false
+        },
+        "invariants": {
+          "canonicalMutationAllowed": false,
+          "reusableKnowledgeSelfAdmissionAllowed": false,
+          "searchUsefulnessSeparateFromAuthority": true,
+          "candidateCannotOverrideContradictoryStatementStructure": true
+        }
+      },
+      "operationCounts": {
+        "searches": 4,
+        "documentFetches": 3,
+        "syntheses": 1,
+        "totalExternalOperations": 8,
+        "providerRequests": 5,
+        "providerInternalWebSearchCalls": 8
+      },
+      "providerAccounting": {
+        "requestIds": [
+          "resp_07bfe4d9207ba09e016aa014bde26c87d292b8b45dfaa285f4",
+          "resp_0a3b0305c248b10d016aa014cddb2c87d2b99322209b92405b",
+          "resp_072df7e2bbf48b16016aa014de519487d2b2e6e95a7d078301",
+          "resp_026a3b31cf437f7d016aa014ee336487d28ad30a409f76b69c",
+          "resp_03607ecf7b274f6d016aa0150a419887d29eb346d81959665c"
+        ],
+        "inputTokens": 53609,
+        "outputTokens": 2449
+      }
+    },
+    "armB": {
+      "arm": "B_PRODUCT_MANUAL",
+      "queryShapes": [
+        {
+          "shapeId": "manual_01_payment_processing",
+          "kind": "EXACT_QUOTED_LABEL",
+          "exactQuery": "\"Monthly Advantage Fee\" payment processing",
+          "hypothesis": "The exact fee phrase is used in payment-processing material.",
+          "documentGenres": [
+            "payment_processing_document"
+          ]
+        },
+        {
+          "shapeId": "manual_02_mcvdb",
+          "kind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+          "exactQuery": "\"Monthly Advantage Fee\" MCVDB",
+          "hypothesis": "MCVDB is associated with the exact fee phrase.",
+          "documentGenres": [
+            "exact_document",
+            "merchant_statement",
+            "merchant_application"
+          ]
+        },
+        {
+          "shapeId": "manual_03_amds",
+          "kind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+          "exactQuery": "\"Monthly Advantage Fee\" AMDS",
+          "hypothesis": "AMDS is a competing program/code association for the exact fee phrase.",
+          "documentGenres": [
+            "exact_document",
+            "merchant_statement",
+            "merchant_application"
+          ]
+        },
+        {
+          "shapeId": "manual_04_statement_identity_application",
+          "kind": "PROCESSOR_MERCHANT_APPLICATION",
+          "exactQuery": "\"Monthly Advantage Fee\" \"merchant application\" \"Clover\" \"First Data\"",
+          "hypothesis": "The statement-derived Clover / A First Data Company identity appears with the fee in a merchant application.",
+          "documentGenres": [
+            "processor_or_iso_merchant_application"
+          ]
+        }
+      ],
+      "discovery": [
+        {
+          "shapeId": "manual_01_payment_processing",
+          "exactQueryShape": "\"Monthly Advantage Fee\" payment processing",
+          "candidates": [
+            {
+              "url": "https://nppagents.com/wp-content/uploads/2025/07/PCS2705_Editable.pdf",
+              "title": null,
+              "publisher": null
+            },
+            {
+              "url": "https://southwest.tn.edu/financial-and-administrative-services/purchasing/bids/Merchant%20Statements%20from%20SWTCC.pdf",
+              "title": null,
+              "publisher": null
+            }
+          ]
+        },
+        {
+          "shapeId": "manual_02_mcvdb",
+          "exactQueryShape": "\"Monthly Advantage Fee\" MCVDB",
+          "candidates": [
+            {
+              "url": "https://www.ccrta.org/wp-content/uploads/2023/09/Addendum-No.-1.pdf",
+              "title": null,
+              "publisher": null
+            },
+            {
+              "url": "https://southwest.tn.edu/financial-and-administrative-services/purchasing/bids/Merchant%20Statements%20from%20SWTCC.pdf",
+              "title": null,
+              "publisher": null
+            }
+          ]
+        },
+        {
+          "shapeId": "manual_03_amds",
+          "exactQueryShape": "\"Monthly Advantage Fee\" AMDS",
+          "candidates": [
+            {
+              "url": "https://www.ccrta.org/wp-content/uploads/2023/09/Addendum-No.-1.pdf",
+              "title": null,
+              "publisher": null
+            },
+            {
+              "url": "https://southwest.tn.edu/financial-and-administrative-services/purchasing/bids/Merchant%20Statements%20from%20SWTCC.pdf",
+              "title": null,
+              "publisher": null
+            }
+          ]
+        },
+        {
+          "shapeId": "manual_04_statement_identity_application",
+          "exactQueryShape": "\"Monthly Advantage Fee\" \"merchant application\" \"Clover\" \"First Data\"",
+          "candidates": [
+            {
+              "url": "https://www.scribd.com/document/977727479/Adobe-Acrobat-Sign-Agreement-Unsigned",
+              "title": null,
+              "publisher": null
+            },
+            {
+              "url": "https://cdn.valuedmerchants.com/wp-content/uploads/2026/02/vms_pcs_application_-2705_editable_20326-1.pdf",
+              "title": null,
+              "publisher": null
+            }
+          ]
+        }
+      ],
+      "retrieval": [
+        {
+          "url": "https://southwest.tn.edu/financial-and-administrative-services/purchasing/bids/Merchant%20Statements%20from%20SWTCC.pdf",
+          "status": "retrieved_text",
+          "reasonCodes": [
+            "fee_knowledge_pdf_text_retrieved"
+          ],
+          "boundedPublicExcerpt": "Page 1 SOUTHWEST TENNESSEE COM Page 1 of 7 THIS IS NOT A BILL ANITA LOCKRIDGE/SCH ONL 5983 MACON CV MEMPHIS TN 38134-7693 Statement Period Merchant Number Customer Service 09/01/25 - 09/30/25 3888 SUMMARY An overview of account activity for the statement period. Total Amount Submitted $368,349.96 Chargebacks/Reversals 0.00 Adjustments 0.00 Fees Total Amount Processed $ Page 2 Page 4 Page 4 Page 4 IMPORTANT INFORMATION ABOUT YOUR ACCOUNT YOUR CARD PROCESSING STATEMENT Page 2 Merchant Number 3888 Page 2 of 7 Customer Service - Statement Period 09/01/25 - 09/30/25 IMPORTANT INFORMATION ABOUT YOUR ACCOUNT YOUR CARD PROCESSING STATEMENT SUMMARY BY DAY Date Submitted ðù/ðñ/òõ ðù/ðò/òõ ðù/ðó/òõ ðù/ðô/òõ ðù/ðõ/òõ ðù/ðö/òõ ðù/ð÷/òõ ðù/ðø/òõ ðù/ðù/òõ ðù/ñð/òõ ðù/ññ/òõ ðù/ñò/òõ ðù/ñó/òõ ðù/ñô/òõ ðù/ñõ/òõ ðù/ñö/òõ ðù/ñ÷/òõ ðù/ñø/òõ ðù/ñù/òõ ðù/òð/òõ ðù/òñ/òõ ðù/òó/òõ ðù/òô/òõ ðù/òõ/òõ ðù/òö/òõ ðù/ò÷/òõ ðù/òø/òõ ðù/òù/òõ ðù/óð/òõ Submitted Amount $÷,õ÷ñ.øõ $ø,ùôñ.ù÷ $ö,ñöñ.õó $ñó,ðôö.óó $ôõ,ö÷ø.òù $ñðñ,ñðó.öó $øò,ô÷ó.ù÷ $õó,ñ÷ð.òð $ñò,øøò.öø $õ,ðøð.öò $ò,òöð.ôò $ó,ùñö.ðø $õ,õóò.÷ð $ó,øô÷.ôø $ò,õóö.ùù -$ññ,ñðõ.öñ -$òó,òóó.ñ÷ $÷ôò.ðð $õ,ñ÷ó.öó $ò,ñðò.øð $ùòø.ðð $ùöø.ñø $ù,ôùô.ñù $ñ,öùò.ò÷ $ö,óôø.÷ö $õ,øõø.ðõ $ó,ôðð.ðø $õ,õòù.õö $ö,òôö.ôø Chargebacks/ Reversals ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð Adjustments ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð Fees ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð ð.ðð Amount Processed $÷,õ÷ñ.øõ $ø,ùôñ.ù÷ $ö,ñöñ.õó $ñó,ðôö.óó $ôõ,ö÷ø.òù $ñðñ,ñðó.öó $øò,ô÷ó.ù÷ $õó,ñ÷ð.òð $ñò,øøò.öø $õ,ðøð.öò $ò,òöð.ôò $ó,ùñö.ðø $õ,õóò.÷ð $ó,øô÷.ôø $ò,õóö.ùù -$ññ,ñðõ.öñ -$òó,òóó.ñ÷ $÷ôò.ðð $õ,ñ÷ó.öó $ò,ñðò.øð $ùòø.ðð $ùöø.ñø $ù,ôùô.ñù $ñ,öùò.ò÷ $ö,óôø.÷ö $õ,øõø.ðõ "
+        },
+        {
+          "url": "https://www.ccrta.org/wp-content/uploads/2023/09/Addendum-No.-1.pdf",
+          "status": "unavailable",
+          "reasonCodes": [
+            "fee_knowledge_http_429"
+          ],
+          "boundedPublicExcerpt": null
+        },
+        {
+          "url": "https://cdn.valuedmerchants.com/wp-content/uploads/2026/02/vms_pcs_application_-2705_editable_20326-1.pdf",
+          "status": "unavailable",
+          "reasonCodes": [
+            "fee_knowledge_http_404"
+          ],
+          "boundedPublicExcerpt": null
+        }
+      ],
+      "result": {
+        "feeRowId": "feerow_6221ff8d432f60c4ec066763",
+        "stage0Decision": "RESEARCH",
+        "stoppingDecision": {
+          "stop": true,
+          "stoppingReason": "S3_RESEARCH_STAGNATION",
+          "reasonCodes": [
+            "further_research_did_not_improve_evidence_or_confidence_tier"
+          ]
+        },
+        "operations": [
+          {
+            "ordinal": 1,
+            "type": "search",
+            "shapeKind": "EXACT_QUOTED_LABEL",
+            "status": "completed",
+            "reasonCodes": [
+              "search_candidates_discovered"
+            ]
+          },
+          {
+            "ordinal": 2,
+            "type": "search",
+            "shapeKind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+            "status": "completed",
+            "reasonCodes": [
+              "search_candidates_discovered"
+            ]
+          },
+          {
+            "ordinal": 3,
+            "type": "search",
+            "shapeKind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+            "status": "completed",
+            "reasonCodes": [
+              "search_candidates_discovered"
+            ]
+          },
+          {
+            "ordinal": 4,
+            "type": "search",
+            "shapeKind": "PROCESSOR_MERCHANT_APPLICATION",
+            "status": "completed",
+            "reasonCodes": [
+              "search_candidates_discovered"
+            ]
+          },
+          {
+            "ordinal": 5,
+            "type": "document_fetch",
+            "shapeKind": null,
+            "status": "completed",
+            "reasonCodes": [
+              "fee_knowledge_pdf_text_retrieved"
+            ]
+          },
+          {
+            "ordinal": 6,
+            "type": "document_fetch",
+            "shapeKind": null,
+            "status": "completed",
+            "reasonCodes": [
+              "fee_knowledge_http_429"
+            ]
+          },
+          {
+            "ordinal": 7,
+            "type": "document_fetch",
+            "shapeKind": null,
+            "status": "completed",
+            "reasonCodes": [
+              "fee_knowledge_http_404"
+            ]
+          },
+          {
+            "ordinal": 8,
+            "type": "candidate_synthesis",
+            "shapeKind": null,
+            "status": "completed",
+            "reasonCodes": [
+              "candidate_interpretations_generated_not_admitted"
+            ]
+          }
+        ],
+        "queryShapeResults": [
+          {
+            "shapeId": "manual_01_payment_processing",
+            "kind": "EXACT_QUOTED_LABEL",
+            "candidateCount": 2,
+            "usefulCandidateCount": 1,
+            "reasonCodes": [
+              "candidate_utility_pending_retrieval"
+            ]
+          },
+          {
+            "shapeId": "manual_02_mcvdb",
+            "kind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+            "candidateCount": 2,
+            "usefulCandidateCount": 1,
+            "reasonCodes": [
+              "candidate_utility_pending_retrieval"
+            ]
+          },
+          {
+            "shapeId": "manual_03_amds",
+            "kind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+            "candidateCount": 2,
+            "usefulCandidateCount": 1,
+            "reasonCodes": [
+              "candidate_utility_pending_retrieval"
+            ]
+          },
+          {
+            "shapeId": "manual_04_statement_identity_application",
+            "kind": "PROCESSOR_MERCHANT_APPLICATION",
+            "candidateCount": 2,
+            "usefulCandidateCount": 0,
+            "reasonCodes": [
+              "candidate_utility_pending_retrieval"
+            ]
+          }
+        ],
+        "sources": [
+          {
+            "url": "https://southwest.tn.edu/financial-and-administrative-services/purchasing/bids/Merchant%20Statements%20from%20SWTCC.pdf",
+            "title": null,
+            "publisher": null,
+            "lane": "same_platform_statement",
+            "discoveredByShapeIds": [
+              "manual_01_payment_processing",
+              "manual_02_mcvdb",
+              "manual_03_amds"
+            ],
+            "retrievalStatus": "retrieved_text",
+            "searchUseful": true,
+            "evidenceUseful": true,
+            "authorityState": "candidate_not_admitted",
+            "reasonCodes": [
+              "retrieved_text_applies_to_fee_candidate"
+            ]
+          },
+          {
+            "url": "https://www.ccrta.org/wp-content/uploads/2023/09/Addendum-No.-1.pdf",
+            "title": null,
+            "publisher": null,
+            "lane": "procurement_or_institutional",
+            "discoveredByShapeIds": [
+              "manual_02_mcvdb",
+              "manual_03_amds"
+            ],
+            "retrievalStatus": "unavailable",
+            "searchUseful": false,
+            "evidenceUseful": false,
+            "authorityState": "candidate_not_admitted",
+            "reasonCodes": [
+              "fee_knowledge_http_429"
+            ]
+          },
+          {
+            "url": "https://cdn.valuedmerchants.com/wp-content/uploads/2026/02/vms_pcs_application_-2705_editable_20326-1.pdf",
+            "title": null,
+            "publisher": null,
+            "lane": "generic_or_ai_navigation",
+            "discoveredByShapeIds": [
+              "manual_04_statement_identity_application"
+            ],
+            "retrievalStatus": "unavailable",
+            "searchUseful": false,
+            "evidenceUseful": false,
+            "authorityState": "candidate_not_admitted",
+            "reasonCodes": [
+              "fee_knowledge_http_404"
+            ]
+          }
+        ],
+        "synthesis": {
+          "candidateInterpretations": [],
+          "determinantLift": [],
+          "actionLift": false,
+          "evidenceTierImproved": false
+        },
+        "invariants": {
+          "canonicalMutationAllowed": false,
+          "reusableKnowledgeSelfAdmissionAllowed": false,
+          "searchUsefulnessSeparateFromAuthority": true,
+          "candidateCannotOverrideContradictoryStatementStructure": true
+        }
+      },
+      "operationCounts": {
+        "searches": 4,
+        "documentFetches": 3,
+        "syntheses": 1,
+        "totalExternalOperations": 8,
+        "providerRequests": 5,
+        "providerInternalWebSearchCalls": 8
+      },
+      "providerAccounting": {
+        "requestIds": [
+          "resp_02e89c38508cb40f016aa0150e5f6887d29509cdaa995103a5",
+          "resp_0e6623e91bfb3fea016aa0151cb3f487d2a7bc554ff0055240",
+          "resp_03426e45a950cfa5016aa01530236487d2851c8d2e0a914280",
+          "resp_096bae2cc7fc0b43016aa0153d657c87d28bc1ce7fd2cee8a4",
+          "resp_08301b1d3a864d44016aa0155682c487d2aae59220cc755156"
+        ],
+        "inputTokens": 53851,
+        "outputTokens": 2071
+      }
+    },
+    "comparison": {
+      "discoveredUrlOverlap": [
+        "https://nppagents.com/wp-content/uploads/2025/07/PCS2705_Editable.pdf",
+        "https://southwest.tn.edu/financial-and-administrative-services/purchasing/bids/Merchant%20Statements%20from%20SWTCC.pdf",
+        "https://www.ccrta.org/wp-content/uploads/2023/09/Addendum-No.-1.pdf",
+        "https://www.scribd.com/document/977727479/Adobe-Acrobat-Sign-Agreement-Unsigned"
+      ],
+      "usefulDocumentOverlap": [
+        "https://southwest.tn.edu/financial-and-administrative-services/purchasing/bids/Merchant%20Statements%20from%20SWTCC.pdf"
+      ],
+      "sameUsefulDocumentsDiscovered": true,
+      "armAUsefulSourceCount": 1,
+      "armBUsefulSourceCount": 1
+    }
+  },
+  "invariants": {
+    "perStatement": [
+      {
+        "file": "Nov_2024_Statement.pdf",
+        "beforeFingerprint": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+        "afterFingerprint": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
+        "unchanged": true
+      },
+      {
+        "file": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+        "beforeFingerprint": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+        "afterFingerprint": "ce45064446ff6c2a513a58bc9082872c65808d21b6f3babffe0d7b738c4b20e6",
+        "unchanged": true
+      },
+      {
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "beforeFingerprint": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+        "afterFingerprint": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
+        "unchanged": true
+      }
+    ],
+    "allCanonicalFinancialFingerprintsUnchanged": true,
+    "governedD1D4MutatedByE2": false,
+    "governedConfidenceMutatedByE2": false,
+    "governedKnowledgeMutated": false,
+    "reusableKnowledgeSelfAdmitted": false
+  }
+}

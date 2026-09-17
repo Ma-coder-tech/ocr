@@ -238,6 +238,7 @@ describe("canonical research admission integration", () => {
 
     expect(bodies).toHaveLength(1);
     expect(bodies[0]).toMatchObject({
+      store: false,
       reasoning: { effort: "low" },
       text: {
         format: {

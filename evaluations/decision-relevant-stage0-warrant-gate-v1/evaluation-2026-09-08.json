@@ -1,0 +1,3404 @@
+{
+  "schemaVersion": "decision_relevant_stage0_warrant_gate_2026_09_08_v1",
+  "baseline": {
+    "branch": "codex/unknown-fee-research-diagnosis-e1-e2-v1",
+    "commit": "a520d09528c1b54ef74c39ed1fc9e5a0696afe0d",
+    "priorOpenWorldEscalations": 200,
+    "priorCalibratedResearchEscalations": 168
+  },
+  "corpus": {
+    "statements": 11,
+    "materialRows": 483,
+    "priorCalibratedResearchEscalations": 168,
+    "currentPreliminaryOpenWorldEscalations": 166,
+    "newWarrantedResearchEscalations": 153,
+    "netResearchEscalationReduction": 15,
+    "exactBaselineRowComparison": {
+      "baselineCommit": "a520d09528c1b54ef74c39ed1fc9e5a0696afe0d",
+      "retainedResearchEscalations": 134,
+      "newlyWarrantedEscalations": 19,
+      "newlyWarrantedDollarsMinor": 6528,
+      "newlySuppressedEscalations": 34,
+      "newlySuppressedDollarsMinor": 128574
+    },
+    "warrantedResearchRows": [
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_bed9d5b98e6a05b20583f9ae",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_bed9d5b98e6a05b20583f9ae",
+        "label": "MASTERCARD - MC-REG INCENT FRF ADJ POS (DB)",
+        "amountMinor": 3785,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_da0f83e1e745f305e4a87065",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_da0f83e1e745f305e4a87065",
+        "label": "MASTERCARD - MASTERCARD DEBIT SALES DISC 0.001 DISC RATE TIMES $6744.78",
+        "amountMinor": 674,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_d09d1d6a939d33e1694ed2f9",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_d09d1d6a939d33e1694ed2f9",
+        "label": "MASTERCARD - MC LICENSE VOLUME FEE 0.000217 DISC RATE TIMES $12970.74",
+        "amountMinor": 281,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_bd62d0fc27bec94faa42cbe5",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_bd62d0fc27bec94faa42cbe5",
+        "label": "VISA - VI-SM MERCH REST INF SQ",
+        "amountMinor": 1527,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_03161ac0a995bd0f24d4c5b6",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_03161ac0a995bd0f24d4c5b6",
+        "label": "VISA - VI-REG CONSUMER MQ (DB)",
+        "amountMinor": 120,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_31733fb2ed21e6b83fec8c0d",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_31733fb2ed21e6b83fec8c0d",
+        "label": "VISA - VI-US BUS TR3 TRVL",
+        "amountMinor": 372,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_119f0bccea6a16f1d7870a04",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_119f0bccea6a16f1d7870a04",
+        "label": "VISA - VI-US BUS TR5 TRVL",
+        "amountMinor": 1104,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_f613ac8ab584b829a83197d8",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_f613ac8ab584b829a83197d8",
+        "label": "VISA - VI-BUSINESS CARD CP (DB)",
+        "amountMinor": 1375,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_83b6a7d1cb372d5e7badabc9",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_83b6a7d1cb372d5e7badabc9",
+        "label": "VISA - VI-US BUS TR2 TRVL",
+        "amountMinor": 285,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_3e92421884840fa813482214",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_3e92421884840fa813482214",
+        "label": "VISA - VI-SM MERCH REST SIG SIGN PRF",
+        "amountMinor": 15245,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_0eb2fb06502100a17bb9d5b8",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_0eb2fb06502100a17bb9d5b8",
+        "label": "DISCOVER - DSCVR PSL REST RW",
+        "amountMinor": 559,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_b5a571d88cdcdae91866324b",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_b5a571d88cdcdae91866324b",
+        "label": "DISCOVER - DSCVR PSL REST PR",
+        "amountMinor": 379,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_bfc359b831677a5a0f9baab4",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_bfc359b831677a5a0f9baab4",
+        "label": "DISCOVER - DSCVR PSL EXP SVC RW",
+        "amountMinor": 122,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_7149113d8bba4ac888595d01",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_7149113d8bba4ac888595d01",
+        "label": "DISCOVER - DSCVR PSL REST PP",
+        "amountMinor": 847,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_e10b95394643bfb649c8831a",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_e10b95394643bfb649c8831a",
+        "label": "SIGNATURE DEBIT - ST-BASE S1 STD CP (DB)",
+        "amountMinor": 111,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_6221ff8d432f60c4ec066763",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_6221ff8d432f60c4ec066763",
+        "label": "Other - MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $47996.83",
+        "amountMinor": 1440,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_dfdea51f9fd0a9682f5e0d4b",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_dfdea51f9fd0a9682f5e0d4b",
+        "label": "ACCEL ADVANTAGE REG",
+        "amountMinor": 665,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_fed3c7130c6437f71fed2860",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_fed3c7130c6437f71fed2860",
+        "label": "STAR NE",
+        "amountMinor": 115,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_8df1d9f5ae417d701017af7b",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_8df1d9f5ae417d701017af7b",
+        "label": "MAESTRO REG",
+        "amountMinor": 109,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_a7f0ddb23b302a573be19cb1",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_a7f0ddb23b302a573be19cb1",
+        "label": "PULSE PAY CHOICE",
+        "amountMinor": 515,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_bf24c51cc93d02c1ff0fec4b",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_bf24c51cc93d02c1ff0fec4b",
+        "label": "PULSE PAY CHOICE REG",
+        "amountMinor": 106,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_44a2b20bc586281e956d5631",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_44a2b20bc586281e956d5631",
+        "label": "ACCEL ADVANTAGE",
+        "amountMinor": 412,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_6d54fcf3fe6b0af87b2e0d1b",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_6d54fcf3fe6b0af87b2e0d1b",
+        "label": "INTERLINK REG",
+        "amountMinor": 131,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_8df5c4a9f1df73f311083b61",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_8df5c4a9f1df73f311083b61",
+        "label": "DEBIT/ATM CARD TRANSACTION FEE 31 TRANSACTIONS AT 0.1",
+        "amountMinor": 310,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_8fa9452aa772973022b2ed29",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_8fa9452aa772973022b2ed29",
+        "label": "VISA NETWORK FEE CP 1B-01",
+        "amountMinor": 200,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_459279be93a0f1618c73fa63",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_459279be93a0f1618c73fa63",
+        "label": "STAR ACCESS PER TRAN CP 33 TRANSACTIONS AT .100000",
+        "amountMinor": 330,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_2a55a4716a547eee96a259cd",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_2a55a4716a547eee96a259cd",
+        "label": "BENTOBOX ONLINE ORDER FEE 17 TRANSACTIONS AT 0.99",
+        "amountMinor": 1683,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_b41e913510feb5a900c1deaa",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_b41e913510feb5a900c1deaa",
+        "label": "MASTERCARD - MC-REG INCENT FRF ADJ POS (DB)",
+        "amountMinor": 3545,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_8f67dd18a7a1cc276c10a029",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_8f67dd18a7a1cc276c10a029",
+        "label": "MASTERCARD - MASTERCARD DEBIT SALES DISC 0.001 DISC RATE TIMES $6314.56",
+        "amountMinor": 631,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_2682ec5185106f8610772f09",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_2682ec5185106f8610772f09",
+        "label": "MASTERCARD - MC LICENSE VOLUME FEE 0.000217 DISC RATE TIMES $12147.20",
+        "amountMinor": 264,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_6c32f0498883264a73f3737f",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_6c32f0498883264a73f3737f",
+        "label": "VISA - VI-SM MERCH REST INF SQ",
+        "amountMinor": 1529,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_1531fde4c549845b78739c54",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_1531fde4c549845b78739c54",
+        "label": "VISA - VI-REG CONSUMER MQ (DB)",
+        "amountMinor": 120,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_9b3374f24afd284c7c2389d5",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_9b3374f24afd284c7c2389d5",
+        "label": "VISA - VI-US BUS TR3 TRVL",
+        "amountMinor": 373,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_adff785860b09867ada29d83",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_adff785860b09867ada29d83",
+        "label": "VISA - VI-US BUS TR5 TRVL",
+        "amountMinor": 1106,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_3c04a6dd03760d6abf267393",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_3c04a6dd03760d6abf267393",
+        "label": "VISA - VI-BUSINESS CARD CP (DB)",
+        "amountMinor": 1377,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_b317e3a22ca6c2e7191dfa38",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_b317e3a22ca6c2e7191dfa38",
+        "label": "VISA - VI-US BUS TR2 TRVL",
+        "amountMinor": 285,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_8b0fac382fa430bcdd9b7454",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_8b0fac382fa430bcdd9b7454",
+        "label": "VISA - VI-SM MERCH REST SIG SIGN PRF",
+        "amountMinor": 15267,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_d6d7342eec8dcb3ff84d47bb",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_d6d7342eec8dcb3ff84d47bb",
+        "label": "DISCOVER - DSCVR PSL REST RW",
+        "amountMinor": 560,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_59462810076c993c8eb76bb9",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_59462810076c993c8eb76bb9",
+        "label": "DISCOVER - DSCVR PSL REST PR",
+        "amountMinor": 380,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_603c8b9df827dd97e17be7f0",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_603c8b9df827dd97e17be7f0",
+        "label": "DISCOVER - DSCVR PSL EXP SVC RW",
+        "amountMinor": 122,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_939f5f19c6df693d673dd61a",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_939f5f19c6df693d673dd61a",
+        "label": "DISCOVER - DSCVR PSL REST PP",
+        "amountMinor": 849,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_f64dfc2b0952e791052521e6",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_f64dfc2b0952e791052521e6",
+        "label": "SIGNATURE DEBIT - ST-BASE S1 STD CP (DB)",
+        "amountMinor": 105,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_eb688e9f9cbcbe7685c57515",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_eb688e9f9cbcbe7685c57515",
+        "label": "Other - MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $47229.33",
+        "amountMinor": 1417,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_f45e65eb5e413101ea744c5f",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_f45e65eb5e413101ea744c5f",
+        "label": "ACCEL ADVANTAGE REG",
+        "amountMinor": 638,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_76fb2ddcf4bd1a47095c1144",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_76fb2ddcf4bd1a47095c1144",
+        "label": "STAR NE",
+        "amountMinor": 110,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_e91f047bf6fa989d2df3ac3e",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_e91f047bf6fa989d2df3ac3e",
+        "label": "MAESTRO REG",
+        "amountMinor": 105,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_c94a4502076d7c03fe661286",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_c94a4502076d7c03fe661286",
+        "label": "PULSE PAY CHOICE",
+        "amountMinor": 494,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_b10922bd69d7a66f81cb0b22",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_b10922bd69d7a66f81cb0b22",
+        "label": "PULSE PAY CHOICE REG",
+        "amountMinor": 102,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_d18ef33c75bd7a817eeeb3e2",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_d18ef33c75bd7a817eeeb3e2",
+        "label": "ACCEL ADVANTAGE",
+        "amountMinor": 395,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_250baa4691906b292175359b",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_250baa4691906b292175359b",
+        "label": "INTERLINK REG",
+        "amountMinor": 126,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_11503e6386e07fd5bfe058b4",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_11503e6386e07fd5bfe058b4",
+        "label": "DEBIT/ATM CARD TRANSACTION FEE 30 TRANSACTIONS AT 0.1",
+        "amountMinor": 300,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_ad0730e457b190f224565cf1",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_ad0730e457b190f224565cf1",
+        "label": "VISA NETWORK FEE CP 1B-01",
+        "amountMinor": 200,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_3236443d39029ee3c387609a",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_3236443d39029ee3c387609a",
+        "label": "STAR ACCESS PER TRAN CP 32 TRANSACTIONS AT .100000",
+        "amountMinor": 320,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_19785377007d01c62816c9e9",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_19785377007d01c62816c9e9",
+        "label": "BENTOBOX ONLINE ORDER FEE 17 TRANSACTIONS AT 0.99",
+        "amountMinor": 1683,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf:feerow_4478641c8ee5de4b67d7cded",
+        "file": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+        "feeRowId": "feerow_4478641c8ee5de4b67d7cded",
+        "label": "Other - NON SWIPED DISCOUNT $1,450.00 AT .028900 , 4 TRANS AT .100000",
+        "amountMinor": 4231,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_6a886d5b12e1fe65786ea9c7",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_6a886d5b12e1fe65786ea9c7",
+        "label": "MASTERCARD - OTHER ITEM FEES",
+        "amountMinor": 30,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_0a5dc85393bf3559de94cd17",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_0a5dc85393bf3559de94cd17",
+        "label": "MASTERCARD - DISC 1",
+        "amountMinor": 56,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_f806c66d9372acce04075030",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_f806c66d9372acce04075030",
+        "label": "MASTERCARD - LICENSE RATE",
+        "amountMinor": 14,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_78ce6720ce9dedca5d62c2f5",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_78ce6720ce9dedca5d62c2f5",
+        "label": "MC OFLN DB - OTHER ITEM FEES",
+        "amountMinor": 170,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_06159bea39e902817b7cf5ed",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_06159bea39e902817b7cf5ed",
+        "label": "MC OFLN DB - BIN ICA FEE",
+        "amountMinor": 13,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_d44facaaf01ee64162645788",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_d44facaaf01ee64162645788",
+        "label": "MC OFLN DB - DISC 1",
+        "amountMinor": 108,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_63d5f5bca973eec7065c2cfc",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_63d5f5bca973eec7065c2cfc",
+        "label": "MC OFLN DB - LICENSE RATE",
+        "amountMinor": 27,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_04d72108ee9209bfcbe77204",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_04d72108ee9209bfcbe77204",
+        "label": "AMEXCT043 - DISC 1",
+        "amountMinor": 13,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_073c9a089969b30ae5cae491",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_073c9a089969b30ae5cae491",
+        "label": "AMEXCT043 - OTHER VOLUME FEES",
+        "amountMinor": 19,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_5a022aeadcf58b1a8c30f6c7",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_5a022aeadcf58b1a8c30f6c7",
+        "label": "VISA - DISC 1",
+        "amountMinor": 79,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_e2eae62bcfbc2ef92a4a0fb8",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_e2eae62bcfbc2ef92a4a0fb8",
+        "label": "VISA - OTHER ITEM FEES",
+        "amountMinor": 90,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_f8ebf9183065df1b9cfe95bf",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_f8ebf9183065df1b9cfe95bf",
+        "label": "VISA - FIXED NETWORK CP FEE",
+        "amountMinor": 145,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_7bb1b847e7549191d1771630",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_7bb1b847e7549191d1771630",
+        "label": "VISA - FILE TRANSMISSION FEE",
+        "amountMinor": 10,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_6fc9dfa778845775aee4ff50",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_6fc9dfa778845775aee4ff50",
+        "label": "VS OFLN DB - DISC 1",
+        "amountMinor": 276,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_8b2dc022907415ffe94ebfa3",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_8b2dc022907415ffe94ebfa3",
+        "label": "VS OFLN DB - OTHER ITEM FEES",
+        "amountMinor": 320,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_db03067cc9daee9dc62502b1",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_db03067cc9daee9dc62502b1",
+        "label": "VS OFLN DB - ACQ ISA FEE",
+        "amountMinor": 11,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_57bfdbfd2f3c6a8ecf592440",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_57bfdbfd2f3c6a8ecf592440",
+        "label": "VS OFLN DB - DB DUES AND ASSESS",
+        "amountMinor": 179,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_530af6b238be126eb6f5645e",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_530af6b238be126eb6f5645e",
+        "label": "DCVR ACQ - DISC 1",
+        "amountMinor": 10,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_0e0e3a27d4e5066df62020fe",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_0e0e3a27d4e5066df62020fe",
+        "label": "DCVR ACQ - OTHER ITEM FEES",
+        "amountMinor": 10,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_df20daecb58c7f1b76d8c9eb",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_df20daecb58c7f1b76d8c9eb",
+        "label": "DCVR ACQ - DUES & ASSESSMENTS",
+        "amountMinor": 7,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_9ee29cc94b2e0b092bc15d4d",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_9ee29cc94b2e0b092bc15d4d",
+        "label": "SALES ITEMS",
+        "amountMinor": 640,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_46abc75d0b5a37925767ccf0",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_46abc75d0b5a37925767ccf0",
+        "label": "MASTERCARD - MC-ENHANCED KEY ENTERED",
+        "amountMinor": 688,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_53299a2e95856604056c601e",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_53299a2e95856604056c601e",
+        "label": "MASTERCARD - MC-KEY ENTERED",
+        "amountMinor": 1365,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_ce06e6b2f383a621fa107438",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_ce06e6b2f383a621fa107438",
+        "label": "MASTERCARD - MC-KEY ENTERED (DB)",
+        "amountMinor": 2387,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_5dd68d9fef82f7d9a7839bbf",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_5dd68d9fef82f7d9a7839bbf",
+        "label": "MASTERCARD - MC-KEY ENTERED PREPAID",
+        "amountMinor": 146,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_8a6033c2a1854440423d35ed",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_8a6033c2a1854440423d35ed",
+        "label": "MASTERCARD - MC-REG INCENT FRF ADJ POS (DB)",
+        "amountMinor": 1747,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_f35f971f802d62b1ca9fa917",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_f35f971f802d62b1ca9fa917",
+        "label": "MASTERCARD - MC LICENSE VOLUME FEE .000061 DISC RATE TIMES $25317.39",
+        "amountMinor": 154,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_0af6b9fdec2bacdd4f417140",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_0af6b9fdec2bacdd4f417140",
+        "label": "VISA - VI-INTREG CHIP ISS (US)",
+        "amountMinor": 169,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_4142b7fd221280b3c0793890",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_4142b7fd221280b3c0793890",
+        "label": "VISA - VI-REG CONSUMER MQ (DB)",
+        "amountMinor": 4694,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_6a38b9096da276773d1cab3e",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_6a38b9096da276773d1cab3e",
+        "label": "VISA - VI-US HNW CONSUMER STD",
+        "amountMinor": 166,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_da55518ed2af85bacfcddfc6",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_da55518ed2af85bacfcddfc6",
+        "label": "VISA - VI-SIGNATURE CARD ELECTRONIC",
+        "amountMinor": 28749,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_a5a6f260b88ebbc61e683c64",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_a5a6f260b88ebbc61e683c64",
+        "label": "VISA - VI-BUSINESS CARD CP (DB)",
+        "amountMinor": 1001,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_2f4c2f5f9e5a14b572e77542",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_2f4c2f5f9e5a14b572e77542",
+        "label": "VISA - VI-SIGNATURE PREFERRED CRP ELC",
+        "amountMinor": 87591,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_bbcd6690934ca6f872c26cf1",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_bbcd6690934ca6f872c26cf1",
+        "label": "VISA - VI-SIGNATURE PREFERRED CRP STD",
+        "amountMinor": 3175,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_26abef604502b6fe2b3ccc5d",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_26abef604502b6fe2b3ccc5d",
+        "label": "VISA - VI-PRIVATE LABEL ENHANCED",
+        "amountMinor": 125,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_7bf610001c4598993bc4a48e",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_7bf610001c4598993bc4a48e",
+        "label": "VISA - VI-SIGNATURE CARD STANDARD",
+        "amountMinor": 1046,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_c368a8a54416f577e629554c",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_c368a8a54416f577e629554c",
+        "label": "VISA - VI-BUSINESS CARD TR4 ELEC",
+        "amountMinor": 2314,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_8b1c4ae4421ed66863c6d595",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_8b1c4ae4421ed66863c6d595",
+        "label": "VISA - VI-US HNW CONSUMER ELECT",
+        "amountMinor": 7723,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_373eb5bd73d0d46f9a365cb0",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_373eb5bd73d0d46f9a365cb0",
+        "label": "VISA - VI NTWK ACQ PROC FEE US DB/PP 1520 TRANSACTIONS AT .0155",
+        "amountMinor": 2358,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_81e4a8b90ee0b11817b24a90",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_81e4a8b90ee0b11817b24a90",
+        "label": "VISA - VI NTWK ACQ PROC FEE US CR 1154 TRANSACTIONS AT .0195",
+        "amountMinor": 2251,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_ea9c165d16800a16ba764036",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_ea9c165d16800a16ba764036",
+        "label": "DISCOVER - DSCVR KEY ENTRY RW",
+        "amountMinor": 836,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_d2f86ae56960c7eab8f0c72a",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_d2f86ae56960c7eab8f0c72a",
+        "label": "DISCOVER - DSCVR PSL REST RW",
+        "amountMinor": 5232,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_46e077e7ef0be6f8177c3f4d",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_46e077e7ef0be6f8177c3f4d",
+        "label": "DISCOVER - DSCVR KEY ENTRY PR",
+        "amountMinor": 172,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_0c9528986e7bf10ed815a50d",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_0c9528986e7bf10ed815a50d",
+        "label": "DISCOVER - DSCVR COMML ELECT OTHER",
+        "amountMinor": 728,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_a61e8820a1714a56c10ba725",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_a61e8820a1714a56c10ba725",
+        "label": "DISCOVER - DSCVR KEY ENTRY PP",
+        "amountMinor": 137,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_772df6c31bd676acc06ef951",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_772df6c31bd676acc06ef951",
+        "label": "DISCOVER - DSCVR PSL REST PR",
+        "amountMinor": 184,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_bb1c06610201485b45783664",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_bb1c06610201485b45783664",
+        "label": "AMEX - AXP RESTAURANT NONSWIPE T1",
+        "amountMinor": 253,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_61a25c4ab5efb1cb661bec8b",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_61a25c4ab5efb1cb661bec8b",
+        "label": "AMEX - AXP RESTAURANT NONSWIPE T2",
+        "amountMinor": 3278,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_0692ceb5ce73663615905417",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_0692ceb5ce73663615905417",
+        "label": "AMEX - AXP RESTAURANT BASE T3",
+        "amountMinor": 478,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_7a34e490993333cac81b9ff0",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_7a34e490993333cac81b9ff0",
+        "label": "AMEX - AXP RESTAURANT BASE T1",
+        "amountMinor": 1036,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_02051a46445fb63fd887337c",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_02051a46445fb63fd887337c",
+        "label": "AMEX - AXP RESTAURANT NONUS T2",
+        "amountMinor": 357,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_40e4bd4a294092ab385bca1c",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_40e4bd4a294092ab385bca1c",
+        "label": "AMEX - AXP RESTAURANT NONSWIPE T3",
+        "amountMinor": 590,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_bcb6c53d95325dbde52e0773",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_bcb6c53d95325dbde52e0773",
+        "label": "AMEX - AXP RESTAURANT BASE T2",
+        "amountMinor": 11542,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_f39943cd1cda6b159904303c",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_f39943cd1cda6b159904303c",
+        "label": "DEBIT FEE ADJ/REV BREACH INSURANCE",
+        "amountMinor": 595,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_6d89642df8b93ba607d48599",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_6d89642df8b93ba607d48599",
+        "label": "VISA - VISA NETWORK FEE CP 1B-01",
+        "amountMinor": 200,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_393ed21cfa784c36d0c50a2e",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_393ed21cfa784c36d0c50a2e",
+        "label": "MONTHLY MAINTENANCE FEE",
+        "amountMinor": 1495,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_NXGEN_VORTAX_Sep_2022.pdf:feerow_d79a5e80428ec0916be2599b",
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_d79a5e80428ec0916be2599b",
+        "label": "VISA - AVS ECIC-G",
+        "amountMinor": 107,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_NXGEN_VORTAX_Sep_2022.pdf:feerow_a9e3858742d7409cdbfee112",
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_a9e3858742d7409cdbfee112",
+        "label": "VISA - INTERNTL ACQUIRER FEE",
+        "amountMinor": 158,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_NXGEN_VORTAX_Sep_2022.pdf:feerow_8bec1513a6c6d3bf759fdd60",
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_8bec1513a6c6d3bf759fdd60",
+        "label": "VISA - FIXED NETWORK CNP FEE",
+        "amountMinor": 1500,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_NXGEN_VORTAX_Sep_2022.pdf:feerow_ffad9d733557793dd3fe0f36",
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_ffad9d733557793dd3fe0f36",
+        "label": "VS OFLN DB - DB DUES AND ASSESS",
+        "amountMinor": 1124,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_NXGEN_VORTAX_Sep_2022.pdf:feerow_4de36ab3e2290394899448dd",
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_4de36ab3e2290394899448dd",
+        "label": "DCVR ACQ - DUES & ASSESSMENTS",
+        "amountMinor": 350,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_NXGEN_VORTAX_Sep_2022.pdf:feerow_3450e65b7c328266fe20853f",
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_3450e65b7c328266fe20853f",
+        "label": "COMM CARD I/C SAVINGS ADJ",
+        "amountMinor": 747,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_Febr_2024.pdf:feerow_ea05a0d2774bd41afe329489",
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "feeRowId": "feerow_ea05a0d2774bd41afe329489",
+        "label": "MASTERCARD - MQUAL DISC",
+        "amountMinor": 20559,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_Febr_2024.pdf:feerow_ee2ef9dc7d3a69f43ca9f678",
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "feeRowId": "feerow_ee2ef9dc7d3a69f43ca9f678",
+        "label": "MASTERCARD - NQUAL DISC",
+        "amountMinor": 27252,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_Febr_2024.pdf:feerow_abbfe5abc366fe818aeb9113",
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "feeRowId": "feerow_abbfe5abc366fe818aeb9113",
+        "label": "VISA - NQUAL DISC",
+        "amountMinor": 51131,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_Febr_2024.pdf:feerow_deea74bed3eb3ef50ee8aba5",
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "feeRowId": "feerow_deea74bed3eb3ef50ee8aba5",
+        "label": "VISA - FIXED NETWORK CNP FEE",
+        "amountMinor": 2333,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_Febr_2024.pdf:feerow_bd2aee710025fac4a3f75cad",
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "feeRowId": "feerow_bd2aee710025fac4a3f75cad",
+        "label": "VS OFLN DB - NQUAL DISC",
+        "amountMinor": 46873,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_Febr_2024.pdf:feerow_128ae3afb2dbef0765ba22c8",
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "feeRowId": "feerow_128ae3afb2dbef0765ba22c8",
+        "label": "VS OFLN DB - DB DUES AND ASSESS",
+        "amountMinor": 1015,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_Febr_2024.pdf:feerow_8592f3cfa99d106076acf5be",
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "feeRowId": "feerow_8592f3cfa99d106076acf5be",
+        "label": "**ADDITIONAL FEES",
+        "amountMinor": 948,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf:feerow_2be71a6a24a4da7196c3b214",
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "feeRowId": "feerow_2be71a6a24a4da7196c3b214",
+        "label": "AMEXCT043 - SYSTEM PROCESSING FEE",
+        "amountMinor": 2474,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf:feerow_6c536f90536312de26527f69",
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "feeRowId": "feerow_6c536f90536312de26527f69",
+        "label": "VISA - FIXED NETWORK CNP FEE",
+        "amountMinor": 36,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf:feerow_1f155154fe337f01ac20d0f6",
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "feeRowId": "feerow_1f155154fe337f01ac20d0f6",
+        "label": "VS OFLN DB - DB DUES AND ASSESS",
+        "amountMinor": 32,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf:feerow_86163efa45006478bcb80a21",
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "feeRowId": "feerow_86163efa45006478bcb80a21",
+        "label": "DCVR ACQ - DUES & ASSESSMENTS",
+        "amountMinor": 31,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf:feerow_743157875810d3ed72068049",
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "feeRowId": "feerow_743157875810d3ed72068049",
+        "label": "DCVR ACQ - DUES & ASSESSMENTS",
+        "amountMinor": 45,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf:feerow_2cea52ceebbfec77c0352e12",
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "feeRowId": "feerow_2cea52ceebbfec77c0352e12",
+        "label": "**ADDITIONAL FEES",
+        "amountMinor": 495,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf:feerow_121429287441937375a724c4",
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
+        "feeRowId": "feerow_121429287441937375a724c4",
+        "label": "**ADDITIONAL FEES",
+        "amountMinor": 495,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf:feerow_84cb4993eedc0ea5a232da2a",
+        "file": "fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf",
+        "feeRowId": "feerow_84cb4993eedc0ea5a232da2a",
+        "label": "DEBIT MONTHLY FEE",
+        "amountMinor": 500,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_5f0e4e32df911425d1c7422f",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_5f0e4e32df911425d1c7422f",
+        "label": "MASTERCARD - MC-REG INCENT FRF ADJ POS (DB)",
+        "amountMinor": 3067,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_84cded13d45760ca3261616d",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_84cded13d45760ca3261616d",
+        "label": "VISA - VI-US BUS TR3 TRVL",
+        "amountMinor": 518,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_06b92af1ffbe8a1d602de8c2",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_06b92af1ffbe8a1d602de8c2",
+        "label": "VISA - VI-US BUS TR1 TRVL",
+        "amountMinor": 450,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_162019cab8a1880003afb5c4",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_162019cab8a1880003afb5c4",
+        "label": "VISA - VI-BUSINESS CARD CP (DB)",
+        "amountMinor": 1115,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_d47639c78f1d4b28149b7901",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_d47639c78f1d4b28149b7901",
+        "label": "VISA - VI-US BUS TR4 TRVL",
+        "amountMinor": 1726,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_6defc555f2c7cad4270d329b",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_6defc555f2c7cad4270d329b",
+        "label": "VISA - VI-REG CONSUMER MQ (DB)",
+        "amountMinor": 1441,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_e9ef8a95492f5d09a160ddea",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_e9ef8a95492f5d09a160ddea",
+        "label": "VISA - VI-SM MERCH REST SIG SIGN PRF",
+        "amountMinor": 45383,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_c79c34f90c890cd4f9420285",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_c79c34f90c890cd4f9420285",
+        "label": "VISA - VI-US BUS TR2 TRVL",
+        "amountMinor": 180,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_e5daed76038813e4117fe496",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_e5daed76038813e4117fe496",
+        "label": "VISA - VI-SM MERCH REST INF SQ",
+        "amountMinor": 1889,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_46b273f97af1ea286d25263a",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_46b273f97af1ea286d25263a",
+        "label": "VISA - VI-US BUS TR5 TRVL",
+        "amountMinor": 1207,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_32e8a1632709f1735726dbc3",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_32e8a1632709f1735726dbc3",
+        "label": "VISA - VI NTWK ACQ PROC FEE US DB/PP 2839 TRANSACTIONS AT 0.0155",
+        "amountMinor": 4400,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_6de248ee508bc4d4a330ed05",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_6de248ee508bc4d4a330ed05",
+        "label": "VISA - VI NTWK ACQ PROC FEE US CR 572 TRANSACTIONS AT 0.0195",
+        "amountMinor": 1115,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_d23afa4996cfc103b2e550df",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_d23afa4996cfc103b2e550df",
+        "label": "DISCOVER - DSCVR PSL REST PR",
+        "amountMinor": 2152,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_ebd5bb79c531f766e7779540",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_ebd5bb79c531f766e7779540",
+        "label": "DISCOVER - DSCVR PSL REST PP",
+        "amountMinor": 834,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_f066f4101043c80f2a6d4be1",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_f066f4101043c80f2a6d4be1",
+        "label": "DISCOVER - DSCVR PSL EXP SVC RW",
+        "amountMinor": 103,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_772b1809745b92b4c8d84819",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_772b1809745b92b4c8d84819",
+        "label": "DISCOVER - DSCVR PSL REST RW",
+        "amountMinor": 1713,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_90f2c1cf82675d81f2148f9e",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_90f2c1cf82675d81f2148f9e",
+        "label": "VI-COMMERCIAL SOLUTIONS FEE .000100 TIMES",
+        "amountMinor": 102,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_8290bb6788edbdef1135e8ff",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_8290bb6788edbdef1135e8ff",
+        "label": "SUPPLY SHIPPING & HANDLING 100000026767543",
+        "amountMinor": 1595,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_4b5883b24cef381c42cae5e1",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_4b5883b24cef381c42cae5e1",
+        "label": "VISA NETWORK FEE CNP 2-03",
+        "amountMinor": 700,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_3130004369a105fafd7a3668",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_3130004369a105fafd7a3668",
+        "label": "VISA NETWORK FEE CP 1B-01",
+        "amountMinor": 200,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_d8e4e259d2e770fec109ebcb",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_d8e4e259d2e770fec109ebcb",
+        "label": "MC MERCH MONTHLY LOCATION",
+        "amountMinor": 125,
+        "decision": "RESEARCH"
+      }
+    ],
+    "newResearchEscalationsOutsidePreliminaryProjection": [
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_d09d1d6a939d33e1694ed2f9",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_d09d1d6a939d33e1694ed2f9",
+        "label": "MASTERCARD - MC LICENSE VOLUME FEE 0.000217 DISC RATE TIMES $12970.74",
+        "amountMinor": 281,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_2682ec5185106f8610772f09",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_2682ec5185106f8610772f09",
+        "label": "MASTERCARD - MC LICENSE VOLUME FEE 0.000217 DISC RATE TIMES $12147.20",
+        "amountMinor": 264,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_6a886d5b12e1fe65786ea9c7",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_6a886d5b12e1fe65786ea9c7",
+        "label": "MASTERCARD - OTHER ITEM FEES",
+        "amountMinor": 30,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_0a5dc85393bf3559de94cd17",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_0a5dc85393bf3559de94cd17",
+        "label": "MASTERCARD - DISC 1",
+        "amountMinor": 56,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_d44facaaf01ee64162645788",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_d44facaaf01ee64162645788",
+        "label": "MC OFLN DB - DISC 1",
+        "amountMinor": 108,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_04d72108ee9209bfcbe77204",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_04d72108ee9209bfcbe77204",
+        "label": "AMEXCT043 - DISC 1",
+        "amountMinor": 13,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_5a022aeadcf58b1a8c30f6c7",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_5a022aeadcf58b1a8c30f6c7",
+        "label": "VISA - DISC 1",
+        "amountMinor": 79,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_6fc9dfa778845775aee4ff50",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_6fc9dfa778845775aee4ff50",
+        "label": "VS OFLN DB - DISC 1",
+        "amountMinor": 276,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_57bfdbfd2f3c6a8ecf592440",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_57bfdbfd2f3c6a8ecf592440",
+        "label": "VS OFLN DB - DB DUES AND ASSESS",
+        "amountMinor": 179,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_530af6b238be126eb6f5645e",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_530af6b238be126eb6f5645e",
+        "label": "DCVR ACQ - DISC 1",
+        "amountMinor": 10,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_df20daecb58c7f1b76d8c9eb",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_df20daecb58c7f1b76d8c9eb",
+        "label": "DCVR ACQ - DUES & ASSESSMENTS",
+        "amountMinor": 7,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_f35f971f802d62b1ca9fa917",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_f35f971f802d62b1ca9fa917",
+        "label": "MASTERCARD - MC LICENSE VOLUME FEE .000061 DISC RATE TIMES $25317.39",
+        "amountMinor": 154,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_NXGEN_VORTAX_Sep_2022.pdf:feerow_ffad9d733557793dd3fe0f36",
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_ffad9d733557793dd3fe0f36",
+        "label": "VS OFLN DB - DB DUES AND ASSESS",
+        "amountMinor": 1124,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_NXGEN_VORTAX_Sep_2022.pdf:feerow_4de36ab3e2290394899448dd",
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_4de36ab3e2290394899448dd",
+        "label": "DCVR ACQ - DUES & ASSESSMENTS",
+        "amountMinor": 350,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_Febr_2024.pdf:feerow_128ae3afb2dbef0765ba22c8",
+        "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+        "feeRowId": "feerow_128ae3afb2dbef0765ba22c8",
+        "label": "VS OFLN DB - DB DUES AND ASSESS",
+        "amountMinor": 1015,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf:feerow_2be71a6a24a4da7196c3b214",
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "feeRowId": "feerow_2be71a6a24a4da7196c3b214",
+        "label": "AMEXCT043 - SYSTEM PROCESSING FEE",
+        "amountMinor": 2474,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf:feerow_1f155154fe337f01ac20d0f6",
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "feeRowId": "feerow_1f155154fe337f01ac20d0f6",
+        "label": "VS OFLN DB - DB DUES AND ASSESS",
+        "amountMinor": 32,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf:feerow_86163efa45006478bcb80a21",
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "feeRowId": "feerow_86163efa45006478bcb80a21",
+        "label": "DCVR ACQ - DUES & ASSESSMENTS",
+        "amountMinor": 31,
+        "decision": "RESEARCH"
+      },
+      {
+        "key": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf:feerow_743157875810d3ed72068049",
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "feeRowId": "feerow_743157875810d3ed72068049",
+        "label": "DCVR ACQ - DUES & ASSESSMENTS",
+        "amountMinor": 45,
+        "decision": "RESEARCH"
+      }
+    ],
+    "stage0Stops": 330,
+    "governedConflictAdjudications": 18,
+    "governedConflictRows": [
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_bd0f1aed5cf3a16a4c37c1e0",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_bd0f1aed5cf3a16a4c37c1e0",
+        "label": "MASTERCARD - MASTERCARD ASSESSMENT FEE 0.0014 TIMES $12970.74",
+        "amountMinor": 1816,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Known April 2024 increase conflicts with a current table carrying the old base value."
+            ],
+            "evidenceRefs": [
+              "rr_product_current_2026_us_core_network_final#unresolved-values"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "Nov_2024_Statement.pdf:feerow_e90d70551278838af6da7ad6",
+        "file": "Nov_2024_Statement.pdf",
+        "feeRowId": "feerow_e90d70551278838af6da7ad6",
+        "label": "MC MONTHLY LOCATION FEE",
+        "amountMinor": 125,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Excluded-MCC list remains conflicted: the retained Fiserv guide states 8393 and 8661; secondary material states 8661 and 8398."
+            ],
+            "evidenceRefs": [
+              "mastercard_location_2023_04",
+              "fiserv_card_brand_pass_through_guide_2023_04",
+              "RateReveal_US_Network_Fee_Evidence_Pack_2020-2026_FINAL_Product_Adjudicated.md#mastercard_location_2023_04"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_4f2128cf267d131112f92cff",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_4f2128cf267d131112f92cff",
+        "label": "MASTERCARD - MASTERCARD ASSESSMENT FEE 0.0014 TIMES $12147.20",
+        "amountMinor": 1701,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Known April 2024 increase conflicts with a current table carrying the old base value."
+            ],
+            "evidenceRefs": [
+              "rr_product_current_2026_us_core_network_final#unresolved-values"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "SAMPLE_MERCHANT4_CLOVER.pdf:feerow_8bff8d71932ceaaa1f2f0b44",
+        "file": "SAMPLE_MERCHANT4_CLOVER.pdf",
+        "feeRowId": "feerow_8bff8d71932ceaaa1f2f0b44",
+        "label": "MC MONTHLY LOCATION FEE",
+        "amountMinor": 125,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Excluded-MCC list remains conflicted: the retained Fiserv guide states 8393 and 8661; secondary material states 8661 and 8398."
+            ],
+            "evidenceRefs": [
+              "mastercard_location_2023_04",
+              "fiserv_card_brand_pass_through_guide_2023_04",
+              "RateReveal_US_Network_Fee_Evidence_Pack_2020-2026_FINAL_Product_Adjudicated.md#mastercard_location_2023_04"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_3ce8d27aaeda422f2edfc6b5",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_3ce8d27aaeda422f2edfc6b5",
+        "label": "MASTERCARD - DUES & ASSESSMENTS",
+        "amountMinor": 39,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Known April 2024 increase conflicts with a current table carrying the old base value."
+            ],
+            "evidenceRefs": [
+              "rr_product_current_2026_us_core_network_final#unresolved-values"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_000220f34e5aac766fe8c834",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_000220f34e5aac766fe8c834",
+        "label": "MASTERCARD - LOCATION FEE",
+        "amountMinor": 62,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Excluded-MCC list remains conflicted: the retained Fiserv guide states 8393 and 8661; secondary material states 8661 and 8398."
+            ],
+            "evidenceRefs": [
+              "mastercard_location_2023_04",
+              "fiserv_card_brand_pass_through_guide_2023_04",
+              "RateReveal_US_Network_Fee_Evidence_Pack_2020-2026_FINAL_Product_Adjudicated.md#mastercard_location_2023_04"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_174df8c5301cf3e3eb0f0f05",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_174df8c5301cf3e3eb0f0f05",
+        "label": "MC OFLN DB - DUES & ASSESSMENTS",
+        "amountMinor": 76,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Known April 2024 increase conflicts with a current table carrying the old base value."
+            ],
+            "evidenceRefs": [
+              "rr_product_current_2026_us_core_network_final#unresolved-values"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fiserv_ABDUL_BASHER_Aug_2025.pdf:feerow_5c137d2bc67e4a16325df13d",
+        "file": "fiserv_ABDUL_BASHER_Aug_2025.pdf",
+        "feeRowId": "feerow_5c137d2bc67e4a16325df13d",
+        "label": "AMEXCT043 - PROGRAM FEES",
+        "amountMinor": 124,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "economic_beneficiary",
+            "interpretations": [
+              "issuer",
+              "card_network"
+            ],
+            "evidenceRefs": [
+              "ev_48dca15cebd1db816132",
+              "chase_payment_brand_fee_support_2026",
+              "first_financial_interchange_fee_guide",
+              "RR-B1-00",
+              "RR-B1-03"
+            ]
+          },
+          {
+            "field": "rule_setter",
+            "interpretations": [
+              "issuer_or_network",
+              "card_network"
+            ],
+            "evidenceRefs": [
+              "ev_48dca15cebd1db816132",
+              "chase_payment_brand_fee_support_2026",
+              "first_financial_interchange_fee_guide",
+              "RR-B1-00",
+              "RR-B1-03"
+            ]
+          },
+          {
+            "field": "price_setter",
+            "interpretations": [
+              "issuer_or_network",
+              "card_network"
+            ],
+            "evidenceRefs": [
+              "ev_48dca15cebd1db816132",
+              "chase_payment_brand_fee_support_2026",
+              "first_financial_interchange_fee_guide",
+              "RR-B1-00",
+              "RR-B1-03"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_26f1b3758d39e3ba6523ae8b",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_26f1b3758d39e3ba6523ae8b",
+        "label": "MASTERCARD - MASTERCARD ASSESSMENT FEE .0012 TIMES $25317.39",
+        "amountMinor": 3038,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Known April 2024 increase conflicts with a current table carrying the old base value."
+            ],
+            "evidenceRefs": [
+              "rr_product_current_2026_us_core_network_final#unresolved-values"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf:feerow_b2c0ace0944e56d4c810f9f5",
+        "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+        "feeRowId": "feerow_b2c0ace0944e56d4c810f9f5",
+        "label": "MASTERCARD - MC MONTHLY LOCATION FEE",
+        "amountMinor": 125,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Excluded-MCC list remains conflicted: the retained Fiserv guide states 8393 and 8661; secondary material states 8661 and 8398."
+            ],
+            "evidenceRefs": [
+              "mastercard_location_2023_04",
+              "fiserv_card_brand_pass_through_guide_2023_04",
+              "RateReveal_US_Network_Fee_Evidence_Pack_2020-2026_FINAL_Product_Adjudicated.md#mastercard_location_2023_04"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fiserv_NXGEN_VORTAX_Sep_2022.pdf:feerow_483f41a24bd9026d43e364da",
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_483f41a24bd9026d43e364da",
+        "label": "MASTERCARD - DUES & ASSESSMENTS",
+        "amountMinor": 1447,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Known April 2024 increase conflicts with a current table carrying the old base value."
+            ],
+            "evidenceRefs": [
+              "rr_product_current_2026_us_core_network_final#unresolved-values"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fiserv_NXGEN_VORTAX_Sep_2022.pdf:feerow_c761d8b71b35e0bf92e085e2",
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_c761d8b71b35e0bf92e085e2",
+        "label": "MASTERCARD - LOCATION FEE",
+        "amountMinor": 125,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Excluded-MCC list remains conflicted: the retained Fiserv guide states 8393 and 8661; secondary material states 8661 and 8398."
+            ],
+            "evidenceRefs": [
+              "mastercard_location_2023_04",
+              "fiserv_card_brand_pass_through_guide_2023_04",
+              "RateReveal_US_Network_Fee_Evidence_Pack_2020-2026_FINAL_Product_Adjudicated.md#mastercard_location_2023_04"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fiserv_NXGEN_VORTAX_Sep_2022.pdf:feerow_abc2ec347ae5155154668daa",
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_abc2ec347ae5155154668daa",
+        "label": "MC OFLN DB - DUES & ASSESSMENTS",
+        "amountMinor": 689,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Known April 2024 increase conflicts with a current table carrying the old base value."
+            ],
+            "evidenceRefs": [
+              "rr_product_current_2026_us_core_network_final#unresolved-values"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fiserv_NXGEN_VORTAX_Sep_2022.pdf:feerow_4cb07059bb71bd0b9a4a6dd9",
+        "file": "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
+        "feeRowId": "feerow_4cb07059bb71bd0b9a4a6dd9",
+        "label": "AMEXCT043 - PROGRAM FEES",
+        "amountMinor": 2185,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "economic_beneficiary",
+            "interpretations": [
+              "issuer",
+              "card_network"
+            ],
+            "evidenceRefs": [
+              "ev_b29a555d22287395b347",
+              "chase_payment_brand_fee_support_2026",
+              "first_financial_interchange_fee_guide",
+              "RR-B1-00",
+              "RR-B1-03"
+            ]
+          },
+          {
+            "field": "rule_setter",
+            "interpretations": [
+              "issuer_or_network",
+              "card_network"
+            ],
+            "evidenceRefs": [
+              "ev_b29a555d22287395b347",
+              "chase_payment_brand_fee_support_2026",
+              "first_financial_interchange_fee_guide",
+              "RR-B1-00",
+              "RR-B1-03"
+            ]
+          },
+          {
+            "field": "price_setter",
+            "interpretations": [
+              "issuer_or_network",
+              "card_network"
+            ],
+            "evidenceRefs": [
+              "ev_b29a555d22287395b347",
+              "chase_payment_brand_fee_support_2026",
+              "first_financial_interchange_fee_guide",
+              "RR-B1-00",
+              "RR-B1-03"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf:feerow_989715dce0eedc8ba96405a3",
+        "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+        "feeRowId": "feerow_989715dce0eedc8ba96405a3",
+        "label": "MASTERCARD - DUES & ASSESSMENTS",
+        "amountMinor": 146,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Known April 2024 increase conflicts with a current table carrying the old base value."
+            ],
+            "evidenceRefs": [
+              "rr_product_current_2026_us_core_network_final#unresolved-values"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_9e0127ffcb40a190fae065ab",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_9e0127ffcb40a190fae065ab",
+        "label": "MASTERCARD - MASTERCARD ASSESSMENT FEE 0.001475 TIMES $26744.25",
+        "amountMinor": 3945,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Known April 2024 increase conflicts with a current table carrying the old base value."
+            ],
+            "evidenceRefs": [
+              "rr_product_current_2026_us_core_network_final#unresolved-values"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_2ca86e68c5b49944f07e91a3",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_2ca86e68c5b49944f07e91a3",
+        "label": "DISCOVER - NETWORK AUTHORIZATION FEE 62 TRANSACTIONS AT 0.019",
+        "amountMinor": 118,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "Current authorization value conflicts across sources."
+            ],
+            "evidenceRefs": [
+              "rr_product_current_2026_us_core_network_final#unresolved-values"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf:feerow_1875b7aa339f8f6b731367f4",
+        "file": "fiserv_WELLS_FARGO_EL_NUEVO_TEQUILA_Sep_2024.pdf",
+        "feeRowId": "feerow_1875b7aa339f8f6b731367f4",
+        "label": "Other - VI BASE II SYSTEM FILE FEE 3362 TRANSACTIONS AT 0.0018",
+        "amountMinor": 605,
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "conflicts": [
+          {
+            "field": "governed_interpretation",
+            "interpretations": [
+              "System File, Transmission, and Network Access naming/value continuity is unresolved."
+            ],
+            "evidenceRefs": [
+              "rr_product_current_2026_us_core_network_final#unresolved-values"
+            ]
+          }
+        ]
+      }
+    ],
+    "determinantSufficientRows": 313,
+    "actionClassifiedRows": 330,
+    "highMaterialityRows": 65,
+    "highMaterialityActionResolvedRows": 50,
+    "materialDollarsMinor": 1640090,
+    "explainedMaterialDollarsMinor": 1165245,
+    "explainedMaterialDollarCoveragePercent": 71.05,
+    "actionableMaterialDollarsMinor": 1165245,
+    "actionableMaterialDollarCoveragePercent": 71.05,
+    "warrantedResearchDollarsMinor": 474845,
+    "warrantedResearchDollarSharePercent": 28.95
+  },
+  "falseNegativeReview": {
+    "warrantedButMissingFromResearchQueue": [],
+    "queuedWithoutFinalWarrant": [],
+    "knownPriorNoDecisionValueEscalationsCorrected": [
+      "batch_settlement",
+      "application_fee",
+      "amex_nqual"
+    ],
+    "knownPriorNoDecisionValueExternalOperationsAvoided": 17,
+    "monthlyAdvantageWarrantPreserved": true,
+    "priorStage0MissesNowWarranted": 19,
+    "priorStage0OverEscalationsNowSuppressed": 34,
+    "finding": "No current Stage-0 false negative or queue-boundary mismatch was found: every warranted row is queued, every queued row is warranted, Monthly Advantage remains selected, and 19 decision-relevant rows missed by the prior gate are now warranted."
+  },
+  "controls": [
+    {
+      "caseId": "monthly_advantage",
+      "file": "Nov_2024_Statement.pdf",
+      "printedLabel": "Other - MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $47996.83",
+      "establishedEvidenceBeforeResearch": [
+        {
+          "field": "collector",
+          "value": "processor_or_acquirer",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_987fdcc26780adcd35fb"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "assessment_mechanic",
+          "value": "rate_times_volume",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_987fdcc26780adcd35fb"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "relevant_population",
+          "value": "printed_money_volume",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_987fdcc26780adcd35fb"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "cardinality",
+          "value": "single_fee",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_987fdcc26780adcd35fb"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "assessment_mechanic",
+          "value": "rate_times_volume",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_987fdcc26780adcd35fb"
+          ],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "collector",
+          "value": "processor_or_acquirer",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_49766015eeaa0009ca55",
+            "ev_987fdcc26780adcd35fb"
+          ],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "pricing_model",
+          "value": "interchange_plus",
+          "confidence": "STRONG",
+          "evidenceRefs": [],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "relevant_population",
+          "value": "printed_money_volume",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_987fdcc26780adcd35fb"
+          ],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "practical_merchant_action",
+          "value": "Ask the processor to identify the charge, billed unit, population, beneficiary, and merchant-facing price controller before making a negotiation or operational recommendation.",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "OWD-01",
+            "OWD-02",
+            "OWD-03",
+            "OWD-04",
+            "OWD-05",
+            "OWD-06",
+            "OWD-07"
+          ],
+          "sourceLayer": "governed_knowledge"
+        }
+      ],
+      "unresolvedFields": [
+        {
+          "field": "exact_fee_identity",
+          "decisionRelevant": true,
+          "requiresMerchantDocument": false,
+          "rationale": "Neither exact identity nor a defensible family is established."
+        },
+        {
+          "field": "economic_layer",
+          "decisionRelevant": true,
+          "requiresMerchantDocument": false,
+          "rationale": "Economic layer remains unresolved; collection and catalog failure are insufficient."
+        },
+        {
+          "field": "economic_beneficiary",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "Economic beneficiary and ultimate retention are not inferred from collection or price control."
+        },
+        {
+          "field": "rule_setter",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "Rule setter is not established by the printed label alone."
+        },
+        {
+          "field": "price_setter",
+          "decisionRelevant": true,
+          "requiresMerchantDocument": false,
+          "rationale": "Price setter is not established by collection, catalog failure, or a broad family alone."
+        },
+        {
+          "field": "merchant_facing_price_controller",
+          "decisionRelevant": true,
+          "requiresMerchantDocument": false,
+          "rationale": "Price controller remains unresolved."
+        },
+        {
+          "field": "printed_arithmetic_correctness",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "The deterministic exact-source arithmetic bridge lacks a complete printed rate/base pair for this row."
+        },
+        {
+          "field": "commercial_reasonableness",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "Commercial reasonableness requires both a supported vertical and risk class."
+        },
+        {
+          "field": "contractual_compliance",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": true,
+          "rationale": "Whether the charged rate or term complies with this merchant's agreement requires the operative agreement/pricing schedule and relevant amendments."
+        }
+      ],
+      "finalStage0Decision": "RESEARCH",
+      "researchWarranted": true,
+      "stopOrWarrantReasons": [
+        "identity_or_interpretation_materially_changes_conclusion",
+        "perfect_answer_could_change_merchant_decision",
+        "research_type_a_proprietary_branded",
+        "research_type_c_abbreviated_coded",
+        "research_type_f_unfamiliar_per_item_or_recurring"
+      ],
+      "availableMerchantConclusionWithoutResearch": {
+        "actionClass": "N7",
+        "action": "Ask the processor to identify the charge, billed unit, population, beneficiary, and merchant-facing price controller before making a negotiation or operational recommendation.",
+        "confidence": "STRONG"
+      },
+      "additionalConclusionIfResearchSucceeds": [
+        "Could replace verification-only action with a supported network, commercial, service, operational, or contract-routing action.",
+        "Exact identity is necessary here because it could change the applicable price authority, assessed population, or merchant action."
+      ],
+      "currentProjection": {
+        "exactIdentity": {
+          "state": "identity_unresolved",
+          "value": null,
+          "necessaryForUsefulAction": true,
+          "explanation": "Neither exact identity nor a defensible family is established."
+        },
+        "family": {
+          "state": "unresolved",
+          "value": null,
+          "confidence": "UNRESOLVED",
+          "evidenceRefs": [],
+          "explanation": "No affirmative statement structure or admitted knowledge supports a fee family; unfamiliarity does not imply acquiring-side ownership."
+        },
+        "mechanic": {
+          "state": "category_only",
+          "value": "rate_times_volume",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_987fdcc26780adcd35fb"
+          ],
+          "explanation": "The printed source exposes a rate-times-money-volume formula, while canonical arithmetic remains unresolved because a complete normalized operand pair is unavailable."
+        },
+        "population": {
+          "state": "category_only",
+          "value": "printed_money_volume",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_987fdcc26780adcd35fb"
+          ],
+          "explanation": "The printed money-volume base is preserved, while exact arithmetic remains unresolved."
+        },
+        "arithmetic": {
+          "state": "unresolved",
+          "value": null,
+          "confidence": "UNRESOLVED",
+          "evidence": [
+            {
+              "evidenceClass": "E1_statement",
+              "refs": [
+                "ev_987fdcc26780adcd35fb"
+              ],
+              "characterization": "statement_fact"
+            }
+          ],
+          "explanation": "The deterministic exact-source arithmetic bridge lacks a complete printed rate/base pair for this row.",
+          "limitations": []
+        },
+        "determinantSufficiency": "INSUFFICIENT",
+        "renderingPermissions": {
+          "exactIdentityAllowed": false,
+          "familyLanguageAllowed": false,
+          "acquiringSideLanguageAllowed": false,
+          "networkOwnershipLanguageAllowed": false,
+          "negotiationLanguageAllowed": false,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      }
+    },
+    {
+      "caseId": "batch_settlement",
+      "file": "Nov_2024_Statement.pdf",
+      "printedLabel": "Other - BATCH SETTLEMENT FEE 56 TRANSACTIONS AT 0.15",
+      "establishedEvidenceBeforeResearch": [
+        {
+          "field": "fee_family",
+          "value": "F6",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_70ae35af669b621ff627",
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-11",
+            "RR-B2-12",
+            "RR-B2-13",
+            "RR-B2-15"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "economic_layer",
+          "value": "acquiring_commercial",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_70ae35af669b621ff627",
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-11",
+            "RR-B2-12",
+            "RR-B2-13",
+            "RR-B2-15"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "collector",
+          "value": "processor_or_acquirer",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_70ae35af669b621ff627"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "price_setter",
+          "value": "acquiring_side_program",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_70ae35af669b621ff627"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "merchant_facing_price_controller",
+          "value": "acquiring_side_program",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_70ae35af669b621ff627"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "assessment_mechanic",
+          "value": "per_item",
+          "confidence": "CONFIRMED",
+          "evidenceRefs": [
+            "ev_70ae35af669b621ff627"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "relevant_population",
+          "value": "printed_item_count",
+          "confidence": "CONFIRMED",
+          "evidenceRefs": [
+            "ev_70ae35af669b621ff627"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "cardinality",
+          "value": "single_fee",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_70ae35af669b621ff627"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "broader_economic_category",
+          "value": "acquiring_side_batch",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-11",
+            "RR-B2-12",
+            "RR-B2-13",
+            "RR-B2-15",
+            "OWD-01",
+            "OWD-02",
+            "OWD-03",
+            "OWD-04",
+            "OWD-05",
+            "OWD-06",
+            "OWD-07",
+            "ev_70ae35af669b621ff627"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "assessment_mechanic",
+          "value": "per_item",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-11",
+            "RR-B2-12",
+            "RR-B2-13",
+            "RR-B2-15",
+            "ev_70ae35af669b621ff627"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "collector",
+          "value": "processor_or_acquirer",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_49766015eeaa0009ca55",
+            "ev_70ae35af669b621ff627",
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-11",
+            "RR-B2-12",
+            "RR-B2-13",
+            "RR-B2-15"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "rule_setter",
+          "value": "acquiring_side_program",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-11",
+            "RR-B2-12",
+            "RR-B2-13",
+            "RR-B2-15"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "price_setter",
+          "value": "acquiring_side_program",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-11",
+            "RR-B2-12",
+            "RR-B2-13",
+            "RR-B2-15"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "merchant_facing_price_controller",
+          "value": "acquiring_side_program",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-11",
+            "RR-B2-12",
+            "RR-B2-13",
+            "RR-B2-15"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "printed_arithmetic_correctness",
+          "value": "reproduces",
+          "confidence": "CONFIRMED",
+          "evidenceRefs": [
+            "ev_70ae35af669b621ff627"
+          ],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "pricing_model",
+          "value": "interchange_plus",
+          "confidence": "STRONG",
+          "evidenceRefs": [],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "relevant_population",
+          "value": "printed_item_count",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_70ae35af669b621ff627"
+          ],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "practical_merchant_action",
+          "value": "Verify the charge against the actual settlement-batch table and review batch operations before changing frequency. Ask the acquiring side to explain or review the merchant-facing price; no agreement is needed to request that review.",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-11",
+            "RR-B2-12",
+            "RR-B2-13",
+            "RR-B2-15",
+            "ev_70ae35af669b621ff627"
+          ],
+          "sourceLayer": "governed_knowledge"
+        }
+      ],
+      "unresolvedFields": [
+        {
+          "field": "exact_fee_identity",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "The economic family is useful while exact identity remains unresolved."
+        },
+        {
+          "field": "economic_beneficiary",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "Economic beneficiary and ultimate retention are not inferred from collection or price control."
+        },
+        {
+          "field": "commercial_reasonableness",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "Commercial reasonableness requires both a supported vertical and risk class."
+        },
+        {
+          "field": "contractual_compliance",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": true,
+          "rationale": "Whether the charged rate or term complies with this merchant's agreement requires the operative agreement/pricing schedule and relevant amendments."
+        }
+      ],
+      "finalStage0Decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+      "researchWarranted": false,
+      "stopOrWarrantReasons": [
+        "d1_d4_sufficient",
+        "remaining_unknowns_do_not_change_current_merchant_decision"
+      ],
+      "availableMerchantConclusionWithoutResearch": {
+        "actionClass": "N3",
+        "action": "Verify the charge against the actual settlement-batch table and review batch operations before changing frequency. Ask the acquiring side to explain or review the merchant-facing price; no agreement is needed to request that review.",
+        "confidence": "LIKELY"
+      },
+      "additionalConclusionIfResearchSucceeds": [],
+      "currentProjection": {
+        "exactIdentity": {
+          "state": "family_known_identity_unresolved",
+          "value": null,
+          "necessaryForUsefulAction": false,
+          "explanation": "The economic family is useful while exact identity remains unresolved."
+        },
+        "family": {
+          "state": "supported",
+          "value": "F6",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_70ae35af669b621ff627",
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-11",
+            "RR-B2-12",
+            "RR-B2-13",
+            "RR-B2-15"
+          ],
+          "explanation": "Admitted per-item knowledge affirmatively supports acquiring-side per-item economics."
+        },
+        "mechanic": {
+          "state": "supported",
+          "value": "per_item",
+          "confidence": "CONFIRMED",
+          "evidenceRefs": [
+            "ev_70ae35af669b621ff627"
+          ],
+          "explanation": "Canonical statement operands support a printed per-item mechanic."
+        },
+        "population": {
+          "state": "supported",
+          "value": "printed_item_count",
+          "confidence": "CONFIRMED",
+          "evidenceRefs": [
+            "ev_70ae35af669b621ff627"
+          ],
+          "explanation": "The canonical statement row preserves the printed item count without equating it to another statement population."
+        },
+        "arithmetic": {
+          "state": "confirmed",
+          "value": "reproduces",
+          "confidence": "CONFIRMED",
+          "evidence": [
+            {
+              "evidenceClass": "E1_statement",
+              "refs": [
+                "ev_70ae35af669b621ff627"
+              ],
+              "characterization": "statement_fact"
+            }
+          ],
+          "explanation": "The existing exact rational reconstruction reproduces the printed charged amount under the canonical rounding policy.",
+          "limitations": []
+        },
+        "determinantSufficiency": "DETERMINANT_SUFFICIENT",
+        "renderingPermissions": {
+          "exactIdentityAllowed": false,
+          "familyLanguageAllowed": true,
+          "acquiringSideLanguageAllowed": true,
+          "networkOwnershipLanguageAllowed": false,
+          "negotiationLanguageAllowed": true,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      }
+    },
+    {
+      "caseId": "application_fee",
+      "file": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+      "printedLabel": "APPLICATION FEE",
+      "establishedEvidenceBeforeResearch": [
+        {
+          "field": "fee_family",
+          "value": "F7",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "economic_layer",
+          "value": "acquiring_commercial",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "collector",
+          "value": "processor_or_acquirer",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "merchant_facing_price_controller",
+          "value": "acquiring_side_program",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "assessment_mechanic",
+          "value": "fixed_or_printed_charge",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "relevant_population",
+          "value": "current_statement_period_occurrence",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "cardinality",
+          "value": "single_fee",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "broader_economic_category",
+          "value": "acquiring_fixed_or_administrative",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "OWD-01",
+            "OWD-02",
+            "OWD-03",
+            "OWD-04",
+            "OWD-05",
+            "OWD-06",
+            "OWD-07",
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "assessment_mechanic",
+          "value": "fixed_or_printed_charge",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "collector",
+          "value": "processor_or_acquirer",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_1fcf76a34213a65c2aac",
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "merchant_facing_price_controller",
+          "value": "acquiring_side_program",
+          "confidence": "LIKELY",
+          "evidenceRefs": [],
+          "sourceLayer": "internal_analyst"
+        },
+        {
+          "field": "relevant_population",
+          "value": "current_statement_period_occurrence",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "practical_merchant_action",
+          "value": "Ask to explain, remove, waive, or reduce this administrative/account charge; the request itself does not require the merchant agreement. Use merchant documents only for contractual authorization, rights, or remedies.",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "OWD-01",
+            "OWD-02",
+            "OWD-03",
+            "OWD-04",
+            "OWD-05",
+            "OWD-06",
+            "OWD-07",
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "sourceLayer": "governed_knowledge"
+        }
+      ],
+      "unresolvedFields": [
+        {
+          "field": "exact_fee_identity",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "The economic family is useful while exact identity remains unresolved."
+        },
+        {
+          "field": "economic_beneficiary",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "Economic beneficiary and ultimate retention are not inferred from collection or price control."
+        },
+        {
+          "field": "rule_setter",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "Rule setter is not established by the printed label alone."
+        },
+        {
+          "field": "price_setter",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "Price setter is not established by collection, catalog failure, or a broad family alone."
+        },
+        {
+          "field": "printed_arithmetic_correctness",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "The deterministic exact-source arithmetic bridge lacks a complete printed rate/base pair for this row."
+        },
+        {
+          "field": "commercial_reasonableness",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "Commercial reasonableness requires both a supported vertical and risk class."
+        },
+        {
+          "field": "contractual_compliance",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": true,
+          "rationale": "Whether the charged rate or term complies with this merchant's agreement requires the operative agreement/pricing schedule and relevant amendments."
+        },
+        {
+          "field": "recurrence",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "Only the current statement occurrence is established; recurrence must not be inferred from a single statement."
+        }
+      ],
+      "finalStage0Decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+      "researchWarranted": false,
+      "stopOrWarrantReasons": [
+        "d1_d4_sufficient",
+        "remaining_unknowns_do_not_change_current_merchant_decision"
+      ],
+      "availableMerchantConclusionWithoutResearch": {
+        "actionClass": "N4",
+        "action": "Ask to explain, remove, waive, or reduce this administrative/account charge; the request itself does not require the merchant agreement. Use merchant documents only for contractual authorization, rights, or remedies.",
+        "confidence": "STRONG"
+      },
+      "additionalConclusionIfResearchSucceeds": [],
+      "currentProjection": {
+        "exactIdentity": {
+          "state": "family_known_identity_unresolved",
+          "value": null,
+          "necessaryForUsefulAction": false,
+          "explanation": "The economic family is useful while exact identity remains unresolved."
+        },
+        "family": {
+          "state": "category_only",
+          "value": "F7",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "explanation": "Explicit account/administrative wording or placement in the statement's Account Fees section supports an acquiring administrative family; recurrence and contractual authorization remain unresolved."
+        },
+        "mechanic": {
+          "state": "category_only",
+          "value": "fixed_or_printed_charge",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "explanation": "The statement supports a current-period printed charge but not a recurring cadence or more specific assessed population."
+        },
+        "population": {
+          "state": "category_only",
+          "value": "current_statement_period_occurrence",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_77b1937d89ea01a4f9e0"
+          ],
+          "explanation": "Only the current statement occurrence is established; recurrence is not inferred."
+        },
+        "arithmetic": {
+          "state": "unresolved",
+          "value": null,
+          "confidence": "UNRESOLVED",
+          "evidence": [
+            {
+              "evidenceClass": "E1_statement",
+              "refs": [
+                "ev_77b1937d89ea01a4f9e0"
+              ],
+              "characterization": "statement_fact"
+            }
+          ],
+          "explanation": "The deterministic exact-source arithmetic bridge lacks a complete printed rate/base pair for this row.",
+          "limitations": []
+        },
+        "determinantSufficiency": "DETERMINANT_SUFFICIENT",
+        "renderingPermissions": {
+          "exactIdentityAllowed": false,
+          "familyLanguageAllowed": true,
+          "acquiringSideLanguageAllowed": true,
+          "networkOwnershipLanguageAllowed": false,
+          "negotiationLanguageAllowed": true,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      }
+    },
+    {
+      "caseId": "amex_nqual",
+      "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+      "printedLabel": "AMEXCT043 - NQUAL DISC",
+      "establishedEvidenceBeforeResearch": [
+        {
+          "field": "fee_family",
+          "value": "F5",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_cc64ad9dfdd6bf06d3d6",
+            "RR-B1-00",
+            "RR-B1-01",
+            "RR-B1-05"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "economic_layer",
+          "value": "acquiring_commercial",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_cc64ad9dfdd6bf06d3d6",
+            "RR-B1-00",
+            "RR-B1-01",
+            "RR-B1-05"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "collector",
+          "value": "processor_or_acquirer",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "rule_setter",
+          "value": "acquiring_side_program",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "price_setter",
+          "value": "acquiring_side_program",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "merchant_facing_price_controller",
+          "value": "acquiring_side_program",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "assessment_mechanic",
+          "value": "rate_times_volume",
+          "confidence": "CONFIRMED",
+          "evidenceRefs": [
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "relevant_population",
+          "value": "printed_money_volume",
+          "confidence": "CONFIRMED",
+          "evidenceRefs": [
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "cardinality",
+          "value": "multiple_components",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "broader_economic_category",
+          "value": "bundled_merchant_facing_pricing",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "RR-B1-00",
+            "RR-B1-01",
+            "RR-B1-05",
+            "OWD-01",
+            "OWD-02",
+            "OWD-03",
+            "OWD-04",
+            "OWD-05",
+            "OWD-06",
+            "OWD-07",
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "assessment_mechanic",
+          "value": "rate_times_volume",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "RR-B1-00",
+            "RR-B1-01",
+            "RR-B1-05",
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "collector",
+          "value": "processor_or_acquirer",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_4f712bc19a198b265a08",
+            "ev_cc64ad9dfdd6bf06d3d6",
+            "RR-B1-00",
+            "RR-B1-01",
+            "RR-B1-05"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "price_setter",
+          "value": "acquiring_side_program",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "RR-B1-00",
+            "RR-B1-01",
+            "RR-B1-05"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "merchant_facing_price_controller",
+          "value": "acquiring_side_program",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "RR-B1-00",
+            "RR-B1-01",
+            "RR-B1-05"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "printed_arithmetic_correctness",
+          "value": "reproduces_with_rounding",
+          "confidence": "CONFIRMED",
+          "evidenceRefs": [
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "pricing_model",
+          "value": "tiered_pricing",
+          "confidence": "CONFIRMED",
+          "evidenceRefs": [
+            "ev_1930c5eecf01940776bb",
+            "ev_3a1cb49f5b6d0e89ff17",
+            "ev_4d3c39cdd7f726af5cf5",
+            "ev_a4682217b8728d622455",
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "relevant_population",
+          "value": "printed_money_volume",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "practical_merchant_action",
+          "value": "Ask the processor/acquirer/ISO to itemize and review this merchant-facing price; requesting explanation or reduction does not require the merchant agreement.",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "OWD-01",
+            "OWD-02",
+            "OWD-03",
+            "OWD-04",
+            "OWD-05",
+            "OWD-06",
+            "OWD-07",
+            "RR-B1-00",
+            "RR-B1-01",
+            "RR-B1-05",
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "sourceLayer": "governed_knowledge"
+        }
+      ],
+      "unresolvedFields": [
+        {
+          "field": "exact_fee_identity",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "The economic family is useful while exact identity remains unresolved."
+        },
+        {
+          "field": "economic_beneficiary",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "Economic beneficiary and ultimate retention are not inferred from collection or price control."
+        },
+        {
+          "field": "commercial_reasonableness",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "Commercial reasonableness requires both a supported vertical and risk class."
+        },
+        {
+          "field": "contractual_compliance",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": true,
+          "rationale": "Whether the charged rate or term complies with this merchant's agreement requires the operative agreement/pricing schedule and relevant amendments."
+        }
+      ],
+      "finalStage0Decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+      "researchWarranted": false,
+      "stopOrWarrantReasons": [
+        "d1_d4_sufficient",
+        "remaining_unknowns_do_not_change_current_merchant_decision"
+      ],
+      "availableMerchantConclusionWithoutResearch": {
+        "actionClass": "N3",
+        "action": "Ask the processor/acquirer/ISO to itemize and review this merchant-facing price; requesting explanation or reduction does not require the merchant agreement.",
+        "confidence": "STRONG"
+      },
+      "additionalConclusionIfResearchSucceeds": [],
+      "currentProjection": {
+        "exactIdentity": {
+          "state": "family_known_identity_unresolved",
+          "value": null,
+          "necessaryForUsefulAction": false,
+          "explanation": "The economic family is useful while exact identity remains unresolved."
+        },
+        "family": {
+          "state": "supported",
+          "value": "F5",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_cc64ad9dfdd6bf06d3d6",
+            "RR-B1-00",
+            "RR-B1-01",
+            "RR-B1-05"
+          ],
+          "explanation": "Admitted pricing knowledge supports a bundled merchant-facing acquiring price; component identity remains unresolved."
+        },
+        "mechanic": {
+          "state": "supported",
+          "value": "rate_times_volume",
+          "confidence": "CONFIRMED",
+          "evidenceRefs": [
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "explanation": "Canonical statement operands support a printed rate-times-money-volume mechanic."
+        },
+        "population": {
+          "state": "supported",
+          "value": "printed_money_volume",
+          "confidence": "CONFIRMED",
+          "evidenceRefs": [
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "explanation": "The canonical statement row preserves the printed money-volume base."
+        },
+        "arithmetic": {
+          "state": "confirmed",
+          "value": "reproduces_with_rounding",
+          "confidence": "CONFIRMED",
+          "evidence": [
+            {
+              "evidenceClass": "E1_statement",
+              "refs": [
+                "ev_cc64ad9dfdd6bf06d3d6"
+              ],
+              "characterization": "statement_fact"
+            }
+          ],
+          "explanation": "The existing exact rational reconstruction reproduces the printed charged amount under the canonical rounding policy.",
+          "limitations": []
+        },
+        "determinantSufficiency": "DETERMINANT_SUFFICIENT",
+        "renderingPermissions": {
+          "exactIdentityAllowed": false,
+          "familyLanguageAllowed": true,
+          "acquiringSideLanguageAllowed": true,
+          "networkOwnershipLanguageAllowed": false,
+          "negotiationLanguageAllowed": true,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      }
+    },
+    {
+      "caseId": "cpu_gateway",
+      "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+      "printedLabel": "MASTERCARD - CPU GTWY",
+      "establishedEvidenceBeforeResearch": [
+        {
+          "field": "fee_family",
+          "value": "F9",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_4420f6587e36bc064bfa",
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-04",
+            "RR-B2-05",
+            "RR-B2-11",
+            "RR-B2-13",
+            "RR-B2-15"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "economic_layer",
+          "value": "technology_or_service",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_4420f6587e36bc064bfa",
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-04",
+            "RR-B2-05",
+            "RR-B2-11",
+            "RR-B2-13",
+            "RR-B2-15"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "collector",
+          "value": "processor_or_acquirer",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_4420f6587e36bc064bfa"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "economic_beneficiary",
+          "value": "technology_or_service_provider",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_4420f6587e36bc064bfa"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "price_setter",
+          "value": "acquiring_side_program",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_4420f6587e36bc064bfa"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "merchant_facing_price_controller",
+          "value": "acquiring_side_program",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_4420f6587e36bc064bfa"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "assessment_mechanic",
+          "value": "authorization_events",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_4420f6587e36bc064bfa"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "relevant_population",
+          "value": "printed_authorization_or_access_events",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_4420f6587e36bc064bfa"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "cardinality",
+          "value": "single_fee",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_4420f6587e36bc064bfa"
+          ],
+          "sourceLayer": "open_world"
+        },
+        {
+          "field": "broader_economic_category",
+          "value": "acquiring_side_gateway_commercial",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-04",
+            "RR-B2-05",
+            "RR-B2-11",
+            "RR-B2-13",
+            "RR-B2-15",
+            "ev_4420f6587e36bc064bfa"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "assessment_mechanic",
+          "value": "authorization_events",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-04",
+            "RR-B2-05",
+            "RR-B2-11",
+            "RR-B2-13",
+            "RR-B2-15",
+            "ev_4420f6587e36bc064bfa"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "collector",
+          "value": "processor_or_acquirer",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_4420f6587e36bc064bfa",
+            "ev_4f712bc19a198b265a08",
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-04",
+            "RR-B2-05",
+            "RR-B2-11",
+            "RR-B2-13",
+            "RR-B2-15"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "rule_setter",
+          "value": "acquiring_side_program",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-04",
+            "RR-B2-05",
+            "RR-B2-11",
+            "RR-B2-13",
+            "RR-B2-15"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "price_setter",
+          "value": "acquiring_side_program",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-04",
+            "RR-B2-05",
+            "RR-B2-11",
+            "RR-B2-13",
+            "RR-B2-15"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "merchant_facing_price_controller",
+          "value": "acquiring_side_program",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-04",
+            "RR-B2-05",
+            "RR-B2-11",
+            "RR-B2-13",
+            "RR-B2-15"
+          ],
+          "sourceLayer": "governed_knowledge"
+        },
+        {
+          "field": "pricing_model",
+          "value": "tiered_pricing",
+          "confidence": "CONFIRMED",
+          "evidenceRefs": [
+            "ev_1930c5eecf01940776bb",
+            "ev_3a1cb49f5b6d0e89ff17",
+            "ev_4d3c39cdd7f726af5cf5",
+            "ev_a4682217b8728d622455",
+            "ev_cc64ad9dfdd6bf06d3d6"
+          ],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "relevant_population",
+          "value": "printed_authorization_or_access_events",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "ev_4420f6587e36bc064bfa"
+          ],
+          "sourceLayer": "canonical_statement"
+        },
+        {
+          "field": "practical_merchant_action",
+          "value": "Ask the processor/acquirer/ISO to explain and commercially review the acquiring-side per-item price. This request does not require the merchant agreement; the agreement is needed only for an exact contractual-rate, breach, right, or remedy conclusion.",
+          "confidence": "LIKELY",
+          "evidenceRefs": [
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-04",
+            "RR-B2-05",
+            "RR-B2-11",
+            "RR-B2-13",
+            "RR-B2-15",
+            "ev_4420f6587e36bc064bfa"
+          ],
+          "sourceLayer": "governed_knowledge"
+        }
+      ],
+      "unresolvedFields": [
+        {
+          "field": "exact_fee_identity",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "The economic family is useful while exact identity remains unresolved."
+        },
+        {
+          "field": "printed_arithmetic_correctness",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "The deterministic exact-source arithmetic bridge lacks a complete printed rate/base pair for this row."
+        },
+        {
+          "field": "commercial_reasonableness",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": false,
+          "rationale": "Commercial reasonableness requires both a supported vertical and risk class."
+        },
+        {
+          "field": "contractual_compliance",
+          "decisionRelevant": false,
+          "requiresMerchantDocument": true,
+          "rationale": "Whether the charged rate or term complies with this merchant's agreement requires the operative agreement/pricing schedule and relevant amendments."
+        }
+      ],
+      "finalStage0Decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+      "researchWarranted": false,
+      "stopOrWarrantReasons": [
+        "d1_d4_sufficient",
+        "remaining_unknowns_do_not_change_current_merchant_decision"
+      ],
+      "availableMerchantConclusionWithoutResearch": {
+        "actionClass": "N5",
+        "action": "Ask the processor/acquirer/ISO to explain and commercially review the acquiring-side per-item price. This request does not require the merchant agreement; the agreement is needed only for an exact contractual-rate, breach, right, or remedy conclusion.",
+        "confidence": "LIKELY"
+      },
+      "additionalConclusionIfResearchSucceeds": [],
+      "currentProjection": {
+        "exactIdentity": {
+          "state": "family_known_identity_unresolved",
+          "value": null,
+          "necessaryForUsefulAction": false,
+          "explanation": "The economic family is useful while exact identity remains unresolved."
+        },
+        "family": {
+          "state": "supported",
+          "value": "F9",
+          "confidence": "CATEGORY_ONLY",
+          "evidenceRefs": [
+            "ev_4420f6587e36bc064bfa",
+            "RR-B2-00",
+            "RR-B2-01",
+            "RR-B2-02",
+            "RR-B2-03",
+            "RR-B2-04",
+            "RR-B2-05",
+            "RR-B2-11",
+            "RR-B2-13",
+            "RR-B2-15"
+          ],
+          "explanation": "Cross-brand statement structure and admitted knowledge support a technology/gateway commercial family while provider identity remains unresolved."
+        },
+        "mechanic": {
+          "state": "supported",
+          "value": "authorization_events",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_4420f6587e36bc064bfa"
+          ],
+          "explanation": "The label/source unit supports an authorization/access event population without equating it to settled transactions. The unit is supported, while the statement quantity is unavailable."
+        },
+        "population": {
+          "state": "supported",
+          "value": "printed_authorization_or_access_events",
+          "confidence": "STRONG",
+          "evidenceRefs": [
+            "ev_4420f6587e36bc064bfa"
+          ],
+          "explanation": "The supported unit is retained as its own population and is not forced into a settlement-count comparison."
+        },
+        "arithmetic": {
+          "state": "unresolved",
+          "value": null,
+          "confidence": "UNRESOLVED",
+          "evidence": [
+            {
+              "evidenceClass": "E1_statement",
+              "refs": [
+                "ev_4420f6587e36bc064bfa"
+              ],
+              "characterization": "statement_fact"
+            }
+          ],
+          "explanation": "The deterministic exact-source arithmetic bridge lacks a complete printed rate/base pair for this row.",
+          "limitations": []
+        },
+        "determinantSufficiency": "DETERMINANT_SUFFICIENT",
+        "renderingPermissions": {
+          "exactIdentityAllowed": false,
+          "familyLanguageAllowed": true,
+          "acquiringSideLanguageAllowed": false,
+          "networkOwnershipLanguageAllowed": false,
+          "negotiationLanguageAllowed": false,
+          "contractComplianceLanguageAllowed": false,
+          "candidateAsFactAllowed": false
+        }
+      }
+    }
+  ],
+  "crossLayerCorrections": [
+    "Canonical complete per-item arithmetic now projects Batch Settlement D2 mechanic and printed item population without claiming the population equals a separate settlement table.",
+    "Canonical complete rate-times-volume arithmetic now projects AMEX NQUAL D2 mechanic and printed money-volume population while bundled component allocation remains unresolved.",
+    "Explicit printed formula syntax now projects Monthly Advantage as rate-times-volume/proportional even though canonical arithmetic correctly remains unresolved because the normalized printed rate operand is missing.",
+    "Account Fees section evidence plus ordinary administrative label structure now supports the Application Fee F7 category, current-period occurrence, and waiver/reduction request without inferring recurrence or contract authorization."
+  ],
+  "changedAnalystConclusions": [
+    "Application Fee moves from unresolved/N7 verification-only to category-only F7/N4 administrative review and waiver request; recurrence, beneficiary, retention, and contract compliance remain unresolved.",
+    "Batch Settlement and AMEX NQUAL move from Open-World D2 unresolved to determinant-sufficient using already-canonical arithmetic and existing governed family evidence; their useful merchant actions do not depend on exact identity or retention.",
+    "Monthly Advantage changes from fixed-periodic projection to proportional rate-times-volume projection; its arithmetic, economic layer, price control, and N7 action remain unresolved, so research remains warranted.",
+    "CPU GTWY remains determinant-sufficient and suppressed."
+  ],
+  "confidenceAndRenderingPermissions": {
+    "familyLanguageAllowedRows": 330,
+    "acquiringSideLanguageAllowedRows": 81,
+    "networkOwnershipLanguageAllowedRows": 60,
+    "negotiationLanguageAllowedRows": 81,
+    "exactIdentityAllowedRows": 90,
+    "candidateAsFactAllowedRows": 0,
+    "actionClassDistribution": {
+      "N1": 55,
+      "N2": 169,
+      "N3": 76,
+      "N4": 5,
+      "N5": 25,
+      "N7": 153
+    },
+    "determinantConfidenceDistribution": {
+      "DETERMINANT_SUFFICIENT": 313,
+      "INSUFFICIENT": 153,
+      "PARTIAL": 17
+    }
+  },
+  "invariants": {
+    "canonicalFinancialTruthChangedStatements": [],
+    "canonicalFingerprintsUnchanged": true,
+    "sourceFactsRewritten": false,
+    "aiOrResearchExecuted": false,
+    "reusableKnowledgeSelfAdmitted": false,
+    "canonicalMutationAllowed": false
+  }
+}
