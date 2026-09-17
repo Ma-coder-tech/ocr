@@ -307,4 +307,37 @@ describe("runMultiStatementAnalysis", () => {
     expect(result.failedFiles).toEqual([]);
     expect(result.excludedFiles).toEqual([]);
   });
+
+  it("contains legacy narrative AI from normal multi-statement authority", async () => {
+    const result = await orchestrator.runMultiStatementAnalysis(
+      {
+        businessType: BUSINESS_TYPE,
+        files: [uploadFile("nov.pdf"), uploadFile("dec.pdf")],
+        narrative: { enabled: true, provider: "anthropic" },
+      },
+      depsFor({
+        "nov.pdf": comparisonInput("2024-11"),
+        "dec.pdf": comparisonInput("2024-12"),
+      }),
+    );
+
+    expect(result.status).toBe("completed");
+    expect(store.getLatestMultiStatementReportForJob(result.jobId)).toMatchObject({
+      narrativeStatus: "disabled",
+      narrativeProvider: null,
+      narrativeModel: null,
+      narrative: null,
+    });
+    const containmentEvent = store
+      .listMultiStatementJobEvents(result.jobId)
+      .find((event) => event.stage === "narrative_contained");
+    expect(containmentEvent?.metadata).toMatchObject({
+      providerAuthority: {
+        authority: "LEGACY_AI_PROHIBITED_SUPPORTED_FISERV",
+        providerCallAttempts: 0,
+        disposition: "blocked_before_dispatch",
+        operations: ["multi_statement_narrative_ai"],
+      },
+    });
+  });
 });

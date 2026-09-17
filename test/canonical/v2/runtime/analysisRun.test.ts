@@ -221,7 +221,7 @@ describe("production canonical AnalysisRun core", () => {
       .toEqual({ kind: "role", controlDimension: "economic_owner" });
   });
 
-  it("retains the authoritative fee total and types the coverage gap when fee detail is unproven", () => {
+  it("retains the authoritative fee total and admits complete fee detail only through the bounded rounding control", () => {
     const { run } = executeDeterministicCanonicalAnalysisRun({
       runId: "fee-total-with-unproven-detail",
       sourceDocumentRef: "fee-total-with-unproven-detail-source",
@@ -235,23 +235,17 @@ describe("production canonical AnalysisRun core", () => {
       provenanceStatus: "authoritative",
     });
     expect(run.artifacts.rd?.economicLayer).toMatchObject({
-      admissionProfile: { source: "runtime_capability", feeDetailCoverage: "incomplete" },
-      charges: [],
+      admissionProfile: { source: "claim_scoped_fee_rounding", feeDetailCoverage: "complete" },
       costStack: {
         completeness: "partial_but_financially_reconciled",
-        reconciliationDeltaMinor: 0,
+        reconciliationDeltaMinor: -1,
+        unresolvedRemainder: null,
+        roundingResidual: { signedResidualMinor: -1, additiveChargeRef: null },
       },
     });
-    expect(run.artifacts.rd?.economicLayer.costStack.unresolvedRemainder)
-      .toEqual(run.artifacts.rb?.financialPopulations.totalStatementProcessingFees.value);
-    expect(run.artifacts.unresolvedClaims?.claims).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        claimClass: "fee_detail_coverage",
-        state: "unresolved",
-        requiredEvidenceClass: "admitted_fee_detail_evidence",
-        blockingEffect: "limits_authority",
-      }),
-    ]));
+    expect(run.artifacts.rd?.economicLayer.charges.filter((charge) => charge.contributionStatus.startsWith("contributes_")))
+      .toHaveLength(50);
+    expect(run.artifacts.unresolvedClaims?.claims.some((claim) => claim.claimClass === "fee_detail_coverage")).toBe(false);
   });
 
   it("runs admitted RF category resolution inside the shared AnalysisRun and preserves adjacent claims", () => {

@@ -32,7 +32,14 @@ export type RuntimeCommercialComponentKindV1 =
   | "gateway_batch_fee";
 
 export type RuntimeActivityChannelV1 = "card_present" | "card_not_present" | "mixed" | "gateway" | "unknown";
-export type RuntimeCardBrandScopeV1 = "visa" | "mastercard" | "discover" | "amex" | "all_card_brands" | "unknown";
+export type RuntimeCardBrandScopeV1 = "visa" | "mastercard" | "discover" | "amex" | "visa_mastercard_discover" | "all_card_brands" | "unknown";
+export type RuntimeCommercialPopulationIdentityV1 =
+  | "authorization_attempts"
+  | "approved_authorizations"
+  | "authorizations"
+  | "settled_transactions"
+  | "gateway_transactions"
+  | "settled_batches";
 
 export type RuntimeCurrentCommercialComponentV1 = {
   componentRef: string;
@@ -44,17 +51,26 @@ export type RuntimeCurrentCommercialComponentV1 = {
   economicLayer: string | null;
   unit: "per_authorization" | "per_gateway_transaction" | "per_batch";
   populationLabel: string;
+  populationIdentity: RuntimeCommercialPopulationIdentityV1;
   populationCount: number;
   currentUnitPriceMinor: number;
   currentAmount: { state: "EXACT" | "UPPER_BOUND"; amountMinor: number };
   currentComponentEvidenceRefs: string[];
   populationEvidenceRefs: string[];
+  providerControlEvidenceRefs: string[];
 };
 
 export type RuntimeCommercialMerchantFactsV1 = {
   facts: Partial<Record<CommercialPredicateFactFieldV1, string | number | boolean>>;
   channel: RuntimeActivityChannelV1;
   evidenceRefsByFact: Partial<Record<CommercialPredicateFactFieldV1, string[]>>;
+  merchantSpecificApprovals: Array<{
+    providerBrand: string;
+    namedOffer: string;
+    distributionChannel: string;
+    productScope: string;
+    evidenceRefs: string[];
+  }>;
   unresolvedFacts: string[];
 };
 
@@ -353,6 +369,9 @@ export function extractRuntimeCurrentCommercialComponentsV1(input: {
     if (!componentKind) continue;
     const unit = componentKind === "authorization_fee" ? "per_authorization" : componentKind === "gateway_transaction_fee" ? "per_gateway_transaction" : "per_batch";
     const channel = currentChannel(row.printedLabel, input.merchantContext.channel, componentKind);
+    const populationLabel = row.mechanicAndPopulation.population ?? unit;
+    const populationIdentity = runtimePopulationIdentity(`${row.printedLabel} ${populationLabel}`, unit);
+    if (populationIdentity === null) continue;
     components.push({
       componentRef: `canonical_fee_component:${row.feeRowId}`,
       feeRowId: row.feeRowId,
@@ -362,7 +381,8 @@ export function extractRuntimeCurrentCommercialComponentsV1(input: {
       cardBrandScope: currentBrand(row.printedLabel),
       economicLayer: row.economicLayer.value,
       unit,
-      populationLabel: row.mechanicAndPopulation.population ?? unit,
+      populationLabel,
+      populationIdentity,
       populationCount: arithmetic.itemCount,
       currentUnitPriceMinor,
       currentAmount: { state: amountState, amountMinor: row.billedAmountMinor },
@@ -376,6 +396,10 @@ export function extractRuntimeCurrentCommercialComponentsV1(input: {
       populationEvidenceRefs: unique([
         ...arithmetic.fieldEvidenceRefs.count,
         `canonical_fee_population:${row.feeRowId}`,
+      ]),
+      providerControlEvidenceRefs: unique([
+        ...row.evidenceRefs,
+        `commercial_decomposition_control:${row.feeRowId}:${row.commercialDollarAttribution.kind}`,
       ]),
     });
   }
@@ -394,6 +418,14 @@ function buildRuntimeCommercialMerchantFactsV1(
     channel: context.evidenceRefs,
     known_high_risk: context.evidenceRefs,
   };
+  for (const [field, supplied] of Object.entries(context.commercialFacts ?? {}) as Array<[
+    CommercialPredicateFactFieldV1,
+    NonNullable<InternalAnalystMerchantContext["commercialFacts"]>[CommercialPredicateFactFieldV1],
+  ]>) {
+    if (!supplied || supplied.evidenceRefs.length === 0) continue;
+    facts[field] = supplied.value;
+    evidenceRefsByFact[field] = unique(supplied.evidenceRefs);
+  }
   if (analysis.financialFacts.processedSales.value) {
     facts.monthly_volume_minor = analysis.financialFacts.processedSales.value.amountMinor;
     evidenceRefsByFact.monthly_volume_minor = analysis.financialFacts.processedSales.evidenceRefs;
@@ -420,7 +452,10 @@ function buildRuntimeCommercialMerchantFactsV1(
     context.channel === "unknown" ? "merchant_channel" : null,
     context.riskClass === "unknown" ? "merchant_risk_class" : null,
   ].filter((value): value is string => value !== null));
-  return { facts, channel: context.channel, evidenceRefsByFact, unresolvedFacts };
+  const merchantSpecificApprovals = (context.merchantSpecificApprovals ?? [])
+    .filter((item) => item.evidenceRefs.length > 0)
+    .map((item) => ({ ...item, evidenceRefs: unique(item.evidenceRefs) }));
+  return { facts, channel: context.channel, evidenceRefsByFact, merchantSpecificApprovals, unresolvedFacts };
 }
 
 function evaluateCandidate(
@@ -430,9 +465,17 @@ function evaluateCandidate(
   merchantFacts: RuntimeCommercialMerchantFactsV1,
 ): RuntimeCommercialComparisonAttemptV1 {
   const channel = channelGate(current.channel, alternative.channel);
-  const population = current.componentKind !== "authorization_fee" || brandCompatible(current.cardBrandScope, alternative.cardBrandScope)
-    ? "matched"
-    : "mismatch";
+  const currentPopulation = runtimeCurrentPopulationIdentity(current);
+  const alternativePopulation = runtimeAlternativePopulationIdentity(alternative.component);
+  const brandPopulationCompatible = current.componentKind !== "authorization_fee"
+    || brandCompatible(current.cardBrandScope, alternative.cardBrandScope);
+  const population = !brandPopulationCompatible
+    ? "mismatch"
+    : currentPopulation === null || alternativePopulation === null
+      ? "unknown"
+      : currentPopulation === alternativePopulation
+        ? "matched"
+        : "mismatch";
   const qualification = evaluateCommercialOfferQualificationV1(alternative.composition, merchantFacts.facts);
   const eligibility = qualificationGate(alternative.composition, qualification.state);
   const period = sourcePeriodGate(statement.statementPeriod, alternative);
@@ -445,7 +488,8 @@ function evaluateCandidate(
     period.state === "mismatch" ? { reason: period.reason, unlocker: "Period-applicable governed commercial evidence for the statement period." } : null,
     channel === "mismatch" ? { reason: "The current merchant activity channel does not match the governed alternative component channel.", unlocker: "A governed alternative component for the merchant's established channel." } : null,
     channel === "unknown" ? { reason: "The current component cannot be assigned to a compatible card-present or card-not-present population.", unlocker: "CP versus CNP transaction and volume split for the current component." } : null,
-    population === "mismatch" ? { reason: "The current card-brand population does not match the governed alternative component population.", unlocker: "A governed alternative component covering the same card-brand population." } : null,
+    population === "mismatch" ? { reason: "The current billing population does not match the governed alternative component population.", unlocker: "A governed alternative component covering the same billing population." } : null,
+    population === "unknown" ? { reason: "The current and alternative billing populations cannot be shown to be the same.", unlocker: "Exact current and alternative billing-population identity." } : null,
     eligibility === "mismatch" ? { reason: "The governed offer is not applicable under the established qualification or risk facts.", unlocker: "A different admitted offer whose qualification rules are satisfied." } : null,
     eligibility === "unknown" ? { reason: qualification.reasons.join(" ") || "Offer qualification remains unresolved.", unlocker: qualificationUnlocker(alternative.composition, merchantFacts) } : null,
     applicabilityGate === "mismatch" ? { reason: "The component's admitted applicability predicate is not satisfied.", unlocker: "A component whose admitted applicability predicate matches the merchant activity." } : null,
@@ -455,7 +499,7 @@ function evaluateCandidate(
     ? "unavailable"
     : current.currentAmount.state === "UPPER_BOUND"
       ? "bounded_component"
-      : "conditional_scenario";
+      : "exact_component";
   const diagnostic = runtimeDiagnostic({
     caseId: `runtime:${statement.statementRef}:${current.feeRowId}:${alternative.component.componentVersionId}`,
     alternative,
@@ -644,7 +688,7 @@ function runtimeDiagnostic(input: {
   current: RuntimeCurrentCommercialComponentV1;
   comparisonStrength: AcceptedComparatorDiagnosticV1["comparisonStrength"];
   channelGate: "matched" | "mismatch" | "unknown";
-  populationGate: "matched" | "mismatch";
+  populationGate: "matched" | "mismatch" | "unknown";
   eligibilityGate: "matched" | "mismatch" | "unknown" | "not_required";
   applicabilityGate: "matched" | "mismatch" | "unknown";
   sourcePeriodGate: "matched" | "mismatch";
@@ -863,7 +907,7 @@ function currentBrand(label: string): RuntimeCardBrandScopeV1 {
 function alternativeBrand(component: CommercialPriceComponentVersionV1): RuntimeCardBrandScopeV1 {
   const text = `${component.componentIdentity} ${component.billedPopulation}`.toLowerCase();
   if (text.includes("amex")) return "amex";
-  if (text.includes("visa_mastercard_discover")) return "all_card_brands";
+  if (text.includes("visa_mastercard_discover")) return "visa_mastercard_discover";
   if (text.includes("card_present") || text.includes("card_not_present") || component.offerIdentity.productScope === "gateway_only") return "all_card_brands";
   return "unknown";
 }
@@ -875,7 +919,27 @@ function channelGate(current: RuntimeActivityChannelV1, alternative: RuntimeActi
 
 function brandCompatible(current: RuntimeCardBrandScopeV1, alternative: RuntimeCardBrandScopeV1): boolean {
   if (alternative === "all_card_brands") return current !== "unknown";
+  if (alternative === "visa_mastercard_discover") return ["visa", "mastercard", "discover"].includes(current);
   return current === alternative;
+}
+
+function runtimeCurrentPopulationIdentity(current: RuntimeCurrentCommercialComponentV1): string | null {
+  return current.populationIdentity ?? runtimePopulationIdentity(`${current.printedLabel} ${current.populationLabel}`, current.unit);
+}
+
+function runtimePopulationIdentity(value: string, unit: string): RuntimeCommercialPopulationIdentityV1 | null {
+  const text = value.toLowerCase().replaceAll("-", "_");
+  if (/settled.*(?:sale|transaction)|(?:sale|transaction).*settled/.test(text)) return "settled_transactions";
+  if (/attempt(?:ed|s)?.*auth|auth.*attempt/.test(text)) return "authorization_attempts";
+  if (/approved.*auth|auth.*approved/.test(text)) return "approved_authorizations";
+  if (unit === "per_gateway_transaction") return "gateway_transactions";
+  if (unit === "per_batch") return "settled_batches";
+  if (/authorization|\bauth\b|\bwats\b/.test(text) || unit === "per_authorization") return "authorizations";
+  return null;
+}
+
+function runtimeAlternativePopulationIdentity(component: CommercialPriceComponentVersionV1): string | null {
+  return runtimePopulationIdentity(component.billedPopulation, component.unit);
 }
 
 function qualificationGate(

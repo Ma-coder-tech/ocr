@@ -33,6 +33,9 @@ import type {
 import type { CanonicalEconomicsV2SourceOccurrence } from "./types.js";
 import { validateCanonicalEconomicsV2EconomicAnalysis } from "./economicValidate.js";
 import { canonicalRoleProofRouteSatisfied } from "./economicProofRoutes.js";
+import { FISERV_FEE_LEDGER_OCCURRENCE_MARKER } from "./fiservAdapter.js";
+import { fiservClaimScopedFeeControlIdentityMatchesFoundationV1 } from "./fiservClaimScopedFeeOccurrenceAdmissionV1.js";
+import { fiservClaimScopedFeeRoundingControlMatchesFoundationV1 } from "./fiservClaimScopedFeeRoundingResidualV1.js";
 
 export type CanonicalEconomicParticipantAdmission = {
   key: string;
@@ -186,6 +189,10 @@ export function buildCanonicalEconomicsV2EconomicAnalysis(
         ? foundation.templateCapability.identityStatus === "proven" &&
           foundation.templateCapability.admissionStatus === "admitted" &&
           foundation.templateCapability.admissionAuthority !== null
+        : input.admissionProfile.source === "claim_scoped_fee_occurrence"
+          ? claimScopedFeeAuthorityAllowed(foundation, input.admissionProfile)
+        : input.admissionProfile.source === "claim_scoped_fee_rounding"
+          ? claimScopedFeeRoundingAuthorityAllowed(foundation, input.admissionProfile)
         : false;
   const occurrenceById = new Map(foundation.sourceModel.occurrences.map((item) => [item.id, item]));
   const evidenceIds = new Set(foundation.sourceModel.evidence.map((item) => item.id));
@@ -490,7 +497,8 @@ function chargeFromAdmission(input: {
     .map((ref) => input.semanticApplicationById.get(ref))
     .find((application) => application?.claimClass === "economic_category" && application.value.kind === "mapping" &&
       application.occurrenceRef === contributingOccurrence?.id && application.value.canonicalCode === item.category);
-  const semanticApplicationPermitsCategory = categoryResolution !== "proven" || input.profile.source !== "runtime_capability" ||
+  const semanticApplicationPermitsCategory = categoryResolution !== "proven" ||
+    !["runtime_capability", "claim_scoped_fee_occurrence", "claim_scoped_fee_rounding"].includes(input.profile.source) ||
     item.category === "unresolved_unclassified" || Boolean(categorySemanticApplication);
   const admittedCategoryResolution = categoryResolution === "proven" && !semanticApplicationPermitsCategory
     ? "unresolved" as const
@@ -585,7 +593,13 @@ function buildCostStack(input: {
     addToBucket(bucketByKind.get(kind)!, charge);
   }
   const classifiedNetMinor = sum(buckets.map((bucket) => bucket.netAmount.amountMinor));
-  const authoritativeMinor = feeFact.status === "available" ? feeFact.value?.amountMinor ?? null : null;
+  const claimScopedControl = input.profile.source === "claim_scoped_fee_occurrence"
+    ? input.profile.claimScopedFeeControl ?? null : null;
+  const claimScopedRoundingControl = input.profile.source === "claim_scoped_fee_rounding"
+    ? input.profile.claimScopedFeeRoundingControl ?? null : null;
+  const authoritativeMinor = feeFact.status === "available" ? feeFact.value?.amountMinor ?? null
+    : claimScopedControl?.authoritativeFeeTotal.amountMinor
+      ?? claimScopedRoundingControl?.authoritativeFeeTotal.amountMinor ?? null;
   if (authoritativeMinor === null) {
     return {
       statementFeeFactRef: feeFact.id,
@@ -623,28 +637,116 @@ function buildCostStack(input: {
     : Math.round(Math.abs(Number(roundingControl.tolerance)) * 100);
   const documentedRounding = deltaMinor !== 0 && roundingToleranceMinor !== null && Number.isFinite(roundingToleranceMinor) &&
     Math.abs(deltaMinor) <= roundingToleranceMinor;
+  const claimScopedDocumentedRounding = claimScopedRoundingControl !== null &&
+    deltaMinor === claimScopedRoundingControl.signedResidualMinor &&
+    Math.abs(deltaMinor) === claimScopedRoundingControl.absoluteResidualMinor &&
+    claimScopedRoundingControl.absoluteResidualMinor >= 1 &&
+    claimScopedRoundingControl.absoluteResidualMinor <= claimScopedRoundingControl.maximumAcceptedAbsoluteResidualMinor &&
+    claimScopedRoundingControl.maximumAcceptedAbsoluteResidualMinor === 2;
   const semanticPartial = unresolvedCharges || incompleteCoverage || input.profile.feeDetailCoverage === "unknown";
   const completeness = deltaMinor === 0
     ? semanticPartial ? "partial_but_financially_reconciled" as const : "complete" as const
-    : documentedRounding
+    : documentedRounding || claimScopedDocumentedRounding
       ? semanticPartial ? "partial_but_financially_reconciled" as const : "complete_with_rounding" as const
       : "financially_unreconciled" as const;
   return {
     statementFeeFactRef: feeFact.id,
-    authoritativeStatementFeeTotal: feeFact.value,
+    authoritativeStatementFeeTotal: money(authoritativeMinor),
     buckets,
     classifiedChargeNet: money(classifiedNetMinor),
     unresolvedRemainder,
-    totalStatementProcessingCost: completeness === "financially_unreconciled" ? null : feeFact.value,
+    totalStatementProcessingCost: completeness === "financially_unreconciled" ? null : money(authoritativeMinor),
     reconciliationDeltaMinor: deltaMinor,
-    reconciliationRef: roundingControl?.id ?? findPassingFeeReconciliation(foundation.reconciliation),
+    reconciliationRef: roundingControl?.id ?? claimScopedControl?.exactReconciliationControlId
+      ?? claimScopedRoundingControl?.reconciliationControlId
+      ?? findPassingFeeReconciliation(foundation.reconciliation),
     completeness,
+    ...(claimScopedRoundingControl ? { roundingResidual: {
+      policyVersion: "fiserv_fee_total_nonadditive_rounding_residual_max_2_minor_units_v1" as const,
+      state: "accepted_bounded_rounding_nonadditive" as const,
+      printedStatementFeeTotalMinor: claimScopedRoundingControl.authoritativeFeeTotal.amountMinor,
+      admittedFeeOccurrenceSumMinor: claimScopedRoundingControl.admittedFeeOccurrenceSumMinor,
+      signedResidualMinor: claimScopedRoundingControl.signedResidualMinor,
+      absoluteResidualMinor: claimScopedRoundingControl.absoluteResidualMinor,
+      maximumAcceptedAbsoluteResidualMinor: 2 as const,
+      controlRef: claimScopedRoundingControl.reconciliationControlId,
+      evidenceRefs: [...claimScopedRoundingControl.evidenceRefs],
+      reasonCode: "bounded_rounding_reconciles_complete_fee_population" as const,
+      additiveChargeRef: null,
+      category: null,
+      participantOrOwner: null,
+    } } : {}),
     limitations: unique([
       ...(semanticPartial ? ["The stack is financially reconciled only by preserving unresolved or incomplete economic allocation."] : []),
       ...(completeness === "financially_unreconciled" ? ["Admitted charges do not reconcile to authoritative statement processing fees."] : []),
       "This stack represents statement-evidenced processing cost, not complete total acceptance cost.",
     ]),
   };
+}
+
+function claimScopedFeeAuthorityAllowed(
+  foundation: CanonicalEconomicsV2PricingAnalysis["foundation"],
+  profile: CanonicalEconomicAdmissionProfile,
+): boolean {
+  const control = profile.claimScopedFeeControl;
+  if (!control || profile.feeDetailCoverage !== "complete" || !profile.statementPeriodApplicabilityProven) return false;
+  if (!fiservClaimScopedFeeControlIdentityMatchesFoundationV1(control, foundation)) return false;
+  const occurrenceById = new Map(foundation.sourceModel.occurrences.map((occurrence) => [occurrence.id, occurrence]));
+  const total = occurrenceById.get(control.authoritativeFeeTotalOccurrenceRef);
+  if (!total || total.evidenceRef !== control.authoritativeFeeTotalEvidenceRef ||
+      total.printedAmount?.amountMinor !== control.authoritativeFeeTotal.amountMinor) return false;
+  if (!control.exactReconciliationControlId.trim() || new Set(control.admittedOccurrenceRefs).size !== control.admittedOccurrenceRefs.length ||
+      new Set(control.zeroDollarOccurrenceRefs).size !== control.zeroDollarOccurrenceRefs.length) return false;
+  const admitted = control.admittedOccurrenceRefs.map((ref) => occurrenceById.get(ref));
+  const zeros = control.zeroDollarOccurrenceRefs.map((ref) => occurrenceById.get(ref));
+  if (admitted.some((occurrence) => !occurrence || occurrence.semanticRole !== "fee_charge" ||
+      occurrence.contributionRole !== "supporting_detail" || occurrence.printedAmount === null ||
+      occurrence.printedAmount.amountMinor <= 0 || !["positive", "unsigned"].includes(occurrence.printedDirection))) return false;
+  if (zeros.some((occurrence) => !occurrence || occurrence.semanticRole !== "fee_charge" ||
+      occurrence.contributionRole !== "supporting_detail" || occurrence.printedAmount?.amountMinor !== 0)) return false;
+  const controlledRefs = [...control.admittedOccurrenceRefs, ...control.zeroDollarOccurrenceRefs].sort();
+  const normalizedFeeRefs = foundation.sourceModel.occurrences
+    .filter((occurrence) => occurrence.limitations.includes(FISERV_FEE_LEDGER_OCCURRENCE_MARKER))
+    .map((occurrence) => occurrence.id).sort();
+  if (JSON.stringify(controlledRefs) !== JSON.stringify(normalizedFeeRefs) ||
+      [...admitted, ...zeros].some((occurrence) => !profile.evidenceRefs.includes(occurrence!.evidenceRef))) return false;
+  return admitted.reduce((sum, occurrence) => sum + occurrence!.printedAmount!.amountMinor, 0) ===
+    control.authoritativeFeeTotal.amountMinor;
+}
+
+function claimScopedFeeRoundingAuthorityAllowed(
+  foundation: CanonicalEconomicsV2PricingAnalysis["foundation"],
+  profile: CanonicalEconomicAdmissionProfile,
+): boolean {
+  const control = profile.claimScopedFeeRoundingControl;
+  if (!control || profile.feeDetailCoverage !== "complete" || !profile.statementPeriodApplicabilityProven) return false;
+  if (!fiservClaimScopedFeeRoundingControlMatchesFoundationV1(control, foundation) ||
+      control.reconciliationControlResult !== "pass_with_rounding" ||
+      control.maximumAcceptedAbsoluteResidualMinor !== 2 ||
+      control.absoluteResidualMinor < 1 || control.absoluteResidualMinor > 2 ||
+      Math.abs(control.signedResidualMinor) !== control.absoluteResidualMinor ||
+      control.authoritativeFeeTotal.amountMinor - control.admittedFeeOccurrenceSumMinor !== control.signedResidualMinor) return false;
+  const occurrenceById = new Map(foundation.sourceModel.occurrences.map((occurrence) => [occurrence.id, occurrence]));
+  const total = occurrenceById.get(control.authoritativeFeeTotalOccurrenceRef);
+  if (!total || total.evidenceRef !== control.authoritativeFeeTotalEvidenceRef ||
+      total.printedAmount?.amountMinor !== control.authoritativeFeeTotal.amountMinor ||
+      !control.reconciliationControlId.trim() || new Set(control.admittedOccurrenceRefs).size !== control.admittedOccurrenceRefs.length ||
+      new Set(control.zeroDollarOccurrenceRefs).size !== control.zeroDollarOccurrenceRefs.length) return false;
+  const admitted = control.admittedOccurrenceRefs.map((ref) => occurrenceById.get(ref));
+  const zeros = control.zeroDollarOccurrenceRefs.map((ref) => occurrenceById.get(ref));
+  if (admitted.some((occurrence) => !occurrence || occurrence.semanticRole !== "fee_charge" ||
+      occurrence.contributionRole !== "supporting_detail" || occurrence.printedAmount === null ||
+      occurrence.printedAmount.amountMinor <= 0 || !["positive", "unsigned"].includes(occurrence.printedDirection))) return false;
+  if (zeros.some((occurrence) => !occurrence || occurrence.semanticRole !== "fee_charge" ||
+      occurrence.contributionRole !== "supporting_detail" || occurrence.printedAmount?.amountMinor !== 0)) return false;
+  const controlledRefs = [...control.admittedOccurrenceRefs, ...control.zeroDollarOccurrenceRefs].sort();
+  const normalizedFeeRefs = foundation.sourceModel.occurrences
+    .filter((occurrence) => occurrence.limitations.includes(FISERV_FEE_LEDGER_OCCURRENCE_MARKER))
+    .map((occurrence) => occurrence.id).sort();
+  if (JSON.stringify(controlledRefs) !== JSON.stringify(normalizedFeeRefs) ||
+      [...admitted, ...zeros].some((occurrence) => !profile.evidenceRefs.includes(occurrence!.evidenceRef))) return false;
+  return admitted.reduce((sum, occurrence) => sum + occurrence!.printedAmount!.amountMinor, 0) ===
+    control.admittedFeeOccurrenceSumMinor;
 }
 
 function bucketForCharge(

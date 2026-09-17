@@ -148,6 +148,7 @@ describe("Runtime Commercial Comparison Attachment v1", () => {
       channel: "gateway",
       cardBrandScope: "unknown",
       populationLabel: "gateway credit-card transaction events",
+      populationIdentity: "gateway_transactions",
       printedLabel: "GATEWAY TRANSACTION FEE",
       populationCount: 1_000,
       currentUnitPriceMinor: 12,
@@ -218,12 +219,14 @@ function authorizationComponent(
     cardBrandScope: "mastercard",
     economicLayer: "acquiring_commercial",
     unit: "per_authorization",
+    populationIdentity: "authorizations",
     populationLabel: "printed authorization events",
     populationCount: 6_000,
     currentUnitPriceMinor: 11,
     currentAmount: { state: "EXACT", amountMinor: 66_000 },
     currentComponentEvidenceRefs: ["statement:auth_component"],
     populationEvidenceRefs: ["statement:auth_population"],
+    providerControlEvidenceRefs: ["governed_control:auth_component"],
     ...patch,
   };
 }

@@ -17,6 +17,7 @@ import type { ParserDecision, ParserDriver, ParserConfidence } from "./parserFou
 import type { ParsedDocument } from "./parser.js";
 import type { AnalysisSummary, BenchmarkResult, DataQualitySignal, FeeBreakdownRow } from "./types.js";
 import type { BusinessTypeId } from "./businessTypes.js";
+import { isSupportedFiservParserDriverId } from "./aiProviderAuthority.js";
 
 type ParserWarning = {
   code: string;
@@ -367,6 +368,13 @@ export async function analyzeStatementDocumentWithOptionalAi(
 
   const matched = findValidatedPdfParser(doc, options.sourceFileName, businessType);
   if (!matched) return baseSummary;
+
+  // Supported Fiserv production analysis is deterministically contained. Legacy AI
+  // modules remain importable for isolated evaluation, but are not dispatched from
+  // this production call graph, regardless of credentials or legacy feature flags.
+  if (isSupportedFiservParserDriverId(matched.driver.id)) {
+    return applyValidatedParserOutput(baseSummary, matched, businessType);
+  }
 
   const noticeEnhanced = await maybeRunStatementNoticeAiExtractionForParserOutput(matched.output as any);
   const categoryEnhanced = await maybeRunBenchmarkCategoryAiInferenceForParserOutput(noticeEnhanced.output as any);
