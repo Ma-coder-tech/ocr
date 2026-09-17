@@ -9,6 +9,7 @@ import {
   type ShadowAiRequiredEvidenceClassV1,
   type ShadowAiResolutionPathV1,
 } from "./shadowAiEconomicResolutionPlannerTypesV1.js";
+import { shadowAiIssueSemanticContractV1 } from "./shadowAiPlannerSemanticContractV1.js";
 
 /**
  * Offline-only evaluator. It exercises the full packet and output contracts without
@@ -36,15 +37,19 @@ export function createShadowAiEconomicResolutionEvaluationAdapterV1(): ShadowAiP
 }
 
 function buildEvaluationPlan(packet: ShadowAiEconomicResolutionPacketV1): ShadowAiEconomicResolutionPlanV1 {
-  const route = routeFor(packet.issueClass);
-  const cited = packet.acceptedFactRefs.length > 0
-    ? [...packet.acceptedFactRefs]
-    : packet.acceptedIssueRelevantActivityFacts.slice(0, 2).map((fact) => fact.factRef);
-  const support = cited.length > 0 ? cited : packet.currentGovernedEvidenceRefs.slice(0, 1);
+  const semanticContract = shadowAiIssueSemanticContractV1(packet.issueClass);
+  const route = semanticContract.resolutionPath;
+  const cited = [...packet.acceptedFactRefs];
+  const support = unique([
+    ...packet.acceptedFactRefs,
+    ...packet.currentGovernedEvidenceRefs,
+    ...packet.selectedRdChargeRefs,
+    ...packet.acceptedParticipantControlStates.map((state) => state.rdChargeRef),
+  ]).slice(0, 2);
   const gap = gapFor(packet.issueClass);
   const primary = hypothesis(
     primaryText(packet.issueClass), support, gap,
-    confirmationFor(route), falsificationFor(packet.issueClass), "MEDIUM",
+    confirmationFor(route), falsificationFor(packet.issueClass), support.length > 0 ? "MEDIUM" : "LOW",
   );
   const alternatives = packet.competingHypothesisRequired
     ? [hypothesis(
@@ -52,7 +57,7 @@ function buildEvaluationPlan(packet: ShadowAiEconomicResolutionPacketV1): Shadow
       alternativeConfirmationFor(route), alternativeFalsificationFor(packet.issueClass), "LOW",
     )]
     : [];
-  const requiredEvidence = evidenceForRoute(route, packet.allowedEvidenceClasses);
+  const requiredEvidence = [...semanticContract.requiredEvidenceClasses];
 
   return deepFreeze({
     schemaVersion: SHADOW_AI_ECONOMIC_RESOLUTION_OUTPUT_SCHEMA_VERSION,
@@ -84,40 +89,6 @@ function buildEvaluationPlan(packet: ShadowAiEconomicResolutionPacketV1): Shadow
     limitationCodes: ["offline_evaluation_stub", "no_new_evidence_admitted", "deterministic_inputs_unchanged"],
     reconstructionSuspicions: [],
   });
-}
-
-function routeFor(issueClass: ShadowAiEconomicIssueClassV1): ShadowAiResolutionPathV1 {
-  switch (issueClass) {
-    case "QUALIFICATION_INTEGRITY_ROOT_CAUSE":
-    case "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE":
-      return "PROCESSOR_OR_GATEWAY_DATA_REQUIRED";
-    case "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS":
-    case "GATEWAY_PROCESSOR_TERMINOLOGY":
-    case "PARTICIPANT_CONTROL_UNCERTAINTY":
-      return "PUBLIC_RESEARCH_REQUIRED";
-    case "COST_INCIDENCE_UNCERTAINTY":
-      return "MERCHANT_INPUT_REQUIRED";
-    case "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED":
-      return "DOCUMENT_REQUIRED";
-  }
-}
-
-function evidenceForRoute(
-  route: ShadowAiResolutionPathV1,
-  allowed: readonly ShadowAiRequiredEvidenceClassV1[],
-): ShadowAiRequiredEvidenceClassV1[] {
-  const preferred: Partial<Record<ShadowAiResolutionPathV1, ShadowAiRequiredEvidenceClassV1>> = {
-    PUBLIC_RESEARCH_REQUIRED: "GOVERNED_PUBLIC_SOURCE",
-    MERCHANT_INPUT_REQUIRED: "MERCHANT_ATTESTATION",
-    DOCUMENT_REQUIRED: "MERCHANT_CONTRACT_OR_SCHEDULE",
-    PROCESSOR_OR_GATEWAY_DATA_REQUIRED: "PROCESSOR_OR_GATEWAY_OPERATIONAL_DATA",
-    MULTI_STATEMENT_REQUIRED: "ADDITIONAL_COMPATIBLE_STATEMENT",
-    COMPARATOR_EVIDENCE_REQUIRED: "COMPARATOR_SOURCE_EVIDENCE",
-    RESOLVABLE_FROM_EXISTING_EVIDENCE: "ACCEPTED_STATEMENT_FACT",
-    NOT_RESOLVABLE_CURRENT_SCOPE: undefined,
-  };
-  const match = preferred[route];
-  return match && allowed.includes(match) ? [match] : allowed.slice(0, 1);
 }
 
 function hypothesis(
@@ -211,6 +182,10 @@ function publicQueryFor(packet: ShadowAiEconomicResolutionPacketV1): string {
 
 function estimateTokens(value: string): number {
   return Math.ceil(Buffer.byteLength(value, "utf8") / 4);
+}
+
+function unique<T>(values: readonly T[]): T[] {
+  return [...new Set(values)];
 }
 
 function deepFreeze<T>(value: T): T {

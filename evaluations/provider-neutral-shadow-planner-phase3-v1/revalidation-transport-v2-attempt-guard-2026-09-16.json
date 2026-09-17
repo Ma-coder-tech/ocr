@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "provider_neutral_shadow_planner_phase3_attempt_guard_2026_09_16_v3",
+  "state": "COMPLETED",
+  "startedAt": "2026-09-16T16:54:16.616Z",
+  "completedAt": "2026-09-16T16:57:54.983Z",
+  "maximumProviderCalls": 14,
+  "actualProviderCalls": 14,
+  "callsByIssueFamily": {
+    "SHARED_BUNDLED_UNRESOLVED_FEE_SEMANTICS": 2,
+    "QUALIFICATION_INTEGRITY_ROOT_CAUSE": 2,
+    "PARTICIPANT_CONTROL_UNCERTAINTY": 2,
+    "GATEWAY_PROCESSOR_TERMINOLOGY": 2,
+    "AUTHORIZATION_ECONOMICS_MISSING_EVIDENCE": 2,
+    "COST_INCIDENCE_UNCERTAINTY": 2,
+    "CONTRACT_OFF_STATEMENT_EVIDENCE_NEED": 2
+  },
+  "resultSha256": "d09e1c68b493bff870931e7616c59058f49a119b553ddae8a3f8d47d40ee3e6f"
+}

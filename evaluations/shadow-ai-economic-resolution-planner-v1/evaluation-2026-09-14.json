@@ -142,19 +142,16 @@
     "truthEffect": "NONE",
     "financialMutationAllowed": false,
     "customerRenderingAllowed": false,
-    "issueId": "shadow-issue-e33ddde52a71cccc8ae0dbf4d4431e19",
-    "inputHash": "674dbf8432b030c1170777d46eaaf6416bed76773c7bbca9ba083a10d269956b",
-    "exactCitedFactRefs": [
-      "fact_v2_canonical_net_submitted_card_volume",
-      "fact_v2_submitted_transaction_count"
-    ],
+    "issueId": "shadow-issue-76e3408d721b75e7fa0c4ddecb5589c5",
+    "inputHash": "1a2da5fdc901656024cb982f79bddc42e6a313b13632382be9337539f4ce2b92",
+    "exactCitedFactRefs": [],
     "unresolvedQuestion": "Which period-effective contract terms govern the charge and change authority?",
     "primaryHypothesis": {
       "hypothesis": "The period-effective agreement may contain the missing control and pricing terms.",
       "confidence": "MEDIUM",
       "supportingFactRefs": [
-        "fact_v2_canonical_net_submitted_card_volume",
-        "fact_v2_submitted_transaction_count"
+        "OWD-01",
+        "OWD-02"
       ],
       "contradictingFactRefs": [],
       "acknowledgedEvidenceGaps": [
@@ -211,6 +208,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 2,
           "competingHypothesisRequired": true
         },
         {
@@ -228,6 +226,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -243,6 +242,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -256,6 +256,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -273,6 +274,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -290,6 +292,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": false
         }
       ],
@@ -338,7 +341,7 @@
           "providerNetworkCalls": 0,
           "inputBytes": 44338,
           "inputTokens": 11085,
-          "outputTokens": 4030,
+          "outputTokens": 3799,
           "estimatedCostUsdMicros": 0,
           "latencyMs": 0,
           "retries": 0,
@@ -434,17 +437,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-7d76133402d4dca669996601d1b6e21e",
           "inputHash": "b2c7dd1e9eb609ddf24987577ff6dc05e42ffe4a60b756d22626021f6b17bc97",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What period-matched operational condition accounts for the accepted qualification or integrity condition?",
           "primaryHypothesis": {
             "hypothesis": "A period-specific operational condition may account for the accepted qualification or integrity condition.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -462,7 +462,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -508,17 +508,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-0efc69e3e4e56296aa3776fd71a3072a",
           "inputHash": "877387d134a13a320ebf1c211dfb0e152153320ff4e2426409e993c376ab1c1a",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What evidence can separate the bundled charge into supported economic roles?",
           "primaryHypothesis": {
             "hypothesis": "The charge may combine more than one service role that the accepted statement facts do not separate.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -536,7 +533,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -582,18 +579,12 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-1779a78a3ac9ee9e26d6b6bd0e3c8ac7",
           "inputHash": "d08a768bea34d1e1516804b706b5215180c0266b4369c43db9e2e27505e70940",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Was any accepted processing cost offset by a merchant-operated program during the period?",
           "primaryHypothesis": {
             "hypothesis": "The statement alone may be insufficient to determine whether a separate merchant program offset any processing cost.",
-            "confidence": "MEDIUM",
-            "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
-            ],
+            "confidence": "LOW",
+            "supportingFactRefs": [],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
               "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -609,9 +600,7 @@
             {
               "hypothesis": "No separate offset program may have operated during the period, but statement silence does not establish that state.",
               "confidence": "LOW",
-              "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
-              ],
+              "supportingFactRefs": [],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
                 "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -656,17 +645,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-7b6cba91f4452bc915e62d2807d2ad3a",
           "inputHash": "4a760d23ff3c7925c828ffee5fa4d00dc66e41b86bcb5da637fb37f2bb57aaee",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which participant held the relevant rule-setting and merchant-facing price-control roles for this charge?",
           "primaryHypothesis": {
             "hypothesis": "The collecting participant may differ from the rule setter or merchant-facing price controller.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -684,7 +670,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -730,17 +716,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-76e3408d721b75e7fa0c4ddecb5589c5",
           "inputHash": "1a2da5fdc901656024cb982f79bddc42e6a313b13632382be9337539f4ce2b92",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which period-effective contract terms govern the charge and change authority?",
           "primaryHypothesis": {
             "hypothesis": "The period-effective agreement may contain the missing control and pricing terms.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -866,6 +849,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 2,
           "competingHypothesisRequired": true
         },
         {
@@ -883,6 +867,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -898,6 +883,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -911,6 +897,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -928,6 +915,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -945,6 +933,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": false
         }
       ],
@@ -993,7 +982,7 @@
           "providerNetworkCalls": 0,
           "inputBytes": 47559,
           "inputTokens": 11890,
-          "outputTokens": 4030,
+          "outputTokens": 3799,
           "estimatedCostUsdMicros": 0,
           "latencyMs": 0,
           "retries": 0,
@@ -1089,17 +1078,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-ec051f8aaced240e215fde8bf146dd4a",
           "inputHash": "38721e949f231737f12737d076b9d5ada6a83f2c4080714aec4ded70eb8dc09c",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What period-matched operational condition accounts for the accepted qualification or integrity condition?",
           "primaryHypothesis": {
             "hypothesis": "A period-specific operational condition may account for the accepted qualification or integrity condition.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -1117,7 +1103,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -1163,17 +1149,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-1d91e9da8d2432dfaa7aaf1b8377579c",
           "inputHash": "508e17b01b29bf11a848f3bfb03d41c04b88fc8fcaa32235e77132ff24ecd3b9",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What evidence can separate the bundled charge into supported economic roles?",
           "primaryHypothesis": {
             "hypothesis": "The charge may combine more than one service role that the accepted statement facts do not separate.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -1191,7 +1174,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -1237,18 +1220,12 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-5077d805381f062b10f62dd4ad030512",
           "inputHash": "a697eddc1462925670255ca9034c0d055e5633f37b4d6b5cda531c24b3dcc728",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Was any accepted processing cost offset by a merchant-operated program during the period?",
           "primaryHypothesis": {
             "hypothesis": "The statement alone may be insufficient to determine whether a separate merchant program offset any processing cost.",
-            "confidence": "MEDIUM",
-            "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
-            ],
+            "confidence": "LOW",
+            "supportingFactRefs": [],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
               "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -1264,9 +1241,7 @@
             {
               "hypothesis": "No separate offset program may have operated during the period, but statement silence does not establish that state.",
               "confidence": "LOW",
-              "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
-              ],
+              "supportingFactRefs": [],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
                 "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -1311,17 +1286,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-b5ddeb5cec59952781f0b170d7945f45",
           "inputHash": "e2982060b1cc1de2ccb74c72e99029c7913064f93d40e3b084af9ee7d3d241f0",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which participant held the relevant rule-setting and merchant-facing price-control roles for this charge?",
           "primaryHypothesis": {
             "hypothesis": "The collecting participant may differ from the rule setter or merchant-facing price controller.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -1339,7 +1311,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -1385,17 +1357,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-cb77a391afa4e2cc04e3645ac66bb8db",
           "inputHash": "43e9e810f4f9847b960115e755ff5cac96a42ffcbd0d061a79b3381e1bacb8a0",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which period-effective contract terms govern the charge and change authority?",
           "primaryHypothesis": {
             "hypothesis": "The period-effective agreement may contain the missing control and pricing terms.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -1521,6 +1490,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 2,
           "competingHypothesisRequired": true
         },
         {
@@ -1536,6 +1506,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -1549,6 +1520,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -1565,6 +1537,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -1581,6 +1554,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": false
         }
       ],
@@ -1630,7 +1604,7 @@
           "providerNetworkCalls": 0,
           "inputBytes": 19142,
           "inputTokens": 4786,
-          "outputTokens": 3331,
+          "outputTokens": 3147,
           "estimatedCostUsdMicros": 0,
           "latencyMs": 0,
           "retries": 0,
@@ -1726,17 +1700,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-2195e8f73ae240f9353a60f077d654a2",
           "inputHash": "1959eee5de9de33ceed75f49a92b03e771321c2d3c9a34f79123c04147627bd0",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What evidence can separate the bundled charge into supported economic roles?",
           "primaryHypothesis": {
             "hypothesis": "The charge may combine more than one service role that the accepted statement facts do not separate.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -1754,7 +1725,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -1800,18 +1771,12 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-11b6ed3213fc42873682d65641a6bf6f",
           "inputHash": "07335ccb0e1e4ace3006df6fda596659dcb2bfc82c39f89fbdcda3380f7c860c",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Was any accepted processing cost offset by a merchant-operated program during the period?",
           "primaryHypothesis": {
             "hypothesis": "The statement alone may be insufficient to determine whether a separate merchant program offset any processing cost.",
-            "confidence": "MEDIUM",
-            "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
-            ],
+            "confidence": "LOW",
+            "supportingFactRefs": [],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
               "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -1827,9 +1792,7 @@
             {
               "hypothesis": "No separate offset program may have operated during the period, but statement silence does not establish that state.",
               "confidence": "LOW",
-              "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
-              ],
+              "supportingFactRefs": [],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
                 "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -1874,17 +1837,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-879d506d9cec0ce764460760d951237c",
           "inputHash": "d2f036f3a3888b13d59c886fb4fd844e6a7c27c890526a368d0a6ad83c8d1e44",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which participant held the relevant rule-setting and merchant-facing price-control roles for this charge?",
           "primaryHypothesis": {
             "hypothesis": "The collecting participant may differ from the rule setter or merchant-facing price controller.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -1902,7 +1862,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -1948,17 +1908,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-1c830fdad90275d2bd1b2508143d4322",
           "inputHash": "5825917b36ed1f21b6b6299335151f3e2682c490d2a0410a05fefbfc13d1e65b",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which period-effective contract terms govern the charge and change authority?",
           "primaryHypothesis": {
             "hypothesis": "The period-effective agreement may contain the missing control and pricing terms.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -2083,6 +2040,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 2,
           "competingHypothesisRequired": true
         },
         {
@@ -2096,6 +2054,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -2112,6 +2071,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -2128,6 +2088,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": false
         }
       ],
@@ -2178,7 +2139,7 @@
           "providerNetworkCalls": 0,
           "inputBytes": 21117,
           "inputTokens": 5280,
-          "outputTokens": 2606,
+          "outputTokens": 2469,
           "estimatedCostUsdMicros": 0,
           "latencyMs": 0,
           "retries": 0,
@@ -2274,18 +2235,12 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-616cde97a3ed70d188756a18b72343c9",
           "inputHash": "fd81571fa0921bde0e49afc051c78dcec13594e9c101fdbaae301ac0c26f6af2",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Was any accepted processing cost offset by a merchant-operated program during the period?",
           "primaryHypothesis": {
             "hypothesis": "The statement alone may be insufficient to determine whether a separate merchant program offset any processing cost.",
-            "confidence": "MEDIUM",
-            "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
-            ],
+            "confidence": "LOW",
+            "supportingFactRefs": [],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
               "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -2301,9 +2256,7 @@
             {
               "hypothesis": "No separate offset program may have operated during the period, but statement silence does not establish that state.",
               "confidence": "LOW",
-              "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
-              ],
+              "supportingFactRefs": [],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
                 "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -2348,17 +2301,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-9bbdd8c66d9854b9fe93fc6c74019b03",
           "inputHash": "15c2afe2adc01cfdc83c3d211273c2f63fb4c35079da44147af6792101cfeb0e",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which participant held the relevant rule-setting and merchant-facing price-control roles for this charge?",
           "primaryHypothesis": {
             "hypothesis": "The collecting participant may differ from the rule setter or merchant-facing price controller.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -2376,7 +2326,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -2422,17 +2372,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-9853d6ba562afbece26ddcef23925404",
           "inputHash": "8671e881310f4d0ae0817e3bc90b539d0ae7765077d9b04691819f367e9bcbc7",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which period-effective contract terms govern the charge and change authority?",
           "primaryHypothesis": {
             "hypothesis": "The period-effective agreement may contain the missing control and pricing terms.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -2556,6 +2503,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 2,
           "competingHypothesisRequired": true
         },
         {
@@ -2575,6 +2523,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -2592,6 +2541,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -2605,6 +2555,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -2627,6 +2578,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -2649,6 +2601,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": false
         }
       ],
@@ -2697,7 +2650,7 @@
           "providerNetworkCalls": 0,
           "inputBytes": 39402,
           "inputTokens": 9851,
-          "outputTokens": 4034,
+          "outputTokens": 3804,
           "estimatedCostUsdMicros": 0,
           "latencyMs": 0,
           "retries": 0,
@@ -2793,17 +2746,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-dba4d926824d27d958f20c0b6ba092ce",
           "inputHash": "95eb0c6ef5b1ff4cd2bb4bead822af40049b7a8e60af45a3cb1ba9bf53f2d5c0",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What period-matched operational condition accounts for the accepted qualification or integrity condition?",
           "primaryHypothesis": {
             "hypothesis": "A period-specific operational condition may account for the accepted qualification or integrity condition.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -2821,7 +2771,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -2867,17 +2817,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-ba382749bcd10806ea0f650c056d582a",
           "inputHash": "96ace46ce01eada93cc01f1ddf6fc4be6742f9a903aaa7380fb7a3e21aa942db",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What evidence can separate the bundled charge into supported economic roles?",
           "primaryHypothesis": {
             "hypothesis": "The charge may combine more than one service role that the accepted statement facts do not separate.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -2895,7 +2842,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -2941,18 +2888,12 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-f6d6aebabde2b498b9aad02b8c76ea21",
           "inputHash": "be997e3acf4e95d99577575130b2cff4c93bd1961e12fc8b582e093953c4492e",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Was any accepted processing cost offset by a merchant-operated program during the period?",
           "primaryHypothesis": {
             "hypothesis": "The statement alone may be insufficient to determine whether a separate merchant program offset any processing cost.",
-            "confidence": "MEDIUM",
-            "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
-            ],
+            "confidence": "LOW",
+            "supportingFactRefs": [],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
               "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -2968,9 +2909,7 @@
             {
               "hypothesis": "No separate offset program may have operated during the period, but statement silence does not establish that state.",
               "confidence": "LOW",
-              "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
-              ],
+              "supportingFactRefs": [],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
                 "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -3015,17 +2954,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-44cc980d422d3eb7c44755d06350631b",
           "inputHash": "32f5e414cf67fe4a45fdc1be00402d0bb453a4c3bbf905b9d29e27447609051d",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which participant held the relevant rule-setting and merchant-facing price-control roles for this charge?",
           "primaryHypothesis": {
             "hypothesis": "The collecting participant may differ from the rule setter or merchant-facing price controller.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -3043,7 +2979,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -3089,17 +3025,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-c3f3fd4c6cd7221779f913c0b9f5cb5a",
           "inputHash": "908a6c256af5b01dedd0dd9848d7eac63f91e0a80665dd96e824e0b3cfa968de",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which period-effective contract terms govern the charge and change authority?",
           "primaryHypothesis": {
             "hypothesis": "The period-effective agreement may contain the missing control and pricing terms.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -3225,6 +3158,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 2,
           "competingHypothesisRequired": true
         },
         {
@@ -3247,6 +3181,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -3265,6 +3200,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -3278,6 +3214,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -3299,6 +3236,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -3320,6 +3258,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": false
         }
       ],
@@ -3368,7 +3307,7 @@
           "providerNetworkCalls": 0,
           "inputBytes": 40325,
           "inputTokens": 10082,
-          "outputTokens": 4022,
+          "outputTokens": 3792,
           "estimatedCostUsdMicros": 0,
           "latencyMs": 0,
           "retries": 0,
@@ -3464,17 +3403,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-ac2fcc6aa8f8a3f89a0152db5d4cf708",
           "inputHash": "00a19875b574f5954a96774cb03a0deb001c0a8e04a53083013dead5afc3ac96",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What period-matched operational condition accounts for the accepted qualification or integrity condition?",
           "primaryHypothesis": {
             "hypothesis": "A period-specific operational condition may account for the accepted qualification or integrity condition.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -3492,7 +3428,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -3538,17 +3474,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-61b13e189fa565bd44b4d8cf4aa44909",
           "inputHash": "51c3f17191b7795018d68c2bc777b53344f30597b82a63473948a07a94581f17",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What evidence can separate the bundled charge into supported economic roles?",
           "primaryHypothesis": {
             "hypothesis": "The charge may combine more than one service role that the accepted statement facts do not separate.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -3566,7 +3499,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -3612,18 +3545,12 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-b4df4d28d0942d10353d7db142bcffc9",
           "inputHash": "f19e54b2498ecbf534518ff3b31e95c2c1cf971f430c3c38aa3d59ed14ce6ac1",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Was any accepted processing cost offset by a merchant-operated program during the period?",
           "primaryHypothesis": {
             "hypothesis": "The statement alone may be insufficient to determine whether a separate merchant program offset any processing cost.",
-            "confidence": "MEDIUM",
-            "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
-            ],
+            "confidence": "LOW",
+            "supportingFactRefs": [],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
               "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -3639,9 +3566,7 @@
             {
               "hypothesis": "No separate offset program may have operated during the period, but statement silence does not establish that state.",
               "confidence": "LOW",
-              "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
-              ],
+              "supportingFactRefs": [],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
                 "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -3686,17 +3611,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-53233512b2fd2714aaff52fc45b528ed",
           "inputHash": "5377bf3875f8d39f2a49d18e161481321fd71b62c987c3fb6820359ecfc83bbc",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which participant held the relevant rule-setting and merchant-facing price-control roles for this charge?",
           "primaryHypothesis": {
             "hypothesis": "The collecting participant may differ from the rule setter or merchant-facing price controller.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -3714,7 +3636,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -3760,17 +3682,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-94ff57c92712040f22a68ee888699979",
           "inputHash": "f9e87072d12ba756c93375882eb0a0b109ee741a28e4d7694b2812d21466cea1",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which period-effective contract terms govern the charge and change authority?",
           "primaryHypothesis": {
             "hypothesis": "The period-effective agreement may contain the missing control and pricing terms.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -3896,6 +3815,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 2,
           "competingHypothesisRequired": true
         },
         {
@@ -3914,6 +3834,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -3927,6 +3848,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -3945,6 +3867,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -3963,6 +3886,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": false
         }
       ],
@@ -4012,7 +3936,7 @@
           "providerNetworkCalls": 0,
           "inputBytes": 23114,
           "inputTokens": 5779,
-          "outputTokens": 3310,
+          "outputTokens": 3126,
           "estimatedCostUsdMicros": 0,
           "latencyMs": 0,
           "retries": 0,
@@ -4108,17 +4032,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-f543b0c25d9332f4b063d9cbc25f6221",
           "inputHash": "ff12eed7ec1eec0dd4d8768110a1690a5348518fa72d6dfaf2ec8d0dca0a9d06",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What evidence can separate the bundled charge into supported economic roles?",
           "primaryHypothesis": {
             "hypothesis": "The charge may combine more than one service role that the accepted statement facts do not separate.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -4136,7 +4057,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -4182,18 +4103,12 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-eff31f1a1cbd5e56a6c585674c360eea",
           "inputHash": "d9fda75899c84958f8311e283d62f2209a04b17db2e42a0edb504d3e1be22339",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Was any accepted processing cost offset by a merchant-operated program during the period?",
           "primaryHypothesis": {
             "hypothesis": "The statement alone may be insufficient to determine whether a separate merchant program offset any processing cost.",
-            "confidence": "MEDIUM",
-            "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
-            ],
+            "confidence": "LOW",
+            "supportingFactRefs": [],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
               "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -4209,9 +4124,7 @@
             {
               "hypothesis": "No separate offset program may have operated during the period, but statement silence does not establish that state.",
               "confidence": "LOW",
-              "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
-              ],
+              "supportingFactRefs": [],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
                 "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -4256,17 +4169,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-2b657ece4b1c21f8031a7375206c01d1",
           "inputHash": "c4ba9b309b09b53dce8fac6b3c2fff850fc05a4758dc1a3ffd6b19ca566373be",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which participant held the relevant rule-setting and merchant-facing price-control roles for this charge?",
           "primaryHypothesis": {
             "hypothesis": "The collecting participant may differ from the rule setter or merchant-facing price controller.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -4284,7 +4194,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -4330,17 +4240,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-5a8ef0f02c7504c5408842b145750872",
           "inputHash": "59902271860af925058aa4960ed6156dd054ce00ca8c5772e02b042c099221da",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which period-effective contract terms govern the charge and change authority?",
           "primaryHypothesis": {
             "hypothesis": "The period-effective agreement may contain the missing control and pricing terms.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -4465,6 +4372,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 2,
           "competingHypothesisRequired": true
         },
         {
@@ -4481,6 +4389,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -4497,6 +4406,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -4510,6 +4420,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -4526,6 +4437,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -4542,6 +4454,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": false
         }
       ],
@@ -4590,7 +4503,7 @@
           "providerNetworkCalls": 0,
           "inputBytes": 27926,
           "inputTokens": 6982,
-          "outputTokens": 4028,
+          "outputTokens": 3797,
           "estimatedCostUsdMicros": 0,
           "latencyMs": 0,
           "retries": 0,
@@ -4686,17 +4599,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-582ade3397d6abcc902bd58eff9a9431",
           "inputHash": "7994a4b7da73d0d5cde7db6dcfba7884f2845b0afb14f6933435bbe071dc11d4",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What period-matched operational condition accounts for the accepted qualification or integrity condition?",
           "primaryHypothesis": {
             "hypothesis": "A period-specific operational condition may account for the accepted qualification or integrity condition.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -4714,7 +4624,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -4760,17 +4670,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-5e962715cd9d18ae676c6a067420e2a7",
           "inputHash": "126ee351cf7d1cce6f7359cf6567a36570789b1667270602be1830e17ac37c95",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What evidence can separate the bundled charge into supported economic roles?",
           "primaryHypothesis": {
             "hypothesis": "The charge may combine more than one service role that the accepted statement facts do not separate.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -4788,7 +4695,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -4834,18 +4741,12 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-b82e5d1abc503ee0a2c4bf489d43072d",
           "inputHash": "6e1117b64788edb6dd617b2b8aabd5ca04987c458784886c6031b277a9418ad2",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Was any accepted processing cost offset by a merchant-operated program during the period?",
           "primaryHypothesis": {
             "hypothesis": "The statement alone may be insufficient to determine whether a separate merchant program offset any processing cost.",
-            "confidence": "MEDIUM",
-            "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
-            ],
+            "confidence": "LOW",
+            "supportingFactRefs": [],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
               "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -4861,9 +4762,7 @@
             {
               "hypothesis": "No separate offset program may have operated during the period, but statement silence does not establish that state.",
               "confidence": "LOW",
-              "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
-              ],
+              "supportingFactRefs": [],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
                 "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -4908,17 +4807,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-c100908c6bc7ff1cf72eb522dc6577b5",
           "inputHash": "954200ed480a77ef2f1f48b992afe8f3293c9da8fb1407f484c3878b4c8b6564",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which participant held the relevant rule-setting and merchant-facing price-control roles for this charge?",
           "primaryHypothesis": {
             "hypothesis": "The collecting participant may differ from the rule setter or merchant-facing price controller.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -4936,7 +4832,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -4982,17 +4878,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-c717a29393a65bff048737181547442d",
           "inputHash": "4b1d591d7a335bd265e14279d79940b24b6839fa3493333da9dedafae1c54998",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which period-effective contract terms govern the charge and change authority?",
           "primaryHypothesis": {
             "hypothesis": "The period-effective agreement may contain the missing control and pricing terms.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -5118,6 +5011,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 2,
           "competingHypothesisRequired": true
         },
         {
@@ -5131,6 +5025,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -5146,6 +5041,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -5161,6 +5057,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": false
         }
       ],
@@ -5211,7 +5108,7 @@
           "providerNetworkCalls": 0,
           "inputBytes": 13070,
           "inputTokens": 3268,
-          "outputTokens": 2601,
+          "outputTokens": 2463,
           "estimatedCostUsdMicros": 0,
           "latencyMs": 0,
           "retries": 0,
@@ -5307,18 +5204,12 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-c201a26f049b08038ce40fecb5b3acb8",
           "inputHash": "9567a3d5fe0b50cf5c396ddc02fc37d8d5a072efdac0d6bf4e8d34db8da16d7a",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Was any accepted processing cost offset by a merchant-operated program during the period?",
           "primaryHypothesis": {
             "hypothesis": "The statement alone may be insufficient to determine whether a separate merchant program offset any processing cost.",
-            "confidence": "MEDIUM",
-            "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
-            ],
+            "confidence": "LOW",
+            "supportingFactRefs": [],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
               "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -5334,9 +5225,7 @@
             {
               "hypothesis": "No separate offset program may have operated during the period, but statement silence does not establish that state.",
               "confidence": "LOW",
-              "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
-              ],
+              "supportingFactRefs": [],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
                 "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -5381,17 +5270,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-110038dc7b74b15e04a2fe76c20acb63",
           "inputHash": "82d2e6acb74d6d0e2b1f7a44143a7fff397702763d9797ce34076ed5ad8fe621",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which participant held the relevant rule-setting and merchant-facing price-control roles for this charge?",
           "primaryHypothesis": {
             "hypothesis": "The collecting participant may differ from the rule setter or merchant-facing price controller.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -5409,7 +5295,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -5455,17 +5341,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-722859b668d6838f0496e1ca45a32019",
           "inputHash": "dc290547d75ded46e47263a2bf9641782e7f63630d356ec9072e4cf36f4b92af",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which period-effective contract terms govern the charge and change authority?",
           "primaryHypothesis": {
             "hypothesis": "The period-effective agreement may contain the missing control and pricing terms.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -5589,6 +5472,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 2,
           "competingHypothesisRequired": true
         },
         {
@@ -5609,6 +5493,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -5629,6 +5514,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -5642,6 +5528,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -5662,6 +5549,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -5682,6 +5570,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": false
         }
       ],
@@ -5730,7 +5619,7 @@
           "providerNetworkCalls": 0,
           "inputBytes": 30311,
           "inputTokens": 7578,
-          "outputTokens": 4026,
+          "outputTokens": 3795,
           "estimatedCostUsdMicros": 0,
           "latencyMs": 0,
           "retries": 0,
@@ -5826,17 +5715,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-4f3d160e895ca2ef8944952e0d66ff3b",
           "inputHash": "ad6664c921bd99a1681702bab796054e11904ba4e12d66a52a47c8e6a8dd0e09",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What period-matched operational condition accounts for the accepted qualification or integrity condition?",
           "primaryHypothesis": {
             "hypothesis": "A period-specific operational condition may account for the accepted qualification or integrity condition.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -5854,7 +5740,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -5900,17 +5786,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-51c9c289086b02449c2ddb2f227c0a18",
           "inputHash": "6dba566494177163c95b57ba749799634263b2bfe75489888f8e3acd06d6153f",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What evidence can separate the bundled charge into supported economic roles?",
           "primaryHypothesis": {
             "hypothesis": "The charge may combine more than one service role that the accepted statement facts do not separate.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -5928,7 +5811,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -5974,18 +5857,12 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-b2f78452a5de0b8172d5343e386eba3f",
           "inputHash": "b7428be69dc8fbf63e318c861cf6acdfdbf78aa34de3628b125fb3842f147fc6",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Was any accepted processing cost offset by a merchant-operated program during the period?",
           "primaryHypothesis": {
             "hypothesis": "The statement alone may be insufficient to determine whether a separate merchant program offset any processing cost.",
-            "confidence": "MEDIUM",
-            "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
-            ],
+            "confidence": "LOW",
+            "supportingFactRefs": [],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
               "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -6001,9 +5878,7 @@
             {
               "hypothesis": "No separate offset program may have operated during the period, but statement silence does not establish that state.",
               "confidence": "LOW",
-              "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
-              ],
+              "supportingFactRefs": [],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
                 "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -6048,17 +5923,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-8af62e68117502e894a7cddfe82d6804",
           "inputHash": "1c94863c8e932ee1d8ee7cabdce8e280d7deb27c667f6662a9e558491696d3c4",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which participant held the relevant rule-setting and merchant-facing price-control roles for this charge?",
           "primaryHypothesis": {
             "hypothesis": "The collecting participant may differ from the rule setter or merchant-facing price controller.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -6076,7 +5948,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -6122,17 +5994,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-465655942b67f31410c56584e86d0b5d",
           "inputHash": "4e93515f5ce724b4e716deb5c57ff5b30bdef281eb3a9bcb2b0504bc7e09506c",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which period-effective contract terms govern the charge and change authority?",
           "primaryHypothesis": {
             "hypothesis": "The period-effective agreement may contain the missing control and pricing terms.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -6258,6 +6127,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 2,
           "competingHypothesisRequired": true
         },
         {
@@ -6274,6 +6144,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -6289,6 +6160,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -6302,6 +6174,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d2"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -6325,6 +6198,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": true
         },
         {
@@ -6348,6 +6222,7 @@
             "accepted_unresolved_state",
             "existing_materiality_policy_d1"
           ],
+          "issueSupportingFactCount": 0,
           "competingHypothesisRequired": false
         }
       ],
@@ -6396,7 +6271,7 @@
           "providerNetworkCalls": 0,
           "inputBytes": 39265,
           "inputTokens": 9817,
-          "outputTokens": 4031,
+          "outputTokens": 3815,
           "estimatedCostUsdMicros": 0,
           "latencyMs": 0,
           "retries": 0,
@@ -6492,17 +6367,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-eacd33c1e8e92f3301bf9a3227d6ee5e",
           "inputHash": "196718e5ea31af3161eff00ebbf2d11525328849447a68bf3e3eef761b0095c1",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What period-matched operational condition accounts for the accepted qualification or integrity condition?",
           "primaryHypothesis": {
             "hypothesis": "A period-specific operational condition may account for the accepted qualification or integrity condition.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "OWD-01",
+              "OWD-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -6520,7 +6392,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "OWD-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -6566,17 +6438,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-fa7110f6579944360a675687b30f0ebf",
           "inputHash": "36fdefbf0e80fe7dc0f6443d205691a92e0b0c01e9b80335644e776ef7ec384b",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "What evidence can separate the bundled charge into supported economic roles?",
           "primaryHypothesis": {
             "hypothesis": "The charge may combine more than one service role that the accepted statement facts do not separate.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "MC-FOCUSED-01",
+              "MC-FOCUSED-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -6594,7 +6463,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "MC-FOCUSED-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -6640,18 +6509,12 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-1190646ce45ae88e8e57e288ebf6375e",
           "inputHash": "be4d1e4dee10727a3ac5e495ab90275af55c803fcbb513ed3b2a2ede1bc8f43d",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Was any accepted processing cost offset by a merchant-operated program during the period?",
           "primaryHypothesis": {
             "hypothesis": "The statement alone may be insufficient to determine whether a separate merchant program offset any processing cost.",
-            "confidence": "MEDIUM",
-            "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
-            ],
+            "confidence": "LOW",
+            "supportingFactRefs": [],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
               "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -6667,9 +6530,7 @@
             {
               "hypothesis": "No separate offset program may have operated during the period, but statement silence does not establish that state.",
               "confidence": "LOW",
-              "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
-              ],
+              "supportingFactRefs": [],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
                 "Accepted evidence does not establish merchant program use or cost-offset revenue."
@@ -6714,17 +6575,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-338ce5d9487f1f428053709c80ab811b",
           "inputHash": "056e7fe377cc2cb1977d078d44c431b4060448f66a972e887db3e25c4c0c9fc4",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which participant held the relevant rule-setting and merchant-facing price-control roles for this charge?",
           "primaryHypothesis": {
             "hypothesis": "The collecting participant may differ from the rule setter or merchant-facing price controller.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "MC-FOCUSED-01",
+              "MC-FOCUSED-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
@@ -6742,7 +6600,7 @@
               "hypothesis": "The unresolved state may reflect a documentation or population-definition gap rather than the proposed operational explanation.",
               "confidence": "LOW",
               "supportingFactRefs": [
-                "fact_v2_canonical_net_submitted_card_volume"
+                "MC-FOCUSED-01"
               ],
               "contradictingFactRefs": [],
               "acknowledgedEvidenceGaps": [
@@ -6788,17 +6646,14 @@
           "customerRenderingAllowed": false,
           "issueId": "shadow-issue-e33ddde52a71cccc8ae0dbf4d4431e19",
           "inputHash": "674dbf8432b030c1170777d46eaaf6416bed76773c7bbca9ba083a10d269956b",
-          "exactCitedFactRefs": [
-            "fact_v2_canonical_net_submitted_card_volume",
-            "fact_v2_submitted_transaction_count"
-          ],
+          "exactCitedFactRefs": [],
           "unresolvedQuestion": "Which period-effective contract terms govern the charge and change authority?",
           "primaryHypothesis": {
             "hypothesis": "The period-effective agreement may contain the missing control and pricing terms.",
             "confidence": "MEDIUM",
             "supportingFactRefs": [
-              "fact_v2_canonical_net_submitted_card_volume",
-              "fact_v2_submitted_transaction_count"
+              "MC-FOCUSED-01",
+              "MC-FOCUSED-02"
             ],
             "contradictingFactRefs": [],
             "acknowledgedEvidenceGaps": [
